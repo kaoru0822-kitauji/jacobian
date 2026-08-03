@@ -20,10 +20,8 @@ as:
 | Checker registry and authorization | [#5](https://github.com/morluto/jacobian/issues/5) |
 | Witness and certificate verification | [#6](https://github.com/morluto/jacobian/issues/6) |
 
-Their descriptions reflect the repository state when filed. The current
-normative behavior is defined by the
-[v0.2 specification](../reference/specifications/v0.2.md) and
-[v0.2 conformance suite](../reference/conformance-v0.2.md).
+Their descriptions reflect the repository state when filed. Current reference
+documents and the installed catalog define the supported behavior.
 
 ## Current implementation
 

@@ -97,7 +97,6 @@ The registry measures all regular source files in the package, not just the
 selected entrypoint file. A symlink anywhere in that measured package invalidates
 resolution.
 
-## Related decisions
+## Related references
 
-- [Sealed package ADR](../explanation/adr/0002-sealed-plugin-packages.md)
 - [Testing strategy](testing-strategy.md)

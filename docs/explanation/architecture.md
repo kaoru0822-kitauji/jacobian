@@ -3,9 +3,6 @@
 [Documentation home](../index.md)
 
 - Status: Current architecture
-- Historical normative context:
-  [v0.2 specification](../reference/specifications/v0.2.md) and
-  [conformance gate](../reference/conformance-v0.2.md)
 
 ## Purpose
 
@@ -207,8 +204,10 @@ Only completed invocations are eligible for research memory recording.
 A registered capability should expose one observable mathematical operation.
 Broad tasks are workflows over multiple capability invocations owned by the
 agent, not by the runtime. A capability may coordinate several backend calls
-when they implement that one operation, but material intermediate artifacts
-and verification obligations remain visible.
+when they implement that one operation. Useful intermediate values and
+verification obligations remain visible; artifacts are materialized only when
+durable identity, independent retrieval, replay, resumability, evidence
+binding, or size-separated transport requires them.
 
 ### Domain operation library
 
@@ -223,10 +222,13 @@ single built-in composition module holds the ordered tuple of factories.
 incomplete result and carries a typed scope projection plus the basis for
 unknown completeness. Both use Pydantic request and result models.
 `OperationInstaller` projects either operation into the existing
-`CapabilityAdapter` protocol, registers schemas and semantics, materializes
-input and result artifacts with lineage, and caps producer assurance at
-`COMPUTED`. Domain functions therefore depend on mathematical libraries and
-contracts, not stores, protocol envelopes, or checker authorization.
+`CapabilityAdapter` protocol, registers schemas and semantics, and caps producer
+assurance at `COMPUTED`. Ordinary computed values remain inline. Explicit
+materializers and evidence-producing capabilities create artifacts with
+lineage; bounded searches retain durable state only where their resumability or
+evidence contract requires it. Domain functions therefore depend on
+mathematical libraries and contracts, not stores, protocol envelopes, or
+checker authorization.
 
 The runtime builds and installs a typed, fixed `PortfolioPlan` through
 `PortfolioAssembler`. Bundles declare earlier domain dependencies explicitly;
@@ -521,24 +523,27 @@ surface is deliberately small:
 - `capability.invoke` performs the selected bounded operation.
 - `capability://catalog` exposes installed capability descriptors.
 - Resources expose large artifacts, traces, and experiment state.
-- Tool responses contain only compact structured summaries and resource URIs.
+- Tool responses return typed mathematical values in MCP structured content;
+  durable or large objects are exposed as resource URIs.
 - Long-running searches return an experiment handle.
 - Scope and archive artifacts are immutable; the experiment snapshot is a
   durable lifecycle record.
 
-The released MCP Python SDK `2.0.0` owns validation for statically declared
-tool arguments. Jacobian retains descriptor-selected validation for the
-dynamic `capability.invoke` payload, because the selected mathematical schema
-is not known when the MCP tool is registered. User-correctable application
-failures are projected as `CallToolResult(is_error=True)`; protocol-state
-failures remain MCP errors. Successful capability calls keep the canonical
-`CapabilityResult` in `structured_content` and a compact text projection.
+The MCP Python SDK `2.0.0` owns statically declared tool schemas, typed result
+serialization and validation, structured content, progress, and transport
+cancellation. Jacobian retains descriptor-selected validation for the dynamic
+`capability.invoke` payload because the selected mathematical schema is not
+known when the MCP tool is registered. Ordinary responses return the Pydantic
+`CapabilityResult` directly so the SDK produces synchronized model-visible
+`content` and application-facing `structured_content`. An explicit
+`CallToolResult` is reserved for responses that genuinely require MCP content
+blocks such as a `ResourceLink`, custom metadata, or a deliberate text
+projection.
 
-When a result has a durable episode URI, the adapter additionally emits an
-MCP `ResourceLink` with the result's JSON media type and known size. The link
-is additive: clients that ignore it still receive the text and structured
-result, and tenant/resource authorization follows the direct resource-read
-path.
+When a result needs durable retrieval, its typed result includes the canonical
+artifact URI and the adapter may additionally emit an MCP `ResourceLink` with
+the resource's JSON media type and known size. Tenant and resource
+authorization follow the direct resource-read path.
 
 The Python SDK advertises these stable tools and static resources through the
 `io.jacobian/core` v1 extension. They remain ordinary MCP tools and resources:

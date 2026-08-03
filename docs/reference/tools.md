@@ -3,9 +3,7 @@
 [Documentation home](../index.md)
 
 - Status: Current pre-stable MCP surface
-- Frozen baseline: [v0.2 specification](specifications/v0.2.md) and
-  [conformance gate](conformance-v0.2.md); installed later-release membership
-  remains runtime-defined
+- Installed membership remains runtime-defined
 
 Jacobian exposes mathematical operations as namespaced capabilities. The
 model-facing MCP surface contains two tools:
@@ -46,8 +44,8 @@ fail-closed registration, and repeatable local measurement.
 
 Backend-call atomicity is not required. An adapter may coordinate several
 backend calls when they jointly implement one coherent operation, but it must
-not hide mathematically useful intermediate artifacts, failures, relationships,
-or obligations.
+not hide mathematically useful intermediate values or artifacts, failures,
+relationships, or obligations.
 
 `EXPLORE` returns proposed, heuristic, or computed evidence. `VERIFY` may
 return `VERIFIED` only when an operator-authorized independent checker accepts
@@ -145,21 +143,18 @@ searching for a checker. Follow the checker, certificate, and verification
 fields in the producer result rather than guessing that a generic verifier
 accepts its artifact.
 
-`capability.invoke` accepts an optional result `view`. The default `STANDARD`
-keeps the complete canonical `CapabilityResult` in MCP structured content.
-Small operation outputs also remain complete in model-visible text. When a
-completed output is large, the text view retains structurally small fields and
-replaces omitted fields with JSON paths, types, byte counts, and SHA-256
-digests; `full_result_episode_uri` points to the durable complete result.
-`SUMMARY` explicitly omits operation output from text. `FULL` places the
-complete result in text as well as structured content.
+`capability.invoke` returns the Pydantic `CapabilityResult`. MCP Python SDK 2.0
+derives its output schema, validates the returned value, serializes
+model-visible `content`, and supplies the same typed value in
+`structured_content`. Small, bounded mathematical outputs remain inline in the
+result. An empty `artifact_uris` with `episode_uri: null` means the value was not
+retained.
 
-Each non-`FULL` text response includes `mcp_projection`, and each MCP result
-includes transport metadata, with logical canonical bytes, model-visible text
-bytes, output completeness, full-result digest, and episode URI. Evaluation
-telemetry records logical, model-visible, and serialized wire bytes separately;
-the three measures answer different questions and must not be substituted for
-one another.
+Capabilities return resource URIs only when their mathematical outcome needs
+durable identity, independent retrieval, replay, resumability, evidence
+binding, or size-separated transport. An adapter uses an explicit
+`CallToolResult` only when it must add an MCP content block such as
+`ResourceLink`, custom metadata, or a deliberate text projection.
 
 Published invocation examples are validated against the descriptor schema when
 the capability is installed. Domain-owned examples may additionally be
@@ -231,7 +226,7 @@ Opaque multi-stage commands are not part of the public surface. Agents should
 compose generation, evaluation, ranking, falsification,
 refinement, and verification from separately invocable capabilities. An
 optional workflow capability is appropriate only when it has one coherent
-mathematical outcome and preserves visible intermediate artifacts and
+mathematical outcome and preserves visible intermediate values, artifacts, and
 assurance boundaries.
 
 ## Adapters and trust boundaries

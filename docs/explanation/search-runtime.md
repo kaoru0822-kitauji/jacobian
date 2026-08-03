@@ -136,8 +136,7 @@ sandbox. Workers inherit the coordinator's network and filesystem boundary.
 Run Jacobian under an OS or container policy when operator-installed code needs
 stronger isolation.
 
-## Related decisions
+## Related references
 
-- [Durable invocation ADR](adr/0003-durable-search-invocations.md)
 - [Plugin conformance kit](../reference/plugin-conformance.md)
 - [Testing strategy](../reference/testing-strategy.md)

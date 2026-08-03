@@ -9,7 +9,7 @@
 Built-in mathematical producers are grouped into explicit, domain-owned
 bundles. The library removes repeated adapter plumbing while preserving the
 public capability contract: each operation still has one typed mathematical
-outcome, material artifacts and relationships, declared scope and
+outcome, optional durable artifacts and relationships, declared scope and
 completeness, provider provenance, and visible proof obligations.
 
 This document describes the shared installation contract. It is not a static
@@ -57,11 +57,13 @@ deterministic finite implementation. Its implementation returns exactly one of:
 | `ComputedNotApplicable` | A valid request outside the mathematical domain |
 | `OperationExecutionFailure` | `ERROR`, `TIMEOUT`, or `CANCELLED`, with no mathematical conclusion |
 
-The installer validates the complete request model before computation or
-artifact writes. On success it validates the returned result again,
-materializes input and result artifacts, records their lineage and relation,
-and returns `COMPLETE · COMPUTED`. Neither exact arithmetic nor deterministic
-execution grants `VERIFIED`.
+The installer validates the complete request model before computation. On
+success it validates the returned result again and returns it inline as
+`COMPLETE · COMPUTED`, without generic input or result artifacts and without an
+episode. Neither exact arithmetic nor deterministic execution grants
+`VERIFIED`. A reusable mathematical object or evidence-bearing result belongs
+in an explicitly artifact-producing capability, not behind a persistence flag
+on an ordinary computation.
 
 ### Static type contract
 
@@ -86,7 +88,7 @@ this contract and is not supported.
 This static precision does not replace runtime validation. The installer still
 validates untrusted input with the declared Pydantic request model before it
 calls domain code, then validates returned result and obligation values before
-materializing artifacts.
+returning them or performing any explicit artifact writes.
 
 ## Native Python relationship
 
@@ -99,8 +101,9 @@ directly. They do not construct the capability runtime or route through
 When a native function corresponds to a capability, both paths share the same
 domain-owned mathematical kernel. Explicit adapters translate between native
 values and the existing Pydantic request and result contracts. This keeps one
-mathematical implementation while preserving capability schemas, artifact
-lineage, completeness, provenance, and verification behavior. Generic
+mathematical implementation while preserving capability schemas, completeness,
+provenance, verification behavior, and artifact lineage when artifacts are
+part of the outcome. Generic
 reflection, automatic model generation, and universal value conversion are
 outside this library's contract.
 
@@ -127,21 +130,22 @@ The adapter rejects an implementation whose outcome variant contradicts its
 completion predicate. Timeouts, cancellations, errors, resource exhaustion,
 and failure to find a witness remain non-conclusions.
 
-## Artifacts and assurance
+## Values, artifacts, and assurance
 
 `OperationInstaller` owns the generic mechanics:
 
 1. register the bundle semantics and request, result, and obligation schemas;
 2. validate the full request before invoking domain code;
 3. validate the returned result and obligation;
-4. materialize content-addressed artifacts with explicit parents;
+4. return ordinary computed results inline, or delegate explicit durable
+   outcomes to their artifact-producing capability;
 5. project relationships, scope, completeness, diagnostics, and provenance
    into `CapabilityResult`; and
 6. cap producer assurance at `COMPUTED`, or `HEURISTIC` after interruption.
 
 Domain implementations therefore depend on mathematical contracts and
-maintained libraries, not artifact stores, capability envelopes, or checker
-authorization.
+maintained libraries, not artifact stores, capability envelopes, persistence
+flags, or checker authorization.
 
 ## Independent exact replay
 

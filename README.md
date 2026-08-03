@@ -155,8 +155,8 @@ Jacobian keeps four responsibilities separate:
   prescribed research workflow.
 - **Capabilities expose one coherent outcome.** Useful intermediate objects,
   failures, and proof obligations remain visible.
-- **Artifacts carry context.** Results report execution status, provenance,
-  scope, completeness, exactness, assurance, and available certificates.
+- **Values compose directly.** Small, bounded mathematical results stay inline;
+  artifacts carry reusable objects, replayable evidence, and large payloads.
 - **Checkers own trust.** Plugins and search code cannot authorize a checker or
   change verification policy.
 
@@ -174,7 +174,6 @@ capability entry points, `capability.describe` and `capability.invoke`.
 | [Tool surface](docs/reference/tools.md) | MCP resources, tools, and invocation contracts |
 | [Domain operation library](docs/reference/domain-operation-library.md) | Built-in producer, bounded-search, artifact, and exact-replay contracts |
 | [Provider runtime](docs/reference/provider-runtime.md) | Backend availability, compatibility, and identity |
-| [v0.2 specification](docs/reference/specifications/v0.2.md) | Last frozen release snapshot and conformance baseline |
 | [Testing strategy](docs/reference/testing-strategy.md) | Validation layers, commands, and CI responsibilities |
 
 Specialized contracts cover
@@ -189,8 +188,6 @@ demonstrates discovery, computed invocation, bounded-result interpretation,
 and exact replay. The
 [Lean formal-intermediates reference](docs/reference/lean-formal-intermediates.md)
 covers proof states, premise retrieval, dependency graphs, and checked edits.
-Architecture decisions are recorded in the
-[ADR index](docs/explanation/adr/index.md).
 
 ## MCP clients and deployment
 

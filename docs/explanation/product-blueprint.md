@@ -18,19 +18,20 @@ The product direction is:
 - broad portfolio of mathematical capabilities;
 - mathematically atomic, agent-visible outcomes;
 - agent-owned composition and research strategy;
-- optional workflows with inspectable intermediate artifacts;
+- optional workflows with inspectable intermediate values and durable artifacts;
 - independent verification of exact claims and evidence.
 
 Each capability performs one observable mathematical operation and returns
 typed, inspectable results with explicit relationships, scope, execution
 status, assurance, and provenance. Existing mathematical software and domain
 plugins supply the mathematics; capability adapters expose it through a common
-contract. Jacobian supplies operations, artifacts, execution policy, and trust
-boundaries—not a prescribed research strategy.
+contract. Jacobian supplies operations, optional durable artifacts, execution
+policy, and trust boundaries—not a prescribed research strategy.
 
 The product is the mathematical toolset and its shared capability runtime:
-versioned contracts, artifact and provenance storage, execution and budget
-control, adapter and plugin boundaries, and optional checker-backed assurance.
+versioned contracts, typed value transport, artifact and provenance storage,
+execution and budget control, adapter and plugin boundaries, and optional
+checker-backed assurance.
 MCP is the primary agent-facing interface; the CLI and Python API support local
 use and integration without changing the mathematical contracts.
 
@@ -46,14 +47,23 @@ At the product level these capabilities are tools. Internally, the target
 mathematical primitive contract is a versioned capability with one observable,
 agent-visible outcome. Backend-call atomicity is not required: an adapter may
 coordinate several backend calls when they jointly produce that outcome. A
-capability consumes typed artifacts and returns:
+capability consumes typed values and artifact references as appropriate and
+returns:
 
-- typed output artifacts;
-- explicit relationships to its inputs;
+- a typed inline output, or a reference to a durable mathematical object;
+- explicit relationships to its inputs when durable objects are involved;
 - any proof obligations created by the operation;
 - execution status and resource accounting;
 - assurance and the evidence supporting it;
 - enough provenance to replay or compare the step.
+
+Composition uses three boundaries:
+
+```text
+typed values compose computations
+artifact references compose durable evidence
+verification records establish trust
+```
 
 Search, generation, transformation, retrieval, and evaluation primitives may
 return useful unverified results. They cannot promote their own output to
@@ -63,17 +73,18 @@ checker identity.
 
 Broad actions such as “investigate this conjecture” are workflows, not
 primitives. A workflow may coordinate many primitive calls, but it must expose
-the stage artifacts and preserve their separate assurance labels. Jacobian does
-not retain parallel top-level MCP tools or compatibility façades for these
-workflows; agents compose the namespaced capabilities.
+useful stage values and artifacts and preserve their separate assurance labels.
+Jacobian does not retain parallel top-level MCP tools or compatibility façades
+for these workflows; agents compose the namespaced capabilities.
 
 Design new capabilities against the installed portfolio. When an existing
-typed artifact already exposes the needed mathematical outcome, consume that
-artifact instead of silently recomputing it. Temporary overlap is acceptable
+typed value or artifact already exposes the needed mathematical outcome,
+consume it instead of silently recomputing or materializing it. Temporary
+overlap is acceptable
 for experimentation, performance, batching, backend constraints, or a
 genuinely different agent-visible outcome. State the overlap explicitly and
-preserve useful intermediate artifacts. If two capabilities expose the same
-outcome, consider discovery, contract clarity, artifact handoff,
+preserve useful intermediate values and artifacts. If two capabilities expose
+the same outcome, consider discovery, contract clarity, artifact handoff,
 consolidation, or retirement before adding another stable ID.
 
 ## Ownership model
@@ -82,6 +93,8 @@ The boundaries are intentionally narrow:
 
 - The runtime owns artifact identity, execution status, assurance, checker
   authorization, budgets, and provenance.
+- The MCP SDK owns static tool schemas, typed result serialization and
+  validation, structured content, progress, and transport cancellation.
 - Capability adapters connect external SAT, SMT, CAS, optimization, retrieval,
   and proof systems to the primitive contract.
 - Domain plugins own mathematical schemas, transformations, invariants,

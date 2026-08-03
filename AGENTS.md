@@ -15,13 +15,14 @@ Jacobian gives agents composable mathematical capabilities. Its principles are:
 - a broad mathematical portfolio;
 - atomic, agent-visible outcomes;
 - agent-owned composition and research strategy;
-- inspectable intermediate artifacts; and
+- inspectable intermediate values and, where durable identity matters,
+  artifacts; and
 - independent verification of exact claims and evidence.
 
 Each capability exposes one coherent, inspectable mathematical outcome. It may
-coordinate backend calls, but useful intermediate artifacts, failures,
-relationships, scope, completeness, assurance, and proof obligations remain
-visible.
+coordinate backend calls, but useful intermediate values and artifacts,
+failures, relationships, scope, completeness, assurance, and proof obligations
+remain visible.
 
 Jacobian exposes mathematical affordances, not research policy. Capabilities
 must remain atomic, searchable, and freely composable. Do not prescribe
@@ -31,8 +32,10 @@ or adapters. Capabilities may implement specific mathematical methods, while
 agents remain free to choose and compose them. Prompts and resources may
 explain protocol and evidence semantics, but remain optional.
 
-Design against the existing portfolio. Reuse typed artifacts that expose the
-needed outcome; declare overlap and keep useful intermediates. Before
+Design against the existing portfolio. Reuse typed values or artifacts that
+expose the needed outcome; do not materialize an inline value merely to pass it
+between ordinary mathematical operations. Declare overlap and keep useful
+intermediates. Before
 stabilizing or recommending a capability, inspect nearby catalog entries by
 domain, artifact type, and outcome. If overlap remains ambiguous or
 consequential, use the
@@ -48,6 +51,9 @@ MCP tools.
 
 Prefer thin adapters to maintained mathematical systems. Pin versions when
 reproducibility, certificates, or verification depend on them.
+Do not reimplement proof kernels, elaborators, tactic engines, solver engines,
+computer algebra algorithms, or graph canonicalization when a maintained
+backend provides the needed operation.
 
 The supported native Python API lives only under `jacobian.math`. Keep its
 public modules deliberately small, declare their supported symbols with
@@ -66,6 +72,19 @@ domain model, or erase bounded-search obligation types. When a native API and a
 capability expose the same outcome, share one typed mathematical kernel and use
 explicit domain-owned conversions rather than duplicating the mathematics or
 introducing a generic conversion framework.
+
+At the MCP boundary, prefer MCP Python SDK 2.0 high-level typed returns. Return
+Pydantic result models directly and let the SDK derive the output schema,
+validate results, and populate `content` and `structured_content`. Use an
+explicit `CallToolResult` only when a response genuinely requires MCP content
+blocks such as `ResourceLink`, custom metadata, or a deliberate text
+projection. Set `structured_output=True` so unsupported return annotations fail
+during registration.
+
+Return small, bounded mathematical values inline. Materialize an artifact only
+when the result needs durable identity, independent retrieval, replay,
+resumability, evidence binding, or size-separated transport. Do not add
+persistence flags or generic retention policy to ordinary computations.
 
 Built-in mathematical producers belong in explicit domain bundles. Do not add
 global operation registries, recursive package discovery, import-time
@@ -102,8 +121,8 @@ checker authorization out of plugins and search code.
   selected gate on the final tree. In a shared checkout, agents must own
   disjoint paths and must not switch branches, stage, commit, clean, or rewrite
   shared files until their work is integrated.
-- Jacobian is pre-stable. Release specifications capture supported snapshots;
-  they do not order capability research.
+- Jacobian is pre-stable. Current reference documents and the installed catalog
+  define the supported surface; they do not order capability research.
 - Validate the complete Pydantic request model before computation or artifact
   writes. JSON Schema supports discovery; it does not replace cross-field
   validation.

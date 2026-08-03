@@ -13,9 +13,8 @@ independent checkers may promote exact evidence to a verified result. The
 [product model](explanation/product-blueprint.md) defines the capability
 contract and ownership boundaries.
 
-The current 0.6 architecture is pre-stable. The v0.2 specification remains a
-historical conformance snapshot; current reference documents and the installed
-catalog define the supported capabilities and interfaces.
+The current 0.6 architecture is pre-stable. Current reference documents and the
+installed catalog define the supported capabilities and interfaces.
 Evaluations guide portfolio behavior and maintenance; they do not grant
 verification authority.
 
@@ -28,8 +27,6 @@ These documents track the current product contract and its ongoing evolution:
 | What product is Jacobian building? | [Product model](explanation/product-blueprint.md) | Active product direction |
 | What does the system currently look like? | [Architecture](explanation/architecture.md) | Current implementation and trust boundaries |
 | What direction is the project taking? | [Product goals](explanation/goals.md) | Rolling goals pursued in parallel |
-| Why were cross-cutting choices made? | [Architecture decision log](explanation/adr/index.md) | Accepted decisions with release scope |
-| What is the last frozen release contract? | [v0.2 specification](reference/specifications/v0.2.md) and [conformance gate](reference/conformance-v0.2.md) | Normative historical snapshot for `0.2.0a0`; later releases extend it |
 | What is installed now? | [Tool surface](reference/tools.md) and runtime `capability://catalog` | Current interface rules and installation-specific inventory |
 
 ## Tutorials
@@ -71,7 +68,7 @@ retired state revisions.
 Capability-specific references live with their owning domain or provider.
 They are intentionally not registered in this shared landing page: adding an
 operation or provider must not require editing a central documentation list.
-Release, conformance, benchmark, evaluation, and contributor references are
+Conformance, benchmark, evaluation, and contributor references are
 linked from the control documents and workflows that own them.
 
 ## Explanation
@@ -83,11 +80,6 @@ how its major parts fit together.
 - [Product model](explanation/product-blueprint.md)
 - [Product goals](explanation/goals.md)
 - [Durable search runtime](explanation/search-runtime.md)
-- [Architecture decision log](explanation/adr/index.md)
-- [ADR 0001: Python-first control plane](explanation/adr/0001-python-first-control-plane.md)
-- [ADR 0002: Sealed plugin packages](explanation/adr/0002-sealed-plugin-packages.md)
-- [ADR 0003: Durable search invocations](explanation/adr/0003-durable-search-invocations.md)
-- [ADR 0004: Verified parameter regions](explanation/adr/0004-verified-parameter-regions.md)
 
 ## Contributing
 

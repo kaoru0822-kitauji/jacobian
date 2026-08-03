@@ -53,7 +53,7 @@ The initial corpus contains:
 - artifact blobs near 1 KiB, 100 KiB, and 10 MiB;
 - manifest graphs with zero, tens, and thousands of parent references within
   allowed limits;
-- batches of 1, 32, and the v0.2 maximum of 256 candidates;
+- batches of 1, 32, and the configured maximum of 256 candidates;
 - direct witnesses and finite-enumeration certificates of several sizes;
 - cold-store, deduplication-hit, and verified-cache-hit cases.
 

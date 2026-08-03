@@ -4,9 +4,8 @@
 
 - Status: Active direction
 - Planning model: Rolling goals, pursued in parallel
-- Related records: [Product model](product-blueprint.md),
-  [architecture](architecture.md), and
-  [architecture decision log](adr/index.md)
+- Related records: [Product model](product-blueprint.md) and
+  [architecture](architecture.md)
 
 Jacobian is building a broad toolbox of composable mathematical capabilities
 for AI agents. The project does not follow a linear sequence in which search,
@@ -14,9 +13,9 @@ claim transformation, retrieval, or formal proof must mature before another
 area can be explored. Useful capabilities may be added, evaluated, revised, or
 removed independently.
 
-Release specifications describe supported behavior at a point in time. They do
-not prescribe research order, block experimental capabilities, or promise that
-an idea will become a stable interface.
+Current reference documents and the installed catalog describe supported
+behavior. They do not prescribe research order, block experimental
+capabilities, or promise that an idea will become a stable interface.
 
 ## Rolling goals
 
@@ -31,9 +30,9 @@ Experimental adapters may change without compatibility guarantees.
 
 Help agents find relevant capabilities without loading every schema into their
 initial context. Improve descriptors, examples, catalog search, ranking, and
-artifact relationships from observed agent behavior. Keep research strategy
-with the agent rather than encoding one preferred proof workflow in the
-runtime.
+value and artifact relationships from observed agent behavior. Keep research
+strategy with the agent rather than encoding one preferred proof workflow in
+the runtime.
 
 ### Increase independent verification coverage
 
@@ -53,7 +52,8 @@ consolidation, and retirement—not to gate experimentation.
 ### Preserve transparent mathematical work
 
 Keep important intermediate objects, failed attempts, transformations,
-relationships, and proof obligations inspectable and replayable. Optional
+relationships, and proof obligations inspectable. Retain them durably when
+identity, replay, resumability, evidence binding, or size requires it. Optional
 workflows may coordinate several operations, but must not erase their evidence
 or independent verification boundaries.
 
@@ -69,9 +69,8 @@ backends rather than accumulating custom infrastructure.
 
 Work may advance on any goal when a dataset, transcript, backend, or trust gap
 provides a useful test. Concrete implementation work belongs in focused GitHub
-issues with observable success criteria. Architecture decisions record
-cross-cutting choices; benchmarks and evaluation reports record evidence;
-release specifications record supported contracts.
+issues with observable success criteria. Current reference documents record
+supported contracts; benchmarks and evaluation reports record evidence.
 
 The direction is working when better agents can discover and compose the same
 portfolio more effectively, exact conclusions remain independently

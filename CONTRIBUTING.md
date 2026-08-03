@@ -9,11 +9,10 @@ between heuristic search or evaluation and independently verified evidence.
 ## Before changing code
 
 Read the [documentation home](docs/index.md), the
-[product goals](docs/explanation/goals.md), the
-[v0.2 frozen specification](docs/reference/specifications/v0.2.md), and the
-[v0.2 conformance specification](docs/reference/conformance-v0.2.md).
-Later package versions extend that snapshot; use the installed
-catalog and current reference documents for present capability membership.
+[product goals](docs/explanation/goals.md), and the
+[testing strategy](docs/reference/testing-strategy.md).
+Use the installed catalog and current reference documents for present
+capability membership.
 
 ## Development environment
 

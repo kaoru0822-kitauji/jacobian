@@ -38,11 +38,9 @@ they must demonstrate that malformed inputs, incomplete computations, stale
 caches, and substituted evidence cannot be promoted into verified mathematical
 conclusions.
 
-This document defines the test architecture for the current implementation. It
-complements the normative
-[v0.2 conformance specification](conformance-v0.2.md). The conformance
-specification states what an implementation must do; this document states how
-we build and maintain evidence that it does so.
+This document defines the test architecture for the current implementation.
+Current contracts state what the implementation must do; this document states
+how we build and maintain evidence that it does so.
 
 Two principles govern the suite:
 
@@ -237,10 +235,10 @@ wire format.
 | Semantic completeness | Intended or sampled objects are reported as the full domain | Adversarial hidden-object fixtures, scope certificates, honest coverage fields |
 | Resource limits | Exhaustion changes truth or leaves a half-committed result | Fault injection, bounded parser/store tests, mixed-batch timeout/cancellation tests |
 | Shrinking | A smaller but invalid artifact replaces the verified target | Per-step checker replay, cycle/budget state machine, minimality-label attacks |
-| Representation changes | A relaxation or restriction is treated as equivalence | v0.2 direction tests, proof-obligation replay, proposer/checker separation |
+| Representation changes | A relaxation or restriction is treated as equivalence | Direction tests, proof-obligation replay, proposer/checker separation |
 | Research corpus integration | Retrieved hypotheses silently gain verified status | Trust-label, provider-isolation, retention, and temporal-cutoff tests |
 
-The first seven rows are the highest-risk v0.2 areas. They should be reviewed
+The first seven rows are the highest-risk areas. They should be reviewed
 before optimizing throughput or expanding the public tool surface.
 
 ## Test layers
@@ -765,11 +763,11 @@ Nightly validation runs:
 Nightly failures are triaged as defects. Retrying is useful for diagnosis, not
 for declaring the original result green.
 
-### v0.2 release
+### Release
 
-A v0.2 release requires:
+A release requires:
 
-- every normative conformance test;
+- every required contract and fail-closed verification test;
 - both structurally different reference plugins;
 - package installation and replay in a clean environment;
 - synchronized Python and npm versions with both packages built and tested;
@@ -792,10 +790,10 @@ mathematical assurance level.
 - exact projection and separator replay;
 - capability budget, cancellation, progress, and artifact-replay behavior.
 
-The normative attack matrix is
-[v0.2 conformance](conformance-v0.2.md). Complete search snapshots remain
-unverified; a theorem inferred from the absence of a candidate needs a
-domain-specific completeness certificate and checker.
+The critical-area register and domain verifier tests define the attack matrix.
+Complete search snapshots remain unverified; a theorem inferred from the
+absence of a candidate needs a domain-specific completeness certificate and
+checker.
 
 ## Capability portfolio coverage
 
