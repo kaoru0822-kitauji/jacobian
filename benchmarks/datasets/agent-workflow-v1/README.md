@@ -49,8 +49,9 @@ make agent-eval DATASET=agent-workflow-v1 \
 ```
 
 The task bundles and Harbor task digests must be identical between these
-jobs. Both jobs use the same optional proxy overlay; only the treatment adds
-the Jacobian sidecar and MCP config. This paired setup is for
+jobs. Set `JACOBIAN_EVAL_PROXY=1` to apply the same optional proxy overlay to
+both jobs; only the treatment adds the Jacobian sidecar and MCP config. This
+paired setup is for
 workflow comparison; the public dataset is not held-out evidence.
 
 Five tasks have an operator-authorized verification record and may accept

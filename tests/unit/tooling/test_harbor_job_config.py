@@ -41,6 +41,60 @@ def test_observation_job_uses_harbor_dataset_selection() -> None:
     ]
 
 
+def test_observation_job_keeps_the_minimal_jacobian_treatment() -> None:
+    job = json.loads(JOB.read_text())
+
+    assert job["agents"] == [{"name": "codex", "kwargs": {"web_search": "disabled"}}]
+    assert job["environment"]["extra_docker_compose"] == [
+        "benchmarks/datasets/agent-workflow-v1/jacobian-observation.compose.yaml"
+    ]
+
+
+def test_agent_eval_forwards_web_search_setting_to_harbor() -> None:
+    makefile = (ROOT / "Makefile").read_text()
+
+    assert '--ak "web_search=$(CODEX_WEB_SEARCH)"' in makefile
+    assert "JACOBIAN_EVAL_PROXY" in makefile
+    assert (
+        "JACOBIAN_EVAL_HTTP_PROXY ?= $(call _jacobian_eval_container_proxy,$(HTTP_PROXY))"
+        in makefile
+    )
+    assert (
+        "JACOBIAN_EVAL_HTTPS_PROXY ?= $(call _jacobian_eval_container_proxy,$(HTTPS_PROXY))"
+        in makefile
+    )
+    assert (
+        "JACOBIAN_EVAL_ALL_PROXY ?= $(call _jacobian_eval_container_proxy,$(ALL_PROXY))"
+        in makefile
+    )
+    assert 'JACOBIAN_EVAL_NO_PROXY="$(JACOBIAN_EVAL_NO_PROXY)"' in makefile
+    assert "agent-workflow-v1-control-proxy.json" in makefile
+    assert "jacobian-observation-proxy.json" in makefile
+
+
+def test_proxy_observation_job_is_opt_in_and_preserves_local_mcp_access() -> None:
+    proxy_job = json.loads(
+        (
+            ROOT
+            / "benchmarks"
+            / "datasets"
+            / "agent-workflow-v1"
+            / "jobs"
+            / "jacobian-observation-proxy.json"
+        ).read_text()
+    )
+    proxy_overlay = (
+        ROOT / "benchmarks" / "config" / "agent-eval-proxy.compose.yaml"
+    ).read_text()
+
+    assert proxy_job["environment"]["extra_docker_compose"] == [
+        "benchmarks/config/agent-eval-proxy.compose.yaml",
+        "benchmarks/datasets/agent-workflow-v1/jacobian-observation.compose.yaml",
+    ]
+    assert "NO_PROXY" in proxy_overlay
+    assert "jacobian" in proxy_overlay
+
+
 def test_observation_mcp_config_is_external_to_the_task_job() -> None:
     job = json.loads(JOB.read_text())
     control = json.loads(CONTROL_JOB.read_text())

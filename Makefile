@@ -293,15 +293,43 @@ ifneq ($(filter 0 1,$(JACOBIAN_ENABLED)),$(JACOBIAN_ENABLED))
 $(error JACOBIAN_ENABLED must be exactly 0 or 1 (got '$(JACOBIAN_ENABLED)'))
 endif
 
+CODEX_WEB_SEARCH ?= disabled
+JACOBIAN_EVAL_PROXY ?= 0
+define _jacobian_eval_container_proxy
+$(subst localhost,host.docker.internal,$(subst 127.0.0.1,host.docker.internal,$1))
+endef
+JACOBIAN_EVAL_HTTP_PROXY ?= $(call _jacobian_eval_container_proxy,$(HTTP_PROXY))
+JACOBIAN_EVAL_HTTPS_PROXY ?= $(call _jacobian_eval_container_proxy,$(HTTPS_PROXY))
+JACOBIAN_EVAL_ALL_PROXY ?= $(call _jacobian_eval_container_proxy,$(ALL_PROXY))
+JACOBIAN_EVAL_NO_PROXY ?= localhost,127.0.0.1,jacobian
+ifneq ($(filter 0 1,$(JACOBIAN_EVAL_PROXY)),$(JACOBIAN_EVAL_PROXY))
+$(error JACOBIAN_EVAL_PROXY must be exactly 0 or 1 (got '$(JACOBIAN_EVAL_PROXY)'))
+endif
+
+ifeq ($(JACOBIAN_EVAL_PROXY),1)
+ifneq ($(strip $(JACOBIAN_EVAL_HTTP_PROXY)$(JACOBIAN_EVAL_HTTPS_PROXY)$(JACOBIAN_EVAL_ALL_PROXY)),)
+else
+$(error JACOBIAN_EVAL_PROXY=1 requires JACOBIAN_EVAL_HTTP_PROXY, JACOBIAN_EVAL_HTTPS_PROXY, or JACOBIAN_EVAL_ALL_PROXY)
+endif
+endif
+
 ifeq ($(JACOBIAN_ENABLED),0)
+ifeq ($(JACOBIAN_EVAL_PROXY),1)
+EVAL_CONFIG ?= benchmarks/config/agent-workflow-v1-control-proxy.json
+else
 EVAL_CONFIG ?= benchmarks/config/agent-workflow-v1-control.json
+endif
 override MCP_CONFIG :=
 else
+ifeq ($(JACOBIAN_EVAL_PROXY),1)
+EVAL_CONFIG ?= benchmarks/datasets/$(or $(DATASET),agent-workflow-v1)/jobs/jacobian-observation-proxy.json
+else
 EVAL_CONFIG ?= benchmarks/datasets/$(or $(DATASET),agent-workflow-v1)/jobs/jacobian-observation.json
+endif
 MCP_CONFIG ?= benchmarks/config/jacobian.mcp.json
 endif
 
-agent-eval: ## Run a Harbor evaluation (JACOBIAN_ENABLED=0|1, DATASET=agent-workflow-v1, EVAL_EXECUTE=1).
+agent-eval: ## Run a Harbor evaluation (JACOBIAN_ENABLED=0|1, JACOBIAN_EVAL_PROXY=0|1, DATASET=agent-workflow-v1, EVAL_EXECUTE=1).
 	@if [ "$(EVAL_EXECUTE)" != "1" ]; then \
 		echo "Model execution is opt-in. Review the job, then run: make agent-eval DATASET=agent-workflow-v1 EVAL_EXECUTE=1"; \
 		exit 0; \
@@ -310,10 +338,15 @@ agent-eval: ## Run a Harbor evaluation (JACOBIAN_ENABLED=0|1, DATASET=agent-work
 		echo "JACOBIAN_MODEL must be exported" >&2; \
 		exit 2; \
 	fi; \
+	JACOBIAN_EVAL_HTTP_PROXY="$(JACOBIAN_EVAL_HTTP_PROXY)" \
+	JACOBIAN_EVAL_HTTPS_PROXY="$(JACOBIAN_EVAL_HTTPS_PROXY)" \
+	JACOBIAN_EVAL_ALL_PROXY="$(JACOBIAN_EVAL_ALL_PROXY)" \
+	JACOBIAN_EVAL_NO_PROXY="$(JACOBIAN_EVAL_NO_PROXY)" \
 	$(HARBOR_RUNNER) run \
 		-c "$(EVAL_CONFIG)" \
 		-a codex \
 		-m "$${JACOBIAN_MODEL}" \
+		--ak "web_search=$(CODEX_WEB_SEARCH)" \
 		$(if $(MCP_CONFIG),--mcp-config "$(MCP_CONFIG)",) \
 		$(if $(TASKS),-p "benchmarks/datasets/$(or $(DATASET),agent-workflow-v1)" $(foreach task,$(TASKS),--include-task-name "$(task)"),) \
 		$(EVAL_ARGS)

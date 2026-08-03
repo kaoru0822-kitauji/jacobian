@@ -24,10 +24,17 @@ pass `FULL=1` only when a complete dataset sweep is intentional.
 
 ## Set shared run conditions
 
-For a paired comparison, set the same model, authentication, proxy, task
-filter, prompt, budget, and environment before running either condition. A
-proxy is optional, but if the host requires one for package installation or
-model access, export it before both runs:
+For a paired comparison, set the same model, authentication, task filter,
+prompt, budget, and environment before running either condition. The default
+run is direct networking. Use `JACOBIAN_EVAL_PROXY=1` only when the host or
+region requires a proxy for Codex's outbound model connection.
+
+If a run needs a host proxy for package installation or model access, set the
+flag before both conditions. The flag automatically reuses standard
+`HTTP_PROXY`, `HTTPS_PROXY`, and `ALL_PROXY` variables; use the explicit
+`JACOBIAN_EVAL_*` variables when the evaluation should use different values.
+When inherited proxy URLs use `localhost` or `127.0.0.1`, the Makefile maps
+them to `host.docker.internal` for the container automatically:
 
 ```sh
 export JACOBIAN_MODEL='your-model'
@@ -36,17 +43,21 @@ export CODEX_FORCE_AUTH_JSON=1
 export JACOBIAN_EVAL_HTTP_PROXY='http://host.docker.internal:7890'
 export JACOBIAN_EVAL_HTTPS_PROXY='http://host.docker.internal:7890'
 export JACOBIAN_EVAL_NO_PROXY='localhost,127.0.0.1,jacobian'
+export JACOBIAN_EVAL_PROXY=1
 ```
 
-Unset the proxy variables for direct networking. On Linux, the host proxy must
-accept connections from Docker's bridge interface; a proxy listening only on
-`127.0.0.1` is not reachable from the container.
+Unset `JACOBIAN_EVAL_PROXY` and the proxy variables for direct networking. On
+Linux, the host proxy must accept connections from Docker's bridge interface;
+a proxy listening only on `127.0.0.1` is not reachable from the container.
+Jacobian's service name is included in `NO_PROXY`, so MCP traffic remains on
+the local Compose network.
 
 ## Run with Jacobian
 
 The local path uses Harbor's Docker environment, a Jacobian Compose sidecar,
 and Harbor's external MCP configuration. The default sidecar image is
-`jacobian:local`.
+`jacobian:local`. The treatment contract is deliberately small: Codex has
+Jacobian at `http://jacobian:8000/mcp`, and Codex web search is disabled.
 
 ```sh
 export JACOBIAN_IMAGE='jacobian:local'
@@ -70,12 +81,12 @@ make agent-eval DATASET=agent-workflow-v1 \
 
 `JACOBIAN_ENABLED=0` selects the control job without the Jacobian sidecar or
 MCP configuration. `JACOBIAN_ENABLED=1` selects the treatment job and passes
-Harbor's `--mcp-config` option.
-
-The shared Compose overlay maps `host.docker.internal` to the Docker host and
-passes upper- and lower-case proxy variables to Harbor's `main` container,
-including the agent installation phase. Keep `jacobian` in `NO_PROXY` so the
-agent reaches the sidecar over Harbor's internal network.
+Harbor's `--mcp-config` option. `JACOBIAN_EVAL_PROXY=1` selects matching
+proxy-enabled control/treatment job configs and requires at least one proxy
+URL variable. The Makefile also passes Harbor's
+`web_search=disabled` agent kwarg explicitly, because the `-a codex` and
+`-m <model>` command-line overrides replace the agent block from the job JSON.
+The default treatment job does not include the proxy overlay.
 
 ## Docker and Daytona
 
