@@ -24,23 +24,21 @@ pass `FULL=1` only when a complete dataset sweep is intentional.
 
 ## Set shared run conditions
 
-For a paired comparison, set the same model, authentication, proxy, task
-filter, prompt, budget, and environment before running either condition. A
-proxy is optional, but if the host requires one for package installation or
-model access, export it before both runs:
+For a paired comparison, set the same model, authentication, task filter,
+prompt, budget, and environment before running either condition:
 
 ```sh
 export JACOBIAN_MODEL='your-model'
 export CODEX_FORCE_AUTH_JSON=1
-
-export JACOBIAN_EVAL_HTTP_PROXY='http://host.docker.internal:7890'
-export JACOBIAN_EVAL_HTTPS_PROXY='http://host.docker.internal:7890'
-export JACOBIAN_EVAL_NO_PROXY='localhost,127.0.0.1,jacobian'
 ```
 
-Unset the proxy variables for direct networking. On Linux, the host proxy must
-accept connections from Docker's bridge interface; a proxy listening only on
-`127.0.0.1` is not reachable from the container.
+The checked-in agent-workflow observation jobs deliberately do not attach a
+host-proxy overlay. Their selected task environments use Harbor's
+`no-network` policy; Jacobian is an internal Compose service reached only over
+loopback in the shared egress-control namespace. Use a pre-provisioned agent
+runtime when the agent itself must also remain offline. Stock Harbor Codex
+setup installs missing packages and the CLI from the network, so it cannot
+start in these tasks without an explicitly networked agent phase.
 
 ## Run with Jacobian
 
@@ -72,10 +70,10 @@ make agent-eval DATASET=agent-workflow-v1 \
 MCP configuration. `JACOBIAN_ENABLED=1` selects the treatment job and passes
 Harbor's `--mcp-config` option.
 
-The shared Compose overlay maps `host.docker.internal` to the Docker host and
-passes upper- and lower-case proxy variables to Harbor's `main` container,
-including the agent installation phase. Keep `jacobian` in `NO_PROXY` so the
-agent reaches the sidecar over Harbor's internal network.
+The treatment Compose file adds a Docker healthcheck that runs Jacobian's
+MCP-level readiness probe. Harbor waits for `service_healthy` before starting
+`main`; the probe validates the MCP tools and required capability over
+`127.0.0.1:8000` without opening external networking.
 
 ## Docker and Daytona
 
@@ -119,8 +117,8 @@ export JACOBIAN_MODEL='your-model'
 ```
 
 If the run stalls at `starting environment`, Docker may be building the task
-image or waiting on package installation. Check the Docker build output and
-verify proxy reachability from the container before cancelling the trial.
+image or waiting on the Jacobian healthcheck. Check the Docker Compose logs and
+confirm that the selected image contains `jacobian.adapters.mcp.readiness`.
 
 If the treatment agent reports no Jacobian tools, confirm that
 `JACOBIAN_ENABLED=1` is set and that the treatment job includes the external

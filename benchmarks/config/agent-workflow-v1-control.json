@@ -11,9 +11,7 @@
     "type": "docker",
     "force_build": true,
     "delete": true,
-    "extra_docker_compose": [
-      "benchmarks/config/agent-eval-proxy.compose.yaml"
-    ]
+    "extra_docker_compose": []
   },
   "agents": [
     {
