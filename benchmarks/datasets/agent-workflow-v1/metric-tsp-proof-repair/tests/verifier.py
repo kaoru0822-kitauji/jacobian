@@ -1,5 +1,4 @@
 import json
-import re
 from collections import Counter
 from itertools import combinations, pairwise, permutations
 from pathlib import Path
@@ -26,56 +25,34 @@ def _load_frozen_input():
         if workspace.read_bytes() != frozen_bytes:
             return {}
         value = json.loads(frozen_bytes)
-    except (OSError, ValueError, UnicodeError):
+    except (OSError, ValueError, UnicodeError, RecursionError):
         return {}
     return value if isinstance(value, dict) else {}
 
 
-def evidence_matches_result(evidence, result):
-    if not evidence_list_is_bound(evidence):
+def evidence_matches_submission(evidence, submission):
+    expected_path = "evidence/certificate.json"
+    if not evidence_list_is_bound(evidence, expected_path=expected_path):
         return False
-    target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
+    target = resolve_evidence(evidence[0], expected_path=expected_path)
     if target is None:
         return False
     try:
         if target.stat().st_size > MAX_EVIDENCE_BYTES:
             return False
-        lines = target.read_text().splitlines()
-        marker = next(
-            line.removeprefix("RESULT_JSON:").strip()
-            for line in lines
-            if line.startswith("RESULT_JSON:")
-        )
-        return json.loads(marker) == result and any(
-            line.strip() and not line.startswith("RESULT_JSON:") for line in lines
-        )
-    except (OSError, StopIteration, UnicodeError, ValueError):
+        payload = json.loads(target.read_text())
+        return payload == {
+            "schema_version": "1",
+            "task_id": submission["task_id"],
+            "result": submission["result"],
+            "limitations": submission["limitations"],
+        }
+    except (KeyError, OSError, UnicodeError, ValueError, RecursionError):
         return False
 
 
 def edge_key(left, right):
     return tuple(sorted((left, right)))
-
-
-def _is_two_approximation_claim(value):
-    if not isinstance(value, str):
-        return False
-    normalized = re.sub(r"[_-]+", " ", " ".join(value.casefold().split()))
-    match = re.search(
-        r"\b(?:factor\s*(?:of\s*)?2|two|2)\s+approximation\b",
-        normalized,
-    )
-    if match is None:
-        return False
-    surrounding = normalized[max(0, match.start() - 80) : match.end() + 80]
-    return (
-        re.search(
-            r"\b(?:not|never|cannot|can\s+not|false|invalid|reject|unsupported|"
-            r"unproven|does\s+not|doesn\'t|isn\'t)\b",
-            surrounding,
-        )
-        is None
-    )
 
 
 def is_tree(vertices, edges):
@@ -101,6 +78,21 @@ def is_tree(vertices, edges):
 
 def main():
     submission = load_submission()
+    if submission is None:
+        Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
+        (Path("/logs/verifier/reward.json")).write_text(
+            json.dumps(
+                {
+                    "correctness": 0.0,
+                    "evidence_validity": 0.0,
+                    "scope_accuracy": 0.0,
+                    "assurance_calibration": 0.0,
+                    "reward": 0.0,
+                    "false_certification": False,
+                }
+            )
+        )
+        return
     input_data = _load_frozen_input()
     expected = json.loads((E / "expected.json").read_text())
     result = submission.get("result") if isinstance(submission, dict) else None
@@ -268,7 +260,11 @@ def main():
         and metric
         and result.get("flaw_location") == "STEP_4"
         and result.get("invalid_inference") == "SHORTCUTTING_PRESERVES_EXACT_COST"
-        and _is_two_approximation_claim(result.get("corrected_claim"))
+        and result.get("corrected_claim")
+        == {
+            "shortcut_cost_relation": "NON_INCREASING",
+            "approximation_factor_upper_bound": 2,
+        }
         and tree
         and tree_weight == minimum_tree_weight
         and euler_valid
@@ -297,7 +293,7 @@ def main():
     good = bool(
         contract
         and math_correct
-        and evidence_matches_result(submission["evidence"], result)
+        and evidence_matches_submission(submission["evidence"], submission)
     )
     assurance = bool(
         contract and submission["claimed_assurance"] == expected["maximum_assurance"]
