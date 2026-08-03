@@ -686,26 +686,32 @@ def _agent_environment_failures(suite: Suite, task_dir: Path, rel: str) -> list[
     return failures
 
 
-def _is_ignored_interpreter_cache(path: Path) -> bool:
+def _is_ignored_python_cache(path: Path) -> bool:
+    """Return whether one generated interpreter cache is ignored by Git."""
+
     try:
         relative = path.relative_to(ROOT)
     except ValueError:
         relative = path
     return (
         subprocess.run(
-            [
-                "git",
-                "check-ignore",
-                "--quiet",
-                "--",
-                str(relative),
-            ],
+            ["git", "check-ignore", "--quiet", "--", str(relative)],
             cwd=ROOT,
             capture_output=True,
             check=False,
         ).returncode
         == 0
     )
+
+
+def _python_cache_failure(path: Path) -> str | None:
+    """Describe disallowed interpreter cache material, if any."""
+
+    if path.name != "__pycache__" and path.suffix not in {".pyc", ".pyo"}:
+        return None
+    if _is_ignored_python_cache(path):
+        return None
+    return f"{path.relative_to(ROOT)}: raw interpreter cache is forbidden"
 
 
 def validate_task_topology(suite: Suite, task_dir: Path) -> list[str]:
@@ -717,13 +723,11 @@ def validate_task_topology(suite: Suite, task_dir: Path) -> list[str]:
     for path in task_dir.rglob("*"):
         if path.is_symlink():
             failures.append(f"{rel}: symlink is forbidden")
-        if (
-            path.name == "__pycache__" or path.suffix in {".pyc", ".pyo"}
-        ) and not _is_ignored_interpreter_cache(path):
-            # Committed or explicitly unignored cache material remains invalid.
-            failures.append(
-                f"{path.relative_to(ROOT)}: raw interpreter cache is forbidden"
-            )
+        # Python creates ignored cache files during ordinary local verifier
+        # tests. They are not benchmark source, unlike unignored cache material.
+        cache_failure = _python_cache_failure(path)
+        if cache_failure is not None:
+            failures.append(cache_failure)
     try:
         failures.extend(_task_manifest_failures(suite, task_dir, rel))
     except HarborSuiteError as exc:

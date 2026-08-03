@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 import pytest
 from tests.support.rationals import rational_payload as _q
 
+from jacobian.checker_operations import derive_verification_capability_id
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityMode,
@@ -111,9 +113,12 @@ def test_probability_results_are_independently_replayed(
 
     verified = authorized_complete_runtime.core.capabilities.invoke(
         CapabilityRequest(
-            capability_id="probability.result.verify",
+            capability_id=derive_verification_capability_id(capability_id),
             mode=CapabilityMode.VERIFY,
-            input={"result_uri": computed.output["result_uri"]},
+            input={
+                "input": payload,
+                "candidate": computed.output["result"],
+            },
         )
     )
 
@@ -128,31 +133,22 @@ def test_probability_results_are_independently_replayed(
 def test_probability_checker_rejects_forged_event_mass(
     authorized_complete_runtime,
 ) -> None:
+    payload = {"distribution": _FAIR_BIT, "event_values": [_q(1)]}
     computed = authorized_complete_runtime.core.capabilities.invoke(
         CapabilityRequest(
-            capability_id=("probability.finite_distribution.event_probability.compute"),
-            input={"distribution": _FAIR_BIT, "event_values": [_q(1)]},
+            capability_id="probability.finite_distribution.event_probability.compute",
+            input=payload,
         )
     )
-    result_artifact = authorized_complete_runtime.core.store.get(
-        computed.output["result_uri"]
-    )
-    false_payload = dict(result_artifact.payload)
-    false_payload["event_probability"] = _q(1)
-    false_payload["selected_atoms"] = _FAIR_BIT["atoms"]
-    false_result = authorized_complete_runtime.core.artifacts.put(
-        schema_uri=result_artifact.manifest.schema_uri,
-        semantics_uri=result_artifact.manifest.semantics_uri,
-        parents=result_artifact.manifest.parents,
-        payload=false_payload,
-        summary="adversarial false finite-event probability",
-    )
+    forged_candidate = deepcopy(computed.output["result"])
+    forged_candidate["event_probability"] = _q(1)
+    forged_candidate["selected_atoms"] = _FAIR_BIT["atoms"]
 
     rejected = authorized_complete_runtime.core.capabilities.invoke(
         CapabilityRequest(
-            capability_id="probability.result.verify",
+            capability_id=("probability.finite_distribution.event_probability.verify"),
             mode=CapabilityMode.VERIFY,
-            input={"result_uri": false_result.artifact_uri},
+            input={"input": payload, "candidate": forged_candidate},
         )
     )
 
@@ -165,41 +161,32 @@ def test_probability_checker_rejects_forged_event_mass(
 def test_probability_checker_rejects_forged_graph_reliability(
     authorized_complete_runtime,
 ) -> None:
+    payload = {
+        "graph": {"vertices": ["a", "b"], "edges": [["a", "b"]]},
+        "edge_probabilities": [{"edge": ["a", "b"], "open_probability": _q(1, 3)}],
+        "terminals": ["a", "b"],
+    }
     computed = authorized_complete_runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=(
                 "probability.graph_reliability.connection_probability.compute"
             ),
-            input={
-                "graph": {"vertices": ["a", "b"], "edges": [["a", "b"]]},
-                "edge_probabilities": [
-                    {"edge": ["a", "b"], "open_probability": _q(1, 3)}
-                ],
-                "terminals": ["a", "b"],
-            },
+            input=payload,
         )
     )
-    result_artifact = authorized_complete_runtime.core.store.get(
-        computed.output["result_uri"]
-    )
-    false_payload = dict(result_artifact.payload)
-    false_states = [dict(state) for state in false_payload["states"]]
+    forged_candidate = deepcopy(computed.output["result"])
+    false_states = [dict(state) for state in forged_candidate["states"]]
     false_states[0]["terminals_connected"] = True
-    false_payload["states"] = false_states
-    false_payload["connection_probability"] = _q(1)
-    false_result = authorized_complete_runtime.core.artifacts.put(
-        schema_uri=result_artifact.manifest.schema_uri,
-        semantics_uri=result_artifact.manifest.semantics_uri,
-        parents=result_artifact.manifest.parents,
-        payload=false_payload,
-        summary="adversarial false graph reliability",
-    )
+    forged_candidate["states"] = false_states
+    forged_candidate["connection_probability"] = _q(1)
 
     rejected = authorized_complete_runtime.core.capabilities.invoke(
         CapabilityRequest(
-            capability_id="probability.result.verify",
+            capability_id=(
+                "probability.graph_reliability.connection_probability.verify"
+            ),
             mode=CapabilityMode.VERIFY,
-            input={"result_uri": false_result.artifact_uri},
+            input={"input": payload, "candidate": forged_candidate},
         )
     )
 

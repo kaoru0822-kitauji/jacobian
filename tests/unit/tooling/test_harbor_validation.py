@@ -127,18 +127,18 @@ def test_validate_task_topology_ignores_gitignored_interpreter_caches(
     assert validate_task_topology(suite, task) == []
 
 
-def test_validate_task_topology_does_not_ignore_tracked_interpreter_caches(
+def test_validate_task_topology_rejects_tracked_interpreter_caches(
     tmp_path: Path, patched_root: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import benchmarks.tooling.harbor_suite as harbor_suite
 
-    calls: list[list[str]] = []
+    commands: list[list[str]] = []
 
-    def check_tracked_cache(args: list[str], **kwargs: object) -> SimpleNamespace:
-        calls.append(args)
+    def check_ignore(command: list[str], **_kwargs: object) -> SimpleNamespace:
+        commands.append(command)
         return SimpleNamespace(returncode=1)
 
-    monkeypatch.setattr(harbor_suite.subprocess, "run", check_tracked_cache)
+    monkeypatch.setattr(harbor_suite.subprocess, "run", check_ignore)
     suite, task = _make_suite_with_task(tmp_path)
     cache = task / "tests" / "__pycache__"
     cache.mkdir()
@@ -146,8 +146,12 @@ def test_validate_task_topology_does_not_ignore_tracked_interpreter_caches(
 
     failures = validate_task_topology(suite, task)
 
-    assert any("raw interpreter cache" in failure for failure in failures)
-    assert all("--no-index" not in args for args in calls)
+    assert any("raw interpreter cache is forbidden" in failure for failure in failures)
+    assert commands
+    assert all(
+        command[:3] == ["git", "check-ignore", "--quiet"] for command in commands
+    )
+    assert all("--no-index" not in command for command in commands)
 
 
 def test_validate_task_visibility_detects_host_path(

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from copy import deepcopy
+from typing import Any
+
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityMode,
@@ -33,13 +36,29 @@ def _cycle_request() -> dict[str, object]:
     }
 
 
+def _result_payload(runtime: Any, computed: Any) -> dict[str, Any]:
+    return runtime.core.store.get(computed.output["result_uri"]).payload
+
+
+def _forged_result_uri(runtime: Any, computed: Any, payload: dict[str, Any]) -> str:
+    source = runtime.core.store.get(computed.output["result_uri"])
+    return runtime.core.store.put(
+        schema_uri=source.manifest.schema_uri,
+        semantics_uri=source.manifest.semantics_uri,
+        payload=payload,
+        parents=source.manifest.parents,
+        summary="forged graph symmetry result",
+    ).artifact_uri
+
+
 def test_graph_symmetry_orbits_are_independently_replayed(
     authorized_complete_runtime,
 ) -> None:
+    payload = _cycle_request()
     computed = authorized_complete_runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.symmetry.generator_orbits.compute",
-            input=_cycle_request(),
+            input=payload,
         )
     )
     verified = authorized_complete_runtime.core.capabilities.invoke(
@@ -63,17 +82,15 @@ def test_graph_symmetry_orbits_are_independently_replayed(
 def test_graph_symmetry_checker_rejects_forged_orbit_partition(
     authorized_complete_runtime,
 ) -> None:
+    payload = _cycle_request()
     computed = authorized_complete_runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.symmetry.generator_orbits.compute",
-            input=_cycle_request(),
+            input=payload,
         )
     )
-    result_artifact = authorized_complete_runtime.core.store.get(
-        computed.output["result_uri"]
-    )
-    false_payload = dict(result_artifact.payload)
-    false_payload["vertex_orbits"] = [
+    forged_candidate = deepcopy(_result_payload(authorized_complete_runtime, computed))
+    forged_candidate["vertex_orbits"] = [
         {
             "orbit_index": 0,
             "representative": "a",
@@ -85,20 +102,17 @@ def test_graph_symmetry_checker_rejects_forged_orbit_partition(
             "members": ["c", "d"],
         },
     ]
-    false_payload["vertex_orbit_count"] = 2
-    false_result = authorized_complete_runtime.core.artifacts.put(
-        schema_uri=result_artifact.manifest.schema_uri,
-        semantics_uri=result_artifact.manifest.semantics_uri,
-        parents=result_artifact.manifest.parents,
-        payload=false_payload,
-        summary="adversarial false graph-symmetry orbit partition",
-    )
+    forged_candidate["vertex_orbit_count"] = 2
 
     rejected = authorized_complete_runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.symmetry.generator_orbits.verify",
             mode=CapabilityMode.VERIFY,
-            input={"result_uri": false_result.artifact_uri},
+            input={
+                "result_uri": _forged_result_uri(
+                    authorized_complete_runtime, computed, forged_candidate
+                )
+            },
         )
     )
 

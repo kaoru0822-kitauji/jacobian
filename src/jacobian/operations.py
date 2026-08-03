@@ -71,7 +71,35 @@ class ComputedOperation[
     tags: tuple[str, ...] = ()
     invalid_request: CapabilityDiagnostic | None = None
     invocation_examples: tuple[CapabilityInvocationExample, ...] = ()
-    version: str = "1"
+    version: str = "2"
+
+
+@dataclass(frozen=True, slots=True)
+class MaterializedOperation[
+    RequestT: ContractModel,
+    ArtifactT: ContractModel,
+    PreviewT: ContractModel,
+]:
+    """One deterministic producer whose durable result is materialized."""
+
+    capability_id: str
+    title: str
+    description: str
+    request_model: type[RequestT]
+    result_model: type[ArtifactT]
+    implementation: Callable[[RequestT], ComputedOutcome[ArtifactT]]
+    relation_id: str
+    tags: tuple[str, ...] = ()
+    invalid_request: CapabilityDiagnostic | None = None
+    invocation_examples: tuple[CapabilityInvocationExample, ...] = ()
+    preview_model: type[PreviewT] | None = None
+    preview: Callable[[ArtifactT], PreviewT] | None = None
+    preview_complete: bool = False
+    version: str = "2"
+
+    def __post_init__(self) -> None:
+        if self.preview_complete and self.preview is None:
+            raise ValueError("a complete materialized preview requires a preview")
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,11 +160,69 @@ class ComputedOperationFactory:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class MaterializedOperationFactory:
+    """Build materialized operations with one domain error policy."""
+
+    failure: OperationFailure
+
+    def __call__[
+        RequestT: ContractModel,
+        ResultT: ContractModel,
+    ](
+        self,
+        capability_id: str,
+        title: str,
+        description: str,
+        request_model: type[RequestT],
+        result_model: type[ResultT],
+        operation: Callable[[RequestT], ResultT],
+        *tags: str,
+        invocation_examples: tuple[CapabilityInvocationExample, ...] = (),
+        relation_id: str | None = None,
+        preview: Callable[[ResultT], ResultT] | None = None,
+        preview_complete: bool = False,
+        version: str = "2",
+    ) -> MaterializedOperation[RequestT, ResultT, ResultT]:
+        def implementation(request: RequestT) -> ComputedOutcome[ResultT]:
+            try:
+                return ComputedSuccess(operation(request))
+            except self.failure.exceptions as exc:
+                return ComputedNotApplicable(self.failure.diagnostic(exc))
+
+        return MaterializedOperation(
+            capability_id=capability_id,
+            title=title,
+            description=description,
+            request_model=request_model,
+            result_model=result_model,
+            implementation=implementation,
+            relation_id=relation_id or _relation_id(capability_id),
+            tags=tags,
+            invocation_examples=invocation_examples,
+            preview_model=result_model,
+            preview=preview,
+            preview_complete=preview_complete,
+            version=version,
+        )
+
+
 def _relation_id(capability_id: str) -> str:
-    for verb in ("compute", "decide", "enumerate", "solve", "transform"):
-        marker = f".{verb}."
-        if marker in capability_id:
-            return capability_id.replace(marker, ".relation.", 1)
+    segments = capability_id.split(".")
+    for index, segment in enumerate(segments):
+        if segment in {
+            "classify",
+            "compute",
+            "count",
+            "decide",
+            "enumerate",
+            "evaluate",
+            "materialize",
+            "solve",
+            "transform",
+        }:
+            segments[index] = "relation"
+            return ".".join(segments)
     raise ValueError(
         f"capability ID has no supported operation segment: {capability_id}"
     )
@@ -234,7 +320,9 @@ class DomainDiagnostics:
 
 
 type DomainOperation = (
-    ComputedOperation[Any, Any] | BoundedSearchOperation[Any, Any, Any]
+    ComputedOperation[Any, Any]
+    | MaterializedOperation[Any, Any, Any]
+    | BoundedSearchOperation[Any, Any, Any]
 )
 
 
