@@ -16,8 +16,8 @@ algebraic-geometry / computational-commutative-algebra
 ## Portfolio status
 
 - historical_fit: `MISSING`
-- current_status: `COVERED_WHEN_SINGULAR_AVAILABLE`
-- evaluation_status: `PUBLIC_REPRODUCTION`
+- current_status: `PARTIAL`
+- evaluation_status: `RUNNABLE_PUBLIC_REPRODUCTION`
 - next_action: run repeated Jacobian-on/off trials only after freezing protected coefficient, chart, and mutation variants outside this public dataset.
 
 ## Contract

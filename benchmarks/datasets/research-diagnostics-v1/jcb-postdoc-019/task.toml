@@ -24,8 +24,8 @@ contamination_class = "public-answer-visible-diagnostic"
 fixture_digest = "sha256:99fdb8056b95863414f40c670e37e6a3cf5d487e8b8ff930837b9a22f5e88021"
 derivation = "Twelve exact-degree Rabinowitsch charts for the normalized bivariate Jacobian degree-(2,3) slice, each discharged by an exact rational ideal-membership identity."
 historical_fit = "MISSING"
-current_status = "COVERED_WHEN_SINGULAR_AVAILABLE"
-evaluation_status = "PUBLIC_REPRODUCTION"
+current_status = "PARTIAL"
+evaluation_status = "RUNNABLE_PUBLIC_REPRODUCTION"
 next_action = "Freeze protected coefficient, chart, and adversarial variants before causal Jacobian-on/off evaluation."
 
 [agent]

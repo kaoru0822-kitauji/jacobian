@@ -128,6 +128,7 @@ def _parse_coefficient(value: str) -> CanonicalRational:
 class _TaggedOutputParser:
     def __init__(self) -> None:
         self.chart_terms: dict[str, list[list[BoundedRationalPolynomialTerm]]] = {}
+        self.chart_multipliers: dict[str, set[int]] = {}
         self.current_chart: str | None = None
         self.current_multiplier: int | None = None
 
@@ -149,6 +150,7 @@ class _TaggedOutputParser:
         self.current_chart = chart_id
         self.current_multiplier = None
         self.chart_terms[chart_id] = [[] for _ in range(10)]
+        self.chart_multipliers[chart_id] = set()
 
     def _multiplier(self, value: str) -> None:
         if self.current_chart is None:
@@ -156,6 +158,9 @@ class _TaggedOutputParser:
         multiplier = int(value) - 1
         if not 0 <= multiplier < 10:
             raise ValueError("invalid multiplier index")
+        if multiplier in self.chart_multipliers[self.current_chart]:
+            raise ValueError("duplicate multiplier marker")
+        self.chart_multipliers[self.current_chart].add(multiplier)
         self.current_multiplier = multiplier
 
     def _term(self, line: str) -> None:
@@ -177,6 +182,8 @@ class _TaggedOutputParser:
     def _end(self, chart_id: str) -> None:
         if chart_id != self.current_chart:
             raise ValueError("chart end marker mismatch")
+        if self.chart_multipliers[chart_id] != set(range(10)):
+            raise ValueError("chart does not contain all multiplier markers")
         self.current_chart = None
         self.current_multiplier = None
 

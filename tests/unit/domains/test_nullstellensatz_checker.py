@@ -173,3 +173,25 @@ def test_singular_tagged_output_parser_preserves_exact_multipliers() -> None:
     )
 
     assert parsed == expected
+
+
+@pytest.mark.parametrize("mutation", ("missing", "duplicate"))
+def test_singular_tagged_output_parser_rejects_incomplete_multiplier_markers(
+    mutation: str,
+) -> None:
+    lines = []
+    for chart_index, chart in enumerate(materialize_degree_23_system().charts):
+        lines.append(f"JCB_BEGIN|{chart.chart_id}")
+        for index in range(1, 11):
+            if mutation == "missing" and chart_index == 0 and index == 10:
+                continue
+            lines.append(f"JCB_MULT|{index}")
+        if mutation == "duplicate" and chart_index == 0:
+            lines.append("JCB_MULT|1")
+        lines.append(f"JCB_END|{chart.chart_id}")
+
+    with pytest.raises(ValueError):
+        _parse_output(
+            ("\n".join(lines) + "\n").encode("ascii"),
+            materialize_degree_23_system(),
+        )
