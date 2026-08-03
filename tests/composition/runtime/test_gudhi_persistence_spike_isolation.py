@@ -5,7 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
 
-from tests.support.provider_spike_isolation import (
+from tests.composition.runtime.provider_spike_isolation import (
     assert_unavailable_spike_preserves_catalog,
 )
 

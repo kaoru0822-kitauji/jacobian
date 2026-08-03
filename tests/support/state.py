@@ -108,9 +108,3 @@ def copy_template(template: Path, destination: Path) -> Path:
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(template, destination)
     return destination
-
-
-def isolated_copy(template: Path, tmp_path: Path, name: str = "state") -> Path:
-    """Create one test-owned mutable copy of ``template`` below ``tmp_path``."""
-
-    return copy_template(template, Path(tmp_path) / name)

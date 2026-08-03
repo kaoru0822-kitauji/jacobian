@@ -98,6 +98,17 @@ def test_process_lane_is_invoked_by_ci() -> None:
     assert "run: make test-process" in workflow
 
 
+def test_provider_opt_in_and_deployment_have_explicit_workflow_gates() -> None:
+    workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+
+    assert "ci:provider" in workflow
+    assert "--include-provider" in workflow
+    assert "run-deploy: ${{ steps.classify.outputs.run-deploy }}" in workflow
+    assert "deployment-check:" in workflow
+    assert "run: make deploy-check" in workflow
+    assert "deployment-test:" in workflow
+
+
 def test_benchmark_workflow_has_distinct_pr_merge_and_full_portfolio_tiers() -> None:
     workflow = (ROOT / ".github/workflows/benchmarks.yml").read_text(encoding="utf-8")
 
@@ -113,7 +124,7 @@ def test_oracle_workers_do_not_repeat_benchmark_contract_suite() -> None:
     workflow = (ROOT / ".github/workflows/benchmarks.yml").read_text(encoding="utf-8")
     oracle = workflow.split("  oracle:", 1)[1].split("  validation:", 1)[0]
 
-    assert "needs: [plan, contracts]" in oracle
+    assert "needs: [plan, static, contracts]" in oracle
     assert "make harbor-oracle-task" in oracle
     assert "make harbor-oracle DATASET" not in oracle
 
@@ -134,6 +145,15 @@ def test_product_ci_publishes_a_provenance_bound_plan_receipt() -> None:
     assert "python .github/scripts/emit-plan-receipt" in workflow
     assert "ci-plan-receipt" in workflow
     assert "plan-receipt-digest" in workflow
+
+
+def test_documentation_job_installs_uv_before_make_docs_linkcheck() -> None:
+    workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    docs = workflow.split("  docs:", 1)[1].split("  security-audit:", 1)[0]
+
+    assert "astral-sh/setup-uv@" in docs
+    assert 'version: "0.11.28"' in docs
+    assert "run: make docs-linkcheck" in docs
 
 
 def test_plan_receipt_digests_are_rendered_as_markdown_code() -> None:

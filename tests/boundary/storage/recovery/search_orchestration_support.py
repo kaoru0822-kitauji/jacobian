@@ -13,10 +13,10 @@ def _install_search_plugin(
     runtime: JacobianRuntime,
     *,
     proposer_entrypoint: str = (
-        "tests.component.plugins._fixture_plugins:propose_fixture_values"
+        "tests.support.plugin_entrypoints:propose_fixture_values"
     ),
     refiner_entrypoint: str = (
-        "tests.component.plugins._fixture_plugins:refine_fixture_search"
+        "tests.support.plugin_entrypoints:refine_fixture_search"
     ),
     include_witness_oracle: bool = False,
 ) -> tuple[str, str]:
@@ -44,11 +44,11 @@ def _install_search_plugin(
     entrypoints = {
         "Proposer": proposer_entrypoint,
         "Refiner": refiner_entrypoint,
-        "Evaluator": "tests.component.plugins._fixture_plugins:evaluate_candidate",
+        "Evaluator": "tests.support.plugin_entrypoints:evaluate_candidate",
     }
     if include_witness_oracle:
         entrypoints["WitnessOracle"] = (
-            "tests.component.plugins._fixture_plugins:find_fixture_witness"
+            "tests.support.plugin_entrypoints:find_fixture_witness"
         )
     capabilities: dict[str, dict[str, str]] = {}
     for name, entrypoint in entrypoints.items():

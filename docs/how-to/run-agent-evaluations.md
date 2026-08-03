@@ -9,8 +9,16 @@ interpretation boundaries are in the [reference page](../reference/agent-evaluat
 
 ## Validate the dataset
 
-Run the exact selected-task contract checks before spending model or Docker
-time:
+Preview the benchmark plan before spending Docker or model time:
+
+```sh
+make harbor-plan BASE=origin/main
+```
+
+Then run the exact selected-task contract checks. `make harbor-oracle-task`
+depends on `make harbor-check-task`, so the contract check runs first and
+fails fast; the separate `make harbor-check-task` below is an optional
+cheaper preview that avoids Harbor runtime startup:
 
 ```sh
 make harbor-check-task DATASET=agent-workflow-v1 TASKS="graph-counterexample"
@@ -21,6 +29,11 @@ Use the full `make harbor-check` and explicitly scoped `make harbor-oracle`
 paths only for shared Harbor tooling, schemas, registry, suite policy, or
 other control-plane changes. Pass `TASKS="..."` for a bounded dataset Oracle;
 pass `FULL=1` only when a complete dataset sweep is intentional.
+
+Task README and `benchmarks/validation/` changes do not require an Oracle;
+they affect documentation or deterministic host-side validation. Changes to a
+task's executable input or clean-room verifier do require the exact selected
+task Oracle after contract validation.
 
 ## Set shared run conditions
 
@@ -115,6 +128,26 @@ For Jacobian treatment runs, inspect Harbor ATIF together with Jacobian
 telemetry. Check capability discovery and descriptions, invocation and
 parameter errors, artifact and verification-record flow, repeated or
 irrelevant calls, shell/file activity, tokens, time, and completion.
+
+For a paired control/treatment run, normalize each condition and then compare
+them so task digests, prompts, models, budgets, and job configuration are
+checked for drift:
+
+```sh
+make agent-eval-validate RESULTS=benchmarks/results/agent-workflow-v1 \
+  JOB=<job-name> CONDITION=control OUTPUT=benchmarks/results/normalized-control.json
+make agent-eval-validate RESULTS=benchmarks/results/agent-workflow-v1 \
+  JOB=<job-name> CONDITION=treatment OUTPUT=benchmarks/results/normalized-treatment.json
+make agent-eval-compare \
+  CONTROL=benchmarks/results/normalized-control.json \
+  TREATMENT=benchmarks/results/normalized-treatment.json \
+  OUTPUT=benchmarks/results/comparison.json
+```
+
+The comparator rejects unmatched task repetitions or configuration drift and
+reports correctness and assurance separately. See
+[Capability workflow evaluations](../reference/capability-workflow-evaluations.md)
+for the full evidence roles and interpretation boundaries.
 
 Record the git tree, task digests, provider/runtime, model and prompt settings,
 raw trace location, and validation actually run. A public workflow result is

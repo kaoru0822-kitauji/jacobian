@@ -60,6 +60,8 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             },
             separators=(",", ":"),
         ),
+        "provider-selection": "[]",
+        "run-deploy": str(classification == "exhaustive").lower(),
         **{key: str(key in selected).lower() for key in BOOLEAN_KEYS},
     }
 
@@ -169,7 +171,7 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             _expected_plan("selective", "run-static"),
         ),
         (
-            ("tests/support/provider_spike_isolation.py",),
+            ("tests/composition/runtime/provider_spike_isolation.py",),
             _expected_plan(
                 "python",
                 "run-python",
@@ -271,6 +273,17 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             ),
         ),
         (
+            (".github/scripts/_ci_paths.py",),
+            _expected_plan(
+                "selective",
+                "run-python",
+                "run-unit",
+                "run-process",
+                "run-static",
+                "run-build",
+            ),
+        ),
+        (
             (".github/scripts/classify-ci-paths",),
             _expected_plan(
                 "selective",
@@ -304,10 +317,27 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             ("tools/test_topology.py",),
             _expected_plan(
                 "selective",
-                *GENERIC_PYTHON_KEYS,
+                "run-python",
+                "run-unit",
+                "run-process",
                 "run-static",
                 "run-build",
             ),
+        ),
+        (
+            ("tools/check_doc_commands.py",),
+            _expected_plan(
+                "selective",
+                "run-python",
+                "run-unit",
+                "run-static",
+                "run-build",
+                "run-docs",
+            ),
+        ),
+        (
+            ("tools/check_benchmark_static.py",),
+            _expected_plan("selective", "run-static", "run-build"),
         ),
         (
             ("tests/topology.toml",),

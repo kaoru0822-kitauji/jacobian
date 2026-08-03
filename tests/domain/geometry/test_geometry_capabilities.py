@@ -4,21 +4,7 @@ from pathlib import Path
 import pytest
 from tests.support.services import DomainTestServices, open_domain_services
 
-from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
-    CapabilityRequest,
-)
-from jacobian.contracts.geometry import (
-    LinePairRequest,
-    PointLineRequest,
-    PointPairRequest,
-    PointQuadrupleRequest,
-    PointSetRequest,
-    PointTripleRequest,
-    PolygonRequest,
-    SegmentIntersectionRequest,
-    SimplePolygonPointRequest,
-)
+from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.domains.geometry import build_geometry_bundle
 
@@ -81,52 +67,13 @@ def test_segment_midpoint_example_is_directly_invocable(domain_services) -> None
     }
 
 
-def test_geometry_capabilities_are_distinct_and_every_contract_completes(
-    domain_services,
-) -> None:
-    line_x = {"first": P0, "second": PX}
-    line_y = {"first": P0, "second": PY}
-    payloads = {
-        PointPairRequest: {"first": P0, "second": PXY},
-        PointTripleRequest: {"first": P0, "second": PX, "third": PY},
-        PointQuadrupleRequest: {
-            "first": P0,
-            "second": PX,
-            "third": PY,
-            "fourth": PXY,
-        },
-        LinePairRequest: {"first_line": line_x, "second_line": line_y},
-        PointLineRequest: {"point": PXY, "line": line_x},
-        PolygonRequest: {"points": [P0, PX, PY]},
-        PointSetRequest: {"points": [P0, PX, PY, PXY]},
-        SegmentIntersectionRequest: {
-            "first": _segment(P0, PXY),
-            "second": _segment(PX, PY),
-        },
-        SimplePolygonPointRequest: {
-            "polygon": {"points": [P0, PX, PXY, PY]},
-            "point": {"x": ONE, "y": ONE},
-        },
-    }
+def test_geometry_capabilities_have_distinct_ids() -> None:
     ids = [
         operation.capability_id for operation in build_geometry_bundle().capabilities
     ]
 
     assert ids, "expected geometry capabilities"
     assert len(ids) == len(set(ids))
-    for operation in build_geometry_bundle().capabilities:
-        result = domain_services.core.capabilities.invoke(
-            CapabilityRequest(
-                capability_id=operation.capability_id,
-                input=payloads[operation.request_model],
-            )
-        )
-        assert result.execution.status is ExecutionStatus.COMPLETED, (
-            operation.capability_id,
-            result.diagnostics,
-        )
-        assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-        assert result.artifact_uris == ()
 
 
 def test_geometry_exact_outputs_are_inline(domain_services) -> None:

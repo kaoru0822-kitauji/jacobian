@@ -32,6 +32,12 @@ complete dataset sweep. Model execution with `make agent-eval ... EVAL_EXECUTE=1
 explicit operator-run evidence exercise; it is not a routine development or
 pull-request gate.
 
+A task README or a host-side regression under `benchmarks/validation/` changes
+documentation or deterministic validation only, so it does not require an
+Oracle. Changes to a task's executable input, environment, solution, member
+record, or clean-room verifier do require the selected-task Oracle after the
+contract check.
+
 The suite module checks that each member ID names a direct Harbor task bundle
 and validates the generated task digests. Wrong
 answers, malformed or escaped evidence, incomplete scope, and false

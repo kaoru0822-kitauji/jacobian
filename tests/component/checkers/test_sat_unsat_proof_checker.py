@@ -54,7 +54,7 @@ def _checker_artifact(artifact: StoredArtifact) -> dict[str, Any]:
     }
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def proof_request_factory(
     tmp_path_factory: pytest.TempPathFactory,
 ) -> ProofRequestFactory:

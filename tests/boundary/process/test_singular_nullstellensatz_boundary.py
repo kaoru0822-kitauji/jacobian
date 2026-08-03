@@ -90,6 +90,19 @@ def _invoke(
         ),
         (
             BoundedProcessResult(
+                returncode=None,
+                stdout=b"",
+                stderr=b"",
+                stdout_exceeded=False,
+                stderr_exceeded=False,
+                timed_out=False,
+                cancelled=True,
+            ),
+            "CANCELLED",
+            "SINGULAR_CANCELLED",
+        ),
+        (
+            BoundedProcessResult(
                 returncode=0,
                 stdout=b"not the bounded protocol",
                 stderr=b"",

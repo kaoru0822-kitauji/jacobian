@@ -257,12 +257,19 @@ def pytest_command(
     selectors: list[str] | None = None,
     extra_args: list[str] | None = None,
 ) -> list[str]:
-    """Build one pytest invocation without interpreting selectors."""
+    """Build one pytest invocation without interpreting selectors.
+
+    An explicit selector is the focused ``TESTS=`` form used by local edit
+    loops.  It does not need the lane's worker pool, and starting that pool can
+    cost more than the selected test itself.  An omitted selector still means
+    "the whole lane" and retains the configured CI parallelism.  Lanes with
+    ``workers=0`` are unaffected by this distinction.
+    """
     lane = topology.lane(lane_name)
     command = [sys.executable, "-m", "pytest"]
     command.extend(selectors if selectors else list(lane.paths))
     command.extend(extra_args or ())
-    if lane.workers:
+    if lane.workers and not selectors:
         command.extend(["-n", str(lane.workers), "--dist", lane.distribution])
     command.extend(["--timeout", str(lane.timeout_seconds)])
     return command
@@ -286,22 +293,51 @@ def run_lane(
     os.execvpe(command[0], command, environment)
 
 
+def _print_dry_run(
+    lane: Lane, command: list[str], *, selectors: list[str] | None
+) -> None:
+    """Print lane metadata and the resolved pytest command for inspection.
+
+    Metadata lines are prefixed with ``#`` so the command remains the final,
+    un-prefixed line and stays consumable by callers that only need the
+    invocation string.  The effective worker count and distribution reflect
+    the focused-selector shortcut: an explicit selector disables the lane's
+    configured worker pool, so the reported values drop to zero/``none`` even
+    though the lane itself may declare parallelism.
+    """
+    focused = bool(selectors)
+    workers = 0 if focused else lane.workers
+    distribution = "none" if focused else lane.distribution
+    print(f"# lane: {lane.name}")
+    print(f"# tier: {lane.tier}")
+    print(f"# workers: {workers}")
+    print(f"# distribution: {distribution}")
+    print(f"# timeout_seconds: {lane.timeout_seconds}")
+    print(f"# timing_sharding: {'true' if lane.timing_sharding else 'false'}")
+    if selectors:
+        print(f"# selectors: {len(selectors)}")
+    print(shlex.join(command))
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("lane", help="topology lane to execute")
     parser.add_argument("selectors", nargs="*", help="exact pytest paths or node IDs")
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument(
-        "--dry-run", action="store_true", help="print the pytest command"
+        "--dry-run",
+        action="store_true",
+        help="print lane metadata and the pytest command without executing",
     )
     args, extra_args = parser.parse_known_args(argv)
     try:
         topology = load_topology(args.manifest)
+        lane = topology.lane(args.lane)
         command = pytest_command(topology, args.lane, args.selectors, extra_args)
     except TopologyError as exc:
         parser.error(str(exc))
     if args.dry_run:
-        print(shlex.join(command))
+        _print_dry_run(lane, command, selectors=args.selectors)
         return 0
     return run_lane(topology, args.lane, args.selectors, extra_args)
 

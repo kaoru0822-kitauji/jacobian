@@ -114,14 +114,15 @@ def test_sibling_conftest_imports_are_rejected(tmp_path: Path) -> None:
     assert [item.code for item in report.violations] == ["conftest-import"]
 
 
-def test_runtime_fixture_plugin_is_the_explicit_shared_construction_owner(
+def test_runtime_fixture_plugins_are_explicit_construction_owners(
     tmp_path: Path,
 ) -> None:
-    _test_file(
-        tmp_path,
-        "tests/support/runtime_fixtures.py",
-        "from jacobian.runtime import create_runtime\n",
-    )
+    for name in ("runtime_templates.py", "runtime_instances.py"):
+        _test_file(
+            tmp_path,
+            f"tests/support/{name}",
+            "from jacobian.runtime import create_runtime\n",
+        )
 
     assert check_test_architecture(tmp_path).ok
 

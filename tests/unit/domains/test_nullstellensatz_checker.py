@@ -18,7 +18,7 @@ SYSTEM_DIGEST = "sha256:" + "2" * 64
 BUNDLE_URI = "artifact://sha256/" + "3" * 64
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def valid_request() -> dict[str, Any]:
     bundle = NullstellensatzCertificateBundle(
         system_uri=SYSTEM_URI,

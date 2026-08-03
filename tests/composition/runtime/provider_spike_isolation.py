@@ -1,4 +1,4 @@
-"""Assertions shared by optional-provider spike isolation tests."""
+"""Assertions shared by composition-local optional-provider spike tests."""
 
 from __future__ import annotations
 

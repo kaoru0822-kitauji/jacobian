@@ -36,7 +36,7 @@ def _wait_until_process_exits(
 
 def test_plugin_executor_returns_only_canonical_result() -> None:
     result = PluginExecutor().run(
-        entrypoint="tests.component.plugins._fixture_plugins:echo",
+        entrypoint="tests.support.plugin_entrypoints:echo",
         request={"candidate": {"value": 3}},
         timeout_seconds=30,
     )
@@ -48,7 +48,7 @@ def test_plugin_executor_returns_only_canonical_result() -> None:
 
 def test_plugin_executor_rejects_changed_implementation_digest() -> None:
     result = PluginExecutor().run(
-        entrypoint="tests.component.plugins._fixture_plugins:echo",
+        entrypoint="tests.support.plugin_entrypoints:echo",
         implementation_digest="sha256:" + "0" * 64,
         request={"candidate": {"value": 3}},
         timeout_seconds=30,
@@ -64,7 +64,7 @@ def test_plugin_executor_rejects_changed_implementation_digest() -> None:
 
 def test_plugin_executor_does_not_expose_untrusted_exception_text() -> None:
     result = PluginExecutor().run(
-        entrypoint="tests.component.plugins._fixture_plugins:propose_declared_failure",
+        entrypoint="tests.support.plugin_entrypoints:propose_declared_failure",
         request={},
         timeout_seconds=30,
     )
@@ -80,7 +80,7 @@ def test_plugin_executor_does_not_expose_untrusted_exception_text() -> None:
 
 def test_module_import_diagnostics_do_not_corrupt_worker_protocol() -> None:
     result = PluginExecutor().run(
-        entrypoint="tests.component.plugins._fixture_noisy_module:echo",
+        entrypoint="tests.support.plugin_noisy_module:echo",
         request={"value": 7},
         timeout_seconds=30,
     )
@@ -92,7 +92,7 @@ def test_module_import_diagnostics_do_not_corrupt_worker_protocol() -> None:
 
 def test_plugin_timeout_has_no_mathematical_output() -> None:
     result = PluginExecutor().run(
-        entrypoint="tests.component.plugins._fixture_plugins:wait_forever",
+        entrypoint="tests.support.plugin_entrypoints:wait_forever",
         request={},
         timeout_seconds=1,
     )
@@ -107,7 +107,7 @@ def test_plugin_timeout_has_no_mathematical_output() -> None:
 
 def test_plugin_unreadable_response_explains_recovery() -> None:
     result = PluginExecutor().run(
-        entrypoint="tests.component.plugins._fixture_plugins:exit_without_response",
+        entrypoint="tests.support.plugin_entrypoints:exit_without_response",
         request={},
         timeout_seconds=30,
     )
@@ -123,7 +123,7 @@ def test_plugin_unreadable_response_explains_recovery() -> None:
 def test_plugin_diagnostic_limit_fails_closed() -> None:
     start = time.monotonic()
     result = PluginExecutor(max_diagnostic_bytes=32).run(
-        entrypoint="tests.component.plugins._fixture_plugins:emit_large_diagnostic",
+        entrypoint="tests.support.plugin_entrypoints:emit_large_diagnostic",
         request={},
         timeout_seconds=30,
     )
@@ -148,7 +148,7 @@ def test_plugin_timeout_kills_descendant_processes(tmp_path: Path) -> None:
     pid_marker = tmp_path / "descendant-pid"
 
     result = PluginExecutor().run(
-        entrypoint="tests.component.plugins._fixture_plugins:spawn_delayed_child",
+        entrypoint="tests.support.plugin_entrypoints:spawn_delayed_child",
         request={
             "marker": str(marker),
             "started_marker": str(started_marker),
@@ -174,7 +174,7 @@ def test_plugin_success_kills_descendant_holding_output_pipes(tmp_path: Path) ->
     start = time.monotonic()
 
     result = PluginExecutor().run(
-        entrypoint="tests.component.plugins._fixture_plugins:spawn_child_then_return",
+        entrypoint="tests.support.plugin_entrypoints:spawn_child_then_return",
         request={"marker": str(marker), "pid_marker": str(pid_marker)},
         timeout_seconds=2,
     )
@@ -198,7 +198,7 @@ def test_plugin_success_still_kills_detached_descendants(tmp_path: Path) -> None
 
     result = PluginExecutor().run(
         entrypoint=(
-            "tests.component.plugins._fixture_plugins:spawn_detached_child_then_return"
+            "tests.support.plugin_entrypoints:spawn_detached_child_then_return"
         ),
         request={"marker": str(marker), "pid_marker": str(pid_marker)},
         timeout_seconds=5,
@@ -216,7 +216,7 @@ def test_plugin_worker_does_not_inherit_parent_secrets(
     monkeypatch.setenv("HTTPS_PROXY", "http://secret.invalid")
 
     result = PluginExecutor().run(
-        entrypoint="tests.component.plugins._fixture_plugins:report_environment",
+        entrypoint="tests.support.plugin_entrypoints:report_environment",
         request={},
         timeout_seconds=5,
     )

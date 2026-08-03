@@ -47,14 +47,22 @@ def test_root_conftest_has_no_high_cost_imports_or_runtime_construction() -> Non
 def test_complete_runtime_plugin_is_registered_only_by_owning_tiers() -> None:
     """Complete-runtime fixtures stay out of narrower semantic lanes."""
 
-    plugin_name = "tests.support.runtime_fixtures"
-    for tier in ("composition", "boundary", "e2e"):
+    plugin_names = (
+        "tests.support.runtime_templates",
+        "tests.support.runtime_instances",
+    )
+    for tier in (
+        "composition",
+        "e2e",
+        "boundary" / Path("storage"),
+        "boundary" / Path("providers"),
+    ):
         namespace = runpy.run_path(str(ROOT / tier / "conftest.py"))
-        assert namespace["pytest_plugins"] == (plugin_name,)
+        assert namespace["pytest_plugins"] == plugin_names
 
     for tier in ("component", "domain"):
         imports = _imports(ROOT / tier / "conftest.py")
-        assert plugin_name not in imports
+        assert not any(name in imports for name in plugin_names)
         assert not any(module.startswith("jacobian.portfolio") for module in imports)
 
 

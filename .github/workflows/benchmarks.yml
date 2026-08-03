@@ -109,6 +109,7 @@ jobs:
             --base "$BASE_SHA" \
             --head "$HEAD_SHA" \
             --planner .github/scripts/plan-benchmarks \
+            --config .github/scripts/_ci_paths.py \
             --config .github/scripts/validate-benchmark-plan \
             --config benchmarks/registry.toml \
             --config benchmarks/environment-profiles.toml \
@@ -116,6 +117,7 @@ jobs:
             --config Makefile \
             --config tools/check_benchmark_adapters.py \
             --config tools/check_benchmark_contracts.py \
+            --config tools/check_benchmark_static.py \
             --config tools/check_harbor_dataset.py \
             --config tools/sync_harbor_verifier_support.py \
             --plan-file "$plan_dir/plan.txt" \
@@ -136,6 +138,23 @@ jobs:
           name: benchmark-plan-receipt
           path: ${{ runner.temp }}/jacobian-benchmark-plan/plan-receipt.json
           retention-days: 14
+
+  static:
+    name: Benchmark Static Quality
+    needs: plan
+    if: needs.plan.outputs.run-benchmark-check == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - name: Check benchmark Python, verifier, and validation code
+        run: uv run --locked python tools/check_benchmark_static.py
 
   contracts:
     name: Benchmark Contracts, Records & Digests
@@ -173,10 +192,11 @@ jobs:
 
   oracle:
     name: Benchmark Oracle (${{ matrix.dataset }}/${{ matrix.shard }})
-    needs: [plan, contracts]
+    needs: [plan, static, contracts]
     if: >-
       ${{ always() &&
       needs.plan.result == 'success' &&
+      needs.static.result == 'success' &&
       needs.plan.outputs.run-benchmark-oracle == 'true' &&
       needs.contracts.result == 'success' }}
     runs-on: ubuntu-latest
@@ -213,7 +233,7 @@ jobs:
   validation:
     name: Benchmark Validation
     if: ${{ always() }}
-    needs: [plan, contracts, inventory, oracle]
+    needs: [plan, static, contracts, inventory, oracle]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -225,6 +245,7 @@ jobs:
           PROSPECTIVE_DIGEST_FLAG: ${{ needs.plan.outputs.run-benchmark-prospective-digest }}
           INVENTORY_FLAG: ${{ needs.plan.outputs.run-benchmark-inventory }}
           ORACLE_FLAG: ${{ needs.plan.outputs.run-benchmark-oracle }}
+          STATIC_RESULT: ${{ needs.static.result }}
           CONTRACTS_RESULT: ${{ needs.contracts.result }}
           INVENTORY_RESULT: ${{ needs.inventory.result }}
           ORACLE_RESULT: ${{ needs.oracle.result }}
@@ -268,6 +289,7 @@ jobs:
             false) test "$CONTRACTS_RESULT" = "skipped" ;;
             *) echo "invalid record-schema plan flag: $RECORD_SCHEMA_FLAG" >&2; exit 1 ;;
           esac
+          check_lane "$PLAN_CHECK" "$STATIC_RESULT" "static"
           check_lane "$INVENTORY_FLAG" "$INVENTORY_RESULT" "inventory"
           check_lane "$ORACLE_FLAG" "$ORACLE_RESULT" "oracle"
           case "$PLAN_CHECK" in

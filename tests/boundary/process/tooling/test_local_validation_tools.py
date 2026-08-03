@@ -78,6 +78,55 @@ def test_known_ci_tooling_change_uses_owned_process_tests() -> None:
     assert selected == ["tests/boundary/process/tooling/test_plan_receipt.py"]
 
 
+def test_explicit_missing_path_is_treated_as_a_delete(
+    monkeypatch, tmp_path: Path
+) -> None:
+    planner = _load("plan_local_tests_explicit_delete", "plan-local-tests")
+    monkeypatch.setattr(planner, "ROOT", tmp_path)
+    (tmp_path / "present.py").write_text("", encoding="utf-8")
+
+    assert planner._explicit_entries(["present.py", "removed.py"]) == [
+        planner.Change("M", "present.py"),
+        planner.Change("D", "removed.py"),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        (
+            ".github/scripts/plan-local-tests",
+            {
+                "tests/boundary/process/tooling/test_local_validation_tools.py",
+                "tests/unit/tooling/test_ci_planner_catalog.py",
+            },
+        ),
+        (
+            "tools/test_topology.py",
+            {
+                "tests/boundary/process/tooling/test_local_validation_tools.py",
+                "tests/unit/tooling/test_topology_manifest.py",
+                "tests/unit/tooling/test_topology_runner.py",
+            },
+        ),
+        (
+            "tools/check_doc_commands.py",
+            {"tests/unit/tooling/test_doc_commands.py"},
+        ),
+    ],
+)
+def test_new_tooling_changes_use_narrow_owned_tests(
+    path: str,
+    expected: set[str],
+) -> None:
+    planner = _load("plan_local_tests_owned_tools", "plan-local-tests")
+
+    selected, fallback = planner.exact_tests([planner.Change("M", path)])
+
+    assert fallback is None
+    assert set(selected) == expected
+
+
 def test_deleted_ci_tooling_change_cannot_use_owned_process_override() -> None:
     planner = _load("plan_local_tests_deleted_ci_override", "plan-local-tests")
 
@@ -509,3 +558,20 @@ def test_plan_fails_closed_for_unknown_path_and_invalid_manifest(
 
     assert tests == []
     assert fallback == ".github/local-test-ownership.json: invalid manifest"
+
+
+def test_plan_labels_focused_commands_without_printing_lane_fallbacks(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    planner = _load("plan_local_tests_focused_output", "plan-local-tests")
+    monkeypatch.setenv("PATHS", '["tools/check_doc_commands.py"]')
+    monkeypatch.setattr(sys, "argv", ["plan-local-tests"])
+
+    planner.main()
+    output = capsys.readouterr().out
+
+    assert "focused selectors:" in output
+    assert "make test-unit TESTS=tests/unit/tooling/test_doc_commands.py" in output
+    assert "make test-component" not in output
+    assert "make check-static" not in output
