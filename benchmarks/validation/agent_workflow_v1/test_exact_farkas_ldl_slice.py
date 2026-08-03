@@ -1,9 +1,11 @@
 from __future__ import annotations
+
 import json
+from fractions import Fraction
 from pathlib import Path
+
 import pytest
 from benchmarks.validation.agent_workflow_v1 import support
-from fractions import Fraction
 
 TASK = "exact-farkas-ldl-slice"
 
