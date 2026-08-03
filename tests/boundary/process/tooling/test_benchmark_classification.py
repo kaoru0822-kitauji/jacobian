@@ -59,6 +59,24 @@ def test_task_documentation_does_not_select_oracle(
     assert "task documentation change" in plan["benchmark-plan-reasons"]
 
 
+@pytest.mark.parametrize(
+    "path",
+    [".github/scripts/_ci_paths.py", "tools/check_benchmark_static.py"],
+)
+def test_benchmark_control_tools_run_contract_gate_without_oracle(
+    path: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load()
+    _patch_plan(module, monkeypatch)
+
+    plan = module.plan([path], base="a" * 40, head="b" * 40)
+
+    assert plan["run-benchmark-check"] == "true"
+    assert plan["run-benchmark-record-schema"] == "true"
+    assert plan["run-benchmark-oracle"] == "false"
+
+
 def test_task_environment_selects_exact_task_oracle(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

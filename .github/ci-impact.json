@@ -18,6 +18,33 @@
     "duplicate",
     "docs"
   ],
+  "catalog": {
+    "unit": {"command": "make test-unit", "topology_lane": "unit"},
+    "component": {"command": "make test-component", "topology_lane": "component"},
+    "domain": {"command": "make test-domain", "topology_lane": "domain"},
+    "composition": {"command": "make test-composition", "topology_lane": "composition"},
+    "storage": {"command": "make test-storage", "topology_lane": "storage"},
+    "process": {"command": "make test-process", "topology_lane": "process"},
+    "mcp": {"command": "make test-mcp", "topology_lane": "mcp"},
+    "provider": {
+      "command": "make test-provider",
+      "topology_lane": "provider",
+      "providers": ["cvc5", "external_sat", "flint", "graph", "sympy"]
+    },
+    "e2e": {"command": "make test-e2e", "topology_lane": "e2e"},
+    "lean": {"command": "make test-lean", "topology_lane": "lean"},
+    "npm": {"command": "make npm-test", "topology_lane": null},
+    "static": {"command": "make check-static", "topology_lane": null},
+    "build": {"command": "make build", "topology_lane": null},
+    "security": {"command": "make security-audit", "topology_lane": null},
+    "duplicate": {"command": "make duplicate-code", "topology_lane": null},
+    "docs": {"command": "make docs-linkcheck", "topology_lane": null},
+    "deploy": {
+      "command": "make deploy-check",
+      "topology_lane": null,
+      "local_only": true
+    }
+  },
   "rules": [
     {
       "name": "documentation",
@@ -29,6 +56,15 @@
       ],
       "suites": [
         "docs"
+      ]
+    },
+    {
+      "name": "deployment",
+      "patterns": [
+        "deploy/**"
+      ],
+      "suites": [
+        "process"
       ]
     },
     {
@@ -262,6 +298,7 @@
       "name": "ci-planning-tools",
       "patterns": [
         ".github/local-test-ownership.json",
+        ".github/scripts/_ci_paths.py",
         ".github/scripts/classify-ci-paths",
         ".github/scripts/emit-plan-receipt",
         ".github/scripts/plan-local-tests",
@@ -272,6 +309,7 @@
     {
       "name": "benchmark-ci-automation",
       "patterns": [
+        ".github/scripts/_ci_paths.py",
         ".github/scripts/plan-benchmarks",
         ".github/scripts/validate-benchmark-plan",
         ".github/workflows/benchmarks.yml"
@@ -311,6 +349,40 @@
         "process",
         "mcp",
         "e2e",
+        "static",
+        "build"
+      ]
+    },
+    {
+      "name": "topology-runner-tool",
+      "patterns": [
+        "tools/test_topology.py"
+      ],
+      "suites": [
+        "unit",
+        "process",
+        "static",
+        "build"
+      ]
+    },
+    {
+      "name": "documentation-command-tool",
+      "patterns": [
+        "tools/check_doc_commands.py"
+      ],
+      "suites": [
+        "unit",
+        "static",
+        "build",
+        "docs"
+      ]
+    },
+    {
+      "name": "benchmark-static-tool",
+      "patterns": [
+        "tools/check_benchmark_static.py"
+      ],
+      "suites": [
         "static",
         "build"
       ]

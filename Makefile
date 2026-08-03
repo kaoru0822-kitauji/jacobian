@@ -15,13 +15,13 @@ ORDERING_DEFAULT_SEED := --randomly-seed=17
 PYTEST_DIAGNOSTIC_ARGS ?= --durations=10
 RUFF_PATHS := src tests benchmarks
 TOPOLOGY_RUNNER := $(UV_RUN) python tools/test_topology.py
-PUBLIC_COMMANDS := help setup check check-changed ci-plan test-plan test-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e docs-linkcheck harbor-plan harbor-check-task harbor-oracle-task npm-test test-all-ci check-static deploy-check
+PUBLIC_COMMANDS := help setup check check-changed ci-plan test-plan test-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e docs-command-check docs-linkcheck harbor-plan harbor-check-task harbor-oracle-task npm-test test-all-ci check-static deploy-check
 
 # A timeout is a lane-level containment policy.  It intentionally does not live
 # in pyproject.toml: direct pytest invocations must not silently inherit a
 # signal-based deadline that cannot interrupt a native solver.  Process and
 # provider lanes run risky work in killable children and set their own deadline.
-.PHONY: help help-all uv-version-check setup setup-agent container-image hooks fix lint complexity-check lint-full security-audit typecheck test-architecture ci-plan test-plan test-changed check-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static harbor-plan harbor-sync harbor-contracts harbor-adapter-checks harbor-validation-tests harbor-validate harbor-check harbor-check-task benchmark-inventory benchmark-snapshot benchmark-snapshot-validate benchmark-publish harbor-oracle harbor-oracle-task harbor-oracle-run harbor-oracle-all harbor-adapter-check heldout-validate heldout-render heldout-smoke agent-eval agent-eval-validate agent-eval-compare provider-eval clean docs-linkcheck deploy-check
+.PHONY: help help-all uv-version-check setup setup-agent container-image hooks fix lint complexity-check lint-full security-audit typecheck test-architecture ci-plan test-plan test-changed check-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static harbor-plan harbor-sync harbor-contracts harbor-adapter-checks harbor-validation-tests harbor-validate harbor-check harbor-check-task benchmark-inventory benchmark-snapshot benchmark-snapshot-validate benchmark-publish harbor-oracle harbor-oracle-task harbor-oracle-run harbor-oracle-all harbor-adapter-check heldout-validate heldout-render heldout-smoke agent-eval agent-eval-validate agent-eval-compare provider-eval clean docs-command-check docs-linkcheck deploy-check
 
 help: ## Show available developer commands.
 	@awk -v public="$(PUBLIC_COMMANDS)" 'BEGIN {FS = ":.*## "; n = split(public, names, " "); for (i = 1; i <= n; i++) wanted[names[i]] = 1; printf "Jacobian common developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / && ($$1 in wanted) {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -84,9 +84,13 @@ typecheck: ## Run strict static type checking.
 test-architecture: ## Enforce semantic test-layer and provider-import boundaries.
 	$(UV_RUN) python tools/check_test_architecture.py .
 
-test-plan: ## Print local validation selected for BASE..HEAD and working changes.
-	@test -n "$(BASE)" || { echo "BASE is required (for example: make test-plan BASE=origin/main)" >&2; exit 2; }
-	@$(UV_RUN) python .github/scripts/plan-local-tests --base "$(BASE)"
+test-plan: ## Print local validation selected for BASE..HEAD or explicit PATHS.
+	@if [ -n "$(PATHS)" ]; then \
+		$(UV_RUN) python .github/scripts/plan-local-tests --paths $(PATHS); \
+	else \
+		test -n "$(BASE)" || { echo "BASE is required unless PATHS is set (for example: make test-plan BASE=origin/main)" >&2; exit 2; }; \
+		$(UV_RUN) python .github/scripts/plan-local-tests --base "$(BASE)"; \
+	fi
 
 ci-plan: ## Print the hosted CI lane plan for BASE..HEAD and working changes.
 	@set -eu; \
@@ -94,13 +98,17 @@ ci-plan: ## Print the hosted CI lane plan for BASE..HEAD and working changes.
 	trap 'rm -rf "$$tmp_dir"' EXIT; \
 	base_sha=$$(git rev-parse "$(or $(BASE),origin/main)"); \
 	head_sha=$$(git rev-parse HEAD); \
-	changed_paths=$$({ \
-		git diff --name-only "$(or $(BASE),origin/main)" HEAD; \
-		git diff --name-only HEAD; \
-		git diff --cached --name-only; \
-		git ls-files --others --exclude-standard; \
-	} | sort -u); \
-	printf '%s\n' "$$changed_paths" > "$$tmp_dir/changed-paths.txt"; \
+	if [ -n "$(PATHS)" ]; then \
+		printf '%s\n' $(PATHS) | sort -u > "$$tmp_dir/changed-paths.txt"; \
+	else \
+		{ \
+			git diff --name-only "$(or $(BASE),origin/main)" HEAD; \
+			git diff --name-only HEAD; \
+			git diff --cached --name-only; \
+			git ls-files --others --exclude-standard; \
+		} | sort -u > "$$tmp_dir/changed-paths.txt"; \
+	fi; \
+	changed_paths=$$(tr '\n' ' ' < "$$tmp_dir/changed-paths.txt"); \
 	$(UV_RUN) python .github/scripts/classify-ci-paths -- $$changed_paths > "$$tmp_dir/plan.txt"; \
 	$(UV_RUN) python .github/scripts/validate-ci-plan < "$$tmp_dir/plan.txt"; \
 	$(UV_RUN) python .github/scripts/emit-plan-receipt \
@@ -119,7 +127,11 @@ ci-plan: ## Print the hosted CI lane plan for BASE..HEAD and working changes.
 	cat "$$tmp_dir/receipt.json"
 
 test-changed: ## Run changed-path tests, defaulting BASE to origin/main.
-	@$(UV_RUN) python .github/scripts/plan-local-tests --base "$(or $(BASE),origin/main)" --execute
+	@if [ -n "$(PATHS)" ]; then \
+		$(UV_RUN) python .github/scripts/plan-local-tests --paths $(PATHS) --execute; \
+	else \
+		$(UV_RUN) python .github/scripts/plan-local-tests --base "$(or $(BASE),origin/main)" --execute; \
+	fi
 
 check-changed: ## Run format, types, and exact changed-path tests.
 	$(MAKE) lint typecheck
@@ -228,12 +240,16 @@ harbor-plan: ## Print the independent Harbor benchmark plan (BASE=... optional).
 		base_arg="--base $$base_sha"; \
 	fi; \
 	head_sha=$$(git rev-parse HEAD); \
-	changed_paths=$$({ \
-		if [ -n "$(BASE)" ]; then git diff --name-only "$(BASE)" HEAD; fi; \
-		git diff --name-only HEAD; \
-		git ls-files --others --exclude-standard; \
-	} | sort -u); \
-	printf '%s\n' "$$changed_paths" > "$$tmp_dir/changed-paths.txt"; \
+	if [ -n "$(PATHS)" ]; then \
+		printf '%s\n' $(PATHS) | sort -u > "$$tmp_dir/changed-paths.txt"; \
+	else \
+		{ \
+			if [ -n "$(BASE)" ]; then git diff --name-only "$(BASE)" HEAD; fi; \
+			git diff --name-only HEAD; \
+			git ls-files --others --exclude-standard; \
+		} | sort -u > "$$tmp_dir/changed-paths.txt"; \
+	fi; \
+	changed_paths=$$(tr '\n' ' ' < "$$tmp_dir/changed-paths.txt"); \
 	$(HARBOR_PYTHON) .github/scripts/plan-benchmarks \
 		$$base_arg --head "$$head_sha" -- $$changed_paths > "$$tmp_dir/plan.txt"; \
 	$(UV_RUN) python .github/scripts/validate-benchmark-plan < "$$tmp_dir/plan.txt"; \
@@ -456,7 +472,10 @@ clean: ## Remove local caches, build outputs, and coverage artifacts.
 	find src tests benchmarks -type d -name '__pycache__' -prune -exec rm -rf {} +
 	find . -maxdepth 2 -type d -name '*.egg-info' -prune -exec rm -rf {} +
 
-docs-linkcheck: ## Check relative Markdown links in project docs.
+docs-command-check: ## Validate Make targets and TESTS paths in command examples.
+	$(UV_RUN) python tools/check_doc_commands.py
+
+docs-linkcheck: docs-command-check ## Check relative Markdown links in project docs.
 	npx --yes markdown-link-check@3.15.0 \
 		--config .markdown-link-check.json -q \
 		README.md README.zh-CN.md AGENTS.md CONTRIBUTING.md docs

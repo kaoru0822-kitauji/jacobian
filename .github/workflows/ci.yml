@@ -37,6 +37,7 @@ jobs:
       run-mcp: ${{ steps.classify.outputs.run-mcp }}
       run-provider: ${{ steps.classify.outputs.run-provider }}
       run-e2e: ${{ steps.classify.outputs.run-e2e }}
+      run-deploy: ${{ steps.classify.outputs.run-deploy }}
       run-coverage: ${{ steps.classify.outputs.run-coverage }}
       run-compatibility: ${{ steps.classify.outputs.run-compatibility }}
       run-lean: ${{ steps.classify.outputs.run-lean }}
@@ -76,6 +77,7 @@ jobs:
                 github.sha }}
           FORCE_FULL: ${{ contains(github.event.pull_request.labels.*.name, 'ci:full') }}
           FORCE_LEAN: ${{ contains(github.event.pull_request.labels.*.name, 'ci:lean') }}
+          FORCE_PROVIDER: ${{ contains(github.event.pull_request.labels.*.name, 'ci:provider') }}
         run: |
           if [ "$EVENT_NAME" = "pull_request" ]; then
             mapfile -d '' changed_paths < <(
@@ -86,6 +88,9 @@ jobs:
               planner_args=(--force-full --)
             elif [ "$FORCE_LEAN" = "true" ]; then
               planner_args=(--force-lean --)
+            fi
+            if [ "$FORCE_PROVIDER" = "true" ]; then
+              planner_args=(--include-provider "${planner_args[@]}")
             fi
             plan_output=$(
               .github/scripts/classify-ci-paths \
@@ -484,6 +489,45 @@ jobs:
           name: coverage-data-process
           path: .coverage.process
           include-hidden-files: true
+
+  deployment-check:
+    name: Deployment checks
+    needs: plan
+    if: needs.plan.outputs.run-deploy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-python-tests
+        with:
+          python-version: "3.12"
+      - name: Run the explicit deployment validation gate
+        run: make deploy-check
+
+  deployment-test:
+    name: Deployment Tests
+    if: ${{ always() }}
+    needs: [plan, deployment-check]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require planned deployment validation
+        env:
+          PLAN_RESULT: ${{ needs.plan.result }}
+          RUN_DEPLOY: ${{ needs.plan.outputs.run-deploy }}
+          DEPLOYMENT_RESULT: ${{ needs.deployment-check.result }}
+        run: |
+          test "$PLAN_RESULT" = success || {
+            echo "Upstream plan did not succeed: $PLAN_RESULT" >&2
+            exit 1
+          }
+          case "$RUN_DEPLOY" in
+            true) test "$DEPLOYMENT_RESULT" = success ;;
+            false) test "$DEPLOYMENT_RESULT" = skipped ;;
+            *) exit 1 ;;
+          esac
 
   semantic-lane-test:
     name: Tests (${{ matrix.lane }}, Python 3.12)
@@ -996,6 +1040,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs:
       - plan
+      - deployment-test
       - lint
       - security-audit
       - validate-built-package
