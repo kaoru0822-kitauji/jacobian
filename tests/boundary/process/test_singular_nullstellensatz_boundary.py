@@ -170,7 +170,10 @@ def test_singular_version_probe_matches_the_pinned_version_exactly(
 ) -> None:
     executable = tmp_path / "Singular"
     executable.write_bytes(b"test executable")
-    monkeypatch.setattr("jacobian.providers.singular_runtime.shutil.which", lambda _name: str(executable))
+    monkeypatch.setattr(
+        "jacobian.providers.singular_runtime.shutil.which",
+        lambda _name: str(executable),
+    )
     monkeypatch.setattr(
         "jacobian.providers.singular_runtime.run_bounded_process",
         lambda *_args, **_kwargs: BoundedProcessResult(

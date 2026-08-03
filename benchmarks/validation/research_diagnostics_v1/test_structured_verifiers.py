@@ -173,9 +173,7 @@ def test_nullstellensatz_verifier_accepts_reordered_polynomial_terms(
     certificate = json.loads(certificate_path.read_text())
     for chart in certificate["charts"]:
         for named in chart["generators"]:
-            named["polynomial"]["terms"] = list(
-                reversed(named["polynomial"]["terms"])
-            )
+            named["polynomial"]["terms"] = list(reversed(named["polynomial"]["terms"]))
         for multiplier in chart["multipliers"]:
             multiplier["multiplier"]["terms"] = list(
                 reversed(multiplier["multiplier"]["terms"])
