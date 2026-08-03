@@ -15,6 +15,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 PLANNER_PATH = ROOT / ".github" / "scripts" / "plan-benchmarks"
+PATH_POLICY_PATH = ROOT / ".github" / "scripts" / "_ci_paths.py"
 VALIDATOR_PATH = ROOT / ".github" / "scripts" / "validate-benchmark-plan"
 _SPEC = importlib.util.spec_from_loader(
     "benchmark_planner", SourceFileLoader("benchmark_planner", str(PLANNER_PATH))
@@ -101,8 +102,12 @@ def test_plan_is_versioned_and_bound_to_event_base_head_sha() -> None:
     _assert_plan_valid(result)
 
 
-def test_planner_digest_binds_to_the_planner_source() -> None:
-    expected = "sha256:" + hashlib.sha256(PLANNER_PATH.read_bytes()).hexdigest()
+def test_planner_digest_binds_to_planner_and_path_policy_sources() -> None:
+    payload = "\n".join(
+        f"{path.relative_to(ROOT).as_posix()}\t{path.read_bytes().hex()}"
+        for path in (PLANNER_PATH, PATH_POLICY_PATH)
+    ).encode()
+    expected = "sha256:" + hashlib.sha256(payload).hexdigest()
     result = planner.plan(
         [
             "benchmarks/datasets/agent-workflow-v1/"
