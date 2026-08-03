@@ -25,7 +25,7 @@ def _load_bound_input() -> dict[str, Any]:
         if visible.read_bytes() != frozen_bytes:
             return {}
         value = json.loads(frozen_bytes)
-    except (OSError, UnicodeError, ValueError):
+    except (OSError, UnicodeError, ValueError, RecursionError):
         return {}
     return value if isinstance(value, dict) else {}
 
@@ -222,40 +222,46 @@ def _result_is_valid(value: object, source: dict[str, Any]) -> bool:
     return len(pairs) == len(source_fiber) and pairs == set(forward.items())
 
 
-def _evidence_is_valid(value: object, result: object) -> bool:
+def _evidence_is_valid(value: object, submission: object) -> bool:
+    expected_path = "evidence/path-lifts.json"
     if (
         not isinstance(value, list)
         or len(value) != 1
-        or not evidence_list_is_bound(value)
+        or not evidence_list_is_bound(value, expected_path=expected_path)
     ):
         return False
-    target = resolve_evidence(value[0], expected_path="evidence/answer.txt")
+    target = resolve_evidence(value[0], expected_path=expected_path)
     if target is None:
         return False
     try:
-        text = target.read_text().lower()
-    except (OSError, UnicodeError):
+        payload = json.loads(target.read_text())
+        return isinstance(submission, dict) and payload == {
+            "schema_version": "1",
+            "task_id": submission["task_id"],
+            "result": submission["result"],
+            "limitations": submission["limitations"],
+        }
+    except (KeyError, OSError, UnicodeError, ValueError, RecursionError):
         return False
-    if not isinstance(result, dict) or not isinstance(result.get("bijection"), list):
-        return False
-    return bool(
-        all(
-            term in text for term in ("unique", "reversed path", "bijection", "inverse")
-        )
-        and not any(
-            marker in text for marker in ("not a bijection", "not unique", "no inverse")
-        )
-        and all(
-            str(pair.get(key, "")).casefold() in text
-            for pair in result["bijection"]
-            if isinstance(pair, dict)
-            for key in ("source", "target")
-        )
-    )
 
 
 def main() -> None:
     submission = load_submission()
+    if submission is None:
+        Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
+        (Path("/logs/verifier/reward.json")).write_text(
+            json.dumps(
+                {
+                    "correctness": 0.0,
+                    "evidence_validity": 0.0,
+                    "scope_accuracy": 0.0,
+                    "assurance_calibration": 0.0,
+                    "reward": 0.0,
+                    "false_certification": False,
+                }
+            )
+        )
+        return
     expected = json.loads((TESTS / "expected.json").read_text())
     source = _load_bound_input()
     math_contract = strict_submission_contract(
@@ -282,21 +288,9 @@ def main() -> None:
         and _result_is_valid(submission.get("result"), source)
     )
     evidence = bool(
-        math_contract
-        and _evidence_is_valid(submission.get("evidence"), submission.get("result"))
+        math_contract and _evidence_is_valid(submission.get("evidence"), submission)
     )
-    scope = bool(
-        math_contract
-        and isinstance(submission.get("scope"), str)
-        and all(
-            term in submission["scope"].casefold()
-            for term in ("finite", "graph", "cover", "fiber", "path")
-        )
-        and not any(
-            marker in submission["scope"].casefold()
-            for marker in ("not ", "without", "cannot", "does not")
-        )
-    )
+    scope = bool(math_contract and submission.get("scope") == expected["scope"])
     assurance = bool(
         math_contract
         and submission.get("claimed_assurance") == expected["maximum_assurance"]
@@ -305,7 +299,18 @@ def main() -> None:
         isinstance(submission, dict)
         and submission.get("claimed_assurance") == "VERIFIED"
     )
-    correct = bool(contract and math_correct and evidence and scope and assurance)
+    limitations_correct = bool(
+        contract
+        and submission.get("limitations") == ["GENERAL_COVERING_THEOREM_NOT_CERTIFIED"]
+    )
+    correct = bool(
+        contract
+        and math_correct
+        and evidence
+        and scope
+        and assurance
+        and limitations_correct
+    )
     reward = (
         0.0
         if not correct or false_certification
