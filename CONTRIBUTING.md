@@ -14,6 +14,24 @@ Read the [documentation home](docs/index.md), the
 Use the installed catalog and current reference documents for present
 capability membership.
 
+## Validation at a glance
+
+| Change | Start here | Oracle requirement |
+| --- | --- | --- |
+| Documentation, benchmark README, or `benchmarks/validation/` | `make docs-command-check` (and `make docs-linkcheck` for Markdown links) | None |
+| Focused Python behavior | `make test-plan BASE=<revision>`, the selected lane, then `make check` | None |
+| Benchmark task input or verifier | `make harbor-check-task DATASET=... TASKS=...`, then `make harbor-oracle-task DATASET=... TASKS=...` | Exact selected-task Oracle |
+| Deployment entrypoint | `make deploy-check` | None |
+| CI, dependencies, or unknown paths | `make check-static` plus affected tests | As required by the selected plan |
+
+The four primary test profiles are the cheapest useful starting points:
+`unit` covers pure contracts and models; `component` exercises one real service
+or adapter; `domain` loads explicitly selected mathematical bundles; and
+`composition` checks complete runtime wiring. Use the named boundary profiles
+(`storage`, `process`, `mcp`, `provider`, `lean`, and `e2e`) when the change
+crosses one of those boundaries. The [testing strategy](docs/reference/testing-strategy.md)
+defines the ownership and escalation rules.
+
 ## Development environment
 
 Jacobian uses Python 3.12, the uv release pinned in `.uv-version`, and a small
@@ -30,8 +48,9 @@ behavior: `unit` for pure contracts and models, `component` for one real
 service, `domain` for explicitly installed mathematical bundles,
 `composition` for complete runtime wiring, and the `storage`, `process`,
 `mcp`, `provider`, `lean`, and `e2e` lanes for their named boundaries. Each
-target accepts a pytest file or node through `TESTS=<file-or-node>` and extra
-pytest options through `PYTEST_ARGS`. `make check` runs Ruff, mypy, and the
+semantic lane target accepts a pytest file or node through
+`TESTS=<file-or-node>` and extra pytest options through `PYTEST_ARGS`.
+`make check` runs Ruff, mypy, and the
 unit lane; it is a useful local handoff, but the pre-push hook intentionally
 runs only `make lint typecheck` so it stays below the interactive feedback
 budget. CI owns path-planned correctness lanes and optional environments.
@@ -55,8 +74,8 @@ planner requires the pinned Harbor runtime to compute task digests.
 Tests can be narrowed without learning another wrapper:
 
 ```sh
-make test-component TESTS=tests/component/capabilities/test_mcp_invocation_projection.py
-make test-component TESTS=tests/component/capabilities/test_mcp_invocation_projection.py PYTEST_ARGS="-k schema -n 0"
+make test-component TESTS=tests/component/capabilities/test_atomic_capabilities.py
+make test-component TESTS=tests/component/capabilities/test_atomic_capabilities.py PYTEST_ARGS="-k schema -n 0"
 make test-unit TESTS=tests/unit/contracts/test_result_envelope.py
 make test-process TESTS=tests/boundary/process/search/test_shrinking.py
 make test-mcp PYTEST_ARGS="-k authentication"
@@ -124,10 +143,10 @@ aid; `make check` and CI remain the handoff gates.
 
 | Change | Local handoff | CI adds |
 | --- | --- | --- |
-| Docs only | `make docs-linkcheck` | Documentation |
+| Docs only | `make docs-command-check` and `make docs-linkcheck` | Documentation |
 | Focused Python | affected target, then `make check` | Planned Python/static/package lanes |
-| Benchmark task input | `make harbor-check-task DATASET=... TASKS=...` | Exact task contract and Oracle when executable inputs change |
-| Benchmark task README | `make docs-linkcheck` | Contract checks; no Oracle |
+| Benchmark task or verifier | `make harbor-check-task DATASET=... TASKS=...` and `make harbor-oracle-task DATASET=... TASKS=...` | Exact task contract and Oracle |
+| Benchmark README or validation regression | focused Harbor checks | Contract checks; no Oracle |
 | Lean runtime | focused `make test-lean`, then `make check` | Lean plus affected lanes |
 | CI, dependencies, or unknown paths | `make check-static` plus affected tests | Fail-closed functional lanes |
 
@@ -148,7 +167,7 @@ marker filters:
 
 ```sh
 make test-unit
-make test-component TESTS=tests/component/capabilities/test_mcp_invocation_projection.py
+make test-component TESTS=tests/component/capabilities/test_atomic_capabilities.py
 make test-domain TESTS=tests/domain/graph/test_graph_invariant_domain.py
 ```
 
@@ -158,7 +177,7 @@ retain several gigabytes. CI installs the pinned Lean toolchain and Mathlib
 cache in a dedicated runner.
 Use `uv run --locked pytest --lf` after a failure, `uv run --locked pytest -n 0`
 while debugging, and `make check` before handoff. Use
-`make test-lean TESTS=path/to/test.py` for
+`make test-lean TESTS=tests/boundary/providers/lean/test_lean_repl_runtime.py` for
 a deliberately focused local Lean reproduction, or dispatch the remote Lean
 debug workflow from GitHub Actions when local Lean is impractical. Use
 `make test-lean PYTEST_ARGS=--lf` to rerun a failed Lean-runtime test.
@@ -230,8 +249,10 @@ matching `make test-*` target as the canonical entry point. Markers are retained
 only when they alter execution: `requires_provider(name)`, `performance`,
 `property`, and `destructive_process`. They do not replace directory ownership.
 Reproduce the scheduled validation lanes locally with `make test-stress` and
-`make test-ordering PYTEST_ARGS=--randomly-seed=17` (locked `pytest-repeat` and
-`pytest-randomly` are part of the dev environment).
+`make test-ordering ORDERING_LANE=domain PYTEST_ARGS=--randomly-seed=17`
+(`ORDERING_LANE` selects the semantic lane to reseed; `domain` and
+`composition` are the sharded lanes whose scheduled seed matters most).
+Locked `pytest-repeat` and `pytest-randomly` are part of the dev environment.
 
 Tests may reuse concept-specific helpers under `tests/support`, but must not
 import helpers from a sibling semantic lane. Keep fixtures in the narrowest

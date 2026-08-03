@@ -47,6 +47,12 @@ three-attempt reproducibility fixtures, but running `make agent-eval ...
 EVAL_EXECUTE=1` is an explicit operator-run evidence exercise, not a task
 authoring or pull-request gate.
 
+Task README edits and host-side regression tests under
+`benchmarks/validation/` do not change executable task inputs and do not need
+an Oracle. Changes to the task environment, instructions, solution, member
+record, dependencies, image, or clean-room verifier do: rerun the exact
+selected-task Oracle after validation.
+
 Do not create a snapshot for every task addition. An operator creates a new
 content-addressed snapshot only when intentionally freezing an evaluation or
 publication set. Publication `dataset.toml` files are generated from that lock

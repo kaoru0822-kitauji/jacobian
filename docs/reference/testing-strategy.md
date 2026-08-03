@@ -2,6 +2,23 @@
 
 [Documentation home](../index.md)
 
+## Change matrix
+
+| Change | First local check | Escalate when |
+| --- | --- | --- |
+| Documentation or benchmark README/validation | `make docs-command-check` and `make docs-linkcheck` | No Oracle is needed |
+| Python behavior | `make test-plan BASE=<revision>` and the selected semantic lane | Finish with `make check` |
+| Benchmark task input or verifier | `make harbor-check-task DATASET=... TASKS=...` | Run `make harbor-oracle-task ...` for the selected task |
+| Deployment entrypoint | `make deploy-check` | Include affected process checks for code changes |
+
+The four primary profiles cover most product changes. `unit` owns pure
+contracts and models; `component` uses one real service or adapter; `domain`
+loads explicitly selected mathematical bundles; and `composition` exercises
+complete runtime wiring. Boundary profiles (`storage`, `process`, `mcp`,
+`provider`, `lean`, and `e2e`) own changes whose evidence crosses those named
+interfaces. Use the narrowest profile that proves the behavior, then follow the
+matrix when the change also affects shared infrastructure.
+
 ## Ownership model
 
 The suite separates semantic ownership from execution policy:
@@ -34,8 +51,12 @@ Planning has three intentionally different entry points:
 
 ```sh
 make test-plan BASE=origin/main   # exact local selectors or lane fallback
+make test-plan PATHS='src/jacobian/domains/graph.py'  # hypothetical local change
 make ci-plan BASE=origin/main     # hosted CI semantic lanes
+make ci-plan PATHS='deploy/install.sh'                # hypothetical hosted plan
 make harbor-plan BASE=origin/main # benchmark contracts and Oracle scope
+make harbor-plan PATHS='benchmarks/README.md'         # hypothetical benchmark plan
+make deploy-check                # deployment entrypoint syntax and boundary
 ```
 
 The hosted CI and Harbor plans are evidence plans, not test commands. They
@@ -74,8 +95,8 @@ The current local development entry points are:
 
 ```sh
 make test-unit
-make test-component TESTS=tests/component/capabilities/test_mcp_invocation_projection.py
-make test-component TESTS=tests/component/capabilities/test_mcp_invocation_projection.py PYTEST_ARGS="-k schema -n 0"
+make test-component TESTS=tests/component/capabilities/test_atomic_capabilities.py
+make test-component TESTS=tests/component/capabilities/test_atomic_capabilities.py PYTEST_ARGS="-k schema -n 0"
 make test-domain TESTS=tests/domain/graph/test_graph_invariant_domain.py
 make test-composition
 make test-mcp PYTEST_ARGS="-k authentication"
@@ -85,7 +106,7 @@ make test-provider
 make test-lean TESTS=tests/boundary/providers/lean/test_lean_repl_runtime.py PYTEST_ARGS="-k induction"
 make test-e2e
 make test-stress
-make test-ordering PYTEST_ARGS=--randomly-seed=17
+make test-ordering ORDERING_LANE=domain PYTEST_ARGS=--randomly-seed=17
 make check
 make check-changed BASE=origin/main
 make check-static
@@ -109,7 +130,9 @@ and boundary/e2e tests own persistence, processes, providers, MCP, Lean, and
 complete user workflows. Directory ownership replaces the old catch-all
 integration category.
 `make test-stress` repeats only tests marked `property`, while
-`make test-ordering` reproduces the scheduled ordering seed.
+`make test-ordering ORDERING_LANE=<lane>` reproduces the scheduled ordering
+seed for one semantic lane. `ORDERING_LANE` is required; use `domain` or
+`composition` for the sharded lanes whose scheduled seed matters most.
 Domain and composition timing shards use one fixed `pytest-randomly` seed from
 `.github/ci-config.json`. Every shard must collect tests in the same order
 before `pytest-split` partitions them; otherwise independently randomized
