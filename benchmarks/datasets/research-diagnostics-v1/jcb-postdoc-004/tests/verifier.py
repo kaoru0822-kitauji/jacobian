@@ -150,20 +150,29 @@ def _has_hamiltonian_path(adjacency):
 
 
 def _result_matches(result, *, n, alpha, average):
+    if not isinstance(result, dict) or set(result) != {
+        "certificate_path",
+        "vertex_count",
+        "independence_number",
+        "local_average",
+        "hamiltonian_path_exists",
+    }:
+        return False
+    local_average = result.get("local_average")
+    if (
+        not _integer(result.get("vertex_count"))
+        or not _integer(result.get("independence_number"))
+        or not isinstance(local_average, dict)
+        or set(local_average) != {"numerator", "denominator"}
+        or not _integer(local_average.get("numerator"))
+        or not _integer(local_average.get("denominator"))
+    ):
+        return False
     return bool(
-        isinstance(result, dict)
-        and set(result)
-        == {
-            "certificate_path",
-            "vertex_count",
-            "independence_number",
-            "local_average",
-            "hamiltonian_path_exists",
-        }
-        and result.get("certificate_path") == "evidence/counterexample.json"
-        and result.get("vertex_count") == n
-        and result.get("independence_number") == alpha
-        and result.get("local_average") == average
+        result.get("certificate_path") == "evidence/counterexample.json"
+        and result["vertex_count"] == n
+        and result["independence_number"] == alpha
+        and local_average == average
         and result.get("hamiltonian_path_exists") is False
     )
 

@@ -202,6 +202,19 @@ def test_graph_verifier_rejects_corrupted_witnesses(
     assert result["reward"] == 0.0
 
 
+def test_graph_verifier_rejects_boolean_summary_scalar(tmp_path: Path) -> None:
+    task, app, logs = support.prepare_case(tmp_path, "jcb-postdoc-004")
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["local_average"]["denominator"] = True
+    support.write_json(submission_path, submission)
+
+    result = support.run_verifier(task, app, logs)
+
+    assert result["correctness"] == 0.0
+    assert result["reward"] == 0.0
+
+
 def test_syzygy_verifier_accepts_scaled_relations(tmp_path: Path) -> None:
     task, app, logs = support.prepare_case(tmp_path, "jcb-postdoc-014")
     certificate_path = app / "evidence" / "syzygy-certificate.json"
