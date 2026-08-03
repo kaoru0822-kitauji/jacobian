@@ -1,0 +1,208 @@
+{
+  "claimed_assurance": "COMPUTED",
+  "completeness": "COMPLETE",
+  "conclusion": "PROOF_REPAIRED_AND_REPLAYED",
+  "evidence": [
+    {
+      "path": "evidence/answer.txt",
+      "sha256": "sha256:8bcb85f3c6ae9c577740bfcd4082aefd1fdc610c9f184e9cdc0ffbfde2b37405"
+    }
+  ],
+  "limitations": [
+    "FROZEN_FRAGMENT_NOT_FULL_UPSTREAM_DATABASE",
+    "NO_EXTERNAL_METAMATH_KERNEL_REPLAY"
+  ],
+  "result": {
+    "changed_positions": [
+      6,
+      9
+    ],
+    "final_expression": [
+      "|-",
+      "(",
+      "u",
+      "->",
+      "w",
+      ")"
+    ],
+    "repaired_proof": [
+      "wu",
+      "wv",
+      "ww",
+      "h1",
+      "wv",
+      "ww",
+      "wi",
+      "wu",
+      "h2",
+      "a1i",
+      "mpd"
+    ],
+    "trace": [
+      {
+        "label": "wu",
+        "position": 0,
+        "stack_depth": 1,
+        "stack_top": [
+          "wff",
+          "u"
+        ],
+        "substitution": {}
+      },
+      {
+        "label": "wv",
+        "position": 1,
+        "stack_depth": 2,
+        "stack_top": [
+          "wff",
+          "v"
+        ],
+        "substitution": {}
+      },
+      {
+        "label": "ww",
+        "position": 2,
+        "stack_depth": 3,
+        "stack_top": [
+          "wff",
+          "w"
+        ],
+        "substitution": {}
+      },
+      {
+        "label": "h1",
+        "position": 3,
+        "stack_depth": 4,
+        "stack_top": [
+          "|-",
+          "(",
+          "u",
+          "->",
+          "v",
+          ")"
+        ],
+        "substitution": {}
+      },
+      {
+        "label": "wv",
+        "position": 4,
+        "stack_depth": 5,
+        "stack_top": [
+          "wff",
+          "v"
+        ],
+        "substitution": {}
+      },
+      {
+        "label": "ww",
+        "position": 5,
+        "stack_depth": 6,
+        "stack_top": [
+          "wff",
+          "w"
+        ],
+        "substitution": {}
+      },
+      {
+        "label": "wi",
+        "position": 6,
+        "stack_depth": 5,
+        "stack_top": [
+          "wff",
+          "(",
+          "v",
+          "->",
+          "w",
+          ")"
+        ],
+        "substitution": {
+          "u": [
+            "v"
+          ],
+          "v": [
+            "w"
+          ]
+        }
+      },
+      {
+        "label": "wu",
+        "position": 7,
+        "stack_depth": 6,
+        "stack_top": [
+          "wff",
+          "u"
+        ],
+        "substitution": {}
+      },
+      {
+        "label": "h2",
+        "position": 8,
+        "stack_depth": 7,
+        "stack_top": [
+          "|-",
+          "(",
+          "v",
+          "->",
+          "w",
+          ")"
+        ],
+        "substitution": {}
+      },
+      {
+        "label": "a1i",
+        "position": 9,
+        "stack_depth": 5,
+        "stack_top": [
+          "|-",
+          "(",
+          "u",
+          "->",
+          "(",
+          "v",
+          "->",
+          "w",
+          ")",
+          ")"
+        ],
+        "substitution": {
+          "u": [
+            "(",
+            "v",
+            "->",
+            "w",
+            ")"
+          ],
+          "v": [
+            "u"
+          ]
+        }
+      },
+      {
+        "label": "mpd",
+        "position": 10,
+        "stack_depth": 1,
+        "stack_top": [
+          "|-",
+          "(",
+          "u",
+          "->",
+          "w",
+          ")"
+        ],
+        "substitution": {
+          "u": [
+            "u"
+          ],
+          "v": [
+            "v"
+          ],
+          "w": [
+            "w"
+          ]
+        }
+      }
+    ]
+  },
+  "scope": "FROZEN_METAMATH_STYLE_ASSERTION_REGISTRY",
+  "task_id": "jacobian/metamath-syllogism-repair"
+}
