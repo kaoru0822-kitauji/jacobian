@@ -220,6 +220,15 @@ def test_shared_path_policy_rejects_non_repository_relative_paths() -> None:
             helper.normalize_paths([bad])
 
 
+def test_shared_path_policy_deduplicates_normalized_paths() -> None:
+    helper = _load_script("_ci_paths.py")
+
+    assert helper.normalize_paths(["./README.md", "README.md", "./docs/README.md"]) == [
+        "README.md",
+        "docs/README.md",
+    ]
+
+
 def test_classifier_and_planner_share_one_path_normalization_policy(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

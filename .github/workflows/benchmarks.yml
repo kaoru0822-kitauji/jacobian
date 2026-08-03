@@ -109,6 +109,7 @@ jobs:
             --base "$BASE_SHA" \
             --head "$HEAD_SHA" \
             --planner .github/scripts/plan-benchmarks \
+            --config .github/scripts/_ci_paths.py \
             --config .github/scripts/validate-benchmark-plan \
             --config benchmarks/registry.toml \
             --config benchmarks/environment-profiles.toml \

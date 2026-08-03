@@ -54,6 +54,14 @@ def required_variables(makefile: Path) -> dict[str, set[str]]:
     Guards chained with ``-a`` (AND) are all required.
     """
 
+    direct = _direct_required_variables(makefile)
+    dependencies = _target_dependencies(makefile)
+    return _inherited_required_variables(direct, dependencies)
+
+
+def _direct_required_variables(makefile: Path) -> dict[str, set[str]]:
+    """Return variables guarded directly by each target's recipe."""
+
     result: dict[str, set[str]] = {}
     current_target: str | None = None
     recipe_lines: list[str] = []
@@ -77,6 +85,47 @@ def required_variables(makefile: Path) -> dict[str, set[str]]:
         required = _leading_required_vars(recipe_lines)
         if required:
             result[current_target] = required
+    return result
+
+
+def _target_dependencies(makefile: Path) -> dict[str, set[str]]:
+    """Return concrete Make prerequisites for each target."""
+
+    dependencies: dict[str, set[str]] = {}
+    for line in makefile.read_text(encoding="utf-8").splitlines():
+        if line[:1].isspace():
+            continue
+        name, separator, prerequisites = line.partition(":")
+        if not separator or not MAKE_TARGET.fullmatch(name):
+            continue
+        dependencies[name] = {
+            token
+            for token in prerequisites.split("##", 1)[0].split()
+            if MAKE_TARGET.fullmatch(token)
+        }
+    return dependencies
+
+
+def _inherited_required_variables(
+    direct: dict[str, set[str]], dependencies: dict[str, set[str]]
+) -> dict[str, set[str]]:
+    """Propagate recipe requirements through the prerequisite graph."""
+
+    result: dict[str, set[str]] = {}
+
+    def inherited(target: str, visiting: frozenset[str] = frozenset()) -> set[str]:
+        if target in result:
+            return result[target]
+        if target in visiting:
+            return set()
+        required = set(direct.get(target, set()))
+        for prerequisite in dependencies.get(target, set()):
+            required.update(inherited(prerequisite, visiting | {target}))
+        result[target] = required
+        return required
+
+    for target in direct.keys() | dependencies.keys():
+        inherited(target)
     return result
 
 

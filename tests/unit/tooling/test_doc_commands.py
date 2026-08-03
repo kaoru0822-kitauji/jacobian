@@ -121,3 +121,23 @@ def test_flags_chained_required_variables(tmp_path: Path) -> None:
 
     assert any("make target publish requires DEST" in f for f in failures)
     assert not any("make target publish requires LOCK" in f for f in failures)
+
+
+def test_flags_required_variables_in_make_prerequisites(tmp_path: Path) -> None:
+    makefile = (
+        "harbor-check-task:\n"
+        '\t@test -n "$(DATASET)" || { echo "DATASET is required" >&2; exit 2; }\n'
+        '\t@test -n "$(TASKS)" || { echo "TASKS is required" >&2; exit 2; }\n'
+        "harbor-oracle-task: harbor-check-task\n"
+        "\techo run\n"
+    )
+    root, document = _write_fixture(
+        tmp_path,
+        "```sh\nmake harbor-oracle-task\n```\n",
+        makefile=makefile,
+    )
+
+    failures = validate_documents(root, (document,))
+
+    assert any("make target harbor-oracle-task requires DATASET" in f for f in failures)
+    assert any("make target harbor-oracle-task requires TASKS" in f for f in failures)

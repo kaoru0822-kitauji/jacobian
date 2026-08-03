@@ -147,6 +147,15 @@ def test_product_ci_publishes_a_provenance_bound_plan_receipt() -> None:
     assert "plan-receipt-digest" in workflow
 
 
+def test_documentation_job_installs_uv_before_make_docs_linkcheck() -> None:
+    workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    docs = workflow.split("  docs:", 1)[1].split("  security-audit:", 1)[0]
+
+    assert "astral-sh/setup-uv@" in docs
+    assert 'version: "0.11.28"' in docs
+    assert "run: make docs-linkcheck" in docs
+
+
 def test_plan_receipt_digests_are_rendered_as_markdown_code() -> None:
     for workflow_name in ("ci.yml", "benchmarks.yml"):
         workflow = (ROOT / ".github/workflows" / workflow_name).read_text(

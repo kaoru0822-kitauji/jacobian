@@ -91,7 +91,15 @@ def _digest(path: Path) -> str:
 
 
 def _planner_digest() -> str:
-    return "sha256:" + hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    sources = (
+        Path(__file__),
+        ROOT / ".github" / "scripts" / "_ci_paths.py",
+    )
+    payload = "\n".join(
+        f"{path.relative_to(ROOT).as_posix()}\t{path.read_bytes().hex()}"
+        for path in sources
+    ).encode()
+    return "sha256:" + hashlib.sha256(payload).hexdigest()
 
 
 def _file_sha256(path: Path) -> str:

@@ -39,9 +39,13 @@ def normalize_paths(paths: list[str]) -> list[str]:
     """Reject non-repository-relative paths and strip leading ``./``."""
 
     normalized: list[str] = []
+    seen: set[str] = set()
     for path in paths:
         path = path.replace("\\", "/")
         if not path or path.startswith("/") or ".." in Path(path).parts:
             raise ValueError(f"changed path must be repository-relative: {path!r}")
-        normalized.append(path.removeprefix("./"))
+        path = path.removeprefix("./")
+        if path not in seen:
+            normalized.append(path)
+            seen.add(path)
     return normalized

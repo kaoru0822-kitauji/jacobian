@@ -78,6 +78,19 @@ def test_known_ci_tooling_change_uses_owned_process_tests() -> None:
     assert selected == ["tests/boundary/process/tooling/test_plan_receipt.py"]
 
 
+def test_explicit_missing_path_is_treated_as_a_delete(
+    monkeypatch, tmp_path: Path
+) -> None:
+    planner = _load("plan_local_tests_explicit_delete", "plan-local-tests")
+    monkeypatch.setattr(planner, "ROOT", tmp_path)
+    (tmp_path / "present.py").write_text("", encoding="utf-8")
+
+    assert planner._explicit_entries(["present.py", "removed.py"]) == [
+        planner.Change("M", "present.py"),
+        planner.Change("D", "removed.py"),
+    ]
+
+
 @pytest.mark.parametrize(
     ("path", "expected"),
     [

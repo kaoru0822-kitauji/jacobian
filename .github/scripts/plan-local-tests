@@ -69,7 +69,10 @@ class Change(NamedTuple):
 
 
 def _explicit_entries(paths: list[str]) -> list[Change]:
-    return [Change("M", path) for path in normalize_paths(paths)]
+    return [
+        Change("M" if (ROOT / path).is_file() else "D", path)
+        for path in normalize_paths(paths)
+    ]
 
 
 def git_paths(*args: str) -> list[str]:

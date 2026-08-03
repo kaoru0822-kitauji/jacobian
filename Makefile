@@ -126,6 +126,7 @@ ci-plan: ## Print the hosted CI lane plan for BASE..HEAD and working changes.
 		--base "$$base_sha" --head "$$head_sha" \
 		--planner .github/scripts/classify-ci-paths \
 		--config .github/ci-impact.json --config tests/topology.toml \
+		--config .github/scripts/_ci_paths.py \
 		--config .github/scripts/validate-ci-plan \
 		--config .github/workflows/ci.yml --config Makefile \
 		--plan-file "$$tmp_dir/plan.txt" \
@@ -273,6 +274,7 @@ harbor-plan: ## Print the independent Harbor benchmark plan (BASE=... optional).
 		--kind benchmark --event pull_request \
 		--base "$$base_sha" --head "$$head_sha" \
 		--planner .github/scripts/plan-benchmarks \
+		--config .github/scripts/_ci_paths.py \
 		--config .github/scripts/validate-benchmark-plan \
 		--config benchmarks/registry.toml \
 		--config benchmarks/environment-profiles.toml \
