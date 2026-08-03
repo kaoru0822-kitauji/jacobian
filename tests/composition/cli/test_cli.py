@@ -21,7 +21,8 @@ def test_cli_init_reports_reference_domains_and_polytope_formats(
 
     assert result.exit_code == 0
     catalog = json.loads(result.stdout)
-    assert set(catalog) == {
+    # Required reference surfaces; do not freeze the full key set (merge magnet).
+    required = {
         "erdos_straus",
         "graph_paths",
         "matrices",
@@ -31,6 +32,7 @@ def test_cli_init_reports_reference_domains_and_polytope_formats(
         "rational_polynomial_maps",
         "simple_undirected_graphs",
     }
+    assert required <= set(catalog)
     assert catalog["erdos_straus"]["witness_checker_ids"][
         "erdos_straus.decomposition_table"
     ].startswith("checker://sha256/")
@@ -230,7 +232,6 @@ def test_cli_unsupported_state_version_is_typed_and_preserves_state() -> None:
     assert "fresh state directory" in error["hint"]
 
 
-@pytest.mark.usefixtures("authorized_complete_runtime")
 def test_cli_enumeration_completes_before_the_local_process_exits(
     tmp_path: Path,
 ) -> None:
