@@ -12,6 +12,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import re
+import subprocess
 import sys
 import tomllib
 from collections.abc import Iterator
@@ -685,6 +686,28 @@ def _agent_environment_failures(suite: Suite, task_dir: Path, rel: str) -> list[
     return failures
 
 
+def _is_ignored_interpreter_cache(path: Path) -> bool:
+    try:
+        relative = path.relative_to(ROOT)
+    except ValueError:
+        relative = path
+    return (
+        subprocess.run(
+            [
+                "git",
+                "check-ignore",
+                "--quiet",
+                "--",
+                str(relative),
+            ],
+            cwd=ROOT,
+            capture_output=True,
+            check=False,
+        ).returncode
+        == 0
+    )
+
+
 def validate_task_topology(suite: Suite, task_dir: Path) -> list[str]:
     failures: list[str] = []
     rel = task_dir.relative_to(ROOT).as_posix()
@@ -694,7 +717,10 @@ def validate_task_topology(suite: Suite, task_dir: Path) -> list[str]:
     for path in task_dir.rglob("*"):
         if path.is_symlink():
             failures.append(f"{rel}: symlink is forbidden")
-        if path.name == "__pycache__" or path.suffix in {".pyc", ".pyo"}:
+        if (
+            path.name == "__pycache__" or path.suffix in {".pyc", ".pyo"}
+        ) and not _is_ignored_interpreter_cache(path):
+            # Committed or explicitly unignored cache material remains invalid.
             failures.append(
                 f"{path.relative_to(ROOT)}: raw interpreter cache is forbidden"
             )
