@@ -451,6 +451,52 @@ This scenario is inspired by the finite-countermodel workflow of the
 [Equational Theories project](https://github.com/teorth/equational_theories),
 but the two-element table and checker are independently generated for Jacobian.
 
+### JAC-DEG-023 — Normalized bivariate degree-(2,3) infeasibility
+
+Let a characteristic-zero bivariate polynomial map have exact component
+degrees `(2,3)` and nonzero constant Jacobian. If `A=JF(0)`, then
+`F(A^{-1}z)-F(0)` preserves the component degrees and has constant Jacobian
+one with value `I` at the origin. Over `QQ` the normalized coefficient slice is
+
+```text
+P=x+a20*x^2+a11*x*y+a02*y^2
+Q=y+b20*x^2+b11*x*y+b02*y^2+b30*x^3+b21*x^2*y+b12*x*y^2+b03*y^3.
+```
+
+The original characteristic-zero claim, this rational normalized slice, the
+generated coefficient system, and infeasibility of that system are distinct
+claims. This scenario certifies only the declared `QQ` slice.
+
+Exact degree is
+
+```text
+(a20 != 0 or a11 != 0 or a02 != 0)
+and (b30 != 0 or b21 != 0 or b12 != 0 or b03 != 0).
+```
+
+It is represented by twelve charts. Chart `(a_i,b_j)` adds a fresh `t` and
+`t*a_i*b_j-1`; the charts cover the disjunction because any pair of nonzero
+coordinates selects one chart. A global alternative would introduce
+`u20,u11,u02,v30,v21,v12,v03` and equations
+`u20*a20+u11*a11+u02*a02-1` and
+`v30*b30+v21*b21+v12*b12+v03*b03-1`.
+
+Each chart certificate gives exact rational multipliers with
+`sum(h_i*f_i)=1`. Singular may produce them, but only the separate sparse-QQ
+replay checker can promote the bound infeasibility claim to `VERIFIED`.
+
+**Adversarial variants**
+
+- require every top coefficient to be nonzero instead of encoding the two
+  disjunctions;
+- omit one of the twelve charts while claiming complete scope;
+- reuse multipliers after reordering variables or changing a generator;
+- bind a certificate to a different system artifact;
+- treat Singular success, timeout, or an oversized partial output as product
+  verification;
+- generalize the rational slice result to every characteristic-zero
+  coefficient field without a separately justified transfer argument.
+
 ## Reference-plugin decision
 
 Maintain reference scenarios across structurally different domains. Finite

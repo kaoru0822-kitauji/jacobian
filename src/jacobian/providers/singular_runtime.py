@@ -1,0 +1,83 @@
+"""Pinned optional Singular runtime identity for certificate production."""
+
+from __future__ import annotations
+
+import os
+import shutil
+from pathlib import Path
+
+from jacobian.bounded_process import run_bounded_process
+from jacobian.contracts.capabilities import (
+    CapabilityInstallTier,
+    CapabilityProviderAvailability,
+    CapabilityProviderDigestKind,
+    CapabilityProviderRuntime,
+)
+from jacobian.provider_runtime import (
+    ProviderRuntimeError,
+    _platform_tag,
+    _sha256_file,
+    _unavailable_runtime,
+)
+
+SINGULAR_VERSION = "4.4.1p5"
+
+
+def singular_provider_runtime(
+    executable: str | Path = "Singular",
+) -> CapabilityProviderRuntime:
+    """Inspect the exact pinned Singular command-line producer."""
+
+    resolved_name = shutil.which(os.fspath(executable))
+    if resolved_name is None:
+        return _unavailable_runtime(
+            provider="singular",
+            install_tier=CapabilityInstallTier.T2,
+            license_id="GPL-2.0-or-later",
+            diagnostic=f"The pinned Singular {SINGULAR_VERSION} executable is unavailable.",
+        )
+    try:
+        resolved = Path(resolved_name).resolve(strict=True)
+        completed = run_bounded_process(
+            [str(resolved), "--version"],
+            input_bytes=b"",
+            timeout_seconds=5,
+            environment={**os.environ, "LANG": "C", "LC_ALL": "C", "TZ": "UTC"},
+            stdout_limit=16_384,
+            stderr_limit=16_384,
+        )
+        version_text = (completed.stdout + completed.stderr).decode("utf-8")
+        if (
+            completed.timed_out
+            or completed.stdout_exceeded
+            or completed.stderr_exceeded
+            or completed.returncode != 0
+            or SINGULAR_VERSION not in version_text
+        ):
+            raise ProviderRuntimeError("Singular version probe did not match the pin")
+        digest = _sha256_file(resolved)
+    except (OSError, UnicodeDecodeError, ProviderRuntimeError):
+        return _unavailable_runtime(
+            provider="singular",
+            install_tier=CapabilityInstallTier.T2,
+            license_id="GPL-2.0-or-later",
+            diagnostic=f"The pinned Singular {SINGULAR_VERSION} executable is unavailable.",
+        )
+    return CapabilityProviderRuntime(
+        provider="singular",
+        availability=CapabilityProviderAvailability.AVAILABLE,
+        version=SINGULAR_VERSION,
+        digest=digest,
+        digest_kind=CapabilityProviderDigestKind.EXECUTABLE,
+        platform=_platform_tag(),
+        install_tier=CapabilityInstallTier.T2,
+        license_id="GPL-2.0-or-later",
+        features=("lift", "groebner-basis", "nullstellensatz-certificate"),
+        configuration={
+            "executable": str(resolved),
+            "profile": "jacobian.nullstellensatz.chart-cover/v1",
+        },
+    )
+
+
+__all__ = ["SINGULAR_VERSION", "singular_provider_runtime"]

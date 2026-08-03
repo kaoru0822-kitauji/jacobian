@@ -264,3 +264,52 @@ def test_syzygy_verifier_rejects_corrupted_certificates(
     result = support.run_verifier(task, app, logs)
     assert result["correctness"] == 0.0
     assert result["reward"] == 0.0
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "wrong-generator",
+        "reordered-variables",
+        "altered-domain",
+        "truncated-multiplier",
+        "missing-term",
+        "incorrect-constant",
+        "missing-chart",
+    ),
+)
+def test_nullstellensatz_verifier_rejects_corrupted_certificates(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    task, app, logs = support.prepare_case(tmp_path, "jcb-postdoc-019")
+    certificate_path = app / "evidence" / "nullstellensatz-certificate.json"
+    certificate = json.loads(certificate_path.read_text())
+    first = certificate["charts"][0]
+    if mutation == "wrong-generator":
+        first["generators"][0]["polynomial"]["terms"][0]["coefficient"]["num"] = "7"
+    elif mutation == "reordered-variables":
+        first["variable_order"][0:2] = reversed(first["variable_order"][0:2])
+    elif mutation == "altered-domain":
+        certificate["coefficient_domain"] = "RR"
+    elif mutation == "truncated-multiplier":
+        first["multipliers"].pop()
+    elif mutation == "missing-term":
+        next(
+            item["multiplier"]["terms"]
+            for item in first["multipliers"]
+            if item["multiplier"]["terms"]
+        ).pop()
+    elif mutation == "incorrect-constant":
+        first["identity_rhs"] = {"num": "2", "den": "1"}
+    else:
+        certificate["charts"].pop()
+    support.write_json(certificate_path, certificate)
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["evidence"][0]["sha256"] = support.digest(certificate_path)
+    support.write_json(submission_path, submission)
+
+    result = support.run_verifier(task, app, logs)
+
+    assert result["reward"] == 0.0

@@ -24,6 +24,10 @@ from jacobian.domains.matrix_lattice import build_lattice_bundle, build_matrix_b
 from jacobian.domains.number_theory import build_number_theory_bundle
 from jacobian.domains.optimization import build_rational_optimization_bundle
 from jacobian.domains.polynomial import build_polynomial_bundle
+from jacobian.domains.polynomial_nullstellensatz import (
+    build_nullstellensatz_core_bundle,
+    build_nullstellensatz_singular_bundle,
+)
 from jacobian.domains.posets import build_finite_poset_bundle
 from jacobian.domains.probability import build_finite_probability_bundle
 from jacobian.domains.projective_geometry import build_projective_geometry_bundle
@@ -50,6 +54,8 @@ BUILTIN_DOMAIN_BUNDLE_FACTORIES: tuple[DomainBundleFactory, ...] = (
     build_matrix_bundle,
     build_lattice_bundle,
     build_polynomial_bundle,
+    build_nullstellensatz_core_bundle,
+    build_nullstellensatz_singular_bundle,
     build_real_analysis_bundle,
     build_finite_probability_bundle,
     build_rational_optimization_bundle,

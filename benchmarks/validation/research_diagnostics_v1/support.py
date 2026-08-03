@@ -14,6 +14,7 @@ DATASET = ROOT / "benchmarks" / "datasets" / "research-diagnostics-v1"
 TASK_EVIDENCE = {
     "jcb-postdoc-004": "counterexample.json",
     "jcb-postdoc-014": "syzygy-certificate.json",
+    "jcb-postdoc-019": "nullstellensatz-certificate.json",
 }
 
 
