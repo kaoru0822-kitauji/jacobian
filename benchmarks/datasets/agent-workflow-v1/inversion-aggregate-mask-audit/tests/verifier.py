@@ -1,0 +1,118 @@
+import itertools
+import json
+from pathlib import Path
+
+from verifier_support import (
+    false_verified_claim,
+    load_submission,
+    read_evidence_json,
+    strict_submission_contract,
+)
+
+W, T = Path("/app"), Path("/tests")
+LIMITATIONS = ["FINITE_N4_REPLAY", "NO_LEAN_ELABORATION"]
+
+
+def frozen():
+    try:
+        return (W / "input.json").read_bytes() == (
+            T / "input.json"
+        ).read_bytes() and not (W / "input.json").is_symlink()
+    except OSError:
+        return False
+
+
+def counts(p):
+    pairs = [(i, j) for i in range(4) for j in range(i + 1, 4)]
+    intended = sum(p[i] > p[j] for i, j in pairs)
+    implemented = sum(p[i] <= p[j] for i, j in pairs)
+    return implemented, intended
+
+
+def valid(r):
+    if not isinstance(r, dict) or set(r) != {
+        "witness_permutation",
+        "implemented_count",
+        "intended_count",
+        "implemented_aggregate",
+        "intended_aggregate",
+        "pair_count",
+        "complement_relation",
+    }:
+        return False
+    p = r["witness_permutation"]
+    if not isinstance(p, list) or sorted(p) != list(range(4)):
+        return False
+    ic, tc = counts(p)
+    perms = list(itertools.permutations(range(4)))
+    ia = sum(counts(q)[0] for q in perms)
+    ta = sum(counts(q)[1] for q in perms)
+    return (
+        ic != tc
+        and r
+        == {
+            "witness_permutation": p,
+            "implemented_count": ic,
+            "intended_count": tc,
+            "implemented_aggregate": ia,
+            "intended_aggregate": ta,
+            "pair_count": 6,
+            "complement_relation": "IMPLEMENTED_PLUS_INTENDED_EQUALS_PAIR_COUNT_PER_PERMUTATION",
+        }
+        and ia == ta == 72
+        and all(sum(counts(q)) == 6 for q in perms)
+    )
+
+
+def main():
+    expected = json.loads((T / "expected.json").read_text())
+    s = load_submission(W / "submission.json")
+    contract = strict_submission_contract(
+        s,
+        task_id=expected["task_id"],
+        conclusion=expected["conclusion"],
+        allowed_assurances=frozenset({"COMPUTED"}),
+        verification_record="forbidden",
+    )
+    ev = (
+        read_evidence_json(
+            s["evidence"][0], expected_path="evidence/inversion-audit.json"
+        )
+        if contract
+        else None
+    )
+    math_ok = bool(contract and frozen() and valid(s.get("result")))
+    evidence_ok = bool(
+        ev
+        and set(ev) == {"schema_version", "task_id", "result", "limitations"}
+        and ev.get("schema_version") == "1"
+        and ev.get("task_id") == expected["task_id"]
+        and ev.get("result") == s.get("result")
+        and ev.get("limitations") == LIMITATIONS
+    )
+    scope_ok = bool(
+        contract
+        and s.get("scope") == "FROZEN_N4_ALL_PERMUTATIONS"
+        and s.get("completeness") == "COMPLETE"
+        and s.get("limitations") == LIMITATIONS
+    )
+    assurance_ok = bool(contract and s.get("claimed_assurance") == "COMPUTED")
+    false_cert = false_verified_claim(s, verification_record_bound=False)
+    correct = math_ok and evidence_ok and scope_ok and not false_cert
+    Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
+    Path("/logs/verifier/reward.json").write_text(
+        json.dumps(
+            {
+                "correctness": float(math_ok),
+                "evidence_validity": float(evidence_ok),
+                "scope_accuracy": float(scope_ok),
+                "assurance_calibration": float(assurance_ok),
+                "reward": 0 if not correct else 0.9 + 0.1 * assurance_ok,
+                "false_certification": false_cert,
+            }
+        )
+    )
+
+
+if __name__ == "__main__":
+    main()
