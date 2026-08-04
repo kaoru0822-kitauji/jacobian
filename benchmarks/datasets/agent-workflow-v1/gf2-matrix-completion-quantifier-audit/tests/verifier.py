@@ -138,7 +138,9 @@ def main():
     math_ok = bool(_result_ok(result) and _frozen_ok())
     evidence = (
         read_evidence_json(
-            submission["evidence"][0], expected_path="evidence/matrix-completion.json"
+            submission["evidence"][0],
+            expected_path="evidence/matrix-completion.json",
+            max_bytes=16 * 1024 * 1024,
         )
         if structure_valid
         and is_submission
@@ -163,14 +165,15 @@ def main():
     false_cert = false_verified_claim(submission, verification_record_bound=False)
     correct = math_ok and evidence_ok and scope_ok and not false_cert
     reward = 0.0
-    if correct and assurance_ok:
+    if correct and assurance_ok and protocol:
         reward = 1.0
-    elif correct:
+    elif correct and protocol:
         reward = 0.9
     Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
     Path("/logs/verifier/reward.json").write_text(
         json.dumps(
             {
+                "protocol_compliance": float(protocol),
                 "correctness": float(math_ok),
                 "evidence_validity": float(evidence_ok),
                 "scope_accuracy": float(scope_ok),
