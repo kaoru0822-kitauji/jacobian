@@ -10,6 +10,7 @@ from verifier_support import (
 
 W, T = Path("/app"), Path("/tests")
 LIMITATIONS = ["FINITE_GRIDS_N_2_THROUGH_5", "NO_GENERAL_GRID_FORMULA"]
+REQUIRED_N = (2, 3, 4, 5)
 
 
 def derive_case(n):
@@ -33,7 +34,7 @@ def derive_case(n):
 
 
 def derive():
-    cases = [derive_case(n) for n in range(2, 6)]
+    cases = [derive_case(n) for n in REQUIRED_N]
     return {
         "cases": cases,
         "total": sum(case["independent_set_count"] for case in cases),
@@ -59,8 +60,40 @@ def exact_value(actual, expected):
     return type(actual) is type(expected) and actual == expected
 
 
+def result_matches(result):
+    """Compare a result against the derived computation.
+
+    Cases may appear in any order; each is matched by its ``n`` value.
+    Every integer field is checked with exact type semantics so JSON floats
+    or booleans cannot masquerade as valid integers.
+    """
+    if not isinstance(result, dict):
+        return False
+    derived = derive()
+    if set(result) != set(derived):
+        return False
+    if not exact_value(result.get("total"), derived["total"]):
+        return False
+    cases = result.get("cases")
+    if not isinstance(cases, list) or len(cases) != len(REQUIRED_N):
+        return False
+    by_n = {}
+    for case in cases:
+        if not isinstance(case, dict):
+            return False
+        n = case.get("n")
+        if type(n) is not int or n in by_n:
+            return False
+        by_n[n] = case
+    if set(by_n) != set(REQUIRED_N):
+        return False
+    return all(
+        exact_value(by_n[n], derived["cases"][i]) for i, n in enumerate(REQUIRED_N)
+    )
+
+
 def matches(result):
-    return exact_value(result, derive())
+    return result_matches(result)
 
 
 def frozen():
@@ -89,14 +122,14 @@ def main():
         if contract
         else None
     )
-    derived = derive()
-    math_ok = bool(contract and frozen() and matches(submission.get("result")))
+    result = submission.get("result") if isinstance(submission, dict) else None
+    math_ok = bool(frozen() and result_matches(result))
     evidence_ok = bool(
         evidence
         and set(evidence) == {"schema_version", "task_id", "result", "limitations"}
         and evidence.get("schema_version") == "1"
         and evidence.get("task_id") == expected["task_id"]
-        and evidence.get("result") == derived
+        and result_matches(evidence.get("result"))
         and evidence.get("limitations") == LIMITATIONS
     )
     scope_ok = bool(

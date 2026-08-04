@@ -19,8 +19,8 @@ category = "mathematics"
 tags = ["difficulty-provisional", "dynamic-programming", "state-compression", "offline"]
 case_version = "agent-workflow-v1"
 contamination_class = "public-answer-transformed-transfer-certificate"
-fixture_digest = "sha256:35008ff4de6b4111ca136467608c27de909480052ca39f636cf95fc68d7a0908"
-derivation = "Transfer-state certificate derived from bespokelabs/BeyondAIME row 78 at revision c705198ae1043810b1e1693bd879250b51a7a523."
+fixture_digest = "sha256:bd0dfd593b2e8a0ce7b4e14aa9c38b0786b9da08d7185ca5299f1678286edf8b"
+derivation = "Transfer-state certificate derived from ByteDance-Seed/BeyondAIME row 78 at revision c705198ae1043810b1e1693bd879250b51a7a523."
 [agent]
 timeout_sec = 600.0
 [verifier]

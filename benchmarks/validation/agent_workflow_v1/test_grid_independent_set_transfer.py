@@ -3,6 +3,9 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+from benchmarks.validation.agent_workflow_v1 import support
+
 ROOT = Path(__file__).resolve().parents[3]
 TASK = ROOT / "benchmarks/datasets/agent-workflow-v1/grid-independent-set-transfer"
 
@@ -16,6 +19,23 @@ def load_verifier():
     assert spec and spec.loader
     spec.loader.exec_module(module)
     return module
+
+
+def _make_evidence(submission):
+    return {
+        "schema_version": "1",
+        "task_id": submission["task_id"],
+        "result": submission["result"],
+        "limitations": submission["limitations"],
+    }
+
+
+def _write_evidence_and_submission(app, submission):
+    evidence_path = app / "evidence" / "answer.txt"
+    evidence = _make_evidence(submission)
+    support._write_json(evidence_path, evidence)
+    submission["evidence"][0]["sha256"] = support._digest(evidence_path)
+    support._write_json(app / "submission.json", submission)
 
 
 def test_independent_transfer_derivation():
@@ -50,3 +70,57 @@ def test_corrupt_intermediate_layer_is_rejected():
 def test_contract_has_no_verified_upgrade():
     schema = json.loads((TASK / "environment/submission_schema.json").read_text())
     assert schema["properties"]["claimed_assurance"] == {"const": "COMPUTED"}
+
+
+def test_accepts_computed_submission(tmp_path: Path) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "grid-independent-set-transfer", "computed"
+    )
+    accepted = support._run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["evidence_validity"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+def test_rejects_float_in_result(tmp_path: Path) -> None:
+    """JSON floats in integer fields must not earn reward via Python equality."""
+    task, app, logs = support._prepare_case(
+        tmp_path, "grid-independent-set-transfer", "computed"
+    )
+    submission = json.loads((app / "submission.json").read_text())
+    submission["result"]["cases"][0]["independent_set_count"] = 7.0
+    _write_evidence_and_submission(app, submission)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_rejects_bool_in_result(tmp_path: Path) -> None:
+    """JSON booleans must not pass as integers (True == 1 in Python)."""
+    task, app, logs = support._prepare_case(
+        tmp_path, "grid-independent-set-transfer", "computed"
+    )
+    submission = json.loads((app / "submission.json").read_text())
+    submission["result"]["cases"][0]["valid_row_masks"][1] = True
+    _write_evidence_and_submission(app, submission)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_rejects_float_in_evidence(tmp_path: Path) -> None:
+    """Evidence with float values must not pass even if submission has integers."""
+    task, app, logs = support._prepare_case(
+        tmp_path, "grid-independent-set-transfer", "computed"
+    )
+    submission = json.loads((app / "submission.json").read_text())
+    evidence_path = app / "evidence" / "answer.txt"
+    evidence = json.loads(json.dumps(_make_evidence(submission)))
+    evidence["result"]["cases"][0]["independent_set_count"] = 7.0
+    support._write_json(evidence_path, evidence)
+    submission["evidence"][0]["sha256"] = support._digest(evidence_path)
+    support._write_json(app / "submission.json", submission)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 1.0
+    assert rejected["evidence_validity"] == 0.0
+    assert rejected["reward"] == 0.0
