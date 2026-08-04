@@ -121,7 +121,8 @@ def main():
         and evidence["limitations"] == submission.get("limitations")
     )
     scope_ok = bool(
-        shape_safe
+        contract
+        and shape_safe
         and submission.get("scope") == "DECLARED_SEQUENCE_FORMULA_AND_PRIME_PROBES"
         and submission.get("limitations")
         == [

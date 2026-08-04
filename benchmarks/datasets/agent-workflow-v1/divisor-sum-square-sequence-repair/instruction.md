@@ -14,6 +14,6 @@ exact square.
 Use `/app/submission.json` and bind an identical certificate at
 `evidence/sequence-construction.json`. The certificate must be a JSON object
 with exactly the fields `schema_version` (the string `"1"`), `task_id`
-(`"jacobian/divisor-sum-square-sequence-repair"`), `result` (an object equal to
+(the task identifier), `result` (an object equal to
 the submission's `result`), and `limitations` (an array equal to the
 submission's `limitations`). Maximum assurance: `COMPUTED`.
