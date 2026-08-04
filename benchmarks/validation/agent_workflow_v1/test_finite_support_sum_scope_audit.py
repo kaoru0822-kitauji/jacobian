@@ -72,3 +72,12 @@ def test_accepts_unordered_valid_witnesses(tmp_path):
         reversed(submission["result"]["truncated_checkpoints"])
     )
     assert _verify(tmp_path, submission)["reward"] == 1.0
+
+
+def test_accepts_equivalent_unreduced_rationals(tmp_path):
+    submission = _oracle()
+    submission["result"]["summand_values"][0] = {"numerator": 2, "denominator": 2}
+    checkpoint = submission["result"]["truncated_checkpoints"][0]["value"]
+    checkpoint["numerator"] *= 2
+    checkpoint["denominator"] *= 2
+    assert _verify(tmp_path, submission)["reward"] == 1.0

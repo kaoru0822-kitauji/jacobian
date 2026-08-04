@@ -23,12 +23,7 @@ def _rat(value):
     ):
         return None
     result = Fraction(value["numerator"], value["denominator"])
-    return (
-        result
-        if result.numerator == value["numerator"]
-        and result.denominator == value["denominator"]
-        else None
-    )
+    return result
 
 
 def _truncated(n):
