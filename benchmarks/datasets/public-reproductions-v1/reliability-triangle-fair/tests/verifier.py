@@ -1,4 +1,6 @@
 import json
+from fractions import Fraction
+from itertools import product
 from pathlib import Path
 
 from verifier_support import (
@@ -13,23 +15,92 @@ ALLOWED = frozenset({"UNVERIFIED", "COMPUTED", "CHECKED"})
 
 
 def _frac(v):
-    if not isinstance(v, dict):
+    if not isinstance(v, dict) or set(v) != {"num", "den"}:
         return None
     num, den = v.get("num"), v.get("den")
-    if not isinstance(num, str) or not isinstance(den, str):
+    if (
+        not isinstance(num, str)
+        or not isinstance(den, str)
+        or not num.lstrip("-").isdigit()
+        or not den.isdigit()
+    ):
         return None
-    return (num, den)
+    try:
+        value = Fraction(int(num), int(den))
+    except ZeroDivisionError:
+        return None
+    canonical = {"num": str(value.numerator), "den": str(value.denominator)}
+    return value if v == canonical else None
+
+
+def _expected_result(x):
+    graph = x.get("graph")
+    probabilities = x.get("edge_probabilities")
+    terminals = x.get("terminals")
+    if (
+        not isinstance(graph, dict)
+        or not isinstance(graph.get("vertices"), list)
+        or not isinstance(graph.get("edges"), list)
+        or not isinstance(probabilities, list)
+        or not isinstance(terminals, list)
+        or len(terminals) != 2
+    ):
+        return None
+    edges = graph["edges"]
+    probability_by_edge = {}
+    for item in probabilities:
+        if not isinstance(item, dict) or set(item) != {"edge", "open_probability"}:
+            return None
+        edge = item["edge"]
+        probability = _frac(item["open_probability"])
+        if (
+            not isinstance(edge, list)
+            or len(edge) != 2
+            or any(not isinstance(vertex, str) for vertex in edge)
+            or probability is None
+        ):
+            return None
+        probability_by_edge[frozenset(edge)] = probability
+    if len(probability_by_edge) != len(edges):
+        return None
+
+    total = Fraction(0)
+    for state in product((False, True), repeat=len(edges)):
+        adjacency = {vertex: set() for vertex in graph["vertices"]}
+        mass = Fraction(1)
+        for edge, opened in zip(edges, state, strict=True):
+            probability = probability_by_edge.get(frozenset(edge))
+            if probability is None:
+                return None
+            mass *= probability if opened else 1 - probability
+            if opened:
+                left, right = edge
+                adjacency[left].add(right)
+                adjacency[right].add(left)
+        reached = {terminals[0]}
+        frontier = [terminals[0]]
+        while frontier:
+            vertex = frontier.pop()
+            for neighbor in adjacency[vertex] - reached:
+                reached.add(neighbor)
+                frontier.append(neighbor)
+        if terminals[1] in reached:
+            total += mass
+    return total, 2 ** len(edges)
 
 
 def _math(s, x, e):
     r = s.get("result", {})
-    try:
-        states = int(r.get("states"))
-    except (TypeError, ValueError):
+    expected = _expected_result(x)
+    if (
+        not isinstance(r, dict)
+        or set(r) != {"probability", "states"}
+        or type(r.get("states")) is not int
+        or expected is None
+    ):
         return False
-    return _frac(r.get("probability")) == _frac(
-        e["expected_probability"]
-    ) and states == int(e["expected_states"])
+    probability, states = expected
+    return _frac(r.get("probability")) == probability and r["states"] == states
 
 
 def main():

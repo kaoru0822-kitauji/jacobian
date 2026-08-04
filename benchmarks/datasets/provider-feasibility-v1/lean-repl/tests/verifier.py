@@ -14,6 +14,8 @@ if isinstance(submission, dict) and isinstance(submission.get("evidence"), list)
         expected_path="evidence/provider-report.json",
     )
 result = submission.get("result") if isinstance(submission, dict) else None
+tasks = report.get("tasks") if isinstance(report, dict) else None
+expected_task_ids = {"CONJUNCTION-DECOMPOSITION", "LOCAL-PREMISE-APPLICATION"}
 valid = bool(
     isinstance(submission, dict)
     and set(submission)
@@ -45,11 +47,24 @@ valid = bool(
     and report.get("completed_count") == 2
     and report.get("parameter_error_count") == 0
     and report.get("return_code") == 0
+    and isinstance(tasks, list)
+    and len(tasks) == 2
+    and {item.get("task_id") for item in tasks if isinstance(item, dict)}
+    == expected_task_ids
     and all(
         isinstance(item, dict)
         and item.get("completed") is True
         and item.get("decomposition_observed") is True
-        for item in report.get("tasks", [])
+        and isinstance(item.get("tactics"), list)
+        and item["tactics"]
+        and all(
+            isinstance(trace, dict)
+            and isinstance(trace.get("tactic"), str)
+            and type(trace.get("goal_count")) is int
+            and trace.get("error_count") == 0
+            for trace in item["tactics"]
+        )
+        for item in tasks
     )
 )
 target = Path("/logs/verifier/reward.json")
