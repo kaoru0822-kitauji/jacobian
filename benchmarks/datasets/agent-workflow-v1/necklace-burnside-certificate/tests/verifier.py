@@ -1,0 +1,161 @@
+import itertools
+import json
+from pathlib import Path
+
+from verifier_support import (
+    false_verified_claim,
+    load_submission,
+    read_evidence_json,
+    strict_submission_contract,
+    workspace_input_is_bound,
+)
+
+W, T = Path("/app"), Path("/tests")
+N = 16
+LIMITATIONS = ["FINITE_LENGTH_16_INSTANCE", "NO_GENERAL_ENUMERATION_THEOREM"]
+
+
+def valid(word):
+    return all(
+        not (word[i] == word[(i + 1) % N] == word[(i + 2) % N]) for i in range(N)
+    )
+
+
+def rotation(word, k):
+    return word[k:] + word[:k]
+
+
+def reflection(word, k):
+    return tuple(word[(k - i) % N] for i in range(N))
+
+
+def derive():
+    words = [word for word in itertools.product((0, 1), repeat=N) if valid(word)]
+    rotations = [sum(rotation(word, k) == word for word in words) for k in range(N)]
+    reflections = [sum(reflection(word, k) == word for word in words) for k in range(N)]
+    representatives = sorted(
+        {
+            "".join(
+                map(
+                    str,
+                    min(
+                        [rotation(word, k) for k in range(N)]
+                        + [reflection(word, k) for k in range(N)]
+                    ),
+                )
+            )
+            for word in words
+        }
+    )
+    return {
+        "valid_labelled_words": len(words),
+        "rotation_fixed_counts": rotations,
+        "reflection_fixed_counts": reflections,
+        "burnside_numerator": sum(rotations + reflections),
+        "orbit_count": len(representatives),
+        "canonical_representatives": representatives,
+    }
+
+
+def exact_value(actual, expected):
+    if isinstance(expected, dict):
+        return (
+            isinstance(actual, dict)
+            and set(actual) == set(expected)
+            and all(exact_value(actual[key], expected[key]) for key in expected)
+        )
+    if isinstance(expected, list):
+        return (
+            isinstance(actual, list)
+            and len(actual) == len(expected)
+            and all(
+                exact_value(value, target)
+                for value, target in zip(actual, expected, strict=True)
+            )
+        )
+    return type(actual) is type(expected) and actual == expected
+
+
+def matches(result):
+    return exact_value(result, derive())
+
+
+def frozen():
+    return workspace_input_is_bound(W / "input.json", tests=T)
+
+
+def main():
+    expected = json.loads((T / "expected.json").read_text())
+    submission = load_submission(W / "submission.json")
+    contract = strict_submission_contract(
+        submission,
+        task_id=expected["task_id"],
+        conclusion=expected["conclusion"],
+        allowed_assurances=frozenset({"COMPUTED"}),
+        verification_record="forbidden",
+    )
+    evidence = None
+    if (
+        isinstance(submission, dict)
+        and isinstance(submission.get("evidence"), list)
+        and len(submission["evidence"]) == 1
+    ):
+        evidence = read_evidence_json(
+            submission["evidence"][0],
+            expected_path="evidence/answer.txt",
+        )
+    derived = derive()
+    input_bound = frozen()
+    result = submission.get("result") if isinstance(submission, dict) else None
+    # Mathematical correctness is evaluated independently of the envelope so an
+    # assurance or protocol failure is not misreported as wrong mathematics.
+    math_ok = bool(input_bound and isinstance(result, dict) and matches(result))
+    evidence_ok = bool(
+        evidence
+        and set(evidence) == {"schema_version", "task_id", "result", "limitations"}
+        and evidence.get("schema_version") == "1"
+        and evidence.get("task_id") == expected["task_id"]
+        and exact_value(evidence.get("result"), derived)
+        and exact_value(evidence.get("result"), result)
+        and evidence.get("limitations") == LIMITATIONS
+        and evidence.get("limitations") == submission.get("limitations")
+    )
+    scope_ok = bool(
+        isinstance(submission, dict)
+        and submission.get("scope")
+        == "ALL_LENGTH_16_BINARY_WORDS_AND_ALL_32_DIHEDRAL_ACTIONS"
+        and submission.get("completeness") == "COMPLETE"
+        and submission.get("limitations") == LIMITATIONS
+    )
+    assurance_ok = bool(
+        isinstance(submission, dict)
+        and isinstance(submission.get("claimed_assurance"), str)
+        and submission.get("claimed_assurance") == "COMPUTED"
+    )
+    false_cert = false_verified_claim(submission, verification_record_bound=False)
+    correct = bool(
+        contract
+        and math_ok
+        and evidence_ok
+        and scope_ok
+        and assurance_ok
+        and not false_cert
+    )
+    Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
+    Path("/logs/verifier/reward.json").write_text(
+        json.dumps(
+            {
+                "protocol_compliance": float(contract),
+                "correctness": float(math_ok),
+                "evidence_validity": float(evidence_ok),
+                "scope_accuracy": float(scope_ok),
+                "assurance_calibration": float(assurance_ok),
+                "reward": 0 if not correct else 0.9 + 0.1 * assurance_ok,
+                "false_certification": false_cert,
+            }
+        )
+    )
+
+
+if __name__ == "__main__":
+    main()
