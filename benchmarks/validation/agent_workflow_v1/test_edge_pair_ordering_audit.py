@@ -97,3 +97,52 @@ def test_duplicate_probe_is_rejected_as_malformed_and_incorrect(tmp_path: Path):
     assert result["protocol_compliance"] == 0.0
     assert result["correctness"] == 0.0
     assert result["reward"] == 0.0
+
+
+def test_non_string_pair_semantics_does_not_crash(tmp_path: Path):
+    task, app, logs = _case(tmp_path)
+    submission = json.loads((app / "submission.json").read_text())
+    submission["result"]["pair_semantics"] = ["ORDERED"]
+    _rewrite(app, submission)
+    result = support._run_verifier(task, app, logs)
+    assert result["protocol_compliance"] == 0.0
+    assert result["reward"] == 0.0
+
+
+def test_keyword_only_evidence_is_rejected(tmp_path: Path):
+    task, app, logs = _case(tmp_path)
+    submission = json.loads((app / "submission.json").read_text())
+    marker = "RESULT_JSON: " + json.dumps(
+        submission["result"], sort_keys=True, separators=(",", ":")
+    )
+    (app / "evidence" / "answer.txt").write_text(
+        "ordered unordered incident pair factor free edge coefficient finite\n"
+        + marker
+        + "\n"
+    )
+    submission["evidence"][0]["sha256"] = support._digest(
+        app / "evidence" / "answer.txt"
+    )
+    support._write_json(app / "submission.json", submission)
+    result = support._run_verifier(task, app, logs)
+    assert result["evidence_validity"] == 0.0
+    assert result["reward"] == 0.0
+
+
+def test_recursive_evidence_marker_does_not_crash(tmp_path: Path):
+    task, app, logs = _case(tmp_path)
+    submission = json.loads((app / "submission.json").read_text())
+    nested: list = []
+    for _ in range(600):
+        nested = [nested]
+    marker = "RESULT_JSON: " + json.dumps(nested, separators=(",", ":"))
+    (app / "evidence" / "answer.txt").write_text(
+        "ordered unordered factor free edge finite two\n" + marker + "\n"
+    )
+    submission["evidence"][0]["sha256"] = support._digest(
+        app / "evidence" / "answer.txt"
+    )
+    support._write_json(app / "submission.json", submission)
+    result = support._run_verifier(task, app, logs)
+    assert result["evidence_validity"] == 0.0
+    assert result["reward"] == 0.0

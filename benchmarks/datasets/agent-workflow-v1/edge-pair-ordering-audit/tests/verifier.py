@@ -63,6 +63,8 @@ def _result_shape_is_valid(result: object) -> bool:
         "probe_values",
     }:
         return False
+    if not isinstance(result["pair_semantics"], str):
+        return False
     if result["pair_semantics"] not in {"ORDERED", "UNORDERED"} or not all(
         type(result[field]) is str and bool(result[field].strip())
         for field in (
@@ -106,6 +108,11 @@ def _mathematical_result_is_valid(result: object, source: dict[str, Any]) -> boo
             "and p_(G,e1,e2)(x) = 0 otherwise; sum these polynomials over all "
             "G and all ordered edge pairs."
         ),
+        "source_derivation": (
+            "The original source treats the double sum as unordered, counting "
+            "each incident edge pair once rather than in both orientations, "
+            "yielding half the correct coefficient."
+        ),
         "probe_n": [3, 4, 5, 6],
     }
     if not _exact_json_equal(source, expected_source):
@@ -114,7 +121,17 @@ def _mathematical_result_is_valid(result: object, source: dict[str, Any]) -> boo
         return False
     try:
         probes = result["probe_values"]
-        values = {probe["n"]: probe["coefficient"] for probe in probes}
+        if not isinstance(probes, list) or len(probes) > 10:
+            return False
+        values: dict[int, int] = {}
+        for probe in probes:
+            if not isinstance(probe, dict):
+                return False
+            n = probe.get("n")
+            coefficient = probe.get("coefficient")
+            if type(n) is not int or type(coefficient) is not int:
+                return False
+            values[n] = coefficient
         return bool(
             result["pair_semantics"] == "ORDERED"
             and result["incident_ordered_pair_factor"] == "n(n-1)(n-2)"
@@ -122,13 +139,10 @@ def _mathematical_result_is_valid(result: object, source: dict[str, Any]) -> boo
             and result["formula"] == "n(n-1)(n-2)*2^(binom(n,2)-2)"
             and set(values) == {3, 4, 5, 6}
             and all(
-                type(probe["n"]) is int
-                and type(probe["coefficient"]) is int
-                and values[n]
+                values[n]
                 == exhaustive(n)
                 == n * (n - 1) * (n - 2) * 2 ** (n * (n - 1) // 2 - 2)
-                for probe in probes
-                for n in [probe["n"]]
+                for n in values
             )
         )
     except (KeyError, TypeError, ValueError):
@@ -187,7 +201,11 @@ def _evidence_is_valid(
         marker = json.loads(marker_lines[0].removeprefix("RESULT_JSON:").strip())
     except (ValueError, RecursionError, MemoryError):
         return False
-    if not _exact_json_equal(marker, result):
+    try:
+        marker_match = _exact_json_equal(marker, result)
+    except RecursionError:
+        return False
+    if not marker_match:
         return False
     prose = " ".join(
         line for line in text.splitlines() if not line.startswith("RESULT_JSON:")
@@ -198,15 +216,12 @@ def _evidence_is_valid(
         for term in (
             "ordered",
             "unordered",
-            "incident",
-            "pair",
             "factor",
             "free",
             "edge",
-            "coefficient",
             "finite",
         )
-    )
+    ) and any(phrase in prose for phrase in ("two", "half", "double"))
 
 
 def main():
