@@ -189,14 +189,19 @@ class ReasoningLogService:
         run_id = str(uuid4())
         with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
+            # Count only active (non-finalized) runs.  Finalized runs are
+            # retained as immutable evidence but do not count against the
+            # concurrent-run ceiling, so a long-lived tenant is not
+            # exhausted by completed protocols.
             (count,) = connection.execute(
-                "SELECT COUNT(*) FROM reasoning_runs"
+                "SELECT COUNT(*) FROM reasoning_runs WHERE run_id NOT IN "
+                "(SELECT run_id FROM reasoning_events WHERE kind = 'FINAL')"
             ).fetchone()
             if count >= MAX_RUNS:
                 self._raise(
                     "REASONING_RUN_LIMIT",
-                    f"The aggregate reasoning-run limit ({MAX_RUNS}) has been reached.",
-                    "Contact the operator to prune old reasoning runs or raise the limit.",
+                    f"The active reasoning-run limit ({MAX_RUNS}) has been reached.",
+                    "Finalize or abandon existing runs before starting new ones.",
                 )
             connection.execute(
                 "INSERT INTO reasoning_runs(run_id) VALUES (?)", (run_id,)

@@ -33,21 +33,28 @@ async def _run_blocking[BlockingResultT](
     *args: Any,
     on_cancel: Callable[[], None] | None = None,
 ) -> BlockingResultT:
-    """Run blocking MCP work without detaching it from request teardown."""
+    """Run blocking MCP work without detaching it from request teardown.
+
+    On cancellation, waits for the worker to drain and stores the result
+    in the ``drained_result`` attribute so the caller can persist a
+    completed outcome instead of unconditionally recording cancellation.
+    """
 
     worker = asyncio.create_task(asyncio.to_thread(function, *args))
     try:
         return await asyncio.shield(worker)
-    except asyncio.CancelledError:
+    except asyncio.CancelledError as exc:
         if on_cancel is not None:
             on_cancel()
+        drained: BlockingResultT | None = None
         try:
-            await asyncio.shield(worker)
+            drained = await asyncio.shield(worker)
         except Exception:
             _LOGGER.debug(
                 "blocking MCP worker failed while its cancelled request drained",
                 exc_info=True,
             )
+        exc.drained_result = drained  # type: ignore[attr-defined]
         raise
 
 
@@ -280,28 +287,51 @@ async def _invoke_capability_attempt(
             cancellation_event,
             on_cancel=cancellation_event.set,
         )
-    except asyncio.CancelledError:
-        _finish_failed_reasoning_call(
-            runtime,
-            bound=bound,
-            run_id=reasoning_run_id,
-            call_id=reasoning_call_id,
-            capability_id=capability_id,
-            mode=mode,
-            argument_digest=argument_digest,
-            execution_status="CANCELLED",
-            diagnostic_code="CLIENT_CANCELLED",
-        )
-        _log_capability_attempt(
-            capability_id=capability_id,
-            mode=mode,
-            started=started,
-            argument_digest=argument_digest,
-            trace_digest=trace_digest,
-            trace_source=trace_source,
-            execution_status="CANCELLED",
-            diagnostic_codes=("CLIENT_CANCELLED",),
-        )
+    except asyncio.CancelledError as exc:
+        drained = getattr(exc, "drained_result", None)
+        if isinstance(drained, CapabilityResult):
+            if bound:
+                assert reasoning_run_id is not None
+                assert reasoning_call_id is not None
+                runtime.core.reasoning_log.finish_call(
+                    reasoning_run_id,
+                    reasoning_call_id,
+                    capability_id,
+                    mode,
+                    argument_digest,
+                    result=drained,
+                )
+            _log_capability_attempt(
+                capability_id=capability_id,
+                mode=mode,
+                started=started,
+                argument_digest=argument_digest,
+                trace_digest=trace_digest,
+                trace_source=trace_source,
+                result=drained,
+            )
+        else:
+            _finish_failed_reasoning_call(
+                runtime,
+                bound=bound,
+                run_id=reasoning_run_id,
+                call_id=reasoning_call_id,
+                capability_id=capability_id,
+                mode=mode,
+                argument_digest=argument_digest,
+                execution_status="CANCELLED",
+                diagnostic_code="CLIENT_CANCELLED",
+            )
+            _log_capability_attempt(
+                capability_id=capability_id,
+                mode=mode,
+                started=started,
+                argument_digest=argument_digest,
+                trace_digest=trace_digest,
+                trace_source=trace_source,
+                execution_status="CANCELLED",
+                diagnostic_codes=("CLIENT_CANCELLED",),
+            )
         raise
     except Exception:
         _finish_failed_reasoning_call(

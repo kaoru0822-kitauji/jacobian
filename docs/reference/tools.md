@@ -6,22 +6,22 @@
 - Installed membership remains runtime-defined
 
 Jacobian exposes mathematical operations as namespaced capabilities. The
-model-facing MCP surface contains two capability tools and, by default, one
-operational reasoning-log tool:
+model-facing MCP surface contains two capability tools and, in `REQUIRED` or
+`AUDIT` mode, one operational reasoning-log tool:
 
 | MCP tool | Purpose |
 | --- | --- |
 | `capability.describe` | Search the compact installed index, or read one capability's exact schemas by ID. |
 | `capability.invoke` | Invoke an installed capability in `EXPLORE` or `VERIFY` mode. |
-| `reasoning.write` | Append a bounded model-authored `PLAN`, `BEFORE_TOOL`, `AFTER_TOOL`, or `FINAL` summary. |
+| `reasoning.write` | Append a bounded model-authored `PLAN`, `BEFORE_TOOL`, `AFTER_TOOL`, or `FINAL` summary. Available only in `REQUIRED` or `AUDIT` mode. |
 
 The reasoning log is not a mathematical capability, proof object, workspace, or
-chain-of-thought collector. In the default `REQUIRED` mode, every
-`capability.invoke` must carry the `reasoning_run_id` and `reasoning_call_id`
-returned by the current `BEFORE_TOOL`. The server binds the actual execution
-status, assurance, completeness, result digest, and artifact URIs, then records
-whether the model's structured `AFTER_TOOL` report matches them, without copying
-the capability payload or output into the log. See the
+chain-of-thought collector. In `REQUIRED` mode, every `capability.invoke` must
+carry the `reasoning_run_id` and `reasoning_call_id` returned by the current
+`BEFORE_TOOL`. The server binds the actual execution status, assurance,
+completeness, result digest, and artifact URIs, then records whether the model's
+structured `AFTER_TOOL` report matches them, without copying the capability
+payload or output into the log. See the
 [reasoning-log protocol](reasoning-log.md).
 
 Read `capability://catalog` to discover installed capability IDs, provider
@@ -32,8 +32,9 @@ support, recommendation, conformance coverage, or authority to return
 
 There are no alternate mathematical capability profiles and no public top-level
 MCP commands for individual mathematical operations. The operator may set the
-reasoning-log enforcement mode to `REQUIRED`, `AUDIT`, or `OFF`; `OFF` preserves
-the legacy two-tool surface. Adding a capability does not add a new MCP tool.
+reasoning-log enforcement mode to `REQUIRED`, `AUDIT`, or `OFF`; `OFF` is the
+default and preserves the legacy two-tool surface. Adding a capability does not
+add a new MCP tool.
 
 ## Capability contract
 
