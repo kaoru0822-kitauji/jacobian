@@ -55,7 +55,7 @@ def _result_ok(result):
         or not 4 <= n <= 12
         or not isinstance(tails, list)
         or not 6 <= len(tails) <= 12
-        or tails != sorted(set(tails))
+        or len(set(tails)) != len(tails)
         or any(type(m) is not int or not n < m <= 100 for m in tails)
     ):
         return False
@@ -81,7 +81,7 @@ def _result_ok(result):
             return False
         ns.append(check["n"])
     if (
-        ns != sorted(set(ns))
+        len(set(ns)) != len(ns)
         or result["ratio_threshold"] != 2
         or _rat(result["ratio_bound"]) != Fraction(3, 4)
     ):

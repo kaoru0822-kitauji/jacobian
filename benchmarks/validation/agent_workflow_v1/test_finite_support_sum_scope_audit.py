@@ -58,3 +58,17 @@ def test_scope_and_assurance_attacks_fail(tmp_path):
         submission = copy.deepcopy(_oracle())
         mutate(submission)
         assert _verify(tmp_path / name, submission)["reward"] == 0
+
+
+def test_accepts_unordered_valid_witnesses(tmp_path):
+    submission = _oracle()
+    submission["result"]["tail_singletons"] = list(
+        reversed(submission["result"]["tail_singletons"])
+    )
+    submission["result"]["summand_values"] = list(
+        reversed(submission["result"]["summand_values"])
+    )
+    submission["result"]["truncated_checkpoints"] = list(
+        reversed(submission["result"]["truncated_checkpoints"])
+    )
+    assert _verify(tmp_path, submission)["reward"] == 1.0
