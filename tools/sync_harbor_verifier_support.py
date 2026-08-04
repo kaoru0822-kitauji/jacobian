@@ -33,6 +33,11 @@ def check() -> int:
         checked += 1
         failures.extend(check_verifier_support(suite))
     if report_failures(failures, header="Harbor verifier support drift"):
+        print(
+            "The canonical source is benchmarks/tooling/verifier_support.py; "
+            "run `make harbor-sync`, then stage the generated task copies.",
+            file=sys.stderr,
+        )
         return 1
     report_ok(f"Harbor verifier support matches for {checked} dataset(s).")
     return 0

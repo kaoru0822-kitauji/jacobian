@@ -44,10 +44,11 @@ under `tests/`. No compatibility directories or aliases for the former
 benchmark layout are retained.
 
 The copied `tests/verifier_support.py` files are generated Harbor task
-artifacts. `benchmarks/tooling/verifier_support.py` is their canonical source;
-`make harbor-sync` updates the copies and snapshot generation fails if any
-copy drifts. They remain task-local until the digest-pinned shared verifier
-image migration in ADR 0011 is complete.
+artifacts. `benchmarks/tooling/verifier_support.py` owns their contents;
+`make harbor-sync` regenerates every task copy, and the pre-commit hook plus
+the Harbor contract gate reject drift with the same command in their error
+message. They remain task-local until the digest-pinned shared verifier image
+migration in ADR 0011 is complete.
 
 ## Commands
 
