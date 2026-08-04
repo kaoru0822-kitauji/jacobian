@@ -5,10 +5,13 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import random
 import re
 import tarfile
+import time
 import tomllib
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +27,17 @@ from benchmarks.tooling.harbor_suite import (
 from benchmarks.tooling.strict_boundaries import HeldoutManifest, raise_strict_model
 
 _DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+
+_AWS_ENVIRONMENT_VARS = frozenset(
+    {
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_SESSION_TOKEN",
+        "AWS_SECURITY_TOKEN",
+        "AWS_REGION",
+        "AWS_DEFAULT_REGION",
+    }
+)
 
 
 def _read_json(path: Path) -> Any:
@@ -264,8 +278,20 @@ def verify_bundle(manifest: dict[str, Any], root: Path) -> None:
                 )
 
 
-def _run_command(command: str, arguments: list[str], *, cwd: Path) -> None:
-    result = run_operator_command(command, arguments, cwd=cwd, timeout_seconds=600.0)
+def _run_command(
+    command: str,
+    arguments: list[str],
+    *,
+    cwd: Path,
+    environment: Mapping[str, str] | None = None,
+) -> None:
+    result = run_operator_command(
+        command,
+        arguments,
+        cwd=cwd,
+        timeout_seconds=600.0,
+        environment=environment,
+    )
     if result.exit_code is None or result.exit_code != 0:
         diagnostic = result.diagnostic or result.stderr.decode("utf-8", "replace")
         raise HarborSuiteError(f"held-out command {command} failed: {diagnostic}")
@@ -273,17 +299,31 @@ def _run_command(command: str, arguments: list[str], *, cwd: Path) -> None:
 
 def fetch_bundle(manifest_uri: str, output: Path) -> Path:
     output.mkdir(parents=True, exist_ok=False)
+    aws_env = operator_environment(include=_AWS_ENVIRONMENT_VARS)
     manifest_path = output / "manifest.json"
-    _run_command("aws", ["s3", "cp", manifest_uri, str(manifest_path)], cwd=output)
+    _run_command(
+        "aws",
+        ["s3", "cp", manifest_uri, str(manifest_path)],
+        cwd=output,
+        environment=aws_env,
+    )
     manifest = validate_manifest(manifest_path)
     lock_uri = manifest["snapshot_lock"]["lock_uri"]
     lock_path = output / "snapshot-lock.json"
-    _run_command("aws", ["s3", "cp", lock_uri, str(lock_path)], cwd=output)
+    _run_command(
+        "aws",
+        ["s3", "cp", lock_uri, str(lock_path)],
+        cwd=output,
+        environment=aws_env,
+    )
     if _digest(lock_path) != manifest["snapshot_lock"]["lock_digest"]:
         raise HarborSuiteError("held-out snapshot lock digest mismatch")
     archive = output / "bundle.tar.gz"
     _run_command(
-        "aws", ["s3", "cp", manifest["archive"]["uri"], str(archive)], cwd=output
+        "aws",
+        ["s3", "cp", manifest["archive"]["uri"], str(archive)],
+        cwd=output,
+        environment=aws_env,
     )
     if _digest(archive) != manifest["archive"]["sha256"]:
         raise HarborSuiteError("held-out archive digest mismatch")
@@ -624,6 +664,42 @@ def _static_binding_checks(
     return checks, failures
 
 
+def _probe_until_ready(
+    *,
+    mcp_url: str,
+    expected_version: str,
+    expected_policy_profile: str,
+    timeout_seconds: float,
+    probe_fn: Any,
+    retries: int,
+    retry_delay_seconds: float,
+) -> dict[str, Any]:
+    probe_result: dict[str, Any] = {"reachable": False}
+    for attempt in range(retries + 1):
+        probe_result = probe_fn(
+            mcp_url=mcp_url,
+            expected_version=expected_version,
+            expected_policy_profile=expected_policy_profile,
+            timeout_seconds=timeout_seconds,
+        )
+        if probe_result.get("reachable") or attempt == retries:
+            return probe_result
+        time.sleep(retry_delay_seconds)
+    return probe_result
+
+
+def _validate_readiness_retry_policy(retries: int, delay_seconds: float) -> None:
+    if isinstance(retries, bool) or not isinstance(retries, int) or retries < 0:
+        raise HarborSuiteError("readiness retries must be a non-negative integer")
+    if (
+        isinstance(delay_seconds, bool)
+        or not isinstance(delay_seconds, (int, float))
+        or not math.isfinite(delay_seconds)
+        or delay_seconds < 0
+    ):
+        raise HarborSuiteError("readiness retry delay must be finite and non-negative")
+
+
 def _probe_match_checks(
     probe: dict[str, Any],
     expected_server_version: str,
@@ -665,6 +741,8 @@ def treatment_readiness_preflight(
     mcp_url: str = "",
     probe_timeout_seconds: float = 120.0,
     probe_fn: Any | None = None,
+    readiness_retries: int = 3,
+    readiness_retry_delay_seconds: float = 5.0,
 ) -> dict[str, Any]:
     """Emit a routing status contract for the treatment condition.
 
@@ -680,7 +758,17 @@ def treatment_readiness_preflight(
 
     ``routing_status`` is ``AVAILABLE_UNUSED`` when READY, otherwise
     ``CONFIGURED_UNCALLABLE`` (unreachable) or ``MISROUTED`` (mismatched).
+
+    The probe is retried up to *readiness_retries* additional times with a
+    bounded *readiness_retry_delay_seconds* sleep between attempts, so that
+    a treatment container that is still starting up does not cause a
+    premature ``UNAVAILABLE`` classification.  Each attempt uses the
+    existing bounded ``run_operator_command`` abstraction; the total retry
+    budget is bounded by ``(retries + 1) * probe_timeout_seconds + retries *
+    readiness_retry_delay_seconds``.
     """
+
+    _validate_readiness_retry_policy(readiness_retries, readiness_retry_delay_seconds)
 
     manifest = validate_manifest(manifest_path)
     manifest_digest = _digest(manifest_path)
@@ -706,20 +794,15 @@ def treatment_readiness_preflight(
         "diagnostic": None,
     }
     if mcp_url:
-        if probe_fn is None:
-            probe_result = _run_mcp_probe(
-                mcp_url=mcp_url,
-                expected_version=expected_server_version,
-                expected_policy_profile=expected_policy_profile,
-                timeout_seconds=probe_timeout_seconds,
-            )
-        else:
-            probe_result = probe_fn(
-                mcp_url=mcp_url,
-                expected_version=expected_server_version,
-                expected_policy_profile=expected_policy_profile,
-                timeout_seconds=probe_timeout_seconds,
-            )
+        probe_result = _probe_until_ready(
+            mcp_url=mcp_url,
+            expected_version=expected_server_version,
+            expected_policy_profile=expected_policy_profile,
+            timeout_seconds=probe_timeout_seconds,
+            probe_fn=_run_mcp_probe if probe_fn is None else probe_fn,
+            retries=readiness_retries,
+            retry_delay_seconds=readiness_retry_delay_seconds,
+        )
         if probe_result.get("reachable"):
             report = probe_result["report"]
             probe = {
@@ -825,6 +908,10 @@ def main() -> int:
     preflight_parser.add_argument("--manifest", type=Path, required=True)
     preflight_parser.add_argument("--mcp-url", default="")
     preflight_parser.add_argument("--probe-timeout-seconds", type=float, default=120.0)
+    preflight_parser.add_argument("--readiness-retries", type=int, default=3)
+    preflight_parser.add_argument(
+        "--readiness-retry-delay-seconds", type=float, default=5.0
+    )
     control_parser = subparsers.add_parser("control-routing-status")
     control_parser.add_argument("--manifest", type=Path, required=True)
     args = parser.parse_args()
@@ -838,6 +925,8 @@ def main() -> int:
             args.manifest,
             mcp_url=args.mcp_url,
             probe_timeout_seconds=args.probe_timeout_seconds,
+            readiness_retries=args.readiness_retries,
+            readiness_retry_delay_seconds=args.readiness_retry_delay_seconds,
         )
         print(json.dumps(contract, indent=2, sort_keys=True))
     elif args.command == "control-routing-status":

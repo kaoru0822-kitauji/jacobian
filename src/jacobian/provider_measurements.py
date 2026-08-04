@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import importlib.metadata
+import re
 import shutil
 import sys
 import tempfile
@@ -89,11 +90,47 @@ else:
     import jacobian.canonical as backend
     if operation == "reproduction":
         assert backend.canonicalize_json({"value": 1})
+
+# Report this child's own peak resident set so a short probe that exits
+# before the engine's procfs sampler can poll it still yields a trustworthy
+# positive RSS.  RUSAGE_SELF is the child's own high-water mark, not the
+# parent's cumulative prior-child rusage, so it never blends siblings.
+try:
+    import resource as _resource
+    _rss = _resource.getrusage(_resource.RUSAGE_SELF).ru_maxrss
+    print(
+        "JACOBIAN_MEASUREMENT_RSS_BYTES="
+        + str(_rss * 1024 if sys.platform.startswith("linux") else _rss)
+    )
+except (ImportError, OSError, ValueError):
+    pass
 """
+
+# Marker emitted by the Python probe child carrying its own peak RSS, so a
+# short probe that exits before the engine's procfs sampler polls it still
+# reports a trustworthy positive value.  The child reads RUSAGE_SELF, which is
+# its own high-water mark and never the parent's cumulative prior-child rusage.
+_RSS_MARKER = re.compile(rb"JACOBIAN_MEASUREMENT_RSS_BYTES=(\d+)")
 
 
 def _process_environment(*, toolchain_path: str | None = None) -> dict[str, str]:
     return worker_environment(path_prefix=toolchain_path)
+
+
+def _child_peak_rss_bytes(stdout: bytes, sampled: int | None) -> int | None:
+    """Return a trustworthy peak RSS for one completed probe.
+
+    The Python probe child prints its own ``RUSAGE_SELF`` high-water mark as a
+    final marker.  That value is the child's own peak, captured at exit, so it
+    is trustworthy for short probes that complete before the engine's procfs
+    sampler can poll them and it never blends prior siblings.  When the marker
+    is absent (e.g. a Lean executable probe, or a platform without
+    ``resource``) we fall back to the engine's sampled ``peak_rss_bytes``.
+    """
+    matches = _RSS_MARKER.findall(stdout)
+    if matches:
+        return int(matches[-1])
+    return sampled
 
 
 def _measure_command(
@@ -128,7 +165,7 @@ def _measure_command(
         return ProviderMeasurementSample(
             status=ProviderMeasurementStatus.COMPLETED,
             seconds=time.perf_counter() - started,
-            peak_rss_bytes=result.peak_rss_bytes,
+            peak_rss_bytes=_child_peak_rss_bytes(result.stdout, result.peak_rss_bytes),
             output_bytes=len(result.stdout) + len(result.stderr),
         )
     except (OSError, RuntimeError, ValueError):

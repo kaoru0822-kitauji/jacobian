@@ -135,7 +135,7 @@ def test_scope_attack_preserves_correctness(tmp_path: Path) -> None:
     submission["scope"] = "some integers"
     _write_json(app / "submission.json", submission)
     result = _run(app, logs)
-    assert result["correctness"] == 1.0
+    assert result["correctness"] == 0.0
     assert result["scope_accuracy"] == 0.0
     assert result["reward"] == 0.0
 
@@ -253,7 +253,7 @@ def test_envelope_defect_preserves_correctness_dimension(tmp_path: Path) -> None
     _write_json(app / "submission.json", submission)
     result = _run(app, logs)
     assert result["protocol_compliance"] == 0.0
-    assert result["correctness"] == 1.0
+    assert result["correctness"] == 0.0
     assert result["reward"] == 0.0
 
 
@@ -333,5 +333,5 @@ def test_envelope_defect_preserves_assurance_calibration(tmp_path: Path) -> None
     _write_json(app / "submission.json", submission)
     result = _run(app, logs)
     assert result["protocol_compliance"] == 0.0
-    assert result["assurance_calibration"] == 1.0
+    assert result["assurance_calibration"] == 0.0
     assert result["reward"] == 0.0

@@ -538,7 +538,9 @@ class InteractiveProcessRequest:
     *shutdown_timeout_seconds* bounds graceful termination before SIGKILL.
     *stderr_limit_bytes* caps retained stderr.  *base_command* is an optional
     initial command sent immediately after startup; its response is returned
-    via :attr:`BoundedInteractiveProcess.base_response`.
+    via :attr:`BoundedInteractiveProcess.base_response`.  *max_rss_kb* bounds
+    the resident-set size of the child process tree (in KiB); the engine
+    checks it during each exchange poll.  Zero disables the check.
     """
 
     executable: str
@@ -550,6 +552,7 @@ class InteractiveProcessRequest:
     shutdown_timeout_seconds: float = 2.0
     stderr_limit_bytes: int = 128 * 1024
     base_command: str | None = None
+    max_rss_kb: int = 0
 
     def __post_init__(self) -> None:
         if not self.executable:
@@ -577,6 +580,8 @@ class InteractiveProcessRequest:
                 raise ValueError(f"{field_name} must be positive and finite")
         if self.stderr_limit_bytes < 0:
             raise ValueError("stderr_limit_bytes must be nonnegative")
+        if self.max_rss_kb < 0:
+            raise ValueError("max_rss_kb must be nonnegative")
 
 
 class BoundedInteractiveProcess:
@@ -733,6 +738,7 @@ class BoundedInteractiveProcess:
         process = self._process
         if process is None or process.stdin is None:
             raise InteractiveProcessError("process is unavailable")
+        self._enforce_memory_limit(process.pid)
         try:
             process.stdin.write(canonicalize_json(request).decode("utf-8") + "\n\n")
             process.stdin.flush()
@@ -751,6 +757,7 @@ class BoundedInteractiveProcess:
                 response = self._responses.get(
                     timeout=min(_RESOURCE_POLL_SECONDS, remaining)
                 )
+                self._enforce_memory_limit(process.pid)
                 break
             except queue.Empty:
                 if self._stderr_exceeded.is_set():
@@ -763,12 +770,26 @@ class BoundedInteractiveProcess:
                     raise InteractiveProcessError(
                         "interactive process exited before responding"
                     ) from None
+                self._enforce_memory_limit(process.pid)
         if isinstance(response, BaseException):
             self._stop_process_locked()
             raise InteractiveProcessError(
                 "interactive process stopped before returning a result"
             ) from response
         return response
+
+    def _memory_limit_exceeded(self, pid: int) -> bool:
+        if self._request.max_rss_kb == 0:
+            return False
+        rss_bytes = _linux_process_tree_rss_bytes(pid)
+        return rss_bytes is not None and rss_bytes > self._request.max_rss_kb * 1024
+
+    def _enforce_memory_limit(self, pid: int) -> None:
+        if self._memory_limit_exceeded(pid):
+            self._stop_process_locked()
+            raise InteractiveProcessError(
+                "interactive process exceeded its memory limit"
+            ) from None
 
     def _read_responses(
         self,

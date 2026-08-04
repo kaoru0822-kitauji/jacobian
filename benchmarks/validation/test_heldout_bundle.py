@@ -6,8 +6,10 @@ from pathlib import Path
 
 import pytest
 from benchmarks.tooling import heldout_bundle
+from benchmarks.tooling.command_runner import operator_environment
 from benchmarks.tooling.errors import HarborSuiteError
 from benchmarks.tooling.heldout_bundle import (
+    _AWS_ENVIRONMENT_VARS,
     _digest,
     _safe_extract,
     _tree_digest,
@@ -610,6 +612,7 @@ def test_treatment_readiness_preflight_unavailable_when_probe_fails(
         manifest_path,
         mcp_url="http://127.0.0.1:8000/mcp",
         probe_fn=_unreachable_probe,
+        readiness_retries=0,
     )
 
     assert contract["infrastructure_status"] == "UNAVAILABLE"
@@ -617,6 +620,69 @@ def test_treatment_readiness_preflight_unavailable_when_probe_fails(
     assert any("not reachable" in f for f in contract["failures"])
     assert contract["probe"]["reachable"] is False
     assert contract["probe"]["diagnostic"] == "connection refused"
+
+
+def test_treatment_readiness_preflight_retries_until_probe_succeeds(
+    tmp_path: Path,
+) -> None:
+    value = _manifest()
+    manifest_path = _write(tmp_path, value)
+    call_count = 0
+
+    def eventually_ready(
+        *, mcp_url, expected_version, expected_policy_profile, timeout_seconds
+    ):
+        nonlocal call_count
+        call_count += 1
+        if call_count < 3:
+            return {"reachable": False, "diagnostic": "connection refused"}
+        return _ready_probe(
+            mcp_url=mcp_url,
+            expected_version=expected_version,
+            expected_policy_profile=expected_policy_profile,
+            timeout_seconds=timeout_seconds,
+        )
+
+    contract = treatment_readiness_preflight(
+        manifest_path,
+        mcp_url="http://127.0.0.1:8000/mcp",
+        probe_fn=eventually_ready,
+        readiness_retries=5,
+        readiness_retry_delay_seconds=0,
+    )
+
+    assert contract["infrastructure_status"] == "READY"
+    assert contract["routing_status"] == "AVAILABLE_UNUSED"
+    assert contract["probe"]["reachable"] is True
+    assert call_count == 3
+
+
+def test_treatment_readiness_preflight_exhausts_retries_and_fails_closed(
+    tmp_path: Path,
+) -> None:
+    value = _manifest()
+    manifest_path = _write(tmp_path, value)
+    call_count = 0
+
+    def always_unreachable(
+        *, mcp_url, expected_version, expected_policy_profile, timeout_seconds
+    ):
+        nonlocal call_count
+        call_count += 1
+        return {"reachable": False, "diagnostic": "connection refused"}
+
+    contract = treatment_readiness_preflight(
+        manifest_path,
+        mcp_url="http://127.0.0.1:8000/mcp",
+        probe_fn=always_unreachable,
+        readiness_retries=3,
+        readiness_retry_delay_seconds=0,
+    )
+
+    assert contract["infrastructure_status"] == "UNAVAILABLE"
+    assert contract["routing_status"] == "CONFIGURED_UNCALLABLE"
+    assert contract["probe"]["reachable"] is False
+    assert call_count == 4
 
 
 def test_treatment_readiness_preflight_misconfigured_on_digest_mismatch(
@@ -856,3 +922,96 @@ def test_mark_invoked_mixed_trials_one_success_transitions(tmp_path: Path) -> No
     _mark_invoked_if_capability_used(ledger, trials, contract_dir=tmp_path)
 
     assert ledger["routing_status"]["C2"]["routing_status"] == "AVAILABLE_INVOKED"
+
+
+def test_aws_environment_vars_include_only_credentials_and_region(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "AKIATEST")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "secret")
+    monkeypatch.setenv("AWS_SESSION_TOKEN", "token")
+    monkeypatch.setenv("AWS_REGION", "us-east-1")
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "us-west-2")
+    monkeypatch.setenv("UNRELATED_SECRET", "should-not-leak")
+    monkeypatch.setenv("PATH", "/usr/bin")
+
+    env = operator_environment(include=_AWS_ENVIRONMENT_VARS)
+
+    assert env["AWS_ACCESS_KEY_ID"] == "AKIATEST"
+    assert env["AWS_SECRET_ACCESS_KEY"] == "secret"
+    assert env["AWS_SESSION_TOKEN"] == "token"
+    assert env["AWS_REGION"] == "us-east-1"
+    assert env["AWS_DEFAULT_REGION"] == "us-west-2"
+    assert "UNRELATED_SECRET" not in env
+
+
+def test_aws_environment_vars_exclude_non_aws_secrets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "AKIATEST")
+    monkeypatch.setenv("DATABASE_URL", "postgres://should-not-leak")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-should-not-leak")
+
+    env = operator_environment(include=_AWS_ENVIRONMENT_VARS)
+
+    assert env["AWS_ACCESS_KEY_ID"] == "AKIATEST"
+    assert "DATABASE_URL" not in env
+    assert "OPENAI_API_KEY" not in env
+
+
+def test_fetch_bundle_passes_aws_environment_to_s3_commands(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "AKIATEST")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "secret")
+    monkeypatch.setenv("AWS_REGION", "us-east-1")
+    monkeypatch.setenv("LEAKED_VAR", "should-not-appear")
+
+    captured_envs: list[object] = []
+    manifest = _manifest()
+
+    def fake_run_command(
+        command: str,
+        arguments: list[str],
+        *,
+        cwd: Path,
+        timeout_seconds: float = 600.0,
+        environment: object | None = None,
+    ) -> object:
+        captured_envs.append(environment)
+        dest = Path(arguments[-1])
+        if dest.suffix == ".json":
+            dest.write_text("{}", encoding="utf-8")
+        else:
+            dest.write_text("fake", encoding="utf-8")
+        return type(
+            "Result",
+            (),
+            {"exit_code": 0, "diagnostic": None, "stderr": b""},
+        )()
+
+    monkeypatch.setattr(heldout_bundle, "run_operator_command", fake_run_command)
+    monkeypatch.setattr(heldout_bundle, "validate_manifest", lambda _p: manifest)
+    monkeypatch.setattr(heldout_bundle, "verify_bundle", lambda _m, _r: None)
+    monkeypatch.setattr(heldout_bundle, "_safe_extract", lambda _a, _o: None)
+
+    def fake_digest(path: Path) -> str:
+        name = Path(path).name
+        if name == "snapshot-lock.json":
+            return manifest["snapshot_lock"]["lock_digest"]
+        if name == "bundle.tar.gz":
+            return manifest["archive"]["sha256"]
+        return "sha256:" + "0" * 64
+
+    monkeypatch.setattr(heldout_bundle, "_digest", fake_digest)
+
+    heldout_bundle.fetch_bundle("s3://bucket/manifest.json", tmp_path / "out")
+
+    assert len(captured_envs) == 3
+    for env in captured_envs:
+        env_dict = dict(env) if env is not None else {}
+        assert env_dict.get("AWS_ACCESS_KEY_ID") == "AKIATEST"
+        assert env_dict.get("AWS_SECRET_ACCESS_KEY") == "secret"
+        assert env_dict.get("AWS_REGION") == "us-east-1"
+        assert "LEAKED_VAR" not in env_dict

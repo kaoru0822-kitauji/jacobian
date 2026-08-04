@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-import subprocess
 from copy import deepcopy
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
+from jacobian.process_policy import ProcessResult, ProcessTermination
 from jacobian_checkers.lean4 import (
     LEAN_COMMIT,
     LEAN_VERSION,
@@ -66,8 +67,7 @@ def test_lean_checker_accepts_exact_bound_core_proof(
 ) -> None:
     monkeypatch.setattr(
         "jacobian_checkers.lean4._run_lean",
-        lambda *_args, **_kwargs: subprocess.CompletedProcess(
-            args=("lean",),
+        lambda *_args, **_kwargs: SimpleNamespace(
             returncode=0,
             stdout="'jacobian_theorem' does not depend on any axioms",
             stderr="",
@@ -104,10 +104,23 @@ def test_lean_checker_rejects_unbound_or_unsupported_certificates(
 def test_lean_checker_timeout_fails_closed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def timed_out(*_args: object, **_kwargs: object) -> object:
-        raise subprocess.TimeoutExpired(cmd=("lean",), timeout=1)
-
-    monkeypatch.setattr("jacobian_checkers.lean4._run_lean", timed_out)
+    monkeypatch.setattr(
+        "jacobian_checkers.lean4._validate_lean", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        "jacobian_checkers.lean4._lean_command", lambda _name: ("/usr/bin/lean",)
+    )
+    monkeypatch.setattr(
+        "jacobian_checkers.lean4.execute_process",
+        lambda _request: ProcessResult(
+            termination=ProcessTermination.TIMED_OUT,
+            returncode=None,
+            stdout=b"",
+            stderr=b"",
+            stdout_exceeded=False,
+            stderr_exceeded=False,
+        ),
+    )
 
     decision = check_kernel_certificate(_request())
 

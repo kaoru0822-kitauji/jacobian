@@ -53,7 +53,7 @@ def test_rejects_escaped_evidence_with_zero_aggregate_reward(tmp_path: Path) -> 
     support._write_json(app / "submission.json", submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected["correctness"] == 1.0
+    assert rejected["correctness"] == 0.0
     assert rejected["evidence_validity"] == 0.0
     assert rejected["reward"] == 0.0
 

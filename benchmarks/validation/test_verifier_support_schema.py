@@ -119,3 +119,16 @@ def test_load_submission_rejects_nonfinite_json(
         _VS, "_load_public_contract", lambda: json.loads(contract_path.read_text())
     )
     assert _VS.load_submission(submission, require_input_binding=False) is None
+
+
+def test_load_submission_enforces_the_complete_public_schema(
+    tmp_path: Path,
+    contract_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    submission = tmp_path / "submission.json"
+    submission.write_text('{"count": -1, "labels": [], "unknown": true}')
+    contract = json.loads(contract_path.read_text())
+    monkeypatch.setattr(_VS, "_load_public_contract", lambda: contract)
+
+    assert _VS.load_submission(submission, require_input_binding=False) is None

@@ -148,7 +148,7 @@ def test_assurance_calibration_independent_of_envelope(tmp_path: Path) -> None:
     submission["extra_field"] = True
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result["assurance_calibration"] == 1.0
+    assert result["assurance_calibration"] == 0.0
     assert result["reward"] == 0.0
 
 

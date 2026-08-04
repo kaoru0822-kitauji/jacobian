@@ -168,9 +168,9 @@ def test_protocol_compliance_is_reported(tmp_path: Path) -> None:
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
     assert result["protocol_compliance"] == 0.0
-    assert result["correctness"] == 1.0
-    assert result["evidence_validity"] == 1.0
-    assert result["scope_accuracy"] == 1.0
+    assert result["correctness"] == 0.0
+    assert result["evidence_validity"] == 0.0
+    assert result["scope_accuracy"] == 0.0
     assert result["reward"] == 0.0
 
 

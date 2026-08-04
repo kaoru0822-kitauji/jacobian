@@ -474,12 +474,18 @@ STATE_MIGRATIONS = (
         name="runtime-service-schema-v1",
         definition=_RUNTIME_SCHEMA,
         apply=_install_runtime_schema,
+        recorded_checksum=(
+            "sha256:fb7debf6933ec683bbf9b82294559737ee77801fa9a2f03f64bf299cc4b466f9"
+        ),
     ),
     Migration(
         revision=4,
         name="state-format-boundary-v1",
         definition=_STATE_FORMAT_SCHEMA,
         apply=_install_state_format_schema,
+        recorded_checksum=(
+            "sha256:e14ad430c8469cc01dae835385cad8aa053cb4b667a16952ba230e54723c97b7"
+        ),
     ),
     Migration(
         revision=5,

@@ -236,7 +236,10 @@ def test_runner_persists_routing_status_contracts(tmp_path: Path) -> None:
     assert c2["probe"]["catalog_digest_observed"] == "sha256:" + "2" * 64
 
 
-def test_runner_aborts_when_treatment_not_ready(tmp_path: Path) -> None:
+def test_runner_aborts_when_treatment_not_ready(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("benchmarks.tooling.heldout_bundle.time.sleep", lambda _: None)
     manifest_path = _manifest(tmp_path)
     plan = _plan(tmp_path)
     ledger_path = tmp_path / "ledger.json"
@@ -258,6 +261,46 @@ def test_runner_aborts_when_treatment_not_ready(tmp_path: Path) -> None:
     assert ledger["routing_status"]["C2"]["infrastructure_status"] == "UNAVAILABLE"
     assert ledger["routing_status"]["C2"]["routing_status"] == "CONFIGURED_UNCALLABLE"
     assert ledger["routing_status"]["C1"]["infrastructure_status"] == "NOT_CONFIGURED"
+
+
+def test_runner_retries_probe_and_succeeds_when_container_becomes_ready(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("benchmarks.tooling.heldout_bundle.time.sleep", lambda _: None)
+    manifest_path = _manifest(tmp_path)
+    plan = _plan(tmp_path)
+    ledger_path = tmp_path / "ledger.json"
+    calls, runner = _runner()
+    probe_calls = 0
+
+    def eventually_ready(
+        *, mcp_url, expected_version, expected_policy_profile, timeout_seconds
+    ):
+        nonlocal probe_calls
+        probe_calls += 1
+        if probe_calls < 2:
+            return {"reachable": False, "diagnostic": "connection refused"}
+        return _ready_probe(
+            mcp_url=mcp_url,
+            expected_version=expected_version,
+            expected_policy_profile=expected_policy_profile,
+            timeout_seconds=timeout_seconds,
+        )
+
+    ledger = execute_plan(
+        plan,
+        ledger_path,
+        manifest_path=manifest_path,
+        probe_url="http://127.0.0.1:8000/mcp",
+        command_runner=runner,
+        probe_fn=eventually_ready,
+    )
+
+    assert ledger["status"] == "COMPLETE"
+    assert probe_calls >= 2
+    assert ledger["routing_status"]["C2"]["infrastructure_status"] == "READY"
+    assert len(calls) == 2
 
 
 def test_runner_aborts_when_no_probe_url(tmp_path: Path) -> None:

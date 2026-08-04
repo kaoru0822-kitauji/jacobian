@@ -73,8 +73,11 @@ def main() -> int:
             print(f"{label} could not start: {detail}", file=sys.stderr)
             return 1
         if result.exit_code:
+            output = (result.stdout + result.stderr).decode(errors="replace").strip()
+            if output:
+                print(output, file=sys.stderr)
             print(f"{label} failed with exit code {result.exit_code}", file=sys.stderr)
-            return result.exit_code
+            return int(result.exit_code)
     return 0
 
 

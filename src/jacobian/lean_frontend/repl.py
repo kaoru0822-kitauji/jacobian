@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 import shutil
 import threading
 import time
@@ -163,6 +162,7 @@ class PersistentLeanRepl:
                 shutdown_timeout_seconds=2.0,
                 stderr_limit_bytes=128 * 1024,
                 base_command=self._base_command,
+                max_rss_kb=self._policy.max_rss_kb,
             )
         )
         try:
@@ -190,24 +190,12 @@ class PersistentLeanRepl:
             return True
         if self._requests >= self._policy.max_requests:
             return True
-        if time.monotonic() - self._started_at >= self._policy.max_age_seconds:
-            return True
-        pid = self._process.pid
-        rss_kb = _process_rss_kb(pid) if pid is not None else 0
-        return self._policy.max_rss_kb > 0 and rss_kb > self._policy.max_rss_kb
+        return time.monotonic() - self._started_at >= self._policy.max_age_seconds
 
     def _exchange(self, request: Mapping[str, Any]) -> dict[str, Any]:
         process = self._process
         if process is None:
             raise RuntimeError("Lean REPL is unavailable")
-        pid = process.pid
-        if (
-            pid is not None
-            and self._policy.max_rss_kb > 0
-            and _process_rss_kb(pid) > self._policy.max_rss_kb
-        ):
-            self._stop_process()
-            raise RuntimeError("Lean REPL exceeded its memory limit")
         try:
             return process.exchange(request)
         except InteractiveProcessError as exc:
@@ -217,6 +205,8 @@ class PersistentLeanRepl:
                 raise RuntimeError("Lean REPL timed out") from exc
             if "stderr limit" in detail:
                 raise RuntimeError("Lean REPL exceeded its output limit") from exc
+            if "memory limit" in detail:
+                raise RuntimeError("Lean REPL exceeded its memory limit") from exc
             raise RuntimeError("Lean REPL stopped before returning a result") from exc
 
     def _stop_process(self) -> None:
@@ -244,17 +234,6 @@ def _single_proof_state(response: Mapping[str, Any]) -> int:
     proof_state = sorries[0]["proofState"]
     assert isinstance(proof_state, int)
     return proof_state
-
-
-def _process_rss_kb(pid: int) -> int:
-    """Read current Linux RSS; return zero where procfs is unavailable."""
-
-    try:
-        status = Path(f"/proc/{pid}/status").read_text()
-    except OSError:
-        return 0
-    match = re.search(r"^VmRSS:\s+(?P<rss>\d+)\s+kB$", status, re.MULTILINE)
-    return int(match.group("rss")) if match else 0
 
 
 class LeanExplorationReplRuntime:

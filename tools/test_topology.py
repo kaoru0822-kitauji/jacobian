@@ -33,6 +33,27 @@ DEFAULT_MANIFEST = _ROOT / "tests" / "topology.toml"
 _DISTRIBUTIONS = {"none", "load", "loadscope", "loadfile", "loadgroup", "worksteal"}
 _CI_TARGETS = {"pull_request", "merge_queue", "main", "scheduled"}
 
+# Explicit per-requirement allowlist of host environment variables that a lane
+# may forward to its pytest child.  No host variable is forwarded unless the
+# lane declares the matching ``required_environment`` tag here.  ``PATH`` is
+# forwarded for every lane because pytest children resolve executables by name
+# (git, prlimit, optional solver binaries); the pinned Lean lane additionally
+# needs ``HOME`` and ``ELAN_HOME`` so the elan-managed toolchain can be located
+# by the lean runtime.  This is an explicit authorization, not a default: an
+# arbitrary host variable never leaks through regardless of what a lane
+# declares.
+_LANE_ENVIRONMENT_ALLOWLIST: Mapping[str, tuple[str, ...]] = {
+    "lean-4.31.0": ("HOME", "ELAN_HOME", "JACOBIAN_LEAN_RUNTIME"),
+    "mathlib": ("HOME", "ELAN_HOME", "JACOBIAN_LEAN_RUNTIME"),
+    "provider-readiness": (
+        "HOME",
+        "ELAN_HOME",
+        "JACOBIAN_CHECKER_EXECUTABLE",
+        "JACOBIAN_CHECKER_RUNTIME_DIGEST",
+        "JACOBIAN_LEAN_RUNTIME",
+    ),
+}
+
 
 class TopologyError(ValueError):
     """Raised when a topology manifest is malformed or incomplete."""
@@ -289,6 +310,25 @@ def pytest_command(
     return command
 
 
+def lane_environment(lane: Lane) -> Mapping[str, str]:
+    """Build the bounded pytest environment for one lane.
+
+    Only the operator allowlist, ``PATH``, and the explicitly allowlisted
+    Lean/provider variables for the lane's declared ``required_environment``
+    are forwarded from the host.  No arbitrary host environment leaks
+    through: a variable not named by ``PATH`` or
+    :data:`_LANE_ENVIRONMENT_ALLOWLIST` is never forwarded, and the lane
+    tag is declared rather than inherited.
+    """
+    include: set[str] = {"PATH"}
+    for requirement in lane.required_environment:
+        include.update(_LANE_ENVIRONMENT_ALLOWLIST.get(requirement, ()))
+    return operator_environment(
+        include=include,
+        declared={"JACOBIAN_TEST_LANE": lane.name},
+    )
+
+
 def run_lane(
     topology: Topology,
     lane_name: str,
@@ -304,10 +344,7 @@ def run_lane(
     """
     command = pytest_command(topology, lane_name, selectors, extra_args)
     arguments = tuple(command[1:])
-    environment = operator_environment(
-        include={"PATH"},
-        declared={"JACOBIAN_TEST_LANE": lane_name},
-    )
+    environment = lane_environment(topology.lane(lane_name))
     request = ToolCommandRequest(
         executable=sys.executable,
         arguments=arguments,
