@@ -12,14 +12,15 @@ from importlib.metadata import version
 from pathlib import Path
 
 import pytest
+from tests.support.mcp import create_legacy_server as create_server
 
 from jacobian.adapters.mcp.context import _public_tool_error
-from jacobian.adapters.mcp.server import create_server
 from jacobian.adapters.mcp.tooling import _request_trace_digest, _run_blocking
 
 MCP_TOOL_NAMES = {
     "capability.describe",
     "capability.invoke",
+    "reasoning.write",
 }
 
 
@@ -158,7 +159,7 @@ def test_direct_tool_calls_reject_removed_and_malformed_arguments(
     asyncio.run(scenario())
 
 
-def test_mcp_stdio_entrypoint_exposes_only_capability_tools(
+def test_mcp_stdio_entrypoint_exposes_required_reasoning_tool(
     tmp_path: Path,
 ) -> None:
     async def scenario() -> None:

@@ -18,11 +18,19 @@ from jacobian.adapters.mcp.projections import (
 from jacobian.adapters.mcp.tooling import (
     AgentRecoveryError,
     _invoke_capability_attempt,
+    _run_blocking,
 )
 from jacobian.contracts.capabilities import (
     CapabilityInputKind,
     CapabilityMode,
     CapabilityResult,
+)
+from jacobian.contracts.reasoning import (
+    ReasoningCallId,
+    ReasoningPhase,
+    ReasoningRunId,
+    ReasoningWriteRequest,
+    ReasoningWriteResult,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -231,3 +239,83 @@ async def capability_invoke(
         mode=mode,
         ctx=ctx,
     )
+
+
+async def capability_invoke_reasoned(
+    capability_id: str,
+    payload: dict[str, Any],
+    reasoning_run_id: ReasoningRunId,
+    reasoning_call_id: ReasoningCallId,
+    mode: CapabilityMode = CapabilityMode.EXPLORE,
+    ctx: Context[AppState, Any] | None = None,
+) -> CapabilityResult:
+    active_runtime = _runtime(ctx)
+    return await _invoke_capability_attempt(
+        active_runtime,
+        capability_id=capability_id,
+        payload=payload,
+        mode=mode,
+        ctx=ctx,
+        reasoning_run_id=reasoning_run_id,
+        reasoning_call_id=reasoning_call_id,
+        reasoning_required=True,
+    )
+
+
+async def capability_invoke_audit(
+    capability_id: str,
+    payload: dict[str, Any],
+    reasoning_run_id: ReasoningRunId | None = None,
+    reasoning_call_id: ReasoningCallId | None = None,
+    mode: CapabilityMode = CapabilityMode.EXPLORE,
+    ctx: Context[AppState, Any] | None = None,
+) -> CapabilityResult:
+    active_runtime = _runtime(ctx)
+    return await _invoke_capability_attempt(
+        active_runtime,
+        capability_id=capability_id,
+        payload=payload,
+        mode=mode,
+        ctx=ctx,
+        reasoning_run_id=reasoning_run_id,
+        reasoning_call_id=reasoning_call_id,
+        reasoning_required=False,
+        reasoning_audit=True,
+    )
+
+
+async def reasoning_write(
+    phase: ReasoningPhase,
+    summary: Annotated[str, Field(min_length=1, max_length=512)],
+    run_id: ReasoningRunId | None = None,
+    call_id: ReasoningCallId | None = None,
+    capability_id: str | None = None,
+    mode: CapabilityMode | None = None,
+    ctx: Context[AppState, Any] | None = None,
+) -> ReasoningWriteResult:
+    active_runtime = _runtime(ctx)
+    request = ReasoningWriteRequest(
+        phase=phase,
+        summary=summary,
+        run_id=run_id,
+        call_id=call_id,
+        capability_id=capability_id,
+        mode=mode,
+    )
+    if phase is ReasoningPhase.BEFORE_TOOL:
+        descriptors = {
+            item.capability_id: item
+            for item in active_runtime.core.capabilities.catalog().capabilities
+        }
+        descriptor = descriptors.get(str(capability_id))
+        if descriptor is None:
+            raise AgentRecoveryError(
+                "BEFORE_TOOL names an unavailable capability. Use capability.describe "
+                "to select an installed capability ID."
+            )
+        if mode not in descriptor.modes:
+            raise AgentRecoveryError(
+                "BEFORE_TOOL selects a mode the capability does not advertise. "
+                "Inspect its CONTRACT view and choose an installed mode."
+            )
+    return await _run_blocking(active_runtime.core.reasoning_log.write, request)

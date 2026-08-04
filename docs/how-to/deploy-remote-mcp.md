@@ -10,10 +10,15 @@ deployment source of truth. Keep host-specific copies, smoke output, and
 last-deployed notes outside source control; do not install configuration from
 operator scratch space or treat it as current.
 
-The server exposes `capability.describe` and `capability.invoke`. Clients may
+By default the server exposes `capability.describe`, `capability.invoke`, and
+the operational `reasoning.write` protocol. Clients may
 read installed descriptors from `capability://catalog` and inspect exact
 contracts before invoking mathematical operations, which remain behind
 namespaced capability IDs.
+
+`--reasoning-log-mode required` is the default. Use `audit` only for staged
+fail-open observation and `off` only for rollback or a controlled legacy
+evaluation. These modes do not change capability assurance or checker authority.
 
 ## Install from a clone
 

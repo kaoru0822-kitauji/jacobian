@@ -40,6 +40,73 @@ class _McpResourceTelemetry:
     digest_preservation_successes: int = 0
 
 
+@dataclass
+class _ReasoningProtocolTelemetry:
+    phase_counts: Counter[str] = field(default_factory=Counter)
+    run_ids: set[str] = field(default_factory=set)
+    before_call_ids: set[str] = field(default_factory=set)
+    after_call_ids: set[str] = field(default_factory=set)
+    bound_invoke_count: int = 0
+    summary_characters: int = 0
+
+    def record_attempt(self, tool: str, arguments: object) -> None:
+        if tool != "capability.invoke" or not isinstance(arguments, Mapping):
+            return
+        if isinstance(arguments.get("reasoning_run_id"), str) and isinstance(
+            arguments.get("reasoning_call_id"), str
+        ):
+            self.bound_invoke_count += 1
+
+    def record_write(
+        self,
+        tool: str,
+        arguments: object,
+        response: object,
+    ) -> None:
+        if tool != "reasoning.write" or not isinstance(arguments, Mapping):
+            return
+        phase = arguments.get("phase")
+        if isinstance(phase, str):
+            self.phase_counts[phase] += 1
+        summary = arguments.get("summary")
+        if isinstance(summary, str):
+            self.summary_characters += len(summary)
+        self._record_identity(phase, arguments, response)
+
+    def _record_identity(
+        self,
+        phase: object,
+        arguments: Mapping[str, Any],
+        response: object,
+    ) -> None:
+        run_id = arguments.get("run_id")
+        if isinstance(run_id, str):
+            self.run_ids.add(run_id)
+        if isinstance(response, Mapping) and isinstance(response.get("run_id"), str):
+            self.run_ids.add(response["run_id"])
+        call_id = arguments.get("call_id")
+        if phase == "AFTER_TOOL" and isinstance(call_id, str):
+            self.after_call_ids.add(call_id)
+        if (
+            phase == "BEFORE_TOOL"
+            and isinstance(response, Mapping)
+            and isinstance(response.get("call_id"), str)
+        ):
+            self.before_call_ids.add(response["call_id"])
+
+    def payload(self) -> dict[str, int]:
+        return {
+            "plan_count": self.phase_counts["PLAN"],
+            "before_tool_count": self.phase_counts["BEFORE_TOOL"],
+            "after_tool_count": self.phase_counts["AFTER_TOOL"],
+            "final_count": self.phase_counts["FINAL"],
+            "run_count": len(self.run_ids),
+            "bound_invoke_count": self.bound_invoke_count,
+            "missing_after_tool_count": len(self.before_call_ids - self.after_call_ids),
+            "summary_characters": self.summary_characters,
+        }
+
+
 def _contains_value(value: object, *, field: str, accepted: set[object]) -> bool:
     if isinstance(value, Mapping):
         candidate = value.get(field)
@@ -277,6 +344,7 @@ def parse_agent_transcript(path: Path) -> dict[str, Any]:
     resource_telemetry = _McpResourceTelemetry()
     capability_describe_index_calls = 0
     capability_describe_exact_calls = 0
+    reasoning_telemetry = _ReasoningProtocolTelemetry()
     for line in path.read_text(encoding="utf-8").splitlines():
         try:
             event = json.loads(line)
@@ -301,6 +369,7 @@ def parse_agent_transcript(path: Path) -> dict[str, Any]:
             tool = item["tool"]
             mcp_calls.append(tool)
             arguments = item.get("arguments")
+            reasoning_telemetry.record_attempt(tool, arguments)
             wire_bytes = _mcp_wire_bytes(item)
             model_visible_bytes = _mcp_model_visible_bytes(item)
             text_response = _mcp_text_payload(item)
@@ -359,6 +428,7 @@ def parse_agent_transcript(path: Path) -> dict[str, Any]:
                 tool_error_count += 1
             else:
                 successful_calls.append(tool)
+                reasoning_telemetry.record_write(tool, arguments, response)
                 if tool == "capability.describe" and isinstance(arguments, Mapping):
                     matches = (
                         response.get("matches")
@@ -498,4 +568,5 @@ def parse_agent_transcript(path: Path) -> dict[str, Any]:
         ],
         "capability_describe_index_calls": capability_describe_index_calls,
         "capability_describe_exact_calls": capability_describe_exact_calls,
+        "reasoning_protocol": reasoning_telemetry.payload(),
     }

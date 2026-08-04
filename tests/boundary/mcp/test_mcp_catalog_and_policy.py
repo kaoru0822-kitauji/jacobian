@@ -6,7 +6,8 @@ import asyncio
 import json
 from pathlib import Path
 
-from jacobian.adapters.mcp.server import create_server
+from tests.support.mcp import create_legacy_server as create_server
+
 from jacobian.capability_service import CapabilityPolicy
 
 

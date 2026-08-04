@@ -116,9 +116,12 @@ def _classify_public_tool_error(
         TenantRuntimeLimitError,
     )
     from jacobian.experiments import ExperimentNotFoundError
+    from jacobian.reasoning_log import ReasoningProtocolError
     from jacobian.registry import CheckerNotFoundError
     from jacobian.storage.errors import ArtifactNotFoundError
 
+    if isinstance(tool_error, ReasoningProtocolError):
+        return (tool_error.code, str(tool_error), tool_error.hint)
     if isinstance(tool_error, AgentRecoveryError):
         return (
             "SERVICE_UNAVAILABLE",

@@ -147,6 +147,58 @@ def test_agent_telemetry_counts_response_bytes_and_repeated_calls(
     assert telemetry["mcp_logical_payload_observed_calls"] == 3
 
 
+def test_agent_telemetry_reports_reasoning_protocol_without_summary_text(
+    tmp_path: Path,
+) -> None:
+    run_id = "00000000-0000-4000-8000-000000000000"
+    call_id = "11111111-1111-4111-8111-111111111111"
+    events = [
+        _tool_event(
+            "reasoning.write",
+            {"phase": "PLAN", "summary": "private plan marker"},
+            {"run_id": run_id},
+        ),
+        _tool_event(
+            "reasoning.write",
+            {
+                "phase": "BEFORE_TOOL",
+                "summary": "private before marker",
+                "run_id": run_id,
+            },
+            {"run_id": run_id, "call_id": call_id},
+        ),
+        _tool_event(
+            "capability.invoke",
+            {
+                "capability_id": "integer.compute.gcd",
+                "payload": {},
+                "reasoning_run_id": run_id,
+                "reasoning_call_id": call_id,
+            },
+            {"execution": {"status": "ERROR"}},
+        ),
+    ]
+    transcript = tmp_path / "reasoning.jsonl"
+    transcript.write_text(
+        "\n".join(json.dumps(event) for event in events) + "\n",
+        encoding="utf-8",
+    )
+
+    telemetry = parse_agent_transcript(transcript)
+
+    assert telemetry["reasoning_protocol"] == {
+        "plan_count": 1,
+        "before_tool_count": 1,
+        "after_tool_count": 0,
+        "final_count": 0,
+        "run_count": 1,
+        "bound_invoke_count": 1,
+        "missing_after_tool_count": 1,
+        "summary_characters": len("private plan markerprivate before marker"),
+    }
+    assert "private plan marker" not in json.dumps(telemetry)
+
+
 def test_agent_telemetry_separates_wire_model_and_logical_invocation_bytes(
     tmp_path: Path,
 ) -> None:
