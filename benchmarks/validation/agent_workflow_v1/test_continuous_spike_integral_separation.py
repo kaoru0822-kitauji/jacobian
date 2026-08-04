@@ -68,10 +68,8 @@ def test_rejects_finite_or_reversed_classification():
 
 
 def test_contract_allows_unverified_and_computed():
-    schema = json.loads((TASK / "environment/submission_schema.json").read_text())
-    assert schema["properties"]["claimed_assurance"] == {
-        "enum": ["UNVERIFIED", "COMPUTED"]
-    }
+    contract = json.loads((TASK / "tests/public_contract.json").read_text())
+    assert contract["allowed_assurance"] == ["UNVERIFIED", "COMPUTED"]
 
 
 def test_rejects_boolean_spike_index():

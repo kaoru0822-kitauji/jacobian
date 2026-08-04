@@ -9,9 +9,7 @@ remain pytest concerns.
 from __future__ import annotations
 
 import argparse
-import os
 import shlex
-import subprocess
 import sys
 import tomllib
 from collections.abc import Mapping
@@ -19,7 +17,19 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-DEFAULT_MANIFEST = Path(__file__).resolve().parents[1] / "tests" / "topology.toml"
+_ROOT = Path(__file__).resolve().parents[1]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+from benchmarks.tooling.command_runner import (  # noqa: E402
+    ToolCommandRequest,
+    ToolCommandStatus,
+    operator_environment,
+    run_operator_command,
+    run_tool_command,
+)
+
+DEFAULT_MANIFEST = _ROOT / "tests" / "topology.toml"
 _DISTRIBUTIONS = {"none", "load", "loadscope", "loadfile", "loadgroup", "worksteal"}
 _CI_TARGETS = {"pull_request", "merge_queue", "main", "scheduled"}
 
@@ -71,21 +81,25 @@ def _as_string_list(
 
 def _tracked_files(root: Path) -> set[str]:
     """Return tracked paths, with a filesystem fallback for extracted trees."""
-    try:
-        result = subprocess.run(
-            ["git", "ls-files", "--cached", "--others", "--exclude-standard"],
-            cwd=root,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except (OSError, subprocess.SubprocessError):
+    result = run_operator_command(
+        "git",
+        ("ls-files", "--cached", "--others", "--exclude-standard"),
+        cwd=root,
+        timeout_seconds=30.0,
+        stdout_limit_bytes=16 * 1024 * 1024,
+        stderr_limit_bytes=4096,
+    )
+    if result.status is not ToolCommandStatus.EXITED or result.exit_code != 0:
         return {
             path.relative_to(root).as_posix()
             for path in root.rglob("*")
             if path.is_file()
         }
-    return {line for line in result.stdout.splitlines() if line}
+    return {
+        line
+        for line in result.stdout.decode("utf-8", errors="replace").splitlines()
+        if line
+    }
 
 
 def _test_files(root: Path, tracked: set[str]) -> set[str]:
@@ -281,16 +295,53 @@ def run_lane(
     selectors: list[str] | None = None,
     extra_args: list[str] | None = None,
 ) -> int:
-    """Execute pytest without retaining an extra POSIX control-plane process."""
+    """Execute pytest via the bounded tooling command runner.
+
+    Captured stdout/stderr from the bounded child are forwarded to the
+    parent streams so failures are not silent.  On non-EXITED terminal
+    states (timeout, overflow, start failure) a diagnostic line is emitted
+    to stderr before returning a non-zero exit code.
+    """
     command = pytest_command(topology, lane_name, selectors, extra_args)
-    environment = os.environ.copy()
-    environment.setdefault("JACOBIAN_TEST_LANE", lane_name)
-    if os.name == "nt":  # pragma: no cover - exercised by Windows CI
-        return subprocess.run(
-            command, cwd=topology.root, env=environment, check=False
-        ).returncode
-    os.chdir(topology.root)
-    os.execvpe(command[0], command, environment)
+    arguments = tuple(command[1:])
+    environment = operator_environment(
+        include={"PATH"},
+        declared={"JACOBIAN_TEST_LANE": lane_name},
+    )
+    request = ToolCommandRequest(
+        executable=sys.executable,
+        arguments=arguments,
+        environment=environment,
+        cwd=str(topology.root.resolve()),
+        timeout_seconds=3600.0,
+        stdout_limit_bytes=16 * 1024 * 1024,
+        stderr_limit_bytes=4 * 1024 * 1024,
+    )
+    result = run_tool_command(request)
+
+    # Forward bounded child output to parent streams.
+    if result.stdout:
+        sys.stdout.buffer.write(result.stdout)
+        sys.stdout.buffer.flush()
+    if result.stderr:
+        sys.stderr.buffer.write(result.stderr)
+        sys.stderr.buffer.flush()
+
+    if result.status is ToolCommandStatus.EXITED and result.exit_code is not None:
+        return result.exit_code
+
+    # Non-EXITED: emit a safe diagnostic so the failure is not silent.
+    diagnostic = result.diagnostic or result.status.value
+    overflow_note = ""
+    if result.stdout_exceeded:
+        overflow_note += " (stdout truncated)"
+    if result.stderr_exceeded:
+        overflow_note += " (stderr truncated)"
+    print(
+        f"lane '{lane_name}': {diagnostic}{overflow_note}",
+        file=sys.stderr,
+    )
+    return 1
 
 
 def _print_dry_run(

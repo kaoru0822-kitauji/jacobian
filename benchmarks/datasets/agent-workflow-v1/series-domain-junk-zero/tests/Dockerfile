@@ -2,7 +2,7 @@ FROM ghcr.io/astral-sh/uv:0.8.4-python3.12-bookworm-slim@sha256:dc7e1d08f8ca9798
 # Exact verifier for a series-domain fallback audit.
 LABEL jacobian.task="jacobian/series-domain-junk-zero" \
       jacobian.checksum="2992e5a4a396ebb925da186e0c3d3ff982a3de681fe86385592b93e68f92932f"
-COPY expected.json input.json test.sh verifier.py verifier_support.py /tests/
+COPY expected.json input.json test.sh verifier.py verifier_support.py public_contract.json /tests/
 COPY input.json /app/input.json
 RUN chmod +x /tests/test.sh && \
     python -c 'import json; assert json.load(open("/tests/expected.json"))["task_id"] == "jacobian/series-domain-junk-zero"'

@@ -2,6 +2,6 @@ FROM ghcr.io/astral-sh/uv:0.8.4-python3.12-bookworm-slim@sha256:dc7e1d08f8ca9798
 LABEL jacobian.checksum="4f980bddeae658a27116f6663b248c3342d07738ad1a878dfcf6c525ed8c0e61"
 # Exact verifier for bounded-variation uniform-limit certificates.
 LABEL jacobian.task="jacobian/bounded-variation-uniform-limit"
-COPY expected.json input.json test.sh verifier.py verifier_support.py /tests/
+COPY expected.json input.json test.sh verifier.py verifier_support.py public_contract.json /tests/
 COPY input.json /app/input.json
 RUN chmod +x /tests/test.sh

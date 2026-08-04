@@ -6,17 +6,21 @@ from pathlib import Path
 
 import pytest
 from benchmarks.tooling import heldout_bundle
-from benchmarks.tooling.harbor_suite import HarborSuiteError
+from benchmarks.tooling.errors import HarborSuiteError
 from benchmarks.tooling.heldout_bundle import (
     _digest,
     _safe_extract,
     _tree_digest,
     render_plan,
+    treatment_readiness_preflight,
     validate_manifest,
     verify_bundle,
 )
 from benchmarks.tooling.observation_comparison import compare_evidence
-from benchmarks.tooling.observation_results import collect_heldout_evidence
+from benchmarks.tooling.observation_results import (
+    _mark_invoked_if_capability_used,
+    collect_heldout_evidence,
+)
 
 ROOT = Path(__file__).parents[2]
 
@@ -34,10 +38,16 @@ def _manifest() -> dict:
         }
         for index in range(5)
     ]
+    snapshot_id = "sha256:" + "f" * 64
     return {
-        "schema_version": "2",
+        "schema_version": "3",
         "bundle_id": "capability-held-out-v1",
         "bundle_version": "1.0.0",
+        "snapshot_lock": {
+            "lock_id": snapshot_id,
+            "lock_uri": "s3://private-bucket/snapshot-lock.json",
+            "lock_digest": "sha256:" + "0" * 64,
+        },
         "archive": {
             "uri": "s3://private-bucket/bundle.tar.gz",
             "sha256": "sha256:" + "d" * 64,
@@ -46,7 +56,6 @@ def _manifest() -> dict:
             "id": "capability-held-out-v1",
             "path": "dataset",
             "manifest_digest": "sha256:" + "e" * 64,
-            "snapshot_id": "sha256:" + "f" * 64,
             "minimum_independent_families": 2,
         },
         "tasks": tasks,
@@ -128,6 +137,65 @@ def _bundle(tmp_path: Path, value: dict) -> Path:
         )
     (dataset / "dataset.toml").write_text("\n".join(dataset_entries), encoding="utf-8")
     value["dataset"]["manifest_digest"] = _digest(dataset / "dataset.toml")
+    lock = {
+        "schema_version": "1",
+        "snapshot_id": value["snapshot_lock"]["lock_id"],
+        "lock_digest": "sha256:" + "0" * 64,
+        "suite": {
+            "id": "capability-held-out-v1",
+            "name": "jacobian/capability-held-out-v1",
+            "title": "Held-out",
+            "purpose": "Held-out evaluation",
+            "claim_class": "held-out-comparative-evaluation",
+            "answer_visibility": "hidden-at-runtime",
+            "default_execution_profile": "oracle-and-observation",
+            "evaluation_kind": "workflow",
+            "publication_status": "local",
+            "scored": True,
+            "required_provider": "core",
+            "runtime_profile": "core",
+            "suite_header_digest": "sha256:" + "0" * 64,
+        },
+        "harbor_version": "0.20.0",
+        "source": {
+            "tree_sha": "0" * 40,
+            "dirty": False,
+            "registry_digest": "sha256:" + "0" * 64,
+            "environment_profiles_digest": "sha256:" + "0" * 64,
+        },
+        "environment": {
+            "profiles": ["core"],
+            "summary_digest": "sha256:" + "0" * 64,
+        },
+        "tasks": [
+            {
+                "id": task["id"],
+                "name": f"jacobian/{task['id']}",
+                "digest": task["digest"],
+                "assurance_ceiling": "UNVERIFIED",
+                "required_provider": "core",
+                "environment_profile": "core",
+                "environment": {
+                    "profile": "core",
+                    "agent_image": "registry.invalid/agent@sha256:" + "0" * 64,
+                    "verifier_image": "registry.invalid/verifier@sha256:" + "0" * 64,
+                    "allow_apt": False,
+                },
+                "member_digest": "sha256:" + "0" * 64,
+            }
+            for task in value["tasks"]
+        ],
+        "evaluation": {
+            "task_ids": [task["id"] for task in value["tasks"]],
+            "oracle_job_digest": "sha256:" + "0" * 64,
+            "oracle_jobs_dir": "jobs/oracle.json",
+        },
+    }
+    lock_path = root / "snapshot-lock.json"
+    lock_path.write_text(
+        json.dumps(lock, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    value["snapshot_lock"]["lock_digest"] = _digest(lock_path)
     return root
 
 
@@ -154,7 +222,9 @@ def test_manifest_rejects_control_with_jacobian_image(tmp_path: Path) -> None:
     value = _manifest()
     value["conditions"][0]["image"] = "registry.invalid/c1@sha256:" + "1" * 64
 
-    with pytest.raises(HarborSuiteError, match="held-out manifest is invalid"):
+    with pytest.raises(
+        HarborSuiteError, match="strict configuration validation failed"
+    ):
         validate_manifest(_write(tmp_path, value))
 
 
@@ -163,6 +233,96 @@ def test_manifest_rejects_non_digest_pinned_treatment_image(tmp_path: Path) -> N
     value["conditions"][1]["image"] = "registry.invalid/c2:latest"
 
     with pytest.raises(HarborSuiteError, match="held-out manifest is invalid"):
+        validate_manifest(_write(tmp_path, value))
+
+
+def test_manifest_rejects_v2_schema_version(tmp_path: Path) -> None:
+    value = _manifest()
+    value["schema_version"] = "2"
+
+    with pytest.raises(
+        HarborSuiteError, match="strict configuration validation failed"
+    ):
+        validate_manifest(_write(tmp_path, value))
+
+
+def test_manifest_rejects_extra_top_level_field(tmp_path: Path) -> None:
+    value = _manifest()
+    value["legacy_provenance"] = "should be rejected"
+
+    with pytest.raises(
+        HarborSuiteError, match="strict configuration validation failed"
+    ):
+        validate_manifest(_write(tmp_path, value))
+
+
+def test_manifest_rejects_extra_nested_field(tmp_path: Path) -> None:
+    value = _manifest()
+    value["snapshot_lock"]["extra_field"] = "rejected"
+
+    with pytest.raises(
+        HarborSuiteError, match="strict configuration validation failed"
+    ):
+        validate_manifest(_write(tmp_path, value))
+
+
+def test_manifest_rejects_string_coercion_of_integer(tmp_path: Path) -> None:
+    value = _manifest()
+    value["experiment"]["max_tokens"] = "100000"
+
+    with pytest.raises(
+        HarborSuiteError, match="strict configuration validation failed"
+    ):
+        validate_manifest(_write(tmp_path, value))
+
+
+def test_manifest_rejects_bool_coercion_of_integer(tmp_path: Path) -> None:
+    value = _manifest()
+    value["dataset"]["minimum_independent_families"] = True
+
+    with pytest.raises(
+        HarborSuiteError, match="strict configuration validation failed"
+    ):
+        validate_manifest(_write(tmp_path, value))
+
+
+def test_manifest_rejects_wrong_root_type(tmp_path: Path) -> None:
+    path = tmp_path / "manifest.json"
+    path.write_text("[]", encoding="utf-8")
+
+    with pytest.raises(
+        HarborSuiteError, match="strict configuration validation failed"
+    ):
+        validate_manifest(path)
+
+
+def test_manifest_rejects_missing_required_field(tmp_path: Path) -> None:
+    value = _manifest()
+    del value["snapshot_lock"]
+
+    with pytest.raises(
+        HarborSuiteError, match="strict configuration validation failed"
+    ):
+        validate_manifest(_write(tmp_path, value))
+
+
+def test_manifest_rejects_wrong_condition_id(tmp_path: Path) -> None:
+    value = _manifest()
+    value["conditions"][0]["id"] = "C3"
+
+    with pytest.raises(
+        HarborSuiteError, match="strict configuration validation failed"
+    ):
+        validate_manifest(_write(tmp_path, value))
+
+
+def test_manifest_rejects_wrong_agent_name(tmp_path: Path) -> None:
+    value = _manifest()
+    value["experiment"]["agent"]["name"] = "claude"
+
+    with pytest.raises(
+        HarborSuiteError, match="strict configuration validation failed"
+    ):
         validate_manifest(_write(tmp_path, value))
 
 
@@ -218,12 +378,18 @@ def test_render_expands_stable_pairs_and_keeps_control_jacobian_free(
     )
     plan = json.loads(plan_path.read_text())
 
+    assert plan["schema_version"] == "3"
+    assert plan["manifest_digest"] == _digest(manifest_path)
     assert plan["pair_count"] == 9
     assert len(plan["runs"]) == 18
     assert len({run["pair_id"] for run in plan["runs"]}) == 9
     assert all(not Path(run["job"]).is_absolute() for run in plan["runs"])
     for run in plan["runs"]:
         job = json.loads((plan_path.parent / run["job"]).read_text())
+        runtime = json.loads((plan_path.parent / run["runtime_snapshot"]).read_text())
+        assert "manifest_digest" in runtime
+        assert "harbor_version" not in runtime
+        assert "model" not in runtime
         assert job["n_attempts"] == 1
         assert len(job["datasets"][0]["task_names"]) == 1
         if run["condition"] == "C1":
@@ -300,6 +466,8 @@ def test_complete_plan_collects_exact_pairs_and_derives_heldout_report(
     ledger_path.write_text(
         json.dumps(
             {
+                "schema_version": "2",
+                "manifest_digest": plan["manifest_digest"],
                 "plan_digest": plan["plan_digest"],
                 "status": "COMPLETE",
                 "runs": ledger_runs,
@@ -332,6 +500,188 @@ def test_complete_plan_collects_exact_pairs_and_derives_heldout_report(
     assert report["pair_count"] == 9
 
 
+def test_bundle_rejects_missing_snapshot_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    value = _manifest()
+    root = _bundle(tmp_path, value)
+    monkeypatch.setattr(heldout_bundle, "task_digest", lambda _path: "a" * 64)
+    (root / "snapshot-lock.json").unlink()
+
+    with pytest.raises(HarborSuiteError, match=r"missing snapshot-lock\.json"):
+        verify_bundle(value, root)
+
+
+def test_bundle_rejects_snapshot_lock_task_disagreement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    value = _manifest()
+    root = _bundle(tmp_path, value)
+    monkeypatch.setattr(heldout_bundle, "task_digest", lambda _path: "a" * 64)
+    lock_path = root / "snapshot-lock.json"
+    lock = json.loads(lock_path.read_text(encoding="utf-8"))
+    lock["tasks"][0]["digest"] = "sha256:" + "z" * 64
+    lock_path.write_text(
+        json.dumps(lock, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    value["snapshot_lock"]["lock_digest"] = _digest(lock_path)
+
+    with pytest.raises(HarborSuiteError, match="do not agree with snapshot lock"):
+        verify_bundle(value, root)
+
+
+def _ready_probe(
+    *, mcp_url, expected_version, expected_policy_profile, timeout_seconds
+):
+    return {
+        "reachable": True,
+        "report": {
+            "server": {"name": "jacobian", "version": "1.2.3"},
+            "tool_names": ["capability.describe", "capability.invoke"],
+            "catalog": {
+                "catalog_version": "1",
+                "capabilities": 1,
+                "policy_profile": "DEFAULT",
+                "catalog_digest": "sha256:" + "5" * 64,
+                "policy_digest": "sha256:" + "6" * 64,
+                "sha256": "abc",
+            },
+            "discovery": {"bytes": 100, "matches": ["cap-1"]},
+        },
+    }
+
+
+def _unreachable_probe(
+    *, mcp_url, expected_version, expected_policy_profile, timeout_seconds
+):
+    return {"reachable": False, "diagnostic": "connection refused"}
+
+
+def test_treatment_readiness_preflight_ready_with_successful_probe(
+    tmp_path: Path,
+) -> None:
+    value = _manifest()
+    manifest_path = _write(tmp_path, value)
+    contract = treatment_readiness_preflight(
+        manifest_path,
+        mcp_url="http://127.0.0.1:8000/mcp",
+        probe_fn=_ready_probe,
+    )
+
+    assert contract["infrastructure_status"] == "READY"
+    assert contract["routing_status"] == "AVAILABLE_UNUSED"
+    assert contract["manifest_digest"] == _digest(manifest_path)
+    assert contract["condition_id"] == "C2"
+    assert contract["checks"]["image_digest_pinned"] is True
+    assert contract["checks"]["catalog_digest_bound"] is True
+    assert contract["checks"]["policy_digest_bound"] is True
+    assert contract["checks"]["server_version_bound"] is True
+    assert contract["checks"]["policy_profile_bound"] is True
+    assert contract["checks"]["server_version_match"] is True
+    assert contract["checks"]["catalog_digest_match"] is True
+    assert contract["checks"]["policy_digest_match"] is True
+    assert contract["checks"]["required_tools_present"] is True
+    assert contract["checks"]["describe_responded"] is True
+    assert contract["failures"] == []
+    assert contract["probe"]["reachable"] is True
+    assert contract["probe"]["server_version_observed"] == "1.2.3"
+    assert contract["probe"]["catalog_digest_observed"] == "sha256:" + "5" * 64
+
+
+def test_treatment_readiness_preflight_fail_closed_without_probe_url(
+    tmp_path: Path,
+) -> None:
+    value = _manifest()
+    manifest_path = _write(tmp_path, value)
+    contract = treatment_readiness_preflight(manifest_path)
+
+    assert contract["infrastructure_status"] == "MISCONFIGURED"
+    assert contract["routing_status"] == "CONFIGURED_UNCALLABLE"
+    assert any("probe URL is not configured" in f for f in contract["failures"])
+    assert contract["probe"]["reachable"] is False
+
+
+def test_treatment_readiness_preflight_unavailable_when_probe_fails(
+    tmp_path: Path,
+) -> None:
+    value = _manifest()
+    manifest_path = _write(tmp_path, value)
+    contract = treatment_readiness_preflight(
+        manifest_path,
+        mcp_url="http://127.0.0.1:8000/mcp",
+        probe_fn=_unreachable_probe,
+    )
+
+    assert contract["infrastructure_status"] == "UNAVAILABLE"
+    assert contract["routing_status"] == "CONFIGURED_UNCALLABLE"
+    assert any("not reachable" in f for f in contract["failures"])
+    assert contract["probe"]["reachable"] is False
+    assert contract["probe"]["diagnostic"] == "connection refused"
+
+
+def test_treatment_readiness_preflight_misconfigured_on_digest_mismatch(
+    tmp_path: Path,
+) -> None:
+    value = _manifest()
+    manifest_path = _write(tmp_path, value)
+
+    def mismatched_probe(
+        *, mcp_url, expected_version, expected_policy_profile, timeout_seconds
+    ):
+        return {
+            "reachable": True,
+            "report": {
+                "server": {"name": "jacobian", "version": "1.2.3"},
+                "tool_names": ["capability.describe", "capability.invoke"],
+                "catalog": {
+                    "catalog_version": "1",
+                    "capabilities": 1,
+                    "policy_profile": "DEFAULT",
+                    "catalog_digest": "sha256:" + "9" * 64,
+                    "policy_digest": "sha256:" + "6" * 64,
+                    "sha256": "abc",
+                },
+                "discovery": {"bytes": 100, "matches": ["cap-1"]},
+            },
+        }
+
+    contract = treatment_readiness_preflight(
+        manifest_path,
+        mcp_url="http://127.0.0.1:8000/mcp",
+        probe_fn=mismatched_probe,
+    )
+
+    assert contract["infrastructure_status"] == "MISCONFIGURED"
+    assert contract["routing_status"] == "MISROUTED"
+    assert contract["checks"]["catalog_digest_match"] is False
+    assert any("catalog_digest" in f for f in contract["failures"])
+
+
+def test_control_routing_status_is_not_configured(tmp_path: Path) -> None:
+    from benchmarks.tooling.heldout_bundle import control_routing_status
+
+    value = _manifest()
+    manifest_path = _write(tmp_path, value)
+    contract = control_routing_status(manifest_path)
+
+    assert contract["condition_id"] == "C1"
+    assert contract["infrastructure_status"] == "NOT_CONFIGURED"
+    assert contract["routing_status"] == "NOT_APPLICABLE"
+    assert contract["treatment"] is None
+    assert contract["routing"] is None
+    assert contract["probe"] is None
+    assert contract["failures"] == []
+
+
+def test_treatment_readiness_preflight_fails_for_unpinned_image(tmp_path: Path) -> None:
+    value = _manifest()
+    value["conditions"][1]["image"] = "registry.invalid/jacobian:latest"
+    manifest_path = _write(tmp_path, value)
+
+    with pytest.raises(HarborSuiteError, match="held-out manifest is invalid"):
+        treatment_readiness_preflight(manifest_path)
+
+
 def test_private_archive_rejects_workspace_escape(tmp_path: Path) -> None:
     source = tmp_path / "secret.txt"
     source.write_text("oracle", encoding="utf-8")
@@ -354,6 +704,155 @@ def test_heldout_workflow_is_main_only_manifest_driven_and_sanitized() -> None:
     assert "max_tokens:" not in workflow.split("confirmation:", 1)[0]
     assert "--mcp-config" not in workflow
     assert "benchmarks.tooling.heldout_runner" in workflow
-    assert "catalog.catalog_digest" in workflow
+    assert "--manifest" in workflow
+    assert "--probe-url" in workflow
+    assert "routing-status-c1.json" in workflow
+    assert "routing-status-c2.json" in workflow
     assert "steps.bundle.outputs.root != ''" in workflow
     assert "path: ${{ steps.bundle.outputs.root }}/sanitized" in workflow
+
+
+def _c2_routing_contract(routing_status: str = "AVAILABLE_UNUSED") -> dict:
+    return {
+        "schema_version": "2",
+        "manifest_digest": "sha256:" + "a" * 64,
+        "condition_id": "C2",
+        "infrastructure_status": "READY",
+        "routing_status": routing_status,
+        "treatment": {
+            "image": "registry.invalid/jacobian@sha256:" + "1" * 64,
+            "server_version": "1.0.0",
+            "policy_profile": "DEFAULT",
+            "catalog_digest": "sha256:" + "2" * 64,
+            "policy_digest": "sha256:" + "3" * 64,
+        },
+        "routing": {"compose_file": "c2.compose.json", "mcp_url": "http://x/mcp"},
+        "probe": {
+            "reachable": True,
+            "server_version_observed": "1.0.0",
+            "catalog_digest_observed": "sha256:" + "2" * 64,
+            "policy_digest_observed": "sha256:" + "3" * 64,
+            "policy_profile_observed": "DEFAULT",
+            "tool_names": ["capability.describe", "capability.invoke"],
+            "discovery_matches": ["cap-1"],
+            "probe_digest": "sha256:" + "0" * 64,
+            "diagnostic": None,
+        },
+        "checks": {
+            "image_digest_pinned": True,
+            "catalog_digest_bound": True,
+            "policy_digest_bound": True,
+            "server_version_bound": True,
+            "policy_profile_bound": True,
+            "server_version_match": True,
+            "catalog_digest_match": True,
+            "policy_digest_match": True,
+            "required_tools_present": True,
+            "describe_responded": True,
+        },
+        "failures": [],
+    }
+
+
+def test_mark_invoked_transitions_on_successful_capability_invoke(
+    tmp_path: Path,
+) -> None:
+    ledger = {"routing_status": {"C2": _c2_routing_contract()}}
+    trials = [
+        {
+            "status": "COMPLETED",
+            "tool_calls": {"capability.invoke": 1},
+            "tool_errors": 0,
+        }
+    ]
+    _mark_invoked_if_capability_used(ledger, trials, contract_dir=tmp_path)
+
+    assert ledger["routing_status"]["C2"]["routing_status"] == "AVAILABLE_INVOKED"
+    assert (tmp_path / "routing-status-c2.json").is_file()
+
+
+def test_mark_invoked_fail_closed_on_errored_invocation(tmp_path: Path) -> None:
+    """A failed/errored capability.invoke must not transition to AVAILABLE_INVOKED."""
+
+    ledger = {"routing_status": {"C2": _c2_routing_contract()}}
+    trials = [
+        {
+            "status": "COMPLETED",
+            "tool_calls": {"capability.invoke": 1},
+            "tool_errors": 2,
+        }
+    ]
+    _mark_invoked_if_capability_used(ledger, trials, contract_dir=tmp_path)
+
+    assert ledger["routing_status"]["C2"]["routing_status"] == "AVAILABLE_UNUSED"
+    assert not (tmp_path / "routing-status-c2.json").exists()
+
+
+def test_mark_invoked_fail_closed_on_non_completed_trial(tmp_path: Path) -> None:
+    """A non-COMPLETED trial with capability.invoke must not transition."""
+
+    ledger = {"routing_status": {"C2": _c2_routing_contract()}}
+    trials = [
+        {
+            "status": "ERROR",
+            "tool_calls": {"capability.invoke": 1},
+            "tool_errors": 0,
+        }
+    ]
+    _mark_invoked_if_capability_used(ledger, trials, contract_dir=tmp_path)
+
+    assert ledger["routing_status"]["C2"]["routing_status"] == "AVAILABLE_UNUSED"
+
+
+def test_mark_invoked_fail_closed_on_timeout_trial(tmp_path: Path) -> None:
+    """A timed-out trial with capability.invoke must not transition."""
+
+    ledger = {"routing_status": {"C2": _c2_routing_contract()}}
+    trials = [
+        {
+            "status": "TIMEOUT",
+            "tool_calls": {"capability.invoke": 3},
+            "tool_errors": 0,
+        }
+    ]
+    _mark_invoked_if_capability_used(ledger, trials, contract_dir=tmp_path)
+
+    assert ledger["routing_status"]["C2"]["routing_status"] == "AVAILABLE_UNUSED"
+
+
+def test_mark_invoked_no_transition_when_already_invoked(tmp_path: Path) -> None:
+    """If routing_status is already AVAILABLE_INVOKED, do not re-write."""
+
+    ledger = {"routing_status": {"C2": _c2_routing_contract("AVAILABLE_INVOKED")}}
+    trials = [
+        {
+            "status": "COMPLETED",
+            "tool_calls": {"capability.invoke": 1},
+            "tool_errors": 0,
+        }
+    ]
+    _mark_invoked_if_capability_used(ledger, trials, contract_dir=tmp_path)
+
+    assert ledger["routing_status"]["C2"]["routing_status"] == "AVAILABLE_INVOKED"
+    assert not (tmp_path / "routing-status-c2.json").exists()
+
+
+def test_mark_invoked_mixed_trials_one_success_transitions(tmp_path: Path) -> None:
+    """One successful invocation among errored trials is enough to transition."""
+
+    ledger = {"routing_status": {"C2": _c2_routing_contract()}}
+    trials = [
+        {
+            "status": "COMPLETED",
+            "tool_calls": {"capability.invoke": 1},
+            "tool_errors": 2,
+        },
+        {
+            "status": "COMPLETED",
+            "tool_calls": {"capability.invoke": 1},
+            "tool_errors": 0,
+        },
+    ]
+    _mark_invoked_if_capability_used(ledger, trials, contract_dir=tmp_path)
+
+    assert ledger["routing_status"]["C2"]["routing_status"] == "AVAILABLE_INVOKED"

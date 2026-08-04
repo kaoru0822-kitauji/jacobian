@@ -3,12 +3,12 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
-import pathlib
-import runpy
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+from benchmarks.validation.agent_workflow_v1 import support
 
 TASK = (
     Path(__file__).parents[2]
@@ -53,31 +53,7 @@ def _bind(app: Path, submission: dict) -> None:
 
 
 def _run(app: Path, logs: Path) -> dict:
-    concrete = type(pathlib.Path())
-    original = pathlib.Path
-
-    def mapped(value: str = ".") -> Path:
-        raw = str(value)
-        for prefix, target in {
-            "/app": app,
-            "/tests": TASK / "tests",
-            "/logs/verifier": logs,
-        }.items():
-            if raw == prefix:
-                return concrete(target)
-            if raw.startswith(prefix + "/"):
-                return concrete(target) / raw.removeprefix(prefix + "/")
-        return concrete(raw)
-
-    try:
-        pathlib.Path = mapped  # type: ignore[assignment]
-        sys.path.insert(0, str(TASK / "tests"))
-        runpy.run_path(str(TASK / "tests" / "verifier.py"), run_name="__main__")
-    finally:
-        sys.path.remove(str(TASK / "tests"))
-        sys.modules.pop("verifier_support", None)
-        pathlib.Path = original
-    return json.loads((logs / "reward.json").read_text())
+    return support._run_verifier(TASK, app, logs)
 
 
 def test_oracle_receives_full_reward(tmp_path: Path) -> None:

@@ -2,7 +2,7 @@ FROM ghcr.io/astral-sh/uv:0.8.4-python3.12-bookworm-slim@sha256:dc7e1d08f8ca9798
 # Exact verifier for image/complement commutation conformance.
 LABEL jacobian.task="jacobian/image-complement-commutation" \
       jacobian.checksum="a5357d034cd21804e5e0143842db5a44f950fde24931d0493f474fcde46a37b9"
-COPY expected.json input.json test.sh verifier.py verifier_support.py /tests/
+COPY expected.json input.json test.sh verifier.py verifier_support.py public_contract.json /tests/
 COPY input.json /app/input.json
 RUN chmod +x /tests/test.sh && \
     python -c 'import json; assert json.load(open("/tests/expected.json"))["task_id"] == "jacobian/image-complement-commutation"'

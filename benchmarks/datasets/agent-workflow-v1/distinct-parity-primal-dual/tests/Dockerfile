@@ -2,7 +2,7 @@ FROM ghcr.io/astral-sh/uv:0.8.4-python3.12-bookworm-slim@sha256:dc7e1d08f8ca9798
 # Exact verifier for a parity-constrained primal/dual certificate.
 LABEL jacobian.task="jacobian/distinct-parity-primal-dual" \
       jacobian.checksum="a4a328c870f31dbfff96248c1dee3895ef9c1a2b98dce6fd4e7c073b6bf3c7dd"
-COPY expected.json input.json test.sh verifier.py verifier_support.py /tests/
+COPY expected.json input.json test.sh verifier.py verifier_support.py public_contract.json /tests/
 COPY input.json /app/input.json
 RUN chmod +x /tests/test.sh && \
     python -c 'import json; assert json.load(open("/tests/expected.json"))["task_id"] == "jacobian/distinct-parity-primal-dual"'
