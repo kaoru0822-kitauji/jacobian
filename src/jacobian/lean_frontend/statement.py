@@ -64,6 +64,7 @@ from jacobian.domains._examples import example
 from jacobian.providers.lean_runtime import lean_frontend_provider_runtime
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.storage.repository import ArtifactRepository
+from jacobian.worker_environment import worker_environment
 
 # ---------------------------------------------------------------------------
 # Security: block dangerous Lean commands in user-supplied text.
@@ -83,6 +84,11 @@ _FORBIDDEN_PROOF = re.compile(
 )
 
 _ELAPSED_TIMEOUT_SECONDS = 30
+
+
+def _lean_process_environment(lean_bin: str) -> dict[str, str]:
+    lean_bin_dir = str(Path(lean_bin).resolve().parent)
+    return worker_environment(path_prefix=lean_bin_dir)
 
 
 class _LeanUnavailableError(RuntimeError):
@@ -143,10 +149,12 @@ def _lean_version_info(
     except _LeanUnavailableError:
         return ("unknown", "unknown")
     try:
+        environment = _lean_process_environment(lean_bin)
         result = subprocess.run(
             [lean_bin, "--version"],
             capture_output=True,
             text=True,
+            env=environment,
             timeout=10,
         )
     except (subprocess.TimeoutExpired, OSError):
@@ -297,10 +305,12 @@ def _execute_lean_source(
         with os.fdopen(fd, "w") as handle:
             handle.write(source)
         lean_bin = executable or _lean_executable()
+        environment = _lean_process_environment(lean_bin)
         result = subprocess.run(
             [lean_bin, temp_path],
             capture_output=True,
             text=True,
+            env=environment,
             timeout=timeout_seconds,
         )
     except subprocess.TimeoutExpired as exc:

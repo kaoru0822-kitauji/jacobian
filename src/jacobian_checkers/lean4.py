@@ -11,6 +11,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from jacobian.worker_environment import worker_environment
+
 LEAN_VERSION = "4.31.0"
 LEAN_COMMIT = "68218e876d2a38b1985b8590fff244a83c321783"
 LEAN_TOOLCHAIN = f"leanprover/lean4:v{LEAN_VERSION}"
@@ -143,6 +145,11 @@ def _validate_lean(
     *,
     cwd: Path | None = None,
 ) -> None:
+    elan_home = _elan_home(command)
+    overrides: dict[str, str] = {}
+    if elan_home is not None:
+        overrides["ELAN_HOME"] = elan_home
+    probe_environment = worker_environment(overrides=overrides)
     try:
         version = subprocess.run(
             [*command, "-V"],
@@ -150,6 +157,7 @@ def _validate_lean(
             check=True,
             capture_output=True,
             text=True,
+            env=probe_environment,
             timeout=_TOOLCHAIN_PROBE_TIMEOUT_SECONDS,
         ).stdout.strip()
         commit = subprocess.run(
@@ -158,6 +166,7 @@ def _validate_lean(
             check=True,
             capture_output=True,
             text=True,
+            env=probe_environment,
             timeout=_TOOLCHAIN_PROBE_TIMEOUT_SECONDS,
         ).stdout.strip()
     except subprocess.SubprocessError as exc:
@@ -199,11 +208,13 @@ def _validate_package_checkout(
     ):
         raise RuntimeError("the mathlib manifest contains an invalid package")
     checkout = packages_directory / name
+    git_environment = worker_environment(locale="C")
     actual_revision = subprocess.run(
         ["git", "-C", str(checkout), "rev-parse", "HEAD"],
         check=True,
         capture_output=True,
         text=True,
+        env=git_environment,
         timeout=5,
     ).stdout.strip()
     if actual_revision != revision:
@@ -220,6 +231,7 @@ def _validate_package_checkout(
         check=True,
         capture_output=True,
         text=True,
+        env=git_environment,
         timeout=5,
     ).stdout.strip()
     if tracked_changes:

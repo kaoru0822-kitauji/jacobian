@@ -24,8 +24,15 @@ from jacobian.canonical import (
 )
 from jacobian.contracts.lean import LeanEnvironment
 from jacobian.references import LeanCheckerInstallation
+from jacobian.worker_environment import worker_environment
 
 _RESOURCE_POLL_SECONDS = 0.1
+
+
+def _repl_process_environment() -> dict[str, str]:
+    return worker_environment(
+        extra_variables=("ELAN_HOME",),
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,6 +167,7 @@ class PersistentLeanRepl:
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
+            env=_repl_process_environment(),
             text=True,
             bufsize=1,
             start_new_session=(os.name == "posix"),
