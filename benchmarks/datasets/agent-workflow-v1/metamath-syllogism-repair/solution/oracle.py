@@ -88,9 +88,9 @@ def build_submission(output_root: Path) -> dict[str, object]:
     compact = json.dumps(result, sort_keys=True, separators=(",", ":"))
     evidence_path = evidence_dir / "answer.txt"
     evidence_path.write_text(
-        "Each assertion application was reconstructed by ordered stack unification.\nRESULT_JSON: "
-        + compact
-        + "\n"
+        "The ordered stack applies assertion labels wi, a1i, and mpd by consuming their\n"
+        "hypotheses and recording the corresponding variable substitutions during\n"
+        "unification and replay.\nRESULT_JSON: " + compact + "\n"
     )
     digest = "sha256:" + hashlib.sha256(evidence_path.read_bytes()).hexdigest()
     return {
