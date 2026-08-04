@@ -65,16 +65,17 @@ rejection remain non-conclusions.
 
 `jacobian/jcb-postdoc-015` is a public answer-visible reproduction for the
 five-element set `{1,2,4,8,13}`. Its clean-room Harbor verifier validates the
-benchmark contract: it binds the agent-visible input to the frozen verifier
-copy, checks the submission envelope, confirms the expected conclusion and
-answer-visible key facts, and binds the recorded evidence file by digest. The
-task explicitly marks the public universal obstruction as not replayed: the
-contract-only Oracle does not enumerate the 20 integer differences or exhaust
-orders 5, 6, and 7, so those finite checks do not prove that the set is absent
-from every finite perfect difference set.
+benchmark contract and independently replays the bounded finite mathematics:
+it binds the agent-visible input to the frozen verifier copy, checks the
+submission envelope, confirms the expected conclusion and answer-visible key
+facts, binds the recorded evidence file by digest, reconstructs all 20 ordered
+integer differences, and exhaustively enumerates every extension candidate for
+orders 5, 6, and 7. The task explicitly marks the public universal obstruction
+as not replayed: these finite checks do not prove that the set is absent from
+every finite perfect difference set.
 
-The public Oracle validates the benchmark contract and the bounded operations
-at the submission-protocol level. It is not held-out evidence of model
-improvement, and it does not independently replay the underlying mathematics.
-Protected transformed cases and matched Jacobian-on/off runs remain a separate
-evaluation stage.
+The public Oracle validates the benchmark contract and replays the bounded
+finite operations in a clean room. It is not held-out evidence of model
+improvement, and the finite replay does not establish the universal
+obstruction. Protected transformed cases and matched Jacobian-on/off runs
+remain a separate evaluation stage.
