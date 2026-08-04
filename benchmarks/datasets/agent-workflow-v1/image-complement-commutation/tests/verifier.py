@@ -67,15 +67,17 @@ def _int_set_ok(value):
         return True
     if not isinstance(value, list):
         return False
-    if len(set(value)) != len(value):
+    if not all(_is_int(item) and 0 <= item <= 4 for item in value):
         return False
-    return all(_is_int(item) and 0 <= item <= 4 for item in value)
+    return len(set(value)) == len(value)
 
 
 def _row_schema_ok(row):
     if set(row) != _ROW_KEYS:
         return False
     if not isinstance(row["id"], str):
+        return False
+    if not isinstance(row["classification"], str):
         return False
     if row["classification"] not in _CLASSIFICATIONS:
         return False
