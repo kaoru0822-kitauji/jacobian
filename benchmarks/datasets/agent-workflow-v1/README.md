@@ -59,12 +59,12 @@ arms and vary only its mode:
 
 ```sh
 # Control: identical Jacobian portfolio without the log protocol.
-JACOBIAN_REASONING_LOG_MODE=OFF make agent-eval \
+JACOBIAN_REASONING_LOG_MODE=off make agent-eval \
   DATASET=agent-workflow-v1 JACOBIAN_ENABLED=1 \
   TASKS=graph-counterexample EVAL_EXECUTE=1
 
 # Treatment: identical Jacobian portfolio with required bracketing.
-JACOBIAN_REASONING_LOG_MODE=REQUIRED make agent-eval \
+JACOBIAN_REASONING_LOG_MODE=required make agent-eval \
   DATASET=agent-workflow-v1 JACOBIAN_ENABLED=1 \
   TASKS=graph-counterexample EVAL_EXECUTE=1
 ```

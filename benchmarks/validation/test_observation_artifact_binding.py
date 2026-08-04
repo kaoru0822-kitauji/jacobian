@@ -51,11 +51,21 @@ def test_observation_normalization_binds_v2_fields(
         job_path=job_path,
         jobs_dir=tmp_path,
         result_path=result_path,
+        runtime_snapshot={
+            "snapshot_id": _SNAPSHOT_ID,
+            "harbor_version": _HARBOR_VERSION,
+            "model": "model",
+            "condition": {
+                "id": "control",
+                "role": "PRIMARY_CONTROL",
+                "jacobian_enabled": False,
+            },
+        },
     )
 
     assert failures == []
     assert evidence["status"] == "VALID"
-    assert evidence["schema_version"] == "2"
+    assert evidence["schema_version"] == "3"
     assert evidence["fixed_invariants"]["model"] == "model"
     assert evidence["eval_args"]["selection_mode"] == "dataset-task-names"
     assert evidence["eval_args"]["selection"] == ["graph-counterexample"]
@@ -64,7 +74,7 @@ def test_observation_normalization_binds_v2_fields(
     trial = evidence["trials"][0]
     assert trial["agent"] == {"name": "codex", "version": "1"}
     assert trial["verifier_state"] == "COMPLETED"
-    assert trial["budgets"] is None
+    assert trial["budgets"] == {"max_tokens": None, "max_cost_usd": None}
     assert trial["artifacts"] == []
 
 
@@ -98,6 +108,12 @@ def test_observation_binds_runtime_snapshot_fields(
         "max_cost_usd": 100.0,
         "repetition": 0,
         "pair_id": "graph-counterexample-r001",
+        "condition": {
+            "id": "treatment",
+            "role": "PRIMARY_TREATMENT",
+            "jacobian_enabled": True,
+            "reasoning_log_mode": "OFF",
+        },
     }
 
     evidence, failures = build_observation_evidence(
@@ -161,6 +177,55 @@ def test_required_reasoning_protocol_fails_closed_when_trace_is_missing(
     assert evidence["status"] == "INCOMPLETE"
     assert evidence["trials"][0]["reasoning_protocol"]["mode"] == "REQUIRED"
     assert "required reasoning protocol is incomplete" in " ".join(failures)
+
+
+def test_unbound_reasoning_mode_with_jacobian_enabled_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A Jacobian-enabled run with no reasoning_log_mode binding must not be VALID."""
+
+    monkeypatch.setattr(observation_results, "task_digest", lambda _path: "a" * 64)
+    monkeypatch.setattr(observation_results, "_git_sha", lambda: "b" * 40)
+    job = {
+        "jobs_dir": str(tmp_path / "jobs"),
+        "n_attempts": 1,
+        "timeout_multiplier": 1,
+        "orchestrator": {"type": "local", "n_concurrent_trials": 1},
+        "environment": {"type": "docker"},
+        "agents": [{"name": "codex"}],
+        "datasets": [
+            {
+                "path": "benchmarks/datasets/agent-workflow-v1",
+                "task_names": ["graph-counterexample"],
+            }
+        ],
+    }
+    runtime = {
+        "snapshot_id": _SNAPSHOT_ID,
+        "harbor_version": _HARBOR_VERSION,
+        "model": "model",
+        "condition": {
+            "id": "treatment",
+            "role": "PRIMARY_TREATMENT",
+            "jacobian_enabled": True,
+        },
+    }
+    evidence, failures = build_observation_evidence(
+        dataset="agent-workflow-v1",
+        condition="treatment",
+        job_path=_write_observation_job(tmp_path, job),
+        jobs_dir=tmp_path,
+        result_path=_write_result(tmp_path),
+        runtime_snapshot=runtime,
+    )
+
+    assert evidence["status"] == "INCOMPLETE"
+    assert evidence["trials"][0]["reasoning_protocol"]["mode"] == "UNKNOWN"
+    assert (
+        evidence["trials"][0]["reasoning_protocol"]["requirement_status"]
+        == "INCOMPLETE"
+    )
+    assert "reasoning_log_mode is unbound or invalid" in " ".join(failures)
 
 
 # ---------------------------------------------------------------------------

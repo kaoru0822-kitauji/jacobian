@@ -8,6 +8,19 @@ from pathlib import Path
 from jacobian import __version__
 
 _CAPABILITY_MODES = ("EXPLORE", "VERIFY")
+_REASONING_LOG_MODES = ("required", "audit", "off")
+
+
+def _normalize_reasoning_log_mode(value: str) -> str:
+    """Accept case-insensitive reasoning-log mode values from the CLI."""
+
+    lowered = value.lower()
+    if lowered not in _REASONING_LOG_MODES:
+        raise argparse.ArgumentTypeError(
+            f"invalid reasoning_log_mode: {value!r} "
+            f"(choose from {', '.join(_REASONING_LOG_MODES)})"
+        )
+    return lowered
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -129,9 +142,12 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--reasoning-log-mode",
-        choices=("required", "audit", "off"),
-        default="required",
-        help="external reasoning-log enforcement; defaults to required",
+        type=_normalize_reasoning_log_mode,
+        default="off",
+        help=(
+            "external reasoning-log enforcement; defaults to off. "
+            "Accepts case-insensitive values: required, audit, off."
+        ),
     )
     return parser
 

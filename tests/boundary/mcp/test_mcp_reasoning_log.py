@@ -11,7 +11,10 @@ def test_required_reasoning_log_binds_actual_capability_result(tmp_path: Path) -
     async def scenario() -> None:
         from mcp import Client
 
-        async with Client(create_server(tmp_path), raise_exceptions=True) as client:
+        async with Client(
+            create_server(tmp_path, reasoning_log_mode="REQUIRED"),
+            raise_exceptions=True,
+        ) as client:
             tools = {tool.name: tool for tool in (await client.list_tools()).tools}
             assert set(tools) == {
                 "capability.describe",
@@ -144,7 +147,10 @@ def test_required_mode_rejects_mismatched_call_binding_without_consuming_it(
     async def scenario() -> None:
         from mcp import Client
 
-        async with Client(create_server(tmp_path), raise_exceptions=True) as client:
+        async with Client(
+            create_server(tmp_path, reasoning_log_mode="REQUIRED"),
+            raise_exceptions=True,
+        ) as client:
             plan = await client.call_tool(
                 "reasoning.write",
                 {"phase": "PLAN", "summary": "Compute one exact value."},

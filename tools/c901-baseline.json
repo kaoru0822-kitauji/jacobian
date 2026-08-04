@@ -23,6 +23,11 @@
       "complexity": 17
     },
     {
+      "path": "benchmarks/datasets/agent-workflow-v1/grid-independent-set-transfer/tests/verifier.py",
+      "symbol": "_result_shape_ok",
+      "complexity": 12
+    },
+    {
       "path": "benchmarks/datasets/agent-workflow-v1/indexed-pairwise-vacuity/tests/verifier.py",
       "symbol": "_evidence_valid",
       "complexity": 15
@@ -101,6 +106,11 @@
       "path": "benchmarks/datasets/provider-feasibility-v1/regina/environment/spike.py",
       "symbol": "_replay_triangulation",
       "complexity": 14
+    },
+    {
+      "path": "benchmarks/datasets/research-diagnostics-v1/jcb-postdoc-016/tests/verifier.py",
+      "symbol": "_value_decisions",
+      "complexity": 11
     },
     {
       "path": "benchmarks/tooling/harbor_suite.py",

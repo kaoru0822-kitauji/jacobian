@@ -23,6 +23,7 @@ from jacobian.contracts.reasoning import (
 from jacobian.storage.repository import ArtifactRepository
 
 MAX_CALLS_PER_RUN = 64
+MAX_RUNS = 4096
 
 
 class ReasoningProtocolError(RuntimeError):
@@ -188,6 +189,15 @@ class ReasoningLogService:
         run_id = str(uuid4())
         with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
+            (count,) = connection.execute(
+                "SELECT COUNT(*) FROM reasoning_runs"
+            ).fetchone()
+            if count >= MAX_RUNS:
+                self._raise(
+                    "REASONING_RUN_LIMIT",
+                    f"The aggregate reasoning-run limit ({MAX_RUNS}) has been reached.",
+                    "Contact the operator to prune old reasoning runs or raise the limit.",
+                )
             connection.execute(
                 "INSERT INTO reasoning_runs(run_id) VALUES (?)", (run_id,)
             )

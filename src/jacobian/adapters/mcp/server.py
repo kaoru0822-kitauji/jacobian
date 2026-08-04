@@ -60,6 +60,22 @@ from jacobian.runtime.model import JacobianRuntime
 _LOGGER = logging.getLogger(__name__)
 
 
+def _normalize_reasoning_log_mode(
+    value: ReasoningLogMode | str,
+) -> ReasoningLogMode:
+    """Accept case-insensitive reasoning-log mode values from callers."""
+
+    if isinstance(value, ReasoningLogMode):
+        return value
+    try:
+        return ReasoningLogMode(value.upper())
+    except ValueError:
+        valid = ", ".join(m.value for m in ReasoningLogMode)
+        raise ValueError(
+            f"invalid reasoning_log_mode: {value!r} (choose from {valid})"
+        ) from None
+
+
 class JacobianMCPServer(MCPServer[AppState]):
     """MCP server with SDK-owned static argument validation."""
 
@@ -316,6 +332,7 @@ async def _runtime_lifespan(
     *,
     runtime: JacobianRuntime | None,
     tenant_router: TenantRuntimeRouter | None,
+    reasoning_log_mode: ReasoningLogMode = ReasoningLogMode.OFF,
 ) -> AsyncIterator[AppState]:
     if runtime is not None:
         _start_lean_warmup(runtime)
@@ -323,6 +340,7 @@ async def _runtime_lifespan(
         yield AppState(
             runtime=runtime,
             tenant_router=tenant_router,
+            reasoning_log_mode=reasoning_log_mode,
         )
     finally:
         if runtime is not None:
@@ -345,11 +363,11 @@ def create_server(
     capability_policy: CapabilityPolicy | None = None,
     max_tenant_runtimes: int | None = None,
     tenant_idle_timeout_seconds: float | None = None,
-    reasoning_log_mode: ReasoningLogMode | str = ReasoningLogMode.REQUIRED,
+    reasoning_log_mode: ReasoningLogMode | str = ReasoningLogMode.OFF,
 ) -> MCPServer[AppState]:
     """Create a local or tenant-routed adapter over a Jacobian runtime."""
 
-    selected_reasoning_mode = ReasoningLogMode(reasoning_log_mode)
+    selected_reasoning_mode = _normalize_reasoning_log_mode(reasoning_log_mode)
     if tenant_isolation and capability_exclusions:
         raise ValueError("capability exclusions are supported only by local evaluation")
 
@@ -413,6 +431,7 @@ def create_server(
             server,
             runtime=runtime,
             tenant_router=tenant_router,
+            reasoning_log_mode=selected_reasoning_mode,
         ) as state:
             yield state
 

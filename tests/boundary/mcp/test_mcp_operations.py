@@ -169,7 +169,12 @@ def test_mcp_stdio_entrypoint_exposes_required_reasoning_tool(
         environment["JACOBIAN_STATE_DIR"] = str(tmp_path)
         parameters = StdioServerParameters(
             command=sys.executable,
-            args=["-m", "jacobian.adapters.mcp.server"],
+            args=[
+                "-m",
+                "jacobian.adapters.mcp.server",
+                "--reasoning-log-mode",
+                "required",
+            ],
             env=environment,
             cwd=Path.cwd(),
         )

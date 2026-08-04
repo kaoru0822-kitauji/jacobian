@@ -111,6 +111,7 @@
         "id": {"const": "C2"},
         "role": {"const": "PRIMARY_TREATMENT"},
         "jacobian_enabled": {"const": true},
+        "reasoning_log_mode": {"enum": ["REQUIRED", "AUDIT", "OFF"]},
         "image": {"type": "string", "pattern": "^[^@]+@sha256:[0-9a-f]{64}$"},
         "server_version": {"type": "string", "minLength": 1},
         "policy_profile": {"type": "string", "minLength": 1},

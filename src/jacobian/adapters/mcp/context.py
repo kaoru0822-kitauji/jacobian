@@ -14,6 +14,7 @@ from typing import Any
 from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
 
+from jacobian.adapters.mcp.constants import ReasoningLogMode
 from jacobian.adapters.mcp.remote import TenantRuntimeRouter
 from jacobian.adapters.mcp.tooling import AgentRecoveryError
 from jacobian.runtime.model import JacobianRuntime
@@ -25,6 +26,7 @@ _LOGGER = logging.getLogger(__name__)
 class AppState:
     runtime: JacobianRuntime | None
     tenant_router: TenantRuntimeRouter | None = None
+    reasoning_log_mode: ReasoningLogMode = ReasoningLogMode.OFF
 
 
 def _runtime(ctx: Context[AppState, Any] | None) -> JacobianRuntime:

@@ -8,7 +8,7 @@ from typing import Annotated, Any, Literal
 from mcp.server.mcpserver import Context
 from pydantic import Field, StrictInt
 
-from jacobian.adapters.mcp.constants import _CAPABILITY_SCOPE_RULE
+from jacobian.adapters.mcp.constants import _CAPABILITY_SCOPE_RULE, ReasoningLogMode
 from jacobian.adapters.mcp.context import AppState, _runtime
 from jacobian.adapters.mcp.projections import (
     _capability_descriptor_view,
@@ -191,8 +191,10 @@ async def capability_describe(
             ),
         }
     else:
-        response["invocations"] = [
-            {
+        reasoning_mode = _reasoning_mode_from_context(ctx)
+        invocations = []
+        for example in descriptor.invocation_examples:
+            entry: dict[str, Any] = {
                 "name": example.name,
                 **(
                     {
@@ -208,8 +210,17 @@ async def capability_describe(
                     "payload": example.input,
                 },
             }
-            for example in descriptor.invocation_examples
-        ]
+            if reasoning_mode is ReasoningLogMode.REQUIRED:
+                entry["requires_reasoning_ids"] = True
+                entry["protocol_note"] = (
+                    "In REQUIRED mode, capability.invoke also requires "
+                    "reasoning_run_id and reasoning_call_id. Create a "
+                    "reasoning run with reasoning.write (PLAN), then call "
+                    "reasoning.write (BEFORE_TOOL) to obtain the IDs before "
+                    "invoking."
+                )
+            invocations.append(entry)
+        response["invocations"] = invocations
         response.update(_capability_inspection_extensions(capability_id, descriptors))
     if (
         view != "SUMMARY"
@@ -331,3 +342,16 @@ async def reasoning_write(
                 "Inspect its CONTRACT view and choose an installed mode."
             )
     return await _run_blocking(active_runtime.core.reasoning_log.write, request)
+
+
+def _reasoning_mode_from_context(
+    ctx: Context[AppState, Any] | None,
+) -> ReasoningLogMode:
+    """Read the server's reasoning-log mode from the request lifespan state."""
+
+    if ctx is None:
+        return ReasoningLogMode.OFF
+    state = ctx.request_context.lifespan_context
+    if isinstance(state, AppState):
+        return state.reasoning_log_mode
+    return ReasoningLogMode.OFF

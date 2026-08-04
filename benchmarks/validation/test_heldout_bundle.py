@@ -56,6 +56,7 @@ def _manifest() -> dict:
                 "id": "C2",
                 "role": "PRIMARY_TREATMENT",
                 "jacobian_enabled": True,
+                "reasoning_log_mode": "OFF",
                 "image": "registry.invalid/jacobian@sha256:" + "4" * 64,
                 "server_version": "1.2.3",
                 "policy_profile": "DEFAULT",

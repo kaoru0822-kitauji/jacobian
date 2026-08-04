@@ -11,7 +11,10 @@ from jacobian.adapters.mcp.server import create_server
 
 def test_reasoning_run_survives_runtime_restart_and_finalizes(tmp_path: Path) -> None:
     async def scenario() -> None:
-        async with Client(create_server(tmp_path), raise_exceptions=True) as client:
+        async with Client(
+            create_server(tmp_path, reasoning_log_mode="REQUIRED"),
+            raise_exceptions=True,
+        ) as client:
             plan = await client.call_tool(
                 "reasoning.write",
                 {"phase": "PLAN", "summary": "Compute and audit an exact gcd."},
@@ -55,7 +58,10 @@ def test_reasoning_run_survives_runtime_restart_and_finalizes(tmp_path: Path) ->
                 },
             )
 
-        async with Client(create_server(tmp_path), raise_exceptions=True) as restarted:
+        async with Client(
+            create_server(tmp_path, reasoning_log_mode="REQUIRED"),
+            raise_exceptions=True,
+        ) as restarted:
             final = await restarted.call_tool(
                 "reasoning.write",
                 {
