@@ -1,0 +1,16 @@
+Construct a strictly positive continuous function on `[1,+infinity)` for which
+the improper integral diverges but the series of integer samples converges.
+
+Submit the exact first twelve spike supports and areas, the twelve integer
+samples, and the general symbolic series classifications. Each spike support
+must be disjoint from every other support and must avoid every integer. The
+spike areas must form a divergent series while the integer samples form a
+convergent series.
+
+Your certificate at `/app/evidence/answer.txt` must show that the supports are
+disjoint and avoid every integer, the spike areas form a divergent series, and
+the samples form a convergent series. Write `/app/submission.json` and
+digest-bound `/app/evidence/answer.txt`. Each rational field in the submission
+must be a canonical reduced fraction string of at most 100 characters, and the
+evidence file must be at most 16 MiB. Claim at most `COMPUTED`; `UNVERIFIED` is
+also accepted.
