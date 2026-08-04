@@ -77,6 +77,34 @@ def test_comparison_rejects_same_condition_inputs() -> None:
     )
 
 
+def test_reasoning_comparison_requires_enabled_off_and_required_pair() -> None:
+    control = _evidence("control", [1.0])
+    treatment = _evidence("treatment", [1.0])
+    control["runtime_snapshot"] = {
+        "condition": {
+            "id": "control",
+            "role": "PRIMARY_CONTROL",
+            "jacobian_enabled": True,
+            "reasoning_log_mode": "OFF",
+        }
+    }
+    treatment["runtime_snapshot"] = {
+        "condition": {
+            "id": "treatment",
+            "role": "PRIMARY_TREATMENT",
+            "jacobian_enabled": True,
+            "reasoning_log_mode": "REQUIRED",
+        }
+    }
+
+    assert compare_evidence(control, treatment)["status"] == "VALID"
+
+    treatment["runtime_snapshot"]["condition"]["jacobian_enabled"] = False
+    report = compare_evidence(control, treatment)
+    assert report["status"] == "INVALID"
+    assert "requires Jacobian enabled" in " ".join(report["validation_failures"])
+
+
 def test_comparison_normalization_allows_only_frozen_jacobian_differences() -> None:
     control = {
         "environment": {

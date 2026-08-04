@@ -113,6 +113,33 @@ def _comparison_failures(
     )
     if control.get("fixed_invariants") != treatment.get("fixed_invariants"):
         failures.append("fixed invariants differ")
+    control_condition = control.get("runtime_snapshot", {}).get("condition")
+    treatment_condition = treatment.get("runtime_snapshot", {}).get("condition")
+    if isinstance(control_condition, dict) or isinstance(treatment_condition, dict):
+        control_mode = (
+            control_condition.get("reasoning_log_mode")
+            if isinstance(control_condition, dict)
+            else None
+        )
+        treatment_mode = (
+            treatment_condition.get("reasoning_log_mode")
+            if isinstance(treatment_condition, dict)
+            else None
+        )
+        if control_mode is not None or treatment_mode is not None:
+            if (control_mode, treatment_mode) != ("OFF", "REQUIRED"):
+                failures.append(
+                    "reasoning-log comparison must pair OFF control with REQUIRED treatment"
+                )
+            if not (
+                isinstance(control_condition, dict)
+                and isinstance(treatment_condition, dict)
+                and control_condition.get("jacobian_enabled") is True
+                and treatment_condition.get("jacobian_enabled") is True
+            ):
+                failures.append(
+                    "reasoning-log comparison requires Jacobian enabled in both conditions"
+                )
     if control.get("job", {}).get("comparison_signature") != treatment.get(
         "job", {}
     ).get("comparison_signature"):

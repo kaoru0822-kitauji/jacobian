@@ -10,7 +10,7 @@ services:
       - "8000"
       - --allow-anonymous
       - --reasoning-log-mode
-      - ${JACOBIAN_REASONING_LOG_MODE:-required}
+      - ${JACOBIAN_REASONING_LOG_MODE:-REQUIRED}
       - --state-dir
       - /state
     volumes:

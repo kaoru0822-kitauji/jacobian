@@ -229,6 +229,29 @@ def _normalize_trial(
             source_prefix=source_prefix,
         )
     )
+    reasoning_protocol = observation_artifacts.trial_reasoning_protocol(
+        path,
+        artifacts,
+    )
+    runtime_condition = runtime.get("condition") if runtime is not None else None
+    reasoning_log_mode = (
+        runtime_condition.get("reasoning_log_mode")
+        if isinstance(runtime_condition, dict)
+        else runtime.get("reasoning_log_mode")
+        if runtime is not None
+        else None
+    )
+    if reasoning_log_mode not in {"REQUIRED", "AUDIT", "OFF"}:
+        reasoning_log_mode = "UNKNOWN"
+    reasoning_protocol = {
+        **reasoning_protocol,
+        "mode": reasoning_log_mode,
+        "requirement_status": (
+            reasoning_protocol["status"]
+            if reasoning_log_mode == "REQUIRED"
+            else "NOT_REQUIRED"
+        ),
+    }
     budgets: dict[str, Any] | None = None
     if runtime is not None:
         budgets = {
@@ -266,6 +289,7 @@ def _normalize_trial(
         "artifacts": artifacts,
         "tool_calls": tool_calls,
         "tool_errors": tool_errors,
+        "reasoning_protocol": reasoning_protocol,
         "raw_result_digest": _sha256(path) if path is not None else _json_digest(trial),
     }
     if runtime is not None and isinstance(runtime.get("pair_id"), str):
@@ -323,6 +347,12 @@ def _observation_failures(
     )
     if incomplete or any(trial["status"] != "COMPLETED" for trial in trials):
         failures.append("execution is incomplete or contains errors")
+    failures.extend(
+        f"{trial['task']} repetition {trial['repetition']}: required reasoning protocol is incomplete"
+        for trial in trials
+        if trial["reasoning_protocol"]["mode"] == "REQUIRED"
+        and trial["reasoning_protocol"]["status"] != "COMPLETE"
+    )
     return failures
 
 

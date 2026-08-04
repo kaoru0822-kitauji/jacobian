@@ -39,6 +39,22 @@ def _trial(repetition: int, reward: float) -> dict:
         "artifacts": [],
         "tool_calls": {},
         "tool_errors": 0,
+        "reasoning_protocol": {
+            "status": "INCOMPLETE",
+            "mode": "UNKNOWN",
+            "requirement_status": "NOT_REQUIRED",
+            "plan_count": 0,
+            "before_tool_count": 0,
+            "after_tool_count": 0,
+            "final_count": 0,
+            "run_count": 0,
+            "bound_invoke_count": 0,
+            "missing_after_tool_count": 0,
+            "pending_call_count": 0,
+            "unavailable_after_tool_count": 0,
+            "reported_actual_mismatch_count": 0,
+            "summary_characters": 0,
+        },
         "raw_result_digest": "sha256:" + "e" * 64,
     }
 
