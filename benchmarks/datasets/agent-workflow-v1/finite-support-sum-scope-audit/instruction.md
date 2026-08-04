@@ -12,4 +12,4 @@ lower bound. Then repair the definition by restricting supports to
 `c_n = product_{k=1}^n (2+1/k^2) / n!`
 
 and a uniform ratio certificate showing `c_{n+1}/c_n <= 3/4` for every `n>=2`.
-Bind an evidence object at `evidence/scope-audit.json`. The object must have exactly `schema_version`, `task_id`, `result`, and `limitations`; use `schema_version: "1"`, task ID `jacobian/finite-support-sum-scope-audit`, and exact copies of the submitted `result` and `limitations`. Assurance is `COMPUTED` only.
+Bind an evidence object at `evidence/scope-audit.json`. The object must have exactly `schema_version`, `task_id`, `result`, and `limitations`; use `schema_version: "1"`, the task identifier from `/app/input.json`, and exact copies of the submitted `result` and `limitations`. Assurance is `COMPUTED` only.
