@@ -14,13 +14,13 @@ import pytest
 from deploy.smoke_remote import inspect as inspect_remote_deployment
 from mcp.server.auth.settings import AuthSettings
 from pydantic import AnyHttpUrl
+from tests.support.mcp import create_legacy_server as create_server
 from uvicorn import Config, Server
 
 from jacobian.adapters.mcp.remote import (
     StaticTokenVerifier,
     load_static_token_file,
 )
-from jacobian.adapters.mcp.server import create_server
 
 
 def test_authenticated_streamable_http_isolates_tenant_memory(

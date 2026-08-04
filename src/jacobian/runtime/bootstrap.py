@@ -12,6 +12,7 @@ from jacobian.memory import ResearchMemory
 from jacobian.operation_installation import OperationInstaller
 from jacobian.plugins.registry import PluginRegistry
 from jacobian.polynomial_expressions import install_polynomial_expression_artifacts
+from jacobian.reasoning_log import ReasoningLogService
 from jacobian.registry import CheckerRegistry
 from jacobian.runtime.config import CheckerAuthorityMode, RuntimeOptions
 from jacobian.runtime.services import CoreServices
@@ -54,6 +55,7 @@ def bootstrap_services(root: str | Path, options: RuntimeOptions) -> CoreService
             memory,
             policy=options.capability_policy,
         )
+        reasoning_log = ReasoningLogService(store)
         return CoreServices(
             store=store,
             schemas=schemas,
@@ -68,6 +70,7 @@ def bootstrap_services(root: str | Path, options: RuntimeOptions) -> CoreService
             plugins=plugins,
             checkers=checkers,
             capabilities=capabilities,
+            reasoning_log=reasoning_log,
         )
     except BaseException:
         store.close()

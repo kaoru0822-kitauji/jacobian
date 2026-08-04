@@ -473,6 +473,7 @@
         "tests/support/capability_installations.py",
         "tests/support/nullstellensatz.py",
         "tests/support/polynomials.py",
+        "tests/support/mcp.py",
         "tests/conftest.py"
       ],
       "suites": [

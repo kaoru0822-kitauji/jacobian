@@ -8,9 +8,9 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator
 from mcp.shared.exceptions import MCPError
+from tests.support.mcp import create_legacy_server as create_server
 
 from jacobian.adapters.mcp.guidance import OPERATING_GUIDE
-from jacobian.adapters.mcp.server import create_server
 from jacobian.contracts.capabilities import CapabilityDescriptor
 
 CAPABILITY_TOOL_NAMES = {"capability.describe", "capability.invoke"}
@@ -31,7 +31,7 @@ def test_mcp_exposes_only_capability_tools_with_read_only_resources(
             assert client.instructions == server.instructions
             assert client.server_info.version == version("jacobian")
             assert client.server_capabilities.extensions == {
-                "io.jacobian/core": {"version": "1"}
+                "io.jacobian/core": {"version": "2", "reasoning_log_mode": "OFF"}
             }
             listed = await client.list_tools()
             tools = {tool.name: tool for tool in listed.tools}

@@ -66,6 +66,7 @@ def test_fresh_store_records_immutable_ordered_migrations(tmp_path: Path) -> Non
             )
         }
         assert not any(name.startswith("workspace") for name in tables)
+        assert {"reasoning_runs", "reasoning_events"} <= tables
         assert connection.execute(
             "SELECT format_revision FROM jacobian_state_format WHERE id = 0"
         ).fetchone() == (CURRENT_STATE_FORMAT_REVISION,)
@@ -75,6 +76,33 @@ def test_fresh_store_records_immutable_ordered_migrations(tmp_path: Path) -> Non
             ).fetchone()
             is None
         )
+    finally:
+        connection.close()
+
+
+def test_reasoning_log_tables_reject_update_and_delete(tmp_path: Path) -> None:
+    with ArtifactRepository(tmp_path):
+        pass
+
+    connection = sqlite3.connect(tmp_path / "metadata.sqlite3")
+    try:
+        connection.execute("INSERT INTO reasoning_runs(run_id) VALUES ('fixture-run')")
+        connection.execute(
+            """
+            INSERT INTO reasoning_events(
+                run_id, sequence, kind, event_json, event_digest
+            ) VALUES ('fixture-run', 0, 'PLAN', '{}', 'sha256:fixture')
+            """
+        )
+        connection.commit()
+        with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+            connection.execute(
+                "UPDATE reasoning_events SET kind = 'FINAL' WHERE run_id = 'fixture-run'"
+            )
+        with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+            connection.execute(
+                "DELETE FROM reasoning_runs WHERE run_id = 'fixture-run'"
+            )
     finally:
         connection.close()
 
@@ -413,8 +441,7 @@ def test_missing_retirement_revision_requires_fresh_store(tmp_path: Path) -> Non
     connection = sqlite3.connect(tmp_path / "metadata.sqlite3")
     try:
         connection.execute(
-            "DELETE FROM jacobian_schema_migrations WHERE revision = ?",
-            (len(STATE_MIGRATIONS),),
+            "DELETE FROM jacobian_schema_migrations WHERE revision >= 6",
         )
         connection.commit()
     finally:

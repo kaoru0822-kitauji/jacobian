@@ -19,6 +19,7 @@ from mcp.server.mcpserver.resources import FunctionResource, TextResource
 from mcp.shared.exceptions import MCPError
 
 from jacobian import __version__
+from jacobian.adapters.mcp.constants import ReasoningLogMode
 from jacobian.adapters.mcp.context import (
     AppState,
     _configured_root,
@@ -29,12 +30,16 @@ from jacobian.adapters.mcp.context import (
 from jacobian.adapters.mcp.guidance import (
     CAPABILITY_DESCRIBE_DESCRIPTION,
     CAPABILITY_INVOKE_DESCRIPTION,
-    OPERATING_GUIDE,
+    REASONING_WRITE_DESCRIPTION,
     SERVER_DESCRIPTION,
-    SERVER_INSTRUCTIONS,
+    operating_guide,
+    server_instructions,
 )
 from jacobian.adapters.mcp.remote import TenantRuntimeRouter
-from jacobian.adapters.mcp.resources import _register_resources_and_prompts
+from jacobian.adapters.mcp.resources import (
+    _register_reasoning_resource,
+    _register_resources_and_prompts,
+)
 from jacobian.adapters.mcp.tooling import (
     _argument_digest,
     _response_size,
@@ -43,6 +48,9 @@ from jacobian.adapters.mcp.tooling import (
 from jacobian.adapters.mcp.tools import (
     capability_describe,
     capability_invoke,
+    capability_invoke_audit,
+    capability_invoke_reasoned,
+    reasoning_write,
 )
 from jacobian.capability_service import CapabilityPolicy
 from jacobian.references import reference_catalog
@@ -73,15 +81,22 @@ class JacobianCoreExtension(Extension):
         self,
         runtime: JacobianRuntime | None,
         tenant_router: TenantRuntimeRouter | None,
+        reasoning_log_mode: ReasoningLogMode = ReasoningLogMode.REQUIRED,
     ) -> None:
         self._runtime = runtime
         self._tenant_router = tenant_router
+        self._reasoning_log_mode = reasoning_log_mode
 
     def settings(self) -> dict[str, Any]:
-        return {"version": "1"}
+        return {"version": "2", "reasoning_log_mode": self._reasoning_log_mode.value}
 
     def tools(self) -> tuple[ToolBinding, ...]:
-        return (
+        invoke_handler = {
+            ReasoningLogMode.REQUIRED: capability_invoke_reasoned,
+            ReasoningLogMode.AUDIT: capability_invoke_audit,
+            ReasoningLogMode.OFF: capability_invoke,
+        }[self._reasoning_log_mode]
+        bindings = [
             ToolBinding(
                 _safe_tool_handler("capability.describe", capability_describe),
                 kwargs={
@@ -93,7 +108,7 @@ class JacobianCoreExtension(Extension):
                 },
             ),
             ToolBinding(
-                _safe_tool_handler("capability.invoke", capability_invoke),
+                _safe_tool_handler("capability.invoke", invoke_handler),
                 kwargs={
                     "name": "capability.invoke",
                     "title": "Execute a mathematical capability",
@@ -102,7 +117,21 @@ class JacobianCoreExtension(Extension):
                     "structured_output": True,
                 },
             ),
-        )
+        ]
+        if self._reasoning_log_mode is not ReasoningLogMode.OFF:
+            bindings.append(
+                ToolBinding(
+                    _safe_tool_handler("reasoning.write", reasoning_write),
+                    kwargs={
+                        "name": "reasoning.write",
+                        "title": "Write a concise external reasoning summary",
+                        "description": REASONING_WRITE_DESCRIPTION,
+                        "annotations": _tool_annotations(),
+                        "structured_output": True,
+                    },
+                )
+            )
+        return tuple(bindings)
 
     def resources(self) -> tuple[ResourceBinding, ...]:
         return (
@@ -116,7 +145,10 @@ class JacobianCoreExtension(Extension):
                         "checking Jacobian mathematical capabilities."
                     ),
                     mime_type="text/markdown",
-                    text=OPERATING_GUIDE,
+                    text=operating_guide(
+                        reasoning_enabled=self._reasoning_log_mode
+                        is not ReasoningLogMode.OFF
+                    ),
                 )
             ),
             ResourceBinding(
@@ -313,9 +345,11 @@ def create_server(
     capability_policy: CapabilityPolicy | None = None,
     max_tenant_runtimes: int | None = None,
     tenant_idle_timeout_seconds: float | None = None,
+    reasoning_log_mode: ReasoningLogMode | str = ReasoningLogMode.REQUIRED,
 ) -> MCPServer[AppState]:
     """Create a local or tenant-routed adapter over a Jacobian runtime."""
 
+    selected_reasoning_mode = ReasoningLogMode(reasoning_log_mode)
     if tenant_isolation and capability_exclusions:
         raise ValueError("capability exclusions are supported only by local evaluation")
 
@@ -386,15 +420,21 @@ def create_server(
         name="jacobian",
         title="Jacobian Mathematical Workbench",
         description=SERVER_DESCRIPTION,
-        instructions=SERVER_INSTRUCTIONS,
+        instructions=server_instructions(
+            reasoning_enabled=selected_reasoning_mode is not ReasoningLogMode.OFF
+        ),
         version=__version__,
         lifespan=lifespan,
         token_verifier=token_verifier,
         auth=auth,
-        extensions=[JacobianCoreExtension(runtime, tenant_router)],
+        extensions=[
+            JacobianCoreExtension(runtime, tenant_router, selected_reasoning_mode)
+        ],
     )
 
     _register_resources_and_prompts(server, runtime, tenant_router)
+    if selected_reasoning_mode is not ReasoningLogMode.OFF:
+        _register_reasoning_resource(server, runtime, tenant_router)
     return server
 
 
