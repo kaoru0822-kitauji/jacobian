@@ -53,6 +53,7 @@ RESOURCE_DERIVED_TASKS = (
 )
 # Tasks whose verifier reports scope independently of assurance typing.
 SCOPE_INDEPENDENT_ASSURANCE_TASKS = (
+    "grid-independent-set-transfer",
     "lp-integrability-separator",
     "necklace-burnside-certificate",
     "pythagorean-generator-recurrence",
