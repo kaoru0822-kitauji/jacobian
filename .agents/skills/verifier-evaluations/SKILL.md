@@ -46,11 +46,14 @@ the Harbor skill owns dataset layout and repository commands.
    digests. Reject `VERIFIED` without independent authorization.
 
 4. Keep diagnostic dimensions independent. Compute protocol compliance,
-   mathematical correctness, evidence validity, scope accuracy, and assurance
-   calibration separately. Aggregate them only at the final reward boundary;
-   invalid protocol or false certification may force aggregate reward to zero,
-   but must not hide which other dimensions passed or make a correct
-   mathematical result look like a mathematical failure.
+   mathematical correctness, evidence validity, scope accuracy, assurance
+   calibration, and workspace input binding separately. Aggregate them only at
+   the final reward boundary; invalid protocol or false certification may force
+   aggregate reward to zero, but must not hide which other dimensions passed or
+   make a correct mathematical result look like a mathematical failure. In
+   particular, a tampered or replaced `input.json` must not zero the
+   mathematical-correctness score; report it as a separate `input_binding`
+   dimension and gate only aggregate reward on it.
 
 5. Make prose requirements structural. Do not award credit because a response
    contains words such as “duplicate”, “line”, or “region”. Prefer typed result
@@ -80,6 +83,10 @@ the Harbor skill owns dataset layout and repository commands.
    copies, refresh only their checksum labels, and update only affected
    prospective adapter evidence; never rewrite historical snapshots.
    Report exact revisions, commands, checks, Oracle result, and proof gaps.
+   After every verifier edit — not just support changes — refresh the
+   task-local Dockerfile checksum label (e.g. `make harbor-sync`) and verify
+   it matches `sha256sum` of the final `verifier.py`; a stale label fails
+   `validate_task_topology` and blocks the task.
 
 Read [references/verifier-contract.md](references/verifier-contract.md) for the
 detailed checklist and anti-pattern catalogue.
