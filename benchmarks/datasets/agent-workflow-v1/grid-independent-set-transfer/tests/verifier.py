@@ -40,8 +40,27 @@ def derive():
     }
 
 
+def exact_value(actual, expected):
+    if isinstance(expected, dict):
+        return (
+            isinstance(actual, dict)
+            and set(actual) == set(expected)
+            and all(exact_value(actual[key], expected[key]) for key in expected)
+        )
+    if isinstance(expected, list):
+        return (
+            isinstance(actual, list)
+            and len(actual) == len(expected)
+            and all(
+                exact_value(value, target)
+                for value, target in zip(actual, expected, strict=True)
+            )
+        )
+    return type(actual) is type(expected) and actual == expected
+
+
 def matches(result):
-    return result == derive()
+    return exact_value(result, derive())
 
 
 def frozen():
