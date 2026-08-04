@@ -17,6 +17,8 @@ equal to the target. Merely naming the two repaired labels or asserting the
 target is insufficient.
 
 Write `submission.json` to the provided schema. Write `evidence/answer.txt`
-with a nonempty explanation and one line beginning `RESULT_JSON:` followed by
-the exact compact JSON serialization of `result`. Digest-bind that file and
-claim at most `COMPUTED`.
+with exactly one line beginning `RESULT_JSON:` followed by the exact compact
+JSON serialization of `result`. The other text must explain the assertion
+applications using the ordered stack and its variable unification/substitution;
+unrelated or marker-only text is not evidence. Digest-bind that file and claim
+at most `COMPUTED`.
