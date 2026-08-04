@@ -183,3 +183,53 @@ def test_rejects_false_vieta_integrality(tmp_path: Path) -> None:
     _rewrite(app, submission)
     rejected = support._run_verifier(task, app, logs)
     assert rejected["correctness"] == 0.0
+
+
+def test_rejects_empty_audit_tokens_as_protocol_failure(tmp_path: Path) -> None:
+    """Empty audit strings violate minLength:1 and must fail protocol."""
+
+    task, app, logs = _case(tmp_path)
+    submission = json.loads((app / "submission.json").read_text())
+    submission["result"]["source_audit"]["invalid_step"] = ""
+    _rewrite(app, submission)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["protocol_compliance"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_rejects_zero_valued_probe_multiple(tmp_path: Path) -> None:
+    """A probe with multiple=0 violates the schema minimum of 1."""
+
+    task, app, logs = _case(tmp_path)
+    submission = json.loads((app / "submission.json").read_text())
+    # Force x=y=1 at t=2 so multiple = 1*1*(1-1) = 0.
+    family = submission["result"]["family"]
+    family["a"] = [1]
+    family["b"] = [1]
+    family["d"] = [1]
+    family["x"] = [1]
+    family["y"] = [1]
+    family["norm"] = [1]
+    family["square_congruence_factor"] = [1]
+    family["quotient"] = [0]
+    family["divisibility_quotient"] = [0]
+    family["ratio"] = [1]
+    submission["result"]["probes"] = [_probe(family, 2)]
+    _rewrite(app, submission)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_rejects_malformed_evidence_descriptor_as_protocol_failure(
+    tmp_path: Path,
+) -> None:
+    """A null evidence descriptor must fail protocol, not just evidence validity."""
+
+    task, app, logs = _case(tmp_path)
+    submission = json.loads((app / "submission.json").read_text())
+    submission["evidence"] = [None]
+    support._write_json(app / "submission.json", submission)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["protocol_compliance"] == 0.0
+    assert rejected["reward"] == 0.0

@@ -181,7 +181,7 @@ def _result_shape_is_valid(result: object) -> bool:
             "status_for_d_ge_2",
             "downstream_recurrence_status",
         }
-        and all(type(value) is str for value in audit.values())
+        and all(type(value) is str and value for value in audit.values())
         and _family_shape(result["family"])
         and _probes_shape(result["probes"])
         and type(result["conclusion"]) is str
@@ -260,7 +260,13 @@ def _probes_are_valid(value: object, family: dict[str, Any]) -> bool:
             "ratio": [ratio_value, 1],
         }:
             return False
-        if x != ratio_value * y or x <= 0 or y <= 0 or multiple % divisor:
+        if (
+            x != ratio_value * y
+            or x <= 0
+            or y <= 0
+            or multiple < 1
+            or multiple % divisor
+        ):
             return False
     return len(set(parameters)) == len(parameters)
 
@@ -329,6 +335,24 @@ def _json_exact_equal(left: object, right: object) -> bool:
     return left == right
 
 
+def _evidence_descriptors_ok(evidence: object) -> bool:
+    """Check the evidence descriptor shape, path, and digest syntax.
+
+    File-content binding is left to ``evidence_validity``; this predicate only
+    ensures the envelope descriptor matches the public schema so a malformed
+    descriptor such as ``[null]`` is reported as a protocol failure.
+    """
+
+    return bool(
+        isinstance(evidence, list)
+        and len(evidence) == 1
+        and isinstance(evidence[0], dict)
+        and set(evidence[0]) == {"path", "sha256"}
+        and evidence[0].get("path") == "evidence/answer.txt"
+        and isinstance(evidence[0].get("sha256"), str)
+    )
+
+
 def main() -> None:
     submission = load_submission()
     data = submission if isinstance(submission, dict) else {}
@@ -357,6 +381,7 @@ def main() -> None:
     protocol = bool(
         contract
         and _result_shape_is_valid(result)
+        and _evidence_descriptors_ok(data.get("evidence"))
         and scope_correct
         and assurance_correct
         and limitations_correct
