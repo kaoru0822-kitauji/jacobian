@@ -1,1 +1,17 @@
-{"schema_version":"1","task_id":"inversion-aggregate-mask-audit","family":"Assurance","primary_objective":"semantic defect localization under aggregate masking","quality_score":89,"accepted_because":["pointwise defect is independently witnessed","aggregate masking is exhaustively replayed","alternative witnesses accepted"],"rejected_nearby":[{"row":21,"reason":"routine extremal inversion calculation"},{"row":23,"reason":"routine binomial evaluation"}]}
+{
+  "schema_version": "1",
+  "provenance_status": "historical",
+  "historical_provenance_id": "jacobian.agent-workflow-v1.capability-gap-analysis",
+  "task_id": "inversion-aggregate-mask-audit",
+  "analysis": {
+    "mathematical_moves": [
+      "Separate the intended and implemented pointwise statistics, then replay the aggregate symmetry that masks their disagreement."
+    ],
+    "current_capabilities": [],
+    "gap_classes": ["MODEL_REASONING"],
+    "contamination": "PUBLIC_ANSWER_VISIBLE",
+    "candidate_ids": [],
+    "disposition": "NO_NEW_CAPABILITY",
+    "next_action": "Keep pointwise semantic validation distinct from aggregate theorem validation."
+  }
+}
