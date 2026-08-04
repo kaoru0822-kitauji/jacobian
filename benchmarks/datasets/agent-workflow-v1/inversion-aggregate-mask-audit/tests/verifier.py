@@ -14,6 +14,32 @@ W, T = Path("/app"), Path("/tests")
 LIMITATIONS = ["FINITE_N4_REPLAY", "NO_LEAN_ELABORATION"]
 
 
+def _json_equal(a: object, b: object) -> bool:
+    """Structural JSON equality that rejects type-mismatched scalars.
+
+    Python's ``==`` treats ``True == 1`` and ``6.0 == 6`` as equal, so an
+    evidence file that substitutes a float for an integer field (or a boolean
+    for an integer) would match the submitted result. This helper recursively
+    requires exact scalar types and element-wise equality for containers.
+    """
+
+    if isinstance(a, bool) or isinstance(b, bool):
+        return type(a) is type(b) and a == b
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+        return type(a) is type(b) and a == b
+    if isinstance(a, str) and isinstance(b, str):
+        return a == b
+    if isinstance(a, list) and isinstance(b, list):
+        return len(a) == len(b) and all(
+            _json_equal(x, y) for x, y in zip(a, b, strict=True)
+        )
+    if isinstance(a, dict) and isinstance(b, dict):
+        return a.keys() == b.keys() and all(_json_equal(a[k], b[k]) for k in a)
+    if a is None or b is None:
+        return a is None and b is None
+    return False
+
+
 def frozen():
     try:
         return (W / "input.json").read_bytes() == (
@@ -112,12 +138,12 @@ def main():
         and set(ev) == {"schema_version", "task_id", "result", "limitations"}
         and ev.get("schema_version") == "1"
         and ev.get("task_id") == expected["task_id"]
-        and ev.get("result") == s.get("result")
-        and ev.get("limitations") == LIMITATIONS
+        and _json_equal(ev.get("result"), s.get("result"))
+        and _json_equal(ev.get("limitations"), LIMITATIONS)
     )
     scope_ok = bool(
-        envelope_valid
-        and s is not None
+        s is not None
+        and isinstance(s.get("claimed_assurance"), str)
         and s.get("scope") == "FROZEN_N4_ALL_PERMUTATIONS"
         and s.get("completeness") == "COMPLETE"
         and s.get("limitations") == LIMITATIONS
