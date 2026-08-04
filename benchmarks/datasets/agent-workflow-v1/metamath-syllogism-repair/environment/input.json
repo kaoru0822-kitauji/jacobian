@@ -1,0 +1,18 @@
+{
+  "task_id": "jacobian/metamath-syllogism-repair",
+  "source": {"repository": "metamath/set.mm", "revision": "044c9e9f138dd05c518880800245ebe059c35c7e", "file": "set.mm", "theorem": "syl", "license": "CC0-1.0"},
+  "variables": ["u", "v", "w"],
+  "atomic_entries": {
+    "wu": ["wff", "u"], "wv": ["wff", "v"], "ww": ["wff", "w"],
+    "h1": ["|-", "(", "u", "->", "v", ")"],
+    "h2": ["|-", "(", "v", "->", "w", ")"]
+  },
+  "assertions": {
+    "wi": {"hypotheses": [["wff", "u"], ["wff", "v"]], "conclusion": ["wff", "(", "u", "->", "v", ")"]},
+    "a1i": {"hypotheses": [["wff", "u"], ["wff", "v"], ["|-", "u"]], "conclusion": ["|-", "(", "v", "->", "u", ")"]},
+    "mpd": {"hypotheses": [["wff", "u"], ["wff", "v"], ["wff", "w"], ["|-", "(", "u", "->", "v", ")"], ["|-", "(", "u", "->", "(", "v", "->", "w", ")", ")"]], "conclusion": ["|-", "(", "u", "->", "w", ")"]}
+  },
+  "corrupted_proof": ["wu", "wv", "ww", "h1", "wv", "ww", "a1i", "wu", "h2", "wi", "mpd"],
+  "required_replacements": 2,
+  "target": ["|-", "(", "u", "->", "w", ")"]
+}
