@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from verifier_support import (
+    ASSURANCE_LEVELS,
     false_verified_claim,
     load_submission,
     read_evidence_json,
@@ -91,37 +92,66 @@ def _frozen_ok():
         return False
 
 
+def _evidence_ok(evidence, result, expected, submission):
+    if not evidence:
+        return False
+    if set(evidence) != {"schema_version", "task_id", "result", "limitations"}:
+        return False
+    if evidence["schema_version"] != "1":
+        return False
+    if evidence["task_id"] != expected["task_id"]:
+        return False
+    # Validate the evidence result with the same strict matrix checks used for
+    # the submission result, then require byte-for-byte equality. Python ``==``
+    # admits ``True == 1`` and ``1.0 == 1``, so a certificate that replaces
+    # integers with booleans or floats must be rejected by type-aware checks
+    # rather than by equality alone.
+    if not _result_ok(evidence["result"]):
+        return False
+    if evidence["result"] != result:
+        return False
+    return evidence["limitations"] == submission.get("limitations")
+
+
 def main():
     submission = load_submission()
     expected = json.loads((E / "expected.json").read_text())
-    contract = strict_submission_contract(
+    # Structural envelope validity accepts any assurance level so that a false
+    # VERIFIED claim corrupts only assurance calibration, not the independent
+    # correctness, evidence, and scope diagnostics.
+    structure_valid = strict_submission_contract(
+        submission,
+        task_id=expected["task_id"],
+        conclusion=expected["conclusion"],
+        allowed_assurances=ASSURANCE_LEVELS,
+        verification_record="forbidden",
+    )
+    protocol = strict_submission_contract(
         submission,
         task_id=expected["task_id"],
         conclusion=expected["conclusion"],
         allowed_assurances=frozenset({"UNVERIFIED", "COMPUTED"}),
         verification_record="forbidden",
     )
-    result = submission.get("result") if contract else None
+    is_submission = isinstance(submission, dict)
+    result = submission.get("result") if is_submission else None
     math_ok = bool(_result_ok(result) and _frozen_ok())
     evidence = (
         read_evidence_json(
             submission["evidence"][0], expected_path="evidence/matrix-completion.json"
         )
-        if contract
+        if structure_valid
+        and is_submission
         and isinstance(submission.get("evidence"), list)
         and len(submission["evidence"]) == 1
         else None
     )
     evidence_ok = bool(
-        evidence
-        and set(evidence) == {"schema_version", "task_id", "result", "limitations"}
-        and evidence["schema_version"] == "1"
-        and evidence["task_id"] == expected["task_id"]
-        and evidence["result"] == result
-        and evidence["limitations"] == submission.get("limitations")
+        structure_valid and _evidence_ok(evidence, result, expected, submission)
     )
     scope_ok = bool(
-        contract
+        structure_valid
+        and is_submission
         and submission.get("scope") == "SUBMITTED_FINITE_GF2_PATTERN_AND_COMPLETIONS"
         and submission.get("limitations")
         == [
@@ -129,9 +159,14 @@ def main():
             "ONLY_SUBMITTED_FINITE_COMPLETIONS_CHECKED",
         ]
     )
-    assurance_ok = bool(contract and submission.get("claimed_assurance") == "COMPUTED")
+    assurance_ok = bool(protocol and submission.get("claimed_assurance") == "COMPUTED")
     false_cert = false_verified_claim(submission, verification_record_bound=False)
     correct = math_ok and evidence_ok and scope_ok and not false_cert
+    reward = 0.0
+    if correct and assurance_ok:
+        reward = 1.0
+    elif correct:
+        reward = 0.9
     Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
     Path("/logs/verifier/reward.json").write_text(
         json.dumps(
@@ -140,7 +175,7 @@ def main():
                 "evidence_validity": float(evidence_ok),
                 "scope_accuracy": float(scope_ok),
                 "assurance_calibration": float(assurance_ok),
-                "reward": 0 if not correct else 0.9 + 0.1 * assurance_ok,
+                "reward": reward,
                 "false_certification": false_cert,
             }
         )
