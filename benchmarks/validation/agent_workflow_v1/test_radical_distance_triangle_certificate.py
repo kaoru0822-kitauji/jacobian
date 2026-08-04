@@ -108,12 +108,15 @@ def test_rejects_boolean_center_entries(tmp_path: Path) -> None:
 
 def test_decouples_correctness_from_unsupported_assurance(tmp_path: Path) -> None:
     """An otherwise exact certificate claiming ``VERIFIED`` must retain
-    mathematical correctness while failing assurance and aggregate reward."""
+    mathematical correctness, evidence validity, and scope accuracy while
+    failing assurance and aggregate reward."""
     task, app, logs = support._prepare_case(tmp_path, TASK, "invalid")
     submission = json.loads((app / "submission.json").read_text())
     _rewrite(app, submission)
     result = support._run_verifier(task, app, logs)
     assert result["correctness"] == 1.0
+    assert result["evidence_validity"] == 1.0
+    assert result["scope_accuracy"] == 1.0
     assert result["assurance_calibration"] == 0.0
     assert result["reward"] == 0.0
 
@@ -130,3 +133,30 @@ def test_oversized_evidence_is_rejected_without_crashing(tmp_path: Path) -> None
     result = support._run_verifier(task, app, logs)
     assert result["evidence_validity"] == 0.0
     assert result["reward"] == 0.0
+
+
+def test_rejects_swapped_expansions_with_unswapped_centers(tmp_path: Path) -> None:
+    """Swapping only the expanded radicands while leaving centers unchanged
+    breaks the center-to-expansion pairing and must be rejected."""
+    task, app, logs = _case(tmp_path)
+    submission = json.loads((app / "submission.json").read_text())
+    result = submission["result"]
+    result["expanded_radicands"] = [
+        dict(result["expanded_radicands"][1]),
+        dict(result["expanded_radicands"][0]),
+    ]
+    _rewrite(app, submission)
+    assert support._run_verifier(task, app, logs)["reward"] == 0.0
+
+
+def test_accepts_schema_valid_integral_float_coefficients(tmp_path: Path) -> None:
+    """JSON Schema's ``integer`` type accepts integral floats like ``1.0``,
+    so the verifier must accept them in radicand coefficient records while
+    still rejecting booleans."""
+    task, app, logs = _case(tmp_path)
+    submission = json.loads((app / "submission.json").read_text())
+    for record in submission["result"]["expanded_radicands"]:
+        for key in record:
+            record[key] = float(record[key])
+    _rewrite(app, submission)
+    assert support._run_verifier(task, app, logs)["reward"] == 1.0

@@ -7,6 +7,7 @@ from verifier_support import (
     load_submission,
     read_evidence_json,
     strict_submission_contract,
+    workspace_input_is_bound,
 )
 
 W, T = Path("/app"), Path("/tests")
@@ -44,22 +45,17 @@ def _integer_value(value):
 
 
 def frozen():
-    try:
-        return (W / "input.json").read_bytes() == (
-            T / "input.json"
-        ).read_bytes() and not (W / "input.json").is_symlink()
-    except OSError:
-        return False
+    return workspace_input_is_bound()
 
 
 def _coefficient_record_is_valid(record):
-    """Validate an expanded radicand coefficient record with exact integer
-    types before any equality comparison, rejecting booleans."""
+    """Validate an expanded radicand coefficient record, accepting schema-valid
+    integral JSON numbers while rejecting booleans."""
 
     return bool(
         isinstance(record, dict)
         and set(record) == {"a2", "b2", "a_sqrt2", "b_sqrt2", "constant"}
-        and all(type(record[key]) is int for key in record)
+        and all(_integer_value(record[key]) is not None for key in record)
     )
 
 
@@ -119,7 +115,12 @@ def valid(r):
     def key(item):
         return json.dumps(item, sort_keys=True, separators=(",", ":"))
 
-    if sorted(expansions, key=key) != sorted(derived, key=key):
+    int_expansions = [
+        {k: _integer_value(v) for k, v in item.items()} for item in expansions
+    ]
+    if not all(
+        key(exp) == key(der) for exp, der in zip(int_expansions, derived, strict=True)
+    ):
         return False
     if sorted(derived, key=key) != sorted(frozen_radicands, key=key):
         return False
@@ -141,6 +142,13 @@ def valid(r):
 def main():
     e = json.loads((T / "expected.json").read_text())
     s = load_submission(W / "submission.json")
+    structure_valid = strict_submission_contract(
+        s,
+        task_id=e["task_id"],
+        conclusion=e["conclusion"],
+        allowed_assurances=frozenset({"UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"}),
+        verification_record="optional",
+    )
     c = strict_submission_contract(
         s,
         task_id=e["task_id"],
@@ -154,7 +162,7 @@ def main():
             expected_path="evidence/radical-distance-certificate.json",
             max_bytes=MAX_EVIDENCE_BYTES,
         )
-        if c
+        if structure_valid
         else None
     )
     m = bool(frozen() and isinstance(s, dict) and valid(s.get("result")))
@@ -167,7 +175,7 @@ def main():
         and _json_equal(ev.get("limitations"), LIMITATIONS)
     )
     q = bool(
-        c
+        structure_valid
         and s.get("scope") == "ALL_REAL_A_B"
         and s.get("completeness") == "COMPLETE"
         and s.get("limitations") == LIMITATIONS
