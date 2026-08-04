@@ -229,6 +229,42 @@ def _normalize_trial(
             source_prefix=source_prefix,
         )
     )
+    reasoning_protocol = observation_artifacts.trial_reasoning_protocol(
+        path,
+        artifacts,
+    )
+    runtime_condition = runtime.get("condition") if runtime is not None else None
+    reasoning_log_mode = (
+        runtime_condition.get("reasoning_log_mode")
+        if isinstance(runtime_condition, dict)
+        else runtime.get("reasoning_log_mode")
+        if runtime is not None
+        else None
+    )
+    if reasoning_log_mode not in {"REQUIRED", "AUDIT", "OFF"}:
+        reasoning_log_mode = "UNKNOWN"
+    reasoning_protocol = {
+        **reasoning_protocol,
+        "mode": reasoning_log_mode,
+        "requirement_status": (
+            reasoning_protocol["status"]
+            if reasoning_log_mode == "REQUIRED"
+            else "NOT_REQUIRED"
+        ),
+    }
+    # When Jacobian is enabled (or its state is unknown because the
+    # runtime snapshot is absent), the reasoning-log mode must be
+    # explicitly bound to a valid value.  An absent or invalid mode is a
+    # validation failure rather than a silent downgrade to NOT_REQUIRED.
+    # Only an explicit ``jacobian_enabled: false`` proves Jacobian was
+    # disabled and makes the mode irrelevant.
+    jacobian_enabled = (
+        runtime_condition.get("jacobian_enabled")
+        if isinstance(runtime_condition, dict)
+        else None
+    )
+    if jacobian_enabled is not False and reasoning_log_mode == "UNKNOWN":
+        reasoning_protocol["requirement_status"] = "INCOMPLETE"
     budgets: dict[str, Any] | None = None
     if runtime is not None:
         budgets = {
@@ -266,6 +302,7 @@ def _normalize_trial(
         "artifacts": artifacts,
         "tool_calls": tool_calls,
         "tool_errors": tool_errors,
+        "reasoning_protocol": reasoning_protocol,
         "raw_result_digest": _sha256(path) if path is not None else _json_digest(trial),
     }
     if runtime is not None and isinstance(runtime.get("pair_id"), str):
@@ -323,6 +360,18 @@ def _observation_failures(
     )
     if incomplete or any(trial["status"] != "COMPLETED" for trial in trials):
         failures.append("execution is incomplete or contains errors")
+    failures.extend(
+        f"{trial['task']} repetition {trial['repetition']}: required reasoning protocol is incomplete"
+        for trial in trials
+        if trial["reasoning_protocol"]["mode"] == "REQUIRED"
+        and trial["reasoning_protocol"]["status"] != "COMPLETE"
+    )
+    failures.extend(
+        f"{trial['task']} repetition {trial['repetition']}: reasoning_log_mode is unbound or invalid"
+        for trial in trials
+        if trial["reasoning_protocol"]["requirement_status"] == "INCOMPLETE"
+        and trial["reasoning_protocol"]["mode"] == "UNKNOWN"
+    )
     return failures
 
 
@@ -523,7 +572,7 @@ def build_observation_evidence(
         )
         harbor_version = None
     evidence = {
-        "schema_version": "2",
+        "schema_version": "3",
         "evidence_class": evidence_class,
         "causal_claim_authorized": False,
         "status": "VALID" if not failures else "INCOMPLETE",
@@ -720,7 +769,7 @@ def collect_heldout_evidence(
         len(selected),
     )
     evidence = {
-        "schema_version": "2",
+        "schema_version": "3",
         "evidence_class": "held-out-comparative-evaluation",
         "causal_claim_authorized": False,
         "status": "VALID" if not failures else "INCOMPLETE",

@@ -49,7 +49,11 @@ async def tool(client: Client, name: str, arguments: dict) -> dict:
 
 
 async def main() -> None:
-    server = create_server(STATE_DIR, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED)
+    server = create_server(
+        STATE_DIR,
+        checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED,
+        reasoning_log_mode="off",
+    )
 
     async with Client(server, raise_exceptions=True) as client:
         capability_ids = (

@@ -455,6 +455,57 @@ def _retire_data_upgrade_ledger(connection: sqlite3.Connection) -> None:
     )
 
 
+_REASONING_LOG_SCHEMA_STATEMENTS = (
+    """
+    CREATE TABLE IF NOT EXISTS reasoning_runs (
+        run_id TEXT PRIMARY KEY,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS reasoning_events (
+        run_id TEXT NOT NULL,
+        sequence INTEGER NOT NULL CHECK (sequence >= 0),
+        kind TEXT NOT NULL,
+        call_id TEXT,
+        event_json BLOB NOT NULL,
+        PRIMARY KEY (run_id, sequence),
+        FOREIGN KEY (run_id) REFERENCES reasoning_runs(run_id) ON DELETE RESTRICT
+    )
+    """,
+    "CREATE UNIQUE INDEX IF NOT EXISTS reasoning_event_kind_call ON reasoning_events(run_id, kind, call_id) WHERE call_id IS NOT NULL",
+    "CREATE UNIQUE INDEX IF NOT EXISTS reasoning_one_plan ON reasoning_events(run_id) WHERE kind = 'PLAN'",
+    "CREATE UNIQUE INDEX IF NOT EXISTS reasoning_one_final ON reasoning_events(run_id) WHERE kind = 'FINAL'",
+    """
+    CREATE TRIGGER IF NOT EXISTS reasoning_runs_no_update BEFORE UPDATE ON reasoning_runs
+    BEGIN SELECT RAISE(ABORT, 'reasoning runs are append-only'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS reasoning_runs_no_delete BEFORE DELETE ON reasoning_runs
+    BEGIN SELECT RAISE(ABORT, 'reasoning runs are append-only'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS reasoning_events_no_update BEFORE UPDATE ON reasoning_events
+    BEGIN SELECT RAISE(ABORT, 'reasoning events are append-only'); END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS reasoning_events_no_delete BEFORE DELETE ON reasoning_events
+    BEGIN SELECT RAISE(ABORT, 'reasoning events are append-only'); END
+    """,
+)
+_REASONING_LOG_SCHEMA = "\n-- statement boundary --\n".join(
+    _REASONING_LOG_SCHEMA_STATEMENTS
+)
+
+
+def _install_reasoning_log_schema(connection: sqlite3.Connection) -> None:
+    for statement in _REASONING_LOG_SCHEMA_STATEMENTS:
+        connection.execute(statement)
+    connection.execute(
+        "UPDATE jacobian_state_format SET format_revision = 7 WHERE id = 0"
+    )
+
+
 STATE_MIGRATIONS = (
     Migration(
         revision=1,
@@ -499,8 +550,14 @@ STATE_MIGRATIONS = (
         ),
         apply=_retire_data_upgrade_ledger,
     ),
+    Migration(
+        revision=7,
+        name="reasoning-log-events-v1",
+        definition=_REASONING_LOG_SCHEMA,
+        apply=_install_reasoning_log_schema,
+    ),
 )
 
 SUPPORTED_STATE_FLOOR = 6
-CURRENT_STATE_FORMAT_REVISION = 6
+CURRENT_STATE_FORMAT_REVISION = 7
 RESEARCH_INDEX_UPGRADE_ID = "research-episode-index-v2"

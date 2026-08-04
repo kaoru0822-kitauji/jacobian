@@ -15,11 +15,11 @@ import subprocess
 import tempfile
 import threading
 import time
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import BinaryIO
+from typing import BinaryIO, cast
 
 _CANCELLATION_EVENT: ContextVar[threading.Event | None] = ContextVar(
     "jacobian_bounded_process_cancellation_event",
@@ -90,10 +90,12 @@ def _apply_resource_limits(
         return
     try:
         import resource
-
-        prlimit = resource.prlimit
-    except (AttributeError, ImportError):  # pragma: no cover - platform dependent
+    except ImportError:  # pragma: no cover - platform dependent
         return
+    candidate = getattr(resource, "prlimit", None)
+    if not callable(candidate):  # pragma: no cover - platform dependent
+        return
+    prlimit = cast(Callable[[int, int, tuple[int, int]], object], candidate)
 
     def set_limit(kind: int, value: int) -> None:
         # A very short-lived child may exit between Popen and prlimit. It can

@@ -13,6 +13,8 @@ from jacobian.adapters.mcp.remote import (
     TenantRuntimeRouter,
     TenantRuntimeRouterClosedError,
 )
+from jacobian.contracts.reasoning import ReasoningWriteRequest
+from jacobian.reasoning_log import ReasoningProtocolError
 from jacobian.runtime import CheckerAuthorityMode
 from jacobian.storage.errors import ArtifactNotFoundError
 
@@ -36,6 +38,11 @@ def test_tenant_router_isolates_artifact_stores(tmp_path: Path) -> None:
     assert router.runtime_for("alpha") is alpha
     with pytest.raises(ArtifactNotFoundError):
         beta.core.store.get(stored)
+    reasoning_run = alpha.core.reasoning_log.write(
+        ReasoningWriteRequest(phase="PLAN", summary="Alpha-only plan.")
+    )
+    with pytest.raises(ReasoningProtocolError, match="does not exist"):
+        beta.core.reasoning_log.inspect(reasoning_run.run_id)
 
 
 class _FakeRuntime:

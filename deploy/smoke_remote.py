@@ -17,10 +17,11 @@ from mcp_types import TextContent, TextResourceContents
 from jacobian import __version__
 from jacobian.canonical import canonicalize_json
 
-EXPECTED_TOOLS = {
+REQUIRED_TOOLS = {
     "capability.describe",
     "capability.invoke",
 }
+OPTIONAL_TOOLS = {"reasoning.write"}
 DISCOVERY_RESPONSE_BYTE_LIMIT = 16_384
 
 
@@ -100,10 +101,15 @@ async def inspect(
 
         listed = await client.list_tools()
         tool_names = {tool.name for tool in listed.tools}
-        if tool_names != EXPECTED_TOOLS:
+        missing = sorted(REQUIRED_TOOLS - tool_names)
+        unexpected = sorted(tool_names - REQUIRED_TOOLS - OPTIONAL_TOOLS)
+        if missing:
             failures.append(
-                "deployed MCP tool surface mismatch: "
-                f"expected {sorted(EXPECTED_TOOLS)!r}, got {sorted(tool_names)!r}"
+                f"deployed MCP tool surface is missing required tools: {missing!r}"
+            )
+        if unexpected:
+            failures.append(
+                f"deployed MCP tool surface has unexpected tools: {unexpected!r}"
             )
 
         catalog_result = await client.read_resource("capability://catalog")

@@ -195,3 +195,24 @@ def _register_resources_and_prompts(
         ] = None,
     ) -> str:
         return evidence_check_prompt(claim, artifact_uri)
+
+
+def _register_reasoning_resource(
+    server: Any,
+    runtime: JacobianRuntime | None,
+    tenant_router: Any,
+) -> None:
+    """Register the optional operational reasoning-log reader."""
+
+    @server.resource(  # type: ignore[untyped-decorator]
+        "reasoning://run/{run_id}",
+        name="reasoning-log",
+        description="Read one tenant-isolated append-only external reasoning log.",
+        mime_type="application/x-ndjson",
+    )
+    async def reasoning_log_resource(run_id: str) -> str:
+        with _resource_runtime(runtime, tenant_router) as active_runtime:
+            return await _run_blocking(
+                active_runtime.core.reasoning_log.inspect_jsonl,
+                run_id,
+            )
