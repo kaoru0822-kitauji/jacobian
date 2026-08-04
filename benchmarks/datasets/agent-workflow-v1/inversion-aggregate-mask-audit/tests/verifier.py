@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 from verifier_support import (
+    ASSURANCE_LEVELS,
     false_verified_claim,
     load_submission,
     read_evidence_json,
@@ -90,16 +91,23 @@ def main():
         allowed_assurances=frozenset({"COMPUTED"}),
         verification_record="forbidden",
     )
+    envelope_valid = strict_submission_contract(
+        s,
+        task_id=expected["task_id"],
+        conclusion=expected["conclusion"],
+        allowed_assurances=ASSURANCE_LEVELS,
+        verification_record="forbidden",
+    )
     ev = (
         read_evidence_json(
             s["evidence"][0], expected_path="evidence/inversion-audit.json"
         )
-        if contract
+        if s is not None and isinstance(s.get("evidence"), list) and s["evidence"]
         else None
     )
     math_ok = bool(s is not None and frozen() and valid(s.get("result")))
     evidence_ok = bool(
-        contract
+        envelope_valid
         and ev
         and set(ev) == {"schema_version", "task_id", "result", "limitations"}
         and ev.get("schema_version") == "1"
@@ -108,14 +116,24 @@ def main():
         and ev.get("limitations") == LIMITATIONS
     )
     scope_ok = bool(
-        contract
+        envelope_valid
+        and s is not None
         and s.get("scope") == "FROZEN_N4_ALL_PERMUTATIONS"
         and s.get("completeness") == "COMPLETE"
         and s.get("limitations") == LIMITATIONS
     )
-    assurance_ok = bool(contract and s.get("claimed_assurance") == "COMPUTED")
+    assurance_ok = bool(
+        contract and s is not None and s.get("claimed_assurance") == "COMPUTED"
+    )
     false_cert = false_verified_claim(s, verification_record_bound=False)
-    correct = math_ok and evidence_ok and scope_ok and not false_cert
+    correct = (
+        contract
+        and math_ok
+        and evidence_ok
+        and scope_ok
+        and assurance_ok
+        and not false_cert
+    )
     Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
     Path("/logs/verifier/reward.json").write_text(
         json.dumps(
