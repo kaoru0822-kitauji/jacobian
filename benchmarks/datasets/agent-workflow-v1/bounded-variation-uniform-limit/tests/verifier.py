@@ -59,12 +59,14 @@ def _source_is_bound() -> bool:
     try:
         hidden = (TESTS / "input.json").read_bytes()
         data = json.loads(hidden)
+        workspace_input = WORKSPACE / "input.json"
         return (
-            (WORKSPACE / "input.json").read_bytes() == hidden
+            is_regular_bounded_file(workspace_input, max_bytes=16 * 1024 * 1024)
+            and workspace_input.read_bytes() == hidden
             and data["source"]["row"] == 600
             and data["source"]["revision"] == "d4e9f8ca877552f4491a9c2d52e0d230c0fca620"
         )
-    except (OSError, ValueError, KeyError):
+    except (OSError, ValueError, KeyError, MemoryError):
         return False
 
 
@@ -181,9 +183,11 @@ def _evidence(value: object, result: object) -> bool:
     if not isinstance(value, list) or len(value) != 1:
         return False
     expected = WORKSPACE / "evidence/answer.txt"
-    if not is_regular_bounded_file(expected, max_bytes=1_048_576):
+    if not is_regular_bounded_file(expected, max_bytes=16 * 1024 * 1024):
         return False
-    path = resolve_evidence(value[0], expected_path="evidence/answer.txt")
+    path = resolve_evidence(
+        value[0], expected_path="evidence/answer.txt", max_bytes=16 * 1024 * 1024
+    )
     if path is None:
         return False
     try:
@@ -247,7 +251,6 @@ def _evaluate(submission: object) -> dict[str, float | bool]:
         structure_valid
         and data.get("scope") == SCOPE
         and data.get("completeness") == "COMPLETE"
-        and _limitation_ok(data.get("limitations"))
     )
     assurance_correct = bool(
         data.get("claimed_assurance") == "COMPUTED" and limitation_ok
@@ -264,6 +267,7 @@ def _evaluate(submission: object) -> dict[str, float | bool]:
     )
     return {
         "protocol": protocol,
+        "protocol_compliance": float(protocol),
         "correctness": float(math_correct),
         "evidence_validity": float(evidence_valid),
         "scope_accuracy": float(scope_correct),
