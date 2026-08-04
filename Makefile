@@ -293,8 +293,8 @@ harbor-plan: ## Print the independent Harbor benchmark plan (BASE=... optional).
 	cat "$$tmp_dir/receipt.json"
 
 harbor-sync: ## Update vendored verifier support, verifier checksum labels, and benchmark formatting.
-	$(HARBOR_PYTHON) tools/sync_harbor_verifier_support.py --write
 	$(UV_RUN) ruff format benchmarks
+	$(HARBOR_PYTHON) tools/sync_harbor_verifier_support.py --write
 
 harbor-contracts: ## Check Harbor sync, task topology, schemas, and generated records.
 	$(HARBOR_PYTHON) tools/sync_harbor_verifier_support.py --check
