@@ -20,3 +20,4 @@ or a conclusion label alone is insufficient. Evidence must contain exactly one
 `RESULT_JSON:` line equal to `result`; optional surrounding prose is not a
 substitute for the typed `result.argument` values. Set `limitations` to the
 single structured value `NO_PROOF_ASSISTANT_VERIFICATION`.
+The digest-bound evidence file must not exceed 16 MiB.

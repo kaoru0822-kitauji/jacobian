@@ -11,7 +11,7 @@
       "oracle_evidence_digest": "sha256:12c972f39f8faf584479c2d4cba4be624d723ecfd346e6950a437536c3e7a439",
       "parity_evidence_digest": "sha256:c9e6fbd2f37f92ced3d30a3d4c9f0d650f7b76f5234d2fdda449a44797a86100",
       "source_row": "task-model-smoke/graph-counterexample",
-      "task_digest": "sha256:5c14ffb7867124125425828309809fd50af99753225e1bb99e3f29b0ed62ef3d",
+      "task_digest": "sha256:128c5dced2fb31c8626d578c189d7b91537faae0fa171edff41a5dd5e0269cad",
       "task_id": "graph-counterexample"
     }
   ],

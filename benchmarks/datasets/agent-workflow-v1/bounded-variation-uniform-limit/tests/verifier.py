@@ -22,7 +22,7 @@ LIMITATION = "NO_PROOF_ASSISTANT_VERIFICATION"
 
 # Accept any ordering of q, n, x in the sine argument and q, n in the
 # denominator, with or without explicit multiplication signs.
-_SEQUENCE_RE = re.compile(r"^sin\(([qnx]+)\)/\(([qn]+)\)$")
+_SEQUENCE_RE = re.compile(r"^sin\(([qnx])\*([qnx])\*([qnx])\)/\(([qn])\*([qn])\)$")
 
 
 def _is_int(value: object) -> bool:
@@ -47,16 +47,11 @@ def _valid_sequence(seq: object) -> bool:
 
     if not isinstance(seq, str):
         return False
-    compact = seq.replace(" ", "").replace("*", "")
-    match = _SEQUENCE_RE.match(compact)
-    if match is None:
-        return False
-    num, den = match.group(1), match.group(2)
-    return (
-        set(num) == {"q", "n", "x"}
-        and len(num) == 3
-        and set(den) == {"q", "n"}
-        and len(den) == 2
+    match = _SEQUENCE_RE.fullmatch(seq.replace(" ", ""))
+    return bool(
+        match
+        and set(match.group(1, 2, 3)) == {"q", "n", "x"}
+        and set(match.group(4, 5)) == {"q", "n"}
     )
 
 
@@ -209,7 +204,9 @@ def _evidence(value: object, result: object) -> bool:
     # The required explanation is the typed ``result.argument`` object.  Any
     # surrounding prose is optional and is deliberately not interpreted as a
     # hidden keyword protocol.
-    return bound == result
+    return json.dumps(bound, sort_keys=True, separators=(",", ":")) == json.dumps(
+        result, sort_keys=True, separators=(",", ":")
+    )
 
 
 def _limitation_ok(limitations: object) -> bool:
@@ -238,7 +235,7 @@ def _evaluate(submission: object) -> dict[str, float | bool]:
     evidence_valid = bool(
         math_correct and _evidence(data.get("evidence"), data.get("result"))
     )
-    scope_correct = bool(data.get("scope") == SCOPE)
+    scope_correct = bool(protocol and data.get("scope") == SCOPE)
     assurance_correct = bool(
         data.get("claimed_assurance") == "COMPUTED" and limitation_ok
     )
