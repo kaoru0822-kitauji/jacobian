@@ -16,4 +16,6 @@ Use `/app/submission.json` and bind an identical certificate at
 with exactly the fields `schema_version` (the string `"1"`), `task_id`
 (the task identifier), `result` (an object equal to
 the submission's `result`), and `limitations` (an array equal to the
-submission's `limitations`). Maximum assurance: `COMPUTED`.
+submission's `limitations`). The `evidence[0].sha256` field must be the
+SHA-256 digest of the certificate's exact on-disk bytes, prefixed with
+`sha256:`. Use completeness `COMPLETE` and maximum assurance `COMPUTED`.

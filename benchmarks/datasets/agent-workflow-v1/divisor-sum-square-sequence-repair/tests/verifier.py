@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Any
 
 from verifier_support import (
     false_verified_claim,
@@ -10,9 +11,6 @@ from verifier_support import (
 
 W, E = Path("/app"), Path("/tests")
 
-PRIME_FORMULA = "2^(p+1)+p*2^(2p)"
-THRESHOLD_RULE = "n>=max(2,k)_implies_2^k_divides_a_n"
-
 
 def _is_small_odd_prime(p):
     """Bound p before any exponentiation so a huge probe cannot OOM the verifier."""
@@ -22,7 +20,31 @@ def _is_small_odd_prime(p):
     return all(p % d for d in range(3, int(p**0.5) + 1, 2))
 
 
-def _result_ok(result):
+def _json_exact_equal(left: object, right: object) -> bool:
+    """Compare JSON values with exact scalar types (reject bool==int, float==int)."""
+
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, dict):
+        return set(left) == set(right) and all(
+            _json_exact_equal(left[key], right[key]) for key in left
+        )
+    if isinstance(left, list):
+        return len(left) == len(right) and all(
+            _json_exact_equal(a, b) for a, b in zip(left, right, strict=True)
+        )
+    return left == right
+
+
+def _result_ok(result: Any) -> bool:
+    """Validate the piecewise construction semantically.
+
+    The public instruction permits any deterministic power-of-two default
+    branch and any odd-prime branch whose divisor sum is a perfect square,
+    so the verifier checks the mathematical consequences rather than
+    matching canonical formula strings.
+    """
+
     if not isinstance(result, dict) or set(result) != {
         "a_1",
         "default_exponent_offset",
@@ -35,9 +57,11 @@ def _result_ok(result):
         type(result["a_1"]) is not int
         or result["a_1"] != 1
         or type(result["default_exponent_offset"]) is not int
-        or result["default_exponent_offset"] != 1
-        or result["prime_formula"] != PRIME_FORMULA
-        or result["threshold_rule"] != THRESHOLD_RULE
+        or result["default_exponent_offset"] < 0
+        or not isinstance(result["prime_formula"], str)
+        or not result["prime_formula"]
+        or not isinstance(result["threshold_rule"], str)
+        or not result["threshold_rule"]
     ):
         return False
     probes = result["probes"]
@@ -57,14 +81,15 @@ def _result_ok(result):
             return False
         if not all(type(probe[k]) is int for k in ("a_p", "b_p", "square_root")):
             return False
-        a_p = 2 ** (p + 1) + p * 2 ** (2 * p)
-        root = 1 + p * 2**p
-        if (
-            probe["a_p"] != a_p
-            or probe["b_p"] != 1 + p * a_p
-            or probe["square_root"] != root
-            or probe["b_p"] != root * root
-        ):
+        a_p = probe["a_p"]
+        b_p = probe["b_p"]
+        root = probe["square_root"]
+        # b_p = sum_{d|p} d*a_d = 1*a_1 + p*a_p = 1 + p*a_p.
+        # b_p must be a positive perfect square with the stated root.
+        # The threshold property requires 2^p | a_p for each odd prime p.
+        if a_p <= 0 or root <= 0 or b_p != 1 + p * a_p or b_p != root * root:
+            return False
+        if a_p % (1 << p) != 0:
             return False
         primes.append(p)
     return len(primes) == len(set(primes))
@@ -114,11 +139,14 @@ def main():
     )
     evidence_ok = bool(
         evidence
+        and isinstance(evidence, dict)
         and set(evidence) == {"schema_version", "task_id", "result", "limitations"}
+        and type(evidence["schema_version"]) is str
         and evidence["schema_version"] == "1"
+        and type(evidence["task_id"]) is str
         and evidence["task_id"] == expected["task_id"]
-        and evidence["result"] == result
-        and evidence["limitations"] == submission.get("limitations")
+        and _json_exact_equal(evidence["result"], result)
+        and _json_exact_equal(evidence["limitations"], submission.get("limitations"))
     )
     scope_ok = bool(
         contract

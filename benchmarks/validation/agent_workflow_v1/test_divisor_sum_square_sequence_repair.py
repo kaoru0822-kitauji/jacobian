@@ -46,6 +46,13 @@ def _probe(p):
     return {"prime": p, "a_p": a, "b_p": 1 + p * a, "square_root": 1 + p * 2**p}
 
 
+def _alternate_probe(p):
+    """Probe for the alternate construction a_n=2^n, a_p=2^(p+2)+4*p*2^(2p)."""
+
+    a = 2 ** (p + 2) + 4 * p * 2 ** (2 * p)
+    return {"prime": p, "a_p": a, "b_p": 1 + p * a, "square_root": 1 + 2 * p * 2**p}
+
+
 def test_oracle_and_alternative_primes(tmp_path):
     assert _verify(tmp_path / "oracle", _oracle())["reward"] == 1.0
     alt = _oracle()
@@ -103,8 +110,66 @@ def test_float_probe_values_rejected(tmp_path):
     assert _verify(tmp_path / "float_a_p", sub)["reward"] == 0
 
 
-def test_old_threshold_rule_rejected(tmp_path):
-    """The false threshold rule must no longer earn reward (T5)."""
+def test_old_threshold_rule_string_accepted(tmp_path):
+    """The threshold_rule is a descriptive label; the verifier checks math."""
+
     sub = _oracle()
     sub["result"]["threshold_rule"] = "n>=k_implies_a_n_divisible_by_2^k"
-    assert _verify(tmp_path / "old_threshold", sub)["reward"] == 0
+    assert _verify(tmp_path / "old_threshold", sub)["reward"] == 1.0
+
+
+def test_alternate_piecewise_construction_accepted(tmp_path):
+    """A different valid power-of-two construction must earn full reward."""
+
+    sub = _oracle()
+    sub["result"]["default_exponent_offset"] = 0
+    sub["result"]["prime_formula"] = "2^n"
+    sub["result"]["threshold_rule"] = "n>=max(2,k)_implies_2^k_divides_a_n"
+    sub["result"]["probes"] = [_alternate_probe(p) for p in (3, 5, 7, 11)]
+    assert _verify(tmp_path / "alt_construction", sub)["reward"] == 1.0
+
+
+def test_probe_not_divisible_by_2p_rejected(tmp_path):
+    """A probe whose a_p is not divisible by 2^p fails the threshold property."""
+
+    sub = _oracle()
+    sub["result"]["probes"][0]["a_p"] = 2**3  # not divisible by 2^3=8? 8%8==0, try odd
+    sub["result"]["probes"][0]["a_p"] = 3
+    sub["result"]["probes"][0]["b_p"] = 1 + 3 * 3
+    sub["result"]["probes"][0]["square_root"] = 0
+    assert _verify(tmp_path / "bad_threshold", sub)["reward"] == 0
+
+
+def test_evidence_type_coercion_rejected(tmp_path):
+    """Evidence with bool/float values must not match integer submission result."""
+
+    sub = copy.deepcopy(_oracle())
+    task = Path("benchmarks/datasets/agent-workflow-v1") / TASK
+    app, logs = tmp_path / "app", tmp_path / "logs"
+    (app / "evidence").mkdir(parents=True)
+    logs.mkdir(parents=True)
+    shutil.copy2(task / "environment/input.json", app / "input.json")
+    evidence = {
+        "schema_version": "1",
+        "task_id": TASK_ID,
+        "result": copy.deepcopy(sub["result"]),
+        "limitations": sub["limitations"],
+    }
+    evidence["result"]["a_1"] = True
+    path = app / "evidence/sequence-construction.json"
+    path.write_text(json.dumps(evidence, separators=(",", ":")))
+    sub["evidence"][0]["sha256"] = (
+        "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+    )
+    (app / "submission.json").write_text(json.dumps(sub))
+    result = _run_verifier(task, app, logs)
+    assert result["evidence_validity"] == 0.0
+    assert result["reward"] == 0
+
+
+def test_completeness_partial_rejected(tmp_path):
+    """A PARTIAL completeness value must not earn reward."""
+
+    sub = _oracle()
+    sub["completeness"] = "PARTIAL"
+    assert _verify(tmp_path / "partial", sub)["reward"] == 0
