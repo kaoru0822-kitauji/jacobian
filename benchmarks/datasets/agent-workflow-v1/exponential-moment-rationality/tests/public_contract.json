@@ -277,24 +277,6 @@
       },
       "task_id": {
         "const": "jacobian/exponential-moment-rationality"
-      },
-      "verification_record_uri": {
-        "additionalProperties": false,
-        "properties": {
-          "path": {
-            "minLength": 1,
-            "type": "string"
-          },
-          "sha256": {
-            "pattern": "^sha256:[0-9a-f]{64}$",
-            "type": "string"
-          }
-        },
-        "required": [
-          "path",
-          "sha256"
-        ],
-        "type": "object"
       }
     },
     "required": [

@@ -726,7 +726,7 @@ def _mark_invoked_if_capability_used(
     trials: list[dict[str, Any]],
     *,
     contract_dir: Path,
-) -> None:
+) -> bool:
     """Transition treatment routing_status to AVAILABLE_INVOKED when
     a successful Jacobian capability invocation is observed during
     normalization.  Only actual observed tool_calls evidence this; the
@@ -746,19 +746,20 @@ def _mark_invoked_if_capability_used(
         for trial in trials
     )
     if not invoked:
-        return
+        return False
     routing = ledger.get("routing_status")
     if not isinstance(routing, dict):
-        return
+        return False
     c2 = routing.get("C2")
     if not isinstance(c2, dict):
-        return
+        return False
     if c2.get("routing_status") != "AVAILABLE_UNUSED":
-        return
+        return False
     c2["routing_status"] = "AVAILABLE_INVOKED"
     from benchmarks.tooling.heldout_runner import _write_routing_contract
 
     _write_routing_contract(contract_dir, "C2", c2)
+    return True
 
 
 def collect_heldout_evidence(
@@ -786,9 +787,13 @@ def collect_heldout_evidence(
     failures.extend(run_failures)
     experiment = manifest["experiment"]
     if condition == "C2":
-        _mark_invoked_if_capability_used(
+        routing_changed = _mark_invoked_if_capability_used(
             ledger, trials, contract_dir=ledger_path.parent
         )
+        if routing_changed:
+            from benchmarks.tooling.heldout_runner import _write_ledger
+
+            _write_ledger(ledger_path, ledger)
     stage = str(plan.get("stage", ""))
     stage_tasks = (
         experiment["stages"][stage]["task_ids"] if stage in experiment["stages"] else []

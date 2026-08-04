@@ -296,7 +296,7 @@ class TestRendering:
             "VERIFIED",
         ]
         assert schema["properties"]["completeness"]["const"] == "COMPLETE"
-        assert "verification_record_uri" in schema["properties"]
+        assert "verification_record_uri" not in schema["properties"]
         assert "if" not in schema
 
     def test_submission_schema_includes_verification_record_when_verified(self) -> None:

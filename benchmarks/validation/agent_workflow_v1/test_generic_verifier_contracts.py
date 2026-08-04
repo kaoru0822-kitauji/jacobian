@@ -77,13 +77,16 @@ def test_rational_solution_rejects_unsupported_verified_claim(
     assert computed["reward"] == pytest.approx(1.0)
     assert computed["false_certification"] is False
 
-    for scenario in ("missing", "invalid"):
+    for scenario, expected_correctness, false_certification in (
+        ("missing", 1.0, True),
+        ("invalid", 0.0, False),
+    ):
         result = support._run_verifier(
             *support._prepare_case(tmp_path, support.RATIONAL_TASK, scenario)
         )
-        assert result["correctness"] == 1.0
+        assert result["correctness"] == expected_correctness
         assert result["reward"] == 0.0
-        assert result["false_certification"] is True
+        assert result["false_certification"] is false_certification
 
 
 @pytest.mark.parametrize("task_name", support.RESOURCE_DERIVED_TASKS)

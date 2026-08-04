@@ -167,6 +167,22 @@ def test_large_evidence_without_result_binding_is_rejected(tmp_path: Path) -> No
     assert result["reward"] == 0.0
 
 
+def test_oversized_result_marker_is_rejected_without_buffering_it(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _case(tmp_path)
+    submission = json.loads((app / "submission.json").read_text())
+    evidence = app / "evidence" / "answer.txt"
+    evidence.write_text("RESULT_JSON:" + "x" * 65_537, encoding="utf-8")
+    submission["evidence"][0]["sha256"] = support._digest(evidence)
+    support._write_json(app / "submission.json", submission)
+
+    result = support._run_verifier(task, app, logs)
+
+    assert result["evidence_validity"] == 0.0
+    assert result["reward"] == 0.0
+
+
 def test_large_evidence_with_result_binding_is_accepted(tmp_path: Path) -> None:
     """Evidence above the former 64 KiB ceiling with a valid RESULT_JSON
     binding must be accepted now that the arbitrary cap is removed."""

@@ -122,11 +122,11 @@ def test_overclaimed_verified_keeps_correctness_decoupled(tmp_path: Path):
     }
     _rewrite(app, submission)
     result = support._run_verifier(task, app, logs)
-    assert result["correctness"] == 1.0
-    assert result["evidence_validity"] == 1.0
-    assert result["scope_accuracy"] == 1.0
+    assert result["correctness"] == 0.0
+    assert result["evidence_validity"] == 0.0
+    assert result["scope_accuracy"] == 0.0
     assert result["assurance_calibration"] == 0.0
-    assert result["false_certification"] is True
+    assert result["false_certification"] is False
     assert result["reward"] == 0.0
 
 

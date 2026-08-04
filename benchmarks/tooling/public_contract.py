@@ -341,16 +341,6 @@ def _declared_schema(contract: PublicContract) -> dict[str, Any]:
                 "sha256": {"type": "string", "pattern": DIGEST_PATTERN},
             },
         }
-    else:
-        properties["verification_record_uri"] = {
-            "type": "object",
-            "additionalProperties": False,
-            "required": ["path", "sha256"],
-            "properties": {
-                "path": {"type": "string", "minLength": 1},
-                "sha256": {"type": "string", "pattern": DIGEST_PATTERN},
-            },
-        }
     required = [
         "task_id",
         "conclusion",

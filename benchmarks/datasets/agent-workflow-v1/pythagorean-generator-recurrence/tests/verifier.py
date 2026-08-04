@@ -225,6 +225,7 @@ def _scan_result_json_markers(path):
     """
 
     prefix = "RESULT_JSON:"
+    max_marker_chars = 65_536
     markers: list[str] = []
     pending = ""
     at_line_start = True
@@ -237,6 +238,8 @@ def _scan_result_json_markers(path):
                     )
                     if marker is not None:
                         markers.append(marker)
+                    if len(pending) > max_marker_chars:
+                        return None
                 if len(markers) > 1:
                     return markers
     except (OSError, UnicodeError):
