@@ -1,0 +1,1 @@
+{"task_id":"jacobian/edge-pair-ordering-audit","conclusion":"SOURCE_FACTOR_OF_TWO_REPAIRED","maximum_assurance":"COMPUTED","required_scope":"ordered edge pairs over all labeled simple graphs","required_limitation":"Finite exhaustive replay covers n=3,4,5,6 only; it does not machine-prove the symbolic formula for every n.","evidence_max_bytes":16777216}
