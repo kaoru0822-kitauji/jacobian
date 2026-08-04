@@ -12,6 +12,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import re
+import stat
 import subprocess
 import sys
 import tomllib
@@ -134,7 +135,6 @@ class EnvironmentProfile:
     name: str
     agent_image: str
     verifier_image: str
-    verifier_runtime_digest: str
     allow_apt: bool
 
 
@@ -243,19 +243,10 @@ def load_environment_profiles(
                     f"{path.relative_to(ROOT)}: profile {name} {label} image "
                     "must be digest-pinned"
                 )
-        runtime_digest = _require_string(
-            value.get("verifier_runtime_digest"),
-            f"profile {name} verifier_runtime_digest",
-        )
-        if re.fullmatch(r"sha256:[0-9a-f]{64}", runtime_digest) is None:
-            raise HarborSuiteError(
-                f"{path.relative_to(ROOT)}: profile {name} verifier runtime digest is invalid"
-            )
         profiles[name] = EnvironmentProfile(
             name=name,
             agent_image=agent_image,
             verifier_image=verifier_image,
-            verifier_runtime_digest=runtime_digest,
             allow_apt=value.get("allow_apt") is True,
         )
     return profiles
@@ -738,7 +729,7 @@ def validate_task_topology(suite: Suite, task_dir: Path) -> list[str]:
         failures.append(f"{rel}/tests: directory missing")
     else:
         for name in REQUIRED_TESTS:
-            if not (tests / name).is_file():
+            if not _is_regular_file(tests / name):
                 failures.append(f"{rel}/tests/{name}: required file missing")
         docker = tests / "Dockerfile"
         if docker.is_file() and re.search(
@@ -766,7 +757,7 @@ def validate_task_topology(suite: Suite, task_dir: Path) -> list[str]:
                     f"{rel}/tests/Dockerfile: FROM does not match verifier image "
                     f"for environment profile {profile.name}"
                 )
-            if "verifier_support.py" not in docker_text:
+            if not _dockerfile_copies(docker_text, "verifier_support.py"):
                 failures.append(
                     f"{rel}/tests/Dockerfile: does not copy verifier_support.py"
                 )
@@ -840,60 +831,57 @@ def validate_task(suite: Suite, task_dir: Path) -> list[str]:
     return validate_task_topology(suite, task_dir) + validate_task_visibility(task_dir)
 
 
-def _canonical_support(suite: Suite) -> Path | None:
-    candidate = ROOT / "benchmarks" / "tooling" / "verifier_support.py"
-    return candidate if candidate.is_file() else None
+def _is_regular_file(path: Path) -> bool:
+    """Return whether *path* is a non-symlinked regular file."""
+
+    try:
+        return not path.is_symlink() and stat.S_ISREG(path.stat().st_mode)
+    except OSError:
+        return False
+
+
+def _dockerfile_copies(docker_text: str, filename: str) -> bool:
+    """Return whether a Dockerfile COPY instruction includes *filename*."""
+
+    for line in docker_text.splitlines():
+        source = line.split("#", 1)[0].strip()
+        if not source.upper().startswith("COPY "):
+            continue
+        parts = source.split()[1:]
+        if len(parts) >= 2 and any(Path(part).name == filename for part in parts[:-1]):
+            return True
+    return False
 
 
 def check_verifier_support(
     suite: Suite,
     refs: tuple[TaskRef, ...] | None = None,
 ) -> list[str]:
+    """Validate each task's local verifier and support module.
+
+    Separate Harbor verifier images are built from the task ``tests/``
+    directory.  The local support file is therefore part of the task contract;
+    there is deliberately no repository-level copy to compare against.
+    """
+
     failures: list[str] = []
-    canonical = _canonical_support(suite)
-    if canonical is None:
-        return [
-            "benchmarks/tooling/verifier_support.py: canonical verifier support is missing"
-        ]
-    expected = canonical.read_bytes()
     for ref in suite.tasks if refs is None else refs:
-        target = ref.path / "tests" / "verifier_support.py"
-        if not target.is_file() or target.read_bytes() != expected:
+        tests = ref.path / "tests"
+        verifier = tests / "verifier.py"
+        support = tests / "verifier_support.py"
+        if not _is_regular_file(support):
             failures.append(
-                f"{target.relative_to(ROOT)}: verifier support differs from canonical source"
+                f"{support.relative_to(ROOT)}: verifier_support.py must be a regular, non-symlinked file"
             )
+            continue
+        for source in (verifier, support):
+            if not _is_regular_file(source):
+                continue
+            try:
+                compile(source.read_text(encoding="utf-8"), str(source), "exec")
+            except (OSError, SyntaxError, UnicodeError) as exc:
+                failures.append(f"{source.relative_to(ROOT)}: does not compile: {exc}")
     return failures
-
-
-def sync_verifier_support(suite: Suite) -> int:
-    canonical = _canonical_support(suite)
-    if canonical is None:
-        return 0
-    for ref in suite.tasks:
-        target = ref.path / "tests" / "verifier_support.py"
-        target.write_bytes(canonical.read_bytes())
-        docker = ref.path / "tests" / "Dockerfile"
-        if docker.is_file():
-            text = docker.read_text()
-            digest = hashlib.sha256(
-                (ref.path / "tests" / "verifier.py").read_bytes()
-            ).hexdigest()
-            text, count = re.subn(
-                r'jacobian\.checksum="[0-9a-f]{64}"',
-                f'jacobian.checksum="{digest}"',
-                text,
-            )
-            if not count:
-                text, count = re.subn(
-                    r"^(FROM [^\n]+\n)",
-                    f'\\1LABEL jacobian.checksum="{digest}"\n',
-                    text,
-                    count=1,
-                    flags=re.MULTILINE,
-                )
-            if count:
-                docker.write_text(text)
-    return 0
 
 
 def check_suite_topology(suite: Suite) -> list[str]:
@@ -963,7 +951,6 @@ __all__ = [
     "report_ok",
     "select_task_refs",
     "suite_digests",
-    "sync_verifier_support",
     "task_digest",
     "task_full_name",
     "task_short_name",

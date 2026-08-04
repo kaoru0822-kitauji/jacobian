@@ -193,9 +193,9 @@ workflow separately exercises repeated property stress, alternate ordering
 seeds, and optional providers outside the pull-request critical path.
 
 Benchmark validation is decomposed into evidence roles even though CI shares
-one checkout for the deterministic contract gate: Harbor support synchronization,
-task topology and digests, schemas and generated records, adapter checks, host
-validation tests, and Oracle execution. A task README is documentation; a task
+one checkout for the deterministic contract gate: task-local verifier/support
+validation, task topology and digests, schemas and generated records, adapter
+checks, host validation tests, and Oracle execution. A task README is documentation; a task
 instruction, environment, manifest, or member record is executable evaluation
 input. Shared environment profiles and execution-control changes may escalate
 to merge-queue portfolio evidence. Ignored Python bytecode is excluded from

@@ -6,8 +6,8 @@ content-addressed state.  It captures:
 * the ordered Harbor-native task digests for every member task;
 * the suite-header digest (the canonical ``[dataset]`` table of ``suite.toml``);
 * the pinned Harbor version;
-* the resolved per-task agent/verifier image and verifier runtime digests,
-  resolved from ``benchmarks/environment-profiles.toml`` via each member's
+* the resolved per-task agent/verifier images, resolved from
+  ``benchmarks/environment-profiles.toml`` via each member's
   ``environment_profile`` field (the registry ``runtime_profile`` is an
   evaluation runtime label, not an image-profile key);
 * the source git **tree** SHA (not the commit SHA), with ``dirty=false`` — a
@@ -171,7 +171,6 @@ def _environment_dict(profile: EnvironmentProfile) -> dict[str, Any]:
         "profile": profile.name,
         "agent_image": profile.agent_image,
         "verifier_image": profile.verifier_image,
-        "verifier_runtime_digest": profile.verifier_runtime_digest,
         "allow_apt": profile.allow_apt,
     }
 
@@ -198,20 +197,14 @@ def _resolve_task_environment(
     base = profiles[profile_name]
     agent_image = base.agent_image
     verifier_image = base.verifier_image
-    verifier_runtime_digest = base.verifier_runtime_digest
     if "@sha256:" not in agent_image:
         raise HarborSuiteError(f"{label}: agent_image must be a digest-pinned image")
     if "@sha256:" not in verifier_image:
         raise HarborSuiteError(f"{label}: verifier_image must be a digest-pinned image")
-    if not verifier_runtime_digest.startswith(DIGEST_PREFIX):
-        raise HarborSuiteError(
-            f"{label}: verifier_runtime_digest must be a sha256 digest"
-        )
     return EnvironmentProfile(
         name=profile_name,
         agent_image=agent_image,
         verifier_image=verifier_image,
-        verifier_runtime_digest=verifier_runtime_digest,
         allow_apt=base.allow_apt,
     )
 
@@ -332,12 +325,6 @@ def _lock_body(
     profiles_path: Path,
 ) -> dict[str, Any]:
     header = _suite_header(suite)
-    support_failures = harbor_suite.check_verifier_support(suite)
-    if support_failures:
-        raise HarborSuiteError(
-            "verifier support is not synchronized; run make harbor-sync: "
-            + "; ".join(support_failures)
-        )
     task_records = _task_records(suite, profiles=profiles, digest_fn=digest_fn)
     suite_section: dict[str, Any] = {
         "id": suite.id,

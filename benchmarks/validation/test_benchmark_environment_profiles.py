@@ -16,7 +16,6 @@ def test_every_task_resolves_a_digest_pinned_environment_profile() -> None:
             profile = profiles[task.environment_profile]
             assert "@sha256:" in profile.agent_image
             assert "@sha256:" in profile.verifier_image
-            assert re.fullmatch(r"sha256:[0-9a-f]{64}", profile.verifier_runtime_digest)
             dockerfile = (task.path / "environment" / "Dockerfile").read_text()
             assert dockerfile.splitlines()[0] == f"FROM {profile.agent_image}"
             verifier_dockerfile = (task.path / "tests" / "Dockerfile").read_text()

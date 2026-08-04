@@ -1,14 +1,16 @@
-"""Check or update vendored Harbor verifier support copies.
+"""Update verifier checksum labels for explicitly selected Harbor tasks.
 
-Iterates every dataset registered in ``benchmarks/registry.toml``. For each
-dataset, verifies that all task ``tests/verifier_support.py`` copies match the
-repository-owned canonical support module. ``--write`` regenerates the vendored
-copies.
+Task support modules are intentionally owned by their task bundles.  This
+command only updates the checksum label for each selected task's verifier and
+never copies support code, formats benchmark files, or touches unselected
+tasks.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
+import re
 import sys
 from pathlib import Path
 
@@ -18,48 +20,60 @@ if str(ROOT) not in sys.path:
 
 from benchmarks.tooling.harbor_suite import (  # noqa: E402
     HarborSuiteError,
-    check_verifier_support,
-    load_registry,
-    report_failures,
-    report_ok,
-    sync_verifier_support,
+    get_suite,
+    select_task_refs,
 )
 
+_CHECKSUM = re.compile(r'jacobian\.checksum="[^"]*"')
 
-def check() -> int:
-    failures: list[str] = []
-    checked = 0
-    for suite in load_registry():
-        checked += 1
-        failures.extend(check_verifier_support(suite))
-    if report_failures(failures, header="Harbor verifier support drift"):
-        print(
-            "The canonical source is benchmarks/tooling/verifier_support.py; "
-            "run `make harbor-sync`, then stage the generated task copies.",
-            file=sys.stderr,
+
+def update(dataset: str, tasks: tuple[str, ...]) -> int:
+    suite = get_suite(dataset)
+    refs = select_task_refs(suite, tasks)
+    for ref in refs:
+        tests = ref.path / "tests"
+        verifier = tests / "verifier.py"
+        dockerfile = tests / "Dockerfile"
+        if verifier.is_symlink() or not verifier.is_file():
+            raise HarborSuiteError(
+                f"{verifier.relative_to(ROOT)}: verifier.py must be a regular file"
+            )
+        if dockerfile.is_symlink() or not dockerfile.is_file():
+            raise HarborSuiteError(
+                f"{dockerfile.relative_to(ROOT)}: Dockerfile must be a regular file"
+            )
+        digest = hashlib.sha256(verifier.read_bytes()).hexdigest()
+        text = dockerfile.read_text(encoding="utf-8")
+        updated, count = _CHECKSUM.subn(
+            f'jacobian.checksum="{digest}"', text, count=1
         )
-        return 1
-    report_ok(f"Harbor verifier support matches for {checked} dataset(s).")
-    return 0
-
-
-def write() -> int:
-    for suite in load_registry():
-        sync_verifier_support(suite)
-        print(f"Updated Harbor verifier support for {suite.id}.")
+        if not count:
+            updated, count = re.subn(
+                r"^(FROM [^\n]+\n)",
+                f'\\1LABEL jacobian.checksum="{digest}"\n',
+                text,
+                count=1,
+                flags=re.MULTILINE,
+            )
+        if not count:
+            raise HarborSuiteError(
+                f"{dockerfile.relative_to(ROOT)}: no FROM line for checksum label"
+            )
+        if updated != text:
+            dockerfile.write_text(updated, encoding="utf-8")
+        print(f"Updated verifier checksum: {ref.path.relative_to(ROOT)}")
     return 0
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--check", action="store_true", help="verify vendored copies")
-    mode.add_argument("--write", action="store_true", help="regenerate vendored copies")
+    parser.add_argument("--dataset", required=True)
+    parser.add_argument("--tasks", nargs="+", required=True)
     args = parser.parse_args()
     try:
-        return check() if args.check else write()
+        return update(args.dataset, tuple(args.tasks))
     except HarborSuiteError as exc:
-        print(f"harbor verifier support error: {exc}", file=sys.stderr)
+        print(f"harbor verifier checksum error: {exc}", file=sys.stderr)
         return 2
 
 

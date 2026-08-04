@@ -31,13 +31,14 @@
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["id", "name", "digest", "verifier", "verifier_digest", "submission_schema_digest"],
+              "required": ["id", "name", "digest", "verifier", "verifier_digest", "verifier_support_digest", "submission_schema_digest"],
               "properties": {
                 "id": {"type": "string", "minLength": 1},
                 "name": {"type": "string", "pattern": "^jacobian/"},
                 "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
                 "verifier": {"type": "string", "minLength": 1},
                 "verifier_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+                "verifier_support_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
                 "submission_schema_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
               }
             }

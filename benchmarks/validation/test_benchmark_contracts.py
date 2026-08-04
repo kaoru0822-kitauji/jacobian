@@ -40,6 +40,7 @@ def test_inventory_covers_every_registered_task(
     assert inventory["task_count"] == sum(len(suite.tasks) for suite in suites)
     rendered = json.dumps(inventory)
     assert "verifier_digest" in rendered
+    assert "verifier_support_digest" in rendered
     assert "submission_schema_digest" in rendered
 
 

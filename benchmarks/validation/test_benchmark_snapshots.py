@@ -123,7 +123,6 @@ observation = "jobs/observation.json"
 """,
     )
     support = "# canonical verifier support fixture\n"
-    _write(benchmarks / "tooling" / "verifier_support.py", support)
     _write(
         benchmarks / "environment-profiles.toml",
         """
@@ -132,13 +131,11 @@ schema_version = "1"
 [profiles.core-python]
 agent_image = "python:3.12-slim@sha256:1111111111111111111111111111111111111111111111111111111111111111"
 verifier_image = "python:3.12-slim@sha256:2222222222222222222222222222222222222222222222222222222222222222"
-verifier_runtime_digest = "sha256:3333333333333333333333333333333333333333333333333333333333333333"
 allow_apt = false
 
 [profiles.uv-provider]
 agent_image = "ghcr.io/astral-sh/uv:0.8.4-python3.12-bookworm-slim@sha256:4444444444444444444444444444444444444444444444444444444444444444"
 verifier_image = "python:3.12-slim@sha256:2222222222222222222222222222222222222222222222222222222222222222"
-verifier_runtime_digest = "sha256:5555555555555555555555555555555555555555555555555555555555555555"
 allow_apt = true
 """,
     )
@@ -182,14 +179,14 @@ authors = [{ name = "Jacobian contributors" }]
     }
 
 
-def test_build_lock_rejects_unsynchronized_verifier_support(
+def test_build_lock_accepts_task_owned_verifier_support(
     paths: dict[str, Path],
 ) -> None:
     target = paths["dataset"] / "alpha-task" / "tests" / "verifier_support.py"
     target.write_text("# drifted verifier support\n", encoding="utf-8")
 
-    with pytest.raises(HarborSuiteError, match="verifier support is not synchronized"):
-        _build_from(paths)
+    lock = _build_from(paths)
+    assert lock["tasks"][0]["digest"] == "sha256:" + "a" * 64
 
 
 @pytest.fixture

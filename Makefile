@@ -292,12 +292,13 @@ harbor-plan: ## Print the independent Harbor benchmark plan (BASE=... optional).
 	echo "Plan receipt:"; \
 	cat "$$tmp_dir/receipt.json"
 
-harbor-sync: ## Update vendored verifier support, verifier checksum labels, and benchmark formatting.
-	$(UV_RUN) ruff format benchmarks
-	$(HARBOR_PYTHON) tools/sync_harbor_verifier_support.py --write
+harbor-sync: ## Update verifier checksum labels for selected tasks (DATASET=... TASKS="...").
+	@test -n "$(DATASET)" || { echo "DATASET is required" >&2; exit 2; }
+	@test -n "$(TASKS)" || { echo "TASKS is required; refusing an unscoped checksum update" >&2; exit 2; }
+	$(HARBOR_PYTHON) tools/sync_harbor_verifier_support.py \
+		--dataset "$(DATASET)" --tasks $(TASKS)
 
 harbor-contracts: ## Check Harbor sync, task topology, schemas, and generated records.
-	$(HARBOR_PYTHON) tools/sync_harbor_verifier_support.py --check
 	$(HARBOR_PYTHON) tools/check_harbor_dataset.py --check
 	$(HARBOR_PYTHON) tools/check_benchmark_contracts.py
 
@@ -316,7 +317,7 @@ harbor-validate: harbor-contracts harbor-adapter-checks harbor-validation-tests 
 
 harbor-check: harbor-validate ## Run Harbor topology, digest, provenance, and host-side validation checks.
 
-harbor-check-task: harbor-sync ## Validate selected Harbor leaf tasks (DATASET=..., TASKS="task-a task-b").
+harbor-check-task: ## Validate selected Harbor leaf tasks (DATASET=..., TASKS="task-a task-b").
 	@test -n "$(DATASET)" || { echo "DATASET is required" >&2; exit 2; }
 	@test -n "$(TASKS)" || { echo "TASKS is required; refusing an implicit full-dataset check" >&2; exit 2; }
 	$(HARBOR_PYTHON) tools/check_harbor_dataset.py \

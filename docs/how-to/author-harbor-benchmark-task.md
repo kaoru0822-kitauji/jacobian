@@ -61,6 +61,11 @@ Use `make benchmark-snapshot DATASET=<dataset-id>` from a clean pre-lock tree,
 then validate and publish with `make benchmark-snapshot-validate LOCK=<lock>`
 and `make benchmark-publish LOCK=<lock>`.
 
+Keep the task-local `tests/verifier_support.py` copied from the template. If
+you change `tests/verifier.py`, update only that task's checksum label with
+`make harbor-sync DATASET=<dataset-id> TASKS="<task-id>"`; the check commands
+are read-only.
+
 Do not add task symlinks, aliases, or a second fixture home. The task
 README is maintainer context and is not injected into a trial. Instructions
 describe the requested outcome without prescribing Jacobian capabilities or a

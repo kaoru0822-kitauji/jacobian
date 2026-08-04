@@ -26,7 +26,6 @@ def patch_harbor_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
         name="test-profile",
         agent_image="python:3.12-slim",
         verifier_image="python:3.12-slim",
-        verifier_runtime_digest="sha256:" + "0" * 64,
         allow_apt=False,
     )
     monkeypatch.setattr(
@@ -184,9 +183,6 @@ def _make_suite_with_task(tmp_path: Path) -> tuple[Suite, Path]:
     task = _make_canonical_task(tmp_path)
     (ds_path / "jobs").mkdir()
     (ds_path / "jobs" / "oracle.json").write_text("{}")
-    canonical = tmp_path / "benchmarks" / "tooling"
-    canonical.mkdir(parents=True)
-    (canonical / "verifier_support.py").write_text("# vendored support\n")
     _write_suite_toml(
         ds_path / "suite.toml",
         tasks=[{"id": "jacobian/test-v1-a", "assurance_ceiling": "COMPUTED"}],

@@ -28,7 +28,8 @@ evaluation bundle.
 membership. Intentional evaluation and publication events create immutable,
 content-addressed locks under `benchmarks/snapshots/`; those locks bind the
 suite header, ordered Harbor task digests, Harbor version, resolved images and
-verifier runtime, source tree, split, and evaluation configuration. Harbor
+source tree, split, and evaluation configuration. Inventory diagnostics record
+the digest of each task-local verifier support file separately. Harbor
 publication `dataset.toml` files are generated under ignored `dist/harbor/`
 from a lock and are never committed in dataset roots. Harbor jobs point at the
 dataset root and use Harbor's native task-name filtering.
@@ -43,12 +44,12 @@ Oracle solutions remain under `solution/`; verifier code and fixtures remain
 under `tests/`. No compatibility directories or aliases for the former
 benchmark layout are retained.
 
-The copied `tests/verifier_support.py` files are generated Harbor task
-artifacts. `benchmarks/tooling/verifier_support.py` owns their contents;
-`make harbor-sync` regenerates every task copy, and the pre-commit hook plus
-the Harbor contract gate reject drift with the same command in their error
-message. They remain task-local until the digest-pinned shared verifier image
-migration in ADR 0011 is complete.
+Each task owns its `tests/verifier_support.py` file because Harbor builds the
+separate verifier image from that task's `tests/` directory. The task template
+contains the current generic helper for newly scaffolded tasks; existing tasks
+are not silently rewritten. `make harbor-sync DATASET=<id> TASKS="<ids>"`
+updates only the selected verifier checksum labels. The read-only Harbor gates
+validate local support files and never synchronize unrelated tasks.
 
 ## Commands
 

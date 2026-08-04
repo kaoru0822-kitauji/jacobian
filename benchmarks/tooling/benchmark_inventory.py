@@ -53,6 +53,9 @@ def _suite_inventory(suite: Suite) -> dict[str, Any]:
                 .relative_to(ROOT)
                 .as_posix(),
                 "verifier_digest": _sha256(ref.path / "tests" / "verifier.py"),
+                "verifier_support_digest": _sha256(
+                    ref.path / "tests" / "verifier_support.py"
+                ),
                 "submission_schema_digest": _sha256(
                     ref.path / "environment" / "submission_schema.json"
                 ),
