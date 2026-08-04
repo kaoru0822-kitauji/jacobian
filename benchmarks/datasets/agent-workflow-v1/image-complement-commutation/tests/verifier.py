@@ -130,18 +130,23 @@ def main():
     )
     ev = (
         read_evidence_json(
-            s["evidence"][0], expected_path="evidence/image-complement-certificate.json"
+            s["evidence"][0],
+            expected_path="evidence/image-complement-certificate.json",
+            max_bytes=16 * 1024 * 1024,
         )
         if contract
         else None
     )
-    math_ok = bool(frozen() and valid(s.get("result")))
+    result = s.get("result") if isinstance(s, dict) else None
+    math_ok = bool(frozen() and valid(result))
     evidence_ok = bool(
         ev
         and set(ev) == {"schema_version", "task_id", "result", "limitations"}
+        and type(ev.get("schema_version")) is str
         and ev.get("schema_version") == "1"
+        and type(ev.get("task_id")) is str
         and ev.get("task_id") == expected["task_id"]
-        and ev.get("result") == s.get("result")
+        and valid(ev.get("result"))
         and ev.get("limitations") == LIMITATIONS
     )
     scope_ok = bool(
