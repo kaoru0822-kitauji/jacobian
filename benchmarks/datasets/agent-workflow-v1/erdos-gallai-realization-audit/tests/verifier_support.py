@@ -17,6 +17,7 @@ WORKSPACE = Path("/app")
 TESTS = Path("/tests")
 MAX_SUBMISSION_BYTES = 16 * 1024 * 1024
 MAX_INPUT_BYTES = 16 * 1024 * 1024
+MAX_EVIDENCE_BYTES = 16 * 1024 * 1024
 SUBMISSION_FIELDS = frozenset(
     {
         "task_id",
@@ -107,6 +108,7 @@ def strict_submission_contract(
     conclusion: str,
     completeness: str = "COMPLETE",
     evidence_count: int = 1,
+    min_limitations: int = 0,
     allowed_assurances: frozenset[str] = ASSURANCE_LEVELS,
     verification_record: Literal[
         "required_when_verified", "optional", "forbidden"
@@ -122,6 +124,7 @@ def strict_submission_contract(
         expected_fields = {frozenset(SUBMISSION_FIELDS | {"verification_record_uri"})}
     elif verification_record == "optional":
         expected_fields.add(frozenset(SUBMISSION_FIELDS | {"verification_record_uri"}))
+    limitations = submission.get("limitations", [])
     return bool(
         frozenset(submission) in expected_fields
         and submission.get("task_id") == task_id
@@ -129,8 +132,9 @@ def strict_submission_contract(
         and submission.get("completeness") == completeness
         and isinstance(submission.get("result"), dict)
         and isinstance(submission.get("scope"), str)
-        and isinstance(submission.get("limitations"), list)
-        and all(type(item) is str for item in submission.get("limitations", []))
+        and isinstance(limitations, list)
+        and len(limitations) >= min_limitations
+        and all(type(item) is str for item in limitations)
         and isinstance(submission.get("evidence"), list)
         and len(submission.get("evidence", [])) == evidence_count
         and isinstance(submission.get("claimed_assurance"), str)
@@ -167,7 +171,9 @@ def resolve_evidence(
         target = unresolved.resolve(strict=True)
     except OSError:
         return None
-    if not target.is_relative_to(root) or not target.is_file():
+    if not target.is_relative_to(root) or not is_regular_bounded_file(
+        target, max_bytes=MAX_EVIDENCE_BYTES
+    ):
         return None
     try:
         if descriptor["sha256"] != sha256_uri(target):
@@ -194,7 +200,7 @@ def read_evidence_json(
         return None
     try:
         value = json.loads(target.read_text())
-    except (OSError, ValueError, RecursionError):
+    except (OSError, ValueError, RecursionError, MemoryError):
         return None
     return value if isinstance(value, dict) else None
 
