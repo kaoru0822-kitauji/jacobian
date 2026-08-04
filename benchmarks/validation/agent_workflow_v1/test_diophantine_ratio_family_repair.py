@@ -233,3 +233,40 @@ def test_rejects_malformed_evidence_descriptor_as_protocol_failure(
     rejected = support._run_verifier(task, app, logs)
     assert rejected["protocol_compliance"] == 0.0
     assert rejected["reward"] == 0.0
+
+
+def test_rejects_sign_equivalent_decomposition_failing_auxiliary_identities(
+    tmp_path: Path,
+) -> None:
+    """The sign-equivalent a=-t^2, b=-1, d=t-t^3 preserves x, y, ratio
+    but fails the published auxiliary congruence identities."""
+
+    task, app, logs = _case(tmp_path)
+    submission = json.loads((app / "submission.json").read_text())
+    family = submission["result"]["family"]
+    # a = -t^2, b = -1, d = t - t^3
+    family["a"] = [0, 0, -1]
+    family["b"] = [-1]
+    family["d"] = [0, 1, 0, -1]
+    # x = d*a = (t - t^3)(-t^2) = t^5 - t^3
+    family["x"] = [0, 0, -1, 0, 0, 1]
+    # y = d*b = (t - t^3)(-1) = t^3 - t
+    family["y"] = [0, -1, 0, 1]
+    # norm = a^2 - a*b + b^2 = t^4 - t^2 + 1
+    family["norm"] = [1, 0, -1, 0, 1]
+    # ratio = x/y = (t^5 - t^3)/(t^3 - t) = t^2
+    family["ratio"] = [0, 0, 1]
+    # square_congruence_factor and quotient will fail the auxiliary identities
+    # regardless of what we put, so set them to match the canonical values
+    family["square_congruence_factor"] = [-1, 0, 1]
+    family["quotient"] = [-1, 0, -1, 0, 1]
+    # divisibility_quotient: x*y*(x*y-1) / (x^2 - x*y + y^2)
+    # x*y = (t^5 - t^3)(t^3 - t) = t^8 - 2*t^6 + t^4
+    # This is the same as the canonical family's x*y, so the divisibility
+    # quotient is the same.
+    family["divisibility_quotient"] = [0, 0, -1, 0, -1, 0, 1]
+    submission["result"]["probes"] = [_probe(family, t) for t in (2, 3, 5)]
+    _rewrite(app, submission)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
