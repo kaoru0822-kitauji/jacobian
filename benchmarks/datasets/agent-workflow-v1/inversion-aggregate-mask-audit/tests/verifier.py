@@ -41,7 +41,28 @@ def valid(r):
     }:
         return False
     p = r["witness_permutation"]
-    if not isinstance(p, list) or sorted(p) != list(range(4)):
+    if (
+        not isinstance(p, list)
+        or len(p) != 4
+        or not all(type(value) is int for value in p)
+        or sorted(p) != list(range(4))
+    ):
+        return False
+    if not all(
+        type(r[key]) is int
+        for key in (
+            "implemented_count",
+            "intended_count",
+            "implemented_aggregate",
+            "intended_aggregate",
+            "pair_count",
+        )
+    ):
+        return False
+    if (
+        r["complement_relation"]
+        != "IMPLEMENTED_PLUS_INTENDED_EQUALS_PAIR_COUNT_PER_PERMUTATION"
+    ):
         return False
     ic, tc = counts(p)
     perms = list(itertools.permutations(range(4)))
@@ -49,16 +70,11 @@ def valid(r):
     ta = sum(counts(q)[1] for q in perms)
     return (
         ic != tc
-        and r
-        == {
-            "witness_permutation": p,
-            "implemented_count": ic,
-            "intended_count": tc,
-            "implemented_aggregate": ia,
-            "intended_aggregate": ta,
-            "pair_count": 6,
-            "complement_relation": "IMPLEMENTED_PLUS_INTENDED_EQUALS_PAIR_COUNT_PER_PERMUTATION",
-        }
+        and r["implemented_count"] == ic
+        and r["intended_count"] == tc
+        and r["implemented_aggregate"] == ia
+        and r["intended_aggregate"] == ta
+        and r["pair_count"] == 6
         and ia == ta == 72
         and all(sum(counts(q)) == 6 for q in perms)
     )
@@ -81,9 +97,10 @@ def main():
         if contract
         else None
     )
-    math_ok = bool(contract and frozen() and valid(s.get("result")))
+    math_ok = bool(s is not None and frozen() and valid(s.get("result")))
     evidence_ok = bool(
-        ev
+        contract
+        and ev
         and set(ev) == {"schema_version", "task_id", "result", "limitations"}
         and ev.get("schema_version") == "1"
         and ev.get("task_id") == expected["task_id"]

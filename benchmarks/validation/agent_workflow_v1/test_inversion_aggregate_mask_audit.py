@@ -54,3 +54,38 @@ def test_rejects_aggregate_only_nonwitness(tmp_path: Path):
     )
     rewrite(app, s)
     assert support._run_verifier(task, app, logs)["reward"] == 1.0
+
+
+def test_rejects_boolean_permutation_witness(tmp_path: Path):
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    s = json.loads((app / "submission.json").read_text())
+    s["result"]["witness_permutation"] = [False, True, 2, 3]
+    rewrite(app, s)
+    assert support._run_verifier(task, app, logs)["reward"] == 0.0
+
+
+def test_rejects_float_result_counts(tmp_path: Path):
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    s = json.loads((app / "submission.json").read_text())
+    s["result"]["implemented_count"] = 6.0
+    s["result"]["implemented_aggregate"] = 72.0
+    rewrite(app, s)
+    assert support._run_verifier(task, app, logs)["reward"] == 0.0
+
+
+def test_verified_claim_preserves_correctness_diagnostic(tmp_path: Path):
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    s = json.loads((app / "submission.json").read_text())
+    s["claimed_assurance"] = "VERIFIED"
+    rewrite(app, s)
+    result = support._run_verifier(task, app, logs)
+    assert result["reward"] == 0.0
+    assert result["correctness"] == 1.0
+    assert result["false_certification"] is True
+
+
+def test_rejects_oversized_evidence(tmp_path: Path):
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    (app / "evidence/inversion-audit.json").write_bytes(b"x" * (16 * 1024 * 1024 + 1))
+    result = support._run_verifier(task, app, logs)
+    assert result["reward"] == 0.0
