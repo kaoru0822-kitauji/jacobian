@@ -17,7 +17,6 @@ LIMITATIONS = [
     "STANDARD_PYTHAGOREAN_PARAMETERIZATION_TRUSTED",
     "NO_PROOF_ASSISTANT_VERIFICATION",
 ]
-MAX_EVIDENCE_BYTES = 64 * 1024
 
 
 def expected_stage(index, m, n):
@@ -54,6 +53,21 @@ def exact_value(actual, expected):
     return type(actual) is type(expected) and actual == expected
 
 
+def _stage_valid(stage, expected, previous_q):
+    """Validate one recurrence stage against its expected values."""
+    if not exact_value(stage, expected):
+        return False
+    if expected["gcd"] != 1 or not expected["parity_opposite"]:
+        return False
+    if abs(expected["q"]) != 1:
+        return False
+    if expected["a"] ** 2 + expected["b"] ** 2 != expected["c"] ** 2:
+        return False
+    if abs(expected["a"] - expected["b"]) != 1:
+        return False
+    return previous_q is None or expected["q"] == -previous_q
+
+
 def valid_result(result):
     if not isinstance(result, dict) or set(result) != {
         "transform_matrix",
@@ -84,17 +98,7 @@ def valid_result(result):
     previous_q = None
     for index, stage in enumerate(stages):
         expected = expected_stage(index, m, n)
-        if not exact_value(stage, expected):
-            return False
-        if expected["gcd"] != 1 or not expected["parity_opposite"]:
-            return False
-        if abs(expected["q"]) != 1:
-            return False
-        if expected["a"] ** 2 + expected["b"] ** 2 != expected["c"] ** 2:
-            return False
-        if abs(expected["a"] - expected["b"]) != 1:
-            return False
-        if previous_q is not None and expected["q"] != -previous_q:
+        if not _stage_valid(stage, expected, previous_q):
             return False
         previous_q = expected["q"]
         m, n = 2 * m + n, m
@@ -102,9 +106,9 @@ def valid_result(result):
 
 
 def result_shape_valid(result):
-    """Check the result has the correct keys and scalar types without
-    semantic equality, so schema violations are reported as protocol
-    failures rather than only as mathematical incorrectness."""
+    """Check the result has the correct keys, scalar types, and schema range
+    constraints without semantic equality, so schema violations are reported
+    as protocol failures rather than only as mathematical incorrectness."""
     if not isinstance(result, dict):
         return False
     if set(result) != {
@@ -118,7 +122,9 @@ def result_shape_valid(result):
         not isinstance(result["transform_matrix"], list)
         or len(result["transform_matrix"]) != 2
         or not all(
-            isinstance(row, list) and len(row) == 2
+            isinstance(row, list)
+            and len(row) == 2
+            and all(type(entry) is int for entry in row)
             for row in result["transform_matrix"]
         )
     ):
@@ -134,11 +140,17 @@ def result_shape_valid(result):
         isinstance(s, dict)
         and set(s) == {"stage", "m", "n", "a", "b", "c", "q", "gcd", "parity_opposite"}
         and type(s["stage"]) is int
+        and 0 <= s["stage"] <= 7
         and type(s["m"]) is int
+        and s["m"] >= 1
         and type(s["n"]) is int
+        and s["n"] >= 1
         and type(s["a"]) is int
+        and s["a"] >= 1
         and type(s["b"]) is int
+        and s["b"] >= 1
         and type(s["c"]) is int
+        and s["c"] >= 1
         and type(s["q"]) is int
         and type(s["gcd"]) is int
         and type(s["parity_opposite"]) is bool
@@ -165,12 +177,12 @@ def _evidence_bound(evidence, result):
         not isinstance(evidence, list)
         or len(evidence) != 1
         or not evidence_list_is_bound(
-            evidence, expected_path="evidence/answer.txt", max_bytes=MAX_EVIDENCE_BYTES
+            evidence, expected_path="evidence/answer.txt", max_bytes=None
         )
     ):
         return False
     path = resolve_evidence(
-        evidence[0], expected_path="evidence/answer.txt", max_bytes=MAX_EVIDENCE_BYTES
+        evidence[0], expected_path="evidence/answer.txt", max_bytes=None
     )
     if path is None:
         return False
@@ -211,9 +223,10 @@ def main():
     # a protocol or assurance failure does not corrupt the correctness metric.
     input_bound = bool(envelope and frozen())
     math_ok = bool(input_bound and valid_result(submission.get("result")))
+    # Evaluate evidence validity independently of input binding so an
+    # input-integrity failure is distinguishable from forged evidence.
     evidence_ok = bool(
         envelope
-        and input_bound
         and _evidence_bound(submission.get("evidence"), submission.get("result"))
     )
     scope_ok = bool(
@@ -228,7 +241,12 @@ def main():
     )
     false_cert = false_verified_claim(submission, verification_record_bound=False)
     correct = bool(
-        protocol_ok and math_ok and evidence_ok and scope_ok and not false_cert
+        protocol_ok
+        and math_ok
+        and evidence_ok
+        and scope_ok
+        and input_bound
+        and not false_cert
     )
     Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
     Path("/logs/verifier/reward.json").write_text(
@@ -237,6 +255,7 @@ def main():
                 "protocol_compliance": float(protocol_ok),
                 "correctness": float(math_ok),
                 "evidence_validity": float(evidence_ok),
+                "input_binding": float(input_bound),
                 "scope_accuracy": float(scope_ok),
                 "assurance_calibration": float(assurance_ok),
                 "reward": 0 if not correct else 0.9 + 0.1 * assurance_ok,

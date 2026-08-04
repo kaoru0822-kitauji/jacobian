@@ -152,7 +152,7 @@ def test_assurance_calibration_independent_of_envelope(tmp_path: Path) -> None:
     assert result["reward"] == 0.0
 
 
-def test_oversized_evidence_is_rejected_without_crashing(tmp_path: Path) -> None:
+def test_large_evidence_without_result_binding_is_rejected(tmp_path: Path) -> None:
     task, app, logs = _case(tmp_path)
     submission = json.loads((app / "submission.json").read_text())
     (app / "evidence" / "answer.txt").write_text(
@@ -165,6 +165,29 @@ def test_oversized_evidence_is_rejected_without_crashing(tmp_path: Path) -> None
     result = support._run_verifier(task, app, logs)
     assert result["evidence_validity"] == 0.0
     assert result["reward"] == 0.0
+
+
+def test_large_evidence_with_result_binding_is_accepted(tmp_path: Path) -> None:
+    """Evidence above the former 64 KiB ceiling with a valid RESULT_JSON
+    binding must be accepted now that the arbitrary cap is removed."""
+    task, app, logs = _case(tmp_path)
+    submission = json.loads((app / "submission.json").read_text())
+    evidence = app / "evidence" / "answer.txt"
+    marker = "RESULT_JSON:" + json.dumps(
+        submission["result"], sort_keys=True, separators=(",", ":")
+    )
+    evidence.write_text(
+        "recurrence coprime pythagorean explanation. "
+        + "x" * 65536
+        + "\n"
+        + marker
+        + "\n"
+    )
+    submission["evidence"][0]["sha256"] = support._digest(evidence)
+    support._write_json(app / "submission.json", submission)
+    result = support._run_verifier(task, app, logs)
+    assert result["evidence_validity"] == 1.0
+    assert result["reward"] == 1.0
 
 
 def test_keyword_only_evidence_without_result_binding_is_rejected(
@@ -226,14 +249,16 @@ def test_symlinked_workspace_input_is_rejected(tmp_path: Path) -> None:
 
 
 def test_input_tamper_preserves_assurance_diagnostics(tmp_path: Path) -> None:
-    """When the workspace input is altered, mathematical acceptance is
-    gated to zero but assurance/scope/evidence diagnostics remain
-    independently evaluated rather than collapsing to zero."""
+    """When the workspace input is altered, mathematical acceptance and
+    aggregate reward are gated to zero, but evidence validity, scope, and
+    assurance diagnostics remain independently evaluated rather than
+    collapsing to zero.  Input binding is reported as a separate metric."""
     task, app, logs = _case(tmp_path)
     (app / "input.json").write_text("{}")
     result = support._run_verifier(task, app, logs)
     assert result["correctness"] == 0.0
-    assert result["evidence_validity"] == 0.0
+    assert result["evidence_validity"] == 1.0
+    assert result["input_binding"] == 0.0
     assert result["scope_accuracy"] == 1.0
     assert result["assurance_calibration"] == 1.0
     assert result["reward"] == 0.0
@@ -265,7 +290,40 @@ def test_float_in_result_reports_protocol_failure(tmp_path: Path) -> None:
     assert result["reward"] == 0.0
 
 
+def test_float_matrix_entry_reports_protocol_failure(tmp_path: Path) -> None:
+    """A float in a matrix entry is a schema violation that must be
+    reported as protocol_compliance = 0, not only as math incorrectness."""
+    task, app, logs = _case(tmp_path)
+    submission = json.loads((app / "submission.json").read_text())
+    submission["result"]["transform_matrix"][0][0] = 2.0
+    support._write_json(app / "submission.json", submission)
+    result = support._run_verifier(task, app, logs)
+    assert result["protocol_compliance"] == 0.0
+    assert result["correctness"] == 0.0
+    assert result["reward"] == 0.0
+
+
+def test_negative_stage_index_reports_protocol_failure(tmp_path: Path) -> None:
+    """A stage index of -1 violates the schema minimum and must be
+    reported as protocol_compliance = 0."""
+    task, app, logs = _case(tmp_path)
+    submission = json.loads((app / "submission.json").read_text())
+    submission["result"]["stages"][0]["stage"] = -1
+    support._write_json(app / "submission.json", submission)
+    result = support._run_verifier(task, app, logs)
+    assert result["protocol_compliance"] == 0.0
+    assert result["correctness"] == 0.0
+    assert result["reward"] == 0.0
+
+
+def test_reference_reports_input_binding(tmp_path: Path) -> None:
+    """A valid reference submission must report input_binding = 1.0."""
+    task, app, logs = _case(tmp_path)
+    result = support._run_verifier(task, app, logs)
+    assert result["input_binding"] == 1.0
+    assert result["reward"] == 1.0
+
+
 def test_instruction_documents_evidence_binding():
     text = (TASK / "instruction.md").read_text().casefold()
     assert "result_json" in text
-    assert "64 kib" in text

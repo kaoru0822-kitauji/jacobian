@@ -13,5 +13,4 @@ condition, Pythagorean identity, and unit leg gap. Write `/app/submission.json`
 and digest-bound `/app/evidence/answer.txt`.
 
 The evidence file must contain exactly one `RESULT_JSON:` line whose JSON
-equals the submitted `result` object. Keep it at or below 64 KiB. Do not
-claim `VERIFIED`.
+equals the submitted `result` object. Do not claim `VERIFIED`.
