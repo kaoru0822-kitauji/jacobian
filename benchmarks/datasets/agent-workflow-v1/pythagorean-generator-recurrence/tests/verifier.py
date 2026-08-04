@@ -8,6 +8,7 @@ from verifier_support import (
     load_submission,
     resolve_evidence,
     strict_submission_contract,
+    workspace_input_is_bound,
 )
 
 W, T = Path("/app"), Path("/tests")
@@ -100,13 +101,53 @@ def valid_result(result):
     return True
 
 
-def frozen():
-    try:
-        return (W / "input.json").read_bytes() == (
-            T / "input.json"
-        ).read_bytes() and not (W / "input.json").is_symlink()
-    except OSError:
+def result_shape_valid(result):
+    """Check the result has the correct keys and scalar types without
+    semantic equality, so schema violations are reported as protocol
+    failures rather than only as mathematical incorrectness."""
+    if not isinstance(result, dict):
         return False
+    if set(result) != {
+        "transform_matrix",
+        "transform_determinant",
+        "invariant_multiplier",
+        "stages",
+    }:
+        return False
+    if (
+        not isinstance(result["transform_matrix"], list)
+        or len(result["transform_matrix"]) != 2
+        or not all(
+            isinstance(row, list) and len(row) == 2
+            for row in result["transform_matrix"]
+        )
+    ):
+        return False
+    if type(result["transform_determinant"]) is not int:
+        return False
+    if type(result["invariant_multiplier"]) is not int:
+        return False
+    stages = result["stages"]
+    if not isinstance(stages, list) or len(stages) != 8:
+        return False
+    return all(
+        isinstance(s, dict)
+        and set(s) == {"stage", "m", "n", "a", "b", "c", "q", "gcd", "parity_opposite"}
+        and type(s["stage"]) is int
+        and type(s["m"]) is int
+        and type(s["n"]) is int
+        and type(s["a"]) is int
+        and type(s["b"]) is int
+        and type(s["c"]) is int
+        and type(s["q"]) is int
+        and type(s["gcd"]) is int
+        and type(s["parity_opposite"]) is bool
+        for s in stages
+    )
+
+
+def frozen():
+    return workspace_input_is_bound(W / "input.json", tests=T)
 
 
 def _json_equal(left, right):
@@ -160,6 +201,12 @@ def main():
         allowed_assurances=frozenset({"COMPUTED"}),
         verification_record="forbidden",
     )
+    # Protocol compliance includes the envelope contract and the result
+    # shape so schema violations are reported as protocol failures, not
+    # only as mathematical incorrectness.
+    protocol_ok = bool(
+        contract and envelope and result_shape_valid(submission.get("result"))
+    )
     # Evaluate mathematical correctness independently of protocol validity so
     # a protocol or assurance failure does not corrupt the correctness metric.
     input_bound = bool(envelope and frozen())
@@ -180,12 +227,14 @@ def main():
         and submission.get("claimed_assurance") == "COMPUTED"
     )
     false_cert = false_verified_claim(submission, verification_record_bound=False)
-    correct = bool(contract and math_ok and evidence_ok and scope_ok and not false_cert)
+    correct = bool(
+        protocol_ok and math_ok and evidence_ok and scope_ok and not false_cert
+    )
     Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
     Path("/logs/verifier/reward.json").write_text(
         json.dumps(
             {
-                "protocol_compliance": float(contract),
+                "protocol_compliance": float(protocol_ok),
                 "correctness": float(math_ok),
                 "evidence_validity": float(evidence_ok),
                 "scope_accuracy": float(scope_ok),

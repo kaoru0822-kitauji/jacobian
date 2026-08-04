@@ -225,6 +225,46 @@ def test_symlinked_workspace_input_is_rejected(tmp_path: Path) -> None:
     assert support._run_verifier(task, app, logs)["reward"] == 0.0
 
 
+def test_input_tamper_preserves_assurance_diagnostics(tmp_path: Path) -> None:
+    """When the workspace input is altered, mathematical acceptance is
+    gated to zero but assurance/scope/evidence diagnostics remain
+    independently evaluated rather than collapsing to zero."""
+    task, app, logs = _case(tmp_path)
+    (app / "input.json").write_text("{}")
+    result = support._run_verifier(task, app, logs)
+    assert result["correctness"] == 0.0
+    assert result["evidence_validity"] == 0.0
+    assert result["scope_accuracy"] == 1.0
+    assert result["assurance_calibration"] == 1.0
+    assert result["reward"] == 0.0
+
+
+def test_result_shape_violation_reports_protocol_failure(tmp_path: Path) -> None:
+    """A schema-invalid result (extra property) must report
+    protocol_compliance = 0, not just correctness = 0."""
+    task, app, logs = _case(tmp_path)
+    submission = json.loads((app / "submission.json").read_text())
+    submission["result"]["extra_property"] = 1
+    support._write_json(app / "submission.json", submission)
+    result = support._run_verifier(task, app, logs)
+    assert result["protocol_compliance"] == 0.0
+    assert result["correctness"] == 0.0
+    assert result["reward"] == 0.0
+
+
+def test_float_in_result_reports_protocol_failure(tmp_path: Path) -> None:
+    """A float where an integer is required is a schema violation that
+    must be reported as protocol_compliance = 0."""
+    task, app, logs = _case(tmp_path)
+    submission = json.loads((app / "submission.json").read_text())
+    submission["result"]["transform_determinant"] = -1.0
+    support._write_json(app / "submission.json", submission)
+    result = support._run_verifier(task, app, logs)
+    assert result["protocol_compliance"] == 0.0
+    assert result["correctness"] == 0.0
+    assert result["reward"] == 0.0
+
+
 def test_instruction_documents_evidence_binding():
     text = (TASK / "instruction.md").read_text().casefold()
     assert "result_json" in text
