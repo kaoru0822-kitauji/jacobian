@@ -482,6 +482,98 @@ def test_powerful_window_verifier_accepts_reordered_rows(tmp_path: Path) -> None
     assert result["reward"] == 1.0
 
 
+def test_powerful_window_verifier_accepts_reordered_factor_collections(
+    tmp_path: Path,
+) -> None:
+    """Reversing the factor list or violating_primes list for a value row
+    is mathematically equivalent; the instruction and schema do not
+    prescribe an ordering for these collections."""
+
+    task, app, logs = support.prepare_case(tmp_path, "jcb-postdoc-016")
+    evidence_path = app / "evidence" / "powerful-window.json"
+    evidence = json.loads(evidence_path.read_text())
+    for row in evidence["values"]:
+        row["factors"] = list(reversed(row["factors"]))
+        row["violating_primes"] = list(reversed(row["violating_primes"]))
+    support.write_json(evidence_path, evidence)
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["evidence"][0]["sha256"] = support.digest(evidence_path)
+    support.write_json(submission_path, submission)
+
+    result = support.run_verifier(task, app, logs)
+
+    assert result["evidence_validity"] == 1.0
+    assert result["reward"] == 1.0
+
+
+def test_powerful_window_verifier_rejects_duplicate_factors(tmp_path: Path) -> None:
+    """Duplicate factor entries for the same prime are not a valid
+    factorization even if the collection is otherwise correct."""
+
+    task, app, logs = support.prepare_case(tmp_path, "jcb-postdoc-016")
+    evidence_path = app / "evidence" / "powerful-window.json"
+    evidence = json.loads(evidence_path.read_text())
+    evidence["values"][0]["factors"].append(evidence["values"][0]["factors"][0])
+    support.write_json(evidence_path, evidence)
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["evidence"][0]["sha256"] = support.digest(evidence_path)
+    support.write_json(submission_path, submission)
+
+    result = support.run_verifier(task, app, logs)
+
+    assert result["evidence_validity"] == 0.0
+    assert result["reward"] == 0.0
+
+
+def test_sidon_extension_verifier_accepts_reordered_base_residues(
+    tmp_path: Path,
+) -> None:
+    """Reversing the base_residues list in a fixed-order check is
+    mathematically equivalent; the schema requires only unique integer
+    items and the instruction treats residues as a set."""
+
+    task, app, logs = support.prepare_case(tmp_path, "jcb-postdoc-015")
+    evidence_path = app / "evidence" / "finite-core.json"
+    evidence = json.loads(evidence_path.read_text())
+    for check in evidence["fixed_order_checks"]:
+        check["base_residues"] = list(reversed(check["base_residues"]))
+    support.write_json(evidence_path, evidence)
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["evidence"][0]["sha256"] = support.digest(evidence_path)
+    support.write_json(submission_path, submission)
+
+    result = support.run_verifier(task, app, logs)
+
+    assert result["evidence_validity"] == 1.0
+    assert result["reward"] == 1.0
+
+
+def test_sidon_extension_verifier_rejects_duplicate_base_residues(
+    tmp_path: Path,
+) -> None:
+    """Duplicate base residues are not a valid set even if the sorted
+    presentation would match."""
+
+    task, app, logs = support.prepare_case(tmp_path, "jcb-postdoc-015")
+    evidence_path = app / "evidence" / "finite-core.json"
+    evidence = json.loads(evidence_path.read_text())
+    residues = evidence["fixed_order_checks"][0]["base_residues"]
+    evidence["fixed_order_checks"][0]["base_residues"] = residues + residues
+    support.write_json(evidence_path, evidence)
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["evidence"][0]["sha256"] = support.digest(evidence_path)
+    support.write_json(submission_path, submission)
+
+    result = support.run_verifier(task, app, logs)
+
+    assert result["evidence_validity"] == 0.0
+    assert result["reward"] == 0.0
+
+
 @pytest.mark.parametrize("task_name", ("jcb-postdoc-015", "jcb-postdoc-016"))
 def test_structured_verifier_rejects_duplicate_evidence_rows(
     tmp_path: Path,

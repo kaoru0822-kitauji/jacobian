@@ -78,12 +78,25 @@ def _value_decisions(rows, expected_values):
         factors = _factor(integer)
         violating = [item["prime"] for item in factors if item["power"] < 2]
         powerful = not violating
-        if parsed != integer or row != {
-            "value": str(integer),
-            "factors": factors,
-            "is_powerful": powerful,
-            "violating_primes": violating,
-        }:
+        # Normalize nested factor collections: the instruction and public
+        # evidence schema do not specify an ordering, so compare by prime
+        # and reject duplicates rather than requiring the verifier's
+        # sorted presentation.
+        submitted_factors = sorted(
+            row["factors"], key=lambda f: _positive_integer(f["prime"])
+        )
+        if len(submitted_factors) != len({f["prime"] for f in submitted_factors}):
+            raise ValueError
+        submitted_violating = sorted(row["violating_primes"], key=_positive_integer)
+        if len(submitted_violating) != len(set(submitted_violating)):
+            raise ValueError
+        if (
+            parsed != integer
+            or row["value"] != str(integer)
+            or submitted_factors != factors
+            or row["is_powerful"] != powerful
+            or submitted_violating != violating
+        ):
             raise ValueError
         decisions[integer] = powerful
     return decisions

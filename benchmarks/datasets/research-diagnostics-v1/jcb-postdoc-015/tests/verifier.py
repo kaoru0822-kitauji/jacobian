@@ -108,16 +108,18 @@ def _fixed_order_check_is_valid(check, order, candidate_count, elements):
     base = sorted({element % modulus for element in elements})
     additional = order - len(base)
     calculated_count = math.comb(modulus - len(base), additional)
+    # Compare base_residues as a duplicate-free set; the public schema
+    # requires only unique integer items and the instruction treats these
+    # residues as a set, so order must not affect equality.
+    submitted_residues = check["base_residues"]
     if (
-        check
-        != {
-            "target_order": order,
-            "modulus": modulus,
-            "base_residues": base,
-            "candidate_space_size": calculated_count,
-            "decision": "DOES_NOT_EXTEND",
-            "coverage": "ALL_CANDIDATES",
-        }
+        check["target_order"] != order
+        or check["modulus"] != modulus
+        or len(submitted_residues) != len(set(submitted_residues))
+        or sorted(submitted_residues) != base
+        or check["candidate_space_size"] != calculated_count
+        or check["decision"] != "DOES_NOT_EXTEND"
+        or check["coverage"] != "ALL_CANDIDATES"
         or calculated_count != candidate_count
     ):
         return False
