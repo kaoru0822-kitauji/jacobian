@@ -1,0 +1,4 @@
+Identify the 27 points with the vectors of F_3^3. The blocks are all affine
+lines {x,x+d,x+2d}. Canonicalizing each line removes its six representations.
+Every pair of distinct points determines the unique direction d and hence a
+unique affine line, so the 117 submitted blocks cover all 351 pairs exactly once.
