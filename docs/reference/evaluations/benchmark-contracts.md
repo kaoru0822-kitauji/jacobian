@@ -76,6 +76,13 @@ contract authorizes. Wrong mathematical answers, malformed or escaped evidence,
 incomplete scope, and false certification receive zero reward. An Oracle answer
 does not authorize `VERIFIED`.
 
+Each separate verifier owns its local `tests/verifier_support.py`; Harbor's
+whole-task digest binds that copy, so validation does not synchronize it with a
+global runtime helper. New tasks inherit the template copy, while shared fixes
+are explicit migrations over selected tasks. Use the scoped `harbor-sync`
+command only after such a deliberate update. Evidence has no arbitrary byte
+cap, but its schema, digest, path, and workspace binding remain mandatory.
+
 `TIMEOUT`, `CANCELLED`, `ERROR`, incomplete enumeration, and failure to find a
 witness remain non-conclusions. Only operator-authorized independent checkers
 may accept `VERIFIED`.

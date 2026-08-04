@@ -61,10 +61,13 @@ Use `make benchmark-snapshot DATASET=<dataset-id>` from a clean pre-lock tree,
 then validate and publish with `make benchmark-snapshot-validate LOCK=<lock>`
 and `make benchmark-publish LOCK=<lock>`.
 
-Keep the task-local `tests/verifier_support.py` copied from the template. If
+The task-local `tests/verifier_support.py` is authoritative for that task and
+is bound by Harbor's task digest. New tasks receive the generic helper from
+`benchmarks/templates/task/`; existing tasks are not silently upgraded. If
 you change `tests/verifier.py`, update only that task's checksum label with
-`make harbor-sync DATASET=<dataset-id> TASKS="<task-id>"`; the check commands
-are read-only.
+`make harbor-sync DATASET=<dataset-id> TASKS="<task-id>"`. The command requires
+both selectors and never rewrites unrelated tasks; `harbor-check-task` is
+strictly read-only.
 
 Do not add task symlinks, aliases, or a second fixture home. The task
 README is maintainer context and is not injected into a trial. Instructions
@@ -73,7 +76,9 @@ research strategy.
 
 Verifier attack tests should cover malformed and unknown fields, wrong answers,
 scope and completeness mismatches, forged or escaped evidence, digest mismatch,
-and false assurance. A task may accept `VERIFIED` only when an
+and false assurance. Do not impose an arbitrary byte limit on benchmark
+evidence; validate its declared schema, digest, path, and workspace binding
+instead. A task may accept `VERIFIED` only when an
 operator-authorized checker independently binds the exact claim and evidence.
 After changing a task contract, verifier, dependency, or image, recompute its
 prospective Harbor digest and rerun its exact Oracle.

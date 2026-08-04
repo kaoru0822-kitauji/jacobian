@@ -200,12 +200,19 @@ verifier status. Use Harbor's artifact manifest as the source of truth for
 artifact identity and reject traversal, escaping symlinks, missing entries, and
 non-conclusion execution states.
 
-Current separate-verifier tasks retain synchronized `tests/verifier_support.py`
+Current separate-verifier tasks retain task-local `tests/verifier_support.py`
 copies because Harbor requires the separate verifier image to contain its test
-runtime in the task `tests/` build context. Do not delete those files or the
-sync checker until a digest-pinned shared verifier image is published and the
-task Dockerfiles have migrated to that image. A local-only image or invented
-digest is not a valid substitute.
+runtime in the task `tests/` build context. The local copy is authoritative and
+is already covered by Harbor's whole-task digest; it is not compared with a
+global runtime catalog or copied into tasks at validation time. The task
+template supplies the generic helper only when a new task is scaffolded.
+Shared support changes therefore require an explicit, selected-task migration:
+update the affected local copies deliberately, run each affected Oracle, and
+refresh only their checksum labels with the scoped `harbor-sync` command.
+
+Do not add arbitrary byte limits to benchmark evidence. Evidence must still
+remain schema-valid, digest-bound, at the declared path, and inside the
+verifier workspace, and malformed or unbound evidence must fail closed.
 
 The independent benchmark planner emits `run-benchmark-check`,
 `run-benchmark-oracle`, `benchmark-oracle-scope`, an exact dataset/task/digest
