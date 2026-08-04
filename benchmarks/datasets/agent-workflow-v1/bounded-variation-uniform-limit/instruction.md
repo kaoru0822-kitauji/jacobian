@@ -10,9 +10,13 @@ the exact monotone-segment accounting: two endpoint segments and all interior
 segments. Include at least four distinct freely chosen positive indices with
 their frequency, amplitude, segment counts, endpoint contribution, interior
 contribution, and total variation.
+In `result.argument`, use the three typed values
+`SUP_NORM_1_OVER_QN_TENDS_TO_ZERO`, `TOTAL_VARIATION_IS_CONSTANTLY_FOUR`,
+and `UNIFORM_CONVERGENCE_DOES_NOT_FORCE_VARIATION_CONVERGENCE` to record the
+mathematical explanation.
 
 The verifier recomputes every integer and rational identity. Sampling, a graph,
 or a conclusion label alone is insufficient. Evidence must contain exactly one
-`RESULT_JSON:` line equal to `result` and explain why uniform convergence alone
-does not force convergence of total variation. Do not claim proof-assistant
-verification.
+`RESULT_JSON:` line equal to `result`; optional surrounding prose is not a
+substitute for the typed `result.argument` values. Set `limitations` to the
+single structured value `NO_PROOF_ASSISTANT_VERIFICATION`.

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from verifier_support import (
     false_verified_claim,
+    is_regular_bounded_file,
     load_submission,
     resolve_evidence,
     strict_submission_contract,
@@ -17,6 +18,17 @@ TESTS = Path("/tests")
 TASK_ID = "jacobian/bounded-variation-uniform-limit"
 CONCLUSION = "UNIFORM_CONVERGENCE_DOES_NOT_FORCE_VARIATION_CONVERGENCE"
 SCOPE = "the full sequence on [0,2*pi] and all submitted exact checkpoints"
+LIMITATION = "NO_PROOF_ASSISTANT_VERIFICATION"
+
+# Accept any ordering of q, n, x in the sine argument and q, n in the
+# denominator, with or without explicit multiplication signs.
+_SEQUENCE_RE = re.compile(r"^sin\(([qnx]+)\)/\(([qn]+)\)$")
+
+
+def _is_int(value: object) -> bool:
+    """Accept only true integers, rejecting booleans and floats."""
+
+    return type(value) is int
 
 
 def _fraction(value: object) -> Fraction | None:
@@ -28,6 +40,24 @@ def _fraction(value: object) -> Fraction | None:
         return Fraction(value)
     except (ValueError, ZeroDivisionError):
         return None
+
+
+def _valid_sequence(seq: object) -> bool:
+    """Accept equivalent serializations of ``sin(q*n*x)/(q*n)``."""
+
+    if not isinstance(seq, str):
+        return False
+    compact = seq.replace(" ", "").replace("*", "")
+    match = _SEQUENCE_RE.match(compact)
+    if match is None:
+        return False
+    num, den = match.group(1), match.group(2)
+    return (
+        set(num) == {"q", "n", "x"}
+        and len(num) == 3
+        and set(den) == {"q", "n"}
+        and len(den) == 2
+    )
 
 
 def _source_is_bound() -> bool:
@@ -43,88 +73,125 @@ def _source_is_bound() -> bool:
         return False
 
 
+def _argument_ok(value: object) -> bool:
+    return (
+        isinstance(value, dict)
+        and set(value) == {"uniform_convergence", "variation_behavior", "implication"}
+        and value["uniform_convergence"] == "SUP_NORM_1_OVER_QN_TENDS_TO_ZERO"
+        and value["variation_behavior"] == "TOTAL_VARIATION_IS_CONSTANTLY_FOUR"
+        and value["implication"] == CONCLUSION
+    )
+
+
+def _uniform_certificate_ok(value: object, q: int) -> bool:
+    return (
+        isinstance(value, dict)
+        and set(value)
+        == {"sup_norm_numerator", "sup_norm_denominator_coefficient", "tends_to_zero"}
+        and _is_int(value.get("sup_norm_numerator"))
+        and value.get("sup_norm_numerator") == 1
+        and _is_int(value.get("sup_norm_denominator_coefficient"))
+        and value.get("sup_norm_denominator_coefficient") == q
+        and value.get("tends_to_zero") is True
+    )
+
+
+def _variation_formula_ok(value: object) -> bool:
+    return (
+        isinstance(value, dict)
+        and set(value)
+        == {
+            "endpoint_segment_count",
+            "interior_segment_count",
+            "endpoint_jump_multiplier",
+            "interior_jump_multiplier",
+            "total_variation",
+        }
+        and _is_int(value.get("endpoint_segment_count"))
+        and value.get("endpoint_segment_count") == 2
+        and isinstance(value.get("interior_segment_count"), str)
+        and value.get("interior_segment_count") == "2*q*n-1"
+        and _is_int(value.get("endpoint_jump_multiplier"))
+        and value.get("endpoint_jump_multiplier") == 1
+        and _is_int(value.get("interior_jump_multiplier"))
+        and value.get("interior_jump_multiplier") == 2
+        and isinstance(value.get("total_variation"), str)
+        and value.get("total_variation") == "4"
+    )
+
+
+def _checkpoint_ok(item: object, q: int, seen: set[int]) -> bool:
+    if not isinstance(item, dict) or set(item) != {
+        "n",
+        "frequency",
+        "amplitude",
+        "interior_segments",
+        "endpoint_contribution",
+        "interior_contribution",
+        "total_variation",
+    }:
+        return False
+    n = item["n"]
+    if not _is_int(n) or n < 1 or n in seen:
+        return False
+    seen.add(n)
+    frequency = q * n
+    amplitude = Fraction(1, frequency)
+    interior_segments = 2 * frequency - 1
+    endpoint = 2 * amplitude
+    interior = interior_segments * 2 * amplitude
+    return (
+        _is_int(item.get("frequency"))
+        and item.get("frequency") == frequency
+        and _is_int(item.get("interior_segments"))
+        and item.get("interior_segments") == interior_segments
+        and _fraction(item["amplitude"]) == amplitude
+        and _fraction(item["endpoint_contribution"]) == endpoint
+        and _fraction(item["interior_contribution"]) == interior
+        and _fraction(item["total_variation"]) == 4
+        and endpoint + interior == 4
+    )
+
+
 def _result(value: object) -> bool:
     if not isinstance(value, dict) or set(value) != {
         "scale_q",
         "sequence",
         "limit_function",
+        "argument",
         "uniform_certificate",
         "variation_formula",
         "checkpoints",
     }:
         return False
     q = value["scale_q"]
-    if (
-        type(q) is not int
-        or not 2 <= q <= 9
-        or value["sequence"] != "sin(q*n*x)/(q*n)"
-        or value["limit_function"] != "0"
-    ):
+    if not _is_int(q) or not 2 <= q <= 9:
         return False
-    if value["uniform_certificate"] != {
-        "sup_norm_numerator": 1,
-        "sup_norm_denominator_coefficient": q,
-        "tends_to_zero": True,
-    }:
+    if not _valid_sequence(value["sequence"]) or value["limit_function"] != "0":
         return False
-    if value["variation_formula"] != {
-        "endpoint_segment_count": 2,
-        "interior_segment_count": "2*q*n-1",
-        "endpoint_jump_multiplier": 1,
-        "interior_jump_multiplier": 2,
-        "total_variation": "4",
-    }:
+    if not _argument_ok(value["argument"]):
+        return False
+    if not _uniform_certificate_ok(value["uniform_certificate"], q):
+        return False
+    if not _variation_formula_ok(value["variation_formula"]):
         return False
     checkpoints = value["checkpoints"]
     if not isinstance(checkpoints, list) or not 4 <= len(checkpoints) <= 10:
         return False
     seen: set[int] = set()
-    for item in checkpoints:
-        if not isinstance(item, dict) or set(item) != {
-            "n",
-            "frequency",
-            "amplitude",
-            "interior_segments",
-            "endpoint_contribution",
-            "interior_contribution",
-            "total_variation",
-        }:
-            return False
-        n = item["n"]
-        if type(n) is not int or n < 1 or n in seen:
-            return False
-        seen.add(n)
-        frequency = q * n
-        amplitude = Fraction(1, frequency)
-        interior_segments = 2 * frequency - 1
-        endpoint = 2 * amplitude
-        interior = interior_segments * 2 * amplitude
-        if (
-            item["frequency"] != frequency
-            or item["interior_segments"] != interior_segments
-        ):
-            return False
-        if (
-            _fraction(item["amplitude"]) != amplitude
-            or _fraction(item["endpoint_contribution"]) != endpoint
-            or _fraction(item["interior_contribution"]) != interior
-            or _fraction(item["total_variation"]) != 4
-        ):
-            return False
-        if endpoint + interior != 4:
-            return False
-    return True
+    return all(_checkpoint_ok(item, q, seen) for item in checkpoints)
 
 
 def _evidence(value: object, result: object) -> bool:
     if not isinstance(value, list) or len(value) != 1:
         return False
+    expected = WORKSPACE / "evidence/answer.txt"
+    if not is_regular_bounded_file(expected, max_bytes=1_048_576):
+        return False
     path = resolve_evidence(value[0], expected_path="evidence/answer.txt")
     if path is None:
         return False
     try:
-        if path.stat().st_size > 1_048_576:
-            return False
         text = path.read_text()
     except (OSError, UnicodeError):
         return False
@@ -139,18 +206,14 @@ def _evidence(value: object, result: object) -> bool:
         bound = json.loads(markers[0])
     except (ValueError, RecursionError):
         return False
-    prose = "\n".join(
-        line for line in text.splitlines() if not line.startswith("RESULT_JSON:")
-    )
-    folded = prose.casefold()
-    return bool(
-        bound == result
-        and len(prose) >= 120
-        and all(
-            term in folded
-            for term in ("uniform", "variation", "endpoint", "interior", "does not")
-        )
-    )
+    # The required explanation is the typed ``result.argument`` object.  Any
+    # surrounding prose is optional and is deliberately not interpreted as a
+    # hidden keyword protocol.
+    return bound == result
+
+
+def _limitation_ok(limitations: object) -> bool:
+    return limitations == [LIMITATION]
 
 
 def _evaluate(submission: object) -> dict[str, float | bool]:
@@ -166,23 +229,23 @@ def _evaluate(submission: object) -> dict[str, float | bool]:
     )
     data = submission if isinstance(submission, dict) else {}
     limitations = data.get("limitations", [])
-    limitation_ok = isinstance(limitations, list) and any(
-        isinstance(x, str)
-        and "proof assistant" in x.casefold()
-        and any(word in x.casefold() for word in ("not", "without", "does not"))
-        for x in limitations
-    )
-    math_correct = bool(protocol and _source_is_bound() and _result(data.get("result")))
+    limitation_ok = _limitation_ok(limitations)
+    # Evaluate each diagnostic dimension independently of protocol validity so
+    # a protocol failure does not collapse mathematical correctness, evidence
+    # validity, scope accuracy, or assurance calibration to zero.  Protocol
+    # still gates the aggregate reward.
+    math_correct = bool(_source_is_bound() and _result(data.get("result")))
     evidence_valid = bool(
         math_correct and _evidence(data.get("evidence"), data.get("result"))
     )
-    scope_correct = bool(protocol and data.get("scope") == SCOPE)
+    scope_correct = bool(data.get("scope") == SCOPE)
     assurance_correct = bool(
-        protocol and data.get("claimed_assurance") == "COMPUTED" and limitation_ok
+        data.get("claimed_assurance") == "COMPUTED" and limitation_ok
     )
     reward = (
         1.0
-        if math_correct
+        if protocol
+        and math_correct
         and evidence_valid
         and scope_correct
         and assurance_correct
@@ -190,6 +253,7 @@ def _evaluate(submission: object) -> dict[str, float | bool]:
         else 0.0
     )
     return {
+        "protocol": protocol,
         "correctness": float(math_correct),
         "evidence_validity": float(evidence_valid),
         "scope_accuracy": float(scope_correct),
