@@ -22,3 +22,4 @@ JSON serialization of `result`. The other text must explain the assertion
 applications using the ordered stack and its variable unification/substitution;
 unrelated or marker-only text is not evidence. Digest-bind that file and claim
 at most `COMPUTED`.
+The evidence file must not exceed 16 MiB.

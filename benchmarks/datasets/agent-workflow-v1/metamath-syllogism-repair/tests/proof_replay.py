@@ -168,7 +168,9 @@ def _evidence_binds_result(
         marker_value = json.loads(marker_lines[0].removeprefix("RESULT_JSON:").strip())
     except (TypeError, ValueError, RecursionError, MemoryError):
         return False
-    if marker_value != result:
+    if json.dumps(marker_value, sort_keys=True, separators=(",", ":")) != json.dumps(
+        result, sort_keys=True, separators=(",", ":")
+    ):
         return False
     explanation = " ".join(
         line.strip()
@@ -177,9 +179,12 @@ def _evidence_binds_result(
     ).casefold()
     return bool(
         explanation
-        and any(term in explanation for term in ("assertion", "inference"))
+        and "ordered" in explanation
+        and "hypothes" in explanation
         and "stack" in explanation
-        and any(term in explanation for term in ("unif", "substitut", "replay"))
+        and "unif" in explanation
+        and "substitut" in explanation
+        and all(label in explanation for label in ("wi", "a1i", "mpd"))
     )
 
 
@@ -261,8 +266,8 @@ def verify_submission(
     protocol_ok = bool(envelope_ok and scope_accuracy and assurance_ok)
 
     result = submission.get("result") if isinstance(submission, dict) else None
-    math_failure = _mathematical_failure(result, input_data) if envelope_ok else None
-    correctness = bool(envelope_ok and math_failure is None)
+    math_failure = _mathematical_failure(result, input_data)
+    correctness = bool(math_failure is None)
     evidence_validity = bool(
         correctness
         and isinstance(result, dict)
