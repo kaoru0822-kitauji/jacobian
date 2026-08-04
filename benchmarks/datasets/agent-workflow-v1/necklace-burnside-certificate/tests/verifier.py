@@ -80,6 +80,45 @@ def matches(result):
     return exact_value(result, derive())
 
 
+def result_shape_valid(result):
+    """Check the result has the correct keys and scalar types without
+    semantic equality, so schema violations are reported as protocol
+    failures rather than only as mathematical incorrectness."""
+    if not isinstance(result, dict):
+        return False
+    if set(result) != {
+        "valid_labelled_words",
+        "rotation_fixed_counts",
+        "reflection_fixed_counts",
+        "burnside_numerator",
+        "orbit_count",
+        "canonical_representatives",
+    }:
+        return False
+    if type(result["valid_labelled_words"]) is not int:
+        return False
+    if type(result["burnside_numerator"]) is not int:
+        return False
+    if type(result["orbit_count"]) is not int:
+        return False
+    rfc = result["rotation_fixed_counts"]
+    refc = result["reflection_fixed_counts"]
+    if (
+        not isinstance(rfc, list)
+        or len(rfc) != 16
+        or not all(type(x) is int for x in rfc)
+    ):
+        return False
+    if (
+        not isinstance(refc, list)
+        or len(refc) != 16
+        or not all(type(x) is int for x in refc)
+    ):
+        return False
+    reps = result["canonical_representatives"]
+    return isinstance(reps, list) and all(type(r) is str and len(r) == 16 for r in reps)
+
+
 def frozen():
     return workspace_input_is_bound(W / "input.json", tests=T)
 
@@ -94,6 +133,11 @@ def main():
         allowed_assurances=frozenset({"COMPUTED"}),
         verification_record="forbidden",
     )
+    result = submission.get("result") if isinstance(submission, dict) else None
+    # Protocol compliance includes the envelope contract and the result
+    # shape so schema violations are reported as protocol failures, not
+    # only as mathematical incorrectness.
+    protocol_ok = bool(contract and result_shape_valid(result))
     evidence = None
     if (
         isinstance(submission, dict)
@@ -106,7 +150,6 @@ def main():
         )
     derived = derive()
     input_bound = frozen()
-    result = submission.get("result") if isinstance(submission, dict) else None
     # Mathematical correctness is evaluated independently of the envelope so an
     # assurance or protocol failure is not misreported as wrong mathematics.
     math_ok = bool(input_bound and isinstance(result, dict) and matches(result))
@@ -134,7 +177,7 @@ def main():
     )
     false_cert = false_verified_claim(submission, verification_record_bound=False)
     correct = bool(
-        contract
+        protocol_ok
         and math_ok
         and evidence_ok
         and scope_ok
@@ -145,7 +188,7 @@ def main():
     Path("/logs/verifier/reward.json").write_text(
         json.dumps(
             {
-                "protocol_compliance": float(contract),
+                "protocol_compliance": float(protocol_ok),
                 "correctness": float(math_ok),
                 "evidence_validity": float(evidence_ok),
                 "scope_accuracy": float(scope_ok),

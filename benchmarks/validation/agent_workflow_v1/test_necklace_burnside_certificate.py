@@ -173,6 +173,34 @@ def test_protocol_compliance_is_reported(tmp_path: Path) -> None:
     assert result["reward"] == 0.0
 
 
+def test_float_in_result_reports_protocol_failure(tmp_path: Path) -> None:
+    """A float where an integer is required is a schema violation that
+    must be reported as protocol_compliance = 0."""
+    task, app, logs = _case(tmp_path)
+    submission = json.loads((app / "submission.json").read_text())
+    corrupted = dict(submission["result"])
+    corrupted["orbit_count"] = 88.0
+    submission["result"] = corrupted
+    _rewrite(app, submission, corrupted)
+    result = support._run_verifier(task, app, logs)
+    assert result["protocol_compliance"] == 0.0
+    assert result["correctness"] == 0.0
+    assert result["reward"] == 0.0
+
+
+def test_input_tamper_preserves_assurance_diagnostics(tmp_path: Path) -> None:
+    """When the workspace input is altered, mathematical acceptance is
+    gated to zero but assurance/scope diagnostics remain independently
+    evaluated rather than collapsing to zero."""
+    task, app, logs = _case(tmp_path)
+    (app / "input.json").write_text("{}")
+    result = support._run_verifier(task, app, logs)
+    assert result["correctness"] == 0.0
+    assert result["scope_accuracy"] == 1.0
+    assert result["assurance_calibration"] == 1.0
+    assert result["reward"] == 0.0
+
+
 def test_oversized_evidence_with_valid_digest_is_accepted(tmp_path: Path) -> None:
     """No task-local evidence-size cap: a large but well-formed and
     digest-bound evidence object with the correct result still receives
