@@ -230,12 +230,25 @@ def _evaluate(submission: object) -> dict[str, float | bool]:
     # Evaluate each diagnostic dimension independently of protocol validity so
     # a protocol failure does not collapse mathematical correctness, evidence
     # validity, scope accuracy, or assurance calibration to zero.  Protocol
-    # still gates the aggregate reward.
+    # still gates the aggregate reward.  Scope requires a structurally valid
+    # envelope (dict with string claimed_assurance) but does not enforce the
+    # strict field set or allowed assurance levels.
+    structure_valid = bool(
+        isinstance(submission, dict)
+        and isinstance(data.get("claimed_assurance"), str)
+        and isinstance(data.get("scope"), str)
+        and isinstance(data.get("limitations"), list)
+    )
     math_correct = bool(_source_is_bound() and _result(data.get("result")))
     evidence_valid = bool(
         math_correct and _evidence(data.get("evidence"), data.get("result"))
     )
-    scope_correct = bool(protocol and data.get("scope") == SCOPE)
+    scope_correct = bool(
+        structure_valid
+        and data.get("scope") == SCOPE
+        and data.get("completeness") == "COMPLETE"
+        and _limitation_ok(data.get("limitations"))
+    )
     assurance_correct = bool(
         data.get("claimed_assurance") == "COMPUTED" and limitation_ok
     )
