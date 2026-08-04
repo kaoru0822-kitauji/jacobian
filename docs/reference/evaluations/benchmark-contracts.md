@@ -82,6 +82,11 @@ global runtime helper. New tasks inherit the template copy, while shared fixes
 are explicit migrations over selected tasks. Use the scoped `harbor-sync`
 command only after such a deliberate update. Evidence has no arbitrary byte
 cap, but its schema, digest, path, and workspace binding remain mandatory.
+Verifier regression fixtures should also prove that malformed submissions do
+not crash: exercise booleans where integers are expected, non-finite JSON
+numbers, unhashable nested values, wrong-shaped input, and assurance or
+protocol failures whose independent diagnostics remain visible. A full Oracle
+reward does not replace these negative-path checks.
 
 `TIMEOUT`, `CANCELLED`, `ERROR`, incomplete enumeration, and failure to find a
 witness remain non-conclusions. Only operator-authorized independent checkers

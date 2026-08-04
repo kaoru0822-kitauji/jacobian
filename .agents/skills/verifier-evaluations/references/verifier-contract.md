@@ -13,7 +13,7 @@ Record these values before changing code:
 | Instructions | Are labels, sign conventions, scope, limitations, and evidence rules explicit? |
 | Hidden input | What exact source revision, row, fixture, or environment is frozen? |
 | Mathematical claim | What is the semantic equality relation? Which equivalent witnesses are valid? |
-| Evidence | Which paths and digests are allowed? What size, symlink, and traversal rules apply? |
+| Evidence | Which schema-valid paths and digests are allowed? What symlink and traversal rules apply? Is any task-specific limit explicitly public and enforced? |
 | Assurance | What is the maximum allowed claim? Who, if anyone, can authorize `VERIFIED`? |
 | Diagnostics | Which dimensions are reported independently, and what forces aggregate reward to zero? |
 
@@ -55,6 +55,9 @@ than assuming `/tests/input.json` exists.
 - Validate nested objects before reading a member such as `value["n"]` or
   constructing `set(value)`. Unhashable malformed members must receive zero,
   not a traceback.
+- Treat JSON numbers as untrusted input: reject non-finite values and catch
+  `ValueError`, `TypeError`, and `OverflowError` before integer conversion or
+  arithmetic. Do not let `1e309` become a verifier crash.
 - Accept alternate order, scaling, or equivalent witnesses only when they are
   mathematically valid and within the task's declared scope.
 
@@ -64,15 +67,20 @@ than assuming `/tests/input.json` exists.
   hashing descriptors.
 - Require exact relative paths, reject `..`, absolute paths, symlink components,
   non-regular files, and targets outside the workspace.
-- Check file size before `read_text`, `read_bytes`, or JSON parsing. Keep a
-  conservative bound appropriate to the verifier memory limit.
+- Bound the submission and visible/frozen input before `read_text`,
+  `read_bytes`, or JSON parsing. Benchmark evidence has no arbitrary byte cap;
+  do not add a hidden `max_bytes` rule that is absent from the public contract.
+  Evidence must still be schema-valid, digest-bound, at the declared exact
+  path, and inside the verifier workspace.
 - Bind the evidence digest to the exact result or certificate being scored.
   A valid digest for unrelated content is not evidence for the claim.
 - If evidence validity is reward-bearing, reject unrelated nonempty prose.
   Publish the mathematical explanation obligations and test acceptable
   paraphrases; do not substitute hidden marker syntax or keyword soup.
-- Keep evidence parsing bounded and type-sensitive. A marker containing JSON
-  must parse to the expected object, not merely be present.
+- Keep evidence parsing type-sensitive. A marker containing JSON must parse to
+  the expected object, not merely be present. The schema and resolver must
+  agree exactly: remove unsupported descriptor properties rather than silently
+  ignoring them.
 
 ## Scope, prose, and assurance
 
@@ -94,8 +102,8 @@ than assuming `/tests/input.json` exists.
 | Family | Examples |
 | --- | --- |
 | Envelope | missing field, extra field, wrong task ID, wrong conclusion, false `VERIFIED` |
-| Types | `true` for integer, `64.0` for integer, scalar instead of object, unhashable member |
-| Bounds | negative or oversized index, too many entries, huge submission, deep JSON |
+| Types | `true` for integer, `64.0` for integer, `1e309`, scalar instead of object, unhashable member |
+| Bounds | negative or oversized index, too many entries, huge submission or visible input, deep JSON; large valid evidence remains accepted when otherwise valid |
 | Semantics | wrong answer, equivalent unreduced rational, reordered/scaled witness |
 | Evidence | empty list, duplicate descriptors, wrong path, wrong digest, unrelated result, symlink, traversal |
 | Scope | wrong source revision, incomplete claim, empty or arbitrary limitations, affirmative forbidden claim |

@@ -76,9 +76,12 @@ research strategy.
 
 Verifier attack tests should cover malformed and unknown fields, wrong answers,
 scope and completeness mismatches, forged or escaped evidence, digest mismatch,
-and false assurance. Do not impose an arbitrary byte limit on benchmark
-evidence; validate its declared schema, digest, path, and workspace binding
-instead. A task may accept `VERIFIED` only when an
+false assurance, booleans in integer fields, non-finite numbers, and unhashable
+nested values. Bound regular submissions and visible/frozen inputs before
+reading them to keep malformed inputs from exhausting the verifier. Do not
+impose an arbitrary byte limit on otherwise valid benchmark evidence; validate
+its schema, digest, exact path, and workspace binding instead. A task may
+accept `VERIFIED` only when an
 operator-authorized checker independently binds the exact claim and evidence.
 After changing a task contract, verifier, dependency, or image, recompute its
 prospective Harbor digest and rerun its exact Oracle.
