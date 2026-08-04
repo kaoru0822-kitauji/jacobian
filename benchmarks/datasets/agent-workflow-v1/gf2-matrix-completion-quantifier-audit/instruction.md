@@ -13,8 +13,10 @@ one of rank exactly 1 and one of rank exactly `n`.
 
 Write the certificate to `/app/submission.json` and bind an evidence copy at
 `evidence/matrix-completion.json`. The evidence file must be a JSON object with
-exactly the fields `schema_version` (the string `"1"`), `task_id`
-(`"jacobian/gf2-matrix-completion-quantifier-audit"`), `result` (the same
+exactly the fields `schema_version` (the string `"1"`), `task_id` (the same
+`task_id` string placed in the submission), `result` (the same
 `result` object placed in the submission), and `limitations` (the same
 `limitations` array placed in the submission). It is not the full submission
 envelope. Assurance is capped at `COMPUTED`.
+
+The evidence descriptor in `submission.json` must use `{"path": "evidence/matrix-completion.json", "sha256": "sha256:<hex>"}` where `<hex>` is the SHA-256 digest of the exact on-disk file bytes (not canonicalized JSON).

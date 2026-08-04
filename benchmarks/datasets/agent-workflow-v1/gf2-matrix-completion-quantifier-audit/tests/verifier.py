@@ -116,15 +116,20 @@ def _evidence_ok(evidence, result, expected, submission):
 def main():
     submission = load_submission()
     expected = json.loads((E / "expected.json").read_text())
-    # Structural envelope validity accepts any assurance level so that a false
-    # VERIFIED claim corrupts only assurance calibration, not the independent
-    # correctness, evidence, and scope diagnostics.
-    structure_valid = strict_submission_contract(
-        submission,
-        task_id=expected["task_id"],
-        conclusion=expected["conclusion"],
-        allowed_assurances=ASSURANCE_LEVELS,
-        verification_record="forbidden",
+    # Structural envelope validity accepts any assurance level and any
+    # schema-allowed conclusion so that a false VERIFIED claim or an
+    # abstention corrupts only assurance calibration / protocol, not the
+    # independent correctness, evidence, and scope diagnostics.
+    allowed_conclusions = frozenset({expected["conclusion"], "INSUFFICIENT_EVIDENCE"})
+    structure_valid = any(
+        strict_submission_contract(
+            submission,
+            task_id=expected["task_id"],
+            conclusion=conclusion,
+            allowed_assurances=ASSURANCE_LEVELS,
+            verification_record="forbidden",
+        )
+        for conclusion in allowed_conclusions
     )
     protocol = strict_submission_contract(
         submission,
