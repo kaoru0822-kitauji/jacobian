@@ -51,6 +51,12 @@ RESOURCE_DERIVED_TASKS = (
     "subspace-direct-sum-counterexample",
     "well-total-domination-counterexample",
 )
+# Tasks whose verifier reports scope independently of assurance typing.
+SCOPE_INDEPENDENT_ASSURANCE_TASKS = (
+    "lp-integrability-separator",
+    "necklace-burnside-certificate",
+    "pythagorean-generator-recurrence",
+)
 VERIFIER_TASKS = tuple(
     sorted(
         ref.path.name
