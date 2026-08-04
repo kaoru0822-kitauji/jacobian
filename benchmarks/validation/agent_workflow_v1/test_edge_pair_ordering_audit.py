@@ -146,3 +146,28 @@ def test_recursive_evidence_marker_does_not_crash(tmp_path: Path):
     result = support._run_verifier(task, app, logs)
     assert result["evidence_validity"] == 0.0
     assert result["reward"] == 0.0
+
+
+def test_scope_accuracy_independent_of_conclusion_mismatch(tmp_path: Path):
+    """An envelope defect (wrong conclusion) must not erase scope_accuracy."""
+
+    task, app, logs = _case(tmp_path)
+    submission = json.loads((app / "submission.json").read_text())
+    submission["conclusion"] = "UNSUPPORTED"
+    _rewrite(app, submission)
+    result = support._run_verifier(task, app, logs)
+    assert result["protocol_compliance"] == 0.0
+    assert result["scope_accuracy"] == 1.0
+    assert result["reward"] == 0.0
+
+
+def test_wrong_limitation_reported_as_protocol_failure(tmp_path: Path):
+    """A wrong limitation must produce protocol_compliance 0.0, not a silent zero."""
+
+    task, app, logs = _case(tmp_path)
+    submission = json.loads((app / "submission.json").read_text())
+    submission["limitations"] = ["wrong limitation text"]
+    _rewrite(app, submission)
+    result = support._run_verifier(task, app, logs)
+    assert result["protocol_compliance"] == 0.0
+    assert result["reward"] == 0.0

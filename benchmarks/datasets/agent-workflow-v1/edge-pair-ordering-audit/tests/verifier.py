@@ -243,7 +243,9 @@ def main():
         data.get("evidence"), result, expected.get("evidence_max_bytes", 0)
     )
     scope_correct = bool(
-        contract and data.get("scope") == expected.get("required_scope")
+        isinstance(submission, dict)
+        and isinstance(data.get("claimed_assurance"), str)
+        and data.get("scope") == expected.get("required_scope")
     )
     assurance_correct = data.get("claimed_assurance") == expected.get(
         "maximum_assurance"
@@ -254,6 +256,7 @@ def main():
     false_certification = false_verified_claim(
         submission, verification_record_bound=False
     )
+    protocol = bool(protocol and limitations_correct)
     reward = (
         1.0
         if protocol
