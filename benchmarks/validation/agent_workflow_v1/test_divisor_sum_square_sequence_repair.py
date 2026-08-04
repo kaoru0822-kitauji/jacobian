@@ -173,3 +173,52 @@ def test_completeness_partial_rejected(tmp_path):
     sub = _oracle()
     sub["completeness"] = "PARTIAL"
     assert _verify(tmp_path / "partial", sub)["reward"] == 0
+
+
+def test_garbage_prime_formula_rejected(tmp_path):
+    """A prime_formula that is not a power-of-two expression must fail."""
+
+    sub = _oracle()
+    sub["result"]["prime_formula"] = "not a formula"
+    result = _verify(tmp_path / "garbage_formula", sub)
+    assert result["correctness"] == 0.0
+    assert result["reward"] == 0
+
+
+def test_garbage_threshold_rule_rejected(tmp_path):
+    """A threshold_rule that does not describe the divisibility property must fail."""
+
+    sub = _oracle()
+    sub["result"]["threshold_rule"] = "false"
+    result = _verify(tmp_path / "garbage_threshold", sub)
+    assert result["correctness"] == 0.0
+    assert result["reward"] == 0
+
+
+def test_recursive_evidence_comparison_does_not_crash(tmp_path):
+    """Deeply nested evidence must fail closed without raising RecursionError."""
+
+    sub = copy.deepcopy(_oracle())
+    task = Path("benchmarks/datasets/agent-workflow-v1") / TASK
+    app, logs = tmp_path / "app", tmp_path / "logs"
+    (app / "evidence").mkdir(parents=True)
+    logs.mkdir(parents=True)
+    shutil.copy2(task / "environment/input.json", app / "input.json")
+    nested: list = []
+    for _ in range(500):
+        nested = [nested]
+    evidence = {
+        "schema_version": "1",
+        "task_id": TASK_ID,
+        "result": nested,
+        "limitations": sub["limitations"],
+    }
+    path = app / "evidence/sequence-construction.json"
+    path.write_text(json.dumps(evidence, separators=(",", ":")))
+    sub["evidence"][0]["sha256"] = (
+        "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+    )
+    (app / "submission.json").write_text(json.dumps(sub))
+    result = _run_verifier(task, app, logs)
+    assert result["evidence_validity"] == 0.0
+    assert result["reward"] == 0

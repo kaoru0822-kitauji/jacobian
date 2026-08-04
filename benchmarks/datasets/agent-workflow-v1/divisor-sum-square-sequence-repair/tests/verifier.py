@@ -36,6 +36,24 @@ def _json_exact_equal(left: object, right: object) -> bool:
     return left == right
 
 
+def _is_valid_prime_formula(s: str) -> bool:
+    """The prime formula must describe a power-of-two expression."""
+
+    return "2" in s and "^" in s
+
+
+def _is_valid_threshold_rule(s: str) -> bool:
+    """The threshold rule must describe the global divisibility property."""
+
+    lower = s.casefold()
+    return (
+        "n" in lower
+        and "k" in lower
+        and "2" in lower
+        and ("divisible" in lower or "divides" in lower)
+    )
+
+
 def _result_ok(result: Any) -> bool:
     """Validate the piecewise construction semantically.
 
@@ -59,9 +77,9 @@ def _result_ok(result: Any) -> bool:
         or type(result["default_exponent_offset"]) is not int
         or result["default_exponent_offset"] < 0
         or not isinstance(result["prime_formula"], str)
-        or not result["prime_formula"]
+        or not _is_valid_prime_formula(result["prime_formula"])
         or not isinstance(result["threshold_rule"], str)
-        or not result["threshold_rule"]
+        or not _is_valid_threshold_rule(result["threshold_rule"])
     ):
         return False
     probes = result["probes"]
@@ -108,6 +126,30 @@ def _frozen_ok():
         return False
 
 
+def _evidence_is_valid(
+    evidence: Any, expected: dict, result: Any, submission: Any
+) -> bool:
+    """Check evidence certificate shape and exact equality, fail closed on recursion."""
+
+    if not evidence or not isinstance(evidence, dict):
+        return False
+    if set(evidence) != {"schema_version", "task_id", "result", "limitations"}:
+        return False
+    if type(evidence["schema_version"]) is not str or evidence["schema_version"] != "1":
+        return False
+    if (
+        type(evidence["task_id"]) is not str
+        or evidence["task_id"] != expected["task_id"]
+    ):
+        return False
+    try:
+        return _json_exact_equal(evidence.get("result"), result) and _json_exact_equal(
+            evidence.get("limitations"), submission.get("limitations")
+        )
+    except RecursionError:
+        return False
+
+
 def main():
     submission = load_submission()
     expected = json.loads((E / "expected.json").read_text())
@@ -137,17 +179,7 @@ def main():
         and len(submission["evidence"]) == 1
         else None
     )
-    evidence_ok = bool(
-        evidence
-        and isinstance(evidence, dict)
-        and set(evidence) == {"schema_version", "task_id", "result", "limitations"}
-        and type(evidence["schema_version"]) is str
-        and evidence["schema_version"] == "1"
-        and type(evidence["task_id"]) is str
-        and evidence["task_id"] == expected["task_id"]
-        and _json_exact_equal(evidence["result"], result)
-        and _json_exact_equal(evidence["limitations"], submission.get("limitations"))
-    )
+    evidence_ok = _evidence_is_valid(evidence, expected, result, submission)
     scope_ok = bool(
         contract
         and shape_safe
