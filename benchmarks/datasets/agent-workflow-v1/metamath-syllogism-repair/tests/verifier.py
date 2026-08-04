@@ -41,6 +41,7 @@ def main() -> None:
     false_certification = false_verified_claim(
         submission, verification_record_bound=False
     )
+    message = "frozen input mismatch" if not frozen_ok else result.message
     logs = Path("/logs/verifier")
     logs.mkdir(parents=True, exist_ok=True)
     (logs / "reward.json").write_text(
@@ -51,12 +52,13 @@ def main() -> None:
                 "evidence_validity": float(result.evidence_validity),
                 "scope_accuracy": float(result.scope_accuracy),
                 "assurance_calibration": float(result.assurance_ok),
+                "input_binding": float(frozen_ok),
                 "reward": reward,
                 "false_certification": false_certification,
             }
         )
     )
-    print(json.dumps({"accepted": accepted, "message": result.message}, sort_keys=True))
+    print(json.dumps({"accepted": accepted, "message": message}, sort_keys=True))
 
 
 if __name__ == "__main__":

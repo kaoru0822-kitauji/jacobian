@@ -233,7 +233,7 @@ def _valid_trace_and_target(
 
 
 def _mathematical_failure(result: object, input_data: dict[str, Any]) -> str | None:
-    if not isinstance(result, dict) or set(result) != RESULT_KEYS:
+    if not isinstance(result, dict):
         return "result shape mismatch"
     proof, failure = _valid_proof_and_positions(result, input_data)
     if failure is not None:
@@ -263,9 +263,11 @@ def verify_submission(
         and submission.get("completeness") == "COMPLETE"
         and submission.get("limitations") == LIMITATIONS
     )
-    protocol_ok = bool(envelope_ok and scope_accuracy and assurance_ok)
-
     result = submission.get("result") if isinstance(submission, dict) else None
+    result_shape_ok = isinstance(result, dict) and set(result) == RESULT_KEYS
+    protocol_ok = bool(
+        envelope_ok and scope_accuracy and assurance_ok and result_shape_ok
+    )
     math_failure = _mathematical_failure(result, input_data)
     correctness = bool(math_failure is None)
     evidence_validity = bool(
