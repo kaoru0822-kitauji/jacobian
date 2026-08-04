@@ -469,7 +469,6 @@ _REASONING_LOG_SCHEMA_STATEMENTS = (
         kind TEXT NOT NULL,
         call_id TEXT,
         event_json BLOB NOT NULL,
-        event_digest TEXT NOT NULL UNIQUE,
         PRIMARY KEY (run_id, sequence),
         FOREIGN KEY (run_id) REFERENCES reasoning_runs(run_id) ON DELETE RESTRICT
     )

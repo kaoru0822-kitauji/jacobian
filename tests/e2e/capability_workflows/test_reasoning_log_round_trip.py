@@ -48,6 +48,10 @@ def test_reasoning_run_survives_runtime_restart_and_finalizes(tmp_path: Path) ->
                     "summary": "The exact computation returned gcd 6 with computed assurance.",
                     "run_id": run_id,
                     "call_id": call_id,
+                    "interpretation_status": "INTERPRETED",
+                    "reported_execution_status": "COMPLETED",
+                    "reported_assurance_level": "COMPUTED",
+                    "reported_completeness_status": "COMPLETE",
                 },
             )
 

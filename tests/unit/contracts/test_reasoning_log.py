@@ -37,6 +37,37 @@ def test_before_and_after_require_exact_binding_fields() -> None:
         summary="The completed result is computed, not independently verified.",
         run_id=run_id,
         call_id=call_id,
+        interpretation_status="INTERPRETED",
+        reported_execution_status="COMPLETED",
+        reported_assurance_level="COMPUTED",
+        reported_completeness_status="NOT_APPLICABLE",
     )
     assert before.capability_id == "integer.compute.gcd"
     assert after.call_id == call_id
+
+
+def test_after_tool_distinguishes_interpreted_and_unavailable_results() -> None:
+    binding = {
+        "phase": "AFTER_TOOL",
+        "summary": "No result content was available after restart.",
+        "run_id": "00000000-0000-4000-8000-000000000000",
+        "call_id": "11111111-1111-4111-8111-111111111111",
+    }
+    unavailable = ReasoningWriteRequest(
+        **binding,
+        interpretation_status="RESULT_UNAVAILABLE",
+    )
+    assert unavailable.reported_execution_status is None
+
+    with pytest.raises(ValidationError, match="all reported result fields"):
+        ReasoningWriteRequest(
+            **binding,
+            interpretation_status="INTERPRETED",
+            reported_execution_status="COMPLETED",
+        )
+    with pytest.raises(ValidationError, match="require INTERPRETED"):
+        ReasoningWriteRequest(
+            **binding,
+            interpretation_status="RESULT_UNAVAILABLE",
+            reported_execution_status="ERROR",
+        )

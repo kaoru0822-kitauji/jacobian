@@ -60,6 +60,10 @@ def test_required_reasoning_log_binds_actual_capability_result(tmp_path: Path) -
                     "summary": "The exact computed gcd is 6; it is not independently verified.",
                     "run_id": run_id,
                     "call_id": call_id,
+                    "interpretation_status": "INTERPRETED",
+                    "reported_execution_status": "COMPLETED",
+                    "reported_assurance_level": "COMPUTED",
+                    "reported_completeness_status": "COMPLETE",
                 },
             )
             await client.call_tool(
@@ -82,6 +86,10 @@ def test_required_reasoning_log_binds_actual_capability_result(tmp_path: Path) -
                 finished["payload"]["assurance"]
                 == result.structured_content["assurance"]
             )
+            after = next(event for event in events if event["kind"] == "AFTER_TOOL")
+            assert after["payload"]["execution_status_matches"] is True
+            assert after["payload"]["assurance_level_matches"] is True
+            assert after["payload"]["completeness_status_matches"] is True
             encoded = json.dumps(events)
             assert '"left": "84"' not in encoded
             assert '"gcd": "6"' not in encoded

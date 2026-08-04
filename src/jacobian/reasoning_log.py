@@ -13,6 +13,7 @@ from jacobian.canonical import canonicalize_json
 from jacobian.contracts.capabilities import CapabilityMode, CapabilityResult
 from jacobian.contracts.reasoning import (
     ReasoningEvent,
+    ReasoningInterpretationStatus,
     ReasoningNextRequired,
     ReasoningPhase,
     ReasoningRunState,
@@ -22,7 +23,6 @@ from jacobian.contracts.reasoning import (
 from jacobian.storage.repository import ArtifactRepository
 
 MAX_CALLS_PER_RUN = 64
-INTERRUPTED_CALL_GRACE_SECONDS = 600
 
 
 class ReasoningProtocolError(RuntimeError):
@@ -41,9 +41,14 @@ def _digest(value: Any) -> str:
 class ReasoningLogService:
     """Persist ordered model summaries and system-owned capability bindings."""
 
-    def __init__(self, store: ArtifactRepository) -> None:
+    def __init__(
+        self,
+        store: ArtifactRepository,
+        *,
+        runtime_instance_id: str | None = None,
+    ) -> None:
         self.store = store
-        self.recover_interrupted_calls()
+        self.runtime_instance_id = runtime_instance_id or str(uuid4())
 
     def write(self, request: ReasoningWriteRequest) -> ReasoningWriteResult:
         if request.phase is ReasoningPhase.PLAN:
@@ -89,6 +94,14 @@ class ReasoningLogService:
                     },
                 )
             elif request.phase is ReasoningPhase.AFTER_TOOL:
+                if state is ReasoningRunState.TOOL_RUNNING:
+                    events = self._close_interrupted_call(
+                        connection,
+                        events,
+                        request,
+                        pending,
+                    )
+                    state, pending = self._state(events)
                 if (
                     state is not ReasoningRunState.AWAITING_AFTER_TOOL
                     or pending != request.call_id
@@ -99,11 +112,62 @@ class ReasoningLogService:
                         "Read the reasoning log and use the pending call_id after its capability result.",
                     )
                 call_id = request.call_id
+                finished = next(
+                    event
+                    for event in reversed(events)
+                    if event.kind == "CAPABILITY_FINISHED"
+                )
+                actual_assurance = finished.payload.get("assurance")
+                actual_completeness = finished.payload.get("completeness")
+                reported_execution = (
+                    request.reported_execution_status.value
+                    if request.reported_execution_status is not None
+                    else None
+                )
+                reported_assurance = (
+                    request.reported_assurance_level.value
+                    if request.reported_assurance_level is not None
+                    else None
+                )
+                reported_completeness = (
+                    request.reported_completeness_status.value
+                    if request.reported_completeness_status is not None
+                    else None
+                )
                 event = self._append_event(
                     connection,
                     request.run_id,
                     "AFTER_TOOL",
-                    {"summary": request.summary, "call_id": call_id},
+                    {
+                        "summary": request.summary,
+                        "call_id": call_id,
+                        "interpretation_status": request.interpretation_status.value
+                        if request.interpretation_status is not None
+                        else None,
+                        "reported_execution_status": reported_execution,
+                        "reported_assurance_level": reported_assurance,
+                        "reported_completeness_status": reported_completeness,
+                        "execution_status_matches": reported_execution
+                        == finished.payload.get("execution_status")
+                        if reported_execution is not None
+                        else None,
+                        "assurance_level_matches": reported_assurance
+                        == (
+                            actual_assurance.get("level")
+                            if isinstance(actual_assurance, dict)
+                            else None
+                        )
+                        if reported_assurance is not None
+                        else None,
+                        "completeness_status_matches": reported_completeness
+                        == (
+                            actual_completeness.get("status")
+                            if isinstance(actual_completeness, dict)
+                            else None
+                        )
+                        if reported_completeness is not None
+                        else None,
+                    },
                 )
             else:
                 if state is not ReasoningRunState.READY:
@@ -169,6 +233,7 @@ class ReasoningLogService:
                     "capability_id": capability_id,
                     "mode": mode.value,
                     "request_digest": request_digest,
+                    "runtime_instance_id": self.runtime_instance_id,
                 },
             )
 
@@ -193,6 +258,29 @@ class ReasoningLogService:
                     "REASONING_CALL_MISMATCH",
                     "The capability completion has no matching started call.",
                     "Inspect the durable reasoning log before retrying.",
+                )
+            started = next(
+                event
+                for event in reversed(events)
+                if event.kind == "CAPABILITY_STARTED"
+            )
+            if (
+                started.payload.get("capability_id") != capability_id
+                or started.payload.get("mode") != mode.value
+                or started.payload.get("request_digest") != request_digest
+            ):
+                self._raise(
+                    "REASONING_CALL_MISMATCH",
+                    "The capability completion differs from the started call.",
+                    "Finish only the exact capability, mode, and request that was claimed.",
+                )
+            if result is not None and (
+                result.capability_id != capability_id or result.mode is not mode
+            ):
+                self._raise(
+                    "REASONING_RESULT_MISMATCH",
+                    "The capability result identity differs from the started call.",
+                    "Do not bind a result produced by another capability or mode.",
                 )
             if result is None:
                 payload: dict[str, Any] = {
@@ -230,48 +318,48 @@ class ReasoningLogService:
                 }
             self._append_event(connection, run_id, "CAPABILITY_FINISHED", payload)
 
-    def recover_interrupted_calls(
+    def _close_interrupted_call(
         self,
-        *,
-        stale_after_seconds: int = INTERRUPTED_CALL_GRACE_SECONDS,
-    ) -> None:
-        with self.store.connection() as connection:
-            connection.execute("BEGIN IMMEDIATE")
-            rows = connection.execute(
-                "SELECT run_id FROM reasoning_runs ORDER BY run_id"
-            ).fetchall()
-            for row in rows:
-                events = self._read_events(connection, str(row["run_id"]))
-                state, pending = self._state(events)
-                if state is ReasoningRunState.TOOL_RUNNING and pending is not None:
-                    started = next(
-                        event
-                        for event in reversed(events)
-                        if event.kind == "CAPABILITY_STARTED"
-                    )
-                    started_at = datetime.fromisoformat(started.occurred_at)
-                    age_seconds = (datetime.now(UTC) - started_at).total_seconds()
-                    if age_seconds < stale_after_seconds:
-                        continue
-                    self._append_event(
-                        connection,
-                        str(row["run_id"]),
-                        "CAPABILITY_FINISHED",
-                        {
-                            "call_id": pending,
-                            "capability_id": started.payload["capability_id"],
-                            "mode": started.payload["mode"],
-                            "request_digest": started.payload["request_digest"],
-                            "result_digest": None,
-                            "execution_status": "ERROR",
-                            "assurance": None,
-                            "completeness": None,
-                            "scope_digest": None,
-                            "artifact_uris": [],
-                            "episode_uri": None,
-                            "diagnostic_codes": ["PROCESS_INTERRUPTED"],
-                        },
-                    )
+        connection: sqlite3.Connection,
+        events: tuple[ReasoningEvent, ...],
+        request: ReasoningWriteRequest,
+        pending: str | None,
+    ) -> tuple[ReasoningEvent, ...]:
+        if (
+            request.interpretation_status
+            is not ReasoningInterpretationStatus.RESULT_UNAVAILABLE
+            or pending != request.call_id
+        ):
+            return events
+        started = next(
+            event for event in reversed(events) if event.kind == "CAPABILITY_STARTED"
+        )
+        if started.payload.get("runtime_instance_id") == self.runtime_instance_id:
+            self._raise(
+                "REASONING_CALL_STILL_RUNNING",
+                "The capability call is still owned by this runtime.",
+                "Wait for its result or cancel the invocation before interpreting it.",
+            )
+        finished = self._append_event(
+            connection,
+            request.run_id or "",
+            "CAPABILITY_FINISHED",
+            {
+                "call_id": pending,
+                "capability_id": started.payload["capability_id"],
+                "mode": started.payload["mode"],
+                "request_digest": started.payload["request_digest"],
+                "result_digest": None,
+                "execution_status": "ERROR",
+                "assurance": None,
+                "completeness": None,
+                "scope_digest": None,
+                "artifact_uris": [],
+                "episode_uri": None,
+                "diagnostic_codes": ["PROCESS_INTERRUPTED"],
+            },
+        )
+        return (*events, finished)
 
     def inspect(self, run_id: str) -> tuple[ReasoningEvent, ...]:
         with self.store.connection() as connection:
@@ -302,20 +390,13 @@ class ReasoningLogService:
             ReasoningEvent.model_validate(json.loads(bytes(row["event_json"])))
             for row in rows
         )
-        previous: str | None = None
         for sequence, event in enumerate(events):
-            unsigned = event.model_dump(mode="json", exclude={"event_digest"})
-            if (
-                event.sequence != sequence
-                or event.previous_digest != previous
-                or _digest(unsigned) != event.event_digest
-            ):
+            if event.sequence != sequence:
                 self._raise(
                     "REASONING_LOG_CORRUPT",
-                    "The reasoning event chain failed integrity validation.",
+                    "The reasoning event sequence failed integrity validation.",
                     "Stop using this run and inspect the tenant state offline.",
                 )
-            previous = event.event_digest
         return events
 
     def _append_event(
@@ -326,32 +407,28 @@ class ReasoningLogService:
         payload: dict[str, Any],
     ) -> ReasoningEvent:
         row = connection.execute(
-            "SELECT sequence, event_digest FROM reasoning_events WHERE run_id = ? ORDER BY sequence DESC LIMIT 1",
+            "SELECT sequence FROM reasoning_events WHERE run_id = ? ORDER BY sequence DESC LIMIT 1",
             (run_id,),
         ).fetchone()
         sequence = 0 if row is None else int(row["sequence"]) + 1
-        previous = None if row is None else str(row["event_digest"])
-        unsigned = {
-            "schema_version": "1",
-            "run_id": run_id,
-            "sequence": sequence,
-            "kind": kind,
-            "occurred_at": datetime.now(UTC).isoformat(),
-            "previous_digest": previous,
-            "payload": payload,
-        }
         event = ReasoningEvent.model_validate(
-            {**unsigned, "event_digest": _digest(unsigned)}
+            {
+                "schema_version": "1",
+                "run_id": run_id,
+                "sequence": sequence,
+                "kind": kind,
+                "occurred_at": datetime.now(UTC).isoformat(),
+                "payload": payload,
+            }
         )
         connection.execute(
-            "INSERT INTO reasoning_events(run_id, sequence, kind, call_id, event_json, event_digest) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO reasoning_events(run_id, sequence, kind, call_id, event_json) VALUES (?, ?, ?, ?, ?)",
             (
                 run_id,
                 sequence,
                 kind,
                 payload.get("call_id"),
                 canonicalize_json(event.model_dump(mode="json")),
-                event.event_digest,
             ),
         )
         return event
@@ -397,11 +474,15 @@ class ReasoningLogService:
         return ReasoningWriteResult(
             run_id=event.run_id,
             call_id=call_id,
-            event_digest=event.event_digest,
             sequence=event.sequence,
             state=state,
             next_required=next_required,
             log_uri=f"reasoning://run/{event.run_id}",
+            execution_status_matches=event.payload.get("execution_status_matches"),
+            assurance_level_matches=event.payload.get("assurance_level_matches"),
+            completeness_status_matches=event.payload.get(
+                "completeness_status_matches"
+            ),
         )
 
     @staticmethod
@@ -410,7 +491,6 @@ class ReasoningLogService:
 
 
 __all__ = [
-    "INTERRUPTED_CALL_GRACE_SECONDS",
     "MAX_CALLS_PER_RUN",
     "ReasoningLogService",
     "ReasoningProtocolError",

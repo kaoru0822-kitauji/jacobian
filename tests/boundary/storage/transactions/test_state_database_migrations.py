@@ -90,8 +90,8 @@ def test_reasoning_log_tables_reject_update_and_delete(tmp_path: Path) -> None:
         connection.execute(
             """
             INSERT INTO reasoning_events(
-                run_id, sequence, kind, event_json, event_digest
-            ) VALUES ('fixture-run', 0, 'PLAN', '{}', 'sha256:fixture')
+                run_id, sequence, kind, event_json
+            ) VALUES ('fixture-run', 0, 'PLAN', '{}')
             """
         )
         connection.commit()
