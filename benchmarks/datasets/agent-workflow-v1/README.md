@@ -51,8 +51,29 @@ make agent-eval DATASET=agent-workflow-v1 \
 The task bundles and Harbor task digests must be identical between these
 jobs. Set `JACOBIAN_EVAL_PROXY=1` to apply the same optional proxy overlay to
 both jobs; only the treatment adds the Jacobian sidecar and MCP config. This
-paired setup is for
-workflow comparison; the public dataset is not held-out evidence.
+paired setup is for workflow comparison; the public dataset is not held-out
+evidence.
+
+To isolate the external reasoning-log protocol, keep Jacobian enabled in both
+arms and vary only its mode:
+
+```sh
+# Control: identical Jacobian portfolio without the log protocol.
+JACOBIAN_REASONING_LOG_MODE=OFF make agent-eval \
+  DATASET=agent-workflow-v1 JACOBIAN_ENABLED=1 \
+  TASKS=graph-counterexample EVAL_EXECUTE=1
+
+# Treatment: identical Jacobian portfolio with required bracketing.
+JACOBIAN_REASONING_LOG_MODE=REQUIRED make agent-eval \
+  DATASET=agent-workflow-v1 JACOBIAN_ENABLED=1 \
+  TASKS=graph-counterexample EVAL_EXECUTE=1
+```
+
+Bind `reasoning_log_mode` in each runtime snapshot's condition. The normalizer
+requires a structurally complete `PLAN`/call-cycle/`FINAL` trace for every
+`REQUIRED` trial and excludes summary text from normalized evidence. Public
+workflow observations remain non-causal; protected runs must also freeze the
+model, prompt, agent version, task digests, sampling settings, and budgets.
 
 Five tasks have an operator-authorized verification record and may accept
 `VERIFIED`; the remaining tasks are capped at `COMPUTED`. A wrong result or an

@@ -119,6 +119,50 @@ def test_observation_binds_runtime_snapshot_fields(
     assert evidence["fixed_invariants"]["runtime"]["harbor_version"] == _HARBOR_VERSION
 
 
+def test_required_reasoning_protocol_fails_closed_when_trace_is_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(observation_results, "task_digest", lambda _path: "a" * 64)
+    monkeypatch.setattr(observation_results, "_git_sha", lambda: "b" * 40)
+    job = {
+        "jobs_dir": str(tmp_path / "jobs"),
+        "n_attempts": 1,
+        "timeout_multiplier": 1,
+        "orchestrator": {"type": "local", "n_concurrent_trials": 1},
+        "environment": {"type": "docker"},
+        "agents": [{"name": "codex"}],
+        "datasets": [
+            {
+                "path": "benchmarks/datasets/agent-workflow-v1",
+                "task_names": ["graph-counterexample"],
+            }
+        ],
+    }
+    runtime = {
+        "snapshot_id": _SNAPSHOT_ID,
+        "harbor_version": _HARBOR_VERSION,
+        "model": "model",
+        "condition": {
+            "id": "treatment",
+            "role": "PRIMARY_TREATMENT",
+            "jacobian_enabled": True,
+            "reasoning_log_mode": "REQUIRED",
+        },
+    }
+    evidence, failures = build_observation_evidence(
+        dataset="agent-workflow-v1",
+        condition="treatment",
+        job_path=_write_observation_job(tmp_path, job),
+        jobs_dir=tmp_path,
+        result_path=_write_result(tmp_path),
+        runtime_snapshot=runtime,
+    )
+
+    assert evidence["status"] == "INCOMPLETE"
+    assert evidence["trials"][0]["reasoning_protocol"]["mode"] == "REQUIRED"
+    assert "required reasoning protocol is incomplete" in " ".join(failures)
+
+
 # ---------------------------------------------------------------------------
 # snapshot_id / harbor_version explicit bindings
 # ---------------------------------------------------------------------------

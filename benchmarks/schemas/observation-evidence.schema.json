@@ -206,6 +206,7 @@
         "artifacts",
         "tool_calls",
         "tool_errors",
+        "reasoning_protocol",
         "raw_result_digest"
       ],
       "properties": {
@@ -263,6 +264,7 @@
           "additionalProperties": {"type": "integer"}
         },
         "tool_errors": {"type": "integer", "minimum": 0},
+        "reasoning_protocol": {"$ref": "#/$defs/reasoning_protocol"},
         "raw_result_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
       }
     },
@@ -321,11 +323,48 @@
         "id": {"type": "string", "minLength": 1},
         "role": {"type": "string", "minLength": 1},
         "jacobian_enabled": {"type": "boolean"},
+        "reasoning_log_mode": {"enum": ["REQUIRED", "AUDIT", "OFF"]},
         "image": {"type": "string", "minLength": 1},
         "server_version": {"type": "string", "minLength": 1},
         "policy_profile": {"type": "string", "minLength": 1},
         "catalog_digest": {"$ref": "#/$defs/digest"},
         "policy_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "reasoning_protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "mode",
+        "requirement_status",
+        "plan_count",
+        "before_tool_count",
+        "after_tool_count",
+        "final_count",
+        "run_count",
+        "bound_invoke_count",
+        "missing_after_tool_count",
+        "pending_call_count",
+        "unavailable_after_tool_count",
+        "reported_actual_mismatch_count",
+        "summary_characters"
+      ],
+      "properties": {
+        "status": {"enum": ["COMPLETE", "INCOMPLETE"]},
+        "mode": {"enum": ["REQUIRED", "AUDIT", "OFF", "UNKNOWN"]},
+        "requirement_status": {"enum": ["COMPLETE", "INCOMPLETE", "NOT_REQUIRED"]},
+        "plan_count": {"type": "integer", "minimum": 0},
+        "before_tool_count": {"type": "integer", "minimum": 0},
+        "after_tool_count": {"type": "integer", "minimum": 0},
+        "final_count": {"type": "integer", "minimum": 0},
+        "run_count": {"type": "integer", "minimum": 0},
+        "bound_invoke_count": {"type": "integer", "minimum": 0},
+        "missing_after_tool_count": {"type": "integer", "minimum": 0},
+        "pending_call_count": {"type": "integer", "minimum": 0},
+        "unavailable_after_tool_count": {"type": "integer", "minimum": 0},
+        "reported_actual_mismatch_count": {"type": "integer", "minimum": 0},
+        "summary_characters": {"type": "integer", "minimum": 0}
       }
     },
     "runtime_invariants": {
