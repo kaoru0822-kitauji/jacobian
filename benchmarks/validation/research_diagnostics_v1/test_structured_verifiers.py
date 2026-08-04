@@ -28,6 +28,8 @@ def test_structured_oracle_receives_full_reward(
     }
     if task_name == "jcb-postdoc-019":
         expected["protocol_compliance"] = 1.0
+    if task_name in {"jcb-postdoc-015", "jcb-postdoc-016"}:
+        expected["limitation_accuracy"] = 1.0
     assert result == expected
 
 
@@ -40,7 +42,7 @@ def test_oracle_submission_and_certificate_match_agent_visible_schemas(
         (task / "environment" / "submission_schema.json").read_text()
     )
     certificate_schema = json.loads(
-        (task / "environment" / "certificate_schema.json").read_text()
+        (task / "environment" / support.TASK_EVIDENCE_SCHEMAS[task_name]).read_text()
     )
     submission = json.loads((task / "solution" / "submission.json").read_text())
     certificate = json.loads(
@@ -273,6 +275,366 @@ def test_graph_verifier_rejects_boolean_summary_scalar(tmp_path: Path) -> None:
     result = support.run_verifier(task, app, logs)
 
     assert result["correctness"] == 0.0
+    assert result["reward"] == 0.0
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ("missing-difference", "wrong-candidate-count", "false-negative-decision"),
+)
+def test_sidon_extension_verifier_rejects_corrupted_finite_core(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    task, app, logs = support.prepare_case(tmp_path, "jcb-postdoc-015")
+    evidence_path = app / "evidence" / "finite-core.json"
+    evidence = json.loads(evidence_path.read_text())
+    if mutation == "missing-difference":
+        evidence["ordered_differences"].pop()
+    elif mutation == "wrong-candidate-count":
+        evidence["fixed_order_checks"][1]["candidate_space_size"] = 25
+    else:
+        evidence["fixed_order_checks"][2]["decision"] = "EXTENDS"
+    support.write_json(evidence_path, evidence)
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["evidence"][0]["sha256"] = support.digest(evidence_path)
+    support.write_json(submission_path, submission)
+
+    result = support.run_verifier(task, app, logs)
+
+    assert result["correctness"] == 0.0
+    assert result["reward"] == 0.0
+
+
+def test_sidon_extension_rejects_unhashable_target_order(tmp_path: Path) -> None:
+    task, app, logs = support.prepare_case(tmp_path, "jcb-postdoc-015")
+    evidence_path = app / "evidence" / "finite-core.json"
+    evidence = json.loads(evidence_path.read_text())
+    for check in evidence["fixed_order_checks"]:
+        check["target_order"] = [check["target_order"]]
+    support.write_json(evidence_path, evidence)
+    submission = json.loads((app / "submission.json").read_text())
+    submission["evidence"][0]["sha256"] = support.digest(evidence_path)
+    support.write_json(app / "submission.json", submission)
+
+    result = support.run_verifier(task, app, logs)
+    assert result["evidence_validity"] == 0.0
+    assert result["reward"] == 0.0
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ("wrong-factor-power", "missing-value", "wrong-triple-witness"),
+)
+def test_powerful_window_verifier_rejects_corrupted_finite_evidence(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    task, app, logs = support.prepare_case(tmp_path, "jcb-postdoc-016")
+    evidence_path = app / "evidence" / "powerful-window.json"
+    evidence = json.loads(evidence_path.read_text())
+    if mutation == "wrong-factor-power":
+        evidence["values"][2]["factors"][0]["power"] = 2
+    elif mutation == "missing-value":
+        evidence["values"].pop()
+    else:
+        evidence["triple_checks"][0]["non_powerful_witnesses"] = []
+    support.write_json(evidence_path, evidence)
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["evidence"][0]["sha256"] = support.digest(evidence_path)
+    support.write_json(submission_path, submission)
+
+    result = support.run_verifier(task, app, logs)
+
+    assert result["correctness"] == 0.0
+    assert result["reward"] == 0.0
+
+
+@pytest.mark.parametrize("field", ("power", "start"))
+def test_powerful_window_rejects_boolean_integer_fields(
+    tmp_path: Path, field: str
+) -> None:
+    task, app, logs = support.prepare_case(tmp_path, "jcb-postdoc-016")
+    evidence_path = app / "evidence" / "powerful-window.json"
+    evidence = json.loads(evidence_path.read_text())
+    if field == "power":
+        evidence["values"][0]["factors"][0]["power"] = True
+    else:
+        evidence["triple_checks"][0]["start"] = True
+    support.write_json(evidence_path, evidence)
+    submission = json.loads((app / "submission.json").read_text())
+    submission["evidence"][0]["sha256"] = support.digest(evidence_path)
+    support.write_json(app / "submission.json", submission)
+
+    result = support.run_verifier(task, app, logs)
+    assert result["evidence_validity"] == 0.0
+    assert result["reward"] == 0.0
+
+
+def test_powerful_window_rejects_overflowing_json_number(tmp_path: Path) -> None:
+    task, app, logs = support.prepare_case(tmp_path, "jcb-postdoc-016")
+    evidence_path = app / "evidence" / "powerful-window.json"
+    evidence = json.loads(evidence_path.read_text())
+    evidence["triple_checks"][0]["start"] = float("inf")
+    support.write_json(evidence_path, evidence)
+    submission = json.loads((app / "submission.json").read_text())
+    submission["evidence"][0]["sha256"] = support.digest(evidence_path)
+    support.write_json(app / "submission.json", submission)
+
+    result = support.run_verifier(task, app, logs)
+    assert result["evidence_validity"] == 0.0
+    assert result["reward"] == 0.0
+
+
+def test_powerful_window_scope_survives_extra_envelope_field(tmp_path: Path) -> None:
+    task, app, logs = support.prepare_case(tmp_path, "jcb-postdoc-016")
+    submission = json.loads((app / "submission.json").read_text())
+    submission["unexpected"] = True
+    support.write_json(app / "submission.json", submission)
+
+    result = support.run_verifier(task, app, logs)
+    assert result["scope_accuracy"] == 1.0
+    assert result["reward"] == 0.0
+
+
+@pytest.mark.parametrize("task_name", ("jcb-postdoc-015", "jcb-postdoc-016"))
+def test_structured_verifier_marks_malformed_evidence_invalid(
+    tmp_path: Path,
+    task_name: str,
+) -> None:
+    """A digest-correct but structurally empty evidence object is an evidence
+    failure, not a wrong mathematical answer."""
+
+    task, app, logs = support.prepare_case(tmp_path, task_name)
+    evidence_path = app / "evidence" / support.TASK_EVIDENCE[task_name]
+    evidence_path.write_text("{}", encoding="utf-8")
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["evidence"][0]["sha256"] = support.digest(evidence_path)
+    support.write_json(submission_path, submission)
+
+    result = support.run_verifier(task, app, logs)
+
+    assert result["evidence_validity"] == 0.0
+    assert result["correctness"] == 0.0
+    assert result["reward"] == 0.0
+
+
+@pytest.mark.parametrize("task_name", ("jcb-postdoc-015", "jcb-postdoc-016"))
+def test_structured_verifier_preserves_correctness_under_protocol_failure(
+    tmp_path: Path,
+    task_name: str,
+) -> None:
+    """A protocol failure (false VERIFIED) must zero reward but must not
+    collapse the independently correct finite mathematics into a math failure."""
+
+    task, app, logs = support.prepare_case(tmp_path, task_name)
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["claimed_assurance"] = "VERIFIED"
+    support.write_json(submission_path, submission)
+
+    result = support.run_verifier(task, app, logs)
+
+    assert result["correctness"] == 1.0
+    assert result["evidence_validity"] == 1.0
+    assert result["false_certification"] is True
+    assert result["reward"] == 0.0
+
+
+def test_sidon_extension_verifier_accepts_reordered_differences(tmp_path: Path) -> None:
+    """A complete but differently ordered difference profile is equivalent."""
+
+    task, app, logs = support.prepare_case(tmp_path, "jcb-postdoc-015")
+    evidence_path = app / "evidence" / "finite-core.json"
+    evidence = json.loads(evidence_path.read_text())
+    evidence["ordered_differences"] = list(reversed(evidence["ordered_differences"]))
+    evidence["fixed_order_checks"] = list(reversed(evidence["fixed_order_checks"]))
+    support.write_json(evidence_path, evidence)
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["evidence"][0]["sha256"] = support.digest(evidence_path)
+    support.write_json(submission_path, submission)
+
+    result = support.run_verifier(task, app, logs)
+
+    assert result["reward"] == 1.0
+
+
+def test_powerful_window_verifier_accepts_reordered_rows(tmp_path: Path) -> None:
+    """Complete but differently ordered value and triple rows are equivalent."""
+
+    task, app, logs = support.prepare_case(tmp_path, "jcb-postdoc-016")
+    evidence_path = app / "evidence" / "powerful-window.json"
+    evidence = json.loads(evidence_path.read_text())
+    evidence["values"] = list(reversed(evidence["values"]))
+    evidence["triple_checks"] = list(reversed(evidence["triple_checks"]))
+    support.write_json(evidence_path, evidence)
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["evidence"][0]["sha256"] = support.digest(evidence_path)
+    support.write_json(submission_path, submission)
+
+    result = support.run_verifier(task, app, logs)
+
+    assert result["reward"] == 1.0
+
+
+@pytest.mark.parametrize("task_name", ("jcb-postdoc-015", "jcb-postdoc-016"))
+def test_structured_verifier_rejects_duplicate_evidence_rows(
+    tmp_path: Path,
+    task_name: str,
+) -> None:
+    """Duplicate rows that pad the array to the expected length are rejected."""
+
+    task, app, logs = support.prepare_case(tmp_path, task_name)
+    evidence_path = app / "evidence" / support.TASK_EVIDENCE[task_name]
+    evidence = json.loads(evidence_path.read_text())
+    if task_name == "jcb-postdoc-015":
+        evidence["ordered_differences"][1] = evidence["ordered_differences"][0]
+    else:
+        evidence["values"][1] = evidence["values"][0]
+    support.write_json(evidence_path, evidence)
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["evidence"][0]["sha256"] = support.digest(evidence_path)
+    support.write_json(submission_path, submission)
+
+    result = support.run_verifier(task, app, logs)
+
+    assert result["evidence_validity"] == 0.0
+    assert result["correctness"] == 0.0
+    assert result["reward"] == 0.0
+
+
+def test_sidon_verifier_rejects_unhashable_target_orders(tmp_path: Path) -> None:
+    """A list-valued target_order must not crash the duplicate-check set."""
+
+    task, app, logs = support.prepare_case(tmp_path, "jcb-postdoc-015")
+    evidence_path = app / "evidence" / "finite-core.json"
+    evidence = json.loads(evidence_path.read_text())
+    for check in evidence["fixed_order_checks"]:
+        check["target_order"] = []
+    support.write_json(evidence_path, evidence)
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["evidence"][0]["sha256"] = support.digest(evidence_path)
+    support.write_json(submission_path, submission)
+
+    result = support.run_verifier(task, app, logs)
+
+    assert result["evidence_validity"] == 0.0
+    assert result["correctness"] == 0.0
+    assert result["reward"] == 0.0
+
+
+def test_sidon_verifier_rejects_bool_candidate_space_size(tmp_path: Path) -> None:
+    """A boolean where an integer is required must not pass as 1."""
+
+    task, app, logs = support.prepare_case(tmp_path, "jcb-postdoc-015")
+    evidence_path = app / "evidence" / "finite-core.json"
+    evidence = json.loads(evidence_path.read_text())
+    evidence["fixed_order_checks"][0]["candidate_space_size"] = True
+    support.write_json(evidence_path, evidence)
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["evidence"][0]["sha256"] = support.digest(evidence_path)
+    support.write_json(submission_path, submission)
+
+    result = support.run_verifier(task, app, logs)
+
+    assert result["evidence_validity"] == 0.0
+    assert result["correctness"] == 0.0
+    assert result["reward"] == 0.0
+
+
+def test_powerful_window_verifier_rejects_bool_factor_power(tmp_path: Path) -> None:
+    """A boolean where a factor power is required must not pass as 1."""
+
+    task, app, logs = support.prepare_case(tmp_path, "jcb-postdoc-016")
+    evidence_path = app / "evidence" / "powerful-window.json"
+    evidence = json.loads(evidence_path.read_text())
+    evidence["values"][2]["factors"][0]["power"] = True
+    support.write_json(evidence_path, evidence)
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["evidence"][0]["sha256"] = support.digest(evidence_path)
+    support.write_json(submission_path, submission)
+
+    result = support.run_verifier(task, app, logs)
+
+    assert result["evidence_validity"] == 0.0
+    assert result["correctness"] == 0.0
+    assert result["reward"] == 0.0
+
+
+def test_powerful_window_verifier_rejects_bool_all_powerful(tmp_path: Path) -> None:
+    """A boolean 0 where all_powerful False is expected must not pass."""
+
+    task, app, logs = support.prepare_case(tmp_path, "jcb-postdoc-016")
+    evidence_path = app / "evidence" / "powerful-window.json"
+    evidence = json.loads(evidence_path.read_text())
+    evidence["triple_checks"][0]["all_powerful"] = 0
+    support.write_json(evidence_path, evidence)
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["evidence"][0]["sha256"] = support.digest(evidence_path)
+    support.write_json(submission_path, submission)
+
+    result = support.run_verifier(task, app, logs)
+
+    assert result["evidence_validity"] == 0.0
+    assert result["correctness"] == 0.0
+    assert result["reward"] == 0.0
+
+
+@pytest.mark.parametrize("task_name", ("jcb-postdoc-015", "jcb-postdoc-016"))
+def test_structured_verifier_rejects_overflowing_json_numbers(
+    tmp_path: Path,
+    task_name: str,
+) -> None:
+    """A float infinity where a string integer is expected must not crash."""
+
+    task, app, logs = support.prepare_case(tmp_path, task_name)
+    evidence_path = app / "evidence" / support.TASK_EVIDENCE[task_name]
+    evidence = json.loads(evidence_path.read_text())
+    if task_name == "jcb-postdoc-015":
+        evidence["ordered_differences"][0]["minuend"] = 1e309
+    else:
+        evidence["triple_checks"][0]["start"] = 1e309
+    support.write_json(evidence_path, evidence)
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["evidence"][0]["sha256"] = support.digest(evidence_path)
+    support.write_json(submission_path, submission)
+
+    result = support.run_verifier(task, app, logs)
+
+    assert result["evidence_validity"] == 0.0
+    assert result["correctness"] == 0.0
+    assert result["reward"] == 0.0
+
+
+@pytest.mark.parametrize("task_name", ("jcb-postdoc-015", "jcb-postdoc-016"))
+def test_structured_verifier_scores_scope_independently_of_envelope(
+    tmp_path: Path,
+    task_name: str,
+) -> None:
+    """An extra envelope field zeros reward via contract but scope remains 1.0."""
+
+    task, app, logs = support.prepare_case(tmp_path, task_name)
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["unexpected"] = True
+    support.write_json(submission_path, submission)
+
+    result = support.run_verifier(task, app, logs)
+
+    assert result["scope_accuracy"] == 1.0
+    assert result["assurance_calibration"] == 1.0
+    assert result["limitation_accuracy"] == 1.0
     assert result["reward"] == 0.0
 
 

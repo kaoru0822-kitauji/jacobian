@@ -1,24 +1,22 @@
 # jacobian/jcb-postdoc-016
 
-Research diagnostic: Erdős Problem 364: kernel-checked finite range versus an unbounded powerful-number conjecture
-
-## Field
-
-computational-number-theory
+Research diagnostic for Erdős Problem 364. The task requires exact
+factorizations and powerful-number decisions for 8 through 16, followed by
+structural checks of all seven consecutive triples in that window.
 
 ## Provenance
 
 - case_version: research-diagnostics-v1
 - contamination_class: public-answer-visible-diagnostic
-- fixture_digest: sha256:38d8999a446d7da5d3cd9b60ba7876389bf0c291c3ab9e507b19df020c89f301
-- derivation: The conjecture that three consecutive powerful numbers do not exist remains open, while a separate artifact kernel-checks the finite range through 10^14. This is an unusually clean test of bounded-certificate ingestion, exact scope, and resistance to promoting massive finite verification into an unbounded theorem.
+- fixture_digest: sha256:1e8f2277d84016562c4fea73ca77e0beb1304f2628614be160143b43533ba1b6
+- derivation: The open universal conjecture and public 10^14 reference are separated from an independently replayable local window with complete factorizations and seven consecutive-triple checks.
 
 ## Portfolio status
 
 - historical_fit: `MISSING`
-- current_status: `OPEN_GAP`
-- evaluation_status: `BLOCKED_ON_INTERVENTION`
-- next_action: Implement and independently check the atomic powerful-number predicate first; keep the 10^14 chunk replay as a separate provider- and format-bound candidate.
+- current_status: `PARTIAL`
+- evaluation_status: `RUNNABLE_PUBLIC_REPRODUCTION`
+- next_action: Run public Oracle validation; keep the 10^14 artifact replay as a separate provider- and format-bound proposal.
 
 ## Contract
 
@@ -30,8 +28,7 @@ computational-number-theory
 - timeout_sec (verifier): 120.0
 - environment_mode: separate
 
-The task is self-contained and offline. The instruction names no tool,
-capability, or invocation order. The verifier is a separate clean-room Python
-script that scores correctness, evidence validity, scope accuracy, assurance
-calibration, and aggregate reward; a wrong result or an unsupported VERIFIED
-claim forces the reward to zero.
+The clean-room verifier independently factors every value and reconstructs
+each triple. The public `10^14` artifact is not bundled or replayed, and the
+unbounded conjecture remains explicitly open. This is a public regression and
+scope-calibration diagnostic, not held-out causal evidence.
