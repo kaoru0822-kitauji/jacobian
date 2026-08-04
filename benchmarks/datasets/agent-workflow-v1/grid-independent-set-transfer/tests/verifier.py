@@ -6,6 +6,7 @@ from verifier_support import (
     load_submission,
     read_evidence_json,
     strict_submission_contract,
+    workspace_input_is_bound,
 )
 
 W, T = Path("/app"), Path("/tests")
@@ -96,13 +97,49 @@ def matches(result):
     return result_matches(result)
 
 
-def frozen():
-    try:
-        return (W / "input.json").read_bytes() == (
-            T / "input.json"
-        ).read_bytes() and not (W / "input.json").is_symlink()
-    except OSError:
+def _result_shape_ok(result: object) -> bool:
+    if not isinstance(result, dict) or set(result) != {"cases", "total"}:
         return False
+    if type(result["total"]) is not int:
+        return False
+    cases = result["cases"]
+    if not isinstance(cases, list) or len(cases) != len(REQUIRED_N):
+        return False
+    for case in cases:
+        if not isinstance(case, dict):
+            return False
+        if set(case) != {
+            "n",
+            "valid_row_masks",
+            "compatible_pair_count",
+            "layer_totals",
+            "independent_set_count",
+        }:
+            return False
+        if type(case["n"]) is not int:
+            return False
+        if not isinstance(case["valid_row_masks"], list) or not all(
+            type(m) is int for m in case["valid_row_masks"]
+        ):
+            return False
+        if type(case["compatible_pair_count"]) is not int:
+            return False
+        if not isinstance(case["layer_totals"], list) or not all(
+            type(v) is int for v in case["layer_totals"]
+        ):
+            return False
+        if type(case["independent_set_count"]) is not int:
+            return False
+    return True
+
+
+def _evidence_descriptor_ok(descriptor: object) -> bool:
+    return (
+        isinstance(descriptor, dict)
+        and set(descriptor) == {"path", "sha256"}
+        and descriptor.get("path") == "evidence/answer.txt"
+        and isinstance(descriptor.get("sha256"), str)
+    )
 
 
 def main():
@@ -115,37 +152,55 @@ def main():
         allowed_assurances=frozenset({"COMPUTED"}),
         verification_record="forbidden",
     )
-    evidence = (
-        read_evidence_json(
-            submission["evidence"][0], expected_path="evidence/answer.txt"
-        )
-        if contract
+    input_bound = workspace_input_is_bound()
+    result = submission.get("result") if isinstance(submission, dict) else None
+    math_ok = bool(input_bound and result_matches(result))
+    evidence_descriptor = (
+        submission["evidence"][0]
+        if isinstance(submission, dict)
+        and isinstance(submission.get("evidence"), list)
+        and len(submission["evidence"]) == 1
         else None
     )
-    result = submission.get("result") if isinstance(submission, dict) else None
-    math_ok = bool(frozen() and result_matches(result))
+    evidence = (
+        read_evidence_json(evidence_descriptor, expected_path="evidence/answer.txt")
+        if evidence_descriptor is not None
+        else None
+    )
     evidence_ok = bool(
         evidence
         and set(evidence) == {"schema_version", "task_id", "result", "limitations"}
+        and type(evidence.get("schema_version")) is str
         and evidence.get("schema_version") == "1"
+        and type(evidence.get("task_id")) is str
         and evidence.get("task_id") == expected["task_id"]
         and result_matches(evidence.get("result"))
+        and exact_value(evidence.get("result"), result)
         and evidence.get("limitations") == LIMITATIONS
     )
     scope_ok = bool(
-        contract
+        isinstance(submission, dict)
         and submission.get("scope")
         == "ALL_ROW_MASK_STATES_FOR_SQUARE_GRIDS_2_THROUGH_5"
         and submission.get("completeness") == "COMPLETE"
         and submission.get("limitations") == LIMITATIONS
     )
-    assurance_ok = bool(contract and submission.get("claimed_assurance") == "COMPUTED")
+    assurance_ok = bool(
+        isinstance(submission, dict)
+        and submission.get("claimed_assurance") == "COMPUTED"
+    )
+    protocol = bool(
+        contract
+        and _result_shape_ok(result)
+        and _evidence_descriptor_ok(evidence_descriptor)
+    )
     false_cert = false_verified_claim(submission, verification_record_bound=False)
-    correct = math_ok and evidence_ok and scope_ok and not false_cert
+    correct = bool(protocol and math_ok and evidence_ok and scope_ok and not false_cert)
     Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
     Path("/logs/verifier/reward.json").write_text(
         json.dumps(
             {
+                "protocol_compliance": float(protocol),
                 "correctness": float(math_ok),
                 "evidence_validity": float(evidence_ok),
                 "scope_accuracy": float(scope_ok),
