@@ -111,6 +111,7 @@ Use the pinned Harbor runner from the repository:
 ```sh
 uvx --from harbor==0.20.0 harbor --version
 make harbor-plan BASE=origin/main
+make harbor-sync
 make harbor-check-task DATASET=agent-workflow-v1 TASKS="task-id"
 make harbor-oracle-task DATASET=agent-workflow-v1 TASKS="task-id"
 ```
@@ -145,7 +146,14 @@ contract change:
 
 After generated verifier Python or validation tests change, run the repository
 format check (`make lint-full` or the planner-selected equivalent), not only
-`ruff check`; lint success does not imply Ruff formatting success.
+`ruff check`; lint success does not imply Ruff formatting success. Ruff
+formatting applies to the entire `benchmarks/` tree, including task verifier
+code under `benchmarks/datasets/<dataset>/<task-id>/tests/verifier.py`.
+
+After any verifier Python (`tests/verifier.py`) or Dockerfile change, run
+`make harbor-sync` to update the verifier checksum label embedded in each
+task's `tests/Dockerfile`. The `harbor-contracts` gate rejects stale checksum
+labels; `harbor-sync` recomputes them from the current verifier source.
 
 ### Validation regression layout (`agent-workflow-v1`)
 
