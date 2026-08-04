@@ -215,7 +215,7 @@ with deterministic fixtures, but never start an evaluated model. A human must
 use the separate `make agent-eval` entry point, select cases explicitly, review
 the plan, and opt into execution with `EVAL_EXECUTE=1` and a bounded model-run
 count. See
-[Agent evaluations](agent-evaluations.md#validation-boundary).
+[Agent evaluations](evaluations/evaluation-methods.md#workflow-observations).
 
 ## Criticality classes
 
@@ -385,14 +385,14 @@ not a generic exception and not a mathematical conclusion.
 
 Performance runs measure throughput, latency, memory, and storage amplification
 on already-correct behavior. Their design is specified in
-[Performance benchmarks](performance-benchmarks.md).
+[Performance benchmarks](evaluations/evaluation-methods.md).
 
 ### Model-in-the-loop evaluations
 
 Model evaluations ask whether access to Jacobian improves a model's ability to
 notice semantic gaps, use witnesses, preserve uncertainty, and hand off
 replayable evidence. Their design is specified in
-[Agent evaluations](agent-evaluations.md).
+[Agent evaluations](evaluations/evaluation-methods.md).
 
 ## Component test matrix
 
@@ -607,7 +607,7 @@ The CLI and MCP layer must be thin enough to test by equivalence:
 ### Reference plugins
 
 The public mathematical inputs and expected oracles are selected in the
-[Mathematical scenario catalog](math-scenarios.md).
+[Mathematical scenario catalog](scenarios/math-scenarios.md).
 
 The finite directed-graph/path reference plugin must contain:
 

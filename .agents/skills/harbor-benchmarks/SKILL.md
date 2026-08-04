@@ -41,7 +41,7 @@ Classify the work before editing a task:
 ## Author or change a task
 
 Read `AGENTS.md`, `CONTRIBUTING.md`, and
-`docs/reference/capability-workflow-evaluations.md`. Each Harbor dataset owns
+`docs/reference/evaluations/benchmark-contracts.md`. Each Harbor dataset owns
 its task bundles directly under
 `benchmarks/datasets/<dataset>/<task-id>/`; a bundle is a direct child of its
 dataset, not a symlink or nested task directory. Keep domain-owned execution

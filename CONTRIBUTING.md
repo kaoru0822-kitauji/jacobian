@@ -202,12 +202,17 @@ and verify replay through an independent checker process.
 
 ## Documentation
 
-Place documentation according to the reader's task:
+Documentation follows the [Diátaxis framework](https://diataxis.fr/). Place
+documentation according to the reader's task:
 
 - `docs/tutorials/` teaches through a complete guided experience;
 - `docs/how-to/` explains how to complete one specific task;
 - `docs/reference/` defines exact contracts and lookup information;
 - `docs/explanation/` records architecture, rationale, and tradeoffs.
+
+Domain-owned capability references live in `docs/reference/capabilities/<domain>/`.
+Adding an operation or provider does not require editing a central documentation
+list.
 
 Keep rolling product goals separate from supported release behavior.
 For hosted MCP changes, update and validate
@@ -240,6 +245,17 @@ Keep each change focused on one outcome. Explain the problem, the resulting
 behavior or contract, any compatibility impact, and the validation performed.
 Link a relevant issue when one exists. Include screenshots only when rendered
 layout or diagrams materially change.
+
+Open a new issue when review, conformance testing, or real use identifies a
+specific unresolved behavior. Each issue should describe the observable
+mathematical or operational problem, distinguish verified facts from
+hypotheses, name the affected public contract or conformance case, include a
+minimal reproduction or failing test where practical, and state whether the
+change can affect artifact identity, checker authority, evidence binding, or
+experiment integrity. Do not prescribe a solver or backend unless the
+requirement depends on it. Do not open umbrella issues that restate product
+goals; product goals become issues only when the problem and success criteria
+are concrete.
 
 ## Test ownership and selection
 

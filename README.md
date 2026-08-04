@@ -39,10 +39,10 @@ one opaque solver. An agent can construct an object, compute an invariant,
 search for a witness, and submit exact evidence to a separate checker. Every
 step remains visible as a typed result or artifact.
 
-The trust boundary is deliberate: a search result, solver status, model answer,
-timeout, or score is never promoted directly to `VERIFIED`. Only an
-operator-authorized checker may emit a verified record, bound to the exact
-claim, candidate, scope, semantics, certificate format, and checker identity.
+A search result, solver status, model answer, timeout, or score is never
+promoted directly to `VERIFIED`. Only an operator-authorized checker may emit a
+verified record, bound to the exact claim, candidate, scope, semantics,
+certificate format, and checker identity.
 
 ## Quickstart
 
@@ -182,16 +182,16 @@ capability entry points, `capability.describe` and `capability.invoke`.
 | [Testing strategy](docs/reference/testing-strategy.md) | Validation layers, commands, and CI responsibilities |
 
 Specialized contracts cover
-[SAT artifacts](docs/reference/sat-artifacts.md),
-[SMT/Alethe artifacts](docs/reference/smt-artifacts.md),
-[exact rational linear-system evidence](docs/reference/linear-rational-solutions.md),
-[exact rational matrix determinants](docs/reference/matrix-rational-determinant.md),
-[integer matrix HNF](docs/reference/matrix-hermite-normal-form.md), and
-[Lean declaration discovery](docs/reference/lean-declaration-discovery.md).
+[SAT artifacts](docs/reference/capabilities/sat-smt/sat-artifacts.md),
+[SMT/Alethe artifacts](docs/reference/capabilities/sat-smt/smt-artifacts.md),
+[exact rational linear-system evidence](docs/reference/capabilities/linear-algebra/linear-rational-solutions.md),
+[exact rational matrix determinants](docs/reference/capabilities/matrix/matrix-rational-determinant.md),
+[integer matrix HNF](docs/reference/capabilities/matrix/matrix-hermite-normal-form.md), and
+[Lean declaration discovery](docs/reference/capabilities/lean/lean-declaration-discovery.md).
 The [domain-capability how-to](docs/how-to/invoke-domain-capabilities.md)
 demonstrates discovery, computed invocation, bounded-result interpretation,
 and exact replay. The
-[Lean formal-intermediates reference](docs/reference/lean-formal-intermediates.md)
+[Lean formal-intermediates reference](docs/reference/capabilities/lean/lean-formal-intermediates.md)
 covers proof states, premise retrieval, dependency graphs, and checked edits.
 
 ## MCP clients and deployment
@@ -311,9 +311,9 @@ implementation; it is not a separate JavaScript API.
 
 The visual motif comes from the three-dimensional counterexample to the
 Jacobian conjecture: an exact constant Jacobian determinant alongside three
-distinct rational inputs with the same output. The equations are unusually
-good shorthand for Jacobian's purpose—surprising candidates are valuable, but
-exact computation and independent checking establish what can be trusted.
+distinct rational inputs with the same output. Surprising candidates are
+valuable, but exact computation and independent checking establish what can be
+trusted.
 
 Terence Tao gives an
 [accessible mathematical account](https://terrytao.wordpress.com/2026/07/21/a-digestion-of-the-jacobian-conjecture-counterexample/).

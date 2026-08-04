@@ -124,5 +124,5 @@ are explicitly non-comparative diagnostics. Uniform task structure does not
 make rewards across these datasets comparable.
 
 See [authoring a Harbor benchmark task](../docs/how-to/author-harbor-benchmark-task.md),
-[reference benchmarks](../docs/reference/benchmarks.md), and the
+[benchmark contracts](../docs/reference/evaluations/benchmark-contracts.md), and the
 [Harbor benchmarks skill](../.agents/skills/harbor-benchmarks/SKILL.md).

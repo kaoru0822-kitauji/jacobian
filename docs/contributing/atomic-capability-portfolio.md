@@ -54,7 +54,7 @@ The source bundle is:
 | Source | Snapshot and use |
 | --- | --- |
 | Current Jacobian catalog, descriptors, source, and tests | Baseline at `dc1fa846dd1c`; establishes existing operations and trust rules |
-| [Mathematical scenarios](../reference/math-scenarios.md) and [workflow evaluation plan](../reference/capability-workflow-evaluations.md) | Repeated moves, failure patterns, and public reproduction cases |
+| [Mathematical scenarios](../reference/scenarios/math-scenarios.md) and [workflow evaluation plan](../reference/evaluations/benchmark-contracts.md) | Repeated moves, failure patterns, and public reproduction cases |
 | Maintainer documentation and repositories linked below | Backend contracts, certificate formats, supported domains, installation paths, and licenses |
 | [PyPI JSON metadata][pypi-json] | Dated compressed-wheel size snapshot; not installed size or runtime memory |
 | Local pinned Lean installation | One development-host measurement used only to show ecosystem scale |
@@ -62,7 +62,7 @@ The source bundle is:
 Public examples and known answers are suitable for contract reproduction and
 regression. They must not become hidden evaluation cases. Comparative claims
 require frozen, held-out variants and independent oracles under the
-[agent evaluation protocol](../reference/agent-evaluations.md).
+[agent evaluation protocol](../reference/evaluations/evaluation-methods.md).
 
 Package licenses in this document are discovery inputs, not a completed legal
 review. Before vendoring, redistributing, or enabling a backend by default,
@@ -319,7 +319,7 @@ is to revise rather than stabilize, consolidate, or retire:
 - compact catalog discovery; and
 - rerun the frozen held-out evaluation before changing recommendation status.
 
-See [the task and verifier validation boundary](../reference/capability-workflow-evaluations.md#task-and-verifier-validation)
+See [the task and verifier validation boundary](../reference/evaluations/benchmark-contracts.md#task-and-verifier-validation)
 for scorer invariants, per-run measurements, and the excluded operationally
 invalid pair.
 
@@ -367,7 +367,7 @@ remaining clauses, and binds the resulting DIMACS bytes. Assignment and proof
 artifacts bind the exact CNF URI, object and payload digests, variable map,
 projection, full scope, producer runtime, and resource budget. Raw proof
 storage and assignment payloads remain unverified when created. See
-[SAT artifact contracts](../reference/sat-artifacts.md).
+[SAT artifact contracts](../reference/capabilities/sat-smt/sat-artifacts.md).
 
 The assignment-checker checkpoint was implemented on 2026-07-26.
 `sat.model.verify` is installed only with an operator-authorized bundled
@@ -385,7 +385,7 @@ wall-time and optional conflict limits, validate the competition status
 protocol, and materialize only a total model or bounded raw text DRAT artifact.
 Solver status, failure to produce the requested evidence, timeout, malformed
 output, and stored proof bytes remain unverified and carry `UNKNOWN`. See
-[SAT artifact contracts](../reference/sat-artifacts.md#cadical-exploration).
+[SAT artifact contracts](../reference/capabilities/sat-smt/sat-artifacts.md#cadical-exploration).
 
 The DRAT-trim checker checkpoint was implemented on 2026-07-26.
 `sat.unsat_proof.verify` is installed only with bundled references and an
@@ -398,7 +398,7 @@ syntax before bounded DRAT replay. Only exit zero with exactly one
 `s VERIFIED` creates a `VerificationRecord`; mutation, concatenation,
 cross-CNF replay, warnings, excessive output, timeout, and runtime replacement
 fail closed as `UNKNOWN`. See
-[UNSAT proof verification](../reference/sat-artifacts.md#unsat-proof-verification).
+[UNSAT proof verification](../reference/capabilities/sat-smt/sat-artifacts.md#unsat-proof-verification).
 
 CaDiCaL has a small source build and a command line that accepts DIMACS plus a
 proof path. DRAT-trim independently validates a DRAT proof against the input
@@ -431,7 +431,7 @@ Treatment cost was materially higher, and the small sample demonstrates
 assurance value rather than completion or efficiency lift. Retain the four
 atomic outcomes while prioritizing compact catalog discovery over another SAT
 operation. See
-[the Jacobian-enabled workflow observation boundary](../reference/capability-workflow-evaluations.md#jacobian-enabled-workflow-observation).
+[the Jacobian-enabled workflow observation boundary](../reference/evaluations/evaluation-methods.md#workflow-observations).
 
 ## Wave 3: theory-bounded SMT proof slice
 
@@ -466,7 +466,7 @@ found a zero-hole equality contradiction in `QF_UF` and explicit holes in
 small linear integer and rational contradictions. This is useful producer
 evidence and a concrete compatibility target for item 10, not a broad
 proof-support claim. See
-[SMT Alethe artifact contracts](../reference/smt-artifacts.md).
+[SMT Alethe artifact contracts](../reference/capabilities/sat-smt/smt-artifacts.md).
 
 ## Wave 4: shared exact mathematics
 
@@ -474,10 +474,10 @@ proof-support claim. See
 
 The rational solution, rational inconsistency-certificate, and integer row-HNF
 slices are implemented; see the
-[exact rational linear-system evidence contract](../reference/linear-rational-solutions.md)
-and [integer matrix HNF contract](../reference/matrix-hermite-normal-form.md).
+[exact rational linear-system evidence contract](../reference/capabilities/linear-algebra/linear-rational-solutions.md)
+and [integer matrix HNF contract](../reference/capabilities/matrix/matrix-hermite-normal-form.md).
 The rational-solution usability evidence is recorded in the
-[the committed Harbor task boundary](../reference/capability-workflow-evaluations.md#task-and-verifier-validation).
+[the committed Harbor task boundary](../reference/evaluations/benchmark-contracts.md#task-and-verifier-validation).
 The remaining sequence stays demand-gated.
 
 Implement one vertical slice at a time:
@@ -496,7 +496,7 @@ Implement one vertical slice at a time:
    primitive. It checks the existing SymPy determinant artifact by
    standard-library rational Gaussian elimination in an independent clean
    process; see the
-   [exact rational determinant contract](../reference/matrix-rational-determinant.md).
+   [exact rational determinant contract](../reference/capabilities/matrix/matrix-rational-determinant.md).
 5. `polynomial.factor.compute` is implemented with a product relation.
    Checking that the factors multiply to the input does not by itself certify
    irreducibility or completeness; those remain separate obligations.
@@ -512,9 +512,9 @@ shared exact provider than importing SageMath.
 ### SymPy second
 
 The first typed normalization slice is implemented; see the
-[typed polynomial expression normalization contract](../reference/polynomial-expression-normalization.md)
+[typed polynomial expression normalization contract](../reference/capabilities/polynomial/polynomial-expression-normalization.md)
 and the
-[the committed Harbor task boundary](../reference/capability-workflow-evaluations.md#task-and-verifier-validation).
+[the committed Harbor task boundary](../reference/evaluations/benchmark-contracts.md#task-and-verifier-validation).
 It defines a small versioned polynomial AST with explicit symbols and
 coefficients, then constructs SymPy objects internally. It never passes
 unsanitized user strings to `sympify`, `parse_expr`, `lambdify`, or Python
@@ -554,9 +554,8 @@ capability should be proof checking, not arbitrary interaction.
 
 ## First implementation queue
 
-Create one focused issue per accepted item; the
-[issue index](issues.md) remains a pointer to GitHub rather than an umbrella
-backlog.
+Create one focused issue per accepted item; GitHub is the source of truth
+rather than an umbrella backlog.
 
 1. Optional-provider availability, provenance, install-tier, and measurement
    contract.
@@ -565,43 +564,43 @@ backlog.
 3. Paired Lean discovery evaluation; decide expose, revise, consolidate into
    examples, or stop.
 4. Canonical CNF, assignment, and proof artifact schemas. Implemented; see
-   [SAT artifact contracts](../reference/sat-artifacts.md).
+   [SAT artifact contracts](../reference/capabilities/sat-smt/sat-artifacts.md).
 5. Pure independent SAT-assignment checker with attack tests. Implemented; see
-   [SAT artifact contracts](../reference/sat-artifacts.md#assignment-verification).
+   [SAT artifact contracts](../reference/capabilities/sat-smt/sat-artifacts.md#assignment-verification).
 6. CaDiCaL model and proof-producing exploration adapters. Implemented; see
-   [SAT artifact contracts](../reference/sat-artifacts.md#cadical-exploration).
+   [SAT artifact contracts](../reference/capabilities/sat-smt/sat-artifacts.md#cadical-exploration).
 7. DRAT-trim clean-process checker, authorization fixture, and attack tests.
    Implemented; see
-   [UNSAT proof verification](../reference/sat-artifacts.md#unsat-proof-verification).
+   [UNSAT proof verification](../reference/capabilities/sat-smt/sat-artifacts.md#unsat-proof-verification).
 8. SAT public reproductions and held-out portfolio ablation. Implemented; see
-   [the Jacobian-enabled workflow observation boundary](../reference/capability-workflow-evaluations.md#jacobian-enabled-workflow-observation).
+   [the Jacobian-enabled workflow observation boundary](../reference/evaluations/evaluation-methods.md#workflow-observations).
 9. cvc5 Alethe proof-production spike for quantifier-free EUF and linear
    arithmetic. Implemented; see
-   [SMT Alethe artifact contracts](../reference/smt-artifacts.md).
+   [SMT Alethe artifact contracts](../reference/capabilities/sat-smt/smt-artifacts.md).
 10. Carcara compatibility matrix, checker adapter, mutations, and paired
     evaluation. Implemented; see
-    [SMT Alethe artifact contracts](../reference/smt-artifacts.md#strict-carcara-verification)
+    [SMT Alethe artifact contracts](../reference/capabilities/sat-smt/smt-artifacts.md#strict-carcara-verification)
     and the
-    [the task and verifier validation boundary](../reference/capability-workflow-evaluations.md#task-and-verifier-validation).
+    [the task and verifier validation boundary](../reference/evaluations/benchmark-contracts.md#task-and-verifier-validation).
 11. Python-FLINT rational-solution find and verify slice. Implemented; see the
-    [exact rational solution contract](../reference/linear-rational-solutions.md)
+    [exact rational solution contract](../reference/capabilities/linear-algebra/linear-rational-solutions.md)
     and the
-    [the committed Harbor task boundary](../reference/capability-workflow-evaluations.md#task-and-verifier-validation).
+    [the committed Harbor task boundary](../reference/evaluations/benchmark-contracts.md#task-and-verifier-validation).
 12. Python-FLINT integer-matrix row-HNF slice. Implemented; see the
-    [integer matrix HNF contract](../reference/matrix-hermite-normal-form.md)
+    [integer matrix HNF contract](../reference/capabilities/matrix/matrix-hermite-normal-form.md)
     and the
-    [the committed Harbor task boundary](../reference/capability-workflow-evaluations.md#task-and-verifier-validation).
+    [the committed Harbor task boundary](../reference/evaluations/benchmark-contracts.md#task-and-verifier-validation).
 13. Typed expression AST and one SymPy polynomial-normalization slice.
     Implemented; see the
-    [typed polynomial expression normalization contract](../reference/polynomial-expression-normalization.md)
+    [typed polynomial expression normalization contract](../reference/capabilities/polynomial/polynomial-expression-normalization.md)
     and the
-    [the committed Harbor task boundary](../reference/capability-workflow-evaluations.md#task-and-verifier-validation).
+    [the committed Harbor task boundary](../reference/evaluations/benchmark-contracts.md#task-and-verifier-validation).
 14. Python-FLINT rational inconsistency-certificate find and verify slice.
     Implemented; see the
-    [exact rational linear-system evidence contract](../reference/linear-rational-solutions.md#inconsistency-certificate).
+    [exact rational linear-system evidence contract](../reference/capabilities/linear-algebra/linear-rational-solutions.md#inconsistency-certificate).
 15. Independent exact rational matrix-determinant verification. Implemented;
     see the
-    [exact rational determinant contract](../reference/matrix-rational-determinant.md).
+    [exact rational determinant contract](../reference/capabilities/matrix/matrix-rational-determinant.md).
 16. Re-rank E/Vampire, Metamath, nauty, Singular, PARI, Normaliz, GAP, fplll,
     and HiGHS from accumulated workflow evidence.
 

@@ -174,7 +174,7 @@ URIs. The shared layer validates artifact bindings and checker-backed lifecycle
 states; domain adapters still define the mathematical meaning of relation IDs,
 scope parameters, and obligation artifacts.
 
-The [capability workflow evaluation plan](../reference/capability-workflow-evaluations.md)
+The [capability workflow evaluation plan](../reference/evaluations/benchmark-contracts.md)
 defines held-out workflows used to evaluate discovery, routing, defaults,
 consolidation, and retirement. Experimental and version-breaking adapters may
 be exposed before those evaluations show lift; prescribed-tool cases test
@@ -284,7 +284,7 @@ consolidation, and retirement of capabilities, not to gate exposure of
 experimental adapters. Prescribed-tool cases test contract conformance; only
 agent-chosen-tool cases measure autonomous portfolio value. Cross-project
 corpus providers follow only after local episode queries are empirically
-useful. The [agent evaluation protocol](../reference/agent-evaluations.md)
+useful. The [agent evaluation protocol](../reference/evaluations/evaluation-methods.md)
 defines the controls, retained evidence, and scoring required for a product
 claim.
 

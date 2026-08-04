@@ -1,9 +1,10 @@
 # Jacobian documentation
 
-Jacobian's documentation is organized by what the reader is trying to do.
-Start with a tutorial when learning the system, use a how-to guide for a
-specific task, consult reference material for exact contracts, and read the
-explanations for design rationale.
+Jacobian's documentation follows the
+[Diátaxis framework](https://diataxis.fr/), organized by what the reader is
+trying to do. Start with a tutorial when learning the system, use a how-to
+guide for a specific task, consult reference material for exact contracts, and
+read the explanations for design rationale.
 
 Jacobian exposes composable mathematical capabilities through an MCP server,
 CLI, and Python library. Capabilities have mathematically atomic,
@@ -54,22 +55,34 @@ complete a specific task.
 ## Reference
 
 Reference documents define exact interfaces, records, gates, and test
-expectations. Start with the [tool surface](reference/tools.md) for the public
-MCP contract and the
-[domain operation library](reference/domain-operation-library.md) for the
-shared built-in operation contract. The
-[native Python API](reference/python-api.md) documents the supported
-native-value modules. Use the runtime `capability://catalog` and
-`capability.describe` for the installed capability inventory and exact
-operation schemas. The [persistent state format](reference/state-format.md)
-documents the supported migration floor and fresh-store transition for
-retired state revisions.
+expectations.
 
-Capability-specific references live with their owning domain or provider.
-They are intentionally not registered in this shared landing page: adding an
-operation or provider must not require editing a central documentation list.
-Conformance, benchmark, evaluation, and contributor references are
-linked from the control documents and workflows that own them.
+**Cross-cutting references:**
+
+- [Tool surface](reference/tools.md) — MCP resources, tools, and invocation contracts
+- [Domain operation library](reference/domain-operation-library.md) — built-in producer, bounded-search, artifact, and exact-replay contracts
+- [Native Python API](reference/python-api.md) — supported native-value modules
+- [Provider runtime](reference/provider-runtime.md) — backend availability, compatibility, and identity
+- [Plugin conformance](reference/plugin-conformance.md) — plugin contract and conformance gates
+- [Persistent state format](reference/state-format.md) — supported migration floor and fresh-store transition
+- [Testing strategy](reference/testing-strategy.md) — validation layers, commands, and CI responsibilities
+
+**Domain-owned references:** [Capability references](reference/capabilities/index.md)
+grouped by owning domain (graphs, matrix, polynomial, Lean, SAT/SMT, finite
+math, number theory, linear algebra, topology, geometry, research memory).
+Adding an operation or provider does not require editing a central list; each
+domain owns its own subdirectory.
+
+**Evaluation references:** [Benchmark contracts](reference/evaluations/index.md)
+and [evaluation methods](reference/evaluations/index.md) — Harbor task
+contracts, dataset inventory, validation gates, workflow observation,
+performance measurement, and regression policy.
+
+**Reference scenarios:** [Worked cases](reference/scenarios/index.md) —
+mathematical scenario catalog and certified-homology case.
+
+Use the runtime `capability://catalog` and `capability.describe` for the
+installed capability inventory and exact operation schemas.
 
 ## Explanation
 
@@ -84,27 +97,10 @@ how its major parts fit together.
 ## Contributing
 
 Read [CONTRIBUTING.md](../CONTRIBUTING.md) before changing code or public
-documentation. The [issue index](contributing/issues.md) records implementation
-work that has been identified but not necessarily scheduled. The
+documentation. The
 [atomic capability portfolio](contributing/atomic-capability-portfolio.md)
 records the formal-first backend research, ordering, installation tradeoffs,
 and evaluation gates used to decide which mathematical slices to build next.
-The [nauty/Traces optional-provider spike](contributing/nauty-provider-spike.md)
-records the pinned external-provider reproduction, absence isolation, license
-decision, and unresolved checker gates without registering a capability.
-The [CGAL exact-Delaunay optional-provider spike](contributing/cgal-delaunay-provider-spike.md)
-records the exact-kernel reproduction, GPL/commercial deployment boundary,
-degeneracy semantics, and independent geometry-checker obligations.
-The [GUDHI persistent-homology optional-provider spike](contributing/gudhi-persistence-provider-spike.md)
-records exact-rank transport, selected-module licensing, bounded pairing
-reproduction, and independent modular-reduction obligations.
-The [cddlib exact H/V optional-provider spike](contributing/cddlib-hv-provider-spike.md)
-records the GPL source-build boundary, exact GMP-rational reproduction,
-homogeneous representation semantics, and the unresolved completeness gate.
-The [Regina low-dimensional-topology optional-provider spike](contributing/regina-outcomes-provider-spike.md)
-records the isolated GPL wheel/source boundary, bounded 3-manifold and
-normal-surface reproductions, partial independent replay, and outcome-specific
-production gates.
 
 Harbor benchmark authoring and verifier work is encoded in the repository-local
 [`harbor-benchmarks`](../.agents/skills/harbor-benchmarks/SKILL.md) skill. Use

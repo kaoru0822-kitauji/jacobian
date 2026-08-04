@@ -1,11 +1,11 @@
 # Run agent evaluations
 
-[Documentation home](../index.md) · [Evaluation reference](../reference/agent-evaluations.md)
+[Documentation home](../index.md) · [Evaluation reference](../reference/evaluations/evaluation-methods.md)
 
 This guide covers an explicit operator-run of Harbor workflow observations and
 paired Jacobian control/treatment runs. Model execution is not a routine
 development or pull-request gate. The evaluation roles, assurance rules, and
-interpretation boundaries are in the [reference page](../reference/agent-evaluations.md).
+interpretation boundaries are in the [reference page](../reference/evaluations/evaluation-methods.md).
 
 ## Validate the dataset
 
@@ -146,7 +146,7 @@ make agent-eval-compare \
 
 The comparator rejects unmatched task repetitions or configuration drift and
 reports correctness and assurance separately. See
-[Capability workflow evaluations](../reference/capability-workflow-evaluations.md)
+[Capability workflow evaluations](../reference/evaluations/benchmark-contracts.md)
 for the full evidence roles and interpretation boundaries.
 
 Record the git tree, task digests, provider/runtime, model and prompt settings,

@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DOCUMENTS = (
     Path("CONTRIBUTING.md"),
     Path("docs/reference/testing-strategy.md"),
-    Path("docs/reference/agent-evaluations.md"),
+    Path("docs/reference/evaluations/benchmark-contracts.md"),
     Path("docs/how-to/author-harbor-benchmark-task.md"),
     Path("docs/how-to/run-agent-evaluations.md"),
 )

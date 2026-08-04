@@ -39,7 +39,7 @@ intermediates. Before
 stabilizing or recommending a capability, inspect nearby catalog entries by
 domain, artifact type, and outcome. If overlap remains ambiguous or
 consequential, use the
-[evaluation plan](docs/reference/capability-workflow-evaluations.md). Routine
+[evaluation plan](docs/reference/evaluations/benchmark-contracts.md). Routine
 additions need no exhaustive pairwise or leave-one-out evaluation.
 
 Use `capability.describe(query=...)` for intent-led search,

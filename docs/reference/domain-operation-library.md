@@ -153,7 +153,7 @@ Exact replay also covers bounded sparse rational-function identities. The
 identity verifier preserves the submitted numerators and denominators and
 checks fraction-field equality by independent polynomial cross multiplication;
 pointwise denominator-definedness remains outside its scope. See
-[Rational-function identities](rational-function-identities.md).
+[Rational-function identities](capabilities/polynomial/rational-function-identities.md).
 
 Some polynomial, matrix, graph, geometry, probability, topology, poset, and
 combinatorics results have a separate verification capability. The producer

@@ -35,7 +35,7 @@
 
 Jacobian 为 AI 智能体提供小型、可组合的数学操作，而不是一个不透明的通用求解器。智能体可以构造对象、计算不变量、搜索见证，并将精确证据提交给独立的检查器。每一步都会以类型化结果或 artifact 的形式保持可见。
 
-信任边界是有意设计的：搜索结果、求解器状态、模型答案、超时或评分都不会直接升级为 `VERIFIED`。只有经过操作者授权的检查器才能生成已验证记录，并且该记录必须绑定到确切的命题、候选对象、范围、语义、证书格式和检查器身份。
+搜索结果、求解器状态、模型答案、超时或评分都不会直接升级为 `VERIFIED`。只有经过操作者授权的检查器才能生成已验证记录，并且该记录必须绑定到确切的命题、候选对象、范围、语义、证书格式和检查器身份。
 
 <a id="quickstart"></a>
 
@@ -156,7 +156,7 @@ Jacobian 将四项职责分开：
 | [Provider 运行时](docs/reference/provider-runtime.md) | backend 可用性、兼容性和身份 |
 | [测试策略](docs/reference/testing-strategy.md) | 验证层、命令和 CI 职责 |
 
-此外还有专门的 [SAT artifact](docs/reference/sat-artifacts.md)、[SMT/Alethe artifact](docs/reference/smt-artifacts.md)、[精确有理数线性系统证据](docs/reference/linear-rational-solutions.md)、[精确有理数矩阵行列式](docs/reference/matrix-rational-determinant.md)、[整数矩阵 HNF](docs/reference/matrix-hermite-normal-form.md) 和 [Lean 声明发现](docs/reference/lean-declaration-discovery.md)契约。[领域能力操作指南](docs/how-to/invoke-domain-capabilities.md)演示发现、计算调用、有界结果解释和精确重放；[Lean 形式化中间结果参考](docs/reference/lean-formal-intermediates.md)介绍证明状态、前提获取、依赖图和已检查编辑。
+此外还有专门的 [SAT artifact](docs/reference/capabilities/sat-smt/sat-artifacts.md)、[SMT/Alethe artifact](docs/reference/capabilities/sat-smt/smt-artifacts.md)、[精确有理数线性系统证据](docs/reference/capabilities/linear-algebra/linear-rational-solutions.md)、[精确有理数矩阵行列式](docs/reference/capabilities/matrix/matrix-rational-determinant.md)、[整数矩阵 HNF](docs/reference/capabilities/matrix/matrix-hermite-normal-form.md) 和 [Lean 声明发现](docs/reference/capabilities/lean/lean-declaration-discovery.md)契约。[领域能力操作指南](docs/how-to/invoke-domain-capabilities.md)演示发现、计算调用、有界结果解释和精确重放；[Lean 形式化中间结果参考](docs/reference/capabilities/lean/lean-formal-intermediates.md)介绍证明状态、前提获取、依赖图和已检查编辑。
 
 ## MCP 客户端与部署
 
@@ -238,7 +238,7 @@ Python 发行版包含数学内核、CLI 和 MCP 服务器。npm package 是用�
 <details>
 <summary><strong>关于主视觉图</strong></summary>
 
-这幅图的视觉主题来自雅可比猜想的三维反例：一个精确恒定的雅可比行列式，以及三个映射到同一输出的不同有理数输入。这些方程很好地概括了 Jacobian 的目的——令人意外的候选对象很有价值，但只有精确计算和独立检查才能确定哪些内容值得信任。
+这幅图的视觉主题来自雅可比猜想的三维反例：一个精确恒定的雅可比行列式，以及三个映射到同一输出的不同有理数输入。令人意外的候选对象很有价值，但只有精确计算和独立检查才能确定哪些内容值得信任。
 
 Terence Tao 撰写了[一篇易读的数学介绍](https://terrytao.wordpress.com/2026/07/21/a-digestion-of-the-jacobian-conjecture-counterexample/)。行列式恒等式和碰撞也已经在 Isabelle/HOL 中[独立形式化](https://isa-afp.org/entries/Jacobian_Counterexample.html)。二维猜想仍然是开放问题。
 

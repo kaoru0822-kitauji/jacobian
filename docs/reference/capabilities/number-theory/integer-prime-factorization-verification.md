@@ -1,0 +1,61 @@
+# Integer prime-factorization verification
+
+[Documentation home](../../../index.md)
+
+`integer.compute.prime_factorization` retains its existing request and result
+contracts and returns `COMPUTED` assurance. The operator-authorized
+`integer.prime_factorization.verify` capability independently replays one
+stored result with Python-FLINT and may promote that exact result to
+`VERIFIED`.
+
+## Exact claim and scope
+
+The verifier checks:
+
+> The stored ascending prime-power list is the complete prime factorization of
+> the absolute value of the exact stored nonzero integer.
+
+The producer accepts one canonical decimal integer string of at most 256
+characters and an explicit wall-clock budget. Zero remains not applicable.
+Both `1` and `-1` have an empty factor list, and negative integers use the
+factorization of their absolute value.
+
+The verification request supplies a stored result URI, not a caller-selected
+integer or executable checker. The verification record binds the input
+artifact, result artifact, number-theory semantics, schemas, witness format,
+checker identity, checker source digest, and Python-FLINT runtime.
+
+## Independent replay
+
+The producer runs SymPy `factorint` in an isolated bounded process. The checker
+uses the separately maintained Python-FLINT runtime and does not import the
+producer, its worker, or SymPy.
+
+Before backend replay, the checker requires canonical integer encoding, a
+valid stored producer budget, exact result fields, positive exponents, prime
+bases greater than one, strict ascending order, no duplicates, and equality
+between the declared prime-power product and the input absolute value. It then
+compares the complete list with Python-FLINT's independent factorization.
+
+## Verification obligation ledger
+
+| Obligation | Independent replay | Failure meaning |
+| --- | --- | --- |
+| Artifact binding | Recompute and compare claim, semantics, candidate, lineage, witness-envelope, and payload digests. | Reject this evidence; no mathematical conclusion. |
+| Input domain | Require one canonical nonzero integer and the exact bounded producer budget shape. | Reject malformed, zero, or unsupported evidence. |
+| Result normalization | Require exact fields, canonical positive bases, positive exponents, strict ascending order, and no duplicates. | Reject noncanonical evidence. |
+| Reconstruction | Multiply every declared prime power with bounded exact integer arithmetic and require the product to equal the input absolute value. | Reject an incomplete or incorrect factor list. |
+| Primality and completeness | Independently factor the absolute value with Python-FLINT and compare every base and exponent. | Reject a composite base, missing factor, wrong power, or extra factor. |
+| Sign and unit convention | Replay `±1` as the empty factorization and ignore only the input sign for other nonzero integers. | Reject a mismatched unit or sign convention. |
+| Authorization and runtime | Dispatch only the operator-authorized checker matching the schemas, semantics, format, source digest, and pinned Python-FLINT runtime. | Unavailable, timeout, cancellation, or error remains non-conclusive. |
+
+A rejected candidate returns `UNKNOWN`; it does not assert a different
+factorization or a mathematical claim about another integer.
+
+## Compatibility
+
+The producer capability version, request schema, result schema, backend, and
+artifact relationships are unchanged. The catalog delta is one dedicated
+verification capability plus its operator-authorized checker registration.
+Installations without the number-theory bundle simply omit this verifier while
+retaining unrelated exact-domain checkers.
