@@ -172,7 +172,7 @@ def main():
         and ev.get("schema_version") == "1"
         and ev.get("task_id") == e["task_id"]
         and _json_equal(ev.get("result"), s.get("result"))
-        and _json_equal(ev.get("limitations"), LIMITATIONS)
+        and _json_equal(ev.get("limitations"), s.get("limitations"))
     )
     q = bool(
         structure_valid

@@ -160,3 +160,27 @@ def test_accepts_schema_valid_integral_float_coefficients(tmp_path: Path) -> Non
             record[key] = float(record[key])
     _rewrite(app, submission)
     assert support._run_verifier(task, app, logs)["reward"] == 1.0
+
+
+def test_rejects_evidence_limitations_unbound_from_submission(tmp_path: Path) -> None:
+    """Evidence limitations must match the submitted limitations, not just the
+    canonical constant. A submission that changes limitations while evidence
+    retains the canonical list must fail evidence_validity."""
+    task, app, logs = _case(tmp_path)
+    submission = json.loads((app / "submission.json").read_text())
+    canonical_limitations = list(submission["limitations"])
+    submission["limitations"] = ["FAKE_LIMITATION"]
+    # Write evidence with the canonical limitations, not the submitted ones.
+    evidence = {
+        "schema_version": "1",
+        "task_id": submission["task_id"],
+        "result": submission["result"],
+        "limitations": canonical_limitations,
+    }
+    raw = json.dumps(evidence, separators=(",", ":")).encode()
+    (app / "evidence" / "radical-distance-certificate.json").write_bytes(raw)
+    submission["evidence"][0]["sha256"] = "sha256:" + hashlib.sha256(raw).hexdigest()
+    support._write_json(app / "submission.json", submission)
+    result = support._run_verifier(task, app, logs)
+    assert result["evidence_validity"] == 0.0
+    assert result["reward"] == 0.0
