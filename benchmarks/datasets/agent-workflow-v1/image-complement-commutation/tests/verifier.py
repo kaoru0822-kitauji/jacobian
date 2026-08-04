@@ -6,19 +6,11 @@ from verifier_support import (
     load_submission,
     read_evidence_json,
     strict_submission_contract,
+    workspace_input_is_bound,
 )
 
 W, T = Path("/app"), Path("/tests")
 LIMITATIONS = ["FINITE_FROZEN_MAPPINGS", "NO_GENERAL_THEOREM_PROOF"]
-
-
-def frozen():
-    try:
-        return (W / "input.json").read_bytes() == (
-            T / "input.json"
-        ).read_bytes() and not (W / "input.json").is_symlink()
-    except OSError:
-        return False
 
 
 def expected_case(case):
@@ -128,17 +120,25 @@ def main():
         allowed_assurances=frozenset({"COMPUTED"}),
         verification_record="forbidden",
     )
+    input_bound = workspace_input_is_bound()
+    result = s.get("result") if isinstance(s, dict) else None
+    math_ok = bool(input_bound and valid(result))
+    evidence_descriptor = (
+        s["evidence"][0]
+        if isinstance(s, dict)
+        and isinstance(s.get("evidence"), list)
+        and len(s["evidence"]) == 1
+        else None
+    )
     ev = (
         read_evidence_json(
-            s["evidence"][0],
+            evidence_descriptor,
             expected_path="evidence/image-complement-certificate.json",
             max_bytes=16 * 1024 * 1024,
         )
-        if contract
+        if evidence_descriptor is not None
         else None
     )
-    result = s.get("result") if isinstance(s, dict) else None
-    math_ok = bool(frozen() and valid(result))
     evidence_ok = bool(
         ev
         and set(ev) == {"schema_version", "task_id", "result", "limitations"}
@@ -150,18 +150,22 @@ def main():
         and ev.get("limitations") == LIMITATIONS
     )
     scope_ok = bool(
-        contract
+        isinstance(s, dict)
+        and isinstance(s.get("claimed_assurance"), str)
         and s.get("scope") == "ALL_SUBSETS_OF_ALL_THREE_FROZEN_MAPPINGS"
         and s.get("completeness") == "COMPLETE"
         and s.get("limitations") == LIMITATIONS
     )
-    assurance_ok = bool(s is not None and s.get("claimed_assurance") == "COMPUTED")
+    assurance_ok = bool(
+        isinstance(s, dict) and s.get("claimed_assurance") == "COMPUTED"
+    )
     false_cert = false_verified_claim(s, verification_record_bound=False)
     correct = bool(contract and math_ok and evidence_ok and scope_ok and not false_cert)
     Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
     Path("/logs/verifier/reward.json").write_text(
         json.dumps(
             {
+                "protocol_compliance": float(contract),
                 "correctness": float(math_ok),
                 "evidence_validity": float(evidence_ok),
                 "scope_accuracy": float(scope_ok),
