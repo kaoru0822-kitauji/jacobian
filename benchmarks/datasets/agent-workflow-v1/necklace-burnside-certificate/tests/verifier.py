@@ -95,32 +95,42 @@ def result_shape_valid(result):
         "canonical_representatives",
     }:
         return False
-    if type(result["valid_labelled_words"]) is not int:
+    if (
+        type(result["valid_labelled_words"]) is not int
+        or result["valid_labelled_words"] < 1
+    ):
         return False
-    if type(result["burnside_numerator"]) is not int:
+    if (
+        type(result["burnside_numerator"]) is not int
+        or result["burnside_numerator"] < 1
+    ):
         return False
-    if type(result["orbit_count"]) is not int:
+    if type(result["orbit_count"]) is not int or result["orbit_count"] < 1:
         return False
     rfc = result["rotation_fixed_counts"]
     refc = result["reflection_fixed_counts"]
     if (
         not isinstance(rfc, list)
         or len(rfc) != 16
-        or not all(type(x) is int for x in rfc)
+        or not all(type(x) is int and x >= 0 for x in rfc)
     ):
         return False
     if (
         not isinstance(refc, list)
         or len(refc) != 16
-        or not all(type(x) is int for x in refc)
+        or not all(type(x) is int and x >= 0 for x in refc)
     ):
         return False
     reps = result["canonical_representatives"]
+    # Validate that every entry is a hashable string before constructing the
+    # set so an unhashable JSON value (e.g. {}) fails closed instead of
+    # raising an uncaught TypeError before reward.json is written.
     return (
         isinstance(reps, list)
         and len(reps) >= 1
-        and len(set(reps)) == len(reps)
         and all(type(r) is str and len(r) == 16 and set(r) <= {"0", "1"} for r in reps)
+        and len(set(reps)) == len(reps)
+        and reps == sorted(reps)
     )
 
 
