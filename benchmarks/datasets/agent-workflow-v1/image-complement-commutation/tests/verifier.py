@@ -37,9 +37,8 @@ def expected_case(case):
         subset = {i for i in range(n) if mask >> i & 1}
         left = sorted({mapping[i] for i in range(n) if i not in subset})
         right = sorted(set(range(m)) - {mapping[i] for i in subset})
-        if left != right:
+        if left != right and failure is None:
             failure = (sorted(subset), left, right)
-            break
     return {
         "id": case["id"],
         "classification": classification,
@@ -49,6 +48,47 @@ def expected_case(case):
         "left_image": None if failure is None else failure[1],
         "right_complement": None if failure is None else failure[2],
     }
+
+
+def _is_int(value):
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _row_type_ok(row):
+    if set(row) != {
+        "id",
+        "classification",
+        "commutes",
+        "checked_subsets",
+        "first_failure",
+        "left_image",
+        "right_complement",
+    }:
+        return False
+    if not isinstance(row["id"], str):
+        return False
+    if not isinstance(row["classification"], str):
+        return False
+    if type(row["commutes"]) is not bool:
+        return False
+    if not _is_int(row["checked_subsets"]):
+        return False
+    for key in ("first_failure", "left_image", "right_complement"):
+        value = row[key]
+        if value is not None:
+            if not isinstance(value, list):
+                return False
+            if any(not _is_int(item) for item in value):
+                return False
+    return True
+
+
+def _normalize_row(row):
+    out = dict(row)
+    for key in ("first_failure", "left_image", "right_complement"):
+        value = out[key]
+        out[key] = None if value is None else sorted(value)
+    return out
 
 
 def valid(result):
@@ -62,8 +102,20 @@ def valid(result):
     rows = result["cases"]
     if any(not isinstance(row, dict) for row in rows):
         return False
+    if any(not _row_type_ok(row) for row in rows):
+        return False
     frozen_cases = json.loads((T / "input.json").read_text())["cases"]
-    return rows == [expected_case(case) for case in frozen_cases]
+    expected = {
+        case["id"]: _normalize_row(expected_case(case)) for case in frozen_cases
+    }
+    by_id = {}
+    for row in rows:
+        if row["id"] in by_id:
+            return False
+        by_id[row["id"]] = _normalize_row(row)
+    if set(by_id) != set(expected):
+        return False
+    return all(by_id[cid] == expected[cid] for cid in expected)
 
 
 def main():
@@ -83,7 +135,7 @@ def main():
         if contract
         else None
     )
-    math_ok = bool(contract and frozen() and valid(s.get("result")))
+    math_ok = bool(frozen() and valid(s.get("result")))
     evidence_ok = bool(
         ev
         and set(ev) == {"schema_version", "task_id", "result", "limitations"}
@@ -98,9 +150,9 @@ def main():
         and s.get("completeness") == "COMPLETE"
         and s.get("limitations") == LIMITATIONS
     )
-    assurance_ok = bool(contract and s.get("claimed_assurance") == "COMPUTED")
+    assurance_ok = bool(s is not None and s.get("claimed_assurance") == "COMPUTED")
     false_cert = false_verified_claim(s, verification_record_bound=False)
-    correct = math_ok and evidence_ok and scope_ok and not false_cert
+    correct = bool(contract and math_ok and evidence_ok and scope_ok and not false_cert)
     Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
     Path("/logs/verifier/reward.json").write_text(
         json.dumps(
