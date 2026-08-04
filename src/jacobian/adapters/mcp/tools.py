@@ -21,17 +21,21 @@ from jacobian.adapters.mcp.tooling import (
     _run_blocking,
 )
 from jacobian.contracts.capabilities import (
+    CapabilityAssuranceLevel,
+    CapabilityCompletenessStatus,
     CapabilityInputKind,
     CapabilityMode,
     CapabilityResult,
 )
 from jacobian.contracts.reasoning import (
     ReasoningCallId,
+    ReasoningInterpretationStatus,
     ReasoningPhase,
     ReasoningRunId,
     ReasoningWriteRequest,
     ReasoningWriteResult,
 )
+from jacobian.contracts.results import ExecutionStatus
 
 _LOGGER = logging.getLogger(__name__)
 CapabilityDescriptionView = Literal["SUMMARY", "CONTRACT", "FULL"]
@@ -291,6 +295,10 @@ async def reasoning_write(
     call_id: ReasoningCallId | None = None,
     capability_id: str | None = None,
     mode: CapabilityMode | None = None,
+    interpretation_status: ReasoningInterpretationStatus | None = None,
+    reported_execution_status: ExecutionStatus | None = None,
+    reported_assurance_level: CapabilityAssuranceLevel | None = None,
+    reported_completeness_status: CapabilityCompletenessStatus | None = None,
     ctx: Context[AppState, Any] | None = None,
 ) -> ReasoningWriteResult:
     active_runtime = _runtime(ctx)
@@ -301,6 +309,10 @@ async def reasoning_write(
         call_id=call_id,
         capability_id=capability_id,
         mode=mode,
+        interpretation_status=interpretation_status,
+        reported_execution_status=reported_execution_status,
+        reported_assurance_level=reported_assurance_level,
+        reported_completeness_status=reported_completeness_status,
     )
     if phase is ReasoningPhase.BEFORE_TOOL:
         descriptors = {

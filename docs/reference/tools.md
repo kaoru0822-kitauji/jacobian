@@ -19,8 +19,9 @@ The reasoning log is not a mathematical capability, proof object, workspace, or
 chain-of-thought collector. In the default `REQUIRED` mode, every
 `capability.invoke` must carry the `reasoning_run_id` and `reasoning_call_id`
 returned by the current `BEFORE_TOOL`. The server binds the actual execution
-status, assurance, completeness, result digest, and artifact URIs without
-copying the capability payload or output into the log. See the
+status, assurance, completeness, result digest, and artifact URIs, then records
+whether the model's structured `AFTER_TOOL` report matches them, without copying
+the capability payload or output into the log. See the
 [reasoning-log protocol](reasoning-log.md).
 
 Read `capability://catalog` to discover installed capability IDs, provider

@@ -12,15 +12,18 @@ operational and unverified and never change mathematical assurance.
 2. Before each capability execution, write `BEFORE_TOOL` with that run ID,
    exact capability ID, mode, and a short purpose. Retain the returned `call_id`.
 3. Add both IDs to the matching `capability.invoke` request.
-4. After every result, including errors, cancellations, and timeouts, write
-   `AFTER_TOOL` with the same IDs and a concise interpretation.
+4. After every result, write `AFTER_TOOL` with `interpretation_status:
+   "INTERPRETED"`, the same IDs, a concise interpretation, and the reported
+   execution status, assurance level, and completeness status. If the result
+   content was lost after a response failure or runtime restart, use
+   `interpretation_status: "RESULT_UNAVAILABLE"` and omit those reported fields.
 5. Write one `FINAL` audit after all calls have been interpreted.
 
 One run executes only one capability cycle at a time and accepts at most 64
-cycles. Different runs and tenants remain concurrent. A started call that is
-still unfinished after the ten-minute recovery grace is recorded on a later
-runtime start as an `ERROR` non-conclusion and still requires `AFTER_TOOL`. The
-grace prevents a second process from misclassifying a live long-running call.
+cycles. Different runs and tenants remain concurrent. A current runtime never
+declares a call interrupted because of elapsed time. After a runtime restart, an
+explicit `RESULT_UNAVAILABLE` entry atomically records the old call as an `ERROR`
+non-conclusion before closing its interpretation cycle.
 
 Each summary is limited to 512 Unicode characters and 2048 UTF-8 bytes. Do not
 include prompts, credentials, personal data, raw request payloads, or copied tool
@@ -29,8 +32,9 @@ actual capability ID/version/mode, execution status, assurance, completeness,
 scope digest, diagnostics, artifact URIs, and episode URI.
 
 Read the durable append-only log at `reasoning://run/{run_id}`. It is returned as
-newline-delimited JSON. Events carry a sequence number and previous-event digest,
-and SQLite rejects event updates and deletes.
+newline-delimited JSON. Events carry a contiguous sequence number, and SQLite
+rejects event updates and deletes. Canonical request and result digests bind calls
+without claiming protection against a privileged state-database operator.
 
 ## Enforcement and recovery
 
@@ -41,8 +45,11 @@ the extra invocation fields.
 
 A duplicate or concurrent use of one `call_id` never starts a second
 calculation. If a response is lost after completion, inspect the log rather than
-blindly retrying; complete the pending interpretation and reserve a new call only
-when recomputation is genuinely required.
+blindly retrying. Use `RESULT_UNAVAILABLE` when the actual result content cannot
+be recovered, and reserve a new call only when recomputation is genuinely
+required. V1 assumes one server runtime owns a tenant state directory; multiple
+MCP clients may share that runtime, and run/call IDs are bearer identifiers inside
+the tenant.
 
 Jacobian cannot prevent an agent from emitting a final answer outside MCP. A run
 without `FINAL` is therefore auditable as incomplete, rather than falsely treated
@@ -50,8 +57,12 @@ as completed. Timestamps and append order constrain post-hoc insertion but canno
 prove that a summary accurately represents a model's private cognition.
 
 The log follows the tenant state directory's retention and access controls. V1
-does not add per-entry deletion or encryption at rest; operators handling
-sensitive research must protect or rotate the complete tenant state directory.
+does not add per-entry deletion, automatic expiry, listing, or encryption at rest.
+The run resource is its JSONL export. Delete or rotate the complete tenant state
+directory to remove logs. Evaluation jobs must use one ephemeral tenant state
+directory per trial, export required evidence, and delete the directory after the
+declared retention period. Operators handling persistent or sensitive research
+must protect and rotate the complete tenant state directory.
 Request and result digests are integrity bindings, not anonymization: an operator
 with the log may be able to guess low-entropy inputs or outputs offline and compare
 their hashes. Do not use sensitive payloads in a tenant whose state is not trusted.
