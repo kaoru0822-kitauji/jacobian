@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import os
 import pathlib
@@ -118,6 +119,10 @@ def _execute_child(app: Path, tests: Path, logs: Path) -> None:
         tests_root / "verifier_support.py", root=tests_root
     )
     verifier_source = _regular_source(tests_root / "verifier.py", root=tests_root)
+    # Load maintained verifier dependencies before the task-local Path mapping.
+    # Some dependencies register concrete pathlib classes while importing.
+    importlib.import_module("jsonschema")
+    importlib.import_module("referencing")
     original_path = pathlib.Path
     try:
         pathlib.Path = mapper  # type: ignore[assignment]
