@@ -116,7 +116,12 @@ def result_shape_valid(result):
     ):
         return False
     reps = result["canonical_representatives"]
-    return isinstance(reps, list) and all(type(r) is str and len(r) == 16 for r in reps)
+    return (
+        isinstance(reps, list)
+        and len(reps) >= 1
+        and len(set(reps)) == len(reps)
+        and all(type(r) is str and len(r) == 16 and set(r) <= {"0", "1"} for r in reps)
+    )
 
 
 def frozen():
@@ -150,9 +155,11 @@ def main():
         )
     derived = derive()
     input_bound = frozen()
-    # Mathematical correctness is evaluated independently of the envelope so an
-    # assurance or protocol failure is not misreported as wrong mathematics.
-    math_ok = bool(input_bound and isinstance(result, dict) and matches(result))
+    # Mathematical correctness is evaluated independently of the envelope and
+    # input binding so an assurance, protocol, or input-validity failure is not
+    # misreported as wrong mathematics.  Input validity is reported as its own
+    # diagnostic and only aggregate reward is gated on both.
+    math_ok = bool(isinstance(result, dict) and matches(result))
     evidence_ok = bool(
         evidence
         and set(evidence) == {"schema_version", "task_id", "result", "limitations"}
@@ -179,6 +186,7 @@ def main():
     correct = bool(
         protocol_ok
         and math_ok
+        and input_bound
         and evidence_ok
         and scope_ok
         and assurance_ok
@@ -190,6 +198,7 @@ def main():
             {
                 "protocol_compliance": float(protocol_ok),
                 "correctness": float(math_ok),
+                "input_binding": float(input_bound),
                 "evidence_validity": float(evidence_ok),
                 "scope_accuracy": float(scope_ok),
                 "assurance_calibration": float(assurance_ok),

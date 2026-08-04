@@ -3,6 +3,7 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
 from benchmarks.validation.agent_workflow_v1 import support
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -188,14 +189,48 @@ def test_float_in_result_reports_protocol_failure(tmp_path: Path) -> None:
     assert result["reward"] == 0.0
 
 
+@pytest.mark.parametrize(
+    "corruption",
+    (
+        "empty",
+        "duplicate",
+        "non_binary",
+    ),
+)
+def test_representative_schema_violations_report_protocol_failure(
+    tmp_path: Path, corruption: str
+) -> None:
+    """The result-shape check must enforce the advertised representative
+    schema: at least one entry, all unique, and every entry matching
+    ^[01]{16}$.  Violations are protocol failures, not only math errors."""
+    task, app, logs = _case(tmp_path)
+    submission = json.loads((app / "submission.json").read_text())
+    corrupted = dict(submission["result"])
+    reps = list(corrupted["canonical_representatives"])
+    if corruption == "empty":
+        corrupted["canonical_representatives"] = []
+    elif corruption == "duplicate":
+        corrupted["canonical_representatives"] = [reps[0], reps[0]]
+    else:
+        corrupted["canonical_representatives"] = ["x" * 16]
+    submission["result"] = corrupted
+    _rewrite(app, submission, corrupted)
+    result = support._run_verifier(task, app, logs)
+    assert result["protocol_compliance"] == 0.0
+    assert result["reward"] == 0.0
+
+
 def test_input_tamper_preserves_assurance_diagnostics(tmp_path: Path) -> None:
-    """When the workspace input is altered, mathematical acceptance is
-    gated to zero but assurance/scope diagnostics remain independently
-    evaluated rather than collapsing to zero."""
+    """When the workspace input is altered, mathematical correctness remains
+    independently evaluated (the result is still canonical) while input
+    binding is reported as its own failed diagnostic; assurance/scope
+    diagnostics remain independently evaluated rather than collapsing to
+    zero, and aggregate reward is gated to zero."""
     task, app, logs = _case(tmp_path)
     (app / "input.json").write_text("{}")
     result = support._run_verifier(task, app, logs)
-    assert result["correctness"] == 0.0
+    assert result["correctness"] == 1.0
+    assert result["input_binding"] == 0.0
     assert result["scope_accuracy"] == 1.0
     assert result["assurance_calibration"] == 1.0
     assert result["reward"] == 0.0

@@ -118,7 +118,11 @@ def test_verifiers_reject_replaced_workspace_inputs(
     support._write_json(input_path, input_data)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected["correctness"] == 0.0
+    if task_name in support.INPUT_BINDING_DECOUPLED_TASKS:
+        assert rejected["correctness"] == 1.0
+        assert rejected["input_binding"] == 0.0
+    else:
+        assert rejected["correctness"] == 0.0
     assert rejected["reward"] == 0.0
 
 
@@ -135,7 +139,14 @@ def test_verifiers_fail_closed_on_malformed_workspace_inputs(
     (app / "input.json").write_text(replacement)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected["correctness"] == 0.0
+    if task_name in support.INPUT_BINDING_DECOUPLED_TASKS:
+        # Mathematical correctness is reported independently of input binding;
+        # the result is still canonical, so correctness stays 1.0 while the
+        # separate input_binding diagnostic captures the tamper.
+        assert rejected["correctness"] == 1.0
+        assert rejected["input_binding"] == 0.0
+    else:
+        assert rejected["correctness"] == 0.0
     assert rejected["reward"] == 0.0
 
 
