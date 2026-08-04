@@ -46,6 +46,7 @@ def main() -> None:
     (logs / "reward.json").write_text(
         json.dumps(
             {
+                "protocol_compliance": float(result.protocol_ok),
                 "correctness": float(result.correctness),
                 "evidence_validity": float(result.evidence_validity),
                 "scope_accuracy": float(result.scope_accuracy),

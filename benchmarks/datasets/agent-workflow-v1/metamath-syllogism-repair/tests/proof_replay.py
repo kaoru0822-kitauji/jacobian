@@ -269,12 +269,17 @@ def verify_submission(
     math_failure = _mathematical_failure(result, input_data)
     correctness = bool(math_failure is None)
     evidence_validity = bool(
-        correctness
-        and isinstance(result, dict)
+        isinstance(result, dict)
         and _evidence_binds_result(submission.get("evidence"), result, task_root)
     )
 
-    if correctness and evidence_validity and scope_accuracy and assurance_ok:
+    if (
+        protocol_ok
+        and correctness
+        and evidence_validity
+        and scope_accuracy
+        and assurance_ok
+    ):
         message = "accepted"
     elif not protocol_ok:
         message = "protocol mismatch"
