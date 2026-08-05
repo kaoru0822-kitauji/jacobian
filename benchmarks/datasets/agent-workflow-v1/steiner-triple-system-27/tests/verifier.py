@@ -101,7 +101,6 @@ def main():
         submission,
         task_id=expected["task_id"],
         conclusion=expected["conclusion"],
-        allowed_assurances=frozenset({"COMPUTED"}),
         verification_record="forbidden",
     )
     contract = bool(envelope_contract and _public_submission_is_valid(submission))
