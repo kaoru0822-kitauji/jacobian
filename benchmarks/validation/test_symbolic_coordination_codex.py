@@ -181,6 +181,14 @@ def test_model_selection_requires_listed_tool_model_and_reasoning() -> None:
         sc._selected_model(catalog)
 
 
+def test_harbor_digest_accepts_native_and_prefixed_forms() -> None:
+    raw = "a" * 64
+    assert sc._validate_harbor_digest(raw) == raw
+    assert sc._validate_harbor_digest("sha256:" + raw) == "sha256:" + raw
+    with pytest.raises(sc.HarnessError, match="malformed"):
+        sc._validate_harbor_digest("not-a-digest")
+
+
 def test_runtime_snapshot_is_read_only_and_binds_all_conditions(
     tmp_path: Path,
 ) -> None:

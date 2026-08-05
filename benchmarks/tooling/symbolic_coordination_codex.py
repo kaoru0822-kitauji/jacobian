@@ -249,6 +249,17 @@ def _git_text(arguments: Sequence[str]) -> str:
     return _command_succeeded(result, label="git").decode("utf-8").strip()
 
 
+def _validate_harbor_digest(value: str) -> str:
+    hex_digest = value.removeprefix("sha256:")
+    if len(hex_digest) != 64:
+        raise HarnessError("pinned Harbor returned a malformed task digest")
+    try:
+        int(hex_digest, 16)
+    except ValueError as exc:
+        raise HarnessError("pinned Harbor returned a malformed task digest") from exc
+    return value
+
+
 def _harbor_task_digest(task: Path) -> str:
     script = (
         "import sys; from pathlib import Path; "
@@ -285,13 +296,7 @@ def _harbor_task_digest(task: Path) -> str:
         .decode("ascii", errors="strict")
         .strip()
     )
-    if len(value) != 71 or not value.startswith("sha256:"):
-        raise HarnessError("pinned Harbor returned a malformed task digest")
-    try:
-        int(value.removeprefix("sha256:"), 16)
-    except ValueError as exc:
-        raise HarnessError("pinned Harbor returned a malformed task digest") from exc
-    return value
+    return _validate_harbor_digest(value)
 
 
 def _require_clean_source() -> tuple[str, str]:
