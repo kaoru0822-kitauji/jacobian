@@ -58,11 +58,15 @@ SCOPE_INDEPENDENT_ASSURANCE_TASKS = (
     "lp-integrability-separator",
     "necklace-burnside-certificate",
     "pythagorean-generator-recurrence",
+    "steiner-triple-system-27",
 )
 # Tasks whose verifier reports mathematical correctness independently of
 # workspace input binding, emitting a separate ``input_binding`` diagnostic
 # and gating only aggregate reward on both.
-INPUT_BINDING_DECOUPLED_TASKS = ("necklace-burnside-certificate",)
+INPUT_BINDING_DECOUPLED_TASKS = (
+    "necklace-burnside-certificate",
+    "steiner-triple-system-27",
+)
 VERIFIER_TASKS = tuple(
     sorted(
         ref.path.name

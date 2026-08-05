@@ -102,13 +102,10 @@ def main():
     math_correct = _valid_design(data.get("result"), source)
     evidence_valid = _evidence(data.get("evidence"), data.get("result"))
     scope_correct = bool(
-        contract
-        and data.get("scope") == expected["required_scope"]
+        data.get("scope") == expected["required_scope"]
         and data.get("limitations") == expected["limitations"]
     )
-    assurance_correct = bool(
-        contract and data.get("claimed_assurance") == expected["maximum_assurance"]
-    )
+    assurance_correct = data.get("claimed_assurance") == expected["maximum_assurance"]
     false_certification = false_verified_claim(
         submission, verification_record_bound=False
     )
