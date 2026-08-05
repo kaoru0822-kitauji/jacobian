@@ -15,6 +15,12 @@ Clients may read installed descriptors from `capability://catalog` and inspect
 exact contracts before invoking mathematical operations, which remain behind
 namespaced capability IDs.
 
+For controlled name-selection evaluations, `--tool-name-profile math` exposes
+the same two contracts as `math.find` and `math.run`. Do not expose both profiles
+to one model or interpret the treatment profile as a compatibility alias or
+public rename. Production deployments should retain the default until the
+evaluation and migration decision are complete.
+
 `--reasoning-log-mode off` is the default. Use `required` to enforce the
 operational `reasoning.write` protocol (PLAN → BEFORE_TOOL → invoke →
 AFTER_TOOL → FINAL) and expose the `reasoning.write` tool, or `audit` for

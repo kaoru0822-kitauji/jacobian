@@ -92,8 +92,8 @@ async def capability_describe(
             ge=1,
             le=20,
             description=(
-                "Maximum compact discovery matches; defaults to 5. Start with "
-                "5 and inspect only the strongest one or two candidates."
+                "Maximum compact discovery matches; defaults to 5. This bounds "
+                "the result and does not rank the agent's research choices."
             ),
         ),
     ] = None,
@@ -115,9 +115,9 @@ async def capability_describe(
                 "Exact-lookup projection. SUMMARY is the small agent-facing "
                 "default for judging fit. CONTRACT adds the validation-equivalent "
                 "input schema, runtime identity, related operations, and validated "
-                "invocation examples; request it before invoking. FULL returns "
-                "the complete installed descriptor for audit or client generation. "
-                "Omit for discovery."
+                "invocation examples for constructing an unfamiliar request. FULL "
+                "returns the complete installed descriptor for audit or client "
+                "generation. Omit for discovery."
             )
         ),
     ] = "SUMMARY",
@@ -138,9 +138,8 @@ async def capability_describe(
     ):
         raise AgentRecoveryError(
             "capability_id is an exact lookup and cannot be combined with query, "
-            "domain, mode, input_kind, artifact_type, limit, or cursor. Use one "
-            "discovery call followed by "
-            "one exact description call."
+            "domain, mode, input_kind, artifact_type, limit, or cursor. Use either "
+            "discovery arguments or one exact capability_id in this call."
         )
     if capability_id is None:
         return _capability_discovery_response(

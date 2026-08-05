@@ -203,10 +203,11 @@ For a clone, `jacobian setup --source <checkout> --state-dir <path> --profile
 full-python` explicitly binds the client to that source environment;
 the maintained `scripts/setup-agent` wrapper performs the required locked sync
 and doctor checks first.
-The server advertises only the capability entry points;
-`capability.describe(query=...)` searches compact installed outcomes before an
-agent inspects an exact contract and invokes it. This is a toolbox interface:
-agents own mathematical decomposition, exploration, and composition.
+The server advertises only the capability entry points.
+`capability.describe` searches, browses, or inspects installed operations, while
+`capability.invoke` runs one selected operation. These are composable access
+paths, not a required sequence: agents own mathematical representation,
+decomposition, exploration, composition, verification timing, and stopping.
 
 Clients with MCP resource support can read `jacobian://instructions` for the
 operating guide and `capability://catalog` for the complete machine inventory.

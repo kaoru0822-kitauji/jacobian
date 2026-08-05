@@ -17,6 +17,65 @@ CAPABILITY_TOOL_NAMES = {"capability.describe", "capability.invoke"}
 MCP_TOOL_NAMES = CAPABILITY_TOOL_NAMES
 
 
+def test_math_tool_name_profile_is_consistent_across_discovery(tmp_path: Path) -> None:
+    server = create_server(tmp_path, tool_name_profile="math")
+    assert server.instructions is not None
+    assert "math.find" in server.instructions
+    assert "capability.describe" not in server.instructions
+
+    async def scenario() -> None:
+        from mcp import Client
+
+        async with Client(server, raise_exceptions=True) as client:
+            listed = await client.list_tools()
+            tools = {tool.name: tool for tool in listed.tools}
+            assert set(tools) == {"math.find", "math.run"}
+            assert tools["math.find"].title == "Find or inspect mathematical operations"
+            assert tools["math.run"].title == "Run a mathematical operation"
+            assert "math.find" in (tools["math.run"].description or "")
+            assert "capability.describe" not in (tools["math.run"].description or "")
+
+            discovery = await client.get_prompt(
+                "jacobian-discover",
+                {"task": "Find a finite counterexample."},
+            )
+            discovery_text = discovery.messages[0].content.text
+            assert "math.find" in discovery_text
+            assert "math.run" in discovery_text
+            assert "capability.describe" not in discovery_text
+
+            evidence = await client.get_prompt(
+                "jacobian-check-evidence",
+                {"claim": "The candidate satisfies the defining identity."},
+            )
+            evidence_text = evidence.messages[0].content.text
+            assert "math.find" in evidence_text
+            assert "capability.describe" not in evidence_text
+
+            described = await client.call_tool(
+                "math.find",
+                {"capability_id": "integer.compute.gcd", "view": "CONTRACT"},
+            )
+            assert described.structured_content is not None
+            invocations = described.structured_content["invocations"]
+            assert invocations
+            assert {item["tool"] for item in invocations} == {"math.run"}
+
+            absent = await client.call_tool(
+                "math.find",
+                {"query": "quuxonium frobnicator"},
+            )
+            assert absent.structured_content is not None
+            recovery_tools = {
+                item["tool"]
+                for item in absent.structured_content["available_recovery_paths"]
+                if "tool" in item
+            }
+            assert recovery_tools == {"math.find"}
+
+    asyncio.run(scenario())
+
+
 def test_mcp_exposes_only_capability_tools_with_read_only_resources(
     tmp_path: Path,
 ) -> None:
@@ -31,7 +90,11 @@ def test_mcp_exposes_only_capability_tools_with_read_only_resources(
             assert client.instructions == server.instructions
             assert client.server_info.version == version("jacobian")
             assert client.server_capabilities.extensions == {
-                "io.jacobian/core": {"version": "2", "reasoning_log_mode": "OFF"}
+                "io.jacobian/core": {
+                    "version": "2",
+                    "reasoning_log_mode": "OFF",
+                    "tool_name_profile": "capability",
+                }
             }
             listed = await client.list_tools()
             tools = {tool.name: tool for tool in listed.tools}
@@ -153,7 +216,8 @@ def test_mcp_exposes_only_capability_tools_with_read_only_resources(
             )
             rendered_prompt = discovery_prompt.messages[0].content.text
             assert "research strategy" in rendered_prompt
-            assert "Search any outcomes or concepts" in rendered_prompt
+            assert "desired local mathematical outcome" in rendered_prompt
+            assert "Available affordances" in rendered_prompt
 
             discovery_result = await client.call_tool(
                 "capability.describe",
@@ -163,19 +227,42 @@ def test_mcp_exposes_only_capability_tools_with_read_only_resources(
             assert discovery["kind"] == "discovery"
             assert 0 < len(discovery["matches"]) <= 3
             assert "input_schema" not in discovery["matches"][0]
-            assert discovery["next_step"] == {
-                "tool": "capability.describe",
-                "argument": "capability_id",
-                "choose_from": "matches[].capability_id",
+            assert "next_step" not in discovery
+            assert "routing_guidance" not in discovery
+            operation_card = discovery["matches"][0]
+            assert operation_card["accepted_input_kinds"]
+            assert "output_schema_summary" in operation_card
+            assert operation_card["scope"] == "EXACT_SUPPLIED_INPUT_OR_CLAIM"
+            assert operation_card["assurance_ceiling"] in {"COMPUTED", "VERIFIED"}
+            assert operation_card["provider_availability"] == "AVAILABLE"
+            assert isinstance(operation_card["related_capabilities"], list)
+
+            absent_result = await client.call_tool(
+                "capability.describe",
+                {"query": "quuxonium frobnicator", "domain": "polynomial"},
+            )
+            absent = json.loads(absent_result.content[0].text)
+            assert absent["portfolio_fit"] == "NO_LEXICAL_MATCHES"
+            assert absent["matches"] == []
+            recovery_actions = {
+                option["action"] for option in absent["available_recovery_paths"]
             }
-            assert discovery["routing_guidance"]["inspect_candidates"] == (
-                "Inspect only the strongest one or two domain-relevant matches; "
-                "search again only when none fits the required outcome."
+            assert recovery_actions == {
+                "reformulate_query",
+                "remove_filters",
+                "browse",
+                "inspect_catalog",
+            }
+            browse = next(
+                option
+                for option in absent["available_recovery_paths"]
+                if option["action"] == "browse"
             )
-            assert (
-                "producer result"
-                in discovery["routing_guidance"]["verification_handoff"]
-            )
+            assert browse == {
+                "action": "browse",
+                "tool": "capability.describe",
+                "arguments": {},
+            }
 
             catalog_result = await client.read_resource("capability://catalog")
             catalog = json.loads(catalog_result.contents[0].text)

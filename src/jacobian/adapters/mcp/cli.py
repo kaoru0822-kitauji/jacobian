@@ -149,6 +149,12 @@ def _parser() -> argparse.ArgumentParser:
             "Accepts case-insensitive values: required, audit, off."
         ),
     )
+    parser.add_argument(
+        "--tool-name-profile",
+        choices=("capability", "math"),
+        default="capability",
+        help="agent-visible capability tool names; defaults to capability",
+    )
     return parser
 
 
@@ -195,6 +201,7 @@ def main() -> None:
             capability_adapter_entrypoints=tuple(args.capability_adapter),
             capability_policy=capability_policy,
             reasoning_log_mode=reasoning_log_mode,
+            tool_name_profile=args.tool_name_profile,
         ).run("stdio")
         return
 
@@ -236,6 +243,7 @@ def main() -> None:
         max_tenant_runtimes=args.max_tenant_runtimes,
         tenant_idle_timeout_seconds=args.tenant_idle_timeout_seconds,
         reasoning_log_mode=reasoning_log_mode,
+        tool_name_profile=args.tool_name_profile,
     )
     if args.transport == "streamable-http":
         server.run(

@@ -22,7 +22,11 @@ def test_mcp_sdk_is_exactly_pinned_and_v2_bindings_are_used() -> None:
     extension = JacobianCoreExtension(None, None, ReasoningLogMode.OFF)
     assert isinstance(extension, Extension)
     assert extension.identifier == "io.jacobian/core"
-    assert extension.settings() == {"version": "2", "reasoning_log_mode": "OFF"}
+    assert extension.settings() == {
+        "version": "2",
+        "reasoning_log_mode": "OFF",
+        "tool_name_profile": "capability",
+    }
     assert all(isinstance(binding, ToolBinding) for binding in extension.tools())
     assert all(
         isinstance(binding, ResourceBinding) for binding in extension.resources()

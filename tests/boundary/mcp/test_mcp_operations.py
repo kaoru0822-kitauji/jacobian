@@ -200,6 +200,7 @@ def test_mcp_entrypoint_has_nonstarting_help() -> None:
     assert completed.returncode == 0
     assert "Run the Jacobian MCP server" in completed.stdout
     assert "--tool-profile" not in completed.stdout
+    assert "--tool-name-profile" in completed.stdout
 
 
 def test_mcp_entrypoint_reports_distribution_version() -> None:
