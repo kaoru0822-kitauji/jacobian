@@ -32,7 +32,10 @@ from pathlib import Path
 import pytest
 
 from jacobian.bounded_process import (
+    BoundedInteractiveProcess,
     BoundedProcessResult,
+    InteractiveProcessError,
+    InteractiveProcessRequest,
     ProcessPlatformTools,
     ProcessResourceLimits,
     run_bounded_process,
@@ -479,6 +482,32 @@ def test_execute_process_returns_output_limit_exceeded() -> None:
     assert result.termination is ProcessTermination.OUTPUT_LIMIT_EXCEEDED
     assert result.stdout_exceeded
     assert len(result.stdout) <= 64
+
+
+def test_interactive_response_cannot_hide_stderr_overflow(tmp_path: Path) -> None:
+    request = InteractiveProcessRequest(
+        executable=sys.executable,
+        arguments=(
+            "-c",
+            (
+                "import sys, time; sys.stdin.readline(); sys.stdin.readline(); "
+                "sys.stderr.write('x' * 1024); sys.stderr.flush(); "
+                "print('{}\\n', flush=True)"
+            ),
+        ),
+        environment=_ENV,
+        cwd=str(tmp_path),
+        startup_timeout_seconds=2.0,
+        read_timeout_seconds=2.0,
+        stderr_limit_bytes=8,
+    )
+    process = BoundedInteractiveProcess(request)
+    process.start()
+    try:
+        with pytest.raises(InteractiveProcessError, match="stderr limit"):
+            process.exchange({"cmd": "check"})
+    finally:
+        process.close()
 
 
 def test_execute_process_passes_cwd_to_child(tmp_path: Path) -> None:

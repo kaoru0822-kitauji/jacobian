@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import hashlib
 import json
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
 from benchmarks.tooling.errors import HarborSuiteError
-from benchmarks.tooling.heldout_runner import _json_digest, execute_plan
+from benchmarks.tooling.heldout_runner import (
+    _default_command,
+    _json_digest,
+    execute_plan,
+)
 
 
 def _manifest(tmp_path: Path) -> Path:
@@ -97,7 +103,8 @@ def _plan(tmp_path: Path, *, max_tokens: int = 100) -> Path:
         )
     plan = {
         "schema_version": "3",
-        "manifest_digest": "sha256:" + "a" * 64,
+        "manifest_digest": "sha256:"
+        + hashlib.sha256((tmp_path / "manifest.json").read_bytes()).hexdigest(),
         "stage": "pilot",
         "pair_count": 1,
         "budget": {
@@ -168,6 +175,32 @@ def _unreachable_probe(
     return {"reachable": False, "diagnostic": "connection refused"}
 
 
+def test_default_runner_forwards_only_harbor_authorized_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CODEX_FORCE_AUTH_JSON", "authorized")
+    monkeypatch.setenv("HTTPS_PROXY", "http://proxy.invalid")
+    monkeypatch.setenv("UNRELATED_SECRET", "hidden")
+    captured: dict[str, object] = {}
+
+    def fake_run_operator_command(*args: object, **kwargs: object):
+        captured["environment"] = kwargs["environment"]
+        return type("Result", (), {"exit_code": 0})()
+
+    monkeypatch.setattr(
+        "benchmarks.tooling.heldout_runner.run_operator_command",
+        fake_run_operator_command,
+    )
+
+    assert _default_command(["uvx", "harbor", "run"]) == 0
+    environment = captured["environment"]
+    assert isinstance(environment, Mapping)
+    assert environment["CODEX_FORCE_AUTH_JSON"] == "authorized"
+    assert environment["HTTPS_PROXY"] == "http://proxy.invalid"
+    assert "UNRELATED_SECRET" not in environment
+
+
 def test_runner_executes_whole_pair_and_can_resume_exact_plan(tmp_path: Path) -> None:
     manifest_path = _manifest(tmp_path)
     plan = _plan(tmp_path)
@@ -193,7 +226,10 @@ def test_runner_executes_whole_pair_and_can_resume_exact_plan(tmp_path: Path) ->
 
     assert ledger["status"] == "COMPLETE"
     assert ledger["schema_version"] == "2"
-    assert ledger["manifest_digest"] == "sha256:" + "a" * 64
+    assert (
+        ledger["manifest_digest"]
+        == json.loads(plan.read_text(encoding="utf-8"))["manifest_digest"]
+    )
     assert ledger["completed_pairs"] == ["task-r001"]
     assert ledger["usage"] == {"tokens": 30, "cost_usd": 0.2}
     assert resumed == ledger
@@ -406,6 +442,23 @@ def test_runner_rejects_ledger_from_different_manifest(tmp_path: Path) -> None:
         execute_plan(
             plan,
             ledger,
+            manifest_path=manifest_path,
+            probe_url="http://127.0.0.1:8000/mcp",
+            probe_fn=_ready_probe,
+        )
+
+
+def test_runner_rejects_manifest_that_does_not_match_plan(tmp_path: Path) -> None:
+    manifest_path = _manifest(tmp_path)
+    plan = _plan(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["experiment"]["model"] = "different-model"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(HarborSuiteError, match="manifest digest"):
+        execute_plan(
+            plan,
+            tmp_path / "ledger.json",
             manifest_path=manifest_path,
             probe_url="http://127.0.0.1:8000/mcp",
             probe_fn=_ready_probe,

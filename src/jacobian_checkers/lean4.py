@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -17,6 +18,8 @@ from jacobian.process_policy import (
     execute_process,
 )
 from jacobian.worker_environment import worker_environment
+
+_DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 LEAN_VERSION = "4.31.0"
 LEAN_COMMIT = "68218e876d2a38b1985b8590fff244a83c321783"
@@ -140,7 +143,27 @@ def _source(statement: str, proof: str, import_name: str | None) -> str:
     return "\n".join(lines)
 
 
+def _authorized_lean_runtime() -> Path:
+    executable = os.environ.get("JACOBIAN_CHECKER_EXECUTABLE")
+    expected_digest = os.environ.get("JACOBIAN_CHECKER_RUNTIME_DIGEST")
+    if (
+        executable is None
+        or expected_digest is None
+        or _DIGEST.fullmatch(expected_digest) is None
+    ):
+        raise _LeanSetupError("TOOLCHAIN_RESOLUTION: Lean runtime is not authorized")
+    path = Path(executable).resolve(strict=True)
+    if str(path) != executable or not path.is_file() or path.is_symlink():
+        raise _LeanSetupError("TOOLCHAIN_RESOLUTION: Lean runtime path is not exact")
+    actual_digest = "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+    if actual_digest != expected_digest:
+        raise _LeanSetupError("TOOLCHAIN_RESOLUTION: Lean runtime digest changed")
+    return path
+
+
 def _lean_command(name: str) -> tuple[str, ...]:
+    if name == "lean" and os.environ.get("JACOBIAN_CHECKER_EXECUTABLE") is not None:
+        return (str(_authorized_lean_runtime()),)
     elan = shutil.which("elan")
     if elan is not None:
         return (elan, "run", LEAN_TOOLCHAIN, name)

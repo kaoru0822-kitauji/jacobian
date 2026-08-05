@@ -292,6 +292,23 @@ def _write_plan(tmp_path: Path, runs: list[dict]) -> Path:
     return path
 
 
+def test_heldout_cost_budget_accepts_integer_json_number(tmp_path: Path) -> None:
+    path = _write_plan(
+        tmp_path,
+        [
+            {"pair_id": "p", "condition": condition, "job": "j", "jobs_dir": "d"}
+            for condition in ("C1", "C2")
+        ],
+    )
+    value = json.loads(path.read_text(encoding="utf-8"))
+    value["budget"]["max_cost_usd"] = 2
+    value["plan_digest"] = _json_digest(value)
+
+    parsed = HeldoutRunPlan.model_validate(value)
+
+    assert parsed.budget.max_cost_usd == 2.0
+
+
 def test_validated_plan_rejects_run_missing_pair_id(tmp_path: Path) -> None:
     path = _write_plan(
         tmp_path,

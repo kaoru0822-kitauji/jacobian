@@ -16,7 +16,7 @@ from jacobian.canonical import (
     loads_strict_json,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.implementation import package_source_digest
+from jacobian.implementation import package_import_path, package_source_digest
 from jacobian.process_policy import (
     ProcessRequest,
     ProcessTermination,
@@ -133,7 +133,9 @@ class PluginExecutor:
 
         started = time.monotonic()
         expected_digest = implementation_digest or package_source_digest(entrypoint)
-        environment = worker_environment()
+        environment = worker_environment(
+            overrides={"PYTHONPATH": package_import_path(entrypoint)}
+        )
         completed = execute_process(
             ProcessRequest(
                 executable=sys.executable,

@@ -7,11 +7,30 @@ from pathlib import Path
 import pytest
 from benchmarks.tooling.command_runner import (
     ToolCommandRequest,
+    ToolCommandResult,
     ToolCommandStatus,
     ToolResolver,
+    git_head_sha,
     operator_environment,
     run_operator_command,
 )
+
+
+@pytest.mark.parametrize("stdout", [b"x" * 40, b"\xff" * 40])
+def test_git_head_sha_rejects_non_digest_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stdout: bytes
+) -> None:
+    monkeypatch.setattr(
+        "benchmarks.tooling.command_runner.run_operator_command",
+        lambda *_args, **_kwargs: ToolCommandResult(
+            status=ToolCommandStatus.EXITED,
+            exit_code=0,
+            stdout=stdout,
+            stderr=b"",
+        ),
+    )
+
+    assert git_head_sha(tmp_path) is None
 
 
 def test_tooling_request_rejects_bare_executable(tmp_path: Path) -> None:

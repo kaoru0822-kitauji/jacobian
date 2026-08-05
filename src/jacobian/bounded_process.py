@@ -607,6 +607,8 @@ class BoundedInteractiveProcess:
         self._stderr_thread: threading.Thread | None = None
         self._stderr_captured: bytearray = bytearray()
         self._stderr_exceeded = threading.Event()
+        self._stderr_checkpoint_requested = threading.Event()
+        self._stderr_checkpoint_complete = threading.Event()
         self._started_at = 0.0
         self._base_response: dict[str, Any] | None = None
         self._closed = False
@@ -757,6 +759,7 @@ class BoundedInteractiveProcess:
                 response = self._responses.get(
                     timeout=min(_RESOURCE_POLL_SECONDS, remaining)
                 )
+                self._synchronize_stderr(deadline)
                 self._enforce_memory_limit(process.pid)
                 break
             except queue.Empty:
@@ -777,6 +780,22 @@ class BoundedInteractiveProcess:
                 "interactive process stopped before returning a result"
             ) from response
         return response
+
+    def _synchronize_stderr(self, deadline: float) -> None:
+        self._stderr_checkpoint_complete.clear()
+        self._stderr_checkpoint_requested.set()
+        checkpointed = self._stderr_checkpoint_complete.wait(
+            max(0.0, deadline - time.monotonic())
+        )
+        self._stderr_checkpoint_requested.clear()
+        if not checkpointed:
+            self._stop_process_locked()
+            raise InteractiveProcessError("interactive stderr drain timed out")
+        if self._stderr_exceeded.is_set():
+            self._stop_process_locked()
+            raise InteractiveProcessError(
+                "interactive process exceeded its stderr limit"
+            )
 
     def _memory_limit_exceeded(self, pid: int) -> bool:
         if self._request.max_rss_kb == 0:
@@ -837,18 +856,30 @@ class BoundedInteractiveProcess:
         limit = self._request.stderr_limit_bytes
         total = 0
         try:
-            for line in stderr:
-                total += len(line.encode("utf-8", errors="replace"))
+            os.set_blocking(stderr.fileno(), False)
+            while True:
+                try:
+                    chunk = os.read(stderr.fileno(), 65_536)
+                except BlockingIOError:
+                    if self._stderr_checkpoint_requested.is_set():
+                        self._stderr_checkpoint_complete.set()
+                    if process.poll() is not None:
+                        return
+                    time.sleep(0.001)
+                    continue
+                if not chunk:
+                    return
+                total += len(chunk)
                 remaining = max(0, limit - len(self._stderr_captured))
                 if remaining > 0:
-                    self._stderr_captured.extend(
-                        line.encode("utf-8", errors="replace")[:remaining]
-                    )
+                    self._stderr_captured.extend(chunk[:remaining])
                 if total > limit:
                     self._stderr_exceeded.set()
                     return
         except (OSError, ValueError):
             return
+        finally:
+            self._stderr_checkpoint_complete.set()
 
     def _terminate_child(self, process: subprocess.Popen[str]) -> None:
         """Send SIGTERM/terminate, then SIGKILL/kill if the deadline expires."""

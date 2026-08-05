@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 from copy import deepcopy
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
+import jacobian_checkers.lean4 as lean4_checker
 from jacobian.process_policy import ProcessResult, ProcessTermination
 from jacobian_checkers.lean4 import (
     LEAN_COMMIT,
@@ -60,6 +62,38 @@ def _request() -> dict[str, Any]:
         },
         "expected_bindings": bindings,
     }
+
+
+def test_lean_checker_uses_worker_authorized_executable(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    executable = tmp_path / "lean"
+    executable.write_bytes(b"lean-runtime")
+    monkeypatch.setenv("JACOBIAN_CHECKER_EXECUTABLE", str(executable))
+    monkeypatch.setenv(
+        "JACOBIAN_CHECKER_RUNTIME_DIGEST",
+        "sha256:" + hashlib.sha256(executable.read_bytes()).hexdigest(),
+    )
+    monkeypatch.setattr(lean4_checker.shutil, "which", lambda _name: None)
+
+    assert lean4_checker._lean_command("lean") == (str(executable),)
+
+
+def test_lean_checker_rejects_replaced_authorized_executable(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executable = tmp_path / "lean"
+    executable.write_bytes(b"authorized")
+    monkeypatch.setenv("JACOBIAN_CHECKER_EXECUTABLE", str(executable))
+    monkeypatch.setenv(
+        "JACOBIAN_CHECKER_RUNTIME_DIGEST",
+        "sha256:" + hashlib.sha256(executable.read_bytes()).hexdigest(),
+    )
+    executable.write_bytes(b"replaced")
+
+    with pytest.raises(RuntimeError, match="digest changed"):
+        lean4_checker._lean_command("lean")
 
 
 def test_lean_checker_accepts_exact_bound_core_proof(

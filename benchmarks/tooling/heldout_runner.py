@@ -12,12 +12,26 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
-from benchmarks.tooling.command_runner import run_operator_command
+from benchmarks.tooling.command_runner import operator_environment, run_operator_command
 from benchmarks.tooling.errors import HarborSuiteError
 from benchmarks.tooling.harbor_suite import BENCHMARKS
 from benchmarks.tooling.strict_boundaries import HeldoutRunPlan, raise_strict_model
 
 CommandRunner = Callable[[list[str]], int]
+
+_HARBOR_RUNNER_VARIABLES = (
+    "ALL_PROXY",
+    "CODEX_FORCE_AUTH_JSON",
+    "HOME",
+    "HTTPS_PROXY",
+    "HTTP_PROXY",
+    "NO_PROXY",
+    "OPENAI_API_KEY",
+    "all_proxy",
+    "https_proxy",
+    "http_proxy",
+    "no_proxy",
+)
 
 
 def _read_json(path: Path) -> Any:
@@ -33,7 +47,11 @@ def _json_digest(value: Any) -> str:
 
 
 def _file_digest(path: Path) -> str:
-    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+    try:
+        contents = path.read_bytes()
+    except OSError as exc:
+        raise HarborSuiteError("held-out manifest cannot be read for binding") from exc
+    return "sha256:" + hashlib.sha256(contents).hexdigest()
 
 
 def _plan_digest(plan: dict[str, Any]) -> str:
@@ -136,7 +154,11 @@ def _default_command(command: list[str]) -> int:
     if not command:
         return 1
     result = run_operator_command(
-        command[0], command[1:], cwd=Path.cwd(), timeout_seconds=3600.0
+        command[0],
+        command[1:],
+        cwd=Path.cwd(),
+        timeout_seconds=3600.0,
+        environment=operator_environment(include=_HARBOR_RUNNER_VARIABLES),
     )
     if result.exit_code is not None:
         return result.exit_code
@@ -373,6 +395,8 @@ def execute_plan(
 ) -> dict[str, Any]:
     plan, plan_digest, pair_ids = _validated_plan(plan_path)
     manifest_digest = str(plan["manifest_digest"])
+    if _file_digest(manifest_path) != manifest_digest:
+        raise HarborSuiteError("held-out manifest digest does not match the run plan")
     harbor_version = _resolve_harbor_version(manifest_path)
     ledger = _initial_ledger(ledger_path, plan, plan_digest, manifest_digest)
     if ledger["status"] == "COMPLETE":

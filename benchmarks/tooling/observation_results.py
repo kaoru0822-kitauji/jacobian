@@ -37,7 +37,7 @@ from benchmarks.tooling import (
     observation_comparison,
     observation_selection,
 )
-from benchmarks.tooling.command_runner import run_operator_command
+from benchmarks.tooling.command_runner import git_head_sha
 from benchmarks.tooling.errors import HarborSuiteError
 from benchmarks.tooling.harbor_suite import (
     ROOT,
@@ -86,12 +86,10 @@ def _validate_contract(value: dict[str, Any], schema_name: str) -> None:
 
 
 def _git_sha() -> str:
-    result = run_operator_command(
-        "git", ["rev-parse", "HEAD"], cwd=ROOT, timeout_seconds=30.0
-    )
-    if result.exit_code is None or result.exit_code != 0:
+    value = git_head_sha(ROOT)
+    if value is None:
         raise HarborSuiteError("unable to resolve git HEAD")
-    return result.stdout.decode("utf-8", "replace").strip()
+    return value
 
 
 def _find_result(jobs_dir: Path) -> Path:

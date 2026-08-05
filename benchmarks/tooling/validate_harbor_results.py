@@ -16,13 +16,20 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from benchmarks.tooling.command_runner import git_head_sha  # noqa: E402
 from benchmarks.tooling.errors import HarborSuiteError  # noqa: E402
 from benchmarks.tooling.harbor_suite import (  # noqa: E402
     ROOT,
     get_suite,
     task_digest,
 )
-from benchmarks.tooling.observation_results import _git_sha  # noqa: E402
+
+
+def _git_sha() -> str:
+    value = git_head_sha(ROOT)
+    if value is None:
+        raise HarborSuiteError("unable to resolve git HEAD")
+    return value
 
 
 def _task_id(name: Any) -> str:

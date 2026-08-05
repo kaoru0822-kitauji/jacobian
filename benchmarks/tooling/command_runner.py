@@ -10,6 +10,7 @@ from __future__ import annotations
 import math
 import os
 import queue
+import re
 import shutil
 import signal
 import subprocess
@@ -35,6 +36,7 @@ _OPERATOR_ENVIRONMENT_ALLOWLIST = frozenset(
         "WINDIR",
     }
 )
+_GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 
 
 class ToolCommandStatus(StrEnum):
@@ -162,6 +164,21 @@ def run_operator_command(
         stderr_limit_bytes=stderr_limit_bytes,
     )
     return run_tool_command(request)
+
+
+def git_head_sha(root: Path) -> str | None:
+    """Return the current Git commit through the bounded tooling boundary."""
+
+    result = run_operator_command(
+        "git", ("rev-parse", "HEAD"), cwd=root, timeout_seconds=30.0
+    )
+    if result.status is not ToolCommandStatus.EXITED or result.exit_code != 0:
+        return None
+    try:
+        value = result.stdout.decode("ascii", errors="strict").strip()
+    except UnicodeDecodeError:
+        return None
+    return value if _GIT_SHA.fullmatch(value) is not None else None
 
 
 def operator_environment(
