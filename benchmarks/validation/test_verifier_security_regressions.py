@@ -6,6 +6,7 @@ import shutil
 from pathlib import Path
 
 import pytest
+from benchmarks.validation._verifier_child import run_verifier_in_child
 from benchmarks.validation.agent_workflow_v1 import support
 
 ROOT = Path(__file__).parents[2]
@@ -95,9 +96,10 @@ def test_reliability_rejects_oversized_fraction_without_crashing(
     submission["result"]["probability"] = {"num": "9" * 5000, "den": "1"}
     _write_json(submission_path, submission)
 
-    rejected = support._run_verifier(task, app, logs)
+    rejected = run_verifier_in_child(task=task, app=app, logs=logs)
     assert rejected["correctness"] == 0.0
     assert rejected["reward"] == 0.0
+    assert (logs / "reward.json").is_file()
 
 
 def test_symmetry_recomputes_orbits_and_rejects_nested_endpoint_bypass(
@@ -220,6 +222,26 @@ def test_lean_repl_rejects_boolean_error_count(tmp_path: Path) -> None:
             "completed": True,
             "decomposition_observed": True,
             "tactics": [{"tactic": tactic, "goal_count": 0, "error_count": False}],
+        }
+        for task_id, tactic in (
+            ("CONJUNCTION-DECOMPOSITION", "constructor"),
+            ("LOCAL-PREMISE-APPLICATION", "exact h hP"),
+        )
+    ]
+    task, app, logs = _lean_case(tmp_path, tasks)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["reward"] == 0.0
+
+
+def test_lean_repl_derives_completion_from_final_goal_count(
+    tmp_path: Path,
+) -> None:
+    tasks = [
+        {
+            "task_id": task_id,
+            "completed": True,
+            "decomposition_observed": True,
+            "tactics": [{"tactic": tactic, "goal_count": 999, "error_count": 0}],
         }
         for task_id, tactic in (
             ("CONJUNCTION-DECOMPOSITION", "constructor"),

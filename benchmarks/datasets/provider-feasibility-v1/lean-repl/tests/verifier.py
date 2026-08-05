@@ -16,6 +16,24 @@ if isinstance(submission, dict) and isinstance(submission.get("evidence"), list)
 result = submission.get("result") if isinstance(submission, dict) else None
 tasks = report.get("tasks") if isinstance(report, dict) else None
 expected_task_ids = {"CONJUNCTION-DECOMPOSITION", "LOCAL-PREMISE-APPLICATION"}
+
+
+def _task_trace_is_complete(task):
+    traces = task.get("tactics") if isinstance(task, dict) else None
+    if not isinstance(traces, list) or not traces:
+        return False
+    if not all(
+        isinstance(trace, dict)
+        and isinstance(trace.get("tactic"), str)
+        and type(trace.get("goal_count")) is int
+        and type(trace.get("error_count")) is int
+        and trace.get("error_count") == 0
+        for trace in traces
+    ):
+        return False
+    return traces[-1]["goal_count"] == 0
+
+
 valid_tasks = bool(
     isinstance(tasks, list)
     and len(tasks) == 2
@@ -56,22 +74,7 @@ valid = bool(
     and report.get("parameter_error_count") == 0
     and report.get("return_code") == 0
     and valid_tasks
-    and all(
-        isinstance(item, dict)
-        and item.get("completed") is True
-        and item.get("decomposition_observed") is True
-        and isinstance(item.get("tactics"), list)
-        and item["tactics"]
-        and all(
-            isinstance(trace, dict)
-            and isinstance(trace.get("tactic"), str)
-            and type(trace.get("goal_count")) is int
-            and type(trace.get("error_count")) is int
-            and trace.get("error_count") == 0
-            for trace in item["tactics"]
-        )
-        for item in tasks
-    )
+    and all(_task_trace_is_complete(item) for item in tasks)
 )
 target = Path("/logs/verifier/reward.json")
 target.parent.mkdir(parents=True, exist_ok=True)
