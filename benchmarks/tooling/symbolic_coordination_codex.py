@@ -498,15 +498,17 @@ def _catalog_contract(
     auth_file: Path,
     source: Mapping[str, str],
 ) -> tuple[dict[str, Any], str]:
-    with _ephemeral_codex_home(auth_file) as codex_home:
-        result = _run(
-            codex,
-            ("debug", "models"),
-            cwd=ROOT,
-            environment=_command_environment(source, codex_home=codex_home),
-            timeout_seconds=60.0,
-            stdout_limit_bytes=4 * 1024 * 1024,
-        )
+    # Model discovery is an operator-side check, not a model-visible process.
+    # Reuse Codex's local catalog cache so a transient refresh failure cannot
+    # silently replace the account catalog with a smaller bundled fallback.
+    result = _run(
+        codex,
+        ("debug", "models"),
+        cwd=ROOT,
+        environment=_command_environment(source, codex_home=auth_file.parent),
+        timeout_seconds=60.0,
+        stdout_limit_bytes=4 * 1024 * 1024,
+    )
     catalog = _decode_json_object(
         _command_succeeded(result, label="codex debug models"),
         label="codex debug models",
