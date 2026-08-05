@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -197,9 +198,18 @@ def _timing_seconds(value: Any) -> float | None:
 
 def _trial_status(trial: dict[str, Any], exception: Any) -> str:
     raw = trial.get("status")
-    if isinstance(raw, str) and raw in {"TIMEOUT", "CANCELLED"}:
+    if isinstance(raw, str) and raw in {
+        "RUNNING",
+        "PENDING",
+        "FAILED",
+        "ERROR",
+        "TIMEOUT",
+        "CANCELLED",
+    }:
         return raw
     if exception is not None:
+        return "ERROR"
+    if isinstance(raw, str) and raw != "COMPLETED":
         return "ERROR"
     return "COMPLETED"
 
@@ -462,6 +472,31 @@ def _resolve_binding_values(
     return snapshot_id, harbor_version, snapshot_failures + harbor_failures
 
 
+def _jacobian_image_failures(runtime: dict[str, Any]) -> list[str]:
+    condition = runtime.get("condition")
+    if not isinstance(condition, dict) or condition.get("jacobian_enabled") is not True:
+        return []
+    image = runtime.get("jacobian_image")
+    if not isinstance(image, dict):
+        return ["Jacobian-enabled runtime snapshot must bind jacobian_image"]
+    failures: list[str] = []
+    if image.get("source_dirty") is not False:
+        failures.append("Jacobian image must come from a clean source revision")
+    digest_reference = image.get("digest_reference")
+    if not isinstance(digest_reference, str) or not re.fullmatch(
+        r"[^@]+@sha256:[0-9a-f]{64}", digest_reference
+    ):
+        failures.append("Jacobian image must be bound by an OCI digest")
+    if not isinstance(image.get("platform"), str) or "/" not in image["platform"]:
+        failures.append("Jacobian image platform is not bound")
+    if (
+        not isinstance(image.get("jacobian_package_version"), str)
+        or not image["jacobian_package_version"]
+    ):
+        failures.append("Jacobian package version is not bound")
+    return failures
+
+
 def build_observation_evidence(
     *,
     dataset: str,
@@ -601,12 +636,14 @@ def build_observation_evidence(
             "harbor_version must be a non-empty string bound by the job, runtime, or manifest"
         )
         harbor_version = None
+    source_sha = _git_sha()
+    failures.extend(_jacobian_image_failures(runtime))
     evidence = {
         "schema_version": "3",
         "evidence_class": evidence_class,
         "causal_claim_authorized": False,
         "status": "VALID" if not failures else "INCOMPLETE",
-        "source_sha": _git_sha(),
+        "source_sha": source_sha,
         "dataset": dataset_id,
         "condition": condition,
         "snapshot_id": snapshot_id,
@@ -651,8 +688,19 @@ def _heldout_plan_failures(
         failures.append("held-out ledger does not bind the canonical manifest")
     if ledger.get("status") != "COMPLETE":
         failures.append("held-out execution ledger is not COMPLETE")
+    runs = plan.get("runs")
+    if not isinstance(runs, list):
+        failures.append("held-out plan runs must be a list")
+        return [], failures
+    malformed = [index for index, run in enumerate(runs) if not isinstance(run, dict)]
+    if malformed:
+        failures.extend(
+            f"held-out plan runs[{index}] must be an object" for index in malformed
+        )
     selected = [
-        run for run in plan.get("runs", []) if run.get("condition") == condition
+        run
+        for run in runs
+        if isinstance(run, dict) and run.get("condition") == condition
     ]
     if len(selected) != plan.get("pair_count"):
         failures.append(f"held-out {condition} run coverage is incomplete")
@@ -797,6 +845,17 @@ def collect_heldout_evidence(
         experiment["stages"][stage]["task_ids"] if stage in experiment["stages"] else []
     )
     runtime_invariants = _heldout_runtime_invariants(plan)
+    evidence_runtime = dict(runtime_invariants)
+    if condition == "C2":
+        treatment = next(item for item in manifest["conditions"] if item["id"] == "C2")
+        evidence_runtime["jacobian_image"] = {
+            "source_sha": treatment["source_sha"],
+            "source_dirty": False,
+            "reference": treatment["image"],
+            "digest_reference": treatment["image"],
+            "platform": treatment["platform"],
+            "jacobian_package_version": treatment["server_version"],
+        }
     models = sorted(
         {str(item["model"]) for item in trials if item.get("model") is not None}
     )
@@ -856,7 +915,7 @@ def collect_heldout_evidence(
             ),
             "n_attempts": len(selected),
         },
-        "runtime_snapshot": runtime_invariants,
+        "runtime_snapshot": evidence_runtime,
         "fixed_invariants": {
             "model": models[0] if len(models) == 1 else None,
             "tasks": [

@@ -68,15 +68,44 @@ the local Compose network.
 ## Run with Jacobian
 
 The local path uses Harbor's Docker environment, a Jacobian Compose sidecar,
-and Harbor's external MCP configuration. The default sidecar image is
-`jacobian:local`. The treatment contract is deliberately small: Codex has
-Jacobian at `http://jacobian:8000/mcp`, and Codex web search is disabled.
+and Harbor's external MCP configuration. The treatment contract is deliberately
+small: Codex has Jacobian at `http://jacobian:8000/mcp`, and Codex web search is
+disabled.
+
+Choose the image from the source tree state. A clean revision pulls its
+published full-SHA tag and resolves it to an immutable OCI digest. A dirty tree
+builds `jacobian:local`, reusing Docker's normal local layer cache:
 
 ```sh
-export JACOBIAN_IMAGE='jacobian:local'
+export JACOBIAN_IMAGE="$(make --no-print-directory eval-image)"
+```
+
+Published images live at `ghcr.io/morluto/jacobian`. The `main` and version-tag
+workflow publishes both a human-readable `sha-<full-commit>` tag and registry
+attestations, but evaluations use the returned `name@sha256:...` reference.
+Pull-request builds exercise the Dockerfile without publishing an image. OCI or
+Docker image archives are never repository artifacts and must not be committed.
+
+Create the normal runtime snapshot before execution, then pass its path to the
+run. `agent-eval` inspects the selected image immediately before Harbor starts
+and adds its source SHA, OCI digest (or local image ID), platform, dirty flag,
+and Jacobian package version. A Jacobian-enabled observation made from a dirty
+or non-digest-pinned image remains useful for development, but normalization
+fails closed rather than calling it reproducible evidence.
+
+```sh
+export SNAPSHOT_LOCK='benchmarks/snapshots/agent-workflow-v1/6c6d41612502da5486bc23843e027a30cf91398ecf7c749cb8a017c56490707d.lock.json'
+export RUNTIME_SNAPSHOT='benchmarks/results/my-run/runtime.json'
+mkdir -p "$(dirname "$RUNTIME_SNAPSHOT")"
+jq --arg model "$JACOBIAN_MODEL" \
+  '{snapshot_id, harbor_version: "0.20.0", model: $model,
+    condition: {id: "treatment", role: "PRIMARY_TREATMENT",
+                jacobian_enabled: true, reasoning_log_mode: "OFF"}}' \
+  "$SNAPSHOT_LOCK" > "$RUNTIME_SNAPSHOT"
 
 make agent-eval DATASET=agent-workflow-v1 \
-  JACOBIAN_ENABLED=1 EVAL_EXECUTE=1
+  JACOBIAN_ENABLED=1 EVAL_EXECUTE=1 \
+  RUNTIME_SNAPSHOT="$RUNTIME_SNAPSHOT"
 ```
 
 Use `TASKS=graph-counterexample` for a small smoke run. The treatment run uses
@@ -262,7 +291,9 @@ checked for drift:
 make agent-eval-validate RESULTS=benchmarks/results/agent-workflow-v1 \
   JOB=<job-name> CONDITION=control OUTPUT=benchmarks/results/normalized-control.json
 make agent-eval-validate RESULTS=benchmarks/results/agent-workflow-v1 \
-  JOB=<job-name> CONDITION=treatment OUTPUT=benchmarks/results/normalized-treatment.json
+  JOB=<job-name> CONDITION=treatment \
+  RUNTIME_SNAPSHOT="$RUNTIME_SNAPSHOT" \
+  OUTPUT=benchmarks/results/normalized-treatment.json
 make agent-eval-compare \
   CONTROL=benchmarks/results/normalized-control.json \
   TREATMENT=benchmarks/results/normalized-treatment.json \

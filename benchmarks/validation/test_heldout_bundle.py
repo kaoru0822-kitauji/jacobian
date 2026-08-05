@@ -20,11 +20,33 @@ from benchmarks.tooling.heldout_bundle import (
 )
 from benchmarks.tooling.observation_comparison import compare_evidence
 from benchmarks.tooling.observation_results import (
+    _heldout_plan_failures,
     _mark_invoked_if_capability_used,
     collect_heldout_evidence,
 )
 
 ROOT = Path(__file__).parents[2]
+
+
+@pytest.mark.parametrize("runs", (["bad-run"], None))
+def test_heldout_evidence_rejects_malformed_run_entries(runs: object) -> None:
+    selected, failures = _heldout_plan_failures(
+        {
+            "runs": runs,
+            "pair_count": 1,
+            "manifest_digest": "sha256:" + "a" * 64,
+            "plan_digest": "sha256:" + "b" * 64,
+        },
+        {
+            "plan_digest": "sha256:" + "b" * 64,
+            "manifest_digest": "sha256:" + "a" * 64,
+            "status": "COMPLETE",
+        },
+        "C1",
+    )
+
+    assert selected == []
+    assert any("held-out plan runs" in failure for failure in failures)
 
 
 def _manifest() -> dict:
@@ -69,6 +91,8 @@ def _manifest() -> dict:
                 "jacobian_enabled": True,
                 "reasoning_log_mode": "OFF",
                 "image": "registry.invalid/jacobian@sha256:" + "4" * 64,
+                "source_sha": "b" * 40,
+                "platform": "linux/amd64",
                 "server_version": "1.2.3",
                 "policy_profile": "DEFAULT",
                 "catalog_digest": "sha256:" + "5" * 64,
@@ -400,6 +424,14 @@ def test_render_expands_stable_pairs_and_keeps_control_jacobian_free(
             assert len(job["environment"]["extra_docker_compose"]) == 1
         else:
             assert run["jacobian_enabled"] is True
+            assert runtime["jacobian_image"] == {
+                "source_sha": "b" * 40,
+                "source_dirty": False,
+                "reference": "registry.invalid/jacobian@sha256:" + "4" * 64,
+                "digest_reference": "registry.invalid/jacobian@sha256:" + "4" * 64,
+                "platform": "linux/amd64",
+                "jacobian_package_version": "1.2.3",
+            }
             assert job["agents"][0]["mcp_servers"][0]["name"] == "jacobian"
             assert len(job["environment"]["extra_docker_compose"]) == 2
     assert plan["budget"]["missing_accounting"] == "INCOMPLETE"
@@ -497,6 +529,14 @@ def test_complete_plan_collects_exact_pairs_and_derives_heldout_report(
 
     assert control_failures == treatment_failures == []
     assert len(control["trials"]) == 9
+    assert treatment["runtime_snapshot"]["jacobian_image"] == {
+        "source_sha": "b" * 40,
+        "source_dirty": False,
+        "reference": "registry.invalid/jacobian@sha256:" + "4" * 64,
+        "digest_reference": "registry.invalid/jacobian@sha256:" + "4" * 64,
+        "platform": "linux/amd64",
+        "jacobian_package_version": "1.2.3",
+    }
     assert report["status"] == "VALID"
     assert report["evidence_class"] == "held-out-comparison"
     assert report["pair_count"] == 9
