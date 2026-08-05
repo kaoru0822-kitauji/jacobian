@@ -1,20 +1,20 @@
 schema_version = "1"
 
 [[datasets]]
-id = "jacobian/agent-workflow-v1"
-directory = "benchmarks/datasets/agent-workflow-v1"
+id = "jacobian/mathematical-benchmarks-v1"
+directory = "benchmarks/datasets/mathematical-benchmarks-v1"
 evaluation_kind = "workflow"
 scored = true
 publication_status = "local"
 required_provider = "core"
 runtime_profile = "core"
-title = "Jacobian agent workflow observations"
-purpose = "Fixed Jacobian-enabled mathematical workflows for Oracle validation and agent observation."
-claim_class = "workflow-observation"
+title = "Jacobian mathematical benchmarks"
+purpose = "Fixed hidden-runtime mathematical tasks for independently checked benchmark evaluation and optional workflow observation."
+claim_class = "mathematical-task-correctness"
 answer_visibility = "hidden-at-runtime"
 default_execution_profile = "oracle-and-observation"
-oracle_jobs_dir = "benchmarks/results/agent-workflow-v1-oracle"
-observation_jobs_dir = "benchmarks/results/agent-workflow-v1"
+oracle_jobs_dir = "benchmarks/results/mathematical-benchmarks-v1-oracle"
+observation_jobs_dir = "benchmarks/results/mathematical-benchmarks-v1"
 compose_file = "jacobian-observation.compose.yaml"
 [datasets.jobs]
 oracle = "jobs/oracle.json"

@@ -10,7 +10,7 @@ from tools.check_architecture import check_architecture
 
 _ROOT = Path(__file__).resolve().parents[3]
 _REAL_TASK = (
-    _ROOT / "benchmarks/datasets/agent-workflow-v1/finite-field-irreducibility-repair"
+    _ROOT / "benchmarks/datasets/mathematical-benchmarks-v1/finite-field-irreducibility-repair"
 )
 
 
@@ -22,8 +22,8 @@ def _write(root: Path, relative: str, source: str) -> Path:
 
 
 def _copy_real_task(root: Path, task_name: str) -> None:
-    """Copy a real agent-workflow-v1 task into the test tree."""
-    dest = root / "benchmarks/datasets/agent-workflow-v1" / task_name
+    """Copy a real mathematical-benchmarks-v1 task into the test tree."""
+    dest = root / "benchmarks/datasets/mathematical-benchmarks-v1" / task_name
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(_REAL_TASK, dest)
 
@@ -32,7 +32,7 @@ def test_public_contract_drift_is_flagged(tmp_path: Path) -> None:
     _copy_real_task(tmp_path, "test-task")
     schema_path = (
         tmp_path
-        / "benchmarks/datasets/agent-workflow-v1/test-task/environment/submission_schema.json"
+        / "benchmarks/datasets/mathematical-benchmarks-v1/test-task/environment/submission_schema.json"
     )
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
     schema["required"] = ["task_id"]
@@ -53,7 +53,7 @@ def test_public_contract_no_drift_passes(tmp_path: Path) -> None:
 
 def test_missing_public_contract_is_a_violation(tmp_path: Path) -> None:
     task_dir = (
-        tmp_path / "benchmarks/datasets/agent-workflow-v1" / "missing-contract-task"
+        tmp_path / "benchmarks/datasets/mathematical-benchmarks-v1" / "missing-contract-task"
     )
     (task_dir / "tests").mkdir(parents=True)
     (task_dir / "environment").mkdir(parents=True)
@@ -68,7 +68,7 @@ def test_missing_public_contract_is_a_violation(tmp_path: Path) -> None:
 
 def test_non_task_directory_does_not_require_contract(tmp_path: Path) -> None:
     """Directories without task.toml (e.g. jobs/, members/) are not tasks."""
-    meta_dir = tmp_path / "benchmarks/datasets/agent-workflow-v1" / "metadata"
+    meta_dir = tmp_path / "benchmarks/datasets/mathematical-benchmarks-v1" / "metadata"
     (meta_dir / "tests").mkdir(parents=True)
     report = check_architecture(tmp_path)
     drift = [v for v in report.violations if v.code == "public-contract-drift"]

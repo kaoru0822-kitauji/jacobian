@@ -21,7 +21,7 @@ runtime.  It enforces six PR10 invariants:
    environment (``dict(os.environ)``, ``os.environ.copy()``, ``**os.environ``)
    into child-process calls.  Selective ``os.environ.get`` access is fine.
 
-5. **public-contract-drift**: every canonical agent-workflow-v1 task must
+5. **public-contract-drift**: every canonical mathematical-benchmarks-v1 task must
    have a ``public_contract.json`` and its projection must match the rendered
    ``submission_schema.json`` and ``instruction.md``.  A missing contract is
    a violation, not a skip.
@@ -124,7 +124,7 @@ _SUBPROCESS_ALLOWED_EXACT: frozenset[PurePosixPath] = frozenset(
         PurePosixPath("tests/unit/tooling/test_architecture_diagnostics.py"),
         # Repository-command integration tests deliberately invoke CLI entrypoints.
         PurePosixPath(
-            "benchmarks/validation/agent_workflow_v1/"
+            "benchmarks/validation/mathematical_benchmarks_v1/"
             "test_multiplicative_grid_extremum.py"
         ),
         PurePosixPath("benchmarks/validation/test_benchmark_plan_validation.py"),
@@ -163,8 +163,8 @@ _SHUTIL_WHICH_ALLOWED: frozenset[PurePosixPath] = frozenset(
 # os.environ spreading: product source only.
 _ENVIRON_SPREAD_ROOTS = (PurePosixPath("src"),)
 
-# Public-contract checks apply only to agent-workflow-v1 tasks.
-_DATASET_PREFIX = PurePosixPath("benchmarks/datasets/agent-workflow-v1")
+# Public-contract checks apply only to mathematical-benchmarks-v1 tasks.
+_DATASET_PREFIX = PurePosixPath("benchmarks/datasets/mathematical-benchmarks-v1")
 
 # Unsupported surfaces: scan supported src, tests, schemas, catalog, and docs.
 # Tokens are built from fragments so the checker source does not self-trigger.
@@ -834,7 +834,7 @@ def check_architecture(root: Path | str = ROOT) -> ArchitectureReport:
     run_bounded_process gateway confinement, shutil.which resolver
     confinement, os.environ spreading, and unsupported experimental
     surfaces.  Scans non-Python text files (docs, schemas, catalog) for
-    unsupported surfaces.  Additionally checks every agent-workflow-v1
+    unsupported surfaces.  Additionally checks every mathematical-benchmarks-v1
     task public-contract projection for drift (missing contracts are
     violations).
     """
