@@ -1106,27 +1106,36 @@ def _audit_report_failures(path: Path, *, revised: bool) -> list[str]:
 
 def _verification_copy(
     condition_root: Path,
-    workspace: Path,
+    submission_root: Path,
+    *,
+    verification_directory: str,
 ) -> tuple[Path, Path]:
-    verification = condition_root / "verification"
+    verification = condition_root / verification_directory
     app = verification / "app"
     logs = verification / "logs"
     app.mkdir(parents=True)
     logs.mkdir()
-    submission = workspace / "submission.json"
+    submission = submission_root / "submission.json"
     if submission.is_symlink() or not submission.is_file():
         raise HarnessError("MISSING_OUTPUT: submission.json is absent")
     shutil.copyfile(submission, app / "submission.json")
-    _copy_regular_tree(workspace / "evidence", app / "evidence")
+    _copy_regular_tree(submission_root / "evidence", app / "evidence")
     return app, logs
 
 
 def _run_verification(
     task: TaskContract,
     condition_root: Path,
-    workspace: Path,
+    submission_root: Path,
+    *,
+    result_name: str,
+    verification_directory: str,
 ) -> Mapping[str, Any]:
-    app, logs = _verification_copy(condition_root, workspace)
+    app, logs = _verification_copy(
+        condition_root,
+        submission_root,
+        verification_directory=verification_directory,
+    )
     try:
         reward = run_verifier_in_child(
             task=task.path,
@@ -1144,7 +1153,7 @@ def _run_verification(
         "reward": reward,
         "verifier_workspace_outside_model_workspace": True,
     }
-    _write_json(condition_root / "verifier-result.json", result)
+    _write_json(condition_root / result_name, result)
     return result
 
 
@@ -1193,6 +1202,7 @@ def _condition_result(
     failures: Sequence[str],
     primary_telemetry: Mapping[str, Any],
     audit_telemetry: Mapping[str, Any] | None,
+    initial_verifier: Mapping[str, Any] | None,
     verifier: Mapping[str, Any] | None,
     reasoning_logs: Mapping[str, Any] | None,
     revision_applied: bool | None,
@@ -1220,6 +1230,7 @@ def _condition_result(
         else None,
         "revision_applied": revision_applied,
         "reasoning_logs": reasoning_logs,
+        "initial_verifier": initial_verifier,
         "verifier": verifier,
     }
     return payload
@@ -1258,10 +1269,19 @@ def run_condition(
     _assert_global_invariants(task, preflight_result, source)
     revision_applied: bool | None = None
     audit_telemetry: Mapping[str, Any] | None = None
+    initial_verifier: Mapping[str, Any] | None = None
     if (workspace / "submission.json").is_file():
         _preserve_submission(workspace, condition_root / "pre-audit")
     else:
         failures.append("primary:MISSING_OUTPUT")
+    if not failures:
+        initial_verifier = _run_verification(
+            task,
+            condition_root,
+            condition_root / "pre-audit",
+            result_name="initial-verifier-result.json",
+            verification_directory="initial-verification",
+        )
     if condition == "C" and not failures:
         before = _submission_state_digest(workspace)
         audit, audit_telemetry, _audit_timing = _run_codex_stage(
@@ -1294,7 +1314,17 @@ def run_condition(
     )
     verifier: Mapping[str, Any] | None = None
     if not failures:
-        verifier = _run_verification(task, condition_root, workspace)
+        if condition == "C":
+            verifier = _run_verification(
+                task,
+                condition_root,
+                workspace,
+                result_name="verifier-result.json",
+                verification_directory="verification",
+            )
+        else:
+            verifier = initial_verifier
+            _write_json(condition_root / "verifier-result.json", verifier)
     _assert_snapshot(output / "runtime-snapshot.json", snapshot_digest)
     _assert_global_invariants(task, preflight_result, source)
     result = _condition_result(
@@ -1303,6 +1333,7 @@ def run_condition(
         failures=failures,
         primary_telemetry=primary_telemetry,
         audit_telemetry=audit_telemetry,
+        initial_verifier=initial_verifier,
         verifier=verifier,
         reasoning_logs=reasoning_logs,
         revision_applied=revision_applied,

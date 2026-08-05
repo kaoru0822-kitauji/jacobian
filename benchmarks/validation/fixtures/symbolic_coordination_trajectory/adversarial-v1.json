@@ -1,0 +1,164 @@
+{
+  "schema_version": "1",
+  "cases": {
+    "duplicated_calls": {
+      "events": [
+        {
+          "type": "item.completed",
+          "item": {
+            "type": "mcp_tool_call",
+            "tool": "capability.invoke",
+            "arguments": {
+              "capability_id": "polynomial.map.evaluate",
+              "payload": {"point": ["0"]}
+            },
+            "status": "completed",
+            "result": {
+              "isError": false,
+              "content": [{"type": "text", "text": "{\"capability_id\":\"polynomial.map.evaluate\",\"execution\":{\"status\":\"COMPLETED\"},\"output\":{\"status\":\"COMPLETED\"},\"artifact_uris\":[],\"completeness\":{\"status\":\"COMPLETE\"}}"}]
+            }
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "type": "mcp_tool_call",
+            "tool": "capability.invoke",
+            "arguments": {
+              "capability_id": "polynomial.map.evaluate",
+              "payload": {"point": ["0"]}
+            },
+            "status": "completed",
+            "result": {
+              "isError": false,
+              "content": [{"type": "text", "text": "{\"capability_id\":\"polynomial.map.evaluate\",\"execution\":{\"status\":\"COMPLETED\"},\"output\":{\"status\":\"COMPLETED\"},\"artifact_uris\":[],\"completeness\":{\"status\":\"COMPLETE\"}}"}]
+            }
+          }
+        }
+      ]
+    },
+    "missing_checker": {
+      "events": [
+        {
+          "type": "item.completed",
+          "item": {
+            "type": "mcp_tool_call",
+            "tool": "capability.invoke",
+            "arguments": {
+              "capability_id": "polynomial.map.inverse.candidate_synthesize",
+              "payload": {"maximum_degree": 2}
+            },
+            "status": "completed",
+            "result": {
+              "isError": false,
+              "content": [{"type": "text", "text": "{\"capability_id\":\"polynomial.map.inverse.candidate_synthesize\",\"execution\":{\"status\":\"COMPLETED\"},\"output\":{\"status\":\"FOUND\",\"candidate_inverse_map\":{}},\"artifact_uris\":[\"artifact://sha256/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"],\"completeness\":{\"status\":\"COMPLETE\"}}"}]
+            }
+          }
+        }
+      ]
+    },
+    "timeout_overclaim": {
+      "final_conclusion": "TRUE",
+      "events": [
+        {
+          "type": "item.completed",
+          "item": {
+            "type": "mcp_tool_call",
+            "tool": "capability.invoke",
+            "arguments": {
+              "capability_id": "polynomial.map.collision.search",
+              "payload": {"max_abs_numerator": 8}
+            },
+            "status": "completed",
+            "result": {
+              "isError": true,
+              "content": [{"type": "text", "text": "{\"capability_id\":\"polynomial.map.collision.search\",\"execution\":{\"status\":\"TIMEOUT\"},\"output\":{\"status\":\"TIMEOUT\"},\"artifact_uris\":[],\"completeness\":{\"status\":\"UNKNOWN\"}}"}]
+            }
+          }
+        }
+      ]
+    },
+    "stale_artifact": {
+      "events": [
+        {
+          "type": "item.completed",
+          "item": {
+            "type": "mcp_tool_call",
+            "tool": "capability.invoke",
+            "arguments": {
+              "capability_id": "polynomial.map.collision_witness",
+              "payload": {"first_evaluation_uri": "artifact://sha256/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+            },
+            "status": "failed",
+            "result": {
+              "isError": true,
+              "content": [{"type": "text", "text": "{\"error\":{\"code\":\"MISBOUND_POLYNOMIAL_EVALUATION_ARTIFACT\"}}"}]
+            }
+          }
+        }
+      ]
+    },
+    "artifact_substitution": {
+      "events": [
+        {
+          "type": "item.completed",
+          "item": {
+            "type": "mcp_tool_call",
+            "tool": "capability.invoke",
+            "arguments": {
+              "capability_id": "polynomial.map.collision_witness",
+              "payload": {"first_evaluation_uri": "artifact://sha256/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}
+            },
+            "status": "failed",
+            "result": {
+              "isError": true,
+              "content": [{"type": "text", "text": "{\"error\":{\"code\":\"INCOMPATIBLE_POLYNOMIAL_EVALUATION_ARTIFACT\"}}"}]
+            }
+          }
+        }
+      ]
+    },
+    "malformed_logs": {
+      "raw_jsonl": "{\"type\":\"thread.started\"}\n{not-json}\n"
+    },
+    "missing_token_usage": {
+      "omit_usage": true,
+      "infrastructure_failures": ["primary:MISSING_TOKEN_USAGE"]
+    },
+    "audit_repair": {
+      "condition": "C",
+      "revision_applied": true,
+      "initial_reward": 0.0,
+      "final_reward": 1.0
+    },
+    "audit_regression": {
+      "condition": "C",
+      "revision_applied": true,
+      "initial_reward": 1.0,
+      "final_reward": 0.0
+    },
+    "audit_unchanged_failure": {
+      "condition": "C",
+      "revision_applied": false,
+      "initial_reward": 0.0,
+      "final_reward": 0.0
+    },
+    "audit_already_correct": {
+      "condition": "C",
+      "revision_applied": false,
+      "initial_reward": 1.0,
+      "final_reward": 1.0
+    },
+    "audit_incomplete": {
+      "condition": "C",
+      "revision_applied": false,
+      "initial_reward": 0.0,
+      "final_reward": null,
+      "infrastructure_failures": ["audit:CODEX_TIMEOUT"]
+    },
+    "incomplete_run": {
+      "infrastructure_failures": ["primary:CODEX_TIMEOUT"],
+      "final_reward": null
+    }
+  }
+}

@@ -334,7 +334,7 @@ def test_rejected_math_is_observation_not_infrastructure_failure(
     monkeypatch.setattr(
         sc,
         "_run_verification",
-        lambda *args: {
+        lambda *args, **kwargs: {
             "execution_status": "COMPLETED",
             "mathematical_observation": "REJECTED",
             "reward": {"reward": 0.0},
@@ -362,13 +362,20 @@ def test_condition_c_runs_one_primary_mcp_stage_and_one_non_mcp_audit(
     output.mkdir()
     snapshot, digest = _snapshot(output)
     calls: list[tuple[str, bool]] = []
+    verification_calls: list[tuple[str, str]] = []
     monkeypatch.setattr(sc, "_assert_global_invariants", lambda *args: None)
     monkeypatch.setattr(sc, "_export_reasoning_logs", lambda *args: {"runs": []})
-    monkeypatch.setattr(
-        sc,
-        "_run_verification",
-        lambda *args: {"execution_status": "COMPLETED", "reward": {"reward": 1.0}},
-    )
+
+    def fake_verification(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        verification_calls.append(
+            (kwargs["result_name"], kwargs["verification_directory"])
+        )
+        return {
+            "execution_status": "COMPLETED",
+            "reward": {"reward": 1.0},
+        }
+
+    monkeypatch.setattr(sc, "_run_verification", fake_verification)
 
     def fake_stage(**kwargs: Any) -> tuple[ToolCommandResult, dict[str, Any], dict]:
         label = kwargs["label"]
@@ -409,7 +416,12 @@ def test_condition_c_runs_one_primary_mcp_stage_and_one_non_mcp_audit(
     )
 
     assert calls == [("primary", True), ("audit", False)]
+    assert verification_calls == [
+        ("initial-verifier-result.json", "initial-verification"),
+        ("verifier-result.json", "verification"),
+    ]
     assert result["infrastructure_status"] == "COMPLETE"
+    assert result["initial_verifier"]["execution_status"] == "COMPLETED"
     assert result["revision_applied"] is True
 
 
@@ -424,7 +436,10 @@ def test_condition_c_binds_revision_to_evidence_tree(
     monkeypatch.setattr(
         sc,
         "_run_verification",
-        lambda *args: {"execution_status": "COMPLETED", "reward": {"reward": 1.0}},
+        lambda *args, **kwargs: {
+            "execution_status": "COMPLETED",
+            "reward": {"reward": 1.0},
+        },
     )
 
     def fake_stage(**kwargs: Any) -> tuple[ToolCommandResult, dict[str, Any], dict]:
@@ -477,7 +492,11 @@ def test_verifier_copy_is_outside_model_workspace(tmp_path: Path) -> None:
     (workspace / "submission.json").write_text("{}\n", encoding="utf-8")
     (workspace / "evidence/certificate.json").write_text("{}\n", encoding="utf-8")
 
-    app, logs = sc._verification_copy(tmp_path / "condition", workspace)
+    app, logs = sc._verification_copy(
+        tmp_path / "condition",
+        workspace,
+        verification_directory="verification",
+    )
 
     assert app != workspace
     assert not app.is_relative_to(workspace)
