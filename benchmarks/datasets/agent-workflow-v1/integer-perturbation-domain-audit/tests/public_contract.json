@@ -28,7 +28,7 @@
     "minItems": 1,
     "type": "array"
   },
-  "public_notes": "The verifier checks the declared result, exact domain-semantics scope, completeness, digest-bound evidence, limitation claims, and assurance as separate protocol dimensions. State that no Lean compilation or irrationality theorem is claimed.",
+  "public_notes": "The verifier checks the declared result, exact domain-semantics scope, completeness, digest-bound evidence, limitation claims, and assurance as separate protocol dimensions. State both that Lean compilation is not assessed and that no irrationality theorem is claimed.",
   "required_artifact_filenames": [
     "evidence/answer.txt"
   ],

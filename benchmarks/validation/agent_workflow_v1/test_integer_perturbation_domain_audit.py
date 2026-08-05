@@ -152,6 +152,74 @@ def test_deeply_nested_evidence_json_does_not_crash(tmp_path: Path) -> None:
     assert result["reward"] == 0.0
 
 
+def test_rejects_affirmative_irrationality_claim_in_evidence(tmp_path: Path) -> None:
+    """Evidence prose must obey the irrationality limitation."""
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    evidence_path = app / "evidence" / "answer.txt"
+    evidence_path.write_text(
+        "natural integer perturbations are not assessed. "
+        "The source irrationality theorem has been proved.\n"
+        + evidence_path.read_text()
+    )
+    submission = json.loads((app / "submission.json").read_text())
+    submission["evidence"][0]["sha256"] = support._digest(evidence_path)
+    support._write_json(app / "submission.json", submission)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["evidence_validity"] == 0.0
+
+
+def test_rejects_missing_irrationality_limitation(tmp_path: Path) -> None:
+    """Both excluded claims require an explicit limitation."""
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    submission = json.loads((app / "submission.json").read_text())
+    submission["limitations"] = ["Lean compilation is not assessed."]
+    support._write_json(app / "submission.json", submission)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["limitation_accuracy"] == 0.0
+
+
+def test_rejects_not_only_irrationality_overclaim(tmp_path: Path) -> None:
+    """The phrase 'not only' is not a negation of the following claim."""
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    submission = json.loads((app / "submission.json").read_text())
+    submission["limitations"] = [
+        "Lean compilation is not assessed. Not only has the source irrationality "
+        "theorem been proved, it has been verified."
+    ]
+    support._write_json(app / "submission.json", submission)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["limitation_accuracy"] == 0.0
+
+
+def test_rejects_bool_int_evidence_marker_coercion(tmp_path: Path) -> None:
+    """Digest-bound JSON must preserve exact integer-versus-boolean types."""
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    evidence_path = app / "evidence" / "answer.txt"
+    submission = json.loads((app / "submission.json").read_text())
+    marker_result = json.loads(json.dumps(submission["result"]))
+    marker_result["nat_redundancy"]["a_lower_bound"] = False
+    evidence_path.write_text(
+        "natural integer not assessed\nRESULT_JSON: "
+        + json.dumps(marker_result, sort_keys=True, separators=(",", ":"))
+        + "\n"
+    )
+    submission["evidence"][0]["sha256"] = support._digest(evidence_path)
+    support._write_json(app / "submission.json", submission)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["evidence_validity"] == 0.0
+
+
+def test_scope_diagnostic_is_independent_of_assurance(tmp_path: Path) -> None:
+    """An unsupported assurance must not erase a correct scope diagnostic."""
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    submission = json.loads((app / "submission.json").read_text())
+    submission["claimed_assurance"] = "CHECKED"
+    support._write_json(app / "submission.json", submission)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["scope_accuracy"] == 1.0
+    assert rejected["assurance_calibration"] == 0.0
+
+
 def test_rejects_affirmative_irrationality_claim(tmp_path: Path) -> None:
     """Limitations that affirm an irrationality theorem must be rejected."""
     task, app, logs = support._prepare_case(tmp_path, TASK, "computed")

@@ -12,14 +12,15 @@ both signs, and at least two indices must have `a+b=0`. Report every period
 value, exact sum, extremal `b` value, and cancellation index.
 
 The verifier independently recomputes all bounds and periodic values. Do not
-claim Lean compilation or any irrationality theorem. Write the exact schema to
-`submission.json`; put a concise audit and a matching `RESULT_JSON:` line in
-`evidence/answer.txt`, and bind its SHA-256 digest.
+claim Lean compilation or any irrationality theorem. State both limitations in
+the `limitations` field. Write the exact schema to `submission.json`; put a
+concise audit and a matching `RESULT_JSON:` line in `evidence/answer.txt`, and
+bind its SHA-256 digest.
 
 <!-- BEGIN PUBLIC CONTRACT SUBMISSION BLOCK -->
 ## Submission
 
-The verifier checks the declared result, exact domain-semantics scope, completeness, digest-bound evidence, limitation claims, and assurance as separate protocol dimensions. State that no Lean compilation or irrationality theorem is claimed.
+The verifier checks the declared result, exact domain-semantics scope, completeness, digest-bound evidence, limitation claims, and assurance as separate protocol dimensions. State both that Lean compilation is not assessed and that no irrationality theorem is claimed.
 
 Write `/app/submission.json` to the exact schema in `environment/submission_schema.json`. The submission envelope requires `task_id`, `conclusion`, `result`, `claimed_assurance`, `scope`, `completeness`, `evidence`, and `limitations`.
 
