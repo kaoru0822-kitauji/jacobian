@@ -457,7 +457,16 @@ def _verify_snapshot(root: Path) -> dict[str, Any]:
         expected = _required(
             prompts, f"{stage}_digest", str, "runtime_snapshot.prompts"
         )
-        if _digest_file(root / f"{stage}-prompt.txt") != expected:
+        prompt_path = root / f"{stage}-prompt.txt"
+        if stage == "audit" and not prompt_path.exists():
+            feedback_digest = prompts.get("verifier_feedback_digest")
+            feedback_path = root / "feedback-prompt.txt"
+            if feedback_digest != expected or not feedback_path.is_file():
+                raise TrajectoryTelemetryError(
+                    "audit prompt is missing without a bound verifier-feedback alias"
+                )
+            prompt_path = feedback_path
+        if _digest_file(prompt_path) != expected:
             raise TrajectoryTelemetryError(f"{stage} prompt digest is inconsistent")
     return snapshot
 

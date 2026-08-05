@@ -901,9 +901,21 @@ def render_report(report: CloseoutReport) -> str:
 
 
 def emit_report(root: Path, output: Path) -> CloseoutReport:
+    markdown = output.with_suffix(".md")
+    existing = [path for path in (output, markdown) if path.exists()]
+    if existing:
+        raise CloseoutError(
+            "refusing to overwrite report output(s): "
+            + ", ".join(str(path) for path in existing)
+        )
     report = build_report(root)
     comparison._write_exclusive(output, report.model_dump(mode="json"))
-    comparison._write_exclusive(output.with_suffix(".md"), render_report(report))
+    markdown.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with markdown.open("x", encoding="utf-8", newline="") as stream:
+            stream.write(render_report(report))
+    except FileExistsError as exc:  # pragma: no cover - preflight covers the race
+        raise CloseoutError(f"refusing to overwrite {markdown}") from exc
     return report
 
 

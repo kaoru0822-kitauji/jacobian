@@ -118,6 +118,46 @@ observations, not evidence that the underlying mathematical capabilities are
 ineffective. The final PR5 JSON/Markdown report records the six-family D
 trajectories and must be cited with its frozen manifest and artifact roots.
 
+## Final bounded observation
+
+The frozen experiment ID is
+`sha256:feb57c79f212809ca547be3bb01607e3a8ff5e491585afee6e9e025cbda7e5ac`
+at source revision `3fd643acc7cc6af12f18239aa40f3f9db5ff5a26`.
+All 24 planned condition runs were collected, with zero pre-model failures,
+missing runs, or infrastructure-incomplete terminal records. The final report
+ID is
+`sha256:d6c69204ec63a8b99de95f6ca3785809bb8ec8b810e905f0a8684107ad7f2ea9`.
+
+Final checker acceptance was 0/6 for each of A, B, C, and D. Each condition's
+95% Wilson interval was 0.000–0.390. All four paired tables contained six
+both-failed pairs and no discordant pairs. Consequently the observed
+acceptance differences for A-to-B, B-to-C, B-to-D, and C-to-D were all zero;
+the exact paired values are descriptive only.
+
+Every D initial submission was rejected. Five feedback objects contained only
+`REPAIR_INPUT_BINDING`; the semantic-equivalence representative also contained
+`CHECK_MATHEMATICAL_CONCLUSION`. One D run applied a revision, but no run moved
+to checker acceptance: all six D outcomes were `UNCHANGED_FAILURE`. The
+semantic-equivalence revision also reduced evidence validity, illustrating why
+the report preserves every verifier dimension instead of treating a revision
+as improvement.
+
+No B, C, or D run invoked a Jacobian capability. Required reasoning-log
+protocol compliance was incomplete for all 18 Jacobian-enabled runs. Exact
+total tokens were 345,505 (A), 930,328 (B), 945,760 (C), and 472,385 (D);
+exact total wall times were 305.97, 360.06, 529.37, and 609.55 seconds,
+respectively. Monetary cost remained unavailable.
+
+Collection exposed one host-analyzer compatibility defect after the first D
+run: D correctly persisted the bound second-stage bytes as
+`feedback-prompt.txt`, while the PR3 analyzer expected the C-era name
+`audit-prompt.txt`. The completed A/B/D results were not rerun or mutated. The
+remaining unexecuted units were collected from the original frozen source with
+the same execution functions, and a collection-salvage record preserves that
+decision. Artifact-only analysis then used the tested compatibility rule that
+accepts the D filename only when `verifier_feedback_digest` exactly equals the
+bound `audit_digest`. The rule fails closed for a missing or mismatched alias.
+
 ## Reproduction and artifact boundaries
 
 Use the repository commands documented in
@@ -126,6 +166,13 @@ raw condition roots, clean-room verifier results, artifact indexes, and reports
 outside the repository. A report is reproducible only with its manifest,
 source SHA, exact raw roots, and committed schemas; a copied Markdown table is
 not sufficient evidence.
+
+For this observation, the host-local artifact root was
+`/tmp/jacobian-sc-pr5-closeout-3fd643ac-20260805-live`; the final typed outputs
+were
+`/tmp/jacobian-sc-pr5-closeout-report-3fd643ac-20260805-final2.json` and the
+matching `.md` file. These paths are machine-local handoff locations, not
+published benchmark assets.
 
 Oracle submissions, verifier implementation files, generated expected values,
 and generator internals stay outside every model workspace. Public task inputs,
