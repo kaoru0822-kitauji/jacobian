@@ -392,6 +392,29 @@ apply CPU and address-space limits before execution. Checker dispatch
 remeasures the authorized provider identity, and an interrupted or
 identity-mismatched replay cannot create a verification record.
 
+## External process ownership
+
+`run_bounded_process` is the low-level engine for bounded capture, deadlines,
+cancellation, resource limits, and descendant cleanup. Product code reaches it
+through the product process-policy gateway, which requires an absolute primary
+executable, explicit working directory and environment, positive timeout, and
+stdout and stderr limits. Provider bootstrap owns executable discovery and
+records the resolved identity; the gateway never searches ambient `PATH`.
+Authorized provider and checker identities are remeasured immediately before
+execution.
+
+Repository operations use a separate tooling command runner. Harbor, Git,
+Docker, `uvx`, validation commands, and feasibility probes resolve their
+operator-installed executables before constructing a bounded request. Product
+runtime code must not import this runner. Both boundaries use explicit
+environment policies rather than forwarding the complete host environment;
+providers that launch nested tools receive only an authorized toolchain
+`PATH`.
+
+These boundaries provide bounded host-process containment. They do not claim
+filesystem or network sandboxing, and process completion never establishes a
+mathematical conclusion.
+
 ## Bounded discovery
 
 A bounded enumeration capability validates its claim, domain contract, scope,
