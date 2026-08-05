@@ -102,7 +102,8 @@ def main():
     math_correct = _valid_design(data.get("result"), source)
     evidence_valid = _evidence(data.get("evidence"), data.get("result"))
     scope_correct = bool(
-        data.get("scope") == expected["required_scope"]
+        type(data.get("claimed_assurance")) is str
+        and data.get("scope") == expected["required_scope"]
         and data.get("limitations") == expected["limitations"]
     )
     assurance_correct = data.get("claimed_assurance") == expected["maximum_assurance"]
