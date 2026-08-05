@@ -1,4 +1,4 @@
-"""Tests for observation comparison behavior (preserved v2 public contract)."""
+"""Tests for observation comparison behavior."""
 
 from __future__ import annotations
 
@@ -53,6 +53,28 @@ def test_comparison_rejects_duplicate_pair_keys() -> None:
 
     assert report["status"] == "INVALID"
     assert "duplicate" in " ".join(report["validation_failures"])
+
+
+def test_comparison_rejects_valid_claim_with_noncompleted_trial() -> None:
+    import pytest
+    from benchmarks.tooling.errors import HarborSuiteError
+
+    control = _evidence("control", [1.0])
+    control["trials"][0]["status"] = "RUNNING"
+
+    with pytest.raises(HarborSuiteError, match=r"non-COMPLETED|COMPLETED"):
+        compare_evidence(control, _evidence("treatment", [1.0]))
+
+
+def test_comparison_failures_flag_valid_claim_with_noncompleted_trial() -> None:
+    from benchmarks.tooling.observation_comparison import _comparison_failures
+
+    control = _evidence("control", [1.0])
+    control["trials"][0]["status"] = "RUNNING"
+    treatment = _evidence("treatment", [1.0])
+
+    failures = _comparison_failures(control, treatment)
+    assert any("non-COMPLETED trials" in failure for failure in failures)
 
 
 def test_comparison_derives_heldout_class_from_both_inputs() -> None:

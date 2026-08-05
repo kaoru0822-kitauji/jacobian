@@ -1,4 +1,4 @@
-"""Tests for observation evidence v2 field binding, snapshot/harbor-version resolution, and fail-closed behavior."""
+"""Tests for observation evidence field binding and fail-closed behavior."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from benchmarks.validation.observation_results_support import (
 )
 
 # ---------------------------------------------------------------------------
-# Normalization integration (v2 bindings)
+# Normalization integration
 # ---------------------------------------------------------------------------
 
 
@@ -36,7 +36,7 @@ def test_trial_status_fails_closed_on_unknown_state() -> None:
     assert _trial_status({"status": "UNKNOWN"}, None) == "ERROR"
 
 
-def test_observation_normalization_binds_v2_fields(
+def test_observation_normalization_binds_fields(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(observation_results, "task_digest", lambda _path: "a" * 64)
@@ -404,3 +404,20 @@ def test_incomplete_execution_fails_closed(
     assert evidence["status"] == "INCOMPLETE"
     assert evidence["trials"][0]["status"] == "ERROR"
     assert any("incomplete" in f for f in failures)
+
+
+def test_schema_rejects_valid_evidence_with_noncompleted_trial() -> None:
+    from benchmarks.validation.observation_results_support import _evidence
+    from jsonschema import Draft202012Validator
+
+    schema = json.loads(
+        (
+            Path(__file__).resolve().parents[1]
+            / "schemas"
+            / "observation-evidence.schema.json"
+        ).read_text(encoding="utf-8")
+    )
+    evidence = _evidence("control", [1.0])
+    evidence["trials"][0]["status"] = "RUNNING"
+    errors = list(Draft202012Validator(schema).iter_errors(evidence))
+    assert errors, "schema must reject VALID evidence with a non-COMPLETED trial"
