@@ -1,42 +1,154 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
   "additionalProperties": false,
-  "required": ["task_id", "conclusion", "result", "claimed_assurance", "scope", "completeness", "evidence", "limitations"],
   "properties": {
-    "task_id": {"const": "jacobian/integer-perturbation-domain-audit"},
-    "conclusion": {"const": "NAT_DOMAIN_WEAKENS_CONTRACT"},
-    "result": {
-      "type": "object", "additionalProperties": false,
-      "required": ["semantic_status", "nat_redundancy", "integer_witness"],
-      "properties": {
-        "semantic_status": {"const": "STRICTLY_WEAKER"},
-        "nat_redundancy": {
-          "type": "object", "additionalProperties": false,
-          "required": ["a_lower_bound", "b_lower_bound", "sum_lower_bound", "rule"],
-          "properties": {
-            "a_lower_bound": {"const": 0}, "b_lower_bound": {"const": 1},
-            "sum_lower_bound": {"const": 1}, "rule": {"const": "ORDERED_ADDITION_LOWER_BOUND"}
+    "claimed_assurance": {
+      "enum": [
+        "UNVERIFIED",
+        "COMPUTED",
+        "CHECKED",
+        "VERIFIED"
+      ]
+    },
+    "completeness": {
+      "const": "COMPLETE"
+    },
+    "conclusion": {
+      "const": "NAT_DOMAIN_WEAKENS_CONTRACT"
+    },
+    "evidence": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "const": "evidence/answer.txt"
+          },
+          "sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
           }
         },
-        "integer_witness": {
-          "type": "object", "additionalProperties": false,
-          "required": ["period", "a_values", "b_values", "sum_values", "b_min", "b_max", "cancellation_indices"],
-          "properties": {
-            "period": {"type": "integer"},
-            "a_values": {"type": "array", "items": {"type": "integer"}},
-            "b_values": {"type": "array", "items": {"type": "integer"}},
-            "sum_values": {"type": "array", "items": {"type": "integer"}},
-            "b_min": {"type": "integer"}, "b_max": {"type": "integer"},
-            "cancellation_indices": {"type": "array", "items": {"type": "integer"}, "uniqueItems": true}
-          }
-        }
-      }
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "type": "object"
+      },
+      "maxItems": 1,
+      "minItems": 1,
+      "type": "array"
     },
-    "claimed_assurance": {"const": "COMPUTED"},
-    "scope": {"const": "exact domain-semantics audit with a symbolic Nat bound and finite-periodic integer witness"},
-    "completeness": {"const": "COMPLETE"},
-    "evidence": {"type": "array", "minItems": 1, "maxItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": {"path": {"const": "evidence/answer.txt"}, "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}}},
-    "limitations": {"type": "array", "minItems": 1, "items": {"type": "string"}}
-  }
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "result": {
+      "additionalProperties": false,
+      "properties": {
+        "integer_witness": {
+          "additionalProperties": false,
+          "properties": {
+            "a_values": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "b_max": {
+              "type": "integer"
+            },
+            "b_min": {
+              "type": "integer"
+            },
+            "b_values": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "cancellation_indices": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "period": {
+              "type": "integer"
+            },
+            "sum_values": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "period",
+            "a_values",
+            "b_values",
+            "sum_values",
+            "b_min",
+            "b_max",
+            "cancellation_indices"
+          ],
+          "type": "object"
+        },
+        "nat_redundancy": {
+          "additionalProperties": false,
+          "properties": {
+            "a_lower_bound": {
+              "const": 0
+            },
+            "b_lower_bound": {
+              "const": 1
+            },
+            "rule": {
+              "const": "ORDERED_ADDITION_LOWER_BOUND"
+            },
+            "sum_lower_bound": {
+              "const": 1
+            }
+          },
+          "required": [
+            "a_lower_bound",
+            "b_lower_bound",
+            "sum_lower_bound",
+            "rule"
+          ],
+          "type": "object"
+        },
+        "semantic_status": {
+          "const": "STRICTLY_WEAKER"
+        }
+      },
+      "required": [
+        "semantic_status",
+        "nat_redundancy",
+        "integer_witness"
+      ],
+      "type": "object"
+    },
+    "scope": {
+      "const": "exact domain-semantics audit with a symbolic Nat bound and finite-periodic integer witness",
+      "type": "string"
+    },
+    "task_id": {
+      "const": "jacobian/integer-perturbation-domain-audit"
+    }
+  },
+  "required": [
+    "task_id",
+    "conclusion",
+    "result",
+    "claimed_assurance",
+    "scope",
+    "completeness",
+    "evidence",
+    "limitations"
+  ],
+  "type": "object"
 }
