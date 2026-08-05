@@ -1,0 +1,30 @@
+{
+  "task_id": "jacobian/sine-integral-asymptotic-audit",
+  "conclusion": "PUBLISHED_SINE_TERM_SIGN_IS_WRONG",
+  "result": {
+    "tail_terms": [
+      {"function": "COS", "power": 1, "coefficient": 1},
+      {"function": "SIN", "power": 2, "coefficient": 1},
+      {"function": "COS", "power": 3, "coefficient": -2},
+      {"function": "SIN", "power": 4, "coefficient": -6},
+      {"function": "COS", "power": 5, "coefficient": 24}
+    ],
+    "tail_remainder": {"integrand": "COS", "power": 6, "coefficient": -120},
+    "si_terms": [
+      {"function": "COS", "power": 1, "coefficient": -1},
+      {"function": "SIN", "power": 2, "coefficient": -1},
+      {"function": "COS", "power": 3, "coefficient": 2},
+      {"function": "SIN", "power": 4, "coefficient": 6},
+      {"function": "COS", "power": 5, "coefficient": -24}
+    ],
+    "si_remainder": {"integrand": "COS", "power": 6, "coefficient": 120},
+    "absolute_remainder_bound": {"numerator": 24, "power": 5, "domain": "x>0"},
+    "published_sine_coefficient": 1,
+    "corrected_sine_coefficient": -1
+  },
+  "claimed_assurance": "COMPUTED",
+  "scope": "HARDMATH2_ROW_2_FIVE_TERM_TAIL_CERTIFICATE",
+  "completeness": "COMPLETE_FOR_DECLARED_CERTIFICATE",
+  "evidence": [{"path": "evidence/answer.txt", "sha256": "sha256:a71a0399e0a8e69dfb2b98958ac3482ecef04cc7599ce0f4d573f470094077fd"}],
+  "limitations": ["The checker replays an exact formal tail identity and bound under standard calculus lemmas; it does not machine-prove those lemmas or arbitrary transcendental asymptotics."]
+}
