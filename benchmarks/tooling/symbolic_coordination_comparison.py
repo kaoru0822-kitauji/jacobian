@@ -43,6 +43,7 @@ ORDER_PERMUTATIONS: tuple[tuple[Condition, Condition, Condition], ...] = (
 Condition = Literal["A", "B", "C"]
 Availability = Literal["EXACT", "UNAVAILABLE"]
 Digest = Annotated[str, Field(pattern=r"^sha256:[0-9a-f]{64}$")]
+HarborDigest = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 Revision = Annotated[str, Field(pattern=r"^[0-9a-f]{40}$")]
 
 
@@ -69,7 +70,7 @@ class BudgetValue(_StrictModel):
 class TaskBinding(_StrictModel):
     task_id: str
     family: str
-    harbor_digest: Digest
+    harbor_digest: HarborDigest
     public_file_hashes: dict[str, Digest]
     verifier_hashes: dict[str, Digest]
 

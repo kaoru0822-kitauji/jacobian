@@ -16,7 +16,7 @@ def _binding(task_id: str, family: str) -> comparison.TaskBinding:
     return comparison.TaskBinding(
         task_id=task_id,
         family=family,
-        harbor_digest=digest,
+        harbor_digest="1" * 64,
         public_file_hashes={"input.json": digest},
         verifier_hashes={"verifier.py": digest},
     )
