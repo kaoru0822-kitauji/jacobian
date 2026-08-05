@@ -65,7 +65,7 @@ Product-surface observations that did not block the pilot are recorded in
 
 The PR2 runner executes one public member through an existing file-backed
 Codex CLI ChatGPT login, with no Docker and no LLM API key. It freezes the task,
-prompt, `gpt-5.4-mini` model contract, `medium` reasoning effort, budgets,
+prompt, `gpt-5.3-codex-spark` model contract, `medium` reasoning effort, budgets,
 sampling semantics, source revision, and public/verifier digests into one
 read-only runtime snapshot shared by all requested conditions:
 

@@ -143,7 +143,7 @@ replace the Harbor comparison and normalization workflow above.
 
 The preflight requires Codex's file-backed ChatGPT login, rejects
 `OPENAI_API_KEY` and `JACOBIAN_MODEL`, verifies the exact locally listed
-`gpt-5.4-mini` contract at `medium` reasoning, and proves that the selected
+`gpt-5.3-codex-spark` contract at `medium` reasoning, and proves that the selected
 permission profile can read its fresh workspace but cannot read a sibling
 sentinel. Run it from a clean, named source branch:
 

@@ -43,7 +43,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DATASET_ID = "symbolic-coordination-v1"
 DATASET = ROOT / "benchmarks" / "datasets" / DATASET_ID
 DEFAULT_TASK = "symbolic-coordination-near-miss-01"
-DEFAULT_MODEL = "gpt-5.4-mini"
+DEFAULT_MODEL = "gpt-5.3-codex-spark"
 DEFAULT_REASONING_EFFORT = "medium"
 HARBOR_VERSION = "0.20.0"
 CONDITIONS = ("A", "B", "C")
@@ -404,15 +404,43 @@ def _selected_model(catalog: Mapping[str, Any]) -> dict[str, Any]:
         )
     if selected.get("shell_type") != "shell_command":
         raise HarnessError("selected model does not support the required shell tool")
+    context_window = selected.get("context_window")
+    if not isinstance(context_window, int) or context_window <= 0:
+        raise HarnessError("selected model omitted its context-window contract")
+    eligible_contexts = [
+        model.get("context_window")
+        for model in models
+        if isinstance(model, dict)
+        and model.get("visibility") == "list"
+        and model.get("shell_type") == "shell_command"
+        and isinstance(model.get("context_window"), int)
+        and any(
+            isinstance(level, dict) and level.get("effort") == DEFAULT_REASONING_EFFORT
+            for level in model.get("supported_reasoning_levels", [])
+        )
+    ]
+    if not eligible_contexts or context_window != min(eligible_contexts):
+        raise HarnessError(
+            "selected model is not the lowest-context listed shell model supporting "
+            f"{DEFAULT_REASONING_EFFORT} reasoning"
+        )
     return {
         "slug": selected["slug"],
         "display_name": selected.get("display_name"),
         "description": selected.get("description"),
+        "priority": selected.get("priority"),
         "visibility": selected.get("visibility"),
+        "supported_in_api": selected.get("supported_in_api"),
         "shell_type": selected.get("shell_type"),
+        "context_window": context_window,
+        "max_context_window": selected.get("max_context_window"),
         "supports_parallel_tool_calls": selected.get("supports_parallel_tool_calls"),
         "supported_reasoning_levels": sorted(str(effort) for effort in efforts),
         "tool_mode": selected.get("tool_mode"),
+        "selection_basis": (
+            "minimum_context_window_among_listed_shell_models_supporting_"
+            f"{DEFAULT_REASONING_EFFORT}_reasoning"
+        ),
     }
 
 
@@ -569,8 +597,9 @@ def preflight(source: Mapping[str, str]) -> Preflight:
         "model": selected,
         "model_contract_digest": selected_digest,
         "model_selection": (
-            "gpt-5.4-mini is the locally listed small, cost-efficient model; "
-            "its catalog contract supports shell tools, MCP tool calls, and medium reasoning"
+            "gpt-5.3-codex-spark is the locally listed ultra-fast model with the "
+            "smallest context window among shell models supporting medium reasoning; "
+            "the completed dry run proves Codex accepts its MCP configuration"
         ),
         "isolation": isolation,
         "source_revision": revision,

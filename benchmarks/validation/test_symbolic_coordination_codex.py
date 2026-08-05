@@ -43,13 +43,21 @@ def _preflight(tmp_path: Path) -> sc.Preflight:
     mcp.chmod(0o700)
     model = {
         "slug": sc.DEFAULT_MODEL,
-        "display_name": "GPT-5.4-Mini",
-        "description": "Small model",
+        "display_name": "GPT-5.3-Codex-Spark",
+        "description": "Ultra-fast coding model.",
+        "priority": 26,
         "visibility": "list",
+        "supported_in_api": False,
         "shell_type": "shell_command",
+        "context_window": 128_000,
+        "max_context_window": 128_000,
         "supports_parallel_tool_calls": True,
         "supported_reasoning_levels": ["low", "medium"],
         "tool_mode": None,
+        "selection_basis": (
+            "minimum_context_window_among_listed_shell_models_supporting_"
+            "medium_reasoning"
+        ),
     }
     return sc.Preflight(
         codex=codex,
@@ -200,14 +208,27 @@ def test_model_selection_requires_listed_tool_model_and_reasoning() -> None:
                 "slug": sc.DEFAULT_MODEL,
                 "visibility": "list",
                 "shell_type": "shell_command",
+                "context_window": 128_000,
                 "supported_reasoning_levels": [{"effort": "medium"}],
-            }
+            },
+            {
+                "slug": "larger-model",
+                "visibility": "list",
+                "shell_type": "shell_command",
+                "context_window": 272_000,
+                "supported_reasoning_levels": [{"effort": "medium"}],
+            },
         ]
     }
     assert sc._selected_model(catalog)["slug"] == sc.DEFAULT_MODEL
 
     catalog["models"][0]["shell_type"] = "none"
     with pytest.raises(sc.HarnessError, match="shell"):
+        sc._selected_model(catalog)
+
+    catalog["models"][0]["shell_type"] = "shell_command"
+    catalog["models"][1]["context_window"] = 64_000
+    with pytest.raises(sc.HarnessError, match="lowest-context"):
         sc._selected_model(catalog)
 
 
