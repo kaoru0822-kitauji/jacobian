@@ -35,6 +35,9 @@ __pycache__/
 *.py[cod]
 build/
 dist/
+# Container images belong in an OCI registry, never in Git.
+*.docker.tar
+*.oci.tar
 htmlcov/
 benchmarks/results/
 /jobs/

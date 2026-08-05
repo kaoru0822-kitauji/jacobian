@@ -10,6 +10,19 @@ operations, also use the
 
 ## Product Constraints
 
+Jacobian is a mathematical execution environment for increasingly capable
+models, not a workflow engine for reproducing how we solve mathematics today.
+
+- The server owns hard invariants: typed contracts, resource bounds, evidence
+  semantics, completeness, assurance, and checker authorization.
+- The model owns research decisions: how to represent the problem, what to
+  search for, which operations to invoke, how to combine them, when to verify,
+  and when to stop.
+- Discovery may expose factual relationships and compatibility, but must not
+  become a hidden planner through "recommended next step" rankings.
+- Evaluations must reward correct mathematical outcomes, useful evidence,
+  safety, and efficiency, not adherence to an expected sequence of tool calls.
+
 Jacobian gives agents composable mathematical capabilities. Its principles are:
 
 - a broad mathematical portfolio;
@@ -42,12 +55,13 @@ consequential, use the
 [evaluation plan](docs/reference/evaluations/benchmark-contracts.md). Routine
 additions need no exhaustive pairwise or leave-one-out evaluation.
 
-Use `capability.describe(query=...)` for intent-led search,
-`capability.describe(capability_id=...)` for exact contracts and invocation
-examples, and `capability.invoke` to execute. Use `capability://catalog` for the
-complete machine-readable inventory. Prefer domain-owned capability IDs to
-generic schemas, verb taxonomies, mechanical backend wrappers, or new top-level
-MCP tools.
+The MCP interface exposes `capability.describe` for search and contract
+inspection, `capability.invoke` for execution, and `capability://catalog` for
+the complete machine-readable inventory. These are composable access paths,
+not a required sequence: an agent may invoke a known capability directly,
+search, browse, or revisit discovery as its investigation requires. Prefer
+domain-owned capability IDs to generic schemas, verb taxonomies, mechanical
+backend wrappers, or new top-level MCP tools.
 
 Prefer thin adapters to maintained mathematical systems. Pin versions when
 reproducibility, certificates, or verification depend on them.
@@ -194,5 +208,5 @@ Non-obvious caveats:
   `uv run jacobian-mcp --transport streamable-http --host 127.0.0.1 --port 8000 --allow-anonymous`
   (remote transports require `--allow-anonymous` or `--auth-tokens-file`; stdio is
   the default transport). The runnable
-  `docs/tutorials/first-verified-result.md` script exercises the full
-  find-then-independently-verify flow.
+  `docs/tutorials/first-verified-result.md` script demonstrates one end-to-end
+  investigation that includes discovery and independent verification.

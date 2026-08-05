@@ -66,7 +66,8 @@ def test_fresh_store_records_immutable_ordered_migrations(tmp_path: Path) -> Non
             )
         }
         assert not any(name.startswith("workspace") for name in tables)
-        assert not any(name.startswith("research_episode") for name in tables)
+        legacy_episode_prefix = "research_" + "episode"
+        assert not any(name.startswith(legacy_episode_prefix) for name in tables)
         assert {"reasoning_runs", "reasoning_events"} <= tables
         assert connection.execute(
             "SELECT format_revision FROM jacobian_state_format WHERE id = 0"

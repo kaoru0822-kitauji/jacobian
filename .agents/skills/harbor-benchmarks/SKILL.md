@@ -137,6 +137,12 @@ contract change:
    task Oracles selected by the planner, and leave capped full-dataset sweeps to
    the merge queue unless the operator explicitly requests a local full sweep.
    Report any deferred Oracle scope as a proof gap.
+   For any resumable or augmented Oracle run, derive a deterministic job
+   identity from the selected task digests and normalized execution
+   configuration. Record that identity in the run manifest and require the
+   validated result to live under the exact expected job identity. A changed
+   digest, compose context, or relevant configuration must produce a different
+   identity and must not resume or validate stale results from the previous run.
 4. Exercise deliberate failures: empty or malformed output, malformed and
    wrong-shaped visible input, wrong answers,
    forged or escaped evidence, incomplete scope, mismatched claims, timeouts,
@@ -169,6 +175,15 @@ are gone; do not recreate them). Suite-wide contracts stay in
 `VERIFICATION_RECORD_TASKS` in `support.py` only when the task shares that exact
 assurance or scoring contract. Keep task-local prepare/bind helpers in the leaf;
 do not grow a shared fixture module every PR edits.
+
+Keep generic verifier tests generic: task-specific assurance, scope, or input
+binding exceptions belong in contract metadata under that task's `tests/`
+directory. Do not encode those exceptions in global task-name flag registries
+inside shared support or generic tests. The generic matrix should load the
+task-local metadata, exercise the same common behavior, and fail when metadata
+references a missing or non-member task. When resolving a merge conflict,
+reconcile the metadata against the canonical task directories so removed or
+renamed tasks cannot remain as stale global entries.
 
 Do not treat `harbor sync` as a local digest calculator when the task is not
 published. Membership is authoritative in the member record and task content
