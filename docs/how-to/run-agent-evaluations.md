@@ -42,10 +42,13 @@ prompt, budget, and environment before running either condition. The default
 run is direct networking. Use `JACOBIAN_EVAL_PROXY=1` only when the host or
 region requires a proxy for Codex's outbound model connection.
 
-If a run needs a host proxy for package installation or model access, set the
-flag before both conditions. The flag automatically reuses standard
+If a run needs a host proxy for model access, set the flag before both
+conditions. The flag automatically reuses standard
 `HTTP_PROXY`, `HTTPS_PROXY`, and `ALL_PROXY` variables; use the explicit
 `JACOBIAN_EVAL_*` variables when the evaluation should use different values.
+The proxy profile chooses `JACOBIAN_EVAL_HTTPS_PROXY`, then
+`JACOBIAN_EVAL_ALL_PROXY`, then `JACOBIAN_EVAL_HTTP_PROXY`, and accepts
+`http://`, `socks5://`, or `socks5h://` upstream URLs.
 When inherited proxy URLs use `localhost` or `127.0.0.1`, the Makefile maps
 them to `host.docker.internal` for the container automatically:
 
@@ -55,22 +58,30 @@ export CODEX_FORCE_AUTH_JSON=1
 
 export JACOBIAN_EVAL_HTTP_PROXY='http://host.docker.internal:7890'
 export JACOBIAN_EVAL_HTTPS_PROXY='http://host.docker.internal:7890'
-export JACOBIAN_EVAL_NO_PROXY='localhost,127.0.0.1,jacobian'
 export JACOBIAN_EVAL_PROXY=1
 ```
 
 Unset `JACOBIAN_EVAL_PROXY` and the proxy variables for direct networking. On
 Linux, the host proxy must accept connections from Docker's bridge interface;
 a proxy listening only on `127.0.0.1` is not reachable from the container.
-Jacobian's service name is included in `NO_PROXY`, so MCP traffic remains on
-the local Compose network.
+
+This proxy profile is optional host integration, not part of a task contract.
+It renders a private runtime configuration that chains Harbor's transparent
+egress controller through the upstream proxy, so Harbor's task allowlist stays
+in force. Codex and Jacobian share Harbor's controlled network namespace, and
+MCP uses its loopback interface, so local tool traffic never enters the
+upstream chain. All jobs also mount the host's standalone Codex executable to
+avoid a trial-time package install; override its resolved path with
+`JACOBIAN_EVAL_CODEX_BINARY`. Keep machine-specific Clash addresses in local
+environment variables rather than committed configuration.
 
 ## Run with Jacobian
 
 The local path uses Harbor's Docker environment, a Jacobian Compose sidecar,
 and Harbor's external MCP configuration. The treatment contract is deliberately
-small: Codex has Jacobian at `http://jacobian:8000/mcp`, and Codex web search is
-disabled.
+small: direct runs address Jacobian by its Compose service name, while the
+controlled proxy profile uses loopback because both containers share Harbor's
+egress namespace. Codex web search is disabled in both profiles.
 
 Choose the image from the source tree state. A clean revision pulls its
 published full-SHA tag and resolves it to an immutable OCI digest. A dirty tree
@@ -110,6 +121,34 @@ make agent-eval DATASET=agent-workflow-v1 \
 
 Use `TASKS=graph-counterexample` for a small smoke run. The treatment run uses
 `benchmarks/config/jacobian.mcp.json`; task TOMLs remain agent-agnostic.
+
+### Compare tool-name profiles
+
+The default `capability` profile exposes `capability.describe` and
+`capability.invoke`. The experimental `math` profile exposes the same server
+instructions, descriptions, schemas, handlers, and result semantics as
+`math.find` and `math.run`. Run the profiles separately and bind
+`tool_name_profile` in each runtime snapshot's `condition` object:
+
+```sh
+JACOBIAN_TOOL_NAME_PROFILE=capability make agent-eval \
+  DATASET=agent-workflow-v1 JACOBIAN_ENABLED=1 \
+  TASKS=graph-counterexample EVAL_EXECUTE=1 \
+  RUNTIME_SNAPSHOT=benchmarks/results/name-capability/runtime.json \
+  EVAL_ARGS="--job-name name-capability --jobs-dir benchmarks/results/name-capability"
+
+JACOBIAN_TOOL_NAME_PROFILE=math make agent-eval \
+  DATASET=agent-workflow-v1 JACOBIAN_ENABLED=1 \
+  TASKS=graph-counterexample EVAL_EXECUTE=1 \
+  RUNTIME_SNAPSHOT=benchmarks/results/name-math/runtime.json \
+  EVAL_ARGS="--job-name name-math --jobs-dir benchmarks/results/name-math"
+```
+
+Keep the model, task digests, prompt, reasoning budget, agent version, image,
+reasoning-log mode, attempts, and network policy fixed. Compare appropriate
+Jacobian adoption, valid calls, discovery-to-execution continuation, irrelevant
+calls, fallback behavior, mathematical correctness, tokens, and elapsed time.
+Do not score adherence to a preferred tool sequence.
 
 ### Held-out treatment readiness
 

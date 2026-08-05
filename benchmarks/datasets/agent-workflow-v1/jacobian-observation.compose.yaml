@@ -1,4 +1,8 @@
 services:
+  main:
+    depends_on:
+      jacobian:
+        condition: service_healthy
   jacobian:
     image: ${JACOBIAN_IMAGE:-jacobian:local}
     command:
@@ -11,9 +15,20 @@ services:
       - --allow-anonymous
       - --reasoning-log-mode
       - ${JACOBIAN_REASONING_LOG_MODE:-off}
+      - --tool-name-profile
+      - ${JACOBIAN_TOOL_NAME_PROFILE:-capability}
       - --state-dir
       - /state
     volumes:
       - jacobian-state:/state
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import socket; socket.create_connection(('127.0.0.1', 8000), 2).close()
+      interval: 1s
+      timeout: 3s
+      retries: 30
 volumes:
   jacobian-state: {}
