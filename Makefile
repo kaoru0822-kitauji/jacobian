@@ -323,7 +323,7 @@ harbor-adapter-checks: ## Check every repository-owned Harbor adapter.
 
 harbor-validation-tests: ## Run Harbor's host-side validation test suite.
 	$(UV_RUN) pytest -n $(HARBOR_VALIDATION_WORKERS) \
-		$(PYTEST_DIAGNOSTIC_ARGS) benchmarks/validation $(PYTEST_ARGS)
+		$(PYTEST_DIAGNOSTIC_ARGS) $(if $(TESTS),$(TESTS),benchmarks/validation) $(PYTEST_ARGS)
 
 harbor-validate: harbor-contracts harbor-adapter-checks harbor-validation-tests ## Run all repository-owned Harbor checks under the pinned Harbor runtime.
 
