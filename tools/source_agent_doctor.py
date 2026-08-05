@@ -25,6 +25,15 @@ from jacobian.adapters.mcp.projections import _catalog_digest  # noqa: E402
 from jacobian.contracts.capabilities import (  # noqa: E402
     CapabilityProviderAvailability,
 )
+from jacobian.persistence.migrations import (  # noqa: E402
+    CURRENT_STATE_FORMAT_REVISION,
+    STATE_MIGRATIONS,
+    SUPPORTED_STATE_FLOOR,
+)
+from jacobian.persistence.state_health import (  # noqa: E402
+    StateHealth,
+    inspect_state_health,
+)
 from jacobian.provider_runtime import known_provider_runtime  # noqa: E402
 from jacobian.runtime import CheckerAuthorityMode, create_runtime  # noqa: E402
 
@@ -171,6 +180,27 @@ def inspect_installation(
         declared_version = tomllib.load(stream)["project"]["version"]
     expected_version = _repository_version(repo)
 
+    state_health = inspect_state_health(
+        state_dir,
+        STATE_MIGRATIONS,
+        supported_floor=SUPPORTED_STATE_FLOOR,
+        current_revision=CURRENT_STATE_FORMAT_REVISION,
+    )
+    if state_health.blocking:
+        return _state_incompatible_report(
+            repo=repo,
+            state_dir=state_dir,
+            profile=profile,
+            expected_revision=expected_revision,
+            revision=revision,
+            expected_version=expected_version,
+            declared_version=declared_version,
+            package_source=package_source,
+            dirty=dirty,
+            source_matches=source_matches,
+            state_health=state_health,
+        )
+
     state_dir.mkdir(parents=True, exist_ok=True)
     with create_runtime(
         state_dir,
@@ -205,6 +235,7 @@ def inspect_installation(
         "package_version_matches": jacobian.__version__ == expected_version,
         "source_checkout_matches": source_matches,
         "profile_providers_available": not missing,
+        "state_compatible": not state_health.blocking,
         "provider_path_preserved": effective_provider_path == launcher_provider_path
         or effective_provider_path.endswith(os.pathsep + launcher_provider_path),
         "project_environment_preserved": (
@@ -240,7 +271,62 @@ def inspect_installation(
         "providers": providers,
         "missing_profile_providers": missing,
         "portfolio_diagnostics": diagnostics,
+        "state_health": state_health.as_dict(),
         "checks": checks,
+    }
+
+
+def _state_incompatible_report(
+    *,
+    repo: Path,
+    state_dir: Path,
+    profile: str,
+    expected_revision: str,
+    revision: str,
+    expected_version: str,
+    declared_version: str,
+    package_source: Path,
+    dirty: bool,
+    source_matches: bool,
+    state_health: StateHealth,
+) -> dict[str, Any]:
+    """Return a useful report without attempting to mutate incompatible state."""
+
+    return {
+        "status": "error",
+        "profile": profile,
+        "repo": str(repo),
+        "state_dir": str(state_dir),
+        "git_revision": revision,
+        "expected_git_revision": expected_revision,
+        "git_dirty": dirty,
+        "package_version": jacobian.__version__,
+        "expected_package_version": expected_version,
+        "declared_package_version": declared_version,
+        "package_source": str(package_source),
+        "provider_path": os.environ.get("PATH", ""),
+        "launcher_provider_path": "",
+        "project_environment": os.environ.get("UV_PROJECT_ENVIRONMENT", ""),
+        "launcher_project_environment": "",
+        "elan_home": os.environ.get("ELAN_HOME", ""),
+        "launcher_elan_home": "",
+        "lean_runtime": os.environ.get("JACOBIAN_LEAN_RUNTIME", ""),
+        "launcher_lean_runtime": "",
+        "catalog_digest": None,
+        "catalog_size": 0,
+        "policy_profile": None,
+        "policy_digest": None,
+        "providers": {},
+        "missing_profile_providers": [],
+        "portfolio_diagnostics": [],
+        "state_health": state_health.as_dict(),
+        "checks": {
+            "git_clean": not dirty,
+            "revision_matches": revision == expected_revision,
+            "package_version_matches": jacobian.__version__ == expected_version,
+            "source_checkout_matches": source_matches,
+            "state_compatible": False,
+        },
     }
 
 
@@ -290,6 +376,27 @@ def main() -> int:
         marker = "✓" if report["status"] == "ok" else "✗"
         print(f"{marker} source checkout: {report['git_revision']}")
         print(f"{marker} package: {report['package_version']}")
+        state_health = report.get("state_health", {})
+        state_status = state_health.get("status", "UNKNOWN")
+        state_marker = "✗" if state_health.get("blocking", False) else "✓"
+        print(f"{state_marker} state: {state_status}")
+        if state_health.get("blocking", False):
+            diagnostic = state_health.get("diagnostic")
+            if diagnostic:
+                print(f"  {diagnostic}", file=sys.stderr)
+            for mismatch in state_health.get("mismatches", ()):
+                print(
+                    "  migration {revision} ({name}) checksum differs".format(
+                        **mismatch
+                    ),
+                    file=sys.stderr,
+                )
+            print(
+                "  Preserve this state directory and use a compatible checkout "
+                "to export it, or choose a fresh state directory; do not edit "
+                "metadata.sqlite3.",
+                file=sys.stderr,
+            )
         print(
             f"{marker} catalog: {report['catalog_digest']} "
             f"({report['catalog_size']} capabilities)"
