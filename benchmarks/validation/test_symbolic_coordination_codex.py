@@ -354,6 +354,64 @@ def test_condition_c_runs_one_primary_mcp_stage_and_one_non_mcp_audit(
     assert result["revision_applied"] is True
 
 
+def test_condition_c_binds_revision_to_evidence_tree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = tmp_path / "output"
+    output.mkdir()
+    snapshot, digest = _snapshot(output)
+    monkeypatch.setattr(sc, "_assert_global_invariants", lambda *args: None)
+    monkeypatch.setattr(sc, "_export_reasoning_logs", lambda *args: {"runs": []})
+    monkeypatch.setattr(
+        sc,
+        "_run_verification",
+        lambda *args: {"execution_status": "COMPLETED", "reward": {"reward": 1.0}},
+    )
+
+    def fake_stage(**kwargs: Any) -> tuple[ToolCommandResult, dict[str, Any], dict]:
+        label = kwargs["label"]
+        workspace = kwargs["workspace"]
+        if label == "primary":
+            (workspace / "submission.json").write_text('{"version":1}\n')
+            (workspace / "evidence/certificate.json").write_text('{"version":1}\n')
+        else:
+            (workspace / "evidence/certificate.json").write_text('{"version":2}\n')
+            sc._write_json(
+                workspace / "audit-report.json",
+                {
+                    "audit_schema_version": "1",
+                    "status": "REVISED",
+                    "revision_applied": True,
+                    "checks": {
+                        "schema": True,
+                        "input_binding": True,
+                        "scope": True,
+                        "completeness": True,
+                        "assurance": True,
+                        "evidence_binding": True,
+                        "mathematics": True,
+                    },
+                    "notes": "repaired evidence only",
+                },
+            )
+        return _success_result(), _telemetry(), {}
+
+    monkeypatch.setattr(sc, "_run_codex_stage", fake_stage)
+
+    result = sc.run_condition(
+        condition="C",
+        output=output,
+        task=_task_contract(),
+        snapshot=snapshot,
+        snapshot_digest=digest,
+        preflight_result=_preflight(tmp_path),
+        source={},
+    )
+
+    assert result["infrastructure_status"] == "COMPLETE"
+    assert result["revision_applied"] is True
+
+
 def test_verifier_copy_is_outside_model_workspace(tmp_path: Path) -> None:
     workspace = tmp_path / "condition/workspace"
     (workspace / "evidence").mkdir(parents=True)

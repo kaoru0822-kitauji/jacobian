@@ -1008,6 +1008,29 @@ def _preserve_submission(workspace: Path, destination: Path) -> None:
     _copy_regular_tree(workspace / "evidence", destination / "evidence")
 
 
+def _submission_state_digest(workspace: Path) -> str:
+    """Bind revision detection to the submission and its complete evidence tree."""
+
+    submission = workspace / "submission.json"
+    if submission.is_symlink() or not submission.is_file():
+        raise HarnessError("MISSING_OUTPUT: submission.json is absent")
+    evidence = workspace / "evidence"
+    if evidence.is_symlink() or not evidence.is_dir():
+        raise HarnessError("evidence must be a regular directory")
+    files = [{"path": "submission.json", "digest": _digest_file(submission)}]
+    for path in sorted(evidence.rglob("*")):
+        if path.is_symlink() or (not path.is_dir() and not path.is_file()):
+            raise HarnessError("evidence contains a symlink or special file")
+        if path.is_file():
+            files.append(
+                {
+                    "path": (Path("evidence") / path.relative_to(evidence)).as_posix(),
+                    "digest": _digest_file(path),
+                }
+            )
+    return _digest_json(files)
+
+
 def _audit_report_failures(path: Path, *, revised: bool) -> list[str]:
     try:
         value = json.loads(path.read_bytes())
@@ -1203,7 +1226,7 @@ def run_condition(
     else:
         failures.append("primary:MISSING_OUTPUT")
     if condition == "C" and not failures:
-        before = _digest_file(workspace / "submission.json")
+        before = _submission_state_digest(workspace)
         audit, audit_telemetry, _audit_timing = _run_codex_stage(
             label="audit",
             prompt=AUDIT_PROMPT,
@@ -1219,7 +1242,7 @@ def run_condition(
         if not (workspace / "submission.json").is_file():
             failures.append("audit:MISSING_OUTPUT")
         else:
-            revision_applied = _digest_file(workspace / "submission.json") != before
+            revision_applied = _submission_state_digest(workspace) != before
             failures.extend(
                 _audit_report_failures(
                     workspace / "audit-report.json", revised=revision_applied
