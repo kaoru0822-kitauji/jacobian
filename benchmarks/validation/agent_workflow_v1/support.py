@@ -58,6 +58,7 @@ SCOPE_INDEPENDENT_ASSURANCE_TASKS = ("steiner-triple-system-27",)
 # and gating only aggregate reward on both.
 INPUT_BINDING_DECOUPLED_TASKS = (
     "extremal-subset-sum-semantic-audit",
+    "integer-perturbation-domain-audit",
     "necklace-burnside-certificate",
     "pythagorean-generator-recurrence",
     "steiner-triple-system-27",
