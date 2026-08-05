@@ -62,33 +62,45 @@ def _valid_design(result, source):
 
 def _evidence(value, result):
     if (
-        not evidence_list_is_bound(
-            value, expected_path="evidence/answer.txt", max_bytes=4096
-        )
+        not evidence_list_is_bound(value, expected_path="evidence/answer.txt")
         or not isinstance(value, list)
         or len(value) != 1
         or not isinstance(result, dict)
         or not isinstance(result.get("blocks"), list)
     ):
         return False
-    path = resolve_evidence(
-        value[0], expected_path="evidence/answer.txt", max_bytes=4096
-    )
+    path = resolve_evidence(value[0], expected_path="evidence/answer.txt")
     if path is None:
-        return False
-    try:
-        lines = [line.strip() for line in path.read_text().splitlines() if line.strip()]
-    except (OSError, UnicodeError):
         return False
     digest = hashlib.sha256(
         json.dumps(result, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
-    return lines == [
+    expected_lines = [
         "steiner-triple-system-certificate-v1",
         f"result_sha256: {digest}",
         f"order: {result.get('order')}",
         f"block_count: {len(result['blocks'])}",
     ]
+    expected_bytes = tuple(line.encode() for line in expected_lines)
+    max_line_bytes = max(map(len, expected_bytes), default=0) + 2
+    line_index = 0
+    try:
+        with path.open("rb") as stream:
+            while raw := stream.readline(max_line_bytes):
+                if len(raw) == max_line_bytes and not raw.endswith(b"\n"):
+                    return False
+                line = raw.strip()
+                if not line:
+                    continue
+                if (
+                    line_index >= len(expected_bytes)
+                    or line != expected_bytes[line_index]
+                ):
+                    return False
+                line_index += 1
+    except OSError:
+        return False
+    return line_index == len(expected_bytes)
 
 
 def main():
