@@ -886,6 +886,23 @@ def solution(data: dict[str, object]) -> tuple[dict[str, object], bytes]:
     return submission, evidence_bytes
 
 
+_COLLISION_WITNESS_LIMITATIONS = ["NO_CLAIM_OUTSIDE_EXACT_COLLISION_WITNESS"]
+
+
+def _limitations_schema(data: dict[str, object]) -> dict[str, object]:
+    """Allow collision-witness limitations when a timeout/incomplete search may
+    still yield an exact collision witness in the declared grid."""
+
+    required = data["required_limitations"]
+    if (
+        data["case_type"] == "collision"
+        and required != _COLLISION_WITNESS_LIMITATIONS
+        and data["search_record"].get("stop_reason") in {"TIMEOUT", "INCOMPLETE"}
+    ):
+        return {"enum": [required, _COLLISION_WITNESS_LIMITATIONS]}
+    return {"const": required}
+
+
 def submission_schema_parts(data: dict[str, object]) -> dict[str, object]:
     rational_schema = {
         "type": "object",
@@ -1146,7 +1163,7 @@ def submission_schema_parts(data: dict[str, object]) -> dict[str, object]:
                     },
                 },
             },
-            "limitations": {"const": data["required_limitations"]},
+            "limitations": _limitations_schema(data),
         },
         "$defs": {
             "rational": rational_schema,
@@ -1292,6 +1309,18 @@ constant nonzero Jacobian claim. A bounded search licenses only an exact
 collision witness, complete declared-grid exhaustion, or an honest
 non-conclusion matching timeout or incomplete execution. Any mathematically
 valid collision witness in the declared grid is acceptable.
+
+The `conclusion` field is determined by the terminal `verdict`:
+
+| Verdict | Conclusion |
+|---|---|
+| `VALID_TWO_SIDED_INVERSE` | `TRUE` |
+| `INVALID_INVERSE_CANDIDATE` | `FALSE` |
+| `KELLER_CONDITION_ONLY` | `TRUE` |
+| `NOT_KELLER` | `FALSE` |
+| `COLLISION_FOUND` | `TRUE` |
+| `NO_COLLISION_IN_DECLARED_GRID` | `FALSE` |
+| `UNKNOWN` | `UNKNOWN` |
 
 Use any mathematical method. No external service or special tool is required.
 """

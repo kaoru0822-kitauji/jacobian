@@ -165,9 +165,14 @@
       "type": "array"
     },
     "limitations": {
-      "const": [
-        "SEARCH_NONCONCLUSION",
-        "NO_GLOBAL_INJECTIVITY_OR_INVERTIBILITY_CONCLUSION"
+      "enum": [
+        [
+          "SEARCH_NONCONCLUSION",
+          "NO_GLOBAL_INJECTIVITY_OR_INVERTIBILITY_CONCLUSION"
+        ],
+        [
+          "NO_CLAIM_OUTSIDE_EXACT_COLLISION_WITNESS"
+        ]
       ]
     },
     "result": {
