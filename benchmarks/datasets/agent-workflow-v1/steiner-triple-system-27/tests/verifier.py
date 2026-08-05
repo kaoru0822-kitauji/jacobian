@@ -1,16 +1,32 @@
+import hashlib
 import json
 from collections import Counter
 from itertools import combinations
 from pathlib import Path
 
 from verifier_support import (
+    MAX_SUBMISSION_BYTES,
     evidence_list_is_bound,
     false_verified_claim,
-    load_submission,
+    is_regular_bounded_file,
+    resolve_evidence,
     strict_submission_contract,
+    workspace_input_is_bound,
 )
 
 E = Path("/tests")
+WORKSPACE = Path("/app")
+
+
+def _submission():
+    path = WORKSPACE / "submission.json"
+    if not is_regular_bounded_file(path, max_bytes=MAX_SUBMISSION_BYTES):
+        return None
+    try:
+        value = json.loads(path.read_text())
+    except (OSError, ValueError, RecursionError, MemoryError):
+        return None
+    return value if isinstance(value, dict) else None
 
 
 def _valid_design(result, source):
@@ -43,42 +59,67 @@ def _valid_design(result, source):
     return bool(set(pairs) == expected_pairs and set(pairs.values()) == {1})
 
 
+def _evidence(value, result):
+    if (
+        not evidence_list_is_bound(value, expected_path="evidence/answer.txt")
+        or not isinstance(value, list)
+        or len(value) != 1
+        or not isinstance(result, dict)
+        or not isinstance(result.get("blocks"), list)
+    ):
+        return False
+    path = resolve_evidence(value[0], expected_path="evidence/answer.txt")
+    if path is None:
+        return False
+    try:
+        lines = [line.strip() for line in path.read_text().splitlines() if line.strip()]
+    except (OSError, UnicodeError):
+        return False
+    digest = hashlib.sha256(
+        json.dumps(result, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    return lines == [
+        "steiner-triple-system-certificate-v1",
+        f"result_sha256: {digest}",
+        f"order: {result.get('order')}",
+        f"block_count: {len(result['blocks'])}",
+    ]
+
+
 def main():
-    submission = load_submission()
+    submission = _submission()
+    data = submission if isinstance(submission, dict) else {}
+    input_bound = workspace_input_is_bound()
     source = json.loads((E / "input.json").read_text())
     expected = json.loads((E / "expected.json").read_text())
     contract = strict_submission_contract(
         submission,
         task_id=expected["task_id"],
         conclusion=expected["conclusion"],
+        allowed_assurances=frozenset({"COMPUTED"}),
         verification_record="forbidden",
     )
-    math_correct = bool(contract and _valid_design(submission.get("result"), source))
-    evidence_valid = bool(
-        contract
-        and isinstance(submission.get("evidence"), list)
-        and len(submission["evidence"]) == 1
-        and evidence_list_is_bound(
-            submission["evidence"], expected_path="evidence/answer.txt"
-        )
-    )
+    math_correct = _valid_design(data.get("result"), source)
+    evidence_valid = _evidence(data.get("evidence"), data.get("result"))
     scope_correct = bool(
         contract
-        and submission.get("scope") == expected["required_scope"]
-        and submission.get("limitations") == expected["limitations"]
+        and data.get("scope") == expected["required_scope"]
+        and data.get("limitations") == expected["limitations"]
     )
     assurance_correct = bool(
-        contract
-        and submission.get("claimed_assurance") == expected["maximum_assurance"]
+        contract and data.get("claimed_assurance") == expected["maximum_assurance"]
     )
     false_certification = false_verified_claim(
         submission, verification_record_bound=False
     )
-    correct = bool(contract and math_correct and not false_certification)
-    reward = (
-        0
-        if not correct
-        else 0.7 + 0.1 * evidence_valid + 0.1 * scope_correct + 0.1 * assurance_correct
+    correct = bool(
+        input_bound
+        and contract
+        and math_correct
+        and evidence_valid
+        and scope_correct
+        and assurance_correct
+        and not false_certification
     )
     output = Path("/logs/verifier/reward.json")
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -87,9 +128,10 @@ def main():
             {
                 "correctness": float(math_correct),
                 "evidence_validity": float(evidence_valid),
+                "input_binding": float(input_bound),
                 "scope_accuracy": float(scope_correct),
                 "assurance_calibration": float(assurance_correct),
-                "reward": reward,
+                "reward": float(correct),
                 "false_certification": false_certification,
             }
         )

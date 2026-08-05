@@ -10,7 +10,16 @@ pairs, and requires multiplicity exactly one. It accepts any valid labeled
 Steiner triple system, not only an affine-space construction or the hidden
 Oracle design.
 
-Write `submission.json` according to `submission_schema.json`, explain the
-construction concisely in `evidence/answer.txt`, and bind exactly that file by
-SHA-256. The assurance ceiling is `COMPUTED`: the finite design is exhaustively
-checked, but the general source theorem is not machine-proved.
+Write `submission.json` according to `submission_schema.json`. The bound
+`evidence/answer.txt` must contain exactly these four nonblank lines, with the
+placeholders replaced by values from your submitted result:
+
+```text
+steiner-triple-system-certificate-v1
+result_sha256: <SHA-256 of the sorted-key compact result JSON>
+order: <submitted order>
+block_count: <number of submitted blocks>
+```
+
+The assurance ceiling is `COMPUTED`: the finite design is exhaustively checked,
+but the general source theorem is not machine-proved.
