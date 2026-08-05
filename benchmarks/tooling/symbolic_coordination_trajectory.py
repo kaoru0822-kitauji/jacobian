@@ -24,10 +24,10 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from jacobian.eval.telemetry import parse_agent_transcript
 
 SCHEMA_VERSION = "1"
-Condition = Literal["A", "B", "C"]
-AggregateCondition = Literal["A", "B", "C", "ALL"]
+Condition = Literal["A", "B", "C", "D"]
+AggregateCondition = Literal["A", "B", "C", "D", "ALL"]
 InfrastructureStatus = Literal["COMPLETE", "INCOMPLETE"]
-CONDITIONS: tuple[Condition, ...] = ("A", "B", "C")
+CONDITIONS: tuple[Condition, ...] = ("A", "B", "C", "D")
 TASK_FAMILY_DOMAINS: Mapping[str, frozenset[str]] = {
     "valid-two-sided-inverse": frozenset({"polynomial"}),
     "perturbed-near-miss": frozenset({"polynomial"}),
@@ -457,7 +457,16 @@ def _verify_snapshot(root: Path) -> dict[str, Any]:
         expected = _required(
             prompts, f"{stage}_digest", str, "runtime_snapshot.prompts"
         )
-        if _digest_file(root / f"{stage}-prompt.txt") != expected:
+        prompt_path = root / f"{stage}-prompt.txt"
+        if stage == "audit" and not prompt_path.exists():
+            feedback_digest = prompts.get("verifier_feedback_digest")
+            feedback_path = root / "feedback-prompt.txt"
+            if feedback_digest != expected or not feedback_path.is_file():
+                raise TrajectoryTelemetryError(
+                    "audit prompt is missing without a bound verifier-feedback alias"
+                )
+            prompt_path = feedback_path
+        if _digest_file(prompt_path) != expected:
             raise TrajectoryTelemetryError(f"{stage} prompt digest is inconsistent")
     return snapshot
 
@@ -841,7 +850,7 @@ def _audit_classification(
     initial: VerifierScores | None,
     final: VerifierScores | None,
 ) -> AuditClassification:
-    if condition != "C":
+    if condition not in {"C", "D"}:
         return "NOT_APPLICABLE"
     if initial is None or final is None:
         return "INCOMPLETE"
@@ -1170,7 +1179,7 @@ def _validate_reasoning_summary(
     result: Mapping[str, Any],
 ) -> None:
     expected: object = None
-    if condition in {"B", "C"}:
+    if condition in {"B", "C", "D"}:
         expected = _load_object(
             condition_root / "reasoning-logs" / "index.json",
             label="reasoning-log index",
@@ -1197,9 +1206,17 @@ def _submission_audit_sources(
     revision = result.get("revision_applied")
     if revision is not None and not isinstance(revision, bool):
         raise TrajectoryTelemetryError(f"{condition} revision flag is malformed")
-    if condition != "C" and revision is not None:
+    if condition not in {"C", "D"} and revision is not None:
         raise TrajectoryTelemetryError(f"{condition} cannot declare an audit revision")
-    if initial_submission.present and final_submission.present and condition == "C":
+    if (
+        initial_submission.present
+        and final_submission.present
+        and condition
+        in {
+            "C",
+            "D",
+        }
+    ):
         actual_revision = _submission_tree_digest(
             condition_root / "pre-audit"
         ) != _submission_tree_digest(condition_root / "final")
@@ -1209,7 +1226,7 @@ def _submission_audit_sources(
             )
     initial_raw = result.get("initial_verifier")
     final_raw = result.get("verifier")
-    if condition != "C" and initial_raw != final_raw:
+    if condition not in {"C", "D"} and initial_raw != final_raw:
         raise TrajectoryTelemetryError(
             f"{condition} initial and final verifier results disagree"
         )
@@ -1253,7 +1270,7 @@ def _audit_usage_and_time(
     condition_root: Path, condition: Condition
 ) -> tuple[dict[str, Any] | None, TokenUsage | None, float | None]:
     audit_path = condition_root / "audit.codex.jsonl"
-    if condition != "C":
+    if condition not in {"C", "D"}:
         if audit_path.exists():
             raise TrajectoryTelemetryError(
                 f"{condition} unexpectedly contains an audit stage"
@@ -1264,7 +1281,7 @@ def _audit_usage_and_time(
     _, source = _stage_sources(
         audit_path,
         condition_root / "audit.telemetry.json",
-        label="C audit JSONL",
+        label=f"{condition} second-stage JSONL",
     )
     return (
         source,
@@ -1297,14 +1314,16 @@ def _validate_complete_sources(
         raise TrajectoryTelemetryError(
             f"{condition} complete infrastructure lacks clean-room verifier results"
         )
-    if condition == "C":
+    if condition in {"C", "D"}:
         if audit_usage is None or audit_usage.availability != "EXACT":
             raise TrajectoryTelemetryError(
                 "C complete infrastructure has unavailable audit token usage"
+                if condition == "C"
+                else "D complete infrastructure has unavailable feedback-stage token usage"
             )
         if submissions.revision is None:
             raise TrajectoryTelemetryError(
-                "C complete infrastructure lacks an audit revision decision"
+                f"{condition} complete infrastructure lacks a revision decision"
             )
 
 
@@ -1425,7 +1444,7 @@ def _condition_record(
 
 
 def analyze_run(root: Path) -> list[RunTelemetry]:
-    """Verify and normalize one PR2/PR3 A/B/C run root."""
+    """Verify and normalize one A/B/C run or one PR5 condition-D run root."""
 
     index_digest = verify_artifact_index(root)
     snapshot = _verify_snapshot(root)
@@ -1480,7 +1499,7 @@ def _exact_run_tokens(record: RunTelemetry) -> int | None:
     primary = record.usage.primary
     if primary.availability != "EXACT" or primary.total_tokens is None:
         return None
-    if record.condition != "C":
+    if record.condition not in {"C", "D"}:
         return primary.total_tokens
     audit = record.usage.audit
     if audit is None or audit.availability != "EXACT" or audit.total_tokens is None:

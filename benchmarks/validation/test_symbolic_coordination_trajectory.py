@@ -110,6 +110,39 @@ def _index(root: Path) -> None:
     _write_json(root / "artifact-index.json", {"schema_version": "1", "files": files})
 
 
+def test_snapshot_accepts_only_digest_bound_feedback_prompt_alias(
+    tmp_path: Path,
+) -> None:
+    primary = b"primary prompt\n"
+    feedback = b"feedback prompt\n"
+    body = {
+        "schema_version": "1",
+        "prompts": {
+            "primary_digest": st._digest_bytes(primary),
+            "audit_digest": st._digest_bytes(feedback),
+            "verifier_feedback_digest": st._digest_bytes(feedback),
+        },
+    }
+    snapshot = {**body, "snapshot_id": st._digest_bytes(st._canonical_bytes(body))}
+    _write_json(tmp_path / "runtime-snapshot.json", snapshot)
+    (tmp_path / "primary-prompt.txt").write_bytes(primary)
+    (tmp_path / "feedback-prompt.txt").write_bytes(feedback)
+
+    assert st._verify_snapshot(tmp_path) == snapshot
+
+    snapshot["prompts"]["verifier_feedback_digest"] = "sha256:" + "0" * 64
+    snapshot["snapshot_id"] = st._digest_bytes(
+        st._canonical_bytes(
+            {key: value for key, value in snapshot.items() if key != "snapshot_id"}
+        )
+    )
+    _write_json(tmp_path / "runtime-snapshot.json", snapshot)
+    with pytest.raises(
+        st.TrajectoryTelemetryError, match="without a bound verifier-feedback alias"
+    ):
+        st._verify_snapshot(tmp_path)
+
+
 def _materialize_run(
     tmp_path: Path,
     scenario: dict[str, Any],

@@ -77,7 +77,9 @@ make provider-eval PROVIDER=cgal
 
 `symbolic-coordination-v1` keeps its deterministic 26-case PR1 pilot separate
 from the fixed `agent-workflow-v1` snapshots. Its task bundles are solvable
-without Jacobian and do not yet include the later comparison harness.
+without Jacobian. Host-only A/B/C/D runners, feedback schemas, and descriptive
+reports live under `benchmarks/tooling/`; they do not modify task bundles or
+enter the model workspace.
 
 `harbor-check-task` and `harbor-oracle-task` require an explicit dataset and
 task selection and are the normal gates for a leaf task. The full
