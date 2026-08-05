@@ -36,6 +36,18 @@ def test_accepts_alternative_periodic_witness(tmp_path: Path) -> None:
     assert accepted["reward"] == pytest.approx(1.0)
 
 
+def test_accepts_unordered_cancellation_indices(tmp_path: Path) -> None:
+    """Cancellation indices are a set in the public contract, not a sequence."""
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    submission = json.loads((app / "submission.json").read_text())
+    submission["result"]["integer_witness"]["cancellation_indices"] = [2, 0]
+    support._bind_result_evidence(app, submission)
+    support._write_json(app / "submission.json", submission)
+    accepted = support._run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
 def test_accepts_witness_without_three_distinct_values(tmp_path: Path) -> None:
     """The visible contract does not require three distinct a or b values."""
     task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
@@ -150,6 +162,104 @@ def test_deeply_nested_evidence_json_does_not_crash(tmp_path: Path) -> None:
     result = support._run_verifier(task, app, logs)
     assert result["evidence_validity"] == 0.0
     assert result["reward"] == 0.0
+
+
+def test_rejects_assertion_style_theorem_overclaim(tmp_path: Path) -> None:
+    """A theorem can be overclaimed without using proof or verification verbs."""
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    evidence_path = app / "evidence" / "answer.txt"
+    evidence_path.write_text(
+        "Nat-domain certificate and Z-valued periodic witness. "
+        "No irrationality theorem is claimed, but the theorem is true.\n"
+        + next(
+            line
+            for line in evidence_path.read_text().splitlines()
+            if line.startswith("RESULT_JSON:")
+        )
+        + "\n"
+    )
+    submission = json.loads((app / "submission.json").read_text())
+    submission["evidence"][0]["sha256"] = support._digest(evidence_path)
+    support._write_json(app / "submission.json", submission)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["evidence_validity"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_accepts_equivalent_concise_audit_evidence(tmp_path: Path) -> None:
+    """Equivalent Nat/Z wording satisfies the public concise-audit requirement."""
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    evidence_path = app / "evidence" / "answer.txt"
+    result_marker = next(
+        line
+        for line in evidence_path.read_text().splitlines()
+        if line.startswith("RESULT_JSON:")
+    )
+    evidence_path.write_text(
+        "Nat-domain certificate and Z-valued periodic witness. "
+        "No Lean or theorem claim is made.\n"
+        f"{result_marker}\n"
+    )
+    submission = json.loads((app / "submission.json").read_text())
+    submission["evidence"][0]["sha256"] = support._digest(evidence_path)
+    support._write_json(app / "submission.json", submission)
+    accepted = support._run_verifier(task, app, logs)
+    assert accepted["evidence_validity"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+def test_rejects_multiple_result_markers(tmp_path: Path) -> None:
+    """Evidence must bind exactly one unambiguous result marker."""
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    evidence_path = app / "evidence" / "answer.txt"
+    original = evidence_path.read_text()
+    marker = next(
+        line for line in original.splitlines() if line.startswith("RESULT_JSON:")
+    )
+    evidence_path.write_text(original + marker + "\n")
+    submission = json.loads((app / "submission.json").read_text())
+    submission["evidence"][0]["sha256"] = support._digest(evidence_path)
+    support._write_json(app / "submission.json", submission)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["evidence_validity"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_rejects_evidence_without_result_object(tmp_path: Path) -> None:
+    """A null marker cannot bind evidence when the submission has no result."""
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    submission = json.loads((app / "submission.json").read_text())
+    submission.pop("result")
+    evidence_path = app / "evidence" / "answer.txt"
+    evidence_path.write_text(
+        evidence_path.read_text().replace(
+            next(
+                line
+                for line in evidence_path.read_text().splitlines()
+                if line.startswith("RESULT_JSON:")
+            ),
+            "RESULT_JSON: null",
+        )
+    )
+    submission["evidence"][0]["sha256"] = support._digest(evidence_path)
+    support._write_json(app / "submission.json", submission)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["evidence_validity"] == 0.0
+    assert rejected["protocol_compliance"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_reports_protocol_compliance_separately(tmp_path: Path) -> None:
+    """Envelope failure is visible independently and gates aggregate reward."""
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    submission = json.loads((app / "submission.json").read_text())
+    submission["task_id"] = "wrong-task"
+    support._write_json(app / "submission.json", submission)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["protocol_compliance"] == 0.0
+    assert rejected["correctness"] == 1.0
+    assert rejected["evidence_validity"] == 1.0
+    assert rejected["reward"] == 0.0
 
 
 def test_rejects_affirmative_irrationality_claim_in_evidence(tmp_path: Path) -> None:
