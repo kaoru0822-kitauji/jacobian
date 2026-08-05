@@ -146,3 +146,25 @@ def test_malformed_limitations_fail_closed(tmp_path: Path) -> None:
     assert verdict["limitations_accuracy"] == 0.0
     assert verdict["protocol_compliance"] == 0.0
     assert verdict["reward"] == 0.0
+
+
+def test_unhashable_term_function_fails_closed(tmp_path: Path) -> None:
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    submission = _submission(app)
+    submission["result"]["tail_terms"][0]["function"] = []
+    _bind_evidence(app, submission)
+    support._write_json(app / "submission.json", submission)
+    verdict = support._run_verifier(task, app, logs)
+    assert verdict["correctness"] == 0.0
+    assert verdict["reward"] == 0.0
+
+
+def test_bad_evidence_descriptor_is_protocol_failure(tmp_path: Path) -> None:
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    submission = _submission(app)
+    submission["evidence"][0]["path"] = "../answer.txt"
+    support._write_json(app / "submission.json", submission)
+    verdict = support._run_verifier(task, app, logs)
+    assert verdict["protocol_compliance"] == 0.0
+    assert verdict["evidence_validity"] == 0.0
+    assert verdict["reward"] == 0.0
