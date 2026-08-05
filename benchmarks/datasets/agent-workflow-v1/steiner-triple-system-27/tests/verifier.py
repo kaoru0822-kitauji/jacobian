@@ -69,7 +69,7 @@ def _evidence(value, result):
     ):
         return False
     path = resolve_evidence(value[0], expected_path="evidence/answer.txt")
-    if path is None:
+    if path is None or not is_regular_bounded_file(path, max_bytes=4096):
         return False
     try:
         lines = [line.strip() for line in path.read_text().splitlines() if line.strip()]
@@ -129,6 +129,7 @@ def main():
                 "input_binding": float(input_bound),
                 "scope_accuracy": float(scope_correct),
                 "assurance_calibration": float(assurance_correct),
+                "protocol_compliance": float(contract),
                 "reward": float(correct),
                 "false_certification": false_certification,
             }
