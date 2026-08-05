@@ -107,6 +107,22 @@ contract-invalid mathematical answer is a completed `REJECTED` observation;
 auth, model/task/source drift, timeout, missing usage/output, contamination,
 or verifier infrastructure failure makes the run `INCOMPLETE`.
 
+PR3 also preserves a clean-room verifier result for the initial submission,
+before condition C's audit, and provides a fail-closed operator telemetry
+command:
+
+```sh
+make symbolic-coordination-trajectory-telemetry \
+  SC_TRAJECTORY_RUNS="/tmp/symbolic-coordination-codex-smoke" \
+  SC_TRAJECTORY_OUTPUT=/tmp/symbolic-trajectory.json
+```
+
+It verifies the raw artifact index and emits typed trajectory schema v1 JSON
+plus Markdown A/B/C tables. Mathematical correctness, evidence validity, scope,
+assurance, infrastructure, and trajectory diagnostics remain separate. The
+rules and unavailable-data semantics are documented in
+[the telemetry reference](../../../docs/reference/evaluations/symbolic-coordination-trajectory-telemetry.md).
+
 Codex CLI 0.146.0 does not expose seed or temperature controls for ChatGPT
 login runs, so the snapshot records those fields as unavailable and the run as
 nondeterministic. Token accounting is enforced at the stage boundary after

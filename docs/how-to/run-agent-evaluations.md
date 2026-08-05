@@ -217,6 +217,22 @@ output, contamination, or verifier infrastructure failures. See the dataset
 [README](../../benchmarks/datasets/symbolic-coordination-v1/README.md) for the
 complete artifact inventory and current nondeterminism/auth limitations.
 
+After a complete or honestly incomplete run, verify the raw artifact index and
+emit versioned per-condition plus aggregate trajectory telemetry:
+
+```sh
+make symbolic-coordination-trajectory-telemetry \
+  SC_TRAJECTORY_RUNS="/tmp/symbolic-coordination-codex-smoke" \
+  SC_TRAJECTORY_OUTPUT=/tmp/symbolic-trajectory.json \
+  SC_TRAJECTORY_MARKDOWN=/tmp/symbolic-trajectory.md
+```
+
+The command fails closed on malformed JSONL, artifact-index drift, mismatched
+snapshot/task/condition bindings, malformed reasoning logs, and inconsistent
+submission, audit, or verifier state. It never estimates missing tokens. See
+[Symbolic coordination trajectory telemetry](../reference/evaluations/symbolic-coordination-trajectory-telemetry.md)
+for schema v1 and every deterministic classification rule.
+
 ## Inspect results
 
 Harbor writes results under `benchmarks/results/`. Inspect the summary with:
