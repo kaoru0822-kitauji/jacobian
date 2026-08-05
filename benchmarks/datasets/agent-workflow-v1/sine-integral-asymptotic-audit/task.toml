@@ -19,7 +19,7 @@ category = "mathematics"
 tags = ["asymptotic-audit", "sign-error", "exact-symbolic-replay", "offline"]
 case_version = "agent-workflow-v1"
 contamination_class = "public-dataset-derived"
-fixture_digest = "sha256:0b0376566b725b4c1eb5d58e9e7dd5503668edaa28d5f5489cc42529c33e7bac"
+fixture_digest = "sha256:8f1ae846d3c760ad965d9307694b05a033d585e71efc5f974d8c5a947b0ceccb"
 derivation = "Derived from JVRoggeveen/HARDMath2 train row 2 at immutable revision 5de45cfcb643fb72dafdd72de7c3c853b40d8157."
 [agent]
 timeout_sec = 600.0
