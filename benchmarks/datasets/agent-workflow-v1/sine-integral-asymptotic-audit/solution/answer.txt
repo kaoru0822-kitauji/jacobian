@@ -1,1 +1,4 @@
-Repeated integration by parts gives J = cos/x + sin/x^2 - 2cos/x^3 - 6sin/x^4 + 24cos/x^5 - 120R, so Si has the opposite signs and the published positive sine coefficient is wrong.
+sine-integral-certificate-v1
+result_sha256: 0aad48eefd2d08b2401380adffc228fcf26cb6f6d37deb70e56b870f4861666d
+published_sine_coefficient: 1
+corrected_sine_coefficient: -1

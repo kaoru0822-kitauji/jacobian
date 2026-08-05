@@ -10,4 +10,6 @@ Audit its signs without numerical sampling. Submit an exact certificate obtained
 Also give a rigorous absolute bound for the scaled remainder, using
 `|integral_x^infinity cos(t)/t^6 dt| <= 1/(5*x^5)` for `x > 0`, and classify whether the published coefficient of `sin(x)/x^2` is correct.
 
-Write `/app/submission.json` and exactly one evidence file at `/app/evidence/answer.txt`. Do not claim `VERIFIED`; this benchmark checks a symbolic certificate under the stated calculus lemma and has an assurance ceiling of `COMPUTED`.
+Write `/app/submission.json` and exactly one evidence file at `/app/evidence/answer.txt`. The evidence must contain exactly four nonempty lines: `sine-integral-certificate-v1`, `result_sha256: <digest>` where the digest is SHA-256 of the submitted result serialized as sorted-key compact JSON, `published_sine_coefficient: <submitted integer>`, and `corrected_sine_coefficient: <submitted integer>`.
+
+Include this published limitation exactly: `The checker replays an exact formal tail identity and bound under standard calculus lemmas; it does not machine-prove those lemmas or arbitrary transcendental asymptotics.` Do not claim `VERIFIED`; the assurance ceiling is `COMPUTED`.

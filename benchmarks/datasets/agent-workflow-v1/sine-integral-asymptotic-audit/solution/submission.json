@@ -25,6 +25,6 @@
   "claimed_assurance": "COMPUTED",
   "scope": "HARDMATH2_ROW_2_FIVE_TERM_TAIL_CERTIFICATE",
   "completeness": "COMPLETE_FOR_DECLARED_CERTIFICATE",
-  "evidence": [{"path": "evidence/answer.txt", "sha256": "sha256:a71a0399e0a8e69dfb2b98958ac3482ecef04cc7599ce0f4d573f470094077fd"}],
+  "evidence": [{"path": "evidence/answer.txt", "sha256": "sha256:e92e4a6261d38c3d24667abd89d0b3ce6c1edf4374fb2f289743751ce4314f17"}],
   "limitations": ["The checker replays an exact formal tail identity and bound under standard calculus lemmas; it does not machine-prove those lemmas or arbitrary transcendental asymptotics."]
 }
