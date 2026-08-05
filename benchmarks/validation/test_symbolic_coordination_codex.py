@@ -86,6 +86,9 @@ def _telemetry() -> dict[str, Any]:
         "mcp_calls": [],
         "shell_calls": [],
         "capability_ids": [],
+        "observed_models": [],
+        "terminal_failures": [],
+        "web_search_count": 0,
     }
 
 
