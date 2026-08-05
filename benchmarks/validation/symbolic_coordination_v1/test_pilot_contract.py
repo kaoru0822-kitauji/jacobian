@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import ast
 import json
-import subprocess
 from collections import Counter
 from pathlib import Path
 
 import pytest
+from benchmarks.tooling.command_runner import ToolCommandStatus, run_operator_command
 from benchmarks.validation.symbolic_coordination_v1 import support
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -21,22 +21,21 @@ def canonical_case(tmp_path: Path, task_id: str):
 
 
 def test_generator_is_deterministic() -> None:
-    completed = subprocess.run(
-        [
-            "uv",
+    completed = run_operator_command(
+        "uv",
+        (
             "run",
             "--locked",
             "python",
             str(DATASET / "generate.py"),
             "--check",
-        ],
+        ),
         cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
+        timeout_seconds=60.0,
     )
-    assert completed.returncode == 0, completed.stderr
-    assert "26 generated cases are current" in completed.stdout
+    assert completed.status is ToolCommandStatus.EXITED
+    assert completed.exit_code == 0, completed.stderr.decode(errors="replace")
+    assert b"26 generated cases are current" in completed.stdout
 
 
 def test_manifest_has_the_frozen_pilot_family_balance() -> None:
@@ -52,7 +51,7 @@ def test_manifest_has_the_frozen_pilot_family_balance() -> None:
     }
 
 
-def test_verifier_is_clean_room_and_standard_library_only() -> None:
+def test_verifier_is_clean_room_and_backend_independent() -> None:
     text = (DATASET / "verifier_template.py").read_text()
     imports = {
         alias.name.split(".", 1)[0]

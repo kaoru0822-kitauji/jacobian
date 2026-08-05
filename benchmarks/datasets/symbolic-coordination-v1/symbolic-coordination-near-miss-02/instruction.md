@@ -16,4 +16,19 @@ non-conclusion matching timeout or incomplete execution. Any mathematically
 valid collision witness in the declared grid is acceptable.
 
 Use any mathematical method. No external service or special tool is required.
-The maximum submission assurance is `CHECKED`; do not claim `VERIFIED`.
+
+<!-- BEGIN PUBLIC CONTRACT SUBMISSION BLOCK -->
+## Submission
+
+Mirror the terminal result into evidence/certificate.json and bind that exact regular file by SHA-256. The verifier independently checks the mathematics, input and artifact identities, declared scope, completeness, and assurance.
+
+Write `/app/submission.json` to the exact schema in `environment/submission_schema.json`. The submission envelope requires `task_id`, `conclusion`, `result`, `claimed_assurance`, `scope`, `completeness`, `evidence`, and `limitations`.
+
+- **Conclusion:** one of `TRUE`, `FALSE`, `UNKNOWN`
+- **Assurance:** scoreable values are `UNVERIFIED`, `COMPUTED`, `CHECKED` (ceiling `CHECKED`); the submission schema accepts any of `UNVERIFIED`, `COMPUTED`, `CHECKED`, `VERIFIED` but only scoreable assurances receive credit.
+- **Scope:** the exact value declared in `submission_schema.json`
+- **Completeness:** `COMPLETE`.
+- **Evidence:** 1-1 item(s); allowed path(s): `evidence/certificate.json`; digest must match `^sha256:[0-9a-f]{64}$`.
+- **Evidence media types:** `application/json`.
+- **Required artifact filenames:** `evidence/certificate.json`.
+<!-- END PUBLIC CONTRACT SUBMISSION BLOCK -->

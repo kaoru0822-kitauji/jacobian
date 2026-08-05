@@ -13,6 +13,15 @@ from fractions import Fraction
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from benchmarks.tooling.public_contract import (  # noqa: E402
+    PublicContract,
+    render_instruction,
+    render_submission_schema,
+)
+
 DATASET = Path(__file__).resolve().parent
 TEMPLATE_SUPPORT = ROOT / "benchmarks/templates/task/tests/verifier_support.py"
 VERIFIER_TEMPLATE = DATASET / "verifier_template.py"
@@ -877,7 +886,7 @@ def solution(data: dict[str, object]) -> tuple[dict[str, object], bytes]:
     return submission, evidence_bytes
 
 
-def submission_schema(data: dict[str, object]) -> dict[str, object]:
+def submission_schema_parts(data: dict[str, object]) -> dict[str, object]:
     rational_schema = {
         "type": "object",
         "additionalProperties": False,
@@ -1149,6 +1158,43 @@ def submission_schema(data: dict[str, object]) -> dict[str, object]:
     }
 
 
+def public_contract(data: dict[str, object]) -> PublicContract:
+    """Build the canonical public protocol and its deterministic projection."""
+
+    legacy_schema = submission_schema_parts(data)
+    properties = legacy_schema["properties"]
+    declaration = {
+        "schema_version": "1",
+        "task_id": data["task_id"],
+        "submission_path": "/app/submission.json",
+        "assurance_ceiling": "CHECKED",
+        "allowed_assurance": ["UNVERIFIED", "COMPUTED", "CHECKED"],
+        "allowed_completeness": properties["completeness"]["enum"],
+        "conclusion": properties["conclusion"],
+        "scope": {"type": "string", "const": data["required_scope"]},
+        "evidence": {
+            "min_items": 1,
+            "max_items": 1,
+            "allowed_paths": ["evidence/certificate.json"],
+            "digest_pattern": "^sha256:[0-9a-f]{64}$",
+            "media_types": ["application/json"],
+        },
+        "required_artifact_filenames": ["evidence/certificate.json"],
+        "public_notes": (
+            "Mirror the terminal result into evidence/certificate.json and bind "
+            "that exact regular file by SHA-256. The verifier independently "
+            "checks the mathematics, input and artifact identities, declared "
+            "scope, completeness, and assurance."
+        ),
+        "submission_result": properties["result"],
+        "limitations": properties["limitations"],
+        "schema_definitions": legacy_schema["$defs"],
+    }
+    draft = PublicContract.model_validate(declaration)
+    declaration["submission_schema"] = json.loads(render_submission_schema(draft))
+    return PublicContract.model_validate(declaration)
+
+
 def render_task(
     data: dict[str, object], verifier: bytes, support: bytes
 ) -> dict[Path, bytes]:
@@ -1157,7 +1203,9 @@ def render_task(
     input_content = json_bytes(data)
     fixture_digest = sha256_bytes(input_content)
     submission, evidence = solution(data)
-    schema = submission_schema(data)
+    contract = public_contract(data)
+    contract_value = contract.model_dump(mode="json", exclude_none=True)
+    schema_text = render_submission_schema(contract)
     checksum = hashlib.sha256(verifier).hexdigest()
     description = (
         f"Assess one exact polynomial-map claim in the {data['family']} pilot family."
@@ -1228,7 +1276,7 @@ Jacobian nor the generator; it replays exact rational polynomial arithmetic,
 scope, input and artifact bindings, evidence digest, and assurance. `VERIFIED`
 is unauthorized in this pilot and receives zero reward.
 """.encode()
-    instruction = f"""# Exact polynomial-map claim assessment
+    instruction_base = f"""# Exact polynomial-map claim assessment
 
 Assess the `{data["family"]}` claim frozen in `input.json` under exact rational
 polynomial semantics. Supplied candidates, provider statuses, partial direction
@@ -1246,12 +1294,13 @@ non-conclusion matching timeout or incomplete execution. Any mathematically
 valid collision witness in the declared grid is acceptable.
 
 Use any mathematical method. No external service or special tool is required.
-The maximum submission assurance is `CHECKED`; do not claim `VERIFIED`.
-""".encode()
+"""
+    instruction = render_instruction(contract, instruction_base).encode()
     environment_docker = f"FROM {IMAGE}\nCOPY input.json submission_schema.json /app/\nWORKDIR /app\n".encode()
     tests_docker = f'''FROM {IMAGE}
 LABEL jacobian.checksum="{checksum}"
-COPY verifier.py verifier_support.py input.json test.sh /tests/
+RUN python -m pip install --no-cache-dir attrs==26.1.0 jsonschema==4.26.0 jsonschema-specifications==2025.9.1 referencing==0.37.0 rpds-py==2026.6.3 typing-extensions==4.16.0
+COPY verifier.py verifier_support.py public_contract.json input.json test.sh /tests/
 COPY input.json /app/input.json
 RUN chmod +x /tests/test.sh
 '''.encode()
@@ -1282,7 +1331,7 @@ evaluation_owner = "jacobian/symbolic-coordination-v1"
         task / "task.toml": task_toml,
         task / "environment/Dockerfile": environment_docker,
         task / "environment/input.json": input_content,
-        task / "environment/submission_schema.json": json_bytes(schema),
+        task / "environment/submission_schema.json": schema_text.encode(),
         task / "solution/answer.txt": (
             str(submission["result"]["verdict"]) + "\n"
         ).encode(),
@@ -1291,6 +1340,9 @@ evaluation_owner = "jacobian/symbolic-coordination-v1"
         task / "solution/solve.sh": solve_sh,
         task / "tests/Dockerfile": tests_docker,
         task / "tests/input.json": input_content,
+        task / "tests/public_contract.json": (
+            json.dumps(contract_value, indent=2, sort_keys=True) + "\n"
+        ).encode(),
         task / "tests/test.sh": b"#!/bin/sh\nset -eu\nexec python /tests/verifier.py\n",
         task / "tests/verifier.py": verifier,
         task / "tests/verifier_support.py": support,

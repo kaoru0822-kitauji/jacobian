@@ -1,7 +1,8 @@
 """Clean-room exact verifier copied into every symbolic-coordination-v1 task.
 
-This module deliberately uses only the Python standard library and does not
-import Jacobian, SymPy, the dataset generator, or Oracle solution code.
+This module does not import Jacobian, a mathematical backend, the dataset
+generator, or Oracle solution code. Its only external dependency is the
+maintained JSON Schema validator used by the task-local protocol helper.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from pathlib import Path
 from verifier_support import (
     SUBMISSION_FIELDS,
     is_regular_bounded_file,
+    load_submission,
     read_evidence_json,
     workspace_input_is_bound,
 )
@@ -573,8 +575,10 @@ def _required_completeness(result: object, data: dict[str, object]) -> str:
 def main() -> None:
     frozen_value = _load_json(T / "input.json", maximum_bytes=16 * 1024 * 1024)
     data = frozen_value if isinstance(frozen_value, dict) else {}
-    submission_value = _load_json(W / "submission.json", maximum_bytes=16 * 1024 * 1024)
-    submission = submission_value if isinstance(submission_value, dict) else None
+    # Validate the complete public submission protocol independently from the
+    # frozen-input identity check so a substituted input still reports the
+    # mathematical and binding dimensions separately.
+    submission = load_submission(W / "submission.json", require_input_binding=False)
     result = submission.get("result") if isinstance(submission, dict) else None
 
     try:
