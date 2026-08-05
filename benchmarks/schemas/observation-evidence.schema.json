@@ -215,7 +215,15 @@
         "trial_name": {"type": "string"},
         "pair_id": {"type": ["string", "null"]},
         "status": {
-          "enum": ["COMPLETED", "ERROR", "TIMEOUT", "CANCELLED"]
+          "enum": [
+            "COMPLETED",
+            "RUNNING",
+            "PENDING",
+            "FAILED",
+            "ERROR",
+            "TIMEOUT",
+            "CANCELLED"
+          ]
         },
         "exception_type": {"type": ["string", "null"]},
         "model": {"type": ["string", "null"]},

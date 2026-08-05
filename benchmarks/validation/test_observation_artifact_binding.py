@@ -9,6 +9,7 @@ import pytest
 from benchmarks.tooling import observation_results
 from benchmarks.tooling.observation_results import (
     _resolve_binding,
+    _trial_status,
     build_observation_evidence,
 )
 from benchmarks.validation.observation_results_support import (
@@ -21,6 +22,18 @@ from benchmarks.validation.observation_results_support import (
 # ---------------------------------------------------------------------------
 # Normalization integration (v2 bindings)
 # ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "raw_status",
+    ("RUNNING", "PENDING", "FAILED", "ERROR", "TIMEOUT", "CANCELLED"),
+)
+def test_trial_status_preserves_noncompleted_states(raw_status: str) -> None:
+    assert _trial_status({"status": raw_status}, None) == raw_status
+
+
+def test_trial_status_fails_closed_on_unknown_state() -> None:
+    assert _trial_status({"status": "UNKNOWN"}, None) == "ERROR"
 
 
 def test_observation_normalization_binds_v2_fields(
