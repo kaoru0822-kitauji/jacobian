@@ -130,6 +130,8 @@ class ExperimentManifest(_StrictModel):
 
     @model_validator(mode="after")
     def _manifest_invariants(self) -> ExperimentManifest:
+        if self.stack_revisions.get("pr4") != self.source_revision:
+            raise ValueError("stack revision pr4 must equal the clean source revision")
         if set(self.conditions) != set(CONDITIONS):
             raise ValueError("manifest must bind exactly conditions A/B/C")
         task_ids = [task.task_id for task in self.tasks]

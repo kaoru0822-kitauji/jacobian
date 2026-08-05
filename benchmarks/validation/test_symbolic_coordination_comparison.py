@@ -34,7 +34,7 @@ def _manifest(root: Path, *, repetitions: int = 2) -> comparison.ExperimentManif
         "causal_claim_authorized": False,
         "source_revision": "2" * 40,
         "source_branch": "bench/test",
-        "stack_revisions": {"pr3": "3" * 40},
+        "stack_revisions": {"pr3": "3" * 40, "pr4": "2" * 40},
         "dataset_id": "symbolic-coordination-v1",
         "tasks": [item.model_dump(mode="json") for item in tasks],
         "repetitions": repetitions,
@@ -193,6 +193,14 @@ def test_manifest_drift_fails_closed(tmp_path: Path) -> None:
     (root / "experiment-manifest.json").write_text(json.dumps(payload))
     with pytest.raises(comparison.ComparisonError, match="digest drift"):
         comparison.load_manifest(root)
+
+
+def test_manifest_rejects_source_stack_substitution(tmp_path: Path) -> None:
+    manifest = _manifest(tmp_path / "experiment")
+    payload = manifest.model_dump(mode="json")
+    payload["stack_revisions"]["pr4"] = "9" * 40
+    with pytest.raises(ValidationError, match="must equal the clean source"):
+        comparison.ExperimentManifest.model_validate(payload)
 
 
 def test_duplicate_run_id_is_rejected(tmp_path: Path) -> None:
