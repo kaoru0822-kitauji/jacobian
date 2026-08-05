@@ -15,6 +15,18 @@ collision witness, complete declared-grid exhaustion, or an honest
 non-conclusion matching timeout or incomplete execution. Any mathematically
 valid collision witness in the declared grid is acceptable.
 
+The `conclusion` field is determined by the terminal `verdict`:
+
+| Verdict | Conclusion |
+|---|---|
+| `VALID_TWO_SIDED_INVERSE` | `TRUE` |
+| `INVALID_INVERSE_CANDIDATE` | `FALSE` |
+| `KELLER_CONDITION_ONLY` | `TRUE` |
+| `NOT_KELLER` | `FALSE` |
+| `COLLISION_FOUND` | `TRUE` |
+| `NO_COLLISION_IN_DECLARED_GRID` | `FALSE` |
+| `UNKNOWN` | `UNKNOWN` |
+
 Use any mathematical method. No external service or special tool is required.
 
 <!-- BEGIN PUBLIC CONTRACT SUBMISSION BLOCK -->

@@ -28,6 +28,7 @@ MAX_INTERMEDIATE_TERMS = 4096
 CHECKER_ID = "symbolic-coordination-v1.clean-room-polynomial-map-checker@1"
 SEMANTICS_ID = "exact-sparse-polynomial-maps-over-QQ@1"
 ASSURANCE_LEVELS = {"UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"}
+SCOREABLE_ASSURANCE_LEVELS = {"UNVERIFIED", "COMPUTED", "CHECKED"}
 
 
 def _load_json(path: Path, *, maximum_bytes: int) -> object | None:
@@ -52,8 +53,6 @@ def _fraction(value: object) -> Fraction:
     if type(numerator) is not str or type(denominator) is not str:
         raise ValueError("rational components must be strings")
     parsed = Fraction(int(numerator), int(denominator))
-    if str(parsed.numerator) != numerator or str(parsed.denominator) != denominator:
-        raise ValueError("rational is not canonical")
     return parsed
 
 
@@ -355,16 +354,16 @@ def _inverse_assessment(data: dict[str, object], certificate: object):
     source_variables, forward = _map(data["forward_map"], canonical=False)
     target_variables, inverse = _map(data["candidate_inverse"], canonical=False)
     submitted_variables, submitted_inverse = _map(
-        certificate.get("inverse_map"), canonical=True
+        certificate.get("inverse_map"), canonical=False
     )
     left = _identity_residuals(_compose(inverse, forward))
     right = _identity_residuals(_compose(forward, inverse))
     submitted_left = tuple(
-        _poly(value, len(source_variables), canonical=True)
+        _poly(value, len(source_variables), canonical=False)
         for value in certificate.get("inverse_after_forward_residuals", [])
     )
     submitted_right = tuple(
-        _poly(value, len(target_variables), canonical=True)
+        _poly(value, len(target_variables), canonical=False)
         for value in certificate.get("forward_after_inverse_residuals", [])
     )
     shape = bool(
@@ -404,7 +403,7 @@ def _keller_assessment(data: dict[str, object], certificate: object):
         return False, False, None
     variables, forward = _map(data["forward_map"], canonical=False)
     determinant = _jacobian_determinant(forward)
-    submitted = _poly(certificate.get("determinant"), len(variables), canonical=True)
+    submitted = _poly(certificate.get("determinant"), len(variables), canonical=False)
     constant_key = (0,) * len(variables)
     condition = bool(
         len(determinant) == 1
@@ -572,6 +571,16 @@ def _required_completeness(result: object, data: dict[str, object]) -> str:
     return str(data["expected_completeness"])
 
 
+def _required_limitations(result: object, data: dict[str, object]) -> object:
+    if (
+        isinstance(result, dict)
+        and isinstance(result.get("certificate"), dict)
+        and result["certificate"].get("kind") == "COLLISION_WITNESS_REPLAY"
+    ):
+        return ["NO_CLAIM_OUTSIDE_EXACT_COLLISION_WITNESS"]
+    return data.get("required_limitations")
+
+
 def main() -> None:
     frozen_value = _load_json(T / "input.json", maximum_bytes=16 * 1024 * 1024)
     data = frozen_value if isinstance(frozen_value, dict) else {}
@@ -594,13 +603,17 @@ def main() -> None:
     shape_ok, math_ok, expected_verdict = _assessment(data, result)
     expected_conclusion = _expected_conclusion(expected_verdict)
     expected_completeness = _required_completeness(result, data) if data else ""
+    expected_limitations = _required_limitations(result, data) if data else None
     envelope_ok = bool(
         isinstance(submission, dict)
         and set(submission) == set(SUBMISSION_FIELDS)
         and submission.get("task_id") == data.get("task_id")
+        and type(submission.get("conclusion")) is str
         and submission.get("conclusion") in {"TRUE", "FALSE", "UNKNOWN"}
+        and type(submission.get("claimed_assurance")) is str
         and submission.get("claimed_assurance") in ASSURANCE_LEVELS
         and type(submission.get("scope")) is str
+        and type(submission.get("completeness")) is str
         and submission.get("completeness") in {"COMPLETE", "PARTIAL", "UNKNOWN"}
         and isinstance(submission.get("evidence"), list)
         and len(submission["evidence"]) == 1
@@ -608,7 +621,9 @@ def main() -> None:
         and all(type(value) is str for value in submission["limitations"])
     )
     protocol_ok = bool(
-        envelope_ok and shape_ok and submission.get("claimed_assurance") == "CHECKED"
+        envelope_ok
+        and shape_ok
+        and submission.get("claimed_assurance") in SCOREABLE_ASSURANCE_LEVELS
     )
     artifact_binding_ok = bool(
         isinstance(result, dict) and result.get("bindings") == expected_bindings
@@ -646,11 +661,11 @@ def main() -> None:
         isinstance(submission, dict)
         and submission.get("scope") == data.get("required_scope")
         and submission.get("completeness") == expected_completeness
-        and submission.get("limitations") == data.get("required_limitations")
+        and submission.get("limitations") == expected_limitations
     )
     assurance_ok = bool(
         isinstance(submission, dict)
-        and submission.get("claimed_assurance") == "CHECKED"
+        and submission.get("claimed_assurance") in SCOREABLE_ASSURANCE_LEVELS
     )
     false_certification = bool(
         isinstance(submission, dict)

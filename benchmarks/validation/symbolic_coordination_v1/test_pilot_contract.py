@@ -3,6 +3,8 @@ from __future__ import annotations
 import ast
 import json
 from collections import Counter
+from fractions import Fraction
+from itertools import product
 from pathlib import Path
 
 import pytest
@@ -18,6 +20,59 @@ TASK_IDS = [case["task_id"] for case in MANIFEST["cases"]]
 def canonical_case(tmp_path: Path, task_id: str):
     task, app, logs = support.prepare(tmp_path, task_id)
     return task, app, logs, json.loads((app / "submission.json").read_text())
+
+
+def _parse_poly(coord: dict) -> dict[tuple[int, ...], Fraction]:
+    """Collapse a polynomial coordinate into a nonzero term map keyed by exponents."""
+
+    result: dict[tuple[int, ...], Fraction] = {}
+    for term in coord["terms"]:
+        coefficient = Fraction(
+            int(term["coefficient"]["num"]), int(term["coefficient"]["den"])
+        )
+        exponents = tuple(term["exponents"])
+        result[exponents] = result.get(exponents, Fraction(0)) + coefficient
+    return {k: v for k, v in result.items() if v != 0}
+
+
+def _evaluate(coords: list[dict[tuple[int, ...], Fraction]], point: tuple) -> tuple:
+    """Evaluate the parsed polynomial coordinates at a rational point."""
+
+    values = []
+    for coord in coords:
+        total = Fraction(0)
+        for exponents, coefficient in coord.items():
+            monomial = coefficient
+            for value, exp in zip(point, exponents, strict=True):
+                monomial *= value**exp
+            total += monomial
+        values.append(total)
+    return tuple(values)
+
+
+def _find_collision_in_grid(
+    forward_map: dict, record: dict
+) -> tuple[tuple, tuple, tuple]:
+    """Search the declared grid for two distinct points sharing a common image."""
+
+    coords = [_parse_poly(c) for c in forward_map["coordinates"]]
+    values = tuple(
+        Fraction(v) for v in range(record["min_numerator"], record["max_numerator"] + 1)
+    )
+    points = list(product(values, repeat=len(forward_map["variables"])))
+    images: dict[tuple, tuple] = {}
+    for point in points:
+        image = _evaluate(coords, point)
+        if image in images:
+            return images[image], point, image
+        images[image] = point
+    raise AssertionError("no collision found in the declared grid")
+
+
+def _point_json(point: tuple) -> list[dict[str, str]]:
+    """Serialize a rational point as the certificate's coordinate list."""
+
+    return [{"num": str(c.numerator), "den": str(c.denominator)} for c in point]
 
 
 def test_generator_is_deterministic() -> None:
@@ -374,3 +429,123 @@ def test_malformed_nested_exponents_fail_closed(
     result = support.run_verifier(task, app, logs)
     assert result["protocol_compliance"] == 0.0
     assert result["reward"] == 0.0
+
+
+def test_unreduced_rational_coefficient_is_accepted(tmp_path: Path) -> None:
+    """Thread 5: schema-valid unreduced rationals must not be rejected."""
+    task, app, logs, submission = canonical_case(
+        tmp_path, "symbolic-coordination-valid-inverse-04"
+    )
+    inv_map = submission["result"]["certificate"]["inverse_map"]
+    for coord in inv_map["coordinates"]:
+        for term in coord["terms"]:
+            term["coefficient"] = {
+                "num": str(int(term["coefficient"]["num"]) * 2),
+                "den": str(int(term["coefficient"]["den"]) * 2),
+            }
+    support.rebind_evidence(app, submission)
+    result = support.run_verifier(task, app, logs)
+    assert result["correctness"] == 1.0
+    assert result["reward"] == 1.0
+
+
+def test_non_canonical_polynomial_is_accepted(tmp_path: Path) -> None:
+    """Thread 1: schema-valid non-canonical polynomial encodings (duplicate
+    exponents, zero terms, non-descending order) must be compared semantically."""
+    task, app, logs, submission = canonical_case(
+        tmp_path, "symbolic-coordination-semantic-equivalence-01"
+    )
+    inv_map = submission["result"]["certificate"]["inverse_map"]
+    # Insert a duplicate exponent that cancels and a zero term, plus reorder.
+    coord0 = inv_map["coordinates"][0]
+    original_terms = coord0["terms"]
+    coord0["terms"] = [
+        {"coefficient": {"num": "0", "den": "1"}, "exponents": [0, 0]},
+        original_terms[1],
+        {"coefficient": {"num": "5", "den": "1"}, "exponents": [1, 0]},
+        {"coefficient": {"num": "-5", "den": "1"}, "exponents": [1, 0]},
+        original_terms[0],
+    ]
+    support.rebind_evidence(app, submission)
+    result = support.run_verifier(task, app, logs)
+    assert result["correctness"] == 1.0
+    assert result["reward"] == 1.0
+
+
+@pytest.mark.parametrize("assurance", ["UNVERIFIED", "COMPUTED"])
+def test_lower_assurance_levels_receive_credit(tmp_path: Path, assurance: str) -> None:
+    """Thread 6: scoreable assurances below CHECKED must receive credit."""
+    task, app, logs, submission = canonical_case(
+        tmp_path, "symbolic-coordination-valid-inverse-01"
+    )
+    submission["claimed_assurance"] = assurance
+    support.rebind_evidence(app, submission)
+    result = support.run_verifier(task, app, logs)
+    assert result["protocol_compliance"] == 1.0
+    assert result["assurance_calibration"] == 1.0
+    assert result["reward"] == 1.0
+
+
+@pytest.mark.parametrize("field", ["conclusion", "claimed_assurance", "completeness"])
+def test_malformed_enum_field_does_not_crash(tmp_path: Path, field: str) -> None:
+    """Thread 4: unhashable enum values must produce a deterministic zero,
+    not a TypeError crash."""
+    task, app, logs, submission = canonical_case(
+        tmp_path, "symbolic-coordination-valid-inverse-01"
+    )
+    submission[field] = ["not", "a", "string"]
+    support.write_json(app / "submission.json", submission)
+    result = support.run_verifier(task, app, logs)
+    assert result["protocol_compliance"] == 0.0
+    assert result["reward"] == 0.0
+
+
+@pytest.mark.parametrize(
+    "task_id",
+    [
+        "symbolic-coordination-search-timeout-01",
+        "symbolic-coordination-search-incomplete-01",
+    ],
+)
+def test_collision_witness_in_timeout_case_is_accepted(
+    tmp_path: Path, task_id: str
+) -> None:
+    """Thread 2: an exact collision witness found during a timeout/incomplete
+    search must be accepted with collision-witness scope and limitations."""
+    task, app, logs, submission = canonical_case(tmp_path, task_id)
+    data = json.loads((app / "input.json").read_text())
+    record = data["search_record"]
+    grid = {
+        "min_numerator": record["min_numerator"],
+        "max_numerator": record["max_numerator"],
+        "max_denominator": record["max_denominator"],
+    }
+    first, second, image = _find_collision_in_grid(data["forward_map"], record)
+    submission["result"]["verdict"] = "COLLISION_FOUND"
+    submission["result"]["certificate"] = {
+        "kind": "COLLISION_WITNESS_REPLAY",
+        "grid": grid,
+        "first_point": _point_json(first),
+        "second_point": _point_json(second),
+        "common_image": _point_json(image),
+        "global_consequence": "MAP_NOT_INJECTIVE_OVER_QQ",
+    }
+    submission["conclusion"] = "TRUE"
+    submission["completeness"] = "COMPLETE"
+    submission["limitations"] = ["NO_CLAIM_OUTSIDE_EXACT_COLLISION_WITNESS"]
+    support.rebind_evidence(app, submission)
+    result = support.run_verifier(task, app, logs)
+    assert result["correctness"] == 1.0
+    assert result["scope_accuracy"] == 1.0
+    assert result["reward"] == 1.0
+
+
+def test_verdict_to_conclusion_mapping_is_documented() -> None:
+    """Thread 3: the verdict-to-conclusion mapping must appear in the
+    agent-visible instruction."""
+    task_dir = DATASET / "symbolic-coordination-grid-exhausted-01"
+    instruction = (task_dir / "instruction.md").read_text()
+    assert "NO_COLLISION_IN_DECLARED_GRID" in instruction
+    assert "`FALSE`" in instruction
+    assert "COLLISION_FOUND" in instruction
+    assert "`TRUE`" in instruction
