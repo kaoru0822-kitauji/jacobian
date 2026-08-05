@@ -160,8 +160,9 @@ check-changed: ## Run format, types, and exact changed-path tests.
 	$(MAKE) test-changed BASE="$(or $(BASE),origin/main)"
 
 define run_topology_lane
-	PYTEST_ADDOPTS="$(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)" \
-		$(TOPOLOGY_RUNNER) $(1) $(if $(TESTS),$(TESTS))
+	$(TOPOLOGY_RUNNER) $(1) \
+		--pytest-args "$(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)" \
+		$(if $(TESTS),$(TESTS))
 endef
 
 test-unit: ## Run pure contracts and models (10s lane, sequential).

@@ -84,6 +84,23 @@ def test_dry_run_focused_selector_reports_zero_workers(capsys) -> None:
     assert "-n" not in out.splitlines()[-1]
 
 
+def test_dry_run_forwards_explicit_pytest_arguments(capsys) -> None:
+    rc = main(
+        [
+            "process",
+            "--pytest-args=-k target_test --junitxml=pytest.xml",
+            "tests/boundary/process/tooling/test_local_validation_tools.py",
+            "--dry-run",
+        ]
+    )
+    command = capsys.readouterr().out.splitlines()[-1]
+
+    assert rc == 0
+    assert "--pytest-args=" not in command
+    assert "-k target_test" in command
+    assert "--junitxml=pytest.xml" in command
+
+
 def test_dry_run_serial_lane_reports_no_workers(capsys) -> None:
     rc = main(["storage", "--dry-run"])
     out = capsys.readouterr().out

@@ -413,11 +413,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("selectors", nargs="*", help="exact pytest paths or node IDs")
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument(
+        "--pytest-args",
+        default="",
+        help="shell-style pytest arguments supplied by the repository wrapper",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="print lane metadata and the pytest command without executing",
     )
     args, extra_args = parser.parse_known_args(argv)
+    try:
+        configured_pytest_args = shlex.split(args.pytest_args)
+    except ValueError as exc:
+        parser.error(f"invalid --pytest-args value: {exc}")
+    extra_args = [*configured_pytest_args, *extra_args]
     try:
         topology = load_topology(args.manifest)
         lane = topology.lane(args.lane)
