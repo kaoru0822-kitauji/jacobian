@@ -295,7 +295,9 @@ def main() -> None:
         if evidence
         else None
     )
-    if evidence_value is not None:
+    if evidence_value is None:
+        evidence = False
+    else:
         evidence = (
             set(evidence_value)
             == {"schema_version", "task_id", "result", "limitations"}

@@ -59,6 +59,9 @@ REQUIRED_TESTS = ("Dockerfile", "test.sh", "verifier.py", "verifier_support.py")
 DATASET_SUPPORT_DIRS = frozenset({"jobs", "members"})
 MEMBER_SCHEMA_VERSION = "2"
 VERIFIER_CONTRACT_VERSION = "1"
+PUBLIC_CONTRACT_DATASETS = frozenset(
+    {"mathematical-benchmarks-v1", "conjecture-probes-v1"}
+)
 NETWORK_MODES = frozenset({"public", "no-network", "allowlist"})
 FORBIDDEN_VISIBLE_NAMES = frozenset(
     {
@@ -662,7 +665,7 @@ def _task_manifest_failures(suite: Suite, task_dir: Path, rel: str) -> list[str]
     )
     if structural_failures:
         return structural_failures
-    if suite.id == "mathematical-benchmarks-v1":
+    if suite.id in PUBLIC_CONTRACT_DATASETS:
         contract_path = task_dir / "tests" / "public_contract.json"
         if not contract_path.is_file():
             failures.append(f"{rel}/tests/public_contract.json: required file missing")
@@ -847,7 +850,7 @@ def _tests_dockerfile_failures(
         )
     if not _dockerfile_copies(docker_text, "verifier_support.py"):
         failures.append(f"{rel}/tests/Dockerfile: does not copy verifier_support.py")
-    if suite.id == "mathematical-benchmarks-v1" and not _dockerfile_copies(
+    if suite.id in PUBLIC_CONTRACT_DATASETS and not _dockerfile_copies(
         docker_text, "public_contract.json"
     ):
         failures.append(f"{rel}/tests/Dockerfile: does not copy public_contract.json")

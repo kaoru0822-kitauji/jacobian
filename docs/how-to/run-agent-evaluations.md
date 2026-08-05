@@ -118,7 +118,7 @@ or non-digest-pinned image remains useful for development, but normalization
 fails closed rather than calling it reproducible evidence.
 
 ```sh
-export SNAPSHOT_LOCK='benchmarks/snapshots/mathematical-benchmarks-v1/6c6d41612502da5486bc23843e027a30cf91398ecf7c749cb8a017c56490707d.lock.json'
+export SNAPSHOT_LOCK='benchmarks/snapshots/mathematical-benchmarks-v1/26e558abcfda80f944ff1659f73b3c89b22ed4ddd2700d8340c067dc4ed7b323.lock.json'
 export RUNTIME_SNAPSHOT='benchmarks/results/my-run/runtime.json'
 mkdir -p "$(dirname "$RUNTIME_SNAPSHOT")"
 jq --arg model "$JACOBIAN_MODEL" \

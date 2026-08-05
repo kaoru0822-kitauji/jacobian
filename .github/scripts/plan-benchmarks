@@ -79,6 +79,10 @@ BENCHMARK_CONFIG_PREFIX = "benchmarks/config/"
 HOST_VALIDATION_ROOT = "benchmarks/validation"
 HOST_VALIDATION_FULL_SHARDS = 4
 HOST_VALIDATION_DATASET_FILES = {
+    "conjecture-probes-v1": (
+        "benchmarks/validation/conjecture_probes_v1/"
+        "test_vizing_bounded_cartesian_products.py",
+    ),
     "symbolic-coordination-v1": (
         "benchmarks/validation/symbolic_coordination_v1/test_pilot_contract.py",
     ),

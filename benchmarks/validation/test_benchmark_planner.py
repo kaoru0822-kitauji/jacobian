@@ -292,6 +292,29 @@ def test_dataset_owned_task_selects_shared_host_regression() -> None:
     _assert_plan_valid(result)
 
 
+def test_conjecture_probe_task_selects_owned_host_regression() -> None:
+    result = planner.plan(
+        [
+            "benchmarks/datasets/conjecture-probes-v1/"
+            "vizing-bounded-cartesian-products/tests/verifier.py"
+        ],
+        event="pull_request",
+    )
+    assert _host_matrix(result) == [
+        {
+            "name": "conjecture-probes-v1-1",
+            "selector": (
+                "benchmarks/validation/conjecture_probes_v1/"
+                "test_vizing_bounded_cartesian_products.py"
+            ),
+            "keyword": "",
+            "splits": 0,
+            "group": 0,
+        }
+    ]
+    _assert_plan_valid(result)
+
+
 def test_changed_validation_test_selects_itself() -> None:
     path = "benchmarks/validation/test_benchmark_timings.py"
     result = planner.plan([path], event="pull_request")

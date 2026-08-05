@@ -118,6 +118,20 @@ def test_tampered_input_and_bad_evidence_binding_are_separate(tmp_path: Path) ->
     assert reward["evidence"] == 0.0 and reward["aggregate_reward"] == 0.0
 
 
+def test_malformed_bound_evidence_fails_closed(tmp_path: Path) -> None:
+    app, logs, submission = _case(tmp_path)
+    _write(app, submission)
+    evidence = app / "evidence/answer.txt"
+    evidence.write_text("{")
+    submission["evidence"][0]["sha256"] = (
+        "sha256:" + hashlib.sha256(evidence.read_bytes()).hexdigest()
+    )
+    (app / "submission.json").write_text(json.dumps(submission, sort_keys=True) + "\n")
+    reward = _run(app, logs)
+    assert reward["evidence"] == 0.0
+    assert reward["aggregate_reward"] == 0.0
+
+
 def test_reward_emission_is_deterministic_for_malformed_json(tmp_path: Path) -> None:
     app, logs, _ = _case(tmp_path)
     (app / "submission.json").write_text("{")
