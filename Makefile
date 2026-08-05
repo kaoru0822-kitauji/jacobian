@@ -26,7 +26,7 @@ endif
 # in pyproject.toml: direct pytest invocations must not silently inherit a
 # signal-based deadline that cannot interrupt a native solver.  Process and
 # provider lanes run risky work in killable children and set their own deadline.
-.PHONY: help help-all uv-version-check setup setup-agent container-image hooks fix lint complexity-check lint-full security-audit typecheck test-architecture architecture ci-plan test-plan test-changed check-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static harbor-plan harbor-sync harbor-contracts harbor-adapter-checks harbor-validation-tests harbor-validate harbor-check harbor-check-task benchmark-inventory benchmark-snapshot benchmark-snapshot-validate benchmark-publish harbor-oracle harbor-oracle-task harbor-oracle-run harbor-oracle-all harbor-adapter-check heldout-validate heldout-render heldout-smoke agent-eval agent-eval-validate agent-eval-compare provider-eval clean docs-command-check docs-linkcheck deploy-check
+.PHONY: help help-all uv-version-check setup setup-agent container-image eval-image eval-image-pull eval-image-bind hooks fix lint complexity-check lint-full security-audit typecheck test-architecture architecture ci-plan test-plan test-changed check-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static harbor-plan harbor-sync harbor-contracts harbor-adapter-checks harbor-validation-tests harbor-validate harbor-check harbor-check-task benchmark-inventory benchmark-snapshot benchmark-snapshot-validate benchmark-publish harbor-oracle harbor-oracle-task harbor-oracle-run harbor-oracle-all harbor-adapter-check heldout-validate heldout-render heldout-smoke agent-eval agent-eval-validate agent-eval-compare provider-eval clean docs-command-check docs-linkcheck deploy-check
 
 help: ## Show available developer commands.
 	@awk -v public="$(PUBLIC_COMMANDS)" 'BEGIN {FS = ":.*## "; n = split(public, names, " "); for (i = 1; i <= n; i++) wanted[names[i]] = 1; printf "Jacobian common developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / && ($$1 in wanted) {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -47,14 +47,21 @@ setup: uv-version-check ## Install the locked development environment.
 setup-agent: ## Configure an agent against this source checkout (ARGS="--client codex --profile full-python").
 	./scripts/setup-agent $(ARGS)
 
-container-image: ## Build a revision-labelled local image (IMAGE=jacobian:local).
-	@test -z "$$(git status --porcelain)" || { echo "container-image requires a clean worktree" >&2; exit 2; }
-	@revision=$$(git rev-parse HEAD); \
-	version=$$(uv version --short); \
-	docker build \
-		--build-arg JACOBIAN_REVISION="$$revision" \
-		--build-arg JACOBIAN_VERSION="$$version" \
-		-t "$(or $(IMAGE),jacobian:local)" .
+JACOBIAN_REGISTRY_IMAGE ?= ghcr.io/morluto/jacobian
+
+container-image: ## Build jacobian:local from the current tree, including dirty changes.
+	$(UV_RUN) python tools/manage_jacobian_image.py build --image "$(or $(IMAGE),jacobian:local)"
+
+eval-image: ## Select a published digest for a clean tree or build jacobian:local when dirty.
+	$(UV_RUN) python tools/manage_jacobian_image.py select --registry-image "$(JACOBIAN_REGISTRY_IMAGE)"
+
+eval-image-pull: ## Pull the current clean revision and print its digest-pinned image reference.
+	$(UV_RUN) python tools/manage_jacobian_image.py pull --registry-image "$(JACOBIAN_REGISTRY_IMAGE)"
+
+eval-image-bind: ## Bind image identity into RUNTIME_SNAPSHOT (JACOBIAN_IMAGE=..., RUNTIME_SNAPSHOT=...).
+	@test -n "$(JACOBIAN_IMAGE)" -a -n "$(RUNTIME_SNAPSHOT)" || { echo "JACOBIAN_IMAGE and RUNTIME_SNAPSHOT are required" >&2; exit 2; }
+	$(UV_RUN) python tools/manage_jacobian_image.py bind-runtime \
+		--image "$(JACOBIAN_IMAGE)" --runtime-snapshot "$(RUNTIME_SNAPSHOT)"
 
 deploy-check: ## Validate the clone-to-systemd deployment entrypoint.
 	bash -n deploy/install.sh
@@ -465,6 +472,12 @@ agent-eval: ## Run a Harbor evaluation (JACOBIAN_ENABLED=0|1, JACOBIAN_EVAL_PROX
 	if [ -z "$${JACOBIAN_MODEL:-}" ]; then \
 		echo "JACOBIAN_MODEL must be exported" >&2; \
 		exit 2; \
+	fi; \
+	if [ "$(JACOBIAN_ENABLED)" = "1" ]; then \
+		test -n "$${JACOBIAN_IMAGE:-}" || { echo "JACOBIAN_IMAGE must be exported" >&2; exit 2; }; \
+		test -n "$(RUNTIME_SNAPSHOT)" || { echo "RUNTIME_SNAPSHOT is required for a Jacobian-enabled run" >&2; exit 2; }; \
+		$(UV_RUN) python tools/manage_jacobian_image.py bind-runtime \
+			--image "$${JACOBIAN_IMAGE}" --runtime-snapshot "$(RUNTIME_SNAPSHOT)"; \
 	fi; \
 	JACOBIAN_EVAL_HTTP_PROXY="$(JACOBIAN_EVAL_HTTP_PROXY)" \
 	JACOBIAN_EVAL_HTTPS_PROXY="$(JACOBIAN_EVAL_HTTPS_PROXY)" \

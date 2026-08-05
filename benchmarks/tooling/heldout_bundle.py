@@ -455,17 +455,32 @@ def render_plan(
                 json.dumps(job, indent=2, sort_keys=True) + "\n", encoding="utf-8"
             )
             snapshot_path = run_root / "runtime.json"
+            image_identity = (
+                {
+                    "source_sha": treatment["source_sha"],
+                    "source_dirty": False,
+                    "reference": treatment["image"],
+                    "digest_reference": treatment["image"],
+                    "platform": treatment["platform"],
+                    "jacobian_package_version": treatment["server_version"],
+                }
+                if condition["jacobian_enabled"]
+                else None
+            )
+            runtime_snapshot = {
+                "manifest_digest": manifest_digest,
+                "condition": condition,
+                "stage": stage,
+                "pair_id": pair_id,
+                "pair_index": pair_index,
+                "task": task,
+                "repetition": repetition,
+            }
+            if image_identity is not None:
+                runtime_snapshot["jacobian_image"] = image_identity
             snapshot_path.write_text(
                 json.dumps(
-                    {
-                        "manifest_digest": manifest_digest,
-                        "condition": condition,
-                        "stage": stage,
-                        "pair_id": pair_id,
-                        "pair_index": pair_index,
-                        "task": task,
-                        "repetition": repetition,
-                    },
+                    runtime_snapshot,
                     indent=2,
                     sort_keys=True,
                 )

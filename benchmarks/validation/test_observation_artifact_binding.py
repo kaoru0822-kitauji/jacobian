@@ -8,12 +8,14 @@ from pathlib import Path
 import pytest
 from benchmarks.tooling import observation_results
 from benchmarks.tooling.observation_results import (
+    _jacobian_image_failures,
     _resolve_binding,
     _trial_status,
     build_observation_evidence,
 )
 from benchmarks.validation.observation_results_support import (
     _HARBOR_VERSION,
+    _JACOBIAN_IMAGE,
     _SNAPSHOT_ID,
     _write_observation_job,
     _write_result,
@@ -22,6 +24,23 @@ from benchmarks.validation.observation_results_support import (
 # ---------------------------------------------------------------------------
 # Normalization integration
 # ---------------------------------------------------------------------------
+
+
+def test_reproducible_treatment_requires_digest_bound_clean_image() -> None:
+    runtime = {
+        "condition": {"jacobian_enabled": True},
+        "jacobian_image": {**_JACOBIAN_IMAGE, "source_dirty": True},
+    }
+
+    failures = _jacobian_image_failures(runtime)
+
+    assert failures == ["Jacobian image must come from a clean source revision"]
+
+
+def test_reproducible_treatment_requires_image_identity() -> None:
+    failures = _jacobian_image_failures({"condition": {"jacobian_enabled": True}})
+
+    assert failures == ["Jacobian-enabled runtime snapshot must bind jacobian_image"]
 
 
 @pytest.mark.parametrize(
@@ -121,6 +140,7 @@ def test_observation_binds_runtime_snapshot_fields(
         "max_cost_usd": 100.0,
         "repetition": 0,
         "pair_id": "graph-counterexample-r001",
+        "jacobian_image": _JACOBIAN_IMAGE,
         "condition": {
             "id": "treatment",
             "role": "PRIMARY_TREATMENT",
