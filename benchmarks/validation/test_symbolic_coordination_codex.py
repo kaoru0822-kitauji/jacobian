@@ -166,6 +166,33 @@ def test_preflight_rejects_api_or_model_environment_before_commands() -> None:
             sc.preflight({name: "present"})
 
 
+def test_auth_contract_is_independent_of_unrelated_doctor_status(
+    tmp_path: Path,
+) -> None:
+    auth_file = tmp_path / "auth.json"
+    auth_file.write_text("{}\n", encoding="utf-8")
+    doctor = {
+        "overallStatus": "error",
+        "checks": {
+            "auth.credentials": {
+                "status": "ok",
+                "details": {
+                    "stored auth mode": "chatgpt",
+                    "stored ChatGPT tokens": "true",
+                    "stored API key": "false",
+                    "auth storage mode": "File",
+                },
+            }
+        },
+    }
+
+    assert sc._resolve_auth_file({"CODEX_HOME": str(tmp_path)}, doctor) == auth_file
+
+    doctor["checks"]["auth.credentials"]["status"] = "error"
+    with pytest.raises(sc.HarnessError, match="file-backed ChatGPT auth"):
+        sc._resolve_auth_file({"CODEX_HOME": str(tmp_path)}, doctor)
+
+
 def test_model_selection_requires_listed_tool_model_and_reasoning() -> None:
     catalog = {
         "models": [

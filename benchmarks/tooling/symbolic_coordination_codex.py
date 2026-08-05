@@ -348,8 +348,7 @@ def _resolve_auth_file(source: Mapping[str, str], doctor: Mapping[str, Any]) -> 
     auth = checks.get("auth.credentials") if isinstance(checks, dict) else None
     details = auth.get("details") if isinstance(auth, dict) else None
     if (
-        doctor.get("overallStatus") != "ok"
-        or not isinstance(auth, dict)
+        not isinstance(auth, dict)
         or auth.get("status") != "ok"
         or not isinstance(details, dict)
         or details.get("stored auth mode") != "chatgpt"
@@ -542,8 +541,10 @@ def preflight(source: Mapping[str, str]) -> Preflight:
         timeout_seconds=60.0,
         stdout_limit_bytes=4 * 1024 * 1024,
     )
+    if doctor_result.status is not ToolCommandStatus.EXITED:
+        raise HarnessError(f"codex doctor did not exit: {doctor_result.status}")
     doctor = _decode_json_object(
-        _command_succeeded(doctor_result, label="codex doctor"),
+        doctor_result.stdout,
         label="codex doctor",
     )
     auth_file = _resolve_auth_file(source, doctor)
@@ -563,6 +564,7 @@ def preflight(source: Mapping[str, str]) -> Preflight:
             "stored_api_key": False,
         },
         "codex_version": version,
+        "doctor_overall_status": doctor.get("overallStatus"),
         "doctor_auth_status": auth_check["status"],
         "model": selected,
         "model_contract_digest": selected_digest,
