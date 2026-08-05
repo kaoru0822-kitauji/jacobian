@@ -13,6 +13,10 @@ _REAL_TASK = (
     _ROOT
     / "benchmarks/datasets/mathematical-benchmarks-v1/finite-field-irreducibility-repair"
 )
+_REAL_CONJECTURE_TASK = (
+    _ROOT
+    / "benchmarks/datasets/conjecture-probes-v1/vizing-bounded-cartesian-products"
+)
 
 
 def _write(root: Path, relative: str, source: str) -> Path:
@@ -27,6 +31,12 @@ def _copy_real_task(root: Path, task_name: str) -> None:
     dest = root / "benchmarks/datasets/mathematical-benchmarks-v1" / task_name
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(_REAL_TASK, dest)
+
+
+def _copy_real_conjecture_task(root: Path, task_name: str) -> None:
+    dest = root / "benchmarks/datasets/conjecture-probes-v1" / task_name
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(_REAL_CONJECTURE_TASK, dest)
 
 
 def test_public_contract_drift_is_flagged(tmp_path: Path) -> None:
@@ -47,6 +57,13 @@ def test_public_contract_drift_is_flagged(tmp_path: Path) -> None:
 
 def test_public_contract_no_drift_passes(tmp_path: Path) -> None:
     _copy_real_task(tmp_path, "test-task")
+    report = check_architecture(tmp_path)
+    drift = [v for v in report.violations if v.code == "public-contract-drift"]
+    assert drift == []
+
+
+def test_conjecture_public_contract_no_drift_passes(tmp_path: Path) -> None:
+    _copy_real_conjecture_task(tmp_path, "test-task")
     report = check_architecture(tmp_path)
     drift = [v for v in report.violations if v.code == "public-contract-drift"]
     assert drift == []
