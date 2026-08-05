@@ -85,6 +85,20 @@ def test_rejects_checked_assurance_without_partial_reward(tmp_path: Path) -> Non
     assert rejected["reward"] == 0.0
 
 
+def test_result_shape_drift_is_protocol_only(tmp_path: Path) -> None:
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    submission = json.loads((app / "submission.json").read_text())
+    submission["result"]["unexpected"] = True
+    _bind_evidence(app, submission)
+    support._write_json(app / "submission.json", submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 1.0
+    assert rejected["evidence_validity"] == 1.0
+    assert rejected["protocol_compliance"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
 def test_rejects_stale_evidence_after_relabeling(tmp_path: Path) -> None:
     task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
     submission = json.loads((app / "submission.json").read_text())

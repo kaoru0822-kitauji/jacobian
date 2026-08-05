@@ -6,6 +6,7 @@ from pathlib import Path
 
 from verifier_support import (
     MAX_SUBMISSION_BYTES,
+    _public_submission_is_valid,
     evidence_list_is_bound,
     false_verified_claim,
     is_regular_bounded_file,
@@ -30,7 +31,7 @@ def _submission():
 
 
 def _valid_design(result, source):
-    if not isinstance(result, dict) or set(result) != {"order", "blocks"}:
+    if not isinstance(result, dict) or not {"order", "blocks"} <= set(result):
         return False
     order = result.get("order")
     blocks = result.get("blocks")
@@ -68,8 +69,10 @@ def _evidence(value, result):
         or not isinstance(result.get("blocks"), list)
     ):
         return False
-    path = resolve_evidence(value[0], expected_path="evidence/answer.txt")
-    if path is None or not is_regular_bounded_file(path, max_bytes=4096):
+    path = resolve_evidence(
+        value[0], expected_path="evidence/answer.txt", max_bytes=4096
+    )
+    if path is None:
         return False
     try:
         lines = [line.strip() for line in path.read_text().splitlines() if line.strip()]
@@ -92,18 +95,18 @@ def main():
     input_bound = workspace_input_is_bound()
     source = json.loads((E / "input.json").read_text())
     expected = json.loads((E / "expected.json").read_text())
-    contract = strict_submission_contract(
+    envelope_contract = strict_submission_contract(
         submission,
         task_id=expected["task_id"],
         conclusion=expected["conclusion"],
         allowed_assurances=frozenset({"COMPUTED"}),
         verification_record="forbidden",
     )
+    contract = bool(envelope_contract and _public_submission_is_valid(submission))
     math_correct = _valid_design(data.get("result"), source)
     evidence_valid = _evidence(data.get("evidence"), data.get("result"))
     scope_correct = bool(
-        type(data.get("claimed_assurance")) is str
-        and data.get("scope") == expected["required_scope"]
+        data.get("scope") == expected["required_scope"]
         and data.get("limitations") == expected["limitations"]
     )
     assurance_correct = data.get("claimed_assurance") == expected["maximum_assurance"]
