@@ -72,6 +72,23 @@ oracle_jobs_dir = "benchmarks/results/research-diagnostics-v1-oracle"
 oracle = "jobs/oracle.json"
 
 [[datasets]]
+id = "jacobian/conjecture-probes-v1"
+directory = "benchmarks/datasets/conjecture-probes-v1"
+evaluation_kind = "conjecture-probe"
+scored = true
+publication_status = "local"
+required_provider = "core"
+runtime_profile = "core"
+title = "Jacobian bounded conjecture probes"
+purpose = "Public, independently checked bounded progress on explicit finite conjecture scopes."
+claim_class = "bounded-conjecture-progress"
+answer_visibility = "public"
+default_execution_profile = "oracle-only"
+oracle_jobs_dir = "benchmarks/results/conjecture-probes-v1-oracle"
+[datasets.jobs]
+oracle = "jobs/oracle.json"
+
+[[datasets]]
 id = "jacobian/provider-feasibility-v1"
 directory = "benchmarks/datasets/provider-feasibility-v1"
 evaluation_kind = "provider-feasibility"
