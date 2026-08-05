@@ -132,8 +132,8 @@ for a runnable example.
 ## Capabilities
 
 Capabilities are discovered at runtime through `capability://catalog`,
-described with `capability.describe`, and executed with
-`capability.invoke`. The installed catalog is the source of truth because
+described with `math.find`, and executed with
+`math.run`. The installed catalog is the source of truth because
 availability can depend on local backends.
 
 | Domain | Agent-visible outcomes |
@@ -165,7 +165,7 @@ Jacobian keeps four responsibilities separate:
   change verification policy.
 
 The public MCP surface stays small: the capability catalog plus the two
-capability entry points, `capability.describe` and `capability.invoke`.
+capability entry points, `math.find` and `math.run`.
 
 ## Documentation
 
@@ -204,8 +204,8 @@ full-python` explicitly binds the client to that source environment;
 the maintained `scripts/setup-agent` wrapper performs the required locked sync
 and doctor checks first.
 The server advertises only the capability entry points.
-`capability.describe` searches, browses, or inspects installed operations, while
-`capability.invoke` runs one selected operation. These are composable access
+`math.find` searches, browses, or inspects installed operations, while
+`math.run` runs one selected operation. These are composable access
 paths, not a required sequence: agents own mathematical representation,
 decomposition, exploration, composition, verification timing, and stopping.
 

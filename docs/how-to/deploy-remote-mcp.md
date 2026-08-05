@@ -10,16 +10,10 @@ deployment source of truth. Keep host-specific copies, smoke output, and
 last-deployed notes outside source control; do not install configuration from
 operator scratch space or treat it as current.
 
-By default the server exposes `capability.describe` and `capability.invoke`.
+The server exposes `math.find` and `math.run`.
 Clients may read installed descriptors from `capability://catalog` and inspect
 exact contracts before invoking mathematical operations, which remain behind
 namespaced capability IDs.
-
-For controlled name-selection evaluations, `--tool-name-profile math` exposes
-the same two contracts as `math.find` and `math.run`. Do not expose both profiles
-to one model or interpret the treatment profile as a compatibility alias or
-public rename. Production deployments should retain the default until the
-evaluation and migration decision are complete.
 
 `--reasoning-log-mode off` is the default. Use `required` to enforce the
 operational `reasoning.write` protocol (PLAN → BEFORE_TOOL → invoke →
@@ -343,7 +337,7 @@ startup.
 Lean results are cached only for an exact content-addressed certificate and
 the currently active checker digest. The bounded in-memory cache holds 128
 entries; a changed proof, statement, environment, checker, or authorization
-state cannot reuse an entry. `capability.describe` for `lean.check` reports the
+state cannot reuse an entry. `math.find` for `lean.check` reports the
 cache policy and the MATHLIB warm-up state (`RUNNING`, `HEALTHY`, or
 `UNHEALTHY`). Before advertising a deployment, wait for `HEALTHY` and invoke a
 deployed smoke check with `statement: "True"`, `proof: "by trivial"`, and

@@ -158,8 +158,7 @@ async def capability_describe(
         descriptor = descriptors[capability_id]
     except KeyError:
         hint = (
-            "Call capability.describe with a mathematical query to search "
-            "installed capabilities."
+            "Call math.find with a mathematical query to search installed capabilities."
         )
         return {
             "error": {
@@ -202,7 +201,7 @@ async def capability_describe(
                     if view == "FULL"
                     else {}
                 ),
-                "tool": "capability.invoke",
+                "tool": "math.run",
                 "arguments": {
                     "capability_id": descriptor.capability_id,
                     "mode": example.mode.value,
@@ -212,7 +211,7 @@ async def capability_describe(
             if reasoning_mode is ReasoningLogMode.REQUIRED:
                 entry["requires_reasoning_ids"] = True
                 entry["protocol_note"] = (
-                    "In REQUIRED mode, capability.invoke also requires "
+                    "In REQUIRED mode, math.run also requires "
                     "reasoning_run_id and reasoning_call_id. Create a "
                     "reasoning run with reasoning.write (PLAN), then call "
                     "reasoning.write (BEFORE_TOOL) to obtain the IDs before "
@@ -332,7 +331,7 @@ async def reasoning_write(
         descriptor = descriptors.get(str(capability_id))
         if descriptor is None:
             raise AgentRecoveryError(
-                "BEFORE_TOOL names an unavailable capability. Use capability.describe "
+                "BEFORE_TOOL names an unavailable capability. Use math.find "
                 "to select an installed capability ID."
             )
         if mode not in descriptor.modes:

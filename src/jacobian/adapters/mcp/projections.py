@@ -246,7 +246,7 @@ def _discovery_recovery_paths(
     paths: list[dict[str, Any]] = [
         {
             "action": "reformulate_query",
-            "tool": "capability.describe",
+            "tool": "math.find",
             "change": "Use different or broader mathematical language for query.",
         }
     ]
@@ -262,7 +262,7 @@ def _discovery_recovery_paths(
         paths.append(
             {
                 "action": "remove_filters",
-                "tool": "capability.describe",
+                "tool": "math.find",
                 "change": "Remove domain, mode, input_kind, or artifact_type filters.",
             }
         )
@@ -270,7 +270,7 @@ def _discovery_recovery_paths(
         (
             {
                 "action": "browse",
-                "tool": "capability.describe",
+                "tool": "math.find",
                 "arguments": {},
             },
             {

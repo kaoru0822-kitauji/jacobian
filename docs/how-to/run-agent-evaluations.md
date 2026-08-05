@@ -122,33 +122,27 @@ make agent-eval DATASET=agent-workflow-v1 \
 Use `TASKS=graph-counterexample` for a small smoke run. The treatment run uses
 `benchmarks/config/jacobian.mcp.json`; task TOMLs remain agent-agnostic.
 
-### Compare tool-name profiles
+### Evaluate tool adoption and task design
 
-The default `capability` profile exposes `capability.describe` and
-`capability.invoke`. The experimental `math` profile exposes the same server
-instructions, descriptions, schemas, handlers, and result semantics as
-`math.find` and `math.run`. Run the profiles separately and bind
-`tool_name_profile` in each runtime snapshot's `condition` object:
+Jacobian exposes the canonical `math.find` and `math.run` tools in every
+observation run. Use a separate result root for each model, task set, or prompt
+condition so evidence from distinct runs cannot overwrite each other:
 
 ```sh
-JACOBIAN_TOOL_NAME_PROFILE=capability make agent-eval \
+make agent-eval \
   DATASET=agent-workflow-v1 JACOBIAN_ENABLED=1 \
   TASKS=graph-counterexample EVAL_EXECUTE=1 \
-  RUNTIME_SNAPSHOT=benchmarks/results/name-capability/runtime.json \
-  EVAL_ARGS="--job-name name-capability --jobs-dir benchmarks/results/name-capability"
-
-JACOBIAN_TOOL_NAME_PROFILE=math make agent-eval \
-  DATASET=agent-workflow-v1 JACOBIAN_ENABLED=1 \
-  TASKS=graph-counterexample EVAL_EXECUTE=1 \
-  RUNTIME_SNAPSHOT=benchmarks/results/name-math/runtime.json \
-  EVAL_ARGS="--job-name name-math --jobs-dir benchmarks/results/name-math"
+  RUNTIME_SNAPSHOT=benchmarks/results/adoption/runtime.json \
+  EVAL_ARGS="--job-name adoption --jobs-dir benchmarks/results/adoption"
 ```
 
-Keep the model, task digests, prompt, reasoning budget, agent version, image,
-reasoning-log mode, attempts, and network policy fixed. Compare appropriate
-Jacobian adoption, valid calls, discovery-to-execution continuation, irrelevant
-calls, fallback behavior, mathematical correctness, tokens, and elapsed time.
-Do not score adherence to a preferred tool sequence.
+Measure appropriate Jacobian adoption, valid calls, discovery-to-execution
+continuation, irrelevant calls, fallback behavior, mathematical correctness,
+tokens, and elapsed time. A correct run with no Jacobian calls may show that the
+task is too easy or that native tools are a better fit; it does not by itself
+show that the tool surface was misunderstood. Use negative-control tasks and
+tasks where Jacobian offers a material mathematical affordance. Do not score
+adherence to a preferred tool sequence.
 
 ### Held-out treatment readiness
 

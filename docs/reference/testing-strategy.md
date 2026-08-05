@@ -591,9 +591,9 @@ Required examples and state sequences:
 
 The CLI and MCP layer must be thin enough to test by equivalence:
 
-- the Python API, CLI, and `capability.invoke` return the same semantic result
+- the Python API, CLI, and `math.run` return the same semantic result
   envelope for the same descriptor version and artifact inputs;
-- `capability.describe`, `capability://catalog`, and invocation schemas agree;
+- `math.find`, `capability://catalog`, and invocation schemas agree;
 - boundary tests assert the exact tool, resource, template, and prompt inventories,
   their safety annotations and schemas, the operating guide, and representative
   browse, query, and exact-description behavior through their public MCP seams;
@@ -722,7 +722,7 @@ This work ships with the schema and artifact issues, not after them.
 - add mixed-batch and resource-failure scenarios;
 - add oracle outcome and `NONE_CERTIFIED` protocol tests;
 - add reduction state machines, cycle detection, and minimality-label tests;
-- compare Python API, CLI, and `capability.invoke` results.
+- compare Python API, CLI, and `math.run` results.
 
 ### Cross-domain fixtures
 

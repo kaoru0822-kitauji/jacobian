@@ -75,29 +75,22 @@ requires a structurally complete `PLAN`/call-cycle/`FINAL` trace for every
 workflow observations remain non-causal; protected runs must also freeze the
 model, prompt, agent version, task digests, sampling settings, and budgets.
 
-To screen the agent-visible tool names, keep Jacobian enabled in both arms and
-vary only `JACOBIAN_TOOL_NAME_PROFILE`. Use separate job names and result roots
-so one profile cannot overwrite or be mistaken for the other:
+To evaluate the canonical `math.find` and `math.run` surface, keep each model,
+task set, and prompt condition in a separate result root:
 
 ```sh
-# Existing-name control.
-JACOBIAN_TOOL_NAME_PROFILE=capability make agent-eval \
+make agent-eval \
   DATASET=agent-workflow-v1 JACOBIAN_ENABLED=1 \
   TASKS=graph-counterexample EVAL_EXECUTE=1 \
-  EVAL_ARGS="--job-name name-capability --jobs-dir benchmarks/results/name-capability"
-
-# Short mathematical-name treatment.
-JACOBIAN_TOOL_NAME_PROFILE=math make agent-eval \
-  DATASET=agent-workflow-v1 JACOBIAN_ENABLED=1 \
-  TASKS=graph-counterexample EVAL_EXECUTE=1 \
-  EVAL_ARGS="--job-name name-math --jobs-dir benchmarks/results/name-math"
+  EVAL_ARGS="--job-name adoption --jobs-dir benchmarks/results/adoption"
 ```
 
-Bind `tool_name_profile` in each runtime snapshot's condition. Both profiles
-render the same descriptions, instructions, schemas, handlers, and result
-semantics with different exposed names; a server never advertises both pairs.
-This public-suite screen is directional workflow evidence, not a causal rename
-decision.
+Inspect appropriate adoption, argument validity, discovery-to-execution
+continuation, irrelevant calls, native-tool fallback, correctness, tokens, and
+elapsed time. A correct no-call run may mean the task does not require a
+Jacobian affordance, so include negative controls and tasks that discriminate
+tool adoption. Public-suite observations remain directional workflow evidence,
+not a causal performance claim.
 
 Five tasks have an operator-authorized verification record and may accept
 `VERIFIED`; the remaining tasks are capped at `COMPUTED`. A wrong result or an

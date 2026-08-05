@@ -28,15 +28,12 @@ from jacobian.adapters.mcp.context import (
     _start_lean_warmup,
 )
 from jacobian.adapters.mcp.guidance import (
-    CAPABILITY_DESCRIBE_DESCRIPTION,
-    CAPABILITY_INVOKE_DESCRIPTION,
+    MATH_FIND_DESCRIPTION,
+    MATH_RUN_DESCRIPTION,
     REASONING_WRITE_DESCRIPTION,
     SERVER_DESCRIPTION,
-    ToolNames,
     operating_guide,
-    render_tool_names,
     server_instructions,
-    tool_names,
 )
 from jacobian.adapters.mcp.remote import TenantRuntimeRouter
 from jacobian.adapters.mcp.resources import (
@@ -101,18 +98,15 @@ class JacobianCoreExtension(Extension):
         runtime: JacobianRuntime | None,
         tenant_router: TenantRuntimeRouter | None,
         reasoning_log_mode: ReasoningLogMode = ReasoningLogMode.REQUIRED,
-        names: ToolNames | None = None,
     ) -> None:
         self._runtime = runtime
         self._tenant_router = tenant_router
         self._reasoning_log_mode = reasoning_log_mode
-        self._tool_names = names or tool_names("capability")
 
     def settings(self) -> dict[str, Any]:
         return {
             "version": "2",
             "reasoning_log_mode": self._reasoning_log_mode.value,
-            "tool_name_profile": self._tool_names.profile,
         }
 
     def tools(self) -> tuple[ToolBinding, ...]:
@@ -121,36 +115,23 @@ class JacobianCoreExtension(Extension):
             ReasoningLogMode.AUDIT: capability_invoke_audit,
             ReasoningLogMode.OFF: capability_invoke,
         }[self._reasoning_log_mode]
-        describe_handler = _rewrite_tool_result(capability_describe, self._tool_names)
         bindings = [
             ToolBinding(
-                _safe_tool_handler(
-                    self._tool_names.describe,
-                    describe_handler,
-                    names=self._tool_names,
-                ),
+                _safe_tool_handler("math.find", capability_describe),
                 kwargs={
-                    "name": self._tool_names.describe,
+                    "name": "math.find",
                     "title": "Find or inspect mathematical operations",
-                    "description": render_tool_names(
-                        CAPABILITY_DESCRIBE_DESCRIPTION, self._tool_names
-                    ),
+                    "description": MATH_FIND_DESCRIPTION,
                     "annotations": _tool_annotations(read_only=True, idempotent=True),
                     "structured_output": True,
                 },
             ),
             ToolBinding(
-                _safe_tool_handler(
-                    self._tool_names.invoke,
-                    invoke_handler,
-                    names=self._tool_names,
-                ),
+                _safe_tool_handler("math.run", invoke_handler),
                 kwargs={
-                    "name": self._tool_names.invoke,
+                    "name": "math.run",
                     "title": "Run a mathematical operation",
-                    "description": render_tool_names(
-                        CAPABILITY_INVOKE_DESCRIPTION, self._tool_names
-                    ),
+                    "description": MATH_RUN_DESCRIPTION,
                     "annotations": _tool_annotations(),
                     "structured_output": True,
                 },
@@ -186,14 +167,6 @@ class JacobianCoreExtension(Extension):
                     text=operating_guide(
                         reasoning_enabled=self._reasoning_log_mode
                         is not ReasoningLogMode.OFF
-                    )
-                    if self._tool_names.profile == "capability"
-                    else render_tool_names(
-                        operating_guide(
-                            reasoning_enabled=self._reasoning_log_mode
-                            is not ReasoningLogMode.OFF
-                        ),
-                        self._tool_names,
                     ),
                 )
             ),
@@ -300,11 +273,7 @@ class JacobianCoreExtension(Extension):
                 argument_digest,
                 status="error",
             )
-            raise ToolError(
-                render_tool_names(
-                    _public_tool_error(params.name, exc), self._tool_names
-                )
-            ) from exc
+            raise ToolError(_public_tool_error(params.name, exc)) from exc
         _log_tool_call(
             params.name,
             started,
@@ -315,33 +284,9 @@ class JacobianCoreExtension(Extension):
         return result
 
 
-def _rewrite_tool_result(handler: Any, names: ToolNames) -> Any:
-    """Rewrite agent-facing tool references while preserving the tool signature."""
-
-    @wraps(handler)
-    async def wrapped(*args: Any, **kwargs: Any) -> Any:
-        return _rewrite_tool_value(await handler(*args, **kwargs), names)
-
-    return wrapped
-
-
-def _rewrite_tool_value(value: Any, names: ToolNames) -> Any:
-    if isinstance(value, str):
-        return render_tool_names(value, names)
-    if isinstance(value, list):
-        return [_rewrite_tool_value(item, names) for item in value]
-    if isinstance(value, tuple):
-        return tuple(_rewrite_tool_value(item, names) for item in value)
-    if isinstance(value, dict):
-        return {key: _rewrite_tool_value(item, names) for key, item in value.items()}
-    return value
-
-
 def _safe_tool_handler(
     tool_name: str,
     handler: Any,
-    *,
-    names: ToolNames | None = None,
 ) -> Any:
     """Translate internal failures at the handler boundary before SDK rendering."""
 
@@ -353,10 +298,7 @@ def _safe_tool_handler(
             raise
         except Exception as exc:
             _LOGGER.warning("MCP tool %s failed", tool_name, exc_info=exc)
-            message = _public_tool_error(tool_name, exc)
-            if names is not None:
-                message = render_tool_names(message, names)
-            raise ToolError(message) from exc
+            raise ToolError(_public_tool_error(tool_name, exc)) from exc
 
     return wrapped
 
@@ -428,12 +370,10 @@ def create_server(
     max_tenant_runtimes: int | None = None,
     tenant_idle_timeout_seconds: float | None = None,
     reasoning_log_mode: ReasoningLogMode | str = ReasoningLogMode.OFF,
-    tool_name_profile: str = "capability",
 ) -> MCPServer[AppState]:
     """Create a local or tenant-routed adapter over a Jacobian runtime."""
 
     selected_reasoning_mode = _normalize_reasoning_log_mode(reasoning_log_mode)
-    selected_tool_names = tool_names(tool_name_profile)
     if tenant_isolation and capability_exclusions:
         raise ValueError("capability exclusions are supported only by local evaluation")
 
@@ -507,13 +447,6 @@ def create_server(
         description=SERVER_DESCRIPTION,
         instructions=server_instructions(
             reasoning_enabled=selected_reasoning_mode is not ReasoningLogMode.OFF
-        )
-        if selected_tool_names.profile == "capability"
-        else render_tool_names(
-            server_instructions(
-                reasoning_enabled=selected_reasoning_mode is not ReasoningLogMode.OFF
-            ),
-            selected_tool_names,
         ),
         version=__version__,
         lifespan=lifespan,
@@ -524,7 +457,6 @@ def create_server(
                 runtime,
                 tenant_router,
                 selected_reasoning_mode,
-                selected_tool_names,
             )
         ],
     )
@@ -533,7 +465,6 @@ def create_server(
         server,
         runtime,
         tenant_router,
-        selected_tool_names,
     )
     if selected_reasoning_mode is not ReasoningLogMode.OFF:
         _register_reasoning_resource(server, runtime, tenant_router)

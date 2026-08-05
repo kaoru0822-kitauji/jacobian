@@ -2,52 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
-
-@dataclass(frozen=True)
-class ToolNames:
-    """Agent-visible names for the two stable capability tools."""
-
-    profile: str
-    describe: str
-    invoke: str
-
-
-TOOL_NAME_PROFILES = {
-    "capability": ToolNames(
-        profile="capability",
-        describe="capability.describe",
-        invoke="capability.invoke",
-    ),
-    "math": ToolNames(
-        profile="math",
-        describe="math.find",
-        invoke="math.run",
-    ),
-}
-
-
-def tool_names(profile: str) -> ToolNames:
-    """Resolve one explicit MCP tool-name profile."""
-
-    try:
-        return TOOL_NAME_PROFILES[profile]
-    except KeyError:
-        choices = ", ".join(sorted(TOOL_NAME_PROFILES))
-        raise ValueError(
-            f"invalid tool_name_profile: {profile!r} (choose from {choices})"
-        ) from None
-
-
-def render_tool_names(text: str, names: ToolNames) -> str:
-    """Apply a name profile without changing the surrounding guidance."""
-
-    return text.replace("capability.describe", names.describe).replace(
-        "capability.invoke", names.invoke
-    )
-
-
 SERVER_DESCRIPTION = (
     "Discover and execute installed mathematical operations with explicit scope, "
     "completeness, assurance, and optional independent verification."
@@ -57,9 +11,9 @@ SERVER_INSTRUCTIONS = (
     "Jacobian provides searchable and executable mathematical operations for exact "
     "computation, transformation, structure discovery, examples and counterexamples, "
     "bounded search, formal-environment inspection, and independent checking. "
-    "capability.describe searches, browses, or inspects installed operations using a "
+    "math.find searches, browses, or inspects installed operations using a "
     "plain-language description of the desired local mathematical outcome. "
-    "capability.invoke executes a selected operation using its typed input contract. "
+    "math.run executes a selected operation using its typed input contract. "
     "Search or browse again whenever the objective or available evidence changes. "
     "The model owns representation, decomposition, composition, iteration, verification "
     "timing, and stopping. Results keep execution status, scope, completeness, "
@@ -69,7 +23,7 @@ SERVER_INSTRUCTIONS = (
     "verified. Read jacobian://instructions for the complete operating guide."
 )
 
-CAPABILITY_DESCRIBE_DESCRIPTION = """\
+MATH_FIND_DESCRIPTION = """\
 Find or inspect an installed mathematical operation that can produce a desired outcome.
 
 Choose this when mathematical work may benefit from exact computation, structural
@@ -105,11 +59,11 @@ Examples:
 - `{"capability_id":"polynomial.compute.gcd","view":"CONTRACT"}`
 """
 
-CAPABILITY_INVOKE_DESCRIPTION = """\
+MATH_RUN_DESCRIPTION = """\
 Run one installed mathematical operation and return its typed result, scope,
 completeness, assurance, diagnostics, intermediates, relationships, and artifacts.
 
-Use the selected operation's exact input contract; capability.describe can inspect an
+Use the selected operation's exact input contract; math.find can inspect an
 unfamiliar contract without making inspection a required research step. EXPLORE
 returns proposed, heuristic, or computed evidence. VERIFY is valid only for an
 installed checker-backed contract. The canonical `CapabilityResult` keeps execution,
@@ -147,7 +101,7 @@ independent checking. An installed capability ID is not required for search or b
 
 ## Search, browse, inspect, and run
 
-Search with `capability.describe(query=...)`, optionally filtered by `domain` and
+Search with `math.find(query=...)`, optionally filtered by `domain` and
 `mode`. Results are compact candidates ranked by deterministic matches against
 published descriptor metadata; `matched_on` and `matched_terms` make that retrieval
 visible. Ranking is not a recommendation. Follow `next_cursor` with unchanged filters
@@ -159,14 +113,14 @@ FULL adds complete provider and audit metadata. An agent that already has an exa
 contract may invoke the operation directly. Related operations describe compatibility
 and evidence flow; they do not prescribe what to do next.
 
-`capability.invoke` returns the canonical complete `CapabilityResult` directly as MCP
+`math.run` returns the canonical complete `CapabilityResult` directly as MCP
 structured content. Calls may be composed in any sequence the mathematical
 investigation requires. Inspect execution, scope, completeness, relationships,
 obligations, assurance, diagnostics, intermediates, and artifacts as separate result
 dimensions. Follow returned `artifact://` references to read durable results.
 
 `capability://catalog` is the complete machine-readable installed inventory.
-`capability.describe` is the agent-oriented discovery and exact-inspection surface.
+`math.find` is the agent-oriented discovery and exact-inspection surface.
 Weak or empty discovery results expose query reformulation, filter removal, browse,
 and catalog-inspection paths. They do not establish operation absence or mathematical
 impossibility.
@@ -219,9 +173,9 @@ raw tool output into summary.
 
 _REASONING_PREFIX = (
     "Before using Jacobian, call reasoning.write with phase PLAN and a concise "
-    "external work summary. Before each capability.invoke call, write BEFORE_TOOL "
+    "external work summary. Before each math.run call, write BEFORE_TOOL "
     "with the selected capability ID and mode, then pass the returned run_id and "
-    "call_id to capability.invoke. Write AFTER_TOOL after every result with the "
+    "call_id to math.run. Write AFTER_TOOL after every result with the "
     "reported status, assurance, and completeness; use RESULT_UNAVAILABLE only when "
     "result content was lost. Write FINAL before completing the task. These are summaries, "
     "not hidden chain-of-thought. Do not copy raw tool output. "
@@ -241,7 +195,7 @@ def operating_guide(*, reasoning_enabled: bool) -> str:
     ).replace(
         "## Mathematical affordances",
         "## External reasoning log\n\n"
-        "Start with one concise `PLAN`. Surround every `capability.invoke` with "
+        "Start with one concise `PLAN`. Surround every `math.run` with "
         "`BEFORE_TOOL` and `AFTER_TOOL`, then write one `FINAL` audit. The server "
         "binds actual status, assurance, completeness, and artifact URIs and records "
         "whether the model's structured interpretation matches them, without "
@@ -265,11 +219,11 @@ Keep task decomposition, representation, research strategy, iteration, verificat
 timing, and stopping criteria under your control.
 
 Available affordances:
-- `capability.describe(query=...)` searches by a desired local mathematical outcome.
-- `capability.describe()` browses when the installed vocabulary is unknown.
-- `capability.describe(capability_id=...)` inspects an exact operation and its typed
+- `math.find(query=...)` searches by a desired local mathematical outcome.
+- `math.find()` browses when the installed vocabulary is unknown.
+- `math.find(capability_id=...)` inspects an exact operation and its typed
   contract.
-- `capability.invoke(...)` runs one selected operation.
+- `math.run(...)` runs one selected operation.
 
 Compact matches are retrieval candidates, not recommendations. Compose operations as
 the investigation demands, and interpret execution, scope, completeness, assurance,
@@ -291,7 +245,7 @@ Use Jacobian to look for an independent checking path for this claim:
 {claim}
 </claim>
 {artifact_context}
-1. Search with `capability.describe(query=..., mode="VERIFY")`.
+1. Search with `math.find(query=..., mode="VERIFY")`.
 2. Treat an empty result as checker unavailability, not evidence for or against the
    claim.
 3. Describe the selected exact capability. Confirm that its semantics, scope,

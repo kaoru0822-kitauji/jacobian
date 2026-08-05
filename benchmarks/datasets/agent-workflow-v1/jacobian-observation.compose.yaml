@@ -15,8 +15,6 @@ services:
       - --allow-anonymous
       - --reasoning-log-mode
       - ${JACOBIAN_REASONING_LOG_MODE:-off}
-      - --tool-name-profile
-      - ${JACOBIAN_TOOL_NAME_PROFILE:-capability}
       - --state-dir
       - /state
     volumes:

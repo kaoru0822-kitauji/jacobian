@@ -10,10 +10,8 @@ from pydantic import Field
 
 from jacobian.adapters.mcp.context import _experiment_scope_content, _resource_runtime
 from jacobian.adapters.mcp.guidance import (
-    ToolNames,
     discovery_prompt,
     evidence_check_prompt,
-    render_tool_names,
 )
 from jacobian.adapters.mcp.tooling import _run_blocking
 from jacobian.runtime.model import JacobianRuntime
@@ -25,7 +23,6 @@ def _register_resources_and_prompts(
     server: Any,
     runtime: JacobianRuntime | None,
     tenant_router: Any,
-    names: ToolNames,
 ) -> None:
     """Register all MCP resource and prompt handlers on the server."""
 
@@ -177,7 +174,7 @@ def _register_resources_and_prompts(
             Field(description="The mathematical task or desired outcome."),
         ],
     ) -> str:
-        return render_tool_names(discovery_prompt(task), names)
+        return discovery_prompt(task)
 
     @server.prompt(  # type: ignore[untyped-decorator]
         name="jacobian-check-evidence",
@@ -197,7 +194,7 @@ def _register_resources_and_prompts(
             Field(description="Optional artifact:// URI carrying candidate evidence."),
         ] = None,
     ) -> str:
-        return render_tool_names(evidence_check_prompt(claim, artifact_uri), names)
+        return evidence_check_prompt(claim, artifact_uri)
 
 
 def _register_reasoning_resource(

@@ -11,12 +11,12 @@ model-facing MCP surface contains two capability tools and, in `REQUIRED` or
 
 | MCP tool | Purpose |
 | --- | --- |
-| `capability.describe` | Find or inspect installed mathematical operations by desired outcome or exact ID. |
-| `capability.invoke` | Run one installed mathematical operation in `EXPLORE` or `VERIFY` mode. |
+| `math.find` | Find or inspect installed mathematical operations by desired outcome or exact ID. |
+| `math.run` | Run one installed mathematical operation in `EXPLORE` or `VERIFY` mode. |
 | `reasoning.write` | Append a bounded model-authored `PLAN`, `BEFORE_TOOL`, `AFTER_TOOL`, or `FINAL` summary. Available only in `REQUIRED` or `AUDIT` mode. |
 
 The reasoning log is not a mathematical capability, proof object, workspace, or
-chain-of-thought collector. In `REQUIRED` mode, every `capability.invoke` must
+chain-of-thought collector. In `REQUIRED` mode, every `math.run` must
 carry the `reasoning_run_id` and `reasoning_call_id` returned by the current
 `BEFORE_TOOL`. The server binds the actual execution status, assurance,
 completeness, result digest, and artifact URIs, then records whether the model's
@@ -30,18 +30,14 @@ that an operation is installed and invocable. It does not imply compatibility
 support, recommendation, conformance coverage, or authority to return
 `VERIFIED`.
 
-The supported default names are `capability.describe` and `capability.invoke`.
-Controlled tool-selection evaluations may start the server with
-`--tool-name-profile math`, which exposes the same contracts exclusively as
-`math.find` and `math.run`. A server exposes one profile at a time, never both
-name pairs as aliases. The treatment profile is evaluation infrastructure, not
-evidence that the public default has changed. Adding a capability does not add a
-new MCP tool.
+The supported names are `math.find` and `math.run`. The superseded
+`capability.*` names are not exposed as aliases, so agents never choose between
+equivalent top-level tools. Adding a capability does not add a new MCP tool.
 
 The operator may separately set the reasoning-log enforcement mode to
-`REQUIRED`, `AUDIT`, or `OFF`; `OFF` is the default. Name profiles and reasoning
-logging do not change capability membership, mathematical behavior, assurance,
-or checker authority.
+`REQUIRED`, `AUDIT`, or `OFF`; `OFF` is the default. Reasoning logging does not
+change capability membership, mathematical behavior, assurance, or checker
+authority.
 
 ## Capability contract
 
@@ -88,7 +84,7 @@ enabled bundled references, configured exclusions, and operator-installed
 adapters. A static list in this document would therefore describe only one
 installation snapshot.
 
-`capability.describe` supports search, browse, and exact inspection. Search or
+`math.find` supports search, browse, and exact inspection. Search or
 browse retrieves compact installed outcomes without loading every schema:
 
 ```json
@@ -168,7 +164,7 @@ and other audit metadata:
 }
 ```
 
-`capability.invoke` returns the Pydantic `CapabilityResult`. MCP Python SDK 2.0
+`math.run` returns the Pydantic `CapabilityResult`. MCP Python SDK 2.0
 derives its output schema, validates the returned value, serializes
 model-visible `content`, and supplies the same typed value in
 `structured_content`. Small, bounded mathematical outputs remain inline in the
@@ -240,7 +236,7 @@ Z3 search. Larger inputs return an unsupported non-conclusion.
 Useful low-level operations may retain descriptive IDs such as
 `claim.validate`, `witness.find`, `witness.verify`, or
 `certificate.verify`. Those names identify capabilities invoked through
-`capability.invoke`; they are not separate MCP tools.
+`math.run`; they are not separate MCP tools.
 
 `claim.conjunction.split` and `claim.implication.obligations` operate on the
 registered v1 `PROPOSITIONAL_STRUCTURE` artifact. They return only immediate,
