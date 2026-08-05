@@ -207,6 +207,34 @@ for schema v1 and every deterministic classification rule.
 For the versioned two-task, two-repetition A/B/C pilot, use the resumable
 manifest and paired reporter documented in
 [Symbolic coordination repeated comparison](../reference/evaluations/symbolic-coordination-repeated-comparison.md).
+
+The final bounded closeout adds condition D: one clean-room verifier-feedback
+round followed by at most one coherent revision. Freeze the exact six-family,
+24-condition manifest before any model execution:
+
+```bash
+make symbolic-coordination-closeout-plan \
+  SC_CLOSEOUT_ROOT=/tmp/symbolic-coordination-closeout \
+  SC_CLOSEOUT_STACK_REVISIONS="pr1=<sha> pr2=<sha> pr3=<sha> pr4=<sha> pr5=<sha>"
+```
+
+Review the immutable manifest, then opt in once. `SC_CLOSEOUT_MAX_EXECUTIONS`
+may be used only to stop early; resuming verifies every existing artifact and
+never reruns a wrong answer.
+
+```bash
+make symbolic-coordination-closeout-run EVAL_EXECUTE=1 \
+  SC_CLOSEOUT_ROOT=/tmp/symbolic-coordination-closeout \
+  SC_CLOSEOUT_MAX_EXECUTIONS=24
+
+make symbolic-coordination-closeout-report \
+  SC_CLOSEOUT_ROOT=/tmp/symbolic-coordination-closeout \
+  SC_CLOSEOUT_OUTPUT=/tmp/symbolic-coordination-closeout-report.json
+```
+
+See the
+[symbolic coordination study closeout](../reference/evaluations/symbolic-coordination-study-closeout.md)
+for the feedback leakage boundary, report interpretation, and deferred work.
 It schedules exactly 12 condition-run executions (with C's fixed audit stage
 inside C), verifies every preserved PR3 run before resumption or aggregation,
 and reports descriptive Wilson intervals and exact paired discordance tests
