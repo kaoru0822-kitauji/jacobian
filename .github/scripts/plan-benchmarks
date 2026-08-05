@@ -383,17 +383,13 @@ def _classify_dataset_path(
     suite_task_ids = {ref.path.name for ref in suite.tasks}
     if task_id in suite_task_ids:
         classification.affected_datasets.add(dataset_id)
-        task_relative = relative[1:]
-        if task_relative != ("README.md",):
-            # A new task directory plus its member fragment resolves directly
-            # from the current tree: no prior inventory or dataset version bump
-            # is required to select its Oracle.
-            classification.oracle_tasks.add(task_id)
-            classification.run_oracle = True
-            classification.digest_relevant = True
-            classification.reasons.append(f"executable task change: {task_id}")
-        else:
-            classification.reasons.append(f"task documentation change: {task_id}")
+        # Harbor's task checksum covers the complete task directory, including
+        # task-local documentation. Every task-tree change therefore selects
+        # current-content digest and Oracle evidence for the exact new identity.
+        classification.oracle_tasks.add(task_id)
+        classification.run_oracle = True
+        classification.digest_relevant = True
+        classification.reasons.append(f"task content change: {task_id}")
         return
     if relative[:1] == ("members",) and len(relative) == 2:
         member_name = relative[1]
