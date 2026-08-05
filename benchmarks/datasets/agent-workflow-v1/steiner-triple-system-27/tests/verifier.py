@@ -117,12 +117,14 @@ def _certificate_matches(path, expected_lines):
                         line.append(byte)
                     else:
                         overflow = True
-            if started and (
-                matched >= len(expected_lines)
-                or overflow
-                or bytes(line).rstrip(b" \t\r\v\f") != expected_lines[matched]
-            ):
-                return False
+            if started:
+                if (
+                    matched >= len(expected_lines)
+                    or overflow
+                    or bytes(line).rstrip(b" \t\r\v\f") != expected_lines[matched]
+                ):
+                    return False
+                matched += 1
     except (OSError, UnicodeError):
         return False
     return matched == len(expected_lines)

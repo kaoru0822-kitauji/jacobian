@@ -157,3 +157,19 @@ def test_accepts_large_digest_bound_evidence_without_losing_math_diagnostic(
     assert accepted["correctness"] == 1.0
     assert accepted["evidence_validity"] == 1.0
     assert accepted["reward"] == pytest.approx(1.0)
+
+
+def test_accepts_evidence_without_trailing_newline(tmp_path: Path) -> None:
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    submission = json.loads((app / "submission.json").read_text())
+    evidence_path = app / "evidence" / "answer.txt"
+    evidence_path.write_text(evidence_path.read_text().rstrip("\n"))
+    submission["evidence"][0]["sha256"] = (
+        "sha256:" + hashlib.sha256(evidence_path.read_bytes()).hexdigest()
+    )
+    support._write_json(app / "submission.json", submission)
+
+    accepted = support._run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["evidence_validity"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
