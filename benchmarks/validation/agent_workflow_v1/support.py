@@ -52,9 +52,7 @@ RESOURCE_DERIVED_TASKS = (
     "well-total-domination-counterexample",
 )
 # Tasks whose verifier reports scope independently of assurance typing.
-SCOPE_INDEPENDENT_ASSURANCE_TASKS = (
-    "sine-integral-asymptotic-audit",
-)
+SCOPE_INDEPENDENT_ASSURANCE_TASKS = ("sine-integral-asymptotic-audit",)
 # Tasks whose verifier reports mathematical correctness independently of
 # workspace input binding, emitting a separate ``input_binding`` diagnostic
 # and gating only aggregate reward on both.
