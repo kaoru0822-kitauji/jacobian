@@ -201,7 +201,7 @@ def main() -> None:
         submission,
         task_id=expected["task_id"],
         conclusion=expected["conclusion"],
-        completeness="COMPLETE_FOR_DECLARED_CERTIFICATE",
+        completeness="COMPLETE",
         verification_record="forbidden",
     )
     math_correct = _result(data.get("result"), _load())

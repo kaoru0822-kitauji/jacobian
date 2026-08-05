@@ -1,34 +1,178 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["task_id", "conclusion", "result", "claimed_assurance", "scope", "completeness", "evidence", "limitations"],
-  "properties": {
-    "task_id": {"const": "jacobian/sine-integral-asymptotic-audit"},
-    "conclusion": {"const": "PUBLISHED_SINE_TERM_SIGN_IS_WRONG"},
-    "result": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["tail_terms", "tail_remainder", "si_terms", "si_remainder", "absolute_remainder_bound", "published_sine_coefficient", "corrected_sine_coefficient"],
-      "properties": {
-        "tail_terms": {"$ref": "#/$defs/terms"},
-        "si_terms": {"$ref": "#/$defs/terms"},
-        "tail_remainder": {"$ref": "#/$defs/remainder"},
-        "si_remainder": {"$ref": "#/$defs/remainder"},
-        "absolute_remainder_bound": {"type": "object", "additionalProperties": false, "required": ["numerator", "power", "domain"], "properties": {"numerator": {"type": "integer"}, "power": {"type": "integer"}, "domain": {"const": "x>0"}}},
-        "published_sine_coefficient": {"type": "integer"},
-        "corrected_sine_coefficient": {"type": "integer"}
-      }
-    },
-    "claimed_assurance": {"const": "COMPUTED"},
-    "scope": {"const": "HARDMATH2_ROW_2_FIVE_TERM_TAIL_CERTIFICATE"},
-    "completeness": {"const": "COMPLETE_FOR_DECLARED_CERTIFICATE"},
-    "evidence": {"type": "array", "minItems": 1, "maxItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": {"path": {"const": "evidence/answer.txt"}, "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}}},
-    "limitations": {"type": "array", "items": {"type": "string"}, "minItems": 1}
-  },
   "$defs": {
-    "term": {"type": "object", "additionalProperties": false, "required": ["function", "power", "coefficient"], "properties": {"function": {"enum": ["SIN", "COS"]}, "power": {"type": "integer", "minimum": 1}, "coefficient": {"type": "integer"}}},
-    "terms": {"type": "array", "minItems": 5, "maxItems": 5, "items": {"$ref": "#/$defs/term"}},
-    "remainder": {"type": "object", "additionalProperties": false, "required": ["integrand", "power", "coefficient"], "properties": {"integrand": {"enum": ["SIN", "COS"]}, "power": {"type": "integer", "minimum": 1}, "coefficient": {"type": "integer"}}}
-  }
+    "remainder": {
+      "additionalProperties": false,
+      "properties": {
+        "coefficient": {
+          "type": "integer"
+        },
+        "integrand": {
+          "enum": [
+            "SIN",
+            "COS"
+          ]
+        },
+        "power": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "integrand",
+        "power",
+        "coefficient"
+      ],
+      "type": "object"
+    },
+    "term": {
+      "additionalProperties": false,
+      "properties": {
+        "coefficient": {
+          "type": "integer"
+        },
+        "function": {
+          "enum": [
+            "SIN",
+            "COS"
+          ]
+        },
+        "power": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "function",
+        "power",
+        "coefficient"
+      ],
+      "type": "object"
+    },
+    "terms": {
+      "items": {
+        "$ref": "#/$defs/term"
+      },
+      "maxItems": 5,
+      "minItems": 5,
+      "type": "array"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "claimed_assurance": {
+      "enum": [
+        "UNVERIFIED",
+        "COMPUTED",
+        "CHECKED",
+        "VERIFIED"
+      ]
+    },
+    "completeness": {
+      "const": "COMPLETE"
+    },
+    "conclusion": {
+      "const": "PUBLISHED_SINE_TERM_SIGN_IS_WRONG"
+    },
+    "evidence": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "const": "evidence/answer.txt"
+          },
+          "sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "type": "object"
+      },
+      "maxItems": 1,
+      "minItems": 1,
+      "type": "array"
+    },
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "result": {
+      "additionalProperties": false,
+      "properties": {
+        "absolute_remainder_bound": {
+          "additionalProperties": false,
+          "properties": {
+            "domain": {
+              "const": "x>0"
+            },
+            "numerator": {
+              "type": "integer"
+            },
+            "power": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "numerator",
+            "power",
+            "domain"
+          ],
+          "type": "object"
+        },
+        "corrected_sine_coefficient": {
+          "type": "integer"
+        },
+        "published_sine_coefficient": {
+          "type": "integer"
+        },
+        "si_remainder": {
+          "$ref": "#/$defs/remainder"
+        },
+        "si_terms": {
+          "$ref": "#/$defs/terms"
+        },
+        "tail_remainder": {
+          "$ref": "#/$defs/remainder"
+        },
+        "tail_terms": {
+          "$ref": "#/$defs/terms"
+        }
+      },
+      "required": [
+        "tail_terms",
+        "tail_remainder",
+        "si_terms",
+        "si_remainder",
+        "absolute_remainder_bound",
+        "published_sine_coefficient",
+        "corrected_sine_coefficient"
+      ],
+      "type": "object"
+    },
+    "scope": {
+      "const": "HARDMATH2_ROW_2_FIVE_TERM_TAIL_CERTIFICATE",
+      "type": "string"
+    },
+    "task_id": {
+      "const": "jacobian/sine-integral-asymptotic-audit"
+    }
+  },
+  "required": [
+    "task_id",
+    "conclusion",
+    "result",
+    "claimed_assurance",
+    "scope",
+    "completeness",
+    "evidence",
+    "limitations"
+  ],
+  "type": "object"
 }
