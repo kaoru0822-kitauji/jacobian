@@ -182,7 +182,7 @@ def test_shared_tooling_change_defers_oracle_and_runs_digests_on_pull_request() 
     assert _matrix(merge_group)
 
 
-def test_task_readme_change_selects_current_digest_and_oracle() -> None:
+def test_task_readme_change_runs_record_schema_without_oracle_or_digests() -> None:
     result = planner.plan(
         [
             "benchmarks/datasets/agent-workflow-v1/"
@@ -193,12 +193,12 @@ def test_task_readme_change_selects_current_digest_and_oracle() -> None:
 
     assert result["run-benchmark-check"] == "true"
     assert result["run-benchmark-record-schema"] == "true"
-    assert result["run-benchmark-prospective-digest"] == "true"
+    assert result["run-benchmark-prospective-digest"] == "false"
     assert result["run-benchmark-inventory"] == "false"
-    assert result["run-benchmark-oracle"] == "true"
-    assert result["benchmark-oracle-scope"] == "changed-tasks"
+    assert result["run-benchmark-oracle"] == "false"
+    assert result["benchmark-oracle-scope"] == "none"
     assert result["benchmark-plan-mode"] == "changed"
-    assert _matrix_tasks(result) == {"parameterized-sharp-bound-audit"}
+    assert _matrix(result) == []
     _assert_plan_valid(result)
 
 
@@ -403,7 +403,7 @@ def test_large_task_set_is_deferred_from_pull_request_to_merge_queue() -> None:
     assert set(task_ids) <= _matrix_tasks(merge_group)
 
 
-def test_task_readme_changes_respect_the_oracle_task_cap() -> None:
+def test_documentation_changes_do_not_consume_the_oracle_task_cap() -> None:
     by_task, _suites = planner._membership()
     task_ids = sorted(by_task)[:9]
     paths = [
@@ -418,10 +418,9 @@ def test_task_readme_changes_respect_the_oracle_task_cap() -> None:
 
     result = planner.plan(paths, event="pull_request")
 
-    assert result["run-benchmark-oracle"] == "false"
-    assert result["benchmark-oracle-scope"] == "none"
-    assert result["run-benchmark-prospective-digest"] == "true"
-    assert _matrix(result) == []
+    assert result["run-benchmark-oracle"] == "true"
+    assert result["benchmark-oracle-scope"] == "changed-tasks"
+    assert _matrix_tasks(result) == {task_ids[0]}
 
 
 def test_main_push_runs_contracts_without_inventory_or_oracle() -> None:

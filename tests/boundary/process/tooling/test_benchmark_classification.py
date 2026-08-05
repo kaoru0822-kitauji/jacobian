@@ -39,7 +39,7 @@ def _patch_plan(module: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(module, "_digest", lambda path: "sha256:" + "b" * 64)
 
 
-def test_task_documentation_selects_current_task_oracle(
+def test_task_documentation_does_not_select_oracle(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     module = _load()
@@ -54,9 +54,9 @@ def test_task_documentation_selects_current_task_oracle(
         head="b" * 40,
     )
 
-    assert plan["run-benchmark-oracle"] == "true"
-    assert plan["benchmark-oracle-scope"] == "changed-tasks"
-    assert "task content change" in plan["benchmark-plan-reasons"]
+    assert plan["run-benchmark-oracle"] == "false"
+    assert plan["benchmark-oracle-scope"] == "none"
+    assert "task documentation change" in plan["benchmark-plan-reasons"]
 
 
 @pytest.mark.parametrize(
