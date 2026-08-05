@@ -189,6 +189,25 @@ def test_harbor_digest_accepts_native_and_prefixed_forms() -> None:
         sc._validate_harbor_digest("not-a-digest")
 
 
+def test_jsonl_runtime_facts_detect_model_web_and_terminal_drift() -> None:
+    raw = b"\n".join(
+        (
+            b'{"type":"thread.started","thread_id":"thread-1","model":"other"}',
+            b'{"type":"item.completed","item":{"type":"web_search_call"}}',
+            b'{"type":"turn.failed"}',
+        )
+    )
+    facts = sc._jsonl_runtime_facts(raw)
+    telemetry = {"usage": {"total_tokens": 1}, **facts}
+
+    assert facts["thread_ids"] == ["thread-1"]
+    assert sc._stage_failures(_success_result(), telemetry, label="primary") == [
+        "primary:MODEL_DRIFT",
+        "primary:TERMINAL_FAILURE_EVENT",
+        "primary:WEB_SEARCH_USED",
+    ]
+
+
 def test_runtime_snapshot_is_read_only_and_binds_all_conditions(
     tmp_path: Path,
 ) -> None:

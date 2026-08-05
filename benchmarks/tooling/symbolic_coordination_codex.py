@@ -96,7 +96,7 @@ PRIMARY_TIMEOUT_SECONDS = 900.0
 AUDIT_TIMEOUT_SECONDS = 600.0
 STDOUT_LIMIT_BYTES = 32 * 1024 * 1024
 STDERR_LIMIT_BYTES = 4 * 1024 * 1024
-MAX_TOTAL_TOKENS = 100_000
+MAX_TOTAL_TOKENS = 400_000
 MAX_SUBMISSION_BYTES = 2 * 1024 * 1024
 MAX_WORKSPACE_BYTES = 8 * 1024 * 1024
 PROFILE_NAME = "symbolic-workspace-only"
@@ -896,8 +896,49 @@ def _run_codex_stage(
     _write_bytes(condition_root / f"{label}.stderr.txt", result.stderr)
     _write_json(condition_root / f"{label}.timing.json", timing)
     telemetry = parse_agent_transcript(raw_path)
+    telemetry.update(_jsonl_runtime_facts(result.stdout))
     _write_json(condition_root / f"{label}.telemetry.json", telemetry)
     return result, telemetry, timing
+
+
+def _jsonl_runtime_facts(raw: bytes) -> dict[str, Any]:
+    observed_models: set[str] = set()
+    thread_ids: set[str] = set()
+    terminal_failures: list[str] = []
+    web_search_count = 0
+    for line in raw.splitlines():
+        try:
+            event = json.loads(line)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            continue
+        if not isinstance(event, dict):
+            continue
+        event_type = event.get("type")
+        if event_type == "thread.started" and isinstance(event.get("thread_id"), str):
+            thread_ids.add(event["thread_id"])
+        if event_type in {"turn.failed", "error"}:
+            terminal_failures.append(str(event_type))
+        for container in (event, event.get("turn")):
+            if isinstance(container, dict) and isinstance(container.get("model"), str):
+                observed_models.add(container["model"])
+        item = event.get("item")
+        if isinstance(item, dict) and item.get("type") in {
+            "web_search",
+            "web_search_call",
+        }:
+            web_search_count += 1
+    return {
+        "requested_model": DEFAULT_MODEL,
+        "observed_models": sorted(observed_models),
+        "model_attestation": (
+            "CLI_EVENT_AND_EXPLICIT_REQUEST"
+            if observed_models
+            else "EXPLICIT_REQUEST_AND_FROZEN_CATALOG"
+        ),
+        "thread_ids": sorted(thread_ids),
+        "terminal_failures": terminal_failures,
+        "web_search_count": web_search_count,
+    }
 
 
 def _usage_total(telemetry: Mapping[str, Any]) -> int | None:
@@ -927,6 +968,16 @@ def _stage_failures(
         failures.append(f"{label}:MISSING_TOKEN_USAGE")
     elif usage_total > MAX_TOTAL_TOKENS:
         failures.append(f"{label}:TOKEN_BUDGET_EXCEEDED")
+    observed_models = telemetry.get("observed_models")
+    if isinstance(observed_models, list) and observed_models not in (
+        [],
+        [DEFAULT_MODEL],
+    ):
+        failures.append(f"{label}:MODEL_DRIFT")
+    if telemetry.get("terminal_failures"):
+        failures.append(f"{label}:TERMINAL_FAILURE_EVENT")
+    if telemetry.get("web_search_count") != 0:
+        failures.append(f"{label}:WEB_SEARCH_USED")
     return failures
 
 
