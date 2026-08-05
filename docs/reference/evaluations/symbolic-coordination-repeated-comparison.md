@@ -10,7 +10,9 @@ semantics. Its evidence class is `host-local-workflow-observation`, and its
 reports always set `causal_claim_authorized` to `false`.
 
 The pilot matrix has two tasks from different families, two repetitions, and
-three conditions, for exactly 12 planned model executions:
+three conditions, for exactly 12 planned condition-run executions. As in the
+existing PR2 contract, condition C contains its one fixed audit stage inside
+that condition run; it is not an additional condition or a rerun:
 
 - A: no Jacobian and no audit;
 - B: Jacobian and no audit; and
@@ -30,11 +32,18 @@ immutable `experiment-manifest.json`. The manifest binds:
 - the clean source revision and branch plus operator-supplied stack SHAs;
 - task IDs, families, Harbor digests, public-file hashes, and verifier hashes;
 - the exact condition contracts, repetition count, and counterbalanced order;
+- experiment-manifest, comparison-report, trajectory-telemetry, and runner
+  contract versions;
 - model contract, reasoning effort, Codex version and executable, ChatGPT auth
   mode, prompt digests, token/time/tool-call/cost budget availability;
 - MCP executable and policy configuration; and
 - Python, platform, Harbor, lockfile, pilot-manifest, preflight, and sampling
-  availability metadata.
+availability metadata.
+
+These bindings use closed Pydantic objects rather than arbitrary mappings:
+unknown model, condition, authentication, budget, MCP, or runtime fields fail
+validation. The exact condition-run count is itself a budget and must equal the
+task × repetition × condition matrix.
 
 The manifest ID is the SHA-256 digest of its canonical body. Loading fails on
 manifest or preflight drift. Every run has a unique deterministic ID and its
@@ -76,14 +85,18 @@ JSON and Markdown reports retain per-run:
 - clean-room correctness, evidence validity, scope, assurance, input/artifact
   bindings, false certification, reward, and acceptance;
 - audit repair/regression class and revision state;
-- exact tokens and wall time when exposed, tool/capability counts, reasoning
-  compliance, protocol violations, and source artifact-index digest.
+- exact tokens and wall time when exposed, the full PR3 call-count contract,
+  reasoning-log entries/bytes and token-overhead availability, reasoning
+  compliance, protocol violations, and source artifact-index digest. Missing
+  runs use `null` call/log fields rather than invented zeroes.
 
-Condition summaries report explicit numerators and denominators with 95%
-Wilson intervals. Tokens and wall time are totaled only if every included
-observed run has exact telemetry; otherwise the total remains unavailable with
-an exact-run count. ChatGPT login does not expose monetary cost, so cost and
-cost-per-accepted remain unavailable rather than estimated.
+Condition and overall summaries report acquisition completion separately from
+infrastructure failure, with explicit numerators, denominators, and 95% Wilson
+intervals. Tokens and wall time are totaled only if every included observed run
+has exact telemetry; otherwise the total remains unavailable with an exact-run
+count. Call and log totals declare their exact-run coverage. ChatGPT login does
+not expose monetary cost, so cost and cost-per-accepted remain unavailable
+rather than estimated.
 
 The paired A→B and B→C tables are matched by task and repetition. They report
 both-failed, left-only, right-only, both-accepted, discordant and missing pairs,
@@ -126,6 +139,13 @@ make symbolic-coordination-comparison-report \
 ```
 
 The report command refuses to overwrite outputs.
+
+The bounded pilot was acquired with the initial schema-v1 manifest before the
+explicit `contract_versions` object was added during analyzer completion
+review. Its original manifest digest is replayed first; only then does the
+loader infer the fixed v1 experiment/comparison/trajectory/runner versions and
+the run-count budget. Reports disclose this as `LEGACY_V1_INFERRED`. New plans
+must carry the closed bindings explicitly.
 
 ## Known limits
 

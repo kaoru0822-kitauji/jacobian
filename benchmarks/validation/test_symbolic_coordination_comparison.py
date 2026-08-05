@@ -27,8 +27,16 @@ def _manifest(root: Path, *, repetitions: int = 2) -> comparison.ExperimentManif
         _binding("symbolic-coordination-near-miss-01", "perturbed-near-miss"),
         _binding("symbolic-coordination-grid-exhausted-01", "bounded-collision-scope"),
     ]
+    preflight = {"schema_version": "1", "status": "READY"}
+    planned_runs = len(tasks) * repetitions * 3
     body: dict[str, Any] = {
         "schema_version": "1",
+        "contract_versions": {
+            "experiment_manifest": "1",
+            "comparison_report": "1",
+            "trajectory_telemetry": "1",
+            "runner": "1",
+        },
         "created_at": "2026-08-05T00:00:00+00:00",
         "evidence_class": "host-local-workflow-observation",
         "causal_claim_authorized": False,
@@ -39,24 +47,103 @@ def _manifest(root: Path, *, repetitions: int = 2) -> comparison.ExperimentManif
         "tasks": [item.model_dump(mode="json") for item in tasks],
         "repetitions": repetitions,
         "conditions": {
-            "A": {"jacobian_enabled": False, "post_solution_audit": False},
-            "B": {"jacobian_enabled": True, "post_solution_audit": False},
-            "C": {"jacobian_enabled": True, "post_solution_audit": True},
+            "A": {
+                "jacobian_enabled": False,
+                "post_solution_audit": False,
+                "reasoning_log_mode": "OFF",
+            },
+            "B": {
+                "jacobian_enabled": True,
+                "post_solution_audit": False,
+                "reasoning_log_mode": "REQUIRED",
+            },
+            "C": {
+                "jacobian_enabled": True,
+                "post_solution_audit": True,
+                "audit_passes": 1,
+                "allowed_revisions": 1,
+                "reasoning_log_mode": "REQUIRED",
+                "audit_stage_jacobian_enabled": False,
+            },
         },
-        "model": {"slug": "gpt-5.3-codex-spark"},
+        "model": {
+            "slug": "gpt-5.3-codex-spark",
+            "display_name": "GPT-5.3-Codex-Spark",
+            "description": "test model",
+            "priority": 26,
+            "visibility": "list",
+            "supported_in_api": False,
+            "shell_type": "shell_command",
+            "context_window": 128000,
+            "max_context_window": 128000,
+            "supports_parallel_tool_calls": True,
+            "supported_reasoning_levels": ["low", "medium"],
+            "tool_mode": None,
+            "selection_basis": "test-selection",
+        },
         "model_contract_digest": "sha256:" + "4" * 64,
         "reasoning_effort": "medium",
-        "codex": {"version": "0.146.0"},
-        "auth": {"mode": "chatgpt", "api_key": False},
+        "codex": {
+            "version": "0.146.0",
+            "executable_digest": "sha256:" + "7" * 64,
+            "ignore_user_config": True,
+            "ignore_rules": True,
+        },
+        "auth": {
+            "mode": "chatgpt",
+            "api_key": False,
+            "ephemeral_session": True,
+            "credential_material_recorded": False,
+        },
         "prompt_digests": {
             "primary": "sha256:" + "5" * 64,
             "audit": "sha256:" + "6" * 64,
         },
         "budgets": {
-            "tokens": {"availability": "EXACT", "value": 800000, "unit": "tokens"}
+            "primary_wall_seconds": {
+                "availability": "EXACT",
+                "value": 900.0,
+                "unit": "seconds",
+            },
+            "audit_wall_seconds": {
+                "availability": "EXACT",
+                "value": 600.0,
+                "unit": "seconds",
+            },
+            "tokens_per_stage": {
+                "availability": "EXACT",
+                "value": 800000,
+                "unit": "tokens",
+            },
+            "tool_calls_per_stage": {
+                "availability": "UNBOUNDED",
+                "value": None,
+                "unit": "calls",
+            },
+            "cost": {"availability": "UNAVAILABLE", "value": None, "unit": "USD"},
+            "condition_runs": {
+                "availability": "EXACT",
+                "value": planned_runs,
+                "unit": "condition-runs",
+            },
         },
-        "mcp": {"policy_profile": "COMPUTE_VERIFY_NO_RETRIEVAL"},
-        "runtime": {"python": "3.12"},
+        "mcp": {
+            "executable_digest": "sha256:" + "8" * 64,
+            "policy_profile": "COMPUTE_VERIFY_NO_RETRIEVAL",
+            "conditions": ["B", "C"],
+            "audit_stage_enabled": False,
+        },
+        "runtime": {
+            "python": "3.12",
+            "platform": "test-platform",
+            "harbor_version": "0.20.0",
+            "uv_lock_digest": "sha256:" + "9" * 64,
+            "pilot_manifest_digest": "sha256:" + "a" * 64,
+            "preflight_report_digest": comparison._digest(preflight),
+            "sampling_seed": None,
+            "sampling_temperature": None,
+            "sampling_source": "codex-cli-chatgpt-defaults-no-cli-overrides",
+        },
         "order_method": "balanced-permutation-v1",
         "runs": [
             item.model_dump(mode="json")
@@ -72,6 +159,7 @@ def _manifest(root: Path, *, repetitions: int = 2) -> comparison.ExperimentManif
     (root / "experiment-manifest.json").write_bytes(
         comparison._canonical_bytes(manifest.model_dump(mode="json"))
     )
+    (root / "preflight.json").write_bytes(comparison._canonical_bytes(preflight))
     return manifest
 
 
@@ -94,6 +182,7 @@ def _record(
             assurance_calibration=score,
             input_binding=score,
             artifact_binding=score,
+            protocol_compliance=score,
             false_certification=False,
         )
     usage = SimpleNamespace(
@@ -129,6 +218,16 @@ def _record(
             shell_calls=1,
             discovery_calls=1 if unit.condition != "A" else 0,
             invocation_calls=1 if unit.condition != "A" else 0,
+            schema_valid_calls=1 if unit.condition != "A" else 0,
+            executable_calls=1 if unit.condition != "A" else 0,
+            failed_calls=0,
+            repeated_calls=0,
+            task_irrelevant_calls=0,
+            producer_calls=1 if unit.condition != "A" else 0,
+            checker_calls=0,
+            candidate_or_witness_productions=0,
+            missing_applicable_checker=0,
+            recovered_calls=0,
         ),
         audit=SimpleNamespace(
             final_verifier=verifier,
@@ -139,7 +238,11 @@ def _record(
             else None,
         ),
         reasoning_protocol=SimpleNamespace(
-            compliance="NOT_APPLICABLE" if unit.condition == "A" else "COMPLETE"
+            compliance="NOT_APPLICABLE" if unit.condition == "A" else "COMPLETE",
+            log_entries=0 if unit.condition == "A" else 4,
+            log_bytes=0 if unit.condition == "A" else 256,
+            token_overhead_availability="UNAVAILABLE",
+            token_overhead_tokens=None,
         ),
         classification=SimpleNamespace(protocol_violations=[]),
         source_artifact_index_digest="sha256:" + "7" * 64,
@@ -302,6 +405,12 @@ def test_partial_and_pre_model_failures_are_separate(
     assert report.observed_runs == 4
     assert report.pre_model_failures == 1
     assert report.missing_runs == 1
+    missing = next(
+        item for item in report.records if item.acquisition_status == "MISSING"
+    )
+    assert missing.call_metrics_available is False
+    assert missing.mcp_calls is None
+    assert missing.reasoning_log_bytes is None
 
 
 @pytest.mark.parametrize("accepted", [False, True])
@@ -356,8 +465,8 @@ def test_audit_repair_and_regression_are_reported(
     _patch_records(monkeypatch, root, manifest, overrides)
     report = comparison.build_report(root)
     c_summary = next(item for item in report.conditions if item.condition == "C")
-    assert c_summary.audit_classifications["REPAIR"] == 1
-    assert c_summary.audit_classifications["REGRESSION"] == 1
+    assert c_summary.audit_classifications.repair == 1
+    assert c_summary.audit_classifications.regression == 1
 
 
 def test_exact_paired_counts_and_missing_pair() -> None:
@@ -402,6 +511,8 @@ def test_unavailable_tokens_and_cost_are_not_imputed(
     assert row.tokens.total is None
     assert row.cost.availability == "UNAVAILABLE"
     assert row.cost.per_accepted is None
+    assert row.reasoning_logs.token_overhead.availability == "UNAVAILABLE"
+    assert row.reasoning_logs.token_overhead.total is None
 
 
 def test_artifact_corruption_is_rejected(
@@ -451,8 +562,8 @@ def test_prompt_or_task_digest_substitution_is_rejected(
     task = next(item for item in manifest.tasks if item.task_id == unit.task_id)
     snapshot = {
         "prompts": {
-            "primary_digest": manifest.prompt_digests["primary"],
-            "audit_digest": manifest.prompt_digests["audit"],
+            "primary_digest": manifest.prompt_digests.primary,
+            "audit_digest": manifest.prompt_digests.audit,
         },
         "task": {"harbor_digest": task.harbor_digest},
     }
@@ -468,3 +579,99 @@ def test_prompt_or_task_digest_substitution_is_rejected(
 def test_schemas_accept_model_examples() -> None:
     Draft202012Validator.check_schema(comparison.ExperimentManifest.model_json_schema())
     Draft202012Validator.check_schema(comparison.ComparisonReport.model_json_schema())
+
+
+def test_manifest_schema_closes_typed_runtime_bindings() -> None:
+    schema = comparison.ExperimentManifest.model_json_schema()
+    required = set(schema["required"])
+    assert "contract_versions" in required
+    for name in (
+        "ConditionBindings",
+        "ModelBinding",
+        "CodexBinding",
+        "AuthBinding",
+        "BudgetBindings",
+        "McpBinding",
+        "RuntimeBinding",
+    ):
+        assert schema["$defs"][name]["additionalProperties"] is False
+
+
+def test_legacy_pilot_manifest_versions_are_inferred_after_digest_replay(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "experiment"
+    manifest = _manifest(root, repetitions=1)
+    payload = manifest.model_dump(mode="json")
+    payload.pop("contract_versions")
+    payload["budgets"].pop("condition_runs")
+    payload.pop("experiment_id")
+    payload["experiment_id"] = comparison._digest(payload)
+    (root / "experiment-manifest.json").write_bytes(
+        comparison._canonical_bytes(payload)
+    )
+    loaded = comparison.load_manifest(root)
+    assert loaded.contract_versions.comparison_report == "1"
+    assert loaded.budgets.condition_runs.value == 6
+
+
+def test_condition_run_budget_drift_is_rejected(tmp_path: Path) -> None:
+    manifest = _manifest(tmp_path / "experiment", repetitions=1)
+    payload = manifest.model_dump(mode="json")
+    payload["budgets"]["condition_runs"]["value"] = 7
+    with pytest.raises(ValidationError, match="budget disagrees"):
+        comparison.ExperimentManifest.model_validate(payload)
+
+
+def test_report_exposes_exact_calls_logs_and_complete_markdown(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root = tmp_path / "experiment"
+    manifest = _manifest(root, repetitions=1)
+    _patch_records(monkeypatch, root, manifest)
+    report = comparison.build_report(root)
+    treatment = next(item for item in report.conditions if item.condition == "B")
+    assert treatment.capability_use.exact_run_count == 2
+    assert treatment.capability_use.shell_calls == 2
+    assert treatment.capability_use.invocation_calls == 2
+    assert treatment.reasoning_logs.total_entries == 8
+    assert treatment.reasoning_logs.total_bytes == 512
+    markdown = comparison.render_report(report)
+    for marker in (
+        "95% Wilson",
+        "## Clean-room score means",
+        "## Workflow telemetry",
+        "Audit classifications and reasoning compliance",
+        "Discordant",
+        "## Repeated-run reliability",
+        "exact McNemar",
+    ):
+        assert marker in markdown
+
+
+def test_report_digest_drift_is_rejected(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root = tmp_path / "experiment"
+    manifest = _manifest(root, repetitions=1)
+    _patch_records(monkeypatch, root, manifest)
+    payload = comparison.build_report(root).model_dump(mode="json")
+    payload["records"][0]["reward"] = 0.5
+    with pytest.raises(ValidationError, match="report digest drift"):
+        comparison.ComparisonReport.model_validate(payload)
+
+
+def test_emit_refuses_existing_markdown_without_partial_json(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    output = tmp_path / "report.json"
+    markdown = tmp_path / "report.md"
+    markdown.write_text("existing")
+    monkeypatch.setattr(
+        comparison,
+        "build_report",
+        lambda _root: (_ for _ in ()).throw(AssertionError("must not build")),
+    )
+    with pytest.raises(comparison.ComparisonError, match="refusing to overwrite"):
+        comparison.emit_report(tmp_path, output, markdown)
+    assert not output.exists()

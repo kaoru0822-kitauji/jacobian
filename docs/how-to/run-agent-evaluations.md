@@ -207,9 +207,10 @@ for schema v1 and every deterministic classification rule.
 For the versioned two-task, two-repetition A/B/C pilot, use the resumable
 manifest and paired reporter documented in
 [Symbolic coordination repeated comparison](../reference/evaluations/symbolic-coordination-repeated-comparison.md).
-It schedules exactly 12 model executions, verifies every preserved PR3 run
-before resumption or aggregation, and reports descriptive Wilson intervals and
-exact paired discordance tests without authorizing a causal claim.
+It schedules exactly 12 condition-run executions (with C's fixed audit stage
+inside C), verifies every preserved PR3 run before resumption or aggregation,
+and reports descriptive Wilson intervals and exact paired discordance tests
+without authorizing a causal claim.
 
 ## Inspect results
 
