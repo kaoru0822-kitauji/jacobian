@@ -253,18 +253,44 @@ def test_lean_repl_derives_completion_from_final_goal_count(
     assert rejected["reward"] == 0.0
 
 
+def test_lean_repl_rejects_one_step_constructor_trace(tmp_path: Path) -> None:
+    tasks = [
+        {
+            "task_id": "CONJUNCTION-DECOMPOSITION",
+            "completed": True,
+            "decomposition_observed": True,
+            "tactics": [{"tactic": "constructor", "goal_count": 0, "error_count": 0}],
+        },
+        {
+            "task_id": "LOCAL-PREMISE-APPLICATION",
+            "completed": True,
+            "decomposition_observed": True,
+            "tactics": [{"tactic": "exact h hP", "goal_count": 0, "error_count": 0}],
+        },
+    ]
+    task, app, logs = _lean_case(tmp_path, tasks)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["reward"] == 0.0
+
+
 def test_lean_repl_accepts_complete_distinct_task_traces(tmp_path: Path) -> None:
     tasks = [
         {
-            "task_id": task_id,
+            "task_id": "CONJUNCTION-DECOMPOSITION",
             "completed": True,
             "decomposition_observed": True,
-            "tactics": [{"tactic": tactic, "goal_count": 0, "error_count": 0}],
-        }
-        for task_id, tactic in (
-            ("CONJUNCTION-DECOMPOSITION", "constructor"),
-            ("LOCAL-PREMISE-APPLICATION", "exact h hP"),
-        )
+            "tactics": [
+                {"tactic": "constructor", "goal_count": 2, "error_count": 0},
+                {"tactic": "exact hP", "goal_count": 1, "error_count": 0},
+                {"tactic": "exact hQ", "goal_count": 0, "error_count": 0},
+            ],
+        },
+        {
+            "task_id": "LOCAL-PREMISE-APPLICATION",
+            "completed": True,
+            "decomposition_observed": True,
+            "tactics": [{"tactic": "exact h hP", "goal_count": 0, "error_count": 0}],
+        },
     ]
     task, app, logs = _lean_case(tmp_path, tasks)
     accepted = support._run_verifier(task, app, logs)
