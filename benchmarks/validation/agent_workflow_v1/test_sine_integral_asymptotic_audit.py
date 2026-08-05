@@ -90,6 +90,17 @@ def test_rejects_noninteger_remainder_power(tmp_path: Path) -> None:
     assert support._run_verifier(task, app, logs)["correctness"] == 0.0
 
 
+def test_rejects_noninteger_si_remainder_coefficient(tmp_path: Path) -> None:
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    submission = _submission(app)
+    result = submission["result"]
+    assert isinstance(result, dict)
+    result["si_remainder"]["coefficient"] = 120.0
+    _bind_evidence(app, submission)
+    support._write_json(app / "submission.json", submission)
+    assert support._run_verifier(task, app, logs)["correctness"] == 0.0
+
+
 def test_rejects_boolean_reported_coefficient(tmp_path: Path) -> None:
     task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
     submission = _submission(app)
@@ -123,4 +134,15 @@ def test_input_tamper_is_reported_separately(tmp_path: Path) -> None:
     verdict = support._run_verifier(task, app, logs)
     assert verdict["correctness"] == 1.0
     assert verdict["input_binding"] == 0.0
+    assert verdict["reward"] == 0.0
+
+
+def test_malformed_limitations_fail_closed(tmp_path: Path) -> None:
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    submission = _submission(app)
+    submission["limitations"] = None
+    support._write_json(app / "submission.json", submission)
+    verdict = support._run_verifier(task, app, logs)
+    assert verdict["limitations_accuracy"] == 0.0
+    assert verdict["protocol_compliance"] == 0.0
     assert verdict["reward"] == 0.0
