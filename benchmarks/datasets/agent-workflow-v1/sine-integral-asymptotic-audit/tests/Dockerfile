@@ -1,5 +1,5 @@
 FROM python:3.12-slim@sha256:57cd7c3a7a273101a6485ba99423ee568157882804b1124b4dd04266317710de
-LABEL jacobian.checksum="355c107a0411d5c30222e26f72d145ef3bb88b4963400b9445dc47ebf947640f"
+LABEL jacobian.checksum="22aa17934ad7633143aa23985df726a891cba72f401462dfd599ad298edb94b8"
 LABEL jacobian.task="jacobian/sine-integral-asymptotic-audit"
 COPY expected.json input.json test.sh verifier.py verifier_support.py public_contract.json /tests/
 COPY input.json /app/input.json
