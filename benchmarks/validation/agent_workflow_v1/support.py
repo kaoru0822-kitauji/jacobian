@@ -53,6 +53,7 @@ RESOURCE_DERIVED_TASKS = (
 )
 # Tasks whose verifier reports scope independently of assurance typing.
 SCOPE_INDEPENDENT_ASSURANCE_TASKS = (
+    "prime-power-divisibility-gap-audit",
     "sine-integral-asymptotic-audit",
     "steiner-triple-system-27",
 )
@@ -63,6 +64,7 @@ INPUT_BINDING_DECOUPLED_TASKS = (
     "extremal-subset-sum-semantic-audit",
     "integer-perturbation-domain-audit",
     "necklace-burnside-certificate",
+    "prime-power-divisibility-gap-audit",
     "pythagorean-generator-recurrence",
     "sine-integral-asymptotic-audit",
     "steiner-triple-system-27",
