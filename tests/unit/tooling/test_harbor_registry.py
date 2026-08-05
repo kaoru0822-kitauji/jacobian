@@ -276,6 +276,7 @@ def test_committed_agent_workflow_suite_has_dataset_local_tasks() -> None:
     suite = get_suite("jacobian/mathematical-benchmarks-v1")
     assert suite.tasks
     assert all(
-        task.path.parent == ROOT / "benchmarks" / "datasets" / "mathematical-benchmarks-v1"
+        task.path.parent
+        == ROOT / "benchmarks" / "datasets" / "mathematical-benchmarks-v1"
         for task in suite.tasks
     )

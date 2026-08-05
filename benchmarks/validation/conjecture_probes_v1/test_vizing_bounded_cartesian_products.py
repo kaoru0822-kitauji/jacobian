@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import hashlib
 import json
 import shutil
@@ -9,7 +8,9 @@ from pathlib import Path
 from benchmarks.validation._verifier_child import run_verifier_in_child
 
 ROOT = Path(__file__).parents[3]
-TASK = ROOT / "benchmarks/datasets/conjecture-probes-v1/vizing-bounded-cartesian-products"
+TASK = (
+    ROOT / "benchmarks/datasets/conjecture-probes-v1/vizing-bounded-cartesian-products"
+)
 
 
 def _case(tmp_path: Path):
@@ -33,8 +34,12 @@ def _write(app: Path, submission: dict) -> None:
         "result": submission["result"],
         "limitations": submission["limitations"],
     }
-    evidence.write_text(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n")
-    submission["evidence"][0]["sha256"] = "sha256:" + hashlib.sha256(evidence.read_bytes()).hexdigest()
+    evidence.write_text(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n"
+    )
+    submission["evidence"][0]["sha256"] = (
+        "sha256:" + hashlib.sha256(evidence.read_bytes()).hexdigest()
+    )
     (app / "submission.json").write_text(json.dumps(submission, sort_keys=True) + "\n")
 
 
@@ -55,9 +60,15 @@ def test_alternate_minimum_witnesses_pass(tmp_path: Path) -> None:
     for row in submission["result"]["graphs"]:
         row["minimum_dominating_set"] = list(reversed(row["minimum_dominating_set"]))
     for row in submission["result"]["pairs"]:
-        row["left_minimum_dominating_set"] = list(reversed(row["left_minimum_dominating_set"]))
-        row["right_minimum_dominating_set"] = list(reversed(row["right_minimum_dominating_set"]))
-        row["product_minimum_dominating_set"] = list(reversed(row["product_minimum_dominating_set"]))
+        row["left_minimum_dominating_set"] = list(
+            reversed(row["left_minimum_dominating_set"])
+        )
+        row["right_minimum_dominating_set"] = list(
+            reversed(row["right_minimum_dominating_set"])
+        )
+        row["product_minimum_dominating_set"] = list(
+            reversed(row["product_minimum_dominating_set"])
+        )
     _write(app, submission)
     assert _run(app, logs)["aggregate_reward"] == 1.0
 
@@ -75,7 +86,9 @@ def test_wrong_scope_and_false_assurance_fail_closed(tmp_path: Path) -> None:
     assert reward["false_certification"] is True and reward["aggregate_reward"] == 0.0
 
 
-def test_wrong_values_omissions_duplicates_and_boolean_integers_fail(tmp_path: Path) -> None:
+def test_wrong_values_omissions_duplicates_and_boolean_integers_fail(
+    tmp_path: Path,
+) -> None:
     app, logs, submission = _case(tmp_path)
     submission["result"]["graphs"][0]["domination_number"] += 1
     _write(app, submission)

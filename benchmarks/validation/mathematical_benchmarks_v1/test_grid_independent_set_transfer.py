@@ -7,7 +7,10 @@ import pytest
 from benchmarks.validation.mathematical_benchmarks_v1 import support
 
 ROOT = Path(__file__).resolve().parents[3]
-TASK = ROOT / "benchmarks/datasets/mathematical-benchmarks-v1/grid-independent-set-transfer"
+TASK = (
+    ROOT
+    / "benchmarks/datasets/mathematical-benchmarks-v1/grid-independent-set-transfer"
+)
 
 
 def load_verifier():

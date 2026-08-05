@@ -43,7 +43,9 @@ def main():
         s = None
     x = json.loads(next(E.glob("*input*.json")).read_text())
     e = json.loads(
-        (E / "mathematical-benchmarks-v1-polynomial-normalization-expected.json").read_text()
+        (
+            E / "mathematical-benchmarks-v1-polynomial-normalization-expected.json"
+        ).read_text()
     )
     r = s.get("result") if isinstance(s, dict) else None
     r = r if isinstance(r, dict) else {}

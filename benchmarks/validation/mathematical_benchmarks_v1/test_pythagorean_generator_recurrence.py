@@ -6,7 +6,10 @@ from pathlib import Path
 from benchmarks.validation.mathematical_benchmarks_v1 import support
 
 ROOT = Path(__file__).resolve().parents[3]
-TASK = ROOT / "benchmarks/datasets/mathematical-benchmarks-v1/pythagorean-generator-recurrence"
+TASK = (
+    ROOT
+    / "benchmarks/datasets/mathematical-benchmarks-v1/pythagorean-generator-recurrence"
+)
 TASK_NAME = "pythagorean-generator-recurrence"
 
 

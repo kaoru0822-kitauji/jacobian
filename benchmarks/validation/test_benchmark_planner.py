@@ -350,7 +350,9 @@ def test_membership_change_runs_affected_dataset_in_merge_queue() -> None:
     assert result["benchmark-plan-mode"] == "integration"
     assert result["run-benchmark-inventory"] == "true"
     assert _matrix(result)
-    assert {item["dataset"] for item in _matrix(result)} == {"mathematical-benchmarks-v1"}
+    assert {item["dataset"] for item in _matrix(result)} == {
+        "mathematical-benchmarks-v1"
+    }
     _assert_plan_valid(result)
 
 
@@ -426,7 +428,9 @@ def test_deleted_task_is_deferred_to_merge_queue_on_pull_request() -> None:
     assert _matrix(pull_request) == []
     assert merge_group["run-benchmark-oracle"] == "true"
     assert merge_group["benchmark-oracle-scope"] == "affected-datasets"
-    assert {item["dataset"] for item in _matrix(merge_group)} == {"mathematical-benchmarks-v1"}
+    assert {item["dataset"] for item in _matrix(merge_group)} == {
+        "mathematical-benchmarks-v1"
+    }
     _assert_plan_valid(pull_request)
     _assert_plan_valid(merge_group)
 

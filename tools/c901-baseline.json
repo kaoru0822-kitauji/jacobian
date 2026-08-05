@@ -3,6 +3,16 @@
   "max_complexity": 10,
   "violations": [
     {
+      "path": "benchmarks/datasets/conjecture-probes-v1/vizing-bounded-cartesian-products/tests/verifier.py",
+      "symbol": "_frozen",
+      "complexity": 11
+    },
+    {
+      "path": "benchmarks/datasets/conjecture-probes-v1/vizing-bounded-cartesian-products/tests/verifier.py",
+      "symbol": "_math",
+      "complexity": 17
+    },
+    {
       "path": "benchmarks/datasets/mathematical-benchmarks-v1/cubic-image-classification/tests/verifier.py",
       "symbol": "_result",
       "complexity": 12
@@ -73,11 +83,6 @@
       "complexity": 11
     },
     {
-      "path": "benchmarks/datasets/mathematical-benchmarks-v1/superposition-proof-replay/tests/verifier.py",
-      "symbol": "_replay",
-      "complexity": 13
-    },
-    {
       "path": "benchmarks/datasets/mathematical-benchmarks-v1/ternary-distance-code-optimum/tests/verifier.py",
       "symbol": "_evidence",
       "complexity": 12
@@ -108,8 +113,18 @@
       "complexity": 14
     },
     {
+      "path": "benchmarks/datasets/public-reproductions-v1/superposition-proof-replay/tests/verifier.py",
+      "symbol": "_replay",
+      "complexity": 13
+    },
+    {
       "path": "benchmarks/datasets/research-diagnostics-v1/jcb-postdoc-016/tests/verifier.py",
       "symbol": "_value_decisions",
+      "complexity": 11
+    },
+    {
+      "path": "benchmarks/tooling/benchmark_inventory.py",
+      "symbol": "build_inventory",
       "complexity": 11
     },
     {

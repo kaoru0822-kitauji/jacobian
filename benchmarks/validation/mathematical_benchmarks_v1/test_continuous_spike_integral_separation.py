@@ -8,7 +8,8 @@ from benchmarks.validation.mathematical_benchmarks_v1 import support
 
 ROOT = Path(__file__).resolve().parents[3]
 TASK = (
-    ROOT / "benchmarks/datasets/mathematical-benchmarks-v1/continuous-spike-integral-separation"
+    ROOT
+    / "benchmarks/datasets/mathematical-benchmarks-v1/continuous-spike-integral-separation"
 )
 TASK_NAME = "continuous-spike-integral-separation"
 

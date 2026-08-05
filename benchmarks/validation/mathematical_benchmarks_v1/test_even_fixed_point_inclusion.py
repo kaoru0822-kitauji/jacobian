@@ -4,7 +4,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-TASK = ROOT / "benchmarks/datasets/mathematical-benchmarks-v1/even-fixed-point-inclusion"
+TASK = (
+    ROOT / "benchmarks/datasets/mathematical-benchmarks-v1/even-fixed-point-inclusion"
+)
 
 
 def load_verifier():

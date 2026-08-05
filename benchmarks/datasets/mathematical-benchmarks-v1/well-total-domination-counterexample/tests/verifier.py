@@ -11,7 +11,9 @@ from verifier_support import (
 
 W = Path("/app")
 E = Path("/tests")
-FIXTURE_NAME = "mathematical-benchmarks-v1-well-total-domination-counterexample-input.json"
+FIXTURE_NAME = (
+    "mathematical-benchmarks-v1-well-total-domination-counterexample-input.json"
+)
 
 
 def load_json(path):

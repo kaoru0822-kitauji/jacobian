@@ -7,7 +7,10 @@ import pytest
 from benchmarks.validation.mathematical_benchmarks_v1 import support
 
 ROOT = Path(__file__).resolve().parents[3]
-TASK = ROOT / "benchmarks/datasets/mathematical-benchmarks-v1/necklace-burnside-certificate"
+TASK = (
+    ROOT
+    / "benchmarks/datasets/mathematical-benchmarks-v1/necklace-burnside-certificate"
+)
 TASK_NAME = "necklace-burnside-certificate"
 
 LIMITATIONS = ["FINITE_LENGTH_16_INSTANCE", "NO_GENERAL_ENUMERATION_THEOREM"]

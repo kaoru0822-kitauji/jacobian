@@ -74,7 +74,9 @@ def test_visible_submission_contracts_match_evidence_and_assurance_limits() -> N
 
 def test_task_gap_records_preserve_only_historical_provenance() -> None:
     paths = sorted(
-        Path("benchmarks/datasets/mathematical-benchmarks-v1").glob("*/analysis/gap.json")
+        Path("benchmarks/datasets/mathematical-benchmarks-v1").glob(
+            "*/analysis/gap.json"
+        )
     )
     assert paths, "expected historical gap records under mathematical-benchmarks-v1"
     for path in paths:

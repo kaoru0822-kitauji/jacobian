@@ -10,7 +10,8 @@ from tools.check_architecture import check_architecture
 
 _ROOT = Path(__file__).resolve().parents[3]
 _REAL_TASK = (
-    _ROOT / "benchmarks/datasets/mathematical-benchmarks-v1/finite-field-irreducibility-repair"
+    _ROOT
+    / "benchmarks/datasets/mathematical-benchmarks-v1/finite-field-irreducibility-repair"
 )
 
 
@@ -53,7 +54,9 @@ def test_public_contract_no_drift_passes(tmp_path: Path) -> None:
 
 def test_missing_public_contract_is_a_violation(tmp_path: Path) -> None:
     task_dir = (
-        tmp_path / "benchmarks/datasets/mathematical-benchmarks-v1" / "missing-contract-task"
+        tmp_path
+        / "benchmarks/datasets/mathematical-benchmarks-v1"
+        / "missing-contract-task"
     )
     (task_dir / "tests").mkdir(parents=True)
     (task_dir / "environment").mkdir(parents=True)

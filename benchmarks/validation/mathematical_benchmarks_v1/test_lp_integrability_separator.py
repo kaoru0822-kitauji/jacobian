@@ -6,7 +6,9 @@ from pathlib import Path
 from benchmarks.validation.mathematical_benchmarks_v1 import support
 
 ROOT = Path(__file__).resolve().parents[3]
-TASK = ROOT / "benchmarks/datasets/mathematical-benchmarks-v1/lp-integrability-separator"
+TASK = (
+    ROOT / "benchmarks/datasets/mathematical-benchmarks-v1/lp-integrability-separator"
+)
 
 
 def load_verifier():
