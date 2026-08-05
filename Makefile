@@ -15,7 +15,7 @@ ORDERING_DEFAULT_SEED := --randomly-seed=17
 PYTEST_DIAGNOSTIC_ARGS ?= --durations=10
 RUFF_PATHS := src tests benchmarks
 TOPOLOGY_RUNNER := $(UV_RUN) python tools/test_topology.py
-PUBLIC_COMMANDS := help setup check check-changed ci-plan test-plan test-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e docs-command-check docs-linkcheck harbor-plan harbor-check-task harbor-oracle-task symbolic-coordination-trajectory-telemetry npm-test test-all-ci check-static deploy-check
+PUBLIC_COMMANDS := help setup check check-changed ci-plan test-plan test-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e docs-command-check docs-linkcheck harbor-plan harbor-check-task harbor-oracle-task symbolic-coordination-trajectory-telemetry symbolic-coordination-comparison-report npm-test test-all-ci check-static deploy-check
 
 ifneq ($(strip $(PATHS)),)
 PATHS_FILE := $(shell mktemp)
@@ -26,7 +26,7 @@ endif
 # in pyproject.toml: direct pytest invocations must not silently inherit a
 # signal-based deadline that cannot interrupt a native solver.  Process and
 # provider lanes run risky work in killable children and set their own deadline.
-.PHONY: help help-all uv-version-check setup setup-agent container-image eval-image eval-image-pull eval-image-bind hooks fix lint complexity-check lint-full security-audit typecheck test-architecture architecture ci-plan test-plan test-changed check-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static harbor-plan harbor-sync harbor-contracts harbor-adapter-checks harbor-validation-tests harbor-validate harbor-check harbor-check-task benchmark-inventory benchmark-snapshot benchmark-snapshot-validate benchmark-publish harbor-oracle harbor-oracle-task harbor-oracle-run harbor-oracle-all harbor-adapter-check heldout-validate heldout-render heldout-smoke agent-eval agent-eval-validate agent-eval-compare symbolic-coordination-codex-preflight symbolic-coordination-codex-dry-run symbolic-coordination-codex-eval symbolic-coordination-trajectory-telemetry provider-eval clean docs-command-check docs-linkcheck deploy-check
+.PHONY: help help-all uv-version-check setup setup-agent container-image eval-image eval-image-pull eval-image-bind hooks fix lint complexity-check lint-full security-audit typecheck test-architecture architecture ci-plan test-plan test-changed check-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static harbor-plan harbor-sync harbor-contracts harbor-adapter-checks harbor-validation-tests harbor-validate harbor-check harbor-check-task benchmark-inventory benchmark-snapshot benchmark-snapshot-validate benchmark-publish harbor-oracle harbor-oracle-task harbor-oracle-run harbor-oracle-all harbor-adapter-check heldout-validate heldout-render heldout-smoke agent-eval agent-eval-validate agent-eval-compare symbolic-coordination-codex-preflight symbolic-coordination-codex-dry-run symbolic-coordination-codex-eval symbolic-coordination-trajectory-telemetry symbolic-coordination-comparison-plan symbolic-coordination-comparison-run symbolic-coordination-comparison-report provider-eval clean docs-command-check docs-linkcheck deploy-check
 
 help: ## Show available developer commands.
 	@awk -v public="$(PUBLIC_COMMANDS)" 'BEGIN {FS = ":.*## "; n = split(public, names, " "); for (i = 1; i <= n; i++) wanted[names[i]] = 1; printf "Jacobian common developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / && ($$1 in wanted) {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -535,6 +535,33 @@ symbolic-coordination-trajectory-telemetry: ## Verify raw symbolic runs and emit
 		--output "$(SC_TRAJECTORY_OUTPUT)" \
 		$(if $(SC_TRAJECTORY_MARKDOWN),--markdown-output "$(SC_TRAJECTORY_MARKDOWN)",) \
 		$(SC_TRAJECTORY_RUNS)
+
+SC_COMPARISON_TASKS ?= symbolic-coordination-near-miss-01 symbolic-coordination-grid-exhausted-01
+SC_COMPARISON_REPETITIONS ?= 2
+
+symbolic-coordination-comparison-plan: ## Freeze a repeated symbolic A/B/C experiment (SC_COMPARISON_ROOT=/outside/repo, SC_COMPARISON_STACK_REVISIONS="name=sha ...").
+	@test -n "$(SC_COMPARISON_ROOT)" -a -n "$(SC_COMPARISON_STACK_REVISIONS)" || { echo "SC_COMPARISON_ROOT and SC_COMPARISON_STACK_REVISIONS are required" >&2; exit 2; }
+	$(UV_RUN) python -m benchmarks.tooling.symbolic_coordination_comparison plan \
+		--output "$(SC_COMPARISON_ROOT)" --tasks $(SC_COMPARISON_TASKS) \
+		--repetitions "$(SC_COMPARISON_REPETITIONS)" \
+		$(foreach revision,$(SC_COMPARISON_STACK_REVISIONS),--stack-revision "$(revision)")
+
+symbolic-coordination-comparison-run: ## Resume a frozen repeated experiment (EVAL_EXECUTE=1, SC_COMPARISON_ROOT=...).
+	@if [ "$(EVAL_EXECUTE)" != "1" ]; then \
+		echo "Model execution is opt-in. Set EVAL_EXECUTE=1 after reviewing the manifest."; \
+		exit 0; \
+	fi; \
+	test -n "$(SC_COMPARISON_ROOT)" || { echo "SC_COMPARISON_ROOT is required" >&2; exit 2; }; \
+	$(UV_RUN) python -m benchmarks.tooling.symbolic_coordination_comparison run \
+		--root "$(SC_COMPARISON_ROOT)" \
+		$(if $(SC_COMPARISON_MAX_EXECUTIONS),--max-model-executions "$(SC_COMPARISON_MAX_EXECUTIONS)",) \
+		$(if $(filter 1,$(SC_COMPARISON_RETRY_INFRA)),--retry-infrastructure,)
+
+symbolic-coordination-comparison-report: ## Verify repeated artifacts and emit paired JSON/Markdown (SC_COMPARISON_ROOT=..., SC_COMPARISON_OUTPUT=...).
+	@test -n "$(SC_COMPARISON_ROOT)" -a -n "$(SC_COMPARISON_OUTPUT)" || { echo "SC_COMPARISON_ROOT and SC_COMPARISON_OUTPUT are required" >&2; exit 2; }
+	$(UV_RUN) python -m benchmarks.tooling.symbolic_coordination_comparison report \
+		--root "$(SC_COMPARISON_ROOT)" --output "$(SC_COMPARISON_OUTPUT)" \
+		$(if $(SC_COMPARISON_MARKDOWN),--markdown-output "$(SC_COMPARISON_MARKDOWN)",)
 
 provider-eval: ## Run pinned provider feasibility jobs (PROVIDER=cddlib|cgal|gudhi|lean-repl|nauty|regina).
 	@test -n "$(PROVIDER)" || { echo "PROVIDER is required" >&2; exit 2; }
