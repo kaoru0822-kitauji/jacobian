@@ -80,7 +80,9 @@ only `input.json`, `instruction.md`, `submission_schema.json`, and an empty
 blocks reads outside that fresh workspace and disables shell networking; web
 search is separately disabled. Verification runs later in a fresh child
 interpreter against the task-owned clean-room verifier outside the model
-workspace.
+workspace. The host adapter maps Harbor's `/app/submission.json` to
+`./submission.json` in the isolated model workspace and copies it into the
+verifier's separate `/app` tree only after the model exits.
 
 Run the preflight and review a no-model dry run before opting into execution:
 

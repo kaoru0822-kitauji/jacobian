@@ -177,6 +177,8 @@ does not select the product reasoning-log mode called `AUDIT`.
 
 The runner starts each model in a new non-repository workspace containing only
 the public task input, instruction, schema, and empty evidence directory. It
+maps Harbor's `/app/submission.json` to `./submission.json` inside that
+workspace, then copies the result into the verifier's separate `/app` tree. It
 uses `codex exec --json --ephemeral --ignore-user-config`, disables web search,
 and uses a deny-by-default filesystem/network profile. The existing task-local
 verifier runs afterward in another child process and directory. Inspect

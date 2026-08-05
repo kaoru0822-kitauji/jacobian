@@ -70,6 +70,11 @@ file required by the public contract.  Use any available local or Jacobian
 tools if helpful, choosing your own mathematical method.  Do not use the web,
 inspect paths outside this directory, or merely describe what should be
 written.  Finish only after the on-disk submission and evidence are complete.
+
+This host-local runner maps Harbor's /app/submission.json to
+./submission.json and environment/submission_schema.json to
+./submission_schema.json.  Do not access or create /app; remain in this
+isolated directory.
 """
 AUDIT_PROMPT = """Perform exactly one targeted post-solution contract audit.
 

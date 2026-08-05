@@ -116,6 +116,16 @@ def test_workspace_starts_with_only_public_contract_files(tmp_path: Path) -> Non
     )
 
 
+def test_primary_prompt_maps_harbor_paths_into_the_isolated_workspace() -> None:
+    assert (
+        "maps Harbor's /app/submission.json to\n./submission.json" in sc.PRIMARY_PROMPT
+    )
+    assert "environment/submission_schema.json to\n./submission_schema.json" in (
+        sc.PRIMARY_PROMPT
+    )
+    assert "Do not access or create /app" in sc.PRIMARY_PROMPT
+
+
 def test_workspace_rejects_hidden_material_and_symlinks(tmp_path: Path) -> None:
     workspace = sc.prepare_workspace(tmp_path / "A", _task_contract())
     (workspace / "solution").mkdir()
