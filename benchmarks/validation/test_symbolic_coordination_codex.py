@@ -227,6 +227,7 @@ def test_runtime_snapshot_is_read_only_and_binds_all_conditions(
     assert set(snapshot["conditions"]) == {"A", "B", "C"}
     assert snapshot["conditions"]["C"]["reasoning_log_mode"] == "REQUIRED"
     assert snapshot["conditions"]["C"]["audit_passes"] == 1
+    assert snapshot["budgets"]["max_total_tokens_per_stage"] == 800_000
     assert snapshot["sampling"]["deterministic"] is False
 
 

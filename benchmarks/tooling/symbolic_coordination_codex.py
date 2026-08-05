@@ -96,7 +96,7 @@ PRIMARY_TIMEOUT_SECONDS = 900.0
 AUDIT_TIMEOUT_SECONDS = 600.0
 STDOUT_LIMIT_BYTES = 32 * 1024 * 1024
 STDERR_LIMIT_BYTES = 4 * 1024 * 1024
-MAX_TOTAL_TOKENS = 400_000
+MAX_TOTAL_TOKENS = 800_000
 MAX_SUBMISSION_BYTES = 2 * 1024 * 1024
 MAX_WORKSPACE_BYTES = 8 * 1024 * 1024
 PROFILE_NAME = "symbolic-workspace-only"
@@ -1119,6 +1119,7 @@ def _export_reasoning_logs(state: Path, output: Path) -> Mapping[str, Any]:
     from jacobian.storage.repository import ArtifactRepository
 
     output.mkdir()
+    index: dict[str, Any]
     if not (state / "metadata.sqlite3").is_file():
         index = {"status": "EMPTY", "runs": []}
         _write_json(output / "index.json", index)
@@ -1129,7 +1130,7 @@ def _export_reasoning_logs(state: Path, output: Path) -> Mapping[str, Any]:
                 "SELECT run_id FROM reasoning_runs ORDER BY run_id"
             ).fetchall()
         service = ReasoningLogService(store)
-        runs = []
+        runs: list[dict[str, Any]] = []
         for row in rows:
             run_id = str(row["run_id"])
             events = service.inspect(run_id)
