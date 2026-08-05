@@ -63,6 +63,7 @@ SCOPE_INDEPENDENT_ASSURANCE_TASKS = (
 INPUT_BINDING_DECOUPLED_TASKS = (
     "extremal-subset-sum-semantic-audit",
     "integer-perturbation-domain-audit",
+    "monotone-inverse-continuity-audit",
     "necklace-burnside-certificate",
     "prime-power-divisibility-gap-audit",
     "pythagorean-generator-recurrence",
