@@ -14,7 +14,6 @@ from verifier_support import (
 
 W = Path("/app")
 E = Path("/tests")
-MAX_EVIDENCE_BYTES = 1_048_576
 ALLOWED_ASSURANCES = frozenset({"UNVERIFIED", "COMPUTED"})
 REQUIRED_DEFECTS = {
     "OUTER_PARAMETER_SHADOWED",
@@ -126,6 +125,8 @@ def _predicate_certified(value, source):
     if (
         not _is_exact_int(value.get("target"))
         or value.get("target") != target
+        or not isinstance(value.get("universe"), list)
+        or not all(type(entry) is int for entry in value["universe"])
         or value.get("universe") != universe
     ):
         return False
@@ -191,11 +192,9 @@ def _limitations_valid(limitations):
         folded = item.casefold()
         if "lean" in folded and "not assessed" in folded:
             has_lean_not_assessed = True
-        if (
-            "verified" in folded
-            and "not" not in folded
-            and ("lean" in folded or "asymptotic" in folded or "conjecture" in folded)
-        ):
+        if any(
+            term in folded for term in ("verified", "proved", "proven", "confirmed")
+        ) and ("lean" in folded or "asymptotic" in folded or "conjecture" in folded):
             return False
     return has_lean_not_assessed
 
@@ -207,8 +206,6 @@ def _evidence_matches(evidence, result):
     if target is None:
         return False
     try:
-        if target.stat().st_size > MAX_EVIDENCE_BYTES:
-            return False
         text = target.read_text()
         marker = next(
             line.removeprefix("RESULT_JSON:").strip()
@@ -250,7 +247,7 @@ def main():
     result = submission.get("result") if isinstance(submission, dict) else None
     math_correct = bool(_valid_audit(result, source))
     evidence_valid = bool(
-        contract
+        isinstance(submission, dict)
         and _evidence_matches(submission.get("evidence"), submission.get("result"))
     )
     scope_correct = bool(
@@ -286,6 +283,7 @@ def main():
                 "evidence_validity": float(evidence_valid),
                 "scope_accuracy": float(scope_correct),
                 "assurance_calibration": float(assurance_correct),
+                "limitation_accuracy": float(limitations_correct),
                 "reward": reward,
                 "false_certification": false_certification,
             }

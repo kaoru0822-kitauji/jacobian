@@ -67,6 +67,7 @@ def test_rejects_above_ceiling_assurance(tmp_path: Path) -> None:
     rejected = support._run_verifier(task, app, logs)
     assert rejected["reward"] == 0.0
     assert rejected["assurance_calibration"] == 0.0
+    assert rejected["evidence_validity"] == 1.0
 
 
 def test_rejects_boolean_in_shadowing_certificate(tmp_path: Path) -> None:
@@ -104,6 +105,18 @@ def test_rejects_boolean_target_in_predicate_certificate(tmp_path: Path) -> None
     assert rejected["reward"] == 0.0
 
 
+def test_rejects_boolean_universe_entry(tmp_path: Path) -> None:
+    """JSON booleans must not compare equal to exact universe integers."""
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    submission = json.loads((app / "submission.json").read_text())
+    submission["result"]["predicate_certificate"]["universe"][0] = True
+    support._bind_result_evidence(app, submission)
+    support._write_json(app / "submission.json", submission)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
 def test_rejects_affirmative_lean_verification_claim(tmp_path: Path) -> None:
     """Limitations that affirm Lean verification must be rejected."""
     task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
@@ -128,6 +141,21 @@ def test_rejects_affirmative_asymptotic_verification_claim(tmp_path: Path) -> No
     support._write_json(app / "submission.json", submission)
     rejected = support._run_verifier(task, app, logs)
     assert rejected["reward"] == 0.0
+    assert rejected["limitation_accuracy"] == 0.0
+
+
+def test_rejects_affirmative_asymptotic_proof_claim(tmp_path: Path) -> None:
+    """Proof claims are overclaims even when they avoid the word verified."""
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    submission = json.loads((app / "submission.json").read_text())
+    submission["limitations"] = [
+        "Lean parsing, elaboration, and compilation are not assessed.",
+        "The corrected asymptotic conjecture is proved by the audit.",
+    ]
+    support._write_json(app / "submission.json", submission)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["reward"] == 0.0
+    assert rejected["limitation_accuracy"] == 0.0
 
 
 def test_deeply_nested_evidence_json_does_not_crash(tmp_path: Path) -> None:
@@ -162,3 +190,22 @@ def test_oversized_workspace_input_fails_closed(tmp_path: Path) -> None:
     result = support._run_verifier(task, app, logs)
     assert result["input_binding"] == 0.0
     assert result["reward"] == 0.0
+
+
+def test_accepts_large_digest_bound_evidence(tmp_path: Path) -> None:
+    """Valid evidence has no hidden byte ceiling beyond path and digest binding."""
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    evidence_path = app / "evidence" / "answer.txt"
+    submission = json.loads((app / "submission.json").read_text())
+    evidence_path.write_text(
+        "shadow subset not assessed\n"
+        + ("audit " * 200_000)
+        + "\nRESULT_JSON: "
+        + json.dumps(submission["result"], sort_keys=True, separators=(",", ":"))
+        + "\n"
+    )
+    submission["evidence"][0]["sha256"] = support._digest(evidence_path)
+    support._write_json(app / "submission.json", submission)
+    accepted = support._run_verifier(task, app, logs)
+    assert accepted["evidence_validity"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
