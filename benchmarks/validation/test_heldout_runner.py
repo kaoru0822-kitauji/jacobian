@@ -53,6 +53,8 @@ def _manifest(tmp_path: Path) -> Path:
                 "role": "PRIMARY_TREATMENT",
                 "jacobian_enabled": True,
                 "image": "registry.invalid/jacobian@sha256:" + "1" * 64,
+                "source_sha": "a" * 40,
+                "platform": "linux/amd64",
                 "server_version": "1.0.0",
                 "policy_profile": "DEFAULT",
                 "catalog_digest": "sha256:" + "2" * 64,

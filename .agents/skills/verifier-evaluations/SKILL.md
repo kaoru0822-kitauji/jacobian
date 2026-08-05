@@ -63,6 +63,15 @@ the Harbor skill owns dataset layout and repository commands.
    documented in the visible contract, reject unrelated text, and accept
    mathematically equivalent phrasing.
 
+   For streamed prose verifiers, preserve the local relationship between the
+   claim, its scope, and any negation; independent lexical matches are not a
+   sufficient semantic parser. Add regressions for scope-before-claim and
+   claim-before-scope wording, affirmative constructions such as “not only”,
+   and negations that apply to an unrelated object. Feed those fixtures across
+   chunk boundaries that split the relevant phrases, so buffering behavior
+   cannot change the meaning. Keep both positive equivalents and genuine
+   contradiction cases in the matrix.
+
 6. Build adversarial fixtures before trusting the Oracle. Cover the public
    contract itself, including a correct witness with the permitted assurance
    level and a correct witness with an unsupported assurance claim. Also cover
@@ -131,6 +140,9 @@ detailed checklist and anti-pattern catalogue.
   validity still contributes to reward.
 - Treating a full Oracle reward as proof that malformed submissions are safe.
 - Requiring undocumented lexical tokens or a preferred proof strategy.
+- Treating prose context as independent regex hits; scope, target, and
+  negation must remain associated across streamed chunks and alternate clause
+  orderings.
 - Declaring schema properties that the verifier does not enforce, such as a
   `max_bytes` evidence field that the resolver ignores. The visible schema,
   instructions, and executable checks must describe one contract.

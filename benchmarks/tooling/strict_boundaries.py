@@ -191,6 +191,8 @@ class HeldoutTreatmentCondition(_StrictModel):
     role: Literal["PRIMARY_TREATMENT"]
     jacobian_enabled: Literal[True] = True
     image: StrictStr
+    source_sha: StrictStr
+    platform: StrictStr
     server_version: StrictStr
     policy_profile: StrictStr
     catalog_digest: StrictStr

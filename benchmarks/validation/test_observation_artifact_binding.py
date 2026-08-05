@@ -8,11 +8,14 @@ from pathlib import Path
 import pytest
 from benchmarks.tooling import observation_results
 from benchmarks.tooling.observation_results import (
+    _jacobian_image_failures,
     _resolve_binding,
+    _trial_status,
     build_observation_evidence,
 )
 from benchmarks.validation.observation_results_support import (
     _HARBOR_VERSION,
+    _JACOBIAN_IMAGE,
     _SNAPSHOT_ID,
     _write_observation_job,
     _write_result,
@@ -21,6 +24,35 @@ from benchmarks.validation.observation_results_support import (
 # ---------------------------------------------------------------------------
 # Normalization integration
 # ---------------------------------------------------------------------------
+
+
+def test_reproducible_treatment_requires_digest_bound_clean_image() -> None:
+    runtime = {
+        "condition": {"jacobian_enabled": True},
+        "jacobian_image": {**_JACOBIAN_IMAGE, "source_dirty": True},
+    }
+
+    failures = _jacobian_image_failures(runtime)
+
+    assert failures == ["Jacobian image must come from a clean source revision"]
+
+
+def test_reproducible_treatment_requires_image_identity() -> None:
+    failures = _jacobian_image_failures({"condition": {"jacobian_enabled": True}})
+
+    assert failures == ["Jacobian-enabled runtime snapshot must bind jacobian_image"]
+
+
+@pytest.mark.parametrize(
+    "raw_status",
+    ("RUNNING", "PENDING", "FAILED", "ERROR", "TIMEOUT", "CANCELLED"),
+)
+def test_trial_status_preserves_noncompleted_states(raw_status: str) -> None:
+    assert _trial_status({"status": raw_status}, None) == raw_status
+
+
+def test_trial_status_fails_closed_on_unknown_state() -> None:
+    assert _trial_status({"status": "UNKNOWN"}, None) == "ERROR"
 
 
 def test_observation_normalization_binds_fields(
@@ -108,6 +140,7 @@ def test_observation_binds_runtime_snapshot_fields(
         "max_cost_usd": 100.0,
         "repetition": 0,
         "pair_id": "graph-counterexample-r001",
+        "jacobian_image": _JACOBIAN_IMAGE,
         "condition": {
             "id": "treatment",
             "role": "PRIMARY_TREATMENT",
@@ -391,3 +424,20 @@ def test_incomplete_execution_fails_closed(
     assert evidence["status"] == "INCOMPLETE"
     assert evidence["trials"][0]["status"] == "ERROR"
     assert any("incomplete" in f for f in failures)
+
+
+def test_schema_rejects_valid_evidence_with_noncompleted_trial() -> None:
+    from benchmarks.validation.observation_results_support import _evidence
+    from jsonschema import Draft202012Validator
+
+    schema = json.loads(
+        (
+            Path(__file__).resolve().parents[1]
+            / "schemas"
+            / "observation-evidence.schema.json"
+        ).read_text(encoding="utf-8")
+    )
+    evidence = _evidence("control", [1.0])
+    evidence["trials"][0]["status"] = "RUNNING"
+    errors = list(Draft202012Validator(schema).iter_errors(evidence))
+    assert errors, "schema must reject VALID evidence with a non-COMPLETED trial"
