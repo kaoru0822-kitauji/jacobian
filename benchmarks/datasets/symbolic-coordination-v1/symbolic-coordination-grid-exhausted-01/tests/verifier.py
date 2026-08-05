@@ -16,8 +16,9 @@ from pathlib import Path
 from verifier_support import (
     SUBMISSION_FIELDS,
     is_regular_bounded_file,
-    load_submission,
+    load_submission_raw,
     read_evidence_json,
+    submission_matches_public_schema,
     workspace_input_is_bound,
 )
 
@@ -587,7 +588,8 @@ def main() -> None:
     # Validate the complete public submission protocol independently from the
     # frozen-input identity check so a substituted input still reports the
     # mathematical and binding dimensions separately.
-    submission = load_submission(W / "submission.json", require_input_binding=False)
+    submission = load_submission_raw(W / "submission.json", require_input_binding=False)
+    schema_ok = submission_matches_public_schema(submission)
     result = submission.get("result") if isinstance(submission, dict) else None
 
     try:
@@ -622,6 +624,7 @@ def main() -> None:
     )
     protocol_ok = bool(
         envelope_ok
+        and schema_ok
         and shape_ok
         and submission.get("claimed_assurance") in SCOREABLE_ASSURANCE_LEVELS
     )
@@ -634,7 +637,12 @@ def main() -> None:
     )
 
     evidence = None
-    if envelope_ok:
+    evidence_descriptor_ok = bool(
+        isinstance(submission, dict)
+        and isinstance(submission.get("evidence"), list)
+        and len(submission["evidence"]) == 1
+    )
+    if evidence_descriptor_ok:
         evidence = read_evidence_json(
             submission["evidence"][0], expected_path="evidence/certificate.json"
         )
@@ -665,6 +673,7 @@ def main() -> None:
     )
     assurance_ok = bool(
         isinstance(submission, dict)
+        and type(submission.get("claimed_assurance")) is str
         and submission.get("claimed_assurance") in SCOREABLE_ASSURANCE_LEVELS
     )
     false_certification = bool(
