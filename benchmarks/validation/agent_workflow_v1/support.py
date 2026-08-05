@@ -53,18 +53,30 @@ RESOURCE_DERIVED_TASKS = (
 )
 # Tasks whose verifier reports scope independently of assurance typing.
 SCOPE_INDEPENDENT_ASSURANCE_TASKS = (
-    "grid-independent-set-transfer",
-    "image-complement-commutation",
-    "lp-integrability-separator",
-    "necklace-burnside-certificate",
-    "pythagorean-generator-recurrence",
+    "closed-set-distance-strengthening-audit",
+    "apollonius-gap-repair",
+    "c4-characteristic-invariant-audit",
+    "emerald-path-family-audit",
+    "prime-power-divisibility-gap-audit",
+    "sine-integral-asymptotic-audit",
+    "steiner-triple-system-27",
 )
 # Tasks whose verifier reports mathematical correctness independently of
 # workspace input binding, emitting a separate ``input_binding`` diagnostic
 # and gating only aggregate reward on both.
 INPUT_BINDING_DECOUPLED_TASKS = (
+    "closed-set-distance-strengthening-audit",
+    "apollonius-gap-repair",
+    "c4-characteristic-invariant-audit",
+    "emerald-path-family-audit",
+    "extremal-subset-sum-semantic-audit",
+    "integer-perturbation-domain-audit",
+    "monotone-inverse-continuity-audit",
     "necklace-burnside-certificate",
+    "prime-power-divisibility-gap-audit",
     "pythagorean-generator-recurrence",
+    "sine-integral-asymptotic-audit",
+    "steiner-triple-system-27",
 )
 VERIFIER_TASKS = tuple(
     sorted(
@@ -190,12 +202,33 @@ def _prepare_case(
     root = tmp_path / task_name / scenario
     app = root / "app"
     logs = root / "logs"
-    (app / "evidence").mkdir(parents=True)
+    app.mkdir(parents=True)
     logs.mkdir(parents=True)
     shutil.copy2(task / "environment" / "input.json", app / "input.json")
-    shutil.copy2(task / "solution" / "answer.txt", app / "evidence" / "answer.txt")
     submission = json.loads((task / "solution" / "submission.json").read_text())
     submission.pop("verification_record_uri", None)
+    for descriptor in submission["evidence"]:
+        evidence_path = Path(descriptor["path"])
+        assert not evidence_path.is_absolute() and ".." not in evidence_path.parts
+        destination = app / evidence_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        fixture = task / "solution" / evidence_path.name
+        if fixture.is_file():
+            shutil.copy2(fixture, destination)
+        elif evidence_path.suffix == ".json":
+            _write_json(
+                destination,
+                {
+                    "schema_version": "1",
+                    "task_id": submission["task_id"],
+                    "result": submission["result"],
+                    "limitations": submission["limitations"],
+                },
+            )
+            descriptor["sha256"] = _digest(destination)
+        else:
+            shutil.copy2(task / "solution" / "answer.txt", destination)
+            descriptor["sha256"] = _digest(destination)
 
     if scenario == "computed":
         submission["claimed_assurance"] = "COMPUTED"

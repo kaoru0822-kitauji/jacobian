@@ -7,6 +7,15 @@ import pytest
 from benchmarks.validation.agent_workflow_v1 import support
 
 
+def test_decoupled_input_binding_registrations_are_preserved() -> None:
+    expected = {
+        "closed-set-distance-strengthening-audit",
+        "extremal-subset-sum-semantic-audit",
+    }
+    assert expected <= set(support.VERIFIER_TASKS)
+    assert expected <= set(support.INPUT_BINDING_DECOUPLED_TASKS)
+
+
 def test_verifier_execution_does_not_mutate_task_bundles(tmp_path: Path) -> None:
     before = support._task_tree_snapshot()
 
@@ -16,6 +25,28 @@ def test_verifier_execution_does_not_mutate_task_bundles(tmp_path: Path) -> None
 
     assert result["correctness"] == 1.0
     assert support._task_tree_snapshot() == before
+
+
+def test_json_evidence_task_fixture_starts_valid(tmp_path: Path) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "closed-set-distance-strengthening-audit", "computed"
+    )
+
+    assert (app / "evidence" / "distance-audit.json").is_file()
+    assert not (app / "evidence" / "answer.txt").exists()
+    assert support._run_verifier(task, app, logs)["reward"] == pytest.approx(1.0)
+
+
+def test_generated_json_evidence_task_fixture_starts_valid(tmp_path: Path) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "inversion-aggregate-mask-audit", "computed"
+    )
+
+    evidence_path = app / "evidence" / "inversion-audit.json"
+    submission = json.loads((app / "submission.json").read_text())
+    assert evidence_path.is_file()
+    assert submission["evidence"][0]["sha256"] == support._digest(evidence_path)
+    assert support._run_verifier(task, app, logs)["reward"] == pytest.approx(1.0)
 
 
 @pytest.mark.parametrize("task_name", support.VERIFICATION_RECORD_TASKS)
@@ -193,9 +224,29 @@ def test_verifiers_reject_unhashable_assurance(
     support._write_json(submission_path, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected["scope_accuracy"] == 0.0
+    expected_scope = (
+        1.0 if task_name in support.SCOPE_INDEPENDENT_ASSURANCE_TASKS else 0.0
+    )
+    assert rejected["scope_accuracy"] == expected_scope
     assert rejected["reward"] == 0.0
     assert rejected["false_certification"] is False
+
+
+@pytest.mark.parametrize("task_name", support.SCOPE_INDEPENDENT_ASSURANCE_TASKS)
+def test_scope_independent_verifiers_preserve_scope_for_unsupported_assurance(
+    tmp_path: Path,
+    task_name: str,
+) -> None:
+    task, app, logs = support._prepare_case(tmp_path, task_name, "computed")
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["claimed_assurance"] = "CHECKED"
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["scope_accuracy"] == 1.0
+    assert rejected["assurance_calibration"] == 0.0
+    assert rejected["reward"] == 0.0
 
 
 @pytest.mark.parametrize("task_name", support.VERIFIER_TASKS)

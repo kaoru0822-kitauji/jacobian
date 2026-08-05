@@ -8,6 +8,15 @@ from pathlib import Path
 _DIGEST = "sha256:" + "a" * 64
 _SNAPSHOT_ID = "sha256:" + "f" * 64
 _HARBOR_VERSION = "0.20.0"
+_JACOBIAN_IMAGE = {
+    "source_sha": "b" * 40,
+    "source_dirty": False,
+    "reference": "ghcr.io/morluto/jacobian:sha-" + "b" * 40,
+    "digest_reference": "ghcr.io/morluto/jacobian@sha256:" + "1" * 64,
+    "image_id": "sha256:" + "2" * 64,
+    "platform": "linux/amd64",
+    "jacobian_package_version": "0.8.0",
+}
 
 
 def _trial(repetition: int, reward: float) -> dict:
