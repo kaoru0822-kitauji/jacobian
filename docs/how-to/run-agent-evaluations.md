@@ -134,6 +134,58 @@ Daytona-compatible sidecar configuration. Do not compare a Docker control run
 with a Daytona treatment run unless the runtime, image, network, and resource
 limits are otherwise held constant.
 
+## Run the symbolic pilot directly through Codex CLI
+
+`symbolic-coordination-v1` also has a deliberately small host-local runner for
+an authenticated Codex CLI session. This path uses neither Harbor Docker nor an
+LLM API key. It is intended for the public PR2 A/B/C pilot only; it does not
+replace the Harbor comparison and normalization workflow above.
+
+The preflight requires Codex's file-backed ChatGPT login, rejects
+`OPENAI_API_KEY` and `JACOBIAN_MODEL`, verifies the exact locally listed
+`gpt-5.4-mini` contract at `medium` reasoning, and proves that the selected
+permission profile can read its fresh workspace but cannot read a sibling
+sentinel. Run it from a clean, named source branch:
+
+```sh
+unset OPENAI_API_KEY JACOBIAN_MODEL
+make symbolic-coordination-codex-preflight \
+  SC_CODEX_TASK=symbolic-coordination-near-miss-01
+```
+
+Freeze and inspect a dry run in a new directory outside the checkout:
+
+```sh
+make symbolic-coordination-codex-dry-run \
+  SC_CODEX_TASK=symbolic-coordination-near-miss-01 \
+  SC_CODEX_OUTPUT=/tmp/symbolic-coordination-codex-dry-run
+```
+
+Then opt into the three primary model calls (plus condition C's single audit
+call):
+
+```sh
+make symbolic-coordination-codex-eval EVAL_EXECUTE=1 \
+  SC_CODEX_TASK=symbolic-coordination-near-miss-01 \
+  SC_CODEX_OUTPUT=/tmp/symbolic-coordination-codex-smoke
+```
+
+Conditions A, B, and C share one immutable snapshot. A has no Jacobian MCP; B
+has Jacobian with reasoning-log mode `REQUIRED`; C repeats that primary
+condition and then runs one fixed audit prompt without Jacobian. C therefore
+does not select the product reasoning-log mode called `AUDIT`.
+
+The runner starts each model in a new non-repository workspace containing only
+the public task input, instruction, schema, and empty evidence directory. It
+uses `codex exec --json --ephemeral --ignore-user-config`, disables web search,
+and uses a deny-by-default filesystem/network profile. The existing task-local
+verifier runs afterward in another child process and directory. Inspect
+`run-result.json` first: mathematical rejection with completed infrastructure
+is an observation, while `INCOMPLETE` identifies auth, drift, budget, missing
+output, contamination, or verifier infrastructure failures. See the dataset
+[README](../../benchmarks/datasets/symbolic-coordination-v1/README.md) for the
+complete artifact inventory and current nondeterminism/auth limitations.
+
 ## Inspect results
 
 Harbor writes results under `benchmarks/results/`. Inspect the summary with:

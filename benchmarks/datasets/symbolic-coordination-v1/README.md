@@ -54,6 +54,61 @@ make harbor-oracle-task DATASET=symbolic-coordination-v1 TASKS="<task ids>"
 make harbor-check
 ```
 
-PR1 contains no comparison job, model run, post-solution audit, reasoning-log
-analysis, or training contract. Product-surface observations that did not block
-the pilot are recorded in [deferred capability gaps](CAPABILITY_GAPS.md).
+The dataset contract itself contains no comparison job, model run,
+post-solution audit, reasoning-log analysis, or training contract. The
+host-local PR2 observation runner below is operator tooling around this public
+contract; it does not change any task or add a mathematical capability.
+Product-surface observations that did not block the pilot are recorded in
+[deferred capability gaps](CAPABILITY_GAPS.md).
+
+## Host-local Codex pilot
+
+The PR2 runner executes one public member through an existing file-backed
+Codex CLI ChatGPT login, with no Docker and no LLM API key. It freezes the task,
+prompt, `gpt-5.4-mini` model contract, `medium` reasoning effort, budgets,
+sampling semantics, source revision, and public/verifier digests into one
+read-only runtime snapshot shared by all requested conditions:
+
+- **A:** no Jacobian MCP and no post-solution audit;
+- **B:** Jacobian MCP with reasoning-log mode `REQUIRED`, no audit;
+- **C:** the same Jacobian primary run followed by exactly one fixed,
+  non-Jacobian contract-audit pass and at most one coherent revision.
+
+Condition C is not Jacobian's reasoning-log mode named `AUDIT`. The model sees
+only `input.json`, `instruction.md`, `submission_schema.json`, and an empty
+`evidence/` directory at startup. A deny-by-default Codex permission profile
+blocks reads outside that fresh workspace and disables shell networking; web
+search is separately disabled. Verification runs later in a fresh child
+interpreter against the task-owned clean-room verifier outside the model
+workspace.
+
+Run the preflight and review a no-model dry run before opting into execution:
+
+```sh
+unset OPENAI_API_KEY JACOBIAN_MODEL
+make symbolic-coordination-codex-preflight \
+  SC_CODEX_TASK=symbolic-coordination-near-miss-01
+make symbolic-coordination-codex-dry-run \
+  SC_CODEX_TASK=symbolic-coordination-near-miss-01 \
+  SC_CODEX_OUTPUT=/tmp/symbolic-coordination-codex-dry-run
+make symbolic-coordination-codex-eval EVAL_EXECUTE=1 \
+  SC_CODEX_TASK=symbolic-coordination-near-miss-01 \
+  SC_CODEX_OUTPUT=/tmp/symbolic-coordination-codex-smoke
+```
+
+The output must be outside the repository and initially empty. It preserves
+the immutable snapshot, redacted preflight, exact command plans, raw Codex
+JSONL/stderr, stage timing and telemetry, pre-audit and final submissions,
+audit report/revision, external verifier result, Jacobian state, validated
+reasoning-log JSONL exports, and a content-addressed artifact index. A wrong or
+contract-invalid mathematical answer is a completed `REJECTED` observation;
+auth, model/task/source drift, timeout, missing usage/output, contamination,
+or verifier infrastructure failure makes the run `INCOMPLETE`.
+
+Codex CLI 0.146.0 does not expose seed or temperature controls for ChatGPT
+login runs, so the snapshot records those fields as unavailable and the run as
+nondeterministic. Token accounting is enforced at the stage boundary after
+Codex reports usage. The runner currently requires the local ChatGPT session
+to use Codex's file-backed credential store so it can create an ephemeral
+auth-only `CODEX_HOME`; credential material is never copied into result or
+model workspaces.
