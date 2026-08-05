@@ -114,11 +114,14 @@ _SUBPROCESS_ALLOWED_EXACT: frozenset[PurePosixPath] = frozenset(
         # SAT assignment composition test invokes the SAT checker directly.
         PurePosixPath("tests/composition/runtime/test_sat_assignment_verification.py"),
         # Untrusted plugin entrypoints manage their own process lifecycle.
-        PurePosixPath("tests/support/plugin_entrypoints.py"),
+        PurePosixPath("tests/support/process_entrypoints.py"),
         # Architecture policy test uses subprocess in a synthetic import probe.
         PurePosixPath("tests/unit/tooling/test_architecture_policy.py"),
         # This checker's own test file uses subprocess in synthetic probes.
-        PurePosixPath("tests/unit/tooling/test_architecture_enforcement.py"),
+        PurePosixPath("tests/unit/tooling/test_architecture_process_policies.py"),
+        PurePosixPath("tests/unit/tooling/test_architecture_harbor_contracts.py"),
+        PurePosixPath("tests/unit/tooling/test_architecture_unsupported_surfaces.py"),
+        PurePosixPath("tests/unit/tooling/test_architecture_diagnostics.py"),
         # Repository-command integration tests deliberately invoke CLI entrypoints.
         PurePosixPath(
             "benchmarks/validation/agent_workflow_v1/"
@@ -238,7 +241,10 @@ _UNSUPPORTED_SURFACE_TEXT_EXCLUDED: frozenset[PurePosixPath] = frozenset(
     {
         PurePosixPath("CHANGELOG.md"),
         PurePosixPath("tools/check_architecture.py"),
-        PurePosixPath("tests/unit/tooling/test_architecture_enforcement.py"),
+        PurePosixPath("tests/unit/tooling/test_architecture_process_policies.py"),
+        PurePosixPath("tests/unit/tooling/test_architecture_harbor_contracts.py"),
+        PurePosixPath("tests/unit/tooling/test_architecture_unsupported_surfaces.py"),
+        PurePosixPath("tests/unit/tooling/test_architecture_diagnostics.py"),
     }
 )
 
@@ -686,7 +692,10 @@ def _public_contract_drift_violations(root: Path) -> tuple[Violation, ...]:
 _UNSUPPORTED_SURFACE_AST_EXCLUDED: frozenset[PurePosixPath] = frozenset(
     {
         PurePosixPath("tools/check_architecture.py"),
-        PurePosixPath("tests/unit/tooling/test_architecture_enforcement.py"),
+        PurePosixPath("tests/unit/tooling/test_architecture_process_policies.py"),
+        PurePosixPath("tests/unit/tooling/test_architecture_harbor_contracts.py"),
+        PurePosixPath("tests/unit/tooling/test_architecture_unsupported_surfaces.py"),
+        PurePosixPath("tests/unit/tooling/test_architecture_diagnostics.py"),
     }
 )
 
