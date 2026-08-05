@@ -23,9 +23,9 @@ from benchmarks.tooling.command_runner import ToolCommandStatus, run_operator_co
 from benchmarks.tooling.errors import HarborSuiteError
 from benchmarks.tooling.harbor_digest import (
     HarborDigestError,
-    _extract_build_context,
-    _load_compose_doc,
     compose_context_supplement,
+    extract_build_context,
+    load_compose_doc,
 )
 from benchmarks.tooling.harbor_digest import (
     task_digest as _native_task_digest,
@@ -721,12 +721,12 @@ def _resolve_compose_context(compose_path: Path) -> Path | None:
     """Resolve the build context from a compose file, returning ``None`` if absent."""
 
     try:
-        doc = _load_compose_doc(compose_path)
+        doc = load_compose_doc(compose_path)
     except HarborDigestError:
         return None
     if doc is None:
         return None
-    context = _extract_build_context(doc)
+    context = extract_build_context(doc)
     if context is None:
         return None
     return (compose_path.parent / context).resolve()

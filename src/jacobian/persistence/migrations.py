@@ -456,6 +456,12 @@ def _install_reasoning_log_schema(connection: sqlite3.Connection) -> None:
     )
 
 
+def _install_memoryless_state_boundary(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        "UPDATE jacobian_state_format SET format_revision = 8 WHERE id = 0"
+    )
+
+
 STATE_MIGRATIONS = (
     Migration(
         revision=1,
@@ -474,18 +480,12 @@ STATE_MIGRATIONS = (
         name="runtime-service-schema-v1",
         definition=_RUNTIME_SCHEMA,
         apply=_install_runtime_schema,
-        recorded_checksum=(
-            "sha256:fb7debf6933ec683bbf9b82294559737ee77801fa9a2f03f64bf299cc4b466f9"
-        ),
     ),
     Migration(
         revision=4,
         name="state-format-boundary-v1",
         definition=_STATE_FORMAT_SCHEMA,
         apply=_install_state_format_schema,
-        recorded_checksum=(
-            "sha256:e14ad430c8469cc01dae835385cad8aa053cb4b667a16952ba230e54723c97b7"
-        ),
     ),
     Migration(
         revision=5,
@@ -512,7 +512,16 @@ STATE_MIGRATIONS = (
         definition=_REASONING_LOG_SCHEMA,
         apply=_install_reasoning_log_schema,
     ),
+    Migration(
+        revision=8,
+        name="memoryless-state-boundary-v1",
+        definition=(
+            "Establish the pre-stable state boundary after removing research-memory "
+            "schema and advance the persisted state format to revision 8."
+        ),
+        apply=_install_memoryless_state_boundary,
+    ),
 )
 
-SUPPORTED_STATE_FLOOR = 6
-CURRENT_STATE_FORMAT_REVISION = 7
+SUPPORTED_STATE_FLOOR = 8
+CURRENT_STATE_FORMAT_REVISION = 8

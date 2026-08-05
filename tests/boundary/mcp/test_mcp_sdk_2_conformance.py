@@ -9,10 +9,9 @@ from pathlib import Path
 
 import pytest
 from mcp.server.extension import Extension, ResourceBinding, ToolBinding
-from tests.support.mcp import create_legacy_server as create_server
 
 from jacobian.adapters.mcp.constants import ReasoningLogMode
-from jacobian.adapters.mcp.server import JacobianCoreExtension
+from jacobian.adapters.mcp.server import JacobianCoreExtension, create_server
 from jacobian.contracts.capabilities import CapabilityResult
 
 

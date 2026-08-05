@@ -26,12 +26,9 @@ class Migration:
     definition: str
     apply: Callable[[sqlite3.Connection], None]
     requires_foreign_keys_off: bool = False
-    recorded_checksum: str | None = None
 
     @property
     def checksum(self) -> str:
-        if self.recorded_checksum is not None:
-            return self.recorded_checksum
         framed = f"{self.revision}\0{self.name}\0{self.definition}".encode()
         return "sha256:" + hashlib.sha256(framed).hexdigest()
 

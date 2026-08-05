@@ -17,7 +17,7 @@ _COPY_RE = re.compile(
 )
 
 
-def _load_compose_doc(compose_path: Path) -> dict[str, Any] | None:
+def load_compose_doc(compose_path: Path) -> dict[str, Any] | None:
     """Parse a docker-compose.yaml file, returning ``None`` when absent or not a dict."""
 
     if not compose_path.is_file():
@@ -37,7 +37,7 @@ def _load_compose_doc(compose_path: Path) -> dict[str, Any] | None:
     return doc if isinstance(doc, dict) else None
 
 
-def _extract_build_context(doc: dict[str, Any]) -> str | None:
+def extract_build_context(doc: dict[str, Any]) -> str | None:
     """Extract the ``main`` service build context from a compose document."""
 
     services = doc.get("services")
@@ -76,10 +76,10 @@ def _compose_build_context(task_dir: Path) -> Path | None:
     """
 
     compose_path = task_dir / "environment" / "docker-compose.yaml"
-    doc = _load_compose_doc(compose_path)
+    doc = load_compose_doc(compose_path)
     if doc is None:
         return None
-    context = _extract_build_context(doc)
+    context = extract_build_context(doc)
     if context is None:
         return None
     resolved = (compose_path.parent / context).resolve()
@@ -214,4 +214,10 @@ def task_digest(task_dir: Path) -> str:
     return DIGEST_PREFIX + combined
 
 
-__all__ = ["HarborDigestError", "compose_context_supplement", "task_digest"]
+__all__ = [
+    "HarborDigestError",
+    "compose_context_supplement",
+    "extract_build_context",
+    "load_compose_doc",
+    "task_digest",
+]

@@ -8,9 +8,9 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator
 from mcp.shared.exceptions import MCPError
-from tests.support.mcp import create_legacy_server as create_server
 
 from jacobian.adapters.mcp.guidance import OPERATING_GUIDE
+from jacobian.adapters.mcp.server import create_server
 from jacobian.contracts.capabilities import CapabilityDescriptor
 
 CAPABILITY_TOOL_NAMES = {"capability.describe", "capability.invoke"}
