@@ -280,9 +280,11 @@ def _harbor_task_digest(task: Path) -> str:
             stderr_limit_bytes=64 * 1024,
         )
     )
-    value = _command_succeeded(result, label="pinned Harbor task digest").decode(
-        "ascii", errors="strict"
-    ).strip()
+    value = (
+        _command_succeeded(result, label="pinned Harbor task digest")
+        .decode("ascii", errors="strict")
+        .strip()
+    )
     if len(value) != 71 or not value.startswith("sha256:"):
         raise HarnessError("pinned Harbor returned a malformed task digest")
     try:
