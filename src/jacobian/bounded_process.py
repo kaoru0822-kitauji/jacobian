@@ -784,16 +784,18 @@ class BoundedInteractiveProcess:
 
     def _synchronize_stderr(self, deadline: float) -> None:
         with self._stderr_checkpoint_lock:
-            if self._stderr_exceeded.is_set():
-                self._stop_process_locked()
-                raise InteractiveProcessError(
-                    "interactive process exceeded its stderr limit"
-                )
-            stderr_thread = self._stderr_thread
-            if stderr_thread is None or not stderr_thread.is_alive():
-                return
-            self._stderr_checkpoint_complete.clear()
-            self._stderr_checkpoint_requested.set()
+            overflowed = self._stderr_exceeded.is_set()
+            if not overflowed:
+                stderr_thread = self._stderr_thread
+                if stderr_thread is None or not stderr_thread.is_alive():
+                    return
+                self._stderr_checkpoint_complete.clear()
+                self._stderr_checkpoint_requested.set()
+        if overflowed:
+            self._stop_process_locked()
+            raise InteractiveProcessError(
+                "interactive process exceeded its stderr limit"
+            )
         checkpointed = self._stderr_checkpoint_complete.wait(
             max(0.0, deadline - time.monotonic())
         )
