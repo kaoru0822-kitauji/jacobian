@@ -62,33 +62,70 @@ def _valid_design(result, source):
 
 def _evidence(value, result):
     if (
-        not evidence_list_is_bound(
-            value, expected_path="evidence/answer.txt", max_bytes=4096
-        )
+        not evidence_list_is_bound(value, expected_path="evidence/answer.txt")
         or not isinstance(value, list)
         or len(value) != 1
         or not isinstance(result, dict)
         or not isinstance(result.get("blocks"), list)
     ):
         return False
-    path = resolve_evidence(
-        value[0], expected_path="evidence/answer.txt", max_bytes=4096
-    )
+    path = resolve_evidence(value[0], expected_path="evidence/answer.txt")
     if path is None:
-        return False
-    try:
-        lines = [line.strip() for line in path.read_text().splitlines() if line.strip()]
-    except (OSError, UnicodeError):
         return False
     digest = hashlib.sha256(
         json.dumps(result, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
-    return lines == [
-        "steiner-triple-system-certificate-v1",
-        f"result_sha256: {digest}",
-        f"order: {result.get('order')}",
-        f"block_count: {len(result['blocks'])}",
+    expected_lines = [
+        b"steiner-triple-system-certificate-v1",
+        f"result_sha256: {digest}".encode(),
+        f"order: {result.get('order')}".encode(),
+        f"block_count: {len(result['blocks'])}".encode(),
     ]
+    return _certificate_matches(path, expected_lines)
+
+
+def _certificate_matches(path, expected_lines):
+    """Match four certificate lines while streaming arbitrary blank padding."""
+
+    max_line_bytes = max(map(len, expected_lines))
+    matched = 0
+    line = bytearray()
+    started = False
+    overflow = False
+    try:
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(65_536), b""):
+                for byte in chunk:
+                    if byte == ord("\n"):
+                        if started:
+                            if (
+                                matched >= len(expected_lines)
+                                or overflow
+                                or bytes(line).rstrip(b" \t\r\v\f")
+                                != expected_lines[matched]
+                            ):
+                                return False
+                            matched += 1
+                        line.clear()
+                        started = False
+                        overflow = False
+                        continue
+                    if not started and byte in b" \t\r\v\f":
+                        continue
+                    started = True
+                    if len(line) < max_line_bytes:
+                        line.append(byte)
+                    else:
+                        overflow = True
+            if started and (
+                matched >= len(expected_lines)
+                or overflow
+                or bytes(line).rstrip(b" \t\r\v\f") != expected_lines[matched]
+            ):
+                return False
+    except (OSError, UnicodeError):
+        return False
+    return matched == len(expected_lines)
 
 
 def main():

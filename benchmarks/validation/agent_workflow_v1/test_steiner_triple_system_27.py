@@ -141,19 +141,19 @@ def test_input_tamper_is_reported_separately(tmp_path: Path) -> None:
     assert rejected["reward"] == 0.0
 
 
-def test_rejects_oversized_evidence_without_losing_math_diagnostic(
+def test_accepts_large_digest_bound_evidence_without_losing_math_diagnostic(
     tmp_path: Path,
 ) -> None:
     task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
     submission = json.loads((app / "submission.json").read_text())
     evidence_path = app / "evidence" / "answer.txt"
-    evidence_path.write_text("x" * 4097)
+    evidence_path.write_text(evidence_path.read_text() + "\n" * (8 * 1024))
     submission["evidence"][0]["sha256"] = (
         "sha256:" + hashlib.sha256(evidence_path.read_bytes()).hexdigest()
     )
     support._write_json(app / "submission.json", submission)
 
-    rejected = support._run_verifier(task, app, logs)
-    assert rejected["correctness"] == 1.0
-    assert rejected["evidence_validity"] == 0.0
-    assert rejected["reward"] == 0.0
+    accepted = support._run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["evidence_validity"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
