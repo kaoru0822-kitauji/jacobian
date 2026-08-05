@@ -286,6 +286,24 @@ def load_topology(path: Path = DEFAULT_MANIFEST) -> Topology:
     return validate_topology(data, root=manifest.parent.parent, manifest=manifest)
 
 
+def _has_explicit_xdist_args(extra_args: list[str] | None) -> bool:
+    """Return whether ``extra_args`` supply their own xdist configuration.
+
+    pytest takes the last ``-n``/``--numprocesses`` value, so lane defaults
+    appended after an explicit ``-n 0`` would override the user's request for
+    serial execution.  Detect any explicit xdist worker count so the lane
+    defaults can be suppressed in that case.
+    """
+    if not extra_args:
+        return False
+    for arg in extra_args:
+        if arg in ("-n", "--numprocesses"):
+            return True
+        if arg.startswith(("-n=", "--numprocesses=")):
+            return True
+    return False
+
+
 def pytest_command(
     topology: Topology,
     lane_name: str,
@@ -299,12 +317,17 @@ def pytest_command(
     cost more than the selected test itself.  An omitted selector still means
     "the whole lane" and retains the configured CI parallelism.  Lanes with
     ``workers=0`` are unaffected by this distinction.
+
+    Explicit xdist arguments in ``extra_args`` (e.g. ``-n 0`` for
+    debugger-friendly serial execution) suppress the lane's configured worker
+    pool and distribution so the user's choice is honored rather than
+    overridden by the lane defaults that follow it.
     """
     lane = topology.lane(lane_name)
     command = [sys.executable, "-m", "pytest"]
     command.extend(selectors if selectors else list(lane.paths))
     command.extend(extra_args or ())
-    if lane.workers and not selectors:
+    if lane.workers and not selectors and not _has_explicit_xdist_args(extra_args):
         command.extend(["-n", str(lane.workers), "--dist", lane.distribution])
     command.extend(["--timeout", str(lane.timeout_seconds)])
     return command
