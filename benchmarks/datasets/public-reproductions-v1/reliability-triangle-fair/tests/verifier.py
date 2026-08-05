@@ -27,13 +27,12 @@ def _frac(v):
         return None
     try:
         value = Fraction(int(num), int(den))
-    except ZeroDivisionError:
+    except (OverflowError, ValueError, ZeroDivisionError):
         return None
-    canonical = {"num": str(value.numerator), "den": str(value.denominator)}
-    return value if v == canonical else None
+    return value
 
 
-def _expected_result(x):
+def _graph_parts(x):
     graph = x.get("graph")
     probabilities = x.get("edge_probabilities")
     terminals = x.get("terminals")
@@ -46,7 +45,10 @@ def _expected_result(x):
         or len(terminals) != 2
     ):
         return None
-    edges = graph["edges"]
+    return graph["vertices"], graph["edges"], probabilities, terminals
+
+
+def _probabilities_by_edge(probabilities, edges):
     probability_by_edge = {}
     for item in probabilities:
         if not isinstance(item, dict) or set(item) != {"edge", "open_probability"}:
@@ -61,30 +63,49 @@ def _expected_result(x):
         ):
             return None
         probability_by_edge[frozenset(edge)] = probability
-    if len(probability_by_edge) != len(edges):
+    return probability_by_edge if len(probability_by_edge) == len(edges) else None
+
+
+def _state_result(edges, state, vertices, terminals, probability_by_edge):
+    adjacency = {vertex: set() for vertex in vertices}
+    mass = Fraction(1)
+    for edge, opened in zip(edges, state, strict=True):
+        probability = probability_by_edge.get(frozenset(edge))
+        if probability is None:
+            return None
+        mass *= probability if opened else 1 - probability
+        if opened:
+            left, right = edge
+            adjacency[left].add(right)
+            adjacency[right].add(left)
+    reached = {terminals[0]}
+    frontier = [terminals[0]]
+    while frontier:
+        vertex = frontier.pop()
+        for neighbor in adjacency[vertex] - reached:
+            reached.add(neighbor)
+            frontier.append(neighbor)
+    return mass, terminals[1] in reached
+
+
+def _expected_result(x):
+    parts = _graph_parts(x)
+    if parts is None:
+        return None
+    vertices, edges, probabilities, terminals = parts
+    probability_by_edge = _probabilities_by_edge(probabilities, edges)
+    if probability_by_edge is None:
         return None
 
     total = Fraction(0)
     for state in product((False, True), repeat=len(edges)):
-        adjacency = {vertex: set() for vertex in graph["vertices"]}
-        mass = Fraction(1)
-        for edge, opened in zip(edges, state, strict=True):
-            probability = probability_by_edge.get(frozenset(edge))
-            if probability is None:
-                return None
-            mass *= probability if opened else 1 - probability
-            if opened:
-                left, right = edge
-                adjacency[left].add(right)
-                adjacency[right].add(left)
-        reached = {terminals[0]}
-        frontier = [terminals[0]]
-        while frontier:
-            vertex = frontier.pop()
-            for neighbor in adjacency[vertex] - reached:
-                reached.add(neighbor)
-                frontier.append(neighbor)
-        if terminals[1] in reached:
+        state_result = _state_result(
+            edges, state, vertices, terminals, probability_by_edge
+        )
+        if state_result is None:
+            return None
+        mass, connected = state_result
+        if connected:
             total += mass
     return total, 2 ** len(edges)
 

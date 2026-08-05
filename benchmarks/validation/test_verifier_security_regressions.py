@@ -68,6 +68,38 @@ def test_reliability_recomputes_input_and_rejects_coerced_state_count(
     assert rejected["reward"] == 0.0
 
 
+def test_reliability_accepts_equivalent_unreduced_probability(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _solution_case(
+        tmp_path, "public-reproductions-v1", "reliability-triangle-fair"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["probability"] = {"num": "10", "den": "16"}
+    _write_json(submission_path, submission)
+
+    accepted = support._run_verifier(task, app, logs)
+    assert accepted["correctness"] == pytest.approx(1.0)
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+def test_reliability_rejects_oversized_fraction_without_crashing(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _solution_case(
+        tmp_path, "public-reproductions-v1", "reliability-triangle-fair"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["probability"] = {"num": "9" * 5000, "den": "1"}
+    _write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
 def test_symmetry_recomputes_orbits_and_rejects_nested_endpoint_bypass(
     tmp_path: Path,
 ) -> None:
@@ -155,6 +187,46 @@ def _lean_case(tmp_path: Path, tasks: list[dict]):
 
 def test_lean_repl_rejects_vacuous_empty_task_report(tmp_path: Path) -> None:
     task, app, logs = _lean_case(tmp_path, [])
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["reward"] == 0.0
+
+
+def test_lean_repl_rejects_unhashable_task_id_without_crashing(
+    tmp_path: Path,
+) -> None:
+    tasks = [
+        {
+            "task_id": ["CONJUNCTION-DECOMPOSITION"],
+            "completed": True,
+            "decomposition_observed": True,
+            "tactics": [{"tactic": "constructor", "goal_count": 0, "error_count": 0}],
+        },
+        {
+            "task_id": "LOCAL-PREMISE-APPLICATION",
+            "completed": True,
+            "decomposition_observed": True,
+            "tactics": [{"tactic": "exact h hP", "goal_count": 0, "error_count": 0}],
+        },
+    ]
+    task, app, logs = _lean_case(tmp_path, tasks)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["reward"] == 0.0
+
+
+def test_lean_repl_rejects_boolean_error_count(tmp_path: Path) -> None:
+    tasks = [
+        {
+            "task_id": task_id,
+            "completed": True,
+            "decomposition_observed": True,
+            "tactics": [{"tactic": tactic, "goal_count": 0, "error_count": False}],
+        }
+        for task_id, tactic in (
+            ("CONJUNCTION-DECOMPOSITION", "constructor"),
+            ("LOCAL-PREMISE-APPLICATION", "exact h hP"),
+        )
+    ]
+    task, app, logs = _lean_case(tmp_path, tasks)
     rejected = support._run_verifier(task, app, logs)
     assert rejected["reward"] == 0.0
 
