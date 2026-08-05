@@ -31,7 +31,7 @@
       "NO_CLAIM_BEYOND_SUPPLIED_CANDIDATE_AND_EXACT_QQ_COMPOSITIONS"
     ]
   },
-  "public_notes": "Mirror the terminal result into evidence/certificate.json and bind that exact regular file by SHA-256. The verifier independently checks the mathematics, input and artifact identities, declared scope, completeness, and assurance.",
+  "public_notes": "Write evidence/certificate.json as a JSON wrapper with exactly these fields: schema_version (the string \\\"1\\\"), task_id (the string \\\"jacobian/symbolic-coordination-near-miss-01\\\"), result (an exact copy of the submission result object), scope (an exact copy of the submission scope), completeness (an exact copy of the submission completeness), and limitations (an exact copy of the submission limitations). Bind that exact regular file by SHA-256. The verifier independently checks the mathematics, input and artifact identities, declared scope, completeness, and assurance.",
   "required_artifact_filenames": [
     "evidence/certificate.json"
   ],

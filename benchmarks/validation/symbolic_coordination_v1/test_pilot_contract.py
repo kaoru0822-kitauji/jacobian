@@ -109,10 +109,17 @@ def test_manifest_has_the_frozen_pilot_family_balance() -> None:
 def test_verifier_is_clean_room_and_backend_independent() -> None:
     text = (DATASET / "verifier_template.py").read_text()
     imports = {
-        alias.name.split(".", 1)[0]
-        for node in ast.walk(ast.parse(text))
-        if isinstance(node, (ast.Import, ast.ImportFrom))
-        for alias in node.names
+        *(
+            alias.name.split(".", 1)[0]
+            for node in ast.walk(ast.parse(text))
+            if isinstance(node, ast.Import)
+            for alias in node.names
+        ),
+        *(
+            node.module.split(".", 1)[0]
+            for node in ast.walk(ast.parse(text))
+            if isinstance(node, ast.ImportFrom) and node.module is not None
+        ),
     }
     assert not imports & {"jacobian", "sympy", "generate"}
     assert all(
@@ -214,6 +221,22 @@ def test_unknown_submission_field_is_rejected(tmp_path: Path) -> None:
     support.write_json(app / "submission.json", submission)
     result = support.run_verifier(task, app, logs)
     assert result["protocol_compliance"] == 0.0
+    assert result["reward"] == 0.0
+
+
+def test_schema_invalid_submission_preserves_independent_diagnostics(
+    tmp_path: Path,
+) -> None:
+    """A protocol-only schema error must not erase valid math or evidence."""
+    task, app, logs, submission = canonical_case(
+        tmp_path, "symbolic-coordination-valid-inverse-01"
+    )
+    submission["unexpected"] = "field"
+    support.write_json(app / "submission.json", submission)
+    result = support.run_verifier(task, app, logs)
+    assert result["protocol_compliance"] == 0.0
+    assert result["correctness"] == 1.0
+    assert result["evidence_validity"] == 1.0
     assert result["reward"] == 0.0
 
 
@@ -549,3 +572,19 @@ def test_verdict_to_conclusion_mapping_is_documented() -> None:
     assert "`FALSE`" in instruction
     assert "COLLISION_FOUND" in instruction
     assert "`TRUE`" in instruction
+
+
+def test_evidence_wrapper_contract_is_documented() -> None:
+    instruction = (
+        DATASET / "symbolic-coordination-valid-inverse-01/instruction.md"
+    ).read_text()
+    assert "JSON wrapper with exactly these fields" in instruction
+    for field in (
+        "schema_version",
+        "task_id",
+        "result",
+        "scope",
+        "completeness",
+        "limitations",
+    ):
+        assert field in instruction

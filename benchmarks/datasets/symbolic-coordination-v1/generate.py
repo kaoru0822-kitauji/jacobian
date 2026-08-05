@@ -23,7 +23,11 @@ from benchmarks.tooling.public_contract import (  # noqa: E402
 )
 
 DATASET = Path(__file__).resolve().parent
-TEMPLATE_SUPPORT = ROOT / "benchmarks/templates/task/tests/verifier_support.py"
+# Keep this pilot stable when the reusable task template evolves.  The
+# committed copy in the generated task is the deliberate migration boundary.
+TEMPLATE_SUPPORT = (
+    DATASET / "symbolic-coordination-valid-inverse-01/tests/verifier_support.py"
+)
 VERIFIER_TEMPLATE = DATASET / "verifier_template.py"
 IMAGE = "python:3.12-slim@sha256:57cd7c3a7a273101a6485ba99423ee568157882804b1124b4dd04266317710de"
 GENERATOR_VERSION = "symbolic-coordination-pilot-generator@1"
@@ -1198,10 +1202,15 @@ def public_contract(data: dict[str, object]) -> PublicContract:
         },
         "required_artifact_filenames": ["evidence/certificate.json"],
         "public_notes": (
-            "Mirror the terminal result into evidence/certificate.json and bind "
-            "that exact regular file by SHA-256. The verifier independently "
-            "checks the mathematics, input and artifact identities, declared "
-            "scope, completeness, and assurance."
+            "Write evidence/certificate.json as a JSON wrapper with exactly "
+            'these fields: schema_version (the string \\"1\\"), task_id '
+            f'(the string \\"{data["task_id"]}\\"), result (an exact copy of '
+            "the submission result object), scope (an exact copy of the "
+            "submission scope), completeness (an exact copy of the submission "
+            "completeness), and limitations (an exact copy of the submission "
+            "limitations). Bind that exact regular file by SHA-256. The "
+            "verifier independently checks the mathematics, input and artifact "
+            "identities, declared scope, completeness, and assurance."
         ),
         "submission_result": properties["result"],
         "limitations": properties["limitations"],
