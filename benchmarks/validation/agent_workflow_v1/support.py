@@ -55,6 +55,7 @@ RESOURCE_DERIVED_TASKS = (
 SCOPE_INDEPENDENT_ASSURANCE_TASKS = (
     "closed-set-distance-strengthening-audit",
     "apollonius-gap-repair",
+    "c4-characteristic-invariant-audit",
     "emerald-path-family-audit",
     "prime-power-divisibility-gap-audit",
     "sine-integral-asymptotic-audit",
@@ -66,6 +67,7 @@ SCOPE_INDEPENDENT_ASSURANCE_TASKS = (
 INPUT_BINDING_DECOUPLED_TASKS = (
     "closed-set-distance-strengthening-audit",
     "apollonius-gap-repair",
+    "c4-characteristic-invariant-audit",
     "emerald-path-family-audit",
     "extremal-subset-sum-semantic-audit",
     "integer-perturbation-domain-audit",
