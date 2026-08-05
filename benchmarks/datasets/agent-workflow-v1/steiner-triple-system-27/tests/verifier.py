@@ -62,7 +62,9 @@ def _valid_design(result, source):
 
 def _evidence(value, result):
     if (
-        not evidence_list_is_bound(value, expected_path="evidence/answer.txt")
+        not evidence_list_is_bound(
+            value, expected_path="evidence/answer.txt", max_bytes=4096
+        )
         or not isinstance(value, list)
         or len(value) != 1
         or not isinstance(result, dict)
