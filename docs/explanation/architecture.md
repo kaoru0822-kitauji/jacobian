@@ -26,7 +26,7 @@ agent
   │
   ├── EXPLORE ──► retrieval, computation, search, solver, candidate, witness
   │                    │
-  │                    └── HEURISTIC or COMPUTED + research episode
+  │                    └── HEURISTIC or COMPUTED
   │
   └── VERIFY  ──► checker-backed capability + authorized checker/proof engine
                        │
@@ -140,37 +140,6 @@ Long-running capability adapters may additionally persist append-only lifecycle
 events, immutable checkpoints, archive pages, and archive manifests around a
 small mutable snapshot index.
 
-### Research episode
-
-An immutable, locally indexed record of one capability request and result,
-including adapter version, mode, assurance, artifact lineage, summary, tags,
-and timestamp. Raw runs never become trusted knowledge merely because they
-were stored, indexed, retrieved, or reviewed. Source artifacts and
-verification records remain immutable.
-
-## Research memory and optional corpus integration
-
-Jacobian's research memory and experiment ledger are part of the workbench:
-they preserve local episodes, lineage, and evidence needed to retrieve, resume,
-and replay work. Corpus-scale ranking and cross-project retrieval are separate,
-optional capabilities:
-
-```text
-agent
-  │ MCP tools
-  ▼
-Jacobian capabilities and local research memory
-  │                         ▲
-  │ versioned episodes      │ trust-labeled retrieval
-  ▼                         │
-optional research-corpus provider
-```
-
-The local `knowledge.search` adapter and any external provider may suggest
-records, motifs, or hypotheses. Retrieval is outside the verification trust
-boundary and cannot mutate artifacts, register checkers, or promote evidence.
-Local capability invocation remains available when no provider is configured.
-
 ## Model-facing capability API
 
 `CapabilityService` is a registry of operator-installed adapters exposing a
@@ -199,7 +168,6 @@ The service validates both schemas and prevents adapters from self-promoting:
 `VERIFIED` requires a valid local verification record whose checked evidence
 is returned with the capability result. Stage-aware diagnostics separate
 invalid input, reference resolution, adapter execution, and checker outcomes.
-Only completed invocations are eligible for research memory recording.
 
 A registered capability should expose one observable mathematical operation.
 Broad tasks are workflows over multiple capability invocations owned by the

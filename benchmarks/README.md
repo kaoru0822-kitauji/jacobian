@@ -51,6 +51,13 @@ are not silently rewritten. `make harbor-sync DATASET=<id> TASKS="<ids>"`
 updates only the selected verifier checksum labels. The read-only Harbor gates
 validate local support files and never synchronize unrelated tasks.
 
+`benchmarks/tooling/public_contract.py` is internal repository tooling, not an
+adapter. For `agent-workflow-v1`, each verifier owns one
+`tests/public_contract.json`; the tool projects only the standard agent-visible
+`instruction.md` and `environment/submission_schema.json` files. The checked-in
+task-local declaration is copied into the separate verifier image so protocol
+validation does not depend on files from the agent context.
+
 ## Commands
 
 ```sh

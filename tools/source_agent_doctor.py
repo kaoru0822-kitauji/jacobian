@@ -6,17 +6,27 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import subprocess
 import sys
 import tomllib
 from pathlib import Path
 from typing import Any
 
-import jacobian
-from jacobian.adapters.mcp.projections import _catalog_digest
-from jacobian.contracts.capabilities import CapabilityProviderAvailability
-from jacobian.provider_runtime import known_provider_runtime
-from jacobian.runtime import CheckerAuthorityMode, create_runtime
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from benchmarks.tooling.command_runner import (  # noqa: E402
+    ToolCommandStatus,
+    run_operator_command,
+)
+
+import jacobian  # noqa: E402
+from jacobian.adapters.mcp.projections import _catalog_digest  # noqa: E402
+from jacobian.contracts.capabilities import (  # noqa: E402
+    CapabilityProviderAvailability,
+)
+from jacobian.provider_runtime import known_provider_runtime  # noqa: E402
+from jacobian.runtime import CheckerAuthorityMode, create_runtime  # noqa: E402
 
 PROFILES = ("core", "full-python", "lean", "external-proof")
 _PROFILE_PROVIDERS = {
@@ -53,23 +63,35 @@ _PROFILE_PROVIDERS = {
 
 
 def _git(repo: Path, *args: str) -> str:
-    return subprocess.run(
-        ["git", "-C", str(repo), *args],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
+    result = run_operator_command(
+        "git",
+        ("-C", str(repo), *args),
+        cwd=repo,
+        timeout_seconds=30.0,
+        stdout_limit_bytes=4 * 1024 * 1024,
+        stderr_limit_bytes=4096,
+    )
+    if result.status is not ToolCommandStatus.EXITED or result.exit_code != 0:
+        diagnostic = result.diagnostic or result.stderr.decode(errors="replace")[:1024]
+        raise RuntimeError(f"git {' '.join(args)} failed: {diagnostic}")
+    return result.stdout.decode("utf-8", errors="strict").strip()
 
 
 def _repository_version(repo: Path) -> str:
     """Return uv's normalized version for the selected project."""
 
-    return subprocess.run(
-        ["uv", "version", "--project", str(repo), "--short"],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
+    result = run_operator_command(
+        "uv",
+        ("version", "--project", str(repo), "--short"),
+        cwd=repo,
+        timeout_seconds=30.0,
+        stdout_limit_bytes=4096,
+        stderr_limit_bytes=4096,
+    )
+    if result.status is not ToolCommandStatus.EXITED or result.exit_code != 0:
+        diagnostic = result.diagnostic or result.stderr.decode(errors="replace")[:1024]
+        raise RuntimeError(f"uv version failed: {diagnostic}")
+    return result.stdout.decode("utf-8", errors="strict").strip()
 
 
 def _provider_report(runtime: Any) -> dict[str, dict[str, Any]]:
@@ -253,7 +275,6 @@ def main() -> int:
     except (
         OSError,
         RuntimeError,
-        subprocess.CalledProcessError,
         KeyError,
         ValueError,
     ) as error:
