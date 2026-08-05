@@ -45,14 +45,14 @@
     ]
   },
   "harbor_version": "0.20.0",
-  "lock_digest": "sha256:9076eef0b8d62a205938a88314ff85296423bd72bfd2b93e97bf56cff09a9183",
+  "lock_digest": "sha256:67d91bfda6c60eb622faba327512990d56860b832a65e841b7b519812c879f6a",
   "schema_version": "1",
-  "snapshot_id": "sha256:9076eef0b8d62a205938a88314ff85296423bd72bfd2b93e97bf56cff09a9183",
+  "snapshot_id": "sha256:67d91bfda6c60eb622faba327512990d56860b832a65e841b7b519812c879f6a",
   "source": {
     "dirty": false,
     "environment_profiles_digest": "sha256:46d82dd49f5f940fbff375c7aaa6c29c364ac2f5a55bc31aca9e90502d836056",
     "registry_digest": "sha256:058f2dcf145478e1ecc1ed683211d02d2ebd73355d908d75fe41c269efcec710",
-    "tree_sha": "65aadad95234ec31fe13ed72f183abf413dd9545"
+    "tree_sha": "632532b96bddbb113f7b85ebfd9590b23f34158d"
   },
   "suite": {
     "answer_visibility": "public",

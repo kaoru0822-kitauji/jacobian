@@ -132,14 +132,14 @@
     ]
   },
   "harbor_version": "0.20.0",
-  "lock_digest": "sha256:7253842ac4526a8631c058a4d6398c8e9703f43e63800c0dbc3514c8a2c10fe5",
+  "lock_digest": "sha256:26e558abcfda80f944ff1659f73b3c89b22ed4ddd2700d8340c067dc4ed7b323",
   "schema_version": "1",
-  "snapshot_id": "sha256:7253842ac4526a8631c058a4d6398c8e9703f43e63800c0dbc3514c8a2c10fe5",
+  "snapshot_id": "sha256:26e558abcfda80f944ff1659f73b3c89b22ed4ddd2700d8340c067dc4ed7b323",
   "source": {
     "dirty": false,
     "environment_profiles_digest": "sha256:46d82dd49f5f940fbff375c7aaa6c29c364ac2f5a55bc31aca9e90502d836056",
     "registry_digest": "sha256:058f2dcf145478e1ecc1ed683211d02d2ebd73355d908d75fe41c269efcec710",
-    "tree_sha": "65aadad95234ec31fe13ed72f183abf413dd9545"
+    "tree_sha": "632532b96bddbb113f7b85ebfd9590b23f34158d"
   },
   "suite": {
     "answer_visibility": "hidden-at-runtime",
@@ -1355,7 +1355,7 @@
     },
     {
       "assurance_ceiling": "VERIFIED",
-      "digest": "sha256:a4ade3b61b475dfce20b5c192f629c501d850047ad872fa77e05bed6f520d6cf",
+      "digest": "sha256:bdca13d051f1c521105a79dddf8cf8e961b99356e5b244d6067e7973991a9479",
       "environment": {
         "agent_image": "python:3.12-slim@sha256:57cd7c3a7a273101a6485ba99423ee568157882804b1124b4dd04266317710de",
         "allow_apt": false,
@@ -1370,7 +1370,7 @@
     },
     {
       "assurance_ceiling": "VERIFIED",
-      "digest": "sha256:7b38b7868239d116282c9222efa03ae4c986dff693fbcf2f2a8dde92611e65b7",
+      "digest": "sha256:410c362eefe4308318e30b47327678535f15e6be0795319c3d7c567e98024bf9",
       "environment": {
         "agent_image": "python:3.12-slim@sha256:57cd7c3a7a273101a6485ba99423ee568157882804b1124b4dd04266317710de",
         "allow_apt": false,
@@ -1880,7 +1880,7 @@
     },
     {
       "assurance_ceiling": "COMPUTED",
-      "digest": "sha256:3cd293ac4d7c219974b358a98e4f17c31f34a4d04de952a1cc21c1171ca7861a",
+      "digest": "sha256:520e3563a09033c24d55bfbd0ad59f48fca0bd2f10262a9d47a6dc39e4f1554b",
       "environment": {
         "agent_image": "python:3.12-slim@sha256:57cd7c3a7a273101a6485ba99423ee568157882804b1124b4dd04266317710de",
         "allow_apt": false,
