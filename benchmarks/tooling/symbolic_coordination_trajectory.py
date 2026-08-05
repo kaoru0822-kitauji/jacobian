@@ -446,6 +446,8 @@ def verify_artifact_index(root: Path) -> str:
 
 def _verify_snapshot(root: Path) -> dict[str, Any]:
     snapshot = _load_object(root / "runtime-snapshot.json", label="runtime snapshot")
+    if snapshot.get("schema_version") != SCHEMA_VERSION:
+        raise TrajectoryTelemetryError("runtime snapshot schema version is unsupported")
     snapshot_id = _required(snapshot, "snapshot_id", str, "runtime_snapshot")
     body = {key: value for key, value in snapshot.items() if key != "snapshot_id"}
     if _digest_bytes(_canonical_bytes(body)) != snapshot_id:
@@ -808,6 +810,8 @@ def _verifier(value: object) -> VerifierScores | None:
         return None
     if not isinstance(value, Mapping):
         raise TrajectoryTelemetryError("verifier result must be an object or null")
+    if value.get("verifier_workspace_outside_model_workspace") is not True:
+        raise TrajectoryTelemetryError("verifier result lacks clean-room provenance")
     reward = _required(value, "reward", dict, "verifier")
     try:
         return VerifierScores(
@@ -1005,13 +1009,16 @@ def _artifact_flow(
             handoffs += count
             if count:
                 reused.add(uri)
-    codes = {code for call in calls for code in call.error_codes}
     return ArtifactFlow(
         created_uris=created,
         handoff_count=handoffs,
         reused_uri_count=len(reused),
-        stale_binding_failure_count=sum(code in STALE_BINDING_CODES for code in codes),
-        substitution_failure_count=sum(code in SUBSTITUTION_CODES for code in codes),
+        stale_binding_failure_count=sum(
+            code in STALE_BINDING_CODES for call in calls for code in call.error_codes
+        ),
+        substitution_failure_count=sum(
+            code in SUBSTITUTION_CODES for call in calls for code in call.error_codes
+        ),
         final_input_binding_valid=(final_verifier.input_binding == 1.0)
         if final_verifier
         else None,
@@ -1065,6 +1072,10 @@ def _condition_identity(
     result: Mapping[str, Any],
 ) -> _ConditionIdentity:
     condition_root = root / condition
+    if result.get("schema_version") != SCHEMA_VERSION:
+        raise TrajectoryTelemetryError(
+            f"{condition} condition result schema version is unsupported"
+        )
     snapshot_id = _required(snapshot, "snapshot_id", str, "runtime_snapshot")
     if result.get("snapshot_id") != snapshot_id or result.get("condition") != condition:
         raise TrajectoryTelemetryError(f"{condition} condition binding is inconsistent")
@@ -1117,6 +1128,59 @@ def _stage_sources(
     return events, source
 
 
+def _stage_summary(
+    source: Mapping[str, Any] | None, *, include_capability_ids: bool
+) -> tuple[object, dict[str, object] | None]:
+    if source is None:
+        return None, None
+    mcp_calls = source.get("mcp_calls")
+    shell_calls = source.get("shell_calls")
+    if not isinstance(mcp_calls, list) or not isinstance(shell_calls, list):
+        raise TrajectoryTelemetryError("stage tool-call telemetry is malformed")
+    calls: dict[str, object] = {"mcp": mcp_calls, "shell": shell_calls}
+    if include_capability_ids:
+        capability_ids = source.get("capability_ids")
+        if not isinstance(capability_ids, list):
+            raise TrajectoryTelemetryError("stage capability telemetry is malformed")
+        calls["capability_ids"] = capability_ids
+    return source.get("usage"), calls
+
+
+def _validate_stage_summary(
+    result: Mapping[str, Any],
+    label: Literal["primary", "audit"],
+    source: Mapping[str, Any] | None,
+) -> None:
+    expected_usage, expected_calls = _stage_summary(
+        source, include_capability_ids=label == "primary"
+    )
+    if result.get(f"{label}_usage") != expected_usage:
+        raise TrajectoryTelemetryError(
+            f"condition result {label} usage disagrees with raw telemetry"
+        )
+    if result.get(f"{label}_tool_calls") != expected_calls:
+        raise TrajectoryTelemetryError(
+            f"condition result {label} tool calls disagree with raw telemetry"
+        )
+
+
+def _validate_reasoning_summary(
+    condition_root: Path,
+    condition: Condition,
+    result: Mapping[str, Any],
+) -> None:
+    expected: object = None
+    if condition in {"B", "C"}:
+        expected = _load_object(
+            condition_root / "reasoning-logs" / "index.json",
+            label="reasoning-log index",
+        )
+    if result.get("reasoning_logs") != expected:
+        raise TrajectoryTelemetryError(
+            f"{condition} reasoning-log summary disagrees with raw artifacts"
+        )
+
+
 def _submission_audit_sources(
     condition_root: Path,
     condition: Condition,
@@ -1133,6 +1197,8 @@ def _submission_audit_sources(
     revision = result.get("revision_applied")
     if revision is not None and not isinstance(revision, bool):
         raise TrajectoryTelemetryError(f"{condition} revision flag is malformed")
+    if condition != "C" and revision is not None:
+        raise TrajectoryTelemetryError(f"{condition} cannot declare an audit revision")
     if initial_submission.present and final_submission.present and condition == "C":
         actual_revision = _submission_tree_digest(
             condition_root / "pre-audit"
@@ -1143,6 +1209,10 @@ def _submission_audit_sources(
             )
     initial_raw = result.get("initial_verifier")
     final_raw = result.get("verifier")
+    if condition != "C" and initial_raw != final_raw:
+        raise TrajectoryTelemetryError(
+            f"{condition} initial and final verifier results disagree"
+        )
     for name, expected in (
         ("initial-verifier-result.json", initial_raw),
         ("verifier-result.json", final_raw),
@@ -1181,19 +1251,61 @@ def _infrastructure(
 
 def _audit_usage_and_time(
     condition_root: Path, condition: Condition
-) -> tuple[TokenUsage | None, float | None]:
+) -> tuple[dict[str, Any] | None, TokenUsage | None, float | None]:
     audit_path = condition_root / "audit.codex.jsonl"
-    if condition != "C" or not audit_path.exists():
-        return None, None
+    if condition != "C":
+        if audit_path.exists():
+            raise TrajectoryTelemetryError(
+                f"{condition} unexpectedly contains an audit stage"
+            )
+        return None, None, None
+    if not audit_path.exists():
+        return None, None, None
     _, source = _stage_sources(
         audit_path,
         condition_root / "audit.telemetry.json",
         label="C audit JSONL",
     )
     return (
+        source,
         _token_usage(source.get("usage")),
         _timing(condition_root / "audit.timing.json", required=True),
     )
+
+
+def _validate_complete_sources(
+    condition: Condition,
+    primary_usage: TokenUsage,
+    audit_usage: TokenUsage | None,
+    submissions: _SubmissionAuditSources,
+    infrastructure_status: InfrastructureStatus,
+) -> None:
+    if infrastructure_status != "COMPLETE":
+        return
+    if primary_usage.availability != "EXACT":
+        raise TrajectoryTelemetryError(
+            f"{condition} complete infrastructure has unavailable primary token usage"
+        )
+    if (
+        not submissions.initial_submission.present
+        or not submissions.final_submission.present
+    ):
+        raise TrajectoryTelemetryError(
+            f"{condition} complete infrastructure lacks a preserved submission"
+        )
+    if submissions.initial_verifier is None or submissions.final_verifier is None:
+        raise TrajectoryTelemetryError(
+            f"{condition} complete infrastructure lacks clean-room verifier results"
+        )
+    if condition == "C":
+        if audit_usage is None or audit_usage.availability != "EXACT":
+            raise TrajectoryTelemetryError(
+                "C complete infrastructure has unavailable audit token usage"
+            )
+        if submissions.revision is None:
+            raise TrajectoryTelemetryError(
+                "C complete infrastructure lacks an audit revision decision"
+            )
 
 
 def _call_metrics(
@@ -1239,13 +1351,25 @@ def _condition_record(
         condition_root / "primary.telemetry.json",
         label=f"{condition} primary JSONL",
     )
+    _validate_stage_summary(result, "primary", primary_source)
     calls, recovered_calls = _capability_calls(events, identity.family)
     raw_items = _invoke_items(events)
     reasoning = _reasoning(root, condition, identity.condition_contract, primary_source)
+    _validate_reasoning_summary(condition_root, condition, result)
     submissions = _submission_audit_sources(condition_root, condition, result)
     infrastructure_status, failures = _infrastructure(result, condition)
     primary_usage = _token_usage(primary_source.get("usage"))
-    audit_usage, audit_seconds = _audit_usage_and_time(condition_root, condition)
+    audit_source, audit_usage, audit_seconds = _audit_usage_and_time(
+        condition_root, condition
+    )
+    _validate_stage_summary(result, "audit", audit_source)
+    _validate_complete_sources(
+        condition,
+        primary_usage,
+        audit_usage,
+        submissions,
+        infrastructure_status,
+    )
     primary_seconds = _timing(condition_root / "primary.timing.json", required=True)
     total_seconds = (
         None if primary_seconds is None else primary_seconds + (audit_seconds or 0.0)
@@ -1306,8 +1430,13 @@ def analyze_run(root: Path) -> list[RunTelemetry]:
     index_digest = verify_artifact_index(root)
     snapshot = _verify_snapshot(root)
     run_result = _load_object(root / "run-result.json", label="run result")
+    if run_result.get("schema_version") != SCHEMA_VERSION:
+        raise TrajectoryTelemetryError("run result schema version is unsupported")
     if run_result.get("snapshot_id") != snapshot.get("snapshot_id"):
         raise TrajectoryTelemetryError("run result is not bound to the snapshot")
+    task = _required(snapshot, "task", dict, "runtime_snapshot")
+    if run_result.get("task") != task.get("id"):
+        raise TrajectoryTelemetryError("run result is not bound to the snapshot task")
     raw_conditions = _required(run_result, "conditions", list, "run_result")
     condition_names = [
         item.get("condition") for item in raw_conditions if isinstance(item, Mapping)
@@ -1639,8 +1768,13 @@ def emit(
     roots: Sequence[Path], output: Path, markdown_output: Path | None
 ) -> TelemetryBundle:
     bundle = build_bundle(roots)
-    _write_exclusive(output, _canonical_bytes(bundle.model_dump(mode="json")))
     markdown = markdown_output or output.with_suffix(".md")
+    if output.absolute() == markdown.absolute():
+        raise TrajectoryTelemetryError("JSON and Markdown outputs must be distinct")
+    for path in (output, markdown):
+        if path.exists() or path.is_symlink():
+            raise TrajectoryTelemetryError(f"refusing to overwrite output: {path}")
+    _write_exclusive(output, _canonical_bytes(bundle.model_dump(mode="json")))
     _write_exclusive(markdown, render_tables(bundle).encode("utf-8"))
     return bundle
 

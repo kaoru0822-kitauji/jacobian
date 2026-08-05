@@ -27,10 +27,16 @@ emits any record, it requires all of the following:
   agree;
 - every non-empty Codex JSONL line is a JSON object, and the committed stage
   telemetry agrees with a fresh parse of that JSONL;
+- condition-result usage and tool-call summaries exactly replay the primary and
+  audit stage telemetry, while its reasoning summary exactly matches the
+  exported reasoning-log index;
 - public task files match the snapshot hashes;
 - reasoning-log index paths, counts, and digests agree with their JSONL exports;
 - initial/final submission state, revision flag, initial/final verifier result,
-  condition result, and top-level run result agree.
+  condition result, and top-level run result agree; and
+- a condition declared `COMPLETE` has exact primary usage, both preserved
+  submissions, clean-room verifier provenance and results, plus exact audit
+  usage and a revision decision for condition C.
 
 Missing or inconsistent source data is an error. A declared incomplete model
 run is still analyzable: missing token usage or verifier output remains
@@ -67,7 +73,7 @@ Rules are closed and versioned with schema v1:
   respectively, `polynomial.map.inverse.verify`,
   `polynomial.map.collision.verify`, and
   `polynomial.map.keller_condition.verify`. A later non-failed applicable
-  checker is required.
+  checker with `execution.status=COMPLETED` is required.
 - **Recovery:** a failed or non-conclusive invocation is recovered only by a
   later completed, non-failed invocation of the same capability. Audit repair
   is separately established by clean-room verifier results.
@@ -79,6 +85,7 @@ Rules are closed and versioned with schema v1:
 - **Artifacts:** creation comes from typed `artifact_uris`; handoff/reuse
   requires the exact URI in a later invocation argument. Stale/misbound and
   substituted artifacts use closed diagnostic-code sets, not message text.
+  Failure metrics count occurrences rather than unique diagnostic codes.
   Final input/artifact binding remains the clean-room verifier's score.
 - **Reasoning protocol:** condition A is `NOT_APPLICABLE`. Required modes are
   complete only when the existing parser establishes the exact
