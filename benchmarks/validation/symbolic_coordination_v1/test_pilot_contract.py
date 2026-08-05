@@ -3,6 +3,8 @@ from __future__ import annotations
 import ast
 import json
 from collections import Counter
+from fractions import Fraction
+from itertools import product
 from pathlib import Path
 
 import pytest
@@ -18,6 +20,59 @@ TASK_IDS = [case["task_id"] for case in MANIFEST["cases"]]
 def canonical_case(tmp_path: Path, task_id: str):
     task, app, logs = support.prepare(tmp_path, task_id)
     return task, app, logs, json.loads((app / "submission.json").read_text())
+
+
+def _parse_poly(coord: dict) -> dict[tuple[int, ...], Fraction]:
+    """Collapse a polynomial coordinate into a nonzero term map keyed by exponents."""
+
+    result: dict[tuple[int, ...], Fraction] = {}
+    for term in coord["terms"]:
+        coefficient = Fraction(
+            int(term["coefficient"]["num"]), int(term["coefficient"]["den"])
+        )
+        exponents = tuple(term["exponents"])
+        result[exponents] = result.get(exponents, Fraction(0)) + coefficient
+    return {k: v for k, v in result.items() if v != 0}
+
+
+def _evaluate(coords: list[dict[tuple[int, ...], Fraction]], point: tuple) -> tuple:
+    """Evaluate the parsed polynomial coordinates at a rational point."""
+
+    values = []
+    for coord in coords:
+        total = Fraction(0)
+        for exponents, coefficient in coord.items():
+            monomial = coefficient
+            for value, exp in zip(point, exponents, strict=True):
+                monomial *= value**exp
+            total += monomial
+        values.append(total)
+    return tuple(values)
+
+
+def _find_collision_in_grid(
+    forward_map: dict, record: dict
+) -> tuple[tuple, tuple, tuple]:
+    """Search the declared grid for two distinct points sharing a common image."""
+
+    coords = [_parse_poly(c) for c in forward_map["coordinates"]]
+    values = tuple(
+        Fraction(v) for v in range(record["min_numerator"], record["max_numerator"] + 1)
+    )
+    points = list(product(values, repeat=len(forward_map["variables"])))
+    images: dict[tuple, tuple] = {}
+    for point in points:
+        image = _evaluate(coords, point)
+        if image in images:
+            return images[image], point, image
+        images[image] = point
+    raise AssertionError("no collision found in the declared grid")
+
+
+def _point_json(point: tuple) -> list[dict[str, str]]:
+    """Serialize a rational point as the certificate's coordinate list."""
+
+    return [{"num": str(c.numerator), "den": str(c.denominator)} for c in point]
 
 
 def test_generator_is_deterministic() -> None:
@@ -459,70 +514,20 @@ def test_collision_witness_in_timeout_case_is_accepted(
     search must be accepted with collision-witness scope and limitations."""
     task, app, logs, submission = canonical_case(tmp_path, task_id)
     data = json.loads((app / "input.json").read_text())
-    forward = data["forward_map"]
     record = data["search_record"]
     grid = {
         "min_numerator": record["min_numerator"],
         "max_numerator": record["max_numerator"],
         "max_denominator": record["max_denominator"],
     }
-    # Find an actual collision in the declared grid.
-    from fractions import Fraction
-    from itertools import product
-
-    def parse_poly(coord):
-        result = {}
-        for term in coord["terms"]:
-            c = Fraction(
-                int(term["coefficient"]["num"]), int(term["coefficient"]["den"])
-            )
-            exp = tuple(term["exponents"])
-            result[exp] = result.get(exp, Fraction(0)) + c
-        return {k: v for k, v in result.items() if v != 0}
-
-    def parse_map(m):
-        coords = [parse_poly(c) for c in m["coordinates"]]
-        return coords
-
-    def evaluate(coords, point):
-        vals = []
-        for coord in coords:
-            v = Fraction(0)
-            for exp, c in coord.items():
-                m = c
-                for cv, e in zip(point, exp, strict=True):
-                    m *= cv**e
-                v += m
-            vals.append(v)
-        return tuple(vals)
-
-    coords = parse_map(forward)
-    lower = record["min_numerator"]
-    upper = record["max_numerator"]
-    values = tuple(Fraction(v) for v in range(lower, upper + 1))
-    dim = len(forward["variables"])
-    points = list(product(values, repeat=dim))
-    images = {}
-    collision = None
-    for p in points:
-        img = evaluate(coords, p)
-        if img in images:
-            collision = (images[img], p, img)
-            break
-        images[img] = p
-    assert collision is not None, f"no collision found in {task_id} grid"
-
-    def point_json(pt):
-        return [{"num": str(c.numerator), "den": str(c.denominator)} for c in pt]
-
-    first, second, image = collision
+    first, second, image = _find_collision_in_grid(data["forward_map"], record)
     submission["result"]["verdict"] = "COLLISION_FOUND"
     submission["result"]["certificate"] = {
         "kind": "COLLISION_WITNESS_REPLAY",
         "grid": grid,
-        "first_point": point_json(first),
-        "second_point": point_json(second),
-        "common_image": point_json(image),
+        "first_point": _point_json(first),
+        "second_point": _point_json(second),
+        "common_image": _point_json(image),
         "global_consequence": "MAP_NOT_INJECTIVE_OVER_QQ",
     }
     submission["conclusion"] = "TRUE"
