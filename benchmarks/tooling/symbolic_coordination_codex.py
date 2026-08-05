@@ -33,7 +33,6 @@ from benchmarks.tooling.command_runner import (
     operator_environment,
     run_tool_command,
 )
-from benchmarks.tooling.harbor_digest import task_digest
 from benchmarks.validation._verifier_child import (
     VerifierExecutionError,
     run_verifier_in_child,
@@ -46,6 +45,7 @@ DATASET = ROOT / "benchmarks" / "datasets" / DATASET_ID
 DEFAULT_TASK = "symbolic-coordination-near-miss-01"
 DEFAULT_MODEL = "gpt-5.4-mini"
 DEFAULT_REASONING_EFFORT = "medium"
+HARBOR_VERSION = "0.20.0"
 CONDITIONS = ("A", "B", "C")
 FORBIDDEN_ENVIRONMENT = frozenset({"JACOBIAN_MODEL", "OPENAI_API_KEY"})
 FORBIDDEN_WORKSPACE_NAMES = frozenset(
@@ -249,6 +249,49 @@ def _git_text(arguments: Sequence[str]) -> str:
     return _command_succeeded(result, label="git").decode("utf-8").strip()
 
 
+def _harbor_task_digest(task: Path) -> str:
+    script = (
+        "import sys; from pathlib import Path; "
+        "from benchmarks.tooling.harbor_digest import task_digest; "
+        "print(task_digest(Path(sys.argv[1])))"
+    )
+    uvx = ToolResolver().resolve("uvx")
+    if uvx is None:
+        raise HarnessError("uvx is unavailable")
+    result = run_tool_command(
+        ToolCommandRequest(
+            executable=uvx,
+            arguments=(
+                "--from",
+                f"harbor=={HARBOR_VERSION}",
+                "--with",
+                "tomli-w==1.2.0",
+                "--with",
+                "jsonschema",
+                "python",
+                "-c",
+                script,
+                str(task),
+            ),
+            environment=operator_environment(),
+            cwd=str(ROOT),
+            timeout_seconds=180.0,
+            stdout_limit_bytes=64 * 1024,
+            stderr_limit_bytes=64 * 1024,
+        )
+    )
+    value = _command_succeeded(result, label="pinned Harbor task digest").decode(
+        "ascii", errors="strict"
+    ).strip()
+    if len(value) != 71 or not value.startswith("sha256:"):
+        raise HarnessError("pinned Harbor returned a malformed task digest")
+    try:
+        int(value.removeprefix("sha256:"), 16)
+    except ValueError as exc:
+        raise HarnessError("pinned Harbor returned a malformed task digest") from exc
+    return value
+
+
 def _require_clean_source() -> tuple[str, str]:
     revision = git_head_sha(ROOT)
     if revision is None:
@@ -285,7 +328,7 @@ def _task_contract(task_id: str) -> TaskContract:
     return TaskContract(
         task_id=task_id,
         path=task,
-        harbor_digest=task_digest(task),
+        harbor_digest=_harbor_task_digest(task),
         public_hashes={name: _digest_file(path) for name, path in public_paths.items()},
         verifier_hashes={
             name: _digest_file(path) for name, path in verifier_paths.items()
@@ -569,6 +612,7 @@ def _snapshot_body(
             "public_file_hashes": dict(task.public_hashes),
             "verifier_hashes": dict(task.verifier_hashes),
         },
+        "harbor_version": HARBOR_VERSION,
         "source": {
             "revision": preflight_result.source_revision,
             "branch": preflight_result.branch,
