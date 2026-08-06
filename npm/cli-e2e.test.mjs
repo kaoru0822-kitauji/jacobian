@@ -237,6 +237,7 @@ if (process.argv[2] === "--version") {
 
       const result = await runNpx(tarball, ["upgrade"], base, {
         FAKE_UV_LOG: uvLog,
+        JACOBIAN_NPM_UPGRADE_HANDOFF: "1",
         JACOBIAN_PACKAGE: `jacobian==${packageMetadata.version}`,
         PATH: `${dirname(uv)}${process.platform === "win32" ? ";" : ":"}${process.env.PATH ?? ""}`,
         XDG_DATA_HOME: xdgDataHome,
@@ -259,6 +260,41 @@ if (process.argv[2] === "--version") {
         ],
       ]);
       assert.equal(existsSync(join(base, "global")), false);
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  "npx jacobian upgrade resolves the latest npm bootstrap before Python upgrade",
+  { skip: process.platform === "win32" },
+  async () => {
+    const base = await mkdtemp(join(tmpdir(), "jacobian-npx-upgrade-handoff-"));
+    try {
+      const tarball = await packNpmPackage(base);
+      const npx = join(base, "bin", "npx");
+      const handoffLog = join(base, "handoff.json");
+      await writeExecutable(
+        npx,
+        `#!/usr/bin/env node
+const fs = require("node:fs");
+fs.writeFileSync(process.env.JACOBIAN_HANDOFF_LOG, JSON.stringify({
+  args: process.argv.slice(2),
+  marker: process.env.JACOBIAN_NPM_UPGRADE_HANDOFF,
+}));
+`,
+      );
+
+      const result = await runNpx(tarball, ["upgrade", "--yes"], base, {
+        JACOBIAN_HANDOFF_LOG: handoffLog,
+        JACOBIAN_NPX_EXECUTABLE: npx,
+      });
+      assert.equal(result.status, 0, result.stderr);
+      assert.deepEqual(JSON.parse(await readFile(handoffLog, "utf8")), {
+        args: ["--yes", "--prefer-online", "jacobian@latest", "upgrade", "--yes"],
+        marker: "1",
+      });
     } finally {
       await rm(base, { recursive: true, force: true });
     }

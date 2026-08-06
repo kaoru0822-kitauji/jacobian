@@ -53,7 +53,7 @@ jacobian setup [--client <id>...] [--all] [--yes] [--dry-run] [--json]
                [--source <checkout> --state-dir <path> --profile <name>]
   Configure MCP clients to use Jacobian.
 jacobian upgrade
-  Refresh the launcher-managed Python package.
+  Resolve the latest npm bootstrap, then refresh the launcher-managed Python package.
 jacobian doctor [--json]
   Verify the MCP handshake and tool catalog.
 jacobian remove [--client <id>...] [--all] [--yes] [--json]
@@ -83,6 +83,8 @@ state initialization, source doctor, and client configuration workflow.
 - `JACOBIAN_STATE_DIR` — state directory (default: `./.jacobian`)
 - `JACOBIAN_PACKAGE` — Python package spec override (default: the Python package
   version matching the installed npm launcher)
+- `JACOBIAN_NPM_UPGRADE_HANDOFF` — internal one-time guard used while `upgrade`
+  resolves `jacobian@latest`
 - `JACOBIAN_DATA_DIR` — guided installer release data root
 - `JACOBIAN_BIN_DIR` — guided installer directory for the stable command
 

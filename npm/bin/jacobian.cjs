@@ -3,6 +3,9 @@
 "use strict";
 
 const { stderr } = require("node:process");
+const { spawn } = require("node:child_process");
+
+const NPM_UPGRADE_HANDOFF = "JACOBIAN_NPM_UPGRADE_HANDOFF";
 
 /**
  * Jacobian CLI entry point.
@@ -56,6 +59,62 @@ function reportSetupFailure(error) {
       "then retry `npx jacobian setup`.\n",
   );
   process.exitCode = 1;
+}
+
+/**
+ * Resolve the latest npm bootstrap before upgrading the managed Python package.
+ *
+ * An unqualified npx invocation can execute an older cached launcher. The
+ * handoff guard lets the latest package enter the pinned-runtime path once.
+ *
+ * @param {string[]} args
+ */
+function resolveLatestUpgrade(args) {
+  const executable =
+    process.env.JACOBIAN_NPX_EXECUTABLE ||
+    (process.platform === "win32" ? "npx.cmd" : "npx");
+  const child = spawn(
+    executable,
+    ["--yes", "--prefer-online", "jacobian@latest", "upgrade", ...args.slice(1)],
+    {
+      env: { ...process.env, [NPM_UPGRADE_HANDOFF]: "1" },
+      shell: process.platform === "win32",
+      stdio: "inherit",
+    },
+  );
+  const signals = ["SIGINT", "SIGTERM", "SIGHUP"];
+  const handlers = new Map(
+    signals.map((signal) => [
+      signal,
+      () => {
+        if (!child.killed) child.kill(signal);
+      },
+    ]),
+  );
+  for (const [signal, handler] of handlers) process.on(signal, handler);
+
+  const removeSignalHandlers = () => {
+    for (const [signal, handler] of handlers) {
+      process.removeListener(signal, handler);
+    }
+  };
+
+  child.once("error", (error) => {
+    removeSignalHandlers();
+    stderr.write(
+      `Jacobian could not resolve its latest npm bootstrap: ${error.message}\n` +
+        "Run `npx jacobian@latest upgrade` after checking that npx is available.\n",
+    );
+    process.exitCode = 1;
+  });
+  child.once("exit", (code, signal) => {
+    removeSignalHandlers();
+    if (signal) {
+      process.kill(process.pid, signal);
+      return;
+    }
+    process.exitCode = code ?? 1;
+  });
 }
 
 function main() {
@@ -152,6 +211,13 @@ function main() {
   }
 
   if (command === "upgrade") {
+    if (process.env[NPM_UPGRADE_HANDOFF] !== "1") {
+      stderr.write(
+        "Resolving the latest Jacobian bootstrap before upgrading the managed Python runtime.\n",
+      );
+      resolveLatestUpgrade(args);
+      return;
+    }
     const { PACKAGE_SPEC, upgrade } = require("./launcher.cjs");
     try {
       upgrade();
