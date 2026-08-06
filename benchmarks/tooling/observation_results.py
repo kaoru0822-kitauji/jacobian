@@ -216,7 +216,7 @@ def _trial_status(trial: dict[str, Any], exception: Any) -> str:
         return raw
     if exception is not None:
         return "ERROR"
-    if isinstance(raw, str) and raw != "COMPLETED":
+    if not isinstance(raw, str) or raw != "COMPLETED":
         return "ERROR"
     return "COMPLETED"
 

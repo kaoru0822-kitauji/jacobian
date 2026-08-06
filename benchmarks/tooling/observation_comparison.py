@@ -283,9 +283,9 @@ def compare_evidence(
         metric: _metric_report(metric, pairs, control_trials, treatment_trials)
         for metric in metric_names
     }
-    for metric in ("correctness", "false_certification"):
+    for metric in metric_names:
         if metrics[metric]["pair_count"] != len(pairs):
-            failures.append(f"core metric is missing from a complete pair: {metric}")
+            failures.append(f"metric is missing from a complete pair: {metric}")
     return {
         "schema_version": "1",
         "evidence_class": _derived_comparison_class(control, treatment),
