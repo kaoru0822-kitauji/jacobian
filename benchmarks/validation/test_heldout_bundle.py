@@ -458,7 +458,9 @@ def test_complete_plan_collects_exact_pairs_and_derives_heldout_report(
         result_root = plan_path.parent / run["jobs_dir"] / "job"
         result_root.mkdir(parents=True)
         result = {
+            "n_total_trials": 1,
             "stats": {
+                "n_completed_trials": 1,
                 "n_errored_trials": 0,
                 "n_running_trials": 0,
                 "n_pending_trials": 0,

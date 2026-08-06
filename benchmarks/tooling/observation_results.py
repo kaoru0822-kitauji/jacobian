@@ -134,6 +134,39 @@ def _object(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def _completed_job_stats(job_stats: dict[str, Any], observed_trial_count: int) -> bool:
+    if (
+        not isinstance(observed_trial_count, int)
+        or isinstance(observed_trial_count, bool)
+        or observed_trial_count <= 0
+    ):
+        return False
+    completed = job_stats.get("n_completed_trials")
+    total = job_stats.get("n_total_trials")
+    if (
+        not isinstance(completed, int)
+        or isinstance(completed, bool)
+        or completed <= 0
+        or not isinstance(total, int)
+        or isinstance(total, bool)
+        or total <= 0
+        or completed != total
+        or total != observed_trial_count
+    ):
+        return False
+    return all(
+        isinstance(job_stats.get(key), int)
+        and not isinstance(job_stats.get(key), bool)
+        and job_stats[key] == 0
+        for key in (
+            "n_errored_trials",
+            "n_running_trials",
+            "n_pending_trials",
+            "n_cancelled_trials",
+        )
+    )
+
+
 def _comparison_job(job: dict[str, Any]) -> dict[str, Any]:
     """Normalize only the frozen Jacobian treatment additions.
 
@@ -208,6 +241,7 @@ def _trial_status(
     exception: Any,
     *,
     job_stats: dict[str, Any] | None = None,
+    observed_trial_count: int | None = None,
 ) -> str:
     raw = trial.get("status")
     if exception is not None:
@@ -242,39 +276,21 @@ def _trial_status(
         "TIMEOUT",
         "CANCELLED",
     }:
+        if verifier_status == "COMPLETED" and (
+            job_stats is None
+            or observed_trial_count is None
+            or not _completed_job_stats(job_stats, observed_trial_count)
+        ):
+            return "ERROR"
         return verifier_status
     if verifier_status is not None:
         return "ERROR"
-    if job_stats is not None:
-        completed = job_stats.get("n_completed_trials")
-        total = job_stats.get("n_total_trials")
-        if (
-            isinstance(completed, int)
-            and not isinstance(completed, bool)
-            and isinstance(total, int)
-            and not isinstance(total, bool)
-            and completed == total
-            and all(
-                job_stats.get(key, 0) == 0
-                for key in (
-                    "n_errored_trials",
-                    "n_running_trials",
-                    "n_pending_trials",
-                    "n_cancelled_trials",
-                )
-            )
-        ):
-            return "COMPLETED"
-        if verifier_result and all(
-            job_stats.get(key, 0) == 0
-            for key in (
-                "n_errored_trials",
-                "n_running_trials",
-                "n_pending_trials",
-                "n_cancelled_trials",
-            )
-        ):
-            return "COMPLETED"
+    if (
+        job_stats is not None
+        and observed_trial_count is not None
+        and _completed_job_stats(job_stats, observed_trial_count)
+    ):
+        return "COMPLETED"
     return "ERROR"
 
 
@@ -288,6 +304,7 @@ def _normalize_trial(
     source_prefix: str | None = None,
     configured_artifacts: set[tuple[str, str | None]] | None = None,
     job_stats: dict[str, Any] | None = None,
+    observed_trial_count: int | None = None,
 ) -> tuple[dict[str, Any], list[str]]:
     agent_result = _object(trial.get("agent_result"))
     agent_info = _object(trial.get("agent_info"))
@@ -358,7 +375,12 @@ def _normalize_trial(
         "repetition": repetition,
         "trial_name": str(trial.get("trial_name", "")),
         "pair_id": None,
-        "status": _trial_status(trial, exception, job_stats=job_stats),
+        "status": _trial_status(
+            trial,
+            exception,
+            job_stats=job_stats,
+            observed_trial_count=observed_trial_count,
+        ),
         "exception_type": exception.get("exception_type")
         if isinstance(exception, dict)
         else None,
@@ -444,7 +466,13 @@ def _observation_failures(
         if expected_digests.get(trial["task"]) is not None
         and trial["task_digest"] != expected_digests[trial["task"]]
     )
-    stats = _object(payload.get("stats"))
+    stats = dict(_object(payload.get("stats")))
+    if "n_total_trials" not in stats:
+        stats["n_total_trials"] = payload.get("n_total_trials")
+    if not _completed_job_stats(stats, len(trials)):
+        failures.append(
+            "execution completion counts are missing, malformed, or disagree with observed trials"
+        )
     incomplete = any(
         stats.get(key, 0)
         for key in (
@@ -664,6 +692,7 @@ def build_observation_evidence(
             source_prefix=source_prefix,
             configured_artifacts=configured_artifacts,
             job_stats=job_stats,
+            observed_trial_count=len(raw_trials),
         )
         artifact_failures.extend(trial_artifact_failures)
         trials.append(normalized)
