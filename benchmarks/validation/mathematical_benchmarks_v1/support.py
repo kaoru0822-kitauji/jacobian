@@ -28,6 +28,7 @@ RATIONAL_TASK = "rational-linear-solution"
 # Do not auto-expand to every COMPUTED task; add a name only when that contract
 # is the intended coverage and no leaf already owns the smoke.
 RESOURCE_DERIVED_TASKS = (
+    "elementwise-fixed-no-global-invariant",
     "autoformalization-semantic-audit",
     "calendar-good-days-audit",
     "finite-magma-countermodel",
