@@ -6,12 +6,15 @@ from typing import Any, Self
 import pytest
 from pydantic import BaseModel, ConfigDict, model_validator
 
+import jacobian.schema_registry as schema_registry
+from jacobian.contracts.results import ResultEnvelope
 from jacobian.schema_registry import (
     SchemaRegistry,
     SchemaRegistryError,
     SchemaValidationError,
     model_schema,
 )
+from jacobian.storage.errors import StorageError
 from jacobian.storage.repository import ArtifactRepository
 
 
@@ -34,6 +37,17 @@ class _OrderedPair(BaseModel):
         if self.first >= self.second:
             raise ValueError("pair must be ordered")
         return self
+
+
+class _MalformedCustomizedSchema(BaseModel):
+    value: int
+
+    @classmethod
+    def model_json_schema(cls, **_kwargs: Any) -> dict[str, Any]:  # type: ignore[override]
+        return {"type": 17}
+
+
+_MalformedCustomizedSchema.__module__ = "jacobian.customized_test_model"
 
 
 def test_cached_model_schema_returns_independent_copies(
@@ -64,6 +78,51 @@ def test_external_dynamic_reference_is_rejected(tmp_path: Path) -> None:
             version="1",
             schema={"$dynamicRef": "https://example.test/schema"},
         )
+
+
+def test_customized_model_schema_is_validated_before_persistence(
+    tmp_path: Path,
+) -> None:
+    store = ArtifactRepository(tmp_path)
+    registry = SchemaRegistry(store)
+
+    with pytest.raises(SchemaRegistryError, match="invalid Draft"):
+        registry.register_model(
+            name="customized-invalid-schema",
+            version="1",
+            model=_MalformedCustomizedSchema,
+        )
+
+    uri = store.descriptor_uri(
+        kind="schema",
+        name="customized-invalid-schema",
+        version="1",
+        definition={"type": 17},
+    )
+    with pytest.raises(StorageError):
+        store.get_descriptor(uri, expected_kind="schema")
+
+
+def test_operator_owned_default_model_skips_redundant_meta_validation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def unexpected_meta_validation(_canonical_schema: bytes) -> None:
+        pytest.fail("default operator-owned Pydantic schema was revalidated")
+
+    monkeypatch.setattr(
+        schema_registry,
+        "_validated_schema",
+        unexpected_meta_validation,
+    )
+
+    uri = SchemaRegistry(ArtifactRepository(tmp_path)).register_model(
+        name="operator-owned-result-envelope",
+        version="1",
+        model=ResultEnvelope,
+    )
+
+    assert uri.startswith("artifact://sha256/")
 
 
 def test_schema_validator_cache_is_bound_to_canonical_schema(
