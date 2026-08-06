@@ -276,7 +276,10 @@ class TenantRuntimeRouter:
         except BaseException:
             with self._condition:
                 self._evictions_in_flight -= 1
-                self._runtimes[tenant_key] = entry
+                # Guard against overwriting a runtime that was created
+                # concurrently while this eviction was in flight.
+                if tenant_key not in self._runtimes:
+                    self._runtimes[tenant_key] = entry
                 self._condition.notify_all()
             raise
         with self._condition:
@@ -323,6 +326,7 @@ class TenantRuntimeRouter:
         if failures:
             with self._condition:
                 self._shutdown_in_flight = False
+                self._closing = False
                 self._condition.notify_all()
             raise ExceptionGroup(
                 "one or more tenant runtimes failed to close", failures

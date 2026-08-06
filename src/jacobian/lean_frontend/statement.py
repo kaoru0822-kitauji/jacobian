@@ -315,7 +315,12 @@ def _execute_lean_source(
     _require_current_runtime(provider_runtime)
     fd, temp_path = tempfile.mkstemp(suffix=".lean")
     try:
-        with os.fdopen(fd, "w") as handle:
+        try:
+            handle = os.fdopen(fd, "w")
+        except OSError:
+            os.close(fd)
+            raise
+        with handle:
             handle.write(source)
         lean_bin = executable or _lean_executable()
         environment = _lean_process_environment(lean_bin)

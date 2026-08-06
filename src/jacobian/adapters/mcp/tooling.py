@@ -49,7 +49,7 @@ async def _run_blocking[BlockingResultT](
         drained: BlockingResultT | None = None
         try:
             drained = await asyncio.shield(worker)
-        except Exception:
+        except BaseException:
             _LOGGER.debug(
                 "blocking MCP worker failed while its cancelled request drained",
                 exc_info=True,
