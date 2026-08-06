@@ -553,6 +553,11 @@ def load_registry(path: Path = REGISTRY_PATH) -> tuple[Suite, ...]:
     return result
 
 
+def invalidate_registry_cache() -> None:
+    """Drop cached registry entries so subsequent load_registry calls re-parse."""
+    _load_registry_cache.clear()
+
+
 def get_suite(dataset: str, *, path: Path = REGISTRY_PATH) -> Suite:
     short = dataset.removeprefix(DATASET_PREFIX)
     for suite in load_registry(path):
@@ -1085,6 +1090,7 @@ __all__ = [
     "iter_task_dirs",
     "load_environment_profiles",
     "load_registry",
+    "invalidate_registry_cache",
     "report_failures",
     "report_ok",
     "select_task_refs",

@@ -223,7 +223,7 @@ def _observation_pair_failures() -> list[str]:
     treatment = _read_json(treatment_path)
     control = _read_json(control_path)
     if not isinstance(treatment, dict) or not isinstance(control, dict):
-        return []
+        return ["observation/control pair contains malformed (non-object) JSON"]
 
     def normalized(value: dict[str, Any]) -> dict[str, Any]:
         copy: dict[str, Any] = json.loads(json.dumps(value))

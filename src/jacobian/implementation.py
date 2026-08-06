@@ -76,7 +76,18 @@ def install_source_only_importer(entrypoint: str) -> None:
     """Force the entrypoint package's future imports to compile measured source."""
 
     module_name, _ = split_entrypoint(entrypoint)
-    sys.meta_path.insert(0, _SourceOnlyFinder(module_name.split(".", 1)[0]))
+    top_level = module_name.split(".", 1)[0]
+    # Purge any pre-imported modules from the target package so the
+    # SourceOnlyFinder recompiles them from measured source.  Without
+    # this, already-imported modules in sys.modules would shadow the
+    # finder and serve potentially stale bytecode.
+    stale = [
+        name for name in list(sys.modules)
+        if name == top_level or name.startswith(top_level + ".")
+    ]
+    for name in stale:
+        del sys.modules[name]
+    sys.meta_path.insert(0, _SourceOnlyFinder(top_level))
 
 
 def split_entrypoint(entrypoint: str) -> tuple[str, str]:
