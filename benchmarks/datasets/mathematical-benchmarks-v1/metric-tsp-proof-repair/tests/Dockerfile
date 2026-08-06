@@ -2,7 +2,7 @@ FROM ghcr.io/astral-sh/uv:0.8.4-python3.12-bookworm-slim@sha256:dc7e1d08f8ca9798
 RUN python -m pip install --no-cache-dir attrs==26.1.0 jsonschema==4.26.0 jsonschema-specifications==2025.9.1 referencing==0.37.0 rpds-py==2026.6.3 typing-extensions==4.16.0
 # Exact finite optimization and proof-repair verifier.
 LABEL jacobian.task="jacobian/metric-tsp-proof-repair" \
-      jacobian.checksum="945bf6c773510ca20d2ddd805e4254c744b82a4f76cc5369153f4cce25300025"
+      jacobian.checksum="38630c899f8d23831ad02efe66ba6df0d7991d6dc8087bc5d4df9f3d71aa93c6"
 COPY expected.json input.json test.sh verifier.py verifier_support.py public_contract.json /tests/
 COPY input.json /app/input.json
 RUN chmod +x /tests/test.sh && \

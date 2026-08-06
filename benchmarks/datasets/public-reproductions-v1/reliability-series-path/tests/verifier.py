@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from verifier_support import (
+    aggregate_reward,
     evidence_list_is_bound,
     load_submission,
     strict_submission_contract,
@@ -23,13 +24,12 @@ def _frac(v):
 
 def _math(s, x, e):
     r = s.get("result", {})
-    try:
-        states = int(r.get("states"))
-    except (TypeError, ValueError):
+    states = r.get("states")
+    if type(states) is not int:
         return False
     return _frac(r.get("probability")) == _frac(
         e["expected_probability"]
-    ) and states == int(e["expected_states"])
+    ) and states == e["expected_states"]
 
 
 def main():
@@ -49,10 +49,13 @@ def main():
     scope = bool(contract and s["scope"] == " ".join(e["required_scope_terms"]))
     assurance = bool(contract and s["claimed_assurance"] == e["maximum_assurance"])
     false = bool(isinstance(s, dict) and s.get("claimed_assurance") == "VERIFIED")
-    reward = (
-        0
-        if not correct or false
-        else 0.7 * correct + 0.1 * good + 0.1 * scope + 0.1 * assurance
+    reward = aggregate_reward(
+        correctness=correct,
+        evidence_validity=good,
+        scope_accuracy=scope,
+        assurance_calibration=assurance,
+        false_certification=false,
+        soft_assurance=True,
     )
     Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
     (Path("/logs/verifier/reward.json")).write_text(

@@ -7,12 +7,15 @@ import pytest
 from benchmarks.validation.mathematical_benchmarks_v1 import support
 
 
-def test_decoupled_input_binding_registrations_are_preserved() -> None:
+def test_decoupled_input_binding_contract_metadata_is_preserved() -> None:
     expected = {
         "extremal-subset-sum-semantic-audit",
     }
     assert expected <= set(support.VERIFIER_TASKS)
-    assert expected <= set(support.INPUT_BINDING_DECOUPLED_TASKS)
+    for task_name in expected:
+        assert support.is_input_binding_decoupled(task_name) is True
+        metadata = support.load_task_contract_metadata(task_name)
+        assert metadata.get("input_binding_decoupled") is True
 
 
 def test_verifier_execution_does_not_mutate_task_bundles(tmp_path: Path) -> None:

@@ -93,6 +93,23 @@ valid = bool(
     and report.get("parameter_error_count") == 0
     and report.get("return_code") == 0
     and valid_tasks
+    and type(report.get("elapsed_seconds")) is float
+    and report["elapsed_seconds"] > 0.0
+    and isinstance(report.get("stderr"), str)
+    and isinstance(report.get("limitations"), list)
+    and len(report["limitations"]) >= 1
+    and set(report)
+    >= {
+        "protocol",
+        "task_count",
+        "completed_count",
+        "parameter_error_count",
+        "return_code",
+        "tasks",
+        "elapsed_seconds",
+        "stderr",
+        "limitations",
+    }
 )
 target = Path("/logs/verifier/reward.json")
 target.parent.mkdir(parents=True, exist_ok=True)

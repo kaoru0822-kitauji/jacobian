@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from verifier_support import (
+    aggregate_reward,
     evidence_list_is_bound,
 )
 from verifier_support import (
@@ -117,10 +118,13 @@ def main():
     math_correct = bool(valid and graph_ok(s["result"]))
     correct = bool(math_correct and not claimed_verified)
     false_cert = claimed_verified
-    reward = (
-        0.0
-        if not correct or not ev or false_cert
-        else 0.7 * correct + 0.1 * ev + 0.1 * scope + 0.1 * assurance
+    reward = aggregate_reward(
+        correctness=correct,
+        evidence_validity=ev,
+        scope_accuracy=scope,
+        assurance_calibration=assurance,
+        false_certification=false_cert,
+        soft_assurance=True,
     )
     (Path("/logs/verifier")).mkdir(parents=True, exist_ok=True)
     (Path("/logs/verifier/reward.json")).write_text(

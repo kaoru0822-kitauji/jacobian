@@ -75,6 +75,55 @@ def _evidence_failures(
             failures.append(
                 f"{_display(lock_path)}: {field} mismatch for {_display(evidence_path)}"
             )
+            continue
+        try:
+            payload = json.loads(evidence_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            failures.append(
+                f"{_display(lock_path)}: {_display(evidence_path)} is not JSON: {exc}"
+            )
+            continue
+        if not isinstance(payload, dict):
+            failures.append(
+                f"{_display(lock_path)}: {_display(evidence_path)} must be a JSON object"
+            )
+            continue
+        # Semantic provenance: digests inside evidence must match the lock's
+        # current output task digest, not only the evidence file hash.
+        expected_digest = output.get("task_digest")
+        declared = (
+            payload.get("task_digest")
+            or payload.get("output_task_digest")
+            or payload.get("source_task_digest")
+        )
+        if (
+            declared is not None
+            and expected_digest is not None
+            and declared != expected_digest
+        ):
+            failures.append(
+                f"{_display(lock_path)}: {_display(evidence_path)} task_digest "
+                f"{declared!r} does not match lock output task_digest "
+                f"{expected_digest!r}"
+            )
+        if filename == "parity-evidence.json":
+            if payload.get("task_digest_matches") is False:
+                failures.append(
+                    f"{_display(lock_path)}: {_display(evidence_path)} reports "
+                    "task_digest_matches=false"
+                )
+            for key in ("source_task_digest", "generated_task_digest", "task_digest"):
+                value = payload.get(key)
+                if (
+                    value is not None
+                    and expected_digest is not None
+                    and value != expected_digest
+                ):
+                    failures.append(
+                        f"{_display(lock_path)}: {_display(evidence_path)} {key} "
+                        f"{value!r} does not match lock output task_digest "
+                        f"{expected_digest!r}"
+                    )
     return failures
 
 

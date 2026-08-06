@@ -1,17 +1,17 @@
-"""Canonical fail-closed protocol helpers vendored into Harbor verifiers.
-
-This module uses only the Python standard library. Each task receives an
-identical copy in its hidden ``tests`` directory so the verifier remains
-self-contained and independent from production Jacobian code.
-"""
+"""Fail-closed protocol helpers for one self-contained Harbor verifier."""
 
 from __future__ import annotations
 
 import hashlib
 import json
+import math
 import stat
 from pathlib import Path
 from typing import Any, Literal
+
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import SchemaError
+from referencing.exceptions import Unresolvable
 
 WORKSPACE = Path("/app")
 TESTS = Path("/tests")
@@ -54,28 +54,90 @@ def sha256_uri(path: Path) -> str:
     return "sha256:" + digest.hexdigest()
 
 
-def load_submission(
-    path: Path = WORKSPACE / "submission.json",
+MAX_PUBLIC_CONTRACT_BYTES = 4 * 1024 * 1024
+
+
+def _reject_nonfinite_json(value: str) -> None:
+    raise ValueError(f"non-finite JSON number: {value}")
+
+
+def _finite_json_float(value: str) -> float:
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise ValueError(f"out-of-range JSON number: {value}")
+    return parsed
+
+
+def _load_public_contract(
+    path: Path = TESTS / "public_contract.json",
 ) -> dict[str, Any] | None:
-    """Parse a submission as one JSON object, rejecting malformed input.
-
-    Rejects symlinks, non-regular files, and oversized submissions before
-    reading so a malformed or hostile submission cannot OOM or block the
-    bounded verifier; such input yields a deterministic ``None`` (zero reward).
-
-    Does NOT gate on workspace input binding: the submission is parsed
-    independently so diagnostics remain distinguishable when the input is
-    tampered. Mathematical acceptance is gated on ``workspace_input_is_bound``
-    by the verifier.
-    """
-
-    if not is_regular_bounded_file(path, max_bytes=MAX_SUBMISSION_BYTES):
+    if not is_regular_bounded_file(path, max_bytes=MAX_PUBLIC_CONTRACT_BYTES):
         return None
     try:
-        value = json.loads(path.read_text())
+        contract = json.loads(
+            path.read_text(),
+            parse_constant=_reject_nonfinite_json,
+            parse_float=_finite_json_float,
+        )
     except (OSError, ValueError, RecursionError, MemoryError):
         return None
-    return value if isinstance(value, dict) else None
+    if not isinstance(contract, dict) or contract.get("schema_version") != "1":
+        return None
+    schema = contract.get("submission_schema")
+    if not isinstance(schema, dict):
+        return None
+    try:
+        Draft202012Validator.check_schema(schema)
+    except SchemaError:
+        return None
+    return contract
+
+
+def load_submission(
+    path: Path = WORKSPACE / "submission.json",
+    *,
+    require_input_binding: bool = True,
+) -> dict[str, Any] | None:
+    """Parse and completely validate one bounded submission object."""
+
+    if require_input_binding and not workspace_input_is_bound():
+        return None
+    if not is_regular_bounded_file(path, max_bytes=MAX_SUBMISSION_BYTES):
+        return None
+    contract = _load_public_contract()
+    if contract is None:
+        return None
+    try:
+        value = json.loads(
+            path.read_text(),
+            parse_constant=_reject_nonfinite_json,
+            parse_float=_finite_json_float,
+        )
+    except (OSError, ValueError, RecursionError, MemoryError, TypeError):
+        return None
+    return (
+        value
+        if isinstance(value, dict) and _public_submission_is_valid(value)
+        else None
+    )
+
+
+def _public_submission_is_valid(submission: object) -> bool:
+    contract = _load_public_contract()
+    if contract is None:
+        return False
+    schema = contract["submission_schema"]
+    try:
+        return Draft202012Validator(schema).is_valid(submission)
+    except (
+        SchemaError,
+        Unresolvable,
+        ValueError,
+        RecursionError,
+        MemoryError,
+        TypeError,
+    ):
+        return False
 
 
 def workspace_input_is_bound(
@@ -128,7 +190,8 @@ def strict_submission_contract(
         expected_fields.add(frozenset(SUBMISSION_FIELDS | {"verification_record_uri"}))
     limitations = submission.get("limitations", [])
     return bool(
-        frozenset(submission) in expected_fields
+        _public_submission_is_valid(submission)
+        and frozenset(submission) in expected_fields
         and submission.get("task_id") == task_id
         and submission.get("conclusion") == conclusion
         and submission.get("completeness") == completeness
@@ -283,6 +346,61 @@ def false_verified_claim(
     )
 
 
+def _as_unit_score(value: float | bool | int) -> float:
+    """Normalize a diagnostic to a unit interval score."""
+
+    if isinstance(value, bool):
+        return 1.0 if value else 0.0
+    score = float(value)
+    if score < 0.0 or score > 1.0 or score != score:  # NaN check
+        raise ValueError(f"diagnostic score out of unit interval: {value!r}")
+    return score
+
+
+def aggregate_reward(
+    *,
+    correctness: float | bool,
+    evidence_validity: float | bool,
+    scope_accuracy: float | bool = 1.0,
+    assurance_calibration: float | bool = 1.0,
+    false_certification: bool = False,
+    protocol_ok: bool = True,
+    require_scope: bool = True,
+    soft_assurance: bool = False,
+    soft_assurance_base: float = 0.9,
+    soft_assurance_weight: float = 0.1,
+) -> float:
+    """Compute fail-closed aggregate reward from independent diagnostics.
+
+    Mandatory hard gates (protocol, correctness, evidence, and required scope)
+    always force ``0.0`` when they fail, as does ``false_certification``.
+    When ``soft_assurance`` is false, assurance is also a hard gate and the
+    successful aggregate is ``1.0``. When ``soft_assurance`` is true and every
+    hard gate passes, the aggregate is
+    ``soft_assurance_base + soft_assurance_weight * assurance`` so under-
+    claimed assurance can receive documented partial credit without diluting
+    evidence or protocol failures.
+    """
+
+    if false_certification or not protocol_ok:
+        return 0.0
+    correctness_score = _as_unit_score(correctness)
+    evidence_score = _as_unit_score(evidence_validity)
+    scope_score = _as_unit_score(scope_accuracy)
+    assurance_score = _as_unit_score(assurance_calibration)
+    if correctness_score < 1.0 or evidence_score < 1.0:
+        return 0.0
+    if require_scope and scope_score < 1.0:
+        return 0.0
+    if not soft_assurance:
+        return 1.0 if assurance_score >= 1.0 else 0.0
+    if soft_assurance_base < 0.0 or soft_assurance_weight < 0.0:
+        raise ValueError("soft assurance weights must be non-negative")
+    if soft_assurance_base + soft_assurance_weight > 1.0 + 1e-12:
+        raise ValueError("soft assurance weights must not exceed 1.0 in total")
+    return soft_assurance_base + soft_assurance_weight * assurance_score
+
+
 __all__ = [
     "ASSURANCE_LEVELS",
     "MAX_INPUT_BYTES",
@@ -290,6 +408,7 @@ __all__ = [
     "SUBMISSION_FIELDS",
     "TESTS",
     "WORKSPACE",
+    "aggregate_reward",
     "authorized_record_is_bound",
     "evidence_list_is_bound",
     "false_verified_claim",

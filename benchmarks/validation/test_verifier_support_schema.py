@@ -132,3 +132,41 @@ def test_load_submission_enforces_the_complete_public_schema(
     monkeypatch.setattr(_VS, "_load_public_contract", lambda: contract)
 
     assert _VS.load_submission(submission, require_input_binding=False) is None
+
+
+def test_aggregate_reward_full_credit_when_hard_gates_pass() -> None:
+    assert (
+        _VS.aggregate_reward(
+            correctness=1.0,
+            evidence_validity=True,
+            scope_accuracy=1,
+            assurance_calibration=1.0,
+        )
+        == 1.0
+    )
+
+
+def test_aggregate_reward_zeros_on_invalid_evidence_even_when_math_passes() -> None:
+    assert (
+        _VS.aggregate_reward(
+            correctness=1.0,
+            evidence_validity=0.0,
+            scope_accuracy=1.0,
+            assurance_calibration=1.0,
+        )
+        == 0.0
+    )
+
+
+def test_aggregate_reward_soft_assurance_partial_after_hard_gates() -> None:
+    assert _VS.aggregate_reward(
+        correctness=1.0,
+        evidence_validity=1.0,
+        scope_accuracy=1.0,
+        assurance_calibration=0.0,
+        soft_assurance=True,
+    ) == pytest.approx(0.9)
+
+
+def test_template_exports_aggregate_reward() -> None:
+    assert "aggregate_reward" in _VS.__all__

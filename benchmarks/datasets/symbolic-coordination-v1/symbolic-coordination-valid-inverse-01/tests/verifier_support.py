@@ -374,7 +374,62 @@ def false_verified_claim(
     )
 
 
+def _as_unit_score(value: float | bool | int) -> float:
+    """Normalize a diagnostic to a unit interval score."""
+
+    if isinstance(value, bool):
+        return 1.0 if value else 0.0
+    score = float(value)
+    if score < 0.0 or score > 1.0 or score != score:  # NaN check
+        raise ValueError(f"diagnostic score out of unit interval: {value!r}")
+    return score
+
+
+def aggregate_reward(
+    *,
+    correctness: float | bool,
+    evidence_validity: float | bool,
+    scope_accuracy: float | bool = 1.0,
+    assurance_calibration: float | bool = 1.0,
+    false_certification: bool = False,
+    protocol_ok: bool = True,
+    require_scope: bool = True,
+    soft_assurance: bool = False,
+    soft_assurance_base: float = 0.9,
+    soft_assurance_weight: float = 0.1,
+) -> float:
+    """Compute fail-closed aggregate reward from independent diagnostics.
+
+    Mandatory hard gates (protocol, correctness, evidence, and required scope)
+    always force ``0.0`` when they fail, as does ``false_certification``.
+    When ``soft_assurance`` is false, assurance is also a hard gate and the
+    successful aggregate is ``1.0``. When ``soft_assurance`` is true and every
+    hard gate passes, the aggregate is
+    ``soft_assurance_base + soft_assurance_weight * assurance`` so under-
+    claimed assurance can receive documented partial credit without diluting
+    evidence or protocol failures.
+    """
+
+    if false_certification or not protocol_ok:
+        return 0.0
+    correctness_score = _as_unit_score(correctness)
+    evidence_score = _as_unit_score(evidence_validity)
+    scope_score = _as_unit_score(scope_accuracy)
+    assurance_score = _as_unit_score(assurance_calibration)
+    if correctness_score < 1.0 or evidence_score < 1.0:
+        return 0.0
+    if require_scope and scope_score < 1.0:
+        return 0.0
+    if not soft_assurance:
+        return 1.0 if assurance_score >= 1.0 else 0.0
+    if soft_assurance_base < 0.0 or soft_assurance_weight < 0.0:
+        raise ValueError("soft assurance weights must be non-negative")
+    if soft_assurance_base + soft_assurance_weight > 1.0 + 1e-12:
+        raise ValueError("soft assurance weights must not exceed 1.0 in total")
+    return soft_assurance_base + soft_assurance_weight * assurance_score
+
 __all__ = [
+    "aggregate_reward",
     "ASSURANCE_LEVELS",
     "MAX_INPUT_BYTES",
     "MAX_SUBMISSION_BYTES",

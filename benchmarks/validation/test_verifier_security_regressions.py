@@ -159,6 +159,11 @@ def _lean_case(tmp_path: Path, tasks: list[dict]):
         "parameter_error_count": 0,
         "return_code": 0,
         "tasks": tasks,
+        "elapsed_seconds": 0.042,
+        "stderr": "",
+        "limitations": [
+            "completed tactic states cannot be replayed into the originating command",
+        ],
     }
     report_path = app / "evidence" / "provider-report.json"
     _write_json(report_path, report)
