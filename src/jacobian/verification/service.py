@@ -400,11 +400,7 @@ class VerificationService:
                 arithmetic=decision.arithmetic,
                 method=decision.method,
                 coverage=decision.coverage,
-                verification=(
-                    Verification.VERIFIED
-                    if decision.conclusion == Conclusion.TRUE
-                    else Verification.UNVERIFIED
-                ),
+                verification=Verification.VERIFIED,
                 checker_id=checker.checker_id,
                 checker_digest=checker.executable_digest,
                 scope_uri=scope.artifact_uri if scope is not None else None,
@@ -692,11 +688,7 @@ class VerificationService:
                 arithmetic=decision.arithmetic,
                 method=decision.method,
                 coverage=decision.coverage,
-                verification=(
-                    Verification.VERIFIED
-                    if decision.conclusion == Conclusion.TRUE
-                    else Verification.UNVERIFIED
-                ),
+                verification=Verification.VERIFIED,
                 checker_id=checker.checker_id,
                 checker_digest=checker.executable_digest,
                 scope_uri=scope.artifact_uri if scope is not None else None,
@@ -915,11 +907,7 @@ class VerificationService:
                 arithmetic=decision.arithmetic,
                 method=decision.method,
                 coverage=decision.coverage,
-                verification=(
-                    Verification.VERIFIED
-                    if decision.conclusion == Conclusion.TRUE
-                    else Verification.UNVERIFIED
-                ),
+                verification=Verification.VERIFIED,
                 checker_id=checker.checker_id,
                 checker_digest=checker.executable_digest,
                 scope_uri=transformation_uri,
@@ -1125,11 +1113,7 @@ class VerificationService:
                 arithmetic=decision.arithmetic,
                 method=decision.method,
                 coverage=decision.coverage,
-                verification=(
-                    Verification.VERIFIED
-                    if decision.conclusion == Conclusion.TRUE
-                    else Verification.UNVERIFIED
-                ),
+                verification=Verification.VERIFIED,
                 checker_id=checker.checker_id,
                 checker_digest=checker.executable_digest,
             )
