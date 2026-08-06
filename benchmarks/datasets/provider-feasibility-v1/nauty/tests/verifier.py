@@ -49,9 +49,7 @@ def _execution_bound(report: object) -> bool:
     limitations = report.get("limitations")
     if not isinstance(limitations, list) or not limitations:
         return False
-    if set(report) <= {"contract", "status", "conclusion", "assurance"}:
-        return False
-    return True
+    return set(report) > {"contract", "status", "conclusion", "assurance"}
 
 
 valid = bool(
