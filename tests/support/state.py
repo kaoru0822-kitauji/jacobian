@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import tempfile
 from collections.abc import Callable
@@ -97,7 +98,12 @@ def publish_template(
 
 
 def copy_template(template: Path, destination: Path) -> Path:
-    """Copy an immutable template into a new mutable per-test directory."""
+    """Copy an immutable template into a new mutable per-test directory.
+
+    Blobs under ``blobs/`` are content-addressed and immutable, so they are
+    hardlinked instead of copied.  This avoids copying ~7 MB of blob data per
+    test across 80+ composition tests — a significant I/O reduction.
+    """
 
     template = Path(template)
     destination = Path(destination)
@@ -105,6 +111,33 @@ def copy_template(template: Path, destination: Path) -> Path:
         raise FileNotFoundError(f"template directory does not exist: {template}")
     if destination.exists():
         raise FileExistsError(f"mutable test state already exists: {destination}")
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(template, destination)
+    destination.mkdir(parents=True, exist_ok=True)
+
+    # Copy everything except the blobs directory with a normal recursive copy,
+    # then hardlink the content-addressed blobs.
+    for entry in os.scandir(template):
+        src = Path(entry.path)
+        dst = destination / entry.name
+        if entry.name == "blobs":
+            _hardlink_tree(src, dst)
+        elif entry.is_dir():
+            shutil.copytree(src, dst)
+        else:
+            shutil.copy2(src, dst)
     return destination
+
+
+def _hardlink_tree(src: Path, dst: Path) -> None:
+    """Recursively hardlink all files from *src* into *dst*."""
+
+    dst.mkdir(parents=True, exist_ok=True)
+    for entry in os.scandir(src):
+        s = Path(entry.path)
+        d = dst / entry.name
+        if entry.is_dir(follow_symlinks=False):
+            _hardlink_tree(s, d)
+        elif entry.is_file(follow_symlinks=False):
+            os.link(s, d)
+        else:
+            # Fallback for any unusual file types.
+            shutil.copy2(s, d)
