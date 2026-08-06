@@ -97,7 +97,9 @@ def _usage(result_path: Path) -> tuple[int, float]:
     if not isinstance(result, dict):
         raise HarborSuiteError("Harbor result must be an object")
     stats = result.get("stats")
-    if isinstance(stats, dict) and any(
+    if not isinstance(stats, dict):
+        raise HarborSuiteError("Harbor result stats must be an object")
+    if any(
         stats.get(key, 0)
         for key in (
             "n_errored_trials",
