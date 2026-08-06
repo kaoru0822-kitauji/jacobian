@@ -76,6 +76,8 @@ def plan_outputs() -> dict[str, str]:
 
 
 def shard_count(suite: str = "domain") -> int:
+    if suite == "benchmark":
+        return 4
     return int(plan_outputs()[f"{suite}-shard-count"])
 
 
@@ -106,7 +108,7 @@ def test_prepare_falls_back_to_equal_weighting_without_github_context(
     assert "equal weighting" in result.stderr
 
 
-@pytest.mark.parametrize("suite", ["domain", "composition"])
+@pytest.mark.parametrize("suite", ["domain", "composition", "benchmark"])
 def test_merge_publishes_versioned_metadata_and_all_shards(
     tmp_path: Path, suite: str
 ) -> None:
@@ -114,8 +116,9 @@ def test_merge_publishes_versioned_metadata_and_all_shards(
     inputs: list[str] = []
     for shard in range(1, count + 1):
         path = tmp_path / f"shard-{shard}.json"
+        prefix = "benchmarks/validation" if suite == "benchmark" else f"tests/{suite}"
         path.write_text(
-            json.dumps({f"tests/{suite}/test_{shard}.py::test_case": shard}),
+            json.dumps({f"{prefix}/test_{shard}.py::test_case": shard}),
             encoding="utf-8",
         )
         inputs.extend(["--input", str(path)])

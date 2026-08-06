@@ -26,14 +26,22 @@ from benchmarks.tooling.command_runner import (  # noqa: E402
 
 RUFF_TARGETS = (
     "benchmarks",
+    "tools/benchmark_pr_status.py",
     "tools/check_benchmark_static.py",
     "tools/harbor_task_workflow.py",
+    "tools/pytest_lifecycle.py",
 )
 MYPY_TARGETS = (
+    "benchmarks/tooling/benchmark_timings.py",
+    "benchmarks/tooling/benchmark_validation.py",
+    "benchmarks/tooling/host_validation.py",
+    "benchmarks/tooling/validation_plan.py",
+    "tools/benchmark_pr_status.py",
     "tools/check_benchmark_adapters.py",
     "tools/check_benchmark_contracts.py",
     "tools/check_benchmark_static.py",
     "tools/harbor_task_workflow.py",
+    "tools/pytest_lifecycle.py",
 )
 
 

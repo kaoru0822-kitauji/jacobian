@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ from benchmarks.tooling.command_runner import (
     git_head_sha,
     operator_environment,
     run_operator_command,
+    run_tool_command,
 )
 
 
@@ -88,3 +90,104 @@ def test_operator_command_has_bounded_output(tmp_path: Path) -> None:
     )
     assert result.status is ToolCommandStatus.OUTPUT_LIMIT_EXCEEDED
     assert len(result.stdout) <= 32
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX executable path fixture")
+def test_tool_command_streams_stdout_and_stderr_before_exit(tmp_path: Path) -> None:
+    stdout = bytearray()
+    stderr = bytearray()
+    delivered = threading.Event()
+
+    def receive_stdout(block: bytes) -> None:
+        stdout.extend(block)
+        delivered.set()
+
+    request = ToolCommandRequest(
+        executable=sys.executable,
+        arguments=(
+            "-c",
+            "import sys,time; print('live', flush=True); "
+            "print('warning', file=sys.stderr, flush=True); time.sleep(0.5)",
+        ),
+        cwd=str(tmp_path),
+        timeout_seconds=5.0,
+        stdout_limit_bytes=128,
+        stderr_limit_bytes=128,
+        stdout_sink=receive_stdout,
+        stderr_sink=stderr.extend,
+    )
+    result_box: list[ToolCommandResult] = []
+    runner = threading.Thread(
+        target=lambda: result_box.append(run_tool_command(request))
+    )
+
+    runner.start()
+    assert delivered.wait(timeout=2.0)
+    assert runner.is_alive()
+    runner.join(timeout=5.0)
+
+    assert not runner.is_alive()
+    assert result_box[0].status is ToolCommandStatus.EXITED
+    assert stdout == b"live\n"
+    assert stderr == b"warning\n"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX executable path fixture")
+def test_streamed_output_remains_bounded(tmp_path: Path) -> None:
+    streamed = bytearray()
+    result = run_tool_command(
+        ToolCommandRequest(
+            executable=sys.executable,
+            arguments=("-c", "print('x' * 10000, flush=True)"),
+            cwd=str(tmp_path),
+            timeout_seconds=5.0,
+            stdout_limit_bytes=32,
+            stderr_limit_bytes=32,
+            stdout_sink=streamed.extend,
+        )
+    )
+
+    assert result.status is ToolCommandStatus.OUTPUT_LIMIT_EXCEEDED
+    assert streamed == result.stdout
+    assert len(streamed) == 32
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX executable path fixture")
+def test_tool_command_timeout_is_preserved_with_streaming(tmp_path: Path) -> None:
+    streamed = bytearray()
+    result = run_tool_command(
+        ToolCommandRequest(
+            executable=sys.executable,
+            arguments=("-c", "import time; print('ready', flush=True); time.sleep(5)"),
+            cwd=str(tmp_path),
+            timeout_seconds=0.5,
+            stdout_limit_bytes=128,
+            stderr_limit_bytes=128,
+            stdout_sink=streamed.extend,
+        )
+    )
+
+    assert result.status is ToolCommandStatus.TIMED_OUT
+    assert streamed == b"ready\n"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX executable path fixture")
+def test_sink_failure_stops_the_tool_process(tmp_path: Path) -> None:
+    def reject_output(_block: bytes) -> None:
+        raise RuntimeError("sink unavailable")
+
+    result = run_tool_command(
+        ToolCommandRequest(
+            executable=sys.executable,
+            arguments=("-c", "import time; print('ready', flush=True); time.sleep(5)"),
+            cwd=str(tmp_path),
+            timeout_seconds=4.0,
+            stdout_limit_bytes=128,
+            stderr_limit_bytes=128,
+            stdout_sink=reject_output,
+        )
+    )
+
+    assert result.status is ToolCommandStatus.STREAM_FAILED
+    assert result.exit_code is None
+    assert result.diagnostic == "stdout sink failed: RuntimeError"

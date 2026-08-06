@@ -4,13 +4,18 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
+import sys
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from benchmarks.tooling.receipts import canonical_json, digest_bytes  # noqa: E402
+
 EVENTS = {"pull_request", "merge_group", "push", "schedule", "workflow_dispatch"}
 SHA = re.compile(r"[0-9a-f]{40,64}\Z")
 MAX_PATHS = 10_000
@@ -22,13 +27,7 @@ def fail(message: str) -> None:
 
 
 def _sha256(payload: bytes) -> str:
-    return "sha256:" + hashlib.sha256(payload).hexdigest()
-
-
-def _canonical_json(value: Any) -> bytes:
-    return (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode(
-        "utf-8"
-    )
+    return digest_bytes(payload)
 
 
 def _relative_path(value: str, label: str) -> str:
@@ -131,7 +130,7 @@ def build_receipt(
         ),
         "plan": plan,
     }
-    receipt["receipt_digest"] = _sha256(_canonical_json(receipt))
+    receipt["receipt_digest"] = _sha256(canonical_json(receipt))
     return receipt
 
 

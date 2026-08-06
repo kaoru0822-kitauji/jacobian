@@ -16,7 +16,7 @@ import signal
 import subprocess
 import threading
 import time
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from contextlib import suppress
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -46,6 +46,7 @@ class ToolCommandStatus(StrEnum):
     TIMED_OUT = "TIMED_OUT"
     CANCELLED = "CANCELLED"
     OUTPUT_LIMIT_EXCEEDED = "OUTPUT_LIMIT_EXCEEDED"
+    STREAM_FAILED = "STREAM_FAILED"
     START_FAILED = "START_FAILED"
 
 
@@ -62,6 +63,12 @@ class ToolCommandRequest:
     stdout_limit_bytes: int = 0
     stderr_limit_bytes: int = 0
     cancellation_event: threading.Event | None = None
+    stdout_sink: Callable[[bytes], None] | None = field(
+        default=None, compare=False, repr=False
+    )
+    stderr_sink: Callable[[bytes], None] | None = field(
+        default=None, compare=False, repr=False
+    )
 
     def __post_init__(self) -> None:
         self._validate_command()
@@ -96,6 +103,10 @@ class ToolCommandRequest:
             self.cancellation_event, threading.Event
         ):
             raise TypeError("cancellation_event must be a threading.Event or None")
+        for name in ("stdout_sink", "stderr_sink"):
+            sink = getattr(self, name)
+            if sink is not None and not callable(sink):
+                raise TypeError(f"{name} must be callable or None")
 
 
 @dataclass(frozen=True, slots=True)
@@ -198,14 +209,29 @@ def operator_environment(
 
 
 def _read_stream(
-    stream: object, target: bytearray, limit: int, exceeded: threading.Event
+    stream: object,
+    target: bytearray,
+    limit: int,
+    exceeded: threading.Event,
+    sink: Callable[[bytes], None] | None,
+    sink_name: str,
+    sink_failure: queue.Queue[tuple[str, str]],
 ) -> None:
+    read = getattr(stream, "read1", None) or stream.read  # type: ignore[attr-defined]
     while True:
-        block = stream.read(65_536)  # type: ignore[attr-defined]
+        block = read(65_536)
         if not block:
             return
         remaining = max(0, limit - len(target))
-        target.extend(block[:remaining])
+        accepted = block[:remaining]
+        target.extend(accepted)
+        if accepted and sink is not None:
+            try:
+                sink(bytes(accepted))
+            except Exception as exc:
+                with suppress(queue.Full):
+                    sink_failure.put_nowait((sink_name, type(exc).__name__))
+                return
         if len(block) > remaining:
             exceeded.set()
             return
@@ -257,6 +283,7 @@ def _poll_tool_status(
     request: ToolCommandRequest,
     stdout_overflow: threading.Event,
     stderr_overflow: threading.Event,
+    sink_failure: queue.Queue[tuple[str, str]],
     deadline: float,
 ) -> ToolCommandStatus:
     while process.poll() is None:
@@ -267,6 +294,8 @@ def _poll_tool_status(
             return ToolCommandStatus.CANCELLED
         if stdout_overflow.is_set() or stderr_overflow.is_set():
             return ToolCommandStatus.OUTPUT_LIMIT_EXCEEDED
+        if not sink_failure.empty():
+            return ToolCommandStatus.STREAM_FAILED
         if time.monotonic() >= deadline:
             return ToolCommandStatus.TIMED_OUT
         time.sleep(0.01)
@@ -287,10 +316,44 @@ def run_tool_command(
             stderr=b"",
             diagnostic=process[1],
         )
-    stdout = bytearray()
-    stderr = bytearray()
-    stdout_overflow = threading.Event()
-    stderr_overflow = threading.Event()
+    stdout, stderr, stdout_overflow, stderr_overflow, sink_failure, readers = (
+        _start_stream_readers(process, request)
+    )
+    _start_input_writer(process, request.stdin_bytes)
+    deadline = time.monotonic() + request.timeout_seconds
+    status = _poll_tool_status(
+        process,
+        request,
+        stdout_overflow,
+        stderr_overflow,
+        sink_failure,
+        deadline,
+    )
+    return _finish_tool_process(
+        process,
+        status=status,
+        readers=readers,
+        stdout=stdout,
+        stderr=stderr,
+        stdout_overflow=stdout_overflow,
+        stderr_overflow=stderr_overflow,
+        sink_failure=sink_failure,
+    )
+
+
+def _start_stream_readers(
+    process: subprocess.Popen[bytes], request: ToolCommandRequest
+) -> tuple[
+    bytearray,
+    bytearray,
+    threading.Event,
+    threading.Event,
+    queue.Queue[tuple[str, str]],
+    tuple[threading.Thread, threading.Thread],
+]:
+    stdout, stderr = bytearray(), bytearray()
+    stdout_overflow, stderr_overflow = threading.Event(), threading.Event()
+    sink_failure: queue.Queue[tuple[str, str]] = queue.Queue(maxsize=1)
     readers = (
         threading.Thread(
             target=_read_stream,
@@ -299,6 +362,9 @@ def run_tool_command(
                 stdout,
                 request.stdout_limit_bytes,
                 stdout_overflow,
+                request.stdout_sink,
+                "stdout",
+                sink_failure,
             ),
             daemon=True,
         ),
@@ -309,26 +375,41 @@ def run_tool_command(
                 stderr,
                 request.stderr_limit_bytes,
                 stderr_overflow,
+                request.stderr_sink,
+                "stderr",
+                sink_failure,
             ),
             daemon=True,
         ),
     )
     for reader in readers:
         reader.start()
+    return stdout, stderr, stdout_overflow, stderr_overflow, sink_failure, readers
 
+
+def _start_input_writer(process: subprocess.Popen[bytes], stdin_bytes: bytes) -> None:
     def write_input() -> None:
         try:
             assert process.stdin is not None
-            process.stdin.write(request.stdin_bytes)
+            process.stdin.write(stdin_bytes)
             process.stdin.close()
         except (BrokenPipeError, OSError):
             pass
 
     threading.Thread(target=write_input, daemon=True).start()
-    deadline = time.monotonic() + request.timeout_seconds
-    status = _poll_tool_status(
-        process, request, stdout_overflow, stderr_overflow, deadline
-    )
+
+
+def _finish_tool_process(
+    process: subprocess.Popen[bytes],
+    *,
+    status: ToolCommandStatus,
+    readers: tuple[threading.Thread, threading.Thread],
+    stdout: bytearray,
+    stderr: bytearray,
+    stdout_overflow: threading.Event,
+    stderr_overflow: threading.Event,
+    sink_failure: queue.Queue[tuple[str, str]],
+) -> ToolCommandResult:
     if status is not ToolCommandStatus.EXITED:
         _kill_tool_process_tree(process)
     try:
@@ -349,10 +430,15 @@ def run_tool_command(
             )
     for reader in readers:
         reader.join(timeout=1.0)
-    if status is ToolCommandStatus.EXITED and (
-        stdout_overflow.is_set() or stderr_overflow.is_set()
-    ):
-        status = ToolCommandStatus.OUTPUT_LIMIT_EXCEEDED
+    if status is ToolCommandStatus.EXITED:
+        if stdout_overflow.is_set() or stderr_overflow.is_set():
+            status = ToolCommandStatus.OUTPUT_LIMIT_EXCEEDED
+        elif not sink_failure.empty():
+            status = ToolCommandStatus.STREAM_FAILED
+    diagnostic = None
+    if status is ToolCommandStatus.STREAM_FAILED:
+        sink_name, exception_name = sink_failure.get_nowait()
+        diagnostic = f"{sink_name} sink failed: {exception_name}"
     return ToolCommandResult(
         status=status,
         exit_code=process.returncode if status is ToolCommandStatus.EXITED else None,
@@ -360,6 +446,7 @@ def run_tool_command(
         stderr=bytes(stderr),
         stdout_exceeded=stdout_overflow.is_set(),
         stderr_exceeded=stderr_overflow.is_set(),
+        diagnostic=diagnostic,
     )
 
 

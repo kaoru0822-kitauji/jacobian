@@ -8,6 +8,7 @@ HARBOR_PROJECT_PYTHON ?= uv run --locked --with harbor==$(HARBOR_VERSION) --with
 # Validation pytest is process-isolated under xdist; Path monkeypatches stay
 # worker-local. Oracle/adapter Make targets remain serial.
 HARBOR_VALIDATION_WORKERS ?= 2
+HARBOR_VALIDATION_TOTAL_WORKERS ?= 4
 PYTEST_ARGS ?=
 TESTS ?=
 EVAL_ARGS ?=
@@ -16,6 +17,7 @@ ORDERING_DEFAULT_SEED := --randomly-seed=17
 PYTEST_DIAGNOSTIC_ARGS ?= --durations=10
 RUFF_PATHS := src tests benchmarks
 TOPOLOGY_RUNNER := $(UV_RUN) python tools/test_topology.py
+PYTEST_RUNNER := $(UV_RUN) python tools/pytest_lifecycle.py
 PUBLIC_COMMANDS := help setup check check-changed ci-plan test-plan test-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e docs-command-check docs-linkcheck harbor-plan harbor-prepare-task harbor-validate-task harbor-execution-check harbor-check-task harbor-oracle-task npm-test test-all-ci check-static deploy-check
 
 ifneq ($(strip $(PATHS)),)
@@ -27,7 +29,7 @@ endif
 # in pyproject.toml: direct pytest invocations must not silently inherit a
 # signal-based deadline that cannot interrupt a native solver.  Process and
 # provider lanes run risky work in killable children and set their own deadline.
-.PHONY: help help-all uv-version-check setup setup-agent container-image eval-image eval-image-pull eval-image-bind hooks fix lint complexity-check lint-full security-audit typecheck test-architecture architecture ci-plan test-plan test-changed check-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static harbor-plan harbor-prepare-task harbor-validate-task harbor-sync harbor-contracts harbor-execution-check harbor-adapter-checks harbor-validation-tests harbor-validate harbor-check harbor-check-task benchmark-inventory benchmark-snapshot benchmark-snapshot-validate benchmark-publish harbor-oracle harbor-oracle-task harbor-oracle-run harbor-oracle-all harbor-adapter-check heldout-validate heldout-render heldout-smoke agent-eval agent-eval-validate agent-eval-compare codex-visibility provider-eval clean docs-command-check docs-linkcheck deploy-check
+.PHONY: help help-all uv-version-check setup setup-agent container-image eval-image eval-image-pull eval-image-bind hooks fix lint complexity-check lint-full security-audit typecheck test-architecture architecture ci-plan test-plan test-changed check-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static harbor-plan harbor-prepare-task harbor-validate-task harbor-sync harbor-contracts harbor-execution-check harbor-adapter-checks harbor-validation-tests harbor-host-validation harbor-validate harbor-check harbor-check-task benchmark-inventory benchmark-snapshot benchmark-snapshot-validate benchmark-publish harbor-oracle harbor-oracle-task harbor-oracle-run harbor-oracle-all harbor-adapter-check heldout-validate heldout-render heldout-smoke agent-eval agent-eval-validate agent-eval-compare codex-visibility provider-eval clean docs-command-check docs-linkcheck deploy-check
 
 help: ## Show available developer commands.
 	@awk -v public="$(PUBLIC_COMMANDS)" 'BEGIN {FS = ":.*## "; n = split(public, names, " "); for (i = 1; i <= n; i++) wanted[names[i]] = 1; printf "Jacobian common developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / && ($$1 in wanted) {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -66,7 +68,7 @@ eval-image-bind: ## Bind image identity into RUNTIME_SNAPSHOT (JACOBIAN_IMAGE=..
 
 deploy-check: ## Validate the clone-to-systemd deployment entrypoint.
 	bash -n deploy/install.sh
-	$(UV_RUN) pytest -n 0 tests/boundary/process/tooling/test_deploy_installer.py
+	$(PYTEST_RUNNER) --name deploy-check -- -n 0 tests/boundary/process/tooling/test_deploy_installer.py
 
 hooks: setup ## Install pre-commit hooks.
 	$(UV_RUN) pre-commit install --install-hooks
@@ -197,7 +199,7 @@ test-e2e: ## Run complete user-visible CLI/workflow scenarios serially.
 	$(call run_topology_lane,e2e)
 
 test-compatibility: ## Run the small supported-version import/API compatibility smoke suite.
-	$(UV_RUN) pytest -n 0 --timeout=30 --timeout-method=thread tests/unit/tooling/test_ci_compatibility.py $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
+	$(PYTEST_RUNNER) --name compatibility -- -n 0 --timeout=30 --timeout-method=thread tests/unit/tooling/test_ci_compatibility.py $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 test-affected: test-changed ## Compatibility alias for the changed-path planner.
 
@@ -214,7 +216,7 @@ test-all-ci: ## Explicitly run every semantic lane locally (exceptional).
 	$(MAKE) test-e2e
 
 test-stress: ## Repeat explicitly marked property tests on the scheduled lane.
-	$(UV_RUN) pytest -n 0 --timeout=120 --timeout-method=thread -m property --count=$(STRESS_COUNT) \
+	$(PYTEST_RUNNER) --name stress -- -n 0 --timeout=120 --timeout-method=thread -m property --count=$(STRESS_COUNT) \
 		$(if $(TESTS),$(TESTS),tests) $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 test-ordering: ## Reproduce scheduled ordering (default seed 17; override with PYTEST_ARGS).
@@ -329,7 +331,7 @@ harbor-contracts: ## Check Harbor sync, task topology, schemas, and generated re
 	$(HARBOR_PYTHON) tools/check_benchmark_contracts.py
 
 harbor-execution-check: harbor-contracts ## Check Harbor jobs, MCP config, Compose, and execution helpers.
-	$(UV_RUN) pytest -n 0 tests/unit/tooling/test_harbor*.py \
+	$(PYTEST_RUNNER) --name harbor-execution -- -n 0 tests/unit/tooling/test_harbor*.py \
 		$(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 harbor-adapter-checks: ## Check every repository-owned Harbor adapter.
@@ -340,10 +342,14 @@ harbor-adapter-checks: ## Check every repository-owned Harbor adapter.
 	done
 
 harbor-validation-tests: ## Run Harbor's host-side validation test suite.
-	$(UV_RUN) pytest -n $(HARBOR_VALIDATION_WORKERS) \
+	$(PYTEST_RUNNER) --name "$(or $(PYTEST_RUN_NAME),harbor-validation)" -- -n $(HARBOR_VALIDATION_WORKERS) \
 		$(PYTEST_DIAGNOSTIC_ARGS) $(if $(TESTS),$(TESTS),benchmarks/validation) $(PYTEST_ARGS)
 
-harbor-validate: harbor-contracts harbor-adapter-checks harbor-validation-tests ## Run all repository-owned Harbor checks under the pinned Harbor runtime.
+harbor-host-validation: ## Run the full host suite in timing-balanced local shards.
+	$(UV_RUN) python -m benchmarks.tooling.host_validation run-full \
+		--total-workers $(HARBOR_VALIDATION_TOTAL_WORKERS) --max-parallel 4
+
+harbor-validate: harbor-contracts harbor-adapter-checks harbor-host-validation ## Run all repository-owned Harbor checks under the pinned Harbor runtime.
 
 harbor-check: harbor-validate ## Run Harbor topology, digest, provenance, and host-side validation checks.
 
