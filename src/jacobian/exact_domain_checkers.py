@@ -818,7 +818,9 @@ def _checker_supports(operation_id: str, payload: object) -> bool:
         "polynomial.compute.resultant": ("left", "right"),
         "polynomial.compute.discriminant": ("polynomial",),
         "polynomial.compute.square_free_decomposition": ("polynomial",),
-    }[operation_id]
+    }.get(operation_id)
+    if polynomial_fields is None:
+        return False
     return all(
         isinstance(payload.get(field), dict)
         and payload[field].get("variables")
