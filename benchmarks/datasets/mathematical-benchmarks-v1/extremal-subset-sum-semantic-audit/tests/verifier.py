@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 from verifier_support import (
+    MAX_SUBMISSION_BYTES,
     evidence_list_is_bound,
     false_verified_claim,
     is_regular_bounded_file,
@@ -232,8 +233,21 @@ def _evidence_matches(evidence, result):
         return False
 
 
+def _raw_submission():
+    """Parse the bounded submission without applying the public schema."""
+    path = W / "submission.json"
+    if not is_regular_bounded_file(path, max_bytes=MAX_SUBMISSION_BYTES):
+        return None
+    try:
+        value = json.loads(path.read_text())
+    except (OSError, ValueError, UnicodeError, RecursionError, MemoryError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
 def main():
-    submission = load_submission()
+    raw = _raw_submission()
+    submission = load_submission(require_input_binding=False)
     source = _frozen_source()
     expected = json.loads((E / "expected.json").read_text())
     input_bound = workspace_input_is_bound(W / "input.json", tests=E)
@@ -244,24 +258,24 @@ def main():
         allowed_assurances=ALLOWED_ASSURANCES,
         verification_record="forbidden",
     )
-    result = submission.get("result") if isinstance(submission, dict) else None
+    result = raw.get("result") if isinstance(raw, dict) else None
     math_correct = bool(_valid_audit(result, source))
     evidence_valid = bool(
-        isinstance(submission, dict)
-        and _evidence_matches(submission.get("evidence"), submission.get("result"))
+        isinstance(raw, dict)
+        and _evidence_matches(raw.get("evidence"), raw.get("result"))
     )
     scope_correct = bool(
-        contract and submission.get("scope") == expected["required_scope"]
+        contract
+        and isinstance(raw, dict)
+        and raw.get("scope") == expected["required_scope"]
     )
     assurance_correct = bool(
-        contract
-        and submission.get("claimed_assurance") == expected["maximum_assurance"]
+        isinstance(raw, dict)
+        and raw.get("claimed_assurance") == expected["maximum_assurance"]
     )
-    limitations = submission.get("limitations", []) if contract else []
+    limitations = raw.get("limitations", []) if isinstance(raw, dict) else []
     limitations_correct = _limitations_valid(limitations)
-    false_certification = false_verified_claim(
-        submission, verification_record_bound=False
-    )
+    false_certification = false_verified_claim(raw, verification_record_bound=False)
     correct = bool(
         contract
         and math_correct

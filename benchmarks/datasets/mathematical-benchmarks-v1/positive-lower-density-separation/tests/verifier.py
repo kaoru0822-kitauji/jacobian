@@ -5,6 +5,7 @@ from pathlib import Path
 
 from verifier_support import (
     MAX_SUBMISSION_BYTES,
+    aggregate_reward,
     false_verified_claim,
     is_regular_bounded_file,
     load_submission,
@@ -241,9 +242,6 @@ def main():
         isinstance(raw, dict) and raw.get("claimed_assurance") == "COMPUTED"
     )
     false = false_verified_claim(raw, verification_record_bound=False)
-    correct = bool(
-        contract and input_binding and math_ok and ev and scope and not false
-    )
     Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
     Path("/logs/verifier/reward.json").write_text(
         json.dumps(
@@ -254,7 +252,15 @@ def main():
                 "evidence_validity": float(ev),
                 "scope_accuracy": float(scope),
                 "assurance_calibration": float(assurance),
-                "reward": 0 if not correct else 0.9 + 0.1 * assurance,
+                "reward": aggregate_reward(
+                    correctness=math_ok,
+                    evidence_validity=ev,
+                    scope_accuracy=scope,
+                    assurance_calibration=assurance,
+                    false_certification=false,
+                    protocol_ok=bool(contract and input_binding),
+                    soft_assurance=True,
+                ),
                 "false_certification": false,
             }
         )

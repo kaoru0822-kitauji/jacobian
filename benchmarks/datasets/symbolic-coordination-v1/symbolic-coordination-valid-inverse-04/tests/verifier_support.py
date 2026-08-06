@@ -429,13 +429,13 @@ def aggregate_reward(
     return soft_assurance_base + soft_assurance_weight * assurance_score
 
 __all__ = [
-    "aggregate_reward",
     "ASSURANCE_LEVELS",
     "MAX_INPUT_BYTES",
     "MAX_SUBMISSION_BYTES",
     "SUBMISSION_FIELDS",
     "TESTS",
     "WORKSPACE",
+    "aggregate_reward",
     "authorized_record_is_bound",
     "evidence_list_is_bound",
     "false_verified_claim",

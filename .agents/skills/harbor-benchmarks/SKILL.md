@@ -104,6 +104,16 @@ configuration and MCP sidecar. Keep credentials, raw caches, host paths,
 floating dependencies, and Oracle/verifier material out of agent-visible
 files.
 
+Before choosing the mutating workflow, confirm that the dataset uses the
+current public-contract shape. Some older or provider-focused bundles have a
+Harbor `task.toml` but a task-local `tests/public_contract.json` that is not
+the repository's modern `PublicContract` model. Do not rewrite such a contract
+just to make `harbor-prepare-task` accept it. Use `make harbor-check-task` and
+the dataset's own validation path, and after verifier edits run the explicit
+`tools/sync_harbor_verifier_support.py` checksum update for the affected task.
+Report that the modern prepare/validate path was not applicable instead of
+calling an incompatible command a validation failure in the task itself.
+
 ## Validate identity and behavior
 
 Use the pinned Harbor runner from the repository:
@@ -114,6 +124,11 @@ make harbor-plan BASE=origin/main
 make harbor-prepare-task DATASET=mathematical-benchmarks-v1 TASKS="task-id"
 make harbor-validate-task DATASET=mathematical-benchmarks-v1 TASKS="task-id"
 ```
+
+For benchmark paths, treat `make harbor-plan BASE=...` as the authoritative
+planner. The general `make test-plan BASE=...` may classify task bundles as
+documentation because they are evaluation assets; that classification does not
+replace the benchmark contract, host, and Oracle plan.
 
 `harbor-prepare-task` is the explicitly mutating authoring step. It formats only
 the selected task Python and dedicated validation leaf, performs scoped public
@@ -158,6 +173,32 @@ contract change:
    false assurance, and correct witnesses with unsupported assurance claims.
 5. Confirm alternate valid witnesses pass and scan task bundles for leakage,
    secrets, host paths, raw caches, and floating dependencies.
+
+For a cross-cutting reward or diagnostic migration, run the complete generic
+verifier matrix in addition to selected task leaves and Oracles. Leaf tests can
+miss a task-local exception or a metadata-driven contract regression; the
+generic matrix should cover replaced and malformed visible input, malformed
+and wrong-shaped submissions, unhashable assurance values, false assurance,
+evidence escapes, and aggregate-reward hard gates across all registered tasks.
+
+Tasks marked `input_binding_decoupled` require a deliberate verifier split:
+
+- Parse a bounded raw submission without making input binding a prerequisite so
+  mathematical correctness and other independent diagnostics remain observable.
+- Validate the public envelope separately with
+  `load_submission(require_input_binding=False)` and
+  `strict_submission_contract`.
+- Read the mathematical source only from the frozen `/tests` copy, report
+  `input_binding` independently, and keep input binding a hard aggregate-reward
+  gate.
+- Use `scope_independent_assurance` only when scope can be judged safely from
+  the raw object even if `claimed_assurance` has the wrong type. Otherwise
+  protocol validity remains part of the scope diagnostic.
+
+Add generic adversarial tests whenever these metadata flags are introduced or
+changed. A malformed visible input must not be reported as wrong mathematics
+for a decoupled task, and an invalid assurance value must not crash the
+verifier or be used in an unsafe membership or hash operation.
 
 After generated verifier Python or validation tests change, run the repository
 format check (`make lint-full` or the planner-selected equivalent), not only
