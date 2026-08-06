@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Self
+from typing import Annotated, Any, Self
 
 import pytest
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, WithJsonSchema, model_validator
 
 import jacobian.schema_registry as schema_registry
 from jacobian.contracts.results import ResultEnvelope
@@ -50,6 +50,18 @@ class _MalformedCustomizedSchema(BaseModel):
 _MalformedCustomizedSchema.__module__ = "jacobian.customized_test_model"
 
 
+class _MalformedFieldExtraSchema(BaseModel):
+    value: int = Field(json_schema_extra={"type": 17})
+
+
+class _MalformedAnnotatedSchema(BaseModel):
+    value: Annotated[int, WithJsonSchema({"type": 17})]
+
+
+for _customized_model in (_MalformedFieldExtraSchema, _MalformedAnnotatedSchema):
+    _customized_model.__module__ = "jacobian.customized_test_model"
+
+
 def test_cached_model_schema_returns_independent_copies(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -80,8 +92,13 @@ def test_external_dynamic_reference_is_rejected(tmp_path: Path) -> None:
         )
 
 
+@pytest.mark.parametrize(
+    "model",
+    [_MalformedCustomizedSchema, _MalformedFieldExtraSchema, _MalformedAnnotatedSchema],
+)
 def test_customized_model_schema_is_validated_before_persistence(
     tmp_path: Path,
+    model: type[BaseModel],
 ) -> None:
     store = ArtifactRepository(tmp_path)
     registry = SchemaRegistry(store)
@@ -90,14 +107,15 @@ def test_customized_model_schema_is_validated_before_persistence(
         registry.register_model(
             name="customized-invalid-schema",
             version="1",
-            model=_MalformedCustomizedSchema,
+            model=model,
         )
 
+    schema = model_schema(model)
     uri = store.descriptor_uri(
         kind="schema",
         name="customized-invalid-schema",
         version="1",
-        definition={"type": 17},
+        definition=schema,
     )
     with pytest.raises(StorageError):
         store.get_descriptor(uri, expected_kind="schema")

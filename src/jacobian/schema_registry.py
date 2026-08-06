@@ -120,6 +120,27 @@ def _uses_operator_owned_pydantic_schema(model: type[BaseModel]) -> bool:
         and model_schema_method is base_schema_method
         and model_schema_hook is base_schema_hook
         and model.model_config.get("json_schema_extra") is None
+        and _core_schema_uses_only_pydantic_defaults(model.__pydantic_core_schema__)
+    )
+
+
+def _core_schema_uses_only_pydantic_defaults(value: Any) -> bool:
+    if isinstance(value, list | tuple):
+        return all(_core_schema_uses_only_pydantic_defaults(item) for item in value)
+    if not isinstance(value, dict):
+        return True
+    if value.get("pydantic_js_extra") is not None or value.get(
+        "pydantic_js_annotation_functions"
+    ):
+        return False
+    base_schema_hook = getattr(BaseModel.__get_pydantic_json_schema__, "__func__", None)
+    for hook in value.get("pydantic_js_functions", ()):
+        function = getattr(hook, "__func__", hook)
+        module = getattr(function, "__module__", "")
+        if function is not base_schema_hook and not module.startswith("pydantic."):
+            return False
+    return all(
+        _core_schema_uses_only_pydantic_defaults(item) for item in value.values()
     )
 
 
