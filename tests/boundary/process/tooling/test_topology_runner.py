@@ -67,32 +67,21 @@ def test_make_semantic_lane_forwards_pytest_arguments() -> None:
 
 
 def test_topology_runner_executes_pytest_via_command_runner(monkeypatch) -> None:
-    from benchmarks.tooling.command_runner import ToolCommandStatus
+    from types import SimpleNamespace
+
     from tools import test_topology
 
     topology = test_topology.load_topology()
     observed: dict[str, object] = {}
 
-    class FakeResult:
-        status = ToolCommandStatus.EXITED
-        exit_code = 0
-        stdout = b"all tests passed\n"
-        stderr = b""
-
-    def fake_run_tool_command(request: object) -> FakeResult:
-        observed.update(
-            executable=request.executable,  # type: ignore[attr-defined]
-            arguments=request.arguments,  # type: ignore[attr-defined]
-            cwd=request.cwd,  # type: ignore[attr-defined]
-            environment=request.environment,  # type: ignore[attr-defined]
-            timeout_seconds=request.timeout_seconds,  # type: ignore[attr-defined]
-        )
-        return FakeResult()
+    def fake_run_pytest(arguments: object, **kwargs: object) -> object:
+        observed.update(arguments=arguments, **kwargs)
+        return SimpleNamespace(exit_code=0)
 
     monkeypatch.setattr(
         test_topology,
-        "run_tool_command",
-        fake_run_tool_command,
+        "run_pytest",
+        fake_run_pytest,
     )
 
     rc = test_topology.run_lane(
@@ -103,74 +92,34 @@ def test_topology_runner_executes_pytest_via_command_runner(monkeypatch) -> None
     )
 
     assert rc == 0
-    # Must use the active interpreter verbatim, not resolved (which loses the venv).
-    assert observed["executable"] == sys.executable
-    assert observed["arguments"] == (
-        "-m",
-        "pytest",
+    assert observed["arguments"] == [
         "tests/unit/tooling/test_fixture_architecture.py",
         "-q",
         "--timeout",
         "10",
-    )
+    ]
     environment = observed["environment"]
     assert environment is not None
     assert environment["JACOBIAN_TEST_LANE"] == "unit"
     assert observed["timeout_seconds"] == 3600.0
 
 
-def test_topology_runner_forwards_child_stdout_and_stderr(monkeypatch, capfd) -> None:
-    from benchmarks.tooling.command_runner import ToolCommandStatus
+def test_topology_runner_returns_pytest_failure(monkeypatch) -> None:
+    from types import SimpleNamespace
+
     from tools import test_topology
 
     topology = test_topology.load_topology()
 
-    class FakeResult:
-        status = ToolCommandStatus.EXITED
-        exit_code = 1
-        stdout = b"FAILED tests/unit/test_bad.py\n"
-        stderr = b"Error: assertion failed\n"
-
     monkeypatch.setattr(
         test_topology,
-        "run_tool_command",
-        lambda request: FakeResult(),
+        "run_pytest",
+        lambda *args, **kwargs: SimpleNamespace(exit_code=1),
     )
 
     rc = test_topology.run_lane(topology, "unit", ["tests/unit/test_bad.py"], [])
 
     assert rc == 1
-    captured = capfd.readouterr()
-    assert "FAILED tests/unit/test_bad.py" in captured.out
-    assert "Error: assertion failed" in captured.err
-
-
-def test_topology_runner_emits_diagnostic_on_timeout(monkeypatch, capfd) -> None:
-    from benchmarks.tooling.command_runner import ToolCommandStatus
-    from tools import test_topology
-
-    topology = test_topology.load_topology()
-
-    class FakeResult:
-        status = ToolCommandStatus.TIMED_OUT
-        exit_code = None
-        stdout = b""
-        stderr = b""
-        diagnostic = "deadline exceeded"
-        stdout_exceeded = False
-        stderr_exceeded = False
-
-    monkeypatch.setattr(
-        test_topology,
-        "run_tool_command",
-        lambda request: FakeResult(),
-    )
-
-    rc = test_topology.run_lane(topology, "unit", [], [])
-
-    assert rc == 1
-    captured = capfd.readouterr()
-    assert "deadline exceeded" in captured.err
 
 
 def test_focused_selector_does_not_start_configured_workers() -> None:

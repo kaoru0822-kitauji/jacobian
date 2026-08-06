@@ -22,12 +22,12 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from benchmarks.tooling.command_runner import (  # noqa: E402
-    ToolCommandRequest,
     ToolCommandStatus,
     operator_environment,
     run_operator_command,
-    run_tool_command,
 )
+
+from tools.pytest_lifecycle import run_pytest  # noqa: E402
 
 DEFAULT_MANIFEST = _ROOT / "tests" / "topology.toml"
 _DISTRIBUTIONS = {"none", "load", "loadscope", "loadfile", "loadgroup", "worksteal"}
@@ -366,42 +366,16 @@ def run_lane(
     to stderr before returning a non-zero exit code.
     """
     command = pytest_command(topology, lane_name, selectors, extra_args)
-    arguments = tuple(command[1:])
+    arguments = command[3:]
     environment = lane_environment(topology.lane(lane_name))
-    request = ToolCommandRequest(
-        executable=sys.executable,
-        arguments=arguments,
+    result = run_pytest(
+        arguments,
+        root=topology.root,
+        name=f"topology-{lane_name}",
         environment=environment,
-        cwd=str(topology.root.resolve()),
         timeout_seconds=3600.0,
-        stdout_limit_bytes=16 * 1024 * 1024,
-        stderr_limit_bytes=4 * 1024 * 1024,
     )
-    result = run_tool_command(request)
-
-    # Forward bounded child output to parent streams.
-    if result.stdout:
-        sys.stdout.buffer.write(result.stdout)
-        sys.stdout.buffer.flush()
-    if result.stderr:
-        sys.stderr.buffer.write(result.stderr)
-        sys.stderr.buffer.flush()
-
-    if result.status is ToolCommandStatus.EXITED and result.exit_code is not None:
-        return result.exit_code
-
-    # Non-EXITED: emit a safe diagnostic so the failure is not silent.
-    diagnostic = result.diagnostic or result.status.value
-    overflow_note = ""
-    if result.stdout_exceeded:
-        overflow_note += " (stdout truncated)"
-    if result.stderr_exceeded:
-        overflow_note += " (stderr truncated)"
-    print(
-        f"lane '{lane_name}': {diagnostic}{overflow_note}",
-        file=sys.stderr,
-    )
-    return 1
+    return result.exit_code
 
 
 def _print_dry_run(

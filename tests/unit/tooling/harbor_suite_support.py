@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 import tomli_w
+from benchmarks.tooling.command_runner import ToolCommandStatus, run_operator_command
 from benchmarks.tooling.harbor_suite import (
     TASK_SCHEMA_VERSION,
     EnvironmentProfile,
@@ -22,6 +23,11 @@ def patch_harbor_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     import benchmarks.tooling.harbor_suite as hs
 
     monkeypatch.setattr(hs, "ROOT", tmp_path)
+    # Worktree-local pytest basetemps remain inside the outer repository and
+    # inherit its ignore rules unless the synthetic Harbor root owns a Git
+    # boundary. Keep cache-policy tests independent of their temp location.
+    git = run_operator_command("git", ("init", "--quiet"), cwd=tmp_path)
+    assert git.status is ToolCommandStatus.EXITED and git.exit_code == 0
     profile = EnvironmentProfile(
         name="test-profile",
         agent_image="python:3.12-slim",
