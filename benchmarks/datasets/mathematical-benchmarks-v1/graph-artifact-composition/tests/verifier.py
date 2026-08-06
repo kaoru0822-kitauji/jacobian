@@ -3,6 +3,7 @@ from collections import deque
 from pathlib import Path
 
 from verifier_support import (
+    aggregate_reward,
     evidence_list_is_bound,
 )
 from verifier_support import (
@@ -88,10 +89,13 @@ def main():
     )
     evidence = ev(s) if contract else False
     false = claimed_verified
-    reward = (
-        0
-        if not correct or not evidence or false
-        else 0.7 * correct + 0.1 * evidence + 0.1 * scope + 0.1 * assurance
+    reward = aggregate_reward(
+        correctness=correct,
+        evidence_validity=evidence,
+        scope_accuracy=scope,
+        assurance_calibration=assurance,
+        false_certification=false,
+        soft_assurance=True,
     )
     Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
     (Path("/logs/verifier/reward.json")).write_text(

@@ -14,6 +14,46 @@ if isinstance(submission, dict) and isinstance(submission.get("evidence"), list)
         expected_path="evidence/provider-report.json",
     )
 result = submission.get("result") if isinstance(submission, dict) else None
+
+
+def _execution_bound(report: object) -> bool:
+    """Reject reports that only restate public spike success literals."""
+
+    if not isinstance(report, dict):
+        return False
+    if report.get("contract") != expected["contract"]:
+        return False
+    if report.get("status") != "COMPLETED":
+        return False
+    if report.get("conclusion") != expected["report_conclusion"]:
+        return False
+    if report.get("assurance") != expected["report_assurance"]:
+        return False
+    provider = report.get("provider")
+    reproduction = report.get("reproduction")
+    if not isinstance(provider, dict) or not isinstance(reproduction, dict):
+        return False
+    runtime = provider.get("runtime")
+    if not isinstance(runtime, dict) or not runtime:
+        return False
+    cases = reproduction.get("cases")
+    if not isinstance(cases, list) or not cases:
+        return False
+    output_digest = reproduction.get("provider_output_sha256")
+    if not (
+        isinstance(output_digest, str)
+        and output_digest.startswith("sha256:")
+        and len(output_digest) == 71
+    ):
+        return False
+    limitations = report.get("limitations")
+    if not isinstance(limitations, list) or not limitations:
+        return False
+    if set(report) <= {"contract", "status", "conclusion", "assurance"}:
+        return False
+    return True
+
+
 valid = bool(
     isinstance(submission, dict)
     and set(submission)
@@ -39,11 +79,7 @@ valid = bool(
         "status": "COMPLETED",
         "pin_sha256": expected["pin_sha256"],
     }
-    and isinstance(report, dict)
-    and report.get("contract") == expected["contract"]
-    and report.get("status") == "COMPLETED"
-    and report.get("conclusion") == expected["report_conclusion"]
-    and report.get("assurance") == expected["report_assurance"]
+    and _execution_bound(report)
 )
 target = Path("/logs/verifier/reward.json")
 target.parent.mkdir(parents=True, exist_ok=True)

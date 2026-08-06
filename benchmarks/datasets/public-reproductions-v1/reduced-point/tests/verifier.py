@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from verifier_support import (
+    aggregate_reward,
     evidence_list_is_bound,
     load_submission,
     strict_submission_contract,
@@ -18,9 +19,13 @@ def _math(s, x, e):
     tor = r.get("torsion")
     if not isinstance(fr, list) or not isinstance(tor, list):
         return False
-    return [int(v) for v in fr] == [int(v) for v in e["expected_free_ranks"]] and [
-        [str(v) for v in row] for row in tor
-    ] == [[str(v) for v in row] for row in e["expected_torsion"]]
+    if not all(type(v) is int for v in fr):
+        return False
+    if fr != e["expected_free_ranks"]:
+        return False
+    return [[str(v) for v in row] for row in tor] == [
+        [str(v) for v in row] for row in e["expected_torsion"]
+    ]
 
 
 def main():
@@ -40,10 +45,13 @@ def main():
     scope = bool(contract and s["scope"] == " ".join(e["required_scope_terms"]))
     assurance = bool(contract and s["claimed_assurance"] == e["maximum_assurance"])
     false = bool(isinstance(s, dict) and s.get("claimed_assurance") == "VERIFIED")
-    reward = (
-        0
-        if not correct or false
-        else 0.7 * correct + 0.1 * good + 0.1 * scope + 0.1 * assurance
+    reward = aggregate_reward(
+        correctness=correct,
+        evidence_validity=good,
+        scope_accuracy=scope,
+        assurance_calibration=assurance,
+        false_certification=false,
+        soft_assurance=True,
     )
     Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
     (Path("/logs/verifier/reward.json")).write_text(
