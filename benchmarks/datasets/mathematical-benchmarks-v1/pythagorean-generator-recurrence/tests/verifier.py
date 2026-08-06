@@ -338,7 +338,7 @@ def main():
                 "input_binding": float(input_bound),
                 "scope_accuracy": float(scope_ok),
                 "assurance_calibration": float(assurance_ok),
-                "reward": 0 if not correct else 0.9 + 0.1 * assurance_ok,
+                "reward": float(correct),
                 "false_certification": false_cert,
             }
         )

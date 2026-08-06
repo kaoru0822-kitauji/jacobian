@@ -176,7 +176,7 @@ def main():
     correct = bool(
         math_correct and evidence_valid and envelope_correct and not false_certification
     )
-    reward = 0 if not correct else 0.9 + 0.1 * assurance_correct
+    reward = float(correct)
     Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
     Path("/logs/verifier/reward.json").write_text(
         json.dumps(

@@ -191,7 +191,7 @@ def main():
                 "evidence_validity": float(v),
                 "scope_accuracy": float(q),
                 "assurance_calibration": float(a),
-                "reward": 0 if not ok else 0.9 + 0.1 * a,
+                "reward": float(ok),
                 "false_certification": f,
             }
         )
