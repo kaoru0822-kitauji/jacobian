@@ -1,12 +1,12 @@
-"""Tests for copy_template hardlink optimization."""
+"""Tests for copy_template isolation."""
 import os
 from pathlib import Path
 
 from tests.support.state import copy_template
 
 
-def test_copy_template_hardlinks_blobs(tmp_path: Path) -> None:
-    """Blobs should be hardlinked (not copied) for I/O efficiency."""
+def test_copy_template_copies_blobs_without_sharing_inodes(tmp_path: Path) -> None:
+    """Blob copies must not share inodes with the immutable template."""
     template = tmp_path / "template"
     template.mkdir()
     blob = template / "blobs" / "sha256" / "00" / "abc123"
@@ -20,7 +20,10 @@ def test_copy_template_hardlinks_blobs(tmp_path: Path) -> None:
     assert (dest / "blobs" / "sha256" / "00" / "abc123").read_bytes() == b"blob content"
     template_inode = os.stat(blob).st_ino
     dest_inode = os.stat(dest / "blobs" / "sha256" / "00" / "abc123").st_ino
-    assert template_inode == dest_inode, "blob should be hardlinked"
+    assert template_inode != dest_inode, "blob should be copied, not hardlinked"
+
+    (dest / "blobs" / "sha256" / "00" / "abc123").write_bytes(b"changed")
+    assert blob.read_bytes() == b"blob content"
 
     template_meta = os.stat(template / "metadata.sqlite3").st_ino
     dest_meta = os.stat(dest / "metadata.sqlite3").st_ino
