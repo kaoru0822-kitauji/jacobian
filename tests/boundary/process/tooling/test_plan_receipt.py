@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from benchmarks.tooling.receipts import receipt_digest
 from tests.boundary.process.tooling.ci import run_ci_script
 
 
@@ -68,6 +69,8 @@ def test_plan_receipt_binds_plan_paths_source_and_configuration(tmp_path: Path) 
     }
     assert str(receipt["plan_digest"]).startswith("sha256:")
     assert str(receipt["receipt_digest"]).startswith("sha256:")
+    unsigned = {key: value for key, value in receipt.items() if key != "receipt_digest"}
+    assert receipt["receipt_digest"] == receipt_digest(unsigned)
 
 
 def test_plan_receipt_changes_when_changed_paths_change(tmp_path: Path) -> None:

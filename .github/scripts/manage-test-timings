@@ -18,7 +18,8 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = ROOT / ".github" / "ci-config.json"
-SHARDED_SUITES = ("domain", "composition")
+CI_SHARDED_SUITES = ("domain", "composition")
+TIMING_SUITES = (*CI_SHARDED_SUITES, "benchmark")
 MAX_BYTES = 5 * 1024 * 1024
 MAX_ENTRIES = 10_000
 MAX_CANDIDATES = 5
@@ -58,8 +59,10 @@ class CrossOriginRedirectHandler(urllib.request.HTTPRedirectHandler):
 
 
 def shard_count(suite: str) -> int:
-    if suite not in SHARDED_SUITES:
+    if suite not in TIMING_SUITES:
         raise ValueError(f"unsupported timing suite: {suite}")
+    if suite == "benchmark":
+        return 4
     return int(ci_config()[f"{suite}_shard_count"])
 
 
@@ -75,7 +78,7 @@ def ci_config() -> dict[str, Any]:
     payload = json.loads(CONFIG.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("ci-config.json must contain a JSON object")
-    for suite in SHARDED_SUITES:
+    for suite in CI_SHARDED_SUITES:
         count = payload.get(f"{suite}_shard_count")
         if not isinstance(count, int) or isinstance(count, bool) or count < 1:
             raise ValueError(f"{suite}_shard_count must be a positive integer")
@@ -111,7 +114,7 @@ def emit_plan_outputs() -> None:
     """Print GitHub Actions outputs for shard, Node, and pytest-split pins."""
 
     config = ci_config()
-    for suite in SHARDED_SUITES:
+    for suite in CI_SHARDED_SUITES:
         count = int(config[f"{suite}_shard_count"])
         print(f"{suite}-shard-count={count}")
         print(f"{suite}-shards={json.dumps(list(range(1, count + 1)))}")
@@ -138,8 +141,9 @@ def validate_durations(value: Any, source: str, suite: str) -> dict[str, float]:
         raise ValueError(f"{source} exceeds {MAX_ENTRIES} timing entries")
 
     durations: dict[str, float] = {}
+    prefix = "benchmarks/validation/" if suite == "benchmark" else f"tests/{suite}/"
     for nodeid, duration in value.items():
-        if not isinstance(nodeid, str) or not nodeid.startswith(f"tests/{suite}/"):
+        if not isinstance(nodeid, str) or not nodeid.startswith(prefix):
             raise ValueError(f"{source} contains an invalid test node id: {nodeid!r}")
         if isinstance(duration, bool) or not isinstance(duration, (int, float)):
             raise ValueError(f"{source} contains a non-numeric duration for {nodeid}")
@@ -321,14 +325,14 @@ def main() -> None:
 
     prepare_parser = subparsers.add_parser("prepare")
     prepare_parser.add_argument("--output", type=Path, required=True)
-    prepare_parser.add_argument("--suite", choices=SHARDED_SUITES, required=True)
+    prepare_parser.add_argument("--suite", choices=TIMING_SUITES, required=True)
 
     merge_parser = subparsers.add_parser("merge")
     merge_parser.add_argument("--input", action="append", type=Path, required=True)
     merge_parser.add_argument("--output", type=Path, required=True)
     merge_parser.add_argument("--source-sha", required=True)
     merge_parser.add_argument("--python-version", required=True)
-    merge_parser.add_argument("--suite", choices=SHARDED_SUITES, required=True)
+    merge_parser.add_argument("--suite", choices=TIMING_SUITES, required=True)
     merge_parser.add_argument(
         "--pytest-split-version",
         default=None,

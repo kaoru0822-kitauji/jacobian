@@ -144,11 +144,25 @@ def test_benchmark_contracts_run_once_for_record_and_digest_evidence() -> None:
     assert workflow.count("run: make harbor-contracts harbor-adapter-checks") == 1
     assert "  contracts:" in workflow
     assert "  host_validation:" in workflow
-    assert "make harbor-validation-tests TESTS=" in workflow
-    assert 'pytest_args+=(--splits "$SPLITS" --group "$GROUP")' in workflow
+    assert "benchmarks.tooling.host_validation run-entry" in workflow
+    assert '--entry-json "$HOST_ENTRY"' in workflow
+    assert "--total-workers 8 --max-parallel 4" in workflow
+    assert '--execution-sha "${{ github.sha }}"' in workflow
     assert "  prospective-digest:" not in workflow
     assert "python .github/scripts/emit-plan-receipt" in workflow
     assert "benchmark-plan-receipt" in workflow
+
+
+def test_benchmark_stable_gate_validates_provenance_receipts_in_python() -> None:
+    workflow = (ROOT / ".github/workflows/benchmarks.yml").read_text(encoding="utf-8")
+    validation = workflow.split("  validation:", 1)[1].split("  timings:", 1)[0]
+
+    assert "benchmarks.tooling.benchmark_validation" in validation
+    assert "benchmark-plan-receipt" in validation
+    assert "benchmark-host-timing-*" in validation
+    assert "benchmark-test-durations-input" in validation
+    assert '--execution-sha "${{ github.sha }}"' in validation
+    assert "check_lane()" not in validation
 
 
 def test_product_ci_publishes_a_provenance_bound_plan_receipt() -> None:

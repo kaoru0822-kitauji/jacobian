@@ -16,6 +16,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 PLANNER_PATH = ROOT / ".github" / "scripts" / "plan-benchmarks"
 PATH_POLICY_PATH = ROOT / ".github" / "scripts" / "_ci_paths.py"
+VALIDATION_PLAN_PATH = ROOT / "benchmarks" / "tooling" / "validation_plan.py"
 VALIDATOR_PATH = ROOT / ".github" / "scripts" / "validate-benchmark-plan"
 _SPEC = importlib.util.spec_from_loader(
     "benchmark_planner", SourceFileLoader("benchmark_planner", str(PLANNER_PATH))
@@ -46,6 +47,14 @@ def _matrix_tasks(result: dict[str, str]) -> set[str]:
 
 
 def _host_matrix(result: dict[str, str]) -> list[dict[str, object]]:
+    matrix = json.loads(result["benchmark-host-validation-matrix"])
+    return [
+        {key: value for key, value in entry.items() if key != "predicted_seconds"}
+        for entry in matrix
+    ]
+
+
+def _raw_host_matrix(result: dict[str, str]) -> list[dict[str, object]]:
     return json.loads(result["benchmark-host-validation-matrix"])
 
 
@@ -109,7 +118,7 @@ def test_plan_is_versioned_and_bound_to_event_base_head_sha() -> None:
 def test_planner_digest_binds_to_planner_and_path_policy_sources() -> None:
     payload = "\n".join(
         f"{path.relative_to(ROOT).as_posix()}\t{path.read_bytes().hex()}"
-        for path in (PLANNER_PATH, PATH_POLICY_PATH)
+        for path in (PLANNER_PATH, PATH_POLICY_PATH, VALIDATION_PLAN_PATH)
     ).encode()
     expected = "sha256:" + hashlib.sha256(payload).hexdigest()
     result = planner.plan(
@@ -144,6 +153,21 @@ def test_benchmark_control_plane_changes_run_contract_checks(path: str) -> None:
     assert result["benchmark-oracle-scope"] == "none"
     assert result["benchmark-plan-mode"] == "changed"
     assert _matrix(result) == []
+    _assert_plan_valid(result)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [".github/scripts/manage-test-timings", ".github/scripts/emit-plan-receipt"],
+)
+def test_non_host_control_utilities_do_not_select_full_verifier_corpus(
+    path: str,
+) -> None:
+    result = planner.plan([path], event="pull_request")
+
+    assert result["run-benchmark-check"] == "true"
+    assert result["run-benchmark-host-validation"] == "false"
+    assert _host_matrix(result) == []
     _assert_plan_valid(result)
 
 
@@ -270,6 +294,29 @@ def test_executable_task_change_selects_exact_task_without_version_bump() -> Non
     _assert_plan_valid(result)
 
 
+def test_host_and_oracle_matrices_record_predictions() -> None:
+    task = "parameterized-sharp-bound-audit"
+    result = planner.plan(
+        [f"benchmarks/datasets/mathematical-benchmarks-v1/{task}/tests/verifier.py"],
+        event="pull_request",
+        timings={
+            f"mathematical-benchmarks-v1/{task}": 73.5,
+            f"host-validation/{task}-specific": 8.25,
+            f"host-validation/{task}-generic": 3.5,
+        },
+    )
+
+    assert _matrix(result)[0]["predicted_seconds"] == 73.5
+    predictions = {
+        entry["name"]: entry["predicted_seconds"] for entry in _raw_host_matrix(result)
+    }
+    assert predictions == {
+        f"{task}-generic": 3.5,
+        f"{task}-specific": 8.25,
+    }
+    _assert_plan_valid(result)
+
+
 def test_dataset_owned_task_selects_shared_host_regression() -> None:
     result = planner.plan(
         [
@@ -344,6 +391,22 @@ def test_shared_benchmark_support_falls_back_to_full_host_validation() -> None:
             "group": group,
         }
         for group in range(1, 5)
+    ]
+    assert any(
+        "shared benchmark tooling requires full host validation" in reason
+        for reason in json.loads(result["benchmark-plan-reasons"])
+    )
+    _assert_plan_valid(result)
+
+
+def test_shared_verifier_harness_states_full_suite_reason() -> None:
+    path = "benchmarks/validation/mathematical_benchmarks_v1/support.py"
+    result = planner.plan([path], event="pull_request")
+
+    assert len(_host_matrix(result)) == 4
+    assert json.loads(result["benchmark-plan-reasons"]) == [
+        "benchmark validation or documentation change",
+        f"shared verifier harness requires full host validation: {path}",
     ]
     _assert_plan_valid(result)
 

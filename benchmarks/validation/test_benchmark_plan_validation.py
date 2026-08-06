@@ -47,6 +47,7 @@ def _plan() -> dict[str, str]:
                     "keyword": "",
                     "splits": 0,
                     "group": 0,
+                    "predicted_seconds": 5.0,
                 }
             ]
         ),
@@ -59,6 +60,7 @@ def _plan() -> dict[str, str]:
                     "shard": "task",
                     "tasks": ["task"],
                     "task_digests": [{"task": "task", "digest": DIGEST}],
+                    "predicted_seconds": 30.0,
                 }
             ]
         ),

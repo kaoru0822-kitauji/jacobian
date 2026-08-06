@@ -85,12 +85,14 @@ def _validate_matrix(matrix: list[Any]) -> None:
             "shard",
             "tasks",
             "task_digests",
+            "predicted_seconds",
         }:
             fail(f"benchmark Oracle matrix entry {index} has an invalid shape")
         dataset = entry["dataset"]
         shard = entry["shard"]
         tasks = entry["tasks"]
         digests = entry["task_digests"]
+        predicted = entry["predicted_seconds"]
         if not isinstance(dataset, str) or not dataset:
             fail(f"benchmark Oracle matrix entry {index} has an invalid dataset")
         if not isinstance(shard, str) or not shard:
@@ -104,6 +106,12 @@ def _validate_matrix(matrix: list[Any]) -> None:
             fail(f"benchmark Oracle matrix entry {index} has invalid tasks")
         if not isinstance(digests, list) or len(digests) != len(tasks):
             fail(f"benchmark Oracle matrix entry {index} has invalid task digests")
+        if (
+            not isinstance(predicted, (int, float))
+            or isinstance(predicted, bool)
+            or predicted <= 0
+        ):
+            fail(f"benchmark Oracle matrix entry {index} has invalid prediction")
         digest_tasks: set[str] = set()
         for item in digests:
             if not isinstance(item, dict) or set(item) != {"task", "digest"}:
@@ -141,6 +149,7 @@ def _validate_host_matrix(matrix: list[Any]) -> None:
             "keyword",
             "splits",
             "group",
+            "predicted_seconds",
         }:
             fail(f"benchmark host validation matrix entry {index} has an invalid shape")
         name = entry["name"]
@@ -148,7 +157,12 @@ def _validate_host_matrix(matrix: list[Any]) -> None:
         keyword = entry["keyword"]
         splits = entry["splits"]
         group = entry["group"]
-        if not isinstance(name, str) or HOST_NAME.fullmatch(name) is None:
+        predicted = entry["predicted_seconds"]
+        if (
+            not isinstance(name, str)
+            or name in {".", ".."}
+            or HOST_NAME.fullmatch(name) is None
+        ):
             fail(f"benchmark host validation matrix entry {index} has an invalid name")
         if name in names:
             fail(f"duplicate benchmark host validation matrix name: {name}")
@@ -176,6 +190,12 @@ def _validate_host_matrix(matrix: list[Any]) -> None:
             or splits > MAX_MATRIX_JOBS
         ):
             fail(f"benchmark host validation matrix entry {index} has invalid sharding")
+        if (
+            not isinstance(predicted, (int, float))
+            or isinstance(predicted, bool)
+            or predicted <= 0
+        ):
+            fail(f"benchmark host validation matrix entry {index} has invalid prediction")
         key = (selector, keyword)
         expected_splits, groups = shard_groups.setdefault(key, (splits, set()))
         if expected_splits != splits:

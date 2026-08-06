@@ -5,15 +5,12 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import importlib.util
 import json
 import shutil
 import sys
 import time
 from dataclasses import dataclass
-from importlib.machinery import SourceFileLoader
 from pathlib import Path
-from types import ModuleType
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,8 +29,11 @@ from benchmarks.tooling.harbor_suite import (  # noqa: E402
     get_suite,
     select_task_refs,
 )
+from benchmarks.tooling.validation_plan import (  # noqa: E402
+    HostValidation,
+    task_host_validation,
+)
 
-PLANNER_PATH = ROOT / ".github" / "scripts" / "plan-benchmarks"
 PYTEST_ROOT = ROOT / ".pytest_cache" / "harbor-validation"
 OUTPUT_LIMIT = 8 * 1024 * 1024
 OPERATOR_ENVIRONMENT = (
@@ -50,15 +50,6 @@ TOOL_RESOLVER = ToolResolver()
 
 class TaskWorkflowError(RuntimeError):
     """A selected-task workflow contract was invalid or a stage failed."""
-
-
-@dataclass(frozen=True, slots=True)
-class HostValidation:
-    """One planner-owned host validation selector."""
-
-    name: str
-    selector: str
-    keyword: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,55 +70,6 @@ class StageTiming:
     seconds: float
 
 
-def _load_planner() -> ModuleType:
-    spec = importlib.util.spec_from_loader(
-        "harbor_task_workflow_planner",
-        SourceFileLoader("harbor_task_workflow_planner", str(PLANNER_PATH)),
-    )
-    if spec is None or spec.loader is None:
-        raise TaskWorkflowError(f"could not load benchmark planner: {PLANNER_PATH}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-def _parse_host_validations(raw: str) -> tuple[HostValidation, ...]:
-    try:
-        entries = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise TaskWorkflowError(
-            "benchmark planner returned invalid host matrix JSON"
-        ) from exc
-    if not isinstance(entries, list) or not entries:
-        raise TaskWorkflowError("benchmark planner selected no host validation")
-
-    result: list[HostValidation] = []
-    for entry in entries:
-        if not isinstance(entry, dict):
-            raise TaskWorkflowError("benchmark host matrix entries must be objects")
-        name = entry.get("name")
-        selector = entry.get("selector")
-        keyword = entry.get("keyword", "")
-        splits = entry.get("splits", 0)
-        group = entry.get("group", 0)
-        if (
-            not isinstance(name, str)
-            or not isinstance(selector, str)
-            or not isinstance(keyword, str)
-        ):
-            raise TaskWorkflowError("benchmark host matrix strings are malformed")
-        if splits != 0 or group != 0:
-            raise TaskWorkflowError(
-                "selected-task validation may not use sharded selectors"
-            )
-        selector_path = Path(selector)
-        if selector_path.is_absolute() or ".." in selector_path.parts:
-            raise TaskWorkflowError(f"unsafe benchmark host selector: {selector}")
-        result.append(HostValidation(name=name, selector=selector, keyword=keyword))
-    return tuple(result)
-
-
 def resolve_selection(dataset: str, tasks: tuple[str, ...]) -> TaskSelection:
     """Resolve task membership and host selectors once through canonical owners."""
     if not dataset:
@@ -138,28 +80,25 @@ def resolve_selection(dataset: str, tasks: tuple[str, ...]) -> TaskSelection:
     except HarborSuiteError as exc:
         raise TaskWorkflowError(str(exc)) from exc
 
-    changed_paths = []
-    for ref in refs:
-        verifier = ref.path / "tests" / "verifier.py"
-        source = verifier if verifier.is_file() else ref.path / "task.toml"
-        changed_paths.append(source.relative_to(ROOT).as_posix())
-
-    planner = _load_planner()
-    plan_function = getattr(planner, "plan", None)
-    if not callable(plan_function):
-        raise TaskWorkflowError("benchmark planner does not expose plan()")
-    plan = plan_function(changed_paths, event="pull_request")
-    if not isinstance(plan, dict):
-        raise TaskWorkflowError("benchmark planner returned a malformed plan")
-    raw_host_matrix = plan.get("benchmark-host-validation-matrix")
-    if not isinstance(raw_host_matrix, str):
-        raise TaskWorkflowError("benchmark planner omitted the host validation matrix")
+    host_validations_by_selector = {
+        (validation.selector, validation.keyword): validation
+        for ref in refs
+        for validation in task_host_validation(ROOT, suite.id, ref.path.name)
+    }
+    host_validations = tuple(
+        sorted(
+            host_validations_by_selector.values(),
+            key=lambda item: (item.selector, item.keyword),
+        )
+    )
+    if not host_validations:
+        raise TaskWorkflowError("selected tasks have no owned host validation")
 
     return TaskSelection(
         dataset=suite.id,
         tasks=tuple(ref.path.name for ref in refs),
         task_paths=tuple(ref.path for ref in refs),
-        host_validations=_parse_host_validations(raw_host_matrix),
+        host_validations=host_validations,
     )
 
 
@@ -196,11 +135,11 @@ def _run_checked(
     timings.append(StageTiming(label=label, seconds=elapsed))
 
 
-def _uv_executable() -> str:
-    uv = TOOL_RESOLVER.resolve("uv")
-    if uv is None:
-        raise TaskWorkflowError("uv is required to run repository validation")
-    return uv
+def _required_tool(name: str) -> str:
+    executable = TOOL_RESOLVER.resolve(name)
+    if executable is None:
+        raise TaskWorkflowError(f"{name} is required to run repository validation")
+    return str(executable)
 
 
 def _task_tree_files(selection: TaskSelection, *, root: Path) -> tuple[Path, ...]:
@@ -257,7 +196,7 @@ def prepare(selection: TaskSelection) -> tuple[str, ...]:
             ("run", "--locked", "ruff", "format", *python_paths),
             timings=timings,
             timeout_seconds=120.0,
-            executable=_uv_executable(),
+            executable=_required_tool("uv"),
         )
     after_format = _snapshot(_task_tree_files(selection, root=ROOT), root=ROOT)
     formatted = _changed_paths(before, after_format)
@@ -375,7 +314,7 @@ def validate(selection: TaskSelection) -> tuple[tuple[str, str, str], ...]:
             ("run", "--locked", "python", "tools/check_benchmark_static.py"),
             timings=timings,
             timeout_seconds=360.0,
-            executable=_uv_executable(),
+            executable=_required_tool("uv"),
         )
         _run_checked(
             "contracts",
@@ -407,13 +346,10 @@ def validate(selection: TaskSelection) -> tuple[tuple[str, str, str], ...]:
                 arguments,
                 timings=timings,
                 timeout_seconds=600.0,
-                executable=_uv_executable(),
+                executable=_required_tool("uv"),
             )
         for task in selection.tasks:
             previous_evidence = _oracle_evidence_snapshot(selection)
-            make = TOOL_RESOLVER.resolve("make")
-            if make is None:
-                raise TaskWorkflowError("make is required to run the exact Oracle")
             _run_checked(
                 f"oracle:{task}",
                 (
@@ -424,7 +360,7 @@ def validate(selection: TaskSelection) -> tuple[tuple[str, str, str], ...]:
                 ),
                 timings=timings,
                 timeout_seconds=1800.0,
-                executable=make,
+                executable=_required_tool("make"),
             )
             digest, evidence_path = _fresh_oracle_evidence(
                 selection, task, previous=previous_evidence

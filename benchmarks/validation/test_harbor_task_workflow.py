@@ -22,13 +22,7 @@ sys.modules[_SPEC.name] = workflow
 _SPEC.loader.exec_module(workflow)
 
 
-def test_resolve_selection_uses_planner_owned_host_matrix(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    planner = workflow._load_planner()
-    monkeypatch.setattr(planner, "_digest", lambda path: f"sha256:{path.name}")
-    monkeypatch.setattr(workflow, "_load_planner", lambda: planner)
-
+def test_resolve_selection_uses_planner_owned_host_matrix() -> None:
     selection = workflow.resolve_selection(
         "mathematical-benchmarks-v1", ("parameterized-sharp-bound-audit",)
     )
@@ -45,6 +39,20 @@ def test_resolve_selection_uses_planner_owned_host_matrix(
             "test_parameterized_sharp_bound_audit.py",
             "",
         ),
+    ]
+
+
+def test_resolve_selection_deduplicates_shared_dataset_validation() -> None:
+    selection = workflow.resolve_selection(
+        "symbolic-coordination-v1",
+        (
+            "symbolic-coordination-collision-found-01",
+            "symbolic-coordination-collision-found-02",
+        ),
+    )
+
+    assert [item.selector for item in selection.host_validations] == [
+        "benchmarks/validation/symbolic_coordination_v1/test_pilot_contract.py"
     ]
 
 
