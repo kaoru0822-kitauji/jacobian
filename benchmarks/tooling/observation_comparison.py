@@ -16,6 +16,7 @@ from benchmarks.tooling.errors import HarborSuiteError
 SCHEMA_PATH = (
     Path(__file__).resolve().parents[1] / "schemas" / "observation-evidence.schema.json"
 )
+CORE_METRICS = ("correctness", "false_certification")
 
 
 def _validate_contract(value: dict[str, Any]) -> None:
@@ -283,9 +284,9 @@ def compare_evidence(
         metric: _metric_report(metric, pairs, control_trials, treatment_trials)
         for metric in metric_names
     }
-    for metric in metric_names:
+    for metric in CORE_METRICS:
         if metrics[metric]["pair_count"] != len(pairs):
-            failures.append(f"metric is missing from a complete pair: {metric}")
+            failures.append(f"core metric is missing from a complete pair: {metric}")
     return {
         "schema_version": "1",
         "evidence_class": _derived_comparison_class(control, treatment),

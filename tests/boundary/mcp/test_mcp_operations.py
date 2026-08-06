@@ -271,3 +271,31 @@ def test_cancelled_mcp_blocking_work_drains_before_request_task_finishes() -> No
         assert finished.is_set()
 
     asyncio.run(scenario())
+
+
+def test_repeated_cancellation_keeps_draining_blocking_work() -> None:
+    started = threading.Event()
+    release = threading.Event()
+    finished = threading.Event()
+
+    def blocking_operation() -> str:
+        started.set()
+        release.wait(timeout=2)
+        finished.set()
+        return "finished"
+
+    async def scenario() -> None:
+        task = asyncio.create_task(_run_blocking(blocking_operation))
+        while not started.is_set():
+            await asyncio.sleep(0)
+        task.cancel()
+        await asyncio.sleep(0.05)
+        task.cancel()
+        await asyncio.sleep(0.05)
+        assert not task.done()
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert finished.is_set()
+
+    asyncio.run(scenario())

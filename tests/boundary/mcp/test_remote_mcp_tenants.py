@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from jacobian.adapters.mcp.remote import (
+    TenantRuntimeLease,
     TenantRuntimeLimitError,
     TenantRuntimeRouter,
     TenantRuntimeRouterClosedError,
@@ -46,13 +47,26 @@ def test_tenant_router_isolates_artifact_stores(tmp_path: Path) -> None:
 
 
 class _FakeRuntime:
-    def __init__(self, identity: Path, *, fail_close: bool = False) -> None:
+    def __init__(
+        self,
+        identity: Path,
+        *,
+        fail_close: bool = False,
+        close_started: threading.Event | None = None,
+        close_release: threading.Event | None = None,
+    ) -> None:
         self.identity = identity
         self.fail_close = fail_close
+        self.close_started = close_started
+        self.close_release = close_release
         self.close_calls = 0
 
     def close(self) -> None:
         self.close_calls += 1
+        if self.close_started is not None:
+            self.close_started.set()
+        if self.close_release is not None:
+            self.close_release.wait(timeout=2)
         if self.fail_close:
             raise RuntimeError("injected close failure")
 
@@ -190,6 +204,56 @@ def test_tenant_router_restores_failed_eviction_and_shutdown_waits_for_leases(
     assert closed.is_set()
 
 
+def test_tenant_router_blocks_same_tenant_during_eviction_cleanup(
+    tmp_path: Path,
+) -> None:
+    close_started = threading.Event()
+    close_release = threading.Event()
+    first = _FakeRuntime(
+        tmp_path / "first",
+        fail_close=True,
+        close_started=close_started,
+        close_release=close_release,
+    )
+    router = TenantRuntimeRouter(
+        tmp_path,
+        max_tenant_runtimes=1,
+        runtime_factory=lambda _path, **_kwargs: first,  # type: ignore[arg-type]
+    )
+    router.runtime_for("alpha")
+
+    eviction_error: list[BaseException] = []
+
+    def evict() -> None:
+        try:
+            router.lease_for("beta")
+        except BaseException as exc:
+            eviction_error.append(exc)
+
+    evictor = threading.Thread(target=evict)
+    evictor.start()
+    assert close_started.wait(timeout=2)
+
+    acquired: list[TenantRuntimeLease] = []
+
+    def reacquire() -> None:
+        acquired.append(router.lease_for("alpha"))
+
+    reacquirer = threading.Thread(target=reacquire)
+    reacquirer.start()
+    reacquirer.join(timeout=0.1)
+    assert reacquirer.is_alive()
+
+    close_release.set()
+    evictor.join(timeout=2)
+    reacquirer.join(timeout=2)
+
+    assert len(eviction_error) == 1
+    assert len(acquired) == 1
+    assert acquired[0].runtime is first
+    acquired[0].release()
+
+
 def test_tenant_router_retries_only_failed_runtime_shutdowns(tmp_path: Path) -> None:
     created: list[_FakeRuntime] = []
 
@@ -209,6 +273,8 @@ def test_tenant_router_retries_only_failed_runtime_shutdowns(tmp_path: Path) -> 
     with pytest.raises(ExceptionGroup, match="tenant runtimes failed to close"):
         router.close()
     assert [runtime.close_calls for runtime in created] == [1, 1]
+    with pytest.raises(TenantRuntimeRouterClosedError, match="closing"):
+        router.lease_for("gamma")
 
     created[0].fail_close = False
     router.close()

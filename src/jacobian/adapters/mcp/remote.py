@@ -159,6 +159,7 @@ class TenantRuntimeRouter:
         self._runtime_factory = runtime_factory
         self._runtimes: dict[str, _TenantRuntimeEntry] = {}
         self._creating: set[str] = set()
+        self._evicting: set[str] = set()
         self._evictions_in_flight = 0
         self._condition = threading.Condition()
         self._closing = False
@@ -235,6 +236,8 @@ class TenantRuntimeRouter:
 
     def _plan_acquisition(self, tenant_key: str) -> _AcquisitionPlan:
         now = self._clock()
+        if tenant_key in self._evicting:
+            return "WAIT"
         entry = self._runtimes.get(tenant_key)
         if entry is not None and not (
             entry.active_leases == 0
@@ -245,6 +248,7 @@ class TenantRuntimeRouter:
             return TenantRuntimeLease(self, tenant_key, entry.runtime)
         if entry is not None:
             eviction = (tenant_key, self._runtimes.pop(tenant_key))
+            self._evicting.add(tenant_key)
             self._evictions_in_flight += 1
             return eviction
         if tenant_key in self._creating:
@@ -266,6 +270,7 @@ class TenantRuntimeRouter:
             )
         eviction = min(inactive, key=lambda item: (item[1].last_used, item[0]))
         del self._runtimes[eviction[0]]
+        self._evicting.add(eviction[0])
         self._evictions_in_flight += 1
         return eviction
 
@@ -276,14 +281,13 @@ class TenantRuntimeRouter:
         except BaseException:
             with self._condition:
                 self._evictions_in_flight -= 1
-                # Guard against overwriting a runtime that was created
-                # concurrently while this eviction was in flight.
-                if tenant_key not in self._runtimes:
-                    self._runtimes[tenant_key] = entry
+                self._evicting.remove(tenant_key)
+                self._runtimes[tenant_key] = entry
                 self._condition.notify_all()
             raise
         with self._condition:
             self._evictions_in_flight -= 1
+            self._evicting.remove(tenant_key)
             self._condition.notify_all()
 
     def _release(self, tenant_key: str) -> None:
@@ -326,7 +330,6 @@ class TenantRuntimeRouter:
         if failures:
             with self._condition:
                 self._shutdown_in_flight = False
-                self._closing = False
                 self._condition.notify_all()
             raise ExceptionGroup(
                 "one or more tenant runtimes failed to close", failures

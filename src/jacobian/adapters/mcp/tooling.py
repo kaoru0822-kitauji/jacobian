@@ -47,13 +47,26 @@ async def _run_blocking[BlockingResultT](
         if on_cancel is not None:
             on_cancel()
         drained: BlockingResultT | None = None
-        try:
-            drained = await asyncio.shield(worker)
-        except BaseException:
-            _LOGGER.debug(
-                "blocking MCP worker failed while its cancelled request drained",
-                exc_info=True,
-            )
+        while not worker.done():
+            try:
+                drained = await asyncio.shield(worker)
+                break
+            except asyncio.CancelledError:
+                continue
+            except BaseException:
+                _LOGGER.debug(
+                    "blocking MCP worker failed while its cancelled request drained",
+                    exc_info=True,
+                )
+                break
+        if worker.done() and drained is None:
+            try:
+                drained = worker.result()
+            except BaseException:
+                _LOGGER.debug(
+                    "blocking MCP worker failed while its cancelled request drained",
+                    exc_info=True,
+                )
         exc.drained_result = drained  # type: ignore[attr-defined]
         raise
 
