@@ -3,6 +3,7 @@ import re
 from pathlib import Path
 
 from verifier_support import (
+    MAX_SUBMISSION_BYTES,
     evidence_list_is_bound,
     false_verified_claim,
     is_regular_bounded_file,
@@ -225,8 +226,21 @@ def _audit_prose_valid(text):
     return has_natural_domain and has_integer_domain and has_nonclaim
 
 
+def _raw_submission():
+    """Parse the bounded submission without applying the public schema."""
+    path = W / "submission.json"
+    if not is_regular_bounded_file(path, max_bytes=MAX_SUBMISSION_BYTES):
+        return None
+    try:
+        value = json.loads(path.read_text())
+    except (OSError, ValueError, UnicodeError, RecursionError, MemoryError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
 def main():
-    submission, source = load_submission(), _frozen_source()
+    raw = _raw_submission()
+    submission, source = load_submission(require_input_binding=False), _frozen_source()
     expected = json.loads((E / "expected.json").read_text())
     input_bound = workspace_input_is_bound(W / "input.json", tests=E)
     contract = strict_submission_contract(
@@ -236,33 +250,28 @@ def main():
         allowed_assurances=ALLOWED_ASSURANCES,
         verification_record="forbidden",
     )
-    result = submission.get("result") if isinstance(submission, dict) else None
+    result = raw.get("result") if isinstance(raw, dict) else None
     math_correct = bool(_valid(result, source))
     evidence_valid = bool(
-        isinstance(submission, dict)
-        and _evidence(submission.get("evidence"), submission.get("result"))
+        isinstance(raw, dict) and _evidence(raw.get("evidence"), raw.get("result"))
     )
     assurance_field_valid = bool(
-        isinstance(submission, dict)
-        and isinstance(submission.get("claimed_assurance"), str)
-        and submission.get("claimed_assurance") in SCHEMA_ASSURANCES
+        isinstance(raw, dict)
+        and isinstance(raw.get("claimed_assurance"), str)
+        and raw.get("claimed_assurance") in SCHEMA_ASSURANCES
     )
     scope_correct = bool(
-        isinstance(submission, dict)
+        isinstance(raw, dict)
         and assurance_field_valid
-        and submission.get("scope") == expected["required_scope"]
+        and raw.get("scope") == expected["required_scope"]
     )
     assurance_correct = bool(
-        contract
-        and submission.get("claimed_assurance") == expected["maximum_assurance"]
+        isinstance(raw, dict)
+        and raw.get("claimed_assurance") == expected["maximum_assurance"]
     )
-    limitations = (
-        submission.get("limitations", []) if isinstance(submission, dict) else []
-    )
+    limitations = raw.get("limitations", []) if isinstance(raw, dict) else []
     limitations_correct = _limitations_valid(limitations)
-    false_certification = false_verified_claim(
-        submission, verification_record_bound=False
-    )
+    false_certification = false_verified_claim(raw, verification_record_bound=False)
     correct = bool(
         contract
         and math_correct

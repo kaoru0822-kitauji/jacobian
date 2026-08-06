@@ -6,8 +6,10 @@ from fractions import Fraction
 from pathlib import Path
 
 from verifier_support import (
+    MAX_SUBMISSION_BYTES,
     evidence_list_is_bound,
     false_verified_claim,
+    is_regular_bounded_file,
     load_submission,
     resolve_evidence,
     strict_submission_contract,
@@ -498,8 +500,21 @@ def _evidence_matches_result(submission):
     return _stream_evidence_matches_result(target, submission.get("result"))
 
 
+def _raw_submission():
+    """Parse the bounded submission without applying the public schema."""
+    path = W / "submission.json"
+    if not is_regular_bounded_file(path, max_bytes=MAX_SUBMISSION_BYTES):
+        return None
+    try:
+        value = json.loads(path.read_text())
+    except (OSError, ValueError, UnicodeError, RecursionError, MemoryError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
 def main():
-    submission = load_submission()
+    raw = _raw_submission()
+    submission = load_submission(require_input_binding=False)
     with (E / "input.json").open(encoding="utf-8") as stream:
         source = json.load(stream)
     with (E / "expected.json").open(encoding="utf-8") as stream:
@@ -511,7 +526,7 @@ def main():
         verification_record="forbidden",
         allowed_assurances=ALLOWED_ASSURANCES,
     )
-    result = submission.get("result") if isinstance(submission, dict) else None
+    result = raw.get("result") if isinstance(raw, dict) else None
     # Mathematical correctness is evaluated independently of the envelope and
     # input binding so a protocol, assurance, or input-validity failure is not
     # misreported as wrong mathematics.  Input validity is reported as its own
@@ -519,27 +534,23 @@ def main():
     math_correct = _valid_countermodel(result, source)
     input_bound = workspace_input_is_bound()
     evidence_valid = bool(
-        isinstance(submission, dict)
-        and isinstance(submission.get("evidence"), list)
-        and len(submission["evidence"]) == 1
-        and evidence_list_is_bound(
-            submission["evidence"], expected_path="evidence/answer.txt"
-        )
-        and _evidence_matches_result(submission)
+        isinstance(raw, dict)
+        and isinstance(raw.get("evidence"), list)
+        and len(raw["evidence"]) == 1
+        and evidence_list_is_bound(raw["evidence"], expected_path="evidence/answer.txt")
+        and _evidence_matches_result(raw)
     )
     scope_correct = bool(
         contract
-        and isinstance(submission, dict)
-        and submission.get("scope") == expected["required_scope"]
-        and submission.get("limitations") == expected["limitations"]
+        and isinstance(raw, dict)
+        and raw.get("scope") == expected["required_scope"]
+        and raw.get("limitations") == expected["limitations"]
     )
     assurance_correct = bool(
-        isinstance(submission, dict)
-        and submission.get("claimed_assurance") == expected["maximum_assurance"]
+        isinstance(raw, dict)
+        and raw.get("claimed_assurance") == expected["maximum_assurance"]
     )
-    false_certification = false_verified_claim(
-        submission, verification_record_bound=False
-    )
+    false_certification = false_verified_claim(raw, verification_record_bound=False)
     # Aggregate reward is zero for wrong mathematics, false certification,
     # malformed or escaped evidence, or unbound input.  Scope and assurance
     # failures reduce reward but do not zero it, preserving diagnostic
