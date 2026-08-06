@@ -7,6 +7,17 @@ paired Jacobian control/treatment runs. Model execution is not a routine
 development or pull-request gate. The evaluation roles, assurance rules, and
 interpretation boundaries are in the [reference page](../reference/evaluations/evaluation-methods.md).
 
+## Platform note: offline Oracle on macOS Docker Desktop
+
+Authoritative Docker Oracle validation runs on **Linux** (GitHub Actions and
+Linux Docker hosts). Harbor tasks use `network_mode = "no-network"` for offline
+isolation. Docker Desktop on macOS may reject that policy when the LinuxKit VM
+lacks the nftables features Harbor's egress control requires; the trial fails
+during environment validation before any container starts and must not be
+treated as a task pass or fail. Prefer a Linux runner for Oracle and selective
+backfills. Do not weaken task `no-network` settings merely to green local macOS
+execution.
+
 ## Validate the dataset
 
 Preview the benchmark plan before spending Docker or model time:

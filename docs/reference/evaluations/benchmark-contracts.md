@@ -81,6 +81,41 @@ contract authorizes. Wrong mathematical answers, malformed or escaped evidence,
 incomplete scope, and false certification receive zero reward. An Oracle answer
 does not authorize `VERIFIED`.
 
+### Diagnostics versus aggregate reward
+
+Harbor reads multi-key `reward.json` and treats named floats as independent
+metrics. Jacobian verifiers therefore use a **two-layer** scoring contract:
+
+1. **Diagnostics** — report independent 0/1 scores such as `correctness`,
+   `evidence_validity`, `scope_accuracy`, `assurance_calibration`, and
+   `false_certification`. A zero aggregate must not erase which dimensions
+   passed: invalid evidence with correct mathematics still reports
+   `correctness = 1.0` and `evidence_validity = 0.0`.
+2. **Aggregate `reward`** — the primary pass signal. Mandatory protocol
+   dimensions are **non-compensable hard gates**. Soft weighted sums that still
+   award most of the reward when a mandatory dimension fails are forbidden for
+   evidence-bound tasks.
+
+Mandatory hard gates for standard digest-bound tasks: protocol/envelope,
+mathematical correctness, evidence binding, required scope, and false
+certification. Assurance may be a hard gate or a documented soft partial
+(`soft_assurance=True` in template `aggregate_reward`) only after every hard
+gate passes.
+
+**Forbidden leaky template:**
+
+```python
+# FORBIDDEN: evidence failure still yields reward ≈ 0.9
+reward = (
+    0 if not correct or false
+    else 0.7 * correct + 0.1 * good + 0.1 * scope + 0.1 * assurance
+)
+```
+
+Use template `aggregate_reward` (or an equivalent min-gate of mandatory
+dimensions). Shared validation keeps an inventory ratchet so the leaky pattern
+cannot reappear.
+
 Each separate verifier owns its local `tests/verifier_support.py`; Harbor's
 whole-task digest binds that copy, so validation does not synchronize it with a
 global runtime helper. New tasks inherit the template copy, while shared fixes
@@ -89,7 +124,8 @@ command only after such a deliberate update. Evidence has no arbitrary byte
 cap, but its schema, digest, path, and workspace binding remain mandatory.
 Verifier regression fixtures should also prove that malformed submissions do
 not crash: exercise booleans where integers are expected, non-finite JSON
-numbers, unhashable nested values, wrong-shaped input, and assurance or
+numbers, unhashable nested values, wrong-shaped input, wrong evidence digests
+(aggregate reward zero while diagnostics stay independent), and assurance or
 protocol failures whose independent diagnostics remain visible. A full Oracle
 reward does not replace these negative-path checks.
 
