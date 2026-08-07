@@ -500,11 +500,13 @@ def test_terminal_evidence_is_clean_room_fail_closed_and_not_assurance(
     tmp_path: Path,
 ) -> None:
     path = _write(tmp_path, [_reasoning("PLAN", "Solve exactly.")])
+    source_digest = "sha256:" + "c" * 64
     evidence = CleanRoomTerminalEvidence(
         verifier_digest="sha256:" + "d" * 64,
         clean_room=True,
         verifier_execution_status="COMPLETED",
         acceptance=TerminalAcceptance.ACCEPTED,
+        source_digest=source_digest,
         input_binding_valid=True,
         artifact_binding_valid=True,
     )
@@ -525,6 +527,7 @@ def test_terminal_evidence_is_clean_room_fail_closed_and_not_assurance(
             clean_room=True,
             verifier_execution_status="TIMEOUT",
             acceptance=TerminalAcceptance.ACCEPTED,
+            source_digest=source_digest,
         )
     with pytest.raises(ValidationError, match="invalid bindings"):
         CleanRoomTerminalEvidence(
@@ -532,6 +535,7 @@ def test_terminal_evidence_is_clean_room_fail_closed_and_not_assurance(
             clean_room=True,
             verifier_execution_status="COMPLETED",
             acceptance=TerminalAcceptance.ACCEPTED,
+            source_digest=source_digest,
             input_binding_valid=False,
         )
 

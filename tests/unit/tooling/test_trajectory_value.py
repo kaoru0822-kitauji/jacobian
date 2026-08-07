@@ -193,6 +193,7 @@ def _trajectory(
             after=after,
         )
     )
+    source_digest = _sha("source-" + trajectory_id)
     terminal = CleanRoomTerminalEvidence(
         verifier_digest=_sha("clean-room-polynomial-verifier-v1"),
         clean_room=True,
@@ -200,11 +201,12 @@ def _trajectory(
         acceptance=(
             TerminalAcceptance.ACCEPTED if accepted else TerminalAcceptance.REJECTED
         ),
+        source_digest=source_digest,
         input_binding_valid=True,
         artifact_binding_valid=True,
     )
     extraction = TrajectoryExtraction(
-        source_digest=_sha("source-" + trajectory_id),
+        source_digest=source_digest,
         task_family="polynomial-map-inverse",
         states=tuple(states),
         terminal_evidence=terminal,
