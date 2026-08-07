@@ -16,6 +16,22 @@ if isinstance(submission, dict) and isinstance(submission.get("evidence"), list)
 result = submission.get("result") if isinstance(submission, dict) else None
 
 
+def _digest_ok(value: object) -> bool:
+    return isinstance(value, str) and value.startswith("sha256:") and len(value) == 71
+
+
+def _case_bound(case: object) -> bool:
+    if not isinstance(case, dict):
+        return False
+    if not isinstance(case.get("command"), list) or not case.get("command"):
+        return False
+    if not isinstance(case.get("expected_output"), str):
+        return False
+    return _digest_ok(case.get("expected_output_sha256")) and _digest_ok(
+        case.get("observed_output_sha256")
+    )
+
+
 def _execution_bound(report: object) -> bool:
     """Reject reports that only restate public spike success literals."""
 
@@ -30,21 +46,20 @@ def _execution_bound(report: object) -> bool:
     if report.get("assurance") != expected["report_assurance"]:
         return False
     provider = report.get("provider")
-    reproduction = report.get("reproduction")
-    if not isinstance(provider, dict) or not isinstance(reproduction, dict):
+    reproductions = report.get("reproductions")
+    if not isinstance(provider, dict) or not isinstance(reproductions, dict):
         return False
-    runtime = provider.get("runtime")
-    if not isinstance(runtime, dict) or not runtime:
-        return False
-    cases = reproduction.get("cases")
-    if not isinstance(cases, list) or not cases:
-        return False
-    output_digest = reproduction.get("provider_output_sha256")
-    if not (
-        isinstance(output_digest, str)
-        and output_digest.startswith("sha256:")
-        and len(output_digest) == 71
+    if not isinstance(provider.get("executable"), str) or not provider.get(
+        "executable"
     ):
+        return False
+    if not _digest_ok(provider.get("executable_sha256")):
+        return False
+    if set(reproductions) != {"unique", "cocircular"}:
+        return False
+    if not _case_bound(reproductions.get("unique")):
+        return False
+    if not _case_bound(reproductions.get("cocircular")):
         return False
     limitations = report.get("limitations")
     if not isinstance(limitations, list) or not limitations:

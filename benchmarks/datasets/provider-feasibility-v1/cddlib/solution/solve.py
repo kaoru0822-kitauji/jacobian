@@ -9,7 +9,7 @@ REPORT = APP / "evidence" / "provider-report.json"
 TASK_ID = "jacobian/cddlib"
 PROVIDER = "cddlib/pycddlib"
 CONTRACT = "jacobian.cddlib-hv-spike/v1"
-PIN = "sha256:0ee86d1ba1b82fd022f4396d0e23bc46fb3e96409dd8e8435cbc6c721297d382"
+PIN = "sha256:15b0b5b4d608bc2f354dd484c44aa3da7441d615ab9650d6f7611c7e97af7871"
 
 report = json.loads(REPORT.read_text())
 status = report.get("status", "ERROR")

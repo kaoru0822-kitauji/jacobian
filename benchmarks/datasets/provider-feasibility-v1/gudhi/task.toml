@@ -1,5 +1,5 @@
 schema_version = "1.4"
-artifacts = ["/app/submission.json", "/app/evidence"]
+artifacts = ["/app/input.json", "/app/submission.json", "/app/evidence"]
 
 [task]
 name = "jacobian/gudhi"
@@ -19,7 +19,7 @@ field = "provider-integration"
 assurance_ceiling = "COMPUTED"
 answer_visibility = "public"
 provenance_class = "pinned-provider-spike"
-fixture_digest = "sha256:d5c4eb2ebe0dcfb5512ee2ffe1f8d4186883158a36aadb9e115b55273400bc8b"
+fixture_digest = "sha256:98ef068d9ef62688c4a32da586515a76f132b8c938516adcfed074c7fbc10c2b"
 required_provider = "gudhi"
 
 [agent]

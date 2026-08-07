@@ -45,6 +45,24 @@ def test_provider_verifier_images_include_bound_frozen_input(task_name: str) -> 
     )
 
 
+@pytest.mark.parametrize("task_name", PROVIDER_TASKS)
+def test_provider_separate_verifier_publishes_bound_input_artifact(
+    task_name: str,
+) -> None:
+    """Separate verifier mode only receives declared artifacts.
+
+    ``load_submission`` requires ``/app/input.json`` to match the frozen
+    verifier input, so provider tasks must publish that path or Oracle reward
+    collapses to zero after a successful spike.
+    """
+
+    task = DATASETS / "provider-feasibility-v1" / task_name
+    text = (task / "task.toml").read_text(encoding="utf-8")
+    assert 'environment_mode = "separate"' in text
+    assert '"/app/input.json"' in text
+    assert text.index('"/app/input.json"') < text.index('"/app/submission.json"')
+
+
 def test_reliability_recomputes_input_and_rejects_coerced_state_count(
     tmp_path: Path,
 ) -> None:

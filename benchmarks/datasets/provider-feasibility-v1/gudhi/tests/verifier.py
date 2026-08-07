@@ -16,6 +16,10 @@ if isinstance(submission, dict) and isinstance(submission.get("evidence"), list)
 result = submission.get("result") if isinstance(submission, dict) else None
 
 
+def _digest_ok(value: object) -> bool:
+    return isinstance(value, str) and value.startswith("sha256:") and len(value) == 71
+
+
 def _execution_bound(report: object) -> bool:
     """Reject reports that only restate public spike success literals."""
 
@@ -36,15 +40,13 @@ def _execution_bound(report: object) -> bool:
     runtime = provider.get("runtime")
     if not isinstance(runtime, dict) or not runtime:
         return False
-    cases = reproduction.get("cases")
-    if not isinstance(cases, list) or not cases:
+    pairs = reproduction.get("pairs")
+    filtration = reproduction.get("filtration")
+    if not isinstance(pairs, list) or not pairs:
         return False
-    output_digest = reproduction.get("provider_output_sha256")
-    if not (
-        isinstance(output_digest, str)
-        and output_digest.startswith("sha256:")
-        and len(output_digest) == 71
-    ):
+    if not isinstance(filtration, list) or not filtration:
+        return False
+    if not _digest_ok(reproduction.get("provider_output_sha256")):
         return False
     limitations = report.get("limitations")
     if not isinstance(limitations, list) or not limitations:
