@@ -9,7 +9,7 @@ REPORT = APP / "evidence" / "provider-report.json"
 TASK_ID = "jacobian/regina"
 PROVIDER = "regina"
 CONTRACT = "jacobian.regina-outcomes-spike/v1"
-PIN = "sha256:b5736de228ddc8b4e6dbdf375736b78faafb68add6ae57c49facaafebf8fb7bc"
+PIN = "sha256:188618c36f37e31609eb57158f6f8fba270f86c5c6520b816eda6b7634482563"
 
 report = json.loads(REPORT.read_text())
 status = report.get("status", "ERROR")

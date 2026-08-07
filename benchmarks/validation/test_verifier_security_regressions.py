@@ -45,6 +45,24 @@ def test_provider_verifier_images_include_bound_frozen_input(task_name: str) -> 
     )
 
 
+@pytest.mark.parametrize("task_name", PROVIDER_TASKS)
+def test_provider_separate_verifier_publishes_bound_input_artifact(
+    task_name: str,
+) -> None:
+    """Separate verifier mode only receives declared artifacts.
+
+    ``load_submission`` requires ``/app/input.json`` to match the frozen
+    verifier input, so provider tasks must publish that path or Oracle reward
+    collapses to zero after a successful spike.
+    """
+
+    task = DATASETS / "provider-feasibility-v1" / task_name
+    text = (task / "task.toml").read_text(encoding="utf-8")
+    assert 'environment_mode = "separate"' in text
+    assert '"/app/input.json"' in text
+    assert text.index('"/app/input.json"') < text.index('"/app/submission.json"')
+
+
 def test_reliability_recomputes_input_and_rejects_coerced_state_count(
     tmp_path: Path,
 ) -> None:
@@ -300,3 +318,128 @@ def test_lean_repl_accepts_complete_distinct_task_traces(tmp_path: Path) -> None
     task, app, logs = _lean_case(tmp_path, tasks)
     accepted = support._run_verifier(task, app, logs)
     assert accepted["reward"] == pytest.approx(1.0)
+
+
+def _provider_report_case(tmp_path: Path, task_name: str, report: dict) -> tuple:
+    task = DATASETS / "provider-feasibility-v1" / task_name
+    app = tmp_path / task_name / "app"
+    logs = tmp_path / task_name / "logs"
+    (app / "evidence").mkdir(parents=True)
+    logs.mkdir(parents=True)
+    shutil.copy2(task / "environment" / "input.json", app / "input.json")
+    report_path = app / "evidence" / "provider-report.json"
+    _write_json(report_path, report)
+    expected = json.loads((task / "tests" / "expected.json").read_text())
+    submission = {
+        "task_id": expected["task_id"],
+        "conclusion": "FEASIBLE",
+        "result": {
+            "provider": expected["provider"],
+            "contract": expected["contract"],
+            "status": "COMPLETED",
+            "pin_sha256": expected["pin_sha256"],
+        },
+        "claimed_assurance": "COMPUTED",
+        "scope": "pinned bounded provider reproduction",
+        "completeness": "COMPLETE",
+        "evidence": [
+            {
+                "path": "evidence/provider-report.json",
+                "sha256": _digest(report_path),
+            }
+        ],
+        "limitations": [
+            "provider output is not an operator-authorized independent verification",
+        ],
+    }
+    _write_json(app / "submission.json", submission)
+    return task, app, logs
+
+
+def test_cgal_rejects_fabricated_reproduction_digests(tmp_path: Path) -> None:
+    expected = json.loads(
+        (
+            DATASETS / "provider-feasibility-v1" / "cgal" / "tests" / "expected.json"
+        ).read_text()
+    )
+    fake_digest = "sha256:" + ("0" * 64)
+    report = {
+        "contract": expected["contract"],
+        "status": "COMPLETED",
+        "conclusion": expected["report_conclusion"],
+        "assurance": expected["report_assurance"],
+        "provider": {
+            "executable": "/usr/local/bin/cgal-spike",
+            "executable_sha256": fake_digest,
+        },
+        "reproductions": {
+            name: {
+                **case,
+                "observed_output_sha256": fake_digest,
+                "expected_output_sha256": fake_digest,
+            }
+            for name, case in expected["reproductions"].items()
+        },
+        "limitations": ["fabricated"],
+        "extra": True,
+    }
+    task, app, logs = _provider_report_case(tmp_path, "cgal", report)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["reward"] == 0.0
+
+
+def test_gudhi_rejects_fabricated_persistence_shape(tmp_path: Path) -> None:
+    expected = json.loads(
+        (
+            DATASETS / "provider-feasibility-v1" / "gudhi" / "tests" / "expected.json"
+        ).read_text()
+    )
+    fake_digest = "sha256:" + ("0" * 64)
+    report = {
+        "contract": expected["contract"],
+        "status": "COMPLETED",
+        "conclusion": expected["report_conclusion"],
+        "assurance": expected["report_assurance"],
+        "provider": {
+            "runtime": {"gudhi": "3.13.0", "python": "3.12.0", "numpy": "2.0"}
+        },
+        "reproduction": {
+            "pairs": [{}],
+            "filtration": [{}],
+            "provider_output_sha256": fake_digest,
+        },
+        "limitations": ["fabricated"],
+        "extra": True,
+    }
+    task, app, logs = _provider_report_case(tmp_path, "gudhi", report)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["reward"] == 0.0
+
+
+def test_nauty_rejects_fabricated_count_and_digests(tmp_path: Path) -> None:
+    expected = json.loads(
+        (
+            DATASETS / "provider-feasibility-v1" / "nauty" / "tests" / "expected.json"
+        ).read_text()
+    )
+    fake_digest = "sha256:" + ("0" * 64)
+    report = {
+        "contract": expected["contract"],
+        "status": "COMPLETED",
+        "conclusion": expected["report_conclusion"],
+        "assurance": expected["report_assurance"],
+        "provider": {
+            "executables": {"geng": {"path": "/bin/geng", "sha256": fake_digest}}
+        },
+        "reproduction": {
+            "expected_graph6": ["ZZ"],
+            "observed_count": -1,
+            "observed_output_sha256": fake_digest,
+            "expected_output_sha256": fake_digest,
+        },
+        "limitations": ["fabricated"],
+        "extra": True,
+    }
+    task, app, logs = _provider_report_case(tmp_path, "nauty", report)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["reward"] == 0.0
