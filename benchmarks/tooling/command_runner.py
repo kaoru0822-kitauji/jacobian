@@ -672,6 +672,10 @@ class ToolInteractiveCommand:
                 raise RuntimeError("interactive process closed before responding")
             if not item.strip():
                 if lines:
+                    # Re-check stream bounds before accepting a completed frame.
+                    abort = self._check_read_abort(deadline)
+                    if abort is not None:
+                        raise abort
                     self._responses_read += 1
                     return "\n".join(lines)
                 continue

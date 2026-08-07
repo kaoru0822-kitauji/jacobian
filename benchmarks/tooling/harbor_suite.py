@@ -706,7 +706,36 @@ def _task_manifest_failures(suite: Suite, task_dir: Path, rel: str) -> list[str]
         failures.append(f"{rel}/task.toml: task.name disagrees with suite manifest")
     failures.extend(_metadata_failures(suite, task_dir, rel, cfg.get("metadata", {})))
     failures.extend(_network_mode_failures(cfg, rel))
+    failures.extend(
+        _separate_verifier_input_artifact_failures(suite, task_dir, rel, cfg)
+    )
     return failures
+
+
+def _separate_verifier_input_artifact_failures(
+    suite: Suite, task_dir: Path, rel: str, cfg: dict[str, Any]
+) -> list[str]:
+    """Require bound input publication for separate-verifier provider tasks.
+
+    Harbor's separate verifier mode only mounts declared ``artifacts``. Provider
+    verifiers call ``load_submission`` with input binding, so omitting
+    ``/app/input.json`` makes every completed Oracle trial score zero.
+    """
+
+    if suite.id != "provider-feasibility-v1":
+        return []
+    verifier = cfg.get("verifier", {})
+    if not isinstance(verifier, dict) or verifier.get("environment_mode") != "separate":
+        return []
+    if not (task_dir / "tests" / "input.json").is_file():
+        return []
+    artifacts = cfg.get("artifacts")
+    if not isinstance(artifacts, list) or "/app/input.json" not in artifacts:
+        return [
+            f"{rel}/task.toml: separate verifier mode requires "
+            "/app/input.json in artifacts"
+        ]
+    return []
 
 
 def _agent_environment_failures(suite: Suite, task_dir: Path, rel: str) -> list[str]:
