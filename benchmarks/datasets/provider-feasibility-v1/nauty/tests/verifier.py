@@ -16,6 +16,10 @@ if isinstance(submission, dict) and isinstance(submission.get("evidence"), list)
 result = submission.get("result") if isinstance(submission, dict) else None
 
 
+def _digest_ok(value: object) -> bool:
+    return isinstance(value, str) and value.startswith("sha256:") and len(value) == 71
+
+
 def _execution_bound(report: object) -> bool:
     """Reject reports that only restate public spike success literals."""
 
@@ -31,20 +35,31 @@ def _execution_bound(report: object) -> bool:
         return False
     provider = report.get("provider")
     reproduction = report.get("reproduction")
+    frozen = expected["reproduction"]
     if not isinstance(provider, dict) or not isinstance(reproduction, dict):
         return False
-    runtime = provider.get("runtime")
-    if not isinstance(runtime, dict) or not runtime:
+    if not isinstance(frozen, dict):
         return False
-    cases = reproduction.get("cases")
-    if not isinstance(cases, list) or not cases:
+    executables = provider.get("executables")
+    if not isinstance(executables, dict) or not executables:
         return False
-    output_digest = reproduction.get("provider_output_sha256")
-    if not (
-        isinstance(output_digest, str)
-        and output_digest.startswith("sha256:")
-        and len(output_digest) == 71
-    ):
+    expected_graph6 = reproduction.get("expected_graph6")
+    if expected_graph6 != frozen["expected_graph6"]:
+        return False
+    if not isinstance(expected_graph6, list) or not expected_graph6:
+        return False
+    observed_count = reproduction.get("observed_count")
+    if type(observed_count) is not int or observed_count != frozen["observed_count"]:
+        return False
+    if observed_count != len(expected_graph6):
+        return False
+    expected_digest = reproduction.get("expected_output_sha256")
+    observed_digest = reproduction.get("observed_output_sha256")
+    if expected_digest != frozen["expected_output_sha256"]:
+        return False
+    if not _digest_ok(expected_digest) or not _digest_ok(observed_digest):
+        return False
+    if observed_digest != expected_digest:
         return False
     limitations = report.get("limitations")
     if not isinstance(limitations, list) or not limitations:

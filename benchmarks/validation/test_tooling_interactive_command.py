@@ -5,6 +5,7 @@ import os
 import sys
 import textwrap
 import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -206,6 +207,13 @@ def test_interactive_stderr_is_bounded(tmp_path: Path) -> None:
     command = ToolInteractiveCommand(request)
     command.start()
     try:
+        # The child flushes oversized stderr before reading stdin; wait until
+        # the drain thread observes it so read_response does not race ahead of
+        # the bound flag under parallel host-validation load.
+        deadline = time.monotonic() + 5.0
+        while not command.stderr_exceeded and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert command.stderr_exceeded is True
         command.send("ping")
         with pytest.raises(RuntimeError, match="stderr bounds"):
             command.read_response()

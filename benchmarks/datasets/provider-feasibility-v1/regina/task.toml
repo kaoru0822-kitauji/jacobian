@@ -1,5 +1,5 @@
 schema_version = "1.4"
-artifacts = ["/app/submission.json", "/app/evidence"]
+artifacts = ["/app/input.json", "/app/submission.json", "/app/evidence"]
 
 [task]
 name = "jacobian/regina"
@@ -19,7 +19,7 @@ field = "provider-integration"
 assurance_ceiling = "COMPUTED"
 answer_visibility = "public"
 provenance_class = "pinned-provider-spike"
-fixture_digest = "sha256:b56b8741c6b1ec216bb0d510e12fe5eddc75c901c0ff067e84de887ffdf64a24"
+fixture_digest = "sha256:a20f6aab6523ac570f77fca5226ebe39d9ae951986ec0a933d323c9ce54ff1dc"
 required_provider = "regina"
 
 [agent]
