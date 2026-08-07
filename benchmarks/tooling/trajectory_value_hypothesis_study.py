@@ -1012,7 +1012,9 @@ def _local_auth_status() -> str:
         timeout_seconds=30,
         environment=operator_environment(include=("HOME", "PATH", "CODEX_HOME")),
     )
-    status = result.stdout.decode("utf-8", errors="replace").strip()
+    stdout = result.stdout.decode("utf-8", errors="replace").strip()
+    stderr = result.stderr.decode("utf-8", errors="replace").strip()
+    status = "\n".join(part for part in (stdout, stderr) if part)
     if (
         result.status is not ToolCommandStatus.EXITED
         or result.exit_code != 0
