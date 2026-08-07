@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import shutil
 from pathlib import Path
+from types import SimpleNamespace
 from typing import cast
 
 import pytest
@@ -15,6 +16,7 @@ from benchmarks.tooling.trajectory_value_calibration import (
 from benchmarks.tooling.trajectory_value_hypothesis_study import (
     TrajectoryValueHypothesisStudySpec,
     _codex_arguments,
+    _local_auth_status,
     _verify_terminal,
     analyze_comparison,
     load_hypothesis_spec,
@@ -81,6 +83,21 @@ def test_mixed_study_digest_substitution_fails_closed(tmp_path: Path) -> None:
 def test_external_execution_requires_explicit_opt_in(tmp_path: Path) -> None:
     with pytest.raises(RuntimeError, match="without --execute"):
         run_study(SPEC, tmp_path / "result", execute=False)
+
+
+def test_local_chatgpt_login_accepts_codex_stderr_status(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "benchmarks.tooling.trajectory_value_hypothesis_study.run_operator_command",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            status=ToolCommandStatus.EXITED,
+            exit_code=0,
+            stdout=b"",
+            stderr=b"Logged in using ChatGPT\n",
+        ),
+    )
+    assert _local_auth_status() == "Logged in using ChatGPT"
 
 
 def test_codex_command_freezes_model_isolation_and_no_web_or_retry() -> None:
