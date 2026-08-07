@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import gzip
 import hashlib
 import itertools
 import json
@@ -1069,12 +1070,75 @@ def analyze_study(
     return summary
 
 
+def _package_comparison(output: Path, *, source_revision: str) -> dict[str, Any]:
+    source = output / "comparison.json"
+    destination = output / "comparison.json.gz"
+    if source.is_symlink() or destination.is_symlink():
+        raise RuntimeError("comparison evidence must not be a symlink")
+    if source.is_file() == destination.is_file():
+        raise RuntimeError("exactly one comparison representation is required")
+    if source.is_file():
+        raw = source.read_bytes()
+        OfflineValueComparisonV2.model_validate_json(raw)
+        compressed = gzip.compress(raw, compresslevel=9, mtime=0)
+        temporary = output / ".comparison.json.gz.tmp"
+        temporary.write_bytes(compressed)
+        temporary.replace(destination)
+        source.unlink()
+    else:
+        compressed = destination.read_bytes()
+        try:
+            raw = gzip.decompress(compressed)
+        except (EOFError, gzip.BadGzipFile) as exc:
+            raise RuntimeError("compressed comparison evidence is invalid") from exc
+        OfflineValueComparisonV2.model_validate_json(raw)
+    metadata = {
+        "path": destination.relative_to(output).as_posix(),
+        "encoding": "gzip",
+        "compression_level": 9,
+        "mtime": 0,
+        "uncompressed_bytes": len(raw),
+        "uncompressed_file_digest": "sha256:" + hashlib.sha256(raw).hexdigest(),
+        "compressed_file_digest": file_digest(destination),
+        "source_revision": source_revision,
+        "packager_digest": file_digest(Path(__file__).resolve(strict=True)),
+    }
+    return metadata
+
+
 def _artifact_manifest(output: Path) -> dict[str, str]:
     return {
         path.relative_to(output).as_posix(): file_digest(path)
         for path in _regular_files(output)
         if path.name != "manifest.json"
     }
+
+
+def package_study(output: Path) -> dict[str, Any]:
+    """Deterministically package a completed study without changing its analysis."""
+
+    output = output.resolve(strict=True)
+    manifest_path = output / "manifest.json"
+    if manifest_path.is_symlink() or not manifest_path.is_file():
+        raise RuntimeError("packaging requires a completed study manifest")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict) or not isinstance(
+        manifest.get("artifacts"), dict
+    ):
+        raise RuntimeError("study manifest is malformed")
+    if _artifact_manifest(output) != manifest["artifacts"]:
+        raise RuntimeError("study artifacts do not match the immutable manifest")
+    revision = git_head_sha(_ROOT)
+    if revision is None:
+        raise RuntimeError("unable to bind packaging source revision")
+    packaging = _package_comparison(output, source_revision=revision)
+    existing = manifest.get("packaging")
+    if existing is not None and existing != {"comparison": packaging}:
+        raise RuntimeError("study packaging provenance drift")
+    manifest["packaging"] = {"comparison": packaging}
+    manifest["artifacts"] = _artifact_manifest(output)
+    _write_json(manifest_path, manifest)
+    return packaging
 
 
 def _local_auth_status() -> str:
@@ -1428,6 +1492,7 @@ def run_study(
         interrupted_revision=interrupted_source_revision,
     )
     summary = analyze_study(spec, output, records)
+    packaging = _package_comparison(output, source_revision=revision)
     manifest = {
         "schema_version": "1",
         "analysis_id": spec.analysis_id,
@@ -1503,6 +1568,7 @@ def run_study(
             "rejected": summary["rejected_count"],
             "excluded": len(summary["excluded"]),
         },
+        "packaging": {"comparison": packaging},
         "artifacts": _artifact_manifest(output),
         "terminal_reward": spec.terminal_reward,
         "learned_components": False,
@@ -1524,6 +1590,8 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--resume-after-interruption", action="store_true")
     run.add_argument("--prior-source-revision")
     run.add_argument("--interrupted-source-revision")
+    package = subparsers.add_parser("package")
+    package.add_argument("--output", type=Path, required=True)
     schema = subparsers.add_parser("schema")
     schema.add_argument("--output", type=Path)
     validate = subparsers.add_parser("validate")
@@ -1557,6 +1625,9 @@ def main(argv: Sequence[str] | None = None) -> None:
             )
         )
         return
+    if args.command == "package":
+        print(json.dumps(package_study(args.output), indent=2, sort_keys=True))
+        return
     summary = run_study(
         args.spec,
         args.output,
@@ -1580,5 +1651,6 @@ __all__ = [
     "analyze_comparison",
     "analyze_study",
     "load_hypothesis_spec",
+    "package_study",
     "run_study",
 ]
