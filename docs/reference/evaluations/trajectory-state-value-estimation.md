@@ -439,14 +439,17 @@ and 19 rejected. Exactly three tasks met the frozen 20--80% rule at 1/2 each:
 
 [`trajectory-value-mixed-study-v1.schema.json`](schemas/trajectory-value-mixed-study-v1.schema.json)
 and
-[`trajectory-value-mixed-study-v1.json`](../../../benchmarks/config/trajectory-value-mixed-study-v1.json)
-freeze the main study before any main labels are collected. The contract binds
-both calibration manifests and summaries by digest, recomputes the eligible
-population in source order and candidate order, and rejects task substitution,
-evidence drift, or estimator reordering. Every selected task also binds the
-exact Harbor public and verifier contract through its calibration manifest;
-the loader recomputes the pinned Harbor, public-file, and verifier-file digests
-and refuses execution after task drift.
+the [original frozen contract](../../../benchmarks/studies/trajectory-value-hypothesis-codex-v1/frozen-contracts/trajectory-value-mixed-study-v1.json)
+freeze the main study before any main labels are collected. Those bytes were
+the live PR5 contract at freeze time; the PR7 manifest retains them after later
+calibration hardening refreshed the separately maintained
+[`live contract`](../../../benchmarks/config/trajectory-value-mixed-study-v1.json).
+The frozen contract binds both calibration manifests and summaries by digest,
+recomputes the eligible population in source order and candidate order, and
+rejects task substitution, evidence drift, or estimator reordering. Every
+selected task also binds the exact Harbor public and verifier contract through
+its calibration manifest; the loader recomputes the pinned Harbor, public-file,
+and verifier-file digests and refuses execution after task drift.
 
 The main matrix contains the three selected task groups with eight independent
 rollouts each, for 24 planned rollouts. It retains the exact calibration model,
@@ -555,10 +558,12 @@ not real-model predictive evidence and does not answer H1, H2, or H3.
 and
 [`trajectory-value-hypothesis-study-v1.json`](../../../benchmarks/config/trajectory-value-hypothesis-study-v1.json)
 close the remaining analysis choices before any main-study label exists. The
-contract digest-binds the PR5 mixed-study file and revalidates its two
-calibration sources, three selected Harbor tasks, current public and verifier
-files, eight repetitions per task, model, prompt, timeout, and no-retry policy.
-The 24-rollout population cannot be substituted by this analysis layer.
+contract digest-binds the then-live PR5 mixed-study bytes and revalidates its
+two calibration sources, three selected Harbor tasks, current public and
+verifier files, eight repetitions per task, model, prompt, timeout, and
+no-retry policy. Historical replay now resolves those exact bytes through the
+manifest-bound frozen snapshot. The 24-rollout population cannot be substituted
+by this analysis layer.
 
 H1 reports the complete version 2 metrics for all six estimators: Brier, MAE,
 cluster observation and trajectory sizes, support range and mean, task-group
