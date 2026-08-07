@@ -60,6 +60,7 @@ def validate_payload(
             path=location,
             actual_type=json_value_type(first.instance),
             expected=schema_expectation(first),
+            details=schema_violation_details(first),
         )
     return normalized
 
@@ -95,13 +96,65 @@ def schema_expectation(error: JsonSchemaValidationError) -> str:
         if isinstance(expected, list):
             return "JSON type " + " or ".join(str(item) for item in expected)
         return f"JSON type {expected}"
+    constraint_labels = {
+        "minimum": "a number greater than or equal to",
+        "exclusiveMinimum": "a number greater than",
+        "maximum": "a number less than or equal to",
+        "exclusiveMaximum": "a number less than",
+        "minLength": "a string with minimum length",
+        "maxLength": "a string with maximum length",
+        "minItems": "an array with minimum length",
+        "maxItems": "an array with maximum length",
+        "multipleOf": "a number that is a multiple of",
+        "pattern": "a string matching pattern",
+    }
+    label = constraint_labels.get(str(error.validator))
+    if label is not None:
+        rendered = json.dumps(error.validator_value, ensure_ascii=False)
+        # Truncate to stay within CapabilityDiagnostic.expected's 1024-char limit
+        max_value = 1024 - len(label) - 1
+        if len(rendered) > max_value:
+            rendered = rendered[: max(0, max_value - 3)] + "..."
+        return f"{label} {rendered}"
     return "input matching the capability descriptor JSON Schema"
+
+
+def schema_violation_details(error: JsonSchemaValidationError) -> dict[str, object]:
+    """Return the exact public schema constraint that rejected one value."""
+
+    details: dict[str, object] = {"validator": str(error.validator)}
+    if error.validator in {
+        "minimum",
+        "exclusiveMinimum",
+        "maximum",
+        "exclusiveMaximum",
+        "minLength",
+        "maxLength",
+        "minItems",
+        "maxItems",
+        "multipleOf",
+        "pattern",
+        "enum",
+        "const",
+        "type",
+    }:
+        constraint_value = error.validator_value
+        if isinstance(constraint_value, str):
+            if len(constraint_value) > 1024:
+                constraint_value = constraint_value[:1021] + "..."
+        else:
+            rendered = json.dumps(constraint_value, ensure_ascii=False)
+            if len(rendered) > 1024:
+                constraint_value = rendered[:1021] + "..."
+        details["constraint"] = constraint_value
+    return details
 
 
 __all__ = [
     "compiled_validator",
     "json_value_type",
     "schema_expectation",
+    "schema_violation_details",
     "validate_payload",
     "validator",
 ]
