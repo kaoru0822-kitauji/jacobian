@@ -196,6 +196,7 @@ class ExtractedTrajectoryState(ContractModel):
     boundary: StateBoundary
     hard_state: TrajectoryHardState
     soft_state: TrajectorySoftState | None = None
+    soft_state_digest: str = Field(pattern=_DIGEST_PATTERN)
     hard_state_digest: str = Field(pattern=_DIGEST_PATTERN)
     changed_fields: tuple[str, ...] = ()
     milestone_kinds: tuple[MilestoneKind, ...] = ()
@@ -262,6 +263,14 @@ class TrajectoryExtraction(ContractModel):
             range(len(self.states))
         ):
             raise ValueError("state indices must be contiguous")
+        for state in self.states:
+            soft_payload = (
+                None
+                if state.soft_state is None
+                else state.soft_state.model_dump(mode="json")
+            )
+            if state.soft_state_digest != _digest(soft_payload):
+                raise ValueError("soft-state digest mismatch")
         if (
             self.terminal_evidence is not None
             and self.terminal_evidence.source_binding_digest != self.source_digest
@@ -926,13 +935,17 @@ def extract_codex_trajectory(
             if eligible
             else "observation boundary only; no eligible typed mathematical state transition"
         )
+        soft = mutable.soft()
         snapshots.append(
             ExtractedTrajectoryState(
                 index=len(snapshots),
                 source_event_index=source_event_index,
                 boundary=boundary,
                 hard_state=hard,
-                soft_state=mutable.soft(),
+                soft_state=soft,
+                soft_state_digest=_digest(
+                    None if soft is None else soft.model_dump(mode="json")
+                ),
                 hard_state_digest=_digest(hard.model_dump(mode="json")),
                 changed_fields=changed,
                 milestone_kinds=kinds,

@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from referencing import Registry
 from referencing.jsonschema import DRAFT202012
 
+from jacobian.canonical import canonicalize_json
 from jacobian.eval import trajectory_value_abstraction as abstraction_module
 from jacobian.eval.trajectory_state import (
     ArtifactStateRef,
@@ -47,6 +48,10 @@ ROOT = Path(__file__).resolve().parents[3]
 
 def _sha(value: str) -> str:
     return "sha256:" + hashlib.sha256(value.encode()).hexdigest()
+
+
+def _digest(value: object) -> str:
+    return "sha256:" + hashlib.sha256(canonicalize_json(value)).hexdigest()
 
 
 def _artifact(value: str) -> str:
@@ -120,15 +125,17 @@ def _state(
     after: str | None = None,
 ) -> ExtractedTrajectoryState:
     transitions = hard.latest_meaningful_transitions
+    soft = TrajectorySoftState(
+        plan_summary=plan,
+        latest_after_tool_summary=after,
+    )
     return ExtractedTrajectoryState(
         index=index,
         source_event_index=index,
         boundary=boundary,
         hard_state=hard,
-        soft_state=TrajectorySoftState(
-            plan_summary=plan,
-            latest_after_tool_summary=after,
-        ),
+        soft_state=soft,
+        soft_state_digest=_digest(soft.model_dump(mode="json")),
         hard_state_digest=_sha(f"hard-{index}-{hard.model_dump_json()}"),
         changed_fields=tuple(item.value for item in transitions),
         milestone_kinds=transitions,

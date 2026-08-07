@@ -190,6 +190,11 @@
           ],
           "default": null
         },
+        "soft_state_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Soft State Digest",
+          "type": "string"
+        },
         "source_event_index": {
           "minimum": 0,
           "title": "Source Event Index",
@@ -201,6 +206,7 @@
         "source_event_index",
         "boundary",
         "hard_state",
+        "soft_state_digest",
         "hard_state_digest",
         "milestone_eligible",
         "milestone_reason"
