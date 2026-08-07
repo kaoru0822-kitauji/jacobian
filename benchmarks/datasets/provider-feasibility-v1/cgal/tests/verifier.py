@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -20,16 +21,30 @@ def _digest_ok(value: object) -> bool:
     return isinstance(value, str) and value.startswith("sha256:") and len(value) == 71
 
 
-def _case_bound(case: object) -> bool:
-    if not isinstance(case, dict):
+def _sha256_text(value: str) -> str:
+    return "sha256:" + hashlib.sha256(value.encode("ascii")).hexdigest()
+
+
+def _case_bound(name: str, case: object) -> bool:
+    frozen = expected["reproductions"].get(name)
+    if not isinstance(frozen, dict) or not isinstance(case, dict):
         return False
-    if not isinstance(case.get("command"), list) or not case.get("command"):
+    if case.get("command") != frozen["command"]:
         return False
-    if not isinstance(case.get("expected_output"), str):
+    expected_output = case.get("expected_output")
+    if expected_output != frozen["expected_output"]:
         return False
-    return _digest_ok(case.get("expected_output_sha256")) and _digest_ok(
-        case.get("observed_output_sha256")
-    )
+    if not isinstance(expected_output, str):
+        return False
+    expected_digest = case.get("expected_output_sha256")
+    observed_digest = case.get("observed_output_sha256")
+    if expected_digest != frozen["expected_output_sha256"]:
+        return False
+    if not _digest_ok(expected_digest) or not _digest_ok(observed_digest):
+        return False
+    if _sha256_text(expected_output) != expected_digest:
+        return False
+    return observed_digest == expected_digest
 
 
 def _execution_bound(report: object) -> bool:
@@ -57,9 +72,9 @@ def _execution_bound(report: object) -> bool:
         return False
     if set(reproductions) != {"unique", "cocircular"}:
         return False
-    if not _case_bound(reproductions.get("unique")):
+    if not _case_bound("unique", reproductions.get("unique")):
         return False
-    if not _case_bound(reproductions.get("cocircular")):
+    if not _case_bound("cocircular", reproductions.get("cocircular")):
         return False
     limitations = report.get("limitations")
     if not isinstance(limitations, list) or not limitations:

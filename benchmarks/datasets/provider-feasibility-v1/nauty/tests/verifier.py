@@ -35,19 +35,31 @@ def _execution_bound(report: object) -> bool:
         return False
     provider = report.get("provider")
     reproduction = report.get("reproduction")
+    frozen = expected["reproduction"]
     if not isinstance(provider, dict) or not isinstance(reproduction, dict):
+        return False
+    if not isinstance(frozen, dict):
         return False
     executables = provider.get("executables")
     if not isinstance(executables, dict) or not executables:
         return False
     expected_graph6 = reproduction.get("expected_graph6")
+    if expected_graph6 != frozen["expected_graph6"]:
+        return False
     if not isinstance(expected_graph6, list) or not expected_graph6:
         return False
-    if type(reproduction.get("observed_count")) is not int:
+    observed_count = reproduction.get("observed_count")
+    if type(observed_count) is not int or observed_count != frozen["observed_count"]:
         return False
-    if not _digest_ok(reproduction.get("observed_output_sha256")):
+    if observed_count != len(expected_graph6):
         return False
-    if not _digest_ok(reproduction.get("expected_output_sha256")):
+    expected_digest = reproduction.get("expected_output_sha256")
+    observed_digest = reproduction.get("observed_output_sha256")
+    if expected_digest != frozen["expected_output_sha256"]:
+        return False
+    if not _digest_ok(expected_digest) or not _digest_ok(observed_digest):
+        return False
+    if observed_digest != expected_digest:
         return False
     limitations = report.get("limitations")
     if not isinstance(limitations, list) or not limitations:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -20,6 +21,17 @@ def _digest_ok(value: object) -> bool:
     return isinstance(value, str) and value.startswith("sha256:") and len(value) == 71
 
 
+def _canonical_json(payload: object) -> bytes:
+    return (
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+        + "\n"
+    ).encode("ascii")
+
+
+def _sha256_bytes(payload: bytes) -> str:
+    return "sha256:" + hashlib.sha256(payload).hexdigest()
+
+
 def _execution_bound(report: object) -> bool:
     """Reject reports that only restate public spike success literals."""
 
@@ -35,16 +47,31 @@ def _execution_bound(report: object) -> bool:
         return False
     provider = report.get("provider")
     reproduction = report.get("reproduction")
+    frozen = expected["reproduction"]
     if not isinstance(provider, dict) or not isinstance(reproduction, dict):
+        return False
+    if not isinstance(frozen, dict):
         return False
     runtime = provider.get("runtime")
     if not isinstance(runtime, dict) or not runtime:
         return False
     pairs = reproduction.get("pairs")
     filtration = reproduction.get("filtration")
-    if not isinstance(pairs, list) or not pairs:
+    if pairs != frozen["pairs"]:
         return False
-    if not isinstance(filtration, list) or not filtration:
+    if filtration != frozen["filtration"]:
+        return False
+    mathematical_output = {
+        "contract": expected["contract"],
+        "filtration": filtration,
+        "pairs": pairs,
+        "provider": expected["provider"],
+        "version": frozen["mathematical_output"]["version"],
+    }
+    if mathematical_output != frozen["mathematical_output"]:
+        return False
+    mathematical_digest = _sha256_bytes(_canonical_json(mathematical_output))
+    if mathematical_digest != frozen["expected_mathematical_output_sha256"]:
         return False
     if not _digest_ok(reproduction.get("provider_output_sha256")):
         return False
