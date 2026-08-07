@@ -20,7 +20,7 @@ import threading
 import time
 from collections import Counter, defaultdict
 from collections.abc import Iterator, Mapping
-from contextlib import contextmanager, suppress
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Literal, Self
 
@@ -379,6 +379,8 @@ def _codex_arguments(
         "-c",
         f"model_reasoning_effort={json.dumps(spec.model.reasoning_effort)}",
         "-c",
+        f"web_search={json.dumps(spec.web_search)}",
+        "-c",
         f"mcp_servers.jacobian.url={json.dumps(mcp_url)}",
         prompt,
     )
@@ -424,10 +426,17 @@ async def _read_reasoning_resource(url: str, run_id: str) -> str:
         return result.contents[0].text
 
 
+def _required_reasoning_log(url: str, run_ids: tuple[str, ...]) -> str:
+    if len(run_ids) != 1:
+        raise RuntimeError("required reasoning log has ambiguous run identity")
+    return asyncio.run(_read_reasoning_resource(url, run_ids[0]))
+
+
 def _terminal_evidence(
     command_status: ToolCommandStatus,
     exit_code: int | None,
     verifier: Mapping[str, Any],
+    source_binding_digest: str,
 ) -> CleanRoomTerminalEvidence:
     if command_status is ToolCommandStatus.TIMED_OUT:
         status: Literal["COMPLETED", "TIMEOUT", "CANCELLED", "ERROR"] = "TIMEOUT"
@@ -442,14 +451,17 @@ def _terminal_evidence(
     )
     return CleanRoomTerminalEvidence(
         verifier_digest=str(verifier["verifier_digest"]),
+        source_binding_digest=source_binding_digest,
         clean_room=True,
         verifier_execution_status=status,
         acceptance=TerminalAcceptance(acceptance_value),
         input_binding_valid=(
-            bool(verifier.get("input_binding_valid")) if status == "COMPLETED" else None
+            verifier.get("input_binding_valid") is True
+            if status == "COMPLETED"
+            else None
         ),
         artifact_binding_valid=(
-            bool(verifier.get("artifact_binding_valid"))
+            verifier.get("artifact_binding_valid") is True
             if status == "COMPLETED"
             else None
         ),
@@ -497,12 +509,7 @@ def _run_one(
             transcript.write_bytes(command.stdout)
             (run_dir / "codex.stderr").write_bytes(command.stderr)
             run_ids = _reasoning_run_ids(transcript)
-            reasoning_text = ""
-            if len(run_ids) == 1:
-                with suppress(Exception):
-                    reasoning_text = asyncio.run(
-                        _read_reasoning_resource(mcp_url, run_ids[0])
-                    )
+            reasoning_text = _required_reasoning_log(mcp_url, run_ids)
             (run_dir / "reasoning-log.jsonl").write_text(
                 reasoning_text, encoding="utf-8"
             )
@@ -514,7 +521,12 @@ def _run_one(
         task_payload = _task_payload(task)
         verifier = verify_workspace(task_payload, workspace)
         _write_json(run_dir / "verifier.json", verifier)
-        terminal = _terminal_evidence(command.status, command.exit_code, verifier)
+        terminal = _terminal_evidence(
+            command.status,
+            command.exit_code,
+            verifier,
+            file_digest(transcript),
+        )
         extraction = extract_codex_trajectory(
             transcript,
             task_family=task.task_family,

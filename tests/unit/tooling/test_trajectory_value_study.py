@@ -5,14 +5,18 @@ import json
 from pathlib import Path
 
 import pytest
+from benchmarks.tooling.command_runner import ToolCommandStatus
 from benchmarks.tooling.trajectory_value_study import (
     TrajectoryValueStudySpec,
     _codex_arguments,
+    _required_reasoning_log,
     _submission_schema,
+    _terminal_evidence,
     load_spec,
     run_study,
 )
 from benchmarks.tooling.trajectory_value_study_verifier import (
+    MAX_RATIONAL_COMPONENT_DIGITS,
     file_digest,
     verify_workspace,
 )
@@ -197,6 +201,7 @@ def test_codex_command_binds_exact_model_isolation_and_required_server(
 
     assert arguments[arguments.index("-m") + 1] == "gpt-5.4-mini"
     assert 'model_reasoning_effort="medium"' in arguments
+    assert 'web_search="disabled"' in arguments
     assert 'mcp_servers.jacobian.url="http://127.0.0.1:8765/mcp"' in arguments
     assert "--ephemeral" in arguments
     assert "--ignore-user-config" in arguments
@@ -231,6 +236,101 @@ def test_clean_room_verifier_has_only_standard_library_imports() -> None:
         "stat",
         "typing",
     }
+
+
+def test_verifier_rejects_duplicate_json_keys_before_binding(tmp_path: Path) -> None:
+    spec = load_spec(SPEC_PATH)
+    task = _task(spec, "integer-bezout-01")
+    payload = _task_payload(task)
+    (tmp_path / "task.json").write_text(json.dumps(payload), encoding="utf-8")
+    (tmp_path / "submission.json").write_text(
+        '{"task_id":"integer-bezout-01","answer":{},"answer":{"gcd":"99"}}',
+        encoding="utf-8",
+    )
+
+    result = verify_workspace(payload, tmp_path)
+
+    assert result["acceptance"] == "REJECTED"
+    assert result["input_binding_valid"] is True
+    assert result["artifact_binding_valid"] is True
+    assert result["checks"]["submission_json"] is False
+
+
+def test_verifier_treats_duplicate_task_keys_as_unbound_input(tmp_path: Path) -> None:
+    spec = load_spec(SPEC_PATH)
+    task = _task(spec, "integer-bezout-01")
+    payload = _task_payload(task)
+    (tmp_path / "task.json").write_text(
+        '{"schema_version":"1","schema_version":"1"}',
+        encoding="utf-8",
+    )
+    (tmp_path / "submission.json").write_text("{}", encoding="utf-8")
+
+    result = verify_workspace(payload, tmp_path)
+
+    assert result["acceptance"] == "INCONCLUSIVE"
+    assert result["input_binding_valid"] is False
+
+
+def test_polynomial_verifier_rejects_oversized_rational_coefficients(
+    tmp_path: Path,
+) -> None:
+    spec = load_spec(SPEC_PATH)
+    task = _task(spec, "polynomial-gcd-bezout-01")
+    huge_denominator = "1" + "0" * MAX_RATIONAL_COMPONENT_DIGITS + "1"
+    result = _verify(
+        tmp_path,
+        task,
+        {
+            "gcd": ["1"],
+            "left_bezout": [f"1/{huge_denominator}"],
+            "right_bezout": ["0"],
+        },
+    )
+
+    assert result["acceptance"] == "REJECTED"
+    assert result["input_binding_valid"] is True
+    assert result["checks"]["answer_shape"] is False
+
+
+def test_required_reasoning_log_failures_are_not_silently_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with pytest.raises(RuntimeError, match="ambiguous run identity"):
+        _required_reasoning_log("http://127.0.0.1:1/mcp", ())
+    with pytest.raises(RuntimeError, match="ambiguous run identity"):
+        _required_reasoning_log("http://127.0.0.1:1/mcp", ("a", "b"))
+
+    async def fail_read(_url: str, _run_id: str) -> str:
+        raise RuntimeError("resource missing")
+
+    monkeypatch.setattr(
+        "benchmarks.tooling.trajectory_value_study._read_reasoning_resource",
+        fail_read,
+    )
+    with pytest.raises(RuntimeError, match="resource missing"):
+        _required_reasoning_log("http://127.0.0.1:1/mcp", ("run",))
+
+
+def test_terminal_evidence_binds_transcript_digest_and_strict_booleans() -> None:
+    verifier = {
+        "verifier_digest": "sha256:" + "1" * 64,
+        "verifier_execution_status": "COMPLETED",
+        "acceptance": "REJECTED",
+        "input_binding_valid": 1,
+        "artifact_binding_valid": "true",
+    }
+
+    terminal = _terminal_evidence(
+        ToolCommandStatus.EXITED,
+        0,
+        verifier,
+        "sha256:" + "2" * 64,
+    )
+
+    assert terminal.source_binding_digest == "sha256:" + "2" * 64
+    assert terminal.input_binding_valid is False
+    assert terminal.artifact_binding_valid is False
 
 
 def test_model_execution_is_explicitly_opt_in(tmp_path: Path) -> None:

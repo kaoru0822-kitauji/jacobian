@@ -96,7 +96,7 @@ class FrozenSelectionPolicy(ContractModel):
         "source-order-then-candidate-order"
     )
     maximum_main_tasks: Literal[4] = 4
-    minimum_main_tasks: Literal[2] = 2
+    minimum_main_tasks: Literal[1] = 1
 
 
 class TrajectoryValueMixedStudyContract(ContractModel):
@@ -115,7 +115,7 @@ class TrajectoryValueMixedStudyContract(ContractModel):
         min_length=1, max_length=4
     )
     selection_policy: FrozenSelectionPolicy = FrozenSelectionPolicy()
-    tasks: tuple[FrozenMixedTask, ...] = Field(min_length=2, max_length=4)
+    tasks: tuple[FrozenMixedTask, ...] = Field(min_length=1, max_length=4)
     repetitions_per_task: Literal[8] = 8
     timeout_seconds: Literal[420] = 420
     sandbox: Literal["workspace-write"] = "workspace-write"
@@ -162,7 +162,7 @@ class TrajectoryValueMixedStudyContract(ContractModel):
         if len(set(identities)) != len(identities):
             raise ValueError("frozen tasks must be unique")
         if not self.selection_policy.minimum_main_tasks <= len(self.tasks):
-            raise ValueError("the mixed study requires at least two task groups")
+            raise ValueError("the mixed study requires at least one task group")
         return self
 
 

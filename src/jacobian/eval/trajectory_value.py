@@ -24,6 +24,7 @@ from jacobian.canonical import canonicalize_json
 from jacobian.contracts.results import ContractModel
 from jacobian.eval.trajectory_state import (
     ExtractedTrajectoryState,
+    ReasoningProtocolState,
     StateBoundary,
     TerminalAcceptance,
     TrajectoryExtraction,
@@ -89,7 +90,10 @@ class LabelledTrajectory(ContractModel):
             TerminalAcceptance.REJECTED,
         }:
             raise ValueError("terminal label must be accepted or rejected")
-        if not (evidence.input_binding_valid and evidence.artifact_binding_valid):
+        if not (
+            evidence.input_binding_valid is True
+            and evidence.artifact_binding_valid is True
+        ):
             raise ValueError(
                 "terminal label requires exact input and artifact bindings"
             )
@@ -283,6 +287,8 @@ def _selected_state(
         and previous is not None
         and previous.boundary is StateBoundary.TOOL_RESULT
         and previous.milestone_eligible
+        and state.hard_state.reasoning_protocol_state
+        is not ReasoningProtocolState.INVALID
     )
 
 
@@ -400,7 +406,7 @@ def _tfidf_vectors(
     }
     document_frequency: Counter[str] = Counter()
     for counts in term_counts.values():
-        document_frequency.update(counts)
+        document_frequency.update(counts.keys())
     document_count = len(observations)
     vectors: dict[str, dict[str, float]] = {}
     for observation_id, counts in term_counts.items():
@@ -650,17 +656,41 @@ def _estimate_value(
     )
 
 
+def _clustering_observations(
+    observations: tuple[_Observation, ...],
+    target: _Observation,
+) -> tuple[_Observation, ...]:
+    return tuple(
+        observation
+        for observation in observations
+        if observation.trajectory_id != target.trajectory_id
+        or observation.state.index <= target.state.index
+    )
+
+
+def _target_cluster_members(
+    kind: EstimatorKind,
+    target: _Observation,
+    observations: tuple[_Observation, ...],
+    threshold: float,
+) -> tuple[str, ...]:
+    pool = _clustering_observations(observations, target)
+    vectors = _tfidf_vectors(pool)
+    clusters = _clusters_for(kind, pool, vectors, threshold)
+    member_lookup = {member: cluster for cluster in clusters for member in cluster}
+    return member_lookup[target.observation_id]
+
+
 def _estimates(
     kind: EstimatorKind,
-    clusters: tuple[tuple[str, ...], ...],
     observations: tuple[_Observation, ...],
+    threshold: float,
 ) -> tuple[StateValueEstimate, ...]:
     by_id = {item.observation_id: item for item in observations}
-    member_lookup = {member: cluster for cluster in clusters for member in cluster}
     rewards = {item.trajectory_id: item.terminal_reward for item in observations}
     estimates: list[StateValueEstimate] = []
     for target in observations:
-        members = member_lookup[target.observation_id]
+        members = _target_cluster_members(kind, target, observations, threshold)
         support = _training_trajectories(members, target, by_id)
         source = ValueSource.CLUSTER
         if not support:
@@ -731,16 +761,14 @@ def evaluate_offline_trajectories(
     observations = _observations(corpus)
     by_id = {item.observation_id: item for item in observations}
     vectors = _tfidf_vectors(observations)
+    threshold = corpus.evaluator_config.text_similarity_threshold_millionths / 1_000_000
     evaluations: list[EstimatorEvaluation] = []
     for kind in EstimatorKind:
-        clusters = _clusters_for(
-            kind,
-            observations,
-            vectors,
-            corpus.evaluator_config.text_similarity_threshold_millionths / 1_000_000,
+        estimates = _estimates(kind, observations, threshold)
+        clusters = tuple(
+            sorted({estimate.cluster_member_observation_ids for estimate in estimates})
         )
         summaries = _cluster_summaries(kind, clusters, by_id, vectors)
-        estimates = _estimates(kind, clusters, observations)
         evaluations.append(
             EstimatorEvaluation(
                 estimator=kind,

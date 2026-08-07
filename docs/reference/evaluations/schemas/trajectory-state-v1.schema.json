@@ -103,6 +103,11 @@
           "default": null,
           "title": "Input Binding Valid"
         },
+        "source_binding_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Source Binding Digest",
+          "type": "string"
+        },
         "verifier_digest": {
           "pattern": "^sha256:[0-9a-f]{64}$",
           "title": "Verifier Digest",
@@ -121,6 +126,7 @@
       },
       "required": [
         "verifier_digest",
+        "source_binding_digest",
         "clean_room",
         "verifier_execution_status",
         "acceptance"

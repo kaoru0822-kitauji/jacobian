@@ -141,6 +141,30 @@ class TrajectoryScoreReplay(ContractModel):
             for state in self.states
         ):
             raise ValueError("replay states must share the bound terminal result")
+        cumulative = 0.0
+        previous: ScoredTrajectoryState | None = None
+        for state in self.states:
+            expected_previous = None if previous is None else previous.observation_id
+            if state.previous_observation_id != expected_previous:
+                raise ValueError("replay previous observation ids are stale")
+            expected_delta = (
+                None
+                if previous is None
+                else _round_value(state.estimated_value - previous.estimated_value)
+            )
+            if state.value_delta != expected_delta:
+                raise ValueError("replay value deltas are stale")
+            expected_credit = (
+                expected_delta
+                if state.milestone_eligible and expected_delta is not None
+                else 0.0
+            )
+            if state.transition_credit != expected_credit:
+                raise ValueError("replay transition credits are stale")
+            cumulative = _round_value(cumulative + expected_credit)
+            if state.cumulative_milestone_credit != cumulative:
+                raise ValueError("replay cumulative credit is stale")
+            previous = state
         if self.total_milestone_credit != self.states[-1].cumulative_milestone_credit:
             raise ValueError("total credit must equal the last cumulative credit")
         return self
