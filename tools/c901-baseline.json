@@ -343,16 +343,6 @@
       "complexity": 18
     },
     {
-      "path": "src/jacobian/eval/trajectory_score.py",
-      "symbol": "_validate_estimates",
-      "complexity": 12
-    },
-    {
-      "path": "src/jacobian/eval/trajectory_score.py",
-      "symbol": "require_bound_ordered_replay",
-      "complexity": 14
-    },
-    {
       "path": "src/jacobian/experiments/service.py",
       "symbol": "_run_enumeration",
       "complexity": 22
