@@ -88,12 +88,15 @@ def test_authorized_checker_resolves_lake_beside_the_lean_executable(
     lean = toolchain_bin / "lean"
     lake = toolchain_bin / "lake"
     lean_bytes = b"lean-bin"
+    lake_bytes = b"lake-bin"
     lean.write_bytes(lean_bytes)
-    lake.write_bytes(b"lake-bin")
+    lake.write_bytes(lake_bytes)
     lean_path = str(lean.resolve())
     digest = "sha256:" + hashlib.sha256(lean_bytes).hexdigest()
+    lake_digest = "sha256:" + hashlib.sha256(lake_bytes).hexdigest()
     monkeypatch.setenv("JACOBIAN_CHECKER_EXECUTABLE", lean_path)
     monkeypatch.setenv("JACOBIAN_CHECKER_RUNTIME_DIGEST", digest)
+    monkeypatch.setenv("JACOBIAN_CHECKER_LAKE_DIGEST", lake_digest)
 
     assert _lean_command("lean") == (lean_path,)
     assert _lean_command("lake") == (str(lake.resolve()),)

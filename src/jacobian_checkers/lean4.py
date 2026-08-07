@@ -143,21 +143,26 @@ def _source(statement: str, proof: str, import_name: str | None) -> str:
     return "\n".join(lines)
 
 
-def _authorized_lean_runtime() -> Path:
-    executable = os.environ.get("JACOBIAN_CHECKER_EXECUTABLE")
-    expected_digest = os.environ.get("JACOBIAN_CHECKER_RUNTIME_DIGEST")
+def _authorized_executable(
+    *,
+    executable_env: str,
+    digest_env: str,
+    label: str,
+) -> Path:
+    executable = os.environ.get(executable_env)
+    expected_digest = os.environ.get(digest_env)
     if (
         executable is None
         or expected_digest is None
         or _DIGEST.fullmatch(expected_digest) is None
     ):
-        raise _LeanSetupError("TOOLCHAIN_RESOLUTION: Lean runtime is not authorized")
+        raise _LeanSetupError(f"TOOLCHAIN_RESOLUTION: Lean {label} is not authorized")
     path = Path(executable).resolve(strict=True)
     if str(path) != executable or not path.is_file() or path.is_symlink():
-        raise _LeanSetupError("TOOLCHAIN_RESOLUTION: Lean runtime path is not exact")
+        raise _LeanSetupError(f"TOOLCHAIN_RESOLUTION: Lean {label} path is not exact")
     actual_digest = "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
     if actual_digest != expected_digest:
-        raise _LeanSetupError("TOOLCHAIN_RESOLUTION: Lean runtime digest changed")
+        raise _LeanSetupError(f"TOOLCHAIN_RESOLUTION: Lean {label} digest changed")
     return path
 
 
@@ -176,12 +181,69 @@ def _toolchain_sibling(name: str, lean_executable: Path) -> Path:
     return candidate
 
 
+def _authorized_lean_runtime() -> Path:
+    return _authorized_executable(
+        executable_env="JACOBIAN_CHECKER_EXECUTABLE",
+        digest_env="JACOBIAN_CHECKER_RUNTIME_DIGEST",
+        label="runtime",
+    )
+
+
+def _authorized_lake_runtime(lean: Path) -> Path:
+    """Bind the Lake launcher sibling to the authorized Lean runtime identity.
+
+    The launcher path is derived from the digest-verified ``lean`` sibling so
+    it can never be supplied independently, and its on-disk digest is checked
+    against the operator-authorized ``JACOBIAN_CHECKER_LAKE_DIGEST`` so a Lake
+    binary swapped after provider inspection is rejected before it can drive a
+    MATHLIB compile.
+    """
+    candidate = _toolchain_sibling("lake", lean)
+    expected_digest = os.environ.get("JACOBIAN_CHECKER_LAKE_DIGEST")
+    if expected_digest is None or _DIGEST.fullmatch(expected_digest) is None:
+        raise _LeanSetupError(
+            "TOOLCHAIN_RESOLUTION: Lean lake launcher is not authorized"
+        )
+    if candidate.is_symlink() or not candidate.is_file():
+        raise _LeanSetupError(
+            "TOOLCHAIN_RESOLUTION: Lean lake launcher path is not exact"
+        )
+    actual_digest = "sha256:" + hashlib.sha256(candidate.read_bytes()).hexdigest()
+    if actual_digest != expected_digest:
+        raise _LeanSetupError("TOOLCHAIN_RESOLUTION: Lean lake launcher digest changed")
+    return candidate
+
+
+def lake_launcher_path(lean_executable: Path) -> Path | None:
+    """Return the lake launcher sibling of a resolved Lean executable, if exact.
+
+    The lake launcher lives next to ``lean`` in the pinned toolchain bin
+    directory.  A missing or non-regular sibling means the toolchain cannot
+    drive a MATHLIB compile; callers must treat that as unavailable rather
+    than fall back to an unauthenticated ``PATH`` lookup.
+    """
+    resolved = lean_executable.resolve()
+    candidate = resolved.with_name(
+        "lake.exe" if resolved.suffix.lower() == ".exe" else "lake"
+    )
+    try:
+        if candidate.is_file() and not candidate.is_symlink():
+            return candidate
+    except OSError:
+        return None
+    return None
+
+
 def _lean_command(name: str) -> tuple[str, ...]:
     if os.environ.get("JACOBIAN_CHECKER_EXECUTABLE") is not None:
         lean = _authorized_lean_runtime()
         if name == "lean":
             return (str(lean),)
-        return (str(_toolchain_sibling(name, lean)),)
+        if name == "lake":
+            return (str(_authorized_lake_runtime(lean)),)
+        raise _LeanSetupError(
+            f"TOOLCHAIN_RESOLUTION: Lean {name} launcher is not authorized"
+        )
     elan = shutil.which("elan")
     if elan is not None:
         return (elan, "run", LEAN_TOOLCHAIN, name)
