@@ -366,6 +366,19 @@ def test_committed_hypothesis_study_manifest_binds_every_artifact() -> None:
         file_digest(STUDY / relative) == expected
         for relative, expected in manifest["artifacts"].items()
     )
+    packaging = manifest["packaging"]["comparison"]
+    compressed = (STUDY / packaging["path"]).read_bytes()
+    raw_comparison = gzip.decompress(compressed)
+    assert packaging["encoding"] == "gzip"
+    assert packaging["mtime"] == 0
+    assert packaging["source_revision"] == ("4c09fbac6eefd3521d3ec75cd8d4b53c9e68498c")
+    assert packaging["uncompressed_bytes"] == len(raw_comparison)
+    assert packaging["uncompressed_file_digest"] == (
+        "sha256:" + hashlib.sha256(raw_comparison).hexdigest()
+    )
+    assert (
+        packaging["compressed_file_digest"] == manifest["artifacts"][packaging["path"]]
+    )
     attempt_ids = [
         trajectory_id
         for attempt in manifest["execution_attempts"]
