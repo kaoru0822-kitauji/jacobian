@@ -12,6 +12,7 @@ from pydantic import BaseModel, ValidationError
 from referencing import Registry
 from referencing.jsonschema import DRAFT202012
 
+from jacobian.canonical import canonicalize_json
 from jacobian.eval import trajectory_value as trajectory_value_module
 from jacobian.eval.trajectory_state import (
     BindingValidity,
@@ -43,6 +44,10 @@ ROOT = Path(__file__).resolve().parents[3]
 
 def _sha(value: str) -> str:
     return "sha256:" + hashlib.sha256(value.encode()).hexdigest()
+
+
+def _digest(value: object) -> str:
+    return "sha256:" + hashlib.sha256(canonicalize_json(value)).hexdigest()
 
 
 def _hard(
@@ -87,15 +92,17 @@ def _state(
     after: str | None = None,
     transitions: tuple[MilestoneKind, ...] = (),
 ) -> ExtractedTrajectoryState:
+    soft = TrajectorySoftState(
+        plan_summary=plan,
+        latest_after_tool_summary=after,
+    )
     return ExtractedTrajectoryState(
         index=index,
         source_event_index=index,
         boundary=boundary,
         hard_state=hard,
-        soft_state=TrajectorySoftState(
-            plan_summary=plan,
-            latest_after_tool_summary=after,
-        ),
+        soft_state=soft,
+        soft_state_digest=_digest(soft.model_dump(mode="json")),
         hard_state_digest=_sha(f"hard-{index}-{hard.model_dump_json()}"),
         changed_fields=(),
         milestone_kinds=transitions,
@@ -608,6 +615,27 @@ def test_single_rollout_task_groups_and_unknown_fields_are_rejected() -> None:
     payload["terminal_reward"] = 1
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
         TrajectoryValueCorpus.model_validate(payload)
+
+
+def test_oversized_corpora_are_rejected_before_clustering() -> None:
+    trajectories = tuple(
+        _trajectory(
+            f"oversized-{index:02d}",
+            task_group="oversized-group",
+            accepted=index % 2 == 0,
+            plan="Keep the corpus bounded before clustering.",
+            after="The terminal evidence is exact.",
+            checker=CheckerState.NOT_CHECKED,
+            candidate=CandidateState.PRESENT,
+        )
+        for index in range(65)
+    )
+
+    with pytest.raises(ValidationError, match="at most 64"):
+        TrajectoryValueCorpus(
+            corpus_id="oversized-corpus",
+            trajectories=trajectories,
+        )
 
 
 def test_results_are_deterministic_under_trajectory_reordering() -> None:
