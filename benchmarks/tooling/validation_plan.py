@@ -15,6 +15,8 @@ HOST_VALIDATION_DATASET_FILES = {
         "test_vizing_bounded_cartesian_products.py",
         "benchmarks/validation/conjecture_probes_v1/"
         "test_yang_mills_gauge_invariance_certificate.py",
+        "benchmarks/validation/conjecture_probes_v1/"
+        "test_hadamard_order12_construction.py",
     ),
     "symbolic-coordination-v1": (
         "benchmarks/validation/symbolic_coordination_v1/test_pilot_contract.py",
@@ -222,6 +224,26 @@ def task_host_validation(
                 selector="benchmarks/validation/test_sat_erdos_schur_f4.py",
                 timings=timings,
             ),
+        )
+    if dataset == "conjecture-probes-v1":
+        dedicated = (
+            root
+            / "benchmarks"
+            / "validation"
+            / "conjecture_probes_v1"
+            / f"test_{task.replace('-', '_')}.py"
+        )
+        conjecture_entries: list[HostValidation] = []
+        if dedicated.is_file():
+            conjecture_entries.append(
+                _entry(
+                    name=f"{task}-specific",
+                    selector=dedicated.relative_to(root).as_posix(),
+                    timings=timings,
+                )
+            )
+        return tuple(conjecture_entries) or dataset_host_validation(
+            dataset, timings=timings
         )
     return dataset_host_validation(dataset, timings=timings)
 

@@ -1,5 +1,5 @@
 schema_version = "1.4"
-artifacts = ["/app/submission.json", "/app/evidence"]
+artifacts = ["/app/input.json", "/app/submission.json", "/app/evidence"]
 
 [task]
 name = "jacobian/cddlib"
@@ -19,7 +19,7 @@ field = "provider-integration"
 assurance_ceiling = "COMPUTED"
 answer_visibility = "public"
 provenance_class = "pinned-provider-spike"
-fixture_digest = "sha256:5318109cac828a3616dc770b3a37ca079022f2e49e1c8f610b9ba11d44f3866b"
+fixture_digest = "sha256:cae830638539783f53d716e6b381c833acd4d29b6504a3c35e9bdb5d4a99a00d"
 required_provider = "cddlib"
 
 [agent]
