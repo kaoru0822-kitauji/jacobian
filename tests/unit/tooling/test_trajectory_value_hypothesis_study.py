@@ -445,6 +445,24 @@ def test_historical_corpus_and_analysis_match_frozen_outcomes() -> None:
     assert analysis["h2"]["hybrid_separated_pair_count"] == 22
 
 
+def test_historical_corpus_rejects_substituted_soft_state_binding(
+    tmp_path: Path,
+) -> None:
+    payload = json.loads((STUDY / "corpus.json").read_text(encoding="utf-8"))
+    payload["trajectories"][0]["extraction"]["states"][0]["soft_state_digest"] = (
+        "sha256:" + "0" * 64
+    )
+    corpus_path = tmp_path / "corpus.json"
+    corpus_path.write_text(json.dumps(payload), encoding="utf-8")
+    (tmp_path / "manifest.json").write_text(
+        json.dumps({"artifacts": {"corpus.json": file_digest(corpus_path)}}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="historical soft-state binding drift"):
+        load_historical_corpus(corpus_path)
+
+
 def test_committed_hypothesis_labels_are_clean_room_and_fail_closed() -> None:
     records = [
         json.loads(path.read_text(encoding="utf-8"))

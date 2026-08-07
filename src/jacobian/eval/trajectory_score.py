@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections import defaultdict
+from collections.abc import Mapping
 from enum import StrEnum
 from typing import Literal, Self
 
@@ -204,10 +206,45 @@ def _terminal_result(reward: Literal[0, 1]) -> TerminalResult:
     return TerminalResult.ACCEPTED if reward == 1 else TerminalResult.REJECTED
 
 
+def _terminal_rewards(
+    comparison: OfflineValueComparison,
+) -> dict[str, Literal[0, 1]]:
+    rewards: dict[str, Literal[0, 1]] = {}
+    for evaluation in comparison.evaluations:
+        for estimate in evaluation.estimates:
+            previous = rewards.get(estimate.trajectory_id)
+            if previous is None:
+                rewards[estimate.trajectory_id] = estimate.eventual_terminal_reward
+            elif previous != estimate.eventual_terminal_reward:
+                raise TrajectoryScoreError(
+                    "trajectory has conflicting terminal rewards across estimators"
+                )
+    return rewards
+
+
 def _validate_estimates(
     evaluation: EstimatorEvaluation,
     trajectory_id: str,
-) -> tuple[tuple[StateValueEstimate, ...], dict[str, ClusterSummary]]:
+) -> tuple[
+    tuple[StateValueEstimate, ...],
+    dict[str, ClusterSummary],
+    dict[str, StateValueEstimate],
+    dict[str, tuple[str, ...]],
+]:
+    all_estimates = {
+        estimate.observation_id: estimate for estimate in evaluation.estimates
+    }
+    if len(all_estimates) != len(evaluation.estimates):
+        raise TrajectoryScoreError("estimator has duplicate observation ids")
+    task_groups: dict[str, set[str]] = defaultdict(set)
+    task_group_by_trajectory: dict[str, str] = {}
+    for estimate in evaluation.estimates:
+        previous_group = task_group_by_trajectory.get(estimate.trajectory_id)
+        if previous_group is None:
+            task_group_by_trajectory[estimate.trajectory_id] = estimate.task_group
+        elif previous_group != estimate.task_group:
+            raise TrajectoryScoreError("trajectory has inconsistent task groups")
+        task_groups[estimate.task_group].add(estimate.trajectory_id)
     estimates = tuple(
         sorted(
             (
@@ -247,7 +284,68 @@ def _validate_estimates(
         for cluster in evaluation.clusters
     ):
         raise TrajectoryScoreError("cluster has duplicate observation members")
-    return estimates, clusters
+    return (
+        estimates,
+        clusters,
+        all_estimates,
+        {
+            task_group: tuple(sorted(trajectory_ids))
+            for task_group, trajectory_ids in task_groups.items()
+        },
+    )
+
+
+def _expected_support(
+    estimate: StateValueEstimate,
+    cluster: ClusterSummary,
+    estimates_by_observation: Mapping[str, StateValueEstimate],
+    task_group_trajectories: Mapping[str, tuple[str, ...]],
+) -> tuple[str, ...]:
+    if estimate.value_source is ValueSource.TASK_GROUP_PRIOR:
+        return tuple(
+            trajectory_id
+            for trajectory_id in task_group_trajectories.get(estimate.task_group, ())
+            if trajectory_id != estimate.trajectory_id
+        )
+    return tuple(
+        sorted(
+            {
+                member_estimate.trajectory_id
+                for member in cluster.member_observation_ids
+                if (member_estimate := estimates_by_observation.get(member)) is not None
+                and member_estimate.task_group == estimate.task_group
+                and member_estimate.trajectory_id != estimate.trajectory_id
+            }
+        )
+    )
+
+
+def _validate_support(
+    estimate: StateValueEstimate,
+    cluster: ClusterSummary,
+    estimates_by_observation: Mapping[str, StateValueEstimate],
+    task_group_trajectories: Mapping[str, tuple[str, ...]],
+    rewards: Mapping[str, Literal[0, 1]],
+) -> None:
+    missing_members = [
+        member
+        for member in cluster.member_observation_ids
+        if member not in estimates_by_observation
+    ]
+    if missing_members:
+        raise TrajectoryScoreError("cluster references unknown observations")
+    expected = _expected_support(
+        estimate, cluster, estimates_by_observation, task_group_trajectories
+    )
+    if estimate.supporting_trajectory_ids != expected:
+        raise TrajectoryScoreError("estimate support is stale or substituted")
+    if not expected:
+        raise TrajectoryScoreError("estimate support is empty")
+    missing_rewards = [
+        trajectory_id for trajectory_id in expected if trajectory_id not in rewards
+    ]
+    if missing_rewards:
+        raise TrajectoryScoreError("estimate support lacks terminal rewards")
 
 
 def replay_offline_values(
@@ -263,14 +361,23 @@ def replay_offline_values(
     """
 
     evaluation = _evaluation(comparison, estimator)
-    raw_estimates, raw_clusters = _validate_estimates(evaluation, trajectory_id)
+    rewards_by_trajectory = _terminal_rewards(comparison)
+    raw_estimates, raw_clusters, estimates_by_observation, task_group_trajectories = (
+        _validate_estimates(evaluation, trajectory_id)
+    )
     estimates = tuple(raw_estimates)
     clusters = dict(raw_clusters)
-    rewards = {estimate.eventual_terminal_reward for estimate in estimates}
     task_groups = {estimate.task_group for estimate in estimates}
-    if len(rewards) != 1 or len(task_groups) != 1:
+    if (
+        len({estimate.eventual_terminal_reward for estimate in estimates}) != 1
+        or len(task_groups) != 1
+    ):
         raise TrajectoryScoreError("trajectory estimates have inconsistent bindings")
-    reward = rewards.pop()
+    reward = rewards_by_trajectory.get(trajectory_id)
+    if reward is None:
+        raise TrajectoryScoreError("trajectory lacks terminal reward")
+    if any(estimate.eventual_terminal_reward != reward for estimate in estimates):
+        raise TrajectoryScoreError("trajectory estimates have inconsistent bindings")
     task_group = task_groups.pop()
     terminal = _terminal_result(reward)
     states: list[ScoredTrajectoryState] = []
@@ -284,6 +391,13 @@ def replay_offline_values(
             raise TrajectoryScoreError("estimate is not bound to its declared cluster")
         if estimate.cluster_member_observation_ids != (cluster.member_observation_ids):
             raise TrajectoryScoreError("estimate carries a stale cluster member set")
+        _validate_support(
+            estimate,
+            cluster,
+            estimates_by_observation,
+            task_group_trajectories,
+            rewards_by_trajectory,
+        )
         delta = (
             None
             if previous is None

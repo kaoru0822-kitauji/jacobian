@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import hashlib
 import json
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
+from benchmarks.tooling.command_runner import ToolCommandResult, ToolCommandStatus
 from benchmarks.tooling.trajectory_value_calibration import (
+    HarborTaskContract,
     TrajectoryValueCalibrationSpec,
+    _artifact_manifest,
     _codex_arguments,
+    _run_one,
     _task_contract,
     load_spec,
     summarize,
@@ -144,6 +150,112 @@ def test_calibration_codex_command_disables_web_search_under_ignored_config(
 
     assert "--ignore-user-config" in arguments
     assert 'web_search="disabled"' in arguments
+
+
+def test_artifact_manifest_excludes_only_the_root_manifest(tmp_path: Path) -> None:
+    output = tmp_path / "output"
+    nested = output / "runs" / "case" / "workspace" / "evidence"
+    nested.mkdir(parents=True)
+    (output / "manifest.json").write_text("root", encoding="utf-8")
+    (nested / "manifest.json").write_text("nested", encoding="utf-8")
+    (nested / "result.json").write_text("result", encoding="utf-8")
+
+    manifest = _artifact_manifest(output)
+
+    assert "manifest.json" not in manifest
+    assert "runs/case/workspace/evidence/manifest.json" in manifest
+    assert "runs/case/workspace/evidence/result.json" in manifest
+
+
+def test_unsafe_calibration_workspace_records_inconclusive_rollout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spec = load_spec(SPEC)
+    candidate = spec.candidates[0]
+    task_root = tmp_path / "task"
+    (task_root / "environment").mkdir(parents=True)
+    files = {
+        "instruction.md": task_root / "instruction.md",
+        "input.json": task_root / "environment" / "input.json",
+        "submission_schema.json": task_root / "environment" / "submission_schema.json",
+    }
+    for name, path in files.items():
+        path.write_text(name, encoding="utf-8")
+    task = HarborTaskContract(
+        dataset_id=candidate.dataset_id,
+        task_id=candidate.task_id,
+        path=task_root,
+        harbor_digest="sha256:" + "0" * 64,
+        public_file_digests={
+            name: "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+            for name, path in files.items()
+        },
+        verifier_file_digests={},
+    )
+
+    async def inspect_surface_fixture(_url: str, _timeout: int) -> dict[str, str]:
+        return {"surface_digest": "sha256:" + "1" * 64}
+
+    monkeypatch.setattr(
+        "benchmarks.tooling.trajectory_value_calibration.inspect_surface",
+        inspect_surface_fixture,
+    )
+    monkeypatch.setattr(
+        "benchmarks.tooling.trajectory_value_calibration.run_operator_command",
+        lambda *args, **kwargs: ToolCommandResult(
+            status=ToolCommandStatus.EXITED,
+            exit_code=0,
+            stdout=b"{}",
+            stderr=b"",
+        ),
+    )
+    monkeypatch.setattr(
+        "benchmarks.tooling.trajectory_value_calibration._reasoning_run_ids",
+        lambda _path: ("run",),
+    )
+    monkeypatch.setattr(
+        "benchmarks.tooling.trajectory_value_calibration._required_reasoning_log",
+        lambda _url, _run_ids: "",
+    )
+    monkeypatch.setattr(
+        "benchmarks.tooling.trajectory_value_calibration._verification_outcome",
+        lambda **_kwargs: {
+            "verifier_execution_status": "COMPLETED",
+            "acceptance": "ACCEPTED",
+            "reason": "TERMINAL_CLEAN_ROOM_REWARD",
+            "input_binding_valid": True,
+            "artifact_binding_valid": True,
+            "reward": {"reward": 1.0},
+        },
+    )
+    monkeypatch.setattr(
+        "benchmarks.tooling.trajectory_value_calibration._copy_workspace",
+        lambda _source, _destination: (_ for _ in ()).throw(
+            RuntimeError("symlink is forbidden in evaluation evidence: workspace/link")
+        ),
+    )
+
+    @contextmanager
+    def mcp_server(**_kwargs):
+        yield "http://127.0.0.1:8765/mcp"
+
+    monkeypatch.setattr(
+        "benchmarks.tooling.trajectory_value_calibration._mcp_server",
+        mcp_server,
+    )
+
+    record = _run_one(
+        spec=spec,
+        candidate=candidate,
+        task=task,
+        repetition=1,
+        output=tmp_path / "out",
+    )
+
+    assert record["terminal"]["acceptance"] == "INCONCLUSIVE"
+    assert record["terminal"]["reason"] == "UNSAFE_WORKSPACE_EVIDENCE"
+    assert record["terminal"]["artifact_binding_valid"] is False
+    assert (tmp_path / "out" / "runs" / record["trajectory_id"] / "run.json").is_file()
 
 
 def test_schema_matches_checked_in_contract() -> None:

@@ -75,6 +75,7 @@ _PUBLIC_FILES = {
     "submission_schema.json": Path("environment/submission_schema.json"),
 }
 _HARBOR_VERSION = "0.20.0"
+_DIAGNOSTIC_LIMIT = 1024
 
 
 class CalibrationCandidate(ContractModel):
@@ -349,6 +350,27 @@ def _copy_workspace(source: Path, destination: Path) -> None:
     shutil.copytree(source, destination)
 
 
+def _bounded_diagnostic(exc: BaseException) -> str:
+    diagnostic = str(exc).replace("\x00", "\ufffd")
+    if len(diagnostic) <= _DIAGNOSTIC_LIMIT:
+        return diagnostic
+    return diagnostic[: _DIAGNOSTIC_LIMIT - 14] + "...[truncated]"
+
+
+def _unsafe_workspace_outcome(
+    verifier: Mapping[str, Any], exc: BaseException
+) -> dict[str, Any]:
+    return {
+        **dict(verifier),
+        "acceptance": "INCONCLUSIVE",
+        "reason": "UNSAFE_WORKSPACE_EVIDENCE",
+        "workspace_evidence_status": "REJECTED",
+        "workspace_evidence_diagnostic": _bounded_diagnostic(exc),
+        "artifact_binding_valid": False,
+        "reward": None,
+    }
+
+
 def _verification_outcome(
     *,
     task: HarborTaskContract,
@@ -490,8 +512,14 @@ def _run_one(
             command_status=command.status,
             exit_code=command.exit_code,
         )
+        workspace_copy = run_dir / "workspace"
+        try:
+            _copy_workspace(workspace, workspace_copy)
+        except (RuntimeError, OSError, shutil.Error) as exc:
+            if workspace_copy.exists():
+                shutil.rmtree(workspace_copy, ignore_errors=True)
+            verifier = _unsafe_workspace_outcome(verifier, exc)
         _write_json(run_dir / "verifier.json", verifier)
-        _copy_workspace(workspace, run_dir / "workspace")
         telemetry = parse_agent_transcript(transcript)
         record = {
             "schema_version": "1",
@@ -613,10 +641,11 @@ def summarize(
 
 
 def _artifact_manifest(output: Path) -> dict[str, str]:
+    root_manifest = output / "manifest.json"
     return {
         path.relative_to(output).as_posix(): file_digest(path)
         for path in _regular_files(output)
-        if path.name != "manifest.json"
+        if path != root_manifest
     }
 
 

@@ -1,5 +1,5 @@
 {
-  "corpus_digest": "sha256:b55f87dcf9bdd86b697a3fa47bc38836c37dac764a3239b68ad8bc6b9ea6eade",
+  "corpus_digest": "sha256:59fa2b683e90602872dccad4e546d21ef019f779e5479d29b665aeafe0fd6ed0",
   "corpus_id": "semantic-value-state-controlled-v1",
   "evaluator_config": {
     "config_schema_version": "1",

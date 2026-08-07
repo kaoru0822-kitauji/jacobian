@@ -646,6 +646,11 @@ The manifest preserves the previous derived-artifact digests, records the
 reanalysis source revision and evaluator digests, and binds every migrated
 terminal record to its exact `codex.jsonl` digest.
 
+The historical-only loader also derives and checks the later mandatory
+soft-state digest from each already manifest-bound state payload. A supplied
+but substituted digest fails closed; the adapter still cannot authorize a new
+execution or mutate the frozen corpus.
+
 | Estimator | Clusters | Fallbacks | Mean support | Brier | MAE |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Group/rollout | 30 | 0 | 5.413 | 0.238245614035 | 0.400000000000 |

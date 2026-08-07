@@ -857,8 +857,22 @@ def _corpus(
     )
 
 
+def _bind_historical_soft_state_digests(extraction: dict[str, Any]) -> None:
+    states = extraction.get("states")
+    if not isinstance(states, list):
+        raise ValueError("historical corpus states are malformed")
+    for state in states:
+        if not isinstance(state, dict):
+            raise ValueError("historical corpus state is malformed")
+        expected = object_digest(state.get("soft_state"))
+        existing = state.get("soft_state_digest")
+        if existing is not None and existing != expected:
+            raise ValueError("historical soft-state binding drift")
+        state["soft_state_digest"] = expected
+
+
 def load_historical_corpus(path: Path) -> TrajectoryValueCorpus:
-    """Replay a v1 corpus recorded before terminal source binding was mandatory."""
+    """Replay a v1 corpus recorded before mandatory derived-state bindings."""
 
     path = path.resolve(strict=True)
     if path.is_symlink() or not path.is_file():
@@ -887,6 +901,7 @@ def load_historical_corpus(path: Path) -> TrajectoryValueCorpus:
         if existing is not None and existing != source_digest:
             raise ValueError("historical terminal source binding drift")
         terminal["source_binding_digest"] = source_digest
+        _bind_historical_soft_state_digests(extraction)
     return TrajectoryValueCorpus.model_validate(payload)
 
 

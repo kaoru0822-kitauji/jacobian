@@ -9,6 +9,7 @@ from benchmarks.tooling.command_runner import ToolCommandStatus
 from benchmarks.tooling.trajectory_value_study import (
     TrajectoryValueStudySpec,
     _codex_arguments,
+    _corpus,
     _required_reasoning_log,
     _submission_schema,
     _terminal_evidence,
@@ -22,6 +23,12 @@ from benchmarks.tooling.trajectory_value_study_verifier import (
 )
 from jsonschema import Draft202012Validator
 from pydantic import ValidationError
+
+from jacobian.eval.trajectory_state import (
+    CleanRoomTerminalEvidence,
+    TerminalAcceptance,
+    extract_codex_trajectory,
+)
 
 ROOT = Path(__file__).resolve().parents[3]
 SPEC_PATH = ROOT / "benchmarks/config/trajectory-value-study-v1.json"
@@ -52,6 +59,62 @@ def _verify(tmp_path: Path, task, answer: object):
         encoding="utf-8",
     )
     return verify_workspace(payload, tmp_path)
+
+
+def _reasoning_event(summary: str) -> dict[str, object]:
+    return {
+        "type": "item.completed",
+        "item": {
+            "type": "mcp_tool_call",
+            "tool": "reasoning.write",
+            "arguments": {"phase": "PLAN", "summary": summary},
+            "status": "completed",
+            "result": {
+                "structured_content": {"run_id": "run"},
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps({"run_id": "run"}),
+                    }
+                ],
+            },
+        },
+    }
+
+
+def _write_labelled_extraction(
+    output: Path,
+    *,
+    trajectory_id: str,
+    task_family: str,
+    accepted: bool,
+) -> None:
+    run_dir = output / "runs" / trajectory_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    transcript = run_dir / "codex.jsonl"
+    transcript.write_text(
+        json.dumps(_reasoning_event(f"Plan for {trajectory_id}")) + "\n",
+        encoding="utf-8",
+    )
+    source_digest = file_digest(transcript)
+    evidence = CleanRoomTerminalEvidence(
+        verifier_digest="sha256:" + "1" * 64,
+        source_binding_digest=source_digest,
+        clean_room=True,
+        verifier_execution_status="COMPLETED",
+        acceptance=(
+            TerminalAcceptance.ACCEPTED if accepted else TerminalAcceptance.REJECTED
+        ),
+        input_binding_valid=True,
+        artifact_binding_valid=True,
+    )
+    extraction = extract_codex_trajectory(
+        transcript, task_family=task_family, terminal_evidence=evidence
+    )
+    (run_dir / "extraction.json").write_text(
+        json.dumps(extraction.model_dump(mode="json"), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
 
 
 def test_frozen_spec_covers_four_families_and_repeated_rollouts() -> None:
@@ -336,6 +399,105 @@ def test_terminal_evidence_binds_transcript_digest_and_strict_booleans() -> None
 def test_model_execution_is_explicitly_opt_in(tmp_path: Path) -> None:
     with pytest.raises(RuntimeError, match="without --execute"):
         run_study(SPEC_PATH, tmp_path / "results", execute=False)
+
+
+def test_singleton_labelled_task_groups_are_recorded_as_exclusions(
+    tmp_path: Path,
+) -> None:
+    spec = load_spec(SPEC_PATH)
+    singleton_task = _task(spec, "integer-bezout-01")
+    repeated_task = _task(spec, "matrix-determinant-01")
+    output = tmp_path / "study"
+    records = [
+        {
+            "trajectory_id": "integer-bezout-01-r01",
+            "task_id": singleton_task.task_id,
+            "terminal": {"acceptance": "ACCEPTED"},
+        },
+        {
+            "trajectory_id": "integer-bezout-01-r02",
+            "task_id": singleton_task.task_id,
+            "terminal": {"acceptance": "INCONCLUSIVE"},
+        },
+        {
+            "trajectory_id": "matrix-determinant-01-r01",
+            "task_id": repeated_task.task_id,
+            "terminal": {"acceptance": "ACCEPTED"},
+        },
+        {
+            "trajectory_id": "matrix-determinant-01-r02",
+            "task_id": repeated_task.task_id,
+            "terminal": {"acceptance": "REJECTED"},
+        },
+    ]
+    for record in records:
+        if record["terminal"]["acceptance"] == "INCONCLUSIVE":
+            continue
+        task = _task(spec, str(record["task_id"]))
+        _write_labelled_extraction(
+            output,
+            trajectory_id=str(record["trajectory_id"]),
+            task_family=task.task_family,
+            accepted=record["terminal"]["acceptance"] == "ACCEPTED",
+        )
+
+    corpus, exclusions = _corpus(spec, output, records)
+
+    assert corpus is not None
+    assert [item.trajectory_id for item in corpus.trajectories] == [
+        "matrix-determinant-01-r01",
+        "matrix-determinant-01-r02",
+    ]
+    assert exclusions == [
+        {
+            "trajectory_id": "integer-bezout-01-r02",
+            "reason": "terminal verifier outcome is inconclusive",
+        },
+        {
+            "trajectory_id": "integer-bezout-01-r01",
+            "reason": "task group has only one labelled trajectory after exclusions",
+        },
+    ]
+
+
+def test_only_singleton_labelled_groups_return_exclusions_without_corpus(
+    tmp_path: Path,
+) -> None:
+    spec = load_spec(SPEC_PATH)
+    records = [
+        {
+            "trajectory_id": "integer-bezout-01-r01",
+            "task_id": "integer-bezout-01",
+            "terminal": {"acceptance": "ACCEPTED"},
+        },
+        {
+            "trajectory_id": "matrix-determinant-01-r01",
+            "task_id": "matrix-determinant-01",
+            "terminal": {"acceptance": "REJECTED"},
+        },
+    ]
+    for record in records:
+        task = _task(spec, str(record["task_id"]))
+        _write_labelled_extraction(
+            tmp_path,
+            trajectory_id=str(record["trajectory_id"]),
+            task_family=task.task_family,
+            accepted=record["terminal"]["acceptance"] == "ACCEPTED",
+        )
+
+    corpus, exclusions = _corpus(spec, tmp_path, records)
+
+    assert corpus is None
+    assert exclusions == [
+        {
+            "trajectory_id": "integer-bezout-01-r01",
+            "reason": "task group has only one labelled trajectory after exclusions",
+        },
+        {
+            "trajectory_id": "matrix-determinant-01-r01",
+            "reason": "task group has only one labelled trajectory after exclusions",
+        },
+    ]
 
 
 def test_committed_real_study_manifest_binds_every_artifact() -> None:
