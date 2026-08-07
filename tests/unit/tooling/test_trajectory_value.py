@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from jsonschema import Draft202012Validator
@@ -10,6 +12,7 @@ from pydantic import BaseModel, ValidationError
 from referencing import Registry
 from referencing.jsonschema import DRAFT202012
 
+from jacobian.eval import trajectory_value as trajectory_value_module
 from jacobian.eval.trajectory_state import (
     BindingValidity,
     CandidateState,
@@ -193,8 +196,10 @@ def _trajectory(
             after=after,
         )
     )
+    source_digest = _sha("source-" + trajectory_id)
     terminal = CleanRoomTerminalEvidence(
         verifier_digest=_sha("clean-room-polynomial-verifier-v1"),
+        source_binding_digest=source_digest,
         clean_room=True,
         verifier_execution_status="COMPLETED",
         acceptance=(
@@ -204,7 +209,7 @@ def _trajectory(
         artifact_binding_valid=True,
     )
     extraction = TrajectoryExtraction(
-        source_digest=_sha("source-" + trajectory_id),
+        source_digest=source_digest,
         task_family="polynomial-map-inverse",
         states=tuple(states),
         terminal_evidence=terminal,
@@ -234,6 +239,30 @@ def _with_candidate_digest(
                 }
             )
         )
+    extraction = trajectory.extraction.model_copy(update={"states": tuple(states)})
+    return LabelledTrajectory(
+        trajectory_id=trajectory.trajectory_id,
+        task_group=trajectory.task_group,
+        extraction=extraction,
+    )
+
+
+def _with_invalid_after_tool(trajectory: LabelledTrajectory) -> LabelledTrajectory:
+    states: list[ExtractedTrajectoryState] = []
+    for state in trajectory.extraction.states:
+        if state.boundary is StateBoundary.AFTER_TOOL:
+            hard = state.hard_state.model_copy(
+                update={"reasoning_protocol_state": ReasoningProtocolState.INVALID}
+            )
+            state = state.model_copy(
+                update={
+                    "hard_state": hard,
+                    "hard_state_digest": _sha(
+                        f"invalid-after-{state.index}-{hard.model_dump_json()}"
+                    ),
+                }
+            )
+        states.append(state)
     extraction = trajectory.extraction.model_copy(update={"states": tuple(states)})
     return LabelledTrajectory(
         trajectory_id=trajectory.trajectory_id,
@@ -436,6 +465,50 @@ def test_repeated_nonmilestone_tool_result_cannot_add_an_observation() -> None:
             baseline_eval.metrics.observation_count
             == repeated_eval.metrics.observation_count
         )
+
+
+def test_invalid_after_tool_reasoning_is_not_selected_as_observation() -> None:
+    corpus = _controlled_corpus()
+    trajectories = (
+        _with_invalid_after_tool(corpus.trajectories[0]),
+        *corpus.trajectories[1:],
+    )
+    result = evaluate_offline_trajectories(
+        TrajectoryValueCorpus(
+            corpus_id="invalid-after-tool-v1",
+            trajectories=trajectories,
+        )
+    )
+
+    assert all(item.metrics.observation_count == 23 for item in result.evaluations)
+    assert all(
+        "checker-ok-1:2"
+        not in {estimate.observation_id for estimate in evaluation.estimates}
+        for evaluation in result.evaluations
+    )
+
+
+def test_tfidf_idf_counts_documents_not_term_occurrences() -> None:
+    observations = (
+        SimpleNamespace(observation_id="left", reasoning_text="alpha alpha beta"),
+        SimpleNamespace(observation_id="right", reasoning_text="alpha gamma"),
+    )
+
+    vectors = trajectory_value_module._tfidf_vectors(observations)
+
+    assert vectors["left"]["alpha"] == pytest.approx(2 / 5)
+    assert vectors["left"]["beta"] == pytest.approx((1 / 5) * (math.log(3 / 2) + 1))
+
+
+def test_target_future_observations_do_not_shape_early_state_clusters() -> None:
+    result = evaluate_offline_trajectories(_controlled_corpus())
+    estimate = _estimate(result, EstimatorKind.GROUP_ROLLOUT, "checker-ok-1:0")
+
+    assert "checker-ok-1:0" in estimate.cluster_member_observation_ids
+    assert all(
+        not member.startswith("checker-ok-1:") or member == "checker-ok-1:0"
+        for member in estimate.cluster_member_observation_ids
+    )
 
 
 def test_metrics_weight_each_trajectory_equally() -> None:

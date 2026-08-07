@@ -322,15 +322,12 @@ def _validate_cluster_binding(
     cluster: SemanticClusterSummary,
     estimator: EstimatorKindV2,
     estimates: Mapping[str, SemanticStateValueEstimate],
-    assigned: set[str],
 ) -> None:
     members = cluster.member_observation_ids
     if members != tuple(sorted(set(members))):
         raise ValueError("cluster members must be unique and sorted")
     if _cluster_id(estimator, members) != cluster.cluster_id:
         raise ValueError("cluster digest does not bind its members")
-    if assigned & set(members):
-        raise ValueError("an observation cannot belong to multiple clusters")
     if not set(members) <= estimates.keys():
         raise ValueError("cluster refers to an unknown observation")
     expected_trajectories = tuple(
@@ -338,7 +335,6 @@ def _validate_cluster_binding(
     )
     if cluster.member_trajectory_ids != expected_trajectories:
         raise ValueError("cluster trajectory ids do not bind its observations")
-    assigned.update(members)
 
 
 def _validate_estimate_cluster_binding(
@@ -361,11 +357,10 @@ def _validate_evaluation_bindings(evaluation: EstimatorEvaluationV2) -> None:
     estimates = {estimate.observation_id: estimate for estimate in evaluation.estimates}
     if len(estimates) != len(evaluation.estimates):
         raise ValueError("observation estimates must be unique")
-    assigned: set[str] = set()
     for cluster in evaluation.clusters:
-        _validate_cluster_binding(cluster, evaluation.estimator, estimates, assigned)
-    if assigned != estimates.keys():
-        raise ValueError("clusters must partition every estimate")
+        _validate_cluster_binding(cluster, evaluation.estimator, estimates)
+    if {estimate.cluster_id for estimate in evaluation.estimates} != clusters.keys():
+        raise ValueError("clusters must be exactly the estimate-referenced clusters")
     for estimate in evaluation.estimates:
         _validate_estimate_cluster_binding(estimate, clusters)
     if _metrics(evaluation.estimates, evaluation.clusters) != evaluation.metrics:
@@ -420,13 +415,30 @@ def _expected_estimate_support(
     return _exact._group_prior_trajectories(observations, source)
 
 
+def _expected_cluster_members(
+    estimator: EstimatorKindV2,
+    source: Any,
+    observations: tuple[Any, ...],
+    threshold: float,
+    semantic_digests: Mapping[str, str],
+) -> tuple[str, ...]:
+    pool = _exact._clustering_observations(observations, source)
+    vectors = _exact._tfidf_vectors(pool)
+    clusters = _clusters_for(estimator, pool, vectors, threshold, semantic_digests)
+    member_lookup = {member: cluster for cluster in clusters for member in cluster}
+    return member_lookup[source.observation_id]
+
+
 def _validate_source_estimate(
     estimate: SemanticStateValueEstimate,
+    estimator: EstimatorKindV2,
     source: Any,
     observations: tuple[Any, ...],
     source_by_id: dict[str, Any],
     previous: Mapping[tuple[str, int], ExtractedTrajectoryState | None],
     rewards: Mapping[str, Literal[0, 1]],
+    threshold: float,
+    semantic_digests: Mapping[str, str],
 ) -> None:
     if _source_bound_fields(estimate) != _expected_source_fields(source):
         raise ValueError("estimate fields are stale or source-substituted")
@@ -436,6 +448,13 @@ def _validate_source_estimate(
     )
     if estimate.abstract_value_state != semantic:
         raise ValueError("abstract state does not bind the exact source state")
+    expected_members = _expected_cluster_members(
+        estimator, source, observations, threshold, semantic_digests
+    )
+    if estimate.cluster_member_observation_ids != expected_members:
+        raise ValueError("estimate cluster membership is stale or substituted")
+    if estimate.cluster_id != _cluster_id(estimator, expected_members):
+        raise ValueError("estimate cluster id is stale or substituted")
     expected_support = _expected_estimate_support(
         estimate, source, observations, source_by_id
     )
@@ -453,18 +472,40 @@ def _validate_comparison_source_bindings(
     source_by_id = {item.observation_id: item for item in observations}
     source_ids = tuple(item.observation_id for item in observations)
     previous = _previous_state_lookup(comparison.source_corpus)
+    _, semantic_digests = _semantic_states(comparison.source_corpus, observations)
+    threshold = (
+        comparison.evaluator_config.text_similarity_threshold_millionths / 1_000_000
+    )
     rewards = {item.trajectory_id: item.terminal_reward for item in observations}
     for evaluation in comparison.evaluations:
         if tuple(item.observation_id for item in evaluation.estimates) != source_ids:
             raise ValueError("evaluation observations do not bind the source corpus")
+        expected_clusters = {
+            _expected_cluster_members(
+                evaluation.estimator,
+                source_by_id[estimate.observation_id],
+                observations,
+                threshold,
+                semantic_digests,
+            )
+            for estimate in evaluation.estimates
+        }
+        declared_clusters = {
+            cluster.member_observation_ids for cluster in evaluation.clusters
+        }
+        if declared_clusters != expected_clusters:
+            raise ValueError("evaluation clusters are stale or source-substituted")
         for estimate in evaluation.estimates:
             _validate_source_estimate(
                 estimate,
+                evaluation.estimator,
                 source_by_id[estimate.observation_id],
                 observations,
                 source_by_id,
                 previous,
                 rewards,
+                threshold,
+                semantic_digests,
             )
 
 
@@ -764,17 +805,18 @@ def _wilson(successes: int, support: int) -> EstimateUncertainty:
 
 def _estimates(
     kind: EstimatorKindV2,
-    clusters: tuple[tuple[str, ...], ...],
     observations: tuple[Any, ...],
     semantic_states: Mapping[str, AbstractValueStateSignature],
     semantic_digests: Mapping[str, str],
+    threshold: float,
 ) -> tuple[SemanticStateValueEstimate, ...]:
     by_id = {item.observation_id: item for item in observations}
-    member_lookup = {member: cluster for cluster in clusters for member in cluster}
     rewards = {item.trajectory_id: item.terminal_reward for item in observations}
     estimates: list[SemanticStateValueEstimate] = []
     for target in observations:
-        members = member_lookup[target.observation_id]
+        members = _expected_cluster_members(
+            kind, target, observations, threshold, semantic_digests
+        )
         support = _exact._training_trajectories(members, target, by_id)
         source = ValueSource.CLUSTER
         if not support:
@@ -862,21 +904,21 @@ def evaluate_semantic_trajectories(
     threshold = corpus.evaluator_config.text_similarity_threshold_millionths / 1_000_000
     evaluations: list[EstimatorEvaluationV2] = []
     for kind in EstimatorKindV2:
-        cluster_members = _clusters_for(
-            kind, observations, vectors, threshold, semantic_digests
+        estimates = _estimates(
+            kind,
+            observations,
+            semantic_states,
+            semantic_digests,
+            threshold,
+        )
+        cluster_members = tuple(
+            sorted({estimate.cluster_member_observation_ids for estimate in estimates})
         )
         clusters = _cluster_summaries(
             kind,
             cluster_members,
             by_id,
             vectors,
-            semantic_states,
-            semantic_digests,
-        )
-        estimates = _estimates(
-            kind,
-            cluster_members,
-            observations,
             semantic_states,
             semantic_digests,
         )

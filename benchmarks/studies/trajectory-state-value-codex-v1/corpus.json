@@ -274,6 +274,7 @@
           "clean_room": true,
           "evidence_schema_version": "1",
           "input_binding_valid": true,
+          "source_binding_digest": "sha256:c2b558c73d5d41711dc42d99f7ed7d9bae8493f317fb1a38a79e5f2687457f8a",
           "verifier_digest": "sha256:e684baf691da801ff2315d398f8be75de84d820d676d750ebd76942b3e0dba0e",
           "verifier_execution_status": "COMPLETED"
         }
@@ -390,6 +391,7 @@
           "clean_room": true,
           "evidence_schema_version": "1",
           "input_binding_valid": true,
+          "source_binding_digest": "sha256:aac8041f60adc3be67f76c3f64ee0c181d46040bdc2039c0e23c8df58df539a3",
           "verifier_digest": "sha256:e684baf691da801ff2315d398f8be75de84d820d676d750ebd76942b3e0dba0e",
           "verifier_execution_status": "COMPLETED"
         }
@@ -544,6 +546,7 @@
           "clean_room": true,
           "evidence_schema_version": "1",
           "input_binding_valid": true,
+          "source_binding_digest": "sha256:7e973f1eed195fca057abff7e57ede5d29853e12e467c45c074b9a178c92ca46",
           "verifier_digest": "sha256:e684baf691da801ff2315d398f8be75de84d820d676d750ebd76942b3e0dba0e",
           "verifier_execution_status": "COMPLETED"
         }
@@ -814,6 +817,7 @@
           "clean_room": true,
           "evidence_schema_version": "1",
           "input_binding_valid": true,
+          "source_binding_digest": "sha256:1cc462b0ae71b5d4347b64eabd4878aa2abc729721d9dc1a8f0b1609fb8c8385",
           "verifier_digest": "sha256:e684baf691da801ff2315d398f8be75de84d820d676d750ebd76942b3e0dba0e",
           "verifier_execution_status": "COMPLETED"
         }
@@ -1155,6 +1159,7 @@
           "clean_room": true,
           "evidence_schema_version": "1",
           "input_binding_valid": true,
+          "source_binding_digest": "sha256:aa5368ee40f6f97f9b01fe3f95a784c46afa543591074de7178ae4599f20b2a0",
           "verifier_digest": "sha256:e684baf691da801ff2315d398f8be75de84d820d676d750ebd76942b3e0dba0e",
           "verifier_execution_status": "COMPLETED"
         }
@@ -1496,6 +1501,7 @@
           "clean_room": true,
           "evidence_schema_version": "1",
           "input_binding_valid": true,
+          "source_binding_digest": "sha256:8cb96444d597176721447fd41f68e01076c17190d59c4078e0da7a1d609c4212",
           "verifier_digest": "sha256:e684baf691da801ff2315d398f8be75de84d820d676d750ebd76942b3e0dba0e",
           "verifier_execution_status": "COMPLETED"
         }
@@ -1612,6 +1618,7 @@
           "clean_room": true,
           "evidence_schema_version": "1",
           "input_binding_valid": true,
+          "source_binding_digest": "sha256:b5ab0ccafe1f87f060416ae314d387dc30b70a76bdc169f2973b3c2131e4f7e4",
           "verifier_digest": "sha256:e684baf691da801ff2315d398f8be75de84d820d676d750ebd76942b3e0dba0e",
           "verifier_execution_status": "COMPLETED"
         }
@@ -1893,6 +1900,7 @@
           "clean_room": true,
           "evidence_schema_version": "1",
           "input_binding_valid": true,
+          "source_binding_digest": "sha256:1628bdd73e62761fe6e27d4829d71a486489030b76bb9e7106cc6aa95758084b",
           "verifier_digest": "sha256:e684baf691da801ff2315d398f8be75de84d820d676d750ebd76942b3e0dba0e",
           "verifier_execution_status": "COMPLETED"
         }
@@ -2200,6 +2208,7 @@
           "clean_room": true,
           "evidence_schema_version": "1",
           "input_binding_valid": true,
+          "source_binding_digest": "sha256:751038f2413fd8e795e0a438308908b8b5946d1ce14ae34e3583368994a0e8b9",
           "verifier_digest": "sha256:e684baf691da801ff2315d398f8be75de84d820d676d750ebd76942b3e0dba0e",
           "verifier_execution_status": "COMPLETED"
         }
@@ -2431,6 +2440,7 @@
           "clean_room": true,
           "evidence_schema_version": "1",
           "input_binding_valid": true,
+          "source_binding_digest": "sha256:cea9ff0b90e347f3babcd50109eb39eb0045debe0c0575eb15d215d13175a545",
           "verifier_digest": "sha256:e684baf691da801ff2315d398f8be75de84d820d676d750ebd76942b3e0dba0e",
           "verifier_execution_status": "COMPLETED"
         }
@@ -2586,6 +2596,7 @@
           "clean_room": true,
           "evidence_schema_version": "1",
           "input_binding_valid": true,
+          "source_binding_digest": "sha256:4193b4fb4fa08ded3b80967e3b68fa92bd82efd52514d80568bc0a0ba7663074",
           "verifier_digest": "sha256:e684baf691da801ff2315d398f8be75de84d820d676d750ebd76942b3e0dba0e",
           "verifier_execution_status": "COMPLETED"
         }
@@ -2993,6 +3004,7 @@
           "clean_room": true,
           "evidence_schema_version": "1",
           "input_binding_valid": true,
+          "source_binding_digest": "sha256:eb7b48379c6f17d8c9aea05b4dee068554c5efec8efbde525a56ab815c335f4d",
           "verifier_digest": "sha256:e684baf691da801ff2315d398f8be75de84d820d676d750ebd76942b3e0dba0e",
           "verifier_execution_status": "COMPLETED"
         }
@@ -3147,6 +3159,7 @@
           "clean_room": true,
           "evidence_schema_version": "1",
           "input_binding_valid": true,
+          "source_binding_digest": "sha256:51f8ab9fad75c7881d5b7d64c510d72604ce165db0dfebcd81e686d1d1dfc20f",
           "verifier_digest": "sha256:e684baf691da801ff2315d398f8be75de84d820d676d750ebd76942b3e0dba0e",
           "verifier_execution_status": "COMPLETED"
         }
@@ -3301,6 +3314,7 @@
           "clean_room": true,
           "evidence_schema_version": "1",
           "input_binding_valid": true,
+          "source_binding_digest": "sha256:4404c5452ec6e7b867436dbdb86eca30a83f1345340da205421b46740b25a863",
           "verifier_digest": "sha256:e684baf691da801ff2315d398f8be75de84d820d676d750ebd76942b3e0dba0e",
           "verifier_execution_status": "COMPLETED"
         }
@@ -3417,6 +3431,7 @@
           "clean_room": true,
           "evidence_schema_version": "1",
           "input_binding_valid": true,
+          "source_binding_digest": "sha256:8bd010d25a6a56ac4503d0c816528c3690c458970c4bf2f73da03d47e08e63f5",
           "verifier_digest": "sha256:e684baf691da801ff2315d398f8be75de84d820d676d750ebd76942b3e0dba0e",
           "verifier_execution_status": "COMPLETED"
         }

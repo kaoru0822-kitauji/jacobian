@@ -245,7 +245,7 @@
     "runs/symmetric-polynomial-divisibility-cal-r02/workspace/prompt.txt": "sha256:57721d755ede51cd1d8cdc8eb842c4ca0b64521953244343f1a0de04085a3e49",
     "runs/symmetric-polynomial-divisibility-cal-r02/workspace/submission.json": "sha256:9c497b964af4dde763f28c32c7da3c781ff3b941ef38241acb25a9f247d5ab1e",
     "runs/symmetric-polynomial-divisibility-cal-r02/workspace/submission_schema.json": "sha256:b2154470b4130f86a641bd1b6f2729ae412aeabe901339bc3cf699ebd42d237d",
-    "summary.json": "sha256:a86ff39be7bfb50428dade33fc2127c9118b8e4eb12fbfd58a2a705a9ce32e1c"
+    "summary.json": "sha256:8f2224b72ca9f468284e6f01fc07486785cc0bd4b30b17de4ecb4240c49d48dd"
   },
   "budgets": {
     "candidates": 8,

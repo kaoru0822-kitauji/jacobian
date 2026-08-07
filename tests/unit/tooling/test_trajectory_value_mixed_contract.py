@@ -28,17 +28,13 @@ def _value() -> dict[str, object]:
 def test_frozen_contract_recomputes_calibration_selected_population() -> None:
     validated = load_frozen_study(SPEC)
     assert [task.task_id for task in validated.contract.tasks] == [
-        "graph-artifact-composition",
         "apollonius-gap-repair",
-        "rp2-homology-lattice",
     ]
     assert validated.contract.repetitions_per_task == 8
-    assert len(validated.contract.tasks) * validated.contract.repetitions_per_task == 24
+    assert len(validated.contract.tasks) * validated.contract.repetitions_per_task == 8
     assert validated.contract.h3_warning_rule.startswith("any-strictly-negative")
     assert set(validated.task_contracts) == {
-        ("mathematical-benchmarks-v1", "graph-artifact-composition"),
         ("mathematical-benchmarks-v1", "apollonius-gap-repair"),
-        ("mathematical-benchmarks-v1", "rp2-homology-lattice"),
     }
 
 

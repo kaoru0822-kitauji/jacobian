@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from referencing import Registry
 from referencing.jsonschema import DRAFT202012
 
+from jacobian.eval import trajectory_value_abstraction as abstraction_module
 from jacobian.eval.trajectory_state import (
     ArtifactStateRef,
     BindingValidity,
@@ -213,8 +214,10 @@ def _trajectory(
             after=after,
         ),
     )
+    source_digest = _sha("source-" + trajectory_id)
     evidence = CleanRoomTerminalEvidence(
         verifier_digest=_sha("independent-polynomial-verifier-v1"),
+        source_binding_digest=source_digest,
         clean_room=True,
         verifier_execution_status="COMPLETED",
         acceptance=(
@@ -227,7 +230,7 @@ def _trajectory(
         trajectory_id=trajectory_id,
         task_group=task_group,
         extraction=TrajectoryExtraction(
-            source_digest=_sha("source-" + trajectory_id),
+            source_digest=source_digest,
             task_family="polynomial-map-inverse",
             states=states,
             terminal_evidence=evidence,
@@ -528,6 +531,73 @@ def test_result_is_deterministic_and_source_corpus_is_digest_bound() -> None:
     )
     with pytest.raises(ValueError, match="stale or source-substituted"):
         OfflineValueComparisonV2.model_validate(state_payload)
+
+
+def test_validation_recomputes_cluster_members_from_bound_source_corpus() -> None:
+    result = evaluate_semantic_trajectories(_controlled_corpus())
+    evaluation = _evaluation(result, EstimatorKindV2.GROUP_ROLLOUT)
+    original = evaluation.estimates[0]
+    existing_cluster_ids = {cluster.cluster_id for cluster in evaluation.clusters}
+    substituted_members, substituted_cluster_id = next(
+        (
+            members,
+            abstraction_module._cluster_id(evaluation.estimator, members),
+        )
+        for members in (
+            tuple(sorted((*original.cluster_member_observation_ids, candidate)))
+            for candidate in (
+                estimate.observation_id
+                for estimate in evaluation.estimates
+                if estimate.observation_id
+                not in original.cluster_member_observation_ids
+            )
+        )
+        if abstraction_module._cluster_id(evaluation.estimator, members)
+        not in existing_cluster_ids
+    )
+    substituted_estimate = original.model_copy(
+        update={
+            "cluster_id": substituted_cluster_id,
+            "cluster_member_observation_ids": substituted_members,
+        }
+    )
+    estimates = (substituted_estimate, *evaluation.estimates[1:])
+    referenced_cluster_ids = {estimate.cluster_id for estimate in estimates}
+    clusters = (
+        *(
+            cluster
+            for cluster in evaluation.clusters
+            if cluster.cluster_id in referenced_cluster_ids
+        ),
+        evaluation.clusters[0].model_copy(
+            update={
+                "cluster_id": substituted_cluster_id,
+                "member_observation_ids": substituted_members,
+                "member_trajectory_ids": tuple(
+                    sorted(
+                        {
+                            estimate.trajectory_id
+                            for estimate in evaluation.estimates
+                            if estimate.observation_id in substituted_members
+                        }
+                    )
+                ),
+            }
+        ),
+    )
+    substituted_evaluation = EstimatorEvaluationV2(
+        estimator=evaluation.estimator,
+        clusters=clusters,
+        estimates=estimates,
+        metrics=abstraction_module._metrics(estimates, clusters),
+    )
+    payload = result.model_dump(mode="json")
+    payload["evaluations"][0] = substituted_evaluation.model_dump(mode="json")
+
+    with pytest.raises(
+        ValueError, match=r"clusters are stale|cluster membership is stale"
+    ):
+        OfflineValueComparisonV2.model_validate(payload)
 
 
 def test_controlled_comparison_summary_is_immutable() -> None:

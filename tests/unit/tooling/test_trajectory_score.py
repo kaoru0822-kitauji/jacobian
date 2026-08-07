@@ -229,6 +229,26 @@ def test_closed_state_contract_rejects_credit_for_prose_only_transition() -> Non
         TrajectoryScoreReplay.model_validate(root_payload)
 
 
+def test_replay_contract_rebinds_previous_delta_and_cumulative_credit() -> None:
+    replay = replay_offline_values(_comparison(), trajectory_id="target")
+    wrong_previous = replay.model_dump(mode="json")
+    wrong_previous["states"][2]["previous_observation_id"] = "target:0"
+    with pytest.raises(ValidationError, match="previous observation ids are stale"):
+        TrajectoryScoreReplay.model_validate(wrong_previous)
+
+    wrong_delta = replay.model_dump(mode="json")
+    wrong_delta["states"][1]["value_delta"] = 0.1
+    wrong_delta["states"][1]["transition_credit"] = 0.1
+    wrong_delta["states"][1]["cumulative_milestone_credit"] = 0.1
+    with pytest.raises(ValidationError, match="value deltas are stale"):
+        TrajectoryScoreReplay.model_validate(wrong_delta)
+
+    reset_cumulative = replay.model_dump(mode="json")
+    reset_cumulative["states"][2]["cumulative_milestone_credit"] = 0.0
+    with pytest.raises(ValidationError, match="cumulative credit is stale"):
+        TrajectoryScoreReplay.model_validate(reset_cumulative)
+
+
 def test_replay_is_deterministic_and_binds_the_complete_comparison() -> None:
     comparison = _comparison()
     left = replay_offline_values(comparison, trajectory_id="target")

@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from benchmarks.tooling.trajectory_value_calibration import (
     TrajectoryValueCalibrationSpec,
+    _codex_arguments,
     _task_contract,
     load_spec,
     summarize,
@@ -19,11 +20,20 @@ EXTENSION_SPEC = (
 )
 
 
-def _record(dataset: str, task: str, acceptance: str) -> dict[str, object]:
+def _record(
+    dataset: str,
+    task: str,
+    acceptance: str,
+    *,
+    input_binding_valid: bool | None = None,
+) -> dict[str, object]:
+    terminal: dict[str, object] = {"acceptance": acceptance}
+    if input_binding_valid is not None:
+        terminal["input_binding_valid"] = input_binding_valid
     return {
         "dataset_id": dataset,
         "task_id": task,
-        "terminal": {"acceptance": acceptance},
+        "terminal": terminal,
     }
 
 
@@ -95,6 +105,45 @@ def test_selection_uses_only_labelled_terminal_outcomes_in_candidate_order() -> 
     assert summary["accepted"] == 8
     assert summary["rejected"] == 7
     assert summary["inconclusive"] == 1
+
+
+def test_input_binding_failures_remain_inconclusive_in_summary() -> None:
+    spec = load_spec(SPEC)
+    candidate = spec.candidates[0]
+    records = [
+        _record(
+            candidate.dataset_id,
+            candidate.task_id,
+            "REJECTED",
+            input_binding_valid=False,
+        ),
+        _record(candidate.dataset_id, candidate.task_id, "ACCEPTED"),
+    ]
+
+    summary = summarize(spec, records)
+
+    first = summary["candidate_results"][0]
+    assert first["accepted"] == 1
+    assert first["rejected"] == 0
+    assert first["inconclusive"] == 1
+    assert summary["accepted"] == 1
+    assert summary["rejected"] == 0
+    assert summary["inconclusive"] == 1
+
+
+def test_calibration_codex_command_disables_web_search_under_ignored_config(
+    tmp_path: Path,
+) -> None:
+    spec = load_spec(SPEC)
+    arguments = _codex_arguments(
+        workspace=tmp_path,
+        spec=spec,
+        mcp_url="http://127.0.0.1:8765/mcp",
+        prompt="calibration prompt",
+    )
+
+    assert "--ignore-user-config" in arguments
+    assert 'web_search="disabled"' in arguments
 
 
 def test_schema_matches_checked_in_contract() -> None:

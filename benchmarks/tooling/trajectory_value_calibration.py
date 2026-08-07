@@ -37,9 +37,9 @@ from benchmarks.tooling.trajectory_value_study import (
     _codex_version,
     _mcp_server,
     _model_cache,
-    _read_reasoning_resource,
     _reasoning_run_ids,
     _repository_is_clean,
+    _required_reasoning_log,
 )
 from benchmarks.tooling.trajectory_value_study_verifier import (
     file_digest,
@@ -337,6 +337,8 @@ def _codex_arguments(
         "-c",
         f"model_reasoning_effort={json.dumps(spec.model.reasoning_effort)}",
         "-c",
+        f"web_search={json.dumps(spec.web_search)}",
+        "-c",
         f"mcp_servers.jacobian.url={json.dumps(mcp_url)}",
         prompt,
     )
@@ -402,14 +404,35 @@ def _verification_outcome(
             "reason": type(exc).__name__,
             "reward": None,
         }
+    # Missing binding diagnostics are unknown, not invalid: only an explicit
+    # zero/false binding may force INCONCLUSIVE instead of REJECTED.
+    if "input_binding" not in reward:
+        input_binding_valid: bool | None = None
+    else:
+        input_binding_valid = reward.get("input_binding") == 1.0
+    if "evidence_validity" not in reward:
+        artifact_binding_valid: bool | None = None
+    else:
+        artifact_binding_valid = reward.get("evidence_validity") == 1.0
     accepted = reward.get("reward") == 1.0
+    acceptance = (
+        "INCONCLUSIVE"
+        if input_binding_valid is False
+        else "ACCEPTED"
+        if accepted
+        else "REJECTED"
+    )
     return {
         **base,
         "verifier_execution_status": "COMPLETED",
-        "acceptance": "ACCEPTED" if accepted else "REJECTED",
-        "reason": "TERMINAL_CLEAN_ROOM_REWARD",
-        "input_binding_valid": reward.get("input_binding") == 1.0,
-        "artifact_binding_valid": reward.get("evidence_validity") == 1.0,
+        "acceptance": acceptance,
+        "reason": (
+            "TERMINAL_INPUT_BINDING_INVALID"
+            if input_binding_valid is False
+            else "TERMINAL_CLEAN_ROOM_REWARD"
+        ),
+        "input_binding_valid": input_binding_valid,
+        "artifact_binding_valid": artifact_binding_valid,
         "false_certification": reward.get("false_certification"),
         "reward": reward,
     }
@@ -456,14 +479,7 @@ def _run_one(
             transcript.write_bytes(command.stdout)
             (run_dir / "codex.stderr").write_bytes(command.stderr)
             run_ids = _reasoning_run_ids(transcript)
-            reasoning_text = ""
-            if len(run_ids) == 1:
-                try:
-                    reasoning_text = asyncio.run(
-                        _read_reasoning_resource(mcp_url, run_ids[0])
-                    )
-                except Exception:
-                    reasoning_text = ""
+            reasoning_text = _required_reasoning_log(mcp_url, run_ids)
             (run_dir / "reasoning-log.jsonl").write_text(
                 reasoning_text, encoding="utf-8"
             )
@@ -516,6 +532,15 @@ def _wilson(successes: int, denominator: int) -> tuple[float | None, float | Non
     return max(0.0, center - radius), min(1.0, center + radius)
 
 
+def _terminal_acceptance(record: Mapping[str, Any]) -> str:
+    terminal = record["terminal"]
+    if isinstance(terminal, Mapping) and terminal.get("input_binding_valid") is False:
+        return "INCONCLUSIVE"
+    if isinstance(terminal, Mapping):
+        return str(terminal["acceptance"])
+    return "INCONCLUSIVE"
+
+
 def summarize(
     spec: TrajectoryValueCalibrationSpec,
     records: Sequence[Mapping[str, Any]],
@@ -532,7 +557,7 @@ def summarize(
     maximum = spec.selection_rule.maximum_success_rate_millionths / 1_000_000
     for candidate in spec.candidates:
         task_records = by_task.get((candidate.dataset_id, candidate.task_id), [])
-        acceptances = [str(record["terminal"]["acceptance"]) for record in task_records]
+        acceptances = [_terminal_acceptance(record) for record in task_records]
         labelled = [value for value in acceptances if value != "INCONCLUSIVE"]
         accepted = sum(value == "ACCEPTED" for value in labelled)
         rejected = sum(value == "REJECTED" for value in labelled)
@@ -573,13 +598,13 @@ def summarize(
         "selected_task_count": len(selected),
         "total_rollouts": len(records),
         "accepted": sum(
-            record["terminal"]["acceptance"] == "ACCEPTED" for record in records
+            _terminal_acceptance(record) == "ACCEPTED" for record in records
         ),
         "rejected": sum(
-            record["terminal"]["acceptance"] == "REJECTED" for record in records
+            _terminal_acceptance(record) == "REJECTED" for record in records
         ),
         "inconclusive": sum(
-            record["terminal"]["acceptance"] == "INCONCLUSIVE" for record in records
+            _terminal_acceptance(record) == "INCONCLUSIVE" for record in records
         ),
         "training_performed": False,
         "scorer_intervention": False,

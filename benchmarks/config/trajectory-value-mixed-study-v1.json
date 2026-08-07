@@ -3,16 +3,16 @@
   "calibration_sources": [
     {
       "calibration_id": "trajectory-value-calibration-codex-v1",
-      "manifest_digest": "sha256:5fbfdeb02bcb1a96c1c745133d04d9ee7c9b64a3c1a0f8f1657751f1e8aa190a",
+      "manifest_digest": "sha256:d087a1fff3632ba6f1a34fdfb983cbaae0812faa85dea4d040fdcf3ec311188f",
       "manifest_path": "benchmarks/studies/trajectory-value-calibration-codex-v1/manifest.json",
-      "summary_digest": "sha256:b78411cf0640f7c368e3d0cefc0314fe5297b1ca7f097191aec3b95a1396720d",
+      "summary_digest": "sha256:1de7997f93a1eeeb09508600f8b40ddf12b36a5036e7030cc15f7248589b8df2",
       "summary_path": "benchmarks/studies/trajectory-value-calibration-codex-v1/summary.json"
     },
     {
       "calibration_id": "trajectory-value-calibration-extension-codex-v1",
-      "manifest_digest": "sha256:b0dff703db25237711d2aea33c5291b6a9275ad85f55a6e67243acfe9c686570",
+      "manifest_digest": "sha256:3df9d76e6d79682ef381b60da4d47ab89577d358b3f14eb98c15ede5b07927a0",
       "manifest_path": "benchmarks/studies/trajectory-value-calibration-extension-codex-v1/manifest.json",
-      "summary_digest": "sha256:a86ff39be7bfb50428dade33fc2127c9118b8e4eb12fbfd58a2a705a9ce32e1c",
+      "summary_digest": "sha256:8f2224b72ca9f468284e6f01fc07486785cc0bd4b30b17de4ecb4240c49d48dd",
       "summary_path": "benchmarks/studies/trajectory-value-calibration-extension-codex-v1/summary.json"
     }
   ],
@@ -49,28 +49,11 @@
       "uncertainty": "wilson-95"
     },
     "maximum_main_tasks": 4,
-    "minimum_main_tasks": 2,
+    "minimum_main_tasks": 1,
     "source_combination": "source-order-then-candidate-order"
   },
   "study_id": "trajectory-value-mixed-codex-v1",
   "tasks": [
-    {
-      "accepted": 1,
-      "calibration_id": "trajectory-value-calibration-codex-v1",
-      "calibration_result_digest": "sha256:b1ac5a2b155580127cede1f1f6d08598ef2603b8986557c239b2b0aa59e3ccd2",
-      "calibration_tags": [
-        "artifact-binding",
-        "capability-routing"
-      ],
-      "dataset_id": "mathematical-benchmarks-v1",
-      "labelled": 2,
-      "rejected": 1,
-      "success_rate_millionths": 500000,
-      "task_contract_digest": "sha256:72094704a4ceceeb0fca049c2608502c313584ad1f600dd9f0d26a1757a11b50",
-      "task_family": "graph-artifact-composition",
-      "task_group": "graph-artifact-composition",
-      "task_id": "graph-artifact-composition"
-    },
     {
       "accepted": 1,
       "calibration_id": "trajectory-value-calibration-extension-codex-v1",
@@ -87,23 +70,6 @@
       "task_family": "apollonius-proof-gap-repair",
       "task_group": "apollonius-gap-repair",
       "task_id": "apollonius-gap-repair"
-    },
-    {
-      "accepted": 1,
-      "calibration_id": "trajectory-value-calibration-extension-codex-v1",
-      "calibration_result_digest": "sha256:d009398468dc8a2f9b955a69f430d33a518259ef9f49b601195fa1d0a60ad43f",
-      "calibration_tags": [
-        "artifact-binding",
-        "scope-assurance"
-      ],
-      "dataset_id": "mathematical-benchmarks-v1",
-      "labelled": 2,
-      "rejected": 1,
-      "success_rate_millionths": 500000,
-      "task_contract_digest": "sha256:7006391aacfe6a49ef26b37f9577476aa1cc470e431fdcc53944834453ada975",
-      "task_family": "projective-plane-homology-lattice",
-      "task_group": "rp2-homology-lattice",
-      "task_id": "rp2-homology-lattice"
     }
   ],
   "terminal_reward": "clean-room-verifier-acceptance-only",

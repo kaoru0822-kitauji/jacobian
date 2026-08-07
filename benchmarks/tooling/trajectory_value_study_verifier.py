@@ -21,6 +21,7 @@ from typing import Any
 
 MAX_TASK_BYTES = 256 * 1024
 MAX_SUBMISSION_BYTES = 1024 * 1024
+MAX_RATIONAL_COMPONENT_DIGITS = 128
 VERIFIER_ID = "trajectory-state-value-study.clean-room-exact-verifier@1"
 _INTEGER = re.compile(r"^-?(?:0|[1-9][0-9]*)$")
 _RATIONAL = re.compile(r"^-?(?:0|[1-9][0-9]*)(?:/[1-9][0-9]*)?$")
@@ -52,6 +53,15 @@ def file_digest(path: Path) -> str:
     return "sha256:" + digest.hexdigest()
 
 
+def _reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON object key")
+        result[key] = value
+    return result
+
+
 def verifier_digest() -> str:
     """Bind the exact independent checker implementation."""
 
@@ -74,7 +84,10 @@ def _load_json(path: Path, maximum_bytes: int) -> object | None:
     if not _regular_bounded(path, maximum_bytes):
         return None
     try:
-        value: object = json.loads(path.read_text(encoding="utf-8"))
+        value: object = json.loads(
+            path.read_text(encoding="utf-8"),
+            object_pairs_hook=_reject_duplicate_keys,
+        )
         return value
     except (OSError, UnicodeError, ValueError, RecursionError, MemoryError):
         return None
@@ -89,6 +102,9 @@ def _parse_integer(value: object) -> int:
 def _parse_rational(value: object) -> Fraction:
     if not isinstance(value, str) or _RATIONAL.fullmatch(value) is None:
         raise ValueError("expected rational string")
+    for component in value.lstrip("-").split("/", maxsplit=1):
+        if len(component) > MAX_RATIONAL_COMPONENT_DIGITS:
+            raise ValueError("rational coefficient is too large")
     return Fraction(value)
 
 
@@ -382,6 +398,7 @@ def verify_workspace(expected_task: dict[str, Any], workspace: Path) -> dict[str
 
 
 __all__ = [
+    "MAX_RATIONAL_COMPONENT_DIGITS",
     "MAX_SUBMISSION_BYTES",
     "MAX_TASK_BYTES",
     "VERIFIER_ID",
