@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -9,8 +11,14 @@ from jacobian.canonical import (
     CanonicalizationError,
     CanonicalLimits,
     canonicalize_json,
+    sha256_digest,
 )
 from jacobian.contracts.exact import CanonicalRational
+
+
+def test_sha256_digest_uses_the_canonical_prefixed_format() -> None:
+    for value in (b"", b"\x00", b"jacobian", b"\xde\xad\xbe\xef" * 100):
+        assert sha256_digest(value) == "sha256:" + hashlib.sha256(value).hexdigest()
 
 
 def test_equivalent_rationals_have_identical_canonical_bytes() -> None:
