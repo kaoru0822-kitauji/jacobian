@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from math import comb, gcd
+from math import comb
 from typing import cast
 
 from jacobian.contracts.projective_geometry import (
@@ -16,6 +16,7 @@ from jacobian.contracts.projective_geometry import (
 )
 from jacobian.contracts.results import ContractModel
 from jacobian.domains._examples import example
+from jacobian.math.arithmetic import primitive_integer_vector
 from jacobian.operations import (
     MaterializedOperation,
     MaterializedOperationFactory,
@@ -24,24 +25,10 @@ from jacobian.operations import (
 
 
 def _primitive(values: tuple[Fraction, Fraction, Fraction]) -> tuple[int, int, int]:
-    denominator_lcm = 1
-    for fraction_value in values:
-        denominator_lcm = (
-            denominator_lcm
-            * fraction_value.denominator
-            // gcd(denominator_lcm, fraction_value.denominator)
-        )
-    integers = tuple(
-        value.numerator * (denominator_lcm // value.denominator) for value in values
-    )
-    divisor = 0
-    for integer in integers:
-        divisor = gcd(divisor, abs(integer))
-    if divisor == 0:
-        raise ValueError("projective homogeneous coordinates must be nonzero")
-    primitive = tuple(value // divisor for value in integers)
-    if next(value for value in primitive if value) < 0:
-        primitive = tuple(-value for value in primitive)
+    try:
+        primitive = primitive_integer_vector(values)
+    except ValueError as exc:
+        raise ValueError("projective homogeneous coordinates must be nonzero") from exc
     return cast(tuple[int, int, int], primitive)
 
 
