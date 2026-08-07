@@ -9,9 +9,10 @@ from [Numca and Hista](https://arxiv.org/abs/2605.29782), but does not use model
 hidden states, train a critic, update model weights, or authorize mathematical
 assurance.
 
-The work is staged. The version 1 extractor, deterministic offline value
-comparison, and observation-only replay scorer are defined. The repeated Codex
-study is separately preregistered before its labels are collected.
+The work is staged. The version 1 extractor, exact-state offline value
+comparison, and observation-only replay scorer are defined. A separate semantic
+value-state and six-estimator comparison are also frozen before the mixed-
+difficulty Codex labels are collected.
 
 ## Version 1 state contract
 
@@ -453,15 +454,100 @@ medium reasoning effort, prompt, 420-second timeout, isolated workspace and
 state, no web search, no wrong-answer retries, and clean-room terminal reward.
 The six estimators are frozen in this order: group/rollout, Numca-like numeric,
 reasoning text, exact typed state, abstract value-state, and abstract
-value-state plus text. PR6 must define the two abstract representations without
-changing this population. PR7 must preregister its remaining analysis details
-before execution.
+value-state plus text. The next section defines the two abstract
+representations without changing this population. PR7 must preregister its
+remaining analysis details before execution.
 
 The H3 warning rule is already fixed as any strictly negative change between
 selected preterminal value estimates. No threshold may be tuned on the main
 labels. The scorer remains observation-only, and the contract records that
 exact intermediate resume is unavailable; compatible independent rollouts are
 the declared non-causal surrogate.
+
+## Version 2 semantic value-state comparison
+
+[`trajectory-value-state-abstraction-v1.schema.json`](schemas/trajectory-value-state-abstraction-v1.schema.json)
+and
+[`trajectory-value-evaluation-v2.schema.json`](schemas/trajectory-value-evaluation-v2.schema.json)
+define the separate clustering representation and six-estimator output in
+`jacobian.eval.trajectory_value_abstraction`. The version 1 hard state remains
+unchanged and authoritative for replay and integrity. Each version 2 estimate
+embeds both the complete abstract state and its digest while retaining the
+exact typed-state digest. The result embeds and digest-binds its complete
+version 1 source corpus. Deserialization independently rebinds evaluator
+configuration, every observation and feature digest, cluster partition,
+leave-one-out support set, terminal-success count, and aggregate metric;
+stale or substituted comparison material is rejected.
+
+The abstract signature keeps semantic state but removes exact identity:
+
+- task family and observation boundary;
+- counted object types, without content digests;
+- counted artifact roles, without artifact URIs;
+- candidate and checker state;
+- counted open and discharged obligation classes, derived from the owning
+  capability's domain name rather than obligation URI;
+- whether scope is absent, declared, or rejected as an escalation, plus its
+  relation to the previous exact snapshot;
+- execution, completeness, completeness assurance, mathematical assurance,
+  and binding validity;
+- meaningful transition kinds; and
+- external reasoning-protocol state.
+
+It deliberately excludes candidate, object, scope, and artifact identities,
+sets `exact_identity_fields_included = false`, and has no assurance authority.
+Consequently it may cluster independently materialized states that have the
+same observable mathematical role. It never replaces the exact state, changes
+a verifier result, or licenses mathematical equivalence between the underlying
+objects.
+
+The version 2 comparison fixes all six estimators in the PR5 order:
+
+1. `GROUP_ROLLOUT` uses only other rollouts from the task group.
+2. `NUMCA_NUMERICAL` uses cumulative numerical spans from external summaries.
+3. `REASONING_TEXT` uses the fixed version 1 deterministic TF-IDF clustering.
+4. `JACOBIAN_TYPED_EXACT` uses the complete version 1 typed signature,
+   including exact identities.
+5. `ABSTRACT_VALUE_STATE` uses exact equality of the identity-free semantic
+   signature.
+6. `ABSTRACT_VALUE_STATE_TEXT` first requires the same abstract signature and
+   then applies the fixed text clustering within that partition.
+
+Clustering remains unsupervised and task-group local. Values remain
+leave-one-trajectory-out terminal success frequencies; each supporting
+trajectory votes once, and each trajectory has equal metric weight. Singleton
+clusters fall back only to the other rollouts in the same task group. Every
+estimate reports support IDs, cluster members, source, Brier/absolute error
+inputs, and a 95% Wilson interval. No estimator is learned, no target label is
+used for clustering or its own estimate, and none can alter prompts, tool
+routing, retries, runtime, reward, or assurance.
+
+### PR6 controlled semantic experiment
+
+The immutable
+[`comparison summary`](../../../tests/unit/tooling/fixtures/trajectory_value/pr6_semantic/comparison-summary.json)
+binds an eight-trajectory, 24-observation mechanism check. Every produced
+object, candidate, artifact, obligation, and scope has a distinct exact
+identity. In the checker group, pairs nevertheless share the same semantic
+state and terminal outcome. In the reasoning group, all four trajectories
+share the same semantic state, while two exact-two-sided reasoning summaries
+end accepted and two one-sided-shortcut summaries end rejected.
+
+| Estimator | Clusters | Fallbacks | Mean support | Brier | MAE |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Group/rollout | 2 | 0 | 3.000 | 0.444444444445 | 0.666666666667 |
+| Numca-like numerical | 2 | 0 | 3.000 | 0.444444444445 | 0.666666666667 |
+| Reasoning text | 3 | 0 | 2.000 | 0.222222222222 | 0.333333333334 |
+| Exact typed state | 18 | 16 | 3.000 | 0.444444444445 | 0.666666666667 |
+| Abstract value-state | 8 | 0 | 2.333 | 0.296296296297 | 0.444444444445 |
+| Abstract state plus text | 11 | 0 | 1.333 | 0.074074074074 | 0.111111111111 |
+
+The controlled result demonstrates both intended mechanisms. Semantic
+abstraction recovers cross-rollout support lost solely to exact identity; text
+then separates useful and unsafe reasoning branches that have the same
+abstract mathematical state. The wider Wilson intervals for the more specific
+estimators expose their smaller support rather than hiding it. This fixture is
+not real-model predictive evidence and does not answer H1, H2, or H3.
 
 ## Current limitations
 
@@ -482,6 +568,15 @@ first version, not a tuned optimum. Exact content-addressed compatibility fails
 safe against merging distinct candidates, but may fragment semantically
 equivalent objects or independently produced verification records; the
 success-only corpus cannot measure that support-loss tradeoff.
+
+The abstract state trades that fragmentation for possible semantic aliasing.
+It counts domain-level object, artifact, and obligation classes but does not
+prove that two exact candidates or scopes are mathematically equivalent. Its
+scope relation compares exact digests only within one trajectory, and its
+capability-domain normalization is a fixed syntactic abstraction rather than a
+domain theorem. These choices are suitable only for clustering and remain
+visible beside the exact identities. The PR6 controlled fixture validates the
+mechanism, not its predictive validity on real trajectories.
 
 The PR3 scorer replays a completed frozen comparison; it is not an online
 critic and cannot score a previously unseen state without a new PR2 comparison.
