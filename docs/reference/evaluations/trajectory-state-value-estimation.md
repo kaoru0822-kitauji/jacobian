@@ -613,6 +613,75 @@ uv run python -m benchmarks.tooling.trajectory_value_hypothesis_study run \
   --execute
 ```
 
+## PR7 real H1--H3 pilot
+
+The immutable
+[`study manifest`](../../../benchmarks/studies/trajectory-value-hypothesis-codex-v1/manifest.json)
+records all 24 locally authenticated Codex 0.147.0 rollouts with
+`gpt-5.4-mini` at medium reasoning effort, no API-key forwarding, no
+wrong-answer retry, and the frozen 420-second budget. The task-owned clean-room
+verifiers observed 12 accepted and 12 rejected original submissions, with no
+false certification. Retrospective analysis admitted 19 trajectories: 9
+accepted and 10 rejected. Three runs lacked a successful `PLAN` boundary and
+two runs were conservatively excluded after a trajectory-extractor failure.
+Those two model calls were not repeated; their raw Codex JSONL, reasoning logs,
+surfaces, and original verifier results remain preserved, while the manifest
+records the lost ephemeral submission workspaces and `INCONCLUSIVE` analysis
+disposition.
+
+| Estimator | Clusters | Fallbacks | Mean support | Brier | MAE |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Group/rollout | 3 | 0 | 5.417 | 0.238245614035 | 0.400000000000 |
+| Numca-like numerical | 11 | 9 | 4.188 | 0.272358674464 | 0.429239766082 |
+| Reasoning text | 17 | 33 | 4.083 | 0.354385964912 | 0.473684210526 |
+| Exact typed state | 24 | 17 | 4.604 | 0.266686159844 | 0.425730994152 |
+| Abstract value-state | 20 | 13 | 4.604 | 0.247010233918 | 0.411842105263 |
+| Abstract state plus text | 41 | 35 | 4.208 | 0.317900306321 | 0.443441938179 |
+
+H1 is not directionally supported under its preregistered conjunctive rule.
+Exact typed state and abstract value-state each beat the Numca-like baseline on
+both Brier and MAE, and abstraction improves on exact identity, but neither
+beats the simpler task-group baseline. The hybrid is worse than both baselines.
+Typed state therefore captures useful mathematical-stage regularity and
+abstraction recovers some identity-fragmented support, but the pilot does not
+show incremental predictive validity beyond knowing the task group.
+
+H2 is also not directionally supported. There are 30 cross-trajectory,
+same-task pairs with the same abstract state, different reasoning digests, and
+opposite rewards. Reasoning text separates 28 and the hybrid separates 26, so
+text visibly distinguishes many policy branches. That extra specificity does
+not improve prediction: hybrid minus abstract is +0.070890072403 Brier and
++0.031599832916 MAE. The text partition produces 41 clusters and 35 fallbacks,
+showing that branch separation can destroy more support than it contributes.
+
+H3 is falsified by this pilot. Group, Numca-like, text, and hybrid estimators
+issue no warnings and recall no failures. Exact and abstract state each issue
+three warnings, all on accepted graph trajectories, for precision 0, recall 0,
+and a 33.3% false-alarm rate among accepted trajectories. Their negative drops
+occur one selected observation before the terminal state and mark productive
+tool transitions rather than eventual failure. No estimator has positive
+true-positive lead time.
+
+Representative trajectories explain the result. Graph r01 completes the
+external reasoning protocol and is accepted, while compatible graph r05 stops
+after its tool result and is rejected; text distinguishes this useful branch.
+Apollonius r06 is nevertheless accepted with an incomplete external reasoning
+protocol, so protocol completion is not a necessary proxy for mathematical
+success. RP2 r06 and r02 both compute determinant -2, finalize the same
+`Z/2Z` conclusion, and have nearly identical typed mathematical progress, but
+r02 fails the task-owned evidence-content contract while r06 passes. The
+reasoning summary does not retain the terminal evidence artifact's exact
+contract-relevant wording, so neither typed state nor text predicts that
+difference before verification.
+
+These observations falsify all three preregistered directional hypotheses for
+this real-model pilot. Value-guided runtime intervention is therefore not
+justified as the next step. A defensible next experiment would first make
+terminal evidence-construction state observable, harden extraction coverage,
+and preregister a new held-out task-family replication; it should not tune the
+current clustering or warning rule on these labels. This is a small public
+predictive-validity pilot, not a statistically powered or causal claim.
+
 ## Current limitations
 
 Version 1 deliberately uses conservative generic output interpretation. A
@@ -622,16 +691,26 @@ semantic equivalence is not inferred. Evidence binding becomes valid only from
 verified checker evidence or clean-room terminal evidence; ordinary
 reasoning-call protocol binding is not mathematical progress.
 
-The real v1 study has only one task per family, four unseeded repetitions per
-task, one model and reasoning level, and no labelled failures. It does not show
-that typed or hybrid states predict real continuation success, outperform
-baselines, or generalize beyond the designed cases. TF-IDF vocabulary and
-cluster geometry are fitted to the complete feature corpus, though labels
-remain strictly leave-one-trajectory-out. The fixed threshold is a declared
-first version, not a tuned optimum. Exact content-addressed compatibility fails
-safe against merging distinct candidates, but may fragment semantically
-equivalent objects or independently produced verification records; the
-success-only corpus cannot measure that support-loss tradeoff.
+The real PR7 pilot has only one task per family, eight unseeded repetitions per
+task, one model and reasoning level, and 19 labelled trajectories after five
+fail-closed exclusions. It is too small to establish generalization or precise
+uncertainty across task families. TF-IDF vocabulary and cluster geometry are
+fitted to the complete feature corpus, though labels remain strictly
+leave-one-trajectory-out. The fixed threshold is a declared first version, not
+a tuned optimum. Exact content-addressed compatibility fails safe against
+merging distinct candidates, but fragments semantically equivalent objects or
+independently produced verification records; the real comparison exposes that
+support-loss tradeoff.
+
+Two interrupted runs exposed that the initial extractor rejected a
+noncanonical candidate value after terminal verification and before publishing
+the ephemeral workspace. The recovery path preserves their original verifier
+outcomes as observation-only evidence but excludes both labels and performs no
+rerun. The hardened runner now publishes the workspace first and confines a
+future extraction failure to one `INCONCLUSIVE` record. Three additional runs
+were excluded for lacking a successful `PLAN` boundary, so the reported
+metrics apply only to the frozen eligible observation protocol, not every
+terminal submission.
 
 The abstract state trades that fragmentation for possible semantic aliasing.
 It counts domain-level object, artifact, and obligation classes but does not

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import gzip
+import hashlib
 import json
 import shutil
 from pathlib import Path
@@ -17,6 +19,7 @@ from benchmarks.tooling.trajectory_value_hypothesis_study import (
     TrajectoryValueHypothesisStudySpec,
     _codex_arguments,
     _local_auth_status,
+    _package_comparison,
     _publish_workspace_and_extract,
     _recover_interrupted_record,
     _verify_terminal,
@@ -25,11 +28,16 @@ from benchmarks.tooling.trajectory_value_hypothesis_study import (
     run_study,
 )
 from benchmarks.tooling.trajectory_value_mixed_contract import FrozenMixedTask
+from benchmarks.tooling.trajectory_value_study_verifier import file_digest
 from pydantic import ValidationError
 from tests.unit.tooling.test_trajectory_value_abstraction import _controlled_corpus
 
 from jacobian.eval.trajectory_state import CleanRoomTerminalEvidence, TerminalAcceptance
-from jacobian.eval.trajectory_value_abstraction import evaluate_semantic_trajectories
+from jacobian.eval.trajectory_value import TrajectoryValueCorpus
+from jacobian.eval.trajectory_value_abstraction import (
+    OfflineValueComparisonV2,
+    evaluate_semantic_trajectories,
+)
 
 ROOT = Path(__file__).resolve().parents[3]
 SPEC = ROOT / "benchmarks/config/trajectory-value-hypothesis-study-v1.json"
@@ -37,6 +45,7 @@ SCHEMA = (
     ROOT
     / "docs/reference/evaluations/schemas/trajectory-value-hypothesis-study-v1.schema.json"
 )
+STUDY = ROOT / "benchmarks/studies/trajectory-value-hypothesis-codex-v1"
 
 
 def _value() -> dict[str, object]:
@@ -306,6 +315,22 @@ def test_live_extraction_failure_preserves_workspace_and_becomes_inconclusive(
     assert not (run_dir / "extraction.json").exists()
 
 
+def test_comparison_packaging_is_deterministic_and_preserves_exact_bytes(
+    tmp_path: Path,
+) -> None:
+    comparison = evaluate_semantic_trajectories(_controlled_corpus())
+    raw = (comparison.model_dump_json(indent=2) + "\n").encode()
+    (tmp_path / "comparison.json").write_bytes(raw)
+    metadata = _package_comparison(tmp_path, source_revision="5" * 40)
+    compressed = (tmp_path / "comparison.json.gz").read_bytes()
+    assert gzip.decompress(compressed) == raw
+    assert metadata["uncompressed_file_digest"] == (
+        "sha256:" + hashlib.sha256(raw).hexdigest()
+    )
+    assert metadata["mtime"] == 0
+    assert not (tmp_path / "comparison.json").exists()
+
+
 def test_controlled_comparison_exercises_preregistered_hypothesis_analysis() -> None:
     source = evaluate_semantic_trajectories(_controlled_corpus())
     value = _value()
@@ -326,4 +351,98 @@ def test_controlled_comparison_exercises_preregistered_hypothesis_analysis() -> 
 def test_schema_matches_authoritative_preregistration_contract() -> None:
     assert json.loads(SCHEMA.read_text(encoding="utf-8")) == (
         TrajectoryValueHypothesisStudySpec.model_json_schema()
+    )
+
+
+def test_committed_hypothesis_study_manifest_binds_every_artifact() -> None:
+    manifest = json.loads((STUDY / "manifest.json").read_text(encoding="utf-8"))
+    artifact_paths = {
+        path.relative_to(STUDY).as_posix()
+        for path in STUDY.rglob("*")
+        if path.is_file() and path.name != "manifest.json"
+    }
+    assert artifact_paths == set(manifest["artifacts"])
+    assert all(
+        file_digest(STUDY / relative) == expected
+        for relative, expected in manifest["artifacts"].items()
+    )
+    attempt_ids = [
+        trajectory_id
+        for attempt in manifest["execution_attempts"]
+        for trajectory_id in attempt["trajectory_ids"]
+    ]
+    assert len(attempt_ids) == len(set(attempt_ids)) == 24
+    assert [
+        attempt["completed_normally"] for attempt in manifest["execution_attempts"]
+    ] == [
+        False,
+        False,
+        True,
+    ]
+    assert manifest["codex"]["authentication"] == "Logged in using ChatGPT"
+    assert manifest["codex"]["api_key_environment_forwarded"] is False
+    assert manifest["budgets"]["retries_for_wrong_answers"] == 0
+
+
+def test_committed_hypothesis_analysis_replays_and_records_falsification() -> None:
+    spec, _validated = load_hypothesis_spec(SPEC)
+    corpus = TrajectoryValueCorpus.model_validate(
+        json.loads((STUDY / "corpus.json").read_text(encoding="utf-8"))
+    )
+    comparison_path = STUDY / "comparison.json.gz"
+    comparison_bytes = (
+        gzip.decompress(comparison_path.read_bytes())
+        if comparison_path.is_file()
+        else (STUDY / "comparison.json").read_bytes()
+    )
+    comparison = OfflineValueComparisonV2.model_validate(json.loads(comparison_bytes))
+    analysis = json.loads((STUDY / "analysis.json").read_text(encoding="utf-8"))
+    replay = analyze_comparison(
+        spec,
+        comparison,
+        run_count=24,
+        exclusions=analysis["excluded"],
+    )
+    assert replay == analysis
+    assert len(corpus.trajectories) == 19
+    assert (analysis["accepted_count"], analysis["rejected_count"]) == (9, 10)
+    assert analysis["h1"]["h1_directionally_supported"] is False
+    assert analysis["h2"]["h2_directionally_supported"] is False
+    assert analysis["h3"]["h3_directionally_supported"] is False
+    assert analysis["h2"]["mixed_outcome_compatible_pair_count"] == 30
+    assert analysis["h2"]["hybrid_separated_pair_count"] == 26
+
+
+def test_committed_hypothesis_labels_are_clean_room_and_fail_closed() -> None:
+    records = [
+        json.loads(path.read_text(encoding="utf-8"))
+        for path in sorted((STUDY / "runs").glob("*/run.json"))
+    ]
+    verifiers = [
+        json.loads(path.read_text(encoding="utf-8"))
+        for path in sorted((STUDY / "runs").glob("*/verifier.json"))
+    ]
+    assert len(records) == len(verifiers) == 24
+    assert (
+        sum(record["terminal"]["acceptance"] == "ACCEPTED" for record in records) == 11
+    )
+    assert (
+        sum(record["terminal"]["acceptance"] == "REJECTED" for record in records) == 11
+    )
+    assert (
+        sum(record["terminal"]["acceptance"] == "INCONCLUSIVE" for record in records)
+        == 2
+    )
+    assert all(verifier["clean_room"] is True for verifier in verifiers)
+    assert all(verifier["false_certification"] is False for verifier in verifiers)
+    excluded_failures = [
+        record for record in records if record.get("rerun_performed") is False
+    ]
+    assert [record["trajectory_id"] for record in excluded_failures] == [
+        "apollonius-gap-repair-main-r04",
+        "rp2-homology-lattice-main-r01",
+    ]
+    assert all(
+        record["terminal"]["acceptance"] == "INCONCLUSIVE"
+        for record in excluded_failures
     )
