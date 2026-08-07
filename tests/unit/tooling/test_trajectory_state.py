@@ -622,6 +622,16 @@ def test_strict_source_and_closed_models_reject_malformed_input(tmp_path: Path) 
         TrajectoryExtraction.model_validate(payload)
 
 
+def test_soft_state_digest_rejects_edited_reasoning_summaries(tmp_path: Path) -> None:
+    path = _write(tmp_path, [_reasoning("PLAN", "Bind this exact plan summary.")])
+    extraction = extract_codex_trajectory(path, task_family="soft-state-binding")
+    payload = extraction.model_dump(mode="json")
+    payload["states"][0]["soft_state"]["plan_summary"] = "A substituted plan."
+
+    with pytest.raises(ValidationError, match="soft-state digest mismatch"):
+        TrajectoryExtraction.model_validate(payload)
+
+
 def test_committed_json_schema_matches_typed_contract(tmp_path: Path) -> None:
     path = _write(tmp_path, [_reasoning("PLAN", "Inspect the state contract.")])
     extraction = extract_codex_trajectory(path, task_family="schema-test")
