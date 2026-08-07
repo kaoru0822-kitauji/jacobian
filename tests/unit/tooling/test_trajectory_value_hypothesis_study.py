@@ -398,7 +398,7 @@ def test_committed_hypothesis_study_manifest_binds_every_artifact() -> None:
     raw_comparison = gzip.decompress(compressed)
     assert packaging["encoding"] == "gzip"
     assert packaging["mtime"] == 0
-    assert packaging["source_revision"] == ("4c09fbac6eefd3521d3ec75cd8d4b53c9e68498c")
+    assert packaging["source_revision"] == ("b3b00a39b9efaec9991747526b85ab2e2eaf2105")
     assert packaging["uncompressed_bytes"] == len(raw_comparison)
     assert packaging["uncompressed_file_digest"] == (
         "sha256:" + hashlib.sha256(raw_comparison).hexdigest()
@@ -422,6 +422,13 @@ def test_committed_hypothesis_study_manifest_binds_every_artifact() -> None:
     assert manifest["codex"]["authentication"] == "Logged in using ChatGPT"
     assert manifest["codex"]["api_key_environment_forwarded"] is False
     assert manifest["budgets"]["retries_for_wrong_answers"] == 0
+    reanalysis = manifest["posthoc_reanalysis"]
+    assert reanalysis["source_revision"] == packaging["source_revision"]
+    assert reanalysis["model_rerun"] is False
+    assert reanalysis["terminal_verifier_outcomes_changed"] is False
+    assert reanalysis["previous"]["comparison_packaging"]["source_revision"] == (
+        "4c09fbac6eefd3521d3ec75cd8d4b53c9e68498c"
+    )
 
 
 def test_historical_corpus_replays_under_current_estimator_contract() -> None:
@@ -435,6 +442,7 @@ def test_historical_corpus_replays_under_current_estimator_contract() -> None:
         run_count=24,
         exclusions=analysis["excluded"],
     )
+    assert replay == analysis
     assert len(corpus.trajectories) == 19
     assert (replay["accepted_count"], replay["rejected_count"]) == (9, 10)
     assert replay["h1"]["h1_directionally_supported"] is False

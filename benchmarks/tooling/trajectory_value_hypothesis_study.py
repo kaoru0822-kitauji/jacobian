@@ -249,14 +249,7 @@ def _repo_file(relative: str) -> Path:
     return resolved
 
 
-def _historical_frozen_study(
-    *,
-    spec_path: Path,
-    spec: TrajectoryValueHypothesisStudySpec,
-    mixed_path: Path,
-) -> ValidatedFrozenStudy:
-    """Replay one completed study without authorizing a new execution."""
-
+def _historical_mixed_path(mixed_path: Path, expected_digest: str) -> Path:
     if mixed_path.is_symlink() or not mixed_path.is_file():
         raise ValueError("historical mixed-study snapshot must be a regular file")
     mixed_path = mixed_path.resolve(strict=True)
@@ -266,10 +259,12 @@ def _historical_frozen_study(
         raise ValueError(
             "historical mixed-study snapshot must remain inside the repository"
         ) from exc
-    if file_digest(mixed_path) != spec.mixed_study.file_digest:
+    if file_digest(mixed_path) != expected_digest:
         raise ValueError("historical mixed-study snapshot digest drift")
+    return mixed_path
 
-    study_root = mixed_path.parent.parent
+
+def _historical_manifest(study_root: Path) -> dict[str, Any]:
     manifest_path = study_root / "manifest.json"
     if manifest_path.is_symlink() or not manifest_path.is_file():
         raise ValueError("historical study manifest must be a regular file")
@@ -278,7 +273,14 @@ def _historical_frozen_study(
         raise ValueError("historical study manifest must be one JSON object")
     if manifest.get("source_tree_clean_at_start") is not True:
         raise ValueError("historical study did not start from a clean tree")
+    return manifest
 
+
+def _validate_historical_preregistration(
+    manifest: Mapping[str, Any],
+    spec_path: Path,
+    spec: TrajectoryValueHypothesisStudySpec,
+) -> None:
     preregistration = manifest.get("preregistration")
     if not isinstance(preregistration, dict):
         raise ValueError("historical study has no preregistration binding")
@@ -299,6 +301,13 @@ def _historical_frozen_study(
     ):
         raise ValueError("historical preregistration binding drift")
 
+
+def _historical_mixed_contract(
+    manifest: Mapping[str, Any],
+    study_root: Path,
+    mixed_path: Path,
+    spec: TrajectoryValueHypothesisStudySpec,
+) -> TrajectoryValueMixedStudyContract:
     mixed = TrajectoryValueMixedStudyContract.model_validate_json(
         mixed_path.read_text(encoding="utf-8")
     )
@@ -320,7 +329,12 @@ def _historical_frozen_study(
         or artifacts.get(mixed_relative) != spec.mixed_study.file_digest
     ):
         raise ValueError("historical manifest does not bind the mixed-study snapshot")
+    return mixed
 
+
+def _historical_task_contracts(
+    manifest: Mapping[str, Any], mixed: TrajectoryValueMixedStudyContract
+) -> dict[tuple[str, str], Mapping[str, Any]]:
     raw_contracts = manifest.get("task_contracts")
     if not isinstance(raw_contracts, list):
         raise ValueError("historical study has no task contracts")
@@ -339,6 +353,23 @@ def _historical_frozen_study(
         raw = task_contracts[(task.dataset_id, task.task_id)]
         if object_digest(dict(raw)) != task.task_contract_digest:
             raise ValueError(f"historical task contract drift: {task.task_id}")
+    return task_contracts
+
+
+def _historical_frozen_study(
+    *,
+    spec_path: Path,
+    spec: TrajectoryValueHypothesisStudySpec,
+    mixed_path: Path,
+) -> ValidatedFrozenStudy:
+    """Replay one completed study without authorizing a new execution."""
+
+    mixed_path = _historical_mixed_path(mixed_path, spec.mixed_study.file_digest)
+    study_root = mixed_path.parent.parent
+    manifest = _historical_manifest(study_root)
+    _validate_historical_preregistration(manifest, spec_path, spec)
+    mixed = _historical_mixed_contract(manifest, study_root, mixed_path, spec)
+    task_contracts = _historical_task_contracts(manifest, mixed)
     return ValidatedFrozenStudy(contract=mixed, task_contracts=task_contracts)
 
 

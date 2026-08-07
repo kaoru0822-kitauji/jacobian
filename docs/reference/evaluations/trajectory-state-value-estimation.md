@@ -639,14 +639,21 @@ mixed contract, and all three task-contract records by digest, and refuses to
 authorize current-task verification or new model execution. The strict live
 loader continues to reject the drifted path.
 
+After PR6 added mandatory terminal-to-transcript binding and corrected
+estimator validation, the derived corpus, comparison, and analysis were replayed
+once from the same raw trajectories. No model call or verifier outcome changed.
+The manifest preserves the previous derived-artifact digests, records the
+reanalysis source revision and evaluator digests, and binds every migrated
+terminal record to its exact `codex.jsonl` digest.
+
 | Estimator | Clusters | Fallbacks | Mean support | Brier | MAE |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Group/rollout | 3 | 0 | 5.417 | 0.238245614035 | 0.400000000000 |
-| Numca-like numerical | 11 | 9 | 4.188 | 0.272358674464 | 0.429239766082 |
-| Reasoning text | 17 | 33 | 4.083 | 0.354385964912 | 0.473684210526 |
-| Exact typed state | 24 | 17 | 4.604 | 0.266686159844 | 0.425730994152 |
-| Abstract value-state | 20 | 13 | 4.604 | 0.247010233918 | 0.411842105263 |
-| Abstract state plus text | 41 | 35 | 4.208 | 0.317900306321 | 0.443441938179 |
+| Group/rollout | 30 | 0 | 5.413 | 0.238245614035 | 0.400000000000 |
+| Numca-like numerical | 32 | 8 | 4.130 | 0.272358674464 | 0.429239766082 |
+| Reasoning text | 40 | 13 | 2.196 | 0.345107212476 | 0.422222222222 |
+| Exact typed state | 22 | 15 | 4.565 | 0.266686159844 | 0.425730994152 |
+| Abstract value-state | 18 | 11 | 4.565 | 0.247010233918 | 0.411842105263 |
+| Abstract state plus text | 34 | 25 | 3.543 | 0.331160540240 | 0.457038429407 |
 
 H1 is not directionally supported under its preregistered conjunctive rule.
 Exact typed state and abstract value-state each beat the Numca-like baseline on
@@ -658,19 +665,20 @@ show incremental predictive validity beyond knowing the task group.
 
 H2 is also not directionally supported. There are 30 cross-trajectory,
 same-task pairs with the same abstract state, different reasoning digests, and
-opposite rewards. Reasoning text separates 28 and the hybrid separates 26, so
+opposite rewards. Reasoning text separates 29 and the hybrid separates 22, so
 text visibly distinguishes many policy branches. That extra specificity does
-not improve prediction: hybrid minus abstract is +0.070890072403 Brier and
-+0.031599832916 MAE. The text partition produces 41 clusters and 35 fallbacks,
+not improve prediction: hybrid minus abstract is +0.084150306322 Brier and
++0.045196324144 MAE. The hybrid partition produces 34 clusters and 25 fallbacks,
 showing that branch separation can destroy more support than it contributes.
 
-H3 is falsified by this pilot. Group, Numca-like, text, and hybrid estimators
-issue no warnings and recall no failures. Exact and abstract state each issue
-three warnings, all on accepted graph trajectories, for precision 0, recall 0,
-and a 33.3% false-alarm rate among accepted trajectories. Their negative drops
-occur one selected observation before the terminal state and mark productive
-tool transitions rather than eventual failure. No estimator has positive
-true-positive lead time.
+H3 receives directional support from the reasoning-text estimator only. It
+issues one warning for rejected RP2 r08, one selected observation before the
+terminal state, for precision 1.0, recall 0.1, and no accepted-run false alarm.
+Exact and abstract state still issue three warnings, all on accepted graph
+trajectories, for precision 0, recall 0, and a 33.3% false-alarm rate among
+accepted trajectories. Group, Numca-like, and hybrid estimators issue no
+warnings. The H3 result therefore rests on one true positive and does not show
+broad failure coverage.
 
 Representative trajectories explain the result. Graph r01 completes the
 external reasoning protocol and is accepted, while compatible graph r05 stops
@@ -684,13 +692,14 @@ reasoning summary does not retain the terminal evidence artifact's exact
 contract-relevant wording, so neither typed state nor text predicts that
 difference before verification.
 
-These observations falsify all three preregistered directional hypotheses for
-this real-model pilot. Value-guided runtime intervention is therefore not
-justified as the next step. A defensible next experiment would first make
+These observations falsify H1 and H2 but support H3 through one reasoning-text
+warning. That isolated event is too sparse to justify value-guided runtime
+intervention: it has 10% recall, comes from a text-only estimator, and has no
+held-out task-family replication. A defensible next experiment would first make
 terminal evidence-construction state observable, harden extraction coverage,
-and preregister a new held-out task-family replication; it should not tune the
-current clustering or warning rule on these labels. This is a small public
-predictive-validity pilot, not a statistically powered or causal claim.
+and preregister a held-out replication of the unchanged warning rule; it should
+not tune the current clustering or threshold on these labels. This is a small
+public predictive-validity pilot, not a statistically powered or causal claim.
 
 ## Current limitations
 

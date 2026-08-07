@@ -145,6 +145,7 @@
     "clean_room": true,
     "evidence_schema_version": "1",
     "input_binding_valid": true,
+    "source_binding_digest": "sha256:8384b7eaba849d445aff1811d69389e8707ebb4d7dbb23dcbf182fc1d20eba53",
     "verifier_digest": "sha256:f7484b193a203efeb93e2d7da6f763f1bba8c809d854ca3a0dbf20d971f0f450",
     "verifier_execution_status": "COMPLETED"
   }
