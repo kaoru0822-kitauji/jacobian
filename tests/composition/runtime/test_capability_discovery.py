@@ -90,8 +90,69 @@ def test_installed_capability_discovery_is_compact_deterministic_and_transparent
     assert first.matches[0].lexical_fit == "WEAK_LEXICAL_MATCH"
     assert first.portfolio_fit == "ONLY_WEAK_LEXICAL_MATCHES"
     assert first.domain == "fixture_algebra"
+    assert first.domain_filter_status == "MATCHED"
+    assert "matches at least one installed capability" in first.domain_filter_basis
     assert "fixture_algebra" in first.available_domains
     assert "fixture_graph" in first.available_domains
+
+
+def test_discovery_distinguishes_unknown_domain_from_lexical_absence(
+    capability_core_services: DomainTestServices,
+) -> None:
+    schema = {"type": "object"}
+    capability_core_services.installation.register_capability(
+        DiscoveryAdapter(
+            CapabilityDescriptor(
+                capability_id="fixture_probability.event.compute",
+                version="1",
+                title="Compute event probability",
+                description="Compute one exact finite event probability.",
+                provider="tests",
+                provider_runtime=TEST_RUNTIME,
+                modes=(CapabilityMode.EXPLORE,),
+                input_schema=schema,
+                output_schema=schema,
+                tags=("probability", "exact"),
+            )
+        )
+    )
+
+    discovered = capability_core_services.core.capabilities.discover(
+        CapabilityDiscoveryRequest(
+            query="compute exact event probability",
+            domain="arithmetic",
+        )
+    )
+
+    assert discovered.matches == ()
+    assert discovered.domain == "arithmetic"
+    assert discovered.domain_filter_status == "UNKNOWN"
+    assert "matches no installed capability" in discovered.domain_filter_basis
+    assert "lexical fit outside that filter was not assessed" in (
+        discovered.portfolio_fit_basis
+    )
+
+    browsed = capability_core_services.core.capabilities.discover(
+        CapabilityDiscoveryRequest(domain="arithmetic")
+    )
+    assert browsed.matches == ()
+    assert browsed.domain_filter_status == "UNKNOWN"
+    assert browsed.portfolio_fit == "UNFILTERED"
+    assert browsed.routing_status == "UNFILTERED"
+
+
+def test_discovery_recognizes_hidden_installed_domains_without_returning_them(
+    authorized_complete_runtime: JacobianRuntime,
+) -> None:
+    discovered = authorized_complete_runtime.core.capabilities.discover(
+        CapabilityDiscoveryRequest(domain="artifact")
+    )
+
+    assert discovered.domain == "artifact"
+    assert discovered.domain_filter_status == "MATCHED"
+    assert "matches at least one installed capability" in discovered.domain_filter_basis
+    assert discovered.matches == ()
+    assert "artifact" not in discovered.available_domains
 
 
 def test_storage_primitive_is_catalogued_but_not_discovered(
