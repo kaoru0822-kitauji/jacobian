@@ -615,6 +615,7 @@ def test_domain_specific_verified_status_recognizes_via_assurance_contract(
             _result(
                 "matrix.determinant.compute",
                 output={
+                    "candidate": {"determinant": "42"},
                     "determinant": "42",
                     "certificate_available": False,
                 },
