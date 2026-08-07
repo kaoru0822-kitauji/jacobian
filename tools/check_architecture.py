@@ -662,7 +662,9 @@ def _public_contract_drift_violations(root: Path) -> tuple[Violation, ...]:
             if not (task_dir / "task.toml").is_file():
                 continue
             contract_path = task_dir / "tests" / "public_contract.json"
-            contract_rel = str(PurePosixPath(contract_path.relative_to(root).as_posix()))
+            contract_rel = str(
+                PurePosixPath(contract_path.relative_to(root).as_posix())
+            )
             if not contract_path.is_file():
                 violations.append(
                     Violation(
@@ -682,7 +684,9 @@ def _public_contract_drift_violations(root: Path) -> tuple[Violation, ...]:
                 )
                 continue
             for drift in drifts:
-                violations.append(Violation(contract_rel, "public-contract-drift", drift))
+                violations.append(
+                    Violation(contract_rel, "public-contract-drift", drift)
+                )
     return tuple(violations)
 
 
