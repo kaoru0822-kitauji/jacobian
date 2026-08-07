@@ -10,6 +10,7 @@ from pydantic import BaseModel, ValidationError
 from referencing import Registry
 from referencing.jsonschema import DRAFT202012
 
+from jacobian.canonical import canonicalize_json
 from jacobian.eval.trajectory_state import (
     BindingValidity,
     CandidateState,
@@ -40,6 +41,12 @@ ROOT = Path(__file__).resolve().parents[3]
 
 def _sha(value: str) -> str:
     return "sha256:" + hashlib.sha256(value.encode()).hexdigest()
+
+
+def _hard_state_digest(hard: TrajectoryHardState) -> str:
+    return "sha256:" + hashlib.sha256(
+        canonicalize_json(hard.model_dump(mode="json"))
+    ).hexdigest()
 
 
 def _hard(
@@ -93,7 +100,7 @@ def _state(
             plan_summary=plan,
             latest_after_tool_summary=after,
         ),
-        hard_state_digest=_sha(f"hard-{index}-{hard.model_dump_json()}"),
+        hard_state_digest=_hard_state_digest(hard),
         changed_fields=(),
         milestone_kinds=transitions,
         milestone_eligible=bool(transitions),
