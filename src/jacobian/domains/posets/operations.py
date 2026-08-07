@@ -348,6 +348,7 @@ FINITE_POSET_CAPABILITIES: tuple[MaterializedOperation[Any, Any, Any, Any], ...]
         tags=(
             "poset",
             "partial-order",
+            "partially-ordered-set",
             "hasse-diagram",
             "transitive-closure",
             "exact",
@@ -378,6 +379,8 @@ FINITE_POSET_CAPABILITIES: tuple[MaterializedOperation[Any, Any, Any, Any], ...]
         artifact_uri_field="poset_artifact_uri",
         tags=(
             "poset",
+            "partial-order",
+            "partially-ordered-set",
             "width",
             "maximum-antichain",
             "minimum-chain-cover",
