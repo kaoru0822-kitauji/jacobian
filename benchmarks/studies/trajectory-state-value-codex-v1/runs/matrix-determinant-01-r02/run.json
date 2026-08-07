@@ -2,7 +2,7 @@
   "artifacts": {
     "codex.jsonl": "sha256:8cb96444d597176721447fd41f68e01076c17190d59c4078e0da7a1d609c4212",
     "codex.stderr": "sha256:1aa26269eb1cc57f86b235a03cda53c004edb5b1e9fc99d4da4f00843293d721",
-    "extraction.json": "sha256:55fdb022ea31bcd62efb912d254ae7a84f1786d1bfba02a93666557d4f2f6a61",
+    "extraction.json": "sha256:726342132c71e5cfd1c695d79d8b35f31168eab8ba6ab49c8d70fb7ec1a4be5e",
     "jacobian-mcp.stderr": "sha256:9e9042df1844bb5f7a3dc57e6096d821b0443f15e07ba7a5d7aac31b1065f93b",
     "jacobian-mcp.stdout": "sha256:6054e0dbc4b2d80f9f05723f4d8767a42f2c237093eedbaa6557dd959129fc66",
     "prompt.txt": "sha256:43fb5b57190eb384f74cf19e44ca801d821404197863cf38a91b24731c5471af",
@@ -49,6 +49,7 @@
     "clean_room": true,
     "evidence_schema_version": "1",
     "input_binding_valid": true,
+    "source_binding_digest": "sha256:8cb96444d597176721447fd41f68e01076c17190d59c4078e0da7a1d609c4212",
     "verifier_digest": "sha256:e684baf691da801ff2315d398f8be75de84d820d676d750ebd76942b3e0dba0e",
     "verifier_execution_status": "COMPLETED"
   },
