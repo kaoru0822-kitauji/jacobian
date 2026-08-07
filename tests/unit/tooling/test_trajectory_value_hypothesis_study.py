@@ -17,6 +17,7 @@ from benchmarks.tooling.trajectory_value_hypothesis_study import (
     TrajectoryValueHypothesisStudySpec,
     _codex_arguments,
     _local_auth_status,
+    _recover_interrupted_record,
     _verify_terminal,
     analyze_comparison,
     load_hypothesis_spec,
@@ -200,6 +201,58 @@ def test_public_input_drift_is_inconclusive_and_verifier_is_not_run(
     assert outcome["reason"] == "PUBLIC_INPUT_DRIFT"
     assert terminal.acceptance is TerminalAcceptance.INCONCLUSIVE
     assert terminal.verifier_execution_status == "ERROR"
+
+
+def test_interrupted_rollout_is_excluded_without_rerunning_model(
+    tmp_path: Path,
+) -> None:
+    _spec, validated = load_hypothesis_spec(SPEC)
+    task = validated.contract.tasks[1]
+    run_dir = tmp_path / "runs" / "apollonius-gap-repair-main-r04"
+    run_dir.mkdir(parents=True)
+    fixture = ROOT / "tests/unit/tooling/fixtures/trajectory_state/pr1_gcd_real_codex"
+    shutil.copyfile(fixture / "codex.jsonl", run_dir / "codex.jsonl")
+    shutil.copyfile(fixture / "codex.stderr", run_dir / "codex.stderr")
+    shutil.copyfile(fixture / "reasoning-log.jsonl", run_dir / "reasoning-log.jsonl")
+    (run_dir / "surface.json").write_text(
+        json.dumps(
+            {
+                "surface_digest": "sha256:" + "1" * 64,
+                "catalog": {
+                    "catalog_digest": "sha256:" + "2" * 64,
+                    "policy_digest": "sha256:" + "3" * 64,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (run_dir / "verifier.json").write_text(
+        json.dumps(
+            {
+                "verifier_digest": "sha256:" + "4" * 64,
+                "verifier_execution_status": "COMPLETED",
+                "acceptance": "ACCEPTED",
+                "input_binding_valid": True,
+                "artifact_binding_valid": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    record = _recover_interrupted_record(
+        task=task,
+        repetition=4,
+        run_dir=run_dir,
+        prior_revision="5" * 40,
+    )
+    assert record["terminal"]["acceptance"] == "INCONCLUSIVE"
+    assert record["rerun_performed"] is False
+    assert record["exclusion_reason"].startswith("runner extraction failed")
+    failure = json.loads(
+        (run_dir / "infrastructure-failure.json").read_text(encoding="utf-8")
+    )
+    assert failure["disposition"] == "INCONCLUSIVE"
+    assert failure["rerun_performed"] is False
+    assert not (run_dir / "extraction.json").exists()
 
 
 def test_controlled_comparison_exercises_preregistered_hypothesis_analysis() -> None:

@@ -11,8 +11,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import itertools
 import json
+import re
 import shutil
 import statistics
 import tempfile
@@ -497,6 +499,7 @@ def _run_one(
     contract: HarborTaskContract,
     repetition: int,
     output: Path,
+    source_revision: str,
 ) -> dict[str, Any]:
     trajectory_id = f"{task.task_id}-main-r{repetition:02d}"
     run_dir = output / "runs" / trajectory_id
@@ -567,6 +570,7 @@ def _run_one(
             "task_group": task.task_group,
             "task_family": task.task_family,
             "repetition": repetition,
+            "source_revision": source_revision,
             "task_contract": contract.as_record(),
             "prompt_digest": file_digest(workspace / "prompt.txt"),
             "command": {
@@ -598,12 +602,22 @@ def _corpus(
     exclusions: list[dict[str, str]] = []
     for record in records:
         trajectory_id = str(record["trajectory_id"])
-        extraction = TrajectoryExtraction.model_validate(
-            json.loads(
-                (output / "runs" / trajectory_id / "extraction.json").read_text(
-                    encoding="utf-8"
-                )
+        extraction_path = output / "runs" / trajectory_id / "extraction.json"
+        if not extraction_path.is_file() or extraction_path.is_symlink():
+            exclusions.append(
+                {
+                    "trajectory_id": trajectory_id,
+                    "reason": str(
+                        record.get(
+                            "exclusion_reason",
+                            "missing exact trajectory extraction",
+                        )
+                    ),
+                }
             )
+            continue
+        extraction = TrajectoryExtraction.model_validate(
+            json.loads(extraction_path.read_text(encoding="utf-8"))
         )
         evidence = extraction.terminal_evidence
         reason: str | None = None
@@ -1024,22 +1038,284 @@ def _local_auth_status() -> str:
     return status
 
 
-def run_study(spec_path: Path, output: Path, *, execute: bool) -> dict[str, Any]:
+def _git_file_digest(revision: str, relative: str) -> str:
+    result = run_operator_command(
+        "git",
+        ("show", f"{revision}:{relative}"),
+        cwd=_ROOT,
+        timeout_seconds=30,
+    )
+    if result.status is not ToolCommandStatus.EXITED or result.exit_code != 0:
+        raise RuntimeError(f"unable to bind prior source file: {relative}")
+    return "sha256:" + hashlib.sha256(result.stdout).hexdigest()
+
+
+def _resume_tree_is_clean(output: Path) -> bool:
+    result = run_operator_command(
+        "git", ("status", "--porcelain"), cwd=_ROOT, timeout_seconds=30
+    )
+    if result.status is not ToolCommandStatus.EXITED or result.exit_code != 0:
+        return False
+    relative = output.relative_to(_ROOT).as_posix()
+    lines = result.stdout.decode("utf-8", errors="replace").splitlines()
+    return bool(lines) and all(line == f"?? {relative}/" for line in lines)
+
+
+def _validate_prior_revision(revision: str) -> None:
+    if re.fullmatch(r"[0-9a-f]{40}", revision) is None:
+        raise RuntimeError("prior source revision must be a full commit SHA")
+    result = run_operator_command(
+        "git",
+        ("cat-file", "-e", f"{revision}^{{commit}}"),
+        cwd=_ROOT,
+        timeout_seconds=30,
+    )
+    if result.status is not ToolCommandStatus.EXITED or result.exit_code != 0:
+        raise RuntimeError("prior source revision is unavailable")
+
+
+def _slot_id(task: FrozenMixedTask, repetition: int) -> str:
+    return f"{task.task_id}-main-r{repetition:02d}"
+
+
+def _read_existing_record(
+    path: Path, task: FrozenMixedTask, repetition: int
+) -> dict[str, Any]:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise RuntimeError(f"malformed completed rollout record: {path}")
+    expected = _slot_id(task, repetition)
+    if (
+        value.get("trajectory_id") != expected
+        or value.get("dataset_id") != task.dataset_id
+        or value.get("task_id") != task.task_id
+        or value.get("task_group") != task.task_group
+        or value.get("repetition") != repetition
+    ):
+        raise RuntimeError(f"completed rollout identity drift: {expected}")
+    return value
+
+
+def _recover_interrupted_record(
+    *,
+    task: FrozenMixedTask,
+    repetition: int,
+    run_dir: Path,
+    prior_revision: str,
+) -> dict[str, Any]:
+    trajectory_id = _slot_id(task, repetition)
+    required = (
+        "codex.jsonl",
+        "codex.stderr",
+        "reasoning-log.jsonl",
+        "surface.json",
+        "verifier.json",
+    )
+    if any(
+        (run_dir / name).is_symlink() or not (run_dir / name).is_file()
+        for name in required
+    ):
+        raise RuntimeError(
+            f"interrupted rollout evidence is incomplete: {trajectory_id}"
+        )
+    transcript = run_dir / "codex.jsonl"
+    verifier = json.loads((run_dir / "verifier.json").read_text(encoding="utf-8"))
+    if not isinstance(verifier, dict):
+        raise RuntimeError("interrupted verifier record is malformed")
+    original_terminal = CleanRoomTerminalEvidence(
+        verifier_digest=str(verifier["verifier_digest"]),
+        clean_room=True,
+        verifier_execution_status="COMPLETED",
+        acceptance=TerminalAcceptance(str(verifier["acceptance"])),
+        input_binding_valid=bool(verifier["input_binding_valid"]),
+        artifact_binding_valid=bool(verifier["artifact_binding_valid"]),
+    )
+    extraction_failure: dict[str, str]
+    try:
+        extract_codex_trajectory(
+            transcript,
+            task_family=task.task_family,
+            terminal_evidence=original_terminal,
+        )
+    except Exception as exc:
+        extraction_failure = {
+            "type": type(exc).__name__,
+            "message": str(exc),
+        }
+    else:
+        extraction_failure = {
+            "type": "InterruptedWorkspaceLoss",
+            "message": "raw submission workspace was lost before replay publication",
+        }
+    terminal = CleanRoomTerminalEvidence(
+        verifier_digest=original_terminal.verifier_digest,
+        clean_room=True,
+        verifier_execution_status="ERROR",
+        acceptance=TerminalAcceptance.INCONCLUSIVE,
+    )
+    telemetry = parse_agent_transcript(transcript)
+    surface = json.loads((run_dir / "surface.json").read_text(encoding="utf-8"))
+    failure = {
+        "schema_version": "1",
+        "trajectory_id": trajectory_id,
+        "source_revision": prior_revision,
+        "disposition": "INCONCLUSIVE",
+        "rerun_performed": False,
+        "reason": "RUNNER_EXTRACTION_FAILURE_AND_RAW_WORKSPACE_LOSS",
+        "extraction_failure": extraction_failure,
+        "original_clean_room_verifier": verifier,
+        "missing_artifacts": ["workspace", "raw submission", "extraction"],
+    }
+    _write_json(run_dir / "infrastructure-failure.json", failure)
+    record = {
+        "schema_version": "1",
+        "trajectory_id": trajectory_id,
+        "dataset_id": task.dataset_id,
+        "task_id": task.task_id,
+        "task_group": task.task_group,
+        "task_family": task.task_family,
+        "repetition": repetition,
+        "source_revision": prior_revision,
+        "command": {
+            "status": "UNKNOWN_AFTER_RUNNER_FAILURE",
+            "exit_code": None,
+            "diagnostic": "verifier execution proves Codex returned, but command status was not published",
+        },
+        "reasoning_run_ids": list(_reasoning_run_ids(transcript)),
+        "reasoning_protocol": telemetry.get("reasoning_protocol"),
+        "usage": telemetry.get("usage"),
+        "terminal": terminal.model_dump(mode="json"),
+        "original_clean_room_verifier": verifier,
+        "surface_digest": surface["surface_digest"],
+        "catalog_digest": surface["catalog"]["catalog_digest"],
+        "policy_digest": surface["catalog"]["policy_digest"],
+        "exclusion_reason": "runner extraction failed and raw submission was unavailable for replay",
+        "rerun_performed": False,
+    }
+    _write_json(run_dir / "run.json", record)
+    return record
+
+
+def _execute_or_resume_slots(
+    *,
+    mixed: TrajectoryValueMixedStudyContract,
+    contracts: Mapping[tuple[str, str], HarborTaskContract],
+    output: Path,
+    revision: str,
+    prior_revision: str | None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    records: list[dict[str, Any]] = []
+    prior_ids: list[str] = []
+    current_ids: list[str] = []
+    expected_ids = {
+        _slot_id(task, repetition)
+        for task in mixed.tasks
+        for repetition in range(1, mixed.repetitions_per_task + 1)
+    }
+    actual_dirs = (
+        {path.name for path in (output / "runs").iterdir() if path.is_dir()}
+        if (output / "runs").is_dir()
+        else set()
+    )
+    if not actual_dirs <= expected_ids:
+        raise RuntimeError("resume output contains an unexpected rollout directory")
+    for task in mixed.tasks:
+        for repetition in range(1, mixed.repetitions_per_task + 1):
+            trajectory_id = _slot_id(task, repetition)
+            run_dir = output / "runs" / trajectory_id
+            record_path = run_dir / "run.json"
+            if record_path.is_file() and not record_path.is_symlink():
+                if prior_revision is None:
+                    raise RuntimeError("fresh execution found a completed rollout")
+                records.append(_read_existing_record(record_path, task, repetition))
+                prior_ids.append(trajectory_id)
+                continue
+            if run_dir.exists():
+                if prior_revision is None:
+                    raise RuntimeError("fresh execution found an interrupted rollout")
+                records.append(
+                    _recover_interrupted_record(
+                        task=task,
+                        repetition=repetition,
+                        run_dir=run_dir,
+                        prior_revision=prior_revision,
+                    )
+                )
+                prior_ids.append(trajectory_id)
+                continue
+            records.append(
+                _run_one(
+                    mixed=mixed,
+                    task=task,
+                    contract=contracts[(task.dataset_id, task.task_id)],
+                    repetition=repetition,
+                    output=output,
+                    source_revision=revision,
+                )
+            )
+            current_ids.append(trajectory_id)
+    attempts: list[dict[str, Any]] = []
+    if prior_revision is not None:
+        attempts.append(
+            {
+                "source_revision": prior_revision,
+                "runner_and_analysis_digest": _git_file_digest(
+                    prior_revision,
+                    "benchmarks/tooling/trajectory_value_hypothesis_study.py",
+                ),
+                "trajectory_ids": prior_ids,
+                "completed_normally": False,
+            }
+        )
+    attempts.append(
+        {
+            "source_revision": revision,
+            "runner_and_analysis_digest": file_digest(
+                Path(__file__).resolve(strict=True)
+            ),
+            "trajectory_ids": current_ids,
+            "completed_normally": True,
+        }
+    )
+    return records, attempts
+
+
+def run_study(
+    spec_path: Path,
+    output: Path,
+    *,
+    execute: bool,
+    resume_after_interruption: bool = False,
+    prior_source_revision: str | None = None,
+) -> dict[str, Any]:
     """Execute exactly one clean, immutable 24-rollout mixed study."""
 
     if not execute:
         raise RuntimeError("refusing external Codex execution without --execute")
     spec_path = spec_path.resolve(strict=True)
     output = output.resolve()
-    if output.exists():
+    if resume_after_interruption:
+        if not output.is_dir() or (output / "manifest.json").exists():
+            raise RuntimeError("resume requires one incomplete unmanifested study")
+        if prior_source_revision is None:
+            raise RuntimeError("resume requires the prior full source revision")
+        _validate_prior_revision(prior_source_revision)
+    elif output.exists():
         raise RuntimeError(f"output directory already exists: {output}")
+    elif prior_source_revision is not None:
+        raise RuntimeError("prior source revision is valid only for resume")
     spec, validated = load_hypothesis_spec(spec_path)
     mixed = validated.contract
     if _codex_version(_ROOT) != mixed.model.codex_cli_version:
         raise RuntimeError("Codex CLI version differs from the frozen study")
     model_record, model_cache_digest = _model_cache(mixed)  # type: ignore[arg-type]
     login_status = _local_auth_status()
-    if not _repository_is_clean():
+    tree_clean = (
+        _resume_tree_is_clean(output)
+        if resume_after_interruption
+        else _repository_is_clean()
+    )
+    if not tree_clean:
         raise RuntimeError("study execution requires a clean preregistration tree")
     revision = git_head_sha(_ROOT)
     if revision is None:
@@ -1055,29 +1331,27 @@ def run_study(spec_path: Path, output: Path, *, execute: bool) -> dict[str, Any]
         )
         for task in mixed.tasks
     }
-    output.mkdir(parents=True)
-    records = [
-        _run_one(
-            mixed=mixed,
-            task=task,
-            contract=contracts[(task.dataset_id, task.task_id)],
-            repetition=repetition,
-            output=output,
-        )
-        for task in mixed.tasks
-        for repetition in range(1, mixed.repetitions_per_task + 1)
-    ]
+    output.mkdir(parents=True, exist_ok=resume_after_interruption)
+    records, execution_attempts = _execute_or_resume_slots(
+        mixed=mixed,
+        contracts=contracts,
+        output=output,
+        revision=revision,
+        prior_revision=prior_source_revision,
+    )
     summary = analyze_study(spec, output, records)
     manifest = {
         "schema_version": "1",
         "analysis_id": spec.analysis_id,
         "evidence_class": "public-host-local-codex-predictive-validity-pilot",
-        "source_revision": revision,
+        "source_revision": prior_source_revision or revision,
         "source_tree_clean_at_start": True,
+        "execution_attempts": execution_attempts,
         "preregistration": {
             "path": spec_path.relative_to(_ROOT).as_posix(),
             "file_digest": file_digest(spec_path),
             "object_digest": object_digest(spec.model_dump(mode="json")),
+            "source_revision": prior_source_revision or revision,
             "labels_available_at_revision": False,
         },
         "mixed_study": {
@@ -1159,6 +1433,8 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--spec", type=Path, default=_DEFAULT_SPEC)
     run.add_argument("--output", type=Path, required=True)
     run.add_argument("--execute", action="store_true")
+    run.add_argument("--resume-after-interruption", action="store_true")
+    run.add_argument("--prior-source-revision")
     schema = subparsers.add_parser("schema")
     schema.add_argument("--output", type=Path)
     validate = subparsers.add_parser("validate")
@@ -1192,7 +1468,13 @@ def main(argv: Sequence[str] | None = None) -> None:
             )
         )
         return
-    summary = run_study(args.spec, args.output, execute=args.execute)
+    summary = run_study(
+        args.spec,
+        args.output,
+        execute=args.execute,
+        resume_after_interruption=args.resume_after_interruption,
+        prior_source_revision=args.prior_source_revision,
+    )
     print(json.dumps(summary, indent=2, sort_keys=True))
 
 
