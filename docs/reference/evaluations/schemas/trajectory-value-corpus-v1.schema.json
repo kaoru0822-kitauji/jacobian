@@ -106,6 +106,7 @@
       "items": {
         "$ref": "#/$defs/LabelledTrajectory"
       },
+      "maxItems": 64,
       "minItems": 2,
       "title": "Trajectories",
       "type": "array"
