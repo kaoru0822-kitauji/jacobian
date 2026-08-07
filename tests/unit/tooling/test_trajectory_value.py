@@ -237,9 +237,7 @@ def _with_candidate_digest(
             state.model_copy(
                 update={
                     "hard_state": hard,
-                    "hard_state_digest": _sha(
-                        f"variant-{state.index}-{hard.model_dump_json()}"
-                    ),
+                    "hard_state_digest": _hard_state_digest(hard),
                 }
             )
         )
