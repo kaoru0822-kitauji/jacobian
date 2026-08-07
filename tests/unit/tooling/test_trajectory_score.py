@@ -38,6 +38,8 @@ def _sha(value: str) -> str:
 
 def _comparison(*, reward: Literal[0, 1] = 1) -> OfflineValueComparison:
     observation_ids = tuple(f"target:{index}" for index in range(4))
+    support_observation_ids = ("support-a:0", "support-b:0")
+    cluster_members = tuple(sorted((*observation_ids, *support_observation_ids)))
     values = (0.4, 0.7, 0.2, 0.6)
     boundaries = (
         StateBoundary.PLAN,
@@ -52,11 +54,11 @@ def _comparison(*, reward: Literal[0, 1] = 1) -> OfflineValueComparison:
         cluster = ClusterSummary(
             cluster_id=cluster_id,
             estimator=estimator,
-            member_observation_ids=observation_ids,
+            member_observation_ids=cluster_members,
             member_trajectory_ids=("support-a", "support-b", "target"),
             feature_summary=f"explainable {estimator.value} fixture cluster",
         )
-        estimates = tuple(
+        target_estimates = tuple(
             StateValueEstimate(
                 observation_id=observation_id,
                 trajectory_id="target",
@@ -70,20 +72,47 @@ def _comparison(*, reward: Literal[0, 1] = 1) -> OfflineValueComparison:
                 eventual_terminal_reward=reward,
                 value_source=ValueSource.CLUSTER,
                 supporting_trajectory_ids=("support-a", "support-b"),
-                cluster_member_observation_ids=observation_ids,
+                cluster_member_observation_ids=cluster_members,
                 typed_compatibility_digest=_sha(f"typed-{index}"),
                 reasoning_text_digest=_sha(f"text-{index}"),
                 numerical_milestones=("2",),
             )
             for index, observation_id in enumerate(observation_ids)
         )
+        support_estimates = tuple(
+            StateValueEstimate(
+                observation_id=observation_id,
+                trajectory_id=trajectory_id,
+                task_group="polynomial-task",
+                state_index=0,
+                boundary=StateBoundary.PLAN,
+                milestone_eligible=False,
+                estimator=estimator,
+                cluster_id=cluster_id,
+                estimated_value=0.5,
+                eventual_terminal_reward=support_reward,
+                value_source=ValueSource.CLUSTER,
+                supporting_trajectory_ids=tuple(
+                    sorted({"support-a", "support-b", "target"} - {trajectory_id})
+                ),
+                cluster_member_observation_ids=cluster_members,
+                typed_compatibility_digest=_sha(f"typed-{trajectory_id}"),
+                reasoning_text_digest=_sha(f"text-{trajectory_id}"),
+                numerical_milestones=("2",),
+            )
+            for observation_id, trajectory_id, support_reward in (
+                ("support-a:0", "support-a", 1),
+                ("support-b:0", "support-b", 0),
+            )
+        )
+        estimates = (*support_estimates, *target_estimates)
         evaluations.append(
             EstimatorEvaluation(
                 estimator=estimator,
                 clusters=(cluster,),
                 estimates=estimates,
                 metrics=EstimatorMetrics(
-                    observation_count=4,
+                    observation_count=6,
                     trajectory_count=3,
                     cluster_count=1,
                     task_group_fallback_count=0,
@@ -189,14 +218,57 @@ def test_missing_trajectory_and_stale_cluster_binding_fail_closed() -> None:
         replay_offline_values(stale, trajectory_id="target")
 
 
+def test_task_group_prior_support_is_validated_before_replay() -> None:
+    comparison = _comparison()
+    hybrid = comparison.evaluations[-1]
+    stale = hybrid.estimates[2].model_copy(
+        update={
+            "value_source": ValueSource.TASK_GROUP_PRIOR,
+            "supporting_trajectory_ids": ("support-a",),
+        }
+    )
+    stale_hybrid = hybrid.model_copy(
+        update={"estimates": (*hybrid.estimates[:2], stale, *hybrid.estimates[3:])}
+    )
+    stale_comparison = comparison.model_copy(
+        update={"evaluations": (*comparison.evaluations[:-1], stale_hybrid)}
+    )
+
+    with pytest.raises(TrajectoryScoreError, match="support is stale"):
+        replay_offline_values(stale_comparison, trajectory_id="target")
+
+
+def test_cross_estimator_terminal_reward_conflicts_are_rejected() -> None:
+    comparison = _comparison()
+    text = comparison.evaluations[2]
+    conflicted = text.estimates[2].model_copy(update={"eventual_terminal_reward": 0})
+    conflicted_text = text.model_copy(
+        update={"estimates": (*text.estimates[:2], conflicted, *text.estimates[3:])}
+    )
+    conflicted_comparison = comparison.model_copy(
+        update={
+            "evaluations": (
+                *comparison.evaluations[:2],
+                conflicted_text,
+                *comparison.evaluations[3:],
+            )
+        }
+    )
+
+    with pytest.raises(TrajectoryScoreError, match="conflicting terminal rewards"):
+        replay_offline_values(conflicted_comparison, trajectory_id="target")
+
+
 def test_replay_requires_plan_first_and_unique_state_identity() -> None:
     comparison = _comparison()
     hybrid = comparison.evaluations[-1]
-    first = hybrid.estimates[0].model_copy(
+    first_target = hybrid.estimates[2].model_copy(
         update={"boundary": StateBoundary.TOOL_RESULT}
     )
     malformed_hybrid = hybrid.model_copy(
-        update={"estimates": (first, *hybrid.estimates[1:])}
+        update={
+            "estimates": (*hybrid.estimates[:2], first_target, *hybrid.estimates[3:])
+        }
     )
     malformed = comparison.model_copy(
         update={"evaluations": (*comparison.evaluations[:-1], malformed_hybrid)}
@@ -205,9 +277,11 @@ def test_replay_requires_plan_first_and_unique_state_identity() -> None:
     with pytest.raises(TrajectoryScoreError, match="begin with PLAN"):
         replay_offline_values(malformed, trajectory_id="target")
 
-    substituted = hybrid.estimates[1].model_copy(update={"observation_id": "target:99"})
+    substituted = hybrid.estimates[3].model_copy(update={"observation_id": "target:99"})
     substituted_hybrid = hybrid.model_copy(
-        update={"estimates": (hybrid.estimates[0], substituted, *hybrid.estimates[2:])}
+        update={
+            "estimates": (*hybrid.estimates[:3], substituted, *hybrid.estimates[4:])
+        }
     )
     substituted_comparison = comparison.model_copy(
         update={"evaluations": (*comparison.evaluations[:-1], substituted_hybrid)}
