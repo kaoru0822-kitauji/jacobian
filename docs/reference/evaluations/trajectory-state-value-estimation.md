@@ -185,6 +185,53 @@ A repeated non-milestone tool result adds zero observations. This falsifies the
 idea that either text or the current typed signature is universally sufficient
 on its own, but only for these constructed aliasing cases.
 
+## Version 1 observation-only replay scorer
+
+[`trajectory-score-replay-v1.schema.json`](schemas/trajectory-score-replay-v1.schema.json)
+defines the closed output from `jacobian.eval.trajectory_score`. The scorer
+consumes one immutable PR2 comparison and selects one declared estimator and
+trajectory. It does not refit clusters, inspect hidden model state, invoke
+Codex, call Jacobian tools or verifiers, choose an action, alter a prompt, or
+mutate runtime or mathematical assurance.
+
+Each replay row exposes:
+
+`observation/state digest → cluster and feature summary → support rollouts → estimated value → value delta → milestone credit → eventual terminal result`.
+
+The comparison digest binds the complete sorted evaluator JSON, while the
+source corpus digest preserves the PR2 label boundary. Stale cluster references,
+duplicate state identities, missing trajectories, inconsistent terminal
+bindings, and replays that do not begin with PLAN fail closed. All scorer and
+row contracts declare `observation_only = true` and
+`assurance_authority = false`; the root additionally fixes `chooses_tools`,
+`changes_prompts`, and `mutates_runtime` to false.
+
+Credit is deterministic and deliberately narrower than value inspection:
+
+- the initial PLAN has no delta and receives credit `0`;
+- every later row reports `value_delta = current_value - previous_selected_value`;
+- a typed milestone receives exactly that delta as transition credit; and
+- every non-milestone transition receives credit `0`, even when its estimated
+  value changes sharply.
+
+The frozen
+[`PR3 replay summary`](../../../tests/unit/tooling/fixtures/trajectory_score/pr3_controlled/replay-summary.json)
+demonstrates the distinction:
+
+| Boundary | Milestone | Value | Delta | Credit | Cumulative credit |
+| --- | --- | ---: | ---: | ---: | ---: |
+| PLAN | no | 0.4 | — | 0.0 | 0.0 |
+| TOOL_RESULT | yes | 0.7 | +0.3 | +0.3 | 0.3 |
+| AFTER_TOOL | no | 0.2 | −0.5 | 0.0 | 0.3 |
+| TOOL_RESULT | yes | 0.6 | +0.4 | +0.4 | 0.7 |
+
+The controlled observation shows that a value drop can remain available for
+analysis without turning prose, call count, or an observation boundary into
+reward. It also shows that cumulative milestone credit need not equal the
+last-minus-first value when intervening non-milestone value changes are
+intentionally excluded. These are scorer semantics, not evidence that the
+drop predicts real failure.
+
 ## Current limitations
 
 Version 1 deliberately uses conservative generic output interpretation. A
@@ -205,9 +252,11 @@ against merging distinct candidates, but may fragment semantically equivalent
 objects or independently produced verification records; the real study must
 measure this support-loss tradeoff before relaxing it.
 
-PR3 may replay these frozen estimates in an observation-only scorer, but must
-assign zero credit to non-milestone transitions and must not alter prompts,
-tool choices, runtime state, or assurance. PR4 must provide the first bounded
-real predictive comparison with clean-room terminal labels. Any label-informed
-change to extraction, compatibility, clustering, or threshold requires a new
-schema or experiment boundary.
+The PR3 scorer replays a completed frozen comparison; it is not an online
+critic and cannot score a previously unseen state without a new PR2 comparison.
+That limitation prevents intervention and avoids inventing an out-of-sample
+assignment rule, but it means "early" warnings in PR4 are retrospective
+predictions evaluated only after the rollout corpus is frozen. PR4 must provide
+the first bounded real predictive comparison with clean-room terminal labels.
+Any label-informed change to extraction, compatibility, clustering, threshold,
+or credit semantics requires a new schema or experiment boundary.
