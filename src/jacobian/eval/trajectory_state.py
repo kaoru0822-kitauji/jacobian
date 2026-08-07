@@ -17,11 +17,16 @@ from typing import Any, Literal, Self
 from pydantic import ConfigDict, Field, ValidationError, model_validator
 
 from jacobian.canonical import CanonicalizationError, canonicalize_json
-from jacobian.contracts.capabilities import CapabilityResult
+from jacobian.contracts.capabilities import (
+    CapabilityAssuranceLevel,
+    CapabilityMode,
+    CapabilityResult,
+)
 from jacobian.contracts.results import ContractModel
 
 _DIGEST_PATTERN = r"^sha256:[0-9a-f]{64}$"
 _ARTIFACT_PATTERN = r"^artifact://sha256/[0-9a-f]{64}$"
+_JACOBIAN_SERVER = "jacobian"
 _CONTROL_OUTPUT_FIELDS = frozenset(
     {
         "accepted",
@@ -232,11 +237,13 @@ class CleanRoomTerminalEvidence(ContractModel):
             and self.acceptance is not TerminalAcceptance.INCONCLUSIVE
         ):
             raise ValueError("non-completed verifier evidence is inconclusive")
-        if self.acceptance is TerminalAcceptance.ACCEPTED and False in (
+        if self.acceptance is not TerminalAcceptance.INCONCLUSIVE and False in (
             self.input_binding_valid,
             self.artifact_binding_valid,
         ):
-            raise ValueError("accepted terminal evidence cannot have invalid bindings")
+            raise ValueError(
+                "conclusive terminal evidence cannot have invalid bindings"
+            )
         if self.acceptance is TerminalAcceptance.ACCEPTED and not self.source_digest:
             raise ValueError("accepted terminal evidence must bind a source digest")
         return self
@@ -370,9 +377,7 @@ def _is_checker(capability_id: str) -> bool:
 
 def _checker_outcome(
     capability_id: str,
-    output: object,
-    assurance: object,
-    mode: str | None = None,
+    validated: CapabilityResult | None,
 ) -> CheckerState | None:
     """Derive a checker outcome from the authorized assurance contract.
 
@@ -388,17 +393,18 @@ def _checker_outcome(
     Foreign output fields such as ``status="REJECTED"`` are not consulted
     because they are not a closed vocabulary.
     """
-    if not _is_checker(capability_id) or not isinstance(assurance, dict):
+    if not _is_checker(capability_id) or validated is None:
         return None
-    record_uri = assurance.get("verification_record_uri")
-    level = assurance.get("level")
-    if level == "VERIFIED" and isinstance(record_uri, str) and mode == "VERIFY":
+    assurance = validated.assurance
+    if (
+        assurance.level is CapabilityAssuranceLevel.VERIFIED
+        and validated.mode is CapabilityMode.VERIFY
+        and assurance.verification_record_uri is not None
+    ):
         return CheckerState.ACCEPTED
-    if level not in (None, "VERIFIED"):
-        # A completed checker call that did not achieve VERIFIED assurance
-        # was a rejection.
-        return CheckerState.REJECTED
-    return None
+    # A completed checker call that did not achieve VERIFIED assurance was a
+    # rejection. Non-completed calls return before checker recording.
+    return CheckerState.REJECTED
 
 
 def _mathematical_output(output: object) -> dict[str, Any] | None:
@@ -789,12 +795,10 @@ def _record_scope_completeness_assurance(
 def _record_checker(
     state: _MutableState,
     capability_id: str,
-    output: object,
-    assurance: object,
-    mode: str | None = None,
+    validated: CapabilityResult | None,
 ) -> set[MilestoneKind]:
     kinds: set[MilestoneKind] = set()
-    checker = _checker_outcome(capability_id, output, assurance, mode)
+    checker = _checker_outcome(capability_id, validated)
     if checker is None:
         return kinds
     if checker is CheckerState.REJECTED and state.checker_state is not checker:
@@ -804,8 +808,8 @@ def _record_checker(
         kinds.add(MilestoneKind.CHECKER_REJECTED)
     elif checker is CheckerState.ACCEPTED and state.checker_state is not checker:
         record_uri = (
-            assurance.get("verification_record_uri")
-            if isinstance(assurance, dict)
+            validated.assurance.verification_record_uri
+            if validated is not None
             else None
         )
         # Bind checker decisions to the candidate they checked.  When a
@@ -870,16 +874,7 @@ def _record_math_result(
     kinds.update(_record_artifacts(state, capability_id, response))
     kinds.update(_record_obligations(state, response))
     kinds.update(_record_scope_completeness_assurance(state, response))
-    mode_value = response.get("mode")
-    kinds.update(
-        _record_checker(
-            state,
-            capability_id,
-            output,
-            response.get("assurance"),
-            mode_value if isinstance(mode_value, str) else None,
-        )
-    )
+    kinds.update(_record_checker(state, capability_id, validated))
     return tuple(sorted(kinds, key=str))
 
 
@@ -910,6 +905,8 @@ def _state_observation(
         return None
     item = event.get("item")
     if not isinstance(item, dict) or item.get("type") != "mcp_tool_call":
+        return None
+    if item.get("server") != _JACOBIAN_SERVER:
         return None
     tool = _tool_name(item.get("tool"))
     arguments = item.get("arguments")

@@ -527,6 +527,42 @@ def test_binary_labels_fail_closed_on_bad_evidence_and_duplicate_rollouts() -> N
         )
 
 
+def test_terminal_evidence_bound_to_exact_trajectory_source_digest() -> None:
+    valid = _controlled_corpus().trajectories[0]
+    evidence = valid.extraction.terminal_evidence
+    assert evidence is not None
+    foreign_binding = evidence.model_copy(
+        update={"source_digest": _sha("foreign-source")}
+    )
+    foreign = valid.extraction.model_copy(
+        update={"terminal_evidence": foreign_binding}
+    )
+    with pytest.raises(ValidationError, match="bound to the exact extracted trajectory"):
+        LabelledTrajectory(
+            trajectory_id="foreign-bound",
+            task_group="checker-scope",
+            extraction=foreign,
+        )
+
+
+def test_terminal_only_extraction_rejects_labelled_trajectory() -> None:
+    valid = _controlled_corpus().trajectories[0]
+    terminal = valid.extraction.states[-1].model_copy(update={"index": 0})
+    evidence = valid.extraction.terminal_evidence
+    extraction = valid.extraction.model_copy(
+        update={
+            "states": (terminal,),
+            "terminal_evidence": evidence,
+        }
+    )
+    with pytest.raises(ValidationError, match="PLAN observation"):
+        LabelledTrajectory(
+            trajectory_id="terminal-only",
+            task_group="checker-scope",
+            extraction=extraction,
+        )
+
+
 def test_single_rollout_task_groups_and_unknown_fields_are_rejected() -> None:
     trajectory = _controlled_corpus().trajectories[0]
     with pytest.raises(ValidationError, match="requires repeated rollouts"):
