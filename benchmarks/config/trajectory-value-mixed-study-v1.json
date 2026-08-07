@@ -3,7 +3,7 @@
   "calibration_sources": [
     {
       "calibration_id": "trajectory-value-calibration-codex-v1",
-      "manifest_digest": "sha256:a0312ea7a7b9ebaf1c1c5120d421c96037b712c528e65adc7d0d8fef74adf74f",
+      "manifest_digest": "sha256:5fbfdeb02bcb1a96c1c745133d04d9ee7c9b64a3c1a0f8f1657751f1e8aa190a",
       "manifest_path": "benchmarks/studies/trajectory-value-calibration-codex-v1/manifest.json",
       "summary_digest": "sha256:b78411cf0640f7c368e3d0cefc0314fe5297b1ca7f097191aec3b95a1396720d",
       "summary_path": "benchmarks/studies/trajectory-value-calibration-codex-v1/summary.json"
@@ -66,7 +66,7 @@
       "labelled": 2,
       "rejected": 1,
       "success_rate_millionths": 500000,
-      "task_contract_digest": "sha256:a635b8446904af69f86704e4d1eec8a7c2bdc195820596de6cdd46a813fbe334",
+      "task_contract_digest": "sha256:72094704a4ceceeb0fca049c2608502c313584ad1f600dd9f0d26a1757a11b50",
       "task_family": "graph-artifact-composition",
       "task_group": "graph-artifact-composition",
       "task_id": "graph-artifact-composition"
