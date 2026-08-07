@@ -64,6 +64,7 @@ _SUBPROCESS_ALLOWED_EXACT: frozenset[PurePosixPath] = frozenset(
         PurePosixPath("tests/e2e/verified_results/test_reference_runtime.py"),
         # Process boundary tests directly exercise subprocess seams.
         PurePosixPath("tests/boundary/process/test_bounded_process.py"),
+        PurePosixPath("tests/boundary/process/test_cvc5_worker_command_profile.py"),
         PurePosixPath("tests/boundary/process/test_process_policy.py"),
         PurePosixPath("tests/boundary/process/test_rational_lp_worker_protocol.py"),
         PurePosixPath("tests/boundary/process/test_worker_error_protocol.py"),
@@ -122,11 +123,52 @@ _SUBPROCESS_ALLOWED_EXACT: frozenset[PurePosixPath] = frozenset(
         PurePosixPath("tests/unit/tooling/test_architecture_harbor_contracts.py"),
         PurePosixPath("tests/unit/tooling/test_architecture_unsupported_surfaces.py"),
         PurePosixPath("tests/unit/tooling/test_architecture_diagnostics.py"),
-        # Repository-command integration tests deliberately invoke CLI entrypoints.
+        # Benchmark regressions spawn task-owned solution or Oracle entrypoints.
         PurePosixPath(
             "benchmarks/validation/mathematical_benchmarks_v1/"
             "test_multiplicative_grid_extremum.py"
         ),
+        PurePosixPath(
+            "benchmarks/validation/conjecture_probes_v1/"
+            "test_bsd_infinite_order_certificate.py"
+        ),
+        PurePosixPath(
+            "benchmarks/validation/conjecture_probes_v1/"
+            "test_hadamard_order12_construction.py"
+        ),
+        PurePosixPath(
+            "benchmarks/validation/conjecture_probes_v1/"
+            "test_hadwiger_triangle_free_minor_certificate.py"
+        ),
+        PurePosixPath(
+            "benchmarks/validation/conjecture_probes_v1/"
+            "test_happy_ending_convex_position.py"
+        ),
+        PurePosixPath(
+            "benchmarks/validation/conjecture_probes_v1/"
+            "test_hodge_blowup_divisor_certificate.py"
+        ),
+        PurePosixPath(
+            "benchmarks/validation/conjecture_probes_v1/"
+            "test_littlewood_certified_finite_search.py"
+        ),
+        PurePosixPath(
+            "benchmarks/validation/conjecture_probes_v1/"
+            "test_navier_stokes_polynomial_certificate.py"
+        ),
+        PurePosixPath(
+            "benchmarks/validation/conjecture_probes_v1/"
+            "test_perfect_cuboid_scope_audit.py"
+        ),
+        PurePosixPath(
+            "benchmarks/validation/conjecture_probes_v1/"
+            "test_reconstruction_deck_certificate.py"
+        ),
+        PurePosixPath(
+            "benchmarks/validation/conjecture_probes_v1/"
+            "test_yang_mills_gauge_invariance_certificate.py"
+        ),
+        # Repository-command integration tests deliberately invoke CLI entrypoints.
         PurePosixPath("benchmarks/validation/test_benchmark_plan_validation.py"),
         PurePosixPath("benchmarks/validation/test_benchmark_planner.py"),
     }
@@ -662,7 +704,9 @@ def _public_contract_drift_violations(root: Path) -> tuple[Violation, ...]:
             if not (task_dir / "task.toml").is_file():
                 continue
             contract_path = task_dir / "tests" / "public_contract.json"
-            contract_rel = str(PurePosixPath(contract_path.relative_to(root).as_posix()))
+            contract_rel = str(
+                PurePosixPath(contract_path.relative_to(root).as_posix())
+            )
             if not contract_path.is_file():
                 violations.append(
                     Violation(
@@ -682,7 +726,9 @@ def _public_contract_drift_violations(root: Path) -> tuple[Violation, ...]:
                 )
                 continue
             for drift in drifts:
-                violations.append(Violation(contract_rel, "public-contract-drift", drift))
+                violations.append(
+                    Violation(contract_rel, "public-contract-drift", drift)
+                )
     return tuple(violations)
 
 
