@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import codecs
 import hashlib
 import json
 import math
@@ -249,6 +250,53 @@ def resolve_evidence(
     return target
 
 
+_JSON_WHITESPACE = frozenset(" \t\n\r")
+
+
+def _read_streaming_json_value(stream) -> Any:
+    """Parse the first JSON value from a binary stream without a byte cap.
+
+    ``json.JSONDecoder.raw_decode`` is fed incrementally in bounded chunks,
+    so parsing stops as soon as the top-level value is complete; leading and
+    trailing JSON whitespace are handled exactly like ``json.load``, and any
+    non-whitespace content after the value is rejected chunk by chunk instead
+    of being read into memory. Memory therefore grows only with the size of
+    the JSON value itself, never with arbitrary legal whitespace padding.
+    """
+
+    decoder = codecs.getincrementaldecoder("utf-8")()
+    parser = json.JSONDecoder()
+    buffer = ""
+    start = 0
+    while True:
+        block = stream.read(65_536)
+        if block:
+            buffer += decoder.decode(block)
+        # ``raw_decode`` does not skip leading whitespace; track the prefix
+        # once so each whitespace character is visited only a single time.
+        while start < len(buffer) and buffer[start] in _JSON_WHITESPACE:
+            start += 1
+        try:
+            value, end = parser.raw_decode(buffer, idx=start)
+        except json.JSONDecodeError:
+            if not block:
+                raise
+            continue
+        if not all(character in _JSON_WHITESPACE for character in buffer[end:]):
+            raise ValueError("non-whitespace after evidence JSON value")
+        while True:
+            block = stream.read(65_536)
+            if not block:
+                break
+            tail = decoder.decode(block)
+            if tail and not all(character in _JSON_WHITESPACE for character in tail):
+                raise ValueError("non-whitespace after evidence JSON value")
+        tail = decoder.decode(b"", final=True)
+        if tail and not all(character in _JSON_WHITESPACE for character in tail):
+            raise ValueError("non-whitespace after evidence JSON value")
+        return value
+
+
 def read_evidence_json(
     descriptor: object,
     *,
@@ -256,7 +304,14 @@ def read_evidence_json(
     workspace: Path = WORKSPACE,
     max_bytes: int | None = None,
 ) -> dict[str, Any] | None:
-    """Resolve and parse a digest-bound evidence object."""
+    """Resolve and parse a digest-bound evidence object.
+
+    The file is parsed with a genuinely streaming decoder instead of
+    ``read_text()``, so a digest-correct evidence file with arbitrary legal
+    JSON whitespace is never materialized in full and no internal byte
+    ceiling is imposed: the evidence is already bound by path, digest, and
+    schema. The ``max_bytes`` argument only bounds digest resolution.
+    """
 
     target = resolve_evidence(
         descriptor,
@@ -267,7 +322,8 @@ def read_evidence_json(
     if target is None:
         return None
     try:
-        value = json.loads(target.read_text())
+        with target.open("rb") as stream:
+            value = _read_streaming_json_value(stream)
     except (OSError, ValueError, RecursionError, MemoryError):
         return None
     return value if isinstance(value, dict) else None
