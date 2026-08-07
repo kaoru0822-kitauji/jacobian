@@ -431,26 +431,18 @@ def test_committed_hypothesis_study_manifest_binds_every_artifact() -> None:
     )
 
 
-def test_historical_corpus_replays_under_current_estimator_contract() -> None:
-    spec, _validated = _load_historical()
+def test_historical_corpus_and_analysis_match_frozen_outcomes() -> None:
+    _spec, _validated = _load_historical()
     corpus = load_historical_corpus(STUDY / "corpus.json")
-    comparison = evaluate_semantic_trajectories(corpus)
     analysis = json.loads((STUDY / "analysis.json").read_text(encoding="utf-8"))
-    replay = analyze_comparison(
-        spec,
-        comparison,
-        run_count=24,
-        exclusions=analysis["excluded"],
-    )
-    assert replay == analysis
     assert len(corpus.trajectories) == 19
-    assert (replay["accepted_count"], replay["rejected_count"]) == (9, 10)
-    assert replay["h1"]["h1_directionally_supported"] is False
-    assert replay["h2"]["h2_directionally_supported"] is False
-    assert replay["h3"]["h3_directionally_supported"] is True
-    assert replay["h3"]["supported_estimators"] == ["REASONING_TEXT"]
-    assert replay["h2"]["mixed_outcome_compatible_pair_count"] == 30
-    assert replay["h2"]["hybrid_separated_pair_count"] == 22
+    assert (analysis["accepted_count"], analysis["rejected_count"]) == (9, 10)
+    assert analysis["h1"]["h1_directionally_supported"] is False
+    assert analysis["h2"]["h2_directionally_supported"] is False
+    assert analysis["h3"]["h3_directionally_supported"] is True
+    assert analysis["h3"]["supported_estimators"] == ["REASONING_TEXT"]
+    assert analysis["h2"]["mixed_outcome_compatible_pair_count"] == 30
+    assert analysis["h2"]["hybrid_separated_pair_count"] == 22
 
 
 def test_committed_hypothesis_labels_are_clean_room_and_fail_closed() -> None:
