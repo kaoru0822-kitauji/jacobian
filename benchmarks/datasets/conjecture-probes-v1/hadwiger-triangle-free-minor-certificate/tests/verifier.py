@@ -8,6 +8,8 @@ from typing import Any
 
 from verifier_support import (
     MAX_SUBMISSION_BYTES,
+    _finite_json_float,
+    _reject_nonfinite_json,
     evidence_list_is_bound,
     is_regular_bounded_file,
     load_submission,
@@ -180,12 +182,34 @@ def mathematics(r: Any) -> bool:
     )
 
 
+def _json_equal(a: Any, b: Any) -> bool:
+    """Return whether two JSON-decoded values are identical, types included.
+
+    Python ``==`` treats booleans as integers (``False == 0``) and integral
+    floats as integers (``4.0 == 4``), but the evidence contract requires the
+    payload to exactly copy the submitted ``result`` with concrete JSON types.
+    """
+    if type(a) is not type(b):
+        return False
+    if isinstance(a, dict):
+        return set(a) == set(b) and all(_json_equal(a[k], b[k]) for k in a)
+    if isinstance(a, list):
+        return len(a) == len(b) and all(
+            _json_equal(x, y) for x, y in zip(a, b, strict=True)
+        )
+    return a == b
+
+
 def _raw_submission() -> dict[str, Any] | None:
     path = Path("/app/submission.json")
     if not is_regular_bounded_file(path, max_bytes=MAX_SUBMISSION_BYTES):
         return None
     try:
-        value = json.loads(path.read_text())
+        value = json.loads(
+            path.read_text(),
+            parse_constant=_reject_nonfinite_json,
+            parse_float=_finite_json_float,
+        )
     except (OSError, ValueError, RecursionError, MemoryError):
         return None
     return value if isinstance(value, dict) else None
@@ -227,7 +251,7 @@ def main():
         and set(payload) == {"schema_version", "task_id", "result", "limitations"}
         and payload.get("schema_version") == "1"
         and payload.get("task_id") == TASK_ID
-        and payload.get("result") == raw.get("result")
+        and _json_equal(payload.get("result"), raw.get("result"))
         and payload.get("limitations") == LIMITATIONS
     )
     sc = bool(
@@ -236,10 +260,9 @@ def main():
         and raw.get("limitations") == LIMITATIONS
     )
     scoreable_assurances = frozenset({"UNVERIFIED", "COMPUTED", "CHECKED"})
-    a = bool(
-        isinstance(raw, dict) and raw.get("claimed_assurance") in scoreable_assurances
-    )
-    f = bool(isinstance(raw, dict) and raw.get("claimed_assurance") == "VERIFIED")
+    claimed = raw.get("claimed_assurance") if isinstance(raw, dict) else None
+    a = bool(isinstance(claimed, str) and claimed in scoreable_assurances)
+    f = bool(claimed == "VERIFIED")
     agg = 1.0 if all((ib, c, m, e, sc, a)) and not f else 0.0
     reward(
         {
