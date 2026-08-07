@@ -554,13 +554,15 @@ def _run_one(
             exit_code=command.exit_code,
         )
         _write_json(run_dir / "verifier.json", verifier)
-        extraction = extract_codex_trajectory(
-            transcript,
-            task_family=task.task_family,
-            terminal_evidence=terminal,
+        terminal_for_analysis, exclusion_reason = _publish_workspace_and_extract(
+            transcript=transcript,
+            workspace=workspace,
+            run_dir=run_dir,
+            task=task,
+            source_revision=source_revision,
+            original_terminal=terminal,
+            original_verifier=verifier,
         )
-        _write_json(run_dir / "extraction.json", extraction.model_dump(mode="json"))
-        _copy_workspace(workspace, run_dir / "workspace")
         telemetry = parse_agent_transcript(transcript)
         record = {
             "schema_version": "1",
@@ -583,14 +585,71 @@ def _run_one(
             "reasoning_run_ids": list(run_ids),
             "reasoning_protocol": telemetry.get("reasoning_protocol"),
             "usage": telemetry.get("usage"),
-            "terminal": terminal.model_dump(mode="json"),
+            "terminal": terminal_for_analysis.model_dump(mode="json"),
             "clean_room_verifier": verifier,
             "surface_digest": surface["surface_digest"],
             "catalog_digest": surface["catalog"]["catalog_digest"],
             "policy_digest": surface["catalog"]["policy_digest"],
         }
+        if exclusion_reason is not None:
+            record.update(
+                {
+                    "original_clean_room_verifier": verifier,
+                    "exclusion_reason": exclusion_reason,
+                    "rerun_performed": False,
+                }
+            )
         _write_json(run_dir / "run.json", record)
         return record
+
+
+def _publish_workspace_and_extract(
+    *,
+    transcript: Path,
+    workspace: Path,
+    run_dir: Path,
+    task: FrozenMixedTask,
+    source_revision: str,
+    original_terminal: CleanRoomTerminalEvidence,
+    original_verifier: Mapping[str, Any],
+) -> tuple[CleanRoomTerminalEvidence, str | None]:
+    """Publish raw terminal artifacts before fallible retrospective extraction."""
+
+    _copy_workspace(workspace, run_dir / "workspace")
+    try:
+        extraction = extract_codex_trajectory(
+            transcript,
+            task_family=task.task_family,
+            terminal_evidence=original_terminal,
+        )
+    except Exception as exc:
+        failure = {
+            "schema_version": "1",
+            "trajectory_id": run_dir.name,
+            "source_revision": source_revision,
+            "disposition": "INCONCLUSIVE",
+            "rerun_performed": False,
+            "reason": "RUNNER_EXTRACTION_FAILURE",
+            "extraction_failure": {
+                "type": type(exc).__name__,
+                "message": str(exc),
+            },
+            "original_clean_room_verifier": dict(original_verifier),
+            "missing_artifacts": ["extraction"],
+            "preserved_artifacts": ["workspace", "raw submission"],
+        }
+        _write_json(run_dir / "infrastructure-failure.json", failure)
+        return (
+            CleanRoomTerminalEvidence(
+                verifier_digest=original_terminal.verifier_digest,
+                clean_room=True,
+                verifier_execution_status="ERROR",
+                acceptance=TerminalAcceptance.INCONCLUSIVE,
+            ),
+            "runner extraction failed after raw submission publication",
+        )
+    _write_json(run_dir / "extraction.json", extraction.model_dump(mode="json"))
+    return original_terminal, None
 
 
 def _corpus(
@@ -1203,9 +1262,10 @@ def _execute_or_resume_slots(
     output: Path,
     revision: str,
     prior_revision: str | None,
+    interrupted_revision: str | None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     records: list[dict[str, Any]] = []
-    prior_ids: list[str] = []
+    prior_ids_by_revision: dict[str, list[str]] = {}
     current_ids: list[str] = []
     expected_ids = {
         _slot_id(task, repetition)
@@ -1227,21 +1287,29 @@ def _execute_or_resume_slots(
             if record_path.is_file() and not record_path.is_symlink():
                 if prior_revision is None:
                     raise RuntimeError("fresh execution found a completed rollout")
-                records.append(_read_existing_record(record_path, task, repetition))
-                prior_ids.append(trajectory_id)
+                record = _read_existing_record(record_path, task, repetition)
+                source_revision = str(record.get("source_revision", prior_revision))
+                _validate_prior_revision(source_revision)
+                records.append(record)
+                prior_ids_by_revision.setdefault(source_revision, []).append(
+                    trajectory_id
+                )
                 continue
             if run_dir.exists():
                 if prior_revision is None:
                     raise RuntimeError("fresh execution found an interrupted rollout")
+                source_revision = interrupted_revision or prior_revision
                 records.append(
                     _recover_interrupted_record(
                         task=task,
                         repetition=repetition,
                         run_dir=run_dir,
-                        prior_revision=prior_revision,
+                        prior_revision=source_revision,
                     )
                 )
-                prior_ids.append(trajectory_id)
+                prior_ids_by_revision.setdefault(source_revision, []).append(
+                    trajectory_id
+                )
                 continue
             records.append(
                 _run_one(
@@ -1255,15 +1323,15 @@ def _execute_or_resume_slots(
             )
             current_ids.append(trajectory_id)
     attempts: list[dict[str, Any]] = []
-    if prior_revision is not None:
+    for source_revision, trajectory_ids in prior_ids_by_revision.items():
         attempts.append(
             {
-                "source_revision": prior_revision,
+                "source_revision": source_revision,
                 "runner_and_analysis_digest": _git_file_digest(
-                    prior_revision,
+                    source_revision,
                     "benchmarks/tooling/trajectory_value_hypothesis_study.py",
                 ),
-                "trajectory_ids": prior_ids,
+                "trajectory_ids": trajectory_ids,
                 "completed_normally": False,
             }
         )
@@ -1280,6 +1348,28 @@ def _execute_or_resume_slots(
     return records, attempts
 
 
+def _validate_execution_location(
+    *,
+    output: Path,
+    resume_after_interruption: bool,
+    prior_source_revision: str | None,
+    interrupted_source_revision: str | None,
+) -> None:
+    if resume_after_interruption:
+        if not output.is_dir() or (output / "manifest.json").exists():
+            raise RuntimeError("resume requires one incomplete unmanifested study")
+        if prior_source_revision is None:
+            raise RuntimeError("resume requires the prior full source revision")
+        _validate_prior_revision(prior_source_revision)
+        if interrupted_source_revision is not None:
+            _validate_prior_revision(interrupted_source_revision)
+        return
+    if output.exists():
+        raise RuntimeError(f"output directory already exists: {output}")
+    if prior_source_revision is not None or interrupted_source_revision is not None:
+        raise RuntimeError("source revisions are valid only for resume")
+
+
 def run_study(
     spec_path: Path,
     output: Path,
@@ -1287,6 +1377,7 @@ def run_study(
     execute: bool,
     resume_after_interruption: bool = False,
     prior_source_revision: str | None = None,
+    interrupted_source_revision: str | None = None,
 ) -> dict[str, Any]:
     """Execute exactly one clean, immutable 24-rollout mixed study."""
 
@@ -1294,16 +1385,12 @@ def run_study(
         raise RuntimeError("refusing external Codex execution without --execute")
     spec_path = spec_path.resolve(strict=True)
     output = output.resolve()
-    if resume_after_interruption:
-        if not output.is_dir() or (output / "manifest.json").exists():
-            raise RuntimeError("resume requires one incomplete unmanifested study")
-        if prior_source_revision is None:
-            raise RuntimeError("resume requires the prior full source revision")
-        _validate_prior_revision(prior_source_revision)
-    elif output.exists():
-        raise RuntimeError(f"output directory already exists: {output}")
-    elif prior_source_revision is not None:
-        raise RuntimeError("prior source revision is valid only for resume")
+    _validate_execution_location(
+        output=output,
+        resume_after_interruption=resume_after_interruption,
+        prior_source_revision=prior_source_revision,
+        interrupted_source_revision=interrupted_source_revision,
+    )
     spec, validated = load_hypothesis_spec(spec_path)
     mixed = validated.contract
     if _codex_version(_ROOT) != mixed.model.codex_cli_version:
@@ -1338,6 +1425,7 @@ def run_study(
         output=output,
         revision=revision,
         prior_revision=prior_source_revision,
+        interrupted_revision=interrupted_source_revision,
     )
     summary = analyze_study(spec, output, records)
     manifest = {
@@ -1435,6 +1523,7 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--execute", action="store_true")
     run.add_argument("--resume-after-interruption", action="store_true")
     run.add_argument("--prior-source-revision")
+    run.add_argument("--interrupted-source-revision")
     schema = subparsers.add_parser("schema")
     schema.add_argument("--output", type=Path)
     validate = subparsers.add_parser("validate")
@@ -1474,6 +1563,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         execute=args.execute,
         resume_after_interruption=args.resume_after_interruption,
         prior_source_revision=args.prior_source_revision,
+        interrupted_source_revision=args.interrupted_source_revision,
     )
     print(json.dumps(summary, indent=2, sort_keys=True))
 

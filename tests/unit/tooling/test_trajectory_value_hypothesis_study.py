@@ -17,6 +17,7 @@ from benchmarks.tooling.trajectory_value_hypothesis_study import (
     TrajectoryValueHypothesisStudySpec,
     _codex_arguments,
     _local_auth_status,
+    _publish_workspace_and_extract,
     _recover_interrupted_record,
     _verify_terminal,
     analyze_comparison,
@@ -27,7 +28,7 @@ from benchmarks.tooling.trajectory_value_mixed_contract import FrozenMixedTask
 from pydantic import ValidationError
 from tests.unit.tooling.test_trajectory_value_abstraction import _controlled_corpus
 
-from jacobian.eval.trajectory_state import TerminalAcceptance
+from jacobian.eval.trajectory_state import CleanRoomTerminalEvidence, TerminalAcceptance
 from jacobian.eval.trajectory_value_abstraction import evaluate_semantic_trajectories
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -251,6 +252,56 @@ def test_interrupted_rollout_is_excluded_without_rerunning_model(
         (run_dir / "infrastructure-failure.json").read_text(encoding="utf-8")
     )
     assert failure["disposition"] == "INCONCLUSIVE"
+    assert failure["rerun_performed"] is False
+    assert not (run_dir / "extraction.json").exists()
+
+
+def test_live_extraction_failure_preserves_workspace_and_becomes_inconclusive(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _spec, validated = load_hypothesis_spec(SPEC)
+    task = validated.contract.tasks[2]
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / "submission.json").write_text('{"answer": 1}\n', encoding="utf-8")
+    transcript = tmp_path / "codex.jsonl"
+    transcript.write_text("{}\n", encoding="utf-8")
+    run_dir = tmp_path / "runs" / "rp2-homology-lattice-main-r01"
+    run_dir.mkdir(parents=True)
+    terminal = CleanRoomTerminalEvidence(
+        verifier_digest="sha256:" + "4" * 64,
+        clean_room=True,
+        verifier_execution_status="COMPLETED",
+        acceptance=TerminalAcceptance.REJECTED,
+        input_binding_valid=True,
+        artifact_binding_valid=True,
+    )
+
+    def fail_extraction(*_args: object, **_kwargs: object) -> None:
+        raise ValueError("noncanonical candidate value")
+
+    monkeypatch.setattr(
+        "benchmarks.tooling.trajectory_value_hypothesis_study.extract_codex_trajectory",
+        fail_extraction,
+    )
+    analysis_terminal, reason = _publish_workspace_and_extract(
+        transcript=transcript,
+        workspace=workspace,
+        run_dir=run_dir,
+        task=task,
+        source_revision="5" * 40,
+        original_terminal=terminal,
+        original_verifier={"acceptance": "REJECTED", "reward": {"reward": 0.0}},
+    )
+    assert analysis_terminal.acceptance is TerminalAcceptance.INCONCLUSIVE
+    assert reason == "runner extraction failed after raw submission publication"
+    assert (run_dir / "workspace/submission.json").read_text(encoding="utf-8") == (
+        '{"answer": 1}\n'
+    )
+    failure = json.loads(
+        (run_dir / "infrastructure-failure.json").read_text(encoding="utf-8")
+    )
+    assert failure["missing_artifacts"] == ["extraction"]
     assert failure["rerun_performed"] is False
     assert not (run_dir / "extraction.json").exists()
 
