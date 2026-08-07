@@ -565,7 +565,7 @@ def _run_one(
 
 def _corpus(
     spec: TrajectoryValueStudySpec, output: Path, records: list[dict[str, Any]]
-) -> tuple[TrajectoryValueCorpus, list[dict[str, str]]]:
+) -> tuple[TrajectoryValueCorpus | None, list[dict[str, str]]]:
     task_by_id = {task.task_id: task for task in spec.tasks}
     labelled: list[LabelledTrajectory] = []
     exclusions: list[dict[str, str]] = []
@@ -599,6 +599,26 @@ def _corpus(
                 extraction=extraction,
             )
         )
+    groups: dict[str, list[LabelledTrajectory]] = defaultdict(list)
+    for trajectory in labelled:
+        groups[trajectory.task_group].append(trajectory)
+    singleton_ids = {
+        members[0].trajectory_id for members in groups.values() if len(members) == 1
+    }
+    for trajectory_id in sorted(singleton_ids):
+        exclusions.append(
+            {
+                "trajectory_id": trajectory_id,
+                "reason": "task group has only one labelled trajectory after exclusions",
+            }
+        )
+    labelled = [
+        trajectory
+        for trajectory in labelled
+        if trajectory.trajectory_id not in singleton_ids
+    ]
+    if len(labelled) < 2:
+        return None, exclusions
     return (
         TrajectoryValueCorpus(
             corpus_id=spec.study_id,
@@ -872,6 +892,19 @@ def analyze(
     """Build the frozen comparison, observation replays, and A-F diagnostics."""
 
     corpus, exclusions = _corpus(spec, output, records)
+    if corpus is None:
+        _write_json(
+            output / "exclusions.json",
+            {
+                "schema_version": "1",
+                "study_id": spec.study_id,
+                "excluded": exclusions,
+            },
+        )
+        raise RuntimeError(
+            "trajectory value corpus requires at least two labelled trajectories "
+            "after singleton task-group exclusions"
+        )
     comparison = evaluate_offline_trajectories(corpus)
     _write_json(output / "corpus.json", corpus.model_dump(mode="json"))
     _write_json(output / "comparison.json", comparison.model_dump(mode="json"))

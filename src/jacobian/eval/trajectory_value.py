@@ -32,6 +32,8 @@ from jacobian.eval.trajectory_state import (
 
 _DIGEST_PATTERN = r"^sha256:[0-9a-f]{64}$"
 _IDENTIFIER_PATTERN = r"^[a-z0-9][a-z0-9._-]{0,127}$"
+_MAX_CORPUS_TRAJECTORIES = 64
+_MAX_CORPUS_OBSERVATIONS = 4096
 _TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
 _NUMBER_PATTERN = re.compile(
     r"(?<![\w.])[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?(?:/\d+)?(?![\w.])"
@@ -116,7 +118,9 @@ class TrajectoryValueCorpus(ContractModel):
     corpus_schema_version: Literal["1"] = "1"
     corpus_id: str = Field(pattern=_IDENTIFIER_PATTERN)
     evaluator_config: ValueEstimatorConfig = ValueEstimatorConfig()
-    trajectories: tuple[LabelledTrajectory, ...] = Field(min_length=2)
+    trajectories: tuple[LabelledTrajectory, ...] = Field(
+        min_length=2, max_length=_MAX_CORPUS_TRAJECTORIES
+    )
 
     @model_validator(mode="after")
     def require_independent_repeated_rollouts(self) -> Self:
@@ -127,6 +131,13 @@ class TrajectoryValueCorpus(ContractModel):
         if len(set(source_digests)) != len(source_digests):
             raise ValueError(
                 "duplicate transcript digests cannot become extra rollouts"
+            )
+        observation_count = sum(
+            len(item.extraction.states) for item in self.trajectories
+        )
+        if observation_count > _MAX_CORPUS_OBSERVATIONS:
+            raise ValueError(
+                "trajectory corpus exceeds the maximum observation-state count"
             )
         groups: dict[str, list[LabelledTrajectory]] = defaultdict(list)
         for trajectory in self.trajectories:
@@ -171,6 +182,16 @@ class StateValueEstimate(ContractModel):
     def exclude_target_trajectory_from_support(self) -> Self:
         if self.trajectory_id in self.supporting_trajectory_ids:
             raise ValueError("a trajectory cannot train its own value estimate")
+        if self.supporting_trajectory_ids != tuple(
+            sorted(set(self.supporting_trajectory_ids))
+        ):
+            raise ValueError("supporting trajectory ids must be unique and sorted")
+        if self.cluster_member_observation_ids != tuple(
+            sorted(set(self.cluster_member_observation_ids))
+        ):
+            raise ValueError("cluster member ids must be unique and sorted")
+        if self.observation_id not in self.cluster_member_observation_ids:
+            raise ValueError("an estimate must belong to its declared cluster")
         return self
 
 
@@ -225,6 +246,16 @@ class OfflineValueComparison(ContractModel):
         kinds = tuple(item.estimator for item in self.evaluations)
         if kinds != tuple(EstimatorKind):
             raise ValueError("comparison must contain all estimators in fixed order")
+        rewards: dict[str, Literal[0, 1]] = {}
+        for evaluation in self.evaluations:
+            for estimate in evaluation.estimates:
+                previous = rewards.get(estimate.trajectory_id)
+                if previous is None:
+                    rewards[estimate.trajectory_id] = estimate.eventual_terminal_reward
+                elif previous != estimate.eventual_terminal_reward:
+                    raise ValueError(
+                        "trajectory terminal rewards conflict across estimators"
+                    )
         return self
 
 
