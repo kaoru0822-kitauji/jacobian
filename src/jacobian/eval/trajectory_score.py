@@ -121,61 +121,93 @@ class TrajectoryScoreReplay(ContractModel):
 
     @model_validator(mode="after")
     def require_bound_ordered_replay(self) -> Self:
-        if self.states[0].boundary is not StateBoundary.PLAN:
-            raise ValueError("replay must begin at a PLAN observation")
-        if any(state.trajectory_id != self.trajectory_id for state in self.states):
-            raise ValueError("replay state trajectory identity mismatch")
-        if any(state.task_group != self.task_group for state in self.states):
-            raise ValueError("replay state task-group mismatch")
-        if any(state.estimator is not self.estimator for state in self.states):
-            raise ValueError("replay state estimator mismatch")
-        if tuple(state.state_index for state in self.states) != tuple(
-            sorted(state.state_index for state in self.states)
-        ):
-            raise ValueError("replay states must be ordered by source state index")
-        if len({state.state_index for state in self.states}) != len(self.states):
-            raise ValueError("replay state indices must be unique")
-        if any(
-            state.eventual_terminal_reward != self.eventual_terminal_reward
-            or state.eventual_terminal_result is not self.eventual_terminal_result
-            for state in self.states
-        ):
-            raise ValueError("replay states must share the bound terminal result")
-        if self.total_milestone_credit != self.states[-1].cumulative_milestone_credit:
-            raise ValueError("total credit must equal the last cumulative credit")
-        running_cumulative = 0.0
-        previous_id: str | None = None
-        previous_value: float | None = None
-        for index, state in enumerate(self.states):
-            if index == 0:
-                if state.previous_observation_id is not None:
-                    raise ValueError(
-                        "initial replay state must not reference a previous observation"
-                    )
-            else:
-                if state.previous_observation_id != previous_id:
-                    raise ValueError(
-                        "replay state previous observation must chain to its predecessor"
-                    )
-                if previous_value is None:
-                    raise ValueError(
-                        "non-initial replay state requires a previous estimated value"
-                    )
-                expected_delta = _round_value(state.estimated_value - previous_value)
-                if state.value_delta is None or state.value_delta != expected_delta:
-                    raise ValueError(
-                        "replay value delta must equal the adjacent estimated value difference"
-                    )
-            running_cumulative = _round_value(
-                running_cumulative + state.transition_credit
-            )
-            if state.cumulative_milestone_credit != running_cumulative:
-                raise ValueError(
-                    "replay cumulative credit must equal the running total of transition credits"
-                )
-            previous_id = state.observation_id
-            previous_value = state.estimated_value
+        _require_bound_ordered_replay(self)
         return self
+
+
+def _require_bound_ordered_replay(replay: TrajectoryScoreReplay) -> None:
+    _require_replay_boundaries(replay.states)
+    _require_replay_state_bindings(replay)
+    _require_replay_state_order(replay.states)
+    _require_replay_terminal_bindings(replay)
+    _require_replay_total_credit(replay)
+    _require_replay_credit_chain(replay.states)
+
+
+def _require_replay_boundaries(states: tuple[ScoredTrajectoryState, ...]) -> None:
+    if states[0].boundary is not StateBoundary.PLAN:
+        raise ValueError("replay must begin at a PLAN observation")
+
+
+def _require_replay_state_bindings(replay: TrajectoryScoreReplay) -> None:
+    if any(state.trajectory_id != replay.trajectory_id for state in replay.states):
+        raise ValueError("replay state trajectory identity mismatch")
+    if any(state.task_group != replay.task_group for state in replay.states):
+        raise ValueError("replay state task-group mismatch")
+    if any(state.estimator is not replay.estimator for state in replay.states):
+        raise ValueError("replay state estimator mismatch")
+
+
+def _require_replay_state_order(states: tuple[ScoredTrajectoryState, ...]) -> None:
+    state_indices = tuple(state.state_index for state in states)
+    if state_indices != tuple(sorted(state_indices)):
+        raise ValueError("replay states must be ordered by source state index")
+    if len(set(state_indices)) != len(states):
+        raise ValueError("replay state indices must be unique")
+
+
+def _require_replay_terminal_bindings(replay: TrajectoryScoreReplay) -> None:
+    if any(
+        state.eventual_terminal_reward != replay.eventual_terminal_reward
+        or state.eventual_terminal_result is not replay.eventual_terminal_result
+        for state in replay.states
+    ):
+        raise ValueError("replay states must share the bound terminal result")
+
+
+def _require_replay_total_credit(replay: TrajectoryScoreReplay) -> None:
+    if replay.total_milestone_credit != replay.states[-1].cumulative_milestone_credit:
+        raise ValueError("total credit must equal the last cumulative credit")
+
+
+def _require_replay_credit_chain(states: tuple[ScoredTrajectoryState, ...]) -> None:
+    running_cumulative = 0.0
+    previous_id: str | None = None
+    previous_value: float | None = None
+    for index, state in enumerate(states):
+        _require_replay_previous_link(index, state, previous_id, previous_value)
+        running_cumulative = _round_value(running_cumulative + state.transition_credit)
+        if state.cumulative_milestone_credit != running_cumulative:
+            raise ValueError(
+                "replay cumulative credit must equal the running total of transition credits"
+            )
+        previous_id = state.observation_id
+        previous_value = state.estimated_value
+
+
+def _require_replay_previous_link(
+    index: int,
+    state: ScoredTrajectoryState,
+    previous_id: str | None,
+    previous_value: float | None,
+) -> None:
+    if index == 0:
+        if state.previous_observation_id is not None:
+            raise ValueError(
+                "initial replay state must not reference a previous observation"
+            )
+        return
+    if state.previous_observation_id != previous_id:
+        raise ValueError(
+            "replay state previous observation must chain to its predecessor"
+        )
+    if previous_value is None:
+        raise ValueError("non-initial replay state requires a previous estimated value")
+    expected_delta = _round_value(state.estimated_value - previous_value)
+    if state.value_delta is None or state.value_delta != expected_delta:
+        raise ValueError(
+            "replay value delta must equal the adjacent estimated value difference"
+        )
 
 
 def _round_value(value: float) -> float:
@@ -210,6 +242,29 @@ def _evaluation(
 
 def _terminal_result(reward: Literal[0, 1]) -> TerminalResult:
     return TerminalResult.ACCEPTED if reward == 1 else TerminalResult.REJECTED
+
+
+def _trajectory_bindings(
+    estimates: tuple[StateValueEstimate, ...],
+) -> tuple[Literal[0, 1], str, TerminalResult]:
+    rewards = {estimate.eventual_terminal_reward for estimate in estimates}
+    task_groups = {estimate.task_group for estimate in estimates}
+    if len(rewards) != 1 or len(task_groups) != 1:
+        raise TrajectoryScoreError("trajectory estimates have inconsistent bindings")
+    reward = rewards.pop()
+    return reward, task_groups.pop(), _terminal_result(reward)
+
+
+def _comparison_trajectory_rewards(
+    comparison: OfflineValueComparison,
+) -> dict[str, Literal[0, 1]]:
+    trajectory_rewards: dict[str, Literal[0, 1]] = {}
+    for evaluation_check in comparison.evaluations:
+        for estimate in evaluation_check.estimates:
+            trajectory_rewards.setdefault(
+                estimate.trajectory_id, estimate.eventual_terminal_reward
+            )
+    return trajectory_rewards
 
 
 def _validate_estimates(
@@ -258,6 +313,103 @@ def _validate_estimates(
     return estimates, clusters
 
 
+def _validated_cluster(
+    estimate: StateValueEstimate,
+    cluster: ClusterSummary | None,
+) -> ClusterSummary:
+    if cluster is None or estimate.observation_id not in cluster.member_observation_ids:
+        raise TrajectoryScoreError("estimate is not bound to its declared cluster")
+    if estimate.cluster_member_observation_ids != cluster.member_observation_ids:
+        raise TrajectoryScoreError("estimate carries a stale cluster member set")
+    if estimate.value_source is ValueSource.CLUSTER:
+        _validate_cluster_support(estimate, cluster)
+    return cluster
+
+
+def _validate_cluster_support(
+    estimate: StateValueEstimate,
+    cluster: ClusterSummary,
+) -> None:
+    cluster_trajectories = set(cluster.member_trajectory_ids)
+    if estimate.trajectory_id in cluster_trajectories:
+        cluster_trajectories.discard(estimate.trajectory_id)
+    support_set = set(estimate.supporting_trajectory_ids)
+    if not support_set or not support_set.issubset(cluster_trajectories):
+        raise TrajectoryScoreError(
+            "estimate declares cluster support outside its cluster members"
+        )
+
+
+def _estimate_delta(
+    previous: StateValueEstimate | None,
+    estimate: StateValueEstimate,
+) -> float | None:
+    if previous is None:
+        return None
+    return _round_value(estimate.estimated_value - previous.estimated_value)
+
+
+def _transition_credit(delta: float | None, milestone_eligible: bool) -> float:
+    if milestone_eligible and delta is not None:
+        return delta
+    return 0.0
+
+
+def _credit_reason(
+    previous: StateValueEstimate | None,
+    estimate: StateValueEstimate,
+) -> CreditReason:
+    if previous is None:
+        return CreditReason.INITIAL_STATE
+    if estimate.milestone_eligible:
+        return CreditReason.MILESTONE_VALUE_DELTA
+    return CreditReason.NON_MILESTONE_ZERO
+
+
+def _previous_observation_id(previous: StateValueEstimate | None) -> str | None:
+    if previous is None:
+        return None
+    return previous.observation_id
+
+
+def _scored_state(
+    estimate: StateValueEstimate,
+    *,
+    estimator: EstimatorKind,
+    cluster: ClusterSummary,
+    previous: StateValueEstimate | None,
+    cumulative: float,
+    terminal: TerminalResult,
+    reward: Literal[0, 1],
+) -> tuple[ScoredTrajectoryState, float]:
+    delta = _estimate_delta(previous, estimate)
+    credit = _transition_credit(delta, estimate.milestone_eligible)
+    next_cumulative = _round_value(cumulative + credit)
+    state = ScoredTrajectoryState(
+        observation_id=estimate.observation_id,
+        trajectory_id=estimate.trajectory_id,
+        task_group=estimate.task_group,
+        state_index=estimate.state_index,
+        boundary=estimate.boundary,
+        typed_state_digest=estimate.typed_compatibility_digest,
+        milestone_eligible=estimate.milestone_eligible,
+        estimator=estimator,
+        cluster_id=estimate.cluster_id,
+        cluster_feature_summary=cluster.feature_summary,
+        value_source=estimate.value_source,
+        supporting_trajectory_ids=estimate.supporting_trajectory_ids,
+        estimated_value=estimate.estimated_value,
+        previous_observation_id=_previous_observation_id(previous),
+        value_delta=delta,
+        transition_credit=credit,
+        cumulative_milestone_credit=next_cumulative,
+        credit_reason=_credit_reason(previous, estimate),
+        eventual_terminal_result=terminal,
+        eventual_terminal_reward=reward,
+    )
+    return state, next_cumulative
+
+
 def replay_offline_values(
     comparison: OfflineValueComparison,
     *,
@@ -274,77 +426,23 @@ def replay_offline_values(
     raw_estimates, raw_clusters = _validate_estimates(evaluation, trajectory_id)
     estimates = tuple(raw_estimates)
     clusters = dict(raw_clusters)
-    rewards = {estimate.eventual_terminal_reward for estimate in estimates}
-    task_groups = {estimate.task_group for estimate in estimates}
-    if len(rewards) != 1 or len(task_groups) != 1:
-        raise TrajectoryScoreError("trajectory estimates have inconsistent bindings")
-    reward = rewards.pop()
-    task_group = task_groups.pop()
-    terminal = _terminal_result(reward)
-    trajectory_rewards: dict[str, Literal[0, 1]] = {}
-    for evaluation_check in comparison.evaluations:
-        for estimate in evaluation_check.estimates:
-            trajectory_rewards.setdefault(
-                estimate.trajectory_id, estimate.eventual_terminal_reward
-            )
+    reward, task_group, terminal = _trajectory_bindings(estimates)
+    _comparison_trajectory_rewards(comparison)
     states: list[ScoredTrajectoryState] = []
     cumulative = 0.0
     previous = None
     for estimate in estimates:
-        cluster = clusters.get(estimate.cluster_id)
-        if cluster is None or estimate.observation_id not in (
-            cluster.member_observation_ids
-        ):
-            raise TrajectoryScoreError("estimate is not bound to its declared cluster")
-        if estimate.cluster_member_observation_ids != (cluster.member_observation_ids):
-            raise TrajectoryScoreError("estimate carries a stale cluster member set")
-        if estimate.value_source is ValueSource.CLUSTER:
-            cluster_trajectories = set(cluster.member_trajectory_ids)
-            if estimate.trajectory_id in cluster_trajectories:
-                cluster_trajectories.discard(estimate.trajectory_id)
-            support_set = set(estimate.supporting_trajectory_ids)
-            if not support_set or not support_set.issubset(cluster_trajectories):
-                raise TrajectoryScoreError(
-                    "estimate declares cluster support outside its cluster members"
-                )
-        delta = (
-            None
-            if previous is None
-            else _round_value(estimate.estimated_value - previous.estimated_value)
+        cluster = _validated_cluster(estimate, clusters.get(estimate.cluster_id))
+        state, cumulative = _scored_state(
+            estimate,
+            estimator=estimator,
+            cluster=cluster,
+            previous=previous,
+            cumulative=cumulative,
+            terminal=terminal,
+            reward=reward,
         )
-        credit = delta if estimate.milestone_eligible and delta is not None else 0.0
-        cumulative = _round_value(cumulative + credit)
-        reason = CreditReason.NON_MILESTONE_ZERO
-        if previous is None:
-            reason = CreditReason.INITIAL_STATE
-        elif estimate.milestone_eligible:
-            reason = CreditReason.MILESTONE_VALUE_DELTA
-        states.append(
-            ScoredTrajectoryState(
-                observation_id=estimate.observation_id,
-                trajectory_id=estimate.trajectory_id,
-                task_group=estimate.task_group,
-                state_index=estimate.state_index,
-                boundary=estimate.boundary,
-                typed_state_digest=estimate.typed_compatibility_digest,
-                milestone_eligible=estimate.milestone_eligible,
-                estimator=estimator,
-                cluster_id=estimate.cluster_id,
-                cluster_feature_summary=cluster.feature_summary,
-                value_source=estimate.value_source,
-                supporting_trajectory_ids=estimate.supporting_trajectory_ids,
-                estimated_value=estimate.estimated_value,
-                previous_observation_id=(
-                    None if previous is None else previous.observation_id
-                ),
-                value_delta=delta,
-                transition_credit=credit,
-                cumulative_milestone_credit=cumulative,
-                credit_reason=reason,
-                eventual_terminal_result=terminal,
-                eventual_terminal_reward=reward,
-            )
-        )
+        states.append(state)
         previous = estimate
     return TrajectoryScoreReplay(
         comparison_digest=_comparison_digest(comparison),
