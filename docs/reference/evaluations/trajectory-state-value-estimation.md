@@ -549,6 +549,70 @@ abstract mathematical state. The wider Wilson intervals for the more specific
 estimators expose their smaller support rather than hiding it. This fixture is
 not real-model predictive evidence and does not answer H1, H2, or H3.
 
+## PR7 label-free H1--H3 preregistration
+
+[`trajectory-value-hypothesis-study-v1.schema.json`](schemas/trajectory-value-hypothesis-study-v1.schema.json)
+and
+[`trajectory-value-hypothesis-study-v1.json`](../../../benchmarks/config/trajectory-value-hypothesis-study-v1.json)
+close the remaining analysis choices before any main-study label exists. The
+contract digest-binds the PR5 mixed-study file and revalidates its two
+calibration sources, three selected Harbor tasks, current public and verifier
+files, eight repetitions per task, model, prompt, timeout, and no-retry policy.
+The 24-rollout population cannot be substituted by this analysis layer.
+
+H1 reports the complete version 2 metrics for all six estimators: Brier, MAE,
+cluster observation and trajectory sizes, support range and mean, task-group
+fallback count, and mean per-estimate Wilson 95% interval width. An exact,
+abstract, or abstract-plus-text estimator receives directional support only if
+both its Brier and MAE are strictly lower than both the group and Numca-like
+baselines. Each trajectory retains equal metric weight.
+
+H2 considers pairs from different trajectories in the same task group only
+when they have exactly the same identity-free abstract-state digest, different
+external reasoning-text digests, and opposite terminal rewards. It records
+whether text-only and abstract-plus-text clustering separate each pair. H2
+receives directional support only if at least one such pair is hybrid-separated
+and the hybrid has strictly lower overall Brier and MAE than abstract state
+alone.
+
+H3 applies the already frozen rule without an epsilon or fitted threshold: the
+first strictly negative change between consecutive selected preterminal values
+warns that a trajectory will fail. For every estimator it reports the full
+confusion matrix, precision, recall, failure prevalence, precision lift, false
+alarms among accepted trajectories, and lead time measured as the number of
+later selected preterminal observations. Directional support requires positive
+recall, precision above prevalence, and positive mean true-positive lead time.
+This stricter final condition distinguishes an earlier actionable signal from
+a drop at the last selected state.
+
+The task-owned verifier's aggregate reward remains the only terminal reward.
+The study separately digest-binds the exact raw `submission.json` consumed by
+the verifier and the model-visible public input bundle. Thus a completed
+`REJECTED` result caused by an invalid evidence digest is still an exactly
+bound negative label; the submission's failed evidence dimension is not
+confused with failure to bind the terminal label itself. Input drift, missing
+or changing submissions, model timeout or error, and verifier failure remain
+`INCONCLUSIVE` and are excluded.
+
+The runner requires local ChatGPT authentication, the exact catalogued
+`gpt-5.4-mini` model at medium effort, Codex CLI 0.147.0, a clean source tree,
+an unused output directory, and explicit operator opt-in. It forwards no API
+key and preserves raw Codex JSONL, exported reasoning logs, task-visible
+workspaces, verifier records and logs, exact extractions, catalog and policy
+digests, both value representations, the six-estimator comparison, analysis,
+and a digest-complete manifest. The scorer remains retrospective and
+observation-only. No learned component, training, intervention, or causal
+claim is authorized.
+
+After committing this preregistration boundary, execute exactly once with:
+
+```sh
+uv run python -m benchmarks.tooling.trajectory_value_hypothesis_study run \
+  --spec benchmarks/config/trajectory-value-hypothesis-study-v1.json \
+  --output benchmarks/studies/trajectory-value-hypothesis-codex-v1 \
+  --execute
+```
+
 ## Current limitations
 
 Version 1 deliberately uses conservative generic output interpretation. A
