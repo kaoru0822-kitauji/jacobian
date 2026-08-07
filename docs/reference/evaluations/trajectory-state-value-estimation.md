@@ -629,6 +629,16 @@ surfaces, and original verifier results remain preserved, while the manifest
 records the lost ephemeral submission workspaces and `INCONCLUSIVE` analysis
 disposition.
 
+Later calibration hardening intentionally refreshed the live PR5 mixed-study
+file and reduced its currently eligible population. That change cannot
+retroactively substitute the 24-rollout contract used here. The exact original
+bytes are therefore retained as a manifest-bound
+[`frozen mixed-study contract`](../../../benchmarks/studies/trajectory-value-hypothesis-codex-v1/frozen-contracts/trajectory-value-mixed-study-v1.json).
+Historical loading requires that path explicitly, rebinds the preregistration,
+mixed contract, and all three task-contract records by digest, and refuses to
+authorize current-task verification or new model execution. The strict live
+loader continues to reject the drifted path.
+
 | Estimator | Clusters | Fallbacks | Mean support | Brier | MAE |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Group/rollout | 3 | 0 | 5.417 | 0.238245614035 | 0.400000000000 |

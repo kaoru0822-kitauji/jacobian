@@ -54,6 +54,15 @@ def test_estimator_order_is_preregistered() -> None:
         TrajectoryValueMixedStudyContract.model_validate(value)
 
 
+def test_version_one_accepts_only_the_two_published_minimum_task_counts() -> None:
+    value = _value()
+    policy = value["selection_policy"]
+    assert isinstance(policy, dict)
+    policy["minimum_main_tasks"] = 3
+    with pytest.raises(ValidationError):
+        TrajectoryValueMixedStudyContract.model_validate(value)
+
+
 def test_task_substitution_fails_against_calibration_evidence() -> None:
     value = _value()
     tasks = value["tasks"]

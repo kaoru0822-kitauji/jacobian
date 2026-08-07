@@ -249,18 +249,128 @@ def _repo_file(relative: str) -> Path:
     return resolved
 
 
+def _historical_frozen_study(
+    *,
+    spec_path: Path,
+    spec: TrajectoryValueHypothesisStudySpec,
+    mixed_path: Path,
+) -> ValidatedFrozenStudy:
+    """Replay one completed study without authorizing a new execution."""
+
+    if mixed_path.is_symlink() or not mixed_path.is_file():
+        raise ValueError("historical mixed-study snapshot must be a regular file")
+    mixed_path = mixed_path.resolve(strict=True)
+    try:
+        mixed_path.relative_to(_ROOT.resolve(strict=True))
+    except ValueError as exc:
+        raise ValueError(
+            "historical mixed-study snapshot must remain inside the repository"
+        ) from exc
+    if file_digest(mixed_path) != spec.mixed_study.file_digest:
+        raise ValueError("historical mixed-study snapshot digest drift")
+
+    study_root = mixed_path.parent.parent
+    manifest_path = study_root / "manifest.json"
+    if manifest_path.is_symlink() or not manifest_path.is_file():
+        raise ValueError("historical study manifest must be a regular file")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict):
+        raise ValueError("historical study manifest must be one JSON object")
+    if manifest.get("source_tree_clean_at_start") is not True:
+        raise ValueError("historical study did not start from a clean tree")
+
+    preregistration = manifest.get("preregistration")
+    if not isinstance(preregistration, dict):
+        raise ValueError("historical study has no preregistration binding")
+    try:
+        spec_relative = (
+            spec_path.resolve(strict=True)
+            .relative_to(_ROOT.resolve(strict=True))
+            .as_posix()
+        )
+    except ValueError as exc:
+        raise ValueError("preregistration must remain inside the repository") from exc
+    if (
+        preregistration.get("path") != spec_relative
+        or preregistration.get("file_digest") != file_digest(spec_path)
+        or preregistration.get("object_digest")
+        != object_digest(spec.model_dump(mode="json"))
+        or preregistration.get("labels_available_at_revision") is not False
+    ):
+        raise ValueError("historical preregistration binding drift")
+
+    mixed = TrajectoryValueMixedStudyContract.model_validate_json(
+        mixed_path.read_text(encoding="utf-8")
+    )
+    mixed_binding = manifest.get("mixed_study")
+    if not isinstance(mixed_binding, dict):
+        raise ValueError("historical study has no mixed-study binding")
+    if (
+        mixed_binding.get("path") != spec.mixed_study.path
+        or mixed_binding.get("file_digest") != spec.mixed_study.file_digest
+        or mixed_binding.get("object_digest")
+        != object_digest(mixed.model_dump(mode="json"))
+    ):
+        raise ValueError("historical mixed-study binding drift")
+
+    artifacts = manifest.get("artifacts")
+    mixed_relative = mixed_path.relative_to(study_root).as_posix()
+    if (
+        not isinstance(artifacts, dict)
+        or artifacts.get(mixed_relative) != spec.mixed_study.file_digest
+    ):
+        raise ValueError("historical manifest does not bind the mixed-study snapshot")
+
+    raw_contracts = manifest.get("task_contracts")
+    if not isinstance(raw_contracts, list):
+        raise ValueError("historical study has no task contracts")
+    task_contracts: dict[tuple[str, str], Mapping[str, Any]] = {}
+    for raw in raw_contracts:
+        if not isinstance(raw, dict):
+            raise ValueError("malformed historical task contract")
+        key = (str(raw.get("dataset_id")), str(raw.get("task_id")))
+        if key in task_contracts:
+            raise ValueError("duplicate historical task contract")
+        task_contracts[key] = raw
+    expected_keys = {(task.dataset_id, task.task_id) for task in mixed.tasks}
+    if set(task_contracts) != expected_keys:
+        raise ValueError("historical task-contract population drift")
+    for task in mixed.tasks:
+        raw = task_contracts[(task.dataset_id, task.task_id)]
+        if object_digest(dict(raw)) != task.task_contract_digest:
+            raise ValueError(f"historical task contract drift: {task.task_id}")
+    return ValidatedFrozenStudy(contract=mixed, task_contracts=task_contracts)
+
+
 def load_hypothesis_spec(
-    path: Path, *, verify_current_tasks: bool = True
+    path: Path,
+    *,
+    verify_current_tasks: bool = True,
+    historical_mixed_path: Path | None = None,
 ) -> tuple[TrajectoryValueHypothesisStudySpec, ValidatedFrozenStudy]:
     """Load and cross-bind the label-free H1--H3 preregistration."""
 
+    path = path.resolve(strict=True)
     spec = TrajectoryValueHypothesisStudySpec.model_validate_json(
         path.read_text(encoding="utf-8")
     )
-    mixed_path = _repo_file(spec.mixed_study.path)
-    if file_digest(mixed_path) != spec.mixed_study.file_digest:
-        raise ValueError("frozen mixed-study file digest drift")
-    validated = load_frozen_study(mixed_path, verify_current_tasks=verify_current_tasks)
+    if historical_mixed_path is None:
+        mixed_path = _repo_file(spec.mixed_study.path)
+        if file_digest(mixed_path) != spec.mixed_study.file_digest:
+            raise ValueError("frozen mixed-study file digest drift")
+        validated = load_frozen_study(
+            mixed_path, verify_current_tasks=verify_current_tasks
+        )
+    else:
+        if verify_current_tasks:
+            raise ValueError(
+                "historical mixed-study snapshots cannot authorize new execution"
+            )
+        validated = _historical_frozen_study(
+            spec_path=path,
+            spec=spec,
+            mixed_path=historical_mixed_path,
+        )
     mixed = validated.contract
     if mixed.study_id != spec.mixed_study.study_id:
         raise ValueError("mixed-study identity mismatch")
@@ -362,6 +472,7 @@ def _verify_terminal(
     contract: HarborTaskContract,
     workspace: Path,
     run_dir: Path,
+    source_binding_digest: str,
     command_status: ToolCommandStatus,
     exit_code: int | None,
 ) -> tuple[dict[str, Any], CleanRoomTerminalEvidence]:
@@ -480,6 +591,7 @@ def _verify_terminal(
     acceptance = str(outcome["acceptance"]) if status == "COMPLETED" else "INCONCLUSIVE"
     terminal = CleanRoomTerminalEvidence(
         verifier_digest=checker_digest,
+        source_binding_digest=source_binding_digest,
         clean_room=True,
         verifier_execution_status=status,
         acceptance=TerminalAcceptance(acceptance),
@@ -551,6 +663,7 @@ def _run_one(
             contract=contract,
             workspace=workspace,
             run_dir=run_dir,
+            source_binding_digest=file_digest(transcript),
             command_status=command.status,
             exit_code=command.exit_code,
         )
@@ -643,6 +756,7 @@ def _publish_workspace_and_extract(
         return (
             CleanRoomTerminalEvidence(
                 verifier_digest=original_terminal.verifier_digest,
+                source_binding_digest=original_terminal.source_binding_digest,
                 clean_room=True,
                 verifier_execution_status="ERROR",
                 acceptance=TerminalAcceptance.INCONCLUSIVE,
@@ -710,6 +824,39 @@ def _corpus(
         ),
         exclusions,
     )
+
+
+def load_historical_corpus(path: Path) -> TrajectoryValueCorpus:
+    """Replay a v1 corpus recorded before terminal source binding was mandatory."""
+
+    path = path.resolve(strict=True)
+    if path.is_symlink() or not path.is_file():
+        raise ValueError("historical corpus must be a regular file")
+    manifest_path = path.parent / "manifest.json"
+    if manifest_path.is_symlink() or not manifest_path.is_file():
+        raise ValueError("historical corpus manifest must be a regular file")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    artifacts = manifest.get("artifacts") if isinstance(manifest, dict) else None
+    if not isinstance(artifacts, dict) or artifacts.get(path.name) != file_digest(path):
+        raise ValueError("historical manifest does not bind the corpus")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or not isinstance(
+        payload.get("trajectories"), list
+    ):
+        raise ValueError("historical corpus is malformed")
+    for raw in payload["trajectories"]:
+        if not isinstance(raw, dict) or not isinstance(raw.get("extraction"), dict):
+            raise ValueError("historical corpus extraction is malformed")
+        extraction = raw["extraction"]
+        source_digest = extraction.get("source_digest")
+        terminal = extraction.get("terminal_evidence")
+        if not isinstance(source_digest, str) or not isinstance(terminal, dict):
+            raise ValueError("historical corpus terminal binding is malformed")
+        existing = terminal.get("source_binding_digest")
+        if existing is not None and existing != source_digest:
+            raise ValueError("historical terminal source binding drift")
+        terminal["source_binding_digest"] = source_digest
+    return TrajectoryValueCorpus.model_validate(payload)
 
 
 def _evaluation(comparison: OfflineValueComparisonV2, kind: EstimatorKindV2) -> Any:
@@ -1141,6 +1288,120 @@ def package_study(output: Path) -> dict[str, Any]:
     return packaging
 
 
+def _bind_historical_terminal_sources(output: Path) -> None:
+    for run_dir in sorted((output / "runs").iterdir()):
+        if not run_dir.is_dir() or run_dir.is_symlink():
+            raise RuntimeError("historical run root contains a non-directory entry")
+        transcript = run_dir / "codex.jsonl"
+        if transcript.is_symlink() or not transcript.is_file():
+            raise RuntimeError(f"historical transcript is missing: {run_dir.name}")
+        source_digest = file_digest(transcript)
+        run_path = run_dir / "run.json"
+        run_record = json.loads(run_path.read_text(encoding="utf-8"))
+        terminal = run_record.get("terminal") if isinstance(run_record, dict) else None
+        if not isinstance(terminal, dict):
+            raise RuntimeError(f"historical terminal is malformed: {run_dir.name}")
+        existing = terminal.get("source_binding_digest")
+        if existing is not None and existing != source_digest:
+            raise RuntimeError(f"historical terminal source drift: {run_dir.name}")
+        terminal["source_binding_digest"] = source_digest
+        _write_json(run_path, run_record)
+
+        extraction_path = run_dir / "extraction.json"
+        if extraction_path.is_file() and not extraction_path.is_symlink():
+            extraction = json.loads(extraction_path.read_text(encoding="utf-8"))
+            raw_terminal = (
+                extraction.get("terminal_evidence")
+                if isinstance(extraction, dict)
+                else None
+            )
+            if not isinstance(raw_terminal, dict):
+                raise RuntimeError(
+                    f"historical extraction terminal is malformed: {run_dir.name}"
+                )
+            if extraction.get("source_digest") != source_digest:
+                raise RuntimeError(
+                    f"historical extraction source drift: {run_dir.name}"
+                )
+            existing = raw_terminal.get("source_binding_digest")
+            if existing is not None and existing != source_digest:
+                raise RuntimeError(
+                    f"historical extraction terminal source drift: {run_dir.name}"
+                )
+            raw_terminal["source_binding_digest"] = source_digest
+            validated = TrajectoryExtraction.model_validate(extraction)
+            _write_json(extraction_path, validated.model_dump(mode="json"))
+
+
+def reanalyze_historical_study(
+    *, spec_path: Path, historical_mixed_path: Path, output: Path
+) -> dict[str, Any]:
+    """Migrate exact source bindings and rerun analysis without model execution."""
+
+    if not _repository_is_clean():
+        raise RuntimeError("historical reanalysis requires a clean source tree")
+    output = output.resolve(strict=True)
+    manifest_path = output / "manifest.json"
+    if manifest_path.is_symlink() or not manifest_path.is_file():
+        raise RuntimeError("historical reanalysis requires a completed manifest")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict) or not isinstance(
+        manifest.get("artifacts"), dict
+    ):
+        raise RuntimeError("historical study manifest is malformed")
+    if manifest.get("posthoc_reanalysis") is not None:
+        raise RuntimeError("historical study was already reanalyzed")
+    if _artifact_manifest(output) != manifest["artifacts"]:
+        raise RuntimeError("historical study artifacts do not match the manifest")
+    spec, _validated = load_hypothesis_spec(
+        spec_path,
+        verify_current_tasks=False,
+        historical_mixed_path=historical_mixed_path,
+    )
+    revision = git_head_sha(_ROOT)
+    if revision is None:
+        raise RuntimeError("unable to bind historical reanalysis source revision")
+    previous = {
+        "analysis_file_digest": file_digest(output / "analysis.json"),
+        "comparison_packaging": manifest.get("packaging", {}).get("comparison"),
+        "corpus_file_digest": file_digest(output / "corpus.json"),
+    }
+
+    _bind_historical_terminal_sources(output)
+    records = [
+        json.loads(path.read_text(encoding="utf-8"))
+        for path in sorted((output / "runs").glob("*/run.json"))
+    ]
+    comparison_gzip = output / "comparison.json.gz"
+    if comparison_gzip.is_symlink() or not comparison_gzip.is_file():
+        raise RuntimeError("historical comparison package is missing")
+    comparison_gzip.unlink()
+    summary = analyze_study(spec, output, records)
+    packaging = _package_comparison(output, source_revision=revision)
+    manifest["packaging"] = {"comparison": packaging}
+    manifest["posthoc_reanalysis"] = {
+        "source_revision": revision,
+        "reason": "replay-after-source-binding-and-estimator-validation-fixes",
+        "model_rerun": False,
+        "terminal_verifier_outcomes_changed": False,
+        "source_binding_migration": "terminal-source-binding-equals-exact-codex-jsonl-digest",
+        "previous": previous,
+        "runner_and_analysis_digest": file_digest(Path(__file__).resolve(strict=True)),
+        "mixed_contract_digest": file_digest(
+            _ROOT / "benchmarks/tooling/trajectory_value_mixed_contract.py"
+        ),
+        "exact_evaluator_digest": file_digest(
+            _ROOT / "src/jacobian/eval/trajectory_value.py"
+        ),
+        "semantic_evaluator_digest": file_digest(
+            _ROOT / "src/jacobian/eval/trajectory_value_abstraction.py"
+        ),
+    }
+    manifest["artifacts"] = _artifact_manifest(output)
+    _write_json(manifest_path, manifest)
+    return summary
+
+
 def _local_auth_status() -> str:
     result = run_operator_command(
         "codex",
@@ -1247,6 +1508,7 @@ def _recover_interrupted_record(
         raise RuntimeError("interrupted verifier record is malformed")
     original_terminal = CleanRoomTerminalEvidence(
         verifier_digest=str(verifier["verifier_digest"]),
+        source_binding_digest=file_digest(transcript),
         clean_room=True,
         verifier_execution_status="COMPLETED",
         acceptance=TerminalAcceptance(str(verifier["acceptance"])),
@@ -1272,6 +1534,7 @@ def _recover_interrupted_record(
         }
     terminal = CleanRoomTerminalEvidence(
         verifier_digest=original_terminal.verifier_digest,
+        source_binding_digest=original_terminal.source_binding_digest,
         clean_room=True,
         verifier_execution_status="ERROR",
         acceptance=TerminalAcceptance.INCONCLUSIVE,
@@ -1592,11 +1855,16 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--interrupted-source-revision")
     package = subparsers.add_parser("package")
     package.add_argument("--output", type=Path, required=True)
+    reanalyze = subparsers.add_parser("reanalyze-historical")
+    reanalyze.add_argument("--spec", type=Path, default=_DEFAULT_SPEC)
+    reanalyze.add_argument("--historical-mixed-study", type=Path, required=True)
+    reanalyze.add_argument("--output", type=Path, required=True)
     schema = subparsers.add_parser("schema")
     schema.add_argument("--output", type=Path)
     validate = subparsers.add_parser("validate")
     validate.add_argument("--spec", type=Path, default=_DEFAULT_SPEC)
     validate.add_argument("--skip-current-tasks", action="store_true")
+    validate.add_argument("--historical-mixed-study", type=Path)
     return parser
 
 
@@ -1611,7 +1879,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         return
     if args.command == "validate":
         spec, validated = load_hypothesis_spec(
-            args.spec, verify_current_tasks=not args.skip_current_tasks
+            args.spec,
+            verify_current_tasks=not args.skip_current_tasks,
+            historical_mixed_path=args.historical_mixed_study,
         )
         print(
             json.dumps(
@@ -1627,6 +1897,14 @@ def main(argv: Sequence[str] | None = None) -> None:
         return
     if args.command == "package":
         print(json.dumps(package_study(args.output), indent=2, sort_keys=True))
+        return
+    if args.command == "reanalyze-historical":
+        summary = reanalyze_historical_study(
+            spec_path=args.spec,
+            historical_mixed_path=args.historical_mixed_study,
+            output=args.output,
+        )
+        print(json.dumps(summary, indent=2, sort_keys=True))
         return
     summary = run_study(
         args.spec,
@@ -1650,7 +1928,9 @@ __all__ = [
     "TrajectoryValueHypothesisStudySpec",
     "analyze_comparison",
     "analyze_study",
+    "load_historical_corpus",
     "load_hypothesis_spec",
     "package_study",
+    "reanalyze_historical_study",
     "run_study",
 ]

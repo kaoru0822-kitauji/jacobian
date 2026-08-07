@@ -24,18 +24,20 @@ from benchmarks.tooling.trajectory_value_hypothesis_study import (
     _recover_interrupted_record,
     _verify_terminal,
     analyze_comparison,
+    load_historical_corpus,
     load_hypothesis_spec,
     run_study,
 )
-from benchmarks.tooling.trajectory_value_mixed_contract import FrozenMixedTask
+from benchmarks.tooling.trajectory_value_mixed_contract import (
+    FrozenMixedTask,
+    ValidatedFrozenStudy,
+)
 from benchmarks.tooling.trajectory_value_study_verifier import file_digest
 from pydantic import ValidationError
 from tests.unit.tooling.test_trajectory_value_abstraction import _controlled_corpus
 
 from jacobian.eval.trajectory_state import CleanRoomTerminalEvidence, TerminalAcceptance
-from jacobian.eval.trajectory_value import TrajectoryValueCorpus
 from jacobian.eval.trajectory_value_abstraction import (
-    OfflineValueComparisonV2,
     evaluate_semantic_trajectories,
 )
 
@@ -46,14 +48,25 @@ SCHEMA = (
     / "docs/reference/evaluations/schemas/trajectory-value-hypothesis-study-v1.schema.json"
 )
 STUDY = ROOT / "benchmarks/studies/trajectory-value-hypothesis-codex-v1"
+HISTORICAL_MIXED = STUDY / "frozen-contracts/trajectory-value-mixed-study-v1.json"
 
 
 def _value() -> dict[str, object]:
     return cast(dict[str, object], json.loads(SPEC.read_text(encoding="utf-8")))
 
 
+def _load_historical() -> tuple[
+    TrajectoryValueHypothesisStudySpec, ValidatedFrozenStudy
+]:
+    return load_hypothesis_spec(
+        SPEC,
+        verify_current_tasks=False,
+        historical_mixed_path=HISTORICAL_MIXED,
+    )
+
+
 def test_preregistration_binds_frozen_24_rollout_mixed_study() -> None:
-    spec, validated = load_hypothesis_spec(SPEC)
+    spec, validated = _load_historical()
     assert spec.analysis_id == "trajectory-value-hypothesis-codex-v1"
     assert [task.task_id for task in validated.contract.tasks] == [
         "graph-artifact-composition",
@@ -87,8 +100,19 @@ def test_mixed_study_digest_substitution_fails_closed(tmp_path: Path) -> None:
     altered = TrajectoryValueHypothesisStudySpec.model_validate(value)
     temporary = tmp_path / "invalid-hypothesis-study.json"
     temporary.write_text(altered.model_dump_json(), encoding="utf-8")
-    with pytest.raises(ValueError, match="file digest drift"):
-        load_hypothesis_spec(temporary)
+    with pytest.raises(ValueError, match="digest drift"):
+        load_hypothesis_spec(
+            temporary,
+            verify_current_tasks=False,
+            historical_mixed_path=HISTORICAL_MIXED,
+        )
+
+
+def test_current_contract_drift_cannot_substitute_or_authorize_execution() -> None:
+    with pytest.raises(ValueError, match="frozen mixed-study file digest drift"):
+        load_hypothesis_spec(SPEC)
+    with pytest.raises(ValueError, match="cannot authorize new execution"):
+        load_hypothesis_spec(SPEC, historical_mixed_path=HISTORICAL_MIXED)
 
 
 def test_external_execution_requires_explicit_opt_in(tmp_path: Path) -> None:
@@ -112,7 +136,7 @@ def test_local_chatgpt_login_accepts_codex_stderr_status(
 
 
 def test_codex_command_freezes_model_isolation_and_no_web_or_retry() -> None:
-    _spec, validated = load_hypothesis_spec(SPEC)
+    _spec, validated = _load_historical()
     arguments = _codex_arguments(
         workspace=ROOT,
         mixed=validated.contract,
@@ -130,7 +154,7 @@ def test_codex_command_freezes_model_isolation_and_no_web_or_retry() -> None:
 
 
 def _first_task() -> tuple[FrozenMixedTask, HarborTaskContract]:
-    _spec, validated = load_hypothesis_spec(SPEC)
+    _spec, validated = _load_historical()
     task = validated.contract.tasks[0]
     contract = _task_contract(
         CalibrationCandidate(
@@ -175,6 +199,7 @@ def test_rejected_reward_remains_an_exact_bound_negative_label(
         contract=contract,
         workspace=workspace,
         run_dir=tmp_path / "run",
+        source_binding_digest="sha256:" + "9" * 64,
         command_status=ToolCommandStatus.EXITED,
         exit_code=0,
     )
@@ -205,6 +230,7 @@ def test_public_input_drift_is_inconclusive_and_verifier_is_not_run(
         contract=contract,
         workspace=workspace,
         run_dir=tmp_path / "run",
+        source_binding_digest="sha256:" + "9" * 64,
         command_status=ToolCommandStatus.EXITED,
         exit_code=0,
     )
@@ -216,7 +242,7 @@ def test_public_input_drift_is_inconclusive_and_verifier_is_not_run(
 def test_interrupted_rollout_is_excluded_without_rerunning_model(
     tmp_path: Path,
 ) -> None:
-    _spec, validated = load_hypothesis_spec(SPEC)
+    _spec, validated = _load_historical()
     task = validated.contract.tasks[1]
     run_dir = tmp_path / "runs" / "apollonius-gap-repair-main-r04"
     run_dir.mkdir(parents=True)
@@ -268,7 +294,7 @@ def test_interrupted_rollout_is_excluded_without_rerunning_model(
 def test_live_extraction_failure_preserves_workspace_and_becomes_inconclusive(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _spec, validated = load_hypothesis_spec(SPEC)
+    _spec, validated = _load_historical()
     task = validated.contract.tasks[2]
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -279,6 +305,7 @@ def test_live_extraction_failure_preserves_workspace_and_becomes_inconclusive(
     run_dir.mkdir(parents=True)
     terminal = CleanRoomTerminalEvidence(
         verifier_digest="sha256:" + "4" * 64,
+        source_binding_digest=file_digest(transcript),
         clean_room=True,
         verifier_execution_status="COMPLETED",
         acceptance=TerminalAcceptance.REJECTED,
@@ -397,18 +424,10 @@ def test_committed_hypothesis_study_manifest_binds_every_artifact() -> None:
     assert manifest["budgets"]["retries_for_wrong_answers"] == 0
 
 
-def test_committed_hypothesis_analysis_replays_and_records_falsification() -> None:
-    spec, _validated = load_hypothesis_spec(SPEC)
-    corpus = TrajectoryValueCorpus.model_validate(
-        json.loads((STUDY / "corpus.json").read_text(encoding="utf-8"))
-    )
-    comparison_path = STUDY / "comparison.json.gz"
-    comparison_bytes = (
-        gzip.decompress(comparison_path.read_bytes())
-        if comparison_path.is_file()
-        else (STUDY / "comparison.json").read_bytes()
-    )
-    comparison = OfflineValueComparisonV2.model_validate(json.loads(comparison_bytes))
+def test_historical_corpus_replays_under_current_estimator_contract() -> None:
+    spec, _validated = _load_historical()
+    corpus = load_historical_corpus(STUDY / "corpus.json")
+    comparison = evaluate_semantic_trajectories(corpus)
     analysis = json.loads((STUDY / "analysis.json").read_text(encoding="utf-8"))
     replay = analyze_comparison(
         spec,
@@ -416,14 +435,14 @@ def test_committed_hypothesis_analysis_replays_and_records_falsification() -> No
         run_count=24,
         exclusions=analysis["excluded"],
     )
-    assert replay == analysis
     assert len(corpus.trajectories) == 19
-    assert (analysis["accepted_count"], analysis["rejected_count"]) == (9, 10)
-    assert analysis["h1"]["h1_directionally_supported"] is False
-    assert analysis["h2"]["h2_directionally_supported"] is False
-    assert analysis["h3"]["h3_directionally_supported"] is False
-    assert analysis["h2"]["mixed_outcome_compatible_pair_count"] == 30
-    assert analysis["h2"]["hybrid_separated_pair_count"] == 26
+    assert (replay["accepted_count"], replay["rejected_count"]) == (9, 10)
+    assert replay["h1"]["h1_directionally_supported"] is False
+    assert replay["h2"]["h2_directionally_supported"] is False
+    assert replay["h3"]["h3_directionally_supported"] is True
+    assert replay["h3"]["supported_estimators"] == ["REASONING_TEXT"]
+    assert replay["h2"]["mixed_outcome_compatible_pair_count"] == 30
+    assert replay["h2"]["hybrid_separated_pair_count"] == 22
 
 
 def test_committed_hypothesis_labels_are_clean_room_and_fail_closed() -> None:

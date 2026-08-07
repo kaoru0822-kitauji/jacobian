@@ -96,7 +96,7 @@ class FrozenSelectionPolicy(ContractModel):
         "source-order-then-candidate-order"
     )
     maximum_main_tasks: Literal[4] = 4
-    minimum_main_tasks: Literal[1] = 1
+    minimum_main_tasks: Literal[1, 2] = 1
 
 
 class TrajectoryValueMixedStudyContract(ContractModel):
