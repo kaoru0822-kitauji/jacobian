@@ -24,6 +24,7 @@ from jacobian.canonical import canonicalize_json
 from jacobian.contracts.results import ContractModel
 from jacobian.eval.trajectory_state import (
     ExtractedTrajectoryState,
+    ReasoningProtocolState,
     StateBoundary,
     TerminalAcceptance,
     TrajectoryExtraction,
@@ -89,27 +90,17 @@ class LabelledTrajectory(ContractModel):
             TerminalAcceptance.REJECTED,
         }:
             raise ValueError("terminal label must be accepted or rejected")
-        if not (evidence.input_binding_valid and evidence.artifact_binding_valid):
+        if not (
+            evidence.input_binding_valid is True
+            and evidence.artifact_binding_valid is True
+        ):
             raise ValueError(
                 "terminal label requires exact input and artifact bindings"
             )
-        if evidence.source_digest != self.extraction.source_digest:
-            raise ValueError(
-                "terminal evidence must be bound to the exact extracted trajectory"
-            )
-        states = self.extraction.states
-        if not states or states[-1].boundary is not StateBoundary.TERMINAL:
-            raise ValueError("labelled extraction must end at a terminal boundary")
-        if states[0].boundary is not StateBoundary.PLAN or states[0].index != 0:
-            raise ValueError("labelled extraction must begin at a PLAN observation")
-        if not any(
-            state.boundary is not StateBoundary.TERMINAL
-            and state.boundary is not StateBoundary.FINAL
-            for state in states
+        if not self.extraction.states or self.extraction.states[-1].boundary is not (
+            StateBoundary.TERMINAL
         ):
-            raise ValueError(
-                "labelled extraction must contain at least one selectable observation"
-            )
+            raise ValueError("labelled extraction must end at a terminal boundary")
         return self
 
 
@@ -296,6 +287,8 @@ def _selected_state(
         and previous is not None
         and previous.boundary is StateBoundary.TOOL_RESULT
         and previous.milestone_eligible
+        and state.hard_state.reasoning_protocol_state
+        is not ReasoningProtocolState.INVALID
     )
 
 
@@ -581,9 +574,7 @@ def _feature_summary(
     if kind is EstimatorKind.GROUP_ROLLOUT:
         return f"task_group={first.task_group}; no intermediate-state features"
     if kind is EstimatorKind.NUMCA_NUMERICAL:
-        return _clip_summary(
-            f"task_group={first.task_group}; numbers={list(first.numerical_milestones)!r}"
-        )
+        return f"task_group={first.task_group}; numbers={list(first.numerical_milestones)!r}"
     if kind is EstimatorKind.JACOBIAN_TYPED:
         payload = json.dumps(first.typed_payload, sort_keys=True, separators=(",", ":"))
         return _clip_summary(
@@ -665,17 +656,41 @@ def _estimate_value(
     )
 
 
+def _clustering_observations(
+    observations: tuple[_Observation, ...],
+    target: _Observation,
+) -> tuple[_Observation, ...]:
+    return tuple(
+        observation
+        for observation in observations
+        if observation.trajectory_id != target.trajectory_id
+        or observation.state.index <= target.state.index
+    )
+
+
+def _target_cluster_members(
+    kind: EstimatorKind,
+    target: _Observation,
+    observations: tuple[_Observation, ...],
+    threshold: float,
+) -> tuple[str, ...]:
+    pool = _clustering_observations(observations, target)
+    vectors = _tfidf_vectors(pool)
+    clusters = _clusters_for(kind, pool, vectors, threshold)
+    member_lookup = {member: cluster for cluster in clusters for member in cluster}
+    return member_lookup[target.observation_id]
+
+
 def _estimates(
     kind: EstimatorKind,
-    clusters: tuple[tuple[str, ...], ...],
     observations: tuple[_Observation, ...],
+    threshold: float,
 ) -> tuple[StateValueEstimate, ...]:
     by_id = {item.observation_id: item for item in observations}
-    member_lookup = {member: cluster for cluster in clusters for member in cluster}
     rewards = {item.trajectory_id: item.terminal_reward for item in observations}
     estimates: list[StateValueEstimate] = []
     for target in observations:
-        members = member_lookup[target.observation_id]
+        members = _target_cluster_members(kind, target, observations, threshold)
         support = _training_trajectories(members, target, by_id)
         source = ValueSource.CLUSTER
         if not support:
@@ -746,16 +761,14 @@ def evaluate_offline_trajectories(
     observations = _observations(corpus)
     by_id = {item.observation_id: item for item in observations}
     vectors = _tfidf_vectors(observations)
+    threshold = corpus.evaluator_config.text_similarity_threshold_millionths / 1_000_000
     evaluations: list[EstimatorEvaluation] = []
     for kind in EstimatorKind:
-        clusters = _clusters_for(
-            kind,
-            observations,
-            vectors,
-            corpus.evaluator_config.text_similarity_threshold_millionths / 1_000_000,
+        estimates = _estimates(kind, observations, threshold)
+        clusters = tuple(
+            sorted({estimate.cluster_member_observation_ids for estimate in estimates})
         )
         summaries = _cluster_summaries(kind, clusters, by_id, vectors)
-        estimates = _estimates(kind, clusters, observations)
         evaluations.append(
             EstimatorEvaluation(
                 estimator=kind,

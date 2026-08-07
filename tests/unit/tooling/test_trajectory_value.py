@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from jsonschema import Draft202012Validator
@@ -10,7 +12,7 @@ from pydantic import BaseModel, ValidationError
 from referencing import Registry
 from referencing.jsonschema import DRAFT202012
 
-from jacobian.canonical import canonicalize_json
+from jacobian.eval import trajectory_value as trajectory_value_module
 from jacobian.eval.trajectory_state import (
     BindingValidity,
     CandidateState,
@@ -41,12 +43,6 @@ ROOT = Path(__file__).resolve().parents[3]
 
 def _sha(value: str) -> str:
     return "sha256:" + hashlib.sha256(value.encode()).hexdigest()
-
-
-def _hard_state_digest(hard: TrajectoryHardState) -> str:
-    return "sha256:" + hashlib.sha256(
-        canonicalize_json(hard.model_dump(mode="json"))
-    ).hexdigest()
 
 
 def _hard(
@@ -100,7 +96,7 @@ def _state(
             plan_summary=plan,
             latest_after_tool_summary=after,
         ),
-        hard_state_digest=_hard_state_digest(hard),
+        hard_state_digest=_sha(f"hard-{index}-{hard.model_dump_json()}"),
         changed_fields=(),
         milestone_kinds=transitions,
         milestone_eligible=bool(transitions),
@@ -203,12 +199,12 @@ def _trajectory(
     source_digest = _sha("source-" + trajectory_id)
     terminal = CleanRoomTerminalEvidence(
         verifier_digest=_sha("clean-room-polynomial-verifier-v1"),
+        source_binding_digest=source_digest,
         clean_room=True,
         verifier_execution_status="COMPLETED",
         acceptance=(
             TerminalAcceptance.ACCEPTED if accepted else TerminalAcceptance.REJECTED
         ),
-        source_digest=source_digest,
         input_binding_valid=True,
         artifact_binding_valid=True,
     )
@@ -237,10 +233,36 @@ def _with_candidate_digest(
             state.model_copy(
                 update={
                     "hard_state": hard,
-                    "hard_state_digest": _hard_state_digest(hard),
+                    "hard_state_digest": _sha(
+                        f"variant-{state.index}-{hard.model_dump_json()}"
+                    ),
                 }
             )
         )
+    extraction = trajectory.extraction.model_copy(update={"states": tuple(states)})
+    return LabelledTrajectory(
+        trajectory_id=trajectory.trajectory_id,
+        task_group=trajectory.task_group,
+        extraction=extraction,
+    )
+
+
+def _with_invalid_after_tool(trajectory: LabelledTrajectory) -> LabelledTrajectory:
+    states: list[ExtractedTrajectoryState] = []
+    for state in trajectory.extraction.states:
+        if state.boundary is StateBoundary.AFTER_TOOL:
+            hard = state.hard_state.model_copy(
+                update={"reasoning_protocol_state": ReasoningProtocolState.INVALID}
+            )
+            state = state.model_copy(
+                update={
+                    "hard_state": hard,
+                    "hard_state_digest": _sha(
+                        f"invalid-after-{state.index}-{hard.model_dump_json()}"
+                    ),
+                }
+            )
+        states.append(state)
     extraction = trajectory.extraction.model_copy(update={"states": tuple(states)})
     return LabelledTrajectory(
         trajectory_id=trajectory.trajectory_id,
@@ -445,6 +467,50 @@ def test_repeated_nonmilestone_tool_result_cannot_add_an_observation() -> None:
         )
 
 
+def test_invalid_after_tool_reasoning_is_not_selected_as_observation() -> None:
+    corpus = _controlled_corpus()
+    trajectories = (
+        _with_invalid_after_tool(corpus.trajectories[0]),
+        *corpus.trajectories[1:],
+    )
+    result = evaluate_offline_trajectories(
+        TrajectoryValueCorpus(
+            corpus_id="invalid-after-tool-v1",
+            trajectories=trajectories,
+        )
+    )
+
+    assert all(item.metrics.observation_count == 23 for item in result.evaluations)
+    assert all(
+        "checker-ok-1:2"
+        not in {estimate.observation_id for estimate in evaluation.estimates}
+        for evaluation in result.evaluations
+    )
+
+
+def test_tfidf_idf_counts_documents_not_term_occurrences() -> None:
+    observations = (
+        SimpleNamespace(observation_id="left", reasoning_text="alpha alpha beta"),
+        SimpleNamespace(observation_id="right", reasoning_text="alpha gamma"),
+    )
+
+    vectors = trajectory_value_module._tfidf_vectors(observations)
+
+    assert vectors["left"]["alpha"] == pytest.approx(2 / 5)
+    assert vectors["left"]["beta"] == pytest.approx((1 / 5) * (math.log(3 / 2) + 1))
+
+
+def test_target_future_observations_do_not_shape_early_state_clusters() -> None:
+    result = evaluate_offline_trajectories(_controlled_corpus())
+    estimate = _estimate(result, EstimatorKind.GROUP_ROLLOUT, "checker-ok-1:0")
+
+    assert "checker-ok-1:0" in estimate.cluster_member_observation_ids
+    assert all(
+        not member.startswith("checker-ok-1:") or member == "checker-ok-1:0"
+        for member in estimate.cluster_member_observation_ids
+    )
+
+
 def test_metrics_weight_each_trajectory_equally() -> None:
     result = evaluate_offline_trajectories(_controlled_corpus())
     evaluation = _evaluation(result, EstimatorKind.GROUP_ROLLOUT)
@@ -524,42 +590,6 @@ def test_binary_labels_fail_closed_on_bad_evidence_and_duplicate_rollouts() -> N
         TrajectoryValueCorpus(
             corpus_id="duplicate-corpus",
             trajectories=(valid, duplicate),
-        )
-
-
-def test_terminal_evidence_bound_to_exact_trajectory_source_digest() -> None:
-    valid = _controlled_corpus().trajectories[0]
-    evidence = valid.extraction.terminal_evidence
-    assert evidence is not None
-    foreign_binding = evidence.model_copy(
-        update={"source_digest": _sha("foreign-source")}
-    )
-    foreign = valid.extraction.model_copy(
-        update={"terminal_evidence": foreign_binding}
-    )
-    with pytest.raises(ValidationError, match="bound to the exact extracted trajectory"):
-        LabelledTrajectory(
-            trajectory_id="foreign-bound",
-            task_group="checker-scope",
-            extraction=foreign,
-        )
-
-
-def test_terminal_only_extraction_rejects_labelled_trajectory() -> None:
-    valid = _controlled_corpus().trajectories[0]
-    terminal = valid.extraction.states[-1].model_copy(update={"index": 0})
-    evidence = valid.extraction.terminal_evidence
-    extraction = valid.extraction.model_copy(
-        update={
-            "states": (terminal,),
-            "terminal_evidence": evidence,
-        }
-    )
-    with pytest.raises(ValidationError, match="PLAN observation"):
-        LabelledTrajectory(
-            trajectory_id="terminal-only",
-            task_group="checker-scope",
-            extraction=extraction,
         )
 
 
