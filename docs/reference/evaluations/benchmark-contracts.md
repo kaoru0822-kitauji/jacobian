@@ -160,6 +160,24 @@ reward does not replace these negative-path checks.
 witness remain non-conclusions. Only operator-authorized independent checkers
 may accept `VERIFIED`.
 
+### Jacobian verification records are not task verdicts
+
+A Jacobian verification record is reusable, digest-bound evidence for one
+typed operation; it is not a substitute for the Harbor task's clean-room
+verifier. A task that accepts a record as evidence must publish the required
+record fields, semantics identity, input and candidate bindings, checker
+identity, scope, and evidence-path/digest rules, then validate those rules in
+its own verifier. A record alone never proves a task's broader mathematical
+claim, completeness requirement, or permitted assurance level.
+
+For ordinary inline exact replay, Jacobian retains a verification record and
+the semantics artifact it binds, while the input and candidate remain inline.
+Evaluation authors must not require synthetic input/candidate artifacts merely
+to make a task verifier consume this evidence. Conversely, a clean-room task
+verifier must independently check the task relation or the record's declared
+binding; it must not award credit solely because an agent reports `VERIFIED` or
+supplies an opaque `artifact://` URI.
+
 ## Reproducible handoff
 
 Record the git tree, suite and task digests, provider/runtime profile, model and

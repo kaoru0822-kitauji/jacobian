@@ -105,11 +105,35 @@ artifact references compose durable evidence
 verification records establish trust
 ```
 
+Shared mathematical objects are broad, canonical values, not promises that
+every operation will execute. A matrix, polynomial, or finite complex can be
+valid at its object boundary yet exceed a particular operation's preflight
+budget. Shape, exact scalar representation, ordering, and normalization belong
+to the object; compatible dimensions, coefficient-growth estimates, dense
+construction costs, and algorithm-specific limits belong to the request that
+uses it.
+
+Small bounded results stay inline and can be inserted directly into a later
+typed request. Do not materialize an inline value merely to hand it to another
+ordinary operation. Artifacts are explicit for durable identity, raw proof or
+certificate files, resumable state, independent retrieval, or output whose
+complete inline form would be unusable. A result that exceeds its declared
+representation envelope fails explicitly rather than being truncated,
+approximated, or silently spilled to storage.
+
 Search, generation, transformation, retrieval, and evaluation primitives may
 return useful unverified results. They cannot promote their own output to
 verified evidence. Promotion requires an independently authorized checker bound
 to the exact claim, semantics, candidate, scope, certificate format, and
 checker identity.
+
+For an inline exact replay, the checker receives the authoritative input and
+candidate directly; neither is first materialized as an artifact. An accepted
+replay persists one verification record, whose parent is the immutable
+semantics artifact. The result exposes both URIs in `artifact_uris`: the record
+is the decision evidence and the semantics artifact is the contract it binds.
+Rejected, malformed, cancelled, timed-out, or incomplete replays create no
+verification record and establish no mathematical conclusion.
 
 Broad actions such as “investigate this conjecture” are workflows, not
 primitives. A workflow may coordinate many primitive calls, but it must expose

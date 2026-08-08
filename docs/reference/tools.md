@@ -191,6 +191,13 @@ An agent that already has an exact operation contract may invoke it directly;
 search, browse, and inspection are composable access paths, not a required
 sequence.
 
+Exact replay of an inline value is a deliberate exception to the empty-artifact
+case: it does not retain a copy of the input or candidate, but an accepted
+replay retains its verification record and the semantics artifact that the
+record binds. Both references appear in `artifact_uris`. A record without its
+bound semantics artifact is incomplete evidence; a rejected or non-completing
+replay has no record and does not establish an opposite conclusion.
+
 Capabilities return resource URIs only when their mathematical outcome needs
 durable identity, independent retrieval, replay, resumability, evidence
 binding, or size-separated transport. An adapter uses an explicit

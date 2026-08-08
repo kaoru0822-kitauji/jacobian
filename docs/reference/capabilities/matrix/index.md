@@ -50,9 +50,10 @@ durable identity and independent retrieval.
 `ComputedOperation` results in the `matrix_lattice` bundle. They write no
 artifact: their exact scalar result and pivot columns remain directly reusable
 in a later typed request. Their matching `.verify` capabilities accept those
-authoritative inline request and result values directly, then create replay
-evidence and a verification record only inside the independent-checker
-boundary.
+authoritative inline request and result values directly. An accepted replay
+persists a verification record and its bound semantics artifact, but never
+materializes ordinary input or candidate values; both durable references appear
+in the verification result's `artifact_uris`.
 
 The remaining matrix and lattice operations—RREF, nullspace, matrix product,
 inverse, trace, characteristic polynomial, Smith normal form (diagonal only),

@@ -29,3 +29,18 @@ the same typed producer kernels as the small native
 polynomial through JSON. Independent checkers consume the authoritative
 contracts and implement their own relation checks rather than importing these
 producer conversions or kernels.
+
+## Independent verification
+
+Exact polynomial producers and consumers exchange `RationalPolynomial` and
+`RationalPolynomialMap` values directly. The corresponding replay checkers
+receive the validated inline request and candidate, independently recompute the
+declared relation, and bind the canonical input, candidate, semantics, witness
+format, and checker identity. They do not call polynomial producer kernels or
+reuse their conversions.
+
+An accepted replay persists a verification record plus the immutable semantics
+artifact it binds; those two URIs are exposed in `artifact_uris`. The ordinary
+polynomial input and candidate remain inline. Rejection, timeout, cancellation,
+malformed values, and unsupported relations create no record and remain
+non-conclusions.

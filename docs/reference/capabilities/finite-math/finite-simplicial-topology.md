@@ -163,6 +163,11 @@ semantics, candidate digest, witness format, and checker identity. A malformed,
 interrupted, unsupported, or false replay returns no opposite mathematical
 conclusion and creates no verification record.
 
+An accepted inline replay retains only the verification record and the immutable
+topology semantics artifact it binds. Those two URIs appear in `artifact_uris`;
+the canonical complex, chain complex, and homology candidate remain inline and
+are not converted into routine replay artifacts.
+
 The integral checker additionally replays both Smith relations per dimension,
 the incoming-boundary factorization through the certified kernel basis, every
 free and torsion generator, and every torsion bounding-chain equation.
