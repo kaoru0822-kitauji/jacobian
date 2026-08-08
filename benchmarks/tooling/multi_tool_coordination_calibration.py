@@ -67,6 +67,26 @@ _EXTENSION_TASK_ORDER = (
     "symbolic-coordination-semantic-equivalence-03",
     "symbolic-coordination-semantic-equivalence-04",
 )
+_FROZEN_TASK_ORDER = (
+    "symbolic-coordination-semantic-equivalence-01",
+    "symbolic-coordination-semantic-equivalence-04",
+)
+_FROZEN_TASK_DIGESTS = (
+    "799301c8118daf0c9328aafaace67e904eba0679bffd06ea44ff3c120137df4e",
+    "9a99f6990bf3ac9b0fc5f81ad208ebb0b7f88917ab7f6d2018ae7d2cd324905c",
+)
+_FROZEN_CALIBRATION_REFS = (
+    (
+        "multi-tool-coordination-pr2-calibration",
+        "sha256:b65f5a32438e44dbc58af7f1323f3d38d86a703df41a1ab8daa37044010944bb",
+        "sha256:ce69b7bc01c25a5e187c735c8b8c7234197e6273e086e7462869b283e21ba362",
+    ),
+    (
+        "multi-tool-coordination-pr2-calibration-extension",
+        "sha256:ac1ac4b541c7771fa5ee2a8aeb302bad1b159f3fffe23e9bc90206cb833bd49a",
+        "sha256:6d1f233d05a88b8cb9e46fefc53e437b2c1c85c0977a8d4e349700af3314a518",
+    ),
+)
 
 
 class CalibrationTask(StudyTask):
@@ -190,6 +210,76 @@ class CoordinationCalibrationExtensionSpec(ContractModel):
 CalibrationSpec = CoordinationCalibrationSpec | CoordinationCalibrationExtensionSpec
 
 
+class FrozenCalibrationRef(ContractModel):
+    study_id: Literal[
+        "multi-tool-coordination-pr2-calibration",
+        "multi-tool-coordination-pr2-calibration-extension",
+    ]
+    manifest_sha256: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    summary_sha256: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+
+
+class FrozenComparisonDesign(ContractModel):
+    conditions: tuple[Literal["baseline", "treatment"], ...] = Field(
+        min_length=2, max_length=2
+    )
+    order: Literal["complete-baseline-before-product-change"]
+    repetitions_per_task_per_condition: Literal[5] = 5
+    timeout_seconds_per_rollout: Literal[600] = 600
+    reasoning_log_mode: Literal["REQUIRED"] = "REQUIRED"
+    web_search: Literal["disabled"] = "disabled"
+    wrong_answer_retries: Literal[0] = 0
+    terminal_reward: Literal["task-owned-clean-room-verifier-only"]
+    tool_call_reward: Literal[0] = 0
+
+
+class FrozenCoordinationEvaluationSpec(ContractModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal["1"] = "1"
+    study_id: Literal["multi-tool-coordination-pr3-frozen-comparison"]
+    evidence_class: Literal["public-host-local-exploratory-controlled-comparison"]
+    causal_claim_authorized: Literal[False] = False
+    harbor_execution_claimed: Literal[False] = False
+    model: StudyModel
+    calibrations: tuple[FrozenCalibrationRef, ...] = Field(min_length=2, max_length=2)
+    selection_rule: Literal[
+        "exactly-one-accepted-and-one-rejected-across-two-calibration-rollouts"
+    ]
+    selected_task_ids: tuple[str, ...] = Field(min_length=2, max_length=2)
+    tasks: tuple[CalibrationTask, ...] = Field(min_length=2, max_length=2)
+    target_minimum_tasks: Literal[4] = 4
+    target_minimum_met: Literal[False] = False
+    extension_exhausted: Literal[True] = True
+    intended_use: Literal["small-exploratory-paired-before-after-comparison"]
+    comparison: FrozenComparisonDesign
+    strategic_metrics: tuple[str, ...] = Field(min_length=3, max_length=8)
+    stop_rules: tuple[str, ...] = Field(min_length=4, max_length=8)
+    limitations: tuple[str, ...] = Field(min_length=2, max_length=6)
+    agent_instructions: str = Field(min_length=1, max_length=4096)
+
+    @model_validator(mode="after")
+    def require_frozen_comparison(self) -> Self:
+        if self.selected_task_ids != _FROZEN_TASK_ORDER:
+            raise ValueError("selected tasks must match the frozen PR3 order")
+        if tuple(task.task_id for task in self.tasks) != _FROZEN_TASK_ORDER:
+            raise ValueError("tasks must match the frozen PR3 order")
+        if (
+            tuple(task.harbor_task_digest for task in self.tasks)
+            != _FROZEN_TASK_DIGESTS
+        ):
+            raise ValueError("task digests must match the frozen PR3 bindings")
+        calibration_refs = tuple(
+            (ref.study_id, ref.manifest_sha256, ref.summary_sha256)
+            for ref in self.calibrations
+        )
+        if calibration_refs != _FROZEN_CALIBRATION_REFS:
+            raise ValueError("calibration references must match the frozen bindings")
+        if self.comparison.conditions != ("baseline", "treatment"):
+            raise ValueError("comparison conditions must be baseline then treatment")
+        return self
+
+
 def load_spec(path: Path) -> CalibrationSpec:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
@@ -199,6 +289,12 @@ def load_spec(path: Path) -> CalibrationSpec:
     if value.get("study_id") == "multi-tool-coordination-pr2-calibration-extension":
         return CoordinationCalibrationExtensionSpec.model_validate(value)
     raise ValueError("unsupported coordination calibration study_id")
+
+
+def load_frozen_evaluation(path: Path) -> FrozenCoordinationEvaluationSpec:
+    return FrozenCoordinationEvaluationSpec.model_validate_json(
+        path.read_text(encoding="utf-8")
+    )
 
 
 def _task_records(

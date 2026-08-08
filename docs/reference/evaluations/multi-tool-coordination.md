@@ -160,3 +160,31 @@ uv run --locked --with harbor==0.20.0 --with tomli-w==1.2.0 \
   --output benchmarks/results/multi-tool-coordination-pr2-calibration-extension \
   --execute
 ```
+
+## PR2 extension result and frozen comparison
+
+The one authorized extension ran once in tmux session
+`coord-pr2-calibration-extension` from clean source revision
+`9bf71ae053e0cdaa9cd981c9ee875536f24728d0`. All 12 rollouts completed:
+11 were accepted, one was rejected, every reasoning protocol completed, and
+no result was inconclusive. The 185-artifact manifest digest is
+`ac1ac4b541c7771fa5ee2a8aeb302bad1b159f3fffe23e9bc90206cb833bd49a`.
+The complete audit is recorded in
+[`multi-tool-coordination-pr2-calibration-extension-adjudication.json`](../../../benchmarks/config/multi-tool-coordination-pr2-calibration-extension-adjudication.json).
+
+Only `symbolic-coordination-semantic-equivalence-04` was mixed. Its rejected
+rollout recovered from an invalid noncanonical request and obtained a correct
+VERIFIED inverse result, but then duplicated scope, completeness, and
+limitations inside the terminal result object. The clean-room verifier
+correctly rejected that representation handoff. Other extension traces
+repeated fail-closed sparse-map ordering or duplicate-term errors, but usually
+recovered or completed the exact terminal object locally.
+
+Combining both calibration stages leaves two mixed tasks, below the target of
+four. The extension is exhausted and no further candidate run is authorized.
+The exact two-task evaluation set and a five-repetition-per-condition
+exploratory comparison contract are frozen in
+[`multi-tool-coordination-pr3-frozen-comparison.json`](../../../benchmarks/config/multi-tool-coordination-pr3-frozen-comparison.json).
+Both tasks are semantic-equivalence cases, so a later before/after result must
+not be presented as broad cross-domain performance or as a causal claim. PR2
+contains no product capability change.

@@ -7,10 +7,13 @@ from pathlib import Path
 import pytest
 from benchmarks.tooling.multi_tool_coordination_calibration import (
     _EXTENSION_TASK_ORDER,
+    _FROZEN_TASK_ORDER,
     _TASK_ORDER,
     CoordinationCalibrationExtensionSpec,
     CoordinationCalibrationSpec,
+    FrozenCoordinationEvaluationSpec,
     calibration_selection,
+    load_frozen_evaluation,
     load_spec,
     main,
 )
@@ -20,6 +23,9 @@ ROOT = Path(__file__).parents[3]
 SPEC = ROOT / "benchmarks/config/multi-tool-coordination-pr2-calibration.json"
 EXTENSION_SPEC = (
     ROOT / "benchmarks/config/multi-tool-coordination-pr2-calibration-extension.json"
+)
+FROZEN_SPEC = (
+    ROOT / "benchmarks/config/multi-tool-coordination-pr3-frozen-comparison.json"
 )
 
 
@@ -85,6 +91,37 @@ def test_pr2_extension_task_contracts_are_digest_bound() -> None:
         path = ROOT / "benchmarks/datasets" / task.dataset / task.task_id
         assert path.is_dir()
         assert len(task.harbor_task_digest) == 64
+
+
+def test_pr2_freezes_only_mixed_tasks_for_the_pr3_comparison() -> None:
+    frozen = load_frozen_evaluation(FROZEN_SPEC)
+
+    assert isinstance(frozen, FrozenCoordinationEvaluationSpec)
+    assert frozen.selected_task_ids == _FROZEN_TASK_ORDER
+    assert tuple(task.task_id for task in frozen.tasks) == _FROZEN_TASK_ORDER
+    assert frozen.comparison.conditions == ("baseline", "treatment")
+    assert frozen.comparison.repetitions_per_task_per_condition == 5
+    assert frozen.comparison.tool_call_reward == 0
+    assert frozen.target_minimum_met is False
+    assert frozen.extension_exhausted is True
+    assert frozen.causal_claim_authorized is False
+
+
+def test_frozen_comparison_rejects_substituted_tasks_and_calibration() -> None:
+    value = json.loads(FROZEN_SPEC.read_text())
+    value["tasks"][0], value["tasks"][1] = value["tasks"][1], value["tasks"][0]
+    with pytest.raises(ValidationError, match="frozen PR3 order"):
+        FrozenCoordinationEvaluationSpec.model_validate(value)
+
+    value = json.loads(FROZEN_SPEC.read_text())
+    value["calibrations"].reverse()
+    with pytest.raises(ValidationError, match="calibration references"):
+        FrozenCoordinationEvaluationSpec.model_validate(value)
+
+    value = json.loads(FROZEN_SPEC.read_text())
+    value["calibrations"][0]["manifest_sha256"] = "sha256:" + "0" * 64
+    with pytest.raises(ValidationError, match="calibration references"):
+        FrozenCoordinationEvaluationSpec.model_validate(value)
 
 
 def _record(task_id: str, acceptance: str, repetition: int) -> dict[str, object]:
