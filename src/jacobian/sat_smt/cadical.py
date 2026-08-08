@@ -389,7 +389,8 @@ class CadicalModelFindAdapter:
             run = _cancelled_after_solver(run)
         if run.execution_status is not ExecutionStatus.COMPLETED:
             return _failed_result(self.descriptor, request, resolved, run)
-        assert run.solver_status is not None
+        if run.solver_status is None:
+            return _failed_result(self.descriptor, request, resolved, run)
         assignment_uri: str | None = None
         assignment: dict[str, bool] | None = None
         if run.solver_status == "SATISFIABLE":
@@ -524,10 +525,12 @@ class CadicalUnsatProofFindAdapter:
             run = _cancelled_after_solver(run)
         if run.execution_status is not ExecutionStatus.COMPLETED:
             return _failed_result(self.descriptor, request, resolved, run)
-        assert run.solver_status is not None
+        if run.solver_status is None:
+            return _failed_result(self.descriptor, request, resolved, run)
         proof_uri: str | None = None
         if run.solver_status == "UNSATISFIABLE":
-            assert run.proof is not None
+            if run.proof is None:
+                return _failed_result(self.descriptor, request, resolved, run)
             proof_uri = self.sat.put_proof(
                 cnf_uri=resolved.artifact.artifact_uri,
                 proof=run.proof,
@@ -640,7 +643,8 @@ def _failed_result(
     resolved: ResolvedSatCnf,
     run: _CadicalRun,
 ) -> CapabilityResult:
-    assert run.diagnostic is not None
+    if run.diagnostic is None:
+        raise CapabilityInvocationError("run diagnostic is unexpectedly None")
     return CapabilityResult(
         capability_id=descriptor.capability_id,
         capability_version=descriptor.version,
@@ -853,8 +857,9 @@ def _read_proof_file(path: Path) -> tuple[bytes, int]:
     if path_metadata.st_size > CADICAL_RAW_PROOF_LIMIT:
         raise _CadicalRawProofLimitError("raw proof output exceeds its capture limit")
     flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
-    descriptor = os.open(path, flags)
+    descriptor = -1
     try:
+        descriptor = os.open(path, flags)
         metadata = os.fstat(descriptor)
         if not stat.S_ISREG(metadata.st_mode):
             raise OSError("proof output is not a regular file")
@@ -881,7 +886,8 @@ def _read_proof_file(path: Path) -> tuple[bytes, int]:
             )
         return bytes(normalized), removed_deletion_steps
     finally:
-        os.close(descriptor)
+        if descriptor >= 0:
+            os.close(descriptor)
 
 
 def _sha256_file(path: Path) -> str:

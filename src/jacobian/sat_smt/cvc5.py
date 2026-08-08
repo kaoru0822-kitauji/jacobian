@@ -308,11 +308,13 @@ class Cvc5UnsatProofFindAdapter:
             )
         if run.execution_status is not ExecutionStatus.COMPLETED:
             return _failed_result(self.descriptor, request, resolved, run)
-        assert run.solver_status is not None
+        if run.solver_status is None:
+            return _failed_result(self.descriptor, request, resolved, run)
         proof_uri: str | None = None
         holes: int | None = None
         if run.solver_status == "UNSATISFIABLE":
-            assert run.proof is not None
+            if run.proof is None:
+                return _failed_result(self.descriptor, request, resolved, run)
             proof_uri = self.smt.put_proof(
                 problem_uri=problem_uri,
                 proof=run.proof,
@@ -320,7 +322,8 @@ class Cvc5UnsatProofFindAdapter:
                 resource_budget=validated.resource_budget.artifact_budget(),
             ).artifact_uri
             holes = run.alethe_hole_count
-            assert holes is not None
+            if holes is None:
+                return _failed_result(self.descriptor, request, resolved, run)
         output = SmtUnsatProofFindOutput(
             status="PROOF_PRODUCED" if proof_uri is not None else "NO_PROOF_PRODUCED",
             solver_status=run.solver_status,
@@ -404,7 +407,8 @@ def _failed_result(
     resolved: ResolvedSmtProblem,
     run: _Cvc5Run,
 ) -> CapabilityResult:
-    assert run.diagnostic is not None
+    if run.diagnostic is None:
+        raise CapabilityInvocationError("run diagnostic is unexpectedly None")
     return CapabilityResult(
         capability_id=descriptor.capability_id,
         capability_version=descriptor.version,
@@ -548,8 +552,9 @@ def _read_proof_file(path: Path) -> bytes:
     if not stat.S_ISREG(path_metadata.st_mode):
         raise OSError("proof output is not a regular file")
     flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
-    descriptor = os.open(path, flags)
+    descriptor = -1
     try:
+        descriptor = os.open(path, flags)
         metadata = os.fstat(descriptor)
         if not stat.S_ISREG(metadata.st_mode):
             raise OSError("proof output is not a regular file")
@@ -561,7 +566,8 @@ def _read_proof_file(path: Path) -> bytes:
             raise OverflowError("proof output grew beyond its durable artifact limit")
         return proof
     finally:
-        os.close(descriptor)
+        if descriptor >= 0:
+            os.close(descriptor)
 
 
 def _run_failure(
