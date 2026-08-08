@@ -134,9 +134,7 @@ def test_rejects_corrupt_geometry_and_nonvanishing_gap(tmp_path: Path) -> None:
         ),
         (
             "distance",
-            lambda result: result["epsilon_witnesses"][2].update(
-                distance="1/10"
-            ),
+            lambda result: result["epsilon_witnesses"][2].update(distance="1/10"),
         ),
         (
             "ordering",
