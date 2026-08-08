@@ -258,7 +258,7 @@ def test_weighted_graph_contract_rejects_parallel_edges_and_oversized_weights() 
             }
         )
 
-    with raises(ValidationError, match="256 decimal digits"):
+    with raises(ValidationError, match="256-digit bound"):
         GraphMinimumSpanningTreeRequest.model_validate(
             {
                 "graph": _weighted_graph(

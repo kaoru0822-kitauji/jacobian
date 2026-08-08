@@ -56,7 +56,7 @@ def test_linear_find_request_rejects_ambiguous_or_oversized_rationals() -> None:
         {"num": "1" * 257, "den": "1"},
         _q(1),
     ]
-    with pytest.raises(ValidationError, match="256 decimal digits"):
+    with pytest.raises(ValidationError, match="256-digit bound"):
         LinearRationalSolutionFindRequest.model_validate(
             {"system": oversized, "resource_budget": {"wall_seconds": 5}}
         )

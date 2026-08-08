@@ -18,7 +18,11 @@ from jacobian.canonical import (
     format_canonical_integer,
     parse_canonical_integer,
 )
-from jacobian.contracts.exact import CanonicalInteger, CanonicalRational
+from jacobian.contracts.exact import (
+    CanonicalInteger,
+    CanonicalRational,
+    require_bounded_rational,
+)
 from jacobian.contracts.results import ContractModel
 
 _MAX_N = 1_000
@@ -99,22 +103,6 @@ def _minimum_fraction_wire_bytes(value: Fraction) -> int:
         + _lower_decimal_digits(value.denominator)
         + 20
     )
-
-
-def _require_bounded_rational(
-    value: CanonicalRational,
-    *,
-    max_digits: int,
-    label: str,
-) -> Fraction:
-    if (
-        len(value.num.lstrip("-")) > max_digits
-        or len(value.den.lstrip("-")) > max_digits
-    ):
-        raise ValueError(f"{label} exceeds the {max_digits}-digit bound")
-    fraction = value.as_fraction()
-    _require_bounded_fraction(fraction, max_digits=max_digits, label=label)
-    return fraction
 
 
 def _validate_result_artifact_size(payload: dict[str, object]) -> None:
@@ -276,7 +264,7 @@ def _require_canonical_polynomial(
     label: str,
 ) -> None:
     for coefficient in coefficients:
-        _require_bounded_rational(
+        require_bounded_rational(
             coefficient,
             max_digits=MAX_COMBINATORICS_INPUT_RATIONAL_DIGITS,
             label=label,
@@ -729,7 +717,7 @@ class LinearRecurrenceEvaluationRequest(ContractModel):
             ("recurrence initial value", self.initial_values),
         ):
             for value in values:
-                _require_bounded_rational(
+                require_bounded_rational(
                     value,
                     max_digits=MAX_COMBINATORICS_INPUT_RATIONAL_DIGITS,
                     label=label,
@@ -772,7 +760,7 @@ class IndexedRationalValue(ContractModel):
 
     @model_validator(mode="after")
     def require_bounded_value(self) -> Self:
-        _require_bounded_rational(
+        require_bounded_rational(
             self.value,
             max_digits=MAX_COMBINATORICS_RESULT_RATIONAL_DIGITS,
             label="recurrence result",
@@ -805,7 +793,7 @@ class LinearRecurrenceEvaluationResult(ContractModel):
                 "replay_prefix must cover indices 0 through replay_scope_end"
             )
         for value in self.replay_prefix:
-            _require_bounded_rational(
+            require_bounded_rational(
                 value,
                 max_digits=MAX_COMBINATORICS_RESULT_RATIONAL_DIGITS,
                 label="recurrence replay value",
@@ -899,7 +887,7 @@ class RationalGeneratingFunctionCoefficientsResult(ContractModel):
             ("series residual", self.residual_coefficients),
         ):
             for value in values:
-                _require_bounded_rational(
+                require_bounded_rational(
                     value,
                     max_digits=MAX_COMBINATORICS_RESULT_RATIONAL_DIGITS,
                     label=label,

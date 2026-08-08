@@ -10,7 +10,7 @@ from jacobian.canonical import (
     CanonicalLimits,
     canonicalize_json,
 )
-from jacobian.contracts.exact import CanonicalRational
+from jacobian.contracts.exact import CanonicalRational, require_bounded_rational
 
 
 def test_equivalent_rationals_have_identical_canonical_bytes() -> None:
@@ -59,6 +59,24 @@ def test_canonical_errors_preserve_only_repair_relevant_context(
 def test_canonical_rational_wire_model_rejects_unreduced_input() -> None:
     with pytest.raises(ValidationError):
         CanonicalRational.model_validate({"num": "2", "den": "4"})
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        {"num": "-101", "den": "1"},
+        {"num": "1", "den": "101"},
+    ],
+)
+def test_bounded_rational_rejects_oversized_canonical_components(
+    value: dict[str, str],
+) -> None:
+    with pytest.raises(ValueError, match="test rational exceeds the 2-digit bound"):
+        require_bounded_rational(
+            CanonicalRational.model_validate(value),
+            max_digits=2,
+            label="test rational",
+        )
 
 
 def test_negative_zero_is_not_a_canonical_integer_encoding() -> None:
