@@ -469,8 +469,6 @@ def _map_inverse_residuals(
     )
 
 
-
-
 def _validate_request[RequestModel: ContractModel](
     model: type[RequestModel],
     payload: object,
