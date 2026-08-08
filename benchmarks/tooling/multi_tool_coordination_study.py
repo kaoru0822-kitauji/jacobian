@@ -23,7 +23,7 @@ from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal, Self
+from typing import Any, Literal, Protocol, Self
 
 import httpx2
 from mcp import Client
@@ -140,6 +140,17 @@ class CoordinationStudySpec(ContractModel):
         return self
 
 
+class RunnableCoordinationSpec(Protocol):
+    """Structural contract shared by frozen coordination runners."""
+
+    agent_instructions: str
+    model: StudyModel
+    reasoning_log_mode: str
+    sandbox: str
+    timeout_seconds_per_rollout: int
+    web_search: str
+
+
 def load_spec(path: Path) -> CoordinationStudySpec:
     """Load the completely validated preregistration."""
 
@@ -182,7 +193,7 @@ def _codex_version(workspace: Path) -> str:
     return result.stdout.decode(errors="replace").strip()
 
 
-def _model_record(spec: CoordinationStudySpec) -> tuple[dict[str, Any], str]:
+def _model_record(spec: RunnableCoordinationSpec) -> tuple[dict[str, Any], str]:
     codex_home = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex")))
     cache = codex_home / "models_cache.json"
     payload = json.loads(cache.read_text(encoding="utf-8"))
@@ -338,7 +349,7 @@ def _mcp_server(*, state: Path, run_dir: Path, tenant: str) -> Iterator[str]:
 
 
 def _prepare_workspace(
-    workspace: Path, spec: CoordinationStudySpec, task_path: Path
+    workspace: Path, spec: RunnableCoordinationSpec, task_path: Path
 ) -> str:
     shutil.copyfile(task_path / "instruction.md", workspace / "instruction.md")
     shutil.copyfile(task_path / "environment/input.json", workspace / "input.json")
@@ -352,7 +363,7 @@ def _prepare_workspace(
 
 
 def _codex_arguments(
-    *, workspace: Path, spec: CoordinationStudySpec, mcp_url: str, prompt: str
+    *, workspace: Path, spec: RunnableCoordinationSpec, mcp_url: str, prompt: str
 ) -> tuple[str, ...]:
     return (
         "-a",
@@ -533,7 +544,7 @@ def _copy_workspace(workspace: Path, destination: Path) -> None:
 
 def _run_one(
     *,
-    spec: CoordinationStudySpec,
+    spec: RunnableCoordinationSpec,
     task: StudyTask,
     task_record: Mapping[str, Any],
     repetition: int,

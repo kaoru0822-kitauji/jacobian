@@ -85,3 +85,38 @@ bytes, scope, completeness, and assurance, and reject false `VERIFIED` claims.
 This is an evidence-bearing pilot, not a calibrated comparison suite. PR1
 changes no product capability. Expansion, mixed-difficulty calibration, and
 the immutable pre-treatment freeze remain PR2 work.
+
+## PR2 label-free calibration contract
+
+[`multi-tool-coordination-pr2-calibration.json`](../../../benchmarks/config/multi-tool-coordination-pr2-calibration.json)
+freezes 12 candidates before collecting any PR2 label. It combines the four
+PR1 cross-domain tasks with eight existing `symbolic-coordination-v1` cases:
+valid inverse, near miss, one-direction evidence, Keller-only evidence,
+collision found, complete grid exhaustion, timeout non-conclusion, and semantic
+equivalence. No fixture is copied or rewritten; every task's Harbor digest,
+public input bundle, and clean-room verifier bundle are rebound at execution.
+
+Each candidate receives exactly two independent `gpt-5.4-mini` medium runs
+with the PR1 prompt, REQUIRED reasoning log, 600-second timeout, no web search,
+and no wrong-answer retry. Only a task with exactly one accepted and one
+rejected labelled rollout is eligible. Eligible tasks remain in declared
+order, at most six are selected, and the target is at least four. Wilson 95%
+intervals are descriptive only. Timeout, model error, incomplete reasoning,
+missing output, and verifier infrastructure failure are inconclusive.
+
+If fewer than four tasks qualify, the contract permits one separately
+preregistered extension of at most six new candidates; it does not launch that
+extension automatically. No prompt, model, threshold, task, or product tool
+may change in response to calibration labels. The selected set must be frozen
+in a later commit before any product treatment.
+
+Execution remains explicit and tmux-only:
+
+```sh
+uv run --locked --with harbor==0.20.0 --with tomli-w==1.2.0 \
+  --with jsonschema python \
+  -m benchmarks.tooling.multi_tool_coordination_calibration run \
+  --spec benchmarks/config/multi-tool-coordination-pr2-calibration.json \
+  --output benchmarks/results/multi-tool-coordination-pr2-calibration \
+  --execute
+```
