@@ -50,3 +50,38 @@ uv run --locked --with harbor==0.20.0 --with tomli-w==1.2.0 \
   --spec benchmarks/config/multi-tool-coordination-pr1.json \
   --output benchmarks/results/multi-tool-coordination-pr1 --execute
 ```
+
+## PR1 frozen observation
+
+The bounded batch ran once in tmux session `coord-pr1-batch` from clean source
+revision `4eaf525a136e4473ddbc015a1d6a94aa0f3dd885`. It completed all 12 planned
+rollouts over six task groups: three were accepted and nine rejected, all 12
+reasoning protocols completed, and one post-run extraction error was retained.
+The immutable manifest binds 196 artifacts. The independent adjudication is
+recorded in
+[`multi-tool-coordination-pr1-adjudication.json`](../../../benchmarks/config/multi-tool-coordination-pr1-adjudication.json).
+
+Repeated findings included capability-discovery misses, artifact or
+representation handoff failures, named-scalar and multiplier-direction binding
+errors, undiscovered checkers, false certification after producing an
+unverified candidate, and recoverable reasoning-protocol errors. The batch
+also contained one accepted multi-operation composition, two safe assurance
+downgrades, and one successful repair after checker rejection. Three rejected
+answers exposed verifier lexical or directional overconstraints rather than
+invalid mathematics; they are retained as contract findings and are not
+relabelled.
+
+## PR1 benchmark slice
+
+[`multi-tool-coordination-v1`](../../../benchmarks/datasets/multi-tool-coordination-v1/README.md)
+packages four deterministic, hand-auditable Harbor tasks derived from those
+observations: graph set distance, a cycle-lattice certificate with alternate
+witness support, rational named-scalar binding plus Sylvester replay, and an
+explicitly directed polynomial proportionality identity. Hidden Oracle
+solutions are absent from the runtime environment. Standard-library clean-room
+verifiers independently check the terminal object, frozen input, evidence
+bytes, scope, completeness, and assurance, and reject false `VERIFIED` claims.
+
+This is an evidence-bearing pilot, not a calibrated comparison suite. PR1
+changes no product capability. Expansion, mixed-difficulty calibration, and
+the immutable pre-treatment freeze remain PR2 work.

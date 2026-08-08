@@ -17,6 +17,7 @@ from benchmarks.tooling.multi_tool_coordination_study import (
 
 ROOT = Path(__file__).parents[3]
 SPEC = ROOT / "benchmarks/config/multi-tool-coordination-pr1.json"
+ADJUDICATION = ROOT / "benchmarks/config/multi-tool-coordination-pr1-adjudication.json"
 
 
 def test_preregistration_freezes_bounded_cross_domain_matrix() -> None:
@@ -132,3 +133,40 @@ def test_legacy_verifier_can_leave_input_binding_unreported() -> None:
 
     assert evidence.input_binding_valid is None
     assert evidence.artifact_binding_valid is True
+
+
+def test_pr1_adjudication_binds_the_complete_frozen_batch() -> None:
+    value = json.loads(ADJUDICATION.read_text(encoding="utf-8"))
+    spec = load_spec(SPEC)
+    expected_ids = {
+        f"{task.task_id}-r{repetition:02d}"
+        for task in spec.tasks
+        for repetition in range(1, spec.repetitions_per_task + 1)
+    }
+
+    assert value["study_id"] == spec.study_id
+    assert value["source_revision"] == "4eaf525a136e4473ddbc015a1d6a94aa0f3dd885"
+    assert value["batch"]["run_count"] == len(expected_ids) == 12
+    assert value["batch"]["outcomes"] == {"ACCEPTED": 3, "REJECTED": 9}
+    assert value["batch"]["reasoning_protocol"] == {"COMPLETE": 12}
+    assert {item["trajectory_id"] for item in value["runs"]} == expected_ids
+    assert all(item["categories"] for item in value["runs"])
+    assert all(
+        category in value["taxonomy"]
+        for item in value["runs"]
+        for category in item["categories"]
+    )
+    assert (
+        sum(
+            item["mathematical_adjudication"] == "INVALID_TERMINAL_OBJECT"
+            for item in value["runs"]
+        )
+        == 2
+    )
+    assert (
+        sum(
+            "verifier_contract_overconstraint" in item["categories"]
+            for item in value["runs"]
+        )
+        == 3
+    )
