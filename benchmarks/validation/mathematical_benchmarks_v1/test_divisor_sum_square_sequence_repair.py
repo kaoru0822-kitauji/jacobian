@@ -83,8 +83,8 @@ def test_false_verified_preserves_correctness(tmp_path):
     sub["claimed_assurance"] = "VERIFIED"
     result = _verify(tmp_path / "false_verified", sub)
     assert result.reward == 0
-    assert result.details['correctness'] == 1.0
-    assert result.details['false_certification'] is True
+    assert result.details["correctness"] == 1.0
+    assert result.details["false_certification"] is True
 
 
 def test_oversized_probe_rejected(tmp_path):
@@ -163,7 +163,7 @@ def test_evidence_type_coercion_rejected(tmp_path):
     )
     (app / "submission.json").write_text(json.dumps(sub))
     result = _run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0
 
 
@@ -181,7 +181,7 @@ def test_garbage_prime_formula_rejected(tmp_path):
     sub = _oracle()
     sub["result"]["prime_formula"] = "not a formula"
     result = _verify(tmp_path / "garbage_formula", sub)
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0
 
 
@@ -191,7 +191,7 @@ def test_garbage_threshold_rule_rejected(tmp_path):
     sub = _oracle()
     sub["result"]["threshold_rule"] = "false"
     result = _verify(tmp_path / "garbage_threshold", sub)
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0
 
 
@@ -220,5 +220,5 @@ def test_recursive_evidence_comparison_does_not_crash(tmp_path):
     )
     (app / "submission.json").write_text(json.dumps(sub))
     result = _run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0

@@ -20,7 +20,7 @@ def test_accepts_equivalent_limitation_wording(tmp_path: Path) -> None:
     ]
     support._write_json(app / "submission.json", submission)
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['scope_accuracy'] == 1.0
+    assert reward.details["scope_accuracy"] == 1.0
     assert reward.reward == 1.0
 
 
@@ -28,7 +28,7 @@ def test_oracle_certificate_is_accepted(tmp_path: Path) -> None:
     task, app, logs = _prepare(tmp_path)
     reward = support._run_verifier(task, app, logs)
     assert reward.reward == 1.0
-    assert reward.details['correctness'] == 1.0
+    assert reward.details["correctness"] == 1.0
 
 
 def test_published_evidence_sentence_needs_no_private_marker(tmp_path: Path) -> None:
@@ -42,7 +42,7 @@ def test_published_evidence_sentence_needs_no_private_marker(tmp_path: Path) -> 
     submission["evidence"][0]["sha256"] = support._digest(evidence)
     support._write_json(app / "submission.json", submission)
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['evidence_validity'] == 1.0
+    assert reward.details["evidence_validity"] == 1.0
     assert reward.reward == 1.0
 
 
@@ -50,8 +50,8 @@ def test_visible_input_tamper_preserves_math_diagnostic(tmp_path: Path) -> None:
     task, app, logs = _prepare(tmp_path)
     (app / "input.json").write_text("{}")
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['input_binding'] == 0.0
-    assert reward.details['correctness'] == 1.0
+    assert reward.details["input_binding"] == 0.0
+    assert reward.details["correctness"] == 1.0
     assert reward.reward == 0.0
 
 
@@ -65,7 +65,7 @@ def test_integral_float_permutation_is_rejected_without_crashing(
     ]
     support._write_json(app / "submission.json", submission)
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['correctness'] == 0.0
+    assert reward.details["correctness"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -75,7 +75,7 @@ def test_reordered_matched_pairs_are_accepted(tmp_path: Path) -> None:
     submission["result"]["matched_pairs"].reverse()
     support._write_json(app / "submission.json", submission)
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['correctness'] == 1.0
+    assert reward.details["correctness"] == 1.0
     assert reward.reward == 1.0
 
 
@@ -85,7 +85,7 @@ def test_corrupted_matrix_product_is_rejected(tmp_path: Path) -> None:
     submission["result"]["PA"][0][0] = 1
     support._write_json(app / "submission.json", submission)
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['correctness'] == 0.0
+    assert reward.details["correctness"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -95,7 +95,7 @@ def test_nonunit_permutation_is_rejected(tmp_path: Path) -> None:
     submission["result"]["unit_permutation"] = [3, 4, 0, 5, 2, 1]
     support._write_json(app / "submission.json", submission)
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['correctness'] == 0.0
+    assert reward.details["correctness"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -105,7 +105,7 @@ def test_determinant_tampering_is_rejected(tmp_path: Path) -> None:
     submission["result"]["determinant_modulus"] = 88
     support._write_json(app / "submission.json", submission)
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['correctness'] == 0.0
+    assert reward.details["correctness"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -115,7 +115,7 @@ def test_matched_diagonal_tampering_is_rejected(tmp_path: Path) -> None:
     submission["result"]["matched_pairs"][0]["a_value"] = 7
     support._write_json(app / "submission.json", submission)
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['correctness'] == 0.0
+    assert reward.details["correctness"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -125,7 +125,7 @@ def test_false_verified_claim_is_rejected(tmp_path: Path) -> None:
     submission["claimed_assurance"] = "VERIFIED"
     support._write_json(app / "submission.json", submission)
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['false_certification'] is True
+    assert reward.details["false_certification"] is True
     assert reward.reward == 0.0
 
 
@@ -144,9 +144,9 @@ def test_verified_claim_in_malformed_envelope_is_detected(tmp_path: Path) -> Non
     submission["extra_field"] = "schema-invalid"
     support._write_json(app / "submission.json", submission)
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['false_certification'] is True
-    assert reward.details['correctness'] == 1.0
-    assert reward.details['protocol_compliance'] == 0.0
+    assert reward.details["false_certification"] is True
+    assert reward.details["correctness"] == 1.0
+    assert reward.details["protocol_compliance"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -157,8 +157,8 @@ def test_malformed_envelope_preserves_math_correctness(tmp_path: Path) -> None:
     submission["extra_field"] = "schema-invalid"
     support._write_json(app / "submission.json", submission)
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['protocol_compliance'] == 0.0
-    assert reward.details['correctness'] == 1.0
+    assert reward.details["protocol_compliance"] == 0.0
+    assert reward.details["correctness"] == 1.0
     assert reward.reward == 0.0
 
 
@@ -176,7 +176,7 @@ def test_large_valid_evidence_has_no_arbitrary_byte_cap(tmp_path: Path) -> None:
         "diagonal pair to agree.\n",
     )
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['evidence_validity'] == 1.0
+    assert reward.details["evidence_validity"] == 1.0
     assert reward.reward == 1.0
 
 
@@ -191,7 +191,7 @@ def test_equivalent_explanation_paraphrase_is_accepted(tmp_path: Path) -> None:
         "permutation picks unit entries so each matched diagonal pair agrees.\n",
     )
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['evidence_validity'] == 1.0
+    assert reward.details["evidence_validity"] == 1.0
     assert reward.reward == 1.0
 
 
@@ -206,7 +206,7 @@ def test_contradictory_explanation_is_rejected(tmp_path: Path) -> None:
         "diagonal, and the products do not agree.\n",
     )
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['evidence_validity'] == 0.0
+    assert reward.details["evidence_validity"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -216,7 +216,7 @@ def test_unrelated_explanation_is_rejected(tmp_path: Path) -> None:
     submission = json.loads((app / "submission.json").read_text())
     _set_evidence(app, submission, "The weather is sunny today.\n")
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['evidence_validity'] == 0.0
+    assert reward.details["evidence_validity"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -226,7 +226,7 @@ def test_empty_explanation_is_rejected(tmp_path: Path) -> None:
     submission = json.loads((app / "submission.json").read_text())
     _set_evidence(app, submission, "\n")
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['evidence_validity'] == 0.0
+    assert reward.details["evidence_validity"] == 0.0
     assert reward.reward == 0.0
 
 

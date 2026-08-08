@@ -23,9 +23,9 @@ def test_alternative_dimension_passes(tmp_path: Path) -> None:
     submission = json.loads(path.read_text())
     n = 7
     result = submission["result"]
-    result.details['dimension'] = n
+    result.details["dimension"] = n
     submission["scope"] = f"the cyclic vector inequality at dimension n = {n}"
-    result.details['vectors'] = [
+    result.details["vectors"] = [
         {
             "index": i,
             "first_variable": i,
@@ -34,17 +34,17 @@ def test_alternative_dimension_passes(tmp_path: Path) -> None:
         }
         for i in range(1, n + 1)
     ]
-    result.details['aggregate'] = {
+    result.details["aggregate"] = {
         "first_constant": 0,
         "first_coefficients": [1] * n,
         "second_constant": n,
         "second_coefficients": [-1] * n,
     }
-    result.details['completed_square'] = {
+    result.details["completed_square"] = {
         "lhs_coefficients": [4, -4 * n, n * n],
         "square_coefficients": [2, -n],
     }
-    result.details['equality_witness']["values"] = ["1/2"] * n
+    result.details["equality_witness"]["values"] = ["1/2"] * n
     support._bind_result_evidence(app, submission)
     support._write_json(path, submission)
     assert support._run_verifier(task, app, logs).reward == 1.0
@@ -88,7 +88,7 @@ def test_false_verified_is_rejected(tmp_path: Path) -> None:
     support._write_json(path, submission)
     result = support._run_verifier(task, app, logs)
     assert result.reward == 0.0
-    assert result.details['false_certification'] is True
+    assert result.details["false_certification"] is True
 
 
 def test_boolean_certificate_fields_are_rejected(tmp_path: Path) -> None:

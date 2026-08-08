@@ -132,7 +132,7 @@ def test_structured_verifiers_fail_closed_on_protocol_attacks(
     rejected = support.run_verifier(task, app, logs)
     assert rejected.reward == 0.0
     if attack == "false-verified":
-        assert rejected.details['false_certification'] is True
+        assert rejected.details["false_certification"] is True
 
 
 def test_structured_verifier_scores_math_separately_from_protocol_compliance(
@@ -146,11 +146,11 @@ def test_structured_verifier_scores_math_separately_from_protocol_compliance(
 
     result = support.run_verifier(task, app, logs)
 
-    assert result.details['correctness'] == 1.0
-    assert result.details['evidence_validity'] == 1.0
-    assert result.details['scope_accuracy'] == 1.0
-    assert result.details['assurance_calibration'] == 1.0
-    assert result.details['protocol_compliance'] == 0.0
+    assert result.details["correctness"] == 1.0
+    assert result.details["evidence_validity"] == 1.0
+    assert result.details["scope_accuracy"] == 1.0
+    assert result.details["assurance_calibration"] == 1.0
+    assert result.details["protocol_compliance"] == 0.0
     assert result.reward == 0.0
 
 
@@ -164,7 +164,7 @@ def test_nullstellensatz_verifier_rejects_nonregular_workspace_input(
 
     result = support.run_verifier(task, app, logs)
 
-    assert result.details['protocol_compliance'] == 0.0
+    assert result.details["protocol_compliance"] == 0.0
     assert result.reward == 0.0
 
 
@@ -262,7 +262,7 @@ def test_graph_verifier_rejects_corrupted_witnesses(
     support.write_json(submission_path, submission)
 
     result = support.run_verifier(task, app, logs)
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -275,7 +275,7 @@ def test_graph_verifier_rejects_boolean_summary_scalar(tmp_path: Path) -> None:
 
     result = support.run_verifier(task, app, logs)
 
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -304,7 +304,7 @@ def test_sidon_extension_verifier_rejects_corrupted_finite_core(
 
     result = support.run_verifier(task, app, logs)
 
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -320,7 +320,7 @@ def test_sidon_extension_rejects_unhashable_target_order(tmp_path: Path) -> None
     support.write_json(app / "submission.json", submission)
 
     result = support.run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -349,7 +349,7 @@ def test_powerful_window_verifier_rejects_corrupted_finite_evidence(
 
     result = support.run_verifier(task, app, logs)
 
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -370,7 +370,7 @@ def test_powerful_window_rejects_boolean_integer_fields(
     support.write_json(app / "submission.json", submission)
 
     result = support.run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -385,7 +385,7 @@ def test_powerful_window_rejects_overflowing_json_number(tmp_path: Path) -> None
     support.write_json(app / "submission.json", submission)
 
     result = support.run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -396,7 +396,7 @@ def test_powerful_window_scope_survives_extra_envelope_field(tmp_path: Path) -> 
     support.write_json(app / "submission.json", submission)
 
     result = support.run_verifier(task, app, logs)
-    assert result.details['scope_accuracy'] == 1.0
+    assert result.details["scope_accuracy"] == 1.0
     assert result.reward == 0.0
 
 
@@ -418,8 +418,8 @@ def test_structured_verifier_marks_malformed_evidence_invalid(
 
     result = support.run_verifier(task, app, logs)
 
-    assert result.details['evidence_validity'] == 0.0
-    assert result.details['correctness'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -439,9 +439,9 @@ def test_structured_verifier_preserves_correctness_under_protocol_failure(
 
     result = support.run_verifier(task, app, logs)
 
-    assert result.details['correctness'] == 1.0
-    assert result.details['evidence_validity'] == 1.0
-    assert result.details['false_certification'] is True
+    assert result.details["correctness"] == 1.0
+    assert result.details["evidence_validity"] == 1.0
+    assert result.details["false_certification"] is True
     assert result.reward == 0.0
 
 
@@ -504,7 +504,7 @@ def test_powerful_window_verifier_accepts_reordered_factor_collections(
 
     result = support.run_verifier(task, app, logs)
 
-    assert result.details['evidence_validity'] == 1.0
+    assert result.details["evidence_validity"] == 1.0
     assert result.reward == 1.0
 
 
@@ -524,7 +524,7 @@ def test_powerful_window_verifier_rejects_duplicate_factors(tmp_path: Path) -> N
 
     result = support.run_verifier(task, app, logs)
 
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -548,7 +548,7 @@ def test_sidon_extension_verifier_accepts_reordered_base_residues(
 
     result = support.run_verifier(task, app, logs)
 
-    assert result.details['evidence_validity'] == 1.0
+    assert result.details["evidence_validity"] == 1.0
     assert result.reward == 1.0
 
 
@@ -571,7 +571,7 @@ def test_sidon_extension_verifier_rejects_duplicate_base_residues(
 
     result = support.run_verifier(task, app, logs)
 
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -597,8 +597,8 @@ def test_structured_verifier_rejects_duplicate_evidence_rows(
 
     result = support.run_verifier(task, app, logs)
 
-    assert result.details['evidence_validity'] == 0.0
-    assert result.details['correctness'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -618,8 +618,8 @@ def test_sidon_verifier_rejects_unhashable_target_orders(tmp_path: Path) -> None
 
     result = support.run_verifier(task, app, logs)
 
-    assert result.details['evidence_validity'] == 0.0
-    assert result.details['correctness'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -638,8 +638,8 @@ def test_sidon_verifier_rejects_bool_candidate_space_size(tmp_path: Path) -> Non
 
     result = support.run_verifier(task, app, logs)
 
-    assert result.details['evidence_validity'] == 0.0
-    assert result.details['correctness'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -658,8 +658,8 @@ def test_powerful_window_verifier_rejects_bool_factor_power(tmp_path: Path) -> N
 
     result = support.run_verifier(task, app, logs)
 
-    assert result.details['evidence_validity'] == 0.0
-    assert result.details['correctness'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -678,8 +678,8 @@ def test_powerful_window_verifier_rejects_bool_all_powerful(tmp_path: Path) -> N
 
     result = support.run_verifier(task, app, logs)
 
-    assert result.details['evidence_validity'] == 0.0
-    assert result.details['correctness'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -705,8 +705,8 @@ def test_structured_verifier_rejects_overflowing_json_numbers(
 
     result = support.run_verifier(task, app, logs)
 
-    assert result.details['evidence_validity'] == 0.0
-    assert result.details['correctness'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -725,9 +725,9 @@ def test_structured_verifier_scores_scope_independently_of_envelope(
 
     result = support.run_verifier(task, app, logs)
 
-    assert result.details['scope_accuracy'] == 1.0
-    assert result.details['assurance_calibration'] == 1.0
-    assert result.details['limitation_accuracy'] == 1.0
+    assert result.details["scope_accuracy"] == 1.0
+    assert result.details["assurance_calibration"] == 1.0
+    assert result.details["limitation_accuracy"] == 1.0
     assert result.reward == 0.0
 
 
@@ -778,7 +778,7 @@ def test_syzygy_verifier_rejects_corrupted_certificates(
     support.write_json(submission_path, submission)
 
     result = support.run_verifier(task, app, logs)
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 

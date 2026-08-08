@@ -3,9 +3,12 @@ import re
 from fractions import Fraction
 from pathlib import Path
 
-from verifier_support import evidence_list_is_bound, resolve_evidence
+from verifier_support import (
+    evidence_list_is_bound,
+    normalize_reward_file,
+    resolve_evidence,
+)
 from verifier_support import load_submission as load_strict_submission
-from verifier_support import normalize_reward_file
 
 E = Path("/tests")
 RATIONAL_PATTERN = re.compile(r"-?(?:0|[1-9][0-9]*)(?:/[1-9][0-9]*)?")

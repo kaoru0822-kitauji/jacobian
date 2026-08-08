@@ -48,10 +48,10 @@ def test_accepts_reverse_position_involution(tmp_path: Path) -> None:
     task, app, logs = _case(tmp_path)
     submission = json.loads((app / "submission.json").read_text())
     result = submission["result"]
-    result.details['transformation'] = "REVERSE_POSITIONS"
-    result.details['value_multiplier'] = 1
-    result.details['value_offset'] = 0
-    for trace in result.details['traces']:
+    result.details["transformation"] = "REVERSE_POSITIONS"
+    result.details["value_multiplier"] = 1
+    result.details["value_offset"] = 0
+    for trace in result.details["traces"]:
         permutation = trace["permutation"]
         transformed = list(reversed(permutation))
         trace["transformed"] = transformed
@@ -80,7 +80,7 @@ def test_oversized_evidence_emits_zero_reward(tmp_path: Path) -> None:
     submission["evidence"][0]["sha256"] = support._digest(evidence_path)
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -93,7 +93,7 @@ def test_unhashable_permutation_trace_emits_zero_reward(tmp_path: Path) -> None:
     submission["result"]["traces"][0]["permutation"] = [1, 2, 3, 4, 5, 6, [7]]
     _rewrite(app, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -105,7 +105,7 @@ def test_boolean_permutation_entry_is_rejected(tmp_path: Path) -> None:
     submission["result"]["traces"][0]["permutation"] = [True, 2, 3, 4, 5, 6, 7]
     _rewrite(app, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -117,7 +117,7 @@ def test_boolean_result_field_is_rejected(tmp_path: Path) -> None:
     submission["result"]["fixed_point_count"] = False
     _rewrite(app, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -138,7 +138,7 @@ def test_type_sensitive_evidence_comparison(tmp_path: Path) -> None:
     submission["evidence"][0]["sha256"] = "sha256:" + hashlib.sha256(raw).hexdigest()
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -150,7 +150,7 @@ def test_boolean_trace_inversions_is_rejected(tmp_path: Path) -> None:
     submission["result"]["traces"][0]["inversions"] = False
     _rewrite(app, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -162,7 +162,7 @@ def test_boolean_trace_transformed_entry_is_rejected(tmp_path: Path) -> None:
     submission["result"]["traces"][0]["transformed"][0] = True
     _rewrite(app, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -173,8 +173,8 @@ def test_decouples_scope_from_assurance(tmp_path: Path) -> None:
     submission = json.loads((app / "submission.json").read_text())
     _rewrite(app, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 0.0
-    assert result.details['evidence_validity'] == 0.0
-    assert result.details['scope_accuracy'] == 0.0
-    assert result.details['assurance_calibration'] == 0.0
+    assert result.details["correctness"] == 0.0
+    assert result.details["evidence_validity"] == 0.0
+    assert result.details["scope_accuracy"] == 0.0
+    assert result.details["assurance_calibration"] == 0.0
     assert result.reward == 0.0

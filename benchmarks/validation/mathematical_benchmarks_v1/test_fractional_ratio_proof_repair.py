@@ -27,7 +27,7 @@ def test_accepts_equivalent_limitation_wording(tmp_path: Path) -> None:
             ]
         ),
     )
-    assert result.details['scope_accuracy'] == 1.0
+    assert result.details["scope_accuracy"] == 1.0
     assert result.reward == 1.0
 
 
@@ -47,7 +47,7 @@ def test_published_evidence_sentence_needs_no_private_marker(tmp_path: Path) -> 
     submission["evidence"][0]["sha256"] = support._digest(evidence)
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 1.0
+    assert result.details["evidence_validity"] == 1.0
     assert result.reward == 1.0
 
 
@@ -55,8 +55,8 @@ def test_visible_input_tamper_preserves_math_diagnostic(tmp_path: Path) -> None:
     task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
     (app / "input.json").write_text("{}")
     result = support._run_verifier(task, app, logs)
-    assert result.details['input_binding'] == 0.0
-    assert result.details['correctness'] == 1.0
+    assert result.details["input_binding"] == 0.0
+    assert result.details["correctness"] == 1.0
     assert result.reward == 0.0
 
 
@@ -74,7 +74,7 @@ def test_oversized_ratio_is_rejected_without_crashing(tmp_path: Path) -> None:
         s["result"]["attained_ratio"] = "1" * 5000 + "/1"
 
     result = _run(tmp_path, mutate)
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -103,14 +103,14 @@ def test_boolean_constant_residual_is_rejected(tmp_path: Path) -> None:
     result = _run(
         tmp_path, lambda s: s["result"].__setitem__("constant_residual", False)
     )
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
 def test_bad_scope_preserves_math_diagnostic(tmp_path: Path) -> None:
     result = _run(tmp_path, lambda s: s.__setitem__("scope", "wrong"))
-    assert result.details['correctness'] == 1.0
-    assert result.details['scope_accuracy'] == 0.0
+    assert result.details["correctness"] == 1.0
+    assert result.details["scope_accuracy"] == 0.0
     assert result.reward == 0.0
 
 
@@ -126,7 +126,7 @@ def test_rejects_false_verified_claim(tmp_path: Path) -> None:
         s["claimed_assurance"] = "VERIFIED"
 
     result = _run(tmp_path, mutate)
-    assert result.details['false_certification'] is True
+    assert result.details["false_certification"] is True
     assert result.reward == 0.0
 
 
@@ -137,7 +137,7 @@ def test_unhashable_mismatch_entry_does_not_crash(tmp_path: Path) -> None:
     support._bind_result_evidence(app, submission)
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -146,7 +146,7 @@ def test_float_maximum_residual_sum_is_rejected(tmp_path: Path) -> None:
         tmp_path,
         lambda s: s["result"].__setitem__("maximum_residual_sum", 0.0),
     )
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -165,7 +165,7 @@ def test_equivalent_evidence_phrasing_is_accepted(tmp_path: Path) -> None:
     submission["evidence"][0]["sha256"] = support._digest(evidence)
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 1.0
+    assert result.details["evidence_validity"] == 1.0
     assert result.reward == 1.0
 
 
@@ -180,7 +180,7 @@ def test_unrelated_evidence_text_is_rejected(tmp_path: Path) -> None:
     submission["evidence"][0]["sha256"] = support._digest(evidence)
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -196,7 +196,7 @@ def test_contradictory_keyword_evidence_is_rejected(tmp_path: Path) -> None:
     submission["evidence"][0]["sha256"] = support._digest(evidence)
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -216,7 +216,7 @@ def test_large_valid_evidence_is_accepted(tmp_path: Path) -> None:
     submission["evidence"][0]["sha256"] = support._digest(evidence)
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 1.0
+    assert result.details["evidence_validity"] == 1.0
     assert result.reward == 1.0
 
 
@@ -227,5 +227,5 @@ def test_oversized_index_array_is_rejected_without_crashing(tmp_path: Path) -> N
     support._bind_result_evidence(app, submission)
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0

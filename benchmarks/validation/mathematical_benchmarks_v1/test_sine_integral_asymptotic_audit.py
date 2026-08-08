@@ -39,8 +39,8 @@ def test_accepts_reordered_equivalent_terms(tmp_path: Path) -> None:
     submission = _submission(app)
     result = submission["result"]
     assert isinstance(result, dict)
-    result.details['tail_terms'] = list(reversed(result.details['tail_terms']))
-    result.details['si_terms'] = list(reversed(result.details['si_terms']))
+    result.details["tail_terms"] = list(reversed(result.details["tail_terms"]))
+    result.details["si_terms"] = list(reversed(result.details["si_terms"]))
     _bind_evidence(app, submission)
     support._write_json(app / "submission.json", submission)
     assert support._run_verifier(task, app, logs).reward == 1.0
@@ -51,12 +51,12 @@ def test_rejects_published_wrong_sine_sign(tmp_path: Path) -> None:
     submission = _submission(app)
     result = submission["result"]
     assert isinstance(result, dict)
-    for term in result.details['si_terms']:
+    for term in result.details["si_terms"]:
         if term["function"] == "SIN" and term["power"] == 2:
             term["coefficient"] = 1
-    result.details['corrected_sine_coefficient'] = 1
+    result.details["corrected_sine_coefficient"] = 1
     support._write_json(app / "submission.json", submission)
-    assert support._run_verifier(task, app, logs).details['correctness'] == 0.0
+    assert support._run_verifier(task, app, logs).details["correctness"] == 0.0
 
 
 def test_rejects_corrupt_remainder_bound(tmp_path: Path) -> None:
@@ -64,9 +64,9 @@ def test_rejects_corrupt_remainder_bound(tmp_path: Path) -> None:
     submission = _submission(app)
     result = submission["result"]
     assert isinstance(result, dict)
-    result.details['absolute_remainder_bound']["numerator"] = 23
+    result.details["absolute_remainder_bound"]["numerator"] = 23
     support._write_json(app / "submission.json", submission)
-    assert support._run_verifier(task, app, logs).details['correctness'] == 0.0
+    assert support._run_verifier(task, app, logs).details["correctness"] == 0.0
 
 
 def test_rejects_duplicate_evidence(tmp_path: Path) -> None:
@@ -76,7 +76,7 @@ def test_rejects_duplicate_evidence(tmp_path: Path) -> None:
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
     assert result.reward == 0.0
-    assert result.details['correctness'] == 1.0
+    assert result.details["correctness"] == 1.0
 
 
 def test_rejects_noninteger_remainder_power(tmp_path: Path) -> None:
@@ -84,10 +84,10 @@ def test_rejects_noninteger_remainder_power(tmp_path: Path) -> None:
     submission = _submission(app)
     result = submission["result"]
     assert isinstance(result, dict)
-    result.details['tail_remainder']["power"] = 6.0
+    result.details["tail_remainder"]["power"] = 6.0
     _bind_evidence(app, submission)
     support._write_json(app / "submission.json", submission)
-    assert support._run_verifier(task, app, logs).details['correctness'] == 0.0
+    assert support._run_verifier(task, app, logs).details["correctness"] == 0.0
 
 
 def test_rejects_noninteger_si_remainder_coefficient(tmp_path: Path) -> None:
@@ -95,10 +95,10 @@ def test_rejects_noninteger_si_remainder_coefficient(tmp_path: Path) -> None:
     submission = _submission(app)
     result = submission["result"]
     assert isinstance(result, dict)
-    result.details['si_remainder']["coefficient"] = 120.0
+    result.details["si_remainder"]["coefficient"] = 120.0
     _bind_evidence(app, submission)
     support._write_json(app / "submission.json", submission)
-    assert support._run_verifier(task, app, logs).details['correctness'] == 0.0
+    assert support._run_verifier(task, app, logs).details["correctness"] == 0.0
 
 
 def test_rejects_boolean_reported_coefficient(tmp_path: Path) -> None:
@@ -106,10 +106,10 @@ def test_rejects_boolean_reported_coefficient(tmp_path: Path) -> None:
     submission = _submission(app)
     result = submission["result"]
     assert isinstance(result, dict)
-    result.details['published_sine_coefficient'] = True
+    result.details["published_sine_coefficient"] = True
     _bind_evidence(app, submission)
     support._write_json(app / "submission.json", submission)
-    assert support._run_verifier(task, app, logs).details['correctness'] == 0.0
+    assert support._run_verifier(task, app, logs).details["correctness"] == 0.0
 
 
 def test_rejects_stale_evidence_binding(tmp_path: Path) -> None:
@@ -117,12 +117,12 @@ def test_rejects_stale_evidence_binding(tmp_path: Path) -> None:
     submission = _submission(app)
     result = submission["result"]
     assert isinstance(result, dict)
-    result.details['tail_terms'] = list(reversed(result.details['tail_terms']))
-    result.details['si_terms'] = list(reversed(result.details['si_terms']))
+    result.details["tail_terms"] = list(reversed(result.details["tail_terms"]))
+    result.details["si_terms"] = list(reversed(result.details["si_terms"]))
     support._write_json(app / "submission.json", submission)
     verdict = support._run_verifier(task, app, logs)
-    assert verdict.details['correctness'] == 1.0
-    assert verdict.details['evidence_validity'] == 0.0
+    assert verdict.details["correctness"] == 1.0
+    assert verdict.details["evidence_validity"] == 0.0
     assert verdict.reward == 0.0
 
 
@@ -132,8 +132,8 @@ def test_input_tamper_is_reported_separately(tmp_path: Path) -> None:
     frozen["source"]["row"] = 999
     support._write_json(app / "input.json", frozen)
     verdict = support._run_verifier(task, app, logs)
-    assert verdict.details['correctness'] == 1.0
-    assert verdict.details['input_binding'] == 0.0
+    assert verdict.details["correctness"] == 1.0
+    assert verdict.details["input_binding"] == 0.0
     assert verdict.reward == 0.0
 
 
@@ -143,8 +143,8 @@ def test_malformed_limitations_fail_closed(tmp_path: Path) -> None:
     submission["limitations"] = None
     support._write_json(app / "submission.json", submission)
     verdict = support._run_verifier(task, app, logs)
-    assert verdict.details['limitations_accuracy'] == 0.0
-    assert verdict.details['protocol_compliance'] == 0.0
+    assert verdict.details["limitations_accuracy"] == 0.0
+    assert verdict.details["protocol_compliance"] == 0.0
     assert verdict.reward == 0.0
 
 
@@ -155,7 +155,7 @@ def test_unhashable_term_function_fails_closed(tmp_path: Path) -> None:
     _bind_evidence(app, submission)
     support._write_json(app / "submission.json", submission)
     verdict = support._run_verifier(task, app, logs)
-    assert verdict.details['correctness'] == 0.0
+    assert verdict.details["correctness"] == 0.0
     assert verdict.reward == 0.0
 
 
@@ -165,6 +165,6 @@ def test_bad_evidence_descriptor_is_protocol_failure(tmp_path: Path) -> None:
     submission["evidence"][0]["path"] = "../answer.txt"
     support._write_json(app / "submission.json", submission)
     verdict = support._run_verifier(task, app, logs)
-    assert verdict.details['protocol_compliance'] == 0.0
-    assert verdict.details['evidence_validity'] == 0.0
+    assert verdict.details["protocol_compliance"] == 0.0
+    assert verdict.details["evidence_validity"] == 0.0
     assert verdict.reward == 0.0

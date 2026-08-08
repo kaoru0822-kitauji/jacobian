@@ -1,12 +1,13 @@
 from __future__ import annotations
+
 import json
 from pathlib import Path
 
 from proof_replay import VerifyResult, verify_submission
 from verifier_support import (
-    normalize_reward_file,
     false_verified_claim,
     load_submission,
+    normalize_reward_file,
     workspace_input_is_bound,
 )
 

@@ -433,17 +433,17 @@ __all__ = [
     "false_verified_claim",
     "is_regular_bounded_file",
     "load_submission",
+    "normalize_reward_file",
     "read_evidence_json",
     "resolve_evidence",
     "sha256_uri",
     "strict_submission_contract",
     "valid_sha256_uri",
     "workspace_input_is_bound",
-    "normalize_reward_file",
 ]
 
 
-def normalize_reward_file(reward_path: object) -> None:
+def normalize_reward_file(reward_path: Path) -> None:
     """Split a verifier's completed reward payload into scalar and details files."""
 
     import json
@@ -482,4 +482,7 @@ def normalize_reward_file(reward_path: object) -> None:
     (path.parent / "reward-details.json").write_text(
         json.dumps(details, sort_keys=True, allow_nan=False), encoding="utf-8"
     )
-    path.write_text(json.dumps({"reward": reward}, sort_keys=True, allow_nan=False), encoding="utf-8")
+    path.write_text(
+        json.dumps({"reward": reward}, sort_keys=True, allow_nan=False),
+        encoding="utf-8",
+    )

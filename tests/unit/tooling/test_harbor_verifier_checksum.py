@@ -7,13 +7,13 @@ from pathlib import Path
 
 import pytest
 from benchmarks.tooling.errors import HarborSuiteError
+from benchmarks.tooling.harbor_suite import verifier_bundle_checksum
 from tests.unit.tooling.harbor_suite_support import (
     _make_canonical_task,
     _make_suite_with_task,
     patch_harbor_root,
 )
 from tools import sync_harbor_verifier_support as checksum_tool
-from benchmarks.tooling.harbor_suite import verifier_bundle_checksum
 
 
 def test_checksum_update_only_rewrites_selected_task(

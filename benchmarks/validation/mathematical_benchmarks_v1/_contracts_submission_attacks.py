@@ -72,4 +72,4 @@ def test_verifiers_fail_closed_on_submission_attacks(
     else:
         assert rejected.reward == 0.0
     if attack == "unsupported-verified":
-        assert rejected.details['false_certification'] is True
+        assert rejected.details["false_certification"] is True

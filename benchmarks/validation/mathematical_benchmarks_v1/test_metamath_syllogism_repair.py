@@ -45,7 +45,7 @@ def _tamper(app: Path, submission: dict, mutation: str) -> None:
 def test_metamath_repair_accepts_oracle(tmp_path: Path) -> None:
     task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
+    assert accepted.details["correctness"] == 1.0
     assert accepted.reward == pytest.approx(1.0)
 
 
@@ -71,10 +71,10 @@ def test_metamath_repair_keeps_diagnostics_for_unsupported_assurance(
     _bind(app, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 1.0
-    assert rejected.details['evidence_validity'] == 1.0
-    assert rejected.details['scope_accuracy'] == 1.0
-    assert rejected.details['assurance_calibration'] == 0.0
+    assert rejected.details["correctness"] == 1.0
+    assert rejected.details["evidence_validity"] == 1.0
+    assert rejected.details["scope_accuracy"] == 1.0
+    assert rejected.details["assurance_calibration"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -132,8 +132,8 @@ def test_metamath_repair_rejects_weak_evidence(
     support._write_json(app / "submission.json", submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 1.0
-    assert rejected.details['evidence_validity'] == 0.0
+    assert rejected.details["correctness"] == 1.0
+    assert rejected.details["evidence_validity"] == 0.0
     assert rejected.reward == 0.0
 
 

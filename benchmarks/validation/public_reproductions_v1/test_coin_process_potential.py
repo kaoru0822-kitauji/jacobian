@@ -62,7 +62,7 @@ def test_false_verified_is_rejected(tmp_path: Path) -> None:
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
     assert result.reward == 0.0
-    assert result.details['false_certification'] is True
+    assert result.details["false_certification"] is True
 
 
 def test_boolean_integer_fields_are_rejected(tmp_path: Path) -> None:
@@ -73,7 +73,7 @@ def test_boolean_integer_fields_are_rejected(tmp_path: Path) -> None:
     submission["result"]["average_stopping_time"]["denominator"] = True
     _rewrite(app, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -94,8 +94,8 @@ def test_empty_evidence_is_rejected_without_keyword_scoring(tmp_path: Path) -> N
     (app / "evidence" / "answer.txt").write_text("\n")
     _rewrite(app, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 1.0
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["correctness"] == 1.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -105,10 +105,10 @@ def test_conservative_assurance_preserves_other_dimensions(tmp_path: Path) -> No
     submission["claimed_assurance"] = "UNVERIFIED"
     _rewrite(app, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 1.0
-    assert result.details['evidence_validity'] == 1.0
-    assert result.details['scope_accuracy'] == 1.0
-    assert result.details['assurance_calibration'] == 0.0
+    assert result.details["correctness"] == 1.0
+    assert result.details["evidence_validity"] == 1.0
+    assert result.details["scope_accuracy"] == 1.0
+    assert result.details["assurance_calibration"] == 0.0
     assert result.reward == 0.0
 
 
@@ -118,11 +118,11 @@ def test_false_verified_preserves_evidence_and_scope(tmp_path: Path) -> None:
     submission["claimed_assurance"] = "VERIFIED"
     _rewrite(app, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 1.0
-    assert result.details['evidence_validity'] == 1.0
-    assert result.details['scope_accuracy'] == 1.0
-    assert result.details['assurance_calibration'] == 0.0
-    assert result.details['false_certification'] is True
+    assert result.details["correctness"] == 1.0
+    assert result.details["evidence_validity"] == 1.0
+    assert result.details["scope_accuracy"] == 1.0
+    assert result.details["assurance_calibration"] == 0.0
+    assert result.details["false_certification"] is True
     assert result.reward == 0.0
 
 
@@ -132,8 +132,8 @@ def test_generality_claim_in_limitations_is_rejected(tmp_path: Path) -> None:
     submission["limitations"] = ["This proves the result for arbitrary n."]
     _rewrite(app, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 0.0
-    assert result.details['scope_accuracy'] == 0.0
+    assert result.details["correctness"] == 0.0
+    assert result.details["scope_accuracy"] == 0.0
     assert result.reward == 0.0
 
 
@@ -145,5 +145,5 @@ def test_fixed_scope_limitation_without_keyword_is_accepted(tmp_path: Path) -> N
     ]
     _rewrite(app, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['scope_accuracy'] == 1.0
+    assert result.details["scope_accuracy"] == 1.0
     assert result.reward == 1.0

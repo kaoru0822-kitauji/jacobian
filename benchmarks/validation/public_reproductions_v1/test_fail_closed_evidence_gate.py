@@ -49,4 +49,4 @@ def test_wrong_evidence_digest_zeros_reward_with_visible_diagnostics(
     assert rejected.reward == pytest.approx(0.0)
     # Correct mathematics may remain visible; aggregate must still fail closed.
     if "correctness" in rejected:
-        assert rejected.details['correctness'] in {0.0, 1.0}
+        assert rejected.details["correctness"] in {0.0, 1.0}

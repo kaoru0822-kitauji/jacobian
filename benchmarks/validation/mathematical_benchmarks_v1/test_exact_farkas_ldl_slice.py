@@ -36,7 +36,7 @@ def _bind_farkas_slice(app: Path, submission: dict) -> None:
 def test_exact_farkas_slice_accepts_sylvester_certificate(tmp_path: Path) -> None:
     task, app, logs = _prepare_farkas_slice_case(tmp_path)
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
+    assert accepted.details["correctness"] == 1.0
     assert accepted.reward == pytest.approx(1.0)
 
 
@@ -71,7 +71,7 @@ def test_exact_farkas_slice_accepts_ldl_certificate(tmp_path: Path) -> None:
     _bind_farkas_slice(app, submission)
 
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
+    assert accepted.details["correctness"] == 1.0
     assert accepted.reward == pytest.approx(1.0)
 
 
@@ -84,7 +84,7 @@ def test_exact_farkas_slice_rejects_corrupted_minor(tmp_path: Path) -> None:
     _bind_farkas_slice(app, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -95,7 +95,7 @@ def test_exact_farkas_slice_rejects_full_certificate_overclaim(tmp_path: Path) -
     _bind_farkas_slice(app, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['scope_accuracy'] == 0.0
+    assert rejected.details["scope_accuracy"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -112,8 +112,8 @@ def test_exact_farkas_slice_rejects_checked_assurance_above_ceiling(
     _bind_farkas_slice(app, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 1.0
-    assert rejected.details['assurance_calibration'] == 0.0
+    assert rejected.details["correctness"] == 1.0
+    assert rejected.details["assurance_calibration"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -123,7 +123,7 @@ def test_exact_farkas_slice_rejects_oversized_submission(tmp_path: Path) -> None
     (app / "submission.json").write_text('{"a": 1' + ", " * (2 * 1024 * 1024) + "}")
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -137,5 +137,5 @@ def test_exact_farkas_slice_rejects_missing_evidence_envelope(tmp_path: Path) ->
     support._write_json(app / "submission.json", submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['evidence_validity'] == 0.0
+    assert rejected.details["evidence_validity"] == 0.0
     assert rejected.reward == 0.0

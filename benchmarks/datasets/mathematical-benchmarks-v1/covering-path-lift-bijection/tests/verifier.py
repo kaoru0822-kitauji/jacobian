@@ -5,9 +5,9 @@ from pathlib import Path
 from typing import Any
 
 from verifier_support import (
-    normalize_reward_file,
     evidence_list_is_bound,
     load_submission,
+    normalize_reward_file,
     resolve_evidence,
     strict_submission_contract,
 )

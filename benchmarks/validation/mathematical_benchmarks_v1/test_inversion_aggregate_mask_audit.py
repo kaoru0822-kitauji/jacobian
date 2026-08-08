@@ -80,8 +80,8 @@ def test_verified_claim_preserves_correctness_diagnostic(tmp_path: Path):
     rewrite(app, s)
     result = support._run_verifier(task, app, logs)
     assert result.reward == 0.0
-    assert result.details['correctness'] == 1.0
-    assert result.details['false_certification'] is True
+    assert result.details["correctness"] == 1.0
+    assert result.details["false_certification"] is True
 
 
 def test_rejects_oversized_evidence(tmp_path: Path):

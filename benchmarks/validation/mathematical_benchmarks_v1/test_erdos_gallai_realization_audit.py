@@ -19,7 +19,7 @@ def test_accepts_reversed_one_based_edges(tmp_path: Path) -> None:
     case["edges"] = [[v + 1, u + 1] for u, v in case["edges"]]
     support._write_json(app / "submission.json", submission)
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
+    assert accepted.details["correctness"] == 1.0
     assert accepted.reward == pytest.approx(1.0)
 
 

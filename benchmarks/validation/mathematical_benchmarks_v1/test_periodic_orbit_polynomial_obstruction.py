@@ -42,7 +42,7 @@ def test_periodic_orbit_obstruction_accepts_reordered_prime_reductions(
     support._write_json(submission_path, submission)
 
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
+    assert accepted.details["correctness"] == 1.0
     assert accepted.reward == pytest.approx(1.0)
 
 
@@ -59,7 +59,7 @@ def test_periodic_orbit_obstruction_rejects_one_sided_reduction(
     support._write_json(submission_path, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -74,7 +74,7 @@ def test_periodic_orbit_obstruction_rejects_corrupted_mobius_coefficient(
     support._write_json(submission_path, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -93,7 +93,7 @@ def test_periodic_orbit_obstruction_accepts_sign_equivalent_residue_vectors(
     support._write_json(submission_path, submission)
 
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
+    assert accepted.details["correctness"] == 1.0
     assert accepted.reward == pytest.approx(1.0)
 
 
@@ -109,7 +109,7 @@ def test_periodic_orbit_obstruction_rejects_boolean_coefficients(
     support._write_json(submission_path, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -125,7 +125,7 @@ def test_periodic_orbit_obstruction_rejects_boolean_residue_coefficients(
     support._write_json(submission_path, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -139,7 +139,7 @@ def test_periodic_orbit_obstruction_rejects_oversized_submission(
     submission_path = app / "submission.json"
     submission_path.write_text("[" * 2_000_000 + "1" + "]" * 2_000_000)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -183,7 +183,7 @@ def test_periodic_orbit_obstruction_rejects_oversized_workspace_input(
     task, app, logs = _prepare_periodic_orbit_case(tmp_path)
     (app / "input.json").write_text("x" * 2_000_000)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -198,7 +198,7 @@ def test_periodic_orbit_obstruction_rejects_oversized_evidence(
     submission["evidence"][0]["sha256"] = support._digest(evidence_path)
     support._write_json(app / "submission.json", submission)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['evidence_validity'] == 0.0
+    assert rejected.details["evidence_validity"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -225,5 +225,5 @@ def test_periodic_orbit_obstruction_rejects_boolean_in_evidence_copy(
     support._write_json(submission_path, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['evidence_validity'] == 0.0
+    assert rejected.details["evidence_validity"] == 0.0
     assert rejected.reward == 0.0

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import json
 import math
 import re
@@ -7,10 +8,10 @@ from functools import reduce
 from pathlib import Path
 
 from verifier_support import (
-    normalize_reward_file,
     evidence_list_is_bound,
     false_verified_claim,
     load_submission,
+    normalize_reward_file,
     resolve_evidence,
     strict_submission_contract,
 )

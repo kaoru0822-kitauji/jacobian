@@ -1,6 +1,7 @@
 """Clean-room verifier for the perfect-cuboid finite scope audit."""
 
 from __future__ import annotations
+
 import json
 from collections import Counter
 from math import isqrt
@@ -8,11 +9,11 @@ from pathlib import Path
 from typing import Any
 
 from verifier_support import (
-    normalize_reward_file,
     MAX_SUBMISSION_BYTES,
     evidence_list_is_bound,
     is_regular_bounded_file,
     load_submission,
+    normalize_reward_file,
     read_evidence_json,
     strict_submission_contract,
     workspace_input_is_bound,

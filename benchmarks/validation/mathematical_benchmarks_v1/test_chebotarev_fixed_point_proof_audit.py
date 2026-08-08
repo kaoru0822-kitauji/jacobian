@@ -46,4 +46,4 @@ def test_rejects_correct_density_with_wrong_discriminant(tmp_path: Path):
     s = json.loads((app / "submission.json").read_text())
     s["result"]["actual_discriminant"] = 4352
     rewrite(app, s)
-    assert support._run_verifier(task, app, logs).details['correctness'] == 0.0
+    assert support._run_verifier(task, app, logs).details["correctness"] == 0.0

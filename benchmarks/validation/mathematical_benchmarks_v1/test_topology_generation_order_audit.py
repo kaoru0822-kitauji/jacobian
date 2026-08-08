@@ -23,7 +23,7 @@ def test_accepts_reordered_incomparable_family_and_different_witness(
     submission["result"]["witness_open_set"] = 2
     support._write_json(path, submission)
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
+    assert accepted.details["correctness"] == 1.0
     assert accepted.reward == pytest.approx(1.0)
 
 
@@ -45,7 +45,7 @@ def test_rejects_corrupted_or_trivial_models(
     submission["result"][field] = value
     support._write_json(path, submission)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -57,4 +57,4 @@ def test_rejects_unearned_verified_claim(tmp_path: Path) -> None:
     support._write_json(path, submission)
     rejected = support._run_verifier(task, app, logs)
     assert rejected.reward == 0.0
-    assert rejected.details['false_certification'] is True
+    assert rejected.details["false_certification"] is True

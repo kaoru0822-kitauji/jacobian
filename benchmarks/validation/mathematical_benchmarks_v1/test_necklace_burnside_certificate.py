@@ -55,26 +55,26 @@ def _rewrite(app: Path, submission: dict, result: dict | None = None) -> None:
 
 def test_independent_orbit_derivation():
     result = load_verifier().derive()
-    assert result.details['valid_labelled_words'] == 2206
-    assert result.details['burnside_numerator'] == 2816
-    assert result.details['orbit_count'] == 88
-    assert len(result.details['canonical_representatives']) == 88
+    assert result.details["valid_labelled_words"] == 2206
+    assert result.details["burnside_numerator"] == 2816
+    assert result.details["orbit_count"] == 88
+    assert len(result.details["canonical_representatives"]) == 88
 
 
 def test_wraparound_and_reflection_are_material():
     verifier = load_verifier()
     assert not verifier.valid(tuple(map(int, "0010101010101010")))
     result = verifier.derive()
-    assert result.details['reflection_fixed_counts'] == [42, 26] * 8
+    assert result.details["reflection_fixed_counts"] == [42, 26] * 8
 
 
 def test_corrupt_fixed_count_or_orbit_representative_is_rejected():
     verifier = load_verifier()
     result = verifier.derive()
-    result.details['rotation_fixed_counts'][0] -= 1
+    result.details["rotation_fixed_counts"][0] -= 1
     assert not verifier.matches(result)
     result = verifier.derive()
-    result.details['canonical_representatives'].pop()
+    result.details["canonical_representatives"].pop()
     assert not verifier.matches(result)
 
 
@@ -86,25 +86,27 @@ def test_contract_has_no_verified_upgrade():
 def test_canonical_solution_receives_full_reward(tmp_path: Path) -> None:
     task, app, logs = _case(tmp_path)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 1.0
-    assert result.details['evidence_validity'] == 1.0
-    assert result.details['scope_accuracy'] == 1.0
-    assert result.details['assurance_calibration'] == 1.0
+    assert result.details["correctness"] == 1.0
+    assert result.details["evidence_validity"] == 1.0
+    assert result.details["scope_accuracy"] == 1.0
+    assert result.details["assurance_calibration"] == 1.0
     assert result.reward == 1.0
-    assert result.details['false_certification'] is False
+    assert result.details["false_certification"] is False
 
 
 def test_rejects_boolean_fixed_counts(tmp_path: Path) -> None:
     task, app, logs = _case(tmp_path)
     submission = json.loads((app / "submission.json").read_text())
     result = dict(submission["result"])
-    result.details['rotation_fixed_counts'] = [bool(x) for x in result.details['rotation_fixed_counts']]
+    result.details["rotation_fixed_counts"] = [
+        bool(x) for x in result.details["rotation_fixed_counts"]
+    ]
     submission["result"] = result
     _rewrite(app, submission, result)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
-    assert rejected.details['evidence_validity'] == 0.0
+    assert rejected.details["correctness"] == 0.0
+    assert rejected.details["evidence_validity"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -112,14 +114,14 @@ def test_rejects_float_fixed_counts(tmp_path: Path) -> None:
     task, app, logs = _case(tmp_path)
     submission = json.loads((app / "submission.json").read_text())
     result = dict(submission["result"])
-    result.details['rotation_fixed_counts'] = [
-        float(x) for x in result.details['rotation_fixed_counts']
+    result.details["rotation_fixed_counts"] = [
+        float(x) for x in result.details["rotation_fixed_counts"]
     ]
     submission["result"] = result
     _rewrite(app, submission, result)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -129,10 +131,10 @@ def test_assurance_failure_preserves_evidence_and_scope(tmp_path: Path) -> None:
     submission["claimed_assurance"] = "VERIFIED"
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 1.0
-    assert result.details['evidence_validity'] == 1.0
-    assert result.details['scope_accuracy'] == 1.0
-    assert result.details['assurance_calibration'] == 0.0
+    assert result.details["correctness"] == 1.0
+    assert result.details["evidence_validity"] == 1.0
+    assert result.details["scope_accuracy"] == 1.0
+    assert result.details["assurance_calibration"] == 0.0
     assert result.reward == 0.0
 
 
@@ -145,8 +147,8 @@ def test_evidence_result_must_match_submission_result(tmp_path: Path) -> None:
     _rewrite(app, submission, corrupted)
 
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 0.0
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["correctness"] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -157,7 +159,7 @@ def test_evidence_limitations_must_match_submission(tmp_path: Path) -> None:
     support._write_json(app / "submission.json", submission)
 
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -170,10 +172,10 @@ def test_protocol_compliance_is_reported(tmp_path: Path) -> None:
     submission["extra_field"] = "unexpected"
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['protocol_compliance'] == 0.0
-    assert result.details['correctness'] == 0.0
-    assert result.details['evidence_validity'] == 0.0
-    assert result.details['scope_accuracy'] == 0.0
+    assert result.details["protocol_compliance"] == 0.0
+    assert result.details["correctness"] == 0.0
+    assert result.details["evidence_validity"] == 0.0
+    assert result.details["scope_accuracy"] == 0.0
     assert result.reward == 0.0
 
 
@@ -187,8 +189,8 @@ def test_float_in_result_reports_protocol_failure(tmp_path: Path) -> None:
     submission["result"] = corrupted
     _rewrite(app, submission, corrupted)
     result = support._run_verifier(task, app, logs)
-    assert result.details['protocol_compliance'] == 0.0
-    assert result.details['correctness'] == 0.0
+    assert result.details["protocol_compliance"] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -219,7 +221,7 @@ def test_representative_schema_violations_report_protocol_failure(
     submission["result"] = corrupted
     _rewrite(app, submission, corrupted)
     result = support._run_verifier(task, app, logs)
-    assert result.details['protocol_compliance'] == 0.0
+    assert result.details["protocol_compliance"] == 0.0
     assert result.reward == 0.0
 
 
@@ -232,10 +234,10 @@ def test_input_tamper_preserves_assurance_diagnostics(tmp_path: Path) -> None:
     task, app, logs = _case(tmp_path)
     (app / "input.json").write_text("{}")
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 1.0
-    assert result.details['input_binding'] == 0.0
-    assert result.details['scope_accuracy'] == 1.0
-    assert result.details['assurance_calibration'] == 1.0
+    assert result.details["correctness"] == 1.0
+    assert result.details["input_binding"] == 0.0
+    assert result.details["scope_accuracy"] == 1.0
+    assert result.details["assurance_calibration"] == 1.0
     assert result.reward == 0.0
 
 
@@ -254,6 +256,6 @@ def test_oversized_evidence_with_valid_digest_is_accepted(tmp_path: Path) -> Non
     submission["evidence"][0]["sha256"] = support._digest(evidence_path)
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 1.0
-    assert result.details['correctness'] == 1.0
+    assert result.details["evidence_validity"] == 1.0
+    assert result.details["correctness"] == 1.0
     assert result.reward == 1.0

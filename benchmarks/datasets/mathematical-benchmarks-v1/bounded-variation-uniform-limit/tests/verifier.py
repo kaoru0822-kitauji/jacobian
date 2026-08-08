@@ -1,14 +1,15 @@
 from __future__ import annotations
+
 import json
 import re
 from fractions import Fraction
 from pathlib import Path
 
 from verifier_support import (
-    normalize_reward_file,
     false_verified_claim,
     is_regular_bounded_file,
     load_submission,
+    normalize_reward_file,
     resolve_evidence,
     strict_submission_contract,
 )

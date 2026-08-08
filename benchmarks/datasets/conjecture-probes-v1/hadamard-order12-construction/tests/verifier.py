@@ -1,14 +1,15 @@
 """Clean-room verifier for a normalized order-12 Hadamard construction."""
 
 from __future__ import annotations
+
 import json
 from pathlib import Path
 from typing import Any
 
 from verifier_support import (
-    normalize_reward_file,
     evidence_list_is_bound,
     load_submission,
+    normalize_reward_file,
     read_evidence_json,
     strict_submission_contract,
     workspace_input_is_bound,

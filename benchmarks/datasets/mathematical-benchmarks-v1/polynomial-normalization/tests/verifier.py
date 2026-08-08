@@ -3,9 +3,9 @@ from fractions import Fraction
 from pathlib import Path
 
 from verifier_support import (
-    normalize_reward_file,
     aggregate_reward,
     authorized_record_is_bound,
+    normalize_reward_file,
     sha256_uri,
     workspace_input_is_bound,
 )

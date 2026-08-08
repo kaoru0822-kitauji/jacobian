@@ -1,6 +1,7 @@
 """Rigorous rational-interval verifier for a finite Littlewood search."""
 
 from __future__ import annotations
+
 import json
 from fractions import Fraction
 from math import isqrt
@@ -8,9 +9,9 @@ from pathlib import Path
 from typing import Any
 
 from verifier_support import (
-    normalize_reward_file,
     evidence_list_is_bound,
     load_submission,
+    normalize_reward_file,
     read_evidence_json,
     strict_submission_contract,
     workspace_input_is_bound,

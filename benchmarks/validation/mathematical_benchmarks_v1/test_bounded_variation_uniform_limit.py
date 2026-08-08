@@ -91,7 +91,7 @@ def test_false_verified_is_rejected(tmp_path: Path) -> None:
     support._write_json(path, submission)
     result = support._run_verifier(task, app, logs)
     assert result.reward == 0.0
-    assert result.details['false_certification'] is True
+    assert result.details["false_certification"] is True
 
 
 def test_visible_input_tampering_is_rejected(tmp_path: Path) -> None:
@@ -176,7 +176,7 @@ def test_protocol_failure_preserves_math_correctness(tmp_path: Path) -> None:
     support._write_json(path, submission)
     result = support._run_verifier(task, app, logs)
     assert result.reward == 0.0
-    assert result.details['protocol'] is False
-    assert result.details['correctness'] == 0.0
-    assert result.details['evidence_validity'] == 0.0
-    assert result.details['scope_accuracy'] == 0.0
+    assert result.details["protocol"] is False
+    assert result.details["correctness"] == 0.0
+    assert result.details["evidence_validity"] == 0.0
+    assert result.details["scope_accuracy"] == 0.0

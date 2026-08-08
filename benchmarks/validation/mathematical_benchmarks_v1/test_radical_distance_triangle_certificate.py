@@ -55,13 +55,13 @@ def test_accepts_the_reversed_center_certificate(tmp_path: Path) -> None:
     task, app, logs = _case(tmp_path)
     submission = json.loads((app / "submission.json").read_text())
     result = submission["result"]
-    result.details['scaled_centers'] = [
-        list(result.details['scaled_centers'][1]),
-        list(result.details['scaled_centers'][0]),
+    result.details["scaled_centers"] = [
+        list(result.details["scaled_centers"][1]),
+        list(result.details["scaled_centers"][0]),
     ]
-    result.details['expanded_radicands'] = [
-        dict(result.details['expanded_radicands'][1]),
-        dict(result.details['expanded_radicands'][0]),
+    result.details["expanded_radicands"] = [
+        dict(result.details["expanded_radicands"][1]),
+        dict(result.details["expanded_radicands"][0]),
     ]
     _rewrite(app, submission)
     assert support._run_verifier(task, app, logs).reward == 1.0
@@ -73,13 +73,17 @@ def test_accepts_schema_valid_integral_float_centers(tmp_path: Path) -> None:
     task, app, logs = _case(tmp_path)
     submission = json.loads((app / "submission.json").read_text())
     result = submission["result"]
-    result.details['scaled_centers'] = [
-        [float(v) for v in result.details['scaled_centers'][0]],
-        [float(v) for v in result.details['scaled_centers'][1]],
+    result.details["scaled_centers"] = [
+        [float(v) for v in result.details["scaled_centers"][0]],
+        [float(v) for v in result.details["scaled_centers"][1]],
     ]
-    result.details['center_distance_squared'] = float(result.details['center_distance_squared'])
-    result.details['lower_bound'] = float(result.details['lower_bound'])
-    result.details['equality_witness'] = [float(v) for v in result.details['equality_witness']]
+    result.details["center_distance_squared"] = float(
+        result.details["center_distance_squared"]
+    )
+    result.details["lower_bound"] = float(result.details["lower_bound"])
+    result.details["equality_witness"] = [
+        float(v) for v in result.details["equality_witness"]
+    ]
     _rewrite(app, submission)
     assert support._run_verifier(task, app, logs).reward == 1.0
 
@@ -91,7 +95,7 @@ def test_rejects_boolean_radicand_coefficients(tmp_path: Path) -> None:
     submission["result"]["expanded_radicands"][0]["a2"] = True
     _rewrite(app, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -102,7 +106,7 @@ def test_rejects_boolean_center_entries(tmp_path: Path) -> None:
     submission["result"]["scaled_centers"][0][0] = True
     _rewrite(app, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -114,10 +118,10 @@ def test_decouples_correctness_from_unsupported_assurance(tmp_path: Path) -> Non
     submission = json.loads((app / "submission.json").read_text())
     _rewrite(app, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 0.0
-    assert result.details['evidence_validity'] == 0.0
-    assert result.details['scope_accuracy'] == 0.0
-    assert result.details['assurance_calibration'] == 0.0
+    assert result.details["correctness"] == 0.0
+    assert result.details["evidence_validity"] == 0.0
+    assert result.details["scope_accuracy"] == 0.0
+    assert result.details["assurance_calibration"] == 0.0
     assert result.reward == 0.0
 
 
@@ -131,7 +135,7 @@ def test_oversized_evidence_is_rejected_without_crashing(tmp_path: Path) -> None
     submission["evidence"][0]["sha256"] = support._digest(evidence_path)
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -141,9 +145,9 @@ def test_rejects_swapped_expansions_with_unswapped_centers(tmp_path: Path) -> No
     task, app, logs = _case(tmp_path)
     submission = json.loads((app / "submission.json").read_text())
     result = submission["result"]
-    result.details['expanded_radicands'] = [
-        dict(result.details['expanded_radicands'][1]),
-        dict(result.details['expanded_radicands'][0]),
+    result.details["expanded_radicands"] = [
+        dict(result.details["expanded_radicands"][1]),
+        dict(result.details["expanded_radicands"][0]),
     ]
     _rewrite(app, submission)
     assert support._run_verifier(task, app, logs).reward == 0.0
@@ -182,5 +186,5 @@ def test_rejects_evidence_limitations_unbound_from_submission(tmp_path: Path) ->
     submission["evidence"][0]["sha256"] = "sha256:" + hashlib.sha256(raw).hexdigest()
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0

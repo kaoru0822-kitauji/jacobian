@@ -51,7 +51,7 @@ def test_rejects_sampled_but_corrupt_root(tmp_path: Path) -> None:
     submission["result"]["checkpoints"][1]["root"] = {"numerator": 4, "denominator": 1}
     _rewrite(app, submission)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -60,4 +60,4 @@ def test_rejects_duplicate_checkpoint_shortcut(tmp_path: Path) -> None:
     submission = json.loads((app / "submission.json").read_text())
     submission["result"]["checkpoints"][2] = submission["result"]["checkpoints"][1]
     _rewrite(app, submission)
-    assert support._run_verifier(task, app, logs).details['correctness'] == 0.0
+    assert support._run_verifier(task, app, logs).details["correctness"] == 0.0

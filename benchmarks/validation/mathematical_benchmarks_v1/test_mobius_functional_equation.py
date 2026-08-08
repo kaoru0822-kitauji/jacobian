@@ -22,7 +22,7 @@ def _prepare_mobius_case(tmp_path: Path):
 def test_mobius_functional_equation_accepts_exact_orbit(tmp_path: Path) -> None:
     task, app, logs = _prepare_mobius_case(tmp_path)
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
+    assert accepted.details["correctness"] == 1.0
     assert accepted.reward == pytest.approx(1.0)
 
 
@@ -45,7 +45,7 @@ def test_mobius_functional_equation_rejects_corrupted_orbit_value(
     support._write_json(submission_path, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -68,7 +68,7 @@ def test_mobius_functional_equation_rejects_singular_matrix_claim(
     support._write_json(submission_path, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -90,7 +90,7 @@ def test_mobius_functional_equation_rejects_scalar_orbit(tmp_path: Path) -> None
     support._write_json(submission_path, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -112,7 +112,7 @@ def test_mobius_functional_equation_rejects_short_orbit(tmp_path: Path) -> None:
     support._write_json(submission_path, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -139,5 +139,5 @@ def test_mobius_functional_equation_rejects_boolean_matrix(tmp_path: Path) -> No
     support._write_json(submission_path, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0

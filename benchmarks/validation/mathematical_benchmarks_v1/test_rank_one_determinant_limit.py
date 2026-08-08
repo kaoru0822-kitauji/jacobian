@@ -83,7 +83,7 @@ def test_corrupted_symbolic_certificates_are_rejected(
     mutation(submission["result"][section])
     write_bound(app, submission_path, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -92,7 +92,7 @@ def test_verified_claim_is_rejected(tmp_path: Path) -> None:
     submission["claimed_assurance"] = "VERIFIED"
     support._write_json(submission_path, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['false_certification'] is True
+    assert result.details["false_certification"] is True
     assert result.reward == 0.0
 
 
@@ -101,7 +101,7 @@ def test_checked_claim_above_computed_ceiling_is_rejected(tmp_path: Path) -> Non
     submission["claimed_assurance"] = "CHECKED"
     support._write_json(submission_path, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -113,7 +113,7 @@ def test_scalar_sample_elements_rejected_without_crash(tmp_path: Path) -> None:
     submission["result"]["samples"] = [1, 2, 3, 4, 5, 6]
     write_bound(app, submission_path, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -125,7 +125,7 @@ def test_empty_limitations_rejected(tmp_path: Path) -> None:
     submission["limitations"] = []
     write_bound(app, submission_path, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['scope_accuracy'] == 0.0
+    assert result.details["scope_accuracy"] == 0.0
     assert result.reward < 1.0
 
 
@@ -135,7 +135,7 @@ def test_wrong_limitations_rejected(tmp_path: Path) -> None:
     submission["limitations"] = ["some other limitation"]
     write_bound(app, submission_path, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['scope_accuracy'] == 0.0
+    assert result.details["scope_accuracy"] == 0.0
     assert result.reward < 1.0
 
 
@@ -151,7 +151,7 @@ def test_float_determinant_coefficients_rejected(tmp_path: Path) -> None:
     sample["determinant_linear"] = float(sample["determinant_linear"])
     write_bound(app, submission_path, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -174,5 +174,5 @@ def test_unreduced_rational_coefficients_accepted(tmp_path: Path) -> None:
     sample["reciprocal_sum"] = unreduced
     write_bound(app, submission_path, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 1.0
+    assert result.details["correctness"] == 1.0
     assert result.reward == pytest.approx(1.0)

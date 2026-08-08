@@ -24,7 +24,7 @@ def test_rejects_corrupted_recurrence_term(tmp_path: Path) -> None:
     _rewrite(app, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -39,7 +39,7 @@ def test_rejects_corrupted_induction_case(tmp_path: Path) -> None:
     _rewrite(app, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -52,5 +52,5 @@ def test_rejects_negated_scope(tmp_path: Path) -> None:
     support._write_json(app / "submission.json", submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['scope_accuracy'] == 0.0
+    assert rejected.details["scope_accuracy"] == 0.0
     assert rejected.reward == 0.0

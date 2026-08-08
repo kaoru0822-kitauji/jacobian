@@ -43,7 +43,7 @@ def test_superposition_replay_accepts_independent_topological_order(
     support._write_json(submission_path, submission)
 
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
+    assert accepted.details["correctness"] == 1.0
     assert accepted.reward == 1.0
 
 
@@ -57,7 +57,7 @@ def test_superposition_replay_rejects_non_resolvent_parent_pair(
     support._write_json(submission_path, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -72,7 +72,7 @@ def test_superposition_replay_rejects_forward_reference(tmp_path: Path) -> None:
     support._write_json(submission_path, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -94,5 +94,5 @@ def test_superposition_replay_rejects_promoted_intermediate_axioms(
     support._write_json(submission_path, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0

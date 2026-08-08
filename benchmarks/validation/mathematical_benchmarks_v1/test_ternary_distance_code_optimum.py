@@ -49,7 +49,7 @@ def _submission() -> dict:
 def test_reference_certificate_passes(tmp_path: Path) -> None:
     result = support._run_verifier(*_case(tmp_path, _submission(), label="reference"))
     assert result.reward == pytest.approx(1.0)
-    assert result.details['false_certification'] is False
+    assert result.details["false_certification"] is False
 
 
 def test_alphabet_permutation_is_accepted(tmp_path: Path) -> None:
@@ -66,7 +66,7 @@ def test_pair_distance_corruption_is_rejected(tmp_path: Path) -> None:
     submission = _submission()
     submission["result"]["codewords"][1] = "000001"
     result = support._run_verifier(*_case(tmp_path, submission, label="distance"))
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -76,7 +76,7 @@ def test_wrong_dual_multiplier_is_rejected(tmp_path: Path) -> None:
         "1/2"
     )
     result = support._run_verifier(*_case(tmp_path, submission, label="dual"))
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -89,7 +89,7 @@ def test_noncanonical_rational_is_accepted(tmp_path: Path) -> None:
         "2/12"
     )
     result = support._run_verifier(*_case(tmp_path, submission, label="fraction"))
-    assert result.details['correctness'] == 1.0
+    assert result.details["correctness"] == 1.0
     assert result.reward == pytest.approx(1.0)
 
 
@@ -97,7 +97,7 @@ def test_verified_claim_is_rejected(tmp_path: Path) -> None:
     submission = _submission()
     submission["claimed_assurance"] = "VERIFIED"
     result = support._run_verifier(*_case(tmp_path, submission, label="verified"))
-    assert result.details['false_certification'] is True
+    assert result.details["false_certification"] is True
     assert result.reward == 0.0
 
 
@@ -105,7 +105,7 @@ def test_input_tampering_is_rejected(tmp_path: Path) -> None:
     result = support._run_verifier(
         *_case(tmp_path, _submission(), label="input", tamper_input=True)
     )
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -132,7 +132,7 @@ def test_evidence_contradictory_distribution_is_rejected(tmp_path: Path) -> None
     submission["evidence"][0]["sha256"] = support._digest(evidence_path)
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(TASK, app, logs)
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -146,7 +146,7 @@ def test_unhashable_codewords_rejected_without_crash(tmp_path: Path) -> None:
         *submission["result"]["codewords"][1:],
     ]
     result = support._run_verifier(*_case(tmp_path, submission, label="unhashable"))
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
@@ -159,7 +159,7 @@ def test_out_of_alphabet_codewords_rejected(tmp_path: Path) -> None:
         word.replace("0", "x") for word in submission["result"]["codewords"]
     ]
     result = support._run_verifier(*_case(tmp_path, submission, label="alphabet"))
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 

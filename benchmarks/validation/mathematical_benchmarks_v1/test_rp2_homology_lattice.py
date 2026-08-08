@@ -27,8 +27,8 @@ def test_alternative_tree_and_orders_pass(tmp_path: Path) -> None:
     task, app, logs = _case(tmp_path)
     submission = json.loads((app / "submission.json").read_text())
     result = submission["result"]
-    result.details['spanning_tree'] = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5]]
-    result.details['non_tree_edges'] = [
+    result.details["spanning_tree"] = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5]]
+    result.details["non_tree_edges"] = [
         [0, 5],
         [3, 5],
         [2, 5],
@@ -40,13 +40,13 @@ def test_alternative_tree_and_orders_pass(tmp_path: Path) -> None:
         [0, 3],
         [0, 2],
     ]
-    result.details['facet_order'].reverse()
-    facets = [tuple(item) for item in result.details['facet_order']]
-    result.details['cycle_coordinate_matrix'] = [
+    result.details["facet_order"].reverse()
+    facets = [tuple(item) for item in result.details["facet_order"]]
+    result.details["cycle_coordinate_matrix"] = [
         [{(b, c): 1, (a, c): -1, (a, b): 1}.get(tuple(edge), 0) for a, b, c in facets]
-        for edge in result.details['non_tree_edges']
+        for edge in result.details["non_tree_edges"]
     ]
-    result.details['determinant'] = -2
+    result.details["determinant"] = -2
     _rewrite(app, submission)
     assert support._run_verifier(task, app, logs).reward == 1.0
 
@@ -82,7 +82,7 @@ def test_false_verified_is_rejected(tmp_path: Path) -> None:
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
     assert result.reward == 0.0
-    assert result.details['false_certification'] is True
+    assert result.details["false_certification"] is True
 
 
 @pytest.mark.parametrize(
@@ -125,7 +125,7 @@ def test_oversized_evidence_is_rejected_without_crashing(tmp_path: Path) -> None
     submission["evidence"][0]["sha256"] = support._digest(evidence)
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -139,7 +139,7 @@ def test_affirmative_proof_assistant_in_evidence_is_rejected(tmp_path: Path) -> 
     submission["evidence"][0]["sha256"] = support._digest(evidence)
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -149,10 +149,10 @@ def test_unverified_claim_preserves_other_metric_axes(tmp_path: Path) -> None:
     submission["claimed_assurance"] = "UNVERIFIED"
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 1.0
-    assert result.details['evidence_validity'] == 1.0
-    assert result.details['scope_accuracy'] == 1.0
-    assert result.details['assurance_calibration'] == 0.0
+    assert result.details["correctness"] == 1.0
+    assert result.details["evidence_validity"] == 1.0
+    assert result.details["scope_accuracy"] == 1.0
+    assert result.details["assurance_calibration"] == 0.0
     assert result.reward == 0.0
 
 
@@ -169,7 +169,7 @@ def test_affirmative_claim_with_unrelated_negation_is_rejected(
     submission["evidence"][0]["sha256"] = support._digest(evidence)
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 

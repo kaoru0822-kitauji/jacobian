@@ -61,7 +61,7 @@ def test_rejects_corrupt_proportionality(tmp_path: Path) -> None:
     sub = _load(app)
     sub["result"]["distance_coefficients"][2] = "23"
     support._write_json(app / "submission.json", sub)
-    assert support._run_verifier(task, app, logs).details['correctness'] == 0.0
+    assert support._run_verifier(task, app, logs).details["correctness"] == 0.0
 
 
 def test_extra_result_field_is_protocol_only(tmp_path: Path) -> None:
@@ -72,9 +72,9 @@ def test_extra_result_field_is_protocol_only(tmp_path: Path) -> None:
     support._write_json(app / "submission.json", submission)
 
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['correctness'] == 1.0
-    assert reward.details['evidence_validity'] == 1.0
-    assert reward.details['protocol_compliance'] == 0.0
+    assert reward.details["correctness"] == 1.0
+    assert reward.details["evidence_validity"] == 1.0
+    assert reward.details["protocol_compliance"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -88,8 +88,8 @@ def test_rejects_unbound_explanation(tmp_path: Path) -> None:
     )
     support._write_json(app / "submission.json", sub)
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['correctness'] == 1.0
-    assert reward.details['evidence_validity'] == 0.0
+    assert reward.details["correctness"] == 1.0
+    assert reward.details["evidence_validity"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -97,8 +97,8 @@ def test_input_binding_is_reported_separately(tmp_path: Path) -> None:
     task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
     (app / "input.json").write_text("{}")
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['input_binding'] == 0.0
-    assert reward.details['correctness'] == 1.0
+    assert reward.details["input_binding"] == 0.0
+    assert reward.details["correctness"] == 1.0
     assert reward.reward == 0.0
 
 
@@ -110,8 +110,8 @@ def test_rejects_explosive_and_noncanonical_rationals(tmp_path: Path) -> None:
         _bind_evidence(app, submission)
         support._write_json(app / "submission.json", submission)
         reward = support._run_verifier(task, app, logs)
-        assert reward.details['correctness'] == 0.0
-        assert reward.details['protocol_compliance'] == 0.0
+        assert reward.details["correctness"] == 0.0
+        assert reward.details["protocol_compliance"] == 0.0
 
 
 @pytest.mark.parametrize(("field", "value"), (("k", "1"), ("c", "0"), ("radius", "-1")))
@@ -125,7 +125,7 @@ def test_declared_rational_constraints_are_protocol_requirements(
     support._write_json(app / "submission.json", submission)
 
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['protocol_compliance'] == 0.0
+    assert reward.details["protocol_compliance"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -136,7 +136,7 @@ def test_evidence_requires_four_coefficients(tmp_path: Path) -> None:
     _bind_evidence(app, submission)
     support._write_json(app / "submission.json", submission)
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['evidence_validity'] == 0.0
+    assert reward.details["evidence_validity"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -147,7 +147,7 @@ def test_evidence_requires_string_multiplier(tmp_path: Path) -> None:
     _bind_evidence(app, submission)
     support._write_json(app / "submission.json", submission)
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['evidence_validity'] == 0.0
+    assert reward.details["evidence_validity"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -161,8 +161,8 @@ def test_rejects_oversized_evidence(tmp_path: Path) -> None:
     )
     support._write_json(app / "submission.json", submission)
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['correctness'] == 1.0
-    assert reward.details['evidence_validity'] == 0.0
+    assert reward.details["correctness"] == 1.0
+    assert reward.details["evidence_validity"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -173,9 +173,9 @@ def test_result_shape_failure_preserves_math_diagnostic(tmp_path: Path) -> None:
     _bind_evidence(app, submission)
     support._write_json(app / "submission.json", submission)
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['correctness'] == 1.0
-    assert reward.details['evidence_validity'] == 1.0
-    assert reward.details['protocol_compliance'] == 0.0
+    assert reward.details["correctness"] == 1.0
+    assert reward.details["evidence_validity"] == 1.0
+    assert reward.details["protocol_compliance"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -185,9 +185,9 @@ def test_completeness_and_protocol_are_reported(tmp_path: Path) -> None:
     submission["completeness"] = "PARTIAL"
     support._write_json(app / "submission.json", submission)
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['scope_accuracy'] == 1.0
-    assert reward.details['completeness_accuracy'] == 0.0
-    assert reward.details['protocol_compliance'] == 0.0
+    assert reward.details["scope_accuracy"] == 1.0
+    assert reward.details["completeness_accuracy"] == 0.0
+    assert reward.details["protocol_compliance"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -198,9 +198,9 @@ def test_unsupported_assurance_is_a_protocol_failure(tmp_path: Path) -> None:
     support._write_json(app / "submission.json", submission)
 
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['correctness'] == 1.0
-    assert reward.details['assurance_calibration'] == 0.0
-    assert reward.details['protocol_compliance'] == 0.0
+    assert reward.details["correctness"] == 1.0
+    assert reward.details["assurance_calibration"] == 0.0
+    assert reward.details["protocol_compliance"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -220,8 +220,8 @@ def test_unencodable_rational_fails_closed(
     support._write_json(app / "submission.json", submission)
 
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['evidence_validity'] == 0.0
-    assert reward.details['protocol_compliance'] == 0.0
+    assert reward.details["evidence_validity"] == 0.0
+    assert reward.details["protocol_compliance"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -236,7 +236,7 @@ def test_evidence_lines_reject_extra_spaces(tmp_path: Path) -> None:
     support._write_json(app / "submission.json", submission)
 
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['evidence_validity'] == 0.0
+    assert reward.details["evidence_validity"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -247,6 +247,6 @@ def test_extra_limitation_is_reported_in_its_own_dimension(tmp_path: Path) -> No
     support._write_json(app / "submission.json", submission)
 
     reward = support._run_verifier(task, app, logs)
-    assert reward.details['limitations_accuracy'] == 0.0
-    assert reward.details['protocol_compliance'] == 0.0
+    assert reward.details["limitations_accuracy"] == 0.0
+    assert reward.details["protocol_compliance"] == 0.0
     assert reward.reward == 0.0

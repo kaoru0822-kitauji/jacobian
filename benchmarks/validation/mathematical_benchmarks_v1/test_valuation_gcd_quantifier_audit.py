@@ -73,7 +73,7 @@ def test_rejects_zero_row_that_is_not_a_prime_factor(tmp_path):
         {"prime": 5, "exponents": [2, 2, 2, 2]},
     ]
     reward = _verify(tmp_path, submission)
-    assert reward.details['correctness'] == 0.0
+    assert reward.details["correctness"] == 0.0
     assert reward.reward == 0
 
 
@@ -82,7 +82,7 @@ def test_rejects_out_of_bound_prime_without_crashing(tmp_path):
         submission = copy.deepcopy(_oracle())
         submission["result"]["countermodel"][0]["prime"] = prime
         reward = _verify(tmp_path / name, submission)
-        assert reward.details['correctness'] == 0.0
+        assert reward.details["correctness"] == 0.0
         assert reward.reward == 0
         assert (tmp_path / name / "logs" / "reward.json").is_file()
 
@@ -99,8 +99,8 @@ def test_evidence_result_requires_exact_json_types(tmp_path):
     )
     (app / "submission.json").write_text(json.dumps(submission))
     reward = _run_verifier(task, app, logs)
-    assert reward.details['correctness'] == 1.0
-    assert reward.details['evidence_validity'] == 0.0
+    assert reward.details["correctness"] == 1.0
+    assert reward.details["evidence_validity"] == 0.0
     assert reward.reward == 0
 
 
@@ -117,5 +117,5 @@ def test_math_diagnostic_survives_envelope_failures(tmp_path):
         submission = copy.deepcopy(_oracle())
         mutate(submission)
         reward = _verify(tmp_path / name, submission)
-        assert reward.details['correctness'] == expected_correctness, name
+        assert reward.details["correctness"] == expected_correctness, name
         assert reward.reward == 0

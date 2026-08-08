@@ -16,7 +16,7 @@ def test_reciprocal_polynomial_classification_accepts_oracle(tmp_path: Path) -> 
     target = app / "evidence" / "classification-certificate.json"
     target.write_bytes((task / "solution" / target.name).read_bytes())
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
+    assert accepted.details["correctness"] == 1.0
     assert accepted.reward == pytest.approx(1.0)
 
 
@@ -57,7 +57,7 @@ def test_reciprocal_polynomial_classification_accepts_alternative_member(
     support._write_json(submission_path, submission)
 
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
+    assert accepted.details["correctness"] == 1.0
     assert accepted.reward == pytest.approx(1.0)
 
 
@@ -80,7 +80,7 @@ def test_reciprocal_polynomial_classification_rejects_corrupted_coefficient(
     support._write_json(submission_path, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -114,7 +114,7 @@ def test_reciprocal_polynomial_classification_accepts_schema_valid_integral_numb
     support._write_json(submission_path, submission)
 
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
+    assert accepted.details["correctness"] == 1.0
     assert accepted.reward == pytest.approx(1.0)
 
 
@@ -138,7 +138,7 @@ def test_reciprocal_polynomial_classification_rejects_boolean_coefficient(
     support._write_json(submission_path, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -167,7 +167,7 @@ def test_reciprocal_polynomial_classification_accepts_unsorted_terms(
     support._write_json(submission_path, submission)
 
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
+    assert accepted.details["correctness"] == 1.0
     assert accepted.reward == pytest.approx(1.0)
 
 
@@ -220,5 +220,5 @@ def test_reciprocal_polynomial_classification_rejects_boolean_in_evidence_copy(
     support._write_json(submission_path, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['evidence_validity'] == 0.0
+    assert rejected.details["evidence_validity"] == 0.0
     assert rejected.reward == 0.0

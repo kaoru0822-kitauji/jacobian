@@ -72,11 +72,11 @@ def test_verified_overclaim_preserves_math_diagnostics(tmp_path):
     submission["claimed_assurance"] = "VERIFIED"
     result = _verify(tmp_path, submission)
     assert result.reward == 0
-    assert result.details['false_certification'] is True
-    assert result.details['assurance_calibration'] == 0
-    assert result.details['correctness'] == 1
-    assert result.details['evidence_validity'] == 1
-    assert result.details['scope_accuracy'] == 1
+    assert result.details["false_certification"] is True
+    assert result.details["assurance_calibration"] == 0
+    assert result.details["correctness"] == 1
+    assert result.details["evidence_validity"] == 1
+    assert result.details["scope_accuracy"] == 1
 
 
 def test_unverified_assurance_reports_partial_reward(tmp_path):
@@ -87,10 +87,10 @@ def test_unverified_assurance_reports_partial_reward(tmp_path):
     submission["claimed_assurance"] = "UNVERIFIED"
     result = _verify(tmp_path, submission)
     assert result.reward == 0.9
-    assert result.details['assurance_calibration'] == 0
-    assert result.details['correctness'] == 1
-    assert result.details['evidence_validity'] == 1
-    assert result.details['scope_accuracy'] == 1
+    assert result.details["assurance_calibration"] == 0
+    assert result.details["correctness"] == 1
+    assert result.details["evidence_validity"] == 1
+    assert result.details["scope_accuracy"] == 1
 
 
 def _coerce_matrix(matrix, replacement):
@@ -108,7 +108,7 @@ def test_bool_evidence_result_rejected(tmp_path):
     evidence["result"] = bool_result
     result = _verify(tmp_path, submission, evidence=evidence)
     assert result.reward == 0
-    assert result.details['evidence_validity'] == 0
+    assert result.details["evidence_validity"] == 0
 
 
 def test_float_evidence_result_rejected(tmp_path):
@@ -122,7 +122,7 @@ def test_float_evidence_result_rejected(tmp_path):
     evidence["result"] = float_result
     result = _verify(tmp_path, submission, evidence=evidence)
     assert result.reward == 0
-    assert result.details['evidence_validity'] == 0
+    assert result.details["evidence_validity"] == 0
 
 
 def test_full_envelope_evidence_rejected(tmp_path):
@@ -134,7 +134,7 @@ def test_full_envelope_evidence_rejected(tmp_path):
     evidence = copy.deepcopy(submission)
     result = _verify(tmp_path, submission, evidence=evidence)
     assert result.reward == 0
-    assert result.details['evidence_validity'] == 0
+    assert result.details["evidence_validity"] == 0
 
 
 def test_oversized_evidence_rejected(tmp_path):
@@ -154,4 +154,4 @@ def test_oversized_evidence_rejected(tmp_path):
     (app / "submission.json").write_text(json.dumps(submission))
     result = _run_verifier(task, app, logs)
     assert result.reward == 0
-    assert result.details['evidence_validity'] == 0
+    assert result.details["evidence_validity"] == 0

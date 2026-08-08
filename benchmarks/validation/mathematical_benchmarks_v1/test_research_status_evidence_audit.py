@@ -25,7 +25,7 @@ def test_accepts_equivalent_case_order(tmp_path: Path) -> None:
     _rewrite(app, submission)
 
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
+    assert accepted.details["correctness"] == 1.0
     assert accepted.reward == pytest.approx(1.0)
 
 
@@ -36,8 +36,8 @@ def test_rejects_wrong_scope_with_soft_scope_term(tmp_path: Path) -> None:
     support._write_json(app / "submission.json", submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 1.0
-    assert rejected.details['scope_accuracy'] == 0.0
+    assert rejected.details["correctness"] == 1.0
+    assert rejected.details["scope_accuracy"] == 0.0
     # Evidence remains valid, so reward keeps the hard base plus assurance.
     assert rejected.reward == pytest.approx(0.9)
 
@@ -54,8 +54,8 @@ def test_rejects_escaped_evidence_with_zero_aggregate_reward(tmp_path: Path) -> 
     support._write_json(app / "submission.json", submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 1.0
-    assert rejected.details['evidence_validity'] == 0.0
+    assert rejected.details["correctness"] == 1.0
+    assert rejected.details["evidence_validity"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -66,8 +66,8 @@ def test_rejects_wrong_assurance_with_soft_assurance_term(tmp_path: Path) -> Non
     support._write_json(app / "submission.json", submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 1.0
-    assert rejected.details['assurance_calibration'] == 0.0
+    assert rejected.details["correctness"] == 1.0
+    assert rejected.details["assurance_calibration"] == 0.0
     # Evidence remains valid, so reward keeps the hard base plus scope.
     assert rejected.reward == pytest.approx(0.9)
 
@@ -76,7 +76,7 @@ def test_rejects_tampered_frozen_input(tmp_path: Path) -> None:
     task, app, logs = _case(tmp_path)
     (app / "input.json").write_text('{"cases":[]}')
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -88,7 +88,7 @@ def test_rejects_extra_selected_citations(tmp_path: Path) -> None:
             case["selected_evidence_ids"].append("SW1999")
     _rewrite(app, submission)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -98,7 +98,7 @@ def test_rejects_undeclared_result_field(tmp_path: Path) -> None:
     submission["result"]["current_status"] = "ALL_FOUR_PROBLEMS_RESOLVED"
     _rewrite(app, submission)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -108,7 +108,7 @@ def test_rejects_non_string_case_id(tmp_path: Path) -> None:
     submission["result"]["cases"][0]["case_id"] = ["workshop-equation-status"]
     _rewrite(app, submission)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -120,8 +120,8 @@ def test_rejects_escaped_semantics_in_result_marker(tmp_path: Path) -> None:
     evidence_path.write_text("This is not a problem statement.\nRESULT_JSON: {}\n")
     _rewrite(app, submission)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 1.0
-    assert rejected.details['evidence_validity'] == 0.0
+    assert rejected.details["correctness"] == 1.0
+    assert rejected.details["evidence_validity"] == 0.0
     assert rejected.reward == pytest.approx(0.0)
 
 
@@ -135,8 +135,8 @@ def test_oversized_evidence_does_not_block_reward_record(tmp_path: Path) -> None
     submission["evidence"][0]["sha256"] = "sha256:" + "0" * 64
     support._write_json(app / "submission.json", submission)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 1.0
-    assert rejected.details['evidence_validity'] == 0.0
+    assert rejected.details["correctness"] == 1.0
+    assert rejected.details["evidence_validity"] == 0.0
     assert rejected.reward == pytest.approx(0.0)
 
 
@@ -145,7 +145,7 @@ def test_rejects_deeply_nested_submission(tmp_path: Path) -> None:
     task, app, logs = _case(tmp_path)
     (app / "submission.json").write_text("[" * 12000 + "1" + "]" * 12000)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -169,7 +169,7 @@ def test_rejects_invalid_utf8_evidence(tmp_path: Path) -> None:
     submission["evidence"][0]["sha256"] = support._digest(evidence_path)
     support._write_json(app / "submission.json", submission)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['evidence_validity'] == 0.0
+    assert rejected.details["evidence_validity"] == 0.0
 
 
 def test_requires_exponent_range_inference(tmp_path: Path) -> None:
@@ -180,5 +180,5 @@ def test_requires_exponent_range_inference(tmp_path: Path) -> None:
             case["unsupported_inferences"] = []
     _rewrite(app, submission)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0

@@ -16,12 +16,12 @@ ROOT = Path(__file__).resolve().parents[3]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from benchmarks.tooling.harbor_suite import verifier_bundle_checksum_bytes  # noqa: E402
 from benchmarks.tooling.public_contract import (  # noqa: E402
     PublicContract,
     render_instruction,
     render_submission_schema,
 )
-from benchmarks.tooling.harbor_suite import verifier_bundle_checksum_bytes  # noqa: E402
 
 DATASET = Path(__file__).resolve().parent
 # Keep this pilot stable when the reusable task template evolves.  The

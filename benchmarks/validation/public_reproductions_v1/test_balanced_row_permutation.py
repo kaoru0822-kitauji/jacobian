@@ -28,13 +28,15 @@ def test_alternative_column_order_passes(tmp_path: Path) -> None:
     submission = json.loads((app / "submission.json").read_text())
     result = submission["result"]
     order = [5, 4, 3, 2, 1, 0]
-    result.details['row_permutations'] = [
-        [row[index] for index in order] for row in result.details['row_permutations']
+    result.details["row_permutations"] = [
+        [row[index] for index in order] for row in result.details["row_permutations"]
     ]
-    result.details['balanced_matrix'] = [
-        [row[index] for index in order] for row in result.details['balanced_matrix']
+    result.details["balanced_matrix"] = [
+        [row[index] for index in order] for row in result.details["balanced_matrix"]
     ]
-    result.details['column_layers'] = [result.details['column_layers'][index] for index in order]
+    result.details["column_layers"] = [
+        result.details["column_layers"][index] for index in order
+    ]
     _rewrite(app, submission)
     assert support._run_verifier(task, app, logs).reward == 1.0
 
@@ -72,7 +74,7 @@ def test_false_verified_is_rejected(tmp_path: Path) -> None:
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
     assert result.reward == 0.0
-    assert result.details['false_certification'] is True
+    assert result.details["false_certification"] is True
 
 
 def test_boolean_row_position_is_rejected(tmp_path: Path) -> None:
@@ -97,8 +99,8 @@ def test_affirmative_general_theorem_claim_is_rejected(tmp_path: Path) -> None:
     submission["limitations"] = ["A proof assistant verifies the general theorem."]
     _rewrite(app, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 0.0
-    assert result.details['scope_accuracy'] == 0.0
+    assert result.details["correctness"] == 0.0
+    assert result.details["scope_accuracy"] == 0.0
     assert result.reward == 0.0
 
 
@@ -113,7 +115,7 @@ def test_oversized_evidence_is_rejected_without_crashing(tmp_path: Path) -> None
     )
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -123,10 +125,10 @@ def test_unverified_claim_preserves_other_metric_axes(tmp_path: Path) -> None:
     submission["claimed_assurance"] = "UNVERIFIED"
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 1.0
-    assert result.details['evidence_validity'] == 1.0
-    assert result.details['scope_accuracy'] == 1.0
-    assert result.details['assurance_calibration'] == 0.0
+    assert result.details["correctness"] == 1.0
+    assert result.details["evidence_validity"] == 1.0
+    assert result.details["scope_accuracy"] == 1.0
+    assert result.details["assurance_calibration"] == 0.0
     assert result.reward == 0.0
 
 
@@ -134,8 +136,8 @@ def test_missing_visible_input_fails_closed(tmp_path: Path) -> None:
     task, app, logs = _case(tmp_path)
     (app / "input.json").unlink()
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 0.0
-    assert result.details['input_integrity'] == 0.0
+    assert result.details["correctness"] == 0.0
+    assert result.details["input_integrity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -149,7 +151,7 @@ def test_keyword_only_evidence_without_result_binding_is_rejected(
     submission["evidence"][0]["sha256"] = support._digest(evidence)
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -171,7 +173,7 @@ def test_boolean_in_result_json_evidence_is_rejected(tmp_path: Path) -> None:
     submission["evidence"][0]["sha256"] = support._digest(evidence)
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -189,5 +191,5 @@ def test_nonregular_input_is_rejected(tmp_path: Path) -> None:
     (app / "input.json").unlink()
     os.mkfifo(app / "input.json")
     result = support._run_verifier(task, app, logs)
-    assert result.details['input_integrity'] == 0.0
+    assert result.details["input_integrity"] == 0.0
     assert result.reward == 0.0

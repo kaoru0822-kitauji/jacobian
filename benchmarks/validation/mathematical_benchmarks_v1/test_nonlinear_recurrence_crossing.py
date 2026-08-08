@@ -54,7 +54,7 @@ def test_nonlinear_recurrence_rejects_insufficient_phase_budget(
     _bind_nonlinear_recurrence_evidence(app, submission)
     support._write_json(submission_path, submission)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -71,7 +71,7 @@ def test_nonlinear_recurrence_rejects_decimalized_decrement(
     _bind_nonlinear_recurrence_evidence(app, submission)
     support._write_json(submission_path, submission)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -114,7 +114,7 @@ def test_nonlinear_recurrence_accepts_alternative_threshold_certificate(
     _bind_nonlinear_recurrence_evidence(app, submission)
     support._write_json(submission_path, submission)
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
+    assert accepted.details["correctness"] == 1.0
     assert accepted.reward == pytest.approx(1.0)
 
 
@@ -129,7 +129,7 @@ def test_nonlinear_recurrence_rejects_boolean_coefficients(
     _bind_nonlinear_recurrence_evidence(app, submission)
     support._write_json(submission_path, submission)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -145,5 +145,5 @@ def test_nonlinear_recurrence_rejects_float_index_fields(
     _bind_nonlinear_recurrence_evidence(app, submission)
     support._write_json(submission_path, submission)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0

@@ -1,13 +1,14 @@
 from __future__ import annotations
+
 import json
 import re
 from pathlib import Path
 
 from verifier_support import (
-    normalize_reward_file,
     ASSURANCE_LEVELS,
     false_verified_claim,
     load_submission,
+    normalize_reward_file,
     resolve_evidence,
     strict_submission_contract,
 )

@@ -19,7 +19,7 @@ def test_sharp_cauchy_inequality_accepts_symbolic_certificate(tmp_path: Path) ->
         (task / "solution" / "inequality-certificate.json").read_bytes()
     )
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
+    assert accepted.details["correctness"] == 1.0
     assert accepted.reward == pytest.approx(1.0)
 
 
@@ -40,7 +40,7 @@ def test_sharp_cauchy_inequality_rejects_corrupted_residual(tmp_path: Path) -> N
     support._write_json(submission_path, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -61,7 +61,7 @@ def test_sharp_cauchy_inequality_rejects_nonsharp_constant(tmp_path: Path) -> No
     support._write_json(submission_path, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -115,7 +115,7 @@ def test_sharp_cauchy_inequality_accepts_cauchy_composition_mode(
     support._write_json(submission_path, submission)
 
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
+    assert accepted.details["correctness"] == 1.0
     assert accepted.reward == pytest.approx(1.0)
 
 
@@ -168,7 +168,7 @@ def test_sharp_cauchy_inequality_accepts_unreduced_rationals(tmp_path: Path) -> 
     support._write_json(submission_path, submission)
 
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
+    assert accepted.details["correctness"] == 1.0
     assert accepted.reward == pytest.approx(1.0)
 
 
@@ -224,5 +224,5 @@ def test_sharp_cauchy_inequality_accepts_direct_sos_mode(tmp_path: Path) -> None
     support._write_json(submission_path, submission)
 
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
+    assert accepted.details["correctness"] == 1.0
     assert accepted.reward == pytest.approx(1.0)

@@ -22,7 +22,7 @@ def _prepare_real_rooted_sign_case(tmp_path: Path):
 def test_real_rooted_sign_polynomials_accepts_complete_audit(tmp_path: Path) -> None:
     task, app, logs = _prepare_real_rooted_sign_case(tmp_path)
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
+    assert accepted.details["correctness"] == 1.0
     assert accepted.reward == pytest.approx(1.0)
 
 
@@ -49,7 +49,7 @@ def test_real_rooted_sign_polynomials_rejects_public_list_without_full_audit(
     support._write_json(submission_path, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -72,7 +72,7 @@ def test_real_rooted_sign_polynomials_rejects_corrupted_discriminant(
     support._write_json(submission_path, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -119,7 +119,7 @@ def test_real_rooted_sign_polynomials_rejects_booleans_in_integer_fields(
     support._write_json(submission_path, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -134,7 +134,7 @@ def test_real_rooted_sign_polynomials_rejects_symlinked_submission(
     submission_path.symlink_to(external)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -152,5 +152,5 @@ def test_real_rooted_sign_polynomials_rejects_missing_evidence_envelope(
     support._write_json(submission_path, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['evidence_validity'] == 0.0
+    assert rejected.details["evidence_validity"] == 0.0
     assert rejected.reward == 0.0

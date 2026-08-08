@@ -24,7 +24,7 @@ def test_rejects_missing_symbolic_monomial(tmp_path: Path) -> None:
     _rewrite(app, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -35,5 +35,5 @@ def test_rejects_corrupted_reflection(tmp_path: Path) -> None:
     _rewrite(app, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0

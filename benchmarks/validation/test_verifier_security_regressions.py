@@ -161,7 +161,7 @@ def test_reliability_accepts_equivalent_unreduced_probability(
     _write_json(submission_path, submission)
 
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == pytest.approx(1.0)
+    assert accepted.details["correctness"] == pytest.approx(1.0)
     assert accepted.reward == pytest.approx(1.0)
 
 
@@ -177,7 +177,7 @@ def test_reliability_rejects_oversized_fraction_without_crashing(
     _write_json(submission_path, submission)
 
     rejected = run_verifier_in_child(task=task, app=app, logs=logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
     assert (logs / "reward.json").is_file()
 
@@ -717,4 +717,4 @@ def test_provider_verifier_flags_verified_claim_as_false_certification(
     task, app, logs = _verified_claim_case(tmp_path, task_name)
     result = support._run_verifier(task, app, logs)
     assert result.reward == 0.0
-    assert result.details['false_certification'] is True
+    assert result.details["false_certification"] is True

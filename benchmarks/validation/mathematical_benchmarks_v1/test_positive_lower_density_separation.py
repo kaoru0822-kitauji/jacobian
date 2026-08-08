@@ -28,7 +28,7 @@ def test_accepts_equivalent_limitation_wording(tmp_path: Path) -> None:
             ]
         ),
     )
-    assert result.details['scope_accuracy'] == 1.0
+    assert result.details["scope_accuracy"] == 1.0
     assert result.reward == 1.0
 
 
@@ -74,7 +74,7 @@ def test_published_evidence_sentence_needs_no_private_marker(tmp_path: Path) -> 
     submission["evidence"][0]["sha256"] = support._digest(evidence)
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 1.0
+    assert result.details["evidence_validity"] == 1.0
     assert result.reward == 1.0
 
 
@@ -82,8 +82,8 @@ def test_visible_input_tamper_preserves_math_diagnostic(tmp_path: Path) -> None:
     task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
     (app / "input.json").write_text("{}")
     result = support._run_verifier(task, app, logs)
-    assert result.details['input_binding'] == 0.0
-    assert result.details['correctness'] == 1.0
+    assert result.details["input_binding"] == 0.0
+    assert result.details["correctness"] == 1.0
     assert result.reward == 0.0
 
 
@@ -96,20 +96,20 @@ def test_integral_float_level_fields_are_rejected(tmp_path: Path) -> None:
             row["cumulative_count"] = float(row["cumulative_count"])
 
     result = _run(tmp_path, mutate)
-    assert result.details['correctness'] == 0.0
+    assert result.details["correctness"] == 0.0
     assert result.reward == 0.0
 
 
 def test_level_rows_are_order_independent(tmp_path: Path) -> None:
     result = _run(tmp_path, lambda s: s["result"]["levels"].reverse())
-    assert result.details['correctness'] == 1.0
+    assert result.details["correctness"] == 1.0
     assert result.reward == 1.0
 
 
 def test_bad_scope_preserves_math_diagnostic(tmp_path: Path) -> None:
     result = _run(tmp_path, lambda s: s.__setitem__("scope", "wrong"))
-    assert result.details['correctness'] == 1.0
-    assert result.details['scope_accuracy'] == 0.0
+    assert result.details["correctness"] == 1.0
+    assert result.details["scope_accuracy"] == 0.0
     assert result.reward == 0.0
 
 
@@ -136,7 +136,7 @@ def test_rejects_false_verified_claim(tmp_path: Path) -> None:
         s["claimed_assurance"] = "VERIFIED"
 
     result = _run(tmp_path, mutate)
-    assert result.details['false_certification'] is True
+    assert result.details["false_certification"] is True
     assert result.reward == 0.0
 
 
@@ -154,8 +154,8 @@ def test_malformed_envelope_preserves_math_correctness(tmp_path: Path) -> None:
     submission["extra_field"] = "schema-invalid"
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['protocol_compliance'] == 0.0
-    assert result.details['correctness'] == 1.0
+    assert result.details["protocol_compliance"] == 0.0
+    assert result.details["correctness"] == 1.0
     assert result.reward == 0.0
 
 
@@ -168,8 +168,8 @@ def test_evidence_descriptor_missing_sha256_preserves_correctness(
     submission["evidence"][0] = {"path": "evidence/answer.txt"}
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 1.0
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["correctness"] == 1.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -188,7 +188,7 @@ def test_large_valid_evidence_has_no_arbitrary_byte_cap(tmp_path: Path) -> None:
         "case.\n",
     )
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 1.0
+    assert result.details["evidence_validity"] == 1.0
     assert result.reward == 1.0
 
 
@@ -204,7 +204,7 @@ def test_equivalent_explanation_paraphrase_is_accepted(tmp_path: Path) -> None:
         "general formula, not a proof of the infinite limit.\n",
     )
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 1.0
+    assert result.details["evidence_validity"] == 1.0
     assert result.reward == 1.0
 
 
@@ -219,7 +219,7 @@ def test_contradictory_explanation_is_rejected(tmp_path: Path) -> None:
         "every infinite case.\n",
     )
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -236,7 +236,7 @@ def test_late_contradiction_is_rejected(tmp_path: Path) -> None:
         + "Contrary conclusion: the limits agree.\n",
     )
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -246,7 +246,7 @@ def test_unrelated_explanation_is_rejected(tmp_path: Path) -> None:
     submission = json.loads((app / "submission.json").read_text())
     _set_evidence(app, submission, "The weather is sunny today.\n")
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -256,7 +256,7 @@ def test_empty_explanation_is_rejected(tmp_path: Path) -> None:
     submission = json.loads((app / "submission.json").read_text())
     _set_evidence(app, submission, "\n")
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 

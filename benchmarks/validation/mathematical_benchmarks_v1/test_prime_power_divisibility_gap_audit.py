@@ -114,7 +114,9 @@ def test_rejects_tiny_or_false_certification_shortcuts(tmp_path: Path) -> None:
     assert _verify(tmp_path / "tiny", tiny).reward == 0.0
     verified = copy.deepcopy(_oracle())
     verified["claimed_assurance"] = "VERIFIED"
-    assert _verify(tmp_path / "verified", verified).details['false_certification'] is True
+    assert (
+        _verify(tmp_path / "verified", verified).details["false_certification"] is True
+    )
 
 
 def test_schema_bypass_values_fail_closed(tmp_path: Path) -> None:
@@ -137,7 +139,7 @@ def test_schema_bypass_values_fail_closed(tmp_path: Path) -> None:
         submission = copy.deepcopy(_oracle())
         mutation(submission["result"])
         reward = _verify(tmp_path / name, submission)
-        assert reward.details['correctness'] == 0.0
+        assert reward.details["correctness"] == 0.0
         assert reward.reward == 0.0
 
 
@@ -147,8 +149,8 @@ def test_accepts_schema_valid_integral_json_numbers(tmp_path: Path) -> None:
 
     reward = _verify(tmp_path, submission)
 
-    assert reward.details['correctness'] == 1.0
-    assert reward.details['evidence_validity'] == 1.0
+    assert reward.details["correctness"] == 1.0
+    assert reward.details["evidence_validity"] == 1.0
     assert reward.reward == 1.0
 
 
@@ -169,7 +171,7 @@ def test_rejects_decimal_token_rounded_by_binary_float(tmp_path: Path) -> None:
     (app / "submission.json").write_text(submission_text)
 
     reward = _run_verifier(task, app, logs)
-    assert reward.details['correctness'] == 0.0
+    assert reward.details["correctness"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -190,9 +192,9 @@ def test_rejects_exponential_integer_before_materializing_it(tmp_path: Path) -> 
 
     reward = _run_verifier(task, app, logs)
 
-    assert reward.details['correctness'] == 0.0
-    assert reward.details['evidence_validity'] == 0.0
-    assert reward.details['protocol_compliance'] == 0.0
+    assert reward.details["correctness"] == 0.0
+    assert reward.details["evidence_validity"] == 0.0
+    assert reward.details["protocol_compliance"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -219,9 +221,9 @@ def test_accepts_bounded_exponential_integer_tokens(tmp_path: Path) -> None:
 
     reward = _run_verifier(task, app, logs)
 
-    assert reward.details['correctness'] == 1.0
-    assert reward.details['evidence_validity'] == 1.0
-    assert reward.details['protocol_compliance'] == 1.0
+    assert reward.details["correctness"] == 1.0
+    assert reward.details["evidence_validity"] == 1.0
+    assert reward.details["protocol_compliance"] == 1.0
     assert reward.reward == 1.0
 
 
@@ -229,29 +231,29 @@ def test_protocol_and_input_failures_preserve_diagnostics(tmp_path: Path) -> Non
     bad_conclusion = copy.deepcopy(_oracle())
     bad_conclusion["conclusion"] = "WRONG"
     reward = _verify(tmp_path / "protocol", bad_conclusion)
-    assert reward.details['correctness'] == 1.0
-    assert reward.details['evidence_validity'] == 1.0
-    assert reward.details['scope_accuracy'] == 1.0
-    assert reward.details['assurance_calibration'] == 1.0
-    assert reward.details['protocol_compliance'] == 0.0
+    assert reward.details["correctness"] == 1.0
+    assert reward.details["evidence_validity"] == 1.0
+    assert reward.details["scope_accuracy"] == 1.0
+    assert reward.details["assurance_calibration"] == 1.0
+    assert reward.details["protocol_compliance"] == 0.0
     assert reward.reward == 0.0
 
     bad_assurance = copy.deepcopy(_oracle())
     bad_assurance["claimed_assurance"] = "UNVERIFIED"
     reward = _verify(tmp_path / "assurance", bad_assurance)
-    assert reward.details['correctness'] == 1.0
-    assert reward.details['evidence_validity'] == 1.0
-    assert reward.details['scope_accuracy'] == 1.0
-    assert reward.details['assurance_calibration'] == 0.0
-    assert reward.details['protocol_compliance'] == 1.0
+    assert reward.details["correctness"] == 1.0
+    assert reward.details["evidence_validity"] == 1.0
+    assert reward.details["scope_accuracy"] == 1.0
+    assert reward.details["assurance_calibration"] == 0.0
+    assert reward.details["protocol_compliance"] == 1.0
     assert reward.reward == 0.0
 
     submission = copy.deepcopy(_oracle())
     task, app, logs = _prepare(tmp_path / "input", submission)
     (app / "input.json").write_text("{}")
     reward = _run_verifier(task, app, logs)
-    assert reward.details['input_binding'] == 0.0
-    assert reward.details['correctness'] == 1.0
+    assert reward.details["input_binding"] == 0.0
+    assert reward.details["correctness"] == 1.0
     assert reward.reward == 0.0
 
 
@@ -261,13 +263,13 @@ def test_malformed_assurance_preserves_scope_diagnostic(tmp_path: Path) -> None:
 
     reward = _verify(tmp_path, submission)
 
-    assert reward.details['protocol_compliance'] == 0.0
-    assert reward.details['correctness'] == 1.0
-    assert reward.details['evidence_validity'] == 1.0
-    assert reward.details['scope_accuracy'] == 1.0
-    assert reward.details['assurance_calibration'] == 0.0
+    assert reward.details["protocol_compliance"] == 0.0
+    assert reward.details["correctness"] == 1.0
+    assert reward.details["evidence_validity"] == 1.0
+    assert reward.details["scope_accuracy"] == 1.0
+    assert reward.details["assurance_calibration"] == 0.0
     assert reward.reward == 0.0
-    assert reward.details['false_certification'] is False
+    assert reward.details["false_certification"] is False
 
 
 def test_evidence_comparison_uses_exact_json_types(tmp_path: Path) -> None:
@@ -283,8 +285,8 @@ def test_evidence_comparison_uses_exact_json_types(tmp_path: Path) -> None:
     (app / "submission.json").write_text(json.dumps(submission))
 
     reward = _run_verifier(task, app, logs)
-    assert reward.details['correctness'] == 1.0
-    assert reward.details['evidence_validity'] == 0.0
+    assert reward.details["correctness"] == 1.0
+    assert reward.details["evidence_validity"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -292,9 +294,9 @@ def test_evidence_is_bound_to_the_expected_task(tmp_path: Path) -> None:
     submission = copy.deepcopy(_oracle())
     submission["task_id"] = "jacobian/other-task"
     reward = _verify(tmp_path, submission)
-    assert reward.details['correctness'] == 1.0
-    assert reward.details['evidence_validity'] == 0.0
-    assert reward.details['protocol_compliance'] == 0.0
+    assert reward.details["correctness"] == 1.0
+    assert reward.details["evidence_validity"] == 0.0
+    assert reward.details["protocol_compliance"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -322,9 +324,9 @@ def test_evidence_schema_version_is_public_and_required(tmp_path: Path) -> None:
     (app / "submission.json").write_text(json.dumps(submission))
 
     reward = _run_verifier(task, app, logs)
-    assert reward.details['correctness'] == 1.0
-    assert reward.details['evidence_validity'] == 0.0
-    assert reward.details['protocol_compliance'] == 1.0
+    assert reward.details["correctness"] == 1.0
+    assert reward.details["evidence_validity"] == 0.0
+    assert reward.details["protocol_compliance"] == 1.0
     assert reward.reward == 0.0
 
 
@@ -340,7 +342,7 @@ def test_large_valid_evidence_remains_admissible(tmp_path: Path) -> None:
     (app / "submission.json").write_text(json.dumps(submission))
 
     reward = _run_verifier(task, app, logs)
-    assert reward.details['evidence_validity'] == 1.0
+    assert reward.details["evidence_validity"] == 1.0
     assert reward.reward == 1.0
 
 
@@ -348,8 +350,8 @@ def test_rejects_extra_limitation_even_when_evidence_repeats_it(tmp_path: Path) 
     submission = copy.deepcopy(_oracle())
     submission["limitations"].append("EXTRA")
     reward = _verify(tmp_path, submission)
-    assert reward.details['correctness'] == 1.0
-    assert reward.details['evidence_validity'] == 1.0
-    assert reward.details['limitations_accuracy'] == 0.0
-    assert reward.details['protocol_compliance'] == 0.0
+    assert reward.details["correctness"] == 1.0
+    assert reward.details["evidence_validity"] == 1.0
+    assert reward.details["limitations_accuracy"] == 0.0
+    assert reward.details["protocol_compliance"] == 0.0
     assert reward.reward == 0.0

@@ -70,7 +70,7 @@ def test_false_verified_is_rejected(tmp_path: Path) -> None:
     support._write_json(path, submission)
     result = support._run_verifier(task, app, logs)
     assert result.reward == 0.0
-    assert result.details['false_certification'] is True
+    assert result.details["false_certification"] is True
 
 
 def test_small_checkpoints_below_threshold_pass(tmp_path: Path) -> None:
@@ -163,8 +163,8 @@ def test_dimensions_scored_independently(tmp_path: Path) -> None:
     submission["scope"] = "wrong scope"
     support._write_json(path, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 0.0
-    assert result.details['scope_accuracy'] == 0.0
+    assert result.details["correctness"] == 0.0
+    assert result.details["scope_accuracy"] == 0.0
     assert result.reward == 0.0
 
 
@@ -197,7 +197,7 @@ def test_keyword_only_evidence_is_rejected(tmp_path: Path) -> None:
     submission["evidence"][0]["sha256"] = support._digest(evidence_path)
     support._write_json(path, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -213,7 +213,7 @@ def test_unrelated_negation_does_not_satisfy_limitation(tmp_path: Path) -> None:
     ]
     support._write_json(path, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['assurance_calibration'] == 0.0
+    assert result.details["assurance_calibration"] == 0.0
     assert result.reward == 0.0
 
 
@@ -229,7 +229,7 @@ def test_oversized_evidence_is_rejected(tmp_path: Path) -> None:
     submission["evidence"][0]["sha256"] = support._digest(evidence_path)
     support._write_json(path, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['evidence_validity'] == 0.0
+    assert result.details["evidence_validity"] == 0.0
     assert result.reward == 0.0
 
 
@@ -249,5 +249,5 @@ def test_unreduced_rational_checkpoints_are_accepted(tmp_path: Path) -> None:
     support._bind_result_evidence(app, submission)
     support._write_json(path, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 1.0
+    assert result.details["correctness"] == 1.0
     assert result.reward == 1.0

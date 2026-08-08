@@ -64,7 +64,7 @@ def test_extra_duplicate_probe_is_rejected(tmp_path):
         )
 
     reward = _prepared_submission(tmp_path, mutate)
-    assert reward.details['correctness'] == 0.0
+    assert reward.details["correctness"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -73,7 +73,7 @@ def test_nested_extra_fields_are_rejected(tmp_path):
         submission["result"]["extra"] = "undeclared"
 
     reward = _prepared_submission(tmp_path, mutate)
-    assert reward.details['correctness'] == 0.0
+    assert reward.details["correctness"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -82,7 +82,7 @@ def test_protocol_failures_do_not_hide_mathematical_correctness(tmp_path):
         submission["limitations"] = []
 
     reward = _prepared_submission(tmp_path, mutate)
-    assert reward.details['correctness'] == 0.0
+    assert reward.details["correctness"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -93,8 +93,8 @@ def test_negated_scope_is_rejected(tmp_path):
         )
 
     reward = _prepared_submission(tmp_path, mutate)
-    assert reward.details['correctness'] == 1.0
-    assert reward.details['scope_accuracy'] == 0.0
+    assert reward.details["correctness"] == 1.0
+    assert reward.details["scope_accuracy"] == 0.0
     assert reward.reward == 0.0
 
 
@@ -105,6 +105,6 @@ def test_unrelated_digest_bound_evidence_is_rejected(tmp_path):
         submission["evidence"][0]["sha256"] = support._digest(evidence)
 
     reward = _prepared_submission(tmp_path, mutate)
-    assert reward.details['correctness'] == 1.0
-    assert reward.details['evidence_validity'] == 0.0
+    assert reward.details["correctness"] == 1.0
+    assert reward.details["evidence_validity"] == 0.0
     assert reward.reward == 0.0

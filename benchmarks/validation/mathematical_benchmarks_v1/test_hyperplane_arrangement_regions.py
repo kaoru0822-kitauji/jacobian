@@ -67,7 +67,7 @@ def test_false_verified_is_rejected(tmp_path: Path) -> None:
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
     assert result.reward == 0.0
-    assert result.details['false_certification'] is True
+    assert result.details["false_certification"] is True
 
 
 def test_unhashable_duplicate_member_is_cleanly_rejected(tmp_path: Path) -> None:
@@ -92,7 +92,7 @@ def test_affirmative_proof_assistant_limitation_is_rejected(tmp_path: Path) -> N
     submission["limitations"] = ["A proof assistant verified this result."]
     _rewrite(app, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['scope_accuracy'] == 0.0
+    assert result.details["scope_accuracy"] == 0.0
     assert result.reward == 0.0
 
 
@@ -102,10 +102,10 @@ def test_unverified_claim_preserves_other_metric_axes(tmp_path: Path) -> None:
     submission["claimed_assurance"] = "UNVERIFIED"
     support._write_json(app / "submission.json", submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 1.0
-    assert result.details['evidence_validity'] == 1.0
-    assert result.details['scope_accuracy'] == 1.0
-    assert result.details['assurance_calibration'] == 0.0
+    assert result.details["correctness"] == 1.0
+    assert result.details["evidence_validity"] == 1.0
+    assert result.details["scope_accuracy"] == 1.0
+    assert result.details["assurance_calibration"] == 0.0
     assert result.reward == 0.0
 
 
@@ -127,7 +127,7 @@ def test_affirmative_limitation_with_unrelated_negation_is_rejected(
     ]
     _rewrite(app, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['scope_accuracy'] == 0.0
+    assert result.details["scope_accuracy"] == 0.0
     assert result.reward == 0.0
 
 

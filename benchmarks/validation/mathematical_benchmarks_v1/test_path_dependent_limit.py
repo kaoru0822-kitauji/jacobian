@@ -55,8 +55,8 @@ def test_commuted_terms_and_equivalent_rational_strings_pass(tmp_path: Path) -> 
     path = app / "submission.json"
     submission = json.loads(path.read_text())
     result = submission["result"]
-    result.details['function']["denominator_terms"].reverse()
-    result.details['nonlinear_paths'] = [
+    result.details["function"]["denominator_terms"].reverse()
+    result.details["nonlinear_paths"] = [
         {"c": "+1", "y_x_power": 4, "limit": "0.5"},
         {"c": "2", "y_x_power": 4, "limit": "0.4"},
         {"c": "-0.5", "y_x_power": 4, "limit": "-0.4"},
@@ -73,13 +73,13 @@ def test_nested_boolean_integer_fields_are_rejected(tmp_path: Path) -> None:
         submission = json.loads(path.read_text())
         result = submission["result"]
         if index == 0:
-            result.details['function']["numerator_y_power"] = True
+            result.details["function"]["numerator_y_power"] = True
         elif index == 1:
-            result.details['function']["denominator_terms"][0]["x_power"] = False
+            result.details["function"]["denominator_terms"][0]["x_power"] = False
         elif index == 2:
-            result.details['line_certificate']["quotient_order"] = True
+            result.details["line_certificate"]["quotient_order"] = True
         else:
-            result.details['nonlinear_paths'][0]["y_x_power"] = False
+            result.details["nonlinear_paths"][0]["y_x_power"] = False
         support._bind_result_evidence(app, submission)
         support._write_json(path, submission)
         assert support._run_verifier(task, app, logs).reward == 0.0
@@ -94,7 +94,7 @@ def test_affirmative_proof_assistant_claim_is_rejected(tmp_path: Path) -> None:
     ]
     support._write_json(path, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['assurance_calibration'] == 0.0
+    assert result.details["assurance_calibration"] == 0.0
     assert result.reward == 0.0
 
 
@@ -105,8 +105,8 @@ def test_protocol_validity_is_reported_separately(tmp_path: Path) -> None:
     submission["task_id"] = "wrong/task"
     support._write_json(path, submission)
     result = support._run_verifier(task, app, logs)
-    assert result.details['correctness'] == 0.0
-    assert result.details['protocol_compliance'] == 0.0
+    assert result.details["correctness"] == 0.0
+    assert result.details["protocol_compliance"] == 0.0
     assert result.reward == 0.0
 
 
@@ -173,7 +173,7 @@ def test_false_verified_claim_is_rejected(tmp_path: Path) -> None:
     support._write_json(path, submission)
     result = support._run_verifier(task, app, logs)
     assert result.reward == 0.0
-    assert result.details['false_certification'] is True
+    assert result.details["false_certification"] is True
 
 
 def test_visible_input_tampering_is_rejected(tmp_path: Path) -> None:

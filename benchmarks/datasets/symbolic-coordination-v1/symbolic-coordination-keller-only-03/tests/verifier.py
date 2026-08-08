@@ -6,6 +6,7 @@ maintained JSON Schema validator used by the task-local protocol helper.
 """
 
 from __future__ import annotations
+
 import hashlib
 import itertools
 import json
@@ -13,10 +14,10 @@ from fractions import Fraction
 from pathlib import Path
 
 from verifier_support import (
-    normalize_reward_file,
     SUBMISSION_FIELDS,
     is_regular_bounded_file,
     load_submission_raw,
+    normalize_reward_file,
     read_evidence_json,
     submission_matches_public_schema,
     workspace_input_is_bound,

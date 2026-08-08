@@ -1,13 +1,14 @@
 from __future__ import annotations
+
 import json
 import math
 from pathlib import Path
 
 from verifier_support import (
-    normalize_reward_file,
     MAX_SUBMISSION_BYTES,
     is_regular_bounded_file,
     load_submission,
+    normalize_reward_file,
     read_evidence_json,
 )
 

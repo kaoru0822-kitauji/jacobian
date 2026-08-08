@@ -78,9 +78,13 @@ def _read_verifier_output(logs_root: Path) -> VerifierOutput:
     normalized_reward = float(reward)
     if not isfinite(normalized_reward) or not 0.0 <= normalized_reward <= 1.0:
         raise VerifierExecutionError("verifier reward must be finite and in [0, 1]")
-    details = _read_json_object(logs_root / "reward-details.json", name="reward-details.json")
+    details = _read_json_object(
+        logs_root / "reward-details.json", name="reward-details.json"
+    )
     if "reward" in details:
-        raise VerifierExecutionError("verifier reward-details.json must not contain reward")
+        raise VerifierExecutionError(
+            "verifier reward-details.json must not contain reward"
+        )
     return VerifierOutput(reward=normalized_reward, details=details)
 
 

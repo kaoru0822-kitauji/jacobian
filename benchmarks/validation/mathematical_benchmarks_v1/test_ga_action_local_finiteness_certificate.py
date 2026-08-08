@@ -34,7 +34,7 @@ def test_accepts_equivalent_limitation_wording(tmp_path: Path) -> None:
     ]
     _rewrite(app, submission)
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['limitation_accuracy'] == 1.0
+    assert accepted.details["limitation_accuracy"] == 1.0
     assert accepted.reward == 1.0
 
 
@@ -63,7 +63,7 @@ def test_accepts_an_alternative_scaled_basis(tmp_path: Path) -> None:
     _rewrite(app, submission)
 
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
+    assert accepted.details["correctness"] == 1.0
     assert accepted.reward == pytest.approx(1.0)
 
 
@@ -81,7 +81,7 @@ def test_equivalent_explanatory_evidence_needs_no_private_marker(
     submission["evidence"][0]["sha256"] = support._digest(evidence)
     support._write_json(app / "submission.json", submission)
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['evidence_validity'] == 1.0
+    assert accepted.details["evidence_validity"] == 1.0
     assert accepted.reward == 1.0
 
 
@@ -97,7 +97,7 @@ def test_accepts_composition_identity_wording(tmp_path: Path) -> None:
     submission["evidence"][0]["sha256"] = support._digest(evidence)
     support._write_json(app / "submission.json", submission)
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['evidence_validity'] == 1.0
+    assert accepted.details["evidence_validity"] == 1.0
     assert accepted.reward == 1.0
 
 
@@ -112,7 +112,7 @@ def test_rejects_self_contradictory_explanation(tmp_path: Path) -> None:
     submission["evidence"][0]["sha256"] = support._digest(evidence)
     support._write_json(app / "submission.json", submission)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['evidence_validity'] == 0.0
+    assert rejected.details["evidence_validity"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -125,7 +125,7 @@ def test_unrelated_evidence_is_rejected(tmp_path: Path) -> None:
     support._write_json(app / "submission.json", submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['evidence_validity'] == 0.0
+    assert rejected.details["evidence_validity"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -135,7 +135,7 @@ def test_unverified_assurance_is_accepted(tmp_path: Path) -> None:
     submission["claimed_assurance"] = "UNVERIFIED"
     _rewrite(app, submission)
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['assurance_calibration'] == 1.0
+    assert accepted.details["assurance_calibration"] == 1.0
     assert accepted.reward == 1.0
 
 
@@ -145,7 +145,7 @@ def test_false_limitation_is_rejected_with_diagnostic(tmp_path: Path) -> None:
     submission["limitations"] = ["The general theorem is formally verified."]
     support._write_json(app / "submission.json", submission)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['limitation_accuracy'] == 0.0
+    assert rejected.details["limitation_accuracy"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -177,8 +177,8 @@ def test_rejects_visible_input_tampering(tmp_path: Path) -> None:
     support._write_json(app / "input.json", source)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['input_binding'] == 0.0
-    assert rejected.details['correctness'] == 1.0
+    assert rejected.details["input_binding"] == 0.0
+    assert rejected.details["correctness"] == 1.0
     assert rejected.reward == 0.0
 
 
@@ -189,11 +189,11 @@ def test_envelope_failure_preserves_independent_diagnostics(tmp_path: Path) -> N
     support._write_json(app / "submission.json", submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['protocol_compliance'] == 0.0
-    assert rejected.details['correctness'] == 1.0
-    assert rejected.details['scope_accuracy'] == 1.0
-    assert rejected.details['assurance_calibration'] == 1.0
-    assert rejected.details['evidence_validity'] == 0.0
+    assert rejected.details["protocol_compliance"] == 0.0
+    assert rejected.details["correctness"] == 1.0
+    assert rejected.details["scope_accuracy"] == 1.0
+    assert rejected.details["assurance_calibration"] == 1.0
+    assert rejected.details["evidence_validity"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -204,9 +204,9 @@ def test_unhashable_assurance_preserves_scope_diagnostic(tmp_path: Path) -> None
     support._write_json(app / "submission.json", submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['scope_accuracy'] == 1.0
-    assert rejected.details['assurance_calibration'] == 0.0
-    assert rejected.details['false_certification'] is False
+    assert rejected.details["scope_accuracy"] == 1.0
+    assert rejected.details["assurance_calibration"] == 0.0
+    assert rejected.details["false_certification"] is False
     assert rejected.reward == 0.0
 
 
@@ -223,7 +223,7 @@ def test_accepts_unreduced_rational_coordinates(tmp_path: Path) -> None:
     _rewrite(app, submission)
 
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
+    assert accepted.details["correctness"] == 1.0
     assert accepted.reward == pytest.approx(1.0)
 
 
@@ -254,7 +254,7 @@ def test_accepts_long_rational_coordinates(tmp_path: Path) -> None:
     _rewrite(app, submission)
 
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
+    assert accepted.details["correctness"] == 1.0
     assert accepted.reward == pytest.approx(1.0)
 
 
@@ -270,7 +270,7 @@ def test_rejects_noncanonical_basis_coefficient(tmp_path: Path) -> None:
     _rewrite(app, submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 

@@ -22,7 +22,7 @@ def test_accepts_alternative_point_relabeling(tmp_path: Path) -> None:
     support._write_json(app / "submission.json", submission)
 
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
+    assert accepted.details["correctness"] == 1.0
     assert accepted.reward == pytest.approx(1.0)
 
 
@@ -33,7 +33,7 @@ def test_rejects_duplicate_pair(tmp_path: Path) -> None:
     support._write_json(app / "submission.json", submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 0.0
+    assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -44,8 +44,8 @@ def test_rejects_duplicate_evidence_descriptor(tmp_path: Path) -> None:
     support._write_json(app / "submission.json", submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['evidence_validity'] == 0.0
-    assert rejected.details['correctness'] == 1.0
+    assert rejected.details["evidence_validity"] == 0.0
+    assert rejected.details["correctness"] == 1.0
     assert rejected.reward == 0.0
 
 
@@ -80,9 +80,9 @@ def test_rejects_checked_assurance_without_partial_reward(tmp_path: Path) -> Non
     support._write_json(app / "submission.json", submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 1.0
-    assert rejected.details['assurance_calibration'] == 0.0
-    assert rejected.details['protocol_compliance'] == 1.0
+    assert rejected.details["correctness"] == 1.0
+    assert rejected.details["assurance_calibration"] == 0.0
+    assert rejected.details["protocol_compliance"] == 1.0
     assert rejected.reward == 0.0
 
 
@@ -93,9 +93,9 @@ def test_unverified_assurance_is_protocol_valid_but_unscoreable(tmp_path: Path) 
     support._write_json(app / "submission.json", submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 1.0
-    assert rejected.details['assurance_calibration'] == 0.0
-    assert rejected.details['protocol_compliance'] == 1.0
+    assert rejected.details["correctness"] == 1.0
+    assert rejected.details["assurance_calibration"] == 0.0
+    assert rejected.details["protocol_compliance"] == 1.0
     assert rejected.reward == 0.0
 
 
@@ -107,9 +107,9 @@ def test_result_shape_drift_is_protocol_only(tmp_path: Path) -> None:
     support._write_json(app / "submission.json", submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 1.0
-    assert rejected.details['evidence_validity'] == 1.0
-    assert rejected.details['protocol_compliance'] == 0.0
+    assert rejected.details["correctness"] == 1.0
+    assert rejected.details["evidence_validity"] == 1.0
+    assert rejected.details["protocol_compliance"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -124,8 +124,8 @@ def test_rejects_stale_evidence_after_relabeling(tmp_path: Path) -> None:
     support._write_json(app / "submission.json", submission)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 1.0
-    assert rejected.details['evidence_validity'] == 0.0
+    assert rejected.details["correctness"] == 1.0
+    assert rejected.details["evidence_validity"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -136,8 +136,8 @@ def test_input_tamper_is_reported_separately(tmp_path: Path) -> None:
     support._write_json(app / "input.json", frozen)
 
     rejected = support._run_verifier(task, app, logs)
-    assert rejected.details['correctness'] == 1.0
-    assert rejected.details['input_binding'] == 0.0
+    assert rejected.details["correctness"] == 1.0
+    assert rejected.details["input_binding"] == 0.0
     assert rejected.reward == 0.0
 
 
@@ -154,8 +154,8 @@ def test_accepts_large_digest_bound_evidence_without_losing_math_diagnostic(
     support._write_json(app / "submission.json", submission)
 
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
-    assert accepted.details['evidence_validity'] == 1.0
+    assert accepted.details["correctness"] == 1.0
+    assert accepted.details["evidence_validity"] == 1.0
     assert accepted.reward == pytest.approx(1.0)
 
 
@@ -170,6 +170,6 @@ def test_accepts_evidence_without_trailing_newline(tmp_path: Path) -> None:
     support._write_json(app / "submission.json", submission)
 
     accepted = support._run_verifier(task, app, logs)
-    assert accepted.details['correctness'] == 1.0
-    assert accepted.details['evidence_validity'] == 1.0
+    assert accepted.details["correctness"] == 1.0
+    assert accepted.details["evidence_validity"] == 1.0
     assert accepted.reward == pytest.approx(1.0)

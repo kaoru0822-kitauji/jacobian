@@ -1,5 +1,5 @@
 FROM python:3.12-slim@sha256:57cd7c3a7a273101a6485ba99423ee568157882804b1124b4dd04266317710de
-LABEL jacobian.checksum="85ac064cf3737b865f6daf01f2109d11c4f592267887438fb416b38c68048cb7"
+LABEL jacobian.checksum="d1741fd933f8671e9aa2af8ddae381e72062061c649901c75f5378cdc57ad237"
 RUN python -m pip install --no-cache-dir attrs==26.1.0 jsonschema==4.26.0 jsonschema-specifications==2025.9.1 referencing==0.37.0 rpds-py==2026.6.3 typing-extensions==4.16.0
 COPY test.sh verifier.py verifier_support.py public_contract.json input.json expected.json /tests/
 COPY input.json /app/input.json

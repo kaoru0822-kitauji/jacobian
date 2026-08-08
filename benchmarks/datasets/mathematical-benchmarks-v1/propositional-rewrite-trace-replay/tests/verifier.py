@@ -3,10 +3,10 @@ import json
 from pathlib import Path
 
 from verifier_support import (
-    normalize_reward_file,
     aggregate_reward,
     false_verified_claim,
     load_submission,
+    normalize_reward_file,
     read_evidence_json,
     strict_submission_contract,
 )

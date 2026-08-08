@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import json
 import re
 from fractions import Fraction
@@ -7,11 +8,11 @@ from typing import Any
 
 from sympy import QQ, Matrix, Poly, groebner, symbols
 from verifier_support import (
-    normalize_reward_file,
     MAX_SUBMISSION_BYTES,
     _public_submission_is_valid,
     false_verified_claim,
     is_regular_bounded_file,
+    normalize_reward_file,
     resolve_evidence,
     strict_submission_contract,
     workspace_input_is_bound,

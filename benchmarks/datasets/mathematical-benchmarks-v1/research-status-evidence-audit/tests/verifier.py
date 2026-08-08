@@ -2,9 +2,9 @@ import json
 from pathlib import Path
 
 from verifier_support import (
-    normalize_reward_file,
     evidence_list_is_bound,
     load_submission_raw,
+    normalize_reward_file,
     resolve_evidence,
     strict_submission_contract,
 )

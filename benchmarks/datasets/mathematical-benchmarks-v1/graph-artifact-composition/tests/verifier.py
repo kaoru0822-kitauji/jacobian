@@ -3,12 +3,11 @@ from collections import deque
 from pathlib import Path
 
 from verifier_support import (
-    normalize_reward_file,
     aggregate_reward,
     evidence_list_is_bound,
+    normalize_reward_file,
 )
 from verifier_support import (
-    normalize_reward_file,
     load_submission as load_strict_submission,
 )
 
