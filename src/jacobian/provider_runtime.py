@@ -150,6 +150,11 @@ def _inspect_python_distribution_identity(
     runtime contract. The provider loader validates them on first use; identity
     measurement itself must stay import-free so runtime assembly does not load
     every optional mathematical backend.
+
+    ``required_attributes`` is **not** validated here. Identity checks compare
+    version and RECORD digest only. Required-attribute validation is deferred
+    to the readiness check (:func:`require_provider_runtime_ready`), which
+    imports the distribution and verifies attribute availability at first use.
     """
 
     del required_attributes

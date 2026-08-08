@@ -708,7 +708,14 @@ class SearchService:
         *,
         include_witness_lineage: bool,
     ) -> SearchBudget:
-        """Apply the restrictive intersection of request and operator limits."""
+        """Apply the restrictive intersection of request and operator limits.
+
+        Witness-enabled search requires more parent slots than ordinary search
+        because each candidate lineage page records three lineage parents (one
+        per witness parent) instead of one. The minimum ``max_parents`` is
+        ``fixed_page_parents + parents_per_candidate``: 4 for ordinary search,
+        6 for witness-enabled search.
+        """
 
         fixed_page_parents = 3  # claim, plugin, and one shared evaluation
         parents_per_candidate = 3 if include_witness_lineage else 1
