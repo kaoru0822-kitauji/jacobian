@@ -358,7 +358,15 @@ def test_lean_repl_rejects_one_step_constructor_trace(tmp_path: Path) -> None:
     assert rejected["reward"] == 0.0
 
 
-def test_lean_repl_accepts_complete_distinct_task_traces(tmp_path: Path) -> None:
+def test_lean_repl_rejects_valid_trace_when_replay_is_absent(tmp_path: Path) -> None:
+    """A valid-looking report must score zero when the verifier cannot run Lean.
+
+    In the unit-test environment the pinned Lean/REPL binary is not installed,
+    so ``replay.run_replay()`` returns ``{"ok": False}``.  The verifier must
+    fail closed — awarding zero reward — regardless of the submission content,
+    because it cannot independently confirm the reported traces.
+    """
+
     tasks = [
         {
             "task_id": "CONJUNCTION-DECOMPOSITION",
@@ -378,8 +386,165 @@ def test_lean_repl_accepts_complete_distinct_task_traces(tmp_path: Path) -> None
         },
     ]
     task, app, logs = _lean_case(tmp_path, tasks)
-    accepted = support._run_verifier(task, app, logs)
-    assert accepted["reward"] == pytest.approx(1.0)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["reward"] == 0.0
+
+
+def test_lean_repl_rejects_fabricated_report_when_replay_unavailable(
+    tmp_path: Path,
+) -> None:
+    """The forged fixture from issue #764 must receive zero reward.
+
+    The report is assembled from agent-visible constants without starting Lean.
+    In the unit-test environment the verifier-owned replay cannot run (no
+    pinned Lean/REPL binary), so the verifier fails closed and awards zero
+    reward.  In the verifier Docker image the replay *will* run and will
+    correctly accept a matching public trace — that is semantic verification,
+    not fabrication acceptance.  This test covers the replay-unavailable path.
+    """
+
+    import hashlib
+
+    task = DATASETS / "provider-feasibility-v1" / "lean-repl"
+    app = tmp_path / "lean-repl-fabricated" / "app"
+    logs = tmp_path / "lean-repl-fabricated" / "logs"
+    (app / "evidence").mkdir(parents=True)
+    logs.mkdir(parents=True)
+    shutil.copy2(task / "environment" / "input.json", app / "input.json")
+
+    report = {
+        "protocol": "leanprover-community/repl",
+        "task_count": 2,
+        "completed_count": 2,
+        "parameter_error_count": 0,
+        "return_code": 0,
+        "elapsed_seconds": 0.1,
+        "stderr": "",
+        "tasks": [
+            {
+                "task_id": "CONJUNCTION-DECOMPOSITION",
+                "tactics": [
+                    {"tactic": "constructor", "goal_count": 2, "error_count": 0},
+                    {"tactic": "exact hP", "goal_count": 1, "error_count": 0},
+                    {"tactic": "exact hQ", "goal_count": 0, "error_count": 0},
+                ],
+            },
+            {
+                "task_id": "LOCAL-PREMISE-APPLICATION",
+                "tactics": [
+                    {"tactic": "exact h hP", "goal_count": 0, "error_count": 0},
+                ],
+            },
+        ],
+        "limitations": ["fabricated report"],
+    }
+    report_path = app / "evidence" / "provider-report.json"
+    _write_json(report_path, report)
+
+    public = json.loads((task / "environment" / "input.json").read_text())
+    submission = {
+        "task_id": public["task_id"],
+        "conclusion": "FEASIBLE",
+        "result": {
+            "provider": public["provider"],
+            "contract": public["contract"],
+            "status": "COMPLETED",
+            "pin_sha256": public["pin_sha256"],
+        },
+        "claimed_assurance": "COMPUTED",
+        "scope": "fabricated without Lean REPL execution",
+        "completeness": "COMPLETE",
+        "evidence": [
+            {
+                "path": "evidence/provider-report.json",
+                "sha256": "sha256:"
+                + hashlib.sha256(report_path.read_bytes()).hexdigest(),
+            }
+        ],
+        "limitations": ["fabricated report"],
+    }
+    _write_json(app / "submission.json", submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["reward"] == 0.0
+
+
+def test_lean_repl_traces_match_rejects_disagreeing_trace() -> None:
+    """A submitted trace that disagrees with the verifier-owned replay is rejected.
+
+    This unit-tests ``replay.traces_match`` directly — no fake replay artifact
+    is injected.  The replay result is a Python dict representing what the
+    verifier's own Lean execution would produce.  A submitted trace with a
+    wrong ``goal_count`` must not match.
+    """
+
+    import importlib.util
+
+    replay_path = (
+        DATASETS / "provider-feasibility-v1" / "lean-repl" / "tests" / "replay.py"
+    )
+    spec = importlib.util.spec_from_file_location("replay", replay_path)
+    assert spec is not None and spec.loader is not None
+    replay_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(replay_mod)
+
+    replay_result = {
+        "ok": True,
+        "tasks": [
+            {
+                "task_id": "CONJUNCTION-DECOMPOSITION",
+                "tactics": [
+                    {"tactic": "constructor", "goal_count": 2, "error_count": 0},
+                    {"tactic": "exact hP", "goal_count": 1, "error_count": 0},
+                    {"tactic": "exact hQ", "goal_count": 0, "error_count": 0},
+                ],
+            },
+            {
+                "task_id": "LOCAL-PREMISE-APPLICATION",
+                "tactics": [
+                    {"tactic": "exact h hP", "goal_count": 0, "error_count": 0},
+                ],
+            },
+        ],
+    }
+
+    matching = [
+        {
+            "task_id": "CONJUNCTION-DECOMPOSITION",
+            "tactics": [
+                {"tactic": "constructor", "goal_count": 2, "error_count": 0},
+                {"tactic": "exact hP", "goal_count": 1, "error_count": 0},
+                {"tactic": "exact hQ", "goal_count": 0, "error_count": 0},
+            ],
+        },
+        {
+            "task_id": "LOCAL-PREMISE-APPLICATION",
+            "tactics": [
+                {"tactic": "exact h hP", "goal_count": 0, "error_count": 0},
+            ],
+        },
+    ]
+    assert replay_mod.traces_match(matching, replay_result) is True
+
+    disagreeing = [
+        {
+            "task_id": "CONJUNCTION-DECOMPOSITION",
+            "tactics": [
+                {"tactic": "constructor", "goal_count": 99, "error_count": 0},
+                {"tactic": "exact hP", "goal_count": 1, "error_count": 0},
+                {"tactic": "exact hQ", "goal_count": 0, "error_count": 0},
+            ],
+        },
+        {
+            "task_id": "LOCAL-PREMISE-APPLICATION",
+            "tactics": [
+                {"tactic": "exact h hP", "goal_count": 0, "error_count": 0},
+            ],
+        },
+    ]
+    assert replay_mod.traces_match(disagreeing, replay_result) is False
+
+    assert replay_mod.traces_match(matching, {"ok": False}) is False
 
 
 def _provider_report_case(tmp_path: Path, task_name: str, report: dict) -> tuple:
