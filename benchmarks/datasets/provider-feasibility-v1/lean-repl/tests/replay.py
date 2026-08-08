@@ -96,7 +96,9 @@ def _exchange(
     process: subprocess.Popen[bytes],
     request: dict[str, object],
 ) -> dict[str, Any]:
-    line = (json.dumps(request, sort_keys=True) + "\n").encode("utf-8")
+    # The REPL protocol terminates request frames with a blank line, matching
+    # the production spike's ToolInteractiveCommand.send() transport.
+    line = (json.dumps(request, sort_keys=True) + "\n\n").encode("utf-8")
     assert process.stdin is not None
     process.stdin.write(line)
     process.stdin.flush()
