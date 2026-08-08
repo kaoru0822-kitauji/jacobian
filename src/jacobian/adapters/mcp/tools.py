@@ -8,7 +8,7 @@ from typing import Annotated, Any, Literal
 
 from mcp.server.mcpserver import Context
 from mcp_types import CallToolResult, TextContent
-from pydantic import Field, StrictInt
+from pydantic import BaseModel, ConfigDict, Field, RootModel, StrictInt
 
 from jacobian.adapters.mcp.constants import _CAPABILITY_SCOPE_RULE, ReasoningLogMode
 from jacobian.adapters.mcp.context import AppState, _runtime
@@ -41,7 +41,88 @@ from jacobian.contracts.results import ExecutionStatus
 
 _LOGGER = logging.getLogger(__name__)
 CapabilityDescriptionView = Literal["SUMMARY", "CONTRACT", "FULL"]
-CapabilityDiscoveryToolResult = Annotated[CallToolResult, dict[str, Any]]
+
+
+class _CapabilityDiscoveryFields(BaseModel):
+    """Shared catalog metadata with a closed MCP output shape."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    policy_profile: str
+    policy_digest: str
+
+
+class _CapabilityDiscoveryResult(_CapabilityDiscoveryFields):
+    kind: Literal["discovery"]
+    catalog_version: str
+    catalog_digest: str
+    discovery_version: Literal["1"]
+    query: str | None = None
+    domain: str | None = None
+    domain_filter_status: Literal["UNFILTERED", "MATCHED", "UNKNOWN"]
+    domain_filter_basis: str
+    mode: CapabilityMode | None = None
+    resolved_input_kind: CapabilityInputKind | None = None
+    artifact_type: str | None = None
+    routing_status: Literal["UNFILTERED", "ROUTES_FOUND", "NO_ROUTE"]
+    routing_basis: str
+    matches: list[dict[str, Any]]
+    total_matches: StrictInt
+    truncated: bool
+    next_cursor: str | None = None
+    available_domains: list[str]
+    portfolio_fit: Literal[
+        "UNFILTERED",
+        "STRONG_CANDIDATES_FOUND",
+        "ONLY_WEAK_LEXICAL_MATCHES",
+        "NO_LEXICAL_MATCHES",
+    ]
+    portfolio_fit_basis: str
+    available_recovery_paths: list[dict[str, Any]]
+    recovery_paths_are_unranked: bool
+    response_byte_limit: StrictInt
+    truncation_reason: str | None = None
+    available_domains_total: StrictInt
+    available_domains_truncated: bool
+    match_metadata_truncated: bool
+
+
+class _CapabilityInspectionResult(_CapabilityDiscoveryFields):
+    kind: Literal["capability"]
+    view: CapabilityDescriptionView
+    capability: dict[str, Any]
+    scope_rule: str | dict[str, Any]
+    invocations: list[dict[str, Any]] | None = None
+    related_capabilities: list[dict[str, Any]] | None = None
+    synchronous_execution: dict[str, Any] | None = None
+    next_views: dict[str, str] | None = None
+    cache: dict[str, Any] | None = None
+
+
+class _CapabilityDiscoveryError(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["error"]
+    error: dict[str, Any]
+
+
+class CapabilityDiscoveryResponse(
+    RootModel[
+        Annotated[
+            _CapabilityDiscoveryResult
+            | _CapabilityInspectionResult
+            | _CapabilityDiscoveryError,
+            Field(discriminator="kind"),
+        ]
+    ]
+):
+    """Closed, discriminated structured output for math.find."""
+
+
+CapabilityDiscoveryToolResult = Annotated[
+    CallToolResult,
+    CapabilityDiscoveryResponse,
+]
 CapabilityRunToolResult = Annotated[CallToolResult, CapabilityResult]
 
 
@@ -144,6 +225,16 @@ def _find_text_projection(response: dict[str, Any]) -> dict[str, Any]:
     if response.get("related_capabilities"):
         projection["related_capabilities"] = response["related_capabilities"]
     return projection
+
+
+def _find_result(response: dict[str, Any]) -> CallToolResult:
+    if "error" in response and response.get("kind") != "error":
+        response = {"kind": "error", **response}
+    structured = CapabilityDiscoveryResponse.model_validate(response)
+    return _text_result(
+        structured.model_dump(mode="json", exclude_unset=True),
+        _find_text_projection(response),
+    )
 
 
 def _run_text_projection(result: CapabilityResult) -> dict[str, Any]:
@@ -288,10 +379,7 @@ async def capability_describe(
                 limit=limit,
                 cursor=cursor,
             )
-            return _text_result(
-                discovery_response,
-                _find_text_projection(discovery_response),
-            )
+            return _find_result(discovery_response)
         capability_catalog = active_runtime.core.capabilities.catalog()
         descriptors = {
             item.capability_id: item for item in capability_catalog.capabilities
@@ -309,7 +397,7 @@ async def capability_describe(
                     "available_capability_ids": sorted(descriptors),
                 }
             }
-            return _text_result(error_response, _find_text_projection(error_response))
+            return _find_result(error_response)
         response: dict[str, Any] = {
             "kind": "capability",
             "view": view,
@@ -378,7 +466,7 @@ async def capability_describe(
                     else {"status": "UNAVAILABLE", "detail": None}
                 ),
             }
-        return _text_result(response, _find_text_projection(response))
+        return _find_result(response)
 
 
 async def capability_invoke(
