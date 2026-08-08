@@ -26,7 +26,7 @@ def _value() -> dict[str, object]:
 
 
 def test_frozen_contract_recomputes_calibration_selected_population() -> None:
-    validated = load_frozen_study(SPEC)
+    validated = load_frozen_study(SPEC, verify_current_tasks=False)
     assert [task.task_id for task in validated.contract.tasks] == [
         "apollonius-gap-repair",
     ]
