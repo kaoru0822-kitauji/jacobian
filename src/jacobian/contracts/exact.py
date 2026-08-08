@@ -56,6 +56,21 @@ def bounded_rational_grid_size(
     return size
 
 
+def require_bounded_rational(
+    value: CanonicalRational,
+    *,
+    max_digits: int,
+    label: str,
+) -> None:
+    """Reject a canonical rational whose components exceed a domain bound."""
+
+    if (
+        len(value.num.lstrip("-")) > max_digits
+        or len(value.den.lstrip("-")) > max_digits
+    ):
+        raise ValueError(f"{label} exceeds the {max_digits}-digit bound")
+
+
 class CanonicalRational(ContractModel):
     num: CanonicalInteger
     den: CanonicalInteger
