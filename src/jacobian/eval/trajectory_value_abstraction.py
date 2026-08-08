@@ -310,10 +310,10 @@ class OfflineValueComparisonV2(ContractModel):
             raise ValueError("comparison must contain all six estimators in order")
         if self.corpus_id != self.source_corpus.corpus_id:
             raise ValueError("comparison corpus identity mismatch")
-        if _digest(self.source_corpus.model_dump(mode="json")) != self.corpus_digest:
-            raise ValueError("comparison corpus digest mismatch")
         if self.evaluator_config != self.source_corpus.evaluator_config:
             raise ValueError("comparison evaluator config mismatch")
+        if _digest(self.source_corpus.model_dump(mode="json")) != self.corpus_digest:
+            raise ValueError("comparison corpus digest mismatch")
         _validate_comparison_source_bindings(self)
         return self
 
@@ -440,6 +440,22 @@ def _expected_cluster_members(
     return member_lookup[source.observation_id]
 
 
+def _expected_cluster_members_by_observation(
+    estimator: EstimatorKindV2,
+    observations: tuple[Any, ...],
+    threshold: float,
+    semantic_digests: Mapping[str, str],
+) -> dict[str, tuple[str, ...]]:
+    """Compute each leave-one-trajectory-out cluster once per validation pass."""
+
+    return {
+        source.observation_id: _expected_cluster_members(
+            estimator, source, observations, threshold, semantic_digests
+        )
+        for source in observations
+    }
+
+
 def _validate_source_estimate(
     estimate: SemanticStateValueEstimate,
     estimator: EstimatorKindV2,
@@ -448,8 +464,7 @@ def _validate_source_estimate(
     source_by_id: dict[str, Any],
     previous: Mapping[tuple[str, int], ExtractedTrajectoryState | None],
     rewards: Mapping[str, Literal[0, 1]],
-    threshold: float,
-    semantic_digests: Mapping[str, str],
+    expected_members: tuple[str, ...],
 ) -> None:
     if _source_bound_fields(estimate) != _expected_source_fields(source):
         raise ValueError("estimate fields are stale or source-substituted")
@@ -459,9 +474,6 @@ def _validate_source_estimate(
     )
     if estimate.abstract_value_state != semantic:
         raise ValueError("abstract state does not bind the exact source state")
-    expected_members = _expected_cluster_members(
-        estimator, source, observations, threshold, semantic_digests
-    )
     if estimate.cluster_member_observation_ids != expected_members:
         raise ValueError("estimate cluster membership is stale or substituted")
     if estimate.cluster_id != _cluster_id(estimator, expected_members):
@@ -491,14 +503,14 @@ def _validate_comparison_source_bindings(
     for evaluation in comparison.evaluations:
         if tuple(item.observation_id for item in evaluation.estimates) != source_ids:
             raise ValueError("evaluation observations do not bind the source corpus")
+        expected_members_by_observation = _expected_cluster_members_by_observation(
+            evaluation.estimator,
+            observations,
+            threshold,
+            semantic_digests,
+        )
         expected_clusters = {
-            _expected_cluster_members(
-                evaluation.estimator,
-                source_by_id[estimate.observation_id],
-                observations,
-                threshold,
-                semantic_digests,
-            )
+            expected_members_by_observation[estimate.observation_id]
             for estimate in evaluation.estimates
         }
         declared_clusters = {
@@ -515,8 +527,7 @@ def _validate_comparison_source_bindings(
                 source_by_id,
                 previous,
                 rewards,
-                threshold,
-                semantic_digests,
+                expected_members_by_observation[estimate.observation_id],
             )
 
 
