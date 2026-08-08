@@ -129,7 +129,7 @@ def test_malformed_assurance_keeps_diagnostics(tmp_path):
         and r.details["scope"] == 1.0
         and r.details["assurance"] == 0.0
         and r.details["aggregate_reward"] == 0.0
-        and "error" not in r
+        and "error" not in r.details
     )
 
 
@@ -147,7 +147,7 @@ def test_nonfinite_json_rejected_in_raw_parse(tmp_path):
         and r.details["scope"] == 0.0
         and r.details["assurance"] == 0.0
         and r.details["aggregate_reward"] == 0.0
-        and "error" not in r
+        and "error" not in r.details
     )
 
 

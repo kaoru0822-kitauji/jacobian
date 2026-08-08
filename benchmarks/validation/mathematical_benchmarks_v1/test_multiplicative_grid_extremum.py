@@ -8,6 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from benchmarks.validation._verifier_child import VerifierOutput
 from benchmarks.validation.mathematical_benchmarks_v1 import support
 
 TASK = (
@@ -52,7 +53,7 @@ def _bind(app: Path, submission: dict) -> None:
     _write_json(app / "submission.json", submission)
 
 
-def _run(app: Path, logs: Path) -> dict:
+def _run(app: Path, logs: Path) -> VerifierOutput:
     return support._run_verifier(TASK, app, logs)
 
 
@@ -61,7 +62,7 @@ def test_oracle_receives_full_reward(tmp_path: Path) -> None:
     result = _run(app, logs)
     assert result.reward == 1.0
     assert all(
-        result[key] == 1.0
+        result.details[key] == 1.0
         for key in (
             "protocol_compliance",
             "correctness",

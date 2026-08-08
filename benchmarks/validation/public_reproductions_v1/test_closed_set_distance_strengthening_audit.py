@@ -130,17 +130,17 @@ def test_rejects_corrupt_geometry_and_nonvanishing_gap(tmp_path: Path) -> None:
     for name, mutation in [
         (
             "coordinate",
-            lambda result: result.details["point_pairs"][3]["b"].__setitem__(1, "1/8"),
+            lambda result: result["point_pairs"][3]["b"].__setitem__(1, "1/8"),
         ),
         (
             "distance",
-            lambda result: result.details["epsilon_witnesses"][2].update(
+            lambda result: result["epsilon_witnesses"][2].update(
                 distance="1/10"
             ),
         ),
         (
             "ordering",
-            lambda result: result.details["epsilon_witnesses"][2].update(epsilon="1/4"),
+            lambda result: result["epsilon_witnesses"][2].update(epsilon="1/4"),
         ),
     ]:
         submission = copy.deepcopy(_oracle())
