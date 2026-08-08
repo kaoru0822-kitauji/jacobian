@@ -59,6 +59,14 @@ _TASK_ORDER = (
     "symbolic-coordination-search-timeout-01",
     "symbolic-coordination-semantic-equivalence-01",
 )
+_EXTENSION_TASK_ORDER = (
+    "symbolic-coordination-valid-inverse-04",
+    "symbolic-coordination-near-miss-04",
+    "symbolic-coordination-one-direction-03",
+    "symbolic-coordination-semantic-equivalence-02",
+    "symbolic-coordination-semantic-equivalence-03",
+    "symbolic-coordination-semantic-equivalence-04",
+)
 
 
 class CalibrationTask(StudyTask):
@@ -76,6 +84,17 @@ class CalibrationSelection(ContractModel):
     extension_policy: Literal[
         "one-separately-preregistered-extension-of-at-most-six-new-candidates"
     ]
+
+
+class CalibrationExtensionSelection(ContractModel):
+    required_labelled_rollouts: Literal[2] = 2
+    eligible_accepted_count: Literal[1] = 1
+    eligible_rejected_count: Literal[1] = 1
+    ordering: Literal["declared-task-order"] = "declared-task-order"
+    maximum_selected_tasks: Literal[6] = 6
+    target_minimum_tasks: Literal[4] = 4
+    uncertainty: Literal["wilson-score-95"] = "wilson-score-95"
+    extension_policy: Literal["no-further-extension"]
 
 
 class CoordinationCalibrationSpec(ContractModel):
@@ -118,14 +137,72 @@ class CoordinationCalibrationSpec(ContractModel):
         return self
 
 
-def load_spec(path: Path) -> CoordinationCalibrationSpec:
-    return CoordinationCalibrationSpec.model_validate_json(
-        path.read_text(encoding="utf-8")
-    )
+class CoordinationCalibrationExtensionSpec(ContractModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal["1"] = "1"
+    study_id: Literal["multi-tool-coordination-pr2-calibration-extension"]
+    evidence_class: Literal["public-host-local-difficulty-calibration-extension"]
+    causal_claim_authorized: Literal[False] = False
+    harbor_execution_claimed: Literal[False] = False
+    source_base_revision: Literal["a33d6cd66f431cf1d904fcc719f24383869d4bd4"]
+    parent_study_id: Literal["multi-tool-coordination-pr2-calibration"]
+    parent_manifest_sha256: Literal[
+        "sha256:b65f5a32438e44dbc58af7f1323f3d38d86a703df41a1ab8daa37044010944bb"
+    ]
+    parent_summary_sha256: Literal[
+        "sha256:ce69b7bc01c25a5e187c735c8b8c7234197e6273e086e7462869b283e21ba362"
+    ]
+    parent_selected_task_ids: tuple[str, ...] = Field(min_length=1, max_length=1)
+    extension_number: Literal[1] = 1
+    model: StudyModel
+    repetitions_per_task: Literal[2] = 2
+    timeout_seconds_per_rollout: Literal[600] = 600
+    sandbox: Literal["workspace-write"] = "workspace-write"
+    reasoning_log_mode: Literal["REQUIRED"] = "REQUIRED"
+    web_search: Literal["disabled"] = "disabled"
+    wrong_answer_retries: Literal[0] = 0
+    terminal_reward: Literal["task-owned-clean-room-verifier-only"]
+    tool_call_reward: Literal[0] = 0
+    tasks: tuple[CalibrationTask, ...] = Field(min_length=6, max_length=6)
+    selection: CalibrationExtensionSelection
+    selection_rationale: tuple[str, ...] = Field(min_length=3, max_length=6)
+    stop_rules: tuple[str, ...] = Field(min_length=4, max_length=8)
+    agent_instructions: str = Field(min_length=1, max_length=4096)
+
+    @model_validator(mode="after")
+    def require_frozen_extension(self) -> Self:
+        if tuple(task.task_id for task in self.tasks) != _EXTENSION_TASK_ORDER:
+            raise ValueError("tasks must match the frozen PR2 extension order")
+        if len({task.harbor_task_digest for task in self.tasks}) != len(self.tasks):
+            raise ValueError("task digests must be unique")
+        if any(task.dataset != "symbolic-coordination-v1" for task in self.tasks):
+            raise ValueError("extension tasks must use symbolic-coordination-v1")
+        if set(_EXTENSION_TASK_ORDER) & set(_TASK_ORDER):
+            raise ValueError("extension tasks must be new candidates")
+        if self.parent_selected_task_ids != (
+            "symbolic-coordination-semantic-equivalence-01",
+        ):
+            raise ValueError("parent selected tasks must match the frozen calibration")
+        return self
+
+
+CalibrationSpec = CoordinationCalibrationSpec | CoordinationCalibrationExtensionSpec
+
+
+def load_spec(path: Path) -> CalibrationSpec:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise ValueError("calibration specification must be a JSON object")
+    if value.get("study_id") == "multi-tool-coordination-pr2-calibration":
+        return CoordinationCalibrationSpec.model_validate(value)
+    if value.get("study_id") == "multi-tool-coordination-pr2-calibration-extension":
+        return CoordinationCalibrationExtensionSpec.model_validate(value)
+    raise ValueError("unsupported coordination calibration study_id")
 
 
 def _task_records(
-    spec: CoordinationCalibrationSpec,
+    spec: CalibrationSpec,
 ) -> dict[str, dict[str, Any]]:
     records: dict[str, dict[str, Any]] = {}
     for task in spec.tasks:
@@ -165,7 +242,7 @@ def _wilson_interval(successes: int, total: int) -> tuple[float, float] | None:
 
 
 def _validated_labels(
-    spec: CoordinationCalibrationSpec, records: Sequence[Mapping[str, object]]
+    spec: CalibrationSpec, records: Sequence[Mapping[str, object]]
 ) -> dict[str, list[str]]:
     by_task: dict[str, list[str]] = {task.task_id: [] for task in spec.tasks}
     expected_count = len(spec.tasks) * spec.repetitions_per_task
@@ -201,7 +278,7 @@ def _validated_labels(
 
 
 def calibration_selection(
-    spec: CoordinationCalibrationSpec, records: Sequence[Mapping[str, object]]
+    spec: CalibrationSpec, records: Sequence[Mapping[str, object]]
 ) -> dict[str, object]:
     by_task = _validated_labels(spec, records)
 
@@ -233,17 +310,35 @@ def calibration_selection(
                 "eligible": is_eligible,
             }
         )
-    selected = eligible[: spec.selection.maximum_selected_tasks]
-    return {
+    initial = (
+        list(spec.parent_selected_task_ids)
+        if isinstance(spec, CoordinationCalibrationExtensionSpec)
+        else []
+    )
+    selected = (initial + eligible)[: spec.selection.maximum_selected_tasks]
+    result: dict[str, object] = {
         "schema_version": "1",
         "rule": spec.selection.model_dump(mode="json"),
         "tasks": rows,
         "eligible_task_ids": eligible,
         "selected_task_ids": selected,
         "target_minimum_met": len(selected) >= spec.selection.target_minimum_tasks,
-        "extension_required": len(selected) < spec.selection.target_minimum_tasks,
+        "extension_required": (
+            not isinstance(spec, CoordinationCalibrationExtensionSpec)
+            and len(selected) < spec.selection.target_minimum_tasks
+        ),
         "extension_is_automatic": False,
     }
+    if isinstance(spec, CoordinationCalibrationExtensionSpec):
+        result.update(
+            {
+                "extension_number": spec.extension_number,
+                "initial_selected_task_ids": initial,
+                "new_selected_task_ids": selected[len(initial) :],
+                "extension_exhausted": True,
+            }
+        )
+    return result
 
 
 def run_calibration(spec_path: Path, output: Path) -> None:
@@ -258,7 +353,7 @@ def run_calibration(spec_path: Path, output: Path) -> None:
     source_revision = git_head_sha(_ROOT)
     if _parent_revision() != spec.source_base_revision:
         raise RuntimeError(
-            "the calibration commit is not based directly on the PR1 revision"
+            "the calibration commit is not based directly on its frozen base revision"
         )
     output.mkdir(parents=True)
     started_at = _now()
@@ -310,6 +405,12 @@ def run_calibration(spec_path: Path, output: Path) -> None:
         "causal_claim_authorized": False,
         "harbor_execution_claimed": False,
     }
+    if isinstance(spec, CoordinationCalibrationExtensionSpec):
+        summary["extension_of"] = {
+            "study_id": spec.parent_study_id,
+            "manifest_sha256": spec.parent_manifest_sha256,
+            "summary_sha256": spec.parent_summary_sha256,
+        }
     _write_json(output / "summary.json", summary)
     manifest = {
         "schema_version": "1",
@@ -340,6 +441,12 @@ def run_calibration(spec_path: Path, output: Path) -> None:
         "outcomes": dict(sorted(outcomes.items())),
         "artifacts": _artifact_manifest(output),
     }
+    if isinstance(spec, CoordinationCalibrationExtensionSpec):
+        manifest["extension_of"] = {
+            "study_id": spec.parent_study_id,
+            "manifest_sha256": spec.parent_manifest_sha256,
+            "summary_sha256": spec.parent_summary_sha256,
+        }
     _write_json(output / "manifest.json", manifest)
 
 

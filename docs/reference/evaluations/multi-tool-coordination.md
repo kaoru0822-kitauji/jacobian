@@ -120,3 +120,43 @@ uv run --locked --with harbor==0.20.0 --with tomli-w==1.2.0 \
   --output benchmarks/results/multi-tool-coordination-pr2-calibration \
   --execute
 ```
+
+## PR2 initial calibration result
+
+The frozen batch ran once in tmux session `coord-pr2-calibration` from clean
+source revision `a33d6cd66f431cf1d904fcc719f24383869d4bd4`. All 24 planned
+rollouts completed: 21 were accepted, three were rejected, all reasoning logs
+completed, and no outcome was inconclusive. The immutable manifest binds 375
+artifacts. Its SHA-256 digest is
+`b65f5a32438e44dbc58af7f1323f3d38d86a703df41a1ab8daa37044010944bb`.
+The independent per-trajectory audit is recorded in
+[`multi-tool-coordination-pr2-calibration-adjudication.json`](../../../benchmarks/config/multi-tool-coordination-pr2-calibration-adjudication.json).
+
+Only `symbolic-coordination-semantic-equivalence-01` met the frozen one
+accepted/one rejected rule. Both directed-proportionality rollouts made the
+same fixed-parameter inversion through different operation routes. The mixed
+semantic-equivalence task separated a failed recovery from noncanonical sparse
+input from a successful exact residual replay. Ten post-run typed-state
+extractions failed because certificate metadata was misclassified as a
+candidate scalar; the raw traces and task-owned verifier labels remain intact.
+
+Because one selected task is below the target of four, the initial contract
+authorizes exactly one separately preregistered extension. The extension is
+not a retry: it freezes six previously unrun tasks in
+[`multi-tool-coordination-pr2-calibration-extension.json`](../../../benchmarks/config/multi-tool-coordination-pr2-calibration-extension.json),
+keeps every model, prompt, timeout, verifier, and label rule unchanged, and
+binds the initial manifest and summary digests. It includes rational inverse
+and near-miss encodings, a three-variable one-direction case, and three
+distinct unused semantic-equivalence encodings. No second extension is
+authorized, even if the combined target remains unmet.
+
+The extension is opt-in and must use its own named tmux session:
+
+```sh
+uv run --locked --with harbor==0.20.0 --with tomli-w==1.2.0 \
+  --with jsonschema python \
+  -m benchmarks.tooling.multi_tool_coordination_calibration run \
+  --spec benchmarks/config/multi-tool-coordination-pr2-calibration-extension.json \
+  --output benchmarks/results/multi-tool-coordination-pr2-calibration-extension \
+  --execute
+```
