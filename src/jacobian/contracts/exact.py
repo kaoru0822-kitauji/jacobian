@@ -82,6 +82,22 @@ class CanonicalRational(ContractModel):
         return self
 
     def as_fraction(self) -> Fraction:
-        return Fraction(
-            parse_canonical_integer(self.num), parse_canonical_integer(self.den)
+        return Fraction(*self.as_integer_ratio())
+
+    def as_integer_ratio(self) -> tuple[int, int]:
+        return parse_canonical_integer(self.num), parse_canonical_integer(self.den)
+
+    @classmethod
+    def from_integer_ratio(cls, numerator: int, denominator: int) -> CanonicalRational:
+        try:
+            fraction = Fraction(numerator, denominator)
+        except ZeroDivisionError:
+            raise ValueError("rational denominator cannot be zero") from None
+        return cls.from_fraction(fraction)
+
+    @classmethod
+    def from_fraction(cls, value: Fraction) -> CanonicalRational:
+        return cls(
+            num=format_canonical_integer(value.numerator),
+            den=format_canonical_integer(value.denominator),
         )
