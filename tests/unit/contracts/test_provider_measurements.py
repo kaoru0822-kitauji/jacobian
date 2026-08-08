@@ -20,8 +20,8 @@ from jacobian.provider_measurements import (
     _child_peak_rss_bytes,
     _installed_size,
     _measure_command,
-    measure_provider,
     _process_environment,
+    measure_provider,
 )
 
 
@@ -129,7 +129,9 @@ def test_installed_size_rejects_missing_distribution_file_manifest(
 
     assert measurement.status is ProviderMeasurementStatus.ERROR
     assert measurement.bytes is None
-    assert measurement.detail == "The provider distribution file manifest is unavailable."
+    assert (
+        measurement.detail == "The provider distribution file manifest is unavailable."
+    )
 
 
 def test_installed_size_rejects_unreadable_distribution_file(
