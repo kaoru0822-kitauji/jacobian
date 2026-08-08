@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import ValidationError
 
+from jacobian.canonical import format_canonical_integer
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
@@ -49,6 +50,8 @@ from jacobian.storage.models import StoredArtifact
 
 if TYPE_CHECKING:
     from sympy import Poly
+
+_INVERSE_SOLVER_SHUTDOWN_TIMEOUT_SECONDS = 1.0
 
 
 def _materialize_map(
@@ -376,7 +379,10 @@ def _solve_inverse_system(
     process.join(timeout_ms / 1000)
     if process.is_alive():
         process.terminate()
-        process.join()
+        process.join(timeout=_INVERSE_SOLVER_SHUTDOWN_TIMEOUT_SECONDS)
+        if process.is_alive():
+            process.kill()
+            process.join(timeout=_INVERSE_SOLVER_SHUTDOWN_TIMEOUT_SECONDS)
         return "TIMEOUT", None
     try:
         status, raw = result_queue.get_nowait()
@@ -500,13 +506,10 @@ def _sympy_polynomial(
     generators: tuple[Any, ...],
 ) -> Poly:
     sp = _sympy.get()
-    terms = {
-        term.exponents: sp.QQ(
-            int(term.coefficient.num),
-            int(term.coefficient.den),
-        )
-        for term in polynomial.terms
-    }
+    terms = {}
+    for term in polynomial.terms:
+        coefficient = term.coefficient.as_fraction()
+        terms[term.exponents] = sp.QQ(coefficient.numerator, coefficient.denominator)
     return sp.Poly.from_dict(terms, generators, domain=sp.QQ)
 
 
@@ -525,7 +528,10 @@ def _wire_polynomial(polynomial: Poly) -> SparseRationalPolynomial:
 
 def _wire_rational(value: object) -> CanonicalRational:
     rational = _sympy.get().Rational(value)
-    return CanonicalRational(num=str(rational.p), den=str(rational.q))
+    return CanonicalRational(
+        num=format_canonical_integer(int(rational.p)),
+        den=format_canonical_integer(int(rational.q)),
+    )
 
 
 def _evaluate(
@@ -535,17 +541,10 @@ def _evaluate(
     sp = _sympy.get()
     try:
         generators, coordinates = _sympy_map(polynomial_map)
-        substitutions = {
-            generator: sp.QQ(
-                int(value.num),
-                int(value.den),
-            )
-            for generator, value in zip(
-                generators,
-                point.values,
-                strict=True,
-            )
-        }
+        substitutions = {}
+        for generator, value in zip(generators, point.values, strict=True):
+            fraction = value.as_fraction()
+            substitutions[generator] = sp.QQ(fraction.numerator, fraction.denominator)
         return tuple(_wire_rational(poly.eval(substitutions)) for poly in coordinates)
     except (
         cast(type[BaseException], sp.PolynomialError),

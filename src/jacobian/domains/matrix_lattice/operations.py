@@ -5,6 +5,7 @@ from __future__ import annotations
 from fractions import Fraction
 from typing import Any
 
+from jacobian.canonical import format_canonical_integer, parse_canonical_integer
 from jacobian.contracts.matrix_operations import (
     CharacteristicPolynomialResult,
     IntegerMatrixRequest,
@@ -28,12 +29,24 @@ from jacobian.contracts.matrix_operations import (
 )
 from jacobian.math import matrices as native_matrices
 
+__all__ = [
+    "compute_adjugate",
+    "compute_characteristic_polynomial",
+    "compute_inverse",
+    "compute_nullspace",
+    "compute_product",
+    "compute_rational_linear_solve",
+    "compute_rref",
+    "compute_smith_normal_form",
+    "compute_trace",
+]
+
 
 def _rational(value: Any) -> OutputRational:
     fraction = Fraction(value)
     return OutputRational(
-        num=str(fraction.numerator),
-        den=str(fraction.denominator),
+        num=format_canonical_integer(fraction.numerator),
+        den=format_canonical_integer(fraction.denominator),
     )
 
 
@@ -42,7 +55,7 @@ def _qq_matrix(matrix: RationalMatrix) -> Any:
 
     return sympy.Matrix(
         [
-            [sympy.Rational(int(value.num), int(value.den)) for value in row]
+            [sympy.Rational(value.as_fraction()) for value in row]
             for row in matrix.entries
         ]
     )
@@ -114,7 +127,10 @@ def compute_smith_normal_form(
     from sympy.matrices.normalforms import smith_normal_form
 
     source = sympy.Matrix(
-        [[int(value) for value in row] for row in request.matrix.entries]
+        [
+            [parse_canonical_integer(value) for value in row]
+            for row in request.matrix.entries
+        ]
     )
     raw = smith_normal_form(source, domain=sympy.ZZ)
     diagonal_count = min(raw.rows, raw.cols)
@@ -132,12 +148,17 @@ def compute_smith_normal_form(
     return SmithNormalFormResult(
         normal_form=IntegerOutputMatrix(
             entries=tuple(
-                tuple(str(int(canonical[row, column])) for column in range(raw.cols))
+                tuple(
+                    format_canonical_integer(canonical[row, column])
+                    for column in range(raw.cols)
+                )
                 for row in range(raw.rows)
             )
         ),
         rank=rank,
-        invariant_factors=tuple(str(value) for value in invariant_factors),
+        invariant_factors=tuple(
+            format_canonical_integer(value) for value in invariant_factors
+        ),
     )
 
 
@@ -145,7 +166,10 @@ def compute_inverse(request: SquareIntegerMatrixRequest) -> MatrixInverseResult:
     import sympy
 
     source = sympy.Matrix(
-        [[int(value) for value in row] for row in request.matrix.entries]
+        [
+            [parse_canonical_integer(value) for value in row]
+            for row in request.matrix.entries
+        ]
     )
     inverse = native_matrices.inverse(source)
     return MatrixInverseResult(
@@ -164,7 +188,9 @@ def compute_trace(request: SquareIntegerMatrixRequest) -> MatrixTraceResult:
     source = sympy.Matrix(
         [[int(value) for value in row] for row in request.matrix.entries]
     )
-    return MatrixTraceResult(trace=str(int(native_matrices.trace(source))))
+    return MatrixTraceResult(
+        trace=format_canonical_integer(native_matrices.trace(source))
+    )
 
 
 def compute_product(request: RationalMatrixProductRequest) -> MatrixProductResult:
@@ -190,9 +216,7 @@ def compute_rational_linear_solve(
     import sympy
 
     source = _qq_matrix(request.matrix)
-    rhs = sympy.Matrix(
-        [sympy.Rational(int(value.num), int(value.den)) for value in request.rhs]
-    )
+    rhs = sympy.Matrix([sympy.Rational(value.as_fraction()) for value in request.rhs])
     solution, parameters = source.gauss_jordan_solve(rhs)
     if parameters.rows:
         raise ValueError("linear system does not have a unique solution")
@@ -205,7 +229,10 @@ def compute_adjugate(request: SquareIntegerMatrixRequest) -> MatrixAdjugateResul
     import sympy
 
     source = sympy.Matrix(
-        [[int(value) for value in row] for row in request.matrix.entries]
+        [
+            [parse_canonical_integer(value) for value in row]
+            for row in request.matrix.entries
+        ]
     )
     if source.rows != source.cols:
         raise ValueError("adjugate requires a square matrix")
@@ -214,7 +241,8 @@ def compute_adjugate(request: SquareIntegerMatrixRequest) -> MatrixAdjugateResul
         adjugate=IntegerOutputMatrix(
             entries=tuple(
                 tuple(
-                    str(int(adjugate[row, column])) for column in range(adjugate.cols)
+                    format_canonical_integer(adjugate[row, column])
+                    for column in range(adjugate.cols)
                 )
                 for row in range(adjugate.rows)
             )

@@ -5,6 +5,7 @@ from __future__ import annotations
 import tempfile
 import time
 from pathlib import Path
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -23,7 +24,6 @@ from jacobian.contracts.capabilities import (
     CapabilityResult,
     CapabilityScope,
 )
-from jacobian.contracts.lean import LeanEnvironment
 from jacobian.contracts.lean_exploration import (
     LeanProofStateArtifact,
     LeanProofStateOutput,
@@ -33,12 +33,11 @@ from jacobian.contracts.lean_exploration import (
     LeanTypedGoal,
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
+from jacobian.lean_frontend._state_validation import _load_validated_proof_state
 from jacobian.lean_frontend.artifacts import (
     _environment_digest,
-    _environment_imports,
     _proof_state_command,
     _source_digest,
-    _state_digest_payload,
     _state_payload,
 )
 from jacobian.lean_frontend.exploration import (
@@ -49,7 +48,6 @@ from jacobian.lean_frontend.exploration import (
     _validate_source_parts,
 )
 from jacobian.lean_frontend.repl import _response_errors
-from jacobian.storage.errors import StorageError
 
 
 class LeanProofStateAdapter:
@@ -118,56 +116,59 @@ class LeanProofStateAdapter:
             ) from exc
         return validated
 
-    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
-        validated = self._validate_request(request)
-        started = time.monotonic()
-        installation = self.resources.installations[validated.environment]
-        environment_digest = _environment_digest(
-            validated.environment,
-            installation,
-        )
+    def _resolve_statement_and_prefix(
+        self,
+        validated: LeanProofStateRequest,
+        environment_digest: str,
+    ) -> tuple[str, tuple[str, ...], LeanProofStateArtifact | None]:
+        """Resolve the statement and tactic prefix from a fresh or bound state."""
+
         if validated.state_uri is None:
             assert validated.statement is not None
-            statement = validated.statement
-            proof_prefix = validated.proof_prefix
-            bound_state = None
-        else:
-            bound_state = self._load_bound_state(
-                validated.state_uri,
-                expected_environment=validated.environment,
-                expected_environment_digest=environment_digest,
-            )
-            if bound_state.completed:
-                raise CapabilityInvocationError(
-                    CapabilityDiagnostic(
-                        code="LEAN_PROOF_STATE_COMPLETED",
-                        stage="state_validation",
-                        message="The supplied proof state has no remaining goals.",
-                        hint=(
-                            "Send the complete statement and proof to lean.check; "
-                            "no further tactic transition is applicable."
-                        ),
-                    )
-                )
-            if len(bound_state.tactic_prefix) >= 64:
-                raise CapabilityInvocationError(
-                    CapabilityDiagnostic(
-                        code="LEAN_PROOF_STATE_PREFIX_LIMIT",
-                        stage="state_validation",
-                        message="The replayable proof state reached the 64-tactic limit.",
-                        hint=(
-                            "Submit a complete proof to lean.check or begin a new "
-                            "bounded exploration."
-                        ),
-                    )
-                )
-            statement = bound_state.statement
-            proof_prefix = bound_state.tactic_prefix
-            _validate_source_parts(statement, (*proof_prefix, validated.tactic))
-        command = _proof_state_command(
-            statement=statement,
-            proof_prefix=proof_prefix,
+            return validated.statement, validated.proof_prefix, None
+        bound_state = _load_validated_proof_state(
+            self.resources,
+            validated.state_uri,
+            expected_environment=validated.environment,
+            expected_environment_digest=environment_digest,
+            invalid_state_hint="Use a state URI returned by this capability.",
         )
+        if bound_state.completed:
+            raise CapabilityInvocationError(
+                CapabilityDiagnostic(
+                    code="LEAN_PROOF_STATE_COMPLETED",
+                    stage="state_validation",
+                    message="The supplied proof state has no remaining goals.",
+                    hint=(
+                        "Send the complete statement and proof to lean.check; "
+                        "no further tactic transition is applicable."
+                    ),
+                )
+            )
+        if len(bound_state.tactic_prefix) >= 64:
+            raise CapabilityInvocationError(
+                CapabilityDiagnostic(
+                    code="LEAN_PROOF_STATE_PREFIX_LIMIT",
+                    stage="state_validation",
+                    message="The replayable proof state reached the 64-tactic limit.",
+                    hint=(
+                        "Submit a complete proof to lean.check or begin a new "
+                        "bounded exploration."
+                    ),
+                )
+            )
+        statement = bound_state.statement
+        proof_prefix = bound_state.tactic_prefix
+        _validate_source_parts(statement, (*proof_prefix, validated.tactic))
+        return statement, proof_prefix, bound_state
+
+    def _execute_tactic_and_extract_goals(
+        self,
+        validated: LeanProofStateRequest,
+        command: str,
+    ) -> tuple[tuple[Any, Any, Any], tuple[LeanTypedGoal, ...], bool]:
+        """Execute the tactic in a clean process and extract typed successor goals."""
+
         with tempfile.TemporaryDirectory(prefix="jacobian-lean-proof-state-") as root:
             pickle_path = Path(root) / "proof-state.pickle"
             responses = self.resources.repl.execute_clean(
@@ -233,6 +234,27 @@ class LeanProofStateAdapter:
                             ),
                         )
                     ) from exc
+        return responses, typed_goals, accepted
+
+    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        validated = self._validate_request(request)
+        started = time.monotonic()
+        installation = self.resources.installations[validated.environment]
+        environment_digest = _environment_digest(
+            validated.environment,
+            installation,
+        )
+        statement, proof_prefix, bound_state = self._resolve_statement_and_prefix(
+            validated, environment_digest
+        )
+        command = _proof_state_command(
+            statement=statement,
+            proof_prefix=proof_prefix,
+        )
+        responses, typed_goals, accepted = self._execute_tactic_and_extract_goals(
+            validated, command
+        )
+        _command_response, validation_response, tactic_response = responses
         replayed_goals = _normalized_response_goals(validation_response)
         if bound_state is not None and replayed_goals != bound_state.normalized_goals:
             raise CapabilityInvocationError(
@@ -401,56 +423,6 @@ class LeanProofStateAdapter:
             ),
             artifact_uris=artifact_uris,
         )
-
-    def _load_bound_state(
-        self,
-        state_uri: str,
-        *,
-        expected_environment: LeanEnvironment,
-        expected_environment_digest: str,
-    ) -> LeanProofStateArtifact:
-        try:
-            stored = self.resources.store.get(state_uri)
-            if (
-                stored.manifest.schema_uri != self.resources.state_schema_uri
-                or stored.manifest.semantics_uri != self.resources.semantics_uri
-            ):
-                raise ValueError("artifact is not a Lean proof state")
-            state = LeanProofStateArtifact.model_validate(stored.payload)
-        except (StorageError, ValidationError, ValueError) as exc:
-            raise CapabilityInvocationError(
-                CapabilityDiagnostic(
-                    code="INVALID_LEAN_PROOF_STATE",
-                    stage="state_loading",
-                    message="The supplied state artifact is unavailable or invalid.",
-                    hint="Use a state URI returned by this capability.",
-                )
-            ) from exc
-        installation = self.resources.installations[expected_environment]
-        expected_imports = _environment_imports(expected_environment)
-        if (
-            state.environment is not expected_environment
-            or state.environment_digest != expected_environment_digest
-            or state.imports != expected_imports
-            or state.lean_version != installation.lean_version
-            or state.lean_commit != installation.lean_commit
-            or state.mathlib_commit != installation.mathlib_commit
-            or state.source_digest
-            != _source_digest(state.statement, state.tactic_prefix)
-            or state.state_digest != _state_digest_payload(state)
-        ):
-            raise CapabilityInvocationError(
-                CapabilityDiagnostic(
-                    code="STALE_LEAN_PROOF_STATE",
-                    stage="state_validation",
-                    message=(
-                        "The proof state no longer matches its source or the "
-                        "current pinned Lean environment."
-                    ),
-                    hint="Recreate the proof state under the current environment.",
-                )
-            )
-        return state
 
 
 __all__ = ["LeanProofStateAdapter"]

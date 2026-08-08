@@ -8,6 +8,7 @@ from fractions import Fraction
 from functools import reduce
 from itertools import pairwise
 
+from jacobian.canonical import format_canonical_integer, parse_canonical_integer
 from jacobian.contracts.exact import CanonicalRational
 from jacobian.contracts.sequences import (
     FrequencyEntry,
@@ -20,17 +21,51 @@ from jacobian.contracts.sequences import (
     IntegerSequenceValueResult,
 )
 
+__all__ = [
+    "decide_arithmetic",
+    "decide_geometric",
+    "decide_nondecreasing",
+    "decide_strictly_increasing",
+    "first_differences",
+    "frequencies",
+    "parities",
+    "prefix_gcds",
+    "prefix_lcms",
+    "prefix_maxima",
+    "prefix_minima",
+    "prefix_products",
+    "prefix_sums",
+    "reverse_sequence",
+    "second_differences",
+    "sequence_distinct_count",
+    "sequence_gcd",
+    "sequence_lcm",
+    "sequence_maximum",
+    "sequence_mean",
+    "sequence_median",
+    "sequence_minimum",
+    "sequence_product",
+    "sequence_range",
+    "sequence_sum",
+    "signs",
+    "sort_sequence",
+    "sorted_unique",
+    "zero_indices",
+]
+
 
 def _values(request: IntegerSequenceRequest) -> list[int]:
-    return [int(value) for value in request.values]
+    return [parse_canonical_integer(value) for value in request.values]
 
 
 def _value_result(value: int) -> IntegerSequenceValueResult:
-    return IntegerSequenceValueResult(value=str(value))
+    return IntegerSequenceValueResult(value=format_canonical_integer(value))
 
 
 def _list_result(values: list[int]) -> IntegerSequenceListResult:
-    return IntegerSequenceListResult(values=tuple(str(v) for v in values))
+    return IntegerSequenceListResult(
+        values=tuple(format_canonical_integer(value) for value in values)
+    )
 
 
 def sequence_sum(request: IntegerSequenceRequest) -> IntegerSequenceValueResult:
@@ -67,8 +102,8 @@ def sequence_mean(request: IntegerSequenceRequest) -> IntegerSequenceRationalRes
     fraction = Fraction(sum(values), len(values))
     return IntegerSequenceRationalResult(
         value=CanonicalRational(
-            num=str(fraction.numerator),
-            den=str(fraction.denominator),
+            num=format_canonical_integer(fraction.numerator),
+            den=format_canonical_integer(fraction.denominator),
         )
     )
 
@@ -82,8 +117,8 @@ def sequence_median(request: IntegerSequenceRequest) -> IntegerSequenceRationalR
         fraction = Fraction(values[middle - 1] + values[middle], 2)
     return IntegerSequenceRationalResult(
         value=CanonicalRational(
-            num=str(fraction.numerator),
-            den=str(fraction.denominator),
+            num=format_canonical_integer(fraction.numerator),
+            den=format_canonical_integer(fraction.denominator),
         )
     )
 
@@ -178,7 +213,7 @@ def signs(request: IntegerSequenceRequest) -> IntegerSequenceListResult:
 def frequencies(request: IntegerSequenceRequest) -> IntegerSequenceFrequenciesResult:
     counts = Counter(_values(request))
     entries = tuple(
-        FrequencyEntry(value=str(value), count=counts[value])
+        FrequencyEntry(value=format_canonical_integer(value), count=counts[value])
         for value in sorted(counts)
     )
     return IntegerSequenceFrequenciesResult(entries=entries)

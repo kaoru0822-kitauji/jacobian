@@ -36,13 +36,10 @@ def _load_script(name: str) -> ModuleType:
 def _ci_plan(*args: str) -> dict[str, str]:
     classifier = _load_script("classify-ci-paths")
     output = io.StringIO()
-    original_argv = sys.argv
-    try:
-        sys.argv = ["classify-ci-paths", *args]
+    with pytest.MonkeyPatch.context() as process_state:
+        process_state.setattr(sys, "argv", ["classify-ci-paths", *args])
         with contextlib.redirect_stdout(output):
             classifier.main()
-    finally:
-        sys.argv = original_argv
     return dict(line.split("=", 1) for line in output.getvalue().splitlines())
 
 
@@ -305,6 +302,12 @@ def _write_validator_tree(tmp_path: Path) -> None:
     (tmp_path / "Makefile").write_text(
         (ROOT / "Makefile").read_text("utf-8"), encoding="utf-8"
     )
+    fragments = tmp_path / "make"
+    fragments.mkdir()
+    for name in ("development.mk", "harbor.mk", "evaluations.mk"):
+        (fragments / name).write_text(
+            (ROOT / "make" / name).read_text("utf-8"), encoding="utf-8"
+        )
 
 
 def test_ci_validator_enforces_local_only_deploy_catalog_contract(

@@ -5,6 +5,7 @@ from __future__ import annotations
 from fractions import Fraction
 from typing import Any
 
+from jacobian.canonical import format_canonical_integer
 from jacobian.contracts.exact import CanonicalRational
 from jacobian.contracts.polynomial_operations import (
     PolynomialBezoutIdentity,
@@ -31,6 +32,15 @@ from jacobian.contracts.polynomials import (
 
 _MAX_OUTPUT_TERMS = 1024
 
+__all__ = [
+    "PolynomialOutputBudgetError",
+    "polynomial_discriminant",
+    "polynomial_gcd",
+    "polynomial_groebner_basis",
+    "polynomial_resultant",
+    "polynomial_square_free_decomposition",
+]
+
 
 class PolynomialOutputBudgetError(RuntimeError):
     """A valid computation produced more output than its public contract permits."""
@@ -47,10 +57,7 @@ def _poly(polynomial: RationalPolynomial) -> Any:
 
     generators = _symbols(polynomial.variables)
     coefficients = {
-        term.exponents: Rational(
-            int(term.coefficient.num),
-            int(term.coefficient.den),
-        )
+        term.exponents: Rational(term.coefficient.as_fraction())
         for term in polynomial.polynomial.terms
     }
     return Poly.from_dict(coefficients, *generators, domain=QQ)
@@ -58,7 +65,10 @@ def _poly(polynomial: RationalPolynomial) -> Any:
 
 def _rational(value: Any) -> CanonicalRational:
     fraction = Fraction(value)
-    return CanonicalRational(num=str(fraction.numerator), den=str(fraction.denominator))
+    return CanonicalRational(
+        num=format_canonical_integer(fraction.numerator),
+        den=format_canonical_integer(fraction.denominator),
+    )
 
 
 def _wire(poly: Any, variables: tuple[str, ...]) -> RationalPolynomial:

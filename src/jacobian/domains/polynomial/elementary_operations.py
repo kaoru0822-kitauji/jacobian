@@ -5,6 +5,7 @@ from __future__ import annotations
 from functools import cache
 from typing import Any
 
+from jacobian.canonical import format_canonical_integer, parse_canonical_integer
 from jacobian.contracts.polynomial_operations import (
     IntegerPolynomial,
     IntegerPolynomialCompositionRequest,
@@ -45,7 +46,10 @@ def _integer_poly(polynomial: IntegerPolynomial) -> Any:
     from sympy import Poly
 
     return Poly.from_list(
-        [int(coefficient) for coefficient in polynomial.coefficients],
+        [
+            parse_canonical_integer(coefficient)
+            for coefficient in polynomial.coefficients
+        ],
         _x(),
         domain="ZZ",
     )
@@ -54,7 +58,8 @@ def _integer_poly(polynomial: IntegerPolynomial) -> Any:
 def _integer_wire(polynomial: Any) -> IntegerPolynomial:
     return IntegerPolynomial(
         coefficients=tuple(
-            str(int(coefficient)) for coefficient in polynomial.all_coeffs()
+            format_canonical_integer(int(coefficient))
+            for coefficient in polynomial.all_coeffs()
         )
     )
 
@@ -67,9 +72,9 @@ def integer_polynomial_gcd(
     gcd = left.gcd(right)
     return IntegerPolynomialGcdResult(
         gcd=_integer_wire(gcd),
-        left_content=str(int(left.content())),
-        right_content=str(int(right.content())),
-        gcd_content=str(int(gcd.content())),
+        left_content=format_canonical_integer(int(left.content())),
+        right_content=format_canonical_integer(int(right.content())),
+        gcd_content=format_canonical_integer(int(gcd.content())),
     )
 
 
@@ -77,7 +82,9 @@ def integer_polynomial_content(
     request: IntegerPolynomialRequest,
 ) -> IntegerPolynomialContentResult:
     return IntegerPolynomialContentResult(
-        content=str(int(_integer_poly(request.polynomial).content()))
+        content=format_canonical_integer(
+            int(_integer_poly(request.polynomial).content())
+        )
     )
 
 
@@ -88,7 +95,7 @@ def integer_polynomial_primitive_part(
     content, primitive = source.primitive()
     reconstructed = primitive.mul_ground(content)
     return IntegerPolynomialPrimitivePartResult(
-        content=str(int(content)),
+        content=format_canonical_integer(int(content)),
         primitive_part=_integer_wire(primitive),
         reconstruction=_integer_wire(reconstructed),
     )
@@ -97,9 +104,12 @@ def integer_polynomial_primitive_part(
 def integer_polynomial_evaluate(
     request: IntegerPolynomialEvaluationRequest,
 ) -> IntegerPolynomialEvaluationResult:
-    point = int(request.point)
+    point = parse_canonical_integer(request.point)
     value = _integer_poly(request.polynomial).eval(point)
-    return IntegerPolynomialEvaluationResult(point=request.point, value=str(int(value)))
+    return IntegerPolynomialEvaluationResult(
+        point=request.point,
+        value=format_canonical_integer(int(value)),
+    )
 
 
 def integer_polynomial_compose(
@@ -197,15 +207,17 @@ def _partial_fraction_term(
 def _partial_fraction_sort_key(
     term: RationalPartialFractionTerm,
 ) -> tuple[tuple[tuple[tuple[int, ...], int, int], ...], int]:
-    factor_terms = tuple(
-        (
-            factor_term.exponents,
-            int(factor_term.coefficient.num),
-            int(factor_term.coefficient.den),
+    factor_terms: list[tuple[tuple[int, ...], int, int]] = []
+    for factor_term in term.denominator_factor.polynomial.terms:
+        coefficient = factor_term.coefficient.as_fraction()
+        factor_terms.append(
+            (
+                factor_term.exponents,
+                coefficient.numerator,
+                coefficient.denominator,
+            )
         )
-        for factor_term in term.denominator_factor.polynomial.terms
-    )
-    return factor_terms, term.denominator_exponent
+    return tuple(factor_terms), term.denominator_exponent
 
 
 def rational_partial_fraction_decomposition(

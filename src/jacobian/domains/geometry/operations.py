@@ -6,6 +6,7 @@ from collections.abc import Callable
 from fractions import Fraction
 from typing import Any, cast
 
+from jacobian.canonical import format_canonical_integer
 from jacobian.contracts.exact import CanonicalRational
 from jacobian.contracts.geometry import (
     ClosedSegment2D,
@@ -35,6 +36,24 @@ from jacobian.contracts.geometry import (
 
 Compute = Callable[[LinePairRequest], GeometryBooleanResult]
 
+__all__ = [
+    "centroid",
+    "circumcircle",
+    "classify_polygon_point",
+    "collinear",
+    "concyclic",
+    "convex_hull_points",
+    "line_intersection",
+    "line_predicate",
+    "midpoint",
+    "orientation",
+    "projection",
+    "segment_intersection",
+    "signed_area",
+    "simple_polygon",
+    "squared_distance",
+]
+
 
 def _fraction(value: Any) -> Fraction:
     import sympy
@@ -46,8 +65,8 @@ def _fraction(value: Any) -> Fraction:
 def _wire_rational(value: Any) -> CanonicalRational:
     fraction = _fraction(value)
     return CanonicalRational(
-        num=str(fraction.numerator),
-        den=str(fraction.denominator),
+        num=format_canonical_integer(fraction.numerator),
+        den=format_canonical_integer(fraction.denominator),
     )
 
 
@@ -56,8 +75,8 @@ def _point(value: RationalPoint2D) -> Any:
     from sympy.geometry import Point2D
 
     return Point2D(
-        sympy.Rational(int(value.x.num), int(value.x.den)),
-        sympy.Rational(int(value.y.num), int(value.y.den)),
+        sympy.Rational(value.x.as_fraction()),
+        sympy.Rational(value.y.as_fraction()),
     )
 
 

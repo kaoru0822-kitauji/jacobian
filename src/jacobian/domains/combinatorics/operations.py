@@ -5,6 +5,7 @@ from __future__ import annotations
 from functools import reduce
 from operator import mul
 
+from jacobian.canonical import format_canonical_integer, parse_canonical_integer
 from jacobian.contracts.combinatorics import (
     FibonacciPairRequest,
     FibonacciPairResult,
@@ -18,9 +19,31 @@ from jacobian.contracts.combinatorics import (
 )
 from jacobian.contracts.exact import CanonicalRational
 
+__all__ = [
+    "bell",
+    "bernoulli",
+    "binomial",
+    "catalan",
+    "central_binomial",
+    "compositions",
+    "derangements",
+    "double_factorial",
+    "enumerate_integer_partitions",
+    "factorial",
+    "fibonacci",
+    "fibonacci_pair",
+    "lucas",
+    "motzkin",
+    "multinomial",
+    "partition_number",
+    "permutations",
+    "stirling_first",
+    "stirling_second",
+]
+
 
 def _integer_result(value: int) -> IntegerResult:
-    return IntegerResult(value=str(int(value)))
+    return IntegerResult(value=format_canonical_integer(value))
 
 
 def factorial(request: NonnegativeIntegerRequest) -> IntegerResult:
@@ -56,7 +79,7 @@ def binomial(request: NonnegativePairRequest) -> IntegerResult:
 def multinomial(request: IntegerListRequest) -> IntegerResult:
     import math
 
-    values = [int(v) for v in request.values]
+    values = [parse_canonical_integer(value) for value in request.values]
     numerator = math.factorial(sum(values))
     denominator = reduce(mul, (math.factorial(v) for v in values), 1)
     return _integer_result(numerator // denominator)
@@ -168,7 +191,10 @@ def bernoulli(request: NonnegativeIntegerRequest) -> RationalResult:
     n = request.n
     value = sympy.bernoulli(n)
     return RationalResult(
-        value=CanonicalRational(num=str(value.p), den=str(value.q)),
+        value=CanonicalRational(
+            num=format_canonical_integer(int(value.p)),
+            den=format_canonical_integer(int(value.q)),
+        ),
     )
 
 

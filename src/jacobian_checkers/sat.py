@@ -23,6 +23,7 @@ from jacobian.process_policy import (
     execute_process,
 )
 from jacobian.worker_environment import worker_environment
+from jacobian_checkers.bound_artifacts import valid_unscoped_unencoded_bindings
 
 _ARTIFACT_URI = re.compile(r"^artifact://sha256/[0-9a-f]{64}$")
 _DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
@@ -36,13 +37,6 @@ _ARTIFACT_KEYS = {
     "semantics_uri",
     "parents",
     "payload",
-}
-_BINDING_KEYS = {
-    "claim_digest",
-    "semantics_digest",
-    "candidate_digest",
-    "scope_digest",
-    "encoding_digest",
 }
 DRAT_TRIM_OUTPUT_LIMIT = 1024 * 1024
 DRAT_TRIM_TIMEOUT_SECONDS = 120
@@ -119,15 +113,61 @@ def _valid_artifact(value: object) -> bool:
     )
 
 
-def _valid_bindings(value: object) -> bool:
-    if not isinstance(value, dict) or set(value) != _BINDING_KEYS:
-        return False
-    if value["scope_digest"] is not None or value["encoding_digest"] is not None:
-        return False
-    return all(
-        isinstance(value[key], str) and _DIGEST.fullmatch(value[key]) is not None
-        for key in ("claim_digest", "semantics_digest", "candidate_digest")
-    )
+def _validate_cnf_variables(payload: dict[str, Any]) -> list[str]:
+    variables = payload["variables"]
+    if not isinstance(variables, list) or len(variables) > 1_000_000:
+        raise ValueError("canonical CNF variable map is malformed")
+    names: list[str] = []
+    for expected_id, variable in enumerate(variables, start=1):
+        if (
+            not isinstance(variable, dict)
+            or set(variable) != {"id", "name"}
+            or type(variable["id"]) is not int
+            or variable["id"] != expected_id
+            or not isinstance(variable["name"], str)
+            or _VARIABLE_NAME.fullmatch(variable["name"]) is None
+            or unicodedata.normalize("NFC", variable["name"]) != variable["name"]
+        ):
+            raise ValueError("canonical CNF variable map is malformed")
+        names.append(variable["name"])
+    if names != sorted(names) or len(names) != len(set(names)):
+        raise ValueError("canonical CNF variable map is not canonical")
+    return names
+
+
+def _validate_cnf_clauses(
+    clauses: object,
+    variable_count: int,
+) -> list[list[int]]:
+    if not isinstance(clauses, list) or len(clauses) > 1_000_000:
+        raise ValueError("canonical CNF clauses are malformed")
+    normalized_clauses: list[list[int]] = []
+    clause_keys: list[tuple[tuple[int, bool], ...]] = []
+    for clause in clauses:
+        if (
+            not isinstance(clause, dict)
+            or set(clause) != {"literals"}
+            or not isinstance(clause["literals"], list)
+            or len(clause["literals"]) > 1_000_000
+        ):
+            raise ValueError("canonical CNF clause is malformed")
+        literals = clause["literals"]
+        if any(
+            type(literal) is not int or literal == 0 or abs(literal) > variable_count
+            for literal in literals
+        ):
+            raise ValueError("canonical CNF literal is malformed")
+        if (
+            len(literals) != len(set(literals))
+            or any(-literal in literals for literal in literals)
+            or literals != sorted(literals, key=_literal_key)
+        ):
+            raise ValueError("canonical CNF clause is not canonical")
+        normalized_clauses.append(literals)
+        clause_keys.append(tuple(_literal_key(literal) for literal in literals))
+    if clause_keys != sorted(clause_keys) or len(clause_keys) != len(set(clause_keys)):
+        raise ValueError("canonical CNF clauses are not canonical")
+    return normalized_clauses
 
 
 def _validate_cnf(payload: object) -> tuple[list[list[int]], int, str, str]:
@@ -148,70 +188,24 @@ def _validate_cnf(payload: object) -> tuple[list[list[int]], int, str, str]:
     ):
         raise ValueError("canonical CNF uses an unsupported format")
 
-    variables = payload["variables"]
-    if not isinstance(variables, list) or len(variables) > 1_000_000:
-        raise ValueError("canonical CNF variable map is malformed")
-    names: list[str] = []
-    for expected_id, variable in enumerate(variables, start=1):
-        if (
-            not isinstance(variable, dict)
-            or set(variable) != {"id", "name"}
-            or type(variable["id"]) is not int
-            or variable["id"] != expected_id
-            or not isinstance(variable["name"], str)
-            or _VARIABLE_NAME.fullmatch(variable["name"]) is None
-            or unicodedata.normalize("NFC", variable["name"]) != variable["name"]
-        ):
-            raise ValueError("canonical CNF variable map is malformed")
-        names.append(variable["name"])
-    if names != sorted(names) or len(names) != len(set(names)):
-        raise ValueError("canonical CNF variable map is not canonical")
-
-    clauses = payload["clauses"]
-    if not isinstance(clauses, list) or len(clauses) > 1_000_000:
-        raise ValueError("canonical CNF clauses are malformed")
-    normalized_clauses: list[list[int]] = []
-    clause_keys: list[tuple[tuple[int, bool], ...]] = []
-    for clause in clauses:
-        if (
-            not isinstance(clause, dict)
-            or set(clause) != {"literals"}
-            or not isinstance(clause["literals"], list)
-            or len(clause["literals"]) > 1_000_000
-        ):
-            raise ValueError("canonical CNF clause is malformed")
-        literals = clause["literals"]
-        if any(
-            type(literal) is not int or literal == 0 or abs(literal) > len(variables)
-            for literal in literals
-        ):
-            raise ValueError("canonical CNF literal is malformed")
-        if (
-            len(literals) != len(set(literals))
-            or any(-literal in literals for literal in literals)
-            or literals != sorted(literals, key=_literal_key)
-        ):
-            raise ValueError("canonical CNF clause is not canonical")
-        normalized_clauses.append(literals)
-        clause_keys.append(tuple(_literal_key(literal) for literal in literals))
-    if clause_keys != sorted(clause_keys) or len(clause_keys) != len(set(clause_keys)):
-        raise ValueError("canonical CNF clauses are not canonical")
+    names = _validate_cnf_variables(payload)
+    normalized_clauses = _validate_cnf_clauses(payload["clauses"], len(names))
 
     variable_map_payload = {
         "variable_map_format": "jacobian.sat.variable-map/v1",
-        "variables": variables,
+        "variables": payload["variables"],
     }
     variable_map_digest = _sha256(_canonical_json(variable_map_payload))
     if payload["variable_map_digest"] != variable_map_digest:
         raise ValueError("canonical CNF variable-map digest does not match")
-    rows = [f"p cnf {len(variables)} {len(clauses)}\n"]
+    rows = [f"p cnf {len(names)} {len(normalized_clauses)}\n"]
     for literals in normalized_clauses:
         prefix = " ".join(str(literal) for literal in literals)
         rows.append(f"{prefix} 0\n" if prefix else "0\n")
     dimacs_digest = _sha256("".join(rows).encode("ascii"))
     if payload["dimacs_digest"] != dimacs_digest:
         raise ValueError("canonical CNF DIMACS digest does not match")
-    return normalized_clauses, len(variables), variable_map_digest, dimacs_digest
+    return normalized_clauses, len(names), variable_map_digest, dimacs_digest
 
 
 def _validate_assignment(
@@ -547,7 +541,7 @@ def check_unsat_proof(request: dict[str, Any]) -> dict[str, Any]:
         if not all(_valid_artifact(item) for item in (claim, candidate, certificate)):
             return _reject_proof("checker artifact metadata is malformed")
         expected_bindings = request["expected_bindings"]
-        if not _valid_bindings(expected_bindings):
+        if not valid_unscoped_unencoded_bindings(expected_bindings):
             return _reject_proof("expected evidence bindings are malformed")
         if (
             claim["semantics_uri"] != candidate["semantics_uri"]
@@ -613,35 +607,127 @@ def check_unsat_proof(request: dict[str, Any]) -> dict[str, Any]:
         return _reject_proof("malformed or unauthorized SAT proof checker request")
 
 
+_SAT_REQUEST_KEYS = {
+    "request_version",
+    "claim",
+    "candidate",
+    "scope",
+    "witness",
+    "expected_bindings",
+}
+_SAT_WITNESS_ENVELOPE_KEYS = {
+    "evidence_schema_version",
+    "witness_format",
+    "format_version",
+    "role",
+    "bindings",
+    "payload",
+}
+
+
+def _check_sat_request_envelope(request: object) -> str | None:
+    if not isinstance(request, dict) or set(request) != _SAT_REQUEST_KEYS:
+        return "malformed checker request"
+    if request["request_version"] != "1" or request["scope"] is not None:
+        return "unsupported checker request"
+    return None
+
+
+def _check_sat_artifacts(
+    claim: dict[str, Any],
+    candidate: dict[str, Any],
+    witness: dict[str, Any],
+    expected_bindings: object,
+) -> str | None:
+    if not all(_valid_artifact(item) for item in (claim, candidate, witness)):
+        return "checker artifact metadata is malformed"
+    if not valid_unscoped_unencoded_bindings(expected_bindings):
+        return "expected evidence bindings are malformed"
+    if (
+        claim["semantics_uri"] != candidate["semantics_uri"]
+        or claim["semantics_uri"] != witness["semantics_uri"]
+    ):
+        return "checker artifacts use different semantics"
+    if claim["payload_digest"] != _sha256(_canonical_json(claim["payload"])):
+        return "canonical CNF payload digest does not match"
+    return None
+
+
+def _check_sat_binding_match(
+    expected_bindings: dict[str, Any],
+    claim: dict[str, Any],
+    candidate: dict[str, Any],
+) -> str | None:
+    if (
+        expected_bindings["claim_digest"] != claim["object_digest"]
+        or expected_bindings["candidate_digest"] != candidate["object_digest"]
+    ):
+        return "expected evidence bindings do not match artifacts"
+    return None
+
+
+def _check_sat_witness_envelope(
+    envelope: object,
+    expected_bindings: object,
+) -> str | None:
+    if not isinstance(envelope, dict) or set(envelope) != _SAT_WITNESS_ENVELOPE_KEYS:
+        return "SAT witness envelope is malformed"
+    if (
+        envelope["evidence_schema_version"] != "1"
+        or envelope["witness_format"] != "sat.assignment"
+        or envelope["format_version"] != "1"
+        or envelope["role"] != "SUPPORTS_CLAIM"
+        or envelope["bindings"] != expected_bindings
+    ):
+        return "SAT witness envelope is not exactly bound"
+    return None
+
+
+def _check_sat_witness_payload(
+    witness: dict[str, Any],
+    claim: dict[str, Any],
+    candidate: dict[str, Any],
+) -> str | None:
+    witness_payload = witness["payload"]["payload"]
+    if not isinstance(witness_payload, dict) or witness_payload != {
+        "cnf_uri": claim["artifact_uri"],
+        "assignment_uri": candidate["artifact_uri"],
+    }:
+        return "SAT witness points at different artifacts"
+    if not {
+        claim["artifact_uri"],
+        candidate["artifact_uri"],
+    }.issubset(set(witness["parents"])):
+        return "SAT witness is missing required lineage"
+    return None
+
+
+def _check_sat_witness(
+    witness: dict[str, Any],
+    expected_bindings: object,
+    claim: dict[str, Any],
+    candidate: dict[str, Any],
+) -> str | None:
+    error = _check_sat_witness_envelope(witness["payload"], expected_bindings)
+    if error is not None:
+        return error
+    return _check_sat_witness_payload(witness, claim, candidate)
+
+
 def check_assignment(request: dict[str, Any]) -> dict[str, Any]:
     """Accept only a total assignment satisfying every exact bound clause."""
 
     try:
-        if not isinstance(request, dict) or set(request) != {
-            "request_version",
-            "claim",
-            "candidate",
-            "scope",
-            "witness",
-            "expected_bindings",
-        }:
-            return _reject("malformed checker request")
-        if request["request_version"] != "1" or request["scope"] is not None:
-            return _reject("unsupported checker request")
+        error = _check_sat_request_envelope(request)
+        if error is not None:
+            return _reject(error)
         claim = request["claim"]
         candidate = request["candidate"]
         witness = request["witness"]
-        if not all(_valid_artifact(item) for item in (claim, candidate, witness)):
-            return _reject("checker artifact metadata is malformed")
-        if not _valid_bindings(request["expected_bindings"]):
-            return _reject("expected evidence bindings are malformed")
-        if (
-            claim["semantics_uri"] != candidate["semantics_uri"]
-            or claim["semantics_uri"] != witness["semantics_uri"]
-        ):
-            return _reject("checker artifacts use different semantics")
-        if claim["payload_digest"] != _sha256(_canonical_json(claim["payload"])):
-            return _reject("canonical CNF payload digest does not match")
+        expected_bindings = request["expected_bindings"]
+        error = _check_sat_artifacts(claim, candidate, witness, expected_bindings)
+        if error is not None:
+            return _reject(error)
 
         clauses, variable_count, variable_map_digest, dimacs_digest = _validate_cnf(
             claim["payload"]
@@ -657,41 +743,12 @@ def check_assignment(request: dict[str, Any]) -> dict[str, Any]:
         if claim["artifact_uri"] not in candidate["parents"]:
             return _reject("SAT assignment is missing canonical CNF lineage")
 
-        expected_bindings = request["expected_bindings"]
-        if (
-            expected_bindings["claim_digest"] != claim["object_digest"]
-            or expected_bindings["candidate_digest"] != candidate["object_digest"]
-        ):
-            return _reject("expected evidence bindings do not match artifacts")
-        envelope = witness["payload"]
-        if not isinstance(envelope, dict) or set(envelope) != {
-            "evidence_schema_version",
-            "witness_format",
-            "format_version",
-            "role",
-            "bindings",
-            "payload",
-        }:
-            return _reject("SAT witness envelope is malformed")
-        if (
-            envelope["evidence_schema_version"] != "1"
-            or envelope["witness_format"] != "sat.assignment"
-            or envelope["format_version"] != "1"
-            or envelope["role"] != "SUPPORTS_CLAIM"
-            or envelope["bindings"] != expected_bindings
-        ):
-            return _reject("SAT witness envelope is not exactly bound")
-        witness_payload = envelope["payload"]
-        if not isinstance(witness_payload, dict) or witness_payload != {
-            "cnf_uri": claim["artifact_uri"],
-            "assignment_uri": candidate["artifact_uri"],
-        }:
-            return _reject("SAT witness points at different artifacts")
-        if not {
-            claim["artifact_uri"],
-            candidate["artifact_uri"],
-        }.issubset(set(witness["parents"])):
-            return _reject("SAT witness is missing required lineage")
+        error = _check_sat_binding_match(expected_bindings, claim, candidate)
+        if error is not None:
+            return _reject(error)
+        error = _check_sat_witness(witness, expected_bindings, claim, candidate)
+        if error is not None:
+            return _reject(error)
 
         for clause in clauses:
             if not any(

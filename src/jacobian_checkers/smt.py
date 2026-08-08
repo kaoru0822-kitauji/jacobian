@@ -22,6 +22,7 @@ from jacobian.process_policy import (
     execute_process,
 )
 from jacobian.worker_environment import worker_environment
+from jacobian_checkers.bound_artifacts import valid_unscoped_unencoded_bindings
 
 _ARTIFACT_URI = re.compile(r"^artifact://sha256/[0-9a-f]{64}$")
 _DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
@@ -33,13 +34,6 @@ _ARTIFACT_KEYS = {
     "semantics_uri",
     "parents",
     "payload",
-}
-_BINDING_KEYS = {
-    "claim_digest",
-    "semantics_digest",
-    "candidate_digest",
-    "scope_digest",
-    "encoding_digest",
 }
 _ALLOWED_COMMANDS = {
     "set-logic",
@@ -108,15 +102,43 @@ def _valid_artifact(value: object) -> bool:
     )
 
 
-def _valid_bindings(value: object) -> bool:
-    if not isinstance(value, dict) or set(value) != _BINDING_KEYS:
-        return False
-    if value["scope_digest"] is not None or value["encoding_digest"] is not None:
-        return False
-    return all(
-        isinstance(value[key], str) and _DIGEST.fullmatch(value[key]) is not None
-        for key in ("claim_digest", "semantics_digest", "candidate_digest")
-    )
+def _smtlib_string_token(text: str, index: int) -> tuple[str, int]:
+    start = index
+    index += 1
+    while index < len(text):
+        if text[index] != '"':
+            index += 1
+            continue
+        if index + 1 < len(text) and text[index + 1] == '"':
+            index += 2
+            continue
+        index += 1
+        return text[start:index], index
+    raise ValueError("unterminated SMT-LIB string")
+
+
+def _smtlib_quoted_symbol_token(text: str, index: int) -> tuple[str, int]:
+    start = index
+    index += 1
+    while index < len(text) and text[index] != "|":
+        if text[index] == "\\":
+            raise ValueError("unsupported quoted-symbol escape")
+        index += 1
+    if index >= len(text):
+        raise ValueError("unterminated SMT-LIB quoted symbol")
+    index += 1
+    return text[start:index], index
+
+
+def _smtlib_simple_token(text: str, index: int) -> tuple[str, int]:
+    start = index
+    while index < len(text) and not text[index].isspace() and text[index] not in "();":
+        if text[index] in '"|':
+            raise ValueError("unexpected SMT-LIB quote")
+        index += 1
+    if start == index:
+        raise ValueError("invalid SMT-LIB token")
+    return text[start:index], index
 
 
 def _smtlib_tokens(text: str) -> tuple[str, ...]:
@@ -136,67 +158,56 @@ def _smtlib_tokens(text: str) -> tuple[str, ...]:
             index += 1
             continue
         if character == '"':
-            start = index
-            index += 1
-            while index < len(text):
-                if text[index] != '"':
-                    index += 1
-                    continue
-                if index + 1 < len(text) and text[index + 1] == '"':
-                    index += 2
-                    continue
-                index += 1
-                tokens.append(text[start:index])
-                break
-            else:
-                raise ValueError("unterminated SMT-LIB string")
+            token, index = _smtlib_string_token(text, index)
+            tokens.append(token)
             continue
         if character == "|":
-            start = index
-            index += 1
-            while index < len(text) and text[index] != "|":
-                if text[index] == "\\":
-                    raise ValueError("unsupported quoted-symbol escape")
-                index += 1
-            if index >= len(text):
-                raise ValueError("unterminated SMT-LIB quoted symbol")
-            index += 1
-            tokens.append(text[start:index])
+            token, index = _smtlib_quoted_symbol_token(text, index)
+            tokens.append(token)
             continue
-        start = index
-        while (
-            index < len(text) and not text[index].isspace() and text[index] not in "();"
-        ):
-            if text[index] in '"|':
-                raise ValueError("unexpected SMT-LIB quote")
-            index += 1
-        if start == index:
-            raise ValueError("invalid SMT-LIB token")
-        tokens.append(text[start:index])
+        token, index = _smtlib_simple_token(text, index)
+        tokens.append(token)
     return tuple(tokens)
+
+
+def _smtlib_open_paren(
+    depth: int,
+    direct_atoms: list[str] | None,
+) -> tuple[int, list[str] | None]:
+    if depth == 0:
+        direct_atoms = []
+    depth += 1
+    if depth > 512:
+        raise ValueError("SMT-LIB nesting limit exceeded")
+    return depth, direct_atoms
+
+
+def _smtlib_close_paren(
+    depth: int,
+    direct_atoms: list[str] | None,
+    commands: list[tuple[str, ...]],
+) -> tuple[int, list[str] | None]:
+    if depth == 0:
+        raise ValueError("unmatched SMT-LIB closing parenthesis")
+    if depth == 1:
+        if not direct_atoms:
+            raise ValueError("empty SMT-LIB command")
+        commands.append(tuple(direct_atoms))
+        direct_atoms = None
+    depth -= 1
+    return depth, direct_atoms
 
 
 def _top_level_commands(text: str) -> tuple[tuple[str, ...], ...]:
     commands: list[tuple[str, ...]] = []
-    direct_atoms: list[str] | None = None
+    direct_atoms: list[str] | None = []
     depth = 0
     for token in _smtlib_tokens(text):
         if token == "(":
-            if depth == 0:
-                direct_atoms = []
-            depth += 1
-            if depth > 512:
-                raise ValueError("SMT-LIB nesting limit exceeded")
+            depth, direct_atoms = _smtlib_open_paren(depth, direct_atoms)
             continue
         if token == ")":
-            if depth == 0:
-                raise ValueError("unmatched SMT-LIB closing parenthesis")
-            if depth == 1:
-                if not direct_atoms:
-                    raise ValueError("empty SMT-LIB command")
-                commands.append(tuple(direct_atoms))
-                direct_atoms = None
-            depth -= 1
+            depth, direct_atoms = _smtlib_close_paren(depth, direct_atoms, commands)
             continue
         if depth == 0:
             raise ValueError("SMT-LIB atom outside a command")
@@ -495,7 +506,7 @@ def check_unsat_proof(request: dict[str, Any]) -> dict[str, Any]:
         if not all(_valid_artifact(item) for item in (claim, candidate, certificate)):
             return _reject("checker artifact metadata is malformed")
         expected_bindings = request["expected_bindings"]
-        if not _valid_bindings(expected_bindings):
+        if not valid_unscoped_unencoded_bindings(expected_bindings):
             return _reject("expected evidence bindings are malformed")
         if (
             claim["semantics_uri"] != candidate["semantics_uri"]

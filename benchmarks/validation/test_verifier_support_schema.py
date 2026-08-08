@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -18,16 +20,45 @@ _TEMPLATE = (
 )
 
 
-def _load_module():
-    spec = importlib.util.spec_from_file_location("_vs_under_test", _TEMPLATE)
+def _load_module(module_name: str, path: Path) -> ModuleType:
+    spec = importlib.util.spec_from_file_location(module_name, path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    sys.modules["_vs_under_test"] = module
-    spec.loader.exec_module(module)
+    with pytest.MonkeyPatch.context() as module_state:
+        module_state.setitem(sys.modules, module_name, module)
+        spec.loader.exec_module(module)
     return module
 
 
-_VS = _load_module()
+_VS = _load_module("_vs_under_test", _TEMPLATE)
+
+
+@pytest.mark.parametrize("preserve_existing", [False, True])
+def test_load_module_scopes_sys_modules_registration(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    preserve_existing: bool,
+) -> None:
+    module_name = "_verifier_support_schema_module_probe"
+    source = tmp_path / "module_probe.py"
+    source.write_text(
+        "import sys\nregistered_while_loading = sys.modules[__name__]\n",
+        encoding="utf-8",
+    )
+    sentinel = ModuleType("sentinel")
+    if preserve_existing:
+        monkeypatch.setitem(sys.modules, module_name, sentinel)
+    else:
+        monkeypatch.delitem(sys.modules, module_name, raising=False)
+
+    loaded = _load_module(module_name, source)
+
+    assert vars(loaded)["registered_while_loading"] is loaded
+    if preserve_existing:
+        assert sys.modules[module_name] is sentinel
+    else:
+        assert module_name not in sys.modules
 
 
 @pytest.fixture
@@ -170,3 +201,58 @@ def test_aggregate_reward_soft_assurance_partial_after_hard_gates() -> None:
 
 def test_template_exports_aggregate_reward() -> None:
     assert "aggregate_reward" in _VS.__all__
+
+
+def test_reject_duplicate_keys_raises_on_duplicate_object_name() -> None:
+    with pytest.raises(ValueError, match="duplicate JSON object key"):
+        _VS._reject_duplicate_keys([("a", 1), ("a", 2)])
+
+
+def test_reject_duplicate_keys_accepts_unique_object_names() -> None:
+    result = _VS._reject_duplicate_keys([("a", 1), ("b", 2)])
+    assert result == {"a": 1, "b": 2}
+
+
+def test_reject_duplicate_keys_accepts_empty_pairs() -> None:
+    assert _VS._reject_duplicate_keys([]) == {}
+
+
+def test_load_submission_rejects_duplicate_keys(
+    tmp_path: Path,
+    contract_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    submission = tmp_path / "submission.json"
+    submission.write_text('{"count": 1, "count": 2, "labels": []}')
+    monkeypatch.setattr(
+        _VS, "_load_public_contract", lambda: json.loads(contract_path.read_text())
+    )
+    assert _VS.load_submission(submission, require_input_binding=False) is None
+
+
+def test_load_submission_raw_rejects_duplicate_keys(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    submission = tmp_path / "submission.json"
+    submission.write_text('{"a": 1, "a": 2}')
+    monkeypatch.setattr(_VS, "workspace_input_is_bound", lambda: True)
+    assert _VS.load_submission_raw(submission, require_input_binding=False) is None
+
+
+def test_read_evidence_json_rejects_duplicate_keys(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    evidence = tmp_path / "evidence.json"
+    evidence.write_text('{"a": 1, "a": 2}')
+    digest = "sha256:" + hashlib.sha256(evidence.read_bytes()).hexdigest()
+    descriptor = {"path": "evidence/answer.txt", "sha256": digest}
+    monkeypatch.setattr(
+        _VS,
+        "resolve_evidence",
+        lambda descriptor, **kw: evidence,
+    )
+    assert (
+        _VS.read_evidence_json(descriptor, expected_path="evidence/answer.txt") is None
+    )

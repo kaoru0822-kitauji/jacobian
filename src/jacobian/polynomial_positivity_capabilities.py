@@ -30,7 +30,7 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple, cast
 from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
-from jacobian.canonical import canonicalize_json
+from jacobian.canonical import canonicalize_json, format_canonical_integer
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
@@ -436,7 +436,10 @@ class PolynomialIntervalPositivityVerifyAdapter:
     def __init__(self, resources: PolynomialPositivityResources) -> None:
         self.resources = resources
         checker_id = resources.installation.checker_id
-        assert checker_id is not None
+        if checker_id is None:
+            raise RuntimeError(
+                "polynomial positivity verify adapter requires an authorized checker"
+            )
         self._descriptor = CapabilityDescriptor(
             capability_id="polynomial.interval.positivity.verify",
             version="1",
@@ -483,7 +486,12 @@ class PolynomialIntervalPositivityVerifyAdapter:
         )
         installation = self.resources.installation
         checker_id = installation.checker_id
-        assert checker_id is not None
+        if checker_id is None:
+            raise _positivity_error(
+                "POLYNOMIAL_POSITIVITY_CHECKER_UNAVAILABLE",
+                "positivity_verification",
+                "The independent positivity checker is not installed in this runtime.",
+            )
         polynomial = validated.polynomial
         interval = validated.interval
         polynomial_artifact = self.resources.artifacts.put(
@@ -746,10 +754,10 @@ def _sturm_positivity(
     b = interval.hi.as_fraction()
     sp = _sympy.get()
     generator: Symbol = sp.symbols(polynomial.variable)
-    terms = {
-        term.exponents: sp.QQ(int(term.coefficient.num), int(term.coefficient.den))
-        for term in polynomial.polynomial.terms
-    }
+    terms = {}
+    for term in polynomial.polynomial.terms:
+        coefficient = term.coefficient.as_fraction()
+        terms[term.exponents] = sp.QQ(coefficient.numerator, coefficient.denominator)
     source = sp.Poly.from_dict(terms, generator, domain=sp.QQ)
     degree = polynomial.degree
     if degree == 0:
@@ -818,7 +826,10 @@ def _wire_univariate_poly(poly: Poly) -> SparseRationalPolynomial:
 
 def _rational(value: Any) -> CanonicalRational:
     rational = _sympy.get().Rational(value)
-    return CanonicalRational(num=str(rational.p), den=str(rational.q))
+    return CanonicalRational(
+        num=format_canonical_integer(int(rational.p)),
+        den=format_canonical_integer(int(rational.q)),
+    )
 
 
 def _computed_result(

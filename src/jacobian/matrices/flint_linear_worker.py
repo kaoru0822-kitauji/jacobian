@@ -11,6 +11,7 @@ from typing import Any
 from jacobian.canonical import (
     CanonicalizationError,
     canonicalize_json,
+    format_canonical_integer,
     loads_strict_json,
 )
 
@@ -175,12 +176,11 @@ def _solve(
 
 def _run(request: dict[str, Any]) -> dict[str, object]:
     protocol = request.get("protocol")
-    if protocol not in {
+    if not isinstance(protocol, str) or protocol not in {
         FLINT_LINEAR_WORKER_PROTOCOL,
         FLINT_LINEAR_INCONSISTENCY_WORKER_PROTOCOL,
     }:
         raise FlintLinearWorkerError("FLINT_LINEAR_INPUT_INVALID")
-    assert isinstance(protocol, str)
     coefficients, rhs = _validate_system(request, protocol=protocol)
     try:
         flint: Any = importlib.import_module("flint")
@@ -214,7 +214,10 @@ def _run(request: dict[str, Any]) -> dict[str, object]:
             "status": "CERTIFICATE_PRODUCED",
             "backend_version": "0.9.0",
             "left_witness": [
-                {"num": str(value.numerator), "den": str(value.denominator)}
+                {
+                    "num": format_canonical_integer(value.numerator),
+                    "den": format_canonical_integer(value.denominator),
+                }
                 for value in values
             ],
             "rhs_pairing": {"num": "1", "den": "1"},
@@ -223,7 +226,10 @@ def _run(request: dict[str, Any]) -> dict[str, object]:
         "status": "SOLUTION_PRODUCED",
         "backend_version": "0.9.0",
         "values": [
-            {"num": str(value.numerator), "den": str(value.denominator)}
+            {
+                "num": format_canonical_integer(value.numerator),
+                "den": format_canonical_integer(value.denominator),
+            }
             for value in values
         ],
     }

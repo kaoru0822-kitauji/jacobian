@@ -1,7 +1,16 @@
 from __future__ import annotations
 
+import argparse
 import json
+import runpy
+import sys
+from collections.abc import Sequence
 from pathlib import Path
+
+import pytest
+from pre_commit.clientlib import load_config
+from pre_commit.lang_base import hook_cmd
+from pre_commit.parse_shebang import normalize_cmd
 
 ROOT = Path(__file__).parents[3]
 
@@ -38,10 +47,12 @@ def test_makefile_changes_do_not_route_to_unrelated_provider_lanes() -> None:
 
 def test_makefile_exposes_separate_local_and_hosted_plans() -> None:
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    harbor = (ROOT / "make" / "harbor.mk").read_text(encoding="utf-8")
 
     assert "ci-plan:" in makefile
     assert "test-plan:" in makefile
-    assert "harbor-plan:" in makefile
+    assert "include make/harbor.mk" in makefile
+    assert "harbor-plan:" in harbor
 
 
 def test_domain_mathematical_sources_skip_storage_mcp_and_e2e() -> None:
@@ -83,12 +94,56 @@ def test_global_timeout_is_not_a_pytest_deadline() -> None:
     assert 'timeout_method = "thread"' in pyproject
 
 
-def test_pre_push_hook_stays_in_the_static_feedback_lane() -> None:
-    config = (ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
-    hook = config.split("id: jacobian-pre-push", 1)[1]
+def test_local_hook_commands_have_parseable_entrypoints_and_arguments(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = load_config(str(ROOT / ".pre-commit-config.yaml"))
+    hooks = [
+        hook
+        for repo in config["repos"]
+        if repo["repo"] == "local"
+        for hook in repo["hooks"]
+    ]
+    assert hooks
 
-    assert "entry: make lint typecheck" in hook
-    assert "entry: make check" not in hook
+    class ArgumentsParsedError(Exception):
+        pass
+
+    original_parse_args = argparse.ArgumentParser.parse_args
+
+    def stop_after_parse(
+        parser: argparse.ArgumentParser,
+        args: Sequence[str] | None = None,
+        namespace: argparse.Namespace | None = None,
+    ) -> None:
+        original_parse_args(parser, args, namespace)
+        raise ArgumentsParsedError
+
+    monkeypatch.setattr(argparse.ArgumentParser, "parse_args", stop_after_parse)
+
+    for hook in hooks:
+        command = hook_cmd(hook["entry"], hook["args"])
+        normalize_cmd(command)
+        if hook["id"] == "jacobian-pre-push":
+            assert command == ("make", "lint", "typecheck")
+            continue
+
+        assert command[:4] == ("uv", "run", "--locked", "python"), hook["id"]
+        script_index = 4
+        assert script_index < len(command), hook["id"]
+        script = (ROOT / command[script_index]).resolve()
+        assert script.is_relative_to(ROOT) and script.is_file(), hook["id"]
+
+        namespace = runpy.run_path(str(script))
+        main = namespace.get("main")
+        assert callable(main), hook["id"]
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [str(script), *command[script_index + 1 :]],
+        )
+        with pytest.raises(ArgumentsParsedError):
+            main()
 
 
 def test_process_lane_is_invoked_by_ci() -> None:
@@ -200,15 +255,13 @@ def test_required_ci_gates_fail_when_the_plan_is_cancelled() -> None:
 
 
 def test_local_oracle_targets_require_explicit_scope() -> None:
-    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
-    oracle = makefile.split("harbor-oracle:", 1)[1].split("harbor-oracle-task:", 1)[0]
-    runner = makefile.split("harbor-oracle-run:", 1)[1].split("harbor-oracle-all:", 1)[
-        0
-    ]
+    harbor = (ROOT / "make" / "harbor.mk").read_text(encoding="utf-8")
+    oracle = harbor.split("harbor-oracle:", 1)[1].split("harbor-oracle-task:", 1)[0]
+    runner = harbor.split("harbor-oracle-run:", 1)[1].split("harbor-oracle-all:", 1)[0]
 
     assert '"$(TASKS)" -o "$(FULL)" = "1"' in oracle
     assert '"$(TASKS)" -o "$(FULL)" = "1"' in runner
-    assert "DATASET=$$dataset FULL=1" in makefile
+    assert "DATASET=$$dataset FULL=1" in harbor
 
 
 def test_composition_lane_uses_timing_shards() -> None:
@@ -264,8 +317,9 @@ def test_ordering_lane_dispatches_through_the_semantic_runner() -> None:
 
 def test_static_validation_enforces_test_architecture() -> None:
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    development = (ROOT / "make" / "development.mk").read_text(encoding="utf-8")
 
-    assert "test-architecture:" in makefile
+    assert "test-architecture:" in development
     assert "check-static: lint-full typecheck test-architecture" in makefile
 
 

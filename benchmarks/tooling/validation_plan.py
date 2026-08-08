@@ -9,15 +9,10 @@ from typing import Any
 
 HOST_VALIDATION_ROOT = "benchmarks/validation"
 HOST_VALIDATION_FULL_SHARDS = 4
+# GitHub Actions matrix jobs are capped at 256; stay at or below that limit.
+HOST_VALIDATION_MAX_JOBS = 256
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
 HOST_VALIDATION_DATASET_FILES = {
-    "conjecture-probes-v1": (
-        "benchmarks/validation/conjecture_probes_v1/"
-        "test_vizing_bounded_cartesian_products.py",
-        "benchmarks/validation/conjecture_probes_v1/"
-        "test_yang_mills_gauge_invariance_certificate.py",
-        "benchmarks/validation/conjecture_probes_v1/"
-        "test_hadamard_order12_construction.py",
-    ),
     "symbolic-coordination-v1": (
         "benchmarks/validation/symbolic_coordination_v1/test_pilot_contract.py",
     ),
@@ -28,6 +23,18 @@ HOST_VALIDATION_DATASET_FILES = {
         "benchmarks/validation/test_provider_download_integrity.py",
     ),
 }
+
+
+def _discover_conjecture_host_tests() -> tuple[str, ...]:
+    """Discover dedicated conjecture-probes-v1 host test files in sorted order."""
+
+    root = _PROJECT_ROOT / "benchmarks" / "validation" / "conjecture_probes_v1"
+    return tuple(
+        str(path.relative_to(_PROJECT_ROOT).as_posix())
+        for path in sorted(root.glob("test_*.py"))
+    )
+
+
 CONTROL_PLANE_HOST_TESTS = {
     ".github/scripts/emit-plan-receipt": (),
     ".github/scripts/manage-test-timings": (),
@@ -155,11 +162,13 @@ def full_host_validation(
 def dataset_host_validation(
     dataset: str, *, timings: Mapping[str, float] | None = None
 ) -> tuple[HostValidation, ...]:
+    if dataset == "conjecture-probes-v1":
+        selectors = _discover_conjecture_host_tests()
+    else:
+        selectors = HOST_VALIDATION_DATASET_FILES.get(dataset, ())
     return tuple(
         _entry(name=f"{dataset}-{index}", selector=selector, timings=timings)
-        for index, selector in enumerate(
-            HOST_VALIDATION_DATASET_FILES.get(dataset, ()), start=1
-        )
+        for index, selector in enumerate(selectors, start=1)
     )
 
 
@@ -356,12 +365,18 @@ def host_validation_plan(
     ordered = tuple(
         sorted(unique.values(), key=lambda entry: (entry.selector, entry.keyword))
     )
+    if len(ordered) > HOST_VALIDATION_MAX_JOBS:
+        return HostValidationPlan(
+            full_host_validation(timings=timings),
+            ("focused host validation exceeded matrix job limit; using full suite",),
+        )
     reasons = tuple(f"focused host validation: {entry.name}" for entry in ordered)
     return HostValidationPlan(ordered, reasons)
 
 
 __all__ = [
     "CONTROL_PLANE_HOST_TESTS",
+    "HOST_VALIDATION_MAX_JOBS",
     "HostValidation",
     "HostValidationPlan",
     "dataset_host_validation",

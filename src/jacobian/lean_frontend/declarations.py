@@ -8,6 +8,7 @@ import os
 import tempfile
 import threading
 import uuid
+import weakref
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
@@ -290,6 +291,17 @@ class _SessionEntry:
     session: _DeclarationQuerySession
 
 
+def _close_declaration_sessions(
+    sessions: dict[LeanEnvironment, _SessionEntry],
+    session_locks: dict[LeanEnvironment, threading.Lock],
+) -> None:
+    """Release declaration sessions retained past their backend's lifetime."""
+    for environment, entry in list(sessions.items()):
+        with session_locks[environment]:
+            entry.session.close()
+    sessions.clear()
+
+
 class LeanSubprocessDeclarationBackend:
     """Reuse one catalog across bounded processes for each validated environment."""
 
@@ -312,6 +324,12 @@ class LeanSubprocessDeclarationBackend:
         self._session_locks = {
             environment: threading.Lock() for environment in LeanEnvironment
         }
+        self._finalizer = weakref.finalize(
+            self,
+            _close_declaration_sessions,
+            self._sessions,
+            self._session_locks,
+        )
 
     def environment_digest(self, environment: LeanEnvironment) -> str:
         try:
@@ -327,6 +345,105 @@ class LeanSubprocessDeclarationBackend:
                 f"The pinned Lean {environment.value} environment is not installed.",
             ) from exc
 
+    def _resolve_session(
+        self,
+        environment: LeanEnvironment,
+        environment_digest: str,
+    ) -> _SessionEntry:
+        """Return a valid session entry, discarding stale sessions as needed."""
+
+        entry = self._sessions.get(environment)
+        if entry is not None and entry.environment_digest != environment_digest:
+            self._discard_session(environment)
+            raise LeanDeclarationBackendError(
+                "LEAN_ENVIRONMENT_CHANGED",
+                (
+                    "The pinned Lean environment changed while an indexed "
+                    "declaration session was active."
+                ),
+            )
+        if entry is None:
+            session = self._start_session(environment, environment_digest)
+            entry = _SessionEntry(
+                environment_digest=environment_digest,
+                session=session,
+            )
+            self._sessions[environment] = entry
+            try:
+                unchanged_after_start = (
+                    self.environment_digest(environment) == environment_digest
+                )
+            except LeanDeclarationBackendError:
+                self._discard_session(environment)
+                raise
+            if not unchanged_after_start:
+                self._discard_session(environment)
+                raise LeanDeclarationBackendError(
+                    "LEAN_ENVIRONMENT_CHANGED",
+                    (
+                        "The pinned Lean environment changed while the "
+                        "declaration index was starting."
+                    ),
+                )
+        return entry
+
+    def _execute_session_request(
+        self,
+        environment: LeanEnvironment,
+        entry: _SessionEntry,
+        environment_digest: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Run one bounded request, mapping not-found errors to environment changes."""
+
+        try:
+            output = entry.session.request(
+                payload,
+                timeout_seconds=self._query_timeout_seconds(environment),
+            )
+        except LeanDeclarationBackendError as exc:
+            if exc.code == "LEAN_DECLARATION_NOT_FOUND":
+                try:
+                    unchanged = (
+                        self.environment_digest(environment) == environment_digest
+                    )
+                except LeanDeclarationBackendError:
+                    unchanged = False
+                if unchanged:
+                    raise
+            self._discard_session(environment)
+            if exc.code == "LEAN_DECLARATION_NOT_FOUND":
+                raise LeanDeclarationBackendError(
+                    "LEAN_ENVIRONMENT_CHANGED",
+                    (
+                        "The pinned Lean environment changed during "
+                        "declaration inspection."
+                    ),
+                ) from exc
+            raise
+        return output
+
+    def _validate_session_unchanged(
+        self,
+        environment: LeanEnvironment,
+        environment_digest: str,
+    ) -> None:
+        """Discard the session and fail when the environment changed after a query."""
+
+        try:
+            unchanged_after_query = (
+                self.environment_digest(environment) == environment_digest
+            )
+        except LeanDeclarationBackendError:
+            self._discard_session(environment)
+            raise
+        if not unchanged_after_query:
+            self._discard_session(environment)
+            raise LeanDeclarationBackendError(
+                "LEAN_ENVIRONMENT_CHANGED",
+                "The pinned Lean environment changed during declaration discovery.",
+            )
+
     def query(
         self,
         environment: LeanEnvironment,
@@ -334,77 +451,14 @@ class LeanSubprocessDeclarationBackend:
     ) -> dict[str, Any]:
         with self._session_locks[environment]:
             environment_digest = self.environment_digest(environment)
-            entry = self._sessions.get(environment)
-            if entry is not None and entry.environment_digest != environment_digest:
-                self._discard_session(environment)
-                raise LeanDeclarationBackendError(
-                    "LEAN_ENVIRONMENT_CHANGED",
-                    (
-                        "The pinned Lean environment changed while an indexed "
-                        "declaration session was active."
-                    ),
-                )
-            if entry is None:
-                session = self._start_session(environment, environment_digest)
-                entry = _SessionEntry(
-                    environment_digest=environment_digest,
-                    session=session,
-                )
-                self._sessions[environment] = entry
-                try:
-                    unchanged_after_start = (
-                        self.environment_digest(environment) == environment_digest
-                    )
-                except LeanDeclarationBackendError:
-                    self._discard_session(environment)
-                    raise
-                if not unchanged_after_start:
-                    self._discard_session(environment)
-                    raise LeanDeclarationBackendError(
-                        "LEAN_ENVIRONMENT_CHANGED",
-                        (
-                            "The pinned Lean environment changed while the "
-                            "declaration index was starting."
-                        ),
-                    )
-            try:
-                output = entry.session.request(
-                    payload,
-                    timeout_seconds=self._query_timeout_seconds(environment),
-                )
-            except LeanDeclarationBackendError as exc:
-                if exc.code == "LEAN_DECLARATION_NOT_FOUND":
-                    try:
-                        unchanged = (
-                            self.environment_digest(environment) == environment_digest
-                        )
-                    except LeanDeclarationBackendError:
-                        unchanged = False
-                    if unchanged:
-                        raise
-                self._discard_session(environment)
-                if exc.code == "LEAN_DECLARATION_NOT_FOUND":
-                    raise LeanDeclarationBackendError(
-                        "LEAN_ENVIRONMENT_CHANGED",
-                        (
-                            "The pinned Lean environment changed during "
-                            "declaration inspection."
-                        ),
-                    ) from exc
-                raise
-            try:
-                unchanged_after_query = (
-                    self.environment_digest(environment) == environment_digest
-                )
-            except LeanDeclarationBackendError:
-                self._discard_session(environment)
-                raise
-            if not unchanged_after_query:
-                self._discard_session(environment)
-                raise LeanDeclarationBackendError(
-                    "LEAN_ENVIRONMENT_CHANGED",
-                    "The pinned Lean environment changed during declaration discovery.",
-                )
+            entry = self._resolve_session(environment, environment_digest)
+            output = self._execute_session_request(
+                environment,
+                entry,
+                environment_digest,
+                payload,
+            )
+            self._validate_session_unchanged(environment, environment_digest)
             output["_environment_digest"] = environment_digest
             return output
 
@@ -414,6 +468,7 @@ class LeanSubprocessDeclarationBackend:
         for environment, lock in self._session_locks.items():
             with lock:
                 self._discard_session(environment)
+        self._finalizer.detach()
 
     def _start_session(
         self,
