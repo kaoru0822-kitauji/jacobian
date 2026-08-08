@@ -13,6 +13,7 @@ from pathlib import Path
 
 from jacobian.contracts.capabilities import CapabilityProviderRuntime
 from jacobian.contracts.provider_measurements import (
+    ProviderInstalledSize,
     ProviderMeasurement,
     ProviderMeasurementSample,
     ProviderMeasurementStatus,
@@ -226,25 +227,45 @@ def _tree_size(root: Path) -> int:
     return sum(_file_size(path) for path in root.rglob("*"))
 
 
-def _installed_bytes(runtime: CapabilityProviderRuntime) -> int:
+def _installed_size(runtime: CapabilityProviderRuntime) -> ProviderInstalledSize:
     distribution_name = runtime.configuration.get("distribution")
-    if isinstance(distribution_name, str):
-        distribution = importlib.metadata.distribution(distribution_name)
-        total = 0
-        for package_path in distribution.files or ():
-            total += _file_size(Path(str(distribution.locate_file(package_path))))
-        return total
-    if runtime.provider == "jacobian.lean4":
-        from jacobian_checkers import lean4
+    try:
+        if isinstance(distribution_name, str):
+            distribution = importlib.metadata.distribution(distribution_name)
+            total = 0
+            for package_path in distribution.files or ():
+                total += _file_size(Path(str(distribution.locate_file(package_path))))
+            return ProviderInstalledSize(
+                status=ProviderMeasurementStatus.COMPLETED,
+                bytes=total,
+            )
+        if runtime.provider == "jacobian.lean4":
+            from jacobian_checkers import lean4
 
-        executable, mathlib = lean4.inspect_runtime(require_mathlib=True)
-        roots = {executable.parent.parent.resolve()}
-        if mathlib is not None:
-            roots.add(mathlib.resolve())
-        return sum(_tree_size(root) for root in roots)
-    module = importlib.import_module("jacobian")
-    module_path = Path(str(module.__file__)).resolve().parent
-    return _tree_size(module_path)
+            executable, mathlib = lean4.inspect_runtime(require_mathlib=True)
+            roots = {executable.parent.parent.resolve()}
+            if mathlib is not None:
+                roots.add(mathlib.resolve())
+            return ProviderInstalledSize(
+                status=ProviderMeasurementStatus.COMPLETED,
+                bytes=sum(_tree_size(root) for root in roots),
+            )
+        module = importlib.import_module("jacobian")
+        module_path = Path(str(module.__file__)).resolve().parent
+        return ProviderInstalledSize(
+            status=ProviderMeasurementStatus.COMPLETED,
+            bytes=_tree_size(module_path),
+        )
+    except importlib.metadata.PackageNotFoundError:
+        return ProviderInstalledSize(
+            status=ProviderMeasurementStatus.ERROR,
+            detail="The provider distribution metadata is unavailable.",
+        )
+    except (OSError, RuntimeError):
+        return ProviderInstalledSize(
+            status=ProviderMeasurementStatus.ERROR,
+            detail="The provider installed-size measurement failed.",
+        )
 
 
 def _cold_install_spec(runtime: CapabilityProviderRuntime) -> str | None:
@@ -335,7 +356,7 @@ def measure_provider(
         reproduction = _python_probe(runtime, "reproduction")
     return ProviderMeasurement(
         provider_runtime=runtime,
-        installed_bytes=_installed_bytes(runtime),
+        installed_size=_installed_size(runtime),
         cold_install=_measure_cold_install(
             runtime,
             enabled=include_cold_install,
