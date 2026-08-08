@@ -657,9 +657,7 @@ def test_mcp_exact_description_layers_summary_contract_and_full_views(
             )
             assert contract["related_capabilities"] == [
                 {
-                    "capability_id": (
-                        "polynomial.expression_normalization.verify"
-                    ),
+                    "capability_id": ("polynomial.expression_normalization.verify"),
                     "relationship": (
                         "independently verify the stored typed-expression normalization"
                     ),
