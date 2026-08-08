@@ -217,6 +217,8 @@ jobs:
       - if: needs.plan.outputs.run-static == 'true'
         run: make test-architecture
       - if: needs.plan.outputs.run-static == 'true'
+        run: make architecture
+      - if: needs.plan.outputs.run-static == 'true'
         run: make todo-check
 
   docs:
