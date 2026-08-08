@@ -845,9 +845,11 @@ def _z3_evaluate_term(
     z3: Any,
 ) -> Any:
     if term.kind == "VARIABLE":
-        assert term.variable is not None
+        if term.variable is None:
+            raise ValueError("variable terms require only a variable name")
         return assignment[term.variable]
-    assert term.left is not None and term.right is not None
+    if term.left is None or term.right is None:
+        raise ValueError("product terms require exactly two child terms")
     left = _z3_evaluate_term(term.left, cells, assignment, order, z3)
     right = _z3_evaluate_term(term.right, cells, assignment, order, z3)
     selected: Any = cells[-1][-1]
@@ -904,9 +906,11 @@ def _evaluate_term(
     assignment: dict[str, int],
 ) -> int:
     if term.kind == "VARIABLE":
-        assert term.variable is not None
+        if term.variable is None:
+            raise ValueError("variable terms require only a variable name")
         return assignment[term.variable]
-    assert term.left is not None and term.right is not None
+    if term.left is None or term.right is None:
+        raise ValueError("product terms require exactly two child terms")
     left = _evaluate_term(term.left, table, assignment)
     right = _evaluate_term(term.right, table, assignment)
     return table[left][right]

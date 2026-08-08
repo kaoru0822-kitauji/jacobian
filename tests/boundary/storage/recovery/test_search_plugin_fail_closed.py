@@ -15,6 +15,7 @@ from search_orchestration_support import _install_search_plugin, _request
 from jacobian.contracts.discovery import ExperimentState
 from jacobian.contracts.evidence import WitnessRole
 from jacobian.contracts.search import SearchCheckpoint, SearchStopReason
+from jacobian.search.errors import SearchError
 from jacobian.storage.errors import StorageError
 from jacobian.storage.models import StorageLimits
 
@@ -267,6 +268,32 @@ def test_search_batch_respects_archive_parent_limit(fresh_complete_runtime) -> N
     for page_uri in snapshot.archive_page_uris:
         assert (
             len(fresh_complete_runtime.core.store.get(page_uri).manifest.parents) <= 6
+        )
+
+
+@pytest.mark.parametrize("max_parents", [4, 5])
+def test_witness_search_requires_archive_parent_capacity(
+    fresh_complete_runtime,
+    max_parents: int,
+) -> None:
+    claim_uri, plugin_id = _install_search_plugin(
+        fresh_complete_runtime,
+        include_witness_oracle=True,
+    )
+    fresh_complete_runtime.core.store.limits = StorageLimits(max_parents=max_parents)
+
+    with pytest.raises(
+        SearchError,
+        match="must be at least 6 for one witness-enabled search archive record",
+    ):
+        fresh_complete_runtime.services.search.start(
+            _request(
+                claim_uri,
+                plugin_id,
+                idempotency_key=f"search-witness-parent-capacity-{max_parents}",
+                witness_role=WitnessRole.DEFEATS_CANDIDATE,
+                counterexample_checker_id="checker://sha256/" + "0" * 64,
+            )
         )
 
 

@@ -22,6 +22,17 @@ def test_core_extension_exposes_exactly_the_stable_math_tools() -> None:
         "math.find",
         "math.run",
     )
+    assert set(extension._accepted_tool_arguments) == {"math.find", "math.run"}
+    assert "ctx" not in extension._accepted_tool_arguments["math.find"]
+    assert "capability_id" in extension._accepted_tool_arguments["math.find"]
+
+
+def test_core_extension_caches_reasoning_tool_arguments_when_enabled() -> None:
+    extension = JacobianCoreExtension(None, None, ReasoningLogMode.REQUIRED)
+
+    assert "reasoning.write" in extension._accepted_tool_arguments
+    assert "reasoning_run_id" in extension._accepted_tool_arguments["math.run"]
+    assert "reasoning_call_id" in extension._accepted_tool_arguments["math.run"]
 
 
 def test_model_visible_guidance_exposes_affordances_without_research_order() -> None:

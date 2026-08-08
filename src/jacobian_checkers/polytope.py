@@ -6,6 +6,12 @@ import re
 from fractions import Fraction
 from typing import Any
 
+__all__ = [
+    "check_convex_combination",
+    "check_linear_separator",
+]
+
+
 _INTEGER = re.compile(r"^-?(?:0|[1-9][0-9]*)$")
 _MAX_GENERATORS = 100_000
 _MAX_DIMENSION = 256

@@ -10,6 +10,8 @@ PUBLIC_API = {
     "jacobian.math": ("arithmetic", "graphs", "matrices"),
     "jacobian.math.arithmetic": (
         "absolute_value",
+        "integerize_rational_vector",
+        "primitive_integer_vector",
         "quotient",
         "reciprocal",
         "sign",

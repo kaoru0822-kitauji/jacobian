@@ -108,6 +108,14 @@ class JacobianCoreExtension(Extension):
         self._runtime = runtime
         self._tenant_router = tenant_router
         self._reasoning_log_mode = reasoning_log_mode
+        self._accepted_tool_arguments: dict[str, frozenset[str]] = {
+            binding.kwargs["name"]: frozenset(
+                name
+                for name in inspect.signature(binding.fn).parameters
+                if name != "ctx"
+            )
+            for binding in self.tools()
+        }
 
     def settings(self) -> dict[str, Any]:
         return {
@@ -254,16 +262,9 @@ class JacobianCoreExtension(Extension):
                 # Keep this narrow adapter check so the public tool boundary remains
                 # closed; domain-selected capability payloads are validated later by
                 # Jacobian's descriptor contract.
-                binding = next(
-                    binding
-                    for binding in self.tools()
-                    if binding.kwargs["name"] == params.name
-                )
-                accepted_arguments = {
-                    name
-                    for name in inspect.signature(binding.fn).parameters
-                    if name != "ctx"
-                }
+                accepted_arguments = self._accepted_tool_arguments.get(params.name)
+                if accepted_arguments is None:
+                    raise ValueError(f"unknown tool: {params.name}")
                 unknown_arguments = sorted(set(arguments) - accepted_arguments)
                 if unknown_arguments:
                     raise ValueError(

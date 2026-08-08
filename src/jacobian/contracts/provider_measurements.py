@@ -52,6 +52,11 @@ class ProviderInstalledSize(ContractModel):
             raise ValueError("completed installed-size measurement requires bytes")
         if (
             self.status is not ProviderMeasurementStatus.COMPLETED
+            and self.bytes is not None
+        ):
+            raise ValueError("incomplete installed-size measurement must not include bytes")
+        if (
+            self.status is not ProviderMeasurementStatus.COMPLETED
             and self.detail is None
         ):
             raise ValueError("incomplete installed-size measurement requires a detail")

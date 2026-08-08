@@ -25,6 +25,8 @@ from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.storage.errors import StorageError
 from jacobian.storage.repository import ArtifactRepository
 
+__all__ = ("PluginRegistry", "PluginRegistryError", "ResolvedCapability")
+
 _LOGGER = logging.getLogger(__name__)
 
 
