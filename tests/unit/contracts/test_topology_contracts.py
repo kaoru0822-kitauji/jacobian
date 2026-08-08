@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from jacobian.contracts.topology import (
     ChainCoefficientRing,
     ChainComplexRequest,
+    FiniteSimplicialComplex,
     IntegralSimplicialHomologyRequest,
     SimplicialComplexRequest,
     SimplicialHomologyRequest,
@@ -97,3 +98,20 @@ def test_integral_homology_has_tighter_certificate_size_bounds() -> None:
     assert sum(total_rank_too_large.f_vector) == 33
     with pytest.raises(ValidationError, match="total chain rank at most 32"):
         IntegralSimplicialHomologyRequest(complex=total_rank_too_large)
+
+
+def test_stale_complex_digest_reports_field_level_loc() -> None:
+    """A stale ``complex_digest`` must produce a Pydantic error whose ``loc``
+    targets the ``complex_digest`` field (not a model-level ``()``), so the
+    enrichment helper can surface ``complex/complex_digest`` to the agent.
+    """
+
+    good = _materialized_complex(("a", "b", "c"), (("a", "b"), ("b", "c")))
+    bad_payload = good.model_dump(mode="python")
+    bad_payload["complex_digest"] = "sha256:" + "0" * 64
+    with pytest.raises(ValidationError) as exc_info:
+        FiniteSimplicialComplex.model_validate(bad_payload)
+    errors = exc_info.value.errors()
+    assert len(errors) == 1
+    assert errors[0]["loc"] == ("complex_digest",)
+    assert "complex_digest" in errors[0]["msg"]
