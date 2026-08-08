@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 from itertools import product
 
+from jacobian.bounded_process import bounded_process_cancelled
 from jacobian.canonical import format_canonical_integer
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
@@ -42,6 +43,8 @@ from jacobian.contracts.polynomials import (
 )
 from jacobian.contracts.results import (
     Conclusion,
+    Execution,
+    ExecutionStatus,
     Verification,
 )
 from jacobian.domains._examples import example
@@ -337,10 +340,14 @@ class PolynomialCollisionSearchAdapter:
         ) = None
         evaluation_uris: list[str] = []
         examined = 0
+        cancelled = False
         for point_values in product(
             scalar_values,
             repeat=len(polynomial_map.variables),
         ):
+            if bounded_process_cancelled():
+                cancelled = True
+                break
             examined += 1
             point = RationalPolynomialPoint(values=point_values)
             image = _evaluate(polynomial_map, point)
@@ -438,17 +445,23 @@ class PolynomialCollisionSearchAdapter:
             stop_reason=(
                 PolynomialCollisionSearchStopReason.FIRST_COLLISION
                 if found is not None
-                else PolynomialCollisionSearchStopReason.GRID_EXHAUSTED
+                else (
+                    PolynomialCollisionSearchStopReason.CANCELLED
+                    if cancelled
+                    else PolynomialCollisionSearchStopReason.GRID_EXHAUSTED
+                )
             ),
         )
         artifacts = [map_uri, *evaluation_uris]
-        relationships = [
-            CapabilityRelationship(
-                relation_id="polynomial.relation.evaluation-of",
-                source_artifact_uris=(map_uri,),
-                target_artifact_uris=tuple(evaluation_uris),
+        relationships: list[CapabilityRelationship] = []
+        if evaluation_uris:
+            relationships.append(
+                CapabilityRelationship(
+                    relation_id="polynomial.relation.evaluation-of",
+                    source_artifact_uris=(map_uri,),
+                    target_artifact_uris=tuple(evaluation_uris),
+                )
             )
-        ]
         if found is not None:
             assert first_evaluation_result is not None
             assert second_evaluation_result is not None
@@ -486,24 +499,57 @@ class PolynomialCollisionSearchAdapter:
                 )
             )
         exhausted_grid = examined == grid_point_count
+        scope = CapabilityScope(
+            description="declared finite rational grid",
+            parameters={
+                "max_abs_numerator": validated.max_abs_numerator,
+                "max_denominator": validated.max_denominator,
+                "grid_point_count": grid_point_count,
+            },
+            artifact_uri=map_uri,
+        )
+        artifact_uris = tuple(
+            dict.fromkeys(uri for uri in artifacts if uri is not None)
+        )
+        if cancelled:
+            return CapabilityResult(
+                capability_id=self.descriptor.capability_id,
+                capability_version=self.descriptor.version,
+                mode=request.mode,
+                execution=Execution(
+                    status=ExecutionStatus.CANCELLED,
+                    runtime_ms=max(0, round((time.monotonic() - started) * 1000)),
+                    detail="The client cancelled the collision-grid search.",
+                ),
+                completeness=CapabilityCompleteness(
+                    status=CapabilityCompletenessStatus.PARTIAL,
+                    basis=(
+                        "the deterministic grid prefix completed before client "
+                        "cancellation; no mathematical conclusion or independent "
+                        "verification is claimed"
+                    ),
+                    assurance_level=CapabilityAssuranceLevel.COMPUTED,
+                ),
+                assurance=CapabilityAssurance(
+                    level=CapabilityAssuranceLevel.COMPUTED,
+                    basis=(
+                        "deterministic exact SymPy search was cancelled before the "
+                        "declared grid was exhausted"
+                    ),
+                ),
+                output=output.model_dump(mode="json"),
+                scope=scope,
+                relationships=tuple(relationships),
+                artifact_uris=artifact_uris,
+            )
         return _computed_result(
             descriptor=self.descriptor,
             request=request,
             started=started,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="declared finite rational grid",
-                parameters={
-                    "max_abs_numerator": validated.max_abs_numerator,
-                    "max_denominator": validated.max_denominator,
-                    "grid_point_count": grid_point_count,
-                },
-                artifact_uri=map_uri,
-            ),
+            scope=scope,
             relationships=tuple(relationships),
-            artifact_uris=tuple(
-                dict.fromkeys(uri for uri in artifacts if uri is not None)
-            ),
+            artifact_uris=artifact_uris,
             completeness_basis=(
                 "the deterministic grid was fully enumerated"
                 if exhausted_grid
