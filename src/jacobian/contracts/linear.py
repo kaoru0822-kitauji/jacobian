@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import hashlib
 from typing import Annotated, Literal, Self
 
 from pydantic import Field, StrictInt, StringConstraints, model_validator
 
-from jacobian.canonical import canonicalize_json
+from jacobian.canonical import canonicalize_json, sha256_digest
 from jacobian.contracts.capabilities import (
     CapabilityProviderAvailability,
     CapabilityProviderRuntime,
@@ -29,14 +28,10 @@ LinearVariableName = Annotated[
 ]
 
 
-def _sha256(value: bytes) -> str:
-    return f"sha256:{hashlib.sha256(value).hexdigest()}"
-
-
 def linear_variable_order_digest(variables: tuple[str, ...]) -> str:
     """Bind the declared column order without inventing a generic object schema."""
 
-    return _sha256(canonicalize_json({"variables": list(variables)}))
+    return sha256_digest(canonicalize_json({"variables": list(variables)}))
 
 
 def _require_bounded_rationals(values: tuple[CanonicalRational, ...]) -> None:
