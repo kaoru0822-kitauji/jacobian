@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal, Self
@@ -20,6 +21,7 @@ from jacobian.canonical import CanonicalizationError, canonicalize_json
 from jacobian.contracts.capabilities import CapabilityResult
 from jacobian.contracts.results import ContractModel
 
+_LOGGER = logging.getLogger(__name__)
 _DIGEST_PATTERN = r"^sha256:[0-9a-f]{64}$"
 _ARTIFACT_PATTERN = r"^artifact://sha256/[0-9a-f]{64}$"
 _CONTROL_OUTPUT_FIELDS = frozenset(
@@ -787,7 +789,12 @@ def _record_math_result(
         return tuple(sorted(kinds, key=str))
     try:
         validated = CapabilityResult.model_validate(response)
-    except ValidationError:
+    except ValidationError as exc:
+        _LOGGER.warning(
+            "trajectory extraction rejected malformed capability result for %s: %s",
+            capability_id,
+            exc.errors(include_url=False)[0]["msg"],
+        )
         state.execution_status = "ERROR"
         kinds.update(_record_diagnostics(state, response))
         return tuple(sorted(kinds, key=str))

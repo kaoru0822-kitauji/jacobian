@@ -561,6 +561,7 @@ class PolynomialCollisionSearchRequest(ContractModel):
 class PolynomialCollisionSearchStopReason(StrEnum):
     FIRST_COLLISION = "FIRST_COLLISION"
     GRID_EXHAUSTED = "GRID_EXHAUSTED"
+    CANCELLED = "CANCELLED"
 
 
 class PolynomialCollisionVerifyRequest(ContractModel):
@@ -1022,11 +1023,19 @@ class PolynomialCollisionSearchOutput(ContractModel):
             self.stop_reason is not PolynomialCollisionSearchStopReason.FIRST_COLLISION
         ):
             raise ValueError("found results must stop at the first collision")
-        if not self.found and (
-            self.stop_reason is not PolynomialCollisionSearchStopReason.GRID_EXHAUSTED
-            or self.examined_point_count != self.grid_point_count
-        ):
-            raise ValueError("not-found results require an exhausted grid")
+        if not self.found:
+            if self.stop_reason is PolynomialCollisionSearchStopReason.GRID_EXHAUSTED:
+                if self.examined_point_count != self.grid_point_count:
+                    raise ValueError("exhausted grids must examine every point")
+            elif self.stop_reason is PolynomialCollisionSearchStopReason.CANCELLED:
+                if self.examined_point_count >= self.grid_point_count:
+                    raise ValueError(
+                        "cancelled searches require an unexamined grid suffix"
+                    )
+            else:
+                raise ValueError(
+                    "not-found results require an exhausted or cancelled grid"
+                )
         return self
 
 

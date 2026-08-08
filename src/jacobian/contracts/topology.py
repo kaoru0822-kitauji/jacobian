@@ -7,7 +7,14 @@ from enum import StrEnum
 from itertools import combinations, pairwise
 from typing import Annotated, Literal, Self
 
-from pydantic import Field, StrictInt, StringConstraints, model_validator
+from pydantic import (
+    Field,
+    StrictInt,
+    StringConstraints,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 from jacobian.canonical import canonicalize_json
 from jacobian.contracts.certified_snf import (
@@ -214,6 +221,47 @@ class FiniteSimplicialComplex(ContractModel):
     empty_simplex_stored: Literal[False] = False
     complex_digest: Sha256Digest
 
+    @field_validator("complex_digest", mode="after")
+    @classmethod
+    def require_digest_binds_canonical_complex(
+        cls, value: str, info: ValidationInfo
+    ) -> str:
+        """Bind ``complex_digest`` to the canonical complex derived from the
+        other fields.  Runs as a field validator so Pydantic reports the
+        error location as ``complex_digest`` (nested inside the parent
+        model's ``loc``), not as a model-level error.
+        """
+
+        required = (
+            "vertices",
+            "maximal_simplices",
+            "faces_by_dimension",
+            "dimension",
+            "f_vector",
+            "closure_size",
+        )
+        if not all(key in info.data for key in required):
+            return value
+        vertices: tuple[str, ...] = info.data["vertices"]
+        maximal_simplices: tuple[tuple[str, ...], ...] = info.data["maximal_simplices"]
+        faces_by_dimension: tuple[FacesInDimension, ...] = info.data[
+            "faces_by_dimension"
+        ]
+        dimension: int = info.data["dimension"]
+        f_vector: tuple[int, ...] = info.data["f_vector"]
+        closure_size: int = info.data["closure_size"]
+        expected_digest = simplicial_complex_digest(
+            vertices=vertices,
+            maximal_simplices=maximal_simplices,
+            faces_by_dimension=faces_by_dimension,
+            dimension=dimension,
+            f_vector=f_vector,
+            closure_size=closure_size,
+        )
+        if value != expected_digest:
+            raise ValueError("complex_digest does not bind the canonical complex")
+        return value
+
     @model_validator(mode="after")
     def require_complete_canonical_complex(self) -> Self:
         if tuple(sorted(set(self.vertices))) != self.vertices:
@@ -238,16 +286,6 @@ class FiniteSimplicialComplex(ContractModel):
             or self.closure_size != sum(expected_f_vector)
         ):
             raise ValueError("complex dimension, f-vector, or closure size is invalid")
-        expected_digest = simplicial_complex_digest(
-            vertices=self.vertices,
-            maximal_simplices=self.maximal_simplices,
-            faces_by_dimension=self.faces_by_dimension,
-            dimension=self.dimension,
-            f_vector=self.f_vector,
-            closure_size=self.closure_size,
-        )
-        if self.complex_digest != expected_digest:
-            raise ValueError("complex_digest does not bind the canonical complex")
         return self
 
 

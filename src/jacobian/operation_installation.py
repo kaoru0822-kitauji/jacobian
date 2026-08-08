@@ -16,6 +16,7 @@ from jacobian.contracts.capabilities import (
     CapabilityCompleteness,
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
+    CapabilityDiagnostic,
     CapabilityInputKind,
     CapabilityMode,
     CapabilityObligation,
@@ -94,6 +95,35 @@ def _execution_failure_result(
             level=CapabilityAssuranceLevel.HEURISTIC,
             basis="operation did not complete; no mathematical conclusion",
         ),
+    )
+
+
+def _enriched_invalid_request(
+    base: CapabilityDiagnostic,
+    exc: ValidationError,
+) -> CapabilityDiagnostic:
+    """Copy *base* and surface the first Pydantic error's location and message.
+
+    Used only when no per-operation ``invalid_request`` is set, so the
+    generic bundle diagnostic gains a precise ``path`` (from the Pydantic
+    ``loc``) and ``hint`` (from the validator's own message) without
+    changing its ``code`` or ``stage``.
+    """
+
+    errors = exc.errors()
+    if not errors:
+        return base
+    first = errors[0]
+    loc = first.get("loc", ())
+    path = "/".join(str(part) for part in loc) if loc else None
+    msg = str(first.get("msg", ""))
+    if msg.startswith("Value error, "):
+        msg = msg[len("Value error, ") :]
+    return base.model_copy(
+        update={
+            "path": path,
+            "hint": msg if msg else base.hint,
+        }
     )
 
 
@@ -230,9 +260,14 @@ class ComputedOperationAdapter:
                 request.input
             )
         except ValidationError as exc:
-            raise CapabilityInvocationError(
+            base = (
                 self.operation.invalid_request
                 or self.bundle.diagnostics.invalid_request
+            )
+            raise CapabilityInvocationError(
+                base
+                if self.operation.invalid_request is not None
+                else _enriched_invalid_request(base, exc)
             ) from exc
 
         started = time.monotonic()
@@ -356,10 +391,17 @@ class MaterializedOperationAdapter:
             ValidationError,
             ValueError,
         ) as exc:
-            raise CapabilityInvocationError(
+            base = (
                 self.operation.invalid_request
                 or self.bundle.diagnostics.invalid_request
-            ) from exc
+            )
+            if self.operation.invalid_request is not None or not isinstance(
+                exc, ValidationError
+            ):
+                diagnostic = base
+            else:
+                diagnostic = _enriched_invalid_request(base, exc)
+            raise CapabilityInvocationError(diagnostic) from exc
         started = time.monotonic()
         outcome = self.operation.implementation(validated_request)
         if isinstance(outcome, ComputedNotApplicable):
@@ -475,9 +517,14 @@ class BoundedSearchOperationAdapter:
                 request.input
             )
         except ValidationError as exc:
-            raise CapabilityInvocationError(
+            base = (
                 self.operation.invalid_request
                 or self.bundle.diagnostics.invalid_request
+            )
+            raise CapabilityInvocationError(
+                base
+                if self.operation.invalid_request is not None
+                else _enriched_invalid_request(base, exc)
             ) from exc
 
         started = time.monotonic()

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from pathlib import Path
 
 import pytest
@@ -370,6 +371,39 @@ def test_malformed_or_substituted_typed_results_cannot_create_objects(
     assert tool_states[0].hard_state.typed_objects == ()
     assert tool_states[1].milestone_kinds == (MilestoneKind.BINDING_BECAME_INVALID,)
     assert tool_states[1].hard_state.typed_objects == ()
+
+
+def test_trajectory_extraction_records_discarded_validation_diagnostics(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    capability_id = "integer.compute.gcd"
+    malformed = _result(
+        capability_id,
+        artifacts=["not-an-artifact-uri"],
+    )
+    malformed["assurance"] = {"level": "VERIFIED"}
+    events = [_reasoning("PLAN", "Record invalid observed results.")]
+    events.extend(
+        _cycle(
+            CALL_IDS[0],
+            capability_id,
+            malformed,
+            after="Invalid observations must not become progress.",
+        )
+    )
+
+    with caplog.at_level(logging.WARNING, logger="jacobian.eval.trajectory_state"):
+        extraction = extract_codex_trajectory(
+            _write(tmp_path, events), task_family="exact-arithmetic"
+        )
+
+    messages = caplog.messages
+    assert any(
+        "rejected malformed capability result" in message for message in messages
+    )
+    assert any(capability_id in message for message in messages)
+    assert extraction.states[-2].hard_state.execution_status == "ERROR"
 
 
 def test_rejection_repair_obligations_and_verified_binding_are_milestones(

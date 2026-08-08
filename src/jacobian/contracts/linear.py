@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
-import hashlib
 from typing import Annotated, Literal, Self
 
 from pydantic import Field, StrictInt, StringConstraints, model_validator
 
-from jacobian.canonical import canonicalize_json
+from jacobian.canonical import canonicalize_json, sha256_digest
 from jacobian.contracts.capabilities import (
     CapabilityProviderAvailability,
     CapabilityProviderRuntime,
 )
 from jacobian.contracts.common import ArtifactUri, CheckerUri, Sha256Digest
-from jacobian.contracts.exact import CanonicalRational
+from jacobian.contracts.exact import CanonicalRational, require_bounded_rational
 from jacobian.contracts.matrices import ExactRationalMatrix
 from jacobian.contracts.results import ContractModel
 
@@ -29,26 +28,19 @@ LinearVariableName = Annotated[
 ]
 
 
-def _sha256(value: bytes) -> str:
-    return f"sha256:{hashlib.sha256(value).hexdigest()}"
-
-
 def linear_variable_order_digest(variables: tuple[str, ...]) -> str:
     """Bind the declared column order without inventing a generic object schema."""
 
-    return _sha256(canonicalize_json({"variables": list(variables)}))
+    return sha256_digest(canonicalize_json({"variables": list(variables)}))
 
 
 def _require_bounded_rationals(values: tuple[CanonicalRational, ...]) -> None:
     for value in values:
-        if (
-            len(value.num.lstrip("-")) > MAX_RATIONAL_DIGITS
-            or len(value.den.lstrip("-")) > MAX_RATIONAL_DIGITS
-        ):
-            raise ValueError(
-                "linear-system rationals are limited to 256 decimal digits "
-                "per numerator and denominator"
-            )
+        require_bounded_rational(
+            value,
+            max_digits=MAX_RATIONAL_DIGITS,
+            label="linear-system rational",
+        )
 
 
 class LinearRationalSystem(ContractModel):

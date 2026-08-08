@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 from fractions import Fraction
-from math import gcd
 from typing import Any, Literal, cast
 
 from jacobian.canonical import canonicalize_json, format_canonical_integer
@@ -28,6 +27,7 @@ from jacobian.contracts.polynomials import (
 )
 from jacobian.domains.polynomial._support import materialized_polynomial_operation
 from jacobian.domains.polynomial.operations import _poly, _rational, _symbols, _wire
+from jacobian.math.arithmetic import primitive_integer_vector
 
 
 def _homogeneous_basis(degree: int) -> tuple[tuple[int, int, int], ...]:
@@ -67,24 +67,10 @@ def _matrix_digest(
 
 def _primitive_kernel(vector: Any) -> tuple[Fraction, ...]:
     fractions = tuple(Fraction(value) for value in vector)
-    denominator_lcm = 1
-    for fraction_value in fractions:
-        denominator_lcm = (
-            denominator_lcm
-            * fraction_value.denominator
-            // gcd(denominator_lcm, fraction_value.denominator)
-        )
-    integers = tuple(
-        value.numerator * (denominator_lcm // value.denominator) for value in fractions
-    )
-    divisor = 0
-    for integer in integers:
-        divisor = gcd(divisor, abs(integer))
-    if divisor == 0:
-        raise RuntimeError("symbolic nullspace returned a zero basis vector")
-    primitive = tuple(value // divisor for value in integers)
-    if next(value for value in primitive if value) < 0:
-        primitive = tuple(-value for value in primitive)
+    try:
+        primitive = primitive_integer_vector(fractions)
+    except ValueError as exc:
+        raise RuntimeError("symbolic nullspace returned a zero basis vector") from exc
     return tuple(Fraction(value) for value in primitive)
 
 

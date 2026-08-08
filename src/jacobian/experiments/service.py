@@ -187,6 +187,8 @@ class ExperimentService:
                 timeout_seconds=timeout_seconds,
             )
         except LifecycleTimeoutError as exc:
+            with self._thread_lock:
+                self._closing = False
             raise ExperimentError(
                 "enumeration workers did not quiesce before runtime shutdown"
             ) from exc

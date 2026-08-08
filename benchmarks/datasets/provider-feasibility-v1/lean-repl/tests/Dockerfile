@@ -12,7 +12,7 @@ RUN mkdir -p /opt/provider && \
     git -C /opt/provider/repl fetch --depth 1 origin 0cc60263319308000bbaa5354427f775fe3dc7d0 && \
     git -C /opt/provider/repl checkout --detach FETCH_HEAD && \
     PATH=/opt/provider/lean-4.31.0-linux/bin:$PATH lake -d /opt/provider/repl build
-LABEL jacobian.checksum="609508c26aca1b78b3a00123f43a571ec47b60b109bd01b0a2dc663cfbc0ef8b"
+LABEL jacobian.checksum="39d10b572218598959187170084b43fda4c6f4b0ae44ba3818f2b98b1015b491"
 ENV PATH=/opt/provider/lean-4.31.0-linux/bin:$PATH
 COPY expected.json input.json test.sh verifier.py verifier_support.py replay.py public_contract.json /tests/
 RUN chmod +x /tests/test.sh

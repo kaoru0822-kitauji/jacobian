@@ -217,6 +217,8 @@ def test_enumeration_close_timeout_keeps_store_open_for_retry(
 
     with pytest.raises(ExperimentError, match="did not quiesce"):
         runtime.services.experiments.close(timeout_seconds=0)
+    with pytest.raises(ValidationError):
+        runtime.services.experiments.start_enumeration({})
     runtime.core.store.register_descriptor(
         kind="schema",
         name="store-open-after-enumeration-timeout",
@@ -400,6 +402,8 @@ def test_search_close_timeout_keeps_store_open_for_retry(
 
     with pytest.raises(SearchError, match="did not quiesce"):
         runtime.services.search.close(timeout_seconds=0)
+    with pytest.raises(ValidationError):
+        runtime.services.search.start({})
 
     runtime.core.store.register_descriptor(
         kind="schema",

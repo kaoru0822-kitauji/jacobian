@@ -35,7 +35,7 @@ _TASKS: tuple[dict[str, Any], ...] = (
     },
 )
 
-_READ_TIMEOUT = 30.0
+_REPLAY_TIMEOUT = 110.0
 _SHUTDOWN_TIMEOUT = 5.0
 _MAX_RESPONSE_BYTES = 1 << 20  # 1 MiB
 
@@ -110,6 +110,7 @@ def _exchange(
     process: subprocess.Popen[bytes],
     reader: _FrameReader,
     request: dict[str, object],
+    deadline: float,
 ) -> dict[str, Any]:
     # The REPL protocol terminates request frames with a blank line, matching
     # the production spike's ToolInteractiveCommand.send() transport.
@@ -117,7 +118,10 @@ def _exchange(
     assert process.stdin is not None
     process.stdin.write(line)
     process.stdin.flush()
-    raw = reader.read_frame(_READ_TIMEOUT)
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise RuntimeError("Lean REPL replay timed out")
+    raw = reader.read_frame(remaining)
     response = json.loads(raw.decode("utf-8"))
     if not isinstance(response, dict):
         raise RuntimeError("Lean REPL response must be a JSON object")
@@ -128,8 +132,9 @@ def _run_task(
     process: subprocess.Popen[bytes],
     reader: _FrameReader,
     task: dict[str, Any],
+    deadline: float,
 ) -> dict[str, Any]:
-    command_response = _exchange(process, reader, {"cmd": task["command"]})
+    command_response = _exchange(process, reader, {"cmd": task["command"]}, deadline)
     if _response_errors(command_response):
         raise RuntimeError(f"{task['task_id']} command failed")
     sorries = command_response.get("sorries")
@@ -141,9 +146,14 @@ def _run_task(
     traces: list[dict[str, Any]] = []
     for tactic in task["tactics"]:
         response = _exchange(
-            process, reader, {"tactic": tactic, "proofState": proof_state}
+            process,
+            reader,
+            {"tactic": tactic, "proofState": proof_state},
+            deadline,
         )
         response_errors = _response_errors(response)
+        if response_errors:
+            raise RuntimeError(f"{task['task_id']} tactic failed")
         next_state = response.get("proofState")
         goals = response.get("goals")
         if not isinstance(next_state, int) or not isinstance(goals, list):
@@ -156,6 +166,8 @@ def _run_task(
             }
         )
         proof_state = next_state
+    if not traces or traces[-1]["goal_count"] != 0:
+        raise RuntimeError(f"{task['task_id']} left goals unfinished")
     return {"task_id": task["task_id"], "tactics": traces}
 
 
@@ -173,7 +185,7 @@ def run_replay() -> dict[str, Any]:
             [_REPL],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
             env=_ENV,
         )
     except OSError:
@@ -184,10 +196,11 @@ def run_replay() -> dict[str, Any]:
     task_results: list[dict[str, Any]] = []
     replay_ok = False
     try:
+        deadline = time.monotonic() + _REPLAY_TIMEOUT
         for task in _TASKS:
-            task_results.append(_run_task(process, reader, task))
+            task_results.append(_run_task(process, reader, task, deadline))
         replay_ok = True
-    except (OSError, json.JSONDecodeError, RuntimeError, KeyError):
+    except (OSError, ValueError, RuntimeError, KeyError):
         replay_ok = False
     finally:
         if process.stdin is not None:

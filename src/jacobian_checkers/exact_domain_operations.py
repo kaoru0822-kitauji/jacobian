@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from fractions import Fraction
+from itertools import product
 from typing import Any
 
 import flint
@@ -460,12 +461,7 @@ def _modular_residue_terms(
 
 
 def _cartesian_assignments(domains: list[list[int]]) -> list[list[int]]:
-    assignments: list[list[int]] = [[]]
-    for domain in domains:
-        assignments = [
-            [*prefix, residue] for prefix in assignments for residue in domain
-        ]
-    return assignments
+    return [list(assignment) for assignment in product(*domains)]
 
 
 def _evaluate_modular_polynomial_with_flint(
@@ -998,6 +994,7 @@ __all__ = [
     "check_matrix_product",
     "check_matrix_rref",
     "check_matrix_smith_normal_form",
+    "check_modular_polynomial_residue_image",
     "check_polynomial_discriminant",
     "check_polynomial_gcd",
     "check_polynomial_resultant",

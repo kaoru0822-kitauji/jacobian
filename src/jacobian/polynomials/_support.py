@@ -1,10 +1,10 @@
-"""Shared helpers for polynomial-map capability adapters."""
+"""Shared helpers for exact polynomial capability adapters."""
 
 from __future__ import annotations
 
 import multiprocessing
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from math import prod as multiply
 from queue import Empty
 from typing import TYPE_CHECKING, Any, cast
@@ -475,11 +475,12 @@ def _validate_request[RequestModel: ContractModel](
     *,
     code: str,
     operation: str,
+    error_factory: Callable[[str, str, str], CapabilityInvocationError] | None = None,
 ) -> RequestModel:
     try:
         return model.model_validate(payload)
     except ValidationError as exc:
-        raise _polynomial_error(
+        raise (error_factory or _polynomial_error)(
             code,
             "request_validation",
             f"The complete polynomial {operation} request is invalid.",

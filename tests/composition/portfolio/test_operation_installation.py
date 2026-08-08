@@ -1,8 +1,8 @@
 from dataclasses import replace
-from typing import Any, cast
+from typing import Any, Self, cast
 
 import pytest
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
@@ -32,6 +32,23 @@ from jacobian.runtime.model import JacobianRuntime
 
 class _SyntheticRequest(ContractModel):
     value: int = Field(ge=0, le=100)
+
+
+class _CrossFieldRequest(ContractModel):
+    """A request whose cross-field validator rejects a value that passes
+    JSON Schema (both fields are valid integers in range) but fails
+    Pydantic's ``model_validator`` — exercising the adapter-level
+    ``ValidationError`` path, not the dispatch-level schema path.
+    """
+
+    value: int = Field(ge=0, le=100)
+    limit: int = Field(ge=0, le=100)
+
+    @model_validator(mode="after")
+    def require_value_below_limit(self) -> Self:
+        if self.value >= self.limit:
+            raise ValueError("value must be strictly less than limit")
+        return self
 
 
 class _SyntheticResult(ContractModel):
@@ -483,6 +500,54 @@ def test_computed_adapter_rejects_invalid_implementation_result(
 
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.diagnostics[0].code == "ADAPTER_EXECUTION_FAILED"
+    assert result.artifact_uris == ()
+
+
+def test_operation_specific_invalid_request_is_not_enriched(
+    fresh_complete_runtime,
+) -> None:
+    """An operation that sets its own ``invalid_request`` diagnostic must
+    receive it verbatim on ``ValidationError`` — the enrichment helper must
+    not overwrite its ``path``, ``hint``, or any other field.
+
+    Uses ``_CrossFieldRequest`` so the input passes JSON Schema validation
+    (both fields are valid integers in range) but fails the Pydantic
+    ``model_validator``, reaching the adapter-level ``except ValidationError``
+    block where enrichment is gated on ``operation.invalid_request is None``.
+    """
+
+    bundle = _synthetic_bundle()
+    operation_diagnostic = CapabilityDiagnostic(
+        code="SYNTHETIC_OPERATION_INVALID_REQUEST",
+        stage="synthetic_operation_validation",
+        message="This operation-specific diagnostic must be preserved verbatim.",
+        hint="Use a value between 0 and 100.",
+        path="value",
+    )
+    operation = ComputedOperation(
+        capability_id="synthetic.compute.operation_diagnostic",
+        title="Cross-field validated synthetic operation",
+        description="Exercise operation-specific invalid_request preservation.",
+        request_model=_CrossFieldRequest,
+        result_model=_SyntheticResult,
+        implementation=lambda request: ComputedSuccess(
+            _SyntheticResult(doubled=request.value * 2)
+        ),
+        relation_id="synthetic.relation.cross_field",
+        tags=("synthetic",),
+        invalid_request=operation_diagnostic,
+    )
+    _install(fresh_complete_runtime, replace(bundle, capabilities=(operation,)))
+
+    result = fresh_complete_runtime.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="synthetic.compute.operation_diagnostic",
+            input={"value": 50, "limit": 10},
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0] == operation_diagnostic
     assert result.artifact_uris == ()
 
 
