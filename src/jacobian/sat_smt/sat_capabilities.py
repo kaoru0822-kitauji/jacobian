@@ -427,7 +427,7 @@ class SatAssignmentVerificationAdapter:
 
         checker_id = self.installation.checker_id
         if checker_id is None:
-            raise CapabilityInvocationError("checker is not installed")
+            raise RuntimeError("checker is not installed")
         witness_artifact = put_witness_envelope(
             self.artifacts,
             witness_schema_uri=self.installation.witness_schema_uri,
@@ -643,7 +643,7 @@ class SatUnsatProofVerificationAdapter:
 
         checker_id = self.installation.checker_id
         if checker_id is None:
-            raise CapabilityInvocationError("checker is not installed")
+            raise RuntimeError("checker is not installed")
         bindings = EvidenceBindings(
             claim_digest=resolved.cnf_artifact.manifest.object_digest,
             semantics_digest=semantics.manifest.object_digest,

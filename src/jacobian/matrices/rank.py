@@ -108,7 +108,7 @@ class MatrixRankVerificationAdapter:
             installation,
         )
         if installation.checker_id is None:
-            raise CapabilityInvocationError("checker is not installed")
+            raise RuntimeError("checker is not installed")
         self._descriptor = CapabilityDescriptor(
             capability_id="matrix.rank.verify",
             version="1",
@@ -167,7 +167,7 @@ class MatrixRankVerificationAdapter:
             ) from exc
         checker_id = self.installation.checker_id
         if checker_id is None:
-            raise CapabilityInvocationError("checker is not installed")
+            raise RuntimeError("checker is not installed")
         semantics = self.store.get(self.matrices.semantics_uri)
         witness = WitnessEnvelope(
             witness_format="matrix.rational_rank",
@@ -240,7 +240,7 @@ class MatrixRankVerificationAdapter:
         ]
         if verified:
             if checked.verification_record_uri is None:
-                raise CapabilityInvocationError(
+                raise RuntimeError(
                     "verification record URI is unexpectedly None after successful verification"
                 )
             uris.append(checked.verification_record_uri)

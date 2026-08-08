@@ -51,15 +51,10 @@ class ReasoningLogService:
         self.store = store
         self.runtime_instance_id = runtime_instance_id or str(uuid4())
 
-    @staticmethod
-    def _require_run_id(run_id: str | None) -> None:
-        if run_id is None:
-            raise ValueError("run_id must not be None for reasoning log writes")
-
     def write(self, request: ReasoningWriteRequest) -> ReasoningWriteResult:
         if request.phase is ReasoningPhase.PLAN:
             return self._create_run(request.summary)
-        self._require_run_id(request.run_id)
+        assert request.run_id is not None
         with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             events = self._read_events(connection, request.run_id)

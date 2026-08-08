@@ -123,7 +123,7 @@ class SatLratVerificationAdapter:
         self.installation = installation
         checker_id = installation.checker_id
         if checker_id is None:
-            raise CapabilityInvocationError("checker is not installed")
+            raise RuntimeError("checker is not installed")
         self._descriptor = CapabilityDescriptor(
             capability_id="sat.lrat.verify",
             version="1",
@@ -179,7 +179,7 @@ class SatLratVerificationAdapter:
         )
         checker_id = self.installation.checker_id
         if checker_id is None:
-            raise CapabilityInvocationError("checker is not installed")
+            raise RuntimeError("checker is not installed")
         bindings = EvidenceBindings(
             claim_digest=resolved.artifact.manifest.object_digest,
             semantics_digest=semantics.manifest.object_digest,

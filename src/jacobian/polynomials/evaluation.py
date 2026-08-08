@@ -7,7 +7,6 @@ import time
 from typing import cast
 
 from jacobian.canonical import canonicalize_json
-from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -356,7 +355,7 @@ class PolynomialKellerConditionVerifyAdapter:
         self.resources = resources
         checker_id = resources.installation.keller_checker_id
         if checker_id is None:
-            raise CapabilityInvocationError("checker is not installed")
+            raise RuntimeError("checker is not installed")
         self._descriptor = CapabilityDescriptor(
             capability_id="polynomial.map.keller_condition.verify",
             version="1",

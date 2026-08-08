@@ -213,7 +213,7 @@ def _inverse_supports(
 ) -> tuple[tuple[tuple[int, ...], ...], ...]:
     if request.support_mode is PolynomialInverseSupportMode.EXPLICIT:
         if request.explicit_support is None:
-            raise CapabilityInvocationError(
+            raise RuntimeError(
                 "explicit support mode requires non-None explicit_support"
             )
         return request.explicit_support

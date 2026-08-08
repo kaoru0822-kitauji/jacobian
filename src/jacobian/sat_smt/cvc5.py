@@ -408,7 +408,7 @@ def _failed_result(
     run: _Cvc5Run,
 ) -> CapabilityResult:
     if run.diagnostic is None:
-        raise CapabilityInvocationError("run diagnostic is unexpectedly None")
+        raise RuntimeError("run diagnostic is unexpectedly None")
     return CapabilityResult(
         capability_id=descriptor.capability_id,
         capability_version=descriptor.version,

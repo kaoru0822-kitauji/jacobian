@@ -456,7 +456,7 @@ class FiniteCoverageVerifyAdapter:
         )
         checker_id = self.installation.checker_id
         if checker_id is None:
-            raise CapabilityInvocationError("checker is not installed")
+            raise RuntimeError("checker is not installed")
         checked = self.verification.verify_certificate(
             certificate_uri=certificate.artifact_uri,
             checker_id=checker_id,

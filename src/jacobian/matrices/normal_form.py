@@ -190,7 +190,7 @@ class MatrixHermiteNormalFormVerificationAdapter:
 
         checker_id = self.installation.checker_id
         if checker_id is None:
-            raise CapabilityInvocationError("checker is not installed")
+            raise RuntimeError("checker is not installed")
         bindings = EvidenceBindings(
             claim_digest=resolved.matrix_artifact.manifest.object_digest,
             semantics_digest=semantics.manifest.object_digest,
