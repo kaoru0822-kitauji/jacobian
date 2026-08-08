@@ -131,7 +131,7 @@ uv run jacobian --checker-authority NONE \
 
 The JSON result records:
 
-- current installed bytes;
+- installed-size status and bytes when the footprint measurement completes;
 - cold-start elapsed time and peak resident memory;
 - a small provider-specific reproduction elapsed time and peak resident
   memory;
