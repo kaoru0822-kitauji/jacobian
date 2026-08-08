@@ -8,6 +8,7 @@ import os
 import subprocess
 import sys
 import threading
+import time
 from importlib.metadata import version
 from pathlib import Path
 
@@ -271,6 +272,135 @@ def test_cancelled_mcp_blocking_work_drains_before_request_task_finishes() -> No
         with pytest.raises(asyncio.CancelledError):
             await task
         assert finished.is_set()
+
+    asyncio.run(scenario())
+
+
+def test_worker_draining_within_grace_is_awaited_and_persisted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A worker that completes within the grace period yields its drained result."""
+
+    monkeypatch.setattr(
+        "jacobian.adapters.mcp.tooling._CANCEL_DRAIN_GRACE_SECONDS", 1.0
+    )
+    release = threading.Event()
+    finished = threading.Event()
+
+    async def scenario() -> None:
+        loop = asyncio.get_running_loop()
+        started = asyncio.Event()
+        cancellation_signalled = asyncio.Event()
+
+        def blocking_operation() -> str:
+            loop.call_soon_threadsafe(started.set)
+            release.wait(timeout=2)
+            finished.set()
+            return "finished"
+
+        task = asyncio.create_task(
+            _run_blocking(
+                blocking_operation,
+                on_cancel=cancellation_signalled.set,
+            )
+        )
+        try:
+            await asyncio.wait_for(started.wait(), timeout=1)
+            task.cancel()
+            await asyncio.wait_for(cancellation_signalled.wait(), timeout=1)
+            release.set()
+            with pytest.raises(asyncio.CancelledError) as exc_info:
+                await task
+            assert finished.is_set()
+            assert exc_info.value.drained_result == "finished"
+        finally:
+            release.set()
+
+    asyncio.run(scenario())
+
+
+def test_worker_that_does_not_drain_lets_cancellation_propagate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A worker that never completes is abandoned after the grace period."""
+
+    monkeypatch.setattr(
+        "jacobian.adapters.mcp.tooling._CANCEL_DRAIN_GRACE_SECONDS", 0.1
+    )
+    release = threading.Event()
+
+    async def scenario() -> None:
+        loop = asyncio.get_running_loop()
+        started = asyncio.Event()
+        cancellation_signalled = asyncio.Event()
+
+        def blocking_operation() -> str:
+            loop.call_soon_threadsafe(started.set)
+            release.wait(timeout=5)
+            return "finished"
+
+        task = asyncio.create_task(
+            _run_blocking(
+                blocking_operation,
+                on_cancel=cancellation_signalled.set,
+            )
+        )
+        try:
+            await asyncio.wait_for(started.wait(), timeout=1)
+            task.cancel()
+            await asyncio.wait_for(cancellation_signalled.wait(), timeout=1)
+            cancel_time = time.monotonic()
+            with pytest.raises(asyncio.CancelledError) as exc_info:
+                await task
+            assert exc_info.value.drained_result is None
+            elapsed = time.monotonic() - cancel_time
+            assert elapsed < 0.5, elapsed
+        finally:
+            release.set()
+
+    asyncio.run(scenario())
+
+
+def test_repeated_cancellation_does_not_extend_drain_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Repeated cancellation during the drain does not reset the deadline."""
+
+    monkeypatch.setattr(
+        "jacobian.adapters.mcp.tooling._CANCEL_DRAIN_GRACE_SECONDS", 0.2
+    )
+    release = threading.Event()
+
+    async def scenario() -> None:
+        loop = asyncio.get_running_loop()
+        started = asyncio.Event()
+        first_cancellation = asyncio.Event()
+        second_cancellation_dispatched = asyncio.Event()
+
+        def blocking_operation() -> str:
+            loop.call_soon_threadsafe(started.set)
+            release.wait(timeout=5)
+            return "finished"
+
+        task = asyncio.create_task(
+            _run_blocking(blocking_operation, on_cancel=first_cancellation.set)
+        )
+        try:
+            await asyncio.wait_for(started.wait(), timeout=1)
+            task.cancel()
+            await asyncio.wait_for(first_cancellation.wait(), timeout=1)
+            cancel_time = time.monotonic()
+            await asyncio.sleep(0.1)
+            task.cancel()
+            loop.call_soon(second_cancellation_dispatched.set)
+            await asyncio.wait_for(second_cancellation_dispatched.wait(), timeout=1)
+            with pytest.raises(asyncio.CancelledError) as exc_info:
+                await task
+            assert exc_info.value.drained_result is None
+            elapsed = time.monotonic() - cancel_time
+            assert elapsed < 0.28, elapsed
+        finally:
+            release.set()
 
     asyncio.run(scenario())
 

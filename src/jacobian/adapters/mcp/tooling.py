@@ -26,6 +26,50 @@ from jacobian.reasoning_log import ReasoningProtocolError
 
 _LOGGER = logging.getLogger(__name__)
 
+_CANCEL_DRAIN_GRACE_SECONDS = 5.0
+
+
+async def _drain_cancelled_worker[BlockingResultT](
+    worker: asyncio.Task[BlockingResultT],
+) -> BlockingResultT | None:
+    """Wait for a cancelled worker up to the drain grace period.
+
+    Returns the worker result if it completes within the grace period,
+    otherwise ``None`` after logging that the worker did not drain.
+    """
+
+    drain_deadline = time.monotonic() + _CANCEL_DRAIN_GRACE_SECONDS
+    while not worker.done():
+        remaining = drain_deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        try:
+            return await asyncio.wait_for(asyncio.shield(worker), timeout=remaining)
+        except TimeoutError:
+            break
+        except asyncio.CancelledError:
+            continue
+        except BaseException:
+            _LOGGER.debug(
+                "blocking MCP worker failed while its cancelled request drained",
+                exc_info=True,
+            )
+            return None
+    if not worker.done():
+        _LOGGER.warning(
+            "blocking MCP worker did not drain within %.1fs grace period",
+            _CANCEL_DRAIN_GRACE_SECONDS,
+        )
+        return None
+    try:
+        return worker.result()
+    except BaseException:
+        _LOGGER.debug(
+            "blocking MCP worker failed while its cancelled request drained",
+            exc_info=True,
+        )
+        return None
+
 
 async def _run_blocking[BlockingResultT](
     function: Callable[..., BlockingResultT],
@@ -35,9 +79,12 @@ async def _run_blocking[BlockingResultT](
 ) -> BlockingResultT:
     """Run blocking MCP work without detaching it from request teardown.
 
-    On cancellation, waits for the worker to drain and stores the result
-    in the ``drained_result`` attribute so the caller can persist a
-    completed outcome instead of unconditionally recording cancellation.
+    On cancellation, waits for the worker to drain up to
+    ``_CANCEL_DRAIN_GRACE_SECONDS`` and stores the result in the
+    ``drained_result`` attribute so the caller can persist a completed
+    outcome instead of unconditionally recording cancellation.  If the
+    worker does not finish within the grace period, the caller is
+    unblocked without a drained result.
     """
 
     worker = asyncio.create_task(asyncio.to_thread(function, *args))
@@ -46,27 +93,7 @@ async def _run_blocking[BlockingResultT](
     except asyncio.CancelledError as exc:
         if on_cancel is not None:
             on_cancel()
-        drained: BlockingResultT | None = None
-        while not worker.done():
-            try:
-                drained = await asyncio.shield(worker)
-                break
-            except asyncio.CancelledError:
-                continue
-            except BaseException:
-                _LOGGER.debug(
-                    "blocking MCP worker failed while its cancelled request drained",
-                    exc_info=True,
-                )
-                break
-        if worker.done() and drained is None:
-            try:
-                drained = worker.result()
-            except BaseException:
-                _LOGGER.debug(
-                    "blocking MCP worker failed while its cancelled request drained",
-                    exc_info=True,
-                )
+        drained = await _drain_cancelled_worker(worker)
         exc.drained_result = drained  # type: ignore[attr-defined]
         raise
 
