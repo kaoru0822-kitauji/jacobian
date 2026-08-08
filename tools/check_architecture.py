@@ -66,6 +66,14 @@ _SUBPROCESS_ALLOWED_EXACT: frozenset[PurePosixPath] = frozenset(
         PurePosixPath("src/jacobian/bounded_process.py"),
         # The tooling command runner.
         PurePosixPath("benchmarks/tooling/command_runner.py"),
+        # This clean-room verifier must independently replay the pinned Lean
+        # protocol inside its isolated verifier image.  It cannot import the
+        # repository command runner without widening the verifier build
+        # context, so its one exact replay transport owns the process.
+        PurePosixPath(
+            "benchmarks/datasets/provider-feasibility-v1/lean-repl/"
+            "tests/replay.py"
+        ),
         # --- Explicit test fixtures where subprocess is the test mechanism ---
         # E2e workflow scenarios spawn CLI processes.
         PurePosixPath("tests/e2e/verified_results/test_reference_runtime.py"),

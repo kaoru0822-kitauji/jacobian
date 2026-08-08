@@ -125,7 +125,7 @@ def test_persistent_repl_kills_a_process_that_exceeds_rss_limit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        "jacobian.bounded_process._linux_process_tree_rss_bytes",
+        "jacobian.bounded_process._linux_process_tree_memory_bytes",
         lambda _pid: 2 * 1024,
     )
     repl = PersistentLeanRepl(
@@ -168,7 +168,7 @@ def test_persistent_repl_enforces_rss_during_exchange_not_only_before(
         return 1024 if call_count <= 2 else 4 * 1024
 
     monkeypatch.setattr(
-        "jacobian.bounded_process._linux_process_tree_rss_bytes",
+        "jacobian.bounded_process._linux_process_tree_memory_bytes",
         fake_rss,
     )
     repl = PersistentLeanRepl(
