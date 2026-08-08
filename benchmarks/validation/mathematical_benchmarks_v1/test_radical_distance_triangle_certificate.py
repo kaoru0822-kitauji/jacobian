@@ -55,13 +55,13 @@ def test_accepts_the_reversed_center_certificate(tmp_path: Path) -> None:
     task, app, logs = _case(tmp_path)
     submission = json.loads((app / "submission.json").read_text())
     result = submission["result"]
-    result.details["scaled_centers"] = [
-        list(result.details["scaled_centers"][1]),
-        list(result.details["scaled_centers"][0]),
+    result["scaled_centers"] = [
+        list(result["scaled_centers"][1]),
+        list(result["scaled_centers"][0]),
     ]
-    result.details["expanded_radicands"] = [
-        dict(result.details["expanded_radicands"][1]),
-        dict(result.details["expanded_radicands"][0]),
+    result["expanded_radicands"] = [
+        dict(result["expanded_radicands"][1]),
+        dict(result["expanded_radicands"][0]),
     ]
     _rewrite(app, submission)
     assert support._run_verifier(task, app, logs).reward == 1.0
@@ -73,17 +73,13 @@ def test_accepts_schema_valid_integral_float_centers(tmp_path: Path) -> None:
     task, app, logs = _case(tmp_path)
     submission = json.loads((app / "submission.json").read_text())
     result = submission["result"]
-    result.details["scaled_centers"] = [
-        [float(v) for v in result.details["scaled_centers"][0]],
-        [float(v) for v in result.details["scaled_centers"][1]],
+    result["scaled_centers"] = [
+        [float(v) for v in result["scaled_centers"][0]],
+        [float(v) for v in result["scaled_centers"][1]],
     ]
-    result.details["center_distance_squared"] = float(
-        result.details["center_distance_squared"]
-    )
-    result.details["lower_bound"] = float(result.details["lower_bound"])
-    result.details["equality_witness"] = [
-        float(v) for v in result.details["equality_witness"]
-    ]
+    result["center_distance_squared"] = float(result["center_distance_squared"])
+    result["lower_bound"] = float(result["lower_bound"])
+    result["equality_witness"] = [float(v) for v in result["equality_witness"]]
     _rewrite(app, submission)
     assert support._run_verifier(task, app, logs).reward == 1.0
 
@@ -145,9 +141,9 @@ def test_rejects_swapped_expansions_with_unswapped_centers(tmp_path: Path) -> No
     task, app, logs = _case(tmp_path)
     submission = json.loads((app / "submission.json").read_text())
     result = submission["result"]
-    result.details["expanded_radicands"] = [
-        dict(result.details["expanded_radicands"][1]),
-        dict(result.details["expanded_radicands"][0]),
+    result["expanded_radicands"] = [
+        dict(result["expanded_radicands"][1]),
+        dict(result["expanded_radicands"][0]),
     ]
     _rewrite(app, submission)
     assert support._run_verifier(task, app, logs).reward == 0.0

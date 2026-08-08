@@ -28,15 +28,13 @@ def test_alternative_column_order_passes(tmp_path: Path) -> None:
     submission = json.loads((app / "submission.json").read_text())
     result = submission["result"]
     order = [5, 4, 3, 2, 1, 0]
-    result.details["row_permutations"] = [
-        [row[index] for index in order] for row in result.details["row_permutations"]
+    result["row_permutations"] = [
+        [row[index] for index in order] for row in result["row_permutations"]
     ]
-    result.details["balanced_matrix"] = [
-        [row[index] for index in order] for row in result.details["balanced_matrix"]
+    result["balanced_matrix"] = [
+        [row[index] for index in order] for row in result["balanced_matrix"]
     ]
-    result.details["column_layers"] = [
-        result.details["column_layers"][index] for index in order
-    ]
+    result["column_layers"] = [result["column_layers"][index] for index in order]
     _rewrite(app, submission)
     assert support._run_verifier(task, app, logs).reward == 1.0
 

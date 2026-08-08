@@ -55,26 +55,26 @@ def _rewrite(app: Path, submission: dict, result: dict | None = None) -> None:
 
 def test_independent_orbit_derivation():
     result = load_verifier().derive()
-    assert result.details["valid_labelled_words"] == 2206
-    assert result.details["burnside_numerator"] == 2816
-    assert result.details["orbit_count"] == 88
-    assert len(result.details["canonical_representatives"]) == 88
+    assert result["valid_labelled_words"] == 2206
+    assert result["burnside_numerator"] == 2816
+    assert result["orbit_count"] == 88
+    assert len(result["canonical_representatives"]) == 88
 
 
 def test_wraparound_and_reflection_are_material():
     verifier = load_verifier()
     assert not verifier.valid(tuple(map(int, "0010101010101010")))
     result = verifier.derive()
-    assert result.details["reflection_fixed_counts"] == [42, 26] * 8
+    assert result["reflection_fixed_counts"] == [42, 26] * 8
 
 
 def test_corrupt_fixed_count_or_orbit_representative_is_rejected():
     verifier = load_verifier()
     result = verifier.derive()
-    result.details["rotation_fixed_counts"][0] -= 1
+    result["rotation_fixed_counts"][0] -= 1
     assert not verifier.matches(result)
     result = verifier.derive()
-    result.details["canonical_representatives"].pop()
+    result["canonical_representatives"].pop()
     assert not verifier.matches(result)
 
 
@@ -98,9 +98,7 @@ def test_rejects_boolean_fixed_counts(tmp_path: Path) -> None:
     task, app, logs = _case(tmp_path)
     submission = json.loads((app / "submission.json").read_text())
     result = dict(submission["result"])
-    result.details["rotation_fixed_counts"] = [
-        bool(x) for x in result.details["rotation_fixed_counts"]
-    ]
+    result["rotation_fixed_counts"] = [bool(x) for x in result["rotation_fixed_counts"]]
     submission["result"] = result
     _rewrite(app, submission, result)
 
@@ -114,8 +112,8 @@ def test_rejects_float_fixed_counts(tmp_path: Path) -> None:
     task, app, logs = _case(tmp_path)
     submission = json.loads((app / "submission.json").read_text())
     result = dict(submission["result"])
-    result.details["rotation_fixed_counts"] = [
-        float(x) for x in result.details["rotation_fixed_counts"]
+    result["rotation_fixed_counts"] = [
+        float(x) for x in result["rotation_fixed_counts"]
     ]
     submission["result"] = result
     _rewrite(app, submission, result)

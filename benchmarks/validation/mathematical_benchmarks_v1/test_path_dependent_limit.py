@@ -55,8 +55,8 @@ def test_commuted_terms_and_equivalent_rational_strings_pass(tmp_path: Path) -> 
     path = app / "submission.json"
     submission = json.loads(path.read_text())
     result = submission["result"]
-    result.details["function"]["denominator_terms"].reverse()
-    result.details["nonlinear_paths"] = [
+    result["function"]["denominator_terms"].reverse()
+    result["nonlinear_paths"] = [
         {"c": "+1", "y_x_power": 4, "limit": "0.5"},
         {"c": "2", "y_x_power": 4, "limit": "0.4"},
         {"c": "-0.5", "y_x_power": 4, "limit": "-0.4"},
@@ -73,13 +73,13 @@ def test_nested_boolean_integer_fields_are_rejected(tmp_path: Path) -> None:
         submission = json.loads(path.read_text())
         result = submission["result"]
         if index == 0:
-            result.details["function"]["numerator_y_power"] = True
+            result["function"]["numerator_y_power"] = True
         elif index == 1:
-            result.details["function"]["denominator_terms"][0]["x_power"] = False
+            result["function"]["denominator_terms"][0]["x_power"] = False
         elif index == 2:
-            result.details["line_certificate"]["quotient_order"] = True
+            result["line_certificate"]["quotient_order"] = True
         else:
-            result.details["nonlinear_paths"][0]["y_x_power"] = False
+            result["nonlinear_paths"][0]["y_x_power"] = False
         support._bind_result_evidence(app, submission)
         support._write_json(path, submission)
         assert support._run_verifier(task, app, logs).reward == 0.0

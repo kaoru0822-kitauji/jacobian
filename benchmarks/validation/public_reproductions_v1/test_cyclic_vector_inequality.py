@@ -23,9 +23,9 @@ def test_alternative_dimension_passes(tmp_path: Path) -> None:
     submission = json.loads(path.read_text())
     n = 7
     result = submission["result"]
-    result.details["dimension"] = n
+    result["dimension"] = n
     submission["scope"] = f"the cyclic vector inequality at dimension n = {n}"
-    result.details["vectors"] = [
+    result["vectors"] = [
         {
             "index": i,
             "first_variable": i,
@@ -34,17 +34,17 @@ def test_alternative_dimension_passes(tmp_path: Path) -> None:
         }
         for i in range(1, n + 1)
     ]
-    result.details["aggregate"] = {
+    result["aggregate"] = {
         "first_constant": 0,
         "first_coefficients": [1] * n,
         "second_constant": n,
         "second_coefficients": [-1] * n,
     }
-    result.details["completed_square"] = {
+    result["completed_square"] = {
         "lhs_coefficients": [4, -4 * n, n * n],
         "square_coefficients": [2, -n],
     }
-    result.details["equality_witness"]["values"] = ["1/2"] * n
+    result["equality_witness"]["values"] = ["1/2"] * n
     support._bind_result_evidence(app, submission)
     support._write_json(path, submission)
     assert support._run_verifier(task, app, logs).reward == 1.0

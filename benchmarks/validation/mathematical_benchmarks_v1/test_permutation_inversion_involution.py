@@ -48,10 +48,10 @@ def test_accepts_reverse_position_involution(tmp_path: Path) -> None:
     task, app, logs = _case(tmp_path)
     submission = json.loads((app / "submission.json").read_text())
     result = submission["result"]
-    result.details["transformation"] = "REVERSE_POSITIONS"
-    result.details["value_multiplier"] = 1
-    result.details["value_offset"] = 0
-    for trace in result.details["traces"]:
+    result["transformation"] = "REVERSE_POSITIONS"
+    result["value_multiplier"] = 1
+    result["value_offset"] = 0
+    for trace in result["traces"]:
         permutation = trace["permutation"]
         transformed = list(reversed(permutation))
         trace["transformed"] = transformed

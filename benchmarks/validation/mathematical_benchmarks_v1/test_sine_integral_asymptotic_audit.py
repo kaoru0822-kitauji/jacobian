@@ -23,8 +23,8 @@ def _bind_evidence(app: Path, submission: dict[str, object]) -> None:
         [
             "sine-integral-certificate-v1",
             f"result_sha256: {digest}",
-            f"published_sine_coefficient: {result.details['published_sine_coefficient']}",
-            f"corrected_sine_coefficient: {result.details['corrected_sine_coefficient']}",
+            f"published_sine_coefficient: {result['published_sine_coefficient']}",
+            f"corrected_sine_coefficient: {result['corrected_sine_coefficient']}",
             "",
         ]
     )
@@ -39,8 +39,8 @@ def test_accepts_reordered_equivalent_terms(tmp_path: Path) -> None:
     submission = _submission(app)
     result = submission["result"]
     assert isinstance(result, dict)
-    result.details["tail_terms"] = list(reversed(result.details["tail_terms"]))
-    result.details["si_terms"] = list(reversed(result.details["si_terms"]))
+    result["tail_terms"] = list(reversed(result["tail_terms"]))
+    result["si_terms"] = list(reversed(result["si_terms"]))
     _bind_evidence(app, submission)
     support._write_json(app / "submission.json", submission)
     assert support._run_verifier(task, app, logs).reward == 1.0
@@ -51,10 +51,10 @@ def test_rejects_published_wrong_sine_sign(tmp_path: Path) -> None:
     submission = _submission(app)
     result = submission["result"]
     assert isinstance(result, dict)
-    for term in result.details["si_terms"]:
+    for term in result["si_terms"]:
         if term["function"] == "SIN" and term["power"] == 2:
             term["coefficient"] = 1
-    result.details["corrected_sine_coefficient"] = 1
+    result["corrected_sine_coefficient"] = 1
     support._write_json(app / "submission.json", submission)
     assert support._run_verifier(task, app, logs).details["correctness"] == 0.0
 
@@ -64,7 +64,7 @@ def test_rejects_corrupt_remainder_bound(tmp_path: Path) -> None:
     submission = _submission(app)
     result = submission["result"]
     assert isinstance(result, dict)
-    result.details["absolute_remainder_bound"]["numerator"] = 23
+    result["absolute_remainder_bound"]["numerator"] = 23
     support._write_json(app / "submission.json", submission)
     assert support._run_verifier(task, app, logs).details["correctness"] == 0.0
 
@@ -84,7 +84,7 @@ def test_rejects_noninteger_remainder_power(tmp_path: Path) -> None:
     submission = _submission(app)
     result = submission["result"]
     assert isinstance(result, dict)
-    result.details["tail_remainder"]["power"] = 6.0
+    result["tail_remainder"]["power"] = 6.0
     _bind_evidence(app, submission)
     support._write_json(app / "submission.json", submission)
     assert support._run_verifier(task, app, logs).details["correctness"] == 0.0
@@ -95,7 +95,7 @@ def test_rejects_noninteger_si_remainder_coefficient(tmp_path: Path) -> None:
     submission = _submission(app)
     result = submission["result"]
     assert isinstance(result, dict)
-    result.details["si_remainder"]["coefficient"] = 120.0
+    result["si_remainder"]["coefficient"] = 120.0
     _bind_evidence(app, submission)
     support._write_json(app / "submission.json", submission)
     assert support._run_verifier(task, app, logs).details["correctness"] == 0.0
@@ -106,7 +106,7 @@ def test_rejects_boolean_reported_coefficient(tmp_path: Path) -> None:
     submission = _submission(app)
     result = submission["result"]
     assert isinstance(result, dict)
-    result.details["published_sine_coefficient"] = True
+    result["published_sine_coefficient"] = True
     _bind_evidence(app, submission)
     support._write_json(app / "submission.json", submission)
     assert support._run_verifier(task, app, logs).details["correctness"] == 0.0
@@ -117,8 +117,8 @@ def test_rejects_stale_evidence_binding(tmp_path: Path) -> None:
     submission = _submission(app)
     result = submission["result"]
     assert isinstance(result, dict)
-    result.details["tail_terms"] = list(reversed(result.details["tail_terms"]))
-    result.details["si_terms"] = list(reversed(result.details["si_terms"]))
+    result["tail_terms"] = list(reversed(result["tail_terms"]))
+    result["si_terms"] = list(reversed(result["si_terms"]))
     support._write_json(app / "submission.json", submission)
     verdict = support._run_verifier(task, app, logs)
     assert verdict.details["correctness"] == 1.0

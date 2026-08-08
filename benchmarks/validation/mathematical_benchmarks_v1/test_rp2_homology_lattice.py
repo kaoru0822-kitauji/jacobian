@@ -27,8 +27,8 @@ def test_alternative_tree_and_orders_pass(tmp_path: Path) -> None:
     task, app, logs = _case(tmp_path)
     submission = json.loads((app / "submission.json").read_text())
     result = submission["result"]
-    result.details["spanning_tree"] = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5]]
-    result.details["non_tree_edges"] = [
+    result["spanning_tree"] = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5]]
+    result["non_tree_edges"] = [
         [0, 5],
         [3, 5],
         [2, 5],
@@ -40,13 +40,13 @@ def test_alternative_tree_and_orders_pass(tmp_path: Path) -> None:
         [0, 3],
         [0, 2],
     ]
-    result.details["facet_order"].reverse()
-    facets = [tuple(item) for item in result.details["facet_order"]]
-    result.details["cycle_coordinate_matrix"] = [
+    result["facet_order"].reverse()
+    facets = [tuple(item) for item in result["facet_order"]]
+    result["cycle_coordinate_matrix"] = [
         [{(b, c): 1, (a, c): -1, (a, b): 1}.get(tuple(edge), 0) for a, b, c in facets]
-        for edge in result.details["non_tree_edges"]
+        for edge in result["non_tree_edges"]
     ]
-    result.details["determinant"] = -2
+    result["determinant"] = -2
     _rewrite(app, submission)
     assert support._run_verifier(task, app, logs).reward == 1.0
 
