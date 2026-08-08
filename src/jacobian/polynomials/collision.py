@@ -7,7 +7,6 @@ from itertools import product
 
 from jacobian.bounded_process import bounded_process_cancelled
 from jacobian.canonical import format_canonical_integer
-from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -104,13 +103,9 @@ class PolynomialCollisionAdapter:
         second: str | None,
     ) -> None:
         if first is None:
-            raise RuntimeError(
-                "first evaluation result is unexpectedly None"
-            )
+            raise RuntimeError("first evaluation result is unexpectedly None")
         if second is None:
-            raise RuntimeError(
-                "second evaluation result is unexpectedly None"
-            )
+            raise RuntimeError("second evaluation result is unexpectedly None")
 
     @staticmethod
     def _require_found_result(
@@ -120,13 +115,9 @@ class PolynomialCollisionAdapter:
         witness_uri: str | None,
     ) -> None:
         if first_evaluation_result is None:
-            raise RuntimeError(
-                "first evaluation result is unexpectedly None"
-            )
+            raise RuntimeError("first evaluation result is unexpectedly None")
         if second_evaluation_result is None:
-            raise RuntimeError(
-                "second evaluation result is unexpectedly None"
-            )
+            raise RuntimeError("second evaluation result is unexpectedly None")
         if claim_uri is None:
             raise RuntimeError("claim URI is unexpectedly None")
         if witness_uri is None:
@@ -346,13 +337,9 @@ class PolynomialCollisionSearchAdapter:
         second: str | None,
     ) -> None:
         if first is None:
-            raise RuntimeError(
-                "first evaluation result is unexpectedly None"
-            )
+            raise RuntimeError("first evaluation result is unexpectedly None")
         if second is None:
-            raise RuntimeError(
-                "second evaluation result is unexpectedly None"
-            )
+            raise RuntimeError("second evaluation result is unexpectedly None")
 
     @staticmethod
     def _require_found_result(
@@ -362,13 +349,9 @@ class PolynomialCollisionSearchAdapter:
         witness_uri: str | None,
     ) -> None:
         if first_evaluation_result is None:
-            raise RuntimeError(
-                "first evaluation result is unexpectedly None"
-            )
+            raise RuntimeError("first evaluation result is unexpectedly None")
         if second_evaluation_result is None:
-            raise RuntimeError(
-                "second evaluation result is unexpectedly None"
-            )
+            raise RuntimeError("second evaluation result is unexpectedly None")
         if claim_uri is None:
             raise RuntimeError("claim URI is unexpectedly None")
         if witness_uri is None:
@@ -683,13 +666,9 @@ class PolynomialCollisionVerifyAdapter:
         second: str | None,
     ) -> None:
         if first is None:
-            raise RuntimeError(
-                "first evaluation result is unexpectedly None"
-            )
+            raise RuntimeError("first evaluation result is unexpectedly None")
         if second is None:
-            raise RuntimeError(
-                "second evaluation result is unexpectedly None"
-            )
+            raise RuntimeError("second evaluation result is unexpectedly None")
 
     @staticmethod
     def _require_found_result(
@@ -699,13 +678,9 @@ class PolynomialCollisionVerifyAdapter:
         witness_uri: str | None,
     ) -> None:
         if first_evaluation_result is None:
-            raise RuntimeError(
-                "first evaluation result is unexpectedly None"
-            )
+            raise RuntimeError("first evaluation result is unexpectedly None")
         if second_evaluation_result is None:
-            raise RuntimeError(
-                "second evaluation result is unexpectedly None"
-            )
+            raise RuntimeError("second evaluation result is unexpectedly None")
         if claim_uri is None:
             raise RuntimeError("claim URI is unexpectedly None")
         if witness_uri is None:
@@ -870,13 +845,9 @@ class PolynomialMapInverseCollisionVerifyAdapter:
         second: str | None,
     ) -> None:
         if first is None:
-            raise RuntimeError(
-                "first evaluation result is unexpectedly None"
-            )
+            raise RuntimeError("first evaluation result is unexpectedly None")
         if second is None:
-            raise RuntimeError(
-                "second evaluation result is unexpectedly None"
-            )
+            raise RuntimeError("second evaluation result is unexpectedly None")
 
     @staticmethod
     def _require_found_result(
@@ -886,13 +857,9 @@ class PolynomialMapInverseCollisionVerifyAdapter:
         witness_uri: str | None,
     ) -> None:
         if first_evaluation_result is None:
-            raise RuntimeError(
-                "first evaluation result is unexpectedly None"
-            )
+            raise RuntimeError("first evaluation result is unexpectedly None")
         if second_evaluation_result is None:
-            raise RuntimeError(
-                "second evaluation result is unexpectedly None"
-            )
+            raise RuntimeError("second evaluation result is unexpectedly None")
         if claim_uri is None:
             raise RuntimeError("claim URI is unexpectedly None")
         if witness_uri is None:
