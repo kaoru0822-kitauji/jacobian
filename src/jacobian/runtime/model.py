@@ -42,10 +42,11 @@ class JacobianRuntime:
                     services.close()
                 except BaseException as cleanup_exc:
                     cleanup_failures.append(cleanup_exc)
-            try:
-                self.core.close()
-            except BaseException as cleanup_exc:
-                cleanup_failures.append(cleanup_exc)
+            if hasattr(self, "core"):
+                try:
+                    self.core.close()
+                except BaseException as cleanup_exc:
+                    cleanup_failures.append(cleanup_exc)
             self._closed = True
             if cleanup_failures:
                 exc.add_note(
