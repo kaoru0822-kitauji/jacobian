@@ -31,11 +31,12 @@ from jacobian.contracts.capabilities import (
     CapabilityScope,
 )
 from jacobian.contracts.checkers import EvidenceKind
-from jacobian.contracts.evidence import WitnessEnvelope
+from jacobian.contracts.evidence import EvidenceBindings, WitnessEnvelope
 from jacobian.contracts.exact_domain_verification import (
     ExactComputedVerificationOutput,
     ExactComputedVerificationRequest,
     ExactDomainResultVerificationRequest,
+    inline_exact_value_digest,
 )
 from jacobian.contracts.results import (
     Conclusion,
@@ -85,6 +86,12 @@ _ENTRYPOINT_PROVIDER_RUNTIME_KEYS = {
     "jacobian_checkers.finite_posets": "poset",
     "jacobian_checkers.exact_geometry": "geometry",
 }
+_INLINE_EXACT_ENTRYPOINTS = frozenset(
+    {
+        "jacobian_checkers.exact_domain_operations",
+        "jacobian_checkers.simplicial_topology",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -341,6 +348,9 @@ def install_exact_domain_verification(
                     _provider_runtime_key(declaration)
                 ],
                 stored_result_input=declaration.capability_id in stored_producers,
+                supports_inline_exact=(
+                    declaration.entrypoint_module in _INLINE_EXACT_ENTRYPOINTS
+                ),
             )
         )
     return tuple(adapters), installation
@@ -427,6 +437,7 @@ class ExactComputedVerificationAdapter:
         witness_schema_uri: str,
         provider_runtime: CapabilityProviderRuntime,
         stored_result_input: bool,
+        supports_inline_exact: bool,
     ) -> None:
         self.store = store
         self.schemas = schemas
@@ -435,6 +446,7 @@ class ExactComputedVerificationAdapter:
         self.declaration = declaration
         self.witness_schema_uri = witness_schema_uri
         self.stored_result_input = stored_result_input
+        self.supports_inline_exact = supports_inline_exact
         generic_request_model: Any = ExactComputedVerificationRequest
         self.input_model = generic_request_model[
             declaration.declaration.request_model,
@@ -489,9 +501,15 @@ class ExactComputedVerificationAdapter:
             normalized_input = source_artifacts[0].payload
             normalized_candidate = None
         else:
-            source_artifacts = None
             normalized_input, normalized_candidate = self._validated_inline_payloads(
                 request
+            )
+            source_artifacts = (
+                None
+                if self.supports_inline_exact
+                else self._materialize_inline_payloads(
+                    normalized_input, normalized_candidate
+                )
             )
         # Check the authorized checker's bounded input scope before any artifact write.
         if not _checker_supports(
@@ -557,8 +575,8 @@ class ExactComputedVerificationAdapter:
         if source_artifacts is None:
             if normalized_candidate is None:
                 raise AssertionError("inline replay candidate was not validated")
-            source_artifacts = self._materialize_inline_payloads(
-                normalized_input, normalized_candidate
+            return self._verify_inline_relation(
+                request, normalized_input, normalized_candidate
             )
         input_artifact, result_artifact, semantics_artifact = source_artifacts
         witness = put_witness_envelope(
@@ -582,6 +600,136 @@ class ExactComputedVerificationAdapter:
             input_artifact,
             result_artifact,
             self.store.get(witness.artifact_uri),
+        )
+
+    def _verify_inline_relation(
+        self,
+        request: CapabilityRequest,
+        normalized_input: dict[str, object],
+        normalized_candidate: dict[str, object],
+    ) -> CapabilityResult:
+        """Replay ordinary values through the checker without storing them."""
+
+        declaration = self.declaration
+        semantics = self.store.get(declaration.semantics_uri)
+        bindings = EvidenceBindings(
+            claim_digest=inline_exact_value_digest(
+                schema_uri=declaration.input_schema_uri,
+                semantics_uri=declaration.semantics_uri,
+                payload=normalized_input,
+            ),
+            semantics_digest=semantics.manifest.object_digest,
+            candidate_digest=inline_exact_value_digest(
+                schema_uri=declaration.result_schema_uri,
+                semantics_uri=declaration.semantics_uri,
+                payload=normalized_candidate,
+            ),
+        )
+        checker_request = {
+            "request_version": "2",
+            "claim": {
+                "schema_uri": declaration.input_schema_uri,
+                "semantics_uri": declaration.semantics_uri,
+                "payload": normalized_input,
+            },
+            "candidate": {
+                "schema_uri": declaration.result_schema_uri,
+                "semantics_uri": declaration.semantics_uri,
+                "payload": normalized_candidate,
+            },
+            "semantics": self._checker_artifact(semantics),
+            "scope": None,
+            "expected_bindings": bindings.model_dump(mode="json"),
+        }
+        checked = self.verification.verify_inline_exact(
+            operation_id=declaration.declaration.capability_id,
+            claim_schema_uri=declaration.input_schema_uri,
+            candidate_schema_uri=declaration.result_schema_uri,
+            semantics_uri=declaration.semantics_uri,
+            claim_payload=normalized_input,
+            candidate_payload=normalized_candidate,
+            checker_id=declaration.checker_id,
+            witness_format=declaration.declaration.format_id,
+            request=checker_request,
+        )
+        verified = (
+            checked.execution.status is ExecutionStatus.COMPLETED
+            and checked.conclusion is Conclusion.TRUE
+            and checked.assurance.verification is Verification.VERIFIED
+            and checked.verification_record_uri is not None
+        )
+        status = self._verification_status(checked.execution.status, verified)
+        record_uri = checked.verification_record_uri if verified else None
+        detail = checked.execution.detail or (
+            checked.input.errors[0]
+            if checked.input.errors
+            else (
+                "the authorized independent checker accepted the exact result"
+                if verified
+                else "the exact result was not independently accepted"
+            )
+        )
+        output = ExactComputedVerificationOutput(
+            status=status,
+            conclusion="TRUE" if verified else "UNKNOWN",
+            operation_id=declaration.declaration.capability_id,
+            checker_id=declaration.checker_id,
+            verification_record_uri=record_uri,
+            detail=detail,
+        )
+        completed = checked.execution.status is ExecutionStatus.COMPLETED
+        return CapabilityResult(
+            capability_id=self.descriptor.capability_id,
+            capability_version=self.descriptor.version,
+            mode=request.mode,
+            execution=checked.execution,
+            output=output.model_dump(mode="json"),
+            scope=CapabilityScope(
+                description="the exact inline operation input and result",
+                parameters={
+                    "operation_id": declaration.declaration.capability_id,
+                    "claim_digest": bindings.claim_digest,
+                    "candidate_digest": bindings.candidate_digest,
+                    "semantics_digest": bindings.semantics_digest,
+                    "checker_id": declaration.checker_id,
+                    "witness_format": declaration.declaration.format_id,
+                },
+            ),
+            completeness=CapabilityCompleteness(
+                status=CapabilityCompletenessStatus.NOT_APPLICABLE,
+                basis="direct exact replay makes no search-completeness claim",
+                assurance_level=(
+                    CapabilityAssuranceLevel.COMPUTED
+                    if completed
+                    else CapabilityAssuranceLevel.HEURISTIC
+                ),
+            ),
+            assurance=CapabilityAssurance(
+                level=(
+                    CapabilityAssuranceLevel.VERIFIED
+                    if verified
+                    else (
+                        CapabilityAssuranceLevel.COMPUTED
+                        if completed
+                        else CapabilityAssuranceLevel.HEURISTIC
+                    )
+                ),
+                basis=(
+                    "accepted in a clean process by the operator-authorized independent exact replay checker"
+                    if verified
+                    else (
+                        "checker replay completed without accepting the candidate; no opposite conclusion follows"
+                        if completed
+                        else "checker replay did not complete; no conclusion follows"
+                    )
+                ),
+                verification_record_uri=record_uri,
+            ),
+            artifact_uris=(
+                (record_uri, declaration.semantics_uri)
+                if record_uri is not None
+                else ()
+            ),
         )
 
     def _verify_materialized_relation(
@@ -728,25 +876,41 @@ class ExactComputedVerificationAdapter:
         normalized_input: dict[str, object],
         normalized_candidate: dict[str, object],
     ) -> tuple[StoredArtifact, StoredArtifact, StoredArtifact]:
+        """Bridge legacy artifact-only checkers without changing caller input."""
+
         declaration = self.declaration
+        semantics_artifact = self.store.get(declaration.semantics_uri)
         input_put = self.artifacts.put(
             schema_uri=declaration.input_schema_uri,
             semantics_uri=declaration.semantics_uri,
             payload=normalized_input,
-            summary=f"{declaration.declaration.capability_id} exact input",
+            summary=f"{declaration.declaration.capability_id} verification input",
         )
+        input_artifact = self.store.get(input_put.artifact_uri)
         result_put = self.artifacts.put(
             schema_uri=declaration.result_schema_uri,
             semantics_uri=declaration.semantics_uri,
             payload=normalized_candidate,
-            parents=(input_put.artifact_uri,),
-            summary=f"{declaration.declaration.capability_id} exact candidate",
+            parents=(input_artifact.artifact_uri,),
+            summary=f"{declaration.declaration.capability_id} verification candidate",
         )
         return (
-            self.store.get(input_put.artifact_uri),
+            input_artifact,
             self.store.get(result_put.artifact_uri),
-            self.store.get(declaration.semantics_uri),
+            semantics_artifact,
         )
+
+    @staticmethod
+    def _checker_artifact(artifact: StoredArtifact) -> dict[str, object]:
+        return {
+            "artifact_uri": artifact.artifact_uri,
+            "object_digest": artifact.manifest.object_digest,
+            "payload_digest": artifact.manifest.payload_digest,
+            "schema_uri": artifact.manifest.schema_uri,
+            "semantics_uri": artifact.manifest.semantics_uri,
+            "parents": list(artifact.manifest.parents),
+            "payload": artifact.payload,
+        }
 
     def _resolve_stored_result(
         self, request: CapabilityRequest
