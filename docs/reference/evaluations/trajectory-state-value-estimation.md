@@ -681,9 +681,10 @@ not improve prediction: hybrid minus abstract is +0.084150306322 Brier and
 +0.045196324144 MAE. The hybrid partition produces 34 clusters and 25 fallbacks,
 showing that branch separation can destroy more support than it contributes.
 
-H3 receives directional support from the reasoning-text estimator only. It
-issues one warning for rejected RP2 r08, one selected observation before the
-terminal state, for precision 1.0, recall 0.1, and no accepted-run false alarm.
+H3 satisfies its preregistered directional rule for the reasoning-text
+estimator only, but the scientific result is insufficient. It issues one
+warning for rejected RP2 r08, one selected observation before the terminal
+state, for precision 1.0, recall 0.1, and no accepted-run false alarm.
 Exact and abstract state still issue three warnings, all on accepted graph
 trajectories, for precision 0, recall 0, and a 33.3% false-alarm rate among
 accepted trajectories. Group, Numca-like, and hybrid estimators issue no
@@ -702,14 +703,43 @@ reasoning summary does not retain the terminal evidence artifact's exact
 contract-relevant wording, so neither typed state nor text predicts that
 difference before verification.
 
-These observations falsify H1 and H2 but support H3 through one reasoning-text
-warning. That isolated event is too sparse to justify value-guided runtime
+The engineering closeout therefore records H1 and H2 as unsupported and H3 as
+insufficient. The single H3 event is too sparse to justify value-guided runtime
 intervention: it has 10% recall, comes from a text-only estimator, and has no
-held-out task-family replication. A defensible next experiment would first make
-terminal evidence-construction state observable, harden extraction coverage,
-and preregister a held-out replication of the unchanged warning rule; it should
-not tune the current clustering or threshold on these labels. This is a small
-public predictive-validity pilot, not a statistically powered or causal claim.
+held-out task-family replication. No further estimator, clustering, threshold,
+task, or label tuning is authorized on this public corpus. Any future research
+would require a separately justified, preregistered, held-out population; it is
+not part of this stack. This is a small public predictive-validity pilot, not a
+statistically powered or causal claim.
+
+## Engineering closeout and replay boundary
+
+Terminal construction and exclusion state remain inspectable without changing
+the frozen reports. Each run retains the original task-owned `verifier.json`,
+the analysis terminal in `run.json`, and, for runner failures, an
+`infrastructure-failure.json` that records the operational reason, preserved
+and missing artifacts, original verifier outcome, and the fact that no model
+rerun occurred. `analysis.json` lists every excluded trajectory and its exact
+eligibility reason. A completed verifier result is usable as a label only when
+its input, submission, verifier, and transcript bindings are exact; timeout,
+error, extraction failure, missing extraction, or missing `PLAN` state remains
+an exclusion rather than a negative label.
+
+The exact version 1 state is the provenance and replay-integrity record. The
+abstract version 1 value-state is derived from and digest-bound to that exact
+state and is used for clustering only; it carries no assurance authority and
+does not assert semantic equivalence. The committed artifact replay is covered
+by the focused hypothesis-study tests, which validate all manifest digests,
+historical source and soft-state bindings, deterministic gzip bytes, frozen
+labels, and H1--H3 outputs without executing Codex or a task verifier:
+
+```sh
+uv run --locked pytest -q \
+  tests/unit/tooling/test_trajectory_value_hypothesis_study.py \
+  tests/unit/tooling/test_trajectory_value_abstraction.py \
+  tests/unit/tooling/test_trajectory_value.py \
+  tests/unit/tooling/test_trajectory_state.py
+```
 
 ## Current limitations
 
