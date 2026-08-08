@@ -104,9 +104,13 @@ class PolynomialCollisionAdapter:
         second: str | None,
     ) -> None:
         if first is None:
-            raise CapabilityInvocationError("first evaluation result is unexpectedly None")
+            raise CapabilityInvocationError(
+                "first evaluation result is unexpectedly None"
+            )
         if second is None:
-            raise CapabilityInvocationError("second evaluation result is unexpectedly None")
+            raise CapabilityInvocationError(
+                "second evaluation result is unexpectedly None"
+            )
 
     @staticmethod
     def _require_found_result(
@@ -116,9 +120,13 @@ class PolynomialCollisionAdapter:
         witness_uri: str | None,
     ) -> None:
         if first_evaluation_result is None:
-            raise CapabilityInvocationError("first evaluation result is unexpectedly None")
+            raise CapabilityInvocationError(
+                "first evaluation result is unexpectedly None"
+            )
         if second_evaluation_result is None:
-            raise CapabilityInvocationError("second evaluation result is unexpectedly None")
+            raise CapabilityInvocationError(
+                "second evaluation result is unexpectedly None"
+            )
         if claim_uri is None:
             raise CapabilityInvocationError("claim URI is unexpectedly None")
         if witness_uri is None:
@@ -338,9 +346,13 @@ class PolynomialCollisionSearchAdapter:
         second: str | None,
     ) -> None:
         if first is None:
-            raise CapabilityInvocationError("first evaluation result is unexpectedly None")
+            raise CapabilityInvocationError(
+                "first evaluation result is unexpectedly None"
+            )
         if second is None:
-            raise CapabilityInvocationError("second evaluation result is unexpectedly None")
+            raise CapabilityInvocationError(
+                "second evaluation result is unexpectedly None"
+            )
 
     @staticmethod
     def _require_found_result(
@@ -350,9 +362,13 @@ class PolynomialCollisionSearchAdapter:
         witness_uri: str | None,
     ) -> None:
         if first_evaluation_result is None:
-            raise CapabilityInvocationError("first evaluation result is unexpectedly None")
+            raise CapabilityInvocationError(
+                "first evaluation result is unexpectedly None"
+            )
         if second_evaluation_result is None:
-            raise CapabilityInvocationError("second evaluation result is unexpectedly None")
+            raise CapabilityInvocationError(
+                "second evaluation result is unexpectedly None"
+            )
         if claim_uri is None:
             raise CapabilityInvocationError("claim URI is unexpectedly None")
         if witness_uri is None:
@@ -438,7 +454,9 @@ class PolynomialCollisionSearchAdapter:
                 first_evaluation_result,
                 second_evaluation_result,
             ) = found
-            self._require_found_evaluation(first_evaluation_result, second_evaluation_result)
+            self._require_found_evaluation(
+                first_evaluation_result, second_evaluation_result
+            )
             candidate = self.resources.store.get(map_uri)
             claim = self.resources.artifacts.put(
                 schema_uri=self.resources.installation.claim_schema_uri,
@@ -659,9 +677,13 @@ class PolynomialCollisionVerifyAdapter:
         second: str | None,
     ) -> None:
         if first is None:
-            raise CapabilityInvocationError("first evaluation result is unexpectedly None")
+            raise CapabilityInvocationError(
+                "first evaluation result is unexpectedly None"
+            )
         if second is None:
-            raise CapabilityInvocationError("second evaluation result is unexpectedly None")
+            raise CapabilityInvocationError(
+                "second evaluation result is unexpectedly None"
+            )
 
     @staticmethod
     def _require_found_result(
@@ -671,9 +693,13 @@ class PolynomialCollisionVerifyAdapter:
         witness_uri: str | None,
     ) -> None:
         if first_evaluation_result is None:
-            raise CapabilityInvocationError("first evaluation result is unexpectedly None")
+            raise CapabilityInvocationError(
+                "first evaluation result is unexpectedly None"
+            )
         if second_evaluation_result is None:
-            raise CapabilityInvocationError("second evaluation result is unexpectedly None")
+            raise CapabilityInvocationError(
+                "second evaluation result is unexpectedly None"
+            )
         if claim_uri is None:
             raise CapabilityInvocationError("claim URI is unexpectedly None")
         if witness_uri is None:
@@ -838,9 +864,13 @@ class PolynomialMapInverseCollisionVerifyAdapter:
         second: str | None,
     ) -> None:
         if first is None:
-            raise CapabilityInvocationError("first evaluation result is unexpectedly None")
+            raise CapabilityInvocationError(
+                "first evaluation result is unexpectedly None"
+            )
         if second is None:
-            raise CapabilityInvocationError("second evaluation result is unexpectedly None")
+            raise CapabilityInvocationError(
+                "second evaluation result is unexpectedly None"
+            )
 
     @staticmethod
     def _require_found_result(
@@ -850,9 +880,13 @@ class PolynomialMapInverseCollisionVerifyAdapter:
         witness_uri: str | None,
     ) -> None:
         if first_evaluation_result is None:
-            raise CapabilityInvocationError("first evaluation result is unexpectedly None")
+            raise CapabilityInvocationError(
+                "first evaluation result is unexpectedly None"
+            )
         if second_evaluation_result is None:
-            raise CapabilityInvocationError("second evaluation result is unexpectedly None")
+            raise CapabilityInvocationError(
+                "second evaluation result is unexpectedly None"
+            )
         if claim_uri is None:
             raise CapabilityInvocationError("claim URI is unexpectedly None")
         if witness_uri is None:

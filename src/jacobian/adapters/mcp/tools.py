@@ -282,13 +282,13 @@ async def capability_describe(
                 _find_text_projection(discovery_response),
             )
         capability_catalog = active_runtime.core.capabilities.catalog()
-        descriptors = {item.capability_id: item for item in capability_catalog.capabilities}
+        descriptors = {
+            item.capability_id: item for item in capability_catalog.capabilities
+        }
         try:
             descriptor = descriptors[capability_id]
         except KeyError:
-            hint = (
-                "Call math.find with a mathematical query to search installed capabilities."
-            )
+            hint = "Call math.find with a mathematical query to search installed capabilities."
             error_response = {
                 "error": {
                     "code": "UNKNOWN_CAPABILITY",
@@ -349,7 +349,9 @@ async def capability_describe(
                     )
                 invocations.append(entry)
             response["invocations"] = invocations
-            response.update(_capability_inspection_extensions(capability_id, descriptors))
+            response.update(
+                _capability_inspection_extensions(capability_id, descriptors)
+            )
         if (
             view != "SUMMARY"
             and capability_id == "lean.check"
@@ -382,7 +384,9 @@ async def capability_invoke(
             mode=mode,
             ctx=ctx,
         )
-        return _text_result(result.model_dump(mode="json"), _run_text_projection(result))
+        return _text_result(
+            result.model_dump(mode="json"), _run_text_projection(result)
+        )
 
 
 async def capability_invoke_reasoned(
@@ -404,7 +408,9 @@ async def capability_invoke_reasoned(
             reasoning_call_id=reasoning_call_id,
             reasoning_required=True,
         )
-        return _text_result(result.model_dump(mode="json"), _run_text_projection(result))
+        return _text_result(
+            result.model_dump(mode="json"), _run_text_projection(result)
+        )
 
 
 async def capability_invoke_audit(
@@ -427,7 +433,9 @@ async def capability_invoke_audit(
             reasoning_required=False,
             reasoning_audit=True,
         )
-        return _text_result(result.model_dump(mode="json"), _run_text_projection(result))
+        return _text_result(
+            result.model_dump(mode="json"), _run_text_projection(result)
+        )
 
 
 async def reasoning_write(

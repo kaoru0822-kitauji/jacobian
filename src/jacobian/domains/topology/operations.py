@@ -111,7 +111,9 @@ def _boundary_matrix(
             value = 1 if removed % 2 == 0 else -1
             if coefficient_ring is ChainCoefficientRing.PRIME_FIELD:
                 if prime is None:
-                    raise ValueError("prime field coefficient ring requires a prime modulus")
+                    raise ValueError(
+                        "prime field coefficient ring requires a prime modulus"
+                    )
                 value %= prime
             entries.append(
                 SparseMatrixEntry(
