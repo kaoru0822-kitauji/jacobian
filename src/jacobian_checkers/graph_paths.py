@@ -17,7 +17,6 @@ __all__ = [
 ]
 
 
-
 def _reject(detail: str) -> dict[str, Any]:
     return {
         "accepted": False,

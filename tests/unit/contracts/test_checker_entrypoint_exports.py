@@ -33,9 +33,7 @@ def _build_var_map(tree: ast.Module) -> dict[str, str]:
     return var_map
 
 
-def _resolve_entrypoint_module(
-    kw: ast.keyword, var_map: dict[str, str]
-) -> str:
+def _resolve_entrypoint_module(kw: ast.keyword, var_map: dict[str, str]) -> str:
     """Resolve an entrypoint_module keyword to its module string."""
 
     if isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, str):
@@ -45,9 +43,7 @@ def _resolve_entrypoint_module(
     return "jacobian_checkers.exact_domain_operations"
 
 
-def _collect_declaration_entrypoints(
-    text: str, by_module: dict[str, set[str]]
-) -> None:
+def _collect_declaration_entrypoints(text: str, by_module: dict[str, set[str]]) -> None:
     """Collect ExactReplayCheckerDeclaration function + entrypoint_module pairs."""
 
     if "ExactReplayCheckerDeclaration" not in text:
@@ -79,9 +75,7 @@ def _collect_declaration_entrypoints(
             elif kw.arg == "entrypoint_module":
                 mod = _resolve_entrypoint_module(kw, var_map)
         if func is not None:
-            by_module.setdefault(mod.replace("jacobian_checkers.", ""), set()).add(
-                func
-            )
+            by_module.setdefault(mod.replace("jacobian_checkers.", ""), set()).add(func)
 
 
 def _collect_registered_entrypoints() -> dict[str, set[str]]:
