@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from pathlib import Path
 
@@ -10,10 +11,13 @@ from benchmarks.tooling.codex_visibility import (
     CueLevel,
     ToolMode,
     VisibilityCase,
+    _build_summary,
     _codex_arguments,
+    _run_case,
     classify_visibility,
     load_suite,
 )
+from benchmarks.tooling.command_runner import ToolCommandResult, ToolCommandStatus
 from pydantic import ValidationError
 
 from jacobian.contracts.matrices import MatrixDeterminantRequest
@@ -409,3 +413,159 @@ def test_visibility_classification_treats_timeout_as_non_completion(
     assert result["observed"]["invoked"] is True
     assert result["observed"]["completed"] is False
     assert result["contract_satisfied"] is False
+
+
+def _patched_run_case(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    result: ToolCommandResult,
+) -> dict[str, object]:
+    """Run ``_run_case`` with ``run_operator_command`` replaced by a stub.
+
+    The stub avoids real Codex execution while exercising the real timing,
+    transcript write, telemetry parse, and classification paths.  An empty
+    JSONL transcript is sufficient for ``parse_agent_transcript`` and yields a
+    clean abstention classification for the USE case.
+    """
+
+    monkeypatch.setattr(
+        "benchmarks.tooling.codex_visibility.run_operator_command",
+        lambda *_args, **_kwargs: result,
+    )
+    return _run_case(
+        case=_case(),
+        repetition=1,
+        workspace=tmp_path / "workspace",
+        output=tmp_path,
+        model="test-model",
+        reasoning_effort="high",
+        mcp_url="https://example.test/mcp",
+        timeout_seconds=5.0,
+        tool_mode=ToolMode.DIRECT,
+    )
+
+
+def test_run_case_records_elapsed_seconds_for_successful_command(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    (tmp_path / "workspace").mkdir()
+    result = ToolCommandResult(
+        status=ToolCommandStatus.EXITED,
+        exit_code=0,
+        stdout=b"",
+        stderr=b"",
+    )
+
+    run = _patched_run_case(monkeypatch, tmp_path, result=result)
+
+    elapsed = run["command"]["elapsed_seconds"]
+    assert isinstance(elapsed, float)
+    assert math.isfinite(elapsed)
+    assert elapsed >= 0.0
+    assert run["command"]["status"] == ToolCommandStatus.EXITED
+    assert run["command"]["exit_code"] == 0
+
+
+def test_run_case_records_elapsed_seconds_for_failed_command(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    (tmp_path / "workspace").mkdir()
+    result = ToolCommandResult(
+        status=ToolCommandStatus.START_FAILED,
+        exit_code=None,
+        stdout=b"",
+        stderr=b"",
+        diagnostic="codex is unavailable",
+    )
+
+    run = _patched_run_case(monkeypatch, tmp_path, result=result)
+
+    elapsed = run["command"]["elapsed_seconds"]
+    assert isinstance(elapsed, float)
+    assert math.isfinite(elapsed)
+    assert elapsed >= 0.0
+    assert run["command"]["status"] == ToolCommandStatus.START_FAILED
+    assert run["command"]["exit_code"] is None
+    assert run["command"]["diagnostic"] == "codex is unavailable"
+
+
+def test_run_case_elapsed_seconds_does_not_affect_classification(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    (tmp_path / "workspace").mkdir()
+    result = ToolCommandResult(
+        status=ToolCommandStatus.EXITED,
+        exit_code=0,
+        stdout=b"",
+        stderr=b"",
+    )
+
+    run = _patched_run_case(monkeypatch, tmp_path, result=result)
+
+    assert "elapsed_seconds" not in run["classification"]
+    assert "elapsed_seconds" not in run["classification"]["observed"]
+    assert "elapsed_seconds" not in run["artifacts"]
+
+
+def test_visibility_report_serializes_duration_fields(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    (tmp_path / "workspace").mkdir()
+    exited = ToolCommandResult(
+        status=ToolCommandStatus.EXITED,
+        exit_code=0,
+        stdout=b"",
+        stderr=b"",
+    )
+    failed = ToolCommandResult(
+        status=ToolCommandStatus.START_FAILED,
+        exit_code=None,
+        stdout=b"",
+        stderr=b"",
+        diagnostic="codex is unavailable",
+    )
+
+    results = [exited, failed]
+    monkeypatch.setattr(
+        "benchmarks.tooling.codex_visibility.run_operator_command",
+        lambda *_args, **_kwargs: results.pop(0),
+    )
+    runs = [
+        _run_case(
+            case=_case(),
+            repetition=rep,
+            workspace=tmp_path / "workspace",
+            output=tmp_path,
+            model="test-model",
+            reasoning_effort="high",
+            mcp_url="https://example.test/mcp",
+            timeout_seconds=5.0,
+            tool_mode=ToolMode.DIRECT,
+        )
+        for rep in (1, 2)
+    ]
+
+    summary = _build_summary(runs)
+    report = {
+        "schema_version": "2",
+        "runs": runs,
+        "summary": summary,
+    }
+
+    serialized = json.dumps(report, indent=2, sort_keys=True)
+    parsed = json.loads(serialized)
+
+    for run in parsed["runs"]:
+        assert "elapsed_seconds" in run["command"]
+        assert isinstance(run["command"]["elapsed_seconds"], (int, float))
+        assert run["command"]["elapsed_seconds"] >= 0
+        assert "elapsed_seconds" not in run["classification"]
+    assert "duration_totals" in parsed["summary"]
+    assert "elapsed_seconds" in parsed["summary"]["duration_totals"]
+    assert isinstance(
+        parsed["summary"]["duration_totals"]["elapsed_seconds"], (int, float)
+    )
+    assert parsed["summary"]["duration_totals"]["elapsed_seconds"] >= 0
+    assert parsed["summary"]["run_count"] == 2
+    assert parsed["summary"]["command_failure_count"] == 1
