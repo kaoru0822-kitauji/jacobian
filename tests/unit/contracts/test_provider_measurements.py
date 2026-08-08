@@ -19,6 +19,7 @@ from jacobian.provider_measurements import (
     _child_peak_rss_bytes,
     _installed_size,
     _measure_command,
+    measure_provider,
 )
 
 
@@ -87,6 +88,17 @@ def test_installed_size_reports_missing_distribution_metadata() -> None:
     assert measurement.status is ProviderMeasurementStatus.ERROR
     assert measurement.bytes is None
     assert measurement.detail == "The provider distribution metadata is unavailable."
+
+
+def test_provider_measurement_reports_missing_distribution_metadata() -> None:
+    measurement = measure_provider(_runtime_with_missing_distribution())
+
+    assert measurement.installed_size.status is ProviderMeasurementStatus.ERROR
+    assert measurement.installed_size.bytes is None
+    assert (
+        measurement.installed_size.detail
+        == "The provider distribution metadata is unavailable."
+    )
 
 
 def test_installed_size_contract_requires_a_value_or_diagnostic() -> None:
