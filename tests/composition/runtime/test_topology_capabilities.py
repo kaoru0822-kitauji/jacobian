@@ -429,3 +429,75 @@ def test_invalid_topology_request_fails_before_artifact_writes(
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.diagnostics[0].code == "INVALID_FINITE_SIMPLICIAL_TOPOLOGY_REQUEST"
     assert result.artifact_uris == ()
+
+
+def test_stale_complex_digest_surfaces_precise_field_in_diagnostic(
+    fresh_complete_runtime,
+) -> None:
+    """A stale ``complex_digest`` must fail closed *and* surface the precise
+    Pydantic validator message in the diagnostic ``hint`` and the nested
+    field path in ``path`` — not just the generic bundle wording.
+    """
+
+    result = fresh_complete_runtime.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="topology.simplicial_homology.integral.compute",
+            input={
+                "complex": {
+                    "complex_format": "jacobian.finite-simplicial-complex/v1",
+                    "vertices": ["x", "y", "z"],
+                    "maximal_simplices": [["x", "y"], ["x", "z"], ["y", "z"]],
+                    "faces_by_dimension": [
+                        {
+                            "dimension": 0,
+                            "faces": [["x"], ["y"], ["z"]],
+                        },
+                        {
+                            "dimension": 1,
+                            "faces": [["x", "y"], ["x", "z"], ["y", "z"]],
+                        },
+                    ],
+                    "dimension": 1,
+                    "f_vector": [3, 3],
+                    "closure_size": 6,
+                    "orientation_convention": "LEXICOGRAPHIC_VERTEX_ORDER",
+                    "empty_simplex_stored": False,
+                    "complex_digest": (
+                        "sha256:"
+                        "6f797991bac967e2a8e572707df487061655df0f094c"
+                        "bde0f52f82c5401fc043"
+                    ),
+                },
+            },
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "INVALID_FINITE_SIMPLICIAL_TOPOLOGY_REQUEST"
+    assert result.diagnostics[0].path == "complex/complex_digest"
+    assert "complex_digest" in (result.diagnostics[0].hint or "")
+    assert result.artifact_uris == ()
+
+
+def test_enriched_diagnostic_still_fails_closed_for_non_digest_error(
+    fresh_complete_runtime,
+) -> None:
+    """A non-digest validation error (non-maximal facets) must still fail
+    closed with the correct code and no artifacts, while the enriched
+    ``hint`` surfaces the specific validator message.
+    """
+
+    result = fresh_complete_runtime.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="topology.simplicial_complex.materialize",
+            input={
+                "vertices": ["a", "b"],
+                "facets": [["a"], ["a", "b"]],
+            },
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "INVALID_FINITE_SIMPLICIAL_TOPOLOGY_REQUEST"
+    assert "maximal" in (result.diagnostics[0].hint or "")
+    assert result.artifact_uris == ()
