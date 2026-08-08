@@ -393,7 +393,7 @@ async def _runtime_lifespan(
         if cleanup_failures:
             if len(cleanup_failures) == 1:
                 raise cleanup_failures[0]
-            raise ExceptionGroup(
+            raise BaseExceptionGroup(
                 "runtime and tenant router cleanup failed", cleanup_failures
             )
 
