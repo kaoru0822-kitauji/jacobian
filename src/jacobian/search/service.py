@@ -710,12 +710,17 @@ class SearchService:
 
         fixed_page_parents = 3  # claim, plugin, and one shared evaluation
         parents_per_candidate = 3 if include_witness_lineage else 1
+        minimum_parent_capacity = fixed_page_parents + parents_per_candidate
         lineage_batch_size = (
             self.store.limits.max_parents - fixed_page_parents
         ) // parents_per_candidate
         if lineage_batch_size < 1:
+            search_kind = (
+                "witness-enabled search" if include_witness_lineage else "search"
+            )
             raise SearchError(
-                "store parent limit cannot represent one search archive record"
+                "store parent limit must be at least "
+                f"{minimum_parent_capacity} for one {search_kind} archive record"
             )
         return SearchBudget(
             candidates_max=min(requested.candidates_max, self.max_candidates),
