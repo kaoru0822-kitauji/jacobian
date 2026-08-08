@@ -123,53 +123,62 @@ class TrajectoryScoreReplay(ContractModel):
 
     @model_validator(mode="after")
     def require_bound_ordered_replay(self) -> Self:
-        if self.states[0].boundary is not StateBoundary.PLAN:
-            raise ValueError("replay must begin at a PLAN observation")
-        if any(state.trajectory_id != self.trajectory_id for state in self.states):
-            raise ValueError("replay state trajectory identity mismatch")
-        if any(state.task_group != self.task_group for state in self.states):
-            raise ValueError("replay state task-group mismatch")
-        if any(state.estimator is not self.estimator for state in self.states):
-            raise ValueError("replay state estimator mismatch")
-        if tuple(state.state_index for state in self.states) != tuple(
-            sorted(state.state_index for state in self.states)
-        ):
-            raise ValueError("replay states must be ordered by source state index")
-        if len({state.state_index for state in self.states}) != len(self.states):
-            raise ValueError("replay state indices must be unique")
-        if any(
-            state.eventual_terminal_reward != self.eventual_terminal_reward
-            or state.eventual_terminal_result is not self.eventual_terminal_result
-            for state in self.states
-        ):
-            raise ValueError("replay states must share the bound terminal result")
-        cumulative = 0.0
-        previous: ScoredTrajectoryState | None = None
-        for state in self.states:
-            expected_previous = None if previous is None else previous.observation_id
-            if state.previous_observation_id != expected_previous:
-                raise ValueError("replay previous observation ids are stale")
-            expected_delta = (
-                None
-                if previous is None
-                else _round_value(state.estimated_value - previous.estimated_value)
-            )
-            if state.value_delta != expected_delta:
-                raise ValueError("replay value deltas are stale")
-            expected_credit = (
-                expected_delta
-                if state.milestone_eligible and expected_delta is not None
-                else 0.0
-            )
-            if state.transition_credit != expected_credit:
-                raise ValueError("replay transition credits are stale")
-            cumulative = _round_value(cumulative + expected_credit)
-            if state.cumulative_milestone_credit != cumulative:
-                raise ValueError("replay cumulative credit is stale")
-            previous = state
+        _validate_replay_identity(self)
+        _validate_replay_sequence(self.states)
         if self.total_milestone_credit != self.states[-1].cumulative_milestone_credit:
             raise ValueError("total credit must equal the last cumulative credit")
         return self
+
+
+def _validate_replay_identity(replay: TrajectoryScoreReplay) -> None:
+    states = replay.states
+    if states[0].boundary is not StateBoundary.PLAN:
+        raise ValueError("replay must begin at a PLAN observation")
+    if any(state.trajectory_id != replay.trajectory_id for state in states):
+        raise ValueError("replay state trajectory identity mismatch")
+    if any(state.task_group != replay.task_group for state in states):
+        raise ValueError("replay state task-group mismatch")
+    if any(state.estimator is not replay.estimator for state in states):
+        raise ValueError("replay state estimator mismatch")
+    if tuple(state.state_index for state in states) != tuple(
+        sorted(state.state_index for state in states)
+    ):
+        raise ValueError("replay states must be ordered by source state index")
+    if len({state.state_index for state in states}) != len(states):
+        raise ValueError("replay state indices must be unique")
+    if any(
+        state.eventual_terminal_reward != replay.eventual_terminal_reward
+        or state.eventual_terminal_result is not replay.eventual_terminal_result
+        for state in states
+    ):
+        raise ValueError("replay states must share the bound terminal result")
+
+
+def _validate_replay_sequence(states: tuple[ScoredTrajectoryState, ...]) -> None:
+    cumulative = 0.0
+    previous: ScoredTrajectoryState | None = None
+    for state in states:
+        expected_previous = None if previous is None else previous.observation_id
+        if state.previous_observation_id != expected_previous:
+            raise ValueError("replay previous observation ids are stale")
+        expected_delta = (
+            None
+            if previous is None
+            else _round_value(state.estimated_value - previous.estimated_value)
+        )
+        if state.value_delta != expected_delta:
+            raise ValueError("replay value deltas are stale")
+        expected_credit = (
+            expected_delta
+            if state.milestone_eligible and expected_delta is not None
+            else 0.0
+        )
+        if state.transition_credit != expected_credit:
+            raise ValueError("replay transition credits are stale")
+        cumulative = _round_value(cumulative + expected_credit)
+        if state.cumulative_milestone_credit != cumulative:
+            raise ValueError("replay cumulative credit is stale")
+        previous = state
 
 
 def _round_value(value: float) -> float:
@@ -231,6 +240,15 @@ def _validate_estimates(
     dict[str, StateValueEstimate],
     dict[str, tuple[str, ...]],
 ]:
+    all_estimates, task_groups = _estimate_indexes(evaluation)
+    estimates = _trajectory_estimates(evaluation, trajectory_id)
+    clusters = _cluster_index(evaluation)
+    return estimates, clusters, all_estimates, task_groups
+
+
+def _estimate_indexes(
+    evaluation: EstimatorEvaluation,
+) -> tuple[dict[str, StateValueEstimate], dict[str, tuple[str, ...]]]:
     all_estimates = {
         estimate.observation_id: estimate for estimate in evaluation.estimates
     }
@@ -245,6 +263,15 @@ def _validate_estimates(
         elif previous_group != estimate.task_group:
             raise TrajectoryScoreError("trajectory has inconsistent task groups")
         task_groups[estimate.task_group].add(estimate.trajectory_id)
+    return all_estimates, {
+        task_group: tuple(sorted(trajectory_ids))
+        for task_group, trajectory_ids in task_groups.items()
+    }
+
+
+def _trajectory_estimates(
+    evaluation: EstimatorEvaluation, trajectory_id: str
+) -> tuple[StateValueEstimate, ...]:
     estimates = tuple(
         sorted(
             (
@@ -276,6 +303,12 @@ def _validate_estimates(
         or estimates[0].milestone_eligible
     ):
         raise TrajectoryScoreError("trajectory replay must begin with PLAN")
+    return estimates
+
+
+def _cluster_index(
+    evaluation: EstimatorEvaluation,
+) -> dict[str, ClusterSummary]:
     clusters = {cluster.cluster_id: cluster for cluster in evaluation.clusters}
     if len(clusters) != len(evaluation.clusters):
         raise TrajectoryScoreError("estimator has duplicate cluster ids")
@@ -284,15 +317,7 @@ def _validate_estimates(
         for cluster in evaluation.clusters
     ):
         raise TrajectoryScoreError("cluster has duplicate observation members")
-    return (
-        estimates,
-        clusters,
-        all_estimates,
-        {
-            task_group: tuple(sorted(trajectory_ids))
-            for task_group, trajectory_ids in task_groups.items()
-        },
-    )
+    return clusters
 
 
 def _expected_support(

@@ -49,10 +49,6 @@ def _mathematical_output_bound(
 ) -> bool:
     if reproduction.get("scope") != frozen["scope"]:
         return False
-    if not isinstance(frozen, dict):
-        return False
-    if reproduction.get("scope") != frozen["scope"]:
-        return False
     runtime = provider.get("runtime")
     distribution_version = provider.get("distribution_version")
     if not isinstance(runtime, dict) or not runtime:
