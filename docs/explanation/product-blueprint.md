@@ -28,6 +28,22 @@ plugins supply the mathematics; capability adapters expose it through a common
 contract. Jacobian supplies operations, optional durable artifacts, execution
 policy, and trust boundaries—not a prescribed research strategy.
 
+### Why atomic capabilities scale
+
+An atomic capability has one clear, inspectable mathematical outcome: factor a
+polynomial, check a proof, or find paths in a graph—not “solve the whole
+problem.” This makes each capability easier to test and trust because its
+inputs, outputs, resource bounds, and evidence are explicit. Agents can
+combine those capabilities into new strategies without waiting for a custom
+workflow for every problem, while future models remain free to choose different
+decompositions.
+
+Atomic outcomes also keep failures useful. A result can show that a factorization
+failed, a search timed out, or a proof checker rejected a claim instead of
+collapsing everything into an opaque solver failure. The portfolio can grow one
+reusable capability at a time, while agents—not the runtime—own the strategy
+that composes them.
+
 The product is the mathematical toolset and its shared capability runtime:
 versioned contracts, typed value transport, artifact and provenance storage,
 execution and budget control, adapter and plugin boundaries, and optional
