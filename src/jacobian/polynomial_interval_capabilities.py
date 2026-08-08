@@ -32,8 +32,6 @@ from fractions import Fraction
 from math import comb
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, cast
 
-from pydantic import ValidationError
-
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json, format_canonical_integer
 from jacobian.capability_service import CapabilityInvocationError
@@ -69,12 +67,11 @@ from jacobian.contracts.polynomial_intervals import (
 )
 from jacobian.contracts.results import (
     Conclusion,
-    ContractModel,
-    Execution,
     ExecutionStatus,
     Verification,
 )
 from jacobian.domains._examples import example
+from jacobian.polynomials._support import _computed_result, _validate_request
 from jacobian.provider_runtime import SYMPY_VERSION, known_provider_runtime
 from jacobian.providers import LazyLoader
 from jacobian.registry import CheckerRegistry
@@ -317,6 +314,7 @@ class PolynomialIntervalEncloseAdapter:
             request.input,
             code="INVALID_POLYNOMIAL_INTERVAL_ENCLOSURE_REQUEST",
             operation="interval enclosure",
+            error_factory=_interval_error,
         )
         started = time.monotonic()
         polynomial = validated.polynomial
@@ -465,6 +463,7 @@ class PolynomialIntervalEnclosureVerifyAdapter:
             request.input,
             code="INVALID_POLYNOMIAL_INTERVAL_ENCLOSURE_VERIFY_REQUEST",
             operation="interval enclosure verification",
+            error_factory=_interval_error,
         )
         installation = self.resources.installation
         checker_id = installation.checker_id
@@ -666,23 +665,6 @@ class PolynomialIntervalEnclosureVerifyAdapter:
         )
 
 
-def _validate_request[RequestModel: ContractModel](
-    model: type[RequestModel],
-    payload: object,
-    *,
-    code: str,
-    operation: str,
-) -> RequestModel:
-    try:
-        return model.model_validate(payload)
-    except ValidationError as exc:
-        raise _interval_error(
-            code,
-            "request_validation",
-            f"The complete polynomial {operation} request is invalid.",
-        ) from exc
-
-
 def _bernstein_coefficients(
     polynomial: UnivariateRationalPolynomial,
     interval: RationalInterval,
@@ -731,45 +713,6 @@ def _rational(value: Fraction) -> CanonicalRational:
     return CanonicalRational(
         num=format_canonical_integer(value.numerator),
         den=format_canonical_integer(value.denominator),
-    )
-
-
-def _computed_result(
-    *,
-    descriptor: CapabilityDescriptor,
-    request: CapabilityRequest,
-    started: float,
-    output: dict[str, Any],
-    scope: CapabilityScope,
-    relationships: tuple[CapabilityRelationship, ...],
-    artifact_uris: tuple[str, ...],
-    completeness_basis: str,
-    assurance_basis: str,
-) -> CapabilityResult:
-    return CapabilityResult(
-        capability_id=descriptor.capability_id,
-        capability_version=descriptor.version,
-        mode=request.mode,
-        execution=Execution(
-            status=ExecutionStatus.COMPLETED,
-            runtime_ms=max(0, round((time.monotonic() - started) * 1000)),
-        ),
-        output=output,
-        scope=scope,
-        completeness=CapabilityCompleteness(
-            status=CapabilityCompletenessStatus.COMPLETE,
-            basis=(
-                f"{completeness_basis}; no mathematical conclusion or "
-                "independent verification is claimed"
-            ),
-            assurance_level=CapabilityAssuranceLevel.COMPUTED,
-        ),
-        relationships=relationships,
-        assurance=CapabilityAssurance(
-            level=CapabilityAssuranceLevel.COMPUTED,
-            basis=assurance_basis,
-        ),
-        artifact_uris=artifact_uris,
     )
 
 
