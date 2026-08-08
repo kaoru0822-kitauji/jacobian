@@ -12,7 +12,7 @@ from jacobian.contracts.search import (
     SearchExperimentSnapshot,
 )
 from jacobian.search._helpers import _record_parents
-from jacobian.search.errors import SearchError
+from jacobian.search.errors import SearchCorruptionError, SearchError
 from jacobian.storage.repository import ArtifactRepository
 
 

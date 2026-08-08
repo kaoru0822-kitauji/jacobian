@@ -351,9 +351,9 @@ async def _invoke_capability_attempt(
         if isinstance(drained, CapabilityResult):
             if bound:
                 if reasoning_run_id is None:
-                    raise RuntimeError("reasoning_run_id is unexpectedly None")
+                    raise RuntimeError("reasoning_run_id is unexpectedly None") from exc
                 if reasoning_call_id is None:
-                    raise RuntimeError("reasoning_call_id is unexpectedly None")
+                    raise RuntimeError("reasoning_call_id is unexpectedly None") from exc
                 runtime.core.reasoning_log.finish_call(
                     reasoning_run_id,
                     reasoning_call_id,

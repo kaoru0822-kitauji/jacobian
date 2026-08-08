@@ -10,5 +10,8 @@ ExecStartPre=/usr/bin/tailscale status
 ExecStart=/usr/bin/tailscale funnel --bg --yes http://127.0.0.1:8766
 ExecStop=/usr/bin/tailscale funnel --https=443 off
 RemainAfterExit=yes
+Restart=on-failure
+RestartSec=5
+
 [Install]
 WantedBy=multi-user.target

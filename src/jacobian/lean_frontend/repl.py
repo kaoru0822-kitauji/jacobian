@@ -325,15 +325,12 @@ class LeanExplorationReplRuntime:
             else:
                 with self._lock:
                     self._sessions.pop(environment, None)
-        try:
-            if failures:
-                raise ExceptionGroup("Lean exploration sessions failed to close", failures)
-            with self._lock:
-                self._finalizer.detach()
-                self._closed = True
-        finally:
-            with self._lock:
-                self._closing = False
+        if failures:
+            raise ExceptionGroup("Lean exploration sessions failed to close", failures)
+        with self._lock:
+            self._finalizer.detach()
+            self._closed = True
+            self._closing = False
 
     def _create_session(self, environment: LeanEnvironment) -> PersistentLeanRepl:
         elan = shutil.which("elan")

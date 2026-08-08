@@ -6,8 +6,8 @@ import time
 from itertools import product
 
 from jacobian.bounded_process import bounded_process_cancelled
-from jacobian.capability_service import CapabilityInvocationError
 from jacobian.canonical import format_canonical_integer
+from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -97,6 +97,32 @@ class PolynomialCollisionAdapter:
     @property
     def descriptor(self) -> CapabilityDescriptor:
         return self._descriptor
+
+    @staticmethod
+    def _require_found_evaluation(
+        first: str | None,
+        second: str | None,
+    ) -> None:
+        if first is None:
+            raise CapabilityInvocationError("first evaluation result is unexpectedly None")
+        if second is None:
+            raise CapabilityInvocationError("second evaluation result is unexpectedly None")
+
+    @staticmethod
+    def _require_found_result(
+        first_evaluation_result: str | None,
+        second_evaluation_result: str | None,
+        claim_uri: str | None,
+        witness_uri: str | None,
+    ) -> None:
+        if first_evaluation_result is None:
+            raise CapabilityInvocationError("first evaluation result is unexpectedly None")
+        if second_evaluation_result is None:
+            raise CapabilityInvocationError("second evaluation result is unexpectedly None")
+        if claim_uri is None:
+            raise CapabilityInvocationError("claim URI is unexpectedly None")
+        if witness_uri is None:
+            raise CapabilityInvocationError("witness URI is unexpectedly None")
 
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
         validated = _validate_request(
@@ -306,6 +332,32 @@ class PolynomialCollisionSearchAdapter:
     def descriptor(self) -> CapabilityDescriptor:
         return self._descriptor
 
+    @staticmethod
+    def _require_found_evaluation(
+        first: str | None,
+        second: str | None,
+    ) -> None:
+        if first is None:
+            raise CapabilityInvocationError("first evaluation result is unexpectedly None")
+        if second is None:
+            raise CapabilityInvocationError("second evaluation result is unexpectedly None")
+
+    @staticmethod
+    def _require_found_result(
+        first_evaluation_result: str | None,
+        second_evaluation_result: str | None,
+        claim_uri: str | None,
+        witness_uri: str | None,
+    ) -> None:
+        if first_evaluation_result is None:
+            raise CapabilityInvocationError("first evaluation result is unexpectedly None")
+        if second_evaluation_result is None:
+            raise CapabilityInvocationError("second evaluation result is unexpectedly None")
+        if claim_uri is None:
+            raise CapabilityInvocationError("claim URI is unexpectedly None")
+        if witness_uri is None:
+            raise CapabilityInvocationError("witness URI is unexpectedly None")
+
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
         validated = _validate_request(
             PolynomialCollisionSearchRequest,
@@ -386,10 +438,7 @@ class PolynomialCollisionSearchAdapter:
                 first_evaluation_result,
                 second_evaluation_result,
             ) = found
-            if first_evaluation_result is None:
-                raise CapabilityInvocationError("first evaluation result is unexpectedly None")
-            if second_evaluation_result is None:
-                raise CapabilityInvocationError("second evaluation result is unexpectedly None")
+            self._require_found_evaluation(first_evaluation_result, second_evaluation_result)
             candidate = self.resources.store.get(map_uri)
             claim = self.resources.artifacts.put(
                 schema_uri=self.resources.installation.claim_schema_uri,
@@ -466,14 +515,12 @@ class PolynomialCollisionSearchAdapter:
                 )
             )
         if found is not None:
-            if first_evaluation_result is None:
-                raise CapabilityInvocationError("first evaluation result is unexpectedly None")
-            if second_evaluation_result is None:
-                raise CapabilityInvocationError("second evaluation result is unexpectedly None")
-            if claim_uri is None:
-                raise CapabilityInvocationError("claim URI is unexpectedly None")
-            if witness_uri is None:
-                raise CapabilityInvocationError("witness URI is unexpectedly None")
+            self._require_found_result(
+                first_evaluation_result,
+                second_evaluation_result,
+                claim_uri,
+                witness_uri,
+            )
             artifacts.extend(
                 [
                     second_evaluation_result,
@@ -605,6 +652,32 @@ class PolynomialCollisionVerifyAdapter:
     @property
     def descriptor(self) -> CapabilityDescriptor:
         return self._descriptor
+
+    @staticmethod
+    def _require_found_evaluation(
+        first: str | None,
+        second: str | None,
+    ) -> None:
+        if first is None:
+            raise CapabilityInvocationError("first evaluation result is unexpectedly None")
+        if second is None:
+            raise CapabilityInvocationError("second evaluation result is unexpectedly None")
+
+    @staticmethod
+    def _require_found_result(
+        first_evaluation_result: str | None,
+        second_evaluation_result: str | None,
+        claim_uri: str | None,
+        witness_uri: str | None,
+    ) -> None:
+        if first_evaluation_result is None:
+            raise CapabilityInvocationError("first evaluation result is unexpectedly None")
+        if second_evaluation_result is None:
+            raise CapabilityInvocationError("second evaluation result is unexpectedly None")
+        if claim_uri is None:
+            raise CapabilityInvocationError("claim URI is unexpectedly None")
+        if witness_uri is None:
+            raise CapabilityInvocationError("witness URI is unexpectedly None")
 
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
         validated = _validate_request(
@@ -758,6 +831,32 @@ class PolynomialMapInverseCollisionVerifyAdapter:
     @property
     def descriptor(self) -> CapabilityDescriptor:
         return self._descriptor
+
+    @staticmethod
+    def _require_found_evaluation(
+        first: str | None,
+        second: str | None,
+    ) -> None:
+        if first is None:
+            raise CapabilityInvocationError("first evaluation result is unexpectedly None")
+        if second is None:
+            raise CapabilityInvocationError("second evaluation result is unexpectedly None")
+
+    @staticmethod
+    def _require_found_result(
+        first_evaluation_result: str | None,
+        second_evaluation_result: str | None,
+        claim_uri: str | None,
+        witness_uri: str | None,
+    ) -> None:
+        if first_evaluation_result is None:
+            raise CapabilityInvocationError("first evaluation result is unexpectedly None")
+        if second_evaluation_result is None:
+            raise CapabilityInvocationError("second evaluation result is unexpectedly None")
+        if claim_uri is None:
+            raise CapabilityInvocationError("claim URI is unexpectedly None")
+        if witness_uri is None:
+            raise CapabilityInvocationError("witness URI is unexpectedly None")
 
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
         validated = _validate_request(
