@@ -178,7 +178,8 @@ def _validate_checkpoint(
     semantics_uri: str,
     checkpoint_schema_uri: str,
 ) -> dict[str, Any]:
-    assert snapshot.checkpoint_uri is not None
+    if snapshot.checkpoint_uri is None:
+        raise SearchCorruptionError("snapshot checkpoint URI is unexpectedly None")
     checkpoint_artifact = store.get(snapshot.checkpoint_uri)
     if (
         checkpoint_artifact.manifest.schema_uri != checkpoint_schema_uri

@@ -54,7 +54,8 @@ class ReasoningLogService:
     def write(self, request: ReasoningWriteRequest) -> ReasoningWriteResult:
         if request.phase is ReasoningPhase.PLAN:
             return self._create_run(request.summary)
-        assert request.run_id is not None
+        if request.run_id is None:
+            raise ValueError("run_id must not be None for reasoning log writes")
         with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             events = self._read_events(connection, request.run_id)

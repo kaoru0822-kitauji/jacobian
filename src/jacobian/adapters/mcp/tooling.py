@@ -286,8 +286,10 @@ def _finish_failed_reasoning_call(
 ) -> None:
     if not bound:
         return
-    assert run_id is not None
-    assert call_id is not None
+    if run_id is None:
+        raise RuntimeError("run_id is unexpectedly None")
+    if call_id is None:
+        raise RuntimeError("call_id is unexpectedly None")
     runtime.core.reasoning_log.finish_call(
         run_id,
         call_id,
@@ -348,8 +350,10 @@ async def _invoke_capability_attempt(
         drained = getattr(exc, "drained_result", None)
         if isinstance(drained, CapabilityResult):
             if bound:
-                assert reasoning_run_id is not None
-                assert reasoning_call_id is not None
+                if reasoning_run_id is None:
+                    raise RuntimeError("reasoning_run_id is unexpectedly None")
+                if reasoning_call_id is None:
+                    raise RuntimeError("reasoning_call_id is unexpectedly None")
                 runtime.core.reasoning_log.finish_call(
                     reasoning_run_id,
                     reasoning_call_id,
@@ -417,8 +421,10 @@ async def _invoke_capability_attempt(
         )
         raise
     if bound:
-        assert reasoning_run_id is not None
-        assert reasoning_call_id is not None
+        if reasoning_run_id is None:
+            raise RuntimeError("reasoning_run_id is unexpectedly None")
+        if reasoning_call_id is None:
+            raise RuntimeError("reasoning_call_id is unexpectedly None")
         runtime.core.reasoning_log.finish_call(
             reasoning_run_id,
             reasoning_call_id,

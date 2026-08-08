@@ -503,8 +503,10 @@ def run_bounded_process(
             _apply_post_start_limits(
                 process, resource_limits, limits_applied_before_exec, platform_tools
             )
-            assert process.stdout is not None
-            assert process.stderr is not None
+            if process.stdout is None:
+                raise RuntimeError("process stdout is unexpectedly None")
+            if process.stderr is None:
+                raise RuntimeError("process stderr is unexpectedly None")
         except BaseException:
             # _apply_post_start_limits already killed and waited the
             # process on failure, but the pipes were never closed.  Close
