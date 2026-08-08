@@ -379,10 +379,23 @@ async def _runtime_lifespan(
             reasoning_log_mode=reasoning_log_mode,
         )
     finally:
+        cleanup_failures: list[BaseException] = []
         if runtime is not None:
-            runtime.close()
+            try:
+                runtime.close()
+            except BaseException as exc:
+                cleanup_failures.append(exc)
         if tenant_router is not None:
-            tenant_router.close()
+            try:
+                tenant_router.close()
+            except BaseException as exc:
+                cleanup_failures.append(exc)
+        if cleanup_failures:
+            if len(cleanup_failures) == 1:
+                raise cleanup_failures[0]
+            raise ExceptionGroup(
+                "runtime and tenant router cleanup failed", cleanup_failures
+            )
 
 
 def create_server(
