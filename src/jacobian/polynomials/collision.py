@@ -6,6 +6,7 @@ import time
 from itertools import product
 
 from jacobian.bounded_process import bounded_process_cancelled
+from jacobian.capability_service import CapabilityInvocationError
 from jacobian.canonical import format_canonical_integer
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
@@ -385,8 +386,10 @@ class PolynomialCollisionSearchAdapter:
                 first_evaluation_result,
                 second_evaluation_result,
             ) = found
-            assert first_evaluation_result is not None
-            assert second_evaluation_result is not None
+            if first_evaluation_result is None:
+                raise CapabilityInvocationError("first evaluation result is unexpectedly None")
+            if second_evaluation_result is None:
+                raise CapabilityInvocationError("second evaluation result is unexpectedly None")
             candidate = self.resources.store.get(map_uri)
             claim = self.resources.artifacts.put(
                 schema_uri=self.resources.installation.claim_schema_uri,
@@ -463,10 +466,14 @@ class PolynomialCollisionSearchAdapter:
                 )
             )
         if found is not None:
-            assert first_evaluation_result is not None
-            assert second_evaluation_result is not None
-            assert claim_uri is not None
-            assert witness_uri is not None
+            if first_evaluation_result is None:
+                raise CapabilityInvocationError("first evaluation result is unexpectedly None")
+            if second_evaluation_result is None:
+                raise CapabilityInvocationError("second evaluation result is unexpectedly None")
+            if claim_uri is None:
+                raise CapabilityInvocationError("claim URI is unexpectedly None")
+            if witness_uri is None:
+                raise CapabilityInvocationError("witness URI is unexpectedly None")
             artifacts.extend(
                 [
                     second_evaluation_result,
@@ -573,7 +580,8 @@ class PolynomialCollisionVerifyAdapter:
     def __init__(self, resources: PolynomialResources) -> None:
         self.resources = resources
         checker_id = resources.installation.collision_checker_id
-        assert checker_id is not None
+        if checker_id is None:
+            raise CapabilityInvocationError("checker is not installed")
         self._descriptor = CapabilityDescriptor(
             capability_id="polynomial.map.collision.verify",
             version="1",
@@ -638,7 +646,8 @@ class PolynomialCollisionVerifyAdapter:
             summary="exact rational polynomial-map collision witness",
         )
         checker_id = self.resources.installation.collision_checker_id
-        assert checker_id is not None
+        if checker_id is None:
+            raise CapabilityInvocationError("checker is not installed")
         checked = self.resources.verification.verify_witness(
             claim_uri=claim_artifact.artifact_uri,
             candidate_uri=map_uri,
@@ -723,7 +732,8 @@ class PolynomialMapInverseCollisionVerifyAdapter:
     def __init__(self, resources: PolynomialResources) -> None:
         self.resources = resources
         checker_id = resources.installation.inverse_collision_checker_id
-        assert checker_id is not None
+        if checker_id is None:
+            raise CapabilityInvocationError("checker is not installed")
         self._descriptor = CapabilityDescriptor(
             capability_id="polynomial.map.inverse.refute_by_collision",
             version="1",

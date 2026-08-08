@@ -354,7 +354,8 @@ class PolynomialKellerConditionVerifyAdapter:
     def __init__(self, resources: PolynomialResources) -> None:
         self.resources = resources
         checker_id = resources.installation.keller_checker_id
-        assert checker_id is not None
+        if checker_id is None:
+            raise CapabilityInvocationError("checker is not installed")
         self._descriptor = CapabilityDescriptor(
             capability_id="polynomial.map.keller_condition.verify",
             version="1",

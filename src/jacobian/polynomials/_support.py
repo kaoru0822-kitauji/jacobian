@@ -212,7 +212,10 @@ def _inverse_supports(
     request: PolynomialMapInverseSynthesisRequest,
 ) -> tuple[tuple[tuple[int, ...], ...], ...]:
     if request.support_mode is PolynomialInverseSupportMode.EXPLICIT:
-        assert request.explicit_support is not None
+        if request.explicit_support is None:
+            raise CapabilityInvocationError(
+                "explicit support mode requires non-None explicit_support"
+            )
         return request.explicit_support
     dimension = len(request.target_variables)
     support = tuple(
