@@ -62,7 +62,8 @@ class MatrixCandidate(ContractModel):
         ):
             raise ValueError("determinant predicates require a square matrix")
         if claim.predicate == "maximize_absolute_determinant":
-            assert claim.scope is not None
+            if claim.scope is None:
+                raise ValueError("maximize_absolute_determinant requires a scope")
             if self.rows != claim.scope.rows or self.cols != claim.scope.cols:
                 raise ValueError("candidate dimensions do not match claim scope")
             allowed = {_matrix_integer(value) for value in claim.scope.entries}
