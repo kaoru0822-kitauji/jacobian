@@ -232,6 +232,30 @@ last-minus-first value when intervening non-milestone value changes are
 intentionally excluded. These are scorer semantics, not evidence that the
 drop predicts real failure.
 
+## Version 2 semantic value-state comparison
+
+[`trajectory-value-state-abstraction-v1.schema.json`](schemas/trajectory-value-state-abstraction-v1.schema.json)
+and
+[`trajectory-value-evaluation-v2.schema.json`](schemas/trajectory-value-evaluation-v2.schema.json)
+define an identity-free clustering signature and a deterministic six-estimator
+comparison in `jacobian.eval.trajectory_value_abstraction`. The version 1 hard
+state remains authoritative for replay and integrity; semantic state is an
+additional clustering representation, never a replacement for exact evidence.
+
+The signature retains task family, boundary, object and artifact classes,
+candidate/checker state, obligation classes, scope relation, execution,
+completeness, assurance, binding validity, meaningful transitions, and
+reasoning-protocol state. It deliberately omits object, artifact, candidate,
+and scope identities, declares `exact_identity_fields_included = false`, and
+has no assurance authority.
+
+The controlled fixture contains equivalent states with deliberately distinct
+identities and non-equivalent states with similar surface text. It proves that
+semantic grouping recovers support fragmented only by identity, while the
+semantic-plus-text estimator keeps distinct reasoning branches separate. This
+is a contract and mechanism test, not a model-performance claim; publication
+of any full-study evidence remains deferred.
+
 ## Current limitations
 
 Version 1 deliberately uses conservative generic output interpretation. A
@@ -260,3 +284,8 @@ predictions evaluated only after the rollout corpus is frozen. PR4 must provide
 the first bounded real predictive comparison with clean-room terminal labels.
 Any label-informed change to extraction, compatibility, clustering, threshold,
 or credit semantics requires a new schema or experiment boundary.
+
+Semantic grouping can alias distinct mathematical objects that share the same
+observable state class. It remains visible alongside exact identities and is
+usable only for offline clustering, not for mathematical equivalence or
+verification.
