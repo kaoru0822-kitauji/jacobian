@@ -6,7 +6,6 @@ maintained JSON Schema validator used by the task-local protocol helper.
 """
 
 from __future__ import annotations
-
 import hashlib
 import itertools
 import json
@@ -14,6 +13,7 @@ from fractions import Fraction
 from pathlib import Path
 
 from verifier_support import (
+    normalize_reward_file,
     SUBMISSION_FIELDS,
     is_regular_bounded_file,
     load_submission_raw,
@@ -706,6 +706,7 @@ def main() -> None:
     Path("/logs/verifier/reward.json").write_text(
         json.dumps(output, sort_keys=True, separators=(",", ":"))
     )
+    normalize_reward_file(Path("/logs/verifier/reward.json"))
 
 
 if __name__ == "__main__":

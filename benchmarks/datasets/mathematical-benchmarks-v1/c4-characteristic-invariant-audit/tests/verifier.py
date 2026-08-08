@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 
 from verifier_support import (
+    normalize_reward_file,
     MAX_SUBMISSION_BYTES,
     false_verified_claim,
     is_regular_bounded_file,
@@ -380,6 +381,7 @@ def main():
             }
         )
     )
+    normalize_reward_file(Path("/logs/verifier/reward.json"))
 
 
 if __name__ == "__main__":

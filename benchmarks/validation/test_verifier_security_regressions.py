@@ -139,14 +139,14 @@ def test_reliability_recomputes_input_and_rejects_coerced_state_count(
     _write_json(copied_task / "tests" / "expected.json", expected)
 
     accepted = support._run_verifier(copied_task, app, logs)
-    assert accepted["reward"] == pytest.approx(1.0)
+    assert accepted.reward == pytest.approx(1.0)
 
     submission_path = app / "submission.json"
     submission = json.loads(submission_path.read_text())
     submission["result"]["states"] = "8"
     _write_json(submission_path, submission)
     rejected = support._run_verifier(copied_task, app, logs)
-    assert rejected["reward"] == 0.0
+    assert rejected.reward == 0.0
 
 
 def test_reliability_accepts_equivalent_unreduced_probability(
@@ -161,8 +161,8 @@ def test_reliability_accepts_equivalent_unreduced_probability(
     _write_json(submission_path, submission)
 
     accepted = support._run_verifier(task, app, logs)
-    assert accepted["correctness"] == pytest.approx(1.0)
-    assert accepted["reward"] == pytest.approx(1.0)
+    assert accepted.details['correctness'] == pytest.approx(1.0)
+    assert accepted.reward == pytest.approx(1.0)
 
 
 def test_reliability_rejects_oversized_fraction_without_crashing(
@@ -177,8 +177,8 @@ def test_reliability_rejects_oversized_fraction_without_crashing(
     _write_json(submission_path, submission)
 
     rejected = run_verifier_in_child(task=task, app=app, logs=logs)
-    assert rejected["correctness"] == 0.0
-    assert rejected["reward"] == 0.0
+    assert rejected.details['correctness'] == 0.0
+    assert rejected.reward == 0.0
     assert (logs / "reward.json").is_file()
 
 
@@ -196,14 +196,14 @@ def test_symmetry_recomputes_orbits_and_rejects_nested_endpoint_bypass(
     _write_json(expected_path, expected)
 
     accepted = support._run_verifier(copied_task, app, logs)
-    assert accepted["reward"] == pytest.approx(1.0)
+    assert accepted.reward == pytest.approx(1.0)
 
     submission_path = app / "submission.json"
     submission = json.loads(submission_path.read_text())
     submission["result"]["edge_orbits"] = [[[["a"], ["b"]], [["b"], ["c"]]]]
     _write_json(submission_path, submission)
     rejected = support._run_verifier(copied_task, app, logs)
-    assert rejected["reward"] == 0.0
+    assert rejected.reward == 0.0
 
 
 @pytest.mark.parametrize(
@@ -222,7 +222,7 @@ def test_public_reproductions_reject_schema_invalid_integer_coercion(
     submission["result"][field] = invalid
     _write_json(submission_path, submission)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected["reward"] == 0.0
+    assert rejected.reward == 0.0
 
 
 def _lean_case(tmp_path: Path, tasks: list[dict]):
@@ -275,7 +275,7 @@ def _lean_case(tmp_path: Path, tasks: list[dict]):
 def test_lean_repl_rejects_vacuous_empty_task_report(tmp_path: Path) -> None:
     task, app, logs = _lean_case(tmp_path, [])
     rejected = support._run_verifier(task, app, logs)
-    assert rejected["reward"] == 0.0
+    assert rejected.reward == 0.0
 
 
 def test_lean_repl_rejects_unhashable_task_id_without_crashing(
@@ -297,7 +297,7 @@ def test_lean_repl_rejects_unhashable_task_id_without_crashing(
     ]
     task, app, logs = _lean_case(tmp_path, tasks)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected["reward"] == 0.0
+    assert rejected.reward == 0.0
 
 
 def test_lean_repl_rejects_boolean_error_count(tmp_path: Path) -> None:
@@ -315,7 +315,7 @@ def test_lean_repl_rejects_boolean_error_count(tmp_path: Path) -> None:
     ]
     task, app, logs = _lean_case(tmp_path, tasks)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected["reward"] == 0.0
+    assert rejected.reward == 0.0
 
 
 def test_lean_repl_derives_completion_from_final_goal_count(
@@ -335,7 +335,7 @@ def test_lean_repl_derives_completion_from_final_goal_count(
     ]
     task, app, logs = _lean_case(tmp_path, tasks)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected["reward"] == 0.0
+    assert rejected.reward == 0.0
 
 
 def test_lean_repl_rejects_one_step_constructor_trace(tmp_path: Path) -> None:
@@ -355,7 +355,7 @@ def test_lean_repl_rejects_one_step_constructor_trace(tmp_path: Path) -> None:
     ]
     task, app, logs = _lean_case(tmp_path, tasks)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected["reward"] == 0.0
+    assert rejected.reward == 0.0
 
 
 def test_lean_repl_accepts_complete_distinct_task_traces(tmp_path: Path) -> None:
@@ -379,7 +379,7 @@ def test_lean_repl_accepts_complete_distinct_task_traces(tmp_path: Path) -> None
     ]
     task, app, logs = _lean_case(tmp_path, tasks)
     accepted = support._run_verifier(task, app, logs)
-    assert accepted["reward"] == pytest.approx(1.0)
+    assert accepted.reward == pytest.approx(1.0)
 
 
 def _provider_report_case(tmp_path: Path, task_name: str, report: dict) -> tuple:
@@ -445,7 +445,7 @@ def test_cddlib_rejects_fabricated_nonempty_cases(tmp_path: Path) -> None:
     }
     task, app, logs = _provider_report_case(tmp_path, "cddlib", report)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected["reward"] == 0.0
+    assert rejected.reward == 0.0
 
 
 def test_regina_rejects_fabricated_nonempty_cases(tmp_path: Path) -> None:
@@ -478,7 +478,7 @@ def test_regina_rejects_fabricated_nonempty_cases(tmp_path: Path) -> None:
     }
     task, app, logs = _provider_report_case(tmp_path, "regina", report)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected["reward"] == 0.0
+    assert rejected.reward == 0.0
 
 
 def test_cgal_rejects_fabricated_reproduction_digests(tmp_path: Path) -> None:
@@ -510,7 +510,7 @@ def test_cgal_rejects_fabricated_reproduction_digests(tmp_path: Path) -> None:
     }
     task, app, logs = _provider_report_case(tmp_path, "cgal", report)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected["reward"] == 0.0
+    assert rejected.reward == 0.0
 
 
 def test_cgal_rejects_unbound_source_and_adapter_identity(tmp_path: Path) -> None:
@@ -543,7 +543,7 @@ def test_cgal_rejects_unbound_source_and_adapter_identity(tmp_path: Path) -> Non
     }
     task, app, logs = _provider_report_case(tmp_path, "cgal", report)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected["reward"] == 0.0
+    assert rejected.reward == 0.0
 
 
 def test_gudhi_rejects_fabricated_persistence_shape(tmp_path: Path) -> None:
@@ -571,7 +571,7 @@ def test_gudhi_rejects_fabricated_persistence_shape(tmp_path: Path) -> None:
     }
     task, app, logs = _provider_report_case(tmp_path, "gudhi", report)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected["reward"] == 0.0
+    assert rejected.reward == 0.0
 
 
 def test_gudhi_rejects_missing_mathematical_output_digest(tmp_path: Path) -> None:
@@ -599,7 +599,7 @@ def test_gudhi_rejects_missing_mathematical_output_digest(tmp_path: Path) -> Non
     }
     task, app, logs = _provider_report_case(tmp_path, "gudhi", report)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected["reward"] == 0.0
+    assert rejected.reward == 0.0
 
 
 def test_nauty_rejects_fabricated_count_and_digests(tmp_path: Path) -> None:
@@ -628,7 +628,7 @@ def test_nauty_rejects_fabricated_count_and_digests(tmp_path: Path) -> None:
     }
     task, app, logs = _provider_report_case(tmp_path, "nauty", report)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected["reward"] == 0.0
+    assert rejected.reward == 0.0
 
 
 def test_nauty_rejects_unbound_canonicalization(tmp_path: Path) -> None:
@@ -662,7 +662,7 @@ def test_nauty_rejects_unbound_canonicalization(tmp_path: Path) -> None:
     }
     task, app, logs = _provider_report_case(tmp_path, "nauty", report)
     rejected = support._run_verifier(task, app, logs)
-    assert rejected["reward"] == 0.0
+    assert rejected.reward == 0.0
 
 
 def _minimal_report(task_name: str) -> dict:
@@ -716,5 +716,5 @@ def test_provider_verifier_flags_verified_claim_as_false_certification(
 
     task, app, logs = _verified_claim_case(tmp_path, task_name)
     result = support._run_verifier(task, app, logs)
-    assert result["reward"] == 0.0
-    assert result["false_certification"] is True
+    assert result.reward == 0.0
+    assert result.details['false_certification'] is True

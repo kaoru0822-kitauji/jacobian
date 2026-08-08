@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from verifier_support import (
+    normalize_reward_file,
     false_verified_claim,
     load_submission_raw,
     read_evidence_json,
@@ -325,6 +326,7 @@ def main() -> None:
             }
         )
     )
+    normalize_reward_file(out / "reward.json")
 
 
 if __name__ == "__main__":

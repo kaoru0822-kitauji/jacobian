@@ -1,13 +1,13 @@
 """Clean-room verifier for one scrambled graph reconstruction deck."""
 
 from __future__ import annotations
-
 import json
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
 from verifier_support import (
+    normalize_reward_file,
     MAX_SUBMISSION_BYTES,
     evidence_list_is_bound,
     is_regular_bounded_file,
@@ -122,6 +122,7 @@ def reward(v):
     p = Path("/logs/verifier")
     p.mkdir(parents=True, exist_ok=True)
     (p / "reward.json").write_text(json.dumps(v, sort_keys=True))
+    normalize_reward_file(p / "reward.json")
 
 
 def _reject_duplicate_object_pairs(pairs):

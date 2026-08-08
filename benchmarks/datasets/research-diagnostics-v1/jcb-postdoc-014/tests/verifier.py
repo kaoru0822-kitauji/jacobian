@@ -4,6 +4,7 @@ from math import gcd
 from pathlib import Path
 
 from verifier_support import (
+    normalize_reward_file,
     false_verified_claim,
     load_submission_raw,
     read_evidence_json,
@@ -396,6 +397,7 @@ def main():
             }
         )
     )
+    normalize_reward_file(Path("/logs/verifier/reward.json"))
 
 
 if __name__ == "__main__":

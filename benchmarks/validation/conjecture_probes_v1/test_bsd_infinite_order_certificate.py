@@ -44,18 +44,18 @@ def run(app: Path, logs: Path):
 
 def test_oracle_passes(tmp_path):
     app, logs, _ = case(tmp_path)
-    assert run(app, logs)["aggregate_reward"] == 1.0
+    assert run(app, logs).details['aggregate_reward'] == 1.0
 
 
 def test_wrong_multiple_and_divisibility_label_fail(tmp_path):
     app, logs, s = case(tmp_path)
     s["result"]["double"][0] = "0"
     write(app, s)
-    assert run(app, logs)["mathematics"] == 0.0
+    assert run(app, logs).details['mathematics'] == 0.0
     app, logs, s = case(tmp_path / "label")
     s["result"]["y_square_divides_discriminant"] = True
     write(app, s)
-    assert run(app, logs)["aggregate_reward"] == 0.0
+    assert run(app, logs).details['aggregate_reward'] == 0.0
 
 
 def test_singular_curve_and_torsion_shortcut_fail(tmp_path):
@@ -72,19 +72,19 @@ def test_singular_curve_and_torsion_shortcut_fail(tmp_path):
         }
     )
     write(app, s)
-    assert run(app, logs)["aggregate_reward"] == 0.0
+    assert run(app, logs).details['aggregate_reward'] == 0.0
 
 
 def test_false_verified_and_tampered_input_fail_closed(tmp_path):
     app, logs, s = case(tmp_path)
     s["claimed_assurance"] = "VERIFIED"
     write(app, s)
-    assert run(app, logs)["false_certification"] is True
+    assert run(app, logs).details['false_certification'] is True
     app, logs, _ = case(tmp_path / "input")
     (app / "input.json").write_text("{}\n")
     reward = run(app, logs)
     assert (
-        reward["input_binding"] == 0.0
-        and reward["mathematics"] == 1.0
-        and reward["aggregate_reward"] == 0.0
+        reward.details['input_binding'] == 0.0
+        and reward.details['mathematics'] == 1.0
+        and reward.details['aggregate_reward'] == 0.0
     )

@@ -3,6 +3,7 @@ import math
 from pathlib import Path
 
 from verifier_support import (
+    normalize_reward_file,
     false_verified_claim,
     load_submission,
     read_evidence_json,
@@ -248,6 +249,7 @@ def main():
             }
         )
     )
+    normalize_reward_file(Path("/logs/verifier/reward.json"))
 
 
 if __name__ == "__main__":

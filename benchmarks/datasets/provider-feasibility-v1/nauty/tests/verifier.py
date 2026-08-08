@@ -1,10 +1,10 @@
 from __future__ import annotations
-
 import json
 import math
 from pathlib import Path
 
 from verifier_support import (
+    normalize_reward_file,
     MAX_SUBMISSION_BYTES,
     is_regular_bounded_file,
     load_submission,
@@ -185,3 +185,4 @@ target.write_text(
         sort_keys=True,
     )
 )
+normalize_reward_file(target)

@@ -1,10 +1,10 @@
 from __future__ import annotations
-
 import json
 from pathlib import Path
 
 from proof_replay import VerifyResult, verify_submission
 from verifier_support import (
+    normalize_reward_file,
     false_verified_claim,
     load_submission,
     workspace_input_is_bound,
@@ -58,6 +58,7 @@ def main() -> None:
             }
         )
     )
+    normalize_reward_file(logs / "reward.json")
     print(json.dumps({"accepted": accepted, "message": message}, sort_keys=True))
 
 

@@ -4,6 +4,7 @@ from fractions import Fraction
 from pathlib import Path
 
 from verifier_support import (
+    normalize_reward_file,
     aggregate_reward,
     false_verified_claim,
     load_submission,
@@ -304,6 +305,7 @@ def main():
             }
         )
     )
+    normalize_reward_file(Path("/logs/verifier/reward.json"))
 
 
 if __name__ == "__main__":

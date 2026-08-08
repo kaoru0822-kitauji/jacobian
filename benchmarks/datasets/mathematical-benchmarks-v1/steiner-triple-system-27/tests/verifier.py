@@ -5,6 +5,7 @@ from itertools import combinations
 from pathlib import Path
 
 from verifier_support import (
+    normalize_reward_file,
     MAX_SUBMISSION_BYTES,
     _public_submission_is_valid,
     evidence_list_is_bound,
@@ -178,6 +179,7 @@ def main():
             }
         )
     )
+    normalize_reward_file(output)
 
 
 if __name__ == "__main__":

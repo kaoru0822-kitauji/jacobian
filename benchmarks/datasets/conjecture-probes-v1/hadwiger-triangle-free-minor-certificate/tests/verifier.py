@@ -1,12 +1,12 @@
 """Exact coloring and clique-minor verifier for one Hadwiger instance."""
 
 from __future__ import annotations
-
 import json
 from pathlib import Path
 from typing import Any
 
 from verifier_support import (
+    normalize_reward_file,
     MAX_SUBMISSION_BYTES,
     _finite_json_float,
     _reject_nonfinite_json,
@@ -219,6 +219,7 @@ def reward(v):
     p = Path("/logs/verifier")
     p.mkdir(parents=True, exist_ok=True)
     (p / "reward.json").write_text(json.dumps(v, sort_keys=True))
+    normalize_reward_file(p / "reward.json")
 
 
 def main():

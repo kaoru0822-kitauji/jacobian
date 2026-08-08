@@ -1,11 +1,11 @@
 from __future__ import annotations
-
 import json
 import math
 from collections import defaultdict
 from pathlib import Path
 
 from verifier_support import (
+    normalize_reward_file,
     ASSURANCE_LEVELS,
     evidence_list_is_bound,
     false_verified_claim,
@@ -31,6 +31,7 @@ _PROJECTION_SUMMARY_KEYS = (
 def _write_reward(values: dict[str, object]) -> None:
     LOGS.mkdir(parents=True, exist_ok=True)
     (LOGS / "reward.json").write_text(json.dumps(values), encoding="utf-8")
+    normalize_reward_file(LOGS / "reward.json")
 
 
 def _source() -> dict | None:

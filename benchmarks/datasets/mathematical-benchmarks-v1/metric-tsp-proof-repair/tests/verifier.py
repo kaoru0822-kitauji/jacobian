@@ -5,6 +5,7 @@ from itertools import combinations, pairwise, permutations
 from pathlib import Path
 
 from verifier_support import (
+    normalize_reward_file,
     aggregate_reward,
     evidence_list_is_bound,
     load_submission,
@@ -328,6 +329,7 @@ def main():
             }
         )
     )
+    normalize_reward_file(Path("/logs/verifier/reward.json"))
 
 
 if __name__ == "__main__":

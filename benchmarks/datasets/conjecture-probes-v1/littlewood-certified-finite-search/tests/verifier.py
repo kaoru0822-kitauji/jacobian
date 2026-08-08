@@ -1,7 +1,6 @@
 """Rigorous rational-interval verifier for a finite Littlewood search."""
 
 from __future__ import annotations
-
 import json
 from fractions import Fraction
 from math import isqrt
@@ -9,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from verifier_support import (
+    normalize_reward_file,
     evidence_list_is_bound,
     load_submission,
     read_evidence_json,
@@ -88,6 +88,7 @@ def reward(v):
     p = Path("/logs/verifier")
     p.mkdir(parents=True, exist_ok=True)
     (p / "reward.json").write_text(json.dumps(v, sort_keys=True))
+    normalize_reward_file(p / "reward.json")
 
 
 def main():

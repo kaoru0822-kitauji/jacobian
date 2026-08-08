@@ -11,15 +11,16 @@ from pathlib import Path
 
 from benchmarks.validation._verifier_child import (
     VerifierExecutionError,
+    VerifierOutput,
     run_verifier_in_child,
 )
 
 
-def _run_verifier(task: Path, app: Path, logs: Path) -> dict:
+def _run_verifier(task: Path, app: Path, logs: Path) -> VerifierOutput:
     try:
         return run_verifier_in_child(task=task, app=app, logs=logs)
     except (ValueError, VerifierExecutionError):
-        return {
+        return VerifierOutput(reward=0.0, details={
             "assurance_calibration": 0.0,
             "correctness": 0.0,
             "evidence_validity": 0.0,
@@ -29,6 +30,5 @@ def _run_verifier(task: Path, app: Path, logs: Path) -> dict:
             "limitation_accuracy": 0.0,
             "protocol": 0.0,
             "protocol_compliance": 0.0,
-            "reward": 0.0,
             "scope_accuracy": 0.0,
-        }
+        })

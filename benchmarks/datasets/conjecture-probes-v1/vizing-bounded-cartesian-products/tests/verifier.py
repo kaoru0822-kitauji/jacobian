@@ -1,13 +1,13 @@
 """Clean-room checker for the finite Vizing domination probe."""
 
 from __future__ import annotations
-
 import json
 from itertools import combinations
 from pathlib import Path
 from typing import Any
 
 from verifier_support import (
+    normalize_reward_file,
     evidence_list_is_bound,
     load_submission,
     read_evidence_json,
@@ -299,6 +299,7 @@ def _reward(value: dict[str, Any]) -> None:
     path = Path("/logs/verifier")
     path.mkdir(parents=True, exist_ok=True)
     (path / "reward.json").write_text(json.dumps(value, sort_keys=True))
+    normalize_reward_file(path / "reward.json")
 
 
 def main() -> None:

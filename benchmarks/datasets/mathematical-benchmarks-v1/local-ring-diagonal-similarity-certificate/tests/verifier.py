@@ -4,6 +4,7 @@ from itertools import permutations
 from pathlib import Path
 
 from verifier_support import (
+    normalize_reward_file,
     MAX_SUBMISSION_BYTES,
     aggregate_reward,
     false_verified_claim,
@@ -274,6 +275,7 @@ def main():
             }
         )
     )
+    normalize_reward_file(Path("/logs/verifier/reward.json"))
 
 
 if __name__ == "__main__":

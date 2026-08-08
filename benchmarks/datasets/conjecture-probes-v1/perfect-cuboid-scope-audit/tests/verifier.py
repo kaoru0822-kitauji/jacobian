@@ -1,7 +1,6 @@
 """Clean-room verifier for the perfect-cuboid finite scope audit."""
 
 from __future__ import annotations
-
 import json
 from collections import Counter
 from math import isqrt
@@ -9,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from verifier_support import (
+    normalize_reward_file,
     MAX_SUBMISSION_BYTES,
     evidence_list_is_bound,
     is_regular_bounded_file,
@@ -147,6 +147,7 @@ def _reward(value: dict[str, Any]) -> None:
     path = Path("/logs/verifier")
     path.mkdir(parents=True, exist_ok=True)
     (path / "reward.json").write_text(json.dumps(value, sort_keys=True))
+    normalize_reward_file(path / "reward.json")
 
 
 def main() -> None:

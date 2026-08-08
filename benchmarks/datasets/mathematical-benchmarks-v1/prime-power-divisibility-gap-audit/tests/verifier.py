@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import json
 import math
 import sys
@@ -8,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from verifier_support import (
+    normalize_reward_file,
     MAX_SUBMISSION_BYTES,
     false_verified_claim,
     is_regular_bounded_file,
@@ -273,6 +273,7 @@ def main() -> None:
             }
         )
     )
+    normalize_reward_file(out / "reward.json")
 
 
 if __name__ == "__main__":

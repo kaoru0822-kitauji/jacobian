@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import json
 import re
 from fractions import Fraction
@@ -7,6 +6,7 @@ from itertools import combinations
 from pathlib import Path
 
 from verifier_support import (
+    normalize_reward_file,
     evidence_list_is_bound,
     false_verified_claim,
     load_submission,
@@ -326,6 +326,7 @@ def main() -> None:
     destination.write_text(
         json.dumps(_evaluate(load_submission()), sort_keys=True) + "\n"
     )
+    normalize_reward_file(destination)
 
 
 if __name__ == "__main__":

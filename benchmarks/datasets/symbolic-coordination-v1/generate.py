@@ -21,6 +21,7 @@ from benchmarks.tooling.public_contract import (  # noqa: E402
     render_instruction,
     render_submission_schema,
 )
+from benchmarks.tooling.harbor_suite import verifier_bundle_checksum_bytes  # noqa: E402
 
 DATASET = Path(__file__).resolve().parent
 # Keep this pilot stable when the reusable task template evolves.  The
@@ -1232,7 +1233,7 @@ def render_task(
     contract = public_contract(data)
     contract_value = contract.model_dump(mode="json", exclude_none=True)
     schema_text = render_submission_schema(contract)
-    checksum = hashlib.sha256(verifier).hexdigest()
+    checksum = verifier_bundle_checksum_bytes(verifier, support)
     description = (
         f"Assess one exact polynomial-map claim in the {data['family']} pilot family."
     )

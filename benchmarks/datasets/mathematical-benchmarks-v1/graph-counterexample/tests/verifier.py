@@ -2,10 +2,12 @@ import json
 from pathlib import Path
 
 from verifier_support import (
+    normalize_reward_file,
     aggregate_reward,
     evidence_list_is_bound,
 )
 from verifier_support import (
+    normalize_reward_file,
     load_submission as load_strict_submission,
 )
 
@@ -158,6 +160,7 @@ def main():
             }
         )
     )
+    normalize_reward_file(Path("/logs/verifier/reward.json"))
 
 
 if __name__ == "__main__":

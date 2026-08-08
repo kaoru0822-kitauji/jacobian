@@ -8,6 +8,7 @@ from itertools import pairwise
 from pathlib import Path
 
 from verifier_support import (
+    normalize_reward_file,
     MAX_SUBMISSION_BYTES,
     false_verified_claim,
     is_regular_bounded_file,
@@ -358,6 +359,7 @@ def main() -> None:
             }
         )
     )
+    normalize_reward_file(logs / "reward.json")
 
 
 if __name__ == "__main__":

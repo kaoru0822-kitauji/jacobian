@@ -4,6 +4,7 @@ from pathlib import Path
 
 from verifier_support import evidence_list_is_bound, resolve_evidence
 from verifier_support import load_submission as load_strict_submission
+from verifier_support import normalize_reward_file
 
 E = Path("/tests")
 
@@ -125,6 +126,7 @@ def main():
             }
         )
     )
+    normalize_reward_file(Path("/logs/verifier/reward.json"))
 
 
 if __name__ == "__main__":
