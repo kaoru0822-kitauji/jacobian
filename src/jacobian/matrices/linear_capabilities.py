@@ -248,7 +248,8 @@ class LinearRationalSolutionVerificationAdapter:
             ) from exc
 
         checker_id = self.installation.checker_id
-        assert checker_id is not None
+        if checker_id is None:
+            raise RuntimeError("checker is not installed")
         bindings = EvidenceBindings(
             claim_digest=resolved.system_artifact.manifest.object_digest,
             semantics_digest=semantics.manifest.object_digest,
@@ -473,7 +474,8 @@ class LinearRationalInconsistencyVerificationAdapter:
             ) from exc
 
         checker_id = self.installation.checker_id
-        assert checker_id is not None
+        if checker_id is None:
+            raise RuntimeError("checker is not installed")
         bindings = EvidenceBindings(
             claim_digest=resolved.system_artifact.manifest.object_digest,
             semantics_digest=semantics.manifest.object_digest,

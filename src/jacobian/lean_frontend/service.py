@@ -201,14 +201,19 @@ class LeanService:
         with self._cache_lock:
             self._closing = True
             thread = self._warmup_thread
-        if thread is not None:
-            thread.join(timeout=timeout_seconds)
-            if thread.is_alive():
-                raise RuntimeError("Lean Mathlib warm-up did not quiesce")
-        with self._cache_lock:
-            self._warmup_thread = None
-            self._cache.clear()
-            self._certificate_locks.clear()
+        try:
+            if thread is not None:
+                thread.join(timeout=timeout_seconds)
+                if thread.is_alive():
+                    raise RuntimeError("Lean Mathlib warm-up did not quiesce")
+            with self._cache_lock:
+                self._warmup_thread = None
+                self._cache.clear()
+                self._certificate_locks.clear()
+        except BaseException:
+            with self._cache_lock:
+                self._closing = False
+            raise
 
     def _warm_mathlib(self) -> None:
         try:

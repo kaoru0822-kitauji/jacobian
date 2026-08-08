@@ -97,6 +97,32 @@ class PolynomialCollisionAdapter:
     def descriptor(self) -> CapabilityDescriptor:
         return self._descriptor
 
+    @staticmethod
+    def _require_found_evaluation(
+        first: str | None,
+        second: str | None,
+    ) -> None:
+        if first is None:
+            raise RuntimeError("first evaluation result is unexpectedly None")
+        if second is None:
+            raise RuntimeError("second evaluation result is unexpectedly None")
+
+    @staticmethod
+    def _require_found_result(
+        first_evaluation_result: str | None,
+        second_evaluation_result: str | None,
+        claim_uri: str | None,
+        witness_uri: str | None,
+    ) -> None:
+        if first_evaluation_result is None:
+            raise RuntimeError("first evaluation result is unexpectedly None")
+        if second_evaluation_result is None:
+            raise RuntimeError("second evaluation result is unexpectedly None")
+        if claim_uri is None:
+            raise RuntimeError("claim URI is unexpectedly None")
+        if witness_uri is None:
+            raise RuntimeError("witness URI is unexpectedly None")
+
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
         validated = _validate_request(
             PolynomialCollisionRequest,
@@ -305,6 +331,32 @@ class PolynomialCollisionSearchAdapter:
     def descriptor(self) -> CapabilityDescriptor:
         return self._descriptor
 
+    @staticmethod
+    def _require_found_evaluation(
+        first: str | None,
+        second: str | None,
+    ) -> None:
+        if first is None:
+            raise RuntimeError("first evaluation result is unexpectedly None")
+        if second is None:
+            raise RuntimeError("second evaluation result is unexpectedly None")
+
+    @staticmethod
+    def _require_found_result(
+        first_evaluation_result: str | None,
+        second_evaluation_result: str | None,
+        claim_uri: str | None,
+        witness_uri: str | None,
+    ) -> None:
+        if first_evaluation_result is None:
+            raise RuntimeError("first evaluation result is unexpectedly None")
+        if second_evaluation_result is None:
+            raise RuntimeError("second evaluation result is unexpectedly None")
+        if claim_uri is None:
+            raise RuntimeError("claim URI is unexpectedly None")
+        if witness_uri is None:
+            raise RuntimeError("witness URI is unexpectedly None")
+
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
         validated = _validate_request(
             PolynomialCollisionSearchRequest,
@@ -385,8 +437,9 @@ class PolynomialCollisionSearchAdapter:
                 first_evaluation_result,
                 second_evaluation_result,
             ) = found
-            assert first_evaluation_result is not None
-            assert second_evaluation_result is not None
+            self._require_found_evaluation(
+                first_evaluation_result, second_evaluation_result
+            )
             candidate = self.resources.store.get(map_uri)
             claim = self.resources.artifacts.put(
                 schema_uri=self.resources.installation.claim_schema_uri,
@@ -463,10 +516,18 @@ class PolynomialCollisionSearchAdapter:
                 )
             )
         if found is not None:
-            assert first_evaluation_result is not None
-            assert second_evaluation_result is not None
-            assert claim_uri is not None
-            assert witness_uri is not None
+            self._require_found_result(
+                first_evaluation_result,
+                second_evaluation_result,
+                claim_uri,
+                witness_uri,
+            )
+            assert (
+                first_evaluation_result is not None
+                and second_evaluation_result is not None
+                and claim_uri is not None
+                and witness_uri is not None
+            )
             artifacts.extend(
                 [
                     second_evaluation_result,
@@ -573,7 +634,8 @@ class PolynomialCollisionVerifyAdapter:
     def __init__(self, resources: PolynomialResources) -> None:
         self.resources = resources
         checker_id = resources.installation.collision_checker_id
-        assert checker_id is not None
+        if checker_id is None:
+            raise RuntimeError("checker is not installed")
         self._descriptor = CapabilityDescriptor(
             capability_id="polynomial.map.collision.verify",
             version="1",
@@ -597,6 +659,32 @@ class PolynomialCollisionVerifyAdapter:
     @property
     def descriptor(self) -> CapabilityDescriptor:
         return self._descriptor
+
+    @staticmethod
+    def _require_found_evaluation(
+        first: str | None,
+        second: str | None,
+    ) -> None:
+        if first is None:
+            raise RuntimeError("first evaluation result is unexpectedly None")
+        if second is None:
+            raise RuntimeError("second evaluation result is unexpectedly None")
+
+    @staticmethod
+    def _require_found_result(
+        first_evaluation_result: str | None,
+        second_evaluation_result: str | None,
+        claim_uri: str | None,
+        witness_uri: str | None,
+    ) -> None:
+        if first_evaluation_result is None:
+            raise RuntimeError("first evaluation result is unexpectedly None")
+        if second_evaluation_result is None:
+            raise RuntimeError("second evaluation result is unexpectedly None")
+        if claim_uri is None:
+            raise RuntimeError("claim URI is unexpectedly None")
+        if witness_uri is None:
+            raise RuntimeError("witness URI is unexpectedly None")
 
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
         validated = _validate_request(
@@ -638,7 +726,8 @@ class PolynomialCollisionVerifyAdapter:
             summary="exact rational polynomial-map collision witness",
         )
         checker_id = self.resources.installation.collision_checker_id
-        assert checker_id is not None
+        if checker_id is None:
+            raise RuntimeError("checker is not installed")
         checked = self.resources.verification.verify_witness(
             claim_uri=claim_artifact.artifact_uri,
             candidate_uri=map_uri,
@@ -723,7 +812,8 @@ class PolynomialMapInverseCollisionVerifyAdapter:
     def __init__(self, resources: PolynomialResources) -> None:
         self.resources = resources
         checker_id = resources.installation.inverse_collision_checker_id
-        assert checker_id is not None
+        if checker_id is None:
+            raise RuntimeError("checker is not installed")
         self._descriptor = CapabilityDescriptor(
             capability_id="polynomial.map.inverse.refute_by_collision",
             version="1",
@@ -748,6 +838,32 @@ class PolynomialMapInverseCollisionVerifyAdapter:
     @property
     def descriptor(self) -> CapabilityDescriptor:
         return self._descriptor
+
+    @staticmethod
+    def _require_found_evaluation(
+        first: str | None,
+        second: str | None,
+    ) -> None:
+        if first is None:
+            raise RuntimeError("first evaluation result is unexpectedly None")
+        if second is None:
+            raise RuntimeError("second evaluation result is unexpectedly None")
+
+    @staticmethod
+    def _require_found_result(
+        first_evaluation_result: str | None,
+        second_evaluation_result: str | None,
+        claim_uri: str | None,
+        witness_uri: str | None,
+    ) -> None:
+        if first_evaluation_result is None:
+            raise RuntimeError("first evaluation result is unexpectedly None")
+        if second_evaluation_result is None:
+            raise RuntimeError("second evaluation result is unexpectedly None")
+        if claim_uri is None:
+            raise RuntimeError("claim URI is unexpectedly None")
+        if witness_uri is None:
+            raise RuntimeError("witness URI is unexpectedly None")
 
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
         validated = _validate_request(

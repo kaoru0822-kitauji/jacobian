@@ -124,7 +124,8 @@ class LeanProofStateAdapter:
         """Resolve the statement and tactic prefix from a fresh or bound state."""
 
         if validated.state_uri is None:
-            assert validated.statement is not None
+            if validated.statement is None:
+                raise ValueError("validated statement is unexpectedly None")
             return validated.statement, validated.proof_prefix, None
         bound_state = _load_validated_proof_state(
             self.resources,
@@ -289,7 +290,8 @@ class LeanProofStateAdapter:
             input_state_uri = input_state_artifact.artifact_uri
             input_state = input_state_payload
         else:
-            assert validated.state_uri is not None
+            if validated.state_uri is None:
+                raise ValueError("validated state_uri is unexpectedly None")
             input_state_uri = validated.state_uri
             input_state = bound_state
 

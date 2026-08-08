@@ -185,7 +185,8 @@ class PersistentLeanRepl:
             self._base_env = base_env
 
     def _expired(self) -> bool:
-        assert self._process is not None
+        if self._process is None:
+            raise RuntimeError("Lean REPL process is unexpectedly None")
         if not self._process.is_running:
             return True
         if self._requests >= self._policy.max_requests:
@@ -232,7 +233,8 @@ def _single_proof_state(response: Mapping[str, Any]) -> int:
             )
         raise RuntimeError("Lean did not expose one replayable proof state")
     proof_state = sorries[0]["proofState"]
-    assert isinstance(proof_state, int)
+    if not isinstance(proof_state, int):
+        raise TypeError("proof_state must be an int")
     return proof_state
 
 

@@ -118,12 +118,14 @@ def _capture_cvc5_proof(
         if len(proof) > CVC5_PROOF_LIMIT:
             raise Cvc5WorkerError("CVC5_PROOF_LIMIT_EXCEEDED")
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
-        descriptor = os.open(proof_path, flags, 0o600)
+        descriptor = -1
         try:
+            descriptor = os.open(proof_path, flags, 0o600)
             with os.fdopen(descriptor, "wb", closefd=False) as stream:
                 stream.write(proof)
         finally:
-            os.close(descriptor)
+            if descriptor >= 0:
+                os.close(descriptor)
     except Cvc5WorkerError:
         raise
     except (OSError, RuntimeError, TypeError) as exc:

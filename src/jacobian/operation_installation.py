@@ -370,7 +370,10 @@ class MaterializedOperationAdapter:
             if self.operation.artifact_converter is not None:
                 uri_field = self.operation.artifact_uri_field
                 payload_model = self.operation.artifact_payload_model
-                assert uri_field is not None and payload_model is not None
+                if uri_field is None or payload_model is None:
+                    raise RuntimeError(
+                        "artifact converter requires uri_field and payload_model"
+                    )
                 artifact_uri = getattr(validated_request, uri_field)
                 if artifact_uri is not None:
                     artifact = self.resources.artifacts.store.get(artifact_uri)

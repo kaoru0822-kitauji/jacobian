@@ -110,7 +110,10 @@ def _boundary_matrix(
             face = simplex[:removed] + simplex[removed + 1 :]
             value = 1 if removed % 2 == 0 else -1
             if coefficient_ring is ChainCoefficientRing.PRIME_FIELD:
-                assert prime is not None
+                if prime is None:
+                    raise ValueError(
+                        "prime field coefficient ring requires a prime modulus"
+                    )
                 value %= prime
             entries.append(
                 SparseMatrixEntry(
@@ -211,7 +214,8 @@ def _chain_result(request: ChainComplexRequest) -> ChainComplexResult:
             if upper_dimension == 1 and augmentation is not None
             else boundaries[upper_dimension - 1]
         )
-        assert lower is not None
+        if lower is None:
+            raise ValueError("boundary for lower dimension is unexpectedly None")
         upper = boundaries[upper_dimension]
         if not _product_is_zero(lower, upper, modulus=modulus):
             raise ValueError("constructed simplicial boundary does not square to zero")
@@ -417,7 +421,8 @@ def _homology(
             if dimension == 0 and augmentation is not None
             else boundaries[dimension]
         )
-        assert outgoing is not None
+        if outgoing is None:
+            raise ValueError("boundary for dimension is unexpectedly None")
         cycles = _nullspace(
             outgoing,
             columns=chain_dimension,

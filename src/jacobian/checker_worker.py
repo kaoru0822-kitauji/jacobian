@@ -83,7 +83,8 @@ def _measure_runtime(
             raise ValueError("checker runtime path is not exact")
         os.environ["JACOBIAN_CHECKER_EXECUTABLE"] = str(path)
         _bind_lake_launcher(runtime)
-    assert runtime.digest is not None
+    if runtime.digest is None:
+        raise RuntimeError("runtime digest is unexpectedly None")
     os.environ["JACOBIAN_CHECKER_RUNTIME_DIGEST"] = runtime.digest
     return runtime, runtime.digest
 

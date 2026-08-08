@@ -203,7 +203,8 @@ class MatrixDeterminantVerificationAdapter:
             ) from exc
 
         checker_id = self.installation.checker_id
-        assert checker_id is not None
+        if checker_id is None:
+            raise RuntimeError("checker is not installed")
         witness_artifact = put_witness_envelope(
             self.artifacts,
             witness_schema_uri=self.installation.witness_schema_uri,

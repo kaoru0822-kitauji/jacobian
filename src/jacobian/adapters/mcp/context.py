@@ -29,7 +29,14 @@ class AppState:
     reasoning_log_mode: ReasoningLogMode = ReasoningLogMode.OFF
 
 
-def _runtime(ctx: Context[AppState, Any] | None) -> JacobianRuntime:
+@contextmanager
+def _runtime(ctx: Context[AppState, Any] | None) -> Iterator[JacobianRuntime]:
+    """Return a runtime, holding a tenant lease for the full request lifetime.
+
+    When tenant isolation is active, the lease is held until the context
+    manager exits so the runtime cannot be evicted mid-request.
+    """
+
     if ctx is None:
         raise AgentRecoveryError(
             "Jacobian is unavailable for this request. Retry once; if it fails "
@@ -46,15 +53,16 @@ def _runtime(ctx: Context[AppState, Any] | None) -> JacobianRuntime:
 
         access_token = get_access_token()
         subject = access_token.subject if access_token is not None else None
-        runtime = state.tenant_router.runtime_for(subject)
-        _start_lean_warmup(runtime)
-        return runtime
+        with state.tenant_router.lease_for(subject) as runtime:
+            _start_lean_warmup(runtime)
+            yield runtime
+        return
     if state.runtime is None:
         raise AgentRecoveryError(
             "Jacobian is unavailable for this request. Retry once; if it fails "
             "again, inspect the local Jacobian log."
         )
-    return state.runtime
+    yield state.runtime
 
 
 def _start_lean_warmup(runtime: JacobianRuntime) -> None:

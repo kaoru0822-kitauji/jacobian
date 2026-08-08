@@ -62,6 +62,7 @@ from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.domains._examples import example
 from jacobian.process_policy import (
     ProcessRequest,
+    ProcessResult,
     ProcessTermination,
     execute_process,
 )
@@ -313,8 +314,10 @@ def _execute_lean_source(
     timeout_seconds: int,
 ) -> str:
     _require_current_runtime(provider_runtime)
-    fd, temp_path = tempfile.mkstemp(suffix=".lean")
+    temp_path: str | None = None
+    result: ProcessResult | None = None
     try:
+        fd, temp_path = tempfile.mkstemp(suffix=".lean")
         try:
             handle = os.fdopen(fd, "w")
         except OSError:
@@ -341,7 +344,8 @@ def _execute_lean_source(
             f"The pinned Lean executable could not run: {exc}"
         ) from exc
     finally:
-        Path(temp_path).unlink(missing_ok=True)
+        if temp_path is not None:
+            Path(temp_path).unlink(missing_ok=True)
     if result.termination is ProcessTermination.TIMED_OUT:
         raise _LeanUnavailableError(f"lean timed out after {timeout_seconds}s")
     if result.termination is ProcessTermination.START_FAILED:
