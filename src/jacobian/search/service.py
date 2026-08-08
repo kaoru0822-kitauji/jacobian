@@ -174,6 +174,8 @@ class SearchService:
                 timeout_seconds=timeout_seconds,
             )
         except LifecycleTimeoutError as exc:
+            with self._thread_lock:
+                self._closing = False
             raise SearchError(
                 "search workers did not quiesce before runtime shutdown"
             ) from exc
