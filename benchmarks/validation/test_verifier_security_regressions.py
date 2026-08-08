@@ -547,6 +547,52 @@ def test_lean_repl_traces_match_rejects_disagreeing_trace() -> None:
     assert replay_mod.traces_match(matching, {"ok": False}) is False
 
 
+def test_lean_repl_frame_reader_preserves_suffix() -> None:
+    """_FrameReader reads two sequential blank-line-delimited frames from one pipe.
+
+    This is the exact CI failure mechanism: the old ``_readline_bounded``
+    consumed only the first ``\\n`` and left the blank-line delimiter plus
+    the next frame's bytes in the pipe, so the second exchange parsed the
+    empty delimiter as JSON and failed.  The buffered frame reader must
+    consume the ``\\n\\n`` delimiter, return the complete first frame, and
+    retain any suffix for the next read.
+    """
+
+    import importlib.util
+    import os
+
+    replay_path = (
+        DATASETS / "provider-feasibility-v1" / "lean-repl" / "tests" / "replay.py"
+    )
+    spec = importlib.util.spec_from_file_location("replay_frame", replay_path)
+    assert spec is not None and spec.loader is not None
+    replay_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(replay_mod)
+
+    frame_a = json.dumps({"cmd": "first"}, sort_keys=True).encode("utf-8")
+    frame_b = json.dumps(
+        {"tactic": "exact hP", "proofState": 0}, sort_keys=True
+    ).encode("utf-8")
+    blob = frame_a + b"\n\n" + frame_b + b"\n\n"
+
+    read_fd, write_fd = os.pipe()
+    try:
+        os.write(write_fd, blob)
+        os.close(write_fd)
+        write_fd = -1
+
+        reader = replay_mod._FrameReader(read_fd)
+        raw_a = reader.read_frame(timeout=5.0)
+        raw_b = reader.read_frame(timeout=5.0)
+
+        assert raw_a == frame_a
+        assert raw_b == frame_b
+    finally:
+        if write_fd != -1:
+            os.close(write_fd)
+        os.close(read_fd)
+
+
 def _provider_report_case(tmp_path: Path, task_name: str, report: dict) -> tuple:
     task = DATASETS / "provider-feasibility-v1" / task_name
     app = tmp_path / task_name / "app"

@@ -55,45 +55,60 @@ def _response_errors(response: dict[str, Any]) -> list[str]:
     return errors
 
 
-def _readline_bounded(fd: int, timeout: float) -> bytes:
-    """Read one newline-terminated line from *fd* with a bounded deadline.
+class _FrameReader:
+    """Bounded buffered reader for blank-line-terminated REPL response frames.
 
-    Uses ``os.read`` in a loop with a ``selectors`` readiness check against a
-    monotonic deadline computed from *timeout*.  Raises ``RuntimeError`` on
-    EOF, timeout, or oversized responses (exceeding ``_MAX_RESPONSE_BYTES``).
+    The Lean REPL protocol delimits response frames with a blank line
+    (``\\n\\n``).  This reader retains a ``bytearray`` buffer across
+    exchanges so that suffix bytes left after one frame are available for
+    the next read.  Each call to :meth:`read_frame` blocks (with a
+    monotonic deadline and ``selectors`` readiness checks) until the
+    buffer contains ``\\n\\n``, then returns everything before it and
+    preserves the remainder.
     """
 
-    deadline = time.monotonic() + timeout
-    chunks: list[bytes] = []
-    total = 0
-    sel = selectors.DefaultSelector()
-    sel.register(fd, selectors.EVENT_READ)
-    try:
-        while True:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise RuntimeError("Lean REPL read timed out")
-            events = sel.select(timeout=remaining)
-            if not events:
-                raise RuntimeError("Lean REPL read timed out")
-            chunk = os.read(fd, 4096)
-            if not chunk:
-                raise RuntimeError("Lean REPL closed stdout before responding")
-            total += len(chunk)
-            if total > _MAX_RESPONSE_BYTES:
-                raise RuntimeError("Lean REPL response exceeded 1 MiB")
-            chunks.append(chunk)
-            if b"\n" in chunk:
-                break
-    finally:
-        sel.close()
-    raw = b"".join(chunks)
-    line, _, _ = raw.partition(b"\n")
-    return line
+    def __init__(self, fd: int) -> None:
+        self._fd = fd
+        self._buffer = bytearray()
+
+    def read_frame(self, timeout: float) -> bytes:
+        """Read one ``\\n\\n``-terminated frame, preserving any suffix."""
+
+        delimiter = b"\n\n"
+        deadline = time.monotonic() + timeout
+        index = self._buffer.find(delimiter)
+        if index != -1:
+            frame = bytes(self._buffer[:index])
+            del self._buffer[: index + len(delimiter)]
+            return frame
+        sel = selectors.DefaultSelector()
+        sel.register(self._fd, selectors.EVENT_READ)
+        try:
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise RuntimeError("Lean REPL read timed out")
+                events = sel.select(timeout=remaining)
+                if not events:
+                    raise RuntimeError("Lean REPL read timed out")
+                chunk = os.read(self._fd, 4096)
+                if not chunk:
+                    raise RuntimeError("Lean REPL closed stdout before responding")
+                self._buffer.extend(chunk)
+                if len(self._buffer) > _MAX_RESPONSE_BYTES:
+                    raise RuntimeError("Lean REPL response exceeded 1 MiB")
+                index = self._buffer.find(delimiter)
+                if index != -1:
+                    frame = bytes(self._buffer[:index])
+                    del self._buffer[: index + len(delimiter)]
+                    return frame
+        finally:
+            sel.close()
 
 
 def _exchange(
     process: subprocess.Popen[bytes],
+    reader: _FrameReader,
     request: dict[str, object],
 ) -> dict[str, Any]:
     # The REPL protocol terminates request frames with a blank line, matching
@@ -102,16 +117,19 @@ def _exchange(
     assert process.stdin is not None
     process.stdin.write(line)
     process.stdin.flush()
-    assert process.stdout is not None
-    raw = _readline_bounded(process.stdout.fileno(), _READ_TIMEOUT)
+    raw = reader.read_frame(_READ_TIMEOUT)
     response = json.loads(raw.decode("utf-8"))
     if not isinstance(response, dict):
         raise RuntimeError("Lean REPL response must be a JSON object")
     return response
 
 
-def _run_task(process: subprocess.Popen[bytes], task: dict[str, Any]) -> dict[str, Any]:
-    command_response = _exchange(process, {"cmd": task["command"]})
+def _run_task(
+    process: subprocess.Popen[bytes],
+    reader: _FrameReader,
+    task: dict[str, Any],
+) -> dict[str, Any]:
+    command_response = _exchange(process, reader, {"cmd": task["command"]})
     if _response_errors(command_response):
         raise RuntimeError(f"{task['task_id']} command failed")
     sorries = command_response.get("sorries")
@@ -122,7 +140,9 @@ def _run_task(process: subprocess.Popen[bytes], task: dict[str, Any]) -> dict[st
         raise RuntimeError(f"{task['task_id']} returned an invalid proof state")
     traces: list[dict[str, Any]] = []
     for tactic in task["tactics"]:
-        response = _exchange(process, {"tactic": tactic, "proofState": proof_state})
+        response = _exchange(
+            process, reader, {"tactic": tactic, "proofState": proof_state}
+        )
         response_errors = _response_errors(response)
         next_state = response.get("proofState")
         goals = response.get("goals")
@@ -159,11 +179,13 @@ def run_replay() -> dict[str, Any]:
     except OSError:
         return {"ok": False}
 
+    assert process.stdout is not None
+    reader = _FrameReader(process.stdout.fileno())
     task_results: list[dict[str, Any]] = []
     replay_ok = False
     try:
         for task in _TASKS:
-            task_results.append(_run_task(process, task))
+            task_results.append(_run_task(process, reader, task))
         replay_ok = True
     except (OSError, json.JSONDecodeError, RuntimeError, KeyError):
         replay_ok = False
