@@ -1,0 +1,92 @@
+{
+  "schema_version": "1",
+  "study_id": "typed-recovery-handoff-pr2",
+  "evidence_class": "public-host-local-semantic-tool-observation",
+  "causal_claim_authorized": false,
+  "harbor_execution_claimed": false,
+  "baseline_revision": "b1fcfe25a86eea3b66c3010083d4de21869e7d1d",
+  "treatment_implementation_revision": "ac771316a9048c7474069688a40f3669b48c2a57",
+  "model": {
+    "model_id": "gpt-5.4-mini",
+    "reasoning_effort": "medium",
+    "codex_cli_version": "codex-cli 0.147.0"
+  },
+  "agent_instructions": "Complete the task in instruction.md using input.json and submission_schema.json. You may use the configured Jacobian MCP tools for exact mathematical work. Write the required submission.json and evidence files in the workspace. Do not use web search.",
+  "conditions": [
+    {
+      "id": "canonicalization-baseline",
+      "description": "Latest upstream plus accepted canonical sparse-input handling, without typed diagnostic recovery."
+    },
+    {
+      "id": "canonicalization-recovery",
+      "description": "The identical baseline plus the optional typed diagnostic recovery object only."
+    }
+  ],
+  "tasks": [
+    {
+      "dataset": "symbolic-coordination-v1",
+      "task_id": "symbolic-coordination-semantic-equivalence-02",
+      "harbor_task_digest": "3e12d6a7959fdfc475251ac7e2a8ba5e8ca3ccd8868d12157711d981b536e1d2",
+      "verifier_bundle_digest": "f2434be8f28237142a34b499c99f8615ecfbfc51ff651e5e7119370997941ae1",
+      "selection_basis": "Saved upstream and recovery trajectories contain repeated root-shape rejection while preserving the same exact inverse candidate and strict task verifier."
+    },
+    {
+      "dataset": "symbolic-coordination-v1",
+      "task_id": "symbolic-coordination-semantic-equivalence-03",
+      "harbor_task_digest": "a43b3ff05f551628f6609df3910e63da846309391cb508f48ef0ed478ea27e35",
+      "verifier_bundle_digest": "f2434be8f28237142a34b499c99f8615ecfbfc51ff651e5e7119370997941ae1",
+      "selection_basis": "Saved trajectories contain malformed nested map-coordinate and inverse-checker handoffs, including one observed rejection-to-same-capability success."
+    },
+    {
+      "dataset": "mathematical-benchmarks-v1",
+      "task_id": "polynomial-map-collision",
+      "harbor_task_digest": "9243ca8ee4800cb8eae039a08e0414c7fcfd8e111c3d1a3c8d6fbbfc44884abd",
+      "verifier_bundle_digest": "3e16ffac4270bd7567ad1ff565ba725caea918a77327296b4ff27810ccd6cbbb",
+      "selection_basis": "Two saved difficult rollouts reached exact polynomial capabilities but failed the strict terminal artifact and verification-record handoff."
+    }
+  ],
+  "execution": {
+    "repetitions_per_task_per_condition": 3,
+    "ordering": "declared-task-order-then-repetition",
+    "timeout_seconds_per_rollout": 600,
+    "sandbox": "workspace-write",
+    "reasoning_log_mode": "REQUIRED",
+    "web_search": "disabled",
+    "wrong_answer_retries": 0,
+    "terminal_reward": "unchanged-task-owned-clean-room-verifier-only",
+    "tool_call_reward": 0
+  },
+  "primary_metric": "genuine_rejection_to_correct_repair_to_same_candidate_same_checker_to_exact_terminal_acceptance",
+  "secondary_metrics": [
+    "rejection_opportunities",
+    "typed_recovery_exposures",
+    "repair_attempts",
+    "repair_actions",
+    "candidate_reuse",
+    "same_capability_retries",
+    "same_checker_retries",
+    "terminal_acceptance",
+    "false_certification",
+    "repeated_same_failure",
+    "unrelated_tool_noise"
+  ],
+  "invariants": [
+    "same task bytes and task digests",
+    "same agent instructions, model, reasoning effort, timeout, and ordering",
+    "same task-owned verifier bytes and labels",
+    "same accepted canonicalization code",
+    "conditions differ in runtime behavior only by typed diagnostic recovery",
+    "no automatic retry, strategy instruction, answer content, assurance promotion, or verifier relaxation"
+  ],
+  "stop_rules": [
+    "preserve every started rollout regardless of outcome",
+    "do not rerun model failures or inconclusive outcomes",
+    "stop after the frozen matrix",
+    "stop implementation after two evidence-failing treatment designs and report fallback guidance instead"
+  ],
+  "environment_limitations": [
+    "No Docker, Podman, or compatible Harbor container runtime is installed on the host.",
+    "The existing digest-recording host runner copies only public task files and invokes the unchanged task verifier in a fresh child process.",
+    "Results are exploratory host-local observations and cannot be reported as Harbor or causal evidence."
+  ]
+}
