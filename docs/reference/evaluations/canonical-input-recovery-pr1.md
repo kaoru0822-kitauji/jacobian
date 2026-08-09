@@ -108,7 +108,7 @@ canonicalization-plus-recovery condition.
 ## Engineering closeout
 
 The accepted canonicalization mechanism was rebased without an experimental
-rerun onto upstream `332f0a5d219628a56c790089dcf0f95fa3045955`. Review hardening
+rerun onto upstream `9e87a4515208a462c440d317a8b0ca0d31f4a248`. Review hardening
 now validates a canonical-support representative of the complete typed request
 before duplicate-coefficient accumulation, caps each coefficient involved in an
 accumulation at 256 digits, and validates the exact combined request again. This
@@ -120,4 +120,7 @@ boundary tests in tmux session `jac-pr920-review-hardening-r3`. `make check`
 passed 872 unit tests plus the repository lint, format, and type gates in session
 `jac-pr920-check`. The earlier `jac-pr920-review-hardening` failure exposed and
 preserved one boundary-projection bug in the new guard; its rerun was not a model
-rollout and did not alter the frozen study outcomes.
+rollout and did not alter the frozen study outcomes. After the final upstream
+restack, the same 48-test lane passed again in `jac-pr920-latest-final`, and
+`make check` passed 884 unit tests plus lint, format, and type checking in
+`jac-pr920-latest-check`.
