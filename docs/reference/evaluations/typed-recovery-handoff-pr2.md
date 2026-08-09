@@ -219,13 +219,13 @@ implementation unless a future independently frozen study supplies repeated,
 paired handoff opportunities.
 
 The final branch enacts that outcome. Product commit `d8e47bbc` was omitted when
-the research commits were restacked on canonicalization head `3b242f64`; the
+the research commits were restacked on canonicalization head `334efd07`; the
 unique PR2 diff is the frozen configuration and evaluation documentation only.
 Historical treatment implementation `ac771316a9048c7474069688a40f3669b48c2a57`
 remains recorded for auditability, not as merge-ready code.
 
 Final documentation-only closeout was performed on canonicalization head
-`3b242f6487f4d7c1161813747b784b946938e244`. The frozen JSON parsed successfully,
-`make docs-linkcheck`, `make test-plan BASE=3b242f64`, and `git diff --check`
+`334efd0717a31408a66d12dc71015bba6f4e52d8`. The frozen JSON parsed successfully,
+`make docs-linkcheck`, `make test-plan BASE=334efd07`, and `git diff --check`
 passed; the planner classified the unique four-file diff as documentation only.
 No model, task, or behavioral evaluation was rerun.
