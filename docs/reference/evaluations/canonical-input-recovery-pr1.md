@@ -108,7 +108,7 @@ canonicalization-plus-recovery condition.
 ## Engineering closeout
 
 The accepted canonicalization mechanism was rebased without an experimental
-rerun onto upstream `9e87a4515208a462c440d317a8b0ca0d31f4a248`. Review hardening
+rerun onto upstream `519dd7b9e34b641dcc138e03af6ffc6e3ed736af`. Review hardening
 now validates a canonical-support representative of the complete typed request
 before duplicate-coefficient accumulation, caps each coefficient involved in an
 accumulation at 256 digits, and validates the exact combined request again. This
