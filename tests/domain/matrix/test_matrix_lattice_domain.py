@@ -254,7 +254,8 @@ def test_matrix_multiplication_intent_is_discoverable(
         for descriptor in matrix_domain_services.core.capabilities.catalog().capabilities
         if descriptor.capability_id == "matrix.multiply.compute"
     )
-    assert descriptor.invocation_examples[0].name == "multiply_rectangular_matrices"
+    assert descriptor.version == "2"
+    assert descriptor.invocation_examples[0].name == "multiply_by_transpose"
 
     result = matrix_domain_services.core.capabilities.invoke(
         CapabilityRequest(
@@ -265,11 +266,19 @@ def test_matrix_multiplication_intent_is_discoverable(
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.output["result"] == {
-        "product": _qq([[1, 2], [1, 2]]),
+        "product": _qq([[5, 2], [2, 2]]),
         "left_rows": 2,
         "inner_dimension": 3,
         "right_columns": 2,
         "convention": "STANDARD_ROW_BY_COLUMN_PRODUCT_OVER_QQ",
+    }
+    assert result.scope is not None
+    assert result.scope.parameters["right"] is None
+    assert result.scope.parameters["derived_operand"] == {
+        "operand_derivation_version": "1",
+        "source": "LEFT",
+        "target": "RIGHT",
+        "transform": "TRANSPOSE",
     }
 
 
@@ -282,6 +291,43 @@ def test_matrix_product_contracts_reject_incompatible_or_mismatched_shapes() -> 
             }
         )
 
+    with raises(ValidationError, match="source and target must differ"):
+        RationalMatrixProductRequest.model_validate(
+            {
+                "left": _qq([[1]]),
+                "derived_operand": {
+                    "source": "LEFT",
+                    "target": "LEFT",
+                    "transform": "IDENTITY",
+                },
+            }
+        )
+
+    with raises(ValidationError, match="target must be omitted"):
+        RationalMatrixProductRequest.model_validate(
+            {
+                "left": _qq([[1]]),
+                "right": _qq([[1]]),
+                "derived_operand": {
+                    "source": "LEFT",
+                    "target": "RIGHT",
+                    "transform": "IDENTITY",
+                },
+            }
+        )
+
+    with raises(ValidationError, match="source must be explicit"):
+        RationalMatrixProductRequest.model_validate(
+            {
+                "right": _qq([[1]]),
+                "derived_operand": {
+                    "source": "LEFT",
+                    "target": "RIGHT",
+                    "transform": "IDENTITY",
+                },
+            }
+        )
+
     with raises(ValidationError, match="product row count"):
         MatrixProductResult.model_validate(
             {
@@ -291,6 +337,45 @@ def test_matrix_product_contracts_reject_incompatible_or_mismatched_shapes() -> 
                 "right_columns": 2,
             }
         )
+
+
+def test_matrix_product_derives_either_sibling_by_identity_or_transpose(
+    matrix_domain_services: DomainTestServices,
+) -> None:
+    runtime = matrix_domain_services
+    square = runtime.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="matrix.multiply.compute",
+            input={
+                "left": _qq([[0, 1], [0, 0]]),
+                "derived_operand": {
+                    "source": "LEFT",
+                    "target": "RIGHT",
+                    "transform": "IDENTITY",
+                },
+            },
+        )
+    )
+    left_gram = runtime.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="matrix.multiply.compute",
+            input={
+                "right": _qq([[1, 2, 0], [0, 1, 1]]),
+                "derived_operand": {
+                    "source": "RIGHT",
+                    "target": "LEFT",
+                    "transform": "TRANSPOSE",
+                },
+            },
+        )
+    )
+
+    assert square.execution.status is ExecutionStatus.COMPLETED
+    assert square.output["result"]["product"] == _qq([[0, 0], [0, 0]])
+    assert left_gram.execution.status is ExecutionStatus.COMPLETED
+    assert left_gram.output["result"]["product"] == _qq(
+        [[1, 2, 0], [2, 5, 1], [0, 1, 1]]
+    )
 
 
 def test_nullspace_result_enforces_rank_nullity() -> None:
