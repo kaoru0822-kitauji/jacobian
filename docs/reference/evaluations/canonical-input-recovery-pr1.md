@@ -108,7 +108,7 @@ canonicalization-plus-recovery condition.
 ## Engineering closeout
 
 The accepted canonicalization mechanism was rebased without an experimental
-rerun onto upstream `71fa917c289c6214733d369b3dce35904ff47c18`. Review hardening
+rerun onto upstream `0052a5bf78f63f5539be13da6493abb395c5026d`. Review hardening
 now validates an inverse-verification structural representative of the complete
 typed request before duplicate-coefficient accumulation, caps each coefficient
 involved in an accumulation at 256 digits, caps each duplicate group at 64
@@ -142,3 +142,6 @@ lanes. Its component lane had one unrelated macOS timeout-marker failure in
 test, and the same environment race also reproduced in the isolated DRAT timeout
 test. This is retained as an upstream/environment obligation rather than folded
 into the canonicalization change.
+The final non-overlapping restack onto `0052a5bf` passed the 56 focused tests,
+`make check` with 856 unit tests, documentation link checking, test planning,
+and `git diff --check`.
