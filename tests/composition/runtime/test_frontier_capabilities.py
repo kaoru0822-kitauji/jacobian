@@ -309,6 +309,16 @@ def test_graded_jacobian_syzygy_finds_and_verifies_the_first_kernel(
     assert verified.execution.status is ExecutionStatus.COMPLETED
     assert verified.output["status"] == "VERIFIED"
 
+    verifier = next(
+        descriptor
+        for descriptor in frontier_services.core.capabilities.catalog().capabilities
+        if descriptor.capability_id
+        == "polynomial.jacobian_syzygy.minimum_degree.verify"
+    )
+    assert "complete, unmodified producer output.result object" in (
+        verifier.description
+    )
+
 
 def test_graded_jacobian_syzygy_handles_a_zero_partial_derivative(
     frontier_services: DomainTestServices,
