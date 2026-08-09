@@ -1,5 +1,7 @@
 # Evaluation references
 
+- [Canonical input and recovery study PR1](canonical-input-recovery-pr1.md)
+
 [Documentation home](../../index.md) · [Capability surface](../tools.md)
 
 - [Benchmark contracts](benchmark-contracts.md) — Harbor task contracts, dataset inventory, registry/suite/members, snapshot locks, task and verifier validation
