@@ -109,14 +109,15 @@ canonicalization-plus-recovery condition.
 
 The accepted canonicalization mechanism was rebased without an experimental
 rerun onto upstream `0052a5bf78f63f5539be13da6493abb395c5026d`. Review hardening
-now validates an inverse-verification structural representative of the complete
-typed request before duplicate-coefficient accumulation, caps each coefficient
+now validates a structural representative of every complete canonicalizing
+request before duplicate-coefficient accumulation, caps each coefficient
 involved in an accumulation at 256 digits, caps each duplicate group at 64
-terms, and validates the exact combined request again. The dedicated preflight
-checks ordered-ring alignment without applying composition budgets to supports
-that exact cancellation may remove. This preserves canonical candidate and
-artifact identity, accepts representations whose out-of-budget terms cancel,
-and fails closed before unbounded duplicate arithmetic or artifact writes.
+terms, and validates the exact combined request again. A validation context
+keeps structural and cross-field invariants active while deferring only
+support-dependent operation semantics until after exact cancellation. This
+preserves canonical candidate and artifact identity, accepts representations
+whose out-of-budget terms cancel, and fails closed before unbounded duplicate
+arithmetic or artifact writes.
 
 The final-tree focused lane passed 48 contract, inverse-composition, and identity
 boundary tests in tmux session `jac-pr920-review-hardening-r3`. `make check`
@@ -135,13 +136,19 @@ coefficient accumulation. The final focused lane contains 56 tests, including
 the interval-verification seam exposed by the broad gate; no model rollout was
 rerun.
 
-The final `make test-changed BASE=origin/main` run passed unit, domain,
+The final `make test-changed BASE=origin/main` runs passed unit, domain,
 composition, storage, process, MCP, end-to-end, static, build, and documentation
-lanes. Its component lane had one unrelated macOS timeout-marker failure in
-`test_carcara_timeout_fails_closed`; the branch does not change that checker or
-test, and the same environment race also reproduced in the isolated DRAT timeout
-test. This is retained as an upstream/environment obligation rather than folded
-into the canonicalization change.
+lanes. Their component lanes had unrelated macOS timeout-marker failures in one
+or both of `test_carcara_timeout_fails_closed` and
+`test_drat_timeout_fails_closed`; the branch changes neither checker nor test,
+and the DRAT failure also reproduced in isolation. This is retained as an
+upstream/environment obligation rather than folded into the canonicalization
+change.
 The final non-overlapping restack onto `0052a5bf` passed the 56 focused tests,
 `make check` with 856 unit tests, documentation link checking, test planning,
 and `git diff --check`.
+The last review pass generalized full-request preflight beyond inverse
+verification and added an evaluation-dimension regression proving cross-field
+failure precedes duplicate accumulation. Its expanded focused lane passed 65
+tests, and `make check` again passed 856 unit tests plus lint, format, complexity,
+and type checking. No model rollout was rerun.

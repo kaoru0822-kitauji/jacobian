@@ -209,6 +209,38 @@ def test_complete_request_is_rejected_before_duplicate_term_accumulation(
     assert result.artifact_uris == ()
 
 
+def test_evaluation_cross_field_error_precedes_duplicate_term_accumulation(
+    authorized_complete_runtime,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    polynomial_map, _inverse = _triangular_maps()
+    polynomial_map["coordinates"][0]["terms"].append(_term(1, [1, 0]))
+
+    def unexpected_accumulation(value: object) -> SparseRationalPolynomial:
+        raise AssertionError(f"canonical accumulation reached for {value!r}")
+
+    monkeypatch.setattr(
+        polynomial_support,
+        "_canonical_sparse_polynomial",
+        unexpected_accumulation,
+    )
+
+    result = authorized_complete_runtime.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="polynomial.map.evaluate",
+            mode=CapabilityMode.EXPLORE,
+            input={
+                "map": polynomial_map,
+                "point": [{"num": "0", "den": "1"}],
+            },
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.output["error"]["code"] == "INVALID_POLYNOMIAL_EVALUATION_REQUEST"
+    assert result.artifact_uris == ()
+
+
 def test_duplicate_accumulation_rejects_oversized_coefficients(
     authorized_complete_runtime,
 ) -> None:

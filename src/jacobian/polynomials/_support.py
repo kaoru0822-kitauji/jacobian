@@ -28,6 +28,7 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.exact import CanonicalRational, require_bounded_rational
 from jacobian.contracts.polynomials import (
+    _CANONICALIZATION_PREFLIGHT_CONTEXT_KEY,
     MAX_POLYNOMIAL_EXPONENT,
     MAX_POLYNOMIAL_TERMS,
     MAX_POLYNOMIAL_VARIABLES,
@@ -36,7 +37,6 @@ from jacobian.contracts.polynomials import (
     PolynomialMapEvaluation,
     PolynomialMapInverseSynthesisRequest,
     PolynomialMapInverseVerifyRequest,
-    PolynomialVariable,
     RationalPolynomialMap,
     RationalPolynomialPoint,
     RationalPolynomialTerm,
@@ -89,29 +89,6 @@ class _SparsePolynomialInput(ContractModel):
         default=(),
         max_length=MAX_POLYNOMIAL_TERMS,
     )
-
-
-class _PolynomialMapInverseVerifyInput(ContractModel):
-    """Inverse-check request shape without composition operation budgets."""
-
-    forward_map: RationalPolynomialMap
-    inverse_map: RationalPolynomialMap
-    source_variables: tuple[PolynomialVariable, ...] = Field(min_length=1, max_length=4)
-    target_variables: tuple[PolynomialVariable, ...] = Field(min_length=1, max_length=4)
-
-    @model_validator(mode="after")
-    def require_compatible_ordered_rings(self) -> Self:
-        if self.forward_map.variables != self.source_variables:
-            raise ValueError("forward map variables must equal source_variables")
-        if self.inverse_map.variables != self.target_variables:
-            raise ValueError("inverse map variables must equal target_variables")
-        if len(self.source_variables) != len(self.target_variables):
-            raise ValueError("source and target dimensions must agree")
-        if len(self.forward_map.coordinates) != len(self.target_variables):
-            raise ValueError("forward map coordinate count must match target_variables")
-        if len(self.inverse_map.coordinates) != len(self.source_variables):
-            raise ValueError("inverse map coordinate count must match source_variables")
-        return self
 
 
 def _require_bounded_duplicate_accumulation(
@@ -631,12 +608,14 @@ def _validate_request[RequestModel: ContractModel](
     error_factory: Callable[[str, str, str], CapabilityInvocationError] | None = None,
 ) -> RequestModel:
     try:
-        if model is PolynomialMapInverseVerifyRequest:
-            structural_payload = _normalize_sparse_polynomial_inputs(
-                payload,
-                normalize=_structural_sparse_polynomial,
-            )
-            _PolynomialMapInverseVerifyInput.model_validate(structural_payload)
+        structural_payload = _normalize_sparse_polynomial_inputs(
+            payload,
+            normalize=_structural_sparse_polynomial,
+        )
+        model.model_validate(
+            structural_payload,
+            context={_CANONICALIZATION_PREFLIGHT_CONTEXT_KEY: True},
+        )
         canonical_payload = _normalize_sparse_polynomial_inputs(
             payload,
             normalize=_canonical_sparse_polynomial,
