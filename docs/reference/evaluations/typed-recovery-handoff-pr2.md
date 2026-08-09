@@ -173,7 +173,10 @@ tests with 3 platform skips and failed only
 the timeout. `jac-pr928-component-repro` reproduced that exact failure alone.
 Neither the test nor its checker implementation differs from `origin/main`, so
 this is recorded as an inherited local macOS boundary failure, not recovery
-evidence and not a reason to change PR2.
+evidence and not a reason to change PR2. After upstream removed
+implementation-coupled polynomial checker seams, the final restack repeated all
+30 focused tests and `make check` with 855 unit tests in
+`jac-pr928-main519-final`; both passed.
 
 The raw baseline and treatment directories, batch manifests, exact task and
 verifier digests, model and prompt settings, tool surfaces, trajectory JSONL,
