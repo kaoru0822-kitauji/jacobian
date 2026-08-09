@@ -478,7 +478,6 @@ def planned_commands(
 
     has_infrastructure = any(is_infrastructure_path(entry.path) for entry in entries)
     has_ordinary_python = any(is_ordinary_python_path(entry.path) for entry in entries)
-    has_npm = any(entry.path.startswith("npm/") for entry in entries)
     run_python = plan.get("run-python") == "true"
 
     commands: list[str] = []
@@ -498,8 +497,6 @@ def planned_commands(
 
     for lane in GATE_LANES:
         if lane == "static":
-            continue
-        if lane == "npm" and not has_npm:
             continue
         if lane in gate_lanes:
             commands.append(COMMANDS[lane][0])

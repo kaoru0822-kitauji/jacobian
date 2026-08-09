@@ -629,7 +629,23 @@ def test_planned_commands_uses_check_static_for_infrastructure_with_focused_test
     assert "make test-unit TESTS=tests/unit/test_plan_local_tests.py" in commands
     assert all("security" not in command for command in commands)
     assert all("duplicate" not in command for command in commands)
-    assert all("npm-test" not in command for command in commands)
+    assert "make npm-test" in commands
+
+
+def test_planned_commands_honors_npm_gate_for_python_facing_changes() -> None:
+    planner = _load_script_module(
+        "plan_local_tests_python_npm_gate", "plan-local-tests"
+    )
+
+    commands = planner.planned_commands(
+        [planner.Change("M", "src/jacobian/adapters/mcp/server.py")],
+        _plan(npm=True, python=True),
+        [],
+        None,
+        False,
+    )
+
+    assert commands == ["make lint typecheck", "make npm-test"]
 
 
 def test_planned_commands_mixed_infra_and_python_uses_check_static(
