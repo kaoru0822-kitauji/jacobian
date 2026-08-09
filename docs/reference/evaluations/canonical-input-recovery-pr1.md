@@ -123,4 +123,5 @@ preserved one boundary-projection bug in the new guard; its rerun was not a mode
 rollout and did not alter the frozen study outcomes. After the final upstream
 restack, the same 48-test lane passed again in `jac-pr920-latest-final`, and
 `make check` passed 884 unit tests plus lint, format, and type checking in
-`jac-pr920-latest-check`.
+`jac-pr920-latest-check`. The final checker-seam restack passed the 48 focused
+tests and `make check` with 854 unit tests in `jac-pr920-main519-final`.
