@@ -1,6 +1,7 @@
 # Evaluation references
 
 - [Canonical input and recovery study PR1](canonical-input-recovery-pr1.md)
+- [Typed recovery handoff study PR2](typed-recovery-handoff-pr2.md)
 
 [Documentation home](../../index.md) · [Capability surface](../tools.md)
 
