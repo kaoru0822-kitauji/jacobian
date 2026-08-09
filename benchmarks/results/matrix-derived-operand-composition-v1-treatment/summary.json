@@ -1,0 +1,18 @@
+{
+  "causal_claim_authorized": false,
+  "condition": "derived-operand-treatment",
+  "evidence_class": "public-host-local-semantic-tool-observation",
+  "extraction_error_count": 0,
+  "harbor_execution_claimed": false,
+  "outcomes": {
+    "ACCEPTED": 2,
+    "REJECTED": 4
+  },
+  "reasoning_protocol": {
+    "COMPLETE": 6
+  },
+  "run_count": 6,
+  "schema_version": "1",
+  "study_id": "matrix-derived-operand-composition-v1",
+  "task_count": 3
+}

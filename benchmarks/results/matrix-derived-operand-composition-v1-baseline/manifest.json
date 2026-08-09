@@ -1,0 +1,239 @@
+{
+  "artifacts": {
+    "runs/hadamard-order12-construction-r01/codex.jsonl": "sha256:07210677063c4b59156014c85c78948fe99b65e767c6e044540a27ffdbd39fd7",
+    "runs/hadamard-order12-construction-r01/codex.stderr": "sha256:1aa26269eb1cc57f86b235a03cda53c004edb5b1e9fc99d4da4f00843293d721",
+    "runs/hadamard-order12-construction-r01/extraction.json": "sha256:5246bfe66fb0dce8eef4e7224f5f2473f186feae8f5137dc2eb46eab38c6937f",
+    "runs/hadamard-order12-construction-r01/jacobian-mcp.stderr": "sha256:713c20187e7f24ef3c5c32838acd289eabd57c40880c30faf1fb4227b488dd9d",
+    "runs/hadamard-order12-construction-r01/jacobian-mcp.stdout": "sha256:1b530b7909b286d1d2af9a3470bd1cea0c5d6e9f1806609e77afe9c4a8d0e20a",
+    "runs/hadamard-order12-construction-r01/reasoning-log.jsonl": "sha256:a42ed31b4ba0fa2b0f098ed810fdd7a47249fd66400407aefba6d8f0a453adfa",
+    "runs/hadamard-order12-construction-r01/run.json": "sha256:dd66f90af54027f0c6cad1d00a3f01ce8de38e84c8c8d25b04deb0585fbf6c59",
+    "runs/hadamard-order12-construction-r01/surface.json": "sha256:7db4fb9799e5d8a7deaa9d367c8be40a088de7abb90be71fcd010c9fad0da0dc",
+    "runs/hadamard-order12-construction-r01/verification/logs/reward-details.json": "sha256:8cff0507586b4bac05cabebedbd5388f3e9dd39ff355ce2196c0ea825d243f14",
+    "runs/hadamard-order12-construction-r01/verification/logs/reward.json": "sha256:b2695462ed3c7dd9715862d5c6f030c98f63b701b75282bb90a60ffcaeab06b2",
+    "runs/hadamard-order12-construction-r01/workspace/evidence/answer.txt": "sha256:8144b41c43c89cdd064956e01c52232429991178f609012d00a71fc4f539825c",
+    "runs/hadamard-order12-construction-r01/workspace/input.json": "sha256:e6342e43bac8fb5814706966e2d84877864467d347ac1ccdf8bdabcbf50d0e61",
+    "runs/hadamard-order12-construction-r01/workspace/instruction.md": "sha256:832f82288827a18f403ac988c4d00f180c0b5bf0bfea1d985b436bc24b26b76c",
+    "runs/hadamard-order12-construction-r01/workspace/prompt.txt": "sha256:4a6421bb5bbe9da0febf0fe400a102491d7096601889a7f4f3a2639637730dff",
+    "runs/hadamard-order12-construction-r01/workspace/submission.json": "sha256:7f77a7eaab0aca2a724282adf67bd38dc0b35d2ca7068f3f504d5483438634be",
+    "runs/hadamard-order12-construction-r01/workspace/submission_schema.json": "sha256:b3bd7fd3c045ebd2ad008c9d0bf57457deab37f8f8a346c3407a541ee00243a2",
+    "runs/hadamard-order12-construction-r02/codex.jsonl": "sha256:f1c3885cba75c01f808fc87723c22b66bff313fa8d8b15264cd3dd41a9ff4939",
+    "runs/hadamard-order12-construction-r02/codex.stderr": "sha256:1aa26269eb1cc57f86b235a03cda53c004edb5b1e9fc99d4da4f00843293d721",
+    "runs/hadamard-order12-construction-r02/extraction.json": "sha256:4f112fd77b8311afda716f019c8dfd1d4fbba11397b7d643ee86ef741eaa0460",
+    "runs/hadamard-order12-construction-r02/jacobian-mcp.stderr": "sha256:fcba8eeb4ccf46bd76de287b69a6680b69908762fabed555b619c924a82ed9e4",
+    "runs/hadamard-order12-construction-r02/jacobian-mcp.stdout": "sha256:52bacf087fd85623be89cd985a1340ff743abad7639a23bccf43104dc626b0d9",
+    "runs/hadamard-order12-construction-r02/reasoning-log.jsonl": "sha256:a9e92b56dae658a709b4ccd02f4a5c1ca9bb0385f6997664a9e9b55c29bd1dad",
+    "runs/hadamard-order12-construction-r02/run.json": "sha256:6628266a90ede90fa3d7edfa6a102a54b19985ae00bf8e5504eb4a7b3d525f18",
+    "runs/hadamard-order12-construction-r02/surface.json": "sha256:7db4fb9799e5d8a7deaa9d367c8be40a088de7abb90be71fcd010c9fad0da0dc",
+    "runs/hadamard-order12-construction-r02/verification/logs/reward-details.json": "sha256:8cff0507586b4bac05cabebedbd5388f3e9dd39ff355ce2196c0ea825d243f14",
+    "runs/hadamard-order12-construction-r02/verification/logs/reward.json": "sha256:b2695462ed3c7dd9715862d5c6f030c98f63b701b75282bb90a60ffcaeab06b2",
+    "runs/hadamard-order12-construction-r02/workspace/evidence/answer.txt": "sha256:04ea60f4c8d0623d32dd4718c933047d7fa3ab5b9bae1a2c2547cef902882d85",
+    "runs/hadamard-order12-construction-r02/workspace/input.json": "sha256:e6342e43bac8fb5814706966e2d84877864467d347ac1ccdf8bdabcbf50d0e61",
+    "runs/hadamard-order12-construction-r02/workspace/instruction.md": "sha256:832f82288827a18f403ac988c4d00f180c0b5bf0bfea1d985b436bc24b26b76c",
+    "runs/hadamard-order12-construction-r02/workspace/prompt.txt": "sha256:4a6421bb5bbe9da0febf0fe400a102491d7096601889a7f4f3a2639637730dff",
+    "runs/hadamard-order12-construction-r02/workspace/submission.json": "sha256:5609975a8bf837d42a93c2f8345798f1791a72548f139c01b13c56864f2c8425",
+    "runs/hadamard-order12-construction-r02/workspace/submission_schema.json": "sha256:b3bd7fd3c045ebd2ad008c9d0bf57457deab37f8f8a346c3407a541ee00243a2",
+    "runs/lagrangian-projection-proof-audit-r01/codex.jsonl": "sha256:cbc48217f7559b438e9b71eaec8a5b47bb1a960c0711b08e7672d254e21c7abe",
+    "runs/lagrangian-projection-proof-audit-r01/codex.stderr": "sha256:1aa26269eb1cc57f86b235a03cda53c004edb5b1e9fc99d4da4f00843293d721",
+    "runs/lagrangian-projection-proof-audit-r01/extraction.json": "sha256:74b0fc803d4d50dc630842d4a247dd862067e838419c594959a7b6b5f7f04429",
+    "runs/lagrangian-projection-proof-audit-r01/jacobian-mcp.stderr": "sha256:06bf913ff6cd0bd43b06c5ba7a9b83857d71caf289746675abc1300c567ee7be",
+    "runs/lagrangian-projection-proof-audit-r01/jacobian-mcp.stdout": "sha256:cc32e6ed53d36556b2a72d090e7d50b2da9bc9f3191d72109104ba719d7bc43d",
+    "runs/lagrangian-projection-proof-audit-r01/reasoning-log.jsonl": "sha256:8a3aaf883059884c47b29a66579a698593d932356901481834a8da46e14a175b",
+    "runs/lagrangian-projection-proof-audit-r01/run.json": "sha256:560e8da80bafab32685b3db44669d6addd5457cbcd04e335597b23d19056019e",
+    "runs/lagrangian-projection-proof-audit-r01/surface.json": "sha256:7db4fb9799e5d8a7deaa9d367c8be40a088de7abb90be71fcd010c9fad0da0dc",
+    "runs/lagrangian-projection-proof-audit-r01/verification/logs/reward-details.json": "sha256:6d0572d4d52c8e4b615605d5f3e8f6f70780dc0ad2037a5089163c4ebd7862c5",
+    "runs/lagrangian-projection-proof-audit-r01/verification/logs/reward.json": "sha256:b2695462ed3c7dd9715862d5c6f030c98f63b701b75282bb90a60ffcaeab06b2",
+    "runs/lagrangian-projection-proof-audit-r01/workspace/evidence/answer.txt": "sha256:f3d5bcbad1b86f575eb6ed37587e52eeda652ee4f24c275d8aa9e7d119271075",
+    "runs/lagrangian-projection-proof-audit-r01/workspace/input.json": "sha256:d4e3926941cd4fb8f46438993ce1fa6e6e8cf87e3e263f1b77a270a79876d8bc",
+    "runs/lagrangian-projection-proof-audit-r01/workspace/instruction.md": "sha256:43e3955cb89a8521b1fcf42e8df09e5bbf2a8314c011465e6512e2eb90fdc67c",
+    "runs/lagrangian-projection-proof-audit-r01/workspace/prompt.txt": "sha256:4a6421bb5bbe9da0febf0fe400a102491d7096601889a7f4f3a2639637730dff",
+    "runs/lagrangian-projection-proof-audit-r01/workspace/submission.json": "sha256:919e2d5f74f2794e48bf682db111ed6d0cb81c899aee33435bf832e41376e2f0",
+    "runs/lagrangian-projection-proof-audit-r01/workspace/submission_schema.json": "sha256:87c683974aa5c16263c23b5827b4d9c5663db49dfadb43ddcddcd3834bf3a4e3",
+    "runs/lagrangian-projection-proof-audit-r02/codex.jsonl": "sha256:11317536b727b793ee4fa90c76baf641df3a8f30f152671052d80e8d68e89d32",
+    "runs/lagrangian-projection-proof-audit-r02/codex.stderr": "sha256:1aa26269eb1cc57f86b235a03cda53c004edb5b1e9fc99d4da4f00843293d721",
+    "runs/lagrangian-projection-proof-audit-r02/extraction.json": "sha256:bbedab58673080dc8e4aa6c35c26ff21e1801314fe03934710c49a0da6088df1",
+    "runs/lagrangian-projection-proof-audit-r02/jacobian-mcp.stderr": "sha256:f2adde5e4093ccda1650a097dfe316357a09b64e13a4172d36774ec6b289f09d",
+    "runs/lagrangian-projection-proof-audit-r02/jacobian-mcp.stdout": "sha256:16efe6a21f270185289f309a78c187ef1a643dd91f30ec22599161ec9db860d8",
+    "runs/lagrangian-projection-proof-audit-r02/reasoning-log.jsonl": "sha256:d71a22b376faca929881f735c71d29158f2c67951572488a0e392c57959c1b2b",
+    "runs/lagrangian-projection-proof-audit-r02/run.json": "sha256:4f2029f35fa534fde0a7c67e00d169445e571c1355982fe2c5a6feaac5c597b3",
+    "runs/lagrangian-projection-proof-audit-r02/surface.json": "sha256:7db4fb9799e5d8a7deaa9d367c8be40a088de7abb90be71fcd010c9fad0da0dc",
+    "runs/lagrangian-projection-proof-audit-r02/verification/logs/reward-details.json": "sha256:6d0572d4d52c8e4b615605d5f3e8f6f70780dc0ad2037a5089163c4ebd7862c5",
+    "runs/lagrangian-projection-proof-audit-r02/verification/logs/reward.json": "sha256:b2695462ed3c7dd9715862d5c6f030c98f63b701b75282bb90a60ffcaeab06b2",
+    "runs/lagrangian-projection-proof-audit-r02/workspace/evidence/answer.txt": "sha256:8910bbfef678e7d341cd6446c2062d5f901dee7eefeb5235f8d47ac759556f9d",
+    "runs/lagrangian-projection-proof-audit-r02/workspace/input.json": "sha256:d4e3926941cd4fb8f46438993ce1fa6e6e8cf87e3e263f1b77a270a79876d8bc",
+    "runs/lagrangian-projection-proof-audit-r02/workspace/instruction.md": "sha256:43e3955cb89a8521b1fcf42e8df09e5bbf2a8314c011465e6512e2eb90fdc67c",
+    "runs/lagrangian-projection-proof-audit-r02/workspace/prompt.txt": "sha256:4a6421bb5bbe9da0febf0fe400a102491d7096601889a7f4f3a2639637730dff",
+    "runs/lagrangian-projection-proof-audit-r02/workspace/submission.json": "sha256:9a333455e718304600a7353e7f77a318e009e04167c01e6aefe21d003a8b492d",
+    "runs/lagrangian-projection-proof-audit-r02/workspace/submission_schema.json": "sha256:87c683974aa5c16263c23b5827b4d9c5663db49dfadb43ddcddcd3834bf3a4e3",
+    "runs/matrix-square-zero-counterexample-r01/codex.jsonl": "sha256:a5c1c934c42bd4c4c0ca907ba682188334814d734853dc8d17eeeb5635122201",
+    "runs/matrix-square-zero-counterexample-r01/codex.stderr": "sha256:1aa26269eb1cc57f86b235a03cda53c004edb5b1e9fc99d4da4f00843293d721",
+    "runs/matrix-square-zero-counterexample-r01/extraction.json": "sha256:49f74749b4bbd657312e93e903c19d76f2270259bd5d49e042c8da6469df1e1f",
+    "runs/matrix-square-zero-counterexample-r01/jacobian-mcp.stderr": "sha256:d0bfbcc1a71d76792211e58a2a690ee0453af6f0b8dbc139b2dd90807a066acf",
+    "runs/matrix-square-zero-counterexample-r01/jacobian-mcp.stdout": "sha256:e26cc599a4f6506049dbf1dcf79349dbc79a15177aef3a53979c3b417d2a2f14",
+    "runs/matrix-square-zero-counterexample-r01/reasoning-log.jsonl": "sha256:041e10b9fe26ca6e64d50ec1b16d0c8521cf7e830cb41830ade5e831069b6ae9",
+    "runs/matrix-square-zero-counterexample-r01/run.json": "sha256:1f71c54e0808eceaa6ce89330b748893259cea1775794966fbc50dc3542f549d",
+    "runs/matrix-square-zero-counterexample-r01/surface.json": "sha256:7db4fb9799e5d8a7deaa9d367c8be40a088de7abb90be71fcd010c9fad0da0dc",
+    "runs/matrix-square-zero-counterexample-r01/verification/logs/reward-details.json": "sha256:e74e63f9ad470f7c0efc5102961c5336be65ec696caabf9a2e1aa29526b70699",
+    "runs/matrix-square-zero-counterexample-r01/verification/logs/reward.json": "sha256:452bb15726c21e397ceacf950b4df17a862a2c653664b39e68a5a9dbae16f896",
+    "runs/matrix-square-zero-counterexample-r01/workspace/evidence/answer.txt": "sha256:60bc07e1d15e5768e1e7894ea54f94f13de8d822f3450dd7b7c8108bb35c5939",
+    "runs/matrix-square-zero-counterexample-r01/workspace/input.json": "sha256:d3fb3b32ca882ac9327a511374a2cfaaf3911eaa4cf68d10f1b93f5902c4b863",
+    "runs/matrix-square-zero-counterexample-r01/workspace/instruction.md": "sha256:04d9d31e19f8ec1a03b0779a05344853319816273ca450eb2be41ca2c4b03659",
+    "runs/matrix-square-zero-counterexample-r01/workspace/prompt.txt": "sha256:4a6421bb5bbe9da0febf0fe400a102491d7096601889a7f4f3a2639637730dff",
+    "runs/matrix-square-zero-counterexample-r01/workspace/submission.json": "sha256:ddc145ec8153ba1358efc638bc3a1d321fa8bd074a9bc28fe1f2a777adf4637e",
+    "runs/matrix-square-zero-counterexample-r01/workspace/submission_schema.json": "sha256:0c11db4c7725504a7144d8d08cbfc41852528fca0d9b9b388de81a1eaac50b57",
+    "runs/matrix-square-zero-counterexample-r02/codex.jsonl": "sha256:9bdf99d2c8e83ab8ef239055b0875ac3c04f05e9d09a8e88244471fa783e29d8",
+    "runs/matrix-square-zero-counterexample-r02/codex.stderr": "sha256:1aa26269eb1cc57f86b235a03cda53c004edb5b1e9fc99d4da4f00843293d721",
+    "runs/matrix-square-zero-counterexample-r02/extraction.json": "sha256:c9c07beff97c876b518cf6b5f51a4df7541d1b3dc0c46126ef92062b9553e577",
+    "runs/matrix-square-zero-counterexample-r02/jacobian-mcp.stderr": "sha256:764c1016526588d89b630525f584c53283977fab1ac58649072311f1dd00fb6c",
+    "runs/matrix-square-zero-counterexample-r02/jacobian-mcp.stdout": "sha256:d8d3dbd6628fccf5e8788ed7e62691d9e0cf19a34050236d7b622c2d00d94809",
+    "runs/matrix-square-zero-counterexample-r02/reasoning-log.jsonl": "sha256:ec3aa0f399ffe85a3809c8313d3f77d50d9f882faef426611263ffc8c280664d",
+    "runs/matrix-square-zero-counterexample-r02/run.json": "sha256:986976925101a5032aa70e48eba384ec10789dd098f5d5d7d6a9448610adda5e",
+    "runs/matrix-square-zero-counterexample-r02/surface.json": "sha256:7db4fb9799e5d8a7deaa9d367c8be40a088de7abb90be71fcd010c9fad0da0dc",
+    "runs/matrix-square-zero-counterexample-r02/verification/logs/reward-details.json": "sha256:e74e63f9ad470f7c0efc5102961c5336be65ec696caabf9a2e1aa29526b70699",
+    "runs/matrix-square-zero-counterexample-r02/verification/logs/reward.json": "sha256:452bb15726c21e397ceacf950b4df17a862a2c653664b39e68a5a9dbae16f896",
+    "runs/matrix-square-zero-counterexample-r02/workspace/evidence/answer.txt": "sha256:d49502ded683d9488f751698c25257aafca3a8bd815973b7c71efe6a27c36948",
+    "runs/matrix-square-zero-counterexample-r02/workspace/input.json": "sha256:d3fb3b32ca882ac9327a511374a2cfaaf3911eaa4cf68d10f1b93f5902c4b863",
+    "runs/matrix-square-zero-counterexample-r02/workspace/instruction.md": "sha256:04d9d31e19f8ec1a03b0779a05344853319816273ca450eb2be41ca2c4b03659",
+    "runs/matrix-square-zero-counterexample-r02/workspace/prompt.txt": "sha256:4a6421bb5bbe9da0febf0fe400a102491d7096601889a7f4f3a2639637730dff",
+    "runs/matrix-square-zero-counterexample-r02/workspace/submission.json": "sha256:e48899a994e61d18ce5b9ed6f13d89a534717007120448eedf4fcd6e8753b454",
+    "runs/matrix-square-zero-counterexample-r02/workspace/submission_schema.json": "sha256:0c11db4c7725504a7144d8d08cbfc41852528fca0d9b9b388de81a1eaac50b57",
+    "summary.json": "sha256:fcb3d6ec4d2d97722d22debdf5e592387813a0dbdfa4b51f955954e7af8f37b4"
+  },
+  "codex": {
+    "api_key_forwarded": false,
+    "model": "gpt-5.4-mini",
+    "model_cache_digest": "sha256:fa53edf6c1e5c48ee663b928981f82ac78ab110b8fd7d1918ec57b405b379fa6",
+    "model_catalog_record": {
+      "additional_speed_tiers": [],
+      "apply_patch_tool_type": "freeform",
+      "availability_nux": null,
+      "comp_hash": "2911",
+      "context_window": 272000,
+      "default_reasoning_level": "medium",
+      "default_reasoning_summary": "none",
+      "default_verbosity": "medium",
+      "description": "Small, fast, and cost-efficient model for simpler coding tasks.",
+      "display_name": "GPT-5.4-Mini",
+      "effective_context_window_percent": 95,
+      "experimental_supported_tools": [],
+      "include_apps_usage_instructions": true,
+      "include_plugin_usage_instructions": true,
+      "include_skills_usage_instructions": true,
+      "input_modalities": [
+        "text",
+        "image"
+      ],
+      "max_context_window": 272000,
+      "model_messages": {
+        "approvals": null,
+        "auto_review": null,
+        "collaboration_modes": null,
+        "instructions_template": "You are Codex, a coding agent based on GPT-5. You and the user share the same workspace and collaborate to achieve the user's goals.\n\n{{ personality }}\n\n# General\nAs an expert coding agent, your primary focus is writing code, answering questions, and helping the user complete their task in the current environment. You build context by examining the codebase first without making assumptions or jumping to conclusions. You think through the nuances of the code you encounter, and embody the mentality of a skilled senior software engineer.\n\n- When searching for text or files, prefer using `rg` or `rg --files` respectively because `rg` is much faster than alternatives like `grep`. (If the `rg` command is not found, then use alternatives.)\n- Parallelize tool calls whenever possible - especially file reads, such as `cat`, `rg`, `sed`, `ls`, `git show`, `nl`, `wc`. Use `multi_tool_use.parallel` to parallelize tool calls and only this. Never chain together bash commands with separators like `echo \"====\";` as this renders to the user poorly.\n\n## Editing constraints\n\n- Default to ASCII when editing or creating files. Only introduce non-ASCII or other Unicode characters when there is a clear justification and the file already uses them.\n- Add succinct code comments that explain what is going on if code is not self-explanatory. You should not add comments like \"Assigns the value to the variable\", but a brief comment might be useful ahead of a complex code block that the user would otherwise have to spend time parsing out. Usage of these comments should be rare.\n- Always use apply_patch for manual code edits. Do not use cat or any other commands when creating or editing files. Formatting commands or bulk edits don't need to be done with apply_patch.\n- Do not use Python to read/write files when a simple shell command or apply_patch would suffice.\n- You may be in a dirty git worktree.\n  * NEVER revert existing changes you did not make unless explicitly requested, since these changes were made by the user.\n  * If asked to make a commit or code edits and there are unrelated changes to your work or changes that you didn't make in those files, don't revert those changes.\n  * If the changes are in files you've touched recently, you should read carefully and understand how you can work with the changes rather than reverting them.\n  * If the changes are in unrelated files, just ignore them and don't revert them.\n- Do not amend a commit unless explicitly requested to do so.\n- While you are working, you might notice unexpected changes that you didn't make. It's likely the user made them, or were autogenerated. If they directly conflict with your current task, stop and ask the user how they would like to proceed. Otherwise, focus on the task at hand.\n- **NEVER** use destructive commands like `git reset --hard` or `git checkout --` unless specifically requested or approved by the user.\n- You struggle using the git interactive console. **ALWAYS** prefer using non-interactive git commands.\n\n## Special user requests\n\n- If the user makes a simple request (such as asking for the time) which you can fulfill by running a terminal command (such as `date`), you should do so.\n- If the user asks for a \"review\", default to a code review mindset: prioritise identifying bugs, risks, behavioural regressions, and missing tests. Findings must be the primary focus of the response - keep summaries or overviews brief and only after enumerating the issues. Present findings first (ordered by severity with file/line references), follow with open questions or assumptions, and offer a change-summary only as a secondary detail. If no findings are discovered, state that explicitly and mention any residual risks or testing gaps.\n\n## Autonomy and persistence\nPersist until the task is fully handled end-to-end within the current turn whenever feasible: do not stop at analysis or partial fixes; carry changes through implementation, verification, and a clear explanation of outcomes unless the user explicitly pauses or redirects you.\n\nUnless the user explicitly asks for a plan, asks a question about the code, is brainstorming potential solutions, or some other intent that makes it clear that code should not be written, assume the user wants you to make code changes or run tools to solve the user's problem. In these cases, it's bad to output your proposed solution in a message, you should go ahead and actually implement the change. If you encounter challenges or blockers, you should attempt to resolve them yourself.\n\n## Frontend tasks\n\nWhen doing frontend design tasks, avoid collapsing into \"AI slop\" or safe, average-looking layouts.\nAim for interfaces that feel intentional, bold, and a bit surprising.\n- Typography: Use expressive, purposeful fonts and avoid default stacks (Inter, Roboto, Arial, system).\n- Color & Look: Choose a clear visual direction; define CSS variables; avoid purple-on-white defaults. No purple bias or dark mode bias.\n- Motion: Use a few meaningful animations (page-load, staggered reveals) instead of generic micro-motions.\n- Background: Don't rely on flat, single-color backgrounds; use gradients, shapes, or subtle patterns to build atmosphere.\n- Ensure the page loads properly on both desktop and mobile\n- For React code, prefer modern patterns including useEffectEvent, startTransition, and useDeferredValue when appropriate if used by the team. Do not add useMemo/useCallback by default unless already used; follow the repo's React Compiler guidance.\n- Overall: Avoid boilerplate layouts and interchangeable UI patterns. Vary themes, type families, and visual languages across outputs.\n\nException: If working within an existing website or design system, preserve the established patterns, structure, and visual language.\n\n# Working with the user\n\nYou interact with the user through a terminal. You have 2 ways of communicating with the users:\n- Share intermediary updates in `commentary` channel. \n- After you have completed all your work, send a message to the `final` channel.\nYou are producing plain text that will later be styled by the program you run in. Formatting should make results easy to scan, but not feel mechanical. Use judgment to decide how much structure adds value. Follow the formatting rules exactly.\n\n## Formatting rules\n\n- You may format with GitHub-flavored Markdown.\n- Structure your answer if necessary, the complexity of the answer should match the task. If the task is simple, your answer should be a one-liner. Order sections from general to specific to supporting.\n- Never use nested bullets. Keep lists flat (single level). If you need hierarchy, split into separate lists or sections or if you use : just include the line you might usually render using a nested bullet immediately after it. For numbered lists, only use the `1. 2. 3.` style markers (with a period), never `1)`.\n- Headers are optional, only use them when you think they are necessary. If you do use them, use short Title Case (1-3 words) wrapped in **…**. Don't add a blank line.\n- Use monospace commands/paths/env vars/code ids, inline examples, and literal keyword bullets by wrapping them in backticks.\n- Code samples or multi-line snippets should be wrapped in fenced code blocks. Include an info string as often as possible.\n- File References: When referencing files in your response follow the below rules:\n  * Use markdown links (not inline code) for clickable file paths.\n  * Each reference should have a stand alone path. Even if it's the same file.\n  * For clickable/openable file references, the path target must be an absolute filesystem path. Labels may be short (for example, `[app.ts](/abs/path/app.ts)`).\n  * Optionally include line/column (1‑based): :line[:column] or #Lline[Ccolumn] (column defaults to 1).\n  * Do not use URIs like file://, vscode://, or https://.\n  * Do not provide range of lines\n- Don’t use emojis or em dashes unless explicitly instructed.\n\n## Final answer instructions\n\n- Balance conciseness to not overwhelm the user with appropriate detail for the request. Do not narrate abstractly; explain what you are doing and why.\n- Do not begin responses with conversational interjections or meta commentary. Avoid openers such as acknowledgements (“Done —”, “Got it”, “Great question, ”) or framing phrases.\n- The user does not see command execution outputs. When asked to show the output of a command (e.g. `git show`), relay the important details in your answer or summarize the key lines so the user understands the result.\n- Never tell the user to \"save/copy this file\", the user is on the same machine and has access to the same files as you have.\n- If the user asks for a code explanation, structure your answer with code references.\n- When given a simple task, just provide the outcome in a short answer without strong formatting.\n- When you make big or complex changes, state the solution first, then walk the user through what you did and why.\n- For casual chit-chat, just chat.\n- If you weren't able to do something, for example run tests, tell the user.\n- If there are natural next steps the user may want to take, suggest them at the end of your response. Do not make suggestions if there are no natural next steps. When suggesting multiple options, use numeric lists for the suggestions so the user can quickly respond with a single number.\n\n## Intermediary updates \n\n- Intermediary updates go to the `commentary` channel.\n- User updates are short updates while you are working, they are NOT final answers.\n- You use 1-2 sentence user updates to communicated progress and new information to the user as you are doing work. \n- Do not begin responses with conversational interjections or meta commentary. Avoid openers such as acknowledgements (“Done —”, “Got it”, “Great question, ”) or framing phrases.\n- Before exploring or doing substantial work, you start with a user update acknowledging the request and explaining your first step. You should include your understanding of the user request and explain what you will do. Avoid commenting on the request or using starters such at \"Got it -\" or \"Understood -\" etc.\n- You provide user updates frequently, every 30s.\n- When exploring, e.g. searching, reading files you provide user updates as you go, explaining what context you are gathering and what you've learned. Vary your sentence structure when providing these updates to avoid sounding repetitive - in particular, don't start each sentence the same way.\n- When working for a while, keep updates informative and varied, but stay concise.\n- After you have sufficient context, and the work is substantial you provide a longer plan (this is the only user update that may be longer than 2 sentences and can contain formatting).\n- Before performing file edits of any kind, you provide updates explaining what edits you are making.\n- As you are thinking, you very frequently provide updates even if not taking any actions, informing the user of your progress. You interrupt your thinking and send multiple updates in a row if thinking for more than 100 words.\n- Tone of your updates MUST match your personality.\n",
+        "instructions_variables": {
+          "personality_default": "",
+          "personality_friendly": "# Personality\n\nYou optimize for team morale and being a supportive teammate as much as code quality.  You are consistent, reliable, and kind. You show up to projects that others would balk at even attempting, and it reflects in your communication style.\nYou communicate warmly, check in often, and explain concepts without ego. You excel at pairing, onboarding, and unblocking others. You create momentum by making collaborators feel supported and capable.\n\n## Values\nYou are guided by these core values:\n* Empathy: Interprets empathy as meeting people where they are - adjusting explanations, pacing, and tone to maximize understanding and confidence.\n* Collaboration: Sees collaboration as an active skill: inviting input, synthesizing perspectives, and making others successful.\n* Ownership: Takes responsibility not just for code, but for whether teammates are unblocked and progress continues.\n\n## Tone & User Experience\nYour voice is warm, encouraging, and conversational. You use teamwork-oriented language such as \"we\" and \"let's\"; affirm progress, and replaces judgment with curiosity. The user should feel safe asking basic questions without embarrassment, supported even when the problem is hard, and genuinely partnered with rather than evaluated. Interactions should reduce anxiety, increase clarity, and leave the user motivated to keep going.\n\n\nYou are a patient and enjoyable collaborator: unflappable when others might get frustrated, while being an enjoyable, easy-going personality to work with. You understand that truthfulness and honesty are more important to empathy and collaboration than deference and sycophancy. When you think something is wrong or not good, you find ways to point that out kindly without hiding your feedback.\n\nYou never make the user work for you. You can ask clarifying questions only when they are substantial. Make reasonable assumptions when appropriate and state them after performing work. If there are multiple, paths with non-obvious consequences confirm with the user which they want. Avoid open-ended questions, and prefer a list of options when possible.\n\n## Escalation\nYou escalate gently and deliberately when decisions have non-obvious consequences or hidden risk. Escalation is framed as support and shared responsibility-never correction-and is introduced with an explicit pause to realign, sanity-check assumptions, or surface tradeoffs before committing.\n",
+          "personality_pragmatic": "# Personality\n\nYou are a deeply pragmatic, effective software engineer. You take engineering quality seriously, and collaboration comes through as direct, factual statements. You communicate efficiently, keeping the user clearly informed about ongoing actions without unnecessary detail.\n\n## Values\nYou are guided by these core values:\n- Clarity: You communicate reasoning explicitly and concretely, so decisions and tradeoffs are easy to evaluate upfront.\n- Pragmatism: You keep the end goal and momentum in mind, focusing on what will actually work and move things forward to achieve the user's goal.\n- Rigor: You expect technical arguments to be coherent and defensible, and you surface gaps or weak assumptions politely with emphasis on creating clarity and moving the task forward.\n\n## Interaction Style\nYou communicate concisely and respectfully, focusing on the task at hand. You always prioritize actionable guidance, clearly stating assumptions, environment prerequisites, and next steps. Unless explicitly asked, you avoid excessively verbose explanations about your work.\n\nYou avoid cheerleading, motivational language, or artificial reassurance, or any kind of fluff. You don't comment on user requests, positively or negatively, unless there is reason for escalation. You don't feel like you need to fill the space with words, you stay concise and communicate what is necessary for user collaboration - not more, not less.\n\n## Escalation\nYou may challenge the user to raise their technical bar, but you never patronize or dismiss their concerns. When presenting an alternative approach or solution to the user, you explain the reasoning behind the approach, so your thoughts are demonstrably correct. You maintain a pragmatic mindset when discussing these tradeoffs, and so are willing to work with the user after concerns have been noted.\n"
+        },
+        "permissions": null
+      },
+      "priority": 23,
+      "service_tiers": [],
+      "shell_type": "shell_command",
+      "slug": "gpt-5.4-mini",
+      "support_verbosity": true,
+      "supported_in_api": true,
+      "supported_reasoning_levels": [
+        {
+          "description": "Fast responses with lighter reasoning",
+          "effort": "low"
+        },
+        {
+          "description": "Balances speed and reasoning depth for everyday tasks",
+          "effort": "medium"
+        },
+        {
+          "description": "Greater reasoning depth for complex problems",
+          "effort": "high"
+        },
+        {
+          "description": "Extra high reasoning depth for complex problems",
+          "effort": "xhigh"
+        }
+      ],
+      "supports_image_detail_original": true,
+      "supports_parallel_tool_calls": true,
+      "supports_search_tool": true,
+      "truncation_policy": {
+        "limit": 10000,
+        "mode": "tokens"
+      },
+      "upgrade": {
+        "migration_markdown": "GPT-5.4 Mini will be deprecated soon\n\nCodex now uses GPT-5.6 Luna in place of GPT-5.4 Mini. Switch to GPT-5.6 Luna to continue.\n",
+        "model": "gpt-5.6-luna"
+      },
+      "use_responses_lite": false,
+      "visibility": "list",
+      "web_search_tool_type": "text_and_image"
+    },
+    "reasoning_effort": "medium",
+    "version": "codex-cli 0.147.0"
+  },
+  "condition": "explicit-operands-baseline",
+  "ended_at": "2026-08-09T15:51:09.591749+00:00",
+  "evidence_class": "public-host-local-semantic-tool-observation",
+  "outcomes": {
+    "ACCEPTED": 2,
+    "REJECTED": 4
+  },
+  "product_revision": "aacf3104edb222124d04b538412c5cc0ad3a8ce0",
+  "runner": {
+    "base_digest": "sha256:d4338bfb77e3e5fccfaa149df186a8afc1191b3ef00e8ed916ea8928fd8cb320",
+    "base_path": "/Users/saionjitoko0822/Documents/GitHub/jacobian-multitool-pr2/benchmarks/tooling/multi_tool_coordination_study.py",
+    "wrapper_digest": "sha256:ac233e5140368070c799d5d4261f6281d189a28038c7aa643adb401fba13008d",
+    "wrapper_path": "/Users/saionjitoko0822/Documents/GitHub/jacobian-issue-28-composition/tmp/issue-28-composition/matrix_operand_study.py"
+  },
+  "schema_version": "1",
+  "source_revision": "aacf3104edb222124d04b538412c5cc0ad3a8ce0",
+  "source_tree_clean_at_start": true,
+  "spec": {
+    "digest": "sha256:ab63e1f5214caf94807c7e2d891272ddb2d25dc7a11967fc91d258dcc59b6c66",
+    "path": "benchmarks/config/matrix-derived-operand-composition-v1.json"
+  },
+  "started_at": "2026-08-09T15:32:22.999053+00:00",
+  "study_id": "matrix-derived-operand-composition-v1",
+  "task_contracts": {
+    "hadamard-order12-construction": {
+      "dataset": "conjecture-probes-v1",
+      "harbor_task_digest": "2b98acc7f479de540a8f8129f80ac961bf697dcdb2de6b14205f1b6f4d9cb3ea",
+      "public_bundle_digest": "sha256:ccb691aff89e9d9f18c5f97d0759a6ea53d0c814e6aad1e33ea10c188a1547bc",
+      "public_files": {
+        "environment/input.json": "sha256:e6342e43bac8fb5814706966e2d84877864467d347ac1ccdf8bdabcbf50d0e61",
+        "environment/submission_schema.json": "sha256:b3bd7fd3c045ebd2ad008c9d0bf57457deab37f8f8a346c3407a541ee00243a2",
+        "instruction.md": "sha256:832f82288827a18f403ac988c4d00f180c0b5bf0bfea1d985b436bc24b26b76c"
+      },
+      "verifier_bundle_digest": "sha256:576a555e139a449e4730086a5db9592a75bab9d43621cb15e49ebfeb834cc4fb"
+    },
+    "lagrangian-projection-proof-audit": {
+      "dataset": "mathematical-benchmarks-v1",
+      "harbor_task_digest": "34e1438c8463b9a1d80661e04736aedbf3ad6108b8df80b90fa80349da2dcca3",
+      "public_bundle_digest": "sha256:338b5750f4ad31ae6bb968acd17165b579d6e8c62e37566cefa2d1b30c2c9513",
+      "public_files": {
+        "environment/input.json": "sha256:d4e3926941cd4fb8f46438993ce1fa6e6e8cf87e3e263f1b77a270a79876d8bc",
+        "environment/submission_schema.json": "sha256:87c683974aa5c16263c23b5827b4d9c5663db49dfadb43ddcddcd3834bf3a4e3",
+        "instruction.md": "sha256:43e3955cb89a8521b1fcf42e8df09e5bbf2a8314c011465e6512e2eb90fdc67c"
+      },
+      "verifier_bundle_digest": "sha256:24048bd8b806c21baadf37eefdba621a7dccc0835013a6e20a08f53d7ca49c5f"
+    },
+    "matrix-square-zero-counterexample": {
+      "dataset": "mathematical-benchmarks-v1",
+      "harbor_task_digest": "65887808b95ad5df89468c2141985a1949a0eae41e361d869a4ac9bbf8429c8a",
+      "public_bundle_digest": "sha256:f1519d5788320c0808f9ab629861bfbaa0ed2db5378185f0a36edefbe8acc697",
+      "public_files": {
+        "environment/input.json": "sha256:d3fb3b32ca882ac9327a511374a2cfaaf3911eaa4cf68d10f1b93f5902c4b863",
+        "environment/submission_schema.json": "sha256:0c11db4c7725504a7144d8d08cbfc41852528fca0d9b9b388de81a1eaac50b57",
+        "instruction.md": "sha256:04d9d31e19f8ec1a03b0779a05344853319816273ca450eb2be41ca2c4b03659"
+      },
+      "verifier_bundle_digest": "sha256:72e83028b9a9c11ea1c9f9ec3eb99e62121e9544d5a04e4ee2011c86ca14a9dd"
+    }
+  },
+  "tmux_session": "jac-issue28-baseline"
+}
