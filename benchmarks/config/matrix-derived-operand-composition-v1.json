@@ -1,0 +1,109 @@
+{
+  "schema_version": "1",
+  "study_id": "matrix-derived-operand-composition-v1",
+  "evidence_class": "public-host-local-semantic-tool-observation",
+  "causal_claim_authorized": false,
+  "harbor_execution_claimed": false,
+  "baseline_revision": "0052a5bf78f63f5539be13da6493abb395c5026d",
+  "treatment_revision_policy": "first clean descendant commit implementing only the preregistered matrix-owned derived_operand contract; record the exact revision in the treatment manifest",
+  "model": {
+    "model_id": "gpt-5.4-mini",
+    "reasoning_effort": "medium",
+    "codex_cli_version": "codex-cli 0.147.0"
+  },
+  "agent_instructions": "Complete the task in instruction.md using input.json and submission_schema.json. You may use the configured Jacobian MCP tools for exact mathematical work. Write the required submission.json and evidence files in the workspace. Do not use web search.",
+  "conditions": [
+    {
+      "id": "explicit-operands-baseline",
+      "description": "Current main: matrix.multiply.compute requires two complete explicit RationalMatrix operands."
+    },
+    {
+      "id": "derived-operand-treatment",
+      "description": "The identical surface plus one closed matrix-owned derived_operand field that derives exactly one sibling operand by IDENTITY or TRANSPOSE before multiplication."
+    }
+  ],
+  "treatment_contract": {
+    "capability_id": "matrix.multiply.compute",
+    "new_request_field": "derived_operand",
+    "closed_fields": {
+      "operand_derivation_version": ["1"],
+      "source": ["LEFT", "RIGHT"],
+      "target": ["LEFT", "RIGHT"],
+      "transform": ["IDENTITY", "TRANSPOSE"]
+    },
+    "invariants": [
+      "source and target differ",
+      "the source operand is explicit",
+      "the target operand is omitted before validation and resolved exactly once",
+      "the resolved explicit source, target, and derivation remain bound in checker input",
+      "cycles, two references, JSON pointers, arbitrary expressions, and cross-request references are impossible"
+    ]
+  },
+  "tasks": [
+    {
+      "dataset": "mathematical-benchmarks-v1",
+      "task_id": "matrix-square-zero-counterexample",
+      "harbor_task_digest": "65887808b95ad5df89468c2141985a1949a0eae41e361d869a4ac9bbf8429c8a",
+      "verifier_bundle_digest": "72e83028b9a9c11ea1c9f9ec3eb99e62121e9544d5a04e4ee2011c86ca14a9dd",
+      "selection_basis": "A squared requires reuse of the exact left operand as the right operand."
+    },
+    {
+      "dataset": "mathematical-benchmarks-v1",
+      "task_id": "lagrangian-projection-proof-audit",
+      "harbor_task_digest": "34e1438c8463b9a1d80661e04736aedbf3ad6108b8df80b90fa80349da2dcca3",
+      "verifier_bundle_digest": "24048bd8b806c21baadf37eefdba621a7dccc0835013a6e20a08f53d7ca49c5f",
+      "selection_basis": "The fixed proof audit repeatedly requires D transpose times D and D transpose times J times D."
+    },
+    {
+      "dataset": "conjecture-probes-v1",
+      "task_id": "hadamard-order12-construction",
+      "harbor_task_digest": "2b98acc7f479de540a8f8129f80ac961bf697dcdb2de6b14205f1b6f4d9cb3ea",
+      "verifier_bundle_digest": "576a555e139a449e4730086a5db9592a75bab9d43621cb15e49ebfeb834cc4fb",
+      "selection_basis": "The strict verifier independently recomputes the requested H times H transpose Gram matrix."
+    }
+  ],
+  "execution": {
+    "repetitions_per_task_per_condition": 2,
+    "ordering": "declared-task-order-then-repetition",
+    "timeout_seconds_per_rollout": 600,
+    "sandbox": "workspace-write",
+    "reasoning_log_mode": "REQUIRED",
+    "web_search": "disabled",
+    "wrong_answer_retries": 0,
+    "terminal_reward": "unchanged-task-owned-clean-room-verifier-only",
+    "tool_call_reward": 0
+  },
+  "primary_metric": "task-owned terminal acceptance",
+  "secondary_metrics": [
+    "valid matrix.multiply.compute calls",
+    "invalid matrix.multiply.compute calls",
+    "successful derived-operand calls",
+    "exact matrix.multiply.verify acceptance",
+    "manual matrix reconstruction",
+    "false certification",
+    "wall time and token usage"
+  ],
+  "decision_gate": {
+    "keep": "Treatment preserves or improves terminal acceptance and demonstrates at least two valid derived-operand calls across at least two task lineages without false certification.",
+    "retire": "Treatment reduces terminal acceptance, produces false certification, or is unused across the entire frozen matrix.",
+    "inconclusive": "Any other result remains exploratory and does not justify a generic transform or artifact mechanism."
+  },
+  "invariants": [
+    "same task bytes and Harbor task digests",
+    "same agent instructions, model, reasoning effort, timeout, ordering, and repetitions",
+    "same task-owned verifier bytes and labels",
+    "conditions differ only by the preregistered request-local matrix operand derivation",
+    "no automatic retry, strategy instruction, answer content, assurance promotion, or verifier relaxation"
+  ],
+  "stop_rules": [
+    "preserve every started rollout regardless of outcome",
+    "do not rerun model failures or inconclusive outcomes",
+    "stop after the frozen twelve-rollout matrix",
+    "do not expand beyond sibling IDENTITY and TRANSPOSE derivations based on this study"
+  ],
+  "environment_limitations": [
+    "No Docker, Podman, or compatible Harbor container runtime is installed on the host.",
+    "The digest-recording host runner copies only public task files and invokes the unchanged task verifier in a fresh child process.",
+    "Results are exploratory host-local observations and cannot be reported as Harbor or causal evidence."
+  ]
+}
