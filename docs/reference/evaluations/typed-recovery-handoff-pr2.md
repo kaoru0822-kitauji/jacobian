@@ -7,6 +7,21 @@ the mathematical candidate and the exact checker boundary. The frozen contract i
 No task, prompt, public file, verifier, label, model setting, timeout, or retry
 policy changed between conditions.
 
+## Closeout disposition
+
+This pull request now preserves research evidence only. The experimental
+diagnostic schema, dispatcher behavior, product documentation, and implementation
+tests were removed from the mergeable branch during the final restack. Their
+exact historical implementations remain bound by the frozen revisions below;
+they are not current product behavior.
+
+The product decision is closed: aggregate acceptance was unchanged at 6/9,
+there was only one genuine capability rejection and one typed-recovery exposure
+in treatment, and the single positive rejection-to-repair chain is insufficient
+to establish repeatable behavioral value. No schema expansion, broader rollout,
+or new model execution is authorized by this record. Future work would require a
+new independently frozen study with repeated paired handoff opportunities.
+
 The host had no Docker-, Podman-, or Harbor-compatible container runtime. The
 existing digest-recording coordination runner therefore copied only public task
 files into isolated workspaces, invoked locally authenticated Codex CLI, and ran
@@ -54,10 +69,10 @@ receipt is `/private/tmp/typed-recovery-final-analysis.json`. The first analysis
 session, `jac-recovery-final-analysis`, stopped on formatting before analysis and
 did not alter evidence.
 
-## Recovery contract
+## Historical recovery contract
 
-An existing `CapabilityDiagnostic` may carry one optional closed
-`CapabilityRecovery` object:
+The treatment revision allowed an existing `CapabilityDiagnostic` to carry one
+optional closed `CapabilityRecovery` object:
 
 ```text
 failure_class: REQUEST_VALIDATION
@@ -71,7 +86,7 @@ reusable_input_path: str | null
 retry_input_path: str | null
 ```
 
-The dispatcher emits `REQUEST_VALIDATION`, a shape/value classification,
+The treatment dispatcher emitted `REQUEST_VALIDATION`, a shape/value classification,
 `REPAIR_REQUEST`, `UNASSESSED`, the same factual capability ID, and the advertised
 request type after descriptor input validation fails. It advertises a reusable
 nested path only when exactly one nested object already contains every required
@@ -160,7 +175,7 @@ The sparse polynomial checker was available. Lean and the external `cadical`,
 `drat-trim`, and `carcara` executables were absent and were not needed by the
 frozen tasks.
 
-Final implementation validation ran in `jac-pr928-final-gates`: all 30 focused
+Historical implementation validation ran in `jac-pr928-final-gates`: all 30 focused
 contract and inverse-composition tests passed, `make check` passed 885 unit tests
 plus lint, format, and type checking, and documentation links passed. The
 required planner selected the suite fallback because the benchmark configuration
@@ -173,7 +188,7 @@ tests with 3 platform skips and failed only
 the timeout. `jac-pr928-component-repro` reproduced that exact failure alone.
 Neither the test nor its checker implementation differs from `origin/main`, so
 this is recorded as an inherited local macOS boundary failure, not recovery
-evidence and not a reason to change PR2. After upstream removed
+evidence and not a reason to change the study. After upstream removed
 implementation-coupled polynomial checker seams, the final restack repeated all
 30 focused tests and `make check` with 855 unit tests in
 `jac-pr928-main519-final`; both passed.
@@ -202,3 +217,15 @@ would violate the frozen question. PR2 should not merge as a product change; the
 smallest defensible outcome is to retain this research record and abandon the
 implementation unless a future independently frozen study supplies repeated,
 paired handoff opportunities.
+
+The final branch enacts that outcome. Product commit `d8e47bbc` was omitted when
+the research commits were restacked on canonicalization head `3b242f64`; the
+unique PR2 diff is the frozen configuration and evaluation documentation only.
+Historical treatment implementation `ac771316a9048c7474069688a40f3669b48c2a57`
+remains recorded for auditability, not as merge-ready code.
+
+Final documentation-only closeout was performed on canonicalization head
+`3b242f6487f4d7c1161813747b784b946938e244`. The frozen JSON parsed successfully,
+`make docs-linkcheck`, `make test-plan BASE=3b242f64`, and `git diff --check`
+passed; the planner classified the unique four-file diff as documentation only.
+No model, task, or behavioral evaluation was rerun.

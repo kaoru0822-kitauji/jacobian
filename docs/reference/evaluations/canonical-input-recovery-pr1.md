@@ -224,3 +224,10 @@ to an actual canonical-integer pattern violation, the final file passed. The
 remaining research obligation is a held-out or Harbor comparison that isolates
 recovery from reasoning-log reliability and samples more actual rejected
 producer-to-checker handoffs.
+
+This earlier observation is retained as historical mechanism evidence. The
+subsequent frozen focused comparison is recorded in
+[`typed-recovery-handoff-pr2.md`](typed-recovery-handoff-pr2.md): aggregate
+acceptance remained unchanged, only one treatment rollout exposed typed
+recovery, and the final PR2 branch removed the experimental product code. No
+schema or dispatcher change is proposed by this record.
