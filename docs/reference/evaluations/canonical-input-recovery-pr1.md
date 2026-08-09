@@ -104,3 +104,20 @@ composition files plus one exact-rational capability test. Final PR validation
 is recorded in the pull request checks. The unresolved obligation is a held-out
 or Harbor execution before making a causal claim; the next action is the frozen
 canonicalization-plus-recovery condition.
+
+## Engineering closeout
+
+The accepted canonicalization mechanism was rebased without an experimental
+rerun onto upstream `332f0a5d219628a56c790089dcf0f95fa3045955`. Review hardening
+now validates a canonical-support representative of the complete typed request
+before duplicate-coefficient accumulation, caps each coefficient involved in an
+accumulation at 256 digits, and validates the exact combined request again. This
+preserves canonical candidate and artifact identity while failing closed before
+expensive arithmetic for invalid cross-field requests.
+
+The final-tree focused lane passed 48 contract, inverse-composition, and identity
+boundary tests in tmux session `jac-pr920-review-hardening-r3`. `make check`
+passed 872 unit tests plus the repository lint, format, and type gates in session
+`jac-pr920-check`. The earlier `jac-pr920-review-hardening` failure exposed and
+preserved one boundary-projection bug in the new guard; its rerun was not a model
+rollout and did not alter the frozen study outcomes.

@@ -5,11 +5,13 @@ from typing import Any
 
 import pytest
 
+import jacobian.polynomials._support as polynomial_support
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityMode,
     CapabilityRequest,
 )
+from jacobian.contracts.polynomials import SparseRationalPolynomial
 from jacobian.contracts.results import Conclusion, ExecutionStatus
 from jacobian.runtime.model import JacobianRuntime
 from jacobian_checkers.polynomial_maps import check_map_inverse
@@ -178,6 +180,51 @@ def test_sparse_input_normalization_rejects_malformed_terms_before_artifacts(
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.output["error"]["code"] == "INVALID_REQUEST"
     assert result.output["error"]["stage"] == "capability_input_validation"
+    assert result.artifact_uris == ()
+
+
+def test_complete_request_is_rejected_before_duplicate_term_accumulation(
+    authorized_complete_runtime,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    forward, inverse = _triangular_maps()
+    forward["variables"] = ["z", "y"]
+    forward["coordinates"][0]["terms"].append(_term(1, [1, 0]))
+
+    def unexpected_accumulation(value: object) -> SparseRationalPolynomial:
+        raise AssertionError(f"canonical accumulation reached for {value!r}")
+
+    monkeypatch.setattr(
+        polynomial_support,
+        "_canonical_sparse_polynomial",
+        unexpected_accumulation,
+    )
+
+    result = authorized_complete_runtime.core.capabilities.invoke(
+        _request(forward, inverse)
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.output["error"]["code"] == "INVALID_POLYNOMIAL_MAP_INVERSE_REQUEST"
+    assert result.artifact_uris == ()
+
+
+def test_duplicate_accumulation_rejects_oversized_coefficients(
+    authorized_complete_runtime,
+) -> None:
+    forward, inverse = _triangular_maps()
+    oversized = "9" * 257
+    forward["coordinates"][0]["terms"] = [
+        {"coefficient": {"num": oversized, "den": "1"}, "exponents": [1, 0]},
+        _term(1, [1, 0]),
+    ]
+
+    result = authorized_complete_runtime.core.capabilities.invoke(
+        _request(forward, inverse)
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.output["error"]["code"] == "INVALID_POLYNOMIAL_MAP_INVERSE_REQUEST"
     assert result.artifact_uris == ()
 
 
