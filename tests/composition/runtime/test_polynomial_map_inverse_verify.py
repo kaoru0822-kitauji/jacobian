@@ -109,6 +109,78 @@ def test_two_sided_triangular_inverse_is_verified(authorized_complete_runtime) -
     assert residuals["forward_after_inverse"] == [{"terms": []}, {"terms": []}]
 
 
+def test_noncanonical_sparse_maps_are_normalized_before_verification(
+    authorized_complete_runtime,
+) -> None:
+    canonical_forward, canonical_inverse = _triangular_maps()
+    forward = deepcopy(canonical_forward)
+    inverse = deepcopy(canonical_inverse)
+    forward["coordinates"][0]["terms"] = [
+        _term(1, [0, 2]),
+        {
+            "coefficient": {"num": "3", "den": "2"},
+            "exponents": [1, 0],
+        },
+        {
+            "coefficient": {"num": "-1", "den": "2"},
+            "exponents": [1, 0],
+        },
+        _term(0, [0, 0]),
+    ]
+    inverse["coordinates"][0]["terms"] = [
+        _term(-1, [0, 2]),
+        {
+            "coefficient": {"num": "2", "den": "3"},
+            "exponents": [1, 0],
+        },
+        {
+            "coefficient": {"num": "1", "den": "3"},
+            "exponents": [1, 0],
+        },
+        _term(0, [0, 0]),
+    ]
+
+    normalized = authorized_complete_runtime.core.capabilities.invoke(
+        _request(forward, inverse)
+    )
+    canonical = authorized_complete_runtime.core.capabilities.invoke(
+        _request(canonical_forward, canonical_inverse)
+    )
+
+    assert normalized.output["inverse_verified"] is True
+    assert normalized.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert normalized.output["forward_map_uri"] == canonical.output["forward_map_uri"]
+    assert normalized.output["inverse_map_uri"] == canonical.output["inverse_map_uri"]
+    assert (
+        authorized_complete_runtime.core.store.get(
+            normalized.output["forward_map_uri"]
+        ).payload
+        == canonical_forward
+    )
+    assert (
+        authorized_complete_runtime.core.store.get(
+            normalized.output["inverse_map_uri"]
+        ).payload
+        == canonical_inverse
+    )
+
+
+def test_sparse_input_normalization_rejects_malformed_terms_before_artifacts(
+    authorized_complete_runtime,
+) -> None:
+    forward, inverse = _triangular_maps()
+    forward["coordinates"][0]["terms"][0]["unexpected"] = True
+
+    result = authorized_complete_runtime.core.capabilities.invoke(
+        _request(forward, inverse)
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.output["error"]["code"] == "INVALID_REQUEST"
+    assert result.output["error"]["stage"] == "capability_input_validation"
+    assert result.artifact_uris == ()
+
+
 def test_overlapping_variable_names_use_simultaneous_composition(
     authorized_complete_runtime,
 ) -> None:

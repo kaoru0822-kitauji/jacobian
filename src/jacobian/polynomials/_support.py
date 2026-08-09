@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import multiprocessing
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
+from fractions import Fraction
 from math import prod as multiply
 from queue import Empty
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 
-from pydantic import ValidationError
+from pydantic import Field, ValidationError, model_validator
 
 from jacobian.canonical import format_canonical_integer
 from jacobian.capability_service import CapabilityInvocationError
@@ -27,6 +28,9 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.exact import CanonicalRational
 from jacobian.contracts.polynomials import (
+    MAX_POLYNOMIAL_EXPONENT,
+    MAX_POLYNOMIAL_TERMS,
+    MAX_POLYNOMIAL_VARIABLES,
     PolynomialInverseCoefficientEquation,
     PolynomialInverseSupportMode,
     PolynomialMapEvaluation,
@@ -52,6 +56,76 @@ if TYPE_CHECKING:
     from sympy import Poly
 
 _INVERSE_SOLVER_SHUTDOWN_TIMEOUT_SECONDS = 1.0
+
+
+class _SparsePolynomialInputTerm(ContractModel):
+    """One exact boundary term before like-term canonicalization."""
+
+    coefficient: CanonicalRational
+    exponents: tuple[int, ...] = Field(
+        min_length=1,
+        max_length=MAX_POLYNOMIAL_VARIABLES,
+    )
+
+    @model_validator(mode="after")
+    def require_bounded_exponents(self) -> Self:
+        if any(
+            exponent < 0 or exponent > MAX_POLYNOMIAL_EXPONENT
+            for exponent in self.exponents
+        ):
+            raise ValueError(
+                "polynomial exponents exceed the shared representation limit"
+            )
+        return self
+
+
+class _SparsePolynomialInput(ContractModel):
+    """Bounded noncanonical sparse terms accepted only at capability input."""
+
+    terms: tuple[_SparsePolynomialInputTerm, ...] = Field(
+        default=(),
+        max_length=MAX_POLYNOMIAL_TERMS,
+    )
+
+
+def _canonical_sparse_polynomial(
+    value: object,
+) -> SparseRationalPolynomial:
+    parsed = _SparsePolynomialInput.model_validate(value)
+    coefficients: dict[tuple[int, ...], Fraction] = {}
+    for term in parsed.terms:
+        coefficients[term.exponents] = (
+            coefficients.get(term.exponents, Fraction())
+            + term.coefficient.as_fraction()
+        )
+    return SparseRationalPolynomial(
+        terms=tuple(
+            RationalPolynomialTerm(
+                coefficient=CanonicalRational.from_fraction(coefficient),
+                exponents=exponents,
+            )
+            for exponents, coefficient in sorted(
+                coefficients.items(),
+                reverse=True,
+            )
+            if coefficient
+        )
+    )
+
+
+def _canonicalize_sparse_polynomial_inputs(value: object) -> object:
+    """Canonicalize exact sparse leaves while retaining the request structure."""
+
+    if isinstance(value, Mapping):
+        if "terms" in value and set(value) == {"terms"}:
+            return _canonical_sparse_polynomial(value).model_dump(mode="json")
+        return {
+            key: _canonicalize_sparse_polynomial_inputs(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_canonicalize_sparse_polynomial_inputs(item) for item in value]
+    return value
 
 
 def _materialize_map(
@@ -481,7 +555,7 @@ def _validate_request[RequestModel: ContractModel](
     error_factory: Callable[[str, str, str], CapabilityInvocationError] | None = None,
 ) -> RequestModel:
     try:
-        return model.model_validate(payload)
+        return model.model_validate(_canonicalize_sparse_polynomial_inputs(payload))
     except ValidationError as exc:
         raise (error_factory or _polynomial_error)(
             code,
