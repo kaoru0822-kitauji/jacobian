@@ -277,9 +277,8 @@ MATRIX_CAPABILITIES = (
         "Multiply two exact rational matrices",
         (
             "Compute the standard row-by-column product of two compatible bounded "
-            "matrices over QQ, with the operand shapes bound in the result. Supply "
-            "both operands explicitly, or derive exactly one omitted sibling by "
-            "IDENTITY for a self-product or TRANSPOSE for a Gram product."
+            "matrices over QQ, with the operand shapes bound in the result. Equal "
+            "operands give the exact self-product or matrix square."
         ),
         RationalMatrixProductRequest,
         MatrixProductResult,
@@ -290,39 +289,10 @@ MATRIX_CAPABILITIES = (
         "product",
         "self-product",
         "matrix-square",
-        "gram-matrix",
-        "transpose",
-        "derived-operand",
         "zero-matrix",
         "matrix-identity",
         "exact-rational",
         invocation_examples=(
-            example(
-                "multiply_by_transpose",
-                "Compute A times its transpose without repeating A.",
-                {
-                    "left": {
-                        "entries": [
-                            [
-                                {"num": "1", "den": "1"},
-                                {"num": "2", "den": "1"},
-                                {"num": "0", "den": "1"},
-                            ],
-                            [
-                                {"num": "0", "den": "1"},
-                                {"num": "1", "den": "1"},
-                                {"num": "1", "den": "1"},
-                            ],
-                        ]
-                    },
-                    "derived_operand": {
-                        "operand_derivation_version": "1",
-                        "source": "LEFT",
-                        "target": "RIGHT",
-                        "transform": "TRANSPOSE",
-                    },
-                },
-            ),
             example(
                 "multiply_rectangular_matrices",
                 "Multiply a 2x3 matrix by a 3x2 matrix over QQ.",
@@ -360,7 +330,6 @@ MATRIX_CAPABILITIES = (
                 },
             ),
         ),
-        version="2",
     ),
     matrix_operation(
         "matrix.normal_form.rref.compute",

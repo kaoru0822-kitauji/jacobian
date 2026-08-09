@@ -39,103 +39,24 @@ class RationalMatrixRequest(ContractModel):
         return self
 
 
-class MatrixProductOperandDerivation(ContractModel):
-    """One exact request-local derivation of a sibling product operand."""
-
-    operand_derivation_version: Literal["1"] = "1"
-    source: Literal["LEFT", "RIGHT"]
-    target: Literal["LEFT", "RIGHT"]
-    transform: Literal["IDENTITY", "TRANSPOSE"]
-
-    @model_validator(mode="after")
-    def require_distinct_operands(self) -> Self:
-        if self.source == self.target:
-            raise ValueError("derived operand source and target must differ")
-        return self
-
-
 class RationalMatrixProductRequest(ContractModel):
-    """Two compatible bounded matrices, optionally deriving one sibling operand."""
+    """Two compatible bounded matrices over the exact rational domain."""
 
-    left: RationalMatrix | None = Field(
-        default=None,
-        description=(
-            "Explicit left operand, or omitted only when derived_operand targets LEFT."
-        ),
-    )
-    right: RationalMatrix | None = Field(
-        default=None,
-        description=(
-            "Explicit right operand, or omitted only when derived_operand targets RIGHT."
-        ),
-    )
-    derived_operand: MatrixProductOperandDerivation | None = Field(
-        default=None,
-        description=(
-            "Optionally derive exactly one omitted operand from its explicit sibling "
-            "by IDENTITY or TRANSPOSE within this request."
-        ),
-    )
+    left: RationalMatrix
+    right: RationalMatrix
 
     @model_validator(mode="after")
     def require_compatible_shapes(self) -> Self:
-        left = self.left
-        right = self.right
-        derivation = self.derived_operand
-        if derivation is None:
-            if left is None or right is None:
-                raise ValueError(
-                    "matrix multiplication requires both operands unless "
-                    "derived_operand defines the omitted operand"
-                )
-        else:
-            source = left if derivation.source == "LEFT" else right
-            target = left if derivation.target == "LEFT" else right
-            if source is None:
-                raise ValueError("derived operand source must be explicit")
-            if target is not None:
-                raise ValueError("derived operand target must be omitted")
-            derived_rows = (
-                len(source.entries)
-                if derivation.transform == "IDENTITY"
-                else len(source.entries[0])
-            )
-            derived_columns = (
-                len(source.entries[0])
-                if derivation.transform == "IDENTITY"
-                else len(source.entries)
-            )
-            if derivation.target == "LEFT":
-                left_columns = derived_columns
-                assert right is not None
-                right_rows = len(right.entries)
-            else:
-                assert left is not None
-                left_columns = len(left.entries[0])
-                right_rows = derived_rows
-            if left_columns != right_rows:
-                raise ValueError(
-                    "matrix multiplication requires the resolved left column "
-                    "count to equal the resolved right row count"
-                )
-            require_matrix_scalar_digits(
-                source.entries,
-                maximum=MAX_INPUT_SCALAR_DIGITS,
-                label="matrix input",
-            )
-            return self
-
-        assert left is not None and right is not None
-        if len(left.entries[0]) != len(right.entries):
+        if len(self.left.entries[0]) != len(self.right.entries):
             raise ValueError(
                 "matrix multiplication requires the left column count to equal "
                 "the right row count"
             )
         require_matrix_scalar_digits(
-            left.entries, maximum=MAX_INPUT_SCALAR_DIGITS, label="matrix input"
+            self.left.entries, maximum=MAX_INPUT_SCALAR_DIGITS, label="matrix input"
         )
         require_matrix_scalar_digits(
-            right.entries, maximum=MAX_INPUT_SCALAR_DIGITS, label="matrix input"
+            self.right.entries, maximum=MAX_INPUT_SCALAR_DIGITS, label="matrix input"
         )
         return self
 

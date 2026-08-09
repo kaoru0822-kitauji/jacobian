@@ -899,55 +899,8 @@ def check_matrix_nullspace(request: dict[str, Any]) -> dict[str, Any]:
     )
 
 
-def _matrix_product_operands(source: dict[str, Any]) -> tuple[Any, Any]:
-    if set(source) == {"left", "right"}:
-        derivation = None
-    elif set(source) == {"left", "right", "derived_operand"}:
-        derivation = source["derived_operand"]
-    else:
-        raise ValueError("matrix product source is malformed")
-    if derivation is None:
-        return (
-            _bounded_rational_matrix(
-                source["left"],
-                maximum_digits=_MAX_MATRIX_INPUT_DIGITS,
-            ),
-            _bounded_rational_matrix(
-                source["right"],
-                maximum_digits=_MAX_MATRIX_INPUT_DIGITS,
-            ),
-        )
-    if not isinstance(derivation, dict) or set(derivation) != {
-        "operand_derivation_version",
-        "source",
-        "target",
-        "transform",
-    }:
-        raise ValueError("matrix product operand derivation is malformed")
-    if (
-        derivation["operand_derivation_version"] != "1"
-        or derivation["source"] not in {"LEFT", "RIGHT"}
-        or derivation["target"] not in {"LEFT", "RIGHT"}
-        or derivation["source"] == derivation["target"]
-        or derivation["transform"] not in {"IDENTITY", "TRANSPOSE"}
-    ):
-        raise ValueError("matrix product operand derivation is unsupported")
-    source_name = derivation["source"].lower()
-    target_name = derivation["target"].lower()
-    if source[source_name] is None or source[target_name] is not None:
-        raise ValueError("matrix product operand derivation is not sibling-bound")
-    explicit = _bounded_rational_matrix(
-        source[source_name],
-        maximum_digits=_MAX_MATRIX_INPUT_DIGITS,
-    )
-    derived = (
-        explicit if derivation["transform"] == "IDENTITY" else explicit.transpose()
-    )
-    return (derived, explicit) if target_name == "left" else (explicit, derived)
-
-
 def _matrix_product(source: dict[str, Any], result: dict[str, Any]) -> bool:
-    if set(result) != {
+    if set(source) != {"left", "right"} or set(result) != {
         "product",
         "left_rows",
         "inner_dimension",
@@ -957,7 +910,14 @@ def _matrix_product(source: dict[str, Any], result: dict[str, Any]) -> bool:
         return False
     if result["convention"] != "STANDARD_ROW_BY_COLUMN_PRODUCT_OVER_QQ":
         return False
-    left, right = _matrix_product_operands(source)
+    left = _bounded_rational_matrix(
+        source["left"],
+        maximum_digits=_MAX_MATRIX_INPUT_DIGITS,
+    )
+    right = _bounded_rational_matrix(
+        source["right"],
+        maximum_digits=_MAX_MATRIX_INPUT_DIGITS,
+    )
     if left.ncols() != right.nrows():
         return False
     expected = left * right

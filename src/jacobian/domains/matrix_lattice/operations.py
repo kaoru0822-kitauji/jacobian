@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from jacobian.canonical import format_canonical_integer
 from jacobian.contracts.exact import CanonicalRational
-from jacobian.contracts.matrices import RationalMatrix
 from jacobian.contracts.matrix_operations import (
     CharacteristicPolynomialResult,
     IntegerMatrixRequest,
@@ -144,44 +143,9 @@ def compute_trace(request: SquareIntegerMatrixRequest) -> MatrixTraceResult:
     )
 
 
-def _transpose_rational_matrix(matrix: RationalMatrix) -> RationalMatrix:
-    return RationalMatrix(
-        entries=tuple(
-            tuple(matrix.entries[row][column] for row in range(len(matrix.entries)))
-            for column in range(len(matrix.entries[0]))
-        )
-    )
-
-
-def _product_operands(
-    request: RationalMatrixProductRequest,
-) -> tuple[RationalMatrix, RationalMatrix]:
-    derivation = request.derived_operand
-    if derivation is None:
-        if request.left is None or request.right is None:  # pragma: no cover
-            raise ValueError("validated product request has an omitted operand")
-        return request.left, request.right
-    source = request.left if derivation.source == "LEFT" else request.right
-    if source is None:  # pragma: no cover
-        raise ValueError("validated product request has an omitted source operand")
-    derived = (
-        source
-        if derivation.transform == "IDENTITY"
-        else _transpose_rational_matrix(source)
-    )
-    if derivation.target == "LEFT":
-        if request.right is None:  # pragma: no cover
-            raise ValueError("validated product request has no explicit right operand")
-        return derived, request.right
-    if request.left is None:  # pragma: no cover
-        raise ValueError("validated product request has no explicit left operand")
-    return request.left, derived
-
-
 def compute_product(request: RationalMatrixProductRequest) -> MatrixProductResult:
-    left_operand, right_operand = _product_operands(request)
-    left = conversions.rational_matrix_to_sympy(left_operand)
-    right = conversions.rational_matrix_to_sympy(right_operand)
+    left = conversions.rational_matrix_to_sympy(request.left)
+    right = conversions.rational_matrix_to_sympy(request.right)
     product = kernels.matrix_product(left, right)
     return MatrixProductResult(
         product=conversions.rational_matrix_from_sympy(product),
