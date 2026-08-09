@@ -228,6 +228,65 @@ def test_duplicate_accumulation_rejects_oversized_coefficients(
     assert result.artifact_uris == ()
 
 
+def test_duplicate_accumulation_rejects_oversized_groups(
+    authorized_complete_runtime,
+) -> None:
+    forward, inverse = _triangular_maps()
+    forward["coordinates"][0]["terms"] = [
+        _term(1, [1, 0])
+        for _ in range(polynomial_support._MAX_CANONICALIZATION_DUPLICATE_TERMS + 1)
+    ]
+
+    result = authorized_complete_runtime.core.capabilities.invoke(
+        _request(forward, inverse)
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.output["error"]["code"] == "INVALID_POLYNOMIAL_MAP_INVERSE_REQUEST"
+    assert result.artifact_uris == ()
+
+
+def test_cancelled_high_degree_terms_do_not_apply_operation_budget(
+    authorized_complete_runtime,
+) -> None:
+    forward = {
+        "map_schema_version": "1",
+        "domain": "QQ",
+        "variables": ["x"],
+        "coordinates": [
+            {
+                "terms": [
+                    _term(1, [33]),
+                    _term(-1, [33]),
+                    _term(1, [1]),
+                ]
+            }
+        ],
+    }
+    inverse = {
+        "map_schema_version": "1",
+        "domain": "QQ",
+        "variables": ["u"],
+        "coordinates": [{"terms": [_term(1, [1])]}],
+    }
+
+    result = authorized_complete_runtime.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="polynomial.map.inverse.verify",
+            mode=CapabilityMode.VERIFY,
+            input={
+                "forward_map": forward,
+                "inverse_map": inverse,
+                "source_variables": ["x"],
+                "target_variables": ["u"],
+            },
+        )
+    )
+
+    assert result.output["inverse_verified"] is True
+    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
+
+
 def test_overlapping_variable_names_use_simultaneous_composition(
     authorized_complete_runtime,
 ) -> None:

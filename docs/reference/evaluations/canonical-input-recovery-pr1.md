@@ -108,12 +108,15 @@ canonicalization-plus-recovery condition.
 ## Engineering closeout
 
 The accepted canonicalization mechanism was rebased without an experimental
-rerun onto upstream `519dd7b9e34b641dcc138e03af6ffc6e3ed736af`. Review hardening
-now validates a canonical-support representative of the complete typed request
-before duplicate-coefficient accumulation, caps each coefficient involved in an
-accumulation at 256 digits, and validates the exact combined request again. This
-preserves canonical candidate and artifact identity while failing closed before
-expensive arithmetic for invalid cross-field requests.
+rerun onto upstream `71fa917c289c6214733d369b3dce35904ff47c18`. Review hardening
+now validates an inverse-verification structural representative of the complete
+typed request before duplicate-coefficient accumulation, caps each coefficient
+involved in an accumulation at 256 digits, caps each duplicate group at 64
+terms, and validates the exact combined request again. The dedicated preflight
+checks ordered-ring alignment without applying composition budgets to supports
+that exact cancellation may remove. This preserves canonical candidate and
+artifact identity, accepts representations whose out-of-budget terms cancel,
+and fails closed before unbounded duplicate arithmetic or artifact writes.
 
 The final-tree focused lane passed 48 contract, inverse-composition, and identity
 boundary tests in tmux session `jac-pr920-review-hardening-r3`. `make check`
@@ -125,3 +128,17 @@ restack, the same 48-test lane passed again in `jac-pr920-latest-final`, and
 `make check` passed 884 unit tests plus lint, format, and type checking in
 `jac-pr920-latest-check`. The final checker-seam restack passed the 48 focused
 tests and `make check` with 854 unit tests in `jac-pr920-main519-final`.
+After rebasing onto `71fa917c`, the two final review findings were reproduced and
+covered by the focused lane: cancelled degree-33 terms no longer trigger the
+degree-32 operation budget, and a 65-term duplicate group is rejected before
+coefficient accumulation. The final focused lane contains 56 tests, including
+the interval-verification seam exposed by the broad gate; no model rollout was
+rerun.
+
+The final `make test-changed BASE=origin/main` run passed unit, domain,
+composition, storage, process, MCP, end-to-end, static, build, and documentation
+lanes. Its component lane had one unrelated macOS timeout-marker failure in
+`test_carcara_timeout_fails_closed`; the branch does not change that checker or
+test, and the same environment race also reproduced in the isolated DRAT timeout
+test. This is retained as an upstream/environment obligation rather than folded
+into the canonicalization change.
