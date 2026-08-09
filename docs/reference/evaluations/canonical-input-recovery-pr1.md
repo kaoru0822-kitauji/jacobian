@@ -66,13 +66,14 @@ secondary extracted values are not evidence.
 
 The repeated failure justifying the separate recovery condition was a checker
 handoff shape error, not a mathematical rejection. In upstream task 2 repetition
-3, the agent placed the entire four-field inverse-check request under
-`forward_map`, received a root `required` failure, repeated the same nesting, and
-then did it a third time. The run eventually passed only after abandoning that
-checker path and constructing the terminal certificate locally. Existing prose
-listed missing fields, but did not encode that the nested object was a reusable
-request and belonged at the root. This is the bounded target for PR2; reasoning
-log write errors and strategy choices are out of scope.
+3, the agent embedded `inverse_map` and both variable lists inside the
+`forward_map` object, received a root `required` failure, repeated the same
+nesting, and then did it a third time. The run eventually passed only after
+abandoning that checker path and constructing the terminal certificate locally.
+Existing prose listed missing fields, but did not encode stable failure class,
+contract dimension, candidate-reuse state, or expected request type. This is the
+bounded target for PR2; reasoning-log write errors and strategy choices are out
+of scope.
 
 The installed upstream surface advertised Jacobian `0.10.0`, 332 capabilities,
 catalog digest
