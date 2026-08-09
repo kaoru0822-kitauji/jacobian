@@ -152,3 +152,75 @@ verification and added an evaluation-dimension regression proving cross-field
 failure precedes duplicate accumulation. Its expanded focused lane passed 65
 tests, and `make check` again passed 856 unit tests plus lint, format, complexity,
 and type checking. No model rollout was rerun.
+
+## PR2 recovery observation
+
+The combined condition used recovery implementation revision
+`45a6241b9cda98d8edc07dcb89107561f6445a7e`. It attaches one optional, closed
+`recovery` object to the existing diagnostic. The object separates request
+validation from a mathematical conclusion, request shape from request value,
+the permitted local action, candidate-reuse state, compatible capability IDs,
+and expected input type. It may advertise an exact nested-input move only when
+one nested object factually contains every required root field. It does not
+execute the move, validate nested mathematical values, select another
+capability, or change completeness, assurance, or checker authorization.
+
+| Condition | Exact accepted | Rejected | Inconclusive | False certification |
+| --- | ---: | ---: | ---: | ---: |
+| Upstream | 6/9 | 3/9 | 0/9 | 0 |
+| Canonicalization | 6/9 | 1/9 | 2/9 | 0 |
+| Canonicalization and recovery | 7/9 | 0/9 | 2/9 | 0 |
+
+The combined condition had one model timeout and one ambiguous reasoning-run-ID
+failure. Its seven remaining rollouts were accepted by the unchanged exact
+terminal verifier. This is one more raw acceptance than either earlier
+condition, but the observation is not paired causal evidence and the two
+inconclusive outcomes must remain in the denominator.
+
+Four capability-schema rejections carried typed recovery: three inverse-check
+requests and one Jacobian request. The Jacobian trajectory, task 3 repetition 2,
+classified a malformed coordinate as `REQUEST_SHAPE` with action
+`REPAIR_REQUEST`, then corrected the input and completed the same capability.
+Canonicalization alone also contained one rejection-then-success trajectory, so
+the event is evidence that the contract is usable, not evidence that it caused
+the recovery. In task 2 repetition 2, the agent explicitly distinguished a
+shape failure from a mathematical rejection and stopped after one rejected
+capability call; the analogous upstream trajectory repeated the same rejection
+three times. It still finished by local replay because reasoning-log errors
+blocked its planned checker retry.
+
+The harder negative case was a request whose `inverse_map` and variable fields
+were embedded inside the `forward_map` value. The diagnostic honestly reported
+`REQUEST_SHAPE`, `REPAIR_REQUEST`, `UNASSESSED`, and the expected request type,
+but withheld a reusable path because moving that value unchanged would still be
+invalid. The agent did not complete a corrected checker handoff. No recovery
+rollout reintroduced a strict sparse-representation failure, but total tool
+errors increased from 24 in canonicalization to 50 because of unrelated
+`reasoning.write` and MCP-parameter failures. The recovery tweak therefore has
+no demonstrated overall cost reduction or robust checker-handoff improvement.
+
+The recovery surface advertised 332 capabilities, catalog digest
+`sha256:092432d64c583518d30b9afff626de240ab504bf66a8baffd8688a38db58f0fa`,
+content digest
+`sha256:c410428de4279daf10e00789d6137b932b48a0890711e935e276f4edb8152488`,
+unchanged default policy digest
+`sha256:870a92b83d3e522e4015b6bb1cabda33086906f9de1c3c36e466251ea7ed1957`,
+and surface digest
+`sha256:df8ba288231a55f6b8fa03520bcb1e52caf9a37dcca1ad4c502e0222d4b81f14`.
+Raw evidence is under
+`benchmarks/results/canonical-input-recovery-pr1-canonicalization-recovery`.
+The successful named session was `jac-recovery-treatment-2`, with log
+`/private/tmp/jac-recovery-treatment-2.log`. The earlier
+`jac-recovery-treatment` launch failed before model execution because its
+expanded expected revision was mistyped; it created no result tree and is
+preserved in `/private/tmp/jac-recovery-treatment.log`.
+
+Focused implementation evidence includes 10 contract tests in
+`jac-recovery-contracts-2` and all 18 polynomial inverse composition tests in
+`jac-recovery-polynomial-file-2`. The first full-file attempt exposed and
+preserved a test-fixture mistake: a cross-field domain error was incorrectly
+expected to carry generic schema-boundary recovery. After changing that fixture
+to an actual canonical-integer pattern violation, the final file passed. The
+remaining research obligation is a held-out or Harbor comparison that isolates
+recovery from reasoning-log reliability and samples more actual rejected
+producer-to-checker handoffs.
