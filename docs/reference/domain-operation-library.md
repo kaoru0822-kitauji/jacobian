@@ -240,7 +240,10 @@ summaries are not substitutes for the stored system or certificate.
 `geometry.projective_line_arrangement.flats.materialize` is a complete finite
 materializer rather than a theorem prover. It normalizes labelled rational
 projective lines, groups every pair intersection, recovers all incidences, and
-reports multiplicity and pair accounting at `COMPUTED` assurance. When the
+reports multiplicity and pair accounting at `COMPUTED` assurance. Its typed
+inline preview includes at most 32 higher-multiplicity flats, whether that
+projection is complete, and the complete multiplicity histogram and line-pair
+count. The complete flat lattice remains in the result artifact. When the
 operator authorizes it,
 `geometry.projective_line_arrangement.flats.verify` independently replays all
 of those finite incidence obligations and returns the bound verification

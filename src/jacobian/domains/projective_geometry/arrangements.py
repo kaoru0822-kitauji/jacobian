@@ -11,6 +11,7 @@ from jacobian.contracts.projective_geometry import (
     NormalizedProjectiveLine,
     PrimitiveProjectiveTriple,
     ProjectiveArrangementFlat,
+    ProjectiveLineArrangementPreview,
     ProjectiveLineArrangementRequest,
     ProjectiveLineArrangementResult,
     ProjectiveMultiplicityCount,
@@ -19,10 +20,14 @@ from jacobian.contracts.results import ContractModel
 from jacobian.domains._examples import example
 from jacobian.math.arithmetic import primitive_integer_vector
 from jacobian.operations import (
+    ComputedNotApplicable,
+    ComputedOutcome,
+    ComputedSuccess,
     MaterializedOperation,
-    MaterializedOperationFactory,
     OperationFailure,
 )
+
+_PREVIEW_FLAT_LIMIT = 32
 
 
 def _primitive(values: tuple[Fraction, Fraction, Fraction]) -> tuple[int, int, int]:
@@ -134,45 +139,71 @@ def materialize_projective_line_flats(
     )
 
 
-_FACTORY = MaterializedOperationFactory(
-    OperationFailure(
-        code="PROJECTIVE_ARRANGEMENT_NOT_APPLICABLE",
-        stage="projective_arrangement_computation",
-        hint=(
-            "Supply distinct labelled nonzero rational homogeneous line coefficients."
-        ),
-        exceptions=(ArithmeticError, RuntimeError, TypeError, ValueError),
-    )
+_FAILURE = OperationFailure(
+    code="PROJECTIVE_ARRANGEMENT_NOT_APPLICABLE",
+    stage="projective_arrangement_computation",
+    hint=("Supply distinct labelled nonzero rational homogeneous line coefficients."),
+    exceptions=(ArithmeticError, RuntimeError, TypeError, ValueError),
 )
+
+
+def _materialize_projective_line_flats(
+    request: ProjectiveLineArrangementRequest,
+) -> ComputedOutcome[ProjectiveLineArrangementResult]:
+    try:
+        return ComputedSuccess(materialize_projective_line_flats(request))
+    except _FAILURE.exceptions as exc:
+        return ComputedNotApplicable(_FAILURE.diagnostic(exc))
+
+
+def _projective_line_arrangement_preview(
+    result: ProjectiveLineArrangementResult,
+) -> ProjectiveLineArrangementPreview:
+    non_double_flats = tuple(flat for flat in result.flats if flat.multiplicity > 2)
+    projected_flats = non_double_flats[:_PREVIEW_FLAT_LIMIT]
+    return ProjectiveLineArrangementPreview(
+        line_count=result.line_count,
+        non_double_flat_count=len(non_double_flats),
+        non_double_flats=projected_flats,
+        non_double_flats_complete=len(projected_flats) == len(non_double_flats),
+        multiplicity_histogram=result.multiplicity_histogram,
+        pair_count_total=result.pair_count_total,
+    )
+
 
 PROJECTIVE_LINE_ARRANGEMENT_CAPABILITY: MaterializedOperation[
     ProjectiveLineArrangementRequest,
     ProjectiveLineArrangementResult,
-    ProjectiveLineArrangementResult,
+    ProjectiveLineArrangementPreview,
     ContractModel,
-] = _FACTORY(
-    "geometry.projective_line_arrangement.flats.materialize",
-    "Materialize projective line-arrangement flats",
-    (
+] = MaterializedOperation(
+    capability_id="geometry.projective_line_arrangement.flats.materialize",
+    title="Materialize projective line-arrangement flats",
+    description=(
         "Normalize labelled rational projective lines and exactly materialize "
         "every rank-two flat, full incidence set, multiplicity, non-double flat, "
         "and line-pair accounting identity."
     ),
-    ProjectiveLineArrangementRequest,
-    ProjectiveLineArrangementResult,
-    materialize_projective_line_flats,
-    "geometry",
-    "projective",
-    "line-arrangement",
-    "incidence",
-    "flats",
-    "exact",
+    request_model=ProjectiveLineArrangementRequest,
+    result_model=ProjectiveLineArrangementResult,
+    implementation=_materialize_projective_line_flats,
+    tags=(
+        "geometry",
+        "projective",
+        "line-arrangement",
+        "incidence",
+        "flats",
+        "exact",
+    ),
     relation_id="geometry.projective_line_arrangement.flats.relation",
     resource_reason=(
         "the complete labelled flat lattice is retained for durable projective "
         "incidence provenance and downstream certificate binding"
     ),
-    version="3",
+    preview_model=ProjectiveLineArrangementPreview,
+    preview=_projective_line_arrangement_preview,
+    preview_complete=False,
+    version="4",
     invocation_examples=(
         example(
             "two_coordinate_lines",

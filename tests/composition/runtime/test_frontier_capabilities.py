@@ -86,6 +86,105 @@ def _result_payload(
     return computed.output["result"]
 
 
+def test_projective_arrangement_exposes_proof_critical_flat_preview(
+    frontier_services: DomainTestServices,
+) -> None:
+    lines = {
+        "x0": (1, 0, 0),
+        "x1": (1, 0, -1),
+        "y0": (0, 1, 0),
+        "y1": (0, 1, -1),
+        "diag_main": (1, -1, 0),
+        "diag_anti": (1, 1, -1),
+    }
+    result = frontier_services.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="geometry.projective_line_arrangement.flats.materialize",
+            input={
+                "lines": [
+                    {
+                        "label": label,
+                        "coefficients": [_q(value) for value in coefficients],
+                    }
+                    for label, coefficients in lines.items()
+                ]
+            },
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.COMPLETED
+    assert result.output["preview_complete"] is False
+    assert result.output["preview"] == {
+        "preview_schema_version": "1",
+        "line_count": 6,
+        "non_double_flat_count": 4,
+        "non_double_flats": [
+            {
+                "point": {"coordinates": ["0", "0", "1"]},
+                "incident_labels": ["diag_main", "x0", "y0"],
+                "multiplicity": 3,
+                "pair_count": 3,
+            },
+            {
+                "point": {"coordinates": ["0", "1", "1"]},
+                "incident_labels": ["diag_anti", "x0", "y1"],
+                "multiplicity": 3,
+                "pair_count": 3,
+            },
+            {
+                "point": {"coordinates": ["1", "0", "1"]},
+                "incident_labels": ["diag_anti", "x1", "y0"],
+                "multiplicity": 3,
+                "pair_count": 3,
+            },
+            {
+                "point": {"coordinates": ["1", "1", "1"]},
+                "incident_labels": ["diag_main", "x1", "y1"],
+                "multiplicity": 3,
+                "pair_count": 3,
+            },
+        ],
+        "non_double_flats_complete": True,
+        "multiplicity_histogram": [
+            {"multiplicity": 2, "flat_count": 3},
+            {"multiplicity": 3, "flat_count": 4},
+        ],
+        "pair_count_total": 15,
+        "artifact_completion": "COMPLETE",
+        "arithmetic": "EXACT_INTEGER",
+    }
+
+
+def test_projective_arrangement_bounds_large_flat_preview(
+    frontier_services: DomainTestServices,
+) -> None:
+    lines = [(f"x_{value}", (1, 0, -value)) for value in range(21)]
+    lines.extend((f"y_{value}", (0, 1, -value)) for value in range(21))
+    lines.extend((f"s_{value}", (1, 1, -value)) for value in range(22))
+
+    result = frontier_services.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="geometry.projective_line_arrangement.flats.materialize",
+            input={
+                "lines": [
+                    {
+                        "label": label,
+                        "coefficients": [_q(value) for value in coefficients],
+                    }
+                    for label, coefficients in lines
+                ]
+            },
+        )
+    )
+
+    preview = result.output["preview"]
+    assert result.output["preview_complete"] is False
+    assert preview["non_double_flat_count"] > 32
+    assert len(preview["non_double_flats"]) == 32
+    assert preview["non_double_flats_complete"] is False
+    assert preview["pair_count_total"] == 2016
+
+
 def test_projective_arrangement_materializes_the_nine_line_flat_lattice(
     frontier_services: DomainTestServices,
 ) -> None:
