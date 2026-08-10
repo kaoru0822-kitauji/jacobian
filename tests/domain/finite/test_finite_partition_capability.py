@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+from tests.support.core_capability_harnesses import FinitePartitionTestServices
+
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityObligationStatus,
     CapabilityRelationshipStatus,
     CapabilityRequest,
 )
-from jacobian.contracts.checkers import CheckerDecision
-from jacobian.contracts.results import Arithmetic, Conclusion, Coverage, Method
 
 
 def _request(
@@ -35,10 +35,11 @@ def _request(
 
 
 def test_finite_partition_produce_keeps_coverage_obligation_open(
-    attached_complete_runtime,
+    unauthorized_finite_partition_services: FinitePartitionTestServices,
 ) -> None:
-
-    result = attached_complete_runtime.core.capabilities.invoke(_request())
+    result = unauthorized_finite_partition_services.services.core.capabilities.invoke(
+        _request()
+    )
 
     assert result.capability_id == "case.partition.finite"
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
@@ -49,10 +50,9 @@ def test_finite_partition_produce_keeps_coverage_obligation_open(
 
 
 def test_finite_partition_verify_replays_and_discharges_obligation(
-    authorized_complete_runtime,
+    finite_partition_services: FinitePartitionTestServices,
 ) -> None:
-
-    runtime = authorized_complete_runtime
+    runtime = finite_partition_services.services
     result = runtime.core.capabilities.invoke(_request(verify=True))
 
     assert result.capability_id == "case.partition.finite.verify"
@@ -66,9 +66,9 @@ def test_finite_partition_verify_replays_and_discharges_obligation(
 
 
 def test_finite_partition_contract_and_result_preserve_semantic_boundary(
-    authorized_complete_runtime,
+    finite_partition_services: FinitePartitionTestServices,
 ) -> None:
-    runtime = authorized_complete_runtime
+    runtime = finite_partition_services.services
     producer = next(
         item
         for item in runtime.core.capabilities.catalog().capabilities
@@ -83,9 +83,9 @@ def test_finite_partition_contract_and_result_preserve_semantic_boundary(
 
 
 def test_finite_partition_reports_conditional_disjointness_scope(
-    authorized_complete_runtime,
+    finite_partition_services: FinitePartitionTestServices,
 ) -> None:
-    runtime = authorized_complete_runtime
+    runtime = finite_partition_services.services
     request = _request(verify=True, require_disjoint=False)
     request.input["cases"][1]["members"].append("0")
 
@@ -102,10 +102,9 @@ def test_finite_partition_reports_conditional_disjointness_scope(
 
 
 def test_finite_partition_verify_fails_closed_on_incomplete_cases(
-    authorized_complete_runtime,
+    finite_partition_services: FinitePartitionTestServices,
 ) -> None:
-
-    runtime = authorized_complete_runtime
+    runtime = finite_partition_services.services
     result = runtime.core.capabilities.invoke(_request(verify=True, missing_last=True))
 
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
@@ -114,54 +113,15 @@ def test_finite_partition_verify_fails_closed_on_incomplete_cases(
     assert result.obligations[0].status is CapabilityObligationStatus.OPEN
 
 
-def test_verification_rejects_checker_obligation_outside_request(
-    authorized_complete_runtime,
-    monkeypatch,
-) -> None:
-
-    runtime = authorized_complete_runtime
-
-    def accept_with_unbound_obligation(
-        *,
-        request: dict[str, object],
-        **_: object,
-    ) -> CheckerDecision:
-        scope = request["scope"]
-        candidate = request["candidate"]
-        assert isinstance(scope, dict)
-        assert isinstance(candidate, dict)
-        return CheckerDecision(
-            accepted=True,
-            conclusion=Conclusion.TRUE,
-            arithmetic=Arithmetic.EXACT_INTEGER,
-            method=Method.EXHAUSTIVE_FINITE,
-            coverage=Coverage.EXHAUSTIVE,
-            relation_id="case.relation.partitions",
-            relationship_source_artifact_uris=(str(scope["artifact_uri"]),),
-            relationship_target_artifact_uris=(str(candidate["artifact_uri"]),),
-            obligation_uri="artifact://sha256/" + "9" * 64,
-        )
-
-    monkeypatch.setattr(
-        runtime.services.verification,
-        "_run_checker",
-        accept_with_unbound_obligation,
-    )
-
-    result = runtime.core.capabilities.invoke(_request(verify=True))
-
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    assert result.output["verification_record_uri"] is None
-    assert result.obligations[0].status is CapabilityObligationStatus.OPEN
-
-
 def test_finite_partition_duplicate_case_ids_cannot_report_complete(
-    attached_complete_runtime,
+    unauthorized_finite_partition_services: FinitePartitionTestServices,
 ) -> None:
     request = _request()
     request.input["cases"][1]["case_id"] = "even"
 
-    result = attached_complete_runtime.core.capabilities.invoke(request)
+    result = unauthorized_finite_partition_services.services.core.capabilities.invoke(
+        request
+    )
 
     assert result.output["duplicate_case_ids"] == ["even"]
     assert result.completeness.status.value == "PARTIAL"

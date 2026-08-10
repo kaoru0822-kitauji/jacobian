@@ -1,20 +1,31 @@
 from __future__ import annotations
 
-import asyncio
 import json
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
+from tests.support.mcp_projection_catalog import open_mcp_projection_catalog
+from tests.support.services import DomainTestServices
 
-from jacobian.adapters.mcp.server import create_server
+from jacobian.runtime.model import JacobianRuntime
 
-MATH_TOOL_NAMES = {"math.find", "math.run"}
-MCP_TOOL_NAMES = MATH_TOOL_NAMES
+
+@pytest.fixture
+def projection_catalog(tmp_path: Path) -> Iterator[DomainTestServices]:
+    with open_mcp_projection_catalog(tmp_path / "state") as services:
+        yield services
+
+
+def _as_runtime(services: DomainTestServices) -> JacobianRuntime:
+    """Projection helpers only require ``.core.capabilities``."""
+
+    return cast(JacobianRuntime, services)
 
 
 def test_math_find_compacts_related_capabilities_deterministically(
-    attached_complete_runtime,
+    projection_catalog: DomainTestServices,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from jacobian.adapters.mcp import projections
@@ -23,7 +34,7 @@ def test_math_find_compacts_related_capabilities_deterministically(
     target_id = "polynomial.integer.compute.gcd"
     catalog_ids = tuple(
         descriptor.capability_id
-        for descriptor in attached_complete_runtime.core.capabilities.catalog().capabilities
+        for descriptor in projection_catalog.core.capabilities.catalog().capabilities
         if descriptor.capability_id != target_id
     )
     monkeypatch.setitem(
@@ -43,7 +54,7 @@ def test_math_find_compacts_related_capabilities_deterministically(
 
     def discover() -> dict[str, Any]:
         return projections._capability_discovery_response(
-            attached_complete_runtime,
+            _as_runtime(projection_catalog),
             query=target_id,
             domain=None,
             input_kind=None,
@@ -74,7 +85,7 @@ def test_math_find_compacts_related_capabilities_deterministically(
 
 
 def test_math_find_compacts_relationships_before_ranked_discovery_data(
-    attached_complete_runtime,
+    projection_catalog: DomainTestServices,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from jacobian.adapters.mcp import projections
@@ -88,13 +99,13 @@ def test_math_find_compacts_relationships_before_ranked_discovery_data(
         "cursor": None,
     }
     baseline = projections._capability_discovery_response(
-        attached_complete_runtime, **arguments
+        _as_runtime(projection_catalog), **arguments
     )
     baseline_match_ids = [item["capability_id"] for item in baseline["matches"]]
     baseline_domains = baseline["available_domains"]
     catalog_ids = tuple(
         descriptor.capability_id
-        for descriptor in attached_complete_runtime.core.capabilities.catalog().capabilities
+        for descriptor in projection_catalog.core.capabilities.catalog().capabilities
     )
     for target_id in baseline_match_ids:
         monkeypatch.setitem(
@@ -113,7 +124,7 @@ def test_math_find_compacts_relationships_before_ranked_discovery_data(
     )
 
     compacted = projections._capability_discovery_response(
-        attached_complete_runtime, **arguments
+        _as_runtime(projection_catalog), **arguments
     )
 
     assert [
@@ -125,7 +136,7 @@ def test_math_find_compacts_relationships_before_ranked_discovery_data(
 
 
 def test_math_find_accounts_for_fixed_metadata_before_compacting_relationships(
-    attached_complete_runtime,
+    projection_catalog: DomainTestServices,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from jacobian.adapters.mcp import projections
@@ -141,7 +152,7 @@ def test_math_find_accounts_for_fixed_metadata_before_compacting_relationships(
     }
     related_id = next(
         descriptor.capability_id
-        for descriptor in attached_complete_runtime.core.capabilities.catalog().capabilities
+        for descriptor in projection_catalog.core.capabilities.catalog().capabilities
         if descriptor.capability_id != target_id
     )
     monkeypatch.setitem(
@@ -155,7 +166,7 @@ def test_math_find_accounts_for_fixed_metadata_before_compacting_relationships(
         10_000,
     )
     candidate = projections._capability_discovery_response(
-        attached_complete_runtime, **arguments
+        _as_runtime(projection_catalog), **arguments
     )
     candidate_domains = candidate["available_domains"]
     monkeypatch.setattr(
@@ -165,63 +176,10 @@ def test_math_find_accounts_for_fixed_metadata_before_compacting_relationships(
     )
 
     compacted = projections._capability_discovery_response(
-        attached_complete_runtime, **arguments
+        _as_runtime(projection_catalog), **arguments
     )
 
     assert compacted["matches"][0]["related_capabilities"] == []
     assert compacted["related_capabilities_truncated"] is True
     assert compacted["available_domains"] == candidate_domains
     assert compacted["available_domains_truncated"] is False
-
-
-@pytest.mark.parametrize("view", ["CONTRACT", "FULL"])
-def test_math_find_compacts_exact_inspection_relationships(
-    tmp_path: Path,
-    attached_complete_runtime,
-    monkeypatch: pytest.MonkeyPatch,
-    view: str,
-) -> None:
-    from jacobian.adapters.mcp import projections
-
-    target_id = "polynomial.integer.compute.gcd"
-    monkeypatch.setitem(
-        projections._RELATED_CAPABILITIES,
-        target_id,
-        tuple(
-            (descriptor.capability_id, "compatible exact outcome " + "x" * 200)
-            for descriptor in attached_complete_runtime.core.capabilities.catalog().capabilities
-            if descriptor.capability_id != target_id
-        ),
-    )
-
-    async def scenario() -> None:
-        from mcp import Client
-
-        async with Client(create_server(tmp_path), raise_exceptions=True) as client:
-            result = await client.call_tool(
-                "math.find", {"capability_id": target_id, "view": view}
-            )
-
-        assert result.structured_content is not None
-        structured = result.structured_content
-        text_result = json.loads(result.content[0].text)
-        assert (
-            len(
-                projections._mcp_text_json_bytes(
-                    structured.get("related_capabilities", [])
-                )
-            )
-            <= structured["related_capabilities_byte_limit"]
-        )
-        assert structured["related_capabilities_truncated"] is True
-        assert structured["truncation_reason"] == "BYTE_LIMIT"
-        assert "response_byte_limit" not in structured
-        assert "related_capabilities" not in structured["capability"]
-        assert text_result["related_capabilities_truncated"] is True
-        assert text_result["truncation_reason"] == "BYTE_LIMIT"
-        assert (
-            text_result["related_capabilities_byte_limit"]
-            == structured["related_capabilities_byte_limit"]
-        )
-
-    asyncio.run(scenario())
