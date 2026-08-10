@@ -30,6 +30,36 @@ class GraphMaximumMatchingRequest(ContractModel):
     graph: GraphMaximumMatchingGraph
 
 
+class GraphIndependenceNumberGraph(ChromaticGraph):
+    """A simple graph bounded for the dedicated independence-number search."""
+
+    vertices: tuple[GraphVertex, ...] = Field(max_length=128)
+    edges: tuple[tuple[GraphVertex, GraphVertex], ...] = Field(max_length=8_128)
+
+
+class GraphIndependenceNumberBudget(ContractModel):
+    """Explicit wall-clock and order limits for independence-number search."""
+
+    wall_seconds: StrictInt = Field(default=5, ge=1, le=120)
+    max_solver_calls: StrictInt = Field(default=1, ge=1, le=33)
+    max_order: StrictInt = Field(default=128, ge=0, le=128)
+
+
+class GraphIndependenceNumberRequest(ContractModel):
+    """One bounded simple-graph independence-number request."""
+
+    graph: GraphIndependenceNumberGraph
+    resource_budget: GraphIndependenceNumberBudget = Field(
+        default_factory=GraphIndependenceNumberBudget
+    )
+
+    @model_validator(mode="after")
+    def enforce_order_budget(self) -> Self:
+        if len(self.graph.vertices) > self.resource_budget.max_order:
+            raise ValueError("graph order exceeds the declared max_order budget")
+        return self
+
+
 GraphDistance = Annotated[StrictInt, Field(ge=0, le=31)] | None
 GraphDistanceRow = Annotated[
     tuple[GraphDistance, ...],
@@ -297,6 +327,12 @@ class GraphCliqueNumberResult(GraphCardinalityMaximumResult):
 
 
 class GraphIndependenceNumberResult(GraphCardinalityMaximumResult):
+    order: StrictInt = Field(ge=0, le=128)
+    optimum_value: StrictInt | None = Field(default=None, ge=0, le=128)
+    incumbent_value: StrictInt = Field(ge=0, le=128)
+    lower_bound: StrictInt = Field(ge=0, le=128)
+    upper_bound: StrictInt = Field(ge=0, le=128)
+    witness_vertices: tuple[GraphVertex, ...] = Field(max_length=128)
     convention: Literal["MAXIMUM_EDGE_FREE_VERTEX_SUBSET"] = (
         "MAXIMUM_EDGE_FREE_VERTEX_SUBSET"
     )
@@ -314,6 +350,26 @@ class GraphCardinalityMaximumObligation(ContractModel):
     lower_bound: StrictInt = Field(ge=0, le=32)
     upper_bound: StrictInt = Field(ge=0, le=32)
     witness_vertices: tuple[GraphVertex, ...]
+    tested: tuple[OptimizationSearchStep, ...]
+    required_checks: tuple[
+        Literal["WITNESS_FEASIBILITY", "MAXIMUM_CARDINALITY"],
+        ...,
+    ] = ("WITNESS_FEASIBILITY", "MAXIMUM_CARDINALITY")
+
+
+class GraphIndependenceNumberObligation(ContractModel):
+    """Open feasibility and optimality checks for one independence result."""
+
+    obligation_schema_version: Literal["1"] = "1"
+    graph: GraphIndependenceNumberGraph
+    predicate: Literal["GRAPH_INDEPENDENCE_NUMBER_OPTIMALITY"] = (
+        "GRAPH_INDEPENDENCE_NUMBER_OPTIMALITY"
+    )
+    status: OptimizationStatus
+    claimed_value: StrictInt | None = Field(default=None, ge=0, le=128)
+    lower_bound: StrictInt = Field(ge=0, le=128)
+    upper_bound: StrictInt = Field(ge=0, le=128)
+    witness_vertices: tuple[GraphVertex, ...] = Field(max_length=128)
     tested: tuple[OptimizationSearchStep, ...]
     required_checks: tuple[
         Literal["WITNESS_FEASIBILITY", "MAXIMUM_CARDINALITY"],

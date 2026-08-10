@@ -21,6 +21,8 @@ from jacobian.contracts.graph_invariant_operations import (
     GraphEdgeConnectivityResult,
     GraphEulerianResult,
     GraphGirthResult,
+    GraphIndependenceNumberObligation,
+    GraphIndependenceNumberRequest,
     GraphIndependenceNumberResult,
     GraphInvariantRequest,
     GraphMaximumMatchingRequest,
@@ -65,6 +67,15 @@ _INVALID_MAXIMUM_MATCHING_REQUEST = CapabilityDiagnostic(
         "Input does not satisfy the bounded finite simple-graph matching contract."
     ),
     hint="Supply a simple graph with at most 64 vertices and 2,016 edges.",
+)
+
+_INVALID_INDEPENDENCE_NUMBER_REQUEST = CapabilityDiagnostic(
+    code="INVALID_GRAPH_INDEPENDENCE_NUMBER_REQUEST",
+    stage="graph_independence_number_input_validation",
+    message=(
+        "Input does not satisfy the bounded finite simple-graph independence contract."
+    ),
+    hint="Supply a simple graph with at most 128 vertices and 8,128 edges.",
 )
 
 
@@ -336,20 +347,14 @@ def _k_core_execute(
 
 def _maximum_cardinality(
     request: GraphOptimizationRequest,
-    *,
-    independent: bool,
-) -> GraphCliqueNumberResult | GraphIndependenceNumberResult:
+) -> GraphCliqueNumberResult:
     import networkx as nx
 
     z3 = Z3_LOADER.get()
-    source = cast(Any, build_simple_graph(request.graph))
-    graph = nx.complement(source) if independent else source
+    graph = cast(Any, build_simple_graph(request.graph))
     vertices = tuple(request.graph.vertices)
-    result_model = (
-        GraphIndependenceNumberResult if independent else GraphCliqueNumberResult
-    )
     if not vertices:
-        return result_model(
+        return GraphCliqueNumberResult(
             status="EXACT",
             order=0,
             optimum_value=0,
@@ -435,7 +440,7 @@ def _maximum_cardinality(
         upper_bound = len(incumbent)
         exact = True
 
-    return result_model(
+    return GraphCliqueNumberResult(
         status="EXACT" if exact else "UNKNOWN",
         order=len(vertices),
         optimum_value=len(incumbent) if exact else None,
@@ -452,24 +457,116 @@ def _maximum_cardinality(
 def _clique_execute(
     request: GraphOptimizationRequest,
 ) -> BoundedSearchOutcome[GraphCliqueNumberResult]:
-    result = cast(
-        GraphCliqueNumberResult,
-        _maximum_cardinality(request, independent=False),
-    )
+    result = _maximum_cardinality(request)
     if result.status == "EXACT":
         return BoundedSearchWitness(result)
     return BoundedSearchIncomplete(result)
 
 
 def _independence_execute(
-    request: GraphOptimizationRequest,
+    request: GraphIndependenceNumberRequest,
 ) -> BoundedSearchOutcome[GraphIndependenceNumberResult]:
-    result = cast(
-        GraphIndependenceNumberResult,
-        _maximum_cardinality(request, independent=True),
-    )
-    if result.status == "EXACT":
+    import networkx as nx
+
+    z3 = Z3_LOADER.get()
+    source = cast(Any, build_simple_graph(request.graph))
+    vertices = tuple(request.graph.vertices)
+    if not vertices:
+        result = GraphIndependenceNumberResult(
+            status="EXACT",
+            order=0,
+            optimum_value=0,
+            incumbent_value=0,
+            lower_bound=0,
+            upper_bound=0,
+            witness_vertices=(),
+            tested=(),
+            termination_reason="SPECIAL_CASE",
+            detail="the empty graph has optimum zero",
+        )
         return BoundedSearchWitness(result)
+
+    started = time.monotonic()
+    complement = nx.complement(source)
+    incumbent = tuple(sorted(nx.approximation.max_clique(complement)))
+    remaining_ms = int(
+        (request.resource_budget.wall_seconds - (time.monotonic() - started)) * 1000
+    )
+    if remaining_ms <= 0:
+        result = GraphIndependenceNumberResult(
+            status="UNKNOWN",
+            order=len(vertices),
+            optimum_value=None,
+            incumbent_value=len(incumbent),
+            lower_bound=len(incumbent),
+            upper_bound=len(vertices),
+            witness_vertices=incumbent,
+            tested=(),
+            termination_reason="WALL_TIME",
+            detail="the wall-clock budget expired after the initial approximation",
+        )
+        return BoundedSearchIncomplete(result)
+
+    optimizer = z3.Optimize()
+    optimizer.set(timeout=max(1, remaining_ms))
+    selected = {
+        vertex: z3.Bool(f"selected_{index}") for index, vertex in enumerate(vertices)
+    }
+    for left, right in sorted(source.edges):
+        optimizer.add(z3.Or(z3.Not(selected[left]), z3.Not(selected[right])))
+    objective = optimizer.maximize(
+        z3.Sum([z3.If(selected[vertex], 1, 0) for vertex in vertices])
+    )
+    status = optimizer.check()
+    if status == z3.sat:
+        model = optimizer.model()
+        optimized = tuple(
+            sorted(
+                vertex
+                for vertex, variable in selected.items()
+                if z3.is_true(model.eval(variable, model_completion=True))
+            )
+        )
+        if len(optimized) > len(incumbent):
+            incumbent = optimized
+        lower = objective.lower()
+        upper = objective.upper()
+        if (
+            z3.is_int_value(lower)
+            and z3.is_int_value(upper)
+            and lower.as_long() == upper.as_long() == len(incumbent)
+        ):
+            result = GraphIndependenceNumberResult(
+                status="EXACT",
+                order=len(vertices),
+                optimum_value=len(incumbent),
+                incumbent_value=len(incumbent),
+                lower_bound=len(incumbent),
+                upper_bound=len(incumbent),
+                witness_vertices=incumbent,
+                tested=(),
+                termination_reason="OPTIMUM_ESTABLISHED",
+                detail=("bounded Z3 optimization seeded by a NetworkX approximation"),
+            )
+            return BoundedSearchWitness(result)
+
+    termination: OptimizationTermination = (
+        "WALL_TIME"
+        if time.monotonic() - started >= request.resource_budget.wall_seconds
+        else "SOLVER_UNKNOWN"
+    )
+    result = GraphIndependenceNumberResult(
+        status="UNKNOWN",
+        order=len(vertices),
+        optimum_value=None,
+        incumbent_value=len(incumbent),
+        lower_bound=len(incumbent),
+        upper_bound=len(vertices),
+        witness_vertices=incumbent,
+        tested=(),
+        termination_reason=termination,
+        detail="bounded Z3 optimization did not establish an exact optimum",
+    )
     return BoundedSearchIncomplete(result)
 
 
@@ -486,19 +583,41 @@ def _scope(
     }
 
 
+def _independence_scope(
+    request: GraphIndependenceNumberRequest,
+    result: GraphIndependenceNumberResult,
+) -> dict[str, object]:
+    del result
+    return {
+        "order": len(request.graph.vertices),
+        "wall_seconds": request.resource_budget.wall_seconds,
+        "max_solver_calls": request.resource_budget.max_solver_calls,
+        "max_order": request.resource_budget.max_order,
+    }
+
+
 def _obligation(
     request: GraphOptimizationRequest,
-    result: GraphCliqueNumberResult | GraphIndependenceNumberResult,
-    *,
-    independent: bool,
+    result: GraphCliqueNumberResult,
 ) -> GraphCardinalityMaximumObligation:
     return GraphCardinalityMaximumObligation(
         graph=request.graph,
-        predicate=(
-            "GRAPH_INDEPENDENCE_NUMBER_OPTIMALITY"
-            if independent
-            else "GRAPH_CLIQUE_NUMBER_OPTIMALITY"
-        ),
+        predicate="GRAPH_CLIQUE_NUMBER_OPTIMALITY",
+        status=result.status,
+        claimed_value=result.optimum_value,
+        lower_bound=result.lower_bound,
+        upper_bound=result.upper_bound,
+        witness_vertices=result.witness_vertices,
+        tested=result.tested,
+    )
+
+
+def _independence_obligation(
+    request: GraphIndependenceNumberRequest,
+    result: GraphIndependenceNumberResult,
+) -> GraphIndependenceNumberObligation:
+    return GraphIndependenceNumberObligation(
+        graph=request.graph,
         status=result.status,
         claimed_value=result.optimum_value,
         lower_bound=result.lower_bound,
@@ -519,8 +638,8 @@ CLIQUE_NUMBER_CAPABILITY = BoundedSearchOperation(
     scope_parameters=_scope,
     is_complete=lambda result: result.status == "EXACT",
     obligation_model=GraphCardinalityMaximumObligation,
-    obligation=lambda request, result: _obligation(request, result, independent=False),
-    incomplete_basis="the bounded threshold search did not establish optimality",
+    obligation=_obligation,
+    incomplete_basis="the bounded optimization did not establish optimality",
     tags=("graph", "invariant", "clique", "maximum", "bounded", "z3"),
     invalid_request=_INVALID_REQUEST,
 )
@@ -529,19 +648,21 @@ INDEPENDENCE_NUMBER_CAPABILITY = BoundedSearchOperation(
     capability_id="graph.invariant.independence_number.compute",
     title="Independence number",
     description=(
-        "Compute a maximum independent set under explicit finite search budgets."
+        "Compute a maximum independent set through order 128 under explicit "
+        "finite search budgets."
     ),
-    request_model=GraphOptimizationRequest,
+    request_model=GraphIndependenceNumberRequest,
     result_model=GraphIndependenceNumberResult,
     implementation=_independence_execute,
     relation_id="graph.invariant.independence_number.relation",
-    scope_parameters=_scope,
+    scope_parameters=_independence_scope,
     is_complete=lambda result: result.status == "EXACT",
-    obligation_model=GraphCardinalityMaximumObligation,
-    obligation=lambda request, result: _obligation(request, result, independent=True),
-    incomplete_basis="the bounded threshold search did not establish optimality",
+    obligation_model=GraphIndependenceNumberObligation,
+    obligation=_independence_obligation,
+    incomplete_basis="the bounded optimization did not establish optimality",
     tags=("graph", "invariant", "independent-set", "maximum", "bounded", "z3"),
-    invalid_request=_INVALID_REQUEST,
+    invalid_request=_INVALID_INDEPENDENCE_NUMBER_REQUEST,
+    version="2",
 )
 
 BOUNDED_GRAPH_INVARIANT_CAPABILITIES = (

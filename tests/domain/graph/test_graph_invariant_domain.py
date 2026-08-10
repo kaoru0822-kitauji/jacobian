@@ -249,6 +249,26 @@ _CYCLE_5 = {
 }
 
 
+def _biggs_smith_graph() -> dict[str, object]:
+    vertices = [f"{index}{letter}" for index in range(1, 18) for letter in "abcdef"]
+    edges: set[tuple[str, str]] = set()
+
+    def add_edge(left: str, right: str) -> None:
+        edges.add(tuple(sorted((left, right))))
+
+    for index in range(1, 18):
+        for leaf in "ab":
+            add_edge(f"{index}{leaf}", f"{index}e")
+        for leaf in "cd":
+            add_edge(f"{index}{leaf}", f"{index}f")
+        add_edge(f"{index}e", f"{index}f")
+    for letter, step in (("a", 1), ("b", 4), ("c", 2), ("d", 8)):
+        for index in range(1, 18):
+            target = ((index - 1 + step) % 17) + 1
+            add_edge(f"{index}{letter}", f"{target}{letter}")
+    return _graph(vertices, [list(edge) for edge in sorted(edges)])
+
+
 class _InconsistentCliqueBackend:
     def __init__(self, backend: object) -> None:
         self._backend = backend
@@ -318,3 +338,67 @@ def test_np_hard_invariants_are_budgeted_and_carry_obligations(
     assert len(result.artifact_uris) == 3
     obligation = domain_services.core.store.get(result.obligations[0].obligation_uri)
     assert obligation.payload["claimed_value"] == optimum
+
+
+def test_independence_number_reproduces_biggs_smith_alpha_43(
+    domain_services,
+) -> None:
+    graph = _biggs_smith_graph()
+
+    result = domain_services.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.invariant.independence_number.compute",
+            input={
+                "graph": graph,
+                "resource_budget": {
+                    "wall_seconds": 120,
+                    "max_solver_calls": 33,
+                    "max_order": 128,
+                },
+            },
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.COMPLETED
+    assert result.capability_version == "2"
+    assert result.output["status"] == "EXACT"
+    assert result.output["order"] == 102
+    assert result.output["optimum_value"] == 43
+    witness = set(result.output["witness_vertices"])
+    assert len(witness) == 43
+    assert all(
+        left not in witness or right not in witness for left, right in graph["edges"]
+    )
+    assert result.scope.parameters == {
+        "order": 102,
+        "wall_seconds": 120,
+        "max_solver_calls": 33,
+        "max_order": 128,
+    }
+    obligation = domain_services.core.store.get(result.obligations[0].obligation_uri)
+    assert obligation.payload["predicate"] == "GRAPH_INDEPENDENCE_NUMBER_OPTIMALITY"
+    assert obligation.payload["claimed_value"] == 43
+
+
+def test_independence_number_rejects_order_above_128_without_artifacts(
+    domain_services,
+) -> None:
+    graph = _graph([f"v{index:03d}" for index in range(129)], [])
+
+    result = domain_services.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.invariant.independence_number.compute",
+            input={
+                "graph": graph,
+                "resource_budget": {
+                    "wall_seconds": 120,
+                    "max_solver_calls": 33,
+                    "max_order": 128,
+                },
+            },
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "INVALID_REQUEST"
+    assert result.artifact_uris == ()
