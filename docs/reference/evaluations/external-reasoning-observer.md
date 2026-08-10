@@ -90,3 +90,7 @@ Its baseline and treatment use the same completed trajectory: treatment is the
 post-run derivation only. Agent behavior, tool calls, tokens, verifier results,
 and false-certification classification are therefore paired invariants rather
 than outcomes the observer is allowed to influence.
+
+See the [completed pilot report](external-reasoning-observer-pilot.md) for the
+authenticated weak-model observations, evidence digests, limitations, and keep
+decision.
