@@ -31,7 +31,8 @@ Each server event receives an operator-supplied trial ID and a sequence within
 the runtime log. A non-`none` server request digest is the only cross-event
 correlation key. The observer does not ask the model to mint run or call IDs,
 and it does not infer chronology between the independently ordered agent and
-server artifacts.
+server artifacts. Both sources must resolve beneath the operator-bound trial
+root without crossing a symlink; a source from another trial is rejected.
 
 Agent summaries are optional self-reports. Only explicit, user-visible agent
 messages are eligible:
@@ -46,7 +47,8 @@ messages is a complete observation with zero summaries.
 ## Privacy, retention, and bounds
 
 Each retained message is redacted for bearer tokens, OpenAI-style API keys,
-and user home-directory prefixes, then bounded to 512 UTF-8 bytes. The record
+user home-directory prefixes, and common temporary-workspace paths, then
+bounded to 512 UTF-8 bytes. The record
 states the original post-redaction byte count, whether truncation occurred,
 and the redaction count. Source bindings retain only a basename, byte count,
 and SHA-256 digest; they do not copy source paths.
@@ -73,6 +75,7 @@ Run the observer over immutable copies of one trial's artifacts:
 ```sh
 uv run python -m benchmarks.tooling.external_reasoning_observer \
   --trial-id graph-counterexample-r01 \
+  --trial-root results/attempt-0 \
   --agent-trace results/attempt-0/artifacts/logs/agent/trajectory.json \
   --server-log results/attempt-0/artifacts/logs/jacobian/mcp.log \
   --output results/attempt-0/external-reasoning-observation.json

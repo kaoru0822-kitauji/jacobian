@@ -57,6 +57,10 @@ _REDACTIONS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"(?i)\bBearer\s+[^\s,;]+"), "[REDACTED_BEARER]"),
     (re.compile(r"\bsk-[A-Za-z0-9_-]{8,}\b"), "[REDACTED_API_KEY]"),
     (re.compile(r"/(?:Users|home)/[^/\s]+"), "[REDACTED_HOME]"),
+    (
+        re.compile(r"/(?:private/)?tmp/[^\s)\]]+|/var/folders/[^\s)\]]+"),
+        "[REDACTED_TEMP_PATH]",
+    ),
 )
 
 
@@ -82,6 +86,7 @@ class ObserverDiagnostic(_Contract):
         "MISSING_SERVER_LOG",
         "UNREADABLE_SERVER_LOG",
         "MALFORMED_SERVER_EVENT",
+        "SOURCE_OUTSIDE_TRIAL_ROOT",
     ]
     source_kind: Literal["AGENT_TRACE", "JACOBIAN_MCP_LOG"]
     source_position: int | None = Field(default=None, ge=1)
@@ -249,6 +254,47 @@ def _read_source(
             byte_count=len(content),
         ),
         None,
+    )
+
+
+def _source_is_within_trial_root(path: Path, trial_root: Path) -> bool:
+    try:
+        relative = path.relative_to(trial_root)
+    except ValueError:
+        return False
+    if not relative.parts:
+        return False
+    current = trial_root
+    for part in relative.parts:
+        current /= part
+        if current.is_symlink():
+            return False
+    try:
+        path.resolve().relative_to(trial_root.resolve())
+    except ValueError:
+        return False
+    return True
+
+
+def _outside_trial_binding(
+    path: Path,
+    *,
+    kind: Literal["AGENT_TRACE", "JACOBIAN_MCP_LOG"],
+    source_format: Literal["CODEX_JSONL", "ATIF_JSON", "JACOBIAN_MCP_LOG"],
+) -> tuple[None, SourceBinding, ObserverDiagnostic]:
+    return (
+        None,
+        SourceBinding(
+            source_kind=kind,
+            source_name=path.name or "outside-trial-root",
+            source_format=source_format,
+            status="INCOMPLETE",
+            byte_count=0,
+        ),
+        ObserverDiagnostic(
+            code="SOURCE_OUTSIDE_TRIAL_ROOT",
+            source_kind=kind,
+        ),
     )
 
 
@@ -518,6 +564,7 @@ def _parse_server_events(
 def observe_external_reasoning(
     *,
     trial_id: str,
+    trial_root: Path,
     agent_trace: Path,
     server_log: Path,
 ) -> ExternalReasoningObservation:
@@ -526,15 +573,31 @@ def observe_external_reasoning(
     trace_format: Literal["CODEX_JSONL", "ATIF_JSON"] = (
         "CODEX_JSONL" if agent_trace.suffix == ".jsonl" else "ATIF_JSON"
     )
-    trace_bytes, trace_binding, trace_read_diagnostic = _read_source(
-        agent_trace,
-        kind="AGENT_TRACE",
-        source_format=trace_format,
+    trace_bytes, trace_binding, trace_read_diagnostic = (
+        _read_source(
+            agent_trace,
+            kind="AGENT_TRACE",
+            source_format=trace_format,
+        )
+        if _source_is_within_trial_root(agent_trace, trial_root)
+        else _outside_trial_binding(
+            agent_trace,
+            kind="AGENT_TRACE",
+            source_format=trace_format,
+        )
     )
-    server_bytes, server_binding, server_read_diagnostic = _read_source(
-        server_log,
-        kind="JACOBIAN_MCP_LOG",
-        source_format="JACOBIAN_MCP_LOG",
+    server_bytes, server_binding, server_read_diagnostic = (
+        _read_source(
+            server_log,
+            kind="JACOBIAN_MCP_LOG",
+            source_format="JACOBIAN_MCP_LOG",
+        )
+        if _source_is_within_trial_root(server_log, trial_root)
+        else _outside_trial_binding(
+            server_log,
+            kind="JACOBIAN_MCP_LOG",
+            source_format="JACOBIAN_MCP_LOG",
+        )
     )
     diagnostics = [
         item
@@ -607,6 +670,7 @@ def observe_external_reasoning(
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--trial-id", required=True)
+    parser.add_argument("--trial-root", type=Path, required=True)
     parser.add_argument("--agent-trace", type=Path, required=True)
     parser.add_argument("--server-log", type=Path, required=True)
     parser.add_argument("--output", type=Path)
@@ -617,6 +681,7 @@ def main() -> int:
     args = _parser().parse_args()
     report = observe_external_reasoning(
         trial_id=args.trial_id,
+        trial_root=args.trial_root,
         agent_trace=args.agent_trace,
         server_log=args.server_log,
     )

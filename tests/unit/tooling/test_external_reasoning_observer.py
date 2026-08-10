@@ -80,6 +80,7 @@ def test_observer_preserves_server_facts_and_only_explicit_messages(
 
     report = observe_external_reasoning(
         trial_id="trial-01",
+        trial_root=tmp_path,
         agent_trace=trace,
         server_log=server_log,
     ).model_dump(mode="json")
@@ -162,6 +163,7 @@ def test_atif_uses_agent_message_but_excludes_reasoning_content(tmp_path: Path) 
 
     report = observe_external_reasoning(
         trial_id="atif-trial",
+        trial_root=tmp_path,
         agent_trace=trace,
         server_log=server_log,
     ).model_dump(mode="json")
@@ -185,6 +187,7 @@ def test_no_explicit_messages_is_complete_and_does_not_gate_server_log(
 
     report = observe_external_reasoning(
         trial_id="no-summary",
+        trial_root=tmp_path,
         agent_trace=trace,
         server_log=server_log,
     )
@@ -219,6 +222,7 @@ def test_malformed_inputs_fail_observation_closed_but_retain_valid_events(
 
     report = observe_external_reasoning(
         trial_id="partial",
+        trial_root=tmp_path,
         agent_trace=trace,
         server_log=server_log,
     )
@@ -249,6 +253,7 @@ def test_summary_is_bounded_by_utf8_bytes_after_redaction(tmp_path: Path) -> Non
 
     report = observe_external_reasoning(
         trial_id="bounded",
+        trial_root=tmp_path,
         agent_trace=trace,
         server_log=server_log,
     )
@@ -284,6 +289,7 @@ def test_rich_wrapped_runtime_log_is_normalized_without_losing_digest(
 
     report = observe_external_reasoning(
         trial_id="wrapped",
+        trial_root=tmp_path,
         agent_trace=trace,
         server_log=server_log,
     )
@@ -292,3 +298,79 @@ def test_rich_wrapped_runtime_log_is_normalized_without_losing_digest(
     event = report.server_events[0]
     assert event.trace_digest == "d4735e3a"
     assert event.argument_digest == "sha256:" + digest
+
+
+def test_sources_cannot_cross_the_operator_bound_trial_root(tmp_path: Path) -> None:
+    trial_a = tmp_path / "trial-a"
+    trial_b = tmp_path / "trial-b"
+    trial_a.mkdir()
+    trial_b.mkdir()
+    trace = _write(trial_a / "codex.jsonl", "")
+    server_log = _write(trial_b / "mcp.log", _server_log())
+
+    report = observe_external_reasoning(
+        trial_id="trial-a",
+        trial_root=trial_a,
+        agent_trace=trace,
+        server_log=server_log,
+    )
+
+    assert report.status == "INCOMPLETE"
+    assert report.server_events == ()
+    assert report.diagnostics[0].code == "SOURCE_OUTSIDE_TRIAL_ROOT"
+    assert report.diagnostics[0].source_kind == "JACOBIAN_MCP_LOG"
+
+
+def test_missing_log_returns_partial_self_reports_without_gating(
+    tmp_path: Path,
+) -> None:
+    trace = _write(
+        tmp_path / "codex.jsonl",
+        json.dumps(
+            {
+                "type": "item.completed",
+                "item": {"type": "agent_message", "text": "Visible fallback."},
+            }
+        ),
+    )
+
+    report = observe_external_reasoning(
+        trial_id="missing-log",
+        trial_root=tmp_path,
+        agent_trace=trace,
+        server_log=tmp_path / "missing.log",
+    )
+
+    assert report.status == "INCOMPLETE"
+    assert [summary.text for summary in report.explicit_summaries] == [
+        "Visible fallback."
+    ]
+    assert report.server_events == ()
+    assert report.diagnostics[0].code == "MISSING_SERVER_LOG"
+
+
+def test_temporary_workspace_paths_are_redacted(tmp_path: Path) -> None:
+    trace = _write(
+        tmp_path / "codex.jsonl",
+        json.dumps(
+            {
+                "type": "item.completed",
+                "item": {
+                    "type": "agent_message",
+                    "text": "Wrote [result](/tmp/private-run/submission.json).",
+                },
+            }
+        ),
+    )
+    server_log = _write(tmp_path / "mcp.log", "")
+
+    report = observe_external_reasoning(
+        trial_id="temp-redaction",
+        trial_root=tmp_path,
+        agent_trace=trace,
+        server_log=server_log,
+    )
+
+    assert report.explicit_summaries[0].text == (
+        "Wrote [result]([REDACTED_TEMP_PATH])."
+    )
