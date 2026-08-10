@@ -1,0 +1,63 @@
+{
+  "schema_version": "1",
+  "study_id": "external-reasoning-observer-v1",
+  "status": "FROZEN_BEFORE_IMPLEMENTATION",
+  "evidence_class": "EXPLORATORY_PAIRED_POST_RUN_OBSERVATION",
+  "causal_claim_authorized": false,
+  "frozen_against": {
+    "git_sha": "9653dd991a47c1be3cf8ad478450b69c8be01482",
+    "git_ref": "origin/main"
+  },
+  "research_question": "Can a passive harness-side observer retain useful server-observed Jacobian events and optional explicit agent progress summaries without changing capability discovery, invocation, or mathematical outcomes?",
+  "decision_hypothesis": "Keep the observer only if it leaves the model-facing MCP surface and every paired trajectory outcome unchanged, fails observation closed without affecting mathematics, and records all parseable math.find/math.run server events.",
+  "intervention": {
+    "baseline": "The completed agent trajectory and Jacobian runtime log without observer output.",
+    "treatment": "Run the observer only after the agent process and verifier have completed, over immutable copies of the same trajectory and runtime log.",
+    "model_visible_change": "NONE",
+    "production_mcp_change": "NONE",
+    "prompt_change": "NONE",
+    "observer_effect": "Post-run CPU time and one additional derived artifact only. The observer cannot affect the paired agent or verifier execution."
+  },
+  "runtime": {
+    "agent": "codex",
+    "agent_authentication": "locally authenticated ChatGPT session",
+    "model": "gpt-5.4-mini",
+    "reasoning_effort": "medium",
+    "web_search": "disabled",
+    "repetitions_per_task": 1,
+    "task_timeout_seconds": 900,
+    "sampling_seed": null,
+    "sampling_deterministic": false
+  },
+  "tasks": [
+    "jacobian/graph-counterexample",
+    "jacobian/finite-field-irreducibility-repair",
+    "jacobian/symbolic-block-determinant-decomposition"
+  ],
+  "primary_safety_outcomes": [
+    "canonical MCP tool names and input schemas are identical before and after the implementation",
+    "paired math.find count is unchanged",
+    "paired math.run count is unchanged",
+    "paired tool-error and parameter-error counts are unchanged",
+    "paired verifier result and false-certification classification are unchanged",
+    "missing or malformed observer input does not change or block any agent, verifier, or mathematical result"
+  ],
+  "secondary_observation_outcomes": [
+    "server event coverage",
+    "explicit user-visible agent-message coverage",
+    "observer status and diagnostics",
+    "observer wall time",
+    "derived artifact bytes",
+    "agent prompt, cached, and completion tokens",
+    "agent wall time and tool-call count"
+  ],
+  "interpretation": {
+    "success": "All primary safety outcomes pass and the observer preserves every parseable server event. Partial or zero explicit-summary coverage is acceptable and must be reported.",
+    "failure": "Any product-surface delta, changed paired outcome, false certification, or observer error that affects agent, verifier, discovery, invocation, assurance, or mathematical execution.",
+    "limitations": [
+      "The small non-deterministic sample estimates usability, not a general performance effect.",
+      "The post-run paired design establishes non-interference structurally; it does not estimate the effect of prompting a model to write summaries.",
+      "Only explicit agent messages are eligible summaries. Hidden chain-of-thought and ATIF reasoning_content are excluded."
+    ]
+  }
+}
