@@ -33,14 +33,31 @@ def _invoke(domain_services, vertices: list[str], edges: list[list[str]]):
     )
 
 
+def _row(
+    source_vertex: str,
+    distances: tuple[int | None, ...] | list[int | None],
+    *,
+    targets: tuple[str, ...] = ("a", "b", "c"),
+) -> dict[str, object]:
+    return {
+        "source_vertex": source_vertex,
+        "distances_by_target": dict(zip(targets, distances, strict=True)),
+    }
+
+
 def _result(**changes: object) -> GraphDistanceMatrixResult:
     values: dict[str, object] = {
-        "semantics_version": "unweighted-shortest-path-distance-matrix.v1",
-        "vertex_ordering": "LEXICOGRAPHIC_ASCENDING",
+        "semantics_version": "unweighted-shortest-path-distance-matrix.v3",
+        "row_ordering": "SOURCE_VERTEX_LEXICOGRAPHIC_ASCENDING",
+        "target_ordering": "TARGET_VERTEX_LEXICOGRAPHIC_ASCENDING",
         "pair_coverage": "ALL_ORDERED_VERTEX_PAIRS",
         "unreachable_representation": "JSON_NULL",
-        "vertices": ("a", "b", "c"),
-        "distances": ((0, 1, 2), (1, 0, 1), (2, 1, 0)),
+        "target_vertices": ("a", "b", "c"),
+        "rows": (
+            _row("a", (0, 1, 2)),
+            _row("b", (1, 0, 1)),
+            _row("c", (2, 1, 0)),
+        ),
         "connected": True,
     }
     values.update(changes)
@@ -59,16 +76,39 @@ def test_distance_matrix_is_complete_canonical_and_lineage_bound(
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.output["result"] == {
-        "semantics_version": "unweighted-shortest-path-distance-matrix.v1",
-        "vertex_ordering": "LEXICOGRAPHIC_ASCENDING",
+        "semantics_version": "unweighted-shortest-path-distance-matrix.v3",
+        "row_ordering": "SOURCE_VERTEX_LEXICOGRAPHIC_ASCENDING",
+        "target_ordering": "TARGET_VERTEX_LEXICOGRAPHIC_ASCENDING",
         "pair_coverage": "ALL_ORDERED_VERTEX_PAIRS",
         "unreachable_representation": "JSON_NULL",
-        "vertices": ["a", "b", "c"],
-        "distances": [[0, 1, 2], [1, 0, 1], [2, 1, 0]],
+        "target_vertices": ["a", "b", "c"],
+        "rows": [
+            _row("a", [0, 1, 2]),
+            _row("b", [1, 0, 1]),
+            _row("c", [2, 1, 0]),
+        ],
         "connected": True,
     }
     assert result.artifact_uris == ()
     assert result.relationships == ()
+
+
+def test_distance_matrix_rows_bind_numeric_looking_vertex_labels(
+    domain_services,
+) -> None:
+    result = _invoke(
+        domain_services,
+        ["0", "2", "10"],
+        [["0", "2"], ["2", "10"]],
+    )
+
+    assert "distances" not in result.output["result"]
+    assert result.output["result"]["target_vertices"] == ["0", "10", "2"]
+    assert result.output["result"]["rows"] == [
+        _row("0", [0, 2, 1], targets=("0", "10", "2")),
+        _row("10", [2, 0, 1], targets=("0", "10", "2")),
+        _row("2", [1, 1, 0], targets=("0", "10", "2")),
+    ]
 
 
 def test_distance_matrix_represents_disconnected_pairs_with_null(
@@ -77,11 +117,11 @@ def test_distance_matrix_represents_disconnected_pairs_with_null(
     result = _invoke(domain_services, ["c", "a", "b"], [["a", "b"]])
 
     assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.output["result"]["vertices"] == ["a", "b", "c"]
-    assert result.output["result"]["distances"] == [
-        [0, 1, None],
-        [1, 0, None],
-        [None, None, 0],
+    assert result.output["result"]["target_vertices"] == ["a", "b", "c"]
+    assert result.output["result"]["rows"] == [
+        _row("a", [0, 1, None]),
+        _row("b", [1, 0, None]),
+        _row("c", [None, None, 0]),
     ]
     assert result.output["result"]["connected"] is False
 
@@ -90,11 +130,11 @@ def test_distance_matrix_empty_and_singleton_conventions(domain_services) -> Non
     empty = _invoke(domain_services, [], [])
     singleton = _invoke(domain_services, ["only"], [])
 
-    assert empty.output["result"]["vertices"] == []
-    assert empty.output["result"]["distances"] == []
+    assert empty.output["result"]["target_vertices"] == []
+    assert empty.output["result"]["rows"] == []
     assert empty.output["result"]["connected"] is False
-    assert singleton.output["result"]["vertices"] == ["only"]
-    assert singleton.output["result"]["distances"] == [[0]]
+    assert singleton.output["result"]["target_vertices"] == ["only"]
+    assert singleton.output["result"]["rows"] == [_row("only", [0], targets=("only",))]
     assert singleton.output["result"]["connected"] is True
 
 
@@ -111,26 +151,74 @@ def test_distance_matrix_rejects_graph_above_existing_order_bound(
 @pytest.mark.parametrize(
     ("changes", "message"),
     (
-        ({"vertices": ("b", "a", "c")}, "unique and sorted"),
-        ({"distances": ((0, 1), (1, 0))}, "square"),
+        ({"target_vertices": ("b", "a", "c")}, "unique and sorted"),
         (
-            {"distances": ((1, 1, 2), (1, 0, 1), (2, 1, 0))},
+            {
+                "rows": (
+                    _row("b", (0, 1, 2)),
+                    _row("a", (1, 0, 1)),
+                    _row("c", (2, 1, 0)),
+                )
+            },
+            "bind every source vertex",
+        ),
+        (
+            {
+                "rows": (
+                    _row("a", (0, 1, 2)),
+                    _row("b", (1, 0, 1)),
+                )
+            },
+            "bind every source vertex",
+        ),
+        (
+            {
+                "rows": (
+                    _row("a", (1, 1, 2)),
+                    _row("b", (1, 0, 1)),
+                    _row("c", (2, 1, 0)),
+                )
+            },
             "diagonal",
         ),
         (
-            {"distances": ((0, 0, 2), (0, 0, 1), (2, 1, 0))},
+            {
+                "rows": (
+                    _row("a", (0, 0, 2)),
+                    _row("b", (0, 0, 1)),
+                    _row("c", (2, 1, 0)),
+                )
+            },
             "off-diagonal",
         ),
         (
-            {"distances": ((0, 1, 2), (2, 0, 1), (2, 1, 0))},
+            {
+                "rows": (
+                    _row("a", (0, 1, 2)),
+                    _row("b", (2, 0, 1)),
+                    _row("c", (2, 1, 0)),
+                )
+            },
             "symmetric",
         ),
         (
-            {"distances": ((0, 1, 3), (1, 0, 1), (3, 1, 0))},
+            {
+                "rows": (
+                    _row("a", (0, 1, 3)),
+                    _row("b", (1, 0, 1)),
+                    _row("c", (3, 1, 0)),
+                )
+            },
             "triangle inequality",
         ),
         (
-            {"distances": ((0, 1, None), (1, 0, 1), (None, 1, 0))},
+            {
+                "rows": (
+                    _row("a", (0, 1, None)),
+                    _row("b", (1, 0, 1)),
+                    _row("c", (None, 1, 0)),
+                )
+            },
             "component closure",
         ),
         ({"connected": False}, "connected"),
@@ -152,12 +240,13 @@ def test_distance_matrix_public_postdoc_graph(domain_services) -> None:
     )
 
     assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.output["result"]["distances"] == [
-        [0, 2, 2, 1, 1, 2],
-        [2, 0, 2, 2, 1, 3],
-        [2, 2, 0, 2, 1, 3],
-        [1, 2, 2, 0, 1, 1],
-        [1, 1, 1, 1, 0, 2],
-        [2, 3, 3, 1, 2, 0],
+    targets = ("0", "1", "2", "3", "4", "5")
+    assert result.output["result"]["rows"] == [
+        _row("0", [0, 2, 2, 1, 1, 2], targets=targets),
+        _row("1", [2, 0, 2, 2, 1, 3], targets=targets),
+        _row("2", [2, 2, 0, 2, 1, 3], targets=targets),
+        _row("3", [1, 2, 2, 0, 1, 1], targets=targets),
+        _row("4", [1, 1, 1, 1, 0, 2], targets=targets),
+        _row("5", [2, 3, 3, 1, 2, 0], targets=targets),
     ]
     assert result.output["result"]["connected"] is True

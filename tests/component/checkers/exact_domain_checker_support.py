@@ -525,7 +525,7 @@ _GRAPH_CASES: tuple[
         check_graph_distance_matrix,
         _request(
             "graph.distance_matrix.compute",
-            "graph.distance-matrix.all-sources-bfs-v1",
+            "graph.distance-matrix.all-sources-bfs-v3",
             {
                 "graph": {
                     "graph_schema_version": "1",
@@ -534,12 +534,26 @@ _GRAPH_CASES: tuple[
                 }
             },
             {
-                "semantics_version": ("unweighted-shortest-path-distance-matrix.v1"),
-                "vertex_ordering": "LEXICOGRAPHIC_ASCENDING",
+                "semantics_version": ("unweighted-shortest-path-distance-matrix.v3"),
+                "row_ordering": "SOURCE_VERTEX_LEXICOGRAPHIC_ASCENDING",
+                "target_ordering": "TARGET_VERTEX_LEXICOGRAPHIC_ASCENDING",
                 "pair_coverage": "ALL_ORDERED_VERTEX_PAIRS",
                 "unreachable_representation": "JSON_NULL",
-                "vertices": ["a", "b", "c"],
-                "distances": [[0, 1, 2], [1, 0, 1], [2, 1, 0]],
+                "target_vertices": ["a", "b", "c"],
+                "rows": [
+                    {
+                        "source_vertex": "a",
+                        "distances_by_target": {"a": 0, "b": 1, "c": 2},
+                    },
+                    {
+                        "source_vertex": "b",
+                        "distances_by_target": {"a": 1, "b": 0, "c": 1},
+                    },
+                    {
+                        "source_vertex": "c",
+                        "distances_by_target": {"a": 2, "b": 1, "c": 0},
+                    },
+                ],
                 "connected": True,
             },
         ),

@@ -10,11 +10,15 @@ so inputs retain the established limit of 32 vertices and 496 edges.
 ## Result semantics
 
 The result is bound to
-`unweighted-shortest-path-distance-matrix.v1` and makes its representation
+`unweighted-shortest-path-distance-matrix.v3` and makes its representation
 choices explicit:
 
-- `vertices` is the complete input vertex set in lexicographic ascending order;
-- `distances[i][j]` covers every ordered pair of vertices in that order;
+- `target_vertices` is the complete input vertex set in lexicographic ascending
+  order and labels every distance-vector position;
+- `rows` is in the same canonical order, and every row carries its own
+  `source_vertex` label next to a `distances_by_target` mapping;
+- every distance is therefore bound directly to both its source and target
+  labels rather than relying on a detached pair of positional indices;
 - a finite entry is the number of edges in a shortest path;
 - an unreachable pair is represented by JSON `null`, never a numeric sentinel;
 - the diagonal is zero, finite off-diagonal entries are positive, and the
@@ -22,8 +26,9 @@ choices explicit:
 - `connected` is true exactly when the graph is nonempty and every matrix
   entry is finite.
 
-The empty graph returns an empty matrix with `connected = false`. A singleton
-returns `[[0]]` with `connected = true`.
+The empty graph returns empty targets and rows with `connected = false`. A
+singleton returns one labelled row mapping itself to zero with
+`connected = true`.
 
 The result model rejects inconsistent ordering, shape, diagonal, symmetry,
 component closure, triangle inequality, or connectedness before an artifact is

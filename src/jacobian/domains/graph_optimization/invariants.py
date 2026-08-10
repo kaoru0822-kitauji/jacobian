@@ -18,6 +18,7 @@ from jacobian.contracts.graph_invariant_operations import (
     GraphCoreResult,
     GraphDiameterResult,
     GraphDistanceMatrixResult,
+    GraphDistanceMatrixRow,
     GraphEdgeConnectivityResult,
     GraphEulerianResult,
     GraphGirthResult,
@@ -129,20 +130,28 @@ def _distance_matrix(graph: Any) -> GraphDistanceMatrixResult:
         source: nx.single_source_shortest_path_length(graph, source)
         for source in vertices
     }
-    distances = tuple(
-        tuple(shortest_paths[source].get(target) for target in vertices)
+    rows = tuple(
+        GraphDistanceMatrixRow(
+            source_vertex=source,
+            distances_by_target={
+                target: shortest_paths[source].get(target) for target in vertices
+            },
+        )
         for source in vertices
     )
     connected = bool(vertices) and all(
-        distance is not None for row in distances for distance in row
+        distance is not None
+        for row in rows
+        for distance in row.distances_by_target.values()
     )
     return GraphDistanceMatrixResult(
-        semantics_version="unweighted-shortest-path-distance-matrix.v1",
-        vertex_ordering="LEXICOGRAPHIC_ASCENDING",
+        semantics_version="unweighted-shortest-path-distance-matrix.v3",
+        row_ordering="SOURCE_VERTEX_LEXICOGRAPHIC_ASCENDING",
+        target_ordering="TARGET_VERTEX_LEXICOGRAPHIC_ASCENDING",
         pair_coverage="ALL_ORDERED_VERTEX_PAIRS",
         unreachable_representation="JSON_NULL",
-        vertices=vertices,
-        distances=distances,
+        target_vertices=vertices,
+        rows=rows,
         connected=connected,
     )
 
@@ -562,6 +571,7 @@ EXACT_GRAPH_INVARIANT_CAPABILITIES = (
         "distance",
         "matrix",
         "exact",
+        version="3",
         invocation_examples=(
             example(
                 "path_three_distance_matrix",
