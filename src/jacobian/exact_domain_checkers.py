@@ -84,6 +84,7 @@ _ENTRYPOINT_PROVIDER_RUNTIME_KEYS = {
     "jacobian_checkers.additive_combinatorics": "combinatorics",
     "jacobian_checkers.jacobian_syzygy": "graded-syzygy",
     "jacobian_checkers.projective_arrangements": "projective-arrangement",
+    "jacobian_checkers.real_quadratic": "arithmetic",
     "jacobian_checkers.simplicial_topology": "topology",
     "jacobian_checkers.certified_snf": "certified-snf",
     "jacobian_checkers.finite_posets": "poset",
@@ -153,6 +154,18 @@ def install_exact_domain_checkers(
             install_tier=CapabilityInstallTier.T1,
             license_id="MIT",
             features=("standard-library-rational-replay", "clean-process-checker"),
+        ),
+        "arithmetic": source_provider_runtime(
+            "jacobian.real-quadratic-checker",
+            version="1",
+            entrypoint="jacobian_checkers.real_quadratic:check_real_quadratic_order",
+            install_tier=CapabilityInstallTier.T1,
+            license_id="MIT",
+            features=(
+                "standard-library-rational-replay",
+                "integer-square-sign-replay",
+                "clean-process-checker",
+            ),
         ),
         "matrix-hnf": source_provider_runtime(
             "jacobian.matrix-hnf-checker",
@@ -296,6 +309,21 @@ def install_exact_domain_checkers(
                     "clean-process-checker",
                 ),
                 checker_ids=authorized_ids["geometry"],
+            ),
+            "arithmetic": source_provider_runtime(
+                "jacobian.real-quadratic-checker",
+                version="1",
+                entrypoint=(
+                    "jacobian_checkers.real_quadratic:check_real_quadratic_order"
+                ),
+                install_tier=CapabilityInstallTier.T1,
+                license_id="MIT",
+                features=(
+                    "standard-library-rational-replay",
+                    "integer-square-sign-replay",
+                    "clean-process-checker",
+                ),
+                checker_ids=authorized_ids["arithmetic"],
             ),
             "matrix-hnf": source_provider_runtime(
                 "jacobian.matrix-hnf-checker",

@@ -11,8 +11,14 @@ from __future__ import annotations
 
 import platform
 
+from jacobian.contracts.arithmetic import (
+    MAX_REAL_QUADRATIC_DIGITS,
+    MAX_REAL_QUADRATIC_RADICAND,
+)
 from jacobian.contracts.capabilities import CapabilityDiagnostic
+from jacobian.domains.arithmetic.checkers import ARITHMETIC_EXACT_REPLAY_CHECKERS
 from jacobian.domains.arithmetic.integers import INTEGER_CAPABILITIES
+from jacobian.domains.arithmetic.quadratic import REAL_QUADRATIC_CAPABILITIES
 from jacobian.domains.arithmetic.rationals import RATIONAL_CAPABILITIES
 from jacobian.operations import (
     DomainBundle,
@@ -29,28 +35,43 @@ def build_arithmetic_bundle() -> DomainBundle:
         schema_namespace="jacobian.arithmetic",
         semantics=DomainSemantics(
             name="jacobian.exact-arithmetic",
-            version="1",
+            version="2",
             definition={
                 "description": (
                     "exact integer absolute value, sign, decimal digit sum/count, "
-                    "base expansion, integer nth root, and rational arithmetic/order "
-                    "over canonical integer and rational strings"
+                    "base expansion, integer nth root, rational arithmetic/order, "
+                    "and bounded same-radicand real-quadratic order"
                 ),
                 "integer_encoding": "canonical decimal string",
                 "rational_encoding": "canonical reduced num/den with positive denominator",
+                "real_quadratic_encoding": (
+                    "a+b*sqrt(d), with shared positive square-free d"
+                ),
                 "arithmetic": "exact via stdlib and maintained SymPy APIs",
-                "assurance": "computed; no independent checker",
+                "assurance": (
+                    "computed; real-quadratic order supports operator-authorized "
+                    "independent standard-library replay"
+                ),
             },
         ),
         provider_runtime=known_provider_runtime(
             "jacobian.sympy",
-            features=("exact-integer-arithmetic", "exact-rational-arithmetic"),
-            configuration={"sympy_version": SYMPY_VERSION},
+            features=(
+                "exact-integer-arithmetic",
+                "exact-rational-arithmetic",
+                "exact-real-quadratic-order",
+            ),
+            configuration={
+                "sympy_version": SYMPY_VERSION,
+                "real_quadratic_max_digits": MAX_REAL_QUADRATIC_DIGITS,
+                "real_quadratic_max_radicand": MAX_REAL_QUADRATIC_RADICAND,
+            },
         ),
         backend_version=f"python-{platform.python_version()};sympy-{SYMPY_VERSION}",
         capabilities=(
             *INTEGER_CAPABILITIES,
             *RATIONAL_CAPABILITIES,
+            *REAL_QUADRATIC_CAPABILITIES,
         ),
         diagnostics=DomainDiagnostics(
             invalid_request=CapabilityDiagnostic(
@@ -70,6 +91,8 @@ def build_arithmetic_bundle() -> DomainBundle:
         ),
         assurance_basis=(
             "deterministic exact arithmetic from the pinned stdlib/SymPy runtime; "
-            "no independent checker invoked"
+            "independent verification requires an explicit domain-owned verifier "
+            "invocation where declared"
         ),
+        checker_declarations=ARITHMETIC_EXACT_REPLAY_CHECKERS,
     )

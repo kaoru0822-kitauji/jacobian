@@ -623,7 +623,7 @@ def test_mcp_exposes_only_math_tools_with_read_only_resources(
                 "math.find",
                 {
                     "query": "compute exact event probability",
-                    "domain": "arithmetic",
+                    "domain": "quuxonium",
                 },
             )
             assert isinstance(unknown_domain_result.structured_content, dict)
@@ -641,7 +641,7 @@ def test_mcp_exposes_only_math_tools_with_read_only_resources(
             assert {
                 "action": "remove_unknown_domain_filter",
                 "tool": "math.find",
-                "rejected_domain": "arithmetic",
+                "rejected_domain": "quuxonium",
                 "change": "Retry without the unrecognized domain filter.",
             } in unknown_domain["available_recovery_paths"]
             assert {
@@ -652,7 +652,7 @@ def test_mcp_exposes_only_math_tools_with_read_only_resources(
 
             browse_unknown_result = await client.call_tool(
                 "math.find",
-                {"domain": "arithmetic"},
+                {"domain": "quuxonium"},
             )
             assert isinstance(browse_unknown_result.structured_content, dict)
             browse_unknown = browse_unknown_result.structured_content
@@ -663,7 +663,7 @@ def test_mcp_exposes_only_math_tools_with_read_only_resources(
             assert {
                 "action": "remove_unknown_domain_filter",
                 "tool": "math.find",
-                "rejected_domain": "arithmetic",
+                "rejected_domain": "quuxonium",
                 "change": "Retry without the unrecognized domain filter.",
             } in browse_unknown["available_recovery_paths"]
             assert all(

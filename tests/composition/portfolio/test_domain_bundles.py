@@ -12,6 +12,7 @@ from jacobian.capability_service import CapabilityService
 from jacobian.contracts.arithmetic import (
     IntegerBaseDigitsRequest,
     IntegerNthRootRequest,
+    RealQuadraticOrderRequest,
 )
 from jacobian.contracts.arithmetic import (
     IntegerValueRequest as ArithIntegerValueRequest,
@@ -97,6 +98,21 @@ _REPR: list[tuple[type[ContractModel], dict[str, object]]] = [
     (ArithIntegerValueRequest, {"value": "12"}),
     (IntegerBaseDigitsRequest, {"value": "12", "base": 2}),
     (IntegerNthRootRequest, {"value": 8, "degree": 3}),
+    (
+        RealQuadraticOrderRequest,
+        {
+            "left": {
+                "rational_part": {"num": "0", "den": "1"},
+                "radical_coefficient": {"num": "1", "den": "1"},
+                "radicand": 2,
+            },
+            "right": {
+                "rational_part": {"num": "1", "den": "1"},
+                "radical_coefficient": {"num": "0", "den": "1"},
+                "radicand": 2,
+            },
+        },
+    ),
     (CombNonnegIntRequest, {"n": 5}),
     (FibonacciPairRequest, {"n": 5}),
     (CombNonnegPairRequest, {"n": 5, "k": 2}),

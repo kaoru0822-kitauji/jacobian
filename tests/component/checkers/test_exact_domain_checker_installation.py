@@ -6,6 +6,7 @@ import pytest
 from tests.support.artifacts import artifact_uri as _uri
 
 import jacobian.exact_domain_checkers as exact_domain_checkers
+from jacobian.contracts.arithmetic import RealQuadraticOrderRequest
 from jacobian.contracts.capabilities import CapabilityProviderAvailability
 from jacobian.contracts.graph_invariant_operations import (
     GraphInvariantRequest,
@@ -36,6 +37,7 @@ from jacobian.contracts.polynomial_operations import (
 )
 from jacobian.contracts.projective_geometry import ProjectiveLineArrangementRequest
 from jacobian.contracts.results import ContractModel
+from jacobian.domains.arithmetic.bundle import build_arithmetic_bundle
 from jacobian.domains.graph_optimization.bundle import (
     build_graph_optimization_bundle,
 )
@@ -96,6 +98,7 @@ def install_exact_domain_checkers(
         "graph_optimization": build_graph_optimization_bundle,
         "graph_invariants": build_graph_invariant_bundle,
         "graph_symmetry": build_graph_symmetry_bundle,
+        "arithmetic": build_arithmetic_bundle,
         "matrix": build_matrix_bundle,
         "number_theory": build_number_theory_bundle,
         "polynomial": build_polynomial_bundle,
@@ -114,6 +117,7 @@ def install_exact_domain_checkers(
 
 
 def test_installer_authorizes_all_exact_domain_replays(tmp_path: Path) -> None:
+    arithmetic_ids = ("arithmetic.real_quadratic.order.compute",)
     polynomial_ids = (
         "polynomial.jacobian_syzygy.minimum_degree.compute",
         "polynomial.compute.gcd",
@@ -146,6 +150,11 @@ def test_installer_authorizes_all_exact_domain_replays(tmp_path: Path) -> None:
 
     installation = install_exact_domain_checkers(
         registry,
+        arithmetic=_installed(
+            (RealQuadraticOrderRequest,),
+            arithmetic_ids,
+            character="5",
+        ),
         polynomial=_installed(
             (
                 GradedJacobianSyzygyRequest,
@@ -199,22 +208,31 @@ def test_installer_authorizes_all_exact_domain_replays(tmp_path: Path) -> None:
     )
 
     assert set(installation.checker_ids) == set(
-        polynomial_ids + matrix_ids + graph_ids + number_theory_ids + projective_ids
+        arithmetic_ids
+        + polynomial_ids
+        + matrix_ids
+        + graph_ids
+        + number_theory_ids
+        + projective_ids
     )
     assert all(installation.checker_ids.values())
     for capability_id, checker_id in installation.checker_ids.items():
         assert checker_id is not None
         registration = registry.require_active(checker_id)
         expected_module = (
-            "jacobian_checkers.graph_exact_operations:"
-            if capability_id.startswith("graph.")
+            "jacobian_checkers.real_quadratic:"
+            if capability_id.startswith("arithmetic.real_quadratic.")
             else (
-                "jacobian_checkers.projective_arrangements:"
-                if capability_id.startswith("geometry.projective_")
+                "jacobian_checkers.graph_exact_operations:"
+                if capability_id.startswith("graph.")
                 else (
-                    "jacobian_checkers.jacobian_syzygy:"
-                    if "jacobian_syzygy" in capability_id
-                    else "jacobian_checkers.exact_domain_operations:"
+                    "jacobian_checkers.projective_arrangements:"
+                    if capability_id.startswith("geometry.projective_")
+                    else (
+                        "jacobian_checkers.jacobian_syzygy:"
+                        if "jacobian_syzygy" in capability_id
+                        else "jacobian_checkers.exact_domain_operations:"
+                    )
                 )
             )
         )
@@ -232,6 +250,8 @@ def test_installer_authorizes_all_exact_domain_replays(tmp_path: Path) -> None:
     } == {"jacobian.graded-syzygy-checker-source"}
     projective_runtime = installation.provider_runtimes["projective-arrangement"]
     assert projective_runtime.provider == "jacobian.projective-arrangement-checkers"
+    arithmetic_runtime = installation.provider_runtimes["arithmetic"]
+    assert arithmetic_runtime.provider == "jacobian.real-quadratic-checker"
 
 
 def test_installer_preserves_operator_control(tmp_path: Path) -> None:

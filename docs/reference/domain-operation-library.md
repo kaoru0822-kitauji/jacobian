@@ -155,10 +155,11 @@ checks fraction-field equality by independent polynomial cross multiplication;
 pointwise denominator-definedness remains outside its scope. See
 [Rational-function identities](capabilities/polynomial/rational-function-identities.md).
 
-Some polynomial, matrix, graph, geometry, probability, topology, poset, and
-combinatorics results have a separate verification capability. The producer
-first returns a result artifact in `EXPLORE` mode. A verification request then
-supplies that exact `result_uri` to the matching `VERIFY` capability.
+Some arithmetic, polynomial, matrix, graph, geometry, probability, topology,
+poset, and combinatorics results have a separate verification capability. The
+producer first returns an exact result in `EXPLORE` mode. A verification request
+then supplies that result, inline or by artifact URI as declared by the
+contract, to the matching `VERIFY` capability.
 
 Domain-owned `ExactReplayCheckerDeclaration` values name the request model,
 certificate format, and checker function, but they carry no authority.
@@ -188,6 +189,13 @@ installed runtime.
 
 Bounded portfolio examples show the intended boundary:
 
+- `arithmetic.real_quadratic.order.compute` compares two bounded canonical
+  values `a+b*sqrt(d)` with one shared positive square-free radicand. It returns
+  the exact difference, order, and squared rational/radical magnitudes without
+  claiming general number-field arithmetic or matrix spectral computation.
+  `arithmetic.real_quadratic.order.verify` independently replays the comparison
+  with standard-library fractions and integer squares, without importing the
+  SymPy producer.
 - `graph.hamiltonian_path.decide` returns either a complete spanning path
   witness or a negative decision after exhausting its order-18 state space.
   `graph.hamiltonian_path.verify` checks a positive witness directly and
