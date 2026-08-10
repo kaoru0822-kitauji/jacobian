@@ -28,6 +28,12 @@ solver artifacts, and check formal proofs.
 
 ## Quickstart
 
+For a one-time setup:
+
+```sh
+npx jacobian setup
+```
+
 For a guided user-local install:
 
 ```sh
@@ -43,12 +49,6 @@ MB. Add `--defer-runtime` to postpone both until first use:
 ```sh
 curl -fsSL https://raw.githubusercontent.com/morluto/jacobian/main/npm/install.sh | \
   sh -s -- --client codex --yes --defer-runtime
-```
-
-For a one-off setup without a persistent launcher:
-
-```sh
-npx jacobian setup
 ```
 
 For repeated use:

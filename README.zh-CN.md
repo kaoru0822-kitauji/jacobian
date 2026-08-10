@@ -41,6 +41,12 @@ Jacobian 为 AI 智能体提供小型、可组合的数学操作，而不是一�
 
 ## 快速开始
 
+一次性安装：
+
+```sh
+npx jacobian setup
+```
+
 npm 启动器会安装 Jacobian，并配置受支持的 MCP 客户端。推荐使用用户态引导安装器：
 
 ```sh
@@ -52,12 +58,6 @@ curl -fsSL https://raw.githubusercontent.com/morluto/jacobian/main/npm/install.s
 ```sh
 curl -fsSL https://raw.githubusercontent.com/morluto/jacobian/main/npm/install.sh | \
   sh -s -- --client codex --yes --defer-runtime
-```
-
-若只想临时使用而不持久安装启动器，可以运行：
-
-```sh
-npx jacobian setup
 ```
 
 如果需要反复使用，可以持久安装启动器并使用其命令：
