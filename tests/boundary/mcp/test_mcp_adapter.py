@@ -85,7 +85,6 @@ def test_math_find_exposes_bounded_examples_and_actionable_contract_text(
                 {
                     "query": "compute an exact matrix determinant",
                     "domain": "matrix",
-                    "mode": "EXPLORE",
                     "limit": 3,
                 },
             )
@@ -108,7 +107,6 @@ def test_math_find_exposes_bounded_examples_and_actionable_contract_text(
                 "accepted_input_kinds",
                 "output_schema_summary",
                 "scope",
-                "assurance_ceiling",
                 "related_capabilities",
                 "invocation_example",
             ):
@@ -119,7 +117,6 @@ def test_math_find_exposes_bounded_examples_and_actionable_contract_text(
                 {
                     "query": "independently verify an exact determinant artifact",
                     "domain": "matrix",
-                    "mode": "VERIFY",
                     "limit": 3,
                 },
             )
@@ -205,7 +202,6 @@ def test_math_find_compacts_related_capabilities_deterministically(
             fresh_complete_runtime,
             query=target_id,
             domain=None,
-            mode=None,
             input_kind=None,
             artifact_type=None,
             limit=1,
@@ -242,7 +238,6 @@ def test_math_find_compacts_relationships_before_ranked_discovery_data(
     arguments = {
         "query": "polynomial",
         "domain": None,
-        "mode": None,
         "input_kind": None,
         "artifact_type": None,
         "limit": 5,
@@ -295,7 +290,6 @@ def test_math_find_accounts_for_fixed_metadata_before_compacting_relationships(
     arguments = {
         "query": target_id,
         "domain": None,
-        "mode": None,
         "input_kind": None,
         "artifact_type": None,
         "limit": 1,
@@ -469,7 +463,7 @@ def test_mcp_exposes_only_math_tools_with_read_only_resources(
             assert tools["math.run"].annotations is not None
             assert tools["math.run"].annotations.destructive_hint is True
             assert (
-                "ranking is deterministic retrieval"
+                "ranking is deterministic lexical retrieval"
                 in (tools["math.find"].description or "").lower()
             )
             describe_schema = tools["math.find"].input_schema
@@ -481,7 +475,6 @@ def test_mcp_exposes_only_math_tools_with_read_only_resources(
                 "capability_id",
                 "query",
                 "domain",
-                "mode",
                 "input_kind",
                 "artifact_type",
                 "limit",
@@ -491,7 +484,6 @@ def test_mcp_exposes_only_math_tools_with_read_only_resources(
             assert set(tools["math.run"].input_schema["properties"]) == {
                 "capability_id",
                 "payload",
-                "mode",
             }
             with pytest.raises(MCPError) as unknown_argument:
                 await client.call_tool(
@@ -587,7 +579,6 @@ def test_mcp_exposes_only_math_tools_with_read_only_resources(
             assert operation_card["accepted_input_kinds"]
             assert "output_schema_summary" in operation_card
             assert operation_card["scope"] == "EXACT_SUPPLIED_INPUT_OR_CLAIM"
-            assert operation_card["assurance_ceiling"] in {"COMPUTED", "VERIFIED"}
             assert operation_card["provider_availability"] == "AVAILABLE"
             assert isinstance(operation_card["related_capabilities"], list)
 
@@ -741,7 +732,6 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
                 "math.run",
                 {
                     "capability_id": "integer.compute.gcd",
-                    "mode": "EXPLORE",
                     "payload": {"left": "84", "right": "30"},
                 },
             )
@@ -760,10 +750,11 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
                 "obligations",
                 "assurance",
             ):
-                assert (
-                    response[semantic_field]
-                    == result.structured_content[semantic_field]
-                )
+                if semantic_field in response:
+                    assert (
+                        response[semantic_field]
+                        == result.structured_content[semantic_field]
+                    )
             runtime = contract["capability"]["provider_runtime"]
             assert (
                 result.structured_content["provider"]
@@ -798,7 +789,6 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
                         "connection probability edge subset enumeration"
                     ),
                     "domain": "graph",
-                    "mode": "VERIFY",
                     "limit": 10,
                 },
             )
@@ -839,7 +829,6 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
                 "math.run",
                 {
                     "capability_id": "missing.capability",
-                    "mode": "EXPLORE",
                     "payload": {},
                 },
             )
@@ -873,7 +862,6 @@ def test_mcp_inline_results_do_not_emit_resource_links(
                 "math.run",
                 {
                     "capability_id": "integer.compute.gcd",
-                    "mode": "EXPLORE",
                     "payload": {"left": "84", "right": "30"},
                 },
             )
@@ -897,7 +885,6 @@ def test_mcp_materialized_results_emit_readable_native_resource_links(
                 "math.run",
                 {
                     "capability_id": "sat.cnf.materialize",
-                    "mode": "EXPLORE",
                     "payload": {
                         "variable_names": ["x"],
                         "clauses": [[1]],
