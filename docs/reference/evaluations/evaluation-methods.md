@@ -101,6 +101,11 @@ flow, repeated calls, shell activity, tokens, time, and completion. This is
 workflow evidence, not a causal comparison: the public suite has no held-out
 performance claim.
 
+Use the [external reasoning observer](external-reasoning-observer.md) when an
+evaluation needs a bounded, derived record of server-observed Jacobian calls
+and optional explicit agent progress messages. The observer is post-run and
+does not alter the MCP surface, prompt, agent execution, verifier, or assurance.
+
 ## Performance benchmarks
 
 ### Purpose

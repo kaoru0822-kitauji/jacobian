@@ -26,7 +26,10 @@ equivalent top-level tools. Adding a capability does not add a new MCP tool.
 The `math.run` input schema is invariant across local, remote, and evaluation
 deployments. Evaluation observation belongs outside the production tool
 contract and cannot change mathematical behavior, assurance, or checker
-authority.
+authority. The optional
+[external reasoning observer](evaluations/external-reasoning-observer.md)
+derives bounded evaluation records after a run has completed; it does not add a
+model-facing logging protocol.
 
 Because `math.run` dispatches the installed portfolio, its MCP annotation is
 conservatively `destructiveHint: true`: some installed operations can change
