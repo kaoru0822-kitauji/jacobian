@@ -19,6 +19,7 @@ from jacobian.contracts.matrices import (
 from jacobian.contracts.results import ContractModel
 
 MAX_INPUT_SCALAR_DIGITS = 256
+MAX_DETERMINANT_MATRIX_DIMENSION = 64
 
 
 def _check_integer_digits(
@@ -74,10 +75,32 @@ class SquareRationalMatrixRequest(ContractModel):
         return self
 
 
-class MatrixDeterminantRequest(ContractModel):
-    """One bounded square matrix whose exact determinant is requested."""
+class DeterminantRationalMatrix(ContractModel):
+    """One determinant-owned exact rational matrix bounded independently."""
 
-    matrix: RationalMatrix
+    matrix_schema_version: Literal["1"] = "1"
+    domain: Literal["QQ"] = "QQ"
+    entries: tuple[tuple[CanonicalRational, ...], ...] = Field(
+        min_length=1,
+        max_length=MAX_DETERMINANT_MATRIX_DIMENSION,
+    )
+
+    @model_validator(mode="after")
+    def require_rectangular_nonempty_rows(self) -> Self:
+        column_count = len(self.entries[0])
+        if not 1 <= column_count <= MAX_DETERMINANT_MATRIX_DIMENSION:
+            raise ValueError(
+                "determinant matrix rows must contain between 1 and 64 entries"
+            )
+        if any(len(row) != column_count for row in self.entries):
+            raise ValueError("determinant matrix rows must all have the same length")
+        return self
+
+
+class MatrixDeterminantRequest(ContractModel):
+    """One square matrix of order at most 64 whose determinant is requested."""
+
+    matrix: DeterminantRationalMatrix
 
     @model_validator(mode="after")
     def require_square(self) -> Self:

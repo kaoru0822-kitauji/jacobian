@@ -22,11 +22,22 @@ __all__ = [
 ]
 
 
-def _exact_matrix(value: MatrixBase) -> MatrixBase:
+_DEFAULT_MAX_MATRIX_DIMENSION = 32
+_DETERMINANT_MAX_MATRIX_DIMENSION = 64
+
+
+def _exact_matrix(
+    value: MatrixBase,
+    *,
+    maximum_dimension: int = _DEFAULT_MAX_MATRIX_DIMENSION,
+) -> MatrixBase:
     if not isinstance(value, MatrixBase):
         raise TypeError("matrix must be a SymPy MatrixBase")
-    if not 1 <= value.rows <= 32 or not 1 <= value.cols <= 32:
-        raise ValueError("matrix dimensions must be between 1 and 32")
+    if (
+        not 1 <= value.rows <= maximum_dimension
+        or not 1 <= value.cols <= maximum_dimension
+    ):
+        raise ValueError(f"matrix dimensions must be between 1 and {maximum_dimension}")
     if any(not entry.is_number or entry.is_finite is not True for entry in value):
         raise ValueError("matrix entries must be finite exact numbers")
     if any(entry.has(sympy.Float) for entry in value):
@@ -67,7 +78,10 @@ def characteristic_polynomial(matrix: MatrixBase, variable: str) -> Any:
 
 
 def determinant(matrix: MatrixBase) -> Any:
-    source = _exact_matrix(matrix)
+    source = _exact_matrix(
+        matrix,
+        maximum_dimension=_DETERMINANT_MAX_MATRIX_DIMENSION,
+    )
     if source.rows != source.cols:
         raise ValueError("determinant requires a square matrix")
     return source.det(method="bareiss")

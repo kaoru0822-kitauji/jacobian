@@ -32,7 +32,7 @@ def test_exact_domain_checker_accepts_independent_replay(
     assert checker(checker_request)["accepted"] is True
 
 
-def test_matrix_determinant_checker_accepts_supported_large_canonical_result() -> None:
+def test_matrix_determinant_checker_accepts_order_64_large_canonical_result() -> None:
     diagonal_entry = "1" + "0" * 255
     zero = {"num": "0", "den": "1"}
     source = {
@@ -42,9 +42,9 @@ def test_matrix_determinant_checker_accepts_supported_large_canonical_result() -
             "entries": [
                 [
                     ({"num": diagonal_entry, "den": "1"} if row == column else zero)
-                    for column in range(32)
+                    for column in range(64)
                 ]
-                for row in range(32)
+                for row in range(64)
             ],
         }
     }
@@ -53,12 +53,41 @@ def test_matrix_determinant_checker_accepts_supported_large_canonical_result() -
         "matrix.determinant.flint-replay",
         source,
         {
-            "determinant": {"num": "1" + "0" * (255 * 32), "den": "1"},
+            "determinant": {"num": "1" + "0" * (255 * 64), "den": "1"},
             "method": "FRACTION_FREE_BAREISS",
         },
     )
 
     assert check_matrix_determinant(request)["accepted"] is True
+
+
+def test_matrix_determinant_checker_rejects_order_above_64() -> None:
+    zero = {"num": "0", "den": "1"}
+    one = {"num": "1", "den": "1"}
+    source = {
+        "matrix": {
+            "matrix_schema_version": "1",
+            "domain": "QQ",
+            "entries": [
+                [one if row == column else zero for column in range(65)]
+                for row in range(65)
+            ],
+        }
+    }
+    request = _request(
+        "matrix.determinant.compute",
+        "matrix.determinant.flint-replay",
+        source,
+        {
+            "determinant": one,
+            "method": "FRACTION_FREE_BAREISS",
+        },
+    )
+
+    decision = check_matrix_determinant(request)
+
+    assert decision["accepted"] is False
+    assert decision["conclusion"] == "UNKNOWN"
 
 
 @pytest.mark.parametrize(("checker", "checker_request"), _CASES)

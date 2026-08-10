@@ -43,6 +43,23 @@ def _matrix(rows: list[list[int | Fraction]]) -> dict[str, Any]:
     }
 
 
+def _truncated_legendre_matrix(prime: int) -> dict[str, Any]:
+    order = (prime - 5) // 2
+
+    def entry(row: int, column: int) -> int:
+        residue = (row - column) % prime
+        character = (
+            0
+            if residue == 0
+            else (1 if pow(residue, (prime - 1) // 2, prime) == 1 else -1)
+        )
+        return 1 + character
+
+    return _matrix(
+        [[entry(row, column) for column in range(order)] for row in range(order)]
+    )
+
+
 def _reference_determinant(rows: list[list[Fraction]]) -> Fraction:
     total = Fraction(0)
     for permutation in permutations(range(len(rows))):
@@ -181,6 +198,55 @@ def test_matrix_determinant_verify_independently_recomputes_exact_value(
     assert verified.output["conclusion"] == "TRUE"
     assert verified.output["verification_record_uri"].startswith("artifact://sha256/")
     assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
+
+
+def test_matrix_determinant_computes_and_verifies_order_33_sun_conjecture_case(
+    matrix_checker_services: _MatrixRuntime,
+) -> None:
+    """Reproduce Yang--Yang--Zhang, arXiv:2606.22548, Theorem 1.1 at p=71."""
+
+    matrix = _truncated_legendre_matrix(71)
+    computed = matrix_checker_services.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="matrix.determinant.compute",
+            input={"matrix": matrix},
+        )
+    )
+    verified = matrix_checker_services.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="matrix.determinant.verify",
+            mode=CapabilityMode.VERIFY,
+            input={
+                "input": {"matrix": matrix},
+                "candidate": computed.output["result"],
+            },
+        )
+    )
+
+    assert computed.output["result"]["determinant"] == _rational(529)
+    assert computed.assurance.level is CapabilityAssuranceLevel.COMPUTED
+    assert verified.execution.status is ExecutionStatus.COMPLETED
+    assert verified.output["status"] == "VERIFIED"
+    assert verified.output["conclusion"] == "TRUE"
+    assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
+
+
+def test_matrix_determinant_rejects_order_above_64(
+    matrix_services: _MatrixRuntime,
+) -> None:
+    matrix = _matrix(
+        [[1 if row == column else 0 for column in range(65)] for row in range(65)]
+    )
+
+    result = matrix_services.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="matrix.determinant.compute",
+            input={"matrix": matrix},
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "INVALID_REQUEST"
 
 
 def test_matrix_determinant_verify_rejects_wrong_bound_value(
