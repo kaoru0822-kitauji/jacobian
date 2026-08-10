@@ -200,7 +200,7 @@ def test_polynomial_identity_verifies_a_difference(authorized_complete_runtime) 
     assert record.payload["relation_id"] is None
 
 
-def test_polynomial_identity_duplicate_terms_return_actionable_recovery(
+def test_polynomial_identity_canonicalizes_duplicate_terms(
     authorized_complete_runtime,
 ) -> None:
     runtime = authorized_complete_runtime
@@ -224,9 +224,10 @@ def test_polynomial_identity_duplicate_terms_return_actionable_recovery(
         )
     )
 
-    assert result.execution.status.value == "ERROR"
-    assert result.diagnostics[0].code == "INVALID_POLYNOMIAL_IDENTITY_REQUEST"
-    assert "Combine duplicate exponent vectors" in result.diagnostics[0].hint
+    assert result.execution.status.value == "COMPLETED"
+    assert result.output["identical"] is True
+    assert result.output["conclusion"] == Conclusion.TRUE.value
+    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
 
 
 def test_polynomial_identity_preserves_checker_rejection_as_unknown(
