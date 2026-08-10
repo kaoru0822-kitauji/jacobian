@@ -19,6 +19,8 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from tools.test_plan.runtime_owners import allows_create_runtime
+
 _TEST_FILE = "test_*.py"
 _TOPOLOGY_CANDIDATES = (Path("tests/topology.toml"), Path("topology.toml"))
 
@@ -166,17 +168,13 @@ class ArchitecturePolicyError(RuntimeError):
         super().__init__(report.render())
 
 
-def _collect_lane_entries(raw_lanes: Any, *, list_mode: bool) -> list[tuple[str, Any]]:
-    """Collect ``(name, value)`` lane entries from either TOML shape."""
+def _collect_lane_entries(raw_lanes: list[Any]) -> list[tuple[str, Any]]:
+    """Collect ``(name, value)`` lane entries from the compiled ``[[lanes]]`` array."""
     entries: list[tuple[str, Any]] = []
-    if list_mode:
-        for value in raw_lanes:
-            if not isinstance(value, dict) or not isinstance(value.get("name"), str):
-                continue
-            entries.append((value["name"], value))
-    else:
-        for name, value in raw_lanes.items():
-            entries.append((str(name), value))
+    for value in raw_lanes:
+        if not isinstance(value, dict) or not isinstance(value.get("name"), str):
+            continue
+        entries.append((value["name"], value))
     return entries
 
 
@@ -196,12 +194,7 @@ def _lanes_from_entries(
 
 
 def load_topology_manifest(path: Path) -> TopologyManifest | None:
-    """Read a topology manifest, accepting the two common TOML shapes.
-
-    The target manifest uses ``[lanes.<name>]`` tables.  Supporting an array of
-    ``[[lanes]]`` records keeps the checker useful while the manifest is being
-    introduced, without adding a second execution or selection mechanism.
-    """
+    """Read a topology manifest using the compiled ``[[lanes]]`` array shape."""
 
     if not path.is_file():
         return None
@@ -210,22 +203,11 @@ def load_topology_manifest(path: Path) -> TopologyManifest | None:
     except (OSError, tomllib.TOMLDecodeError) as exc:
         raise ValueError(f"cannot read topology manifest {path}: {exc}") from exc
 
-    raw_lanes = raw.get("lanes", {})
-    if isinstance(raw_lanes, dict):
-        entries = _collect_lane_entries(raw_lanes, list_mode=False)
-    elif isinstance(raw_lanes, list):
-        entries = _collect_lane_entries(raw_lanes, list_mode=True)
-    else:
-        entries = []
+    raw_lanes = raw.get("lanes", [])
+    if not isinstance(raw_lanes, list):
+        raise ValueError(f"topology manifest {path} lanes must be an array")
+    entries = _collect_lane_entries(raw_lanes)
     lanes, lane_tiers = _lanes_from_entries(entries)
-
-    # A few manifests put lane tables at the top level.  Only consume tables
-    # with a path-like field, so unrelated metadata is ignored.
-    if not lanes:
-        top_entries = [
-            (str(name), value) for name, value in raw.items() if isinstance(value, dict)
-        ]
-        lanes, lane_tiers = _lanes_from_entries(top_entries)
     return TopologyManifest(lanes=lanes, path=path, lane_tiers=lane_tiers)
 
 
@@ -289,19 +271,7 @@ def _tier(path: PurePosixPath) -> str | None:
 
 
 def _runtime_allowed(path: PurePosixPath, tier_override: str | None = None) -> bool:
-    if path in {
-        PurePosixPath("tests/support/runtime_templates.py"),
-        PurePosixPath("tests/support/runtime_instances.py"),
-    }:
-        return True
-    tier = tier_override or _tier(path)
-    if tier in {"composition", "e2e"}:
-        return True
-    if tier == "boundary":
-        # Boundary tests are allowed to own complete construction only when
-        # their path names the lifecycle/startup/recovery boundary explicitly.
-        return any(part in {"runtime", "startup", "recovery"} for part in path.parts)
-    return False
+    return allows_create_runtime(path.as_posix(), tier=tier_override)
 
 
 def _provider_allowed(path: PurePosixPath, tier_override: str | None = None) -> bool:

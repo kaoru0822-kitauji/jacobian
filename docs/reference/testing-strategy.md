@@ -22,15 +22,43 @@ matrix when the change also affects shared infrastructure.
 
 ## Ownership model
 
-The suite separates semantic ownership from execution policy:
+One reviewed manifest
+([`tests/plan_manifest.toml`](../../tests/plan_manifest.toml)) is the
+authoritative source for pytest lanes, gates, and path-impact rules.
+`make compile-test-plan` projects it to
+[`tests/topology.toml`](../../tests/topology.toml) and
+[`.github/ci-impact.json`](../../.github/ci-impact.json). Rule-local
+`suppresses` fields drive classifier specificity; do not hand-edit the
+generated projections.
 
-| Concern | Authority |
-| --- | --- |
-| Semantic ownership | Test directories |
-| Execution-affecting traits | Pytest markers |
-| Change impact | `.github/ci-impact.json` |
-| Canonical execution | Make targets |
-| Shard scheduling | Ephemeral per-lane timing artifacts |
+| Dimension | Answers | Authority |
+| --- | --- | --- |
+| Semantic owner | What assertion layer? | Test directories (`unit` / `component` / `domain` / `composition` / `e2e` + boundary seams) |
+| Resources | What isolation hardware? | Typed fixture contracts (`sqlite`, `process-group`, `mcp`, `complete-runtime`, …) |
+| Runtime profile | Minimum install/authority/mutability | `RuntimeTestProfile` in `tests/support/runtime_profiles.py` |
+| CI policy | When does it run? | Manifest `ci` / `runs_on` + impact rules |
+| Execution profile | Workers/timeout/scheduler | Compiled from the dimensions above |
+
+Lane identity also appears in Make targets and workflow jobs. Edit
+`tests/plan_manifest.toml` and regenerate rather than hand-editing
+`tests/topology.toml` or `.github/ci-impact.json`.
+
+### Hydration ladder
+
+Use the narrowest complete-runtime profile that proves the claim:
+
+1. `open_domain_services(bundle)` — one named domain bundle
+2. `attached_complete_runtime` — complete portfolio, **no** checker authority
+   (reference schemas/plugins are available without authorization)
+3. `authorized_complete_runtime` — complete portfolio **with** authorized checkers
+4. `fresh_complete_runtime` — empty-root install / lifecycle ownership only
+
+`authorized_complete_runtime` requires a real verify/authority assertion in
+the module (for example `CapabilityAssuranceLevel.VERIFIED`,
+`services.verification`, `capability_id="….verify"`, or
+`checker_id is not None`). Catalog ID strings and `UNVERIFIED` alone do not
+justify it. Inventory unjustified uses with `make test-runtime-inventory`; the
+inventory fails closed when any remain.
 
 A test's directory answers what kind of behavior it owns. A marker is retained
 only when it changes execution. The CI impact manifest maps changed paths to
@@ -201,8 +229,8 @@ writes raw coverage data and a dependent job combines the files before enforcing
 the repository threshold. The shard count and lane policy are owned by
 [`.github/ci-config.json`](../../.github/ci-config.json).
 
-For pull requests, a tested path planner reads
-[`.github/ci-impact.json`](../../.github/ci-impact.json) and makes
+For pull requests, a tested path planner reads the compiled
+[`.github/ci-impact.json`](../../.github/ci-impact.json) projection and makes
 independent semantic Python, Lean, npm, static, build,
 security, and duplicate-code decisions. Documentation-only changes run only
 the dedicated link checker; npm-only changes stay narrow. Ordinary capability
