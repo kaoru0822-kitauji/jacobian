@@ -77,6 +77,28 @@ _EXACT_DOMAIN_INSTALL_ALLOWLIST = frozenset(
     }
 )
 
+_COMPOSITION_ADMISSION_CATEGORIES = frozenset(
+    {
+        "AUTHORITY",
+        "WIRING",
+        "LIFECYCLE",
+        "DISCOVERY",
+        "REFERENCE",
+        "MIXED",
+    }
+)
+_COMPLETE_RUNTIME_FIXTURE_NAMES = frozenset(
+    {
+        "fresh_complete_runtime",
+        "attached_complete_runtime",
+        "attached_complete_runtime_read_only",
+        "authorized_complete_runtime",
+        "authorized_complete_runtime_read_only",
+        "complete_portfolio_template",
+        "authorized_portfolio_template",
+    }
+)
+
 
 @dataclass(frozen=True)
 class Violation:
@@ -298,6 +320,36 @@ def _node_location(path: str, node: ast.AST) -> tuple[str, int, int]:
     return path, getattr(node, "lineno", 1), getattr(node, "col_offset", 0)
 
 
+def _complete_runtime_fixture_import_violations(
+    module: str,
+    relative: str,
+    node: ast.Import | ast.ImportFrom,
+) -> tuple[Violation, ...]:
+    """Complete-runtime fixture bindings stay out of lower-tier modules."""
+
+    if module != "tests.support.complete_runtime_fixtures":
+        return ()
+    owners = (
+        "tests/composition/conftest.py",
+        "tests/e2e/conftest.py",
+        "tests/boundary/storage/conftest.py",
+        "tests/boundary/providers/conftest.py",
+        "tests/boundary/mcp/conftest.py",
+        "tests/support/complete_runtime_fixtures.py",
+    )
+    if relative in owners:
+        return ()
+    return (
+        Violation(
+            relative,
+            "complete-runtime-fixture-import",
+            "import complete-runtime fixtures only from owning-tier conftest.py",
+            node.lineno,
+            node.col_offset,
+        ),
+    )
+
+
 def _imported_module(node: ast.Import | ast.ImportFrom) -> str:
     if isinstance(node, ast.Import):
         return node.names[0].name if node.names else ""
@@ -354,7 +406,9 @@ def _fixture_is_high_cost(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
         "complete_portfolio_template",
         "fresh_complete_runtime",
         "attached_complete_runtime",
+        "attached_complete_runtime_read_only",
         "authorized_complete_runtime",
+        "authorized_complete_runtime_read_only",
     }
 
 
@@ -413,6 +467,9 @@ def _import_violations(
     runtime_import_violation = False
     module = _imported_module(node)
     violations.extend(_conftest_import_violations(module, relative, node))
+    violations.extend(
+        _complete_runtime_fixture_import_violations(module, relative, node)
+    )
     for alias in node.names:
         imported = (
             alias.name.split(".", 1)[0]
@@ -591,15 +648,12 @@ def _exact_domain_install_name(node: ast.AST) -> str | None:
     return None
 
 
-def _exact_domain_install_violations(
-    tree: ast.AST, relative: str
-) -> list[Violation]:
-    """Ordinary domain confests must use open_exact_domain_services."""
+def _exact_domain_install_violations(tree: ast.AST, relative: str) -> list[Violation]:
+    """Ordinary tests must use open_exact_domain_services, not the low-level recipe."""
 
-    path = PurePosixPath(relative)
     if relative in _EXACT_DOMAIN_INSTALL_ALLOWLIST:
         return []
-    if not (relative.startswith("tests/domain/") and path.name == "conftest.py"):
+    if not relative.startswith("tests/"):
         return []
     message = (
         "use tests.support.exact_domain.open_exact_domain_services "
@@ -639,6 +693,71 @@ def _exact_domain_install_violations(
                 )
             )
     return violations
+
+
+def _uses_complete_runtime_fixture(tree: ast.AST) -> bool:
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            for arg in (*node.args.args, *node.args.kwonlyargs):
+                if arg.arg in _COMPLETE_RUNTIME_FIXTURE_NAMES:
+                    return True
+        elif isinstance(node, ast.Name) and node.id in _COMPLETE_RUNTIME_FIXTURE_NAMES:
+            return True
+    return False
+
+
+def _composition_admission_value(tree: ast.AST) -> tuple[str | None, int | None]:
+    if not isinstance(tree, ast.Module):
+        return None, None
+    for node in tree.body:
+        if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+            continue
+        target = node.targets[0]
+        if not isinstance(target, ast.Name) or target.id != "COMPOSITION_ADMISSION":
+            continue
+        if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+            return node.value.value, node.lineno
+        return None, node.lineno
+    return None, None
+
+
+def _composition_admission_violations(tree: ast.AST, relative: str) -> list[Violation]:
+    """Composition modules that hydrate a complete runtime must declare admission."""
+
+    path = PurePosixPath(relative)
+    if not _is_under(path, _COMPOSITION_PREFIX):
+        return []
+    if path.name == "conftest.py" or not path.name.startswith("test_"):
+        return []
+    if not _uses_complete_runtime_fixture(tree):
+        return []
+    value, line = _composition_admission_value(tree)
+    if value is None:
+        return [
+            Violation(
+                relative,
+                "composition-admission-missing",
+                (
+                    "declare COMPOSITION_ADMISSION as one of "
+                    f"{sorted(_COMPOSITION_ADMISSION_CATEGORIES)} when using "
+                    "complete-runtime fixtures"
+                ),
+                line or 1,
+            )
+        ]
+    if value not in _COMPOSITION_ADMISSION_CATEGORIES:
+        return [
+            Violation(
+                relative,
+                "composition-admission-invalid",
+                (
+                    f"COMPOSITION_ADMISSION={value!r} is not one of "
+                    f"{sorted(_COMPOSITION_ADMISSION_CATEGORIES)}"
+                ),
+                line,
+            )
+        ]
+    return []
 
 
 def _file_violations(
@@ -689,6 +808,7 @@ def _file_violations(
         violations.extend(_conftest_fixture_violations(tree, relative))
     violations.extend(_non_root_pytest_plugins_violations(tree, relative))
     violations.extend(_exact_domain_install_violations(tree, relative))
+    violations.extend(_composition_admission_violations(tree, relative))
     return violations
 
 

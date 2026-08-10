@@ -52,8 +52,18 @@ Use the narrowest complete-runtime profile that proves the claim:
    exact verification adapters (typed verified-domain seam)
 3. `attached_complete_runtime` — complete portfolio, **no** checker authority
    (reference schemas/plugins are available without authorization)
-4. `authorized_complete_runtime` — complete portfolio **with** authorized checkers
-5. `fresh_complete_runtime` — empty-root install / lifecycle ownership only
+4. `attached_complete_runtime_read_only` — module-shared attached copy for
+   non-mutating catalog/discovery inspection (one private template copy per
+   module; tests must not write artifacts or durable store state)
+5. `authorized_complete_runtime` — complete portfolio **with** authorized checkers
+6. `authorized_complete_runtime_read_only` — module-shared authorized copy for
+   non-mutating authorized catalog inspection
+7. `fresh_complete_runtime` — empty-root install / lifecycle ownership only
+
+Prefer `attached_*` over `fresh_*` whenever a private template copy isolates the
+mutation; reserve `fresh_*` for empty-root install and lifecycle ownership.
+Prefer `*_read_only` over function-scoped attached/authorized when a module only
+discovers or catalogs and never mutates shared state.
 
 `authorized_complete_runtime` requires a real verify/authority assertion in
 the module (for example `CapabilityAssuranceLevel.VERIFIED`,
@@ -61,6 +71,42 @@ the module (for example `CapabilityAssuranceLevel.VERIFIED`,
 `checker_id is not None`). Catalog ID strings and `UNVERIFIED` alone do not
 justify it. Inventory unjustified uses with `make test-runtime-inventory`; the
 inventory fails closed when any remain.
+
+### Composition admission
+
+The composition lane proves wiring and trust properties that one bundle cannot:
+
+- complete-portfolio installation and catalog invariants
+- checker presence, absence, authorization, revocation, and hydration
+- cross-bundle or cross-service artifact handoff
+- producer → independent checker / verification-record workflows
+- bootstrap, attach, recovery, and shutdown lifecycle
+- global policy/dispatch and tamper / fail-closed trust boundaries
+
+Ordinary request/output/error matrices for one capability belong in domain or
+component lanes (prefer `open_domain_services` /
+`open_exact_domain_services`). Complete-runtime fixtures are visible only under
+owning composition, e2e, and named boundary confests.
+
+Every composition `test_*.py` that uses a complete-runtime fixture must declare
+a module-level admission category:
+
+```python
+COMPOSITION_ADMISSION = "AUTHORITY"  # or WIRING, LIFECYCLE, DISCOVERY, REFERENCE, MIXED
+```
+
+| Category | Meaning |
+| --- | --- |
+| `AUTHORITY` | Checker presence/absence, hydration, verify handoff, fail-closed trust |
+| `WIRING` | Portfolio install, catalog contracts, cross-service artifact identity |
+| `LIFECYCLE` | Bootstrap, attach, close, recovery, worker quiesce |
+| `DISCOVERY` | Whole-portfolio discovery ranking / intent routing |
+| `REFERENCE` | Portfolio reference-set / structure-canonicalization contracts |
+| `MIXED` | Temporary: ordinary capability matrices still pending domain demotion |
+
+`tools/check_test_architecture.py` fails closed when a complete-runtime
+composition module omits the declaration or uses an unknown category. Prefer
+shrinking `MIXED` over expanding it.
 
 A test's directory answers what kind of behavior it owns. A marker is retained
 only when it changes execution. The CI impact manifest maps changed paths to
@@ -96,6 +142,14 @@ receipt bound to the event, base/head revisions, changed-path digest, planner
 digest, configuration digests, and canonical plan digest. `make harbor-plan`
 uses the pinned Harbor runtime because task digests are part of the plan
 contract.
+
+Local planning reads `[local_planning]` from `tests/plan_manifest.toml` for
+infrastructure prefixes, high-impact paths, and exact pytest selector overrides
+(`[[local_planning.exact_overrides]]`) for non-test paths. Prefer folding
+stable overrides into manifest impact rules over growing exact overrides.
+
+`make test-runtime-inventory` reports complete-runtime fixture setup weights and
+the heaviest paths so demotions can target real cost.
 
 ### Local development and CI ownership
 
@@ -206,8 +260,10 @@ Immutable fixture templates are published by constructing in a temporary
 sibling and atomically renaming the completed directory. Each test receives a
 copied state directory; mutable stores, registries, and runtime
 objects are never shared. Composition fixtures make their cost visible through
-names such as `fresh_complete_runtime`, `attached_complete_runtime`, and
-`authorized_complete_runtime`.
+names such as `fresh_complete_runtime`, `attached_complete_runtime`,
+`attached_complete_runtime_read_only`, `authorized_complete_runtime`, and
+`authorized_complete_runtime_read_only`. Named fixtures remain thin wrappers
+over `RuntimeTestProfile` / `open_runtime_for`.
 
 Pull-request CI runs independently selected unit, component, domain,
 composition, storage, process, MCP, and e2e jobs. Provider and Lean lanes follow
