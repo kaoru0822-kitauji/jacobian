@@ -24,6 +24,12 @@ jacobian/math/matrices/
     values.py
     operations.py
     _sympy.py
+
+jacobian/math/finite_fields/
+    __init__.py
+    values.py
+    operations.py
+    _flint.py
 ```
 
 Public packages declare explicit `__all__` values. Value modules import no
