@@ -65,7 +65,10 @@ from jacobian.process_policy import (
     ProcessTermination,
     execute_process,
 )
-from jacobian.providers.lean_runtime import require_lean_semantic_runtime_identity
+from jacobian.providers.lean_runtime import (
+    lean_mathlib_git_config,
+    require_lean_semantic_runtime_identity,
+)
 from jacobian.references import LeanCheckerInstallation
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.storage.repository import ArtifactRepository
@@ -300,8 +303,11 @@ def _resolve_typed_goal_helper(
         raise RuntimeError("elan is unavailable")
     installation = resources.installations[request.environment]
     environment = worker_environment(
-        extra_variables=("HOME", "PATH", "ELAN_HOME"),
-        overrides={"JACOBIAN_LEAN_PROOF_STATE_QUERY": str(query_path)},
+        extra_variables=("PATH", "ELAN_HOME"),
+        overrides={
+            **lean_mathlib_git_config(resources.runtime),
+            "JACOBIAN_LEAN_PROOF_STATE_QUERY": str(query_path),
+        },
     )
     arguments = (
         "run",

@@ -34,6 +34,7 @@ from jacobian.process_policy import (
     InteractiveProcessError,
     InteractiveProcessRequest,
 )
+from jacobian.providers.lean_runtime import lean_mathlib_git_config
 from jacobian.references import LeanCheckerInstallation
 from jacobian.worker_environment import worker_environment
 
@@ -42,9 +43,15 @@ _DEFAULT_CORE_MAX_RSS_KB = 7 * 1024 * 1024
 _DEFAULT_MATHLIB_MAX_RSS_KB = 9 * 1024 * 1024
 
 
-def _repl_process_environment() -> dict[str, str]:
+def _repl_process_environment(runtime: Path) -> dict[str, str]:
+    overrides = (
+        lean_mathlib_git_config(runtime)
+        if (runtime / "lake-manifest.json").is_file()
+        else None
+    )
     return worker_environment(
-        extra_variables=("HOME", "PATH", "ELAN_HOME"),
+        extra_variables=("PATH", "ELAN_HOME"),
+        overrides=overrides,
     )
 
 
@@ -186,7 +193,7 @@ class PersistentLeanRepl:
             InteractiveProcessRequest(
                 executable=self._command[0],
                 arguments=self._command[1:],
-                environment=_repl_process_environment(),
+                environment=_repl_process_environment(self._cwd),
                 cwd=str(self._cwd.resolve(strict=True)),
                 startup_timeout_seconds=self._policy.timeout_seconds,
                 read_timeout_seconds=self._policy.timeout_seconds,
