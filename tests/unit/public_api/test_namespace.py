@@ -93,12 +93,15 @@ def test_functions_have_one_canonical_module() -> None:
 
 
 def test_root_namespace_stays_minimal() -> None:
-    assert jacobian.__all__ == ["ResultEnvelope"]
-    assert "arithmetic" not in jacobian.__all__
-    assert "matrices" not in jacobian.__all__
-    assert "graphs" not in jacobian.__all__
-    assert "finite_fields" not in jacobian.__all__
-    assert "polynomials" not in jacobian.__all__
+    assert jacobian.__all__ == []
+    assert not hasattr(jacobian, "ResultEnvelope")
+
+
+def test_shared_contract_namespace_contains_only_passive_primitives() -> None:
+    contracts = importlib.import_module("jacobian.contracts")
+
+    assert contracts.__all__ == ["ArtifactUri", "CheckerUri", "Sha256Digest"]
+    assert not hasattr(contracts, "ResultEnvelope")
 
 
 def test_deleted_experimental_contract_modules_are_not_importable() -> None:
