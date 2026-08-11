@@ -575,10 +575,7 @@ def _condition_bindings(
     )
 
 
-def _summary(report: Mapping[str, Any]) -> Mapping[str, Any]:
-    summary = report.get("summary")
-    if not isinstance(summary, Mapping):
-        raise ValueError("recovery reports require summaries")
+def _retained_runs(report: Mapping[str, Any]) -> list[dict[str, Any]]:
     runs = report.get("runs")
     repetitions = report.get("repetitions")
     selected_case_ids = report.get("selected_case_ids")
@@ -593,6 +590,34 @@ def _summary(report: Mapping[str, Any]) -> Mapping[str, Any]:
         or len(runs) != repetitions * len(selected_case_ids)
     ):
         raise ValueError("recovery report retained runs do not match its run plan")
+    expected = {
+        (case_id, repetition)
+        for case_id in selected_case_ids
+        for repetition in range(1, repetitions + 1)
+    }
+    observed = [(run.get("case_id"), run.get("repetition")) for run in runs]
+    valid_observed = all(
+        isinstance(case_id, str)
+        and isinstance(repetition, int)
+        and not isinstance(repetition, bool)
+        for case_id, repetition in observed
+    )
+    if (
+        not valid_observed
+        or len(set(observed)) != len(observed)
+        or set(observed) != expected
+    ):
+        raise ValueError(
+            "recovery report must retain exactly one run per case and repetition"
+        )
+    return runs
+
+
+def _summary(report: Mapping[str, Any]) -> Mapping[str, Any]:
+    summary = report.get("summary")
+    if not isinstance(summary, Mapping):
+        raise ValueError("recovery reports require summaries")
+    runs = _retained_runs(report)
     try:
         computed = summarize_runs(runs)
     except (KeyError, TypeError, ValueError) as exc:

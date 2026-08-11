@@ -187,6 +187,30 @@ def test_timeout_and_cancellation_are_fail_closed(lrat_services) -> None:
     assert cancelled.execution.status is ExecutionStatus.CANCELLED
 
 
+@pytest.mark.parametrize(
+    ("proof", "limits"),
+    (
+        (b"3 0 1 2 0\n4 0 1 2 0\n", {"max_steps": 1}),
+        (b"3 1 0 1 2 0\n", {"max_clause_literals": 0}),
+    ),
+)
+def test_lrat_resource_exhaustion_is_an_operational_error(
+    lrat_services,
+    proof: bytes,
+    limits: dict[str, int],
+) -> None:
+    cnf = lrat_services.core.sat.put_cnf(variable_names=("x",), clauses=((-1,), (1,)))
+
+    result = _verify(lrat_services, cnf.artifact_uri, proof, limits=limits)
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.output["status"] == "ERROR"
+    assert result.output["conclusion"] == "UNKNOWN"
+    assert result.output["invalid_step"] is None
+    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
+    assert result.completeness.assurance_level is CapabilityAssuranceLevel.HEURISTIC
+
+
 def test_capability_is_absent_without_operator_authorized_references(
     unauthorized_lrat_services: DomainTestServices,
 ) -> None:

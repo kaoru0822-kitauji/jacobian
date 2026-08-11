@@ -118,9 +118,10 @@ report retains that declared revision together with the observed MCP server,
 catalog, policy, and surface digests. Comparison fails closed when condition
 labels or run invariants drift, either deployment is bound to the wrong source,
 both conditions observed the same server surface, or a stored summary differs
-from the summary recomputed from its complete retained run set. Verify the
-endpoint's selected release path against the declared revision before starting
-a run.
+from the summary recomputed from its complete retained run set. That set must
+contain exactly one run for every declared case ID and repetition number.
+Verify the endpoint's selected release path against the declared revision
+before starting a run.
 
 The classifier requires the exact injected payload to be the first Jacobian
 capability invocation and carry proof-specific rejection evidence before a

@@ -37,6 +37,8 @@ def _comparison_report(
 ) -> dict[str, object]:
     control = condition == "control"
     run = {
+        "case_id": "core-check-type-mismatch",
+        "repetition": 1,
         "metrics": {
             "repair_success": False,
             "enriched_diagnostic_observed": not control,
@@ -331,6 +333,8 @@ def test_recovery_keeps_legacy_proof_edit_control_observable() -> None:
 def test_recovery_summary_and_comparison_keep_efficiency_metrics_separate() -> None:
     runs = [
         {
+            "case_id": "core-check-type-mismatch",
+            "repetition": 1,
             "metrics": {
                 "repair_success": True,
                 "enriched_diagnostic_observed": True,
@@ -465,3 +469,21 @@ def test_recovery_comparison_rejects_a_stale_summary() -> None:
 
     with pytest.raises(ValueError, match="summary does not match retained runs"):
         compare_reports({**control, "summary": stale}, treatment)
+
+
+def test_recovery_comparison_requires_each_case_repetition_pair() -> None:
+    control = _comparison_report("control")
+    treatment = _comparison_report("enriched-diagnostics")
+    first_run = control["runs"][0]
+    duplicate_runs = [first_run, first_run]
+    selected = ["core-check-type-mismatch", "mathlib-check-unknown-identifier"]
+    invalid_control = {
+        **control,
+        "selected_case_ids": selected,
+        "runs": duplicate_runs,
+        "summary": summarize_runs(duplicate_runs),
+    }
+    matching_treatment_plan = {**treatment, "selected_case_ids": selected}
+
+    with pytest.raises(ValueError, match="exactly one run per case and repetition"):
+        compare_reports(invalid_control, matching_treatment_plan)

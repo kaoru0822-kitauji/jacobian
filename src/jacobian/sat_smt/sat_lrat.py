@@ -298,6 +298,7 @@ class SatLratVerificationAdapter:
         else:
             status = "ERROR"
         record_uri = checked.verification_record_uri if verified else None
+        operational = status in {"TIMEOUT", "CANCELLED", "ERROR"}
         projected_execution = (
             Execution(status=ExecutionStatus.TIMEOUT, detail=detail)
             if status == "TIMEOUT"
@@ -345,7 +346,7 @@ class SatLratVerificationAdapter:
                 basis="certificate replay makes no search-completeness claim",
                 assurance_level=(
                     CapabilityAssuranceLevel.HEURISTIC
-                    if status == "TIMEOUT"
+                    if operational
                     else CapabilityAssuranceLevel.COMPUTED
                 ),
             ),
@@ -355,7 +356,7 @@ class SatLratVerificationAdapter:
                     if verified
                     else (
                         CapabilityAssuranceLevel.HEURISTIC
-                        if status == "TIMEOUT"
+                        if operational
                         else CapabilityAssuranceLevel.COMPUTED
                     )
                 ),
