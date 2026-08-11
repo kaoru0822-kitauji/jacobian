@@ -37,6 +37,7 @@ ROLLBACK_ROOT=""
 ROLLBACK_ARMED=0
 DEPLOYMENT_ACCEPTED=0
 PREVIOUS_RELEASE=""
+VALIDATED_INSTALL_ROOT=""
 
 cleanup() {
     if [[ -n "${RELEASE_BUILD_DIR}" && -d "${RELEASE_BUILD_DIR}" ]]; then
@@ -216,8 +217,28 @@ validate_domain() {
         "domain must be a fully qualified DNS name such as math.example.org"
 }
 
+resolve_effective_path() {
+    local candidate="$1"
+    local unresolved=""
+    local resolved
+
+    # `readlink -f` cannot resolve a nonexistent leaf on every supported host.
+    # Resolve the nearest existing ancestor, including a symlink ancestor, then
+    # append the still-nonexistent suffix without changing its validated shape.
+    while [[ ! -e "${candidate}" && ! -L "${candidate}" ]]; do
+        [[ "${candidate}" != "/" ]] || break
+        unresolved="/${candidate##*/}${unresolved}"
+        candidate="${candidate%/*}"
+        [[ -n "${candidate}" ]] || candidate="/"
+    done
+    resolved="$(readlink -f -- "${candidate}" 2>/dev/null || true)"
+    [[ -n "${resolved}" ]] || return 1
+    printf '%s%s\n' "${resolved%/}" "${unresolved}"
+}
+
 validate_install_root() {
     local value="$1"
+    local effective
     [[ "${value}" != "/" && "${value}" =~ ^/[A-Za-z0-9._/-]+$ ]] || die \
         "--install-root must be a non-root absolute path without spaces"
     [[ "${value}" != *"//"* && "${value}" != *"/./"* \
@@ -229,6 +250,14 @@ validate_install_root() {
             die "--install-root must remain visible through the systemd sandbox; do not place it below /home, /root, /run/user, /tmp, or /var/tmp"
             ;;
     esac
+    effective="$(resolve_effective_path "${value}")" || die \
+        "--install-root has an unresolved or broken symlink ancestor"
+    case "${effective}/" in
+        /home/* | /root/* | /run/user/* | /tmp/* | /var/tmp/*)
+            die "--install-root resolves below a path hidden by the systemd sandbox: ${effective}"
+            ;;
+    esac
+    VALIDATED_INSTALL_ROOT="${effective}"
 }
 
 validate_release_runtime() {
@@ -362,6 +391,7 @@ done
 
 INSTALL_ROOT="${INSTALL_ROOT%/}"
 validate_install_root "${INSTALL_ROOT}"
+INSTALL_ROOT="${VALIDATED_INSTALL_ROOT}"
 RELEASE_ROOT="${INSTALL_ROOT}/releases"
 CURRENT_LINK="${INSTALL_ROOT}/current"
 PYTHON_INSTALL_ROOT="${INSTALL_ROOT}/python"

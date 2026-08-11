@@ -13,6 +13,7 @@ from jacobian.contracts.lean import (
     LeanEnvironment,
 )
 from jacobian.contracts.results import ResultEnvelope
+from jacobian.lean_frontend.artifacts import _PROOF_STATE_STATEMENT_PREFIX
 from jacobian.lean_frontend.repl import _response_errors
 from jacobian.lean_frontend.repl_protocol import (
     LeanReplErrorResponse,
@@ -108,6 +109,7 @@ _PHASE_FALLBACKS = {
 def repl_diagnostics(
     responses: LeanReplValidatedExecution,
     *,
+    statement: str,
     final_phase: LeanDiagnosticPhase = LeanDiagnosticPhase.TACTIC_EXECUTION,
     final_source: LeanDiagnosticSource = LeanDiagnosticSource.TACTIC,
     final_column_offset: int = 0,
@@ -141,6 +143,7 @@ def repl_diagnostics(
                 message=None,
                 column_offset=0,
                 goal_index=(0 if index == 2 else None),
+                statement=None,
             )
             continue
         response_messages = response.messages
@@ -170,6 +173,7 @@ def repl_diagnostics(
                 message=item,
                 column_offset=offset,
                 goal_index=(0 if index == 2 and severity == "ERROR" else None),
+                statement=(statement if index == 0 else None),
             )
         emitted_errors = {item.data for item in response_messages}
         for raw in _response_errors(response):
@@ -185,6 +189,7 @@ def repl_diagnostics(
                 message=None,
                 column_offset=0,
                 goal_index=(0 if index == 2 else None),
+                statement=None,
             )
     return tuple(diagnostics)
 
@@ -266,6 +271,7 @@ def _append_diagnostic(
     message: LeanReplMessage | None,
     column_offset: int,
     goal_index: int | None,
+    statement: str | None,
 ) -> None:
     key = (phase, raw)
     if key in seen:
@@ -283,6 +289,7 @@ def _append_diagnostic(
                     source,
                     message,
                     column_offset=column_offset,
+                    statement=statement,
                 ),
                 "goal_index": goal_index,
                 "metavariable": _first_metavariable(raw),
@@ -308,9 +315,34 @@ def _repl_source_span(
     message: LeanReplMessage | None,
     *,
     column_offset: int,
+    statement: str | None,
 ) -> LeanDiagnosticSourceSpan | None:
     if source is None or message is None:
         return None
+    if source is LeanDiagnosticSource.STATEMENT:
+        if statement is None:
+            return None
+        start_column = len(_PROOF_STATE_STATEMENT_PREFIX)
+        end_column = start_column + len(statement)
+        message_end = message.end_pos or message.pos
+        if (
+            message.pos.line != 0
+            or message_end.line != 0
+            or not start_column <= message.pos.column <= end_column
+            or not start_column <= message_end.column <= end_column
+        ):
+            return None
+        start = LeanDiagnosticPosition(
+            line=0,
+            column=message.pos.column - start_column,
+        )
+        end = LeanDiagnosticPosition(
+            line=0,
+            column=message_end.column - start_column,
+        )
+        if end.column < start.column:
+            end = start
+        return LeanDiagnosticSourceSpan(source=source, start=start, end=end)
     start = _offset_position(
         message.pos.line,
         message.pos.column,

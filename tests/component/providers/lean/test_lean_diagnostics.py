@@ -73,6 +73,7 @@ def test_repl_diagnostics_omit_the_private_sorry_scaffold_warning() -> None:
             _proof_step(),
             _proof_step(error="type mismatch"),
         ),
+        statement="True",
         final_phase=LeanDiagnosticPhase.TERM_ELABORATION,
         final_source=LeanDiagnosticSource.TERM,
         final_column_offset=len("exact "),
@@ -91,13 +92,15 @@ def test_repl_diagnostics_keep_other_source_warnings() -> None:
             _command_with_warning("caller-visible source warning"),
             _proof_step(),
             _proof_step(),
-        )
+        ),
+        statement="True",
     )
 
     assert len(diagnostics) == 1
     assert diagnostics[0].phase is LeanDiagnosticPhase.SOURCE_ELABORATION
     assert diagnostics[0].severity == "WARNING"
     assert diagnostics[0].raw_backend_message == "caller-visible source warning"
+    assert diagnostics[0].source_span is None
 
 
 def test_repl_diagnostics_bound_backend_text_and_metavariable() -> None:
@@ -108,7 +111,8 @@ def test_repl_diagnostics_bound_backend_text_and_metavariable() -> None:
             _command_with_warning("declaration uses `sorry`"),
             _proof_step(),
             _proof_step(error=raw),
-        )
+        ),
+        statement="True",
     )
 
     assert len(diagnostics) == 1
@@ -117,6 +121,36 @@ def test_repl_diagnostics_bound_backend_text_and_metavariable() -> None:
     assert diagnostics[0].raw_backend_message == raw[:20_000]
     assert diagnostics[0].metavariable is not None
     assert len(diagnostics[0].metavariable) == 512
+
+
+def test_repl_diagnostics_translate_generated_statement_columns() -> None:
+    prefix_length = len("example : ")
+    command = LeanReplCommandResponse.model_validate(
+        {
+            "env": 0,
+            "messages": [
+                {
+                    "pos": {"line": 0, "column": prefix_length + 1},
+                    "endPos": {"line": 0, "column": prefix_length + 4},
+                    "severity": "warning",
+                    "data": "caller-visible statement warning",
+                }
+            ],
+            "sorries": [{"goal": "⊢ True", "proofState": 0}],
+        }
+    )
+
+    diagnostics = repl_diagnostics(
+        (command, _proof_step(), _proof_step()),
+        statement="True",
+    )
+
+    assert len(diagnostics) == 1
+    assert diagnostics[0].source_span is not None
+    assert diagnostics[0].source_span.source is LeanDiagnosticSource.STATEMENT
+    assert diagnostics[0].source_span.start.line == 0
+    assert diagnostics[0].source_span.start.column == 1
+    assert diagnostics[0].source_span.end.column == 4
 
 
 def test_checker_diagnostics_classify_setup_failure_as_operational() -> None:

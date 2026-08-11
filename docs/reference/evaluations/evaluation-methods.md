@@ -121,7 +121,12 @@ both conditions observed the same server surface, or a stored summary differs
 from the summary recomputed from its complete retained run set. That set must
 contain exactly one run for every declared case ID and repetition number.
 Every retained command, metric, token count, elapsed duration, and artifact
-digest is schema-validated, and the surface digest is recomputed from the
+digest is schema-validated. Comparison resolves each transcript and stderr file
+relative to its report, rejects path or symlink escapes, verifies both SHA-256
+digests, reparses the retained transcript, and reruns the recovery classifier.
+Reported call, token, rejection, diagnostic, repetition, and repair metrics must
+match those recomputed values before any delta is emitted. The suite digest and
+surface digest are likewise recomputed from the selected suite bytes and the
 retained server, instructions, tool schemas, and catalog snapshot. Verify the
 endpoint's selected release path against the declared revision before starting
 a run.

@@ -321,6 +321,7 @@ class LeanProofStateAdapter:
 
         diagnostics = _tactic_diagnostics(
             responses,
+            statement=statement,
             final_phase=diagnostic_phase,
             final_source=diagnostic_source,
             final_column_offset=diagnostic_column_offset,

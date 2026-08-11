@@ -657,7 +657,7 @@ def _condition_bindings(
     )
 
 
-def _retained_runs(report: Mapping[str, Any]) -> list[dict[str, Any]]:
+def _retained_runs(report: Mapping[str, Any]) -> list[RetainedRecoveryRun]:
     runs = report.get("runs")
     repetitions = report.get("repetitions")
     selected_case_ids = report.get("selected_case_ids")
@@ -685,34 +685,189 @@ def _retained_runs(report: Mapping[str, Any]) -> list[dict[str, Any]]:
         raise ValueError(
             "recovery report must retain exactly one run per case and repetition"
         )
-    return [run.model_dump(mode="json") for run in validated]
+    artifact_names = [
+        name
+        for run in validated
+        for name in (run.artifacts.transcript, run.artifacts.stderr)
+    ]
+    if len(set(artifact_names)) != len(artifact_names):
+        raise ValueError("recovery report must retain distinct artifacts per run")
+    return validated
 
 
-def _summary(report: Mapping[str, Any]) -> Mapping[str, Any]:
+def _artifact_path(report_root: Path, name: str) -> Path:
+    relative = Path(name)
+    if relative.is_absolute() or relative.name != name:
+        raise ValueError("recovery run artifact names must be relative leaf names")
+    try:
+        resolved = (report_root / relative).resolve(strict=True)
+    except OSError as exc:
+        raise ValueError(f"recovery run artifact is unavailable: {name}") from exc
+    if resolved.parent != report_root or not resolved.is_file():
+        raise ValueError(f"recovery run artifact escapes its report directory: {name}")
+    return resolved
+
+
+def _verified_artifact(
+    report_root: Path,
+    *,
+    name: str,
+    expected_digest: str,
+) -> tuple[Path, bytes]:
+    path = _artifact_path(report_root, name)
+    try:
+        payload = path.read_bytes()
+    except OSError as exc:
+        raise ValueError(f"recovery run artifact cannot be read: {name}") from exc
+    if _sha256_bytes(payload) != expected_digest:
+        raise ValueError(f"recovery run artifact digest does not match: {name}")
+    return path, payload
+
+
+def _validate_transcript_jsonl(payload: bytes, *, name: str) -> None:
+    try:
+        lines = payload.decode("utf-8", errors="strict").splitlines()
+        events = [json.loads(line) for line in lines if line.strip()]
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"recovery transcript is not valid JSONL: {name}") from exc
+    if not events or any(not isinstance(event, Mapping) for event in events):
+        raise ValueError(f"recovery transcript has no valid JSON events: {name}")
+
+
+def _recomputed_run(
+    run: RetainedRecoveryRun,
+    *,
+    case: RecoveryCase,
+    report_root: Path,
+) -> dict[str, Any]:
+    transcript_path, transcript_payload = _verified_artifact(
+        report_root,
+        name=run.artifacts.transcript,
+        expected_digest=run.artifacts.transcript_sha256,
+    )
+    _validate_transcript_jsonl(transcript_payload, name=run.artifacts.transcript)
+    _verified_artifact(
+        report_root,
+        name=run.artifacts.stderr,
+        expected_digest=run.artifacts.stderr_sha256,
+    )
+    try:
+        telemetry = parse_agent_transcript(transcript_path)
+        classified = classify_recovery(case, telemetry)
+        completed = (
+            run.command.status is ToolCommandStatus.EXITED
+            and run.command.exit_code == 0
+        )
+        metrics = RecoveryRunMetrics.model_validate(
+            {
+                **classified,
+                "repair_success": completed and classified["repair_success"],
+            }
+        )
+    except (OSError, UnicodeError, ValueError) as exc:
+        raise ValueError(
+            f"recovery transcript cannot be classified for {run.case_id}"
+        ) from exc
+    retained_metrics = run.metrics.model_dump(mode="json", exclude_none=True)
+    recomputed_metrics = metrics.model_dump(mode="json", exclude_none=True)
+    if retained_metrics != recomputed_metrics:
+        raise ValueError(
+            "recovery retained metrics do not match the hash-verified transcript"
+        )
+    retained = run.model_dump(mode="json", exclude_none=True)
+    retained["metrics"] = recomputed_metrics
+    return retained
+
+
+def _summary(
+    report: Mapping[str, Any],
+    *,
+    suite: RecoverySuite,
+    report_root: Path,
+) -> Mapping[str, Any]:
     summary = report.get("summary")
     if not isinstance(summary, Mapping):
         raise ValueError("recovery reports require summaries")
+    cases = {case.case_id: case for case in suite.cases}
     runs = _retained_runs(report)
     try:
-        computed = summarize_runs(runs)
+        recomputed_runs = [
+            _recomputed_run(run, case=cases[run.case_id], report_root=report_root)
+            for run in runs
+        ]
+        computed = summarize_runs(recomputed_runs)
     except (KeyError, TypeError, ValueError) as exc:
+        if isinstance(exc, ValueError) and str(exc).startswith("recovery "):
+            raise
         raise ValueError("recovery report contains malformed retained runs") from exc
     if summary != computed:
         raise ValueError("recovery report summary does not match retained runs")
     return computed
 
 
-def compare_reports(
-    control: Mapping[str, Any],
-    treatment: Mapping[str, Any],
+def _load_report(path: Path) -> tuple[Path, Mapping[str, Any]]:
+    try:
+        resolved = path.resolve(strict=True)
+        if not resolved.is_file():
+            raise ValueError("recovery report path is not a file")
+        decoded = json.loads(resolved.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"recovery report cannot be read: {path}") from exc
+    if not isinstance(decoded, Mapping):
+        raise ValueError("recovery report must contain a JSON object")
+    return resolved, decoded
+
+
+def _validate_suite_binding(
+    report: Mapping[str, Any],
+    *,
+    suite: RecoverySuite,
+    suite_digest: str,
+) -> None:
+    if report.get("suite_id") != suite.suite_id:
+        raise ValueError("recovery report suite_id does not match the selected suite")
+    if report.get("suite_digest") != suite_digest:
+        raise ValueError(
+            "recovery report suite_digest does not match the selected suite"
+        )
+    if report.get("source_base_revision") != suite.source_base_revision:
+        raise ValueError(
+            "recovery report source_base_revision does not match the selected suite"
+        )
+    selected = report.get("selected_case_ids")
+    suite_case_ids = {case.case_id for case in suite.cases}
+    if not isinstance(selected, list) or not set(selected) <= suite_case_ids:
+        raise ValueError("recovery report selects cases outside the selected suite")
+
+
+def compare_report_paths(
+    control_path: Path,
+    treatment_path: Path,
+    *,
+    suite_path: Path = _DEFAULT_SUITE,
 ) -> dict[str, Any]:
+    resolved_suite_path = suite_path.resolve(strict=True)
+    suite = load_suite(resolved_suite_path)
+    suite_digest = digest_suite(resolved_suite_path)
+    resolved_control_path, control = _load_report(control_path)
+    resolved_treatment_path, treatment = _load_report(treatment_path)
     _validate_shared_report_invariants(control, treatment)
     _validate_selected_case_ids(control)
+    _validate_suite_binding(control, suite=suite, suite_digest=suite_digest)
+    _validate_suite_binding(treatment, suite=suite, suite_digest=suite_digest)
     source_base_revision, source_candidate_revision, bindings = _condition_bindings(
         control, treatment
     )
-    control_summary = _summary(control)
-    treatment_summary = _summary(treatment)
+    control_summary = _summary(
+        control,
+        suite=suite,
+        report_root=resolved_control_path.parent,
+    )
+    treatment_summary = _summary(
+        treatment,
+        suite=suite,
+        report_root=resolved_treatment_path.parent,
+    )
     return {
         "schema_version": "1",
         "causal_claim_authorized": False,
@@ -759,9 +914,17 @@ def _parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = _parser().parse_args()
     if args.compare:
-        control = json.loads(args.compare[0].read_text(encoding="utf-8"))
-        treatment = json.loads(args.compare[1].read_text(encoding="utf-8"))
-        print(json.dumps(compare_reports(control, treatment), indent=2, sort_keys=True))
+        print(
+            json.dumps(
+                compare_report_paths(
+                    args.compare[0],
+                    args.compare[1],
+                    suite_path=args.suite,
+                ),
+                indent=2,
+                sort_keys=True,
+            )
+        )
         return
     if not args.execute:
         raise SystemExit("refusing model execution without --execute")

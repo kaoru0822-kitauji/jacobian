@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -10,7 +11,7 @@ from benchmarks.tooling.codex_visibility import surface_snapshot_digest
 from benchmarks.tooling.lean_diagnostic_recovery import (
     RecoveryCase,
     classify_recovery,
-    compare_reports,
+    compare_report_paths,
     digest_suite,
     load_suite,
     summarize_runs,
@@ -18,7 +19,7 @@ from benchmarks.tooling.lean_diagnostic_recovery import (
 
 ROOT = Path(__file__).resolve().parents[3]
 SUITE = ROOT / "benchmarks/config/lean-diagnostic-recovery-v1.json"
-BASE_REVISION = "1" * 40
+BASE_REVISION = "526575833ef9"
 CANDIDATE_REVISION = "2" * 40
 
 
@@ -68,7 +69,7 @@ def _comparison_run(
     input_tokens: int,
     output_tokens: int,
     elapsed_seconds: float,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     return {
         "case_id": "core-check-type-mismatch",
         "repetition": 1,
@@ -102,27 +103,137 @@ def _comparison_run(
     }
 
 
+def _tool_event(
+    capability_id: str,
+    payload: dict[str, object],
+    *,
+    output: dict[str, object],
+    assurance: dict[str, object],
+) -> dict[str, object]:
+    response = {
+        "capability_id": capability_id,
+        "execution": {"status": "COMPLETED"},
+        "output": output,
+        "artifact_uris": [],
+        "assurance": assurance,
+    }
+    return {
+        "type": "item.completed",
+        "item": {
+            "type": "mcp_tool_call",
+            "tool": "math.run",
+            "arguments": {"capability_id": capability_id, "payload": payload},
+            "status": "completed",
+            "result": {
+                "isError": False,
+                "content": [{"type": "text", "text": json.dumps(response)}],
+            },
+        },
+    }
+
+
+def _comparison_evidence(condition: str) -> tuple[dict[str, Any], bytes, bytes]:
+    case = load_suite(SUITE).cases[0]
+    enriched = condition == "enriched-diagnostics"
+    rejection = _tool_event(
+        case.injected_capability_id,
+        case.injected_payload,
+        output={
+            "conclusion": "UNKNOWN",
+            "diagnostics": (
+                [{"code": "LEAN_TYPE_MISMATCH", "phase": "KERNEL_CHECK"}]
+                if enriched
+                else ["Lean rejected the proof: type mismatch"]
+            ),
+        },
+        assurance={"level": "HEURISTIC"},
+    )
+    if enriched:
+        second = _tool_event(
+            case.terminal_capability_id,
+            {
+                "statement": case.injected_payload["statement"],
+                "proof": "by\n  trivial",
+                "environment": case.injected_payload["environment"],
+            },
+            output={"conclusion": "TRUE", "diagnostics": []},
+            assurance={
+                "level": "VERIFIED",
+                "verification_record_uri": "artifact://sha256/" + "f" * 64,
+            },
+        )
+    else:
+        second = rejection
+    usage = {
+        "input_tokens": 100 if enriched else 130,
+        "output_tokens": 20 if enriched else 30,
+    }
+    transcript = (
+        "\n".join(
+            json.dumps(event)
+            for event in (
+                rejection,
+                second,
+                {"type": "turn.completed", "usage": usage},
+            )
+        )
+        + "\n"
+    ).encode()
+    stderr = b""
+    return (
+        {
+            "case_id": case.case_id,
+            "repetition": 1,
+            "command": {
+                "status": "EXITED",
+                "exit_code": 0,
+                "elapsed_seconds": 3.5 if enriched else 5.0,
+            },
+            "metrics": {},
+            "artifacts": {
+                "transcript": "core-check-type-mismatch-r01.jsonl",
+                "transcript_sha256": "sha256:" + hashlib.sha256(transcript).hexdigest(),
+                "stderr": "core-check-type-mismatch-r01.stderr",
+                "stderr_sha256": "sha256:" + hashlib.sha256(stderr).hexdigest(),
+            },
+        },
+        transcript,
+        stderr,
+    )
+
+
 def _comparison_report(
     condition: str,
     *,
     surface_seed: str | None = None,
 ) -> dict[str, object]:
     control = condition == "control"
-    run = _comparison_run(
-        repair_success=False,
-        enriched_diagnostic_observed=not control,
-        repeated_error_count=1,
-        math_run_call_count=3,
-        input_tokens=130,
-        output_tokens=30,
-        elapsed_seconds=5.0,
-    )
+    run, _transcript, _stderr = _comparison_evidence(condition)
+    # The fixture's metrics are the deterministic classification of the events
+    # above; the comparator independently repeats this from the retained file.
+    classified = {
+        "injection_attempted": True,
+        "injection_payload_exact": True,
+        "injection_rejected": True,
+        "observed_diagnostic_codes": ["LEAN_TYPE_MISMATCH"] if not control else [],
+        "enriched_diagnostic_observed": not control,
+        "repair_success": not control,
+        "repeated_error_count": 1 if control else 0,
+        "repeated_mcp_call_count": 1 if control else 0,
+        "math_run_call_count": 2,
+        "tool_error_count": 0,
+        "tokens": {
+            "input_tokens": 130 if control else 100,
+            "output_tokens": 30 if control else 20,
+        },
+    }
+    run["metrics"] = classified
     return {
         "schema_version": "1",
         "evidence_class": "public-host-local-lean-recovery-observation",
         "causal_claim_authorized": False,
         "suite_id": "lean-diagnostic-recovery-v1",
-        "suite_digest": "sha256:" + "a" * 64,
+        "suite_digest": digest_suite(SUITE),
         "source_base_revision": BASE_REVISION,
         "source_candidate_revision": CANDIDATE_REVISION,
         "deployed_revision": BASE_REVISION if control else CANDIDATE_REVISION,
@@ -139,6 +250,36 @@ def _comparison_report(
         "runs": [run],
         "summary": summarize_runs([run]),
     }
+
+
+def _write_comparison_reports(
+    tmp_path: Path,
+    control: dict[str, Any],
+    treatment: dict[str, Any],
+) -> tuple[Path, Path]:
+    paths: list[Path] = []
+    for slot, report in (("control", control), ("enriched-diagnostics", treatment)):
+        root = tmp_path / slot
+        root.mkdir(exist_ok=True)
+        canonical_run, transcript, stderr = _comparison_evidence(slot)
+        artifacts = canonical_run["artifacts"]
+        (root / artifacts["transcript"]).write_bytes(transcript)
+        (root / artifacts["stderr"]).write_bytes(stderr)
+        report_path = root / "report.json"
+        report_path.write_text(json.dumps(report), encoding="utf-8")
+        paths.append(report_path)
+    return paths[0], paths[1]
+
+
+def _compare(
+    tmp_path: Path,
+    control: dict[str, Any],
+    treatment: dict[str, Any],
+) -> dict[str, object]:
+    control_path, treatment_path = _write_comparison_reports(
+        tmp_path, control, treatment
+    )
+    return compare_report_paths(control_path, treatment_path, suite_path=SUITE)
 
 
 def test_recovery_suite_freezes_control_treatment_and_injected_cases() -> None:
@@ -397,7 +538,9 @@ def test_recovery_keeps_legacy_proof_edit_control_observable() -> None:
     assert result["repair_success"] is True
 
 
-def test_recovery_summary_and_comparison_keep_efficiency_metrics_separate() -> None:
+def test_recovery_summary_and_comparison_keep_efficiency_metrics_separate(
+    tmp_path: Path,
+) -> None:
     runs = [
         _comparison_run(
             repair_success=True,
@@ -410,13 +553,11 @@ def test_recovery_summary_and_comparison_keep_efficiency_metrics_separate() -> N
         )
     ]
     treatment_summary = summarize_runs(runs)
+    assert treatment_summary["math_run_call_count"] == 2
     control = _comparison_report("control")
     treatment = _comparison_report("enriched-diagnostics")
 
-    compared = compare_reports(
-        control,
-        {**treatment, "runs": runs, "summary": treatment_summary},
-    )
+    compared = _compare(tmp_path, control, treatment)
 
     assert compared["deltas"]["repair_success_rate"] == 1.0
     assert compared["deltas"]["repeated_error_count"] == -1
@@ -516,11 +657,11 @@ def test_recovery_protocol_includes_failed_math_run_attempts() -> None:
     assert result["repair_success"] is False
 
 
-def test_recovery_comparison_rejects_model_drift() -> None:
+def test_recovery_comparison_rejects_model_drift(tmp_path: Path) -> None:
     control = _comparison_report("control")
     treatment = _comparison_report("enriched-diagnostics")
     with pytest.raises(ValueError, match="model"):
-        compare_reports(control, {**treatment, "model": "second"})
+        _compare(tmp_path, control, {**treatment, "model": "second"})
 
 
 @pytest.mark.parametrize(
@@ -533,6 +674,7 @@ def test_recovery_comparison_rejects_model_drift() -> None:
     ),
 )
 def test_recovery_comparison_rejects_run_invariant_drift(
+    tmp_path: Path,
     field: str,
     changed: object,
     message: str,
@@ -541,51 +683,63 @@ def test_recovery_comparison_rejects_run_invariant_drift(
     treatment = _comparison_report("enriched-diagnostics")
 
     with pytest.raises(ValueError, match=message):
-        compare_reports(control, {**treatment, field: changed})
+        _compare(tmp_path, control, {**treatment, field: changed})
 
 
-def test_recovery_comparison_rejects_mislabeled_conditions() -> None:
+def test_recovery_comparison_rejects_mislabeled_conditions(tmp_path: Path) -> None:
     control = _comparison_report("control")
 
     with pytest.raises(ValueError, match="enriched-diagnostics condition"):
-        compare_reports(control, {**control, "deployed_revision": CANDIDATE_REVISION})
+        _compare(
+            tmp_path,
+            control,
+            {**control, "deployed_revision": CANDIDATE_REVISION},
+        )
 
 
-def test_recovery_comparison_binds_each_deployment_to_its_source_revision() -> None:
+def test_recovery_comparison_binds_each_deployment_to_its_source_revision(
+    tmp_path: Path,
+) -> None:
     control = _comparison_report("control")
     treatment = _comparison_report("enriched-diagnostics")
 
     with pytest.raises(ValueError, match="source_base_revision"):
-        compare_reports({**control, "deployed_revision": "3" * 40}, treatment)
+        _compare(tmp_path, {**control, "deployed_revision": "3" * 40}, treatment)
 
 
-def test_recovery_comparison_rejects_the_same_observed_server_surface() -> None:
+def test_recovery_comparison_rejects_the_same_observed_server_surface(
+    tmp_path: Path,
+) -> None:
     control = _comparison_report("control", surface_seed="b")
     treatment = _comparison_report("enriched-diagnostics", surface_seed="b")
 
     with pytest.raises(ValueError, match="same MCP surface"):
-        compare_reports(control, treatment)
+        _compare(tmp_path, control, treatment)
 
 
 @pytest.mark.parametrize("runs", (None, []))
-def test_recovery_comparison_requires_retained_runs(runs: object) -> None:
+def test_recovery_comparison_requires_retained_runs(
+    tmp_path: Path, runs: object
+) -> None:
     control = _comparison_report("control")
     treatment = _comparison_report("enriched-diagnostics")
 
     with pytest.raises(ValueError, match="retained runs"):
-        compare_reports({**control, "runs": runs}, treatment)
+        _compare(tmp_path, {**control, "runs": runs}, treatment)
 
 
-def test_recovery_comparison_rejects_a_stale_summary() -> None:
+def test_recovery_comparison_rejects_a_stale_summary(tmp_path: Path) -> None:
     control = _comparison_report("control")
     treatment = _comparison_report("enriched-diagnostics")
     stale = {**control["summary"], "repair_success_rate": 1.0}
 
     with pytest.raises(ValueError, match="summary does not match retained runs"):
-        compare_reports({**control, "summary": stale}, treatment)
+        _compare(tmp_path, {**control, "summary": stale}, treatment)
 
 
-def test_recovery_comparison_requires_each_case_repetition_pair() -> None:
+def test_recovery_comparison_requires_each_case_repetition_pair(
+    tmp_path: Path,
+) -> None:
     control = _comparison_report("control")
     treatment = _comparison_report("enriched-diagnostics")
     first_run = control["runs"][0]
@@ -600,10 +754,12 @@ def test_recovery_comparison_requires_each_case_repetition_pair() -> None:
     matching_treatment_plan = {**treatment, "selected_case_ids": selected}
 
     with pytest.raises(ValueError, match="exactly one run per case and repetition"):
-        compare_reports(invalid_control, matching_treatment_plan)
+        _compare(tmp_path, invalid_control, matching_treatment_plan)
 
 
-def test_recovery_comparison_rejects_malformed_retained_metrics() -> None:
+def test_recovery_comparison_rejects_malformed_retained_metrics(
+    tmp_path: Path,
+) -> None:
     control = _comparison_report("control")
     treatment = _comparison_report("enriched-diagnostics")
     original = control["runs"][0]
@@ -627,14 +783,59 @@ def test_recovery_comparison_rejects_malformed_retained_metrics() -> None:
 
     for malformed in malformed_runs:
         with pytest.raises(ValueError, match="malformed retained runs"):
-            compare_reports({**control, "runs": [malformed]}, treatment)
+            _compare(tmp_path, {**control, "runs": [malformed]}, treatment)
 
 
-def test_recovery_comparison_recomputes_the_surface_digest() -> None:
+def test_recovery_comparison_recomputes_the_surface_digest(tmp_path: Path) -> None:
     control = _comparison_report("control")
     treatment = _comparison_report("enriched-diagnostics")
     surface = deepcopy(control["surface"])
     surface["instructions"] = "tampered after observation"
 
     with pytest.raises(ValueError, match="surface digest does not match"):
-        compare_reports({**control, "surface": surface}, treatment)
+        _compare(tmp_path, {**control, "surface": surface}, treatment)
+
+
+def test_recovery_comparison_verifies_retained_artifact_digests(
+    tmp_path: Path,
+) -> None:
+    control = _comparison_report("control")
+    treatment = _comparison_report("enriched-diagnostics")
+    control_path, treatment_path = _write_comparison_reports(
+        tmp_path, control, treatment
+    )
+    transcript_name = control["runs"][0]["artifacts"]["transcript"]
+    (control_path.parent / transcript_name).write_bytes(b"tampered transcript\n")
+
+    with pytest.raises(ValueError, match="artifact digest does not match"):
+        compare_report_paths(control_path, treatment_path, suite_path=SUITE)
+
+
+def test_recovery_comparison_reclassifies_hash_verified_transcripts(
+    tmp_path: Path,
+) -> None:
+    control = _comparison_report("control")
+    treatment = _comparison_report("enriched-diagnostics")
+    control_path, treatment_path = _write_comparison_reports(
+        tmp_path, control, treatment
+    )
+    transcript_name = control["runs"][0]["artifacts"]["transcript"]
+    transcript_path = control_path.parent / transcript_name
+    changed = (
+        transcript_path.read_bytes()
+        + json.dumps(
+            {
+                "type": "turn.completed",
+                "usage": {"input_tokens": 999, "output_tokens": 999},
+            }
+        ).encode()
+        + b"\n"
+    )
+    transcript_path.write_bytes(changed)
+    control["runs"][0]["artifacts"]["transcript_sha256"] = (
+        "sha256:" + hashlib.sha256(changed).hexdigest()
+    )
+    control_path.write_text(json.dumps(control), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="metrics do not match"):
+        compare_report_paths(control_path, treatment_path, suite_path=SUITE)

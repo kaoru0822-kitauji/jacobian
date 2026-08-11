@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -113,6 +114,56 @@ def test_install_root_rejects_unsafe_or_ambiguous_paths(root: str) -> None:
 
     assert completed.returncode != 0
     assert "--install-root" in completed.stderr
+
+
+def test_install_root_rejects_an_allowed_symlink_into_a_hidden_path(
+    tmp_path: Path,
+) -> None:
+    shared_memory = Path("/dev/shm")
+    if not shared_memory.is_dir() or not os.access(shared_memory, os.W_OK):
+        pytest.skip("a writable /dev/shm is required for the symlink sandbox check")
+    visible_parent = Path(
+        tempfile.mkdtemp(prefix="jacobian-install-root-", dir=shared_memory)
+    )
+    visible_link = visible_parent / "release-root"
+    try:
+        visible_link.symlink_to(tmp_path, target_is_directory=True)
+
+        completed = _run(
+            "--install-root",
+            str(visible_link / "jacobian"),
+            "--dry-run",
+        )
+
+        assert completed.returncode != 0
+        assert "resolves below a path hidden by the systemd sandbox" in completed.stderr
+    finally:
+        shutil.rmtree(visible_parent)
+
+
+def test_install_root_canonicalizes_an_allowed_symlink_ancestor() -> None:
+    shared_memory = Path("/dev/shm")
+    if not shared_memory.is_dir() or not os.access(shared_memory, os.W_OK):
+        pytest.skip("a writable /dev/shm is required for the symlink sandbox check")
+    visible_parent = Path(
+        tempfile.mkdtemp(prefix="jacobian-install-root-", dir=shared_memory)
+    )
+    actual_root = visible_parent / "actual"
+    visible_link = visible_parent / "release-root"
+    try:
+        actual_root.mkdir()
+        visible_link.symlink_to(actual_root, target_is_directory=True)
+
+        completed = _run(
+            "--install-root",
+            str(visible_link / "jacobian"),
+            "--dry-run",
+        )
+
+        assert completed.returncode == 0, completed.stderr
+        assert f"install:     {actual_root}/jacobian" in completed.stdout
+    finally:
+        shutil.rmtree(visible_parent)
 
 
 def test_dry_run_never_echoes_supplied_credentials(tmp_path: Path) -> None:

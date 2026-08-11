@@ -256,12 +256,14 @@ def _normalize_goal(goal: str) -> str:
 def _tactic_diagnostics(
     responses: LeanReplValidatedExecution,
     *,
+    statement: str,
     final_phase: LeanDiagnosticPhase = LeanDiagnosticPhase.TACTIC_EXECUTION,
     final_source: LeanDiagnosticSource = LeanDiagnosticSource.TACTIC,
     final_column_offset: int = 0,
 ) -> tuple[LeanDiagnostic, ...]:
     return repl_diagnostics(
         responses,
+        statement=statement,
         final_phase=final_phase,
         final_source=final_source,
         final_column_offset=final_column_offset,
