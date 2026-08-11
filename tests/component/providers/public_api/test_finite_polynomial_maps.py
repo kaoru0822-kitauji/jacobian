@@ -1,0 +1,109 @@
+from __future__ import annotations
+
+import pytest
+
+from jacobian.math.finite_fields import (
+    CollisionCertificate,
+    FiberPartition,
+    FiniteMapTable,
+    FinitePolynomialMap,
+    PermutationCertificate,
+    collision_certificate,
+    element,
+    fiber_partition,
+    finite_field,
+    finite_map_table,
+    finite_polynomial,
+    finite_polynomial_map,
+    permutation_certificate,
+)
+
+pytestmark = pytest.mark.requires_provider("flint")
+
+
+def _map(*exponents: int) -> FinitePolynomialMap:
+    presentation = finite_field(2, (1, 1, 1))
+    zero = element(presentation, (0, 0))
+    one = element(presentation, (1, 0))
+    coefficients = tuple(one if power in exponents else zero for power in range(4))
+    return finite_polynomial_map(finite_polynomial(presentation, coefficients))
+
+
+def test_complete_table_and_fibers_reuse_exact_slice_a_field_identity() -> None:
+    polynomial_map = _map(3)
+
+    table = finite_map_table(polynomial_map)
+    partition = fiber_partition(table)
+    collision = collision_certificate(table)
+
+    assert len(table.entries) == polynomial_map.domain.order == 4
+    assert all(
+        source.presentation is polynomial_map.domain for source, _ in table.entries
+    )
+    assert all(
+        target.presentation is polynomial_map.codomain for _, target in table.entries
+    )
+    assert sorted(len(sources) for _, sources in partition.fibers) == [1, 3]
+    assert collision.left != collision.right
+    assert (
+        next(target for source, target in table.entries if source == collision.left)
+        == collision.image
+    )
+    assert type(table).model_validate(table.model_dump(mode="json")) == table
+
+
+def test_frobenius_map_produces_bound_permutation_certificate() -> None:
+    table = finite_map_table(_map(2))
+
+    certificate = permutation_certificate(table)
+
+    assert len(certificate.inverse_entries) == 4
+    assert {target.digest for _, target in table.entries} == {
+        source.digest for source, _ in certificate.inverse_entries
+    }
+
+
+def test_slice_b_values_reject_wrong_parent_incomplete_table_and_forged_fiber() -> None:
+    polynomial_map = _map(3)
+    table = finite_map_table(polynomial_map)
+    other = finite_field(2, (1, 1, 1), generator="z")
+    wrong_polynomial = finite_polynomial(
+        other,
+        (element(other, (0, 0)), element(other, (1, 0))),
+    )
+
+    with pytest.raises(ValueError, match="one exact field presentation"):
+        FinitePolynomialMap(
+            domain=polynomial_map.domain,
+            codomain=polynomial_map.codomain,
+            polynomial=wrong_polynomial,
+        )
+    with pytest.raises(ValueError, match="complete domain"):
+        FiniteMapTable(map=polynomial_map, entries=table.entries[:-1])
+    with pytest.raises(ValueError, match="canonical domain order"):
+        FiniteMapTable(map=polynomial_map, entries=tuple(reversed(table.entries)))
+    with pytest.raises(ValueError, match="partition"):
+        FiberPartition(
+            table=table,
+            fibers=((table.entries[0][1], (table.entries[0][0],)),),
+        )
+
+
+def test_certificates_reject_values_not_bound_to_the_exact_table() -> None:
+    collision_table = finite_map_table(_map(3))
+    permutation_table = finite_map_table(_map(2))
+    collision = collision_certificate(collision_table)
+    permutation = permutation_certificate(permutation_table)
+
+    with pytest.raises(ValueError, match="exact bound table"):
+        CollisionCertificate(
+            table=collision_table,
+            left=collision.left,
+            right=collision.right,
+            image=collision_table.entries[0][1],
+        )
+    with pytest.raises(ValueError, match="exact permutation"):
+        PermutationCertificate(
+            table=permutation_table,
+            inverse_entries=tuple(reversed(permutation.inverse_entries)),
+        )

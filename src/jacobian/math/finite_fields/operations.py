@@ -4,12 +4,18 @@ from __future__ import annotations
 
 from jacobian.math.finite_fields.values import (
     Axis,
+    CollisionCertificate,
     DirectionRankLedger,
+    FiberPartition,
     FiniteDimensionalSubspace,
     FiniteFieldElement,
     FiniteFieldPresentation,
     FiniteLinearMap,
+    FiniteMapTable,
+    FinitePolynomial,
+    FinitePolynomialMap,
     OrbitDistribution,
+    PermutationCertificate,
     ProjectiveLine,
     ProjectivePoint,
     RankResult,
@@ -90,17 +96,7 @@ def projective_line(
         raise ValueError("projective-line enumeration requires a two-coordinate axis")
     zero = element(presentation, (0,) * presentation.degree)
     one = element(presentation, (1,) + (0,) * (presentation.degree - 1))
-    affine_elements = tuple(
-        element(
-            presentation,
-            tuple(
-                (encoded // presentation.characteristic**power)
-                % presentation.characteristic
-                for power in range(presentation.degree)
-            ),
-        )
-        for encoded in range(presentation.order)
-    )
+    affine_elements = _field_elements(presentation)
     return ProjectiveLine(
         presentation=presentation,
         axis=axis,
@@ -111,6 +107,22 @@ def projective_line(
                 for value in affine_elements
             ),
         ),
+    )
+
+
+def _field_elements(
+    presentation: FiniteFieldPresentation,
+) -> tuple[FiniteFieldElement, ...]:
+    return tuple(
+        element(
+            presentation,
+            tuple(
+                (encoded // presentation.characteristic**power)
+                % presentation.characteristic
+                for power in range(presentation.degree)
+            ),
+        )
+        for encoded in range(presentation.order)
     )
 
 
@@ -212,3 +224,121 @@ def orbit_distribution(ledger: DirectionRankLedger) -> OrbitDistribution:
     """Aggregate projective orbit counts from a complete direction-rank ledger."""
 
     return OrbitDistribution.from_ledger(ledger)
+
+
+def finite_polynomial(
+    presentation: FiniteFieldPresentation,
+    coefficients: tuple[FiniteFieldElement, ...],
+    *,
+    variable: str = "x",
+) -> FinitePolynomial:
+    """Construct a canonical univariate polynomial over one exact field."""
+
+    if not coefficients:
+        raise ValueError("finite polynomial requires coefficients")
+    last = next(
+        (
+            index
+            for index in range(len(coefficients) - 1, -1, -1)
+            if not coefficients[index].is_zero
+        ),
+        0,
+    )
+    return FinitePolynomial(
+        presentation=presentation,
+        variable=variable,
+        coefficients=coefficients[: last + 1],
+    )
+
+
+def finite_polynomial_map(polynomial: FinitePolynomial) -> FinitePolynomialMap:
+    """Bind a polynomial as a self-map of its exact field presentation."""
+
+    return FinitePolynomialMap(
+        domain=polynomial.presentation,
+        codomain=polynomial.presentation,
+        polynomial=polynomial,
+    )
+
+
+def evaluate_finite_polynomial(
+    polynomial: FinitePolynomial,
+    value: FiniteFieldElement,
+) -> FiniteFieldElement:
+    """Evaluate with Python-FLINT while preserving the exact parent."""
+
+    if value.presentation != polynomial.presentation:
+        raise ValueError("polynomial and value must share their exact presentation")
+    from jacobian.math.finite_fields import _flint
+
+    active_context = _flint.context(polynomial.presentation)
+    backend_value = _flint.to_backend(value, active_context=active_context)
+    result = active_context(0)
+    for coefficient in reversed(polynomial.coefficients):
+        result = result * backend_value + _flint.to_backend(
+            coefficient,
+            active_context=active_context,
+        )
+    return element(
+        polynomial.presentation,
+        _flint.coordinates(result, degree=polynomial.presentation.degree),
+    )
+
+
+def finite_map_table(polynomial_map: FinitePolynomialMap) -> FiniteMapTable:
+    """Enumerate a complete finite polynomial-map table in canonical order."""
+
+    return FiniteMapTable(
+        map=polynomial_map,
+        entries=tuple(
+            (value, evaluate_finite_polynomial(polynomial_map.polynomial, value))
+            for value in _field_elements(polynomial_map.domain)
+        ),
+    )
+
+
+def fiber_partition(table: FiniteMapTable) -> FiberPartition:
+    """Partition the complete domain by exact map image."""
+
+    grouped: dict[str, tuple[FiniteFieldElement, list[FiniteFieldElement]]] = {}
+    for source, target in table.entries:
+        _, sources = grouped.setdefault(target.digest, (target, []))
+        sources.append(source)
+    return FiberPartition(
+        table=table,
+        fibers=tuple((target, tuple(sources)) for target, sources in grouped.values()),
+    )
+
+
+def collision_certificate(table: FiniteMapTable) -> CollisionCertificate:
+    """Return the first canonical collision in a non-injective finite table."""
+
+    seen: dict[str, tuple[FiniteFieldElement, FiniteFieldElement]] = {}
+    for source, target in table.entries:
+        previous = seen.get(target.digest)
+        if previous is not None:
+            return CollisionCertificate(
+                table=table,
+                left=previous[0],
+                right=source,
+                image=target,
+            )
+        seen[target.digest] = (source, target)
+    raise ValueError("finite map table has no collision")
+
+
+def permutation_certificate(table: FiniteMapTable) -> PermutationCertificate:
+    """Return the exact inverse table of a finite polynomial permutation."""
+
+    return PermutationCertificate(
+        table=table,
+        inverse_entries=tuple(
+            sorted(
+                ((target, source) for source, target in table.entries),
+                key=lambda entry: sum(
+                    coordinate * table.map.codomain.characteristic**power
+                    for power, coordinate in enumerate(entry[0].coordinates)
+                ),
+            )
+        ),
+    )

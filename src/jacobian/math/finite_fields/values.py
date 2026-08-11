@@ -16,6 +16,13 @@ def _digest(payload: dict[str, Any]) -> str:
     return sha256_digest(rfc8785.dumps(payload))
 
 
+def _encoded_coordinates(value: FiniteFieldElement) -> int:
+    return sum(
+        coordinate * value.presentation.characteristic**power
+        for power, coordinate in enumerate(value.coordinates)
+    )
+
+
 class FiniteFieldPresentation(ContractModel):
     """An exact polynomial presentation with a fixed power-basis encoding."""
 
@@ -443,6 +450,211 @@ class OrbitDistribution(ContractModel):
                 "counts": [list(item) for item in self.counts],
                 "ledger": self.ledger.digest,
                 "value_type": "orbit-distribution-v1",
+            }
+        )
+
+
+class FinitePolynomial(ContractModel):
+    """A canonical univariate polynomial over one exact field presentation."""
+
+    presentation: FiniteFieldPresentation
+    variable: str
+    coefficients: tuple[FiniteFieldElement, ...]
+
+    @model_validator(mode="after")
+    def validate_polynomial(self) -> Self:
+        if not self.variable:
+            raise ValueError("finite polynomial variable must be nonempty")
+        if not self.coefficients:
+            raise ValueError("finite polynomial requires a constant coefficient")
+        if any(
+            coefficient.presentation != self.presentation
+            for coefficient in self.coefficients
+        ):
+            raise ValueError("finite polynomial coefficients must share their parent")
+        if len(self.coefficients) > 1 and self.coefficients[-1].is_zero:
+            raise ValueError(
+                "finite polynomial cannot have a trailing zero coefficient"
+            )
+        return self
+
+    @property
+    def digest(self) -> str:
+        return _digest(
+            {
+                "coefficients": [
+                    list(value.coordinates) for value in self.coefficients
+                ],
+                "presentation": self.presentation.digest,
+                "value_type": "finite-polynomial-v1",
+                "variable": self.variable,
+            }
+        )
+
+
+class FinitePolynomialMap(ContractModel):
+    """A polynomial self-map of one exactly presented finite field."""
+
+    domain: FiniteFieldPresentation
+    codomain: FiniteFieldPresentation
+    polynomial: FinitePolynomial
+
+    @model_validator(mode="after")
+    def validate_map(self) -> Self:
+        if self.polynomial.presentation != self.domain or self.codomain != self.domain:
+            raise ValueError(
+                "finite polynomial map must use one exact field presentation"
+            )
+        return self
+
+    @property
+    def digest(self) -> str:
+        return _digest(
+            {
+                "codomain": self.codomain.digest,
+                "domain": self.domain.digest,
+                "polynomial": self.polynomial.digest,
+                "value_type": "finite-polynomial-map-v1",
+            }
+        )
+
+
+class FiniteMapTable(ContractModel):
+    """A complete ordered evaluation table for one exact finite map."""
+
+    map: FinitePolynomialMap
+    entries: tuple[tuple[FiniteFieldElement, FiniteFieldElement], ...]
+
+    @model_validator(mode="after")
+    def validate_table(self) -> Self:
+        if len(self.entries) != self.map.domain.order:
+            raise ValueError("finite map table must enumerate the complete domain")
+        inputs = tuple(source for source, _ in self.entries)
+        if any(value.presentation != self.map.domain for value in inputs):
+            raise ValueError("finite map table inputs must use the exact domain")
+        if len({value.digest for value in inputs}) != len(inputs):
+            raise ValueError("finite map table cannot repeat a domain element")
+        if tuple(map(_encoded_coordinates, inputs)) != tuple(
+            range(self.map.domain.order)
+        ):
+            raise ValueError("finite map table inputs must use canonical domain order")
+        if any(value.presentation != self.map.codomain for _, value in self.entries):
+            raise ValueError("finite map table outputs must use the exact codomain")
+        return self
+
+    @property
+    def digest(self) -> str:
+        return _digest(
+            {
+                "entries": [
+                    [source.digest, target.digest] for source, target in self.entries
+                ],
+                "map": self.map.digest,
+                "value_type": "finite-map-table-v1",
+            }
+        )
+
+
+class FiberPartition(ContractModel):
+    """The nonempty fibers of one complete finite map table."""
+
+    table: FiniteMapTable
+    fibers: tuple[tuple[FiniteFieldElement, tuple[FiniteFieldElement, ...]], ...]
+
+    @model_validator(mode="after")
+    def validate_partition(self) -> Self:
+        if not self.fibers or any(not sources for _, sources in self.fibers):
+            raise ValueError("fiber partition requires nonempty fibers")
+        grouped: dict[str, tuple[FiniteFieldElement, list[FiniteFieldElement]]] = {}
+        for source, target in self.table.entries:
+            _, sources = grouped.setdefault(target.digest, (target, []))
+            sources.append(source)
+        expected = tuple(
+            (target, tuple(sources)) for target, sources in grouped.values()
+        )
+        if self.fibers != expected:
+            raise ValueError("fibers must partition the exact evaluated table")
+        return self
+
+    @property
+    def digest(self) -> str:
+        return _digest(
+            {
+                "fibers": [
+                    [target.digest, [source.digest for source in sources]]
+                    for target, sources in self.fibers
+                ],
+                "table": self.table.digest,
+                "value_type": "fiber-partition-v1",
+            }
+        )
+
+
+class CollisionCertificate(ContractModel):
+    """Two distinct domain elements with the same bound table image."""
+
+    table: FiniteMapTable
+    left: FiniteFieldElement
+    right: FiniteFieldElement
+    image: FiniteFieldElement
+
+    @model_validator(mode="after")
+    def validate_collision(self) -> Self:
+        if self.left == self.right:
+            raise ValueError("collision inputs must be distinct")
+        evaluated = {source.digest: target for source, target in self.table.entries}
+        if (
+            evaluated.get(self.left.digest) != self.image
+            or evaluated.get(self.right.digest) != self.image
+        ):
+            raise ValueError("collision must occur in the exact bound table")
+        return self
+
+    @property
+    def digest(self) -> str:
+        return _digest(
+            {
+                "image": self.image.digest,
+                "left": self.left.digest,
+                "right": self.right.digest,
+                "table": self.table.digest,
+                "value_type": "collision-certificate-v1",
+            }
+        )
+
+
+class PermutationCertificate(ContractModel):
+    """The exact inverse table of a finite polynomial permutation."""
+
+    table: FiniteMapTable
+    inverse_entries: tuple[tuple[FiniteFieldElement, FiniteFieldElement], ...]
+
+    @model_validator(mode="after")
+    def validate_permutation(self) -> Self:
+        if len({target.digest for _, target in self.table.entries}) != len(
+            self.table.entries
+        ):
+            raise ValueError("finite map table is not injective")
+        expected = tuple(
+            sorted(
+                ((target, source) for source, target in self.table.entries),
+                key=lambda entry: _encoded_coordinates(entry[0]),
+            )
+        )
+        if self.inverse_entries != expected:
+            raise ValueError("inverse table does not bind the exact permutation")
+        return self
+
+    @property
+    def digest(self) -> str:
+        return _digest(
+            {
+                "inverse_entries": [
+                    [target.digest, source.digest]
+                    for target, source in self.inverse_entries
+                ],
+                "table": self.table.digest,
+                "value_type": "permutation-certificate-v1",
             }
         )
 
