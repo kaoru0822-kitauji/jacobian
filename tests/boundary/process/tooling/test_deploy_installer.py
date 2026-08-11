@@ -46,6 +46,7 @@ def test_installer_help_exposes_three_deployment_modes() -> None:
     assert "--mode local" in completed.stdout
     assert "--mode domain" in completed.stdout
     assert "--mode tailscale" in completed.stdout
+    assert "--install-root" in completed.stdout
     assert "--with-lean" in completed.stdout
 
 
@@ -77,6 +78,31 @@ def test_domain_dry_run_reports_connector_without_requiring_root() -> None:
     assert "python:      /opt/jacobian/python" in completed.stdout
     assert "caddy:       enabled" in completed.stdout
     assert "funnel:      disabled" in completed.stdout
+
+
+def test_dry_run_derives_every_runtime_path_from_custom_install_root() -> None:
+    completed = _run(
+        "--install-root",
+        "/srv/math/jacobian",
+        "--with-lean",
+        "--dry-run",
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "install:     /srv/math/jacobian" in completed.stdout
+    assert "release:     /srv/math/jacobian/releases/" in completed.stdout
+    assert "python:      /srv/math/jacobian/python" in completed.stdout
+
+
+@pytest.mark.parametrize(
+    "root",
+    ("relative/path", "/", "/srv/path with spaces", "/srv/../jacobian"),
+)
+def test_install_root_rejects_unsafe_or_ambiguous_paths(root: str) -> None:
+    completed = _run("--install-root", root, "--dry-run")
+
+    assert completed.returncode != 0
+    assert "--install-root" in completed.stderr
 
 
 def test_dry_run_never_echoes_supplied_credentials(tmp_path: Path) -> None:
@@ -200,6 +226,9 @@ def test_lean_profile_is_built_and_validated_before_activation() -> None:
     assert validate < revision_marker < current_link
     assert '"ELAN_HOME=${LEAN_ELAN_HOME}"' in source
     assert '"PATH=${LEAN_SERVICE_PATH}"' in source
+    assert 'chmod -R a+rX "${RELEASE_DIR}/lean"' in source
+    assert "lean_provider_runtime(" in source
+    assert "CapabilityProviderAvailability.AVAILABLE" in source
 
 
 def test_systemd_service_can_read_the_operator_managed_lean_toolchain() -> None:
@@ -210,6 +239,14 @@ def test_systemd_service_can_read_the_operator_managed_lean_toolchain() -> None:
     assert "Environment=ELAN_HOME=/opt/jacobian/lean/elan" in service
     assert "Environment=PATH=/opt/jacobian/lean/elan/bin:" in service
     assert "ProtectHome=true" in service
+
+
+def test_installer_renders_custom_runtime_paths_into_service_and_override() -> None:
+    source = INSTALLER.read_text(encoding="utf-8")
+
+    assert '-e "s|/opt/jacobian/current|${CURRENT_LINK}|g"' in source
+    assert '-e "s|/opt/jacobian/lean/elan|${LEAN_ELAN_HOME}|g"' in source
+    assert source.count('-e "s|/opt/jacobian/current|${CURRENT_LINK}|g"') == 2
 
 
 def test_lean_profile_requires_catalog_and_behavior_smokes() -> None:

@@ -48,8 +48,8 @@ The host must already provide:
 - `elan` when using `--with-lean`. The installer reads the committed
   `lean/lean-toolchain`, installs that exact toolchain through elan, restores
   the manifest-pinned Mathlib cache, and builds the checked-in Lean runtime.
-  The service-readable elan home is `/opt/jacobian/lean/elan`; it does not
-  depend on the invoking operator's home directory.
+  The service-readable elan home defaults to `/opt/jacobian/lean/elan`; it does
+  not depend on the invoking operator's home directory.
 
 The installer does not pipe remote installation scripts into a shell. Install
 those host dependencies through a reviewed package or the upstream documented
@@ -84,8 +84,28 @@ sudo ./deploy/install.sh \
   --with-lean
 ```
 
-Core releases remain under `/opt/jacobian/releases/<git-sha>`; Lean-enabled
-releases use `/opt/jacobian/releases/<git-sha>-lean`. This prevents a core-only
+All code and toolchain paths derive from one installation root. The default is
+`/opt/jacobian`; on a new VPS or a host with a separate application volume,
+select another absolute path without editing the unit templates:
+
+```sh
+sudo ./deploy/install.sh \
+  --install-root /srv/math/jacobian \
+  --mode domain \
+  --domain math.example.org \
+  --with-lean
+```
+
+This places `releases`, `current`, managed Python runtimes, and the shared elan
+home below `/srv/math/jacobian`, and renders both the authenticated unit and the
+anonymous override with those exact paths. Reuse the same option on every
+upgrade. State under `/var/lib/jacobian-mcp` and secrets under
+`/etc/jacobian-mcp` remain separate host data: copy and validate them explicitly
+during a VPS migration rather than treating an application release as a backup.
+
+With the default installation root, core releases remain under
+`/opt/jacobian/releases/<git-sha>`; Lean-enabled releases use
+`/opt/jacobian/releases/<git-sha>-lean`. This prevents a core-only
 release at one revision from being mistaken for a later Lean-enabled build of
 the same source. The Lean build must complete before the release marker or
 `/opt/jacobian/current` activation is written.

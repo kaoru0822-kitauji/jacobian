@@ -25,15 +25,10 @@ WITH_LEAN=0
 
 BACKEND_PORT=8765
 INGRESS_PORT=8766
-RELEASE_ROOT="/opt/jacobian/releases"
-CURRENT_LINK="/opt/jacobian/current"
-PYTHON_INSTALL_ROOT="/opt/jacobian/python"
-LEAN_ELAN_HOME="/opt/jacobian/lean/elan"
-LEAN_SERVICE_PATH="${LEAN_ELAN_HOME}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+INSTALL_ROOT="/opt/jacobian"
 CONFIG_ROOT="/etc/jacobian-mcp"
 CADDY_CONFIG_ROOT="/etc/caddy-jacobian"
 SYSTEMD_ROOT="/etc/systemd/system"
-TOKEN_DESTINATION="${CONFIG_ROOT}/tokens.json"
 TAILSCALE_STATUS=""
 RENDER_ROOT=""
 RELEASE_BUILD_DIR=""
@@ -81,6 +76,8 @@ Configuration:
   --anonymous-tenant-id ID      Shared anonymous namespace
                                 (default: jacobian-test).
   --confirm-public-anonymous    Also required when anonymous mode is public.
+  --install-root PATH           Immutable releases, managed Python, and Lean
+                                root (default: /opt/jacobian).
   --with-lean                   Build and require the pinned Lean CORE + MATHLIB
                                 provider and checker portfolio.
   --skip-smoke                  Do not run the read-only MCP deployment smoke.
@@ -219,6 +216,16 @@ validate_domain() {
         "domain must be a fully qualified DNS name such as math.example.org"
 }
 
+validate_install_root() {
+    local value="$1"
+    [[ "${value}" != "/" && "${value}" =~ ^/[A-Za-z0-9._/-]+$ ]] || die \
+        "--install-root must be a non-root absolute path without spaces"
+    [[ "${value}" != *"//"* && "${value}" != *"/./"* \
+        && "${value}" != */. && "${value}" != *"/../"* \
+        && "${value}" != */.. ]] || die \
+        "--install-root must not contain empty, '.' or '..' path segments"
+}
+
 validate_release_runtime() {
     local release_dir="$1"
     local entrypoint="${release_dir}/.venv/bin/jacobian-mcp"
@@ -267,10 +274,21 @@ validate_lean_release_runtime() {
             "PATH=${LEAN_SERVICE_PATH}" \
             "${release_dir}/.venv/bin/python" - <<'PY'
 from jacobian_checkers import lean4
+from jacobian.contracts.capabilities import CapabilityProviderAvailability
+from jacobian.providers.lean_runtime import lean_provider_runtime
 
 executable, mathlib_runtime = lean4.inspect_runtime(require_mathlib=True)
 if not executable.is_file() or mathlib_runtime is None or not mathlib_runtime.is_dir():
     raise SystemExit("pinned Lean provider is unavailable")
+runtime = lean_provider_runtime(
+    profiles={
+        "CORE": {},
+        "MATHLIB": {"mathlib_commit": lean4.MATHLIB_COMMIT},
+    },
+    checker_ids=(),
+)
+if runtime.availability is not CapabilityProviderAvailability.AVAILABLE:
+    raise SystemExit(runtime.diagnostic or "pinned Lean provider is unavailable")
 PY
     ) || die "pinned Lean provider failed its release readiness probe"
 }
@@ -310,6 +328,11 @@ while (($#)); do
             CONFIRM_PUBLIC_ANONYMOUS=1
             shift
             ;;
+        --install-root)
+            (($# >= 2)) || die "--install-root requires a path"
+            INSTALL_ROOT="$2"
+            shift 2
+            ;;
         --with-lean)
             WITH_LEAN=1
             shift
@@ -331,6 +354,15 @@ while (($#)); do
             ;;
     esac
 done
+
+INSTALL_ROOT="${INSTALL_ROOT%/}"
+validate_install_root "${INSTALL_ROOT}"
+RELEASE_ROOT="${INSTALL_ROOT}/releases"
+CURRENT_LINK="${INSTALL_ROOT}/current"
+PYTHON_INSTALL_ROOT="${INSTALL_ROOT}/python"
+LEAN_ELAN_HOME="${INSTALL_ROOT}/lean/elan"
+LEAN_SERVICE_PATH="${LEAN_ELAN_HOME}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+TOKEN_DESTINATION="${CONFIG_ROOT}/tokens.json"
 
 case "${MODE}" in
     local | domain | tailscale) ;;
@@ -424,6 +456,7 @@ if ((DRY_RUN)); then
     cat <<EOF
 Jacobian deployment plan
   revision:    ${REVISION}
+  install:     ${INSTALL_ROOT}
   release:     ${RELEASE_DIR}
   python:      ${PYTHON_INSTALL_ROOT}
   mode:        ${MODE}
@@ -551,6 +584,10 @@ if [[ ! -d "${RELEASE_DIR}" ]]; then
                 "${LEAN_ELAN_HOME}/bin/elan" run "${LEAN_TOOLCHAIN}" \
                 lake build repl JacobianLeanRuntime jacobian_lean_proof_state
         )
+        # Mathlib's binary cache may preserve owner-only modes from its archive.
+        # The release is immutable and root-owned, but every runtime input must
+        # remain readable (and every executable runnable) by the service user.
+        chmod -R a+rX "${RELEASE_DIR}/lean"
     fi
     chown -R root:root "${RELEASE_DIR}" "${PYTHON_INSTALL_ROOT}"
     RELEASE_WAS_BUILT=1
@@ -601,6 +638,7 @@ if ((ALLOW_ANONYMOUS)); then
         "${SYSTEMD_ROOT}/jacobian-mcp.service.d"
     sed \
         -e "s|replace-with-unique-test-id|${ANONYMOUS_TENANT_ID}|g" \
+        -e "s|/opt/jacobian/current|${CURRENT_LINK}|g" \
         "${REPO_ROOT}/deploy/systemd/jacobian-mcp-anonymous.conf" \
         >"${SYSTEMD_ROOT}/jacobian-mcp.service.d/anonymous.conf"
     chmod 0644 "${SYSTEMD_ROOT}/jacobian-mcp.service.d/anonymous.conf"
@@ -660,6 +698,7 @@ RENDER_ROOT="$(mktemp -d)"
 
 sed \
     -e "s|https://math-tools.example.org|${PUBLIC_BASE_URL}|g" \
+    -e "s|/opt/jacobian/current|${CURRENT_LINK}|g" \
     -e "s|/opt/jacobian/lean/elan|${LEAN_ELAN_HOME}|g" \
     "${REPO_ROOT}/deploy/systemd/jacobian-mcp.service" \
     >"${RENDER_ROOT}/jacobian-mcp.service"
