@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Protocol
+from typing import Any
 
-from jacobian.capability_adapters import TypedInputAdapter
+from jacobian.capability_adapters import CapabilityAdapter, TypedInputAdapter
 from jacobian.capability_errors import (
     CapabilityError,
     CapabilityInvocationError,
@@ -28,20 +28,13 @@ from jacobian.provider_runtime import (
 _LOGGER = logging.getLogger(__name__)
 
 
-class AdapterLike(Protocol):
-    @property
-    def descriptor(self) -> Any: ...
-
-    def invoke(self, request: CapabilityRequest) -> CapabilityResult: ...
-
-
 class CapabilityDispatchMixin:
     """Own the invocation state machine after registry resolution."""
 
     def invoke(self: Any, request: CapabilityRequest) -> CapabilityResult:
         started = time.monotonic()
         try:
-            adapter: AdapterLike = self._adapters[request.capability_id]
+            adapter: CapabilityAdapter = self._adapters[request.capability_id]
         except KeyError:
             result = _unknown_capability_failure(self, request)
             log_invocation(result, started)
@@ -93,7 +86,10 @@ class CapabilityDispatchMixin:
         if invalid is not None:
             log_invocation(invalid, started)
             return invalid
-        if result.execution.status is ExecutionStatus.COMPLETED:
+        if (
+            result.execution.status is ExecutionStatus.COMPLETED
+            and not isinstance(adapter, TypedInputAdapter)
+        ):
             result = _normalize_completed_adapter_output(
                 descriptor=descriptor,
                 request=request,
@@ -108,7 +104,7 @@ class CapabilityDispatchMixin:
 
 
 def _normalize_request(
-    adapter: AdapterLike,
+    adapter: CapabilityAdapter,
     descriptor: Any,
     request: CapabilityRequest,
 ) -> CapabilityRequest:
@@ -320,7 +316,7 @@ def failed_result(
 
 
 def invoke_ready_adapter(
-    *, adapter: AdapterLike, descriptor: Any, request: CapabilityRequest
+    *, adapter: CapabilityAdapter, descriptor: Any, request: CapabilityRequest
 ) -> CapabilityResult:
     runtime = descriptor.provider_runtime
     if runtime is None:
