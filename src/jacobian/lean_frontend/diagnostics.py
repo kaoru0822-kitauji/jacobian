@@ -242,10 +242,9 @@ def _operational_checker_diagnostic(detail: str) -> LeanDiagnostic | None:
                 message=message,
                 raw_backend_message=_bounded_raw_backend_message(detail),
             )
-    if (
-        detail.startswith("The pinned Lean ")
-        and " executable could not be resolved." in detail
-    ) or (detail.startswith("Lean ") and " could not run locally." in detail):
+    if (detail.startswith("The pinned Lean ") and " executable " in detail) or (
+        detail.startswith("Lean ") and " could not run locally." in detail
+    ):
         return LeanDiagnostic(
             code="LEAN_RUNTIME_SETUP_FAILED",
             phase=LeanDiagnosticPhase.RUNTIME_SETUP,

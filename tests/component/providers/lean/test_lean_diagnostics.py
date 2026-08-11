@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from jacobian.contracts.lean import (
     LeanDiagnosticPhase,
     LeanDiagnosticSource,
@@ -157,3 +159,32 @@ def test_checker_diagnostics_keep_toolchain_failure_out_of_proof_repair() -> Non
         diagnostic.phase is LeanDiagnosticPhase.RUNTIME_SETUP
         for diagnostic in diagnostics
     )
+
+
+@pytest.mark.parametrize(
+    "detail",
+    (
+        "The pinned Lean 4.31.0 executable could not be resolved.",
+        "The pinned Lean 4.31.0 executable is unavailable.",
+        (
+            "The pinned Lean 4.31.0 executable resolved to the elan proxy rather "
+            "than the toolchain binary."
+        ),
+    ),
+)
+def test_checker_diagnostics_classify_all_executable_resolution_failures(
+    detail: str,
+) -> None:
+    diagnostics = checker_diagnostics(
+        _rejected_checker_result(detail),
+        statement="True",
+        proof="by trivial",
+        environment=LeanEnvironment.CORE,
+    )
+
+    assert [diagnostic.code for diagnostic in diagnostics] == [
+        "LEAN_RUNTIME_SETUP_FAILED"
+    ]
+    assert diagnostics[0].phase is LeanDiagnosticPhase.RUNTIME_SETUP
+    assert diagnostics[0].source_span is None
+    assert diagnostics[0].raw_backend_message == detail
