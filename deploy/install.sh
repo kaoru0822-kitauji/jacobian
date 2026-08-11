@@ -652,6 +652,7 @@ fi
 if ((RELEASE_WAS_BUILT)); then
     printf '%s\n' "${RELEASE_PROFILE}" >"${RELEASE_DIR}/.release-profile"
     printf '%s\n' "${REVISION}" >"${RELEASE_DIR}/.git-revision"
+    chmod 0644 "${RELEASE_DIR}/.git-revision"
     RELEASE_BUILD_DIR=""
 fi
 

@@ -299,9 +299,12 @@ def test_release_runtime_is_checked_before_current_symlink_is_changed() -> None:
     revision_marker = source.index(
         'printf \'%s\\n\' "${REVISION}" >"${RELEASE_DIR}/.git-revision"'
     )
+    marker_permissions = source.index(
+        'chmod 0644 "${RELEASE_DIR}/.git-revision"'
+    )
     current_link = source.index('ln -sfn "${RELEASE_DIR}" "${CURRENT_LINK}.new"')
 
-    assert validation < revision_marker < current_link
+    assert validation < revision_marker < marker_permissions < current_link
     assert '"${RUNUSER_BIN}" --user jacobian -- "${entrypoint}" --version' in source
 
 
