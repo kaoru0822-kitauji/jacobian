@@ -8,10 +8,44 @@ from pathlib import Path
 import pytest
 from mcp.shared.exceptions import MCPError
 
+from jacobian.adapters.mcp.deployment_identity import DeploymentIdentity
 from jacobian.adapters.mcp.server import create_server
 
 MATH_TOOL_NAMES = {"math.find", "math.run"}
 MCP_TOOL_NAMES = MATH_TOOL_NAMES
+
+
+def test_managed_server_advertises_immutable_deployment_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    identity = DeploymentIdentity(
+        revision="a" * 40,
+        package_version=version("jacobian"),
+    )
+    monkeypatch.setattr(
+        "jacobian.adapters.mcp.server.load_deployment_identity",
+        lambda: identity,
+    )
+    server = create_server(tmp_path)
+
+    async def scenario() -> None:
+        from mcp import Client
+
+        async with Client(server, raise_exceptions=True) as client:
+            resources = await client.list_resources()
+            assert {
+                (resource.name, str(resource.uri)) for resource in resources.resources
+            } == {
+                ("capability-catalog", "capability://catalog"),
+                ("deployment-identity", "deployment://identity"),
+            }
+            result = await client.read_resource("deployment://identity")
+            assert json.loads(result.contents[0].text) == identity.model_dump(
+                mode="json"
+            )
+
+    asyncio.run(scenario())
 
 
 def test_mcp_exposes_only_math_tools_with_read_only_resources(

@@ -16,6 +16,7 @@ from mcp.server.auth.settings import AuthSettings
 from pydantic import AnyHttpUrl
 from uvicorn import Config, Server
 
+from jacobian.adapters.mcp.deployment_identity import DeploymentIdentity
 from jacobian.adapters.mcp.remote import (
     StaticTokenVerifier,
     load_static_token_file,
@@ -27,6 +28,14 @@ def test_authenticated_streamable_http_isolates_tenant_memory(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    revision = "a" * 40
+    monkeypatch.setattr(
+        "jacobian.adapters.mcp.server.load_deployment_identity",
+        lambda: DeploymentIdentity(
+            revision=revision,
+            package_version=version("jacobian"),
+        ),
+    )
     token_file = tmp_path / "tokens.json"
     token_file.write_text(
         json.dumps(
@@ -86,6 +95,7 @@ def test_authenticated_streamable_http_isolates_tenant_memory(
                 inspect_remote_deployment(
                     url=f"http://127.0.0.1:{port}/mcp",
                     expected_version=version("jacobian"),
+                    expected_revision=revision,
                     expected_policy_profile="DEFAULT",
                     required_capabilities={"matrix.determinant.compute"},
                     query="exact matrix determinant",
@@ -93,6 +103,7 @@ def test_authenticated_streamable_http_isolates_tenant_memory(
                 )
             )
             assert report["server"]["version"] == version("jacobian")
+            assert report["deployment"]["revision"] == revision
             assert report["catalog"]["policy_profile"] == "DEFAULT"
             assert report["catalog"]["catalog_digest"].startswith("sha256:")
         finally:

@@ -47,7 +47,8 @@ def _classify(
     return classify_recovery(case, retained)
 
 
-def _surface(seed: str) -> dict[str, object]:
+def _surface(seed: str, deployed_revision: str) -> dict[str, object]:
+    observed_revision = deployed_revision.ljust(40, "0")
     snapshot = {
         "server": {"name": "jacobian", "version": "0.11.0"},
         "instructions": f"test surface {seed}",
@@ -59,6 +60,12 @@ def _surface(seed: str) -> dict[str, object]:
             "policy_digest": "sha256:" + "9" * 64,
             "capability_count": 1,
             "content_sha256": "sha256:" + seed * 64,
+        },
+        "deployment": {
+            "schema_version": "1",
+            "revision": observed_revision,
+            "package_version": "0.11.0",
+            "evidence": "release-marker",
         },
     }
     return {**snapshot, "surface_digest": surface_snapshot_digest(snapshot)}
@@ -268,7 +275,10 @@ def _comparison_report(
         "timeout_seconds": 300.0,
         "codex_version": "codex-test",
         "selected_case_ids": ["core-check-type-mismatch"],
-        "surface": _surface(surface_seed or ("b" if control else "c")),
+        "surface": _surface(
+            surface_seed or ("b" if control else "c"),
+            BASE_REVISION if control else CANDIDATE_REVISION,
+        ),
         "runs": [run],
         "summary": summarize_runs([run]),
     }
@@ -370,6 +380,29 @@ def test_recovery_execution_refuses_a_dirty_evaluator(
 
     with pytest.raises(SystemExit, match="clean tracked worktree"):
         recovery_module._candidate_revision(ROOT)
+
+
+def test_recovery_binds_revision_observed_from_the_mcp_endpoint() -> None:
+    surface = _surface("b", BASE_REVISION)
+
+    observed = recovery_module._bind_observed_deployment_revision(
+        surface,
+        supplied_revision=BASE_REVISION,
+        expected_revision=BASE_REVISION,
+    )
+
+    assert observed == BASE_REVISION.ljust(40, "0")
+
+
+def test_recovery_rejects_a_stale_or_swapped_mcp_endpoint() -> None:
+    stale_surface = _surface("b", "3" * 40)
+
+    with pytest.raises(SystemExit, match="observed MCP deployment revision"):
+        recovery_module._bind_observed_deployment_revision(
+            stale_surface,
+            supplied_revision=BASE_REVISION,
+            expected_revision=BASE_REVISION,
+        )
 
 
 def test_recovery_classification_separates_diagnostic_from_terminal_success() -> None:

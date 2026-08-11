@@ -92,7 +92,11 @@ compare the two `report.json` files with `--compare CONTROL TREATMENT`,
 file inside either output directory is not an external trust anchor. Pass the
 exact selected release revision as `--deployed-revision`. The control must
 match the suite's `source_base_revision`; the treatment must match the
-candidate checkout running the harness.
+candidate checkout running the harness. Managed deployments expose their
+root-owned release marker through `deployment://identity`; execution refuses to
+start unless that endpoint-observed full Git revision agrees with both the
+operator argument and the condition's source revision. This prevents a stale or
+swapped endpoint from being mislabeled as the selected release.
 
 Comparison fails closed on condition or run-plan drift, wrong source bindings,
 identical observed surfaces, incomplete case/repetition coverage, or stale

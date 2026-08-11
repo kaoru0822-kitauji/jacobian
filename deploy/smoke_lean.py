@@ -68,7 +68,10 @@ def _require_transition(
     if result.get("execution", {}).get("status") != "COMPLETED":
         raise RuntimeError("Lean tactic transition did not complete operationally")
     output = result.get("output", {})
-    if output.get("accepted") is not accepted or output.get("completed") is not completed:
+    if (
+        output.get("accepted") is not accepted
+        or output.get("completed") is not completed
+    ):
         raise RuntimeError(
             "Lean tactic transition returned an unexpected candidate verdict"
         )
@@ -77,6 +80,16 @@ def _require_transition(
         raise RuntimeError("Lean tactic transition successor binding is inconsistent")
     if not accepted and not output.get("diagnostics"):
         raise RuntimeError("rejected Lean tactic returned no actionable diagnostics")
+
+
+def _require_mathlib_declaration(result: dict[str, Any]) -> None:
+    if result.get("execution", {}).get("status") != "COMPLETED":
+        raise RuntimeError("MATHLIB declaration search did not complete")
+    declarations = result.get("output", {}).get("declarations")
+    if not isinstance(declarations, list) or not declarations:
+        raise RuntimeError("MATHLIB declaration search returned no exact match")
+    if declarations[0].get("name") != "irrational_sqrt_two":
+        raise RuntimeError("MATHLIB declaration search returned an unexpected match")
 
 
 async def inspect(*, url: str, timeout_seconds: float) -> dict[str, Any]:
@@ -109,6 +122,16 @@ async def inspect(*, url: str, timeout_seconds: float) -> dict[str, Any]:
             },
         )
         _require_verified(mathlib, environment="MATHLIB")
+        declaration = await _run(
+            client,
+            "lean.declaration.search",
+            {
+                "environment": "MATHLIB",
+                "name_contains": "irrational_sqrt_two",
+                "result_limit": 1,
+            },
+        )
+        _require_mathlib_declaration(declaration)
 
         accepted = await _run(
             client,
@@ -128,6 +151,7 @@ async def inspect(*, url: str, timeout_seconds: float) -> dict[str, Any]:
         "checks": {
             "core_verification": "VERIFIED",
             "mathlib_verification": "VERIFIED",
+            "mathlib_declaration_search": "COMPLETED",
             "accepted_tactic": "COMPLETED",
             "rejected_tactic": "DIAGNOSTIC",
         },

@@ -360,9 +360,12 @@ changed by the release.
 `--with-lean` adds `lean.check`, `lean.proof_state.apply_tactic`,
 `lean.term.apply`, and `lean.retrieve.premises` to the required catalog set. It
 then runs `deploy/smoke_lean.py`, which writes disposable tenant artifacts while
-checking CORE and MATHLIB proof acceptance plus accepted and rejected tactic
-transitions. This deeper smoke is deliberately separate from the general
-read-only deployment smoke.
+checking CORE and MATHLIB proof acceptance, a real MATHLIB declaration search,
+plus accepted and rejected tactic transitions. The service also advertises the
+root-owned `.git-revision` captured at process start through
+`deployment://identity`; use that resource when an evaluation or operator
+record must bind observations to the exact deployed checkout. This deeper smoke
+is deliberately separate from the general read-only deployment smoke.
 
 ## Roll back without rewriting the repository
 

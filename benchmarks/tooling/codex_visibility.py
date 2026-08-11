@@ -254,7 +254,12 @@ def classify_visibility(
     }
 
 
-async def inspect_surface(url: str, timeout_seconds: float) -> dict[str, Any]:
+async def inspect_surface(
+    url: str,
+    timeout_seconds: float,
+    *,
+    require_deployment_identity: bool = False,
+) -> dict[str, Any]:
     """Snapshot the exact MCP surface used by a visibility run."""
 
     token = os.environ.get("JACOBIAN_MCP_BEARER_TOKEN")
@@ -310,6 +315,21 @@ async def inspect_surface(url: str, timeout_seconds: float) -> dict[str, Any]:
                 "content_sha256": _sha256_bytes(catalog_content.text.encode("utf-8")),
             },
         }
+        if require_deployment_identity:
+            deployment_result = await client.read_resource("deployment://identity")
+            deployment_content = deployment_result.contents[0]
+            if not isinstance(deployment_content, TextResourceContents):
+                raise RuntimeError("deployment identity is not text")
+            deployment = json.loads(deployment_content.text)
+            if (
+                not isinstance(deployment, dict)
+                or deployment.get("schema_version") != "1"
+                or deployment.get("evidence") != "release-marker"
+                or not isinstance(deployment.get("revision"), str)
+                or deployment.get("package_version") != server_info.version
+            ):
+                raise RuntimeError("MCP deployment identity is malformed")
+            snapshot["deployment"] = deployment
     return {**snapshot, "surface_digest": surface_snapshot_digest(snapshot)}
 
 

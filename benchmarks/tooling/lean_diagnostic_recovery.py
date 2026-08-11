@@ -602,6 +602,55 @@ def _same_revision(left: str, right: str) -> bool:
     return left.startswith(right) or right.startswith(left)
 
 
+def _bind_observed_deployment_revision(
+    surface: Mapping[str, Any],
+    *,
+    supplied_revision: str,
+    expected_revision: str,
+) -> str:
+    deployment = surface.get("deployment")
+    observed = deployment.get("revision") if isinstance(deployment, Mapping) else None
+    if not isinstance(observed, str) or re.fullmatch(r"[0-9a-f]{40}", observed) is None:
+        raise SystemExit("MCP endpoint omitted a canonical deployment revision")
+    if not _same_revision(observed, supplied_revision):
+        raise SystemExit(
+            "observed MCP deployment revision does not match --deployed-revision"
+        )
+    if not _same_revision(observed, expected_revision):
+        raise SystemExit(
+            "observed MCP deployment revision does not match the condition source"
+        )
+    return observed
+
+
+def _required_identity_strings(values: Mapping[str, Any]) -> dict[str, str]:
+    identity: dict[str, str] = {}
+    for key, value in values.items():
+        if not isinstance(value, str) or not value:
+            raise ValueError("recovery report has incomplete observed server identity")
+        identity[key] = value
+    return identity
+
+
+def _deployment_surface_revision(
+    deployment: object,
+    *,
+    server_version: str,
+) -> str:
+    if not isinstance(deployment, Mapping):
+        raise ValueError("recovery report requires observed deployment metadata")
+    revision = deployment.get("revision")
+    if (
+        deployment.get("schema_version") != "1"
+        or deployment.get("evidence") != "release-marker"
+        or deployment.get("package_version") != server_version
+        or not isinstance(revision, str)
+        or re.fullmatch(r"[0-9a-f]{40}", revision) is None
+    ):
+        raise ValueError("recovery report has invalid observed deployment metadata")
+    return revision
+
+
 def _surface_identity(report: Mapping[str, Any]) -> dict[str, str]:
     surface = report.get("surface")
     if not isinstance(surface, Mapping):
@@ -621,16 +670,20 @@ def _surface_identity(report: Mapping[str, Any]) -> dict[str, str]:
         raise ValueError("recovery report requires observed MCP server metadata")
     if not isinstance(catalog, Mapping):
         raise ValueError("recovery report requires observed catalog metadata")
-    identity = {
-        "surface_digest": surface_digest,
-        "server_name": server.get("name"),
-        "server_version": server.get("version"),
-        "catalog_digest": catalog.get("catalog_digest"),
-        "policy_profile": catalog.get("policy_profile"),
-        "policy_digest": catalog.get("policy_digest"),
-    }
-    if any(not isinstance(value, str) or not value for value in identity.values()):
-        raise ValueError("recovery report has incomplete observed server identity")
+    identity = _required_identity_strings(
+        {
+            "surface_digest": surface_digest,
+            "server_name": server.get("name"),
+            "server_version": server.get("version"),
+            "catalog_digest": catalog.get("catalog_digest"),
+            "policy_profile": catalog.get("policy_profile"),
+            "policy_digest": catalog.get("policy_digest"),
+        }
+    )
+    identity["deployment_revision"] = _deployment_surface_revision(
+        surface.get("deployment"),
+        server_version=identity["server_version"],
+    )
     if (
         _DIGEST.fullmatch(identity["catalog_digest"]) is None
         or _DIGEST.fullmatch(identity["policy_digest"]) is None
@@ -688,6 +741,16 @@ def _condition_bindings(
         raise ValueError("control and treatment must use different deployed revisions")
     control_identity = _surface_identity(control)
     treatment_identity = _surface_identity(treatment)
+    if not _same_revision(
+        control_identity["deployment_revision"], control_deployed_revision
+    ):
+        raise ValueError("control report deployment differs from observed MCP revision")
+    if not _same_revision(
+        treatment_identity["deployment_revision"], treatment_deployed_revision
+    ):
+        raise ValueError(
+            "treatment report deployment differs from observed MCP revision"
+        )
     if control_identity["surface_digest"] == treatment_identity["surface_digest"]:
         raise ValueError("control and treatment observed the same MCP surface")
     for field in ("server_name", "policy_profile", "policy_digest"):
@@ -1087,7 +1150,18 @@ def main() -> None:
     output = args.output.resolve()
     if output.exists():
         raise SystemExit(f"output directory already exists: {output}")
-    surface = asyncio.run(inspect_surface(args.mcp_url, timeout))
+    surface = asyncio.run(
+        inspect_surface(
+            args.mcp_url,
+            timeout,
+            require_deployment_identity=True,
+        )
+    )
+    observed_deployed_revision = _bind_observed_deployment_revision(
+        surface,
+        supplied_revision=args.deployed_revision,
+        expected_revision=expected_revision,
+    )
     output.mkdir(parents=True)
     with tempfile.TemporaryDirectory(prefix="jacobian-lean-recovery-") as raw:
         workspace = Path(raw)
@@ -1117,7 +1191,7 @@ def main() -> None:
         "suite_digest": suite_digest,
         "source_base_revision": suite.source_base_revision,
         "source_candidate_revision": source_candidate_revision,
-        "deployed_revision": args.deployed_revision,
+        "deployed_revision": observed_deployed_revision,
         "condition": args.condition,
         "model": args.model,
         "reasoning_effort": args.reasoning_effort,

@@ -352,6 +352,10 @@ def test_systemd_service_can_read_the_operator_managed_lean_toolchain() -> None:
 
     assert "Environment=ELAN_HOME=/opt/jacobian/lean/elan" in service
     assert "Environment=PATH=/opt/jacobian/lean/elan/bin:" in service
+    assert (
+        "Environment=JACOBIAN_DEPLOYMENT_REVISION_FILE="
+        "/opt/jacobian/current/.git-revision" in service
+    )
     assert "ProtectHome=true" in service
 
 
@@ -374,6 +378,7 @@ def test_lean_profile_requires_catalog_and_behavior_smokes() -> None:
         "lean.retrieve.premises",
     ):
         assert f"--require-capability {capability_id}" in smoke_block
+    assert '--expect-revision "${REVISION}"' in smoke_block
     assert '"${RELEASE_DIR}/deploy/smoke_lean.py"' in smoke_block
 
 

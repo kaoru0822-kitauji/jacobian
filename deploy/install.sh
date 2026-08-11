@@ -851,6 +851,7 @@ if ((!SKIP_SMOKE)); then
             "${RELEASE_DIR}/.venv/bin/python" \
             "${RELEASE_DIR}/deploy/smoke_remote.py" \
             "${CONNECTOR_URL}" \
+            --expect-revision "${REVISION}" \
             --expect-policy-profile DEFAULT \
             "${SMOKE_REQUIREMENTS[@]}"; then
             if ((WITH_LEAN)) && ! \

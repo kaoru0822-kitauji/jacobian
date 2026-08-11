@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import pytest
-from deploy.smoke_lean import _require_transition, _require_verified
+from deploy.smoke_lean import (
+    _require_mathlib_declaration,
+    _require_transition,
+    _require_verified,
+)
 
 
 def test_verified_smoke_requires_completed_checker_backing() -> None:
@@ -65,3 +69,19 @@ def test_transition_smoke_requires_exactly_one_bound_successor_on_acceptance() -
     }
     with pytest.raises(RuntimeError, match="successor binding"):
         _require_transition(duplicate, accepted=True, completed=True)
+
+
+def test_mathlib_declaration_smoke_requires_the_exact_declaration() -> None:
+    result = {
+        "execution": {"status": "COMPLETED"},
+        "output": {"declarations": [{"name": "irrational_sqrt_two"}]},
+    }
+    _require_mathlib_declaration(result)
+
+    for mutation in (
+        {**result, "execution": {"status": "ERROR"}},
+        {**result, "output": {"declarations": []}},
+        {**result, "output": {"declarations": [{"name": "Nat.add"}]}},
+    ):
+        with pytest.raises(RuntimeError):
+            _require_mathlib_declaration(mutation)
