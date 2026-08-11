@@ -78,8 +78,8 @@ Configuration:
   --anonymous-tenant-id ID      Shared anonymous namespace
                                 (default: jacobian-test).
   --confirm-public-anonymous    Also required when anonymous mode is public.
-  --install-root PATH           Immutable releases, managed Python, and Lean
-                                root (default: /opt/jacobian).
+  --install-root PATH           Durable root for immutable releases, managed
+                                Python, and Lean (default: /opt/jacobian).
   --with-lean                   Build and require the pinned Lean CORE + MATHLIB
                                 provider and checker portfolio.
   --skip-smoke                  Do not run the read-only MCP deployment smoke.
@@ -247,8 +247,11 @@ validate_install_root() {
         && "${value}" != */.. ]] || die \
         "--install-root must not contain empty, '.' or '..' path segments"
     case "${value}/" in
-        /home/* | /root/* | /run/user/* | /tmp/* | /var/tmp/*)
-            die "--install-root must remain visible through the systemd sandbox; do not place it below /home, /root, /run/user, /tmp, or /var/tmp"
+        /home/* | /root/* | /tmp/* | /var/tmp/*)
+            die "--install-root must remain visible through the systemd sandbox; do not place it below /home, /root, /tmp, or /var/tmp"
+            ;;
+        /run/*)
+            die "--install-root must be durable across reboots; do not place it below /run"
             ;;
     esac
     effective="$(resolve_effective_path "${value}")" || die \
@@ -256,8 +259,11 @@ validate_install_root() {
     [[ "${effective}" != "/" && "${effective}" =~ ^/[A-Za-z0-9._/-]+$ ]] || die \
         "--install-root resolves to a non-root path with unsupported characters"
     case "${effective}/" in
-        /home/* | /root/* | /run/user/* | /tmp/* | /var/tmp/*)
+        /home/* | /root/* | /tmp/* | /var/tmp/*)
             die "--install-root resolves below a path hidden by the systemd sandbox: ${effective}"
+            ;;
+        /run/*)
+            die "--install-root resolves below the volatile /run hierarchy: ${effective}"
             ;;
     esac
     VALIDATED_INSTALL_ROOT="${effective}"

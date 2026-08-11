@@ -104,6 +104,7 @@ def test_dry_run_derives_every_runtime_path_from_custom_install_root() -> None:
         "/srv/../jacobian",
         "/home/apps/jacobian",
         "/root",
+        "/run/jacobian",
         "/run/user/1000/jacobian",
         "/tmp/jacobian",
         "/var/tmp/jacobian",
@@ -137,6 +138,29 @@ def test_install_root_rejects_an_allowed_symlink_into_a_hidden_path(
 
         assert completed.returncode != 0
         assert "resolves below a path hidden by the systemd sandbox" in completed.stderr
+    finally:
+        shutil.rmtree(visible_parent)
+
+
+def test_install_root_rejects_an_allowed_symlink_into_volatile_run() -> None:
+    shared_memory = Path("/dev/shm")
+    if not shared_memory.is_dir() or not os.access(shared_memory, os.W_OK):
+        pytest.skip("a writable /dev/shm is required for the symlink durability check")
+    visible_parent = Path(
+        tempfile.mkdtemp(prefix="jacobian-install-root-", dir=shared_memory)
+    )
+    visible_link = visible_parent / "release-root"
+    try:
+        visible_link.symlink_to("/run", target_is_directory=True)
+
+        completed = _run(
+            "--install-root",
+            str(visible_link / "jacobian"),
+            "--dry-run",
+        )
+
+        assert completed.returncode != 0
+        assert "resolves below the volatile /run hierarchy" in completed.stderr
     finally:
         shutil.rmtree(visible_parent)
 

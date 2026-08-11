@@ -24,7 +24,10 @@ from pathlib import Path
 
 import pyperf
 
-from benchmarks.tooling.command_runner import git_head_sha
+from benchmarks.tooling.command_runner import (
+    git_head_sha,
+    git_tracked_worktree_is_clean,
+)
 from jacobian.canonical import canonicalize_json
 from jacobian.checker_authorization import LeanCheckerInstallation
 from jacobian.contracts.lean import LeanEnvironment
@@ -39,7 +42,15 @@ _PREFIX_LENGTHS = (1, 8, 16, 32)
 
 
 def _source_sha() -> str:
-    return git_head_sha(_ROOT) or "unknown"
+    if not git_tracked_worktree_is_clean(_ROOT):
+        raise SystemExit(
+            "Lean REPL benchmark requires a clean tracked worktree; commit or "
+            "stash source changes before running"
+        )
+    revision = git_head_sha(_ROOT)
+    if revision is None:
+        raise SystemExit("cannot bind Lean REPL benchmark to the source revision")
+    return revision
 
 
 def _setting(name: str) -> str:
@@ -98,6 +109,7 @@ def _corpus_digest(
 
 
 def main() -> None:
+    source_sha = _source_sha()
     try:
         environment = LeanEnvironment(_setting("JACOBIAN_LEAN_BENCH_ENVIRONMENT"))
     except ValueError as exc:
@@ -164,7 +176,7 @@ def main() -> None:
         warmups=1,
         min_time=0.1,
         metadata={
-            "jacobian_source_sha": _source_sha(),
+            "jacobian_source_sha": source_sha,
             "lean_environment": environment.value,
             "lean_backend": backend,
             "proof_prefix_length": prefix_length,

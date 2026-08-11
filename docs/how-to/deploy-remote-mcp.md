@@ -104,10 +104,11 @@ anonymous override with those exact paths. Reuse the same option on every
 upgrade. State under `/var/lib/jacobian-mcp` and secrets under
 `/etc/jacobian-mcp` remain separate host data: copy and validate them explicitly
 during a VPS migration rather than treating an application release as a backup.
-The selected root must also remain visible through the hardened systemd unit:
-the installer rejects `/home`, `/root`, `/run/user`, `/tmp`, `/var/tmp`, and
-their descendants because `ProtectHome=true` and `PrivateTmp=true` hide those
-host paths from the service. Use an application path such as `/opt/jacobian` or
+The selected root must be durable across reboots and remain visible through the
+hardened systemd unit. The installer rejects `/run` and its descendants because
+they are volatile, and rejects `/home`, `/root`, `/tmp`, `/var/tmp`, and their
+descendants because `ProtectHome=true` and `PrivateTmp=true` hide those host
+paths from the service. Use an application path such as `/opt/jacobian` or
 `/srv/math/jacobian` instead.
 
 With the default installation root, core releases remain under
