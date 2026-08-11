@@ -638,12 +638,12 @@ if [[ ! -d "${RELEASE_DIR}" ]]; then
                 "${LEAN_ELAN_HOME}/bin/elan" run "${LEAN_TOOLCHAIN}" \
                 lake build repl JacobianLeanRuntime jacobian_lean_proof_state
         )
-        # Mathlib's binary cache may preserve owner-only modes from its archive.
-        # The release is immutable and root-owned, but every runtime input must
-        # remain readable (and every executable runnable) by the service user.
-        chmod -R a+rX "${RELEASE_DIR}/lean"
     fi
     chown -R root:root "${RELEASE_DIR}" "${PYTHON_INSTALL_ROOT}"
+    # uv and backend caches honor the invoking root umask and may create
+    # owner-only directories or executables. The immutable release contains no
+    # secrets, so normalize every runtime input before service-user validation.
+    chmod -R a+rX "${RELEASE_DIR}" "${PYTHON_INSTALL_ROOT}"
     RELEASE_WAS_BUILT=1
 elif [[ "$(cat "${RELEASE_DIR}/.git-revision" 2>/dev/null || true)" != "${REVISION}" ]]; then
     die "existing release directory is not bound to revision ${REVISION}"
