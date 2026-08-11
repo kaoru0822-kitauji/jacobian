@@ -12,7 +12,7 @@ from typing import Any
 import httpx2
 from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
-from mcp_types import TextContent, TextResourceContents
+from mcp_types import Implementation, TextContent, TextResourceContents
 
 from jacobian import __version__
 from jacobian.canonical import canonicalize_json
@@ -22,6 +22,12 @@ REQUIRED_TOOLS = {
     "math.run",
 }
 DISCOVERY_RESPONSE_BYTE_LIMIT = 16_384
+
+
+def _require_server_info(server_info: Implementation | None) -> Implementation:
+    if server_info is None:
+        raise RuntimeError("deployed MCP server did not provide implementation info")
+    return server_info
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -91,7 +97,8 @@ async def inspect(
             raise_exceptions=True,
         ) as client,
     ):
-        server_version = client.server_info.version
+        server_info = _require_server_info(client.server_info)
+        server_version = server_info.version
         if server_version != expected_version:
             failures.append(
                 "deployed MCP version mismatch: "
@@ -145,7 +152,7 @@ async def inspect(
 
         discovery_result = await client.call_tool(
             "math.find",
-            {"query": query, "limit": 5},
+            {"request": {"op": "search", "query": query, "limit": 5}},
         )
         if discovery_result.is_error:
             failures.append("deployed capability discovery returned an MCP error")
@@ -168,7 +175,7 @@ async def inspect(
         report = {
             "url": url,
             "server": {
-                "name": client.server_info.name,
+                "name": server_info.name,
                 "version": server_version,
             },
             "tool_names": sorted(tool_names),
