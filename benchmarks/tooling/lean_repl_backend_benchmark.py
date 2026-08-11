@@ -19,12 +19,12 @@ from __future__ import annotations
 
 import hashlib
 import os
-import subprocess
 import time
 from pathlib import Path
 
 import pyperf
 
+from benchmarks.tooling.command_runner import git_head_sha
 from jacobian.canonical import canonicalize_json
 from jacobian.contracts.lean import LeanEnvironment
 from jacobian.lean_frontend.artifacts import _proof_state_command
@@ -39,14 +39,7 @@ _PREFIX_LENGTHS = (1, 8, 16, 32)
 
 
 def _source_sha() -> str:
-    completed = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=_ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    return completed.stdout.strip() if completed.returncode == 0 else "unknown"
+    return git_head_sha(_ROOT) or "unknown"
 
 
 def _setting(name: str) -> str:
