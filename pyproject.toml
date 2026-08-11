@@ -140,6 +140,7 @@ root_package = "jacobian"
 name = "Migrated math packages do not depend on runtime or installation"
 type = "forbidden"
 source_modules = [
+    "jacobian.math.finite_fields",
     "jacobian.math.graphs",
     "jacobian.math.matrices",
     "jacobian.math.polynomials",
@@ -155,6 +156,12 @@ forbidden_modules = [
     "jacobian.runtime",
     "jacobian.storage",
 ]
+
+[[tool.importlinter.contracts]]
+name = "Finite-field values do not import the optional backend"
+type = "forbidden"
+source_modules = ["jacobian.math.finite_fields.values"]
+forbidden_modules = ["jacobian.math.finite_fields._flint"]
 
 [tool.coverage.run]
 branch = true

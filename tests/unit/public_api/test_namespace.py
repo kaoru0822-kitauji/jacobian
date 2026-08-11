@@ -9,10 +9,23 @@ import jacobian
 PUBLIC_API = {
     "jacobian.math": (
         "arithmetic",
+        "finite_fields",
         "graphs",
         "matrices",
         "polynomials",
         "prime_field_linear_algebra",
+    ),
+    "jacobian.math.finite_fields": (
+        "Axis",
+        "AxisBoundMatrix",
+        "DirectionRankLedger",
+        "FiniteDimensionalSubspace",
+        "FiniteFieldElement",
+        "FiniteFieldPresentation",
+        "FiniteLinearMap",
+        "OrbitDistribution",
+        "ProjectivePoint",
+        "RankResult",
     ),
     "jacobian.math.arithmetic": (
         "absolute_value",
@@ -62,6 +75,7 @@ def test_root_namespace_stays_minimal() -> None:
     assert "arithmetic" not in jacobian.__all__
     assert "matrices" not in jacobian.__all__
     assert "graphs" not in jacobian.__all__
+    assert "finite_fields" not in jacobian.__all__
     assert "polynomials" not in jacobian.__all__
 
 

@@ -56,3 +56,18 @@ def test_native_matrices_does_not_import_capabilities_or_provider_loading() -> N
             "jacobian.store",
         ),
     )
+
+
+def test_native_finite_fields_does_not_eagerly_import_flint() -> None:
+    imported = _imported_modules("jacobian.math.finite_fields")
+    _assert_not_imported(imported, ("flint",))
+    _assert_not_imported(
+        imported,
+        (
+            "jacobian.adapters",
+            "jacobian.operation_installation",
+            "jacobian.providers",
+            "jacobian.runtime",
+            "jacobian.storage",
+        ),
+    )
