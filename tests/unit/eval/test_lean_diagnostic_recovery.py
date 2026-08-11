@@ -36,6 +36,18 @@ def _comparison_report(
     surface_seed: str | None = None,
 ) -> dict[str, object]:
     control = condition == "control"
+    run = {
+        "metrics": {
+            "repair_success": False,
+            "enriched_diagnostic_observed": not control,
+            "injection_payload_exact": True,
+            "injection_rejected": True,
+            "repeated_error_count": 1,
+            "math_run_call_count": 3,
+            "tokens": {"input_tokens": 130, "output_tokens": 30},
+        },
+        "command": {"elapsed_seconds": 5.0},
+    }
     return {
         "schema_version": "1",
         "evidence_class": "public-host-local-lean-recovery-observation",
@@ -55,15 +67,8 @@ def _comparison_report(
         "skill_digest": None,
         "selected_case_ids": ["core-check-type-mismatch"],
         "surface": _surface(surface_seed or ("b" if control else "c")),
-        "summary": {
-            "run_count": 1,
-            "repair_success_rate": 0.0,
-            "repeated_error_count": 1,
-            "math_run_call_count": 3,
-            "input_tokens": 130,
-            "output_tokens": 30,
-            "elapsed_seconds": 5.0,
-        },
+        "runs": [run],
+        "summary": summarize_runs([run]),
     }
 
 
@@ -339,21 +344,12 @@ def test_recovery_summary_and_comparison_keep_efficiency_metrics_separate() -> N
         }
     ]
     treatment_summary = summarize_runs(runs)
-    control_summary = {
-        **treatment_summary,
-        "repair_success_rate": 0.0,
-        "repeated_error_count": 1,
-        "math_run_call_count": 3,
-        "input_tokens": 130,
-        "output_tokens": 30,
-        "elapsed_seconds": 5.0,
-    }
     control = _comparison_report("control")
     treatment = _comparison_report("enriched-diagnostics")
 
     compared = compare_reports(
-        {**control, "summary": control_summary},
-        {**treatment, "summary": treatment_summary},
+        control,
+        {**treatment, "runs": runs, "summary": treatment_summary},
     )
 
     assert compared["deltas"]["repair_success_rate"] == 1.0
@@ -451,3 +447,21 @@ def test_recovery_comparison_rejects_the_same_observed_server_surface() -> None:
 
     with pytest.raises(ValueError, match="same MCP surface"):
         compare_reports(control, treatment)
+
+
+@pytest.mark.parametrize("runs", (None, []))
+def test_recovery_comparison_requires_retained_runs(runs: object) -> None:
+    control = _comparison_report("control")
+    treatment = _comparison_report("enriched-diagnostics")
+
+    with pytest.raises(ValueError, match="retained runs"):
+        compare_reports({**control, "runs": runs}, treatment)
+
+
+def test_recovery_comparison_rejects_a_stale_summary() -> None:
+    control = _comparison_report("control")
+    treatment = _comparison_report("enriched-diagnostics")
+    stale = {**control["summary"], "repair_success_rate": 1.0}
+
+    with pytest.raises(ValueError, match="summary does not match retained runs"):
+        compare_reports({**control, "summary": stale}, treatment)

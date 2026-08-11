@@ -241,6 +241,18 @@ def test_lean_profile_is_built_and_validated_before_activation() -> None:
     assert "CapabilityProviderAvailability.AVAILABLE" in source
 
 
+def test_lean_profile_finds_the_invoking_users_elan_under_sudo() -> None:
+    source = INSTALLER.read_text(encoding="utf-8")
+
+    resolve_home = source.index(
+        'INVOKING_HOME="$(getent passwd "${SUDO_USER}" | cut -d: -f6 || true)"'
+    )
+    elan_fallback = source.index('ELAN_FALLBACKS+=("${INVOKING_HOME}/.elan/bin/elan")')
+    resolve_elan = source.index('find_executable elan "${ELAN_FALLBACKS[@]}"')
+
+    assert resolve_home < elan_fallback < resolve_elan
+
+
 def test_systemd_service_can_read_the_operator_managed_lean_toolchain() -> None:
     service = (REPOSITORY_ROOT / "deploy/systemd/jacobian-mcp.service").read_text(
         encoding="utf-8"

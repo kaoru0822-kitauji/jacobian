@@ -117,8 +117,10 @@ and the treatment must match the candidate checkout running the harness. Each
 report retains that declared revision together with the observed MCP server,
 catalog, policy, and surface digests. Comparison fails closed when condition
 labels or run invariants drift, either deployment is bound to the wrong source,
-or both conditions observed the same server surface. Verify the endpoint's
-selected release path against the declared revision before starting a run.
+both conditions observed the same server surface, or a stored summary differs
+from the summary recomputed from its complete retained run set. Verify the
+endpoint's selected release path against the declared revision before starting
+a run.
 
 The classifier requires the exact injected payload to be the first Jacobian
 capability invocation and carry proof-specific rejection evidence before a

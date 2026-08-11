@@ -48,6 +48,8 @@ The host must already provide:
 - `elan` when using `--with-lean`. The installer reads the committed
   `lean/lean-toolchain`, installs that exact toolchain through elan, restores
   the manifest-pinned Mathlib cache, and builds the checked-in Lean runtime.
+  Under `sudo`, it resolves elan from the root execution path, standard system
+  locations, or the invoking user's account-local `~/.elan/bin/elan`.
   The service-readable elan home defaults to `/opt/jacobian/lean/elan`; it does
   not depend on the invoking operator's home directory.
 

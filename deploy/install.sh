@@ -482,9 +482,13 @@ fi
 "${GIT[@]}" diff --cached --quiet --ignore-submodules -- \
     || die "staged changes exist; commit or stash them before deployment"
 
+INVOKING_HOME=""
+if [[ -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]]; then
+    INVOKING_HOME="$(getent passwd "${SUDO_USER}" | cut -d: -f6 || true)"
+fi
+
 UV_BIN="$(find_executable uv /usr/local/bin/uv /usr/bin/uv || true)"
-if [[ -z "${UV_BIN}" && -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]]; then
-    INVOKING_HOME="$(getent passwd "${SUDO_USER}" | cut -d: -f6)"
+if [[ -z "${UV_BIN}" && -n "${INVOKING_HOME}" ]]; then
     UV_BIN="$(find_executable uv "${INVOKING_HOME}/.local/bin/uv" || true)"
 fi
 [[ -n "${UV_BIN}" ]] || die \
@@ -501,7 +505,11 @@ FLOCK_BIN="$(find_executable flock /usr/bin/flock || true)"
 ELAN_BIN=""
 LEAN_TOOLCHAIN=""
 if ((WITH_LEAN)); then
-    ELAN_BIN="$(find_executable elan /usr/local/bin/elan /usr/bin/elan || true)"
+    ELAN_FALLBACKS=(/usr/local/bin/elan /usr/bin/elan)
+    if [[ -n "${INVOKING_HOME}" ]]; then
+        ELAN_FALLBACKS+=("${INVOKING_HOME}/.elan/bin/elan")
+    fi
+    ELAN_BIN="$(find_executable elan "${ELAN_FALLBACKS[@]}" || true)"
     [[ -n "${ELAN_BIN}" ]] || die \
         "--with-lean requires an operator-installed elan launcher"
     LEAN_TOOLCHAIN="$(tr -d '\r\n' <"${REPO_ROOT}/lean/lean-toolchain")"

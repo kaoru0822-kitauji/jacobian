@@ -579,7 +579,27 @@ def _summary(report: Mapping[str, Any]) -> Mapping[str, Any]:
     summary = report.get("summary")
     if not isinstance(summary, Mapping):
         raise ValueError("recovery reports require summaries")
-    return summary
+    runs = report.get("runs")
+    repetitions = report.get("repetitions")
+    selected_case_ids = report.get("selected_case_ids")
+    if (
+        not isinstance(runs, list)
+        or not runs
+        or not all(isinstance(run, dict) for run in runs)
+        or not isinstance(repetitions, int)
+        or isinstance(repetitions, bool)
+        or repetitions < 1
+        or not isinstance(selected_case_ids, list)
+        or len(runs) != repetitions * len(selected_case_ids)
+    ):
+        raise ValueError("recovery report retained runs do not match its run plan")
+    try:
+        computed = summarize_runs(runs)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("recovery report contains malformed retained runs") from exc
+    if summary != computed:
+        raise ValueError("recovery report summary does not match retained runs")
+    return computed
 
 
 def compare_reports(
