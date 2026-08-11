@@ -47,7 +47,11 @@ while True:
     elif "pickleTo" in request:
         assert request["proofState"] == proof_state - 1
         pathlib.Path(request["pickleTo"]).write_text("pickled")
-        response = {}
+        response = {
+            "proofState": proof_state,
+            "proofStatus": "Completed",
+            "goals": [],
+        }
     else:
         assert request["proofState"] == proof_state - 1
         response = {
@@ -108,7 +112,7 @@ def test_validated_execution_inspects_state_before_requested_tactic(
     assert starts.read_text() == "x"
 
 
-def test_persistent_repl_accepts_empty_pickle_acknowledgement(
+def test_persistent_repl_accepts_proof_snapshot_pickle_response(
     tmp_path: Path,
 ) -> None:
     starts = tmp_path / "starts"
