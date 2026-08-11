@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import hashlib
+from copy import deepcopy
 from pathlib import Path
+from typing import Any
 
 import pytest
+from benchmarks.tooling.codex_visibility import surface_snapshot_digest
 from benchmarks.tooling.lean_diagnostic_recovery import (
+    RecoveryCase,
     classify_recovery,
     compare_reports,
     digest_suite,
@@ -18,15 +22,83 @@ BASE_REVISION = "1" * 40
 CANDIDATE_REVISION = "2" * 40
 
 
+def _classify(
+    case: RecoveryCase,
+    telemetry: dict[str, object],
+) -> dict[str, Any]:
+    retained = dict(telemetry)
+    invocations = telemetry.get("capability_invocations", [])
+    retained.setdefault(
+        "capability_attempts",
+        [
+            {
+                "capability_id": invocation["capability_id"],
+                "input": invocation["input"],
+                "successful": True,
+            }
+            for invocation in invocations
+        ],
+    )
+    return classify_recovery(case, retained)
+
+
 def _surface(seed: str) -> dict[str, object]:
-    return {
+    snapshot = {
         "server": {"name": "jacobian", "version": "0.11.0"},
+        "instructions": f"test surface {seed}",
+        "tools": [],
         "catalog": {
+            "catalog_version": "1",
             "catalog_digest": "sha256:" + seed * 64,
             "policy_profile": "default",
             "policy_digest": "sha256:" + "9" * 64,
+            "capability_count": 1,
+            "content_sha256": "sha256:" + seed * 64,
         },
-        "surface_digest": "sha256:" + seed * 64,
+    }
+    return {**snapshot, "surface_digest": surface_snapshot_digest(snapshot)}
+
+
+def _comparison_run(
+    *,
+    repair_success: bool,
+    enriched_diagnostic_observed: bool,
+    repeated_error_count: int,
+    math_run_call_count: int,
+    input_tokens: int,
+    output_tokens: int,
+    elapsed_seconds: float,
+) -> dict[str, object]:
+    return {
+        "case_id": "core-check-type-mismatch",
+        "repetition": 1,
+        "command": {
+            "status": "EXITED",
+            "exit_code": 0,
+            "elapsed_seconds": elapsed_seconds,
+        },
+        "metrics": {
+            "injection_attempted": True,
+            "injection_payload_exact": True,
+            "injection_rejected": True,
+            "observed_diagnostic_codes": [],
+            "repair_success": repair_success,
+            "enriched_diagnostic_observed": enriched_diagnostic_observed,
+            "repeated_error_count": repeated_error_count,
+            "repeated_mcp_call_count": 0,
+            "math_run_call_count": math_run_call_count,
+            "tool_error_count": 0,
+            "tokens": {
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+            },
+        },
+        "artifacts": {
+            "transcript": "core-check-type-mismatch-r01.jsonl",
+            "transcript_sha256": "sha256:" + "1" * 64,
+            "stderr": "core-check-type-mismatch-r01.stderr",
+            "stderr_sha256": "sha256:" + "2" * 64,
+        },
     }
 
 
@@ -36,20 +108,15 @@ def _comparison_report(
     surface_seed: str | None = None,
 ) -> dict[str, object]:
     control = condition == "control"
-    run = {
-        "case_id": "core-check-type-mismatch",
-        "repetition": 1,
-        "metrics": {
-            "repair_success": False,
-            "enriched_diagnostic_observed": not control,
-            "injection_payload_exact": True,
-            "injection_rejected": True,
-            "repeated_error_count": 1,
-            "math_run_call_count": 3,
-            "tokens": {"input_tokens": 130, "output_tokens": 30},
-        },
-        "command": {"elapsed_seconds": 5.0},
-    }
+    run = _comparison_run(
+        repair_success=False,
+        enriched_diagnostic_observed=not control,
+        repeated_error_count=1,
+        math_run_call_count=3,
+        input_tokens=130,
+        output_tokens=30,
+        elapsed_seconds=5.0,
+    )
     return {
         "schema_version": "1",
         "evidence_class": "public-host-local-lean-recovery-observation",
@@ -136,7 +203,7 @@ def test_recovery_classification_separates_diagnostic_from_terminal_success() ->
         ],
     }
 
-    result = classify_recovery(case, telemetry)
+    result = _classify(case, telemetry)
 
     assert result["injection_rejected"] is True
     assert result["injection_payload_exact"] is True
@@ -180,7 +247,7 @@ def test_recovery_does_not_count_verification_of_a_different_claim() -> None:
         ]
     }
 
-    result = classify_recovery(case, telemetry)
+    result = _classify(case, telemetry)
 
     assert result["injection_payload_exact"] is True
     assert result["repair_success"] is False
@@ -242,7 +309,7 @@ def test_recovery_excludes_operational_failures_from_repairs(
         ]
     }
 
-    result = classify_recovery(case, telemetry)
+    result = _classify(case, telemetry)
 
     assert result["injection_rejected"] is False
     assert result["repair_success"] is False
@@ -289,8 +356,8 @@ def test_repeated_error_identity_is_condition_independent() -> None:
             ]
         }
 
-    control = classify_recovery(case, telemetry(enriched=False))
-    treatment = classify_recovery(case, telemetry(enriched=True))
+    control = _classify(case, telemetry(enriched=False))
+    treatment = _classify(case, telemetry(enriched=True))
 
     assert control["repeated_error_count"] == 1
     assert treatment["repeated_error_count"] == 1
@@ -324,7 +391,7 @@ def test_recovery_keeps_legacy_proof_edit_control_observable() -> None:
         ]
     }
 
-    result = classify_recovery(case, telemetry)
+    result = _classify(case, telemetry)
 
     assert result["injection_rejected"] is True
     assert result["repair_success"] is True
@@ -332,20 +399,15 @@ def test_recovery_keeps_legacy_proof_edit_control_observable() -> None:
 
 def test_recovery_summary_and_comparison_keep_efficiency_metrics_separate() -> None:
     runs = [
-        {
-            "case_id": "core-check-type-mismatch",
-            "repetition": 1,
-            "metrics": {
-                "repair_success": True,
-                "enriched_diagnostic_observed": True,
-                "injection_payload_exact": True,
-                "injection_rejected": True,
-                "repeated_error_count": 0,
-                "math_run_call_count": 2,
-                "tokens": {"input_tokens": 100, "output_tokens": 20},
-            },
-            "command": {"elapsed_seconds": 3.5},
-        }
+        _comparison_run(
+            repair_success=True,
+            enriched_diagnostic_observed=True,
+            repeated_error_count=0,
+            math_run_call_count=2,
+            input_tokens=100,
+            output_tokens=20,
+            elapsed_seconds=3.5,
+        )
     ]
     treatment_summary = summarize_runs(runs)
     control = _comparison_report("control")
@@ -393,6 +455,58 @@ def test_recovery_does_not_count_a_repaired_call_before_exact_injection() -> Non
                 "assurance": {"level": "HEURISTIC"},
             },
         ]
+    }
+
+    result = _classify(case, telemetry)
+
+    assert result["injection_attempted"] is True
+    assert result["injection_payload_exact"] is False
+    assert result["repair_success"] is False
+
+
+def test_recovery_protocol_includes_failed_math_run_attempts() -> None:
+    case = load_suite(SUITE).cases[0]
+    rejected = {
+        "capability_id": case.injected_capability_id,
+        "input": case.injected_payload,
+        "output": {
+            "conclusion": "UNKNOWN",
+            "diagnostics": [{"code": "LEAN_TYPE_MISMATCH", "phase": "KERNEL_CHECK"}],
+        },
+        "assurance": {"level": "HEURISTIC"},
+    }
+    repaired = {
+        "capability_id": case.terminal_capability_id,
+        "input": {
+            "statement": case.injected_payload["statement"],
+            "proof": "by\n  trivial",
+            "environment": case.injected_payload["environment"],
+        },
+        "output": {"conclusion": "TRUE", "diagnostics": []},
+        "assurance": {
+            "level": "VERIFIED",
+            "verification_record_uri": "artifact://sha256/" + "e" * 64,
+        },
+    }
+    telemetry = {
+        "capability_attempts": [
+            {
+                "capability_id": None,
+                "input": {"malformed": True},
+                "successful": False,
+            },
+            {
+                "capability_id": case.injected_capability_id,
+                "input": case.injected_payload,
+                "successful": True,
+            },
+            {
+                "capability_id": case.terminal_capability_id,
+                "input": repaired["input"],
+                "successful": True,
+            },
+        ],
+        "capability_invocations": [rejected, repaired],
     }
 
     result = classify_recovery(case, telemetry)
@@ -487,3 +601,40 @@ def test_recovery_comparison_requires_each_case_repetition_pair() -> None:
 
     with pytest.raises(ValueError, match="exactly one run per case and repetition"):
         compare_reports(invalid_control, matching_treatment_plan)
+
+
+def test_recovery_comparison_rejects_malformed_retained_metrics() -> None:
+    control = _comparison_report("control")
+    treatment = _comparison_report("enriched-diagnostics")
+    original = control["runs"][0]
+    malformed_runs = []
+
+    non_boolean_success = deepcopy(original)
+    non_boolean_success["metrics"]["repair_success"] = 2
+    malformed_runs.append(non_boolean_success)
+
+    negative_call_count = deepcopy(original)
+    negative_call_count["metrics"]["math_run_call_count"] = -1
+    malformed_runs.append(negative_call_count)
+
+    negative_tokens = deepcopy(original)
+    negative_tokens["metrics"]["tokens"]["input_tokens"] = -1
+    malformed_runs.append(negative_tokens)
+
+    non_finite_elapsed = deepcopy(original)
+    non_finite_elapsed["command"]["elapsed_seconds"] = float("nan")
+    malformed_runs.append(non_finite_elapsed)
+
+    for malformed in malformed_runs:
+        with pytest.raises(ValueError, match="malformed retained runs"):
+            compare_reports({**control, "runs": [malformed]}, treatment)
+
+
+def test_recovery_comparison_recomputes_the_surface_digest() -> None:
+    control = _comparison_report("control")
+    treatment = _comparison_report("enriched-diagnostics")
+    surface = deepcopy(control["surface"])
+    surface["instructions"] = "tampered after observation"
+
+    with pytest.raises(ValueError, match="surface digest does not match"):
+        compare_reports({**control, "surface": surface}, treatment)

@@ -120,13 +120,17 @@ labels or run invariants drift, either deployment is bound to the wrong source,
 both conditions observed the same server surface, or a stored summary differs
 from the summary recomputed from its complete retained run set. That set must
 contain exactly one run for every declared case ID and repetition number.
-Verify the endpoint's selected release path against the declared revision
-before starting a run.
+Every retained command, metric, token count, elapsed duration, and artifact
+digest is schema-validated, and the surface digest is recomputed from the
+retained server, instructions, tool schemas, and catalog snapshot. Verify the
+endpoint's selected release path against the declared revision before starting
+a run.
 
 The classifier requires the exact injected payload to be the first Jacobian
-capability invocation and carry proof-specific rejection evidence before a
-later checker-backed success can count as a repair. Runtime setup, toolchain,
-Mathlib-manifest, and checker-timeout failures are non-conclusions. That
+capability attempt—including unsuccessful `math.run` calls—and to complete with
+proof-specific rejection evidence before a later checker-backed success can
+count as a repair. Runtime setup, toolchain, Mathlib-manifest, and
+checker-timeout failures are non-conclusions. That
 terminal result must also preserve the case's declared immutable input fields:
 statement and environment for `lean.check`, plus the original proof baseline
 for `lean.proof_edit.validate`. Repeated errors mean repeated rejected calls

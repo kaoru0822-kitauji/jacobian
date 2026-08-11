@@ -117,7 +117,55 @@ def test_agent_telemetry_preserves_discovery_to_invocation_dataflow(
         },
     ]
     assert telemetry["capability_attempt_ids"] == ["graph.search.atlas"]
+    assert telemetry["capability_attempts"] == [
+        {
+            "capability_id": "graph.search.atlas",
+            "input": {"order": 7},
+            "successful": True,
+        }
+    ]
     assert telemetry["capability_ids"] == ["graph.search.atlas"]
+
+
+def test_agent_telemetry_retains_failed_math_run_attempts(tmp_path: Path) -> None:
+    failed = {
+        "type": "item.completed",
+        "item": {
+            "type": "mcp_tool_call",
+            "tool": "math.run",
+            "arguments": {"payload": {"malformed": True}},
+            "status": "failed",
+            "result": None,
+            "error": "invalid request",
+        },
+    }
+    succeeded = _tool_event(
+        "math.run",
+        {"capability_id": "lean.check", "payload": {"statement": "True"}},
+        {
+            "capability_id": "lean.check",
+            "execution": {"status": "COMPLETED"},
+            "output": {"conclusion": "UNKNOWN"},
+        },
+    )
+    transcript = tmp_path / "transcript.jsonl"
+    transcript.write_text(
+        "\n".join(json.dumps(event) for event in (failed, succeeded)) + "\n",
+        encoding="utf-8",
+    )
+
+    telemetry = parse_agent_transcript(transcript)
+
+    assert telemetry["capability_attempts"] == [
+        {"capability_id": None, "input": {"malformed": True}, "successful": False},
+        {
+            "capability_id": "lean.check",
+            "input": {"statement": "True"},
+            "successful": True,
+        },
+    ]
+    assert telemetry["capability_attempt_ids"] == ["lean.check"]
+    assert telemetry["capability_ids"] == ["lean.check"]
 
 
 def test_agent_telemetry_counts_response_bytes_and_repeated_calls(

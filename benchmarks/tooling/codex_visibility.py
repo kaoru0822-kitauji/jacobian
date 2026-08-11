@@ -139,6 +139,15 @@ def _json_digest(value: object) -> str:
     return _sha256_bytes(canonicalize_json(value))
 
 
+def surface_snapshot_digest(surface: Mapping[str, Any]) -> str:
+    """Digest exactly the server, instructions, tools, and catalog snapshot."""
+
+    fields = ("server", "instructions", "tools", "catalog")
+    if any(field not in surface for field in fields):
+        raise ValueError("MCP surface snapshot is incomplete")
+    return _json_digest({field: surface[field] for field in fields})
+
+
 def _is_verified_invocation(invocation: object) -> bool:
     if not isinstance(invocation, Mapping):
         return False
@@ -301,7 +310,7 @@ async def inspect_surface(url: str, timeout_seconds: float) -> dict[str, Any]:
                 "content_sha256": _sha256_bytes(catalog_content.text.encode("utf-8")),
             },
         }
-    return {**snapshot, "surface_digest": _json_digest(snapshot)}
+    return {**snapshot, "surface_digest": surface_snapshot_digest(snapshot)}
 
 
 def _copy_skill(skill: Path, workspace: Path) -> str | None:

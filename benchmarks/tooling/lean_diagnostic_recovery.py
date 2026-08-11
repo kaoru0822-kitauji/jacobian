@@ -12,7 +12,16 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictFloat,
+    StrictInt,
+    ValidationError,
+    model_validator,
+)
 
 from benchmarks.tooling.codex_visibility import (
     _CODEX_ENVIRONMENT,
@@ -23,6 +32,7 @@ from benchmarks.tooling.codex_visibility import (
     _sha256_bytes,
     _validate_mcp_url,
     inspect_surface,
+    surface_snapshot_digest,
 )
 from benchmarks.tooling.command_runner import (
     ToolCommandStatus,
@@ -163,6 +173,59 @@ class RecoverySuite(BaseModel):
         if len(set(case_ids)) != len(case_ids):
             raise ValueError("recovery case IDs must be unique")
         return self
+
+
+class RecoveryTokenUsage(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    input_tokens: StrictInt = Field(ge=0)
+    output_tokens: StrictInt = Field(ge=0)
+    cached_input_tokens: StrictInt | None = Field(default=None, ge=0)
+    cache_write_input_tokens: StrictInt | None = Field(default=None, ge=0)
+    reasoning_output_tokens: StrictInt | None = Field(default=None, ge=0)
+
+
+class RecoveryRunMetrics(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    injection_attempted: StrictBool
+    injection_payload_exact: StrictBool
+    injection_rejected: StrictBool
+    observed_diagnostic_codes: tuple[str, ...]
+    enriched_diagnostic_observed: StrictBool
+    repair_success: StrictBool
+    repeated_error_count: StrictInt = Field(ge=0)
+    repeated_mcp_call_count: StrictInt = Field(ge=0)
+    math_run_call_count: StrictInt = Field(ge=0)
+    tool_error_count: StrictInt = Field(ge=0)
+    tokens: RecoveryTokenUsage | None
+
+
+class RecoveryRunCommand(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    status: ToolCommandStatus
+    exit_code: StrictInt | None
+    elapsed_seconds: StrictFloat = Field(ge=0, allow_inf_nan=False)
+
+
+class RecoveryRunArtifacts(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    transcript: str = Field(min_length=1)
+    transcript_sha256: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    stderr: str = Field(min_length=1)
+    stderr_sha256: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+
+
+class RetainedRecoveryRun(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    case_id: str = Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+    repetition: StrictInt = Field(ge=1)
+    command: RecoveryRunCommand
+    metrics: RecoveryRunMetrics
+    artifacts: RecoveryRunArtifacts
 
 
 def load_suite(path: Path) -> RecoverySuite:
@@ -307,16 +370,26 @@ def classify_recovery(
         for invocation in telemetry.get("capability_invocations", [])
         if isinstance(invocation, Mapping)
     )
-    injected = tuple(
-        invocation
-        for invocation in invocations
-        if invocation.get("capability_id") == case.injected_capability_id
+    attempts = tuple(
+        attempt
+        for attempt in telemetry.get("capability_attempts", [])
+        if isinstance(attempt, Mapping)
     )
-    first_invocation = invocations[0] if invocations else None
+    first_attempt = attempts[0] if attempts else None
     injection_payload_exact = bool(
-        isinstance(first_invocation, Mapping)
-        and first_invocation.get("capability_id") == case.injected_capability_id
-        and first_invocation.get("input") == case.injected_payload
+        isinstance(first_attempt, Mapping)
+        and first_attempt.get("capability_id") == case.injected_capability_id
+        and first_attempt.get("input") == case.injected_payload
+    )
+    first_invocation = (
+        invocations[0]
+        if injection_payload_exact
+        and first_attempt is not None
+        and first_attempt.get("successful") is True
+        and invocations
+        and invocations[0].get("capability_id") == case.injected_capability_id
+        and invocations[0].get("input") == case.injected_payload
+        else None
     )
     terminal = tuple(
         invocation
@@ -340,7 +413,10 @@ def classify_recovery(
     )
     usage = telemetry.get("usage")
     return {
-        "injection_attempted": bool(injected),
+        "injection_attempted": any(
+            attempt.get("capability_id") == case.injected_capability_id
+            for attempt in attempts
+        ),
         "injection_payload_exact": injection_payload_exact,
         "injection_rejected": bool(
             injection_payload_exact
@@ -483,6 +559,12 @@ def _surface_identity(report: Mapping[str, Any]) -> dict[str, str]:
     catalog = surface.get("catalog")
     if not isinstance(surface_digest, str) or _DIGEST.fullmatch(surface_digest) is None:
         raise ValueError("recovery report requires a valid surface digest")
+    try:
+        computed_surface_digest = surface_snapshot_digest(surface)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("recovery report contains an invalid MCP surface") from exc
+    if surface_digest != computed_surface_digest:
+        raise ValueError("recovery report surface digest does not match its snapshot")
     if not isinstance(server, Mapping):
         raise ValueError("recovery report requires observed MCP server metadata")
     if not isinstance(catalog, Mapping):
@@ -582,7 +664,6 @@ def _retained_runs(report: Mapping[str, Any]) -> list[dict[str, Any]]:
     if (
         not isinstance(runs, list)
         or not runs
-        or not all(isinstance(run, dict) for run in runs)
         or not isinstance(repetitions, int)
         or isinstance(repetitions, bool)
         or repetitions < 1
@@ -590,27 +671,21 @@ def _retained_runs(report: Mapping[str, Any]) -> list[dict[str, Any]]:
         or len(runs) != repetitions * len(selected_case_ids)
     ):
         raise ValueError("recovery report retained runs do not match its run plan")
+    try:
+        validated = [RetainedRecoveryRun.model_validate(run) for run in runs]
+    except ValidationError as exc:
+        raise ValueError("recovery report contains malformed retained runs") from exc
     expected = {
         (case_id, repetition)
         for case_id in selected_case_ids
         for repetition in range(1, repetitions + 1)
     }
-    observed = [(run.get("case_id"), run.get("repetition")) for run in runs]
-    valid_observed = all(
-        isinstance(case_id, str)
-        and isinstance(repetition, int)
-        and not isinstance(repetition, bool)
-        for case_id, repetition in observed
-    )
-    if (
-        not valid_observed
-        or len(set(observed)) != len(observed)
-        or set(observed) != expected
-    ):
+    observed = [(run.case_id, run.repetition) for run in validated]
+    if len(set(observed)) != len(observed) or set(observed) != expected:
         raise ValueError(
             "recovery report must retain exactly one run per case and repetition"
         )
-    return runs
+    return [run.model_dump(mode="json") for run in validated]
 
 
 def _summary(report: Mapping[str, Any]) -> Mapping[str, Any]:

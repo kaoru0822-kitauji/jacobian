@@ -263,6 +263,7 @@ class _AgentTranscriptTelemetry:
     mcp_calls: list[str] = field(default_factory=list)
     successful_calls: list[str] = field(default_factory=list)
     capability_attempt_ids: list[str] = field(default_factory=list)
+    capability_attempts: list[dict[str, Any]] = field(default_factory=list)
     capability_ids: list[str] = field(default_factory=list)
     capability_invocations: list[dict[str, Any]] = field(default_factory=list)
     capability_descriptions: list[dict[str, Any]] = field(default_factory=list)
@@ -334,6 +335,8 @@ def _record_describe_and_attempt(
     telemetry: _AgentTranscriptTelemetry,
     tool: str,
     arguments: object,
+    *,
+    successful: bool,
 ) -> None:
     if tool == "math.find":
         if isinstance(arguments, Mapping) and isinstance(
@@ -342,12 +345,21 @@ def _record_describe_and_attempt(
             telemetry.capability_describe_exact_calls += 1
         else:
             telemetry.capability_describe_index_calls += 1
-    if (
-        tool == "math.run"
-        and isinstance(arguments, Mapping)
-        and isinstance(arguments.get("capability_id"), str)
-    ):
-        telemetry.capability_attempt_ids.append(arguments["capability_id"])
+    if tool != "math.run":
+        return
+    capability_id = (
+        arguments.get("capability_id") if isinstance(arguments, Mapping) else None
+    )
+    payload = arguments.get("payload") if isinstance(arguments, Mapping) else None
+    telemetry.capability_attempts.append(
+        {
+            "capability_id": capability_id if isinstance(capability_id, str) else None,
+            "input": payload,
+            "successful": successful,
+        }
+    )
+    if isinstance(capability_id, str):
+        telemetry.capability_attempt_ids.append(capability_id)
 
 
 def _mcp_call_failed(
@@ -476,11 +488,17 @@ def _process_mcp_tool_call(
     arguments = item.get("arguments")
     text_response, structured_response = _record_mcp_byte_metrics(telemetry, item, tool)
     telemetry.mcp_call_signatures[_mcp_call_signature(tool, arguments)] += 1
-    _record_describe_and_attempt(telemetry, tool, arguments)
     result = item.get("result")
     response = structured_response or text_response
     status = item.get("status")
-    if _mcp_call_failed(item, result, text_response, status):
+    failed = _mcp_call_failed(item, result, text_response, status)
+    _record_describe_and_attempt(
+        telemetry,
+        tool,
+        arguments,
+        successful=not failed,
+    )
+    if failed:
         telemetry.tool_error_count += 1
     else:
         _record_successful_mcp_call(telemetry, tool, arguments, response)
@@ -502,6 +520,7 @@ def _transcript_payload(telemetry: _AgentTranscriptTelemetry) -> dict[str, Any]:
         "capability_rejection_count": telemetry.capability_rejection_count,
         "successful_tool_calls": telemetry.successful_calls,
         "capability_attempt_ids": telemetry.capability_attempt_ids,
+        "capability_attempts": telemetry.capability_attempts,
         "capability_ids": telemetry.capability_ids,
         "capability_invocations": telemetry.capability_invocations,
         "capability_descriptions": telemetry.capability_descriptions,
