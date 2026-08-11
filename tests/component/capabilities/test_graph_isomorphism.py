@@ -187,6 +187,36 @@ def test_graph_isomorphism_verifies_a_negative_result(
     )
 
 
+def test_graph_isomorphism_preserves_an_empty_missing_vertex_label(
+    graph_isomorphism_services,
+) -> None:
+    left_graph_uri = _graph_uri(
+        graph_isomorphism_services,
+        vertices=["", "a"],
+        edges=[],
+    )
+    right_graph_uri = _graph_uri(
+        graph_isomorphism_services,
+        vertices=["x", "y"],
+        edges=[],
+    )
+
+    result = graph_isomorphism_services.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.isomorphism.verify",
+            input={
+                "left_graph_uri": left_graph_uri,
+                "right_graph_uri": right_graph_uri,
+                "mapping": {"a": "x"},
+            },
+        )
+    )
+
+    assert result.output["conclusion"] == "FALSE"
+    assert result.output["first_violation"]["kind"] == "SOURCE_DOMAIN_MISMATCH"
+    assert result.output["first_violation"]["vertex"] == ""
+
+
 def test_graph_isomorphism_reports_missing_target_for_empty_source(
     graph_isomorphism_services,
 ) -> None:

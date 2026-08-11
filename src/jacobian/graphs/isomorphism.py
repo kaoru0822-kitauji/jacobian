@@ -487,7 +487,7 @@ def _first_mapping_violation(
         extra = next(iter(sorted(mapping_vertices - left_vertices)), None)
         return GraphIsomorphismViolation(
             kind=GraphIsomorphismViolationKind.SOURCE_DOMAIN_MISMATCH,
-            vertex=missing or extra,
+            vertex=missing if missing is not None else extra,
             mapped_vertex=(mapping.get(extra) if extra is not None else None),
         )
     right_vertices = set(right.vertices)

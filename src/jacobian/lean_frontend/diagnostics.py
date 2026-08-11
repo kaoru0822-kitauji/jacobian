@@ -26,6 +26,23 @@ _CHECKER_REJECTION = re.compile(
 )
 _METAVARIABLE = re.compile(r"\?m\.\d+|\?[A-Za-z_][A-Za-z0-9_.]*")
 _INTERNAL_SCAFFOLD_WARNINGS = frozenset({"declaration uses `sorry`"})
+_OPERATIONAL_CHECKER_CLASSIFIERS = (
+    (
+        ("TOOLCHAIN_RESOLUTION:", "TOOLCHAIN_PROBE:"),
+        "LEAN_TOOLCHAIN_SETUP_FAILED",
+        "The pinned Lean toolchain is unavailable or is not authorized.",
+    ),
+    (
+        ("MATHLIB_MANIFEST:",),
+        "LEAN_MATHLIB_SETUP_FAILED",
+        "The pinned Mathlib runtime failed manifest or package validation.",
+    ),
+    (
+        ("LEAN_COMPILE_TIMEOUT:", "LEAN_CORE_TIMEOUT:"),
+        "LEAN_CHECKER_TIMEOUT",
+        "The Lean checker exceeded its bounded compile time.",
+    ),
+)
 _MESSAGE_CLASSIFIERS = (
     (
         ("type mismatch", "application type mismatch"),
@@ -59,6 +76,10 @@ _MESSAGE_CLASSIFIERS = (
     ),
 )
 _PHASE_FALLBACKS = {
+    LeanDiagnosticPhase.RUNTIME_SETUP: (
+        "LEAN_RUNTIME_SETUP_FAILED",
+        "The Lean checker runtime could not be prepared.",
+    ),
     LeanDiagnosticPhase.TERM_ELABORATION: (
         "LEAN_TERM_REJECTED",
         "Lean rejected the supplied term.",
@@ -177,6 +198,10 @@ def checker_diagnostics(
 
     diagnostics: list[LeanDiagnostic] = []
     for detail in result.input.errors:
+        operational = _operational_checker_diagnostic(detail)
+        if operational is not None:
+            diagnostics.append(operational)
+            continue
         match = _CHECKER_REJECTION.fullmatch(detail)
         raw = match.group("message") if match is not None else detail
         source_span = (
@@ -203,6 +228,30 @@ def checker_diagnostics(
             )
         )
     return tuple(diagnostics)
+
+
+def _operational_checker_diagnostic(detail: str) -> LeanDiagnostic | None:
+    for prefixes, code, message in _OPERATIONAL_CHECKER_CLASSIFIERS:
+        if detail.startswith(prefixes):
+            return LeanDiagnostic(
+                code=code,
+                phase=LeanDiagnosticPhase.RUNTIME_SETUP,
+                severity="ERROR",
+                message=message,
+                raw_backend_message=detail,
+            )
+    if (
+        detail.startswith("The pinned Lean ")
+        and " executable could not be resolved." in detail
+    ) or (detail.startswith("Lean ") and " could not run locally." in detail):
+        return LeanDiagnostic(
+            code="LEAN_RUNTIME_SETUP_FAILED",
+            phase=LeanDiagnosticPhase.RUNTIME_SETUP,
+            severity="ERROR",
+            message="The Lean checker runtime could not be prepared.",
+            raw_backend_message=detail,
+        )
+    return None
 
 
 def _append_diagnostic(
