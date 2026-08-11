@@ -25,6 +25,7 @@ _CHECKER_REJECTION = re.compile(
     r"(?P<column>\d+): (?P<message>.+?)\. Correct the proof body and retry\.$"
 )
 _METAVARIABLE = re.compile(r"\?m\.\d+|\?[A-Za-z_][A-Za-z0-9_.]*")
+_INTERNAL_SCAFFOLD_WARNINGS = frozenset({"declaration uses `sorry`"})
 _MESSAGE_CLASSIFIERS = (
     (
         ("type mismatch", "application type mismatch"),
@@ -121,6 +122,16 @@ def repl_diagnostics(
             continue
         response_messages = response.messages
         for item in response_messages:
+            if (
+                index == 0
+                and item.severity == "warning"
+                and item.data.strip() in _INTERNAL_SCAFFOLD_WARNINGS
+            ):
+                # The initial source deliberately contains one private `sorry`
+                # placeholder so the REPL can expose a proof state. It is not
+                # part of the caller's statement, tactic, or term and therefore
+                # must not outrank payload-owned diagnostics in agent results.
+                continue
             severity = (
                 "ERROR"
                 if item.severity == "error"
