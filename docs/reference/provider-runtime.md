@@ -40,10 +40,11 @@ for example Jacobian checker source plus the exact Python-FLINT distribution it
 executes. Its canonical configuration exposes the component identities, and
 resolution remeasures every component before accepting the aggregate digest.
 
-The result repeats the selected `provider` and `provider_digest`. This binds the
-invocation to the exact descriptor runtime without repeating all discovery
-metadata in every response. Provider metadata remains separate from execution
-status, conclusion, evidence type, and assurance.
+The installed descriptor is the authoritative provider identity. Mathematical
+results do not repeat `provider` or `provider_digest` and then validate those
+copies against their source. Invocation provenance and checker records may bind
+the descriptor runtime where an audit record is required; provider metadata
+remains separate from the mathematical value and its assurance.
 
 Identity revalidation and first-use readiness are separate checks. The former
 remeasures the declared executable, source tree, distribution RECORD, or every

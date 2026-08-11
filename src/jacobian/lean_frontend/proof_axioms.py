@@ -301,8 +301,6 @@ class LeanProofAxiomsAdapter:
                 ),
             ),
             artifact_uris=(artifact.artifact_uri,),
-            provider=runtime.provider,
-            provider_digest=runtime.digest,
         )
 
 

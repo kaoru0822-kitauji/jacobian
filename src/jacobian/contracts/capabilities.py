@@ -606,8 +606,6 @@ class CapabilityResult(ContractModel):
     diagnostics: tuple[CapabilityDiagnostic, ...] = ()
     assurance: CapabilityAssurance
     artifact_uris: tuple[ArtifactUri, ...] = ()
-    provider: str | None = Field(default=None, min_length=1, max_length=128)
-    provider_digest: Sha256Digest | None = None
 
     @model_validator(mode="after")
     def enforce_lane_and_canonical_output(self) -> Self:

@@ -182,33 +182,6 @@ class CrashingAdapter:
 
 
 @dataclass(frozen=True)
-class ForgedProviderAdapter:
-    descriptor = CapabilityDescriptor(
-        capability_id="example.forged-provider",
-        version="1",
-        title="Forge provider provenance",
-        description="Adversarial adapter that claims another provider identity.",
-        provider="tests",
-        provider_runtime=TEST_RUNTIME,
-        input_schema={"type": "object"},
-        output_schema={"type": "object"},
-    )
-
-    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
-        return CapabilityResult(
-            capability_id=self.descriptor.capability_id,
-            capability_version=self.descriptor.version,
-            execution=Execution(status=ExecutionStatus.COMPLETED),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis="fixture computation",
-            ),
-            provider="tests.other",
-            provider_digest="sha256:" + "b" * 64,
-        )
-
-
-@dataclass(frozen=True)
 class ForgedVerifiedAdapter:
     descriptor = CapabilityDescriptor(
         capability_id="example.forged",

@@ -95,8 +95,6 @@ class CapabilityDispatchMixin:
         if invalid is not None:
             log_invocation(invalid, started)
             return invalid
-        provenance = provider_provenance(descriptor)
-        result = result.model_copy(update=provenance)
         if result.execution.status is ExecutionStatus.COMPLETED:
             result = _normalize_completed_adapter_output(
                 descriptor=descriptor,
@@ -181,7 +179,7 @@ def _capability_resolution_failure(
             ),
             context={"capability_policy": dispatch.policy.definition},
         )
-        return result.model_copy(update=provider_provenance(descriptor))
+        return result
     return None
 
 
@@ -274,32 +272,6 @@ def _adapter_result_identity_failure(
                 hint="The capability adapter produced a result for a different capability.",
             ),
         )
-    if result.provider is not None and result.provider != descriptor.provider:
-        return failed_result(
-            descriptor=descriptor,
-            request=request,
-            diagnostic=CapabilityDiagnostic(
-                code="ADAPTER_RESULT_INVALID",
-                stage="adapter_execution",
-                message="The adapter returned a result from a different provider runtime.",
-                hint="The capability adapter produced a result from a provider that differs from its descriptor.",
-            ),
-        )
-    provenance = provider_provenance(descriptor)
-    if (
-        result.provider_digest is not None
-        and result.provider_digest != provenance["provider_digest"]
-    ):
-        return failed_result(
-            descriptor=descriptor,
-            request=request,
-            diagnostic=CapabilityDiagnostic(
-                code="ADAPTER_RESULT_INVALID",
-                stage="adapter_execution",
-                message="The adapter returned a result with a mismatched provider digest.",
-                hint="The capability adapter produced a result with a provider digest that differs from its descriptor.",
-            ),
-        )
     return None
 
 
@@ -341,7 +313,6 @@ def _normalize_completed_adapter_output(
 def failed_result(
     *, descriptor: Any, request: CapabilityRequest, diagnostic: CapabilityDiagnostic
 ) -> CapabilityResult:
-    provenance = provider_provenance(descriptor)
     return CapabilityResult(
         capability_id=descriptor.capability_id,
         capability_version=descriptor.version,
@@ -352,8 +323,6 @@ def failed_result(
             level=CapabilityAssuranceLevel.HEURISTIC,
             basis="execution or input failure; no mathematical conclusion",
         ),
-        provider=provenance["provider"],
-        provider_digest=provenance["provider_digest"],
     )
 
 
@@ -385,21 +354,6 @@ def invoke_ready_adapter(
     return CapabilityResult.model_validate(adapter.invoke(request))
 
 
-def provider_provenance(descriptor: Any) -> dict[str, str]:
-    if descriptor.provider_runtime is None:
-        raise CapabilityError(
-            f"capability {descriptor.capability_id} has no provider runtime identity"
-        )
-    if descriptor.provider_runtime.digest is None:
-        raise CapabilityError(
-            f"capability {descriptor.capability_id} has no provider runtime digest"
-        )
-    return {
-        "provider": descriptor.provider,
-        "provider_digest": descriptor.provider_runtime.digest,
-    }
-
-
 def resolution_failure(
     *,
     request: CapabilityRequest,
@@ -428,4 +382,4 @@ def error_path(exc: Exception) -> str | None:
     return path if separator else None
 
 
-__all__ = ["CapabilityDispatchMixin", "provider_provenance"]
+__all__ = ["CapabilityDispatchMixin"]

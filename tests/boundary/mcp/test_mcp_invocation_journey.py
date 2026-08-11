@@ -66,11 +66,10 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
                         == result.structured_content[semantic_field]
                     )
             runtime = contract["capability"]["provider_runtime"]
-            assert (
-                result.structured_content["provider"]
-                == contract["capability"]["provider"]
-            )
-            assert result.structured_content["provider_digest"] == runtime["digest"]
+            assert runtime["provider"] == contract["capability"]["provider"]
+            assert runtime["digest"] is not None
+            assert "provider" not in result.structured_content
+            assert "provider_digest" not in result.structured_content
 
             matching_description = await client.call_tool(
                 "math.find",

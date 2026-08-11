@@ -1,8 +1,8 @@
 """Tests for adapter authority and forgery boundaries.
 
 Covers: invocation recording, provider readiness, error diagnostics, forged
-provenance, forged VERIFIED assurance, relationship endpoint exposure, and
-relationship verification record binding.
+VERIFIED assurance, relationship endpoint exposure, and relationship
+verification record binding.
 """
 
 from __future__ import annotations
@@ -13,7 +13,6 @@ import pytest
 from tests.component.capabilities.capability_service_support import (
     ComputedAdapter,
     CrashingAdapter,
-    ForgedProviderAdapter,
     ForgedRelationshipVerificationAdapter,
     ForgedVerifiedAdapter,
     InvalidOutputAdapter,
@@ -201,29 +200,6 @@ def test_schema_invalid_adapter_output_returns_a_typed_failure(
     assert result.diagnostics[0].path == "value"
     assert result.diagnostics[0].actual_type == "string"
     assert result.diagnostics[0].expected == "JSON type integer"
-
-
-def test_adapter_cannot_forge_provider_provenance(
-    capability_core_services: DomainTestServices,
-) -> None:
-    core = capability_core_services.core
-    capability_core_services.installation.register_capability(ForgedProviderAdapter())
-
-    result = core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="example.forged-provider",
-            input={},
-        )
-    )
-
-    assert result.execution.status is ExecutionStatus.ERROR
-    assert result.diagnostics[0].code == "ADAPTER_RESULT_INVALID"
-    assert result.diagnostics[0].stage == "adapter_execution"
-    assert result.diagnostics[0].message == (
-        "The adapter returned a result from a different provider runtime."
-    )
-
-
 def test_adapter_cannot_promote_without_a_local_verification_record(
     capability_core_services: DomainTestServices,
 ) -> None:
