@@ -38,6 +38,26 @@ def coordinates(value: Any, *, degree: int) -> tuple[int, ...]:
     return result + (0,) * (degree - len(result))
 
 
+def evaluate_polynomial(
+    coefficients: tuple[FiniteFieldElement, ...],
+    value: FiniteFieldElement,
+) -> tuple[int, ...]:
+    """Evaluate with FLINT's maintained finite-field polynomial type."""
+
+    from flint import fq_default_poly_ctx
+
+    active_context = context(value.presentation)
+    polynomial_context: Any = fq_default_poly_ctx(active_context)
+    polynomial = polynomial_context(
+        [
+            to_backend(coefficient, active_context=active_context)
+            for coefficient in coefficients
+        ]
+    )
+    result = polynomial.evaluate(to_backend(value, active_context=active_context))
+    return coordinates(result, degree=value.presentation.degree)
+
+
 def matrix_rank(matrix: PrimeFieldMatrix) -> int:
     """Compute rank with python-flint's maintained prime-field matrix type."""
 

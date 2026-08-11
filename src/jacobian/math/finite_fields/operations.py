@@ -271,17 +271,9 @@ def evaluate_finite_polynomial(
         raise ValueError("polynomial and value must share their exact presentation")
     from jacobian.math.finite_fields import _flint
 
-    active_context = _flint.context(polynomial.presentation)
-    backend_value = _flint.to_backend(value, active_context=active_context)
-    result = active_context(0)
-    for coefficient in reversed(polynomial.coefficients):
-        result = result * backend_value + _flint.to_backend(
-            coefficient,
-            active_context=active_context,
-        )
     return element(
         polynomial.presentation,
-        _flint.coordinates(result, degree=polynomial.presentation.degree),
+        _flint.evaluate_polynomial(polynomial.coefficients, value),
     )
 
 
@@ -300,14 +292,7 @@ def finite_map_table(polynomial_map: FinitePolynomialMap) -> FiniteMapTable:
 def fiber_partition(table: FiniteMapTable) -> FiberPartition:
     """Partition the complete domain by exact map image."""
 
-    grouped: dict[str, tuple[FiniteFieldElement, list[FiniteFieldElement]]] = {}
-    for source, target in table.entries:
-        _, sources = grouped.setdefault(target.digest, (target, []))
-        sources.append(source)
-    return FiberPartition(
-        table=table,
-        fibers=tuple((target, tuple(sources)) for target, sources in grouped.values()),
-    )
+    return FiberPartition.from_table(table)
 
 
 def collision_certificate(table: FiniteMapTable) -> CollisionCertificate:

@@ -555,6 +555,16 @@ class FiniteMapTable(ContractModel):
         )
 
 
+def _fibers_for_table(
+    table: FiniteMapTable,
+) -> tuple[tuple[FiniteFieldElement, tuple[FiniteFieldElement, ...]], ...]:
+    grouped: dict[str, tuple[FiniteFieldElement, list[FiniteFieldElement]]] = {}
+    for source, target in table.entries:
+        _, sources = grouped.setdefault(target.digest, (target, []))
+        sources.append(source)
+    return tuple((target, tuple(sources)) for target, sources in grouped.values())
+
+
 class FiberPartition(ContractModel):
     """The nonempty fibers of one complete finite map table."""
 
@@ -565,16 +575,13 @@ class FiberPartition(ContractModel):
     def validate_partition(self) -> Self:
         if not self.fibers or any(not sources for _, sources in self.fibers):
             raise ValueError("fiber partition requires nonempty fibers")
-        grouped: dict[str, tuple[FiniteFieldElement, list[FiniteFieldElement]]] = {}
-        for source, target in self.table.entries:
-            _, sources = grouped.setdefault(target.digest, (target, []))
-            sources.append(source)
-        expected = tuple(
-            (target, tuple(sources)) for target, sources in grouped.values()
-        )
-        if self.fibers != expected:
+        if self.fibers != _fibers_for_table(self.table):
             raise ValueError("fibers must partition the exact evaluated table")
         return self
+
+    @classmethod
+    def from_table(cls, table: FiniteMapTable) -> Self:
+        return cls(table=table, fibers=_fibers_for_table(table))
 
     @property
     def digest(self) -> str:
