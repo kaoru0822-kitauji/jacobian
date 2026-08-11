@@ -111,6 +111,14 @@ the candidate revision with
 explicit `--execute` guard. Use identical model, reasoning effort, tool mode,
 timeout, case selection, and repetitions in both conditions, then compare the
 two `report.json` files with the tool's `--compare CONTROL TREATMENT` mode.
+Pass `--deployed-revision` with the Git revision selected by the endpoint's
+deployment release: the control must match the suite's `source_base_revision`,
+and the treatment must match the candidate checkout running the harness. Each
+report retains that declared revision together with the observed MCP server,
+catalog, policy, and surface digests. Comparison fails closed when condition
+labels or run invariants drift, either deployment is bound to the wrong source,
+or both conditions observed the same server surface. Verify the endpoint's
+selected release path against the declared revision before starting a run.
 
 The classifier requires the exact injected payload to be the first Jacobian
 capability invocation and rejected before a later checker-backed success can

@@ -371,6 +371,7 @@ class SatLratVerificationAdapter:
 
 
 _LINE_REJECTION = re.compile(r"^line (?P<line>\d+): (?P<reason>.+)$")
+_INVALID_PROOF_LINE_LIMIT = 4096
 _LINE_REJECTION_CODES = {
     "non-integer": "NON_INTEGER_TOKEN",
     "invalid clause id": "INVALID_CLAUSE_ID",
@@ -409,9 +410,10 @@ def _invalid_lrat_step(
         return None
     if line_number > len(proof_lines):
         return None
-    proof_line = proof_lines[line_number - 1].strip()
+    full_proof_line = proof_lines[line_number - 1].strip()
+    proof_line = full_proof_line[:_INVALID_PROOF_LINE_LIMIT]
     clause_id: int | None = None
-    fields = proof_line.split()
+    fields = full_proof_line.split(maxsplit=1)
     if fields:
         try:
             parsed_clause_id = int(fields[0])
@@ -425,6 +427,7 @@ def _invalid_lrat_step(
             "clause_id": clause_id,
             "code": code,
             "proof_line": proof_line,
+            "proof_line_truncated": len(full_proof_line) > len(proof_line),
             "raw_checker_message": detail,
         }
     )

@@ -531,6 +531,7 @@ class SatLratInvalidProofStep(ContractModel):
         "RUP_NOT_ESTABLISHED",
     ]
     proof_line: str = Field(min_length=1, max_length=4096)
+    proof_line_truncated: bool
     raw_checker_message: str = Field(min_length=1, max_length=1024)
 
 

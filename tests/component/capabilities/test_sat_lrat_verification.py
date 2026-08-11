@@ -141,8 +141,31 @@ def test_rejected_lrat_reports_the_first_invalid_proof_step(
         "clause_id": 3,
         "code": "HINT_REFERENCES_INACTIVE_CLAUSE",
         "proof_line": "3 0 1 99 0",
+        "proof_line_truncated": False,
         "raw_checker_message": "line 1: hint references inactive clause",
     }
+
+
+def test_rejected_lrat_bounds_an_oversized_invalid_proof_line(
+    lrat_services,
+) -> None:
+    cnf = lrat_services.core.sat.put_cnf(variable_names=("x",), clauses=((-1,), (1,)))
+    oversized_line = "invalid-clause-id " + "1 " * 2500
+
+    result = _verify(
+        lrat_services,
+        cnf.artifact_uri,
+        (oversized_line + "\n").encode("ascii"),
+    )
+
+    assert result.execution.status is ExecutionStatus.COMPLETED
+    assert result.output["status"] == "REJECTED"
+    assert result.output["conclusion"] == "UNKNOWN"
+    invalid_step = result.output["invalid_step"]
+    assert invalid_step["code"] == "NON_INTEGER_TOKEN"
+    assert len(invalid_step["proof_line"]) == 4096
+    assert invalid_step["proof_line"] == oversized_line[:4096]
+    assert invalid_step["proof_line_truncated"] is True
 
 
 def test_timeout_and_cancellation_are_fail_closed(lrat_services) -> None:

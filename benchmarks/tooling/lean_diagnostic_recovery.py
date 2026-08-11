@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import re
 import tempfile
 import time
 from collections.abc import Mapping
@@ -25,6 +26,7 @@ from benchmarks.tooling.codex_visibility import (
 )
 from benchmarks.tooling.command_runner import (
     ToolCommandStatus,
+    git_head_sha,
     operator_environment,
     run_operator_command,
 )
@@ -32,6 +34,33 @@ from jacobian.eval.telemetry import parse_agent_transcript
 
 _ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_SUITE = _ROOT / "benchmarks/config/lean-diagnostic-recovery-v1.json"
+_REVISION = re.compile(r"^[0-9a-f]{12,40}$")
+_DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
+_SHARED_REPORT_FIELDS = (
+    "schema_version",
+    "evidence_class",
+    "causal_claim_authorized",
+    "suite_id",
+    "suite_digest",
+    "source_base_revision",
+    "source_candidate_revision",
+    "model",
+    "reasoning_effort",
+    "tool_mode",
+    "repetitions",
+    "timeout_seconds",
+    "codex_version",
+    "skill_digest",
+    "selected_case_ids",
+)
+_DELTA_METRICS = (
+    "repair_success_rate",
+    "repeated_error_count",
+    "math_run_call_count",
+    "input_tokens",
+    "output_tokens",
+    "elapsed_seconds",
+)
 
 
 class RecoveryCondition(BaseModel):
@@ -312,41 +341,148 @@ def summarize_runs(runs: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _revision(report: Mapping[str, Any], field: str) -> str:
+    value = report.get(field)
+    if not isinstance(value, str) or _REVISION.fullmatch(value) is None:
+        raise ValueError(f"recovery report requires a valid {field}")
+    return value
+
+
+def _same_revision(left: str, right: str) -> bool:
+    return left.startswith(right) or right.startswith(left)
+
+
+def _surface_identity(report: Mapping[str, Any]) -> dict[str, str]:
+    surface = report.get("surface")
+    if not isinstance(surface, Mapping):
+        raise ValueError("recovery report requires an observed MCP surface")
+    surface_digest = surface.get("surface_digest")
+    server = surface.get("server")
+    catalog = surface.get("catalog")
+    if not isinstance(surface_digest, str) or _DIGEST.fullmatch(surface_digest) is None:
+        raise ValueError("recovery report requires a valid surface digest")
+    if not isinstance(server, Mapping):
+        raise ValueError("recovery report requires observed MCP server metadata")
+    if not isinstance(catalog, Mapping):
+        raise ValueError("recovery report requires observed catalog metadata")
+    identity = {
+        "surface_digest": surface_digest,
+        "server_name": server.get("name"),
+        "server_version": server.get("version"),
+        "catalog_digest": catalog.get("catalog_digest"),
+        "policy_profile": catalog.get("policy_profile"),
+        "policy_digest": catalog.get("policy_digest"),
+    }
+    if any(not isinstance(value, str) or not value for value in identity.values()):
+        raise ValueError("recovery report has incomplete observed server identity")
+    if (
+        _DIGEST.fullmatch(identity["catalog_digest"]) is None
+        or _DIGEST.fullmatch(identity["policy_digest"]) is None
+    ):
+        raise ValueError("recovery report has an invalid catalog or policy digest")
+    return identity
+
+
+def _validate_shared_report_invariants(
+    control: Mapping[str, Any],
+    treatment: Mapping[str, Any],
+) -> None:
+    if control.get("condition") != "control":
+        raise ValueError("control report must use the control condition")
+    if treatment.get("condition") != "enriched-diagnostics":
+        raise ValueError("treatment report must use the enriched-diagnostics condition")
+    for field in _SHARED_REPORT_FIELDS:
+        if control.get(field) != treatment.get(field):
+            raise ValueError(f"recovery comparison invariant differs: {field}")
+    if control.get("schema_version") != "1":
+        raise ValueError("recovery comparison requires report schema version 1")
+    if control.get("causal_claim_authorized") is not False:
+        raise ValueError("recovery reports cannot authorize causal claims")
+
+
+def _validate_selected_case_ids(report: Mapping[str, Any]) -> None:
+    selected_case_ids = report.get("selected_case_ids")
+    valid = (
+        isinstance(selected_case_ids, list)
+        and bool(selected_case_ids)
+        and all(
+            isinstance(case_id, str) and bool(case_id) for case_id in selected_case_ids
+        )
+        and len(set(selected_case_ids)) == len(selected_case_ids)
+    )
+    if not valid:
+        raise ValueError("recovery reports require stable selected case IDs")
+
+
+def _condition_bindings(
+    control: Mapping[str, Any],
+    treatment: Mapping[str, Any],
+) -> tuple[str, str, dict[str, dict[str, str]]]:
+    source_base_revision = _revision(control, "source_base_revision")
+    source_candidate_revision = _revision(control, "source_candidate_revision")
+    control_deployed_revision = _revision(control, "deployed_revision")
+    treatment_deployed_revision = _revision(treatment, "deployed_revision")
+    if not _same_revision(control_deployed_revision, source_base_revision):
+        raise ValueError("control deployment does not match source_base_revision")
+    if not _same_revision(treatment_deployed_revision, source_candidate_revision):
+        raise ValueError(
+            "treatment deployment does not match source_candidate_revision"
+        )
+    if _same_revision(control_deployed_revision, treatment_deployed_revision):
+        raise ValueError("control and treatment must use different deployed revisions")
+    control_identity = _surface_identity(control)
+    treatment_identity = _surface_identity(treatment)
+    if control_identity["surface_digest"] == treatment_identity["surface_digest"]:
+        raise ValueError("control and treatment observed the same MCP surface")
+    for field in ("server_name", "policy_profile", "policy_digest"):
+        if control_identity[field] != treatment_identity[field]:
+            raise ValueError(f"recovery server invariant differs: {field}")
+    return (
+        source_base_revision,
+        source_candidate_revision,
+        {
+            "control": {
+                "deployed_revision": control_deployed_revision,
+                **control_identity,
+            },
+            "enriched-diagnostics": {
+                "deployed_revision": treatment_deployed_revision,
+                **treatment_identity,
+            },
+        },
+    )
+
+
+def _summary(report: Mapping[str, Any]) -> Mapping[str, Any]:
+    summary = report.get("summary")
+    if not isinstance(summary, Mapping):
+        raise ValueError("recovery reports require summaries")
+    return summary
+
+
 def compare_reports(
     control: Mapping[str, Any],
     treatment: Mapping[str, Any],
 ) -> dict[str, Any]:
-    for field in (
-        "suite_digest",
-        "model",
-        "reasoning_effort",
-        "tool_mode",
-        "repetitions",
-    ):
-        if control.get(field) != treatment.get(field):
-            raise ValueError(f"recovery comparison invariant differs: {field}")
-    control_summary = control.get("summary")
-    treatment_summary = treatment.get("summary")
-    if not isinstance(control_summary, Mapping) or not isinstance(
-        treatment_summary, Mapping
-    ):
-        raise ValueError("recovery reports require summaries")
+    _validate_shared_report_invariants(control, treatment)
+    _validate_selected_case_ids(control)
+    source_base_revision, source_candidate_revision, bindings = _condition_bindings(
+        control, treatment
+    )
+    control_summary = _summary(control)
+    treatment_summary = _summary(treatment)
     return {
         "schema_version": "1",
         "causal_claim_authorized": False,
         "suite_digest": control["suite_digest"],
-        "control_condition": control.get("condition"),
-        "treatment_condition": treatment.get("condition"),
+        "source_base_revision": source_base_revision,
+        "source_candidate_revision": source_candidate_revision,
+        "control_condition": "control",
+        "treatment_condition": "enriched-diagnostics",
+        "condition_bindings": bindings,
         "deltas": {
             metric: treatment_summary[metric] - control_summary[metric]
-            for metric in (
-                "repair_success_rate",
-                "repeated_error_count",
-                "math_run_call_count",
-                "input_tokens",
-                "output_tokens",
-                "elapsed_seconds",
-            )
+            for metric in _DELTA_METRICS
         },
         "interpretation": (
             "Descriptive public observation only; task identity and run invariants "
@@ -359,6 +495,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--suite", type=Path, default=_DEFAULT_SUITE)
     parser.add_argument("--condition", choices=("control", "enriched-diagnostics"))
+    parser.add_argument("--deployed-revision")
     parser.add_argument("--mcp-url")
     parser.add_argument("--model")
     parser.add_argument("--reasoning-effort", default="high")
@@ -386,14 +523,35 @@ def main() -> None:
         return
     if not args.execute:
         raise SystemExit("refusing model execution without --execute")
-    if not args.condition or not args.mcp_url or not args.model or args.output is None:
+    if (
+        not args.condition
+        or not args.deployed_revision
+        or not args.mcp_url
+        or not args.model
+        or args.output is None
+    ):
         raise SystemExit(
-            "run mode requires --condition, --mcp-url, --model, and --output"
+            "run mode requires --condition, --deployed-revision, --mcp-url, "
+            "--model, and --output"
         )
     _validate_mcp_url(args.mcp_url)
     suite_path = args.suite.resolve(strict=True)
     suite = load_suite(suite_path)
     suite_digest = digest_suite(suite_path)
+    source_candidate_revision = git_head_sha(_ROOT)
+    if source_candidate_revision is None:
+        raise SystemExit("cannot bind recovery report to the candidate Git revision")
+    if _REVISION.fullmatch(args.deployed_revision) is None:
+        raise SystemExit("--deployed-revision must be a 12- to 40-character Git SHA")
+    expected_revision = (
+        suite.source_base_revision
+        if args.condition == "control"
+        else source_candidate_revision
+    )
+    if not _same_revision(args.deployed_revision, expected_revision):
+        raise SystemExit(
+            f"{args.condition} deployment revision does not match {expected_revision}"
+        )
     repetitions = args.repetitions or suite.execution.repetitions_per_case
     timeout = args.timeout_seconds or suite.execution.timeout_seconds_per_rollout
     if not 1 <= repetitions <= 20 or timeout <= 0:
@@ -439,6 +597,9 @@ def main() -> None:
         "causal_claim_authorized": False,
         "suite_id": suite.suite_id,
         "suite_digest": suite_digest,
+        "source_base_revision": suite.source_base_revision,
+        "source_candidate_revision": source_candidate_revision,
+        "deployed_revision": args.deployed_revision,
         "condition": args.condition,
         "model": args.model,
         "reasoning_effort": args.reasoning_effort,
