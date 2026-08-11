@@ -527,8 +527,21 @@ if [[ ! -d "${RELEASE_DIR}" ]]; then
         install -d -m 0755 "${LEAN_ELAN_HOME}/bin"
         install -m 0755 "$(readlink -f "${ELAN_BIN}")" \
             "${LEAN_ELAN_HOME}/bin/elan"
-        ELAN_HOME="${LEAN_ELAN_HOME}" \
-            "${LEAN_ELAN_HOME}/bin/elan" toolchain install "${LEAN_TOOLCHAIN}"
+        INSTALLED_LEAN_TOOLCHAINS="$({
+            ELAN_HOME="${LEAN_ELAN_HOME}" \
+                "${LEAN_ELAN_HOME}/bin/elan" toolchain list
+        })" || die "could not inspect installed Lean toolchains"
+        LEAN_TOOLCHAIN_INSTALLED=0
+        while IFS= read -r installed_toolchain; do
+            if [[ "${installed_toolchain}" == "${LEAN_TOOLCHAIN}" ]]; then
+                LEAN_TOOLCHAIN_INSTALLED=1
+                break
+            fi
+        done <<<"${INSTALLED_LEAN_TOOLCHAINS}"
+        if ((!LEAN_TOOLCHAIN_INSTALLED)); then
+            ELAN_HOME="${LEAN_ELAN_HOME}" \
+                "${LEAN_ELAN_HOME}/bin/elan" toolchain install "${LEAN_TOOLCHAIN}"
+        fi
         (
             cd "${RELEASE_DIR}/lean"
             ELAN_HOME="${LEAN_ELAN_HOME}" \

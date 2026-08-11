@@ -183,6 +183,7 @@ def test_lean_profile_is_built_and_validated_before_activation() -> None:
     install_toolchain = source.index(
         '"${LEAN_ELAN_HOME}/bin/elan" toolchain install "${LEAN_TOOLCHAIN}"'
     )
+    inspect_toolchains = source.index('"${LEAN_ELAN_HOME}/bin/elan" toolchain list')
     fetch_cache = source.index("lake exe cache get")
     build_runtime = source.index(
         "lake build repl JacobianLeanRuntime jacobian_lean_proof_state"
@@ -193,7 +194,9 @@ def test_lean_profile_is_built_and_validated_before_activation() -> None:
     )
     current_link = source.index('ln -sfn "${RELEASE_DIR}" "${CURRENT_LINK}.new"')
 
-    assert install_toolchain < fetch_cache < build_runtime < validate
+    assert (
+        inspect_toolchains < install_toolchain < fetch_cache < build_runtime < validate
+    )
     assert validate < revision_marker < current_link
     assert '"ELAN_HOME=${LEAN_ELAN_HOME}"' in source
     assert '"PATH=${LEAN_SERVICE_PATH}"' in source
