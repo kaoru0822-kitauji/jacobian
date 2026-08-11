@@ -285,6 +285,41 @@ class ProjectivePoint(ContractModel):
         )
 
 
+class ProjectiveLine(ContractModel):
+    """The complete ordered projective line for one presentation and axis."""
+
+    presentation: FiniteFieldPresentation
+    axis: Axis
+    points: tuple[ProjectivePoint, ...]
+
+    @model_validator(mode="after")
+    def validate_line(self) -> Self:
+        expected = (self.presentation.order ** len(self.axis.labels) - 1) // (
+            self.presentation.order - 1
+        )
+        if len(self.points) != expected:
+            raise ValueError("projective line must contain every direction")
+        if any(
+            point.presentation != self.presentation or point.axis != self.axis
+            for point in self.points
+        ):
+            raise ValueError("projective line points must share their parent and axis")
+        if len({point.digest for point in self.points}) != len(self.points):
+            raise ValueError("projective line cannot repeat a direction")
+        return self
+
+    @property
+    def digest(self) -> str:
+        return _digest(
+            {
+                "axis": self.axis.digest,
+                "points": [point.digest for point in self.points],
+                "presentation": self.presentation.digest,
+                "value_type": "projective-line-v1",
+            }
+        )
+
+
 class FiniteLinearMap(ContractModel):
     """A matrix-defined linear map with exact source and target axes."""
 

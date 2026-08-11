@@ -24,6 +24,7 @@ PUBLIC_API = {
         "FiniteFieldPresentation",
         "FiniteLinearMap",
         "OrbitDistribution",
+        "ProjectiveLine",
         "ProjectivePoint",
         "RankResult",
         "direction_rank_ledger",

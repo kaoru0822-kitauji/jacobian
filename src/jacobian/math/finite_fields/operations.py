@@ -10,6 +10,7 @@ from jacobian.math.finite_fields.values import (
     FiniteFieldPresentation,
     FiniteLinearMap,
     OrbitDistribution,
+    ProjectiveLine,
     ProjectivePoint,
     RankResult,
 )
@@ -82,7 +83,7 @@ def projective_point(
 def projective_line(
     presentation: FiniteFieldPresentation,
     axis: Axis,
-) -> tuple[ProjectivePoint, ...]:
+) -> ProjectiveLine:
     """Enumerate a projective line in deterministic power-basis encoding order."""
 
     if len(axis.labels) != 2:
@@ -100,11 +101,15 @@ def projective_line(
         )
         for encoded in range(presentation.order)
     )
-    return (
-        projective_point(presentation, axis, (zero, one)),
-        *(
-            projective_point(presentation, axis, (one, value))
-            for value in affine_elements
+    return ProjectiveLine(
+        presentation=presentation,
+        axis=axis,
+        points=(
+            projective_point(presentation, axis, (zero, one)),
+            *(
+                projective_point(presentation, axis, (one, value))
+                for value in affine_elements
+            ),
         ),
     )
 
@@ -190,7 +195,7 @@ def linear_map_rank(
 
 def direction_rank_ledger(
     subspace: FiniteDimensionalSubspace,
-    directions: tuple[ProjectivePoint, ...],
+    directions: ProjectiveLine,
 ) -> DirectionRankLedger:
     """Restrict scalars and rank every supplied direction without losing order."""
 
@@ -198,7 +203,7 @@ def direction_rank_ledger(
         subspace=subspace,
         entries=tuple(
             linear_map_rank(direction, restrict_scalars(subspace, direction))
-            for direction in directions
+            for direction in directions.points
         ),
     )
 

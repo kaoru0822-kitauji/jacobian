@@ -9,7 +9,7 @@ from jacobian.math.finite_fields import (
     AxisBoundMatrix,
     FiniteDimensionalSubspace,
     FiniteFieldElement,
-    ProjectivePoint,
+    ProjectiveLine,
     direction_rank_ledger,
     element,
     finite_field,
@@ -25,7 +25,7 @@ pytestmark = pytest.mark.requires_provider("flint")
 
 def _slice_a_values() -> tuple[
     FiniteDimensionalSubspace,
-    tuple[ProjectivePoint, ...],
+    ProjectiveLine,
 ]:
     # The exact presentation, actions, and direction order are Theorem 1.2 of
     # https://arxiv.org/abs/2607.23857. Coefficients are low-degree first.
@@ -88,11 +88,15 @@ def _slice_a_values() -> tuple[
         one_plus_a2,
         e((0, 1, 1)),
     )
-    directions = (
-        projective_point(presentation, rows, (zero, one)),
-        *(
-            projective_point(presentation, rows, (one, value))
-            for value in paper_affine_order
+    directions = ProjectiveLine(
+        presentation=presentation,
+        axis=rows,
+        points=(
+            projective_point(presentation, rows, (zero, one)),
+            *(
+                projective_point(presentation, rows, (one, value))
+                for value in paper_affine_order
+            ),
         ),
     )
     return subspace, directions
@@ -108,7 +112,7 @@ def test_exact_flint_presentation_and_element_coordinates_round_trip() -> None:
         for point in projective_line(
             presentation,
             Axis(name="b", labels=("b1", "b2")),
-        )[1:]
+        ).points[1:]
     ) == tuple(
         ((1, 0, 0), coordinates)
         for coordinates in (
@@ -127,7 +131,9 @@ def test_exact_flint_presentation_and_element_coordinates_round_trip() -> None:
 def test_slice_a_restricts_to_f2_4_to_f2_6_and_matches_paper_ranks() -> None:
     subspace, directions = _slice_a_values()
 
-    maps = tuple(restrict_scalars(subspace, direction) for direction in directions)
+    maps = tuple(
+        restrict_scalars(subspace, direction) for direction in directions.points
+    )
     assert all(linear_map.matrix.prime == 2 for linear_map in maps)
     assert all(len(linear_map.matrix.entries) == 6 for linear_map in maps)
     assert all(linear_map.matrix.columns == 4 for linear_map in maps)
@@ -154,7 +160,7 @@ def test_slice_a_keeps_directions_bound_through_orbit_aggregation() -> None:
     ledger = direction_rank_ledger(subspace, directions)
     distribution = orbit_distribution(ledger)
 
-    assert tuple(entry.direction for entry in ledger.entries) == directions
+    assert tuple(entry.direction for entry in ledger.entries) == directions.points
     assert ledger.subspace is subspace
     assert tuple(entry.rank for entry in ledger.entries) == (3, 3, 3, 3, 3, 3, 4, 4, 4)
     assert distribution.counts == ((1, 9), (8, 48), (16, 12))
@@ -167,7 +173,7 @@ def test_slice_a_keeps_directions_bound_through_orbit_aggregation() -> None:
 
 def test_slice_a_ports_compose_restriction_into_rank_without_wire_conversion() -> None:
     subspace, directions = _slice_a_values()
-    direction = directions[0]
+    direction = directions.points[0]
     restrict_operation, rank_operation = build_finite_field_bundle().capabilities
 
     restrict_payload: dict[str, object] = {}
@@ -213,7 +219,7 @@ def test_slice_a_rejects_wrong_presentation_and_axis() -> None:
     wrong_axis_direction = projective_point(
         subspace.presentation,
         wrong_axis,
-        directions[0].coordinates,
+        directions.points[0].coordinates,
     )
 
     with pytest.raises(ValueError, match="presentation"):

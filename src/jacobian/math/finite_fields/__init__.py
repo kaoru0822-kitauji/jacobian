@@ -19,6 +19,7 @@ from jacobian.math.finite_fields.values import (
     FiniteFieldPresentation,
     FiniteLinearMap,
     OrbitDistribution,
+    ProjectiveLine,
     ProjectivePoint,
     RankResult,
 )
@@ -32,6 +33,7 @@ __all__ = [
     "FiniteFieldPresentation",
     "FiniteLinearMap",
     "OrbitDistribution",
+    "ProjectiveLine",
     "ProjectivePoint",
     "RankResult",
     "direction_rank_ledger",
