@@ -856,12 +856,23 @@ def _summary(
     return computed
 
 
-def _load_report(path: Path) -> tuple[Path, Mapping[str, Any]]:
+def _load_report(
+    path: Path,
+    *,
+    expected_sha256: str,
+) -> tuple[Path, Mapping[str, Any]]:
+    if _DIGEST.fullmatch(expected_sha256) is None:
+        raise ValueError("recovery report requires a valid external SHA-256 anchor")
     try:
         resolved = path.resolve(strict=True)
         if not resolved.is_file():
             raise ValueError("recovery report path is not a file")
-        decoded = json.loads(resolved.read_text(encoding="utf-8"))
+        payload = resolved.read_bytes()
+        if _sha256_bytes(payload) != expected_sha256:
+            raise ValueError(
+                "recovery report does not match its external SHA-256 anchor"
+            )
+        decoded = json.loads(payload.decode("utf-8", errors="strict"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise ValueError(f"recovery report cannot be read: {path}") from exc
     if not isinstance(decoded, Mapping):
@@ -895,13 +906,21 @@ def compare_report_paths(
     control_path: Path,
     treatment_path: Path,
     *,
+    control_report_sha256: str,
+    treatment_report_sha256: str,
     suite_path: Path = _DEFAULT_SUITE,
 ) -> dict[str, Any]:
     resolved_suite_path = suite_path.resolve(strict=True)
     suite = load_suite(resolved_suite_path)
     suite_digest = digest_suite(resolved_suite_path)
-    resolved_control_path, control = _load_report(control_path)
-    resolved_treatment_path, treatment = _load_report(treatment_path)
+    resolved_control_path, control = _load_report(
+        control_path,
+        expected_sha256=control_report_sha256,
+    )
+    resolved_treatment_path, treatment = _load_report(
+        treatment_path,
+        expected_sha256=treatment_report_sha256,
+    )
     _validate_shared_report_invariants(control, treatment)
     _validate_selected_case_ids(control)
     _validate_suite_binding(control, suite=suite, suite_digest=suite_digest)
@@ -927,6 +946,10 @@ def compare_report_paths(
         "source_candidate_revision": source_candidate_revision,
         "control_condition": "control",
         "treatment_condition": "enriched-diagnostics",
+        "report_sha256": {
+            "control": control_report_sha256,
+            "treatment": treatment_report_sha256,
+        },
         "condition_bindings": bindings,
         "deltas": {
             metric: treatment_summary[metric] - control_summary[metric]
@@ -958,7 +981,24 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--compare", nargs=2, type=Path, metavar=("CONTROL", "TREATMENT")
     )
+    parser.add_argument("--control-report-sha256")
+    parser.add_argument("--treatment-report-sha256")
     return parser
+
+
+def _compare_from_arguments(args: argparse.Namespace) -> dict[str, Any]:
+    if not args.control_report_sha256 or not args.treatment_report_sha256:
+        raise SystemExit(
+            "--compare requires externally retained --control-report-sha256 "
+            "and --treatment-report-sha256 anchors"
+        )
+    return compare_report_paths(
+        args.compare[0],
+        args.compare[1],
+        control_report_sha256=args.control_report_sha256,
+        treatment_report_sha256=args.treatment_report_sha256,
+        suite_path=args.suite,
+    )
 
 
 def main() -> None:
@@ -966,11 +1006,7 @@ def main() -> None:
     if args.compare:
         print(
             json.dumps(
-                compare_report_paths(
-                    args.compare[0],
-                    args.compare[1],
-                    suite_path=args.suite,
-                ),
+                _compare_from_arguments(args),
                 indent=2,
                 sort_keys=True,
             )
@@ -1062,9 +1098,18 @@ def main() -> None:
         "runs": runs,
         "summary": summarize_runs(runs),
     }
-    (output / "report.json").write_text(
-        json.dumps(report, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+    report_path = output / "report.json"
+    report_payload = (json.dumps(report, indent=2, sort_keys=True) + "\n").encode()
+    report_path.write_bytes(report_payload)
+    print(
+        json.dumps(
+            {
+                "report": str(report_path),
+                "report_sha256": _sha256_bytes(report_payload),
+                "retention_required": "external-append-only-or-signed",
+            },
+            sort_keys=True,
+        )
     )
 
 

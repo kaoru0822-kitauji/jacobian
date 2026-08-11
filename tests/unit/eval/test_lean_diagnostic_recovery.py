@@ -274,8 +274,9 @@ def _write_comparison_reports(
     tmp_path: Path,
     control: dict[str, Any],
     treatment: dict[str, Any],
-) -> tuple[Path, Path]:
+) -> tuple[Path, Path, str, str]:
     paths: list[Path] = []
+    anchors: list[str] = []
     for slot, report in (("control", control), ("enriched-diagnostics", treatment)):
         root = tmp_path / slot
         root.mkdir(exist_ok=True)
@@ -285,9 +286,11 @@ def _write_comparison_reports(
         (root / artifacts["transcript"]).write_bytes(transcript)
         (root / artifacts["stderr"]).write_bytes(stderr)
         report_path = root / "report.json"
-        report_path.write_text(json.dumps(report), encoding="utf-8")
+        report_payload = json.dumps(report).encode()
+        report_path.write_bytes(report_payload)
         paths.append(report_path)
-    return paths[0], paths[1]
+        anchors.append("sha256:" + hashlib.sha256(report_payload).hexdigest())
+    return paths[0], paths[1], anchors[0], anchors[1]
 
 
 def _compare(
@@ -295,10 +298,16 @@ def _compare(
     control: dict[str, Any],
     treatment: dict[str, Any],
 ) -> dict[str, object]:
-    control_path, treatment_path = _write_comparison_reports(
-        tmp_path, control, treatment
+    control_path, treatment_path, control_anchor, treatment_anchor = (
+        _write_comparison_reports(tmp_path, control, treatment)
     )
-    return compare_report_paths(control_path, treatment_path, suite_path=SUITE)
+    return compare_report_paths(
+        control_path,
+        treatment_path,
+        control_report_sha256=control_anchor,
+        treatment_report_sha256=treatment_anchor,
+        suite_path=SUITE,
+    )
 
 
 def test_recovery_suite_freezes_control_treatment_and_injected_cases() -> None:
@@ -581,6 +590,8 @@ def test_recovery_summary_and_comparison_keep_efficiency_metrics_separate(
     assert compared["deltas"]["repair_success_rate"] == 1.0
     assert compared["deltas"]["repeated_error_count"] == -1
     assert compared["causal_claim_authorized"] is False
+    assert compared["report_sha256"]["control"].startswith("sha256:")
+    assert compared["report_sha256"]["treatment"].startswith("sha256:")
     assert (
         compared["condition_bindings"]["control"]["deployed_revision"] == BASE_REVISION
     )
@@ -820,14 +831,20 @@ def test_recovery_comparison_verifies_retained_artifact_digests(
 ) -> None:
     control = _comparison_report("control")
     treatment = _comparison_report("enriched-diagnostics")
-    control_path, treatment_path = _write_comparison_reports(
-        tmp_path, control, treatment
+    control_path, treatment_path, control_anchor, treatment_anchor = (
+        _write_comparison_reports(tmp_path, control, treatment)
     )
     transcript_name = control["runs"][0]["artifacts"]["transcript"]
     (control_path.parent / transcript_name).write_bytes(b"tampered transcript\n")
 
     with pytest.raises(ValueError, match="artifact digest does not match"):
-        compare_report_paths(control_path, treatment_path, suite_path=SUITE)
+        compare_report_paths(
+            control_path,
+            treatment_path,
+            control_report_sha256=control_anchor,
+            treatment_report_sha256=treatment_anchor,
+            suite_path=SUITE,
+        )
 
 
 def test_recovery_comparison_binds_completion_to_the_command_receipt(
@@ -840,12 +857,73 @@ def test_recovery_comparison_binds_completion_to_the_command_receipt(
         "exit_code": None,
         "elapsed_seconds": 3.5,
     }
-    control_path, treatment_path = _write_comparison_reports(
-        tmp_path, control, treatment
+    control_path, treatment_path, control_anchor, treatment_anchor = (
+        _write_comparison_reports(tmp_path, control, treatment)
     )
 
     with pytest.raises(ValueError, match="command metadata does not match"):
-        compare_report_paths(control_path, treatment_path, suite_path=SUITE)
+        compare_report_paths(
+            control_path,
+            treatment_path,
+            control_report_sha256=control_anchor,
+            treatment_report_sha256=treatment_anchor,
+            suite_path=SUITE,
+        )
+
+
+def test_recovery_comparison_rejects_a_self_consistent_forged_command_receipt(
+    tmp_path: Path,
+) -> None:
+    control = _comparison_report("control")
+    treatment = _comparison_report("enriched-diagnostics")
+    control_path, treatment_path, control_anchor, _ = _write_comparison_reports(
+        tmp_path, control, treatment
+    )
+    run = treatment["runs"][0]
+    command_path = treatment_path.parent / run["artifacts"]["command"]
+
+    timed_out_receipt = canonicalize_json(
+        {"status": "TIMED_OUT", "exit_code": None, "elapsed_microseconds": 3_500_000}
+    )
+    command_path.write_bytes(timed_out_receipt)
+    run["command"] = {
+        "status": "TIMED_OUT",
+        "exit_code": None,
+        "elapsed_seconds": 3.5,
+    }
+    run["artifacts"]["command_sha256"] = (
+        "sha256:" + hashlib.sha256(timed_out_receipt).hexdigest()
+    )
+    run["metrics"]["repair_success"] = False
+    treatment["summary"] = summarize_runs(treatment["runs"])
+    trusted_payload = json.dumps(treatment).encode()
+    treatment_path.write_bytes(trusted_payload)
+    treatment_anchor = "sha256:" + hashlib.sha256(trusted_payload).hexdigest()
+
+    forged_receipt = canonicalize_json(
+        {"status": "EXITED", "exit_code": 0, "elapsed_microseconds": 3_500_000}
+    )
+    command_path.write_bytes(forged_receipt)
+    run["command"] = {
+        "status": "EXITED",
+        "exit_code": 0,
+        "elapsed_seconds": 3.5,
+    }
+    run["artifacts"]["command_sha256"] = (
+        "sha256:" + hashlib.sha256(forged_receipt).hexdigest()
+    )
+    run["metrics"]["repair_success"] = True
+    treatment["summary"] = summarize_runs(treatment["runs"])
+    treatment_path.write_bytes(json.dumps(treatment).encode())
+
+    with pytest.raises(ValueError, match="external SHA-256 anchor"):
+        compare_report_paths(
+            control_path,
+            treatment_path,
+            control_report_sha256=control_anchor,
+            treatment_report_sha256=treatment_anchor,
+            suite_path=SUITE,
+        )
 
 
 def test_recovery_comparison_reclassifies_hash_verified_transcripts(
@@ -853,7 +931,7 @@ def test_recovery_comparison_reclassifies_hash_verified_transcripts(
 ) -> None:
     control = _comparison_report("control")
     treatment = _comparison_report("enriched-diagnostics")
-    control_path, treatment_path = _write_comparison_reports(
+    control_path, treatment_path, _, treatment_anchor = _write_comparison_reports(
         tmp_path, control, treatment
     )
     transcript_name = control["runs"][0]["artifacts"]["transcript"]
@@ -872,7 +950,15 @@ def test_recovery_comparison_reclassifies_hash_verified_transcripts(
     control["runs"][0]["artifacts"]["transcript_sha256"] = (
         "sha256:" + hashlib.sha256(changed).hexdigest()
     )
-    control_path.write_text(json.dumps(control), encoding="utf-8")
+    control_payload = json.dumps(control).encode()
+    control_path.write_bytes(control_payload)
+    control_anchor = "sha256:" + hashlib.sha256(control_payload).hexdigest()
 
     with pytest.raises(ValueError, match="metrics do not match"):
-        compare_report_paths(control_path, treatment_path, suite_path=SUITE)
+        compare_report_paths(
+            control_path,
+            treatment_path,
+            control_report_sha256=control_anchor,
+            treatment_report_sha256=treatment_anchor,
+            suite_path=SUITE,
+        )
