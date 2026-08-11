@@ -19,6 +19,7 @@ from jacobian.canonical import (
     canonicalize_json,
     loads_strict_json,
 )
+from jacobian.checker_authorization import LeanCheckerInstallation
 from jacobian.contracts.capabilities import (
     CapabilityProviderRuntime,
 )
@@ -69,7 +70,6 @@ from jacobian.providers.lean_runtime import (
     lean_mathlib_git_config,
     require_lean_semantic_runtime_identity,
 )
-from jacobian.references import LeanCheckerInstallation
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.storage.repository import ArtifactRepository
 from jacobian.worker_environment import worker_environment

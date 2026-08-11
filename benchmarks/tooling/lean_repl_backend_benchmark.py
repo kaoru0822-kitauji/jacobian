@@ -26,11 +26,11 @@ import pyperf
 
 from benchmarks.tooling.command_runner import git_head_sha
 from jacobian.canonical import canonicalize_json
+from jacobian.checker_authorization import LeanCheckerInstallation
 from jacobian.contracts.lean import LeanEnvironment
 from jacobian.lean_frontend.artifacts import _proof_state_command
 from jacobian.lean_frontend.repl import LeanExplorationReplRuntime, LeanReplPolicy
 from jacobian.lean_frontend.repl_protocol import LeanReplProofStepResponse
-from jacobian.references import LeanCheckerInstallation
 
 _ROOT = Path(__file__).resolve().parents[2]
 _RUNTIME = _ROOT / "lean"

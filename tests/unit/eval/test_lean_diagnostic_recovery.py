@@ -244,7 +244,6 @@ def _comparison_report(
         "repetitions": 1,
         "timeout_seconds": 300.0,
         "codex_version": "codex-test",
-        "skill_digest": None,
         "selected_case_ids": ["core-check-type-mismatch"],
         "surface": _surface(surface_seed or ("b" if control else "c")),
         "runs": [run],

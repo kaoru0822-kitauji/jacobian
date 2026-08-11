@@ -28,7 +28,6 @@ from benchmarks.tooling.codex_visibility import (
     ToolMode,
     _codex_arguments,
     _command_version,
-    _copy_skill,
     _sha256_bytes,
     _validate_mcp_url,
     inspect_surface,
@@ -60,7 +59,6 @@ _SHARED_REPORT_FIELDS = (
     "repetitions",
     "timeout_seconds",
     "codex_version",
-    "skill_digest",
     "selected_case_ids",
 )
 _DELTA_METRICS = (
@@ -903,7 +901,6 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--case", action="append", default=[])
     parser.add_argument("--timeout-seconds", type=float)
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--skill", type=Path)
     parser.add_argument("--execute", action="store_true")
     parser.add_argument(
         "--compare", nargs=2, type=Path, metavar=("CONTROL", "TREATMENT")
@@ -975,11 +972,6 @@ def main() -> None:
     output.mkdir(parents=True)
     with tempfile.TemporaryDirectory(prefix="jacobian-lean-recovery-") as raw:
         workspace = Path(raw)
-        skill_digest = (
-            _copy_skill(args.skill.resolve(strict=True), workspace)
-            if args.skill is not None
-            else None
-        )
         codex_version = _command_version(workspace)
         runs = [
             _run_case(
@@ -1012,7 +1004,6 @@ def main() -> None:
         "repetitions": repetitions,
         "timeout_seconds": timeout,
         "codex_version": codex_version,
-        "skill_digest": skill_digest,
         "surface": surface,
         "selected_case_ids": [case.case_id for case in selected],
         "runs": runs,

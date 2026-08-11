@@ -6,9 +6,9 @@ import hashlib
 from typing import Any
 
 from jacobian.canonical import canonicalize_json
+from jacobian.checker_authorization import LeanCheckerInstallation
 from jacobian.contracts.lean import LeanEnvironment
 from jacobian.contracts.lean_exploration import LeanProofStateArtifact
-from jacobian.references import LeanCheckerInstallation
 
 _PROOF_STATE_STATEMENT_PREFIX = "example : "
 
