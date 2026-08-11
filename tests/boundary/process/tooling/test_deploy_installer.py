@@ -301,6 +301,12 @@ def test_deployment_lock_is_host_global_and_precedes_shared_host_mutations() -> 
 def test_release_runtime_is_checked_before_current_symlink_is_changed() -> None:
     source = INSTALLER.read_text(encoding="utf-8")
 
+    ownership = source.index(
+        'chown -R root:root "${RELEASE_DIR}" "${PYTHON_INSTALL_ROOT}"'
+    )
+    runtime_permissions = source.index(
+        'chmod -R a+rX "${RELEASE_DIR}" "${PYTHON_INSTALL_ROOT}"'
+    )
     validation = source.index('validate_release_runtime "${RELEASE_DIR}"')
     revision_marker = source.index(
         'printf \'%s\\n\' "${REVISION}" >"${RELEASE_DIR}/.git-revision"'
@@ -308,6 +314,7 @@ def test_release_runtime_is_checked_before_current_symlink_is_changed() -> None:
     marker_permissions = source.index('chmod 0644 "${RELEASE_DIR}/.git-revision"')
     current_link = source.index('ln -sfn "${RELEASE_DIR}" "${CURRENT_LINK}.new"')
 
+    assert ownership < runtime_permissions < validation
     assert validation < revision_marker < marker_permissions < current_link
     assert '"${RUNUSER_BIN}" --user jacobian -- "${entrypoint}" --version' in source
 
@@ -335,7 +342,7 @@ def test_lean_profile_is_built_and_validated_before_activation() -> None:
     assert validate < revision_marker < current_link
     assert '"ELAN_HOME=${LEAN_ELAN_HOME}"' in source
     assert '"PATH=${LEAN_SERVICE_PATH}"' in source
-    assert 'chmod -R a+rX "${RELEASE_DIR}/lean"' in source
+    assert 'chmod -R a+rX "${RELEASE_DIR}" "${PYTHON_INSTALL_ROOT}"' in source
     assert "lean_provider_runtime(" in source
     assert "CapabilityProviderAvailability.AVAILABLE" in source
 
