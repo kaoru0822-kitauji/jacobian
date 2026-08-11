@@ -153,6 +153,40 @@ def test_repl_diagnostics_translate_generated_statement_columns() -> None:
     assert diagnostics[0].source_span.end.column == 4
 
 
+def test_repl_diagnostics_preserve_identical_messages_at_distinct_spans() -> None:
+    prefix_length = len("example : ")
+    command = LeanReplCommandResponse.model_validate(
+        {
+            "env": 0,
+            "messages": [
+                {
+                    "pos": {"line": 0, "column": prefix_length},
+                    "endPos": {"line": 0, "column": prefix_length + 4},
+                    "severity": "error",
+                    "data": "unknown identifier",
+                },
+                {
+                    "pos": {"line": 0, "column": prefix_length + 7},
+                    "endPos": {"line": 0, "column": prefix_length + 11},
+                    "severity": "error",
+                    "data": "unknown identifier",
+                },
+            ],
+            "sorries": [{"goal": "⊢ True ∧ True", "proofState": 0}],
+        }
+    )
+
+    diagnostics = repl_diagnostics(
+        (command, _proof_step(), _proof_step()),
+        statement="True ∧ True",
+    )
+
+    assert len(diagnostics) == 2
+    spans = [diagnostic.source_span for diagnostic in diagnostics]
+    assert all(span is not None for span in spans)
+    assert [span.start.column for span in spans if span is not None] == [0, 7]
+
+
 def test_checker_diagnostics_classify_setup_failure_as_operational() -> None:
     detail = (
         "MATHLIB_MANIFEST: a pinned mathlib package checkout failed integrity "

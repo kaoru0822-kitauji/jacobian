@@ -39,6 +39,7 @@ from benchmarks.tooling.command_runner import (
     operator_environment,
     run_operator_command,
 )
+from jacobian.canonical import canonicalize_json, loads_strict_json
 from jacobian.eval.telemetry import parse_agent_transcript
 
 _ROOT = Path(__file__).resolve().parents[2]
@@ -207,9 +208,19 @@ class RecoveryRunCommand(BaseModel):
     elapsed_seconds: StrictFloat = Field(ge=0, allow_inf_nan=False)
 
 
+class RecoveryRunCommandReceipt(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    status: ToolCommandStatus
+    exit_code: StrictInt | None
+    elapsed_microseconds: StrictInt = Field(ge=0)
+
+
 class RecoveryRunArtifacts(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    command: str = Field(min_length=1)
+    command_sha256: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     transcript: str = Field(min_length=1)
     transcript_sha256: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     stderr: str = Field(min_length=1)
@@ -456,6 +467,7 @@ def _run_case(
     tool_mode: ToolMode,
 ) -> dict[str, Any]:
     stem = f"{case.case_id}-r{repetition:02d}"
+    command_path = output / f"{stem}.command.json"
     transcript_path = output / f"{stem}.jsonl"
     stderr_path = output / f"{stem}.stderr"
     started = time.monotonic()
@@ -479,20 +491,30 @@ def _run_case(
     stderr_path.write_bytes(result.stderr)
     telemetry = parse_agent_transcript(transcript_path)
     classified = classify_recovery(case, telemetry)
-    completed = result.status is ToolCommandStatus.EXITED and result.exit_code == 0
+    command = RecoveryRunCommand(
+        status=result.status,
+        exit_code=result.exit_code,
+        elapsed_seconds=round(time.monotonic() - started, 6),
+    )
+    command_receipt = RecoveryRunCommandReceipt(
+        status=command.status,
+        exit_code=command.exit_code,
+        elapsed_microseconds=round(command.elapsed_seconds * 1_000_000),
+    )
+    command_payload = canonicalize_json(command_receipt.model_dump(mode="json"))
+    command_path.write_bytes(command_payload)
+    completed = command.status is ToolCommandStatus.EXITED and command.exit_code == 0
     return {
         "case_id": case.case_id,
         "repetition": repetition,
-        "command": {
-            "status": result.status,
-            "exit_code": result.exit_code,
-            "elapsed_seconds": round(time.monotonic() - started, 6),
-        },
+        "command": command.model_dump(mode="json"),
         "metrics": {
             **classified,
             "repair_success": completed and classified["repair_success"],
         },
         "artifacts": {
+            "command": command_path.name,
+            "command_sha256": _sha256_bytes(command_payload),
             "transcript": transcript_path.name,
             "transcript_sha256": _sha256_bytes(result.stdout),
             "stderr": stderr_path.name,
@@ -686,7 +708,11 @@ def _retained_runs(report: Mapping[str, Any]) -> list[RetainedRecoveryRun]:
     artifact_names = [
         name
         for run in validated
-        for name in (run.artifacts.transcript, run.artifacts.stderr)
+        for name in (
+            run.artifacts.command,
+            run.artifacts.transcript,
+            run.artifacts.stderr,
+        )
     ]
     if len(set(artifact_names)) != len(artifact_names):
         raise ValueError("recovery report must retain distinct artifacts per run")
@@ -732,12 +758,39 @@ def _validate_transcript_jsonl(payload: bytes, *, name: str) -> None:
         raise ValueError(f"recovery transcript has no valid JSON events: {name}")
 
 
+def _verified_command_receipt(
+    run: RetainedRecoveryRun,
+    *,
+    report_root: Path,
+) -> RecoveryRunCommand:
+    _, payload = _verified_artifact(
+        report_root,
+        name=run.artifacts.command,
+        expected_digest=run.artifacts.command_sha256,
+    )
+    try:
+        receipt = RecoveryRunCommandReceipt.model_validate(loads_strict_json(payload))
+    except (TypeError, ValueError, ValidationError) as exc:
+        raise ValueError("recovery command receipt is malformed") from exc
+    if canonicalize_json(receipt.model_dump(mode="json")) != payload:
+        raise ValueError("recovery command receipt is not canonical")
+    command = RecoveryRunCommand(
+        status=receipt.status,
+        exit_code=receipt.exit_code,
+        elapsed_seconds=receipt.elapsed_microseconds / 1_000_000,
+    )
+    if command != run.command:
+        raise ValueError("recovery command metadata does not match its receipt")
+    return command
+
+
 def _recomputed_run(
     run: RetainedRecoveryRun,
     *,
     case: RecoveryCase,
     report_root: Path,
 ) -> dict[str, Any]:
+    command = _verified_command_receipt(run, report_root=report_root)
     transcript_path, transcript_payload = _verified_artifact(
         report_root,
         name=run.artifacts.transcript,
@@ -753,8 +806,7 @@ def _recomputed_run(
         telemetry = parse_agent_transcript(transcript_path)
         classified = classify_recovery(case, telemetry)
         completed = (
-            run.command.status is ToolCommandStatus.EXITED
-            and run.command.exit_code == 0
+            command.status is ToolCommandStatus.EXITED and command.exit_code == 0
         )
         metrics = RecoveryRunMetrics.model_validate(
             {
@@ -773,6 +825,7 @@ def _recomputed_run(
             "recovery retained metrics do not match the hash-verified transcript"
         )
     retained = run.model_dump(mode="json", exclude_none=True)
+    retained["command"] = command.model_dump(mode="json", exclude_none=True)
     retained["metrics"] = recomputed_metrics
     return retained
 

@@ -92,12 +92,14 @@ running the harness.
 
 Comparison fails closed on condition or run-plan drift, wrong source bindings,
 identical observed surfaces, incomplete case/repetition coverage, or stale
-summaries. It resolves each transcript and stderr file relative to its report,
-rejects path and symlink escapes, verifies both SHA-256 digests, validates and
-reparses the retained JSONL transcript, and reruns the recovery classifier for
-the bound suite case. Reported call, token, rejection, diagnostic, repetition,
-and repair metrics must equal the recomputed values before any delta is
-emitted. The selected suite bytes and retained MCP surface are also rehashed.
+summaries. It resolves each command receipt, transcript, and stderr file
+relative to its report, rejects path and symlink escapes, verifies every
+SHA-256 digest, derives process completion from the canonical command receipt,
+validates and reparses the retained JSONL transcript, and reruns the recovery
+classifier for the bound suite case. Reported call, token, rejection,
+diagnostic, repetition, and repair metrics must equal the recomputed values
+before any delta is emitted. The selected suite bytes and retained MCP surface
+are also rehashed.
 
 The exact injected payload must be the first Jacobian capability attempt,
 including unsuccessful `math.run` calls, and must produce proof-specific

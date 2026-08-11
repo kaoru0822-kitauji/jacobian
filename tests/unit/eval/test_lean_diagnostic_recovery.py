@@ -17,6 +17,8 @@ from benchmarks.tooling.lean_diagnostic_recovery import (
     summarize_runs,
 )
 
+from jacobian.canonical import canonicalize_json
+
 ROOT = Path(__file__).resolve().parents[3]
 SUITE = ROOT / "benchmarks/config/lean-diagnostic-recovery-v1.json"
 BASE_REVISION = "526575833ef9"
@@ -95,6 +97,8 @@ def _comparison_run(
             },
         },
         "artifacts": {
+            "command": "core-check-type-mismatch-r01.command.json",
+            "command_sha256": "sha256:" + "0" * 64,
             "transcript": "core-check-type-mismatch-r01.jsonl",
             "transcript_sha256": "sha256:" + "1" * 64,
             "stderr": "core-check-type-mismatch-r01.stderr",
@@ -132,7 +136,9 @@ def _tool_event(
     }
 
 
-def _comparison_evidence(condition: str) -> tuple[dict[str, Any], bytes, bytes]:
+def _comparison_evidence(
+    condition: str,
+) -> tuple[dict[str, Any], bytes, bytes, bytes]:
     case = load_suite(SUITE).cases[0]
     enriched = condition == "enriched-diagnostics"
     rejection = _tool_event(
@@ -180,17 +186,29 @@ def _comparison_evidence(condition: str) -> tuple[dict[str, Any], bytes, bytes]:
         + "\n"
     ).encode()
     stderr = b""
+    elapsed_seconds = 3.5 if enriched else 5.0
+    command: dict[str, Any] = {
+        "status": "EXITED",
+        "exit_code": 0,
+        "elapsed_seconds": elapsed_seconds,
+    }
+    command_receipt = canonicalize_json(
+        {
+            "status": command["status"],
+            "exit_code": command["exit_code"],
+            "elapsed_microseconds": round(elapsed_seconds * 1_000_000),
+        }
+    )
     return (
         {
             "case_id": case.case_id,
             "repetition": 1,
-            "command": {
-                "status": "EXITED",
-                "exit_code": 0,
-                "elapsed_seconds": 3.5 if enriched else 5.0,
-            },
+            "command": command,
             "metrics": {},
             "artifacts": {
+                "command": "core-check-type-mismatch-r01.command.json",
+                "command_sha256": "sha256:"
+                + hashlib.sha256(command_receipt).hexdigest(),
                 "transcript": "core-check-type-mismatch-r01.jsonl",
                 "transcript_sha256": "sha256:" + hashlib.sha256(transcript).hexdigest(),
                 "stderr": "core-check-type-mismatch-r01.stderr",
@@ -199,6 +217,7 @@ def _comparison_evidence(condition: str) -> tuple[dict[str, Any], bytes, bytes]:
         },
         transcript,
         stderr,
+        command_receipt,
     )
 
 
@@ -208,7 +227,7 @@ def _comparison_report(
     surface_seed: str | None = None,
 ) -> dict[str, object]:
     control = condition == "control"
-    run, _transcript, _stderr = _comparison_evidence(condition)
+    run, _transcript, _stderr, _command_receipt = _comparison_evidence(condition)
     # The fixture's metrics are the deterministic classification of the events
     # above; the comparator independently repeats this from the retained file.
     classified = {
@@ -260,8 +279,9 @@ def _write_comparison_reports(
     for slot, report in (("control", control), ("enriched-diagnostics", treatment)):
         root = tmp_path / slot
         root.mkdir(exist_ok=True)
-        canonical_run, transcript, stderr = _comparison_evidence(slot)
+        canonical_run, transcript, stderr, command_receipt = _comparison_evidence(slot)
         artifacts = canonical_run["artifacts"]
+        (root / artifacts["command"]).write_bytes(command_receipt)
         (root / artifacts["transcript"]).write_bytes(transcript)
         (root / artifacts["stderr"]).write_bytes(stderr)
         report_path = root / "report.json"
@@ -807,6 +827,24 @@ def test_recovery_comparison_verifies_retained_artifact_digests(
     (control_path.parent / transcript_name).write_bytes(b"tampered transcript\n")
 
     with pytest.raises(ValueError, match="artifact digest does not match"):
+        compare_report_paths(control_path, treatment_path, suite_path=SUITE)
+
+
+def test_recovery_comparison_binds_completion_to_the_command_receipt(
+    tmp_path: Path,
+) -> None:
+    control = _comparison_report("control")
+    treatment = _comparison_report("enriched-diagnostics")
+    treatment["runs"][0]["command"] = {
+        "status": "TIMED_OUT",
+        "exit_code": None,
+        "elapsed_seconds": 3.5,
+    }
+    control_path, treatment_path = _write_comparison_reports(
+        tmp_path, control, treatment
+    )
+
+    with pytest.raises(ValueError, match="command metadata does not match"):
         compare_report_paths(control_path, treatment_path, suite_path=SUITE)
 
 

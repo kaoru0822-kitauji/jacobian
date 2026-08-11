@@ -29,6 +29,12 @@ _METAVARIABLE = re.compile(r"\?m\.\d+|\?[A-Za-z_][A-Za-z0-9_.]*")
 _INTERNAL_SCAFFOLD_WARNINGS = frozenset({"declaration uses `sorry`"})
 _MAX_METAVARIABLE_LENGTH = 512
 _MAX_RAW_BACKEND_MESSAGE_LENGTH = 20_000
+_DiagnosticIdentity = tuple[
+    LeanDiagnosticPhase,
+    str,
+    str,
+    tuple[LeanDiagnosticSource, int, int, int, int] | None,
+]
 _OPERATIONAL_CHECKER_CLASSIFIERS = (
     (
         ("TOOLCHAIN_RESOLUTION:", "TOOLCHAIN_PROBE:"),
@@ -117,7 +123,7 @@ def repl_diagnostics(
     """Convert one clean replay into bounded, payload-relative diagnostics."""
 
     diagnostics: list[LeanDiagnostic] = []
-    seen: set[tuple[LeanDiagnosticPhase, str]] = set()
+    seen: set[_DiagnosticIdentity] = set()
     for index, response in enumerate(responses):
         phase = (
             LeanDiagnosticPhase.SOURCE_ELABORATION
@@ -262,7 +268,7 @@ def _operational_checker_diagnostic(detail: str) -> LeanDiagnostic | None:
 
 def _append_diagnostic(
     diagnostics: list[LeanDiagnostic],
-    seen: set[tuple[LeanDiagnosticPhase, str]],
+    seen: set[_DiagnosticIdentity],
     *,
     raw: str,
     severity: str,
@@ -273,7 +279,24 @@ def _append_diagnostic(
     goal_index: int | None,
     statement: str | None,
 ) -> None:
-    key = (phase, raw)
+    source_span = _repl_source_span(
+        source,
+        message,
+        column_offset=column_offset,
+        statement=statement,
+    )
+    span_identity = (
+        (
+            source_span.source,
+            source_span.start.line,
+            source_span.start.column,
+            source_span.end.line,
+            source_span.end.column,
+        )
+        if source_span is not None
+        else None
+    )
+    key = (phase, severity, raw, span_identity)
     if key in seen:
         return
     seen.add(key)
@@ -285,12 +308,7 @@ def _append_diagnostic(
                 "phase": phase,
                 "severity": severity,
                 "message": normalized,
-                "source_span": _repl_source_span(
-                    source,
-                    message,
-                    column_offset=column_offset,
-                    statement=statement,
-                ),
+                "source_span": source_span,
                 "goal_index": goal_index,
                 "metavariable": _first_metavariable(raw),
                 "raw_backend_message": _bounded_raw_backend_message(raw),
