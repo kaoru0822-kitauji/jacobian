@@ -107,7 +107,9 @@ def test_recovery_classification_separates_diagnostic_from_terminal_success() ->
                 "input": case.injected_payload,
                 "output": {
                     "conclusion": "UNKNOWN",
-                    "diagnostics": [{"code": "LEAN_TYPE_MISMATCH"}],
+                    "diagnostics": [
+                        {"code": "LEAN_TYPE_MISMATCH", "phase": "KERNEL_CHECK"}
+                    ],
                 },
                 "assurance": {"level": "HEURISTIC"},
             },
@@ -146,7 +148,12 @@ def test_recovery_does_not_count_verification_of_a_different_claim() -> None:
                 "input": case.injected_payload,
                 "output": {
                     "conclusion": "UNKNOWN",
-                    "diagnostics": [{"code": "LEAN_UNKNOWN_IDENTIFIER"}],
+                    "diagnostics": [
+                        {
+                            "code": "LEAN_UNKNOWN_IDENTIFIER",
+                            "phase": "KERNEL_CHECK",
+                        }
+                    ],
                 },
                 "assurance": {"level": "HEURISTIC"},
             },
@@ -170,6 +177,150 @@ def test_recovery_does_not_count_verification_of_a_different_claim() -> None:
 
     assert result["injection_payload_exact"] is True
     assert result["repair_success"] is False
+
+
+@pytest.mark.parametrize(
+    ("diagnostic", "input_error"),
+    (
+        (
+            {
+                "code": "LEAN_TOOLCHAIN_SETUP_FAILED",
+                "phase": "RUNTIME_SETUP",
+            },
+            "TOOLCHAIN_PROBE: pinned Lean is unavailable",
+        ),
+        (
+            {
+                "code": "LEAN_MATHLIB_SETUP_FAILED",
+                "phase": "RUNTIME_SETUP",
+            },
+            "MATHLIB_MANIFEST: pinned Mathlib is unavailable",
+        ),
+        (
+            "TOOLCHAIN_PROBE: pinned Lean is unavailable",
+            "TOOLCHAIN_PROBE: pinned Lean is unavailable",
+        ),
+    ),
+)
+def test_recovery_excludes_operational_failures_from_repairs(
+    diagnostic: object,
+    input_error: str,
+) -> None:
+    case = load_suite(SUITE).cases[0]
+    telemetry = {
+        "capability_invocations": [
+            {
+                "capability_id": case.injected_capability_id,
+                "input": case.injected_payload,
+                "output": {
+                    "conclusion": "UNKNOWN",
+                    "diagnostics": [diagnostic],
+                    "input": {"status": "REJECTED", "errors": [input_error]},
+                },
+                "assurance": {"level": "HEURISTIC"},
+            },
+            {
+                "capability_id": case.terminal_capability_id,
+                "input": {
+                    "statement": case.injected_payload["statement"],
+                    "proof": "by\n  trivial",
+                    "environment": case.injected_payload["environment"],
+                },
+                "output": {"conclusion": "TRUE", "diagnostics": []},
+                "assurance": {
+                    "level": "VERIFIED",
+                    "verification_record_uri": "artifact://sha256/" + "c" * 64,
+                },
+            },
+        ]
+    }
+
+    result = classify_recovery(case, telemetry)
+
+    assert result["injection_rejected"] is False
+    assert result["repair_success"] is False
+
+
+def test_repeated_error_identity_is_condition_independent() -> None:
+    case = load_suite(SUITE).cases[0]
+
+    def telemetry(*, enriched: bool) -> dict[str, object]:
+        payloads = (
+            case.injected_payload,
+            {**case.injected_payload, "proof": "by\n  exact missing_name"},
+            case.injected_payload,
+        )
+        diagnostics: tuple[list[object], ...] = (
+            (
+                [{"code": "LEAN_TYPE_MISMATCH", "phase": "KERNEL_CHECK"}]
+                if enriched
+                else ["Lean rejected the proof: type mismatch"]
+            ),
+            (
+                [{"code": "LEAN_UNKNOWN_IDENTIFIER", "phase": "KERNEL_CHECK"}]
+                if enriched
+                else ["Lean rejected the proof: unknown identifier"]
+            ),
+            (
+                [{"code": "LEAN_TYPE_MISMATCH", "phase": "KERNEL_CHECK"}]
+                if enriched
+                else ["Lean rejected the proof with different legacy formatting"]
+            ),
+        )
+        return {
+            "capability_invocations": [
+                {
+                    "capability_id": case.injected_capability_id,
+                    "input": payload,
+                    "output": {
+                        "conclusion": "UNKNOWN",
+                        "diagnostics": diagnostic,
+                    },
+                    "assurance": {"level": "HEURISTIC"},
+                }
+                for payload, diagnostic in zip(payloads, diagnostics, strict=True)
+            ]
+        }
+
+    control = classify_recovery(case, telemetry(enriched=False))
+    treatment = classify_recovery(case, telemetry(enriched=True))
+
+    assert control["repeated_error_count"] == 1
+    assert treatment["repeated_error_count"] == 1
+
+
+def test_recovery_keeps_legacy_proof_edit_control_observable() -> None:
+    case = load_suite(SUITE).cases[2]
+    corrected = {**case.injected_payload, "edited_proof": "by\n  trivial"}
+    telemetry = {
+        "capability_invocations": [
+            {
+                "capability_id": case.injected_capability_id,
+                "input": case.injected_payload,
+                "output": {
+                    "accepted": False,
+                    "baseline_accepted": True,
+                    "baseline_checker_execution_status": "COMPLETED",
+                    "checker_execution_status": "COMPLETED",
+                },
+                "assurance": {"level": "HEURISTIC"},
+            },
+            {
+                "capability_id": case.terminal_capability_id,
+                "input": corrected,
+                "output": {"accepted": True},
+                "assurance": {
+                    "level": "VERIFIED",
+                    "verification_record_uri": "artifact://sha256/" + "d" * 64,
+                },
+            },
+        ]
+    }
+
+    result = classify_recovery(case, telemetry)
+
+    assert result["injection_rejected"] is True
+    assert result["repair_success"] is True
 
 
 def test_recovery_summary_and_comparison_keep_efficiency_metrics_separate() -> None:
@@ -235,7 +386,9 @@ def test_recovery_does_not_count_a_repaired_call_before_exact_injection() -> Non
                 "input": case.injected_payload,
                 "output": {
                     "conclusion": "UNKNOWN",
-                    "diagnostics": [{"code": "LEAN_TYPE_MISMATCH"}],
+                    "diagnostics": [
+                        {"code": "LEAN_TYPE_MISMATCH", "phase": "KERNEL_CHECK"}
+                    ],
                 },
                 "assurance": {"level": "HEURISTIC"},
             },

@@ -61,6 +61,27 @@ _DELTA_METRICS = (
     "output_tokens",
     "elapsed_seconds",
 )
+_OPERATIONAL_DIAGNOSTIC_CODES = frozenset(
+    {
+        "LEAN_CHECKER_TIMEOUT",
+        "LEAN_MATHLIB_SETUP_FAILED",
+        "LEAN_RUNTIME_SETUP_FAILED",
+        "LEAN_TOOLCHAIN_SETUP_FAILED",
+    }
+)
+_PROOF_DIAGNOSTIC_PHASES = frozenset(
+    {
+        "KERNEL_CHECK",
+        "SOURCE_ELABORATION",
+        "STATE_RECONSTRUCTION",
+        "TACTIC_EXECUTION",
+        "TERM_ELABORATION",
+    }
+)
+_LEGACY_PROOF_DETAIL_PREFIXES = (
+    "Lean proof has an unapproved trust base",
+    "Lean rejected the proof",
+)
 
 
 class RecoveryCondition(BaseModel):
@@ -166,9 +187,65 @@ def _diagnostic_codes(invocation: Mapping[str, Any]) -> tuple[str, ...]:
     )
 
 
-def _invocation_rejected(invocation: Mapping[str, Any]) -> bool:
+def _diagnostic_rejection_evidence(diagnostics: object) -> list[str]:
+    evidence: list[str] = []
+    if isinstance(diagnostics, list):
+        for diagnostic in diagnostics:
+            if isinstance(diagnostic, str):
+                if diagnostic.startswith(_LEGACY_PROOF_DETAIL_PREFIXES):
+                    evidence.append(diagnostic)
+                continue
+            if not isinstance(diagnostic, Mapping):
+                continue
+            code = diagnostic.get("code")
+            phase = diagnostic.get("phase")
+            if (
+                phase not in _PROOF_DIAGNOSTIC_PHASES
+                or code in _OPERATIONAL_DIAGNOSTIC_CODES
+            ):
+                continue
+            if isinstance(code, str):
+                evidence.append(code)
+    return evidence
+
+
+def _input_rejection_evidence(input_validation: object) -> list[str]:
+    if not isinstance(input_validation, Mapping):
+        return []
+    errors = input_validation.get("errors")
+    if not isinstance(errors, list):
+        return []
+    return [
+        error
+        for error in errors
+        if isinstance(error, str) and error.startswith(_LEGACY_PROOF_DETAIL_PREFIXES)
+    ]
+
+
+def _proof_rejection_evidence(invocation: Mapping[str, Any]) -> tuple[str, ...]:
     output = invocation.get("output")
     if not isinstance(output, Mapping):
+        return ()
+    evidence = _diagnostic_rejection_evidence(output.get("diagnostics"))
+    input_validation = output.get("input")
+    evidence.extend(_input_rejection_evidence(input_validation))
+    if (
+        "diagnostics" not in output
+        and output.get("accepted") is False
+        and output.get("baseline_accepted") is True
+        and output.get("baseline_checker_execution_status") == "COMPLETED"
+        and output.get("checker_execution_status") == "COMPLETED"
+    ):
+        # The legacy proof-edit contract did not project checker diagnostics. Its
+        # accepted baseline proves that the same pinned runtime was available in
+        # this atomic invocation before the edited proof was checked.
+        evidence.append("LEGACY_PROOF_EDIT_REJECTION")
+    return tuple(dict.fromkeys(evidence))
+
+
+def _proof_invocation_rejected(invocation: Mapping[str, Any]) -> bool:
+    output = invocation.get("output")
+    if not isinstance(output, Mapping) or not _proof_rejection_evidence(invocation):
         return False
     input_validation = output.get("input")
     return bool(
@@ -178,6 +255,19 @@ def _invocation_rejected(invocation: Mapping[str, Any]) -> bool:
             isinstance(input_validation, Mapping)
             and input_validation.get("status") == "REJECTED"
         )
+    )
+
+
+def _rejection_fingerprint(invocation: Mapping[str, Any]) -> tuple[str, str]:
+    canonical_input = json.dumps(
+        invocation.get("input"),
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return (
+        str(invocation.get("capability_id")),
+        _sha256_bytes(canonical_input),
     )
 
 
@@ -240,9 +330,9 @@ def classify_recovery(
     )
     expected_codes = set(case.expected_diagnostic_codes)
     rejection_fingerprints = [
-        (str(invocation.get("capability_id")), _diagnostic_codes(invocation))
+        _rejection_fingerprint(invocation)
         for invocation in invocations
-        if _invocation_rejected(invocation)
+        if _proof_invocation_rejected(invocation)
     ]
     repeated_errors = sum(
         fingerprint in rejection_fingerprints[:index]
@@ -255,14 +345,14 @@ def classify_recovery(
         "injection_rejected": bool(
             injection_payload_exact
             and first_invocation is not None
-            and _invocation_rejected(first_invocation)
+            and _proof_invocation_rejected(first_invocation)
         ),
         "observed_diagnostic_codes": list(first_codes),
         "enriched_diagnostic_observed": bool(expected_codes & set(first_codes)),
         "repair_success": bool(
             injection_payload_exact
             and first_invocation is not None
-            and _invocation_rejected(first_invocation)
+            and _proof_invocation_rejected(first_invocation)
             and any(
                 _terminal_preserves_claim(case, invocation)
                 and _terminal_accepted(invocation)
