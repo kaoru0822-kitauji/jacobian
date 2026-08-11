@@ -426,6 +426,9 @@ def _available_declaration_bundles(
         producer_capability_ids = {
             operation.spec.operation_id for operation in bundle.capabilities
         }
+        installed_producer_ids = {
+            adapter.descriptor.capability_id for adapter in installed.adapters
+        }
         for declaration in bundle.checker_declarations:
             if declaration.capability_id not in producer_capability_ids:
                 raise ValueError(
@@ -433,6 +436,11 @@ def _available_declaration_bundles(
                     f"schema: {domain_id}/{declaration.capability_id}"
                 )
             if declaration.capability_id not in installed.result_schema_uris:
+                continue
+            if (
+                installed.adapters
+                and declaration.capability_id not in installed_producer_ids
+            ):
                 continue
             previous = owners.setdefault(declaration.capability_id, domain_id)
             if previous != domain_id:

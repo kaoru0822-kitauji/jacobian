@@ -212,6 +212,10 @@ bases; all transformations are explicit. Slice B may justify bounded
 homogeneous collections or field extraction; neither is part of Slice A. The
 port contract is frozen only after Slice B demonstrates reuse.
 
+Slice A's complete projective line is a domain-owned semantic value with a
+fixed presentation, axis, order, completeness check, and digest. It does not
+make ports collection-aware.
+
 `value://opaque-id` tokens contain no serialized metadata. The request-local
 store owns tenant/session lifetime, semantic value, source operation, operation
 version, output port, bound identities, canonical digest, and invocation

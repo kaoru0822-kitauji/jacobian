@@ -6,7 +6,10 @@ from pathlib import Path
 import pytest
 from tests.support.exact_domain import open_exact_domain_services
 
-from jacobian.contracts.capabilities import CapabilityRequest
+from jacobian.contracts.capabilities import (
+    CapabilityProviderAvailability,
+    CapabilityRequest,
+)
 from jacobian.domains.finite_fields import build_finite_field_bundle
 from jacobian.domains.finite_fields.contracts import (
     LinearMapRankRequest,
@@ -151,3 +154,48 @@ def test_operator_authorized_sympy_replay_checks_restriction_of_scalars(
     assert verified.output["status"] == "VERIFIED"
     assert rejected.output["status"] == "REJECTED"
     assert rejected.output["verification_record_uri"] is None
+
+
+def test_missing_flint_omits_only_flint_operations_and_their_checkers(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from jacobian.providers.flint_runtime import (
+        python_flint_finite_field_provider_runtime,
+    )
+
+    unavailable = python_flint_finite_field_provider_runtime().model_copy(
+        update={
+            "availability": CapabilityProviderAvailability.UNAVAILABLE,
+            "version": None,
+            "digest": None,
+            "digest_kind": None,
+            "diagnostic": "python-flint is not installed",
+        }
+    )
+    monkeypatch.setattr(
+        "jacobian.domains.finite_fields.bundle."
+        "python_flint_finite_field_provider_runtime",
+        lambda: unavailable,
+    )
+
+    with open_exact_domain_services(
+        tmp_path,
+        build_finite_field_bundle(),
+    ) as services:
+        ids = {
+            descriptor.capability_id
+            for descriptor in services.core.capabilities.catalog().capabilities
+        }
+
+    assert {
+        "finite_field.projective_line.enumerate",
+        "finite_field.orbit_distribution.compute",
+    } <= ids
+    assert {
+        "finite_field.restrict_scalars.compute",
+        "finite_field.restrict_scalars.verify",
+        "finite_field.linear_map.rank.compute",
+        "finite_field.linear_map.rank.verify",
+        "finite_field.direction_rank_ledger.compute",
+    }.isdisjoint(ids)

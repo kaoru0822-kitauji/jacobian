@@ -174,7 +174,9 @@ def test_slice_a_keeps_directions_bound_through_orbit_aggregation() -> None:
 def test_slice_a_ports_compose_restriction_into_rank_without_wire_conversion() -> None:
     subspace, directions = _slice_a_values()
     direction = directions.points[0]
-    restrict_operation, rank_operation = build_finite_field_bundle().capabilities
+    _, restrict_operation, rank_operation, _, _ = (
+        build_finite_field_bundle().capabilities
+    )
 
     restrict_payload: dict[str, object] = {}
     for port, value in zip(
@@ -202,6 +204,45 @@ def test_slice_a_ports_compose_restriction_into_rank_without_wire_conversion() -
     assert result.rank == 3
     assert result.direction is direction
     assert result.linear_map is carried_map
+
+
+def test_slice_a_ports_compose_projective_line_into_orbit_distribution() -> None:
+    subspace, _ = _slice_a_values()
+    projective, _, _, ledger_operation, orbit_operation = (
+        build_finite_field_bundle().capabilities
+    )
+
+    projective_payload: dict[str, object] = {}
+    for port, value in zip(
+        projective.input_ports,
+        (subspace.presentation, subspace.row_axis),
+        strict=True,
+    ):
+        projective_payload = port.bind_to_request(projective_payload, value)
+    line = projective.spec.execute(
+        projective.spec.request_type.model_validate(projective_payload)
+    )
+
+    ledger_payload: dict[str, object] = {}
+    for port, value in zip(
+        ledger_operation.input_ports,
+        (subspace, line),
+        strict=True,
+    ):
+        ledger_payload = port.bind_to_request(ledger_payload, value)
+    ledger = ledger_operation.spec.execute(
+        ledger_operation.spec.request_type.model_validate(ledger_payload)
+    )
+
+    orbit_payload = orbit_operation.input_ports[0].bind_to_request({}, ledger)
+    distribution = orbit_operation.spec.execute(
+        orbit_operation.spec.request_type.model_validate(orbit_payload)
+    )
+
+    assert len(line.points) == 9
+    assert tuple(entry.rank for entry in ledger.entries).count(3) == 6
+    assert tuple(entry.rank for entry in ledger.entries).count(4) == 3
+    assert distribution.counts == ((1, 9), (8, 48), (16, 12))
 
 
 def test_slice_a_rejects_wrong_presentation_and_axis() -> None:

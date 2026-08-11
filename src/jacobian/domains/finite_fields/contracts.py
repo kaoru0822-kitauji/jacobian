@@ -2,8 +2,12 @@
 
 from jacobian.contracts.base import ContractModel
 from jacobian.math.finite_fields import (
+    Axis,
+    DirectionRankLedger,
     FiniteDimensionalSubspace,
+    FiniteFieldPresentation,
     FiniteLinearMap,
+    ProjectiveLine,
     ProjectivePoint,
 )
 
@@ -18,4 +22,24 @@ class LinearMapRankRequest(ContractModel):
     linear_map: FiniteLinearMap
 
 
-__all__ = ["LinearMapRankRequest", "RestrictScalarsRequest"]
+class ProjectiveLineRequest(ContractModel):
+    presentation: FiniteFieldPresentation
+    axis: Axis
+
+
+class DirectionRankLedgerRequest(ContractModel):
+    subspace: FiniteDimensionalSubspace
+    directions: ProjectiveLine
+
+
+class OrbitDistributionRequest(ContractModel):
+    ledger: DirectionRankLedger
+
+
+__all__ = [
+    "DirectionRankLedgerRequest",
+    "LinearMapRankRequest",
+    "OrbitDistributionRequest",
+    "ProjectiveLineRequest",
+    "RestrictScalarsRequest",
+]
