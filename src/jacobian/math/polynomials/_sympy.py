@@ -1,22 +1,8 @@
-"""Thin typed calls into SymPy's exact polynomial algorithms."""
+"""Private SymPy backend for exact polynomial algorithms."""
 
 from __future__ import annotations
 
 from typing import Any, cast
-
-__all__ = [
-    "polynomial_derivative",
-    "polynomial_discriminant",
-    "polynomial_division",
-    "polynomial_evaluate",
-    "polynomial_factorization",
-    "polynomial_gcdex",
-    "polynomial_groebner_basis",
-    "polynomial_integral",
-    "polynomial_partial_fractions",
-    "polynomial_resultant",
-    "polynomial_square_free_decomposition",
-]
 
 
 def polynomial_gcdex(left: Any, right: Any) -> tuple[Any, Any, Any]:
@@ -38,8 +24,6 @@ def polynomial_discriminant(polynomial: Any, generator: Any) -> Any:
 def polynomial_square_free_decomposition(
     source: Any,
 ) -> tuple[Any, tuple[tuple[Any, int], ...], Any]:
-    """Return coefficient, monic factors, and the exact reconstruction."""
-
     from sympy import Poly
 
     coefficient, raw_factors = source.sqf_list()
@@ -57,8 +41,6 @@ def polynomial_square_free_decomposition(
 def polynomial_factorization(
     source: Any,
 ) -> tuple[Any, tuple[tuple[Any, int], ...], Any]:
-    """Return content, monic irreducibles, and the exact reconstruction."""
-
     from sympy import Poly
 
     coefficient, raw_factors = source.factor_list()

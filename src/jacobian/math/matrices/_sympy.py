@@ -1,4 +1,4 @@
-"""Typed SymPy kernels shared by matrix producers and the native API."""
+"""Private SymPy backend for exact matrix operations."""
 
 from __future__ import annotations
 
@@ -7,22 +7,8 @@ from typing import Any, cast
 import sympy
 from sympy.matrices.matrixbase import MatrixBase
 
-__all__ = [
-    "adjugate",
-    "characteristic_polynomial",
-    "determinant",
-    "inverse",
-    "matrix_product",
-    "nullspace_rref",
-    "rank",
-    "rational_linear_solve",
-    "rref",
-    "smith_normal_form",
-    "trace",
-]
 
-
-def _exact_matrix(value: MatrixBase) -> MatrixBase:
+def exact_matrix(value: MatrixBase) -> MatrixBase:
     if not isinstance(value, MatrixBase):
         raise TypeError("matrix must be a SymPy MatrixBase")
     if not 1 <= value.rows <= 32 or not 1 <= value.cols <= 32:
@@ -35,7 +21,7 @@ def _exact_matrix(value: MatrixBase) -> MatrixBase:
 
 
 def rref(matrix: MatrixBase) -> tuple[MatrixBase, tuple[int, ...]]:
-    reduced, pivots = _exact_matrix(matrix).rref()
+    reduced, pivots = exact_matrix(matrix).rref()
     return reduced, tuple(int(pivot) for pivot in pivots)
 
 
@@ -44,7 +30,7 @@ def nullspace_rref(matrix: MatrixBase) -> tuple[MatrixBase, tuple[int, ...]]:
 
 
 def inverse(matrix: MatrixBase) -> MatrixBase:
-    source = _exact_matrix(matrix)
+    source = exact_matrix(matrix)
     if source.rows != source.cols:
         raise ValueError("inverse requires a square matrix")
     if source.det() == 0:
@@ -53,21 +39,21 @@ def inverse(matrix: MatrixBase) -> MatrixBase:
 
 
 def trace(matrix: MatrixBase) -> Any:
-    source = _exact_matrix(matrix)
+    source = exact_matrix(matrix)
     if source.rows != source.cols:
         raise ValueError("trace requires a square matrix")
     return sympy.simplify(source.trace())
 
 
 def characteristic_polynomial(matrix: MatrixBase, variable: str) -> Any:
-    source = _exact_matrix(matrix)
+    source = exact_matrix(matrix)
     if source.rows != source.cols:
         raise ValueError("characteristic polynomial requires a square matrix")
     return source.charpoly(variable)
 
 
 def determinant(matrix: MatrixBase) -> Any:
-    source = _exact_matrix(matrix)
+    source = exact_matrix(matrix)
     if source.rows != source.cols:
         raise ValueError("determinant requires a square matrix")
     return source.det(method="bareiss")
@@ -79,14 +65,14 @@ def rank(matrix: MatrixBase) -> tuple[int, tuple[int, ...]]:
 
 
 def smith_normal_form(matrix: MatrixBase) -> MatrixBase:
-    source = _exact_matrix(matrix)
+    source = exact_matrix(matrix)
     from sympy.matrices.normalforms import smith_normal_form as sympy_smith_normal_form
 
     return sympy_smith_normal_form(source, domain=sympy.ZZ)
 
 
 def matrix_product(left: MatrixBase, right: MatrixBase) -> MatrixBase:
-    return _exact_matrix(left) * _exact_matrix(right)
+    return exact_matrix(left) * exact_matrix(right)
 
 
 def rational_linear_solve(
@@ -95,12 +81,12 @@ def rational_linear_solve(
 ) -> tuple[MatrixBase, MatrixBase]:
     return cast(
         tuple[MatrixBase, MatrixBase],
-        _exact_matrix(matrix).gauss_jordan_solve(_exact_matrix(rhs)),
+        exact_matrix(matrix).gauss_jordan_solve(exact_matrix(rhs)),
     )
 
 
 def adjugate(matrix: MatrixBase) -> MatrixBase:
-    source = _exact_matrix(matrix)
+    source = exact_matrix(matrix)
     if source.rows != source.cols:
         raise ValueError("adjugate requires a square matrix")
     return source.adjugate()
