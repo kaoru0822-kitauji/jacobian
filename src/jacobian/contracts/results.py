@@ -7,7 +7,7 @@ from typing import Literal, Self
 
 from pydantic import Field, StrictInt, model_validator
 
-from jacobian.contracts.base import ContractModel
+from jacobian.contracts.base import ContractModel as ContractModel
 from jacobian.contracts.common import ArtifactUri, CheckerUri, Sha256Digest
 
 

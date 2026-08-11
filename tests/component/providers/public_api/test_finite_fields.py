@@ -3,10 +3,13 @@ from __future__ import annotations
 import pytest
 from flint import nmod_mat
 
+from jacobian.domains.finite_fields import build_finite_field_bundle
 from jacobian.math.finite_fields import (
     Axis,
     AxisBoundMatrix,
     FiniteDimensionalSubspace,
+    FiniteFieldElement,
+    ProjectivePoint,
     direction_rank_ledger,
     element,
     finite_field,
@@ -22,7 +25,7 @@ pytestmark = pytest.mark.requires_provider("flint")
 
 def _slice_a_values() -> tuple[
     FiniteDimensionalSubspace,
-    tuple,
+    tuple[ProjectivePoint, ...],
 ]:
     # The exact presentation, actions, and direction order are Theorem 1.2 of
     # https://arxiv.org/abs/2607.23857. Coefficients are low-degree first.
@@ -34,7 +37,7 @@ def _slice_a_values() -> tuple[
         labels=("B1", "B2", "B3", "B4"),
     )
 
-    def e(coordinates: tuple[int, int, int]):
+    def e(coordinates: tuple[int, int, int]) -> FiniteFieldElement:
         return element(presentation, coordinates)
 
     zero, one, a, a2 = (
@@ -87,7 +90,10 @@ def _slice_a_values() -> tuple[
     )
     directions = (
         projective_point(presentation, rows, (zero, one)),
-        *(projective_point(presentation, rows, (one, value)) for value in paper_affine_order),
+        *(
+            projective_point(presentation, rows, (one, value))
+            for value in paper_affine_order
+        ),
     )
     return subspace, directions
 
@@ -153,9 +159,43 @@ def test_slice_a_keeps_directions_bound_through_orbit_aggregation() -> None:
     assert tuple(entry.rank for entry in ledger.entries) == (3, 3, 3, 3, 3, 3, 4, 4, 4)
     assert distribution.counts == ((1, 9), (8, 48), (16, 12))
     assert distribution.ledger is ledger
-    assert type(distribution).model_validate(
-        distribution.model_dump(mode="json")
-    ) == distribution
+    assert (
+        type(distribution).model_validate(distribution.model_dump(mode="json"))
+        == distribution
+    )
+
+
+def test_slice_a_ports_compose_restriction_into_rank_without_wire_conversion() -> None:
+    subspace, directions = _slice_a_values()
+    direction = directions[0]
+    restrict_operation, rank_operation = build_finite_field_bundle().capabilities
+
+    restrict_payload: dict[str, object] = {}
+    for port, value in zip(
+        restrict_operation.input_ports,
+        (subspace, direction),
+        strict=True,
+    ):
+        restrict_payload = port.bind_to_request(restrict_payload, value)
+    restrict_request = restrict_operation.spec.request_type.model_validate(
+        restrict_payload
+    )
+    linear_map = restrict_operation.spec.execute(restrict_request)
+    carried_map = restrict_operation.output_ports[0].extract_from_result(linear_map)
+
+    rank_payload: dict[str, object] = {}
+    for port, value in zip(
+        rank_operation.input_ports,
+        (direction, carried_map),
+        strict=True,
+    ):
+        rank_payload = port.bind_to_request(rank_payload, value)
+    rank_request = rank_operation.spec.request_type.model_validate(rank_payload)
+    result = rank_operation.spec.execute(rank_request)
+
+    assert result.rank == 3
+    assert result.direction is direction
+    assert result.linear_map is carried_map
 
 
 def test_slice_a_rejects_wrong_presentation_and_axis() -> None:

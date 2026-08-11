@@ -204,13 +204,13 @@ ValueReference  opaque carrier, source port, provenance
 ```
 
 Initial internal ports are deliberately small and provisional through #905
-Slice A: an input port binds one typed value to a request, and an output port
-extracts one typed value from a result. One port may carry one semantic value or
-one bounded homogeneous collection. Pydantic retains field cardinality and
-cross-field constraints. Installation verifies each typed accessor against its
-declared value type. Compatibility requires exact type/version, parent,
-presentation, axes, and bases; all transformations are explicit. The port
-contract is frozen only after Slice B demonstrates reuse.
+Slice A: an input port names one typed request field, and an output port exposes
+the whole typed result. Pydantic retains field cardinality and cross-field
+constraints. Installation verifies each declared field and result type.
+Compatibility requires exact type/version, parent, presentation, axes, and
+bases; all transformations are explicit. Slice B may justify bounded
+homogeneous collections or field extraction; neither is part of Slice A. The
+port contract is frozen only after Slice B demonstrates reuse.
 
 `value://opaque-id` tokens contain no serialized metadata. The request-local
 store owns tenant/session lifetime, semantic value, source operation, operation
