@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import importlib.metadata
-import json
 from pathlib import Path
 
 import pytest
@@ -74,7 +73,7 @@ def test_mcp_v2_static_validation_context_errors_and_structured_resources(
             ) >= {"kind", "matches", "total_matches", "truncated"}
             assert set(
                 find.output_schema["$defs"]["_CapabilityInspectionResult"]["required"]
-            ) >= {"kind", "view", "capability"}
+            ) >= {"kind", "capability"}
             assert (
                 find.output_schema["$defs"]["_CapabilityDiscoveryOperationCard"][
                     "additionalProperties"
@@ -109,36 +108,21 @@ def test_mcp_v2_static_validation_context_errors_and_structured_resources(
                 )
             assert '"code": "INVALID_INPUT"' in str(retired_reasoning_input.value)
 
-            invalid_discovery_view = await client.call_tool(
+            contract_result = await client.call_tool(
                 "math.find",
                 {
-                    "query": "normalize a polynomial expression",
-                    "view": "FULL",
+                    "capability_id": "polynomial.expression.normalize",
                 },
             )
-            assert invalid_discovery_view.is_error is True
-            invalid_view_error = json.loads(invalid_discovery_view.content[0].text)
-            assert invalid_view_error["error"]["code"] == "INVALID_INPUT"
-            assert invalid_view_error["error"]["stage"] == "math.find"
-
-            contract = json.loads(
-                (
-                    await client.call_tool(
-                        "math.find",
-                        {
-                            "capability_id": "polynomial.expression.normalize",
-                            "view": "CONTRACT",
-                        },
-                    )
-                )
-                .content[0]
-                .text
-            )
+            assert isinstance(contract_result.structured_content, dict)
+            contract = contract_result.structured_content
             result = await client.call_tool(
                 "math.run",
                 {
                     "capability_id": "polynomial.expression.normalize",
-                    "payload": contract["invocations"][0]["arguments"]["payload"],
+                    "payload": contract["capability"]["invocation_examples"][0][
+                        "input"
+                    ],
                 },
             )
             assert isinstance(result.structured_content, dict)

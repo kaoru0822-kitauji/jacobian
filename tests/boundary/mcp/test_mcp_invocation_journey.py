@@ -23,18 +23,16 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
         async with Client(create_server(tmp_path), raise_exceptions=True) as client:
             described = await client.call_tool(
                 "math.find",
-                {"capability_id": "integer.compute.gcd", "view": "CONTRACT"},
+                {"capability_id": "integer.compute.gcd"},
             )
             assert isinstance(described.structured_content, dict)
             contract = described.structured_content
-            assert contract["view"] == "CONTRACT"
             assert contract["capability"]["capability_id"] == "integer.compute.gcd"
             assert contract["capability"]["provider_runtime"]["digest"].startswith(
                 "sha256:"
             )
-            assert "configuration" not in contract["capability"]["provider_runtime"]
-            assert "output_schema" not in contract["capability"]
-            assert "output_schema_summary" in contract["capability"]
+            assert "configuration" in contract["capability"]["provider_runtime"]
+            assert "output_schema" in contract["capability"]
 
             result = await client.call_tool(
                 "math.run",
@@ -74,14 +72,15 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
                 "math.find",
                 {
                     "capability_id": ("graph.invariant.maximum_matching.compute"),
-                    "view": "CONTRACT",
                 },
             )
             assert isinstance(matching_description.structured_content, dict)
             matching_contract = matching_description.structured_content
             assert matching_contract["capability"]["version"] == "3"
-            assert matching_contract["invocations"][0]["name"] == ("triangle_with_tail")
-            assert matching_contract["related_capabilities"] == [
+            assert matching_contract["capability"]["invocation_examples"][0][
+                "name"
+            ] == ("triangle_with_tail")
+            assert matching_contract["capability"]["related_capabilities"] == [
                 {
                     "capability_id": ("graph.invariant.maximum_matching.verify"),
                     "kind": "INDEPENDENT_VERIFIER",
@@ -112,25 +111,27 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
                 "math.find",
                 {
                     "capability_id": "modular.polynomial_residue_image.compute",
-                    "view": "CONTRACT",
                 },
             )
             modular_verify = await client.call_tool(
                 "math.find",
                 {
                     "capability_id": "modular.polynomial_residue_image.verify",
-                    "view": "CONTRACT",
                 },
             )
             assert isinstance(modular_compute.structured_content, dict)
             assert isinstance(modular_verify.structured_content, dict)
             assert {
                 item["capability_id"]
-                for item in modular_compute.structured_content["related_capabilities"]
+                for item in modular_compute.structured_content["capability"][
+                    "related_capabilities"
+                ]
             } == {"modular.polynomial_residue_image.verify"}
             assert {
                 item["capability_id"]
-                for item in modular_verify.structured_content["related_capabilities"]
+                for item in modular_verify.structured_content["capability"][
+                    "related_capabilities"
+                ]
             } == {"modular.polynomial_residue_image.compute"}
 
             unknown = await client.call_tool(

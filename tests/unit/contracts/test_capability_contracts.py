@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from jsonschema import Draft202012Validator
-from pydantic import TypeAdapter, ValidationError
+from pydantic import ValidationError
 
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
@@ -10,12 +9,6 @@ from jacobian.contracts.capabilities import (
     CapabilityCatalog,
     CapabilityCompleteness,
     CapabilityCompletenessStatus,
-    CapabilityDiscoveryBrowseRecoveryPath,
-    CapabilityDiscoveryInspectCatalogRecoveryPath,
-    CapabilityDiscoveryRecoveryPath,
-    CapabilityDiscoveryReformulateQueryRecoveryPath,
-    CapabilityDiscoveryRemoveFiltersRecoveryPath,
-    CapabilityDiscoveryRemoveUnknownDomainRecoveryPath,
     CapabilityDiscoveryResult,
     CapabilityObligation,
     CapabilityObligationStatus,
@@ -42,55 +35,9 @@ def _descriptor(capability_id: str) -> dict[str, object]:
     }
 
 
-def test_discovery_recovery_paths_are_closed_discriminated_contracts() -> None:
-    paths: tuple[CapabilityDiscoveryRecoveryPath, ...] = (
-        CapabilityDiscoveryReformulateQueryRecoveryPath(action="reformulate_query"),
-        CapabilityDiscoveryRemoveUnknownDomainRecoveryPath(
-            action="remove_unknown_domain_filter", rejected_domain="arithmetic"
-        ),
-        CapabilityDiscoveryRemoveFiltersRecoveryPath(action="remove_filters"),
-        CapabilityDiscoveryBrowseRecoveryPath(action="browse"),
-        CapabilityDiscoveryInspectCatalogRecoveryPath(action="inspect_catalog"),
-    )
-    adapter = TypeAdapter(CapabilityDiscoveryRecoveryPath)
-    schema = adapter.json_schema()
-
-    assert {path.action for path in paths} == {
-        "reformulate_query",
-        "remove_unknown_domain_filter",
-        "remove_filters",
-        "browse",
-        "inspect_catalog",
-    }
-    assert schema["discriminator"]["propertyName"] == "action"
-    assert all(
-        "action" in definition["required"] for definition in schema["$defs"].values()
-    )
-    assert CapabilityDiscoveryBrowseRecoveryPath(action="browse").model_dump(
-        mode="json"
-    ) == {
-        "action": "browse",
-        "tool": "math.find",
-        "arguments": {},
-    }
-    with pytest.raises(ValidationError):
-        adapter.validate_python(
-            {
-                "action": "browse",
-                "tool": "math.find",
-                "arguments": {"limit": 5},
-            }
-        )
-    with pytest.raises(ValidationError):
-        adapter.validate_python({"action": "recommended_next_step"})
-    tagless_path = {"arguments": {}}
-    assert list(Draft202012Validator(schema).iter_errors(tagless_path))
-    with pytest.raises(ValidationError):
-        adapter.validate_python(tagless_path)
-
-
 def test_discovery_page_metadata_is_bound_to_returned_matches() -> None:
     base = {
+        "query": "gcd",
         "routing_basis": "The request uses a compatible structured input.",
         "matches": [
             {

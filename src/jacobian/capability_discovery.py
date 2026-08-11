@@ -88,7 +88,7 @@ class CapabilityDiscoveryMixin:
                 query_coverage_milli=query_coverage_milli,
                 lexical_fit=lexical_fit,
             )
-            if request.query is None or score > 0:
+            if score > 0:
                 lexical_candidates.append(match)
                 if input_compatible:
                     ranked.append((score, match))
@@ -200,7 +200,7 @@ def accepts_discovery_input(
 
 
 def discovery_portfolio_fit(
-    query: str | None,
+    query: str,
     lexical_candidates: list[CapabilityDiscoveryMatch],
 ) -> tuple[
     Literal[
@@ -211,12 +211,6 @@ def discovery_portfolio_fit(
     ],
     str,
 ]:
-    if query is None:
-        return (
-            "UNFILTERED",
-            "No query was supplied; results are an unranked installed-portfolio "
-            "listing and make no suitability claim.",
-        )
     if not lexical_candidates:
         return (
             "NO_LEXICAL_MATCHES",
@@ -263,9 +257,7 @@ def discovery_routing_status(
     )
 
 
-def infer_discovery_input_kind(query: str | None) -> CapabilityInputKind | None:
-    if query is None:
-        return None
+def infer_discovery_input_kind(query: str) -> CapabilityInputKind | None:
     normalized = " ".join(_DISCOVERY_TOKEN_PATTERN.findall(query.casefold()))
     if any(
         phrase in normalized
@@ -281,7 +273,7 @@ def token_set(value: str) -> frozenset[str]:
 
 def discovery_relevance(
     descriptor: CapabilityDescriptor,
-    query: str | None,
+    query: str,
 ) -> tuple[
     int,
     tuple[str, ...],
@@ -290,8 +282,6 @@ def discovery_relevance(
     int,
     Literal["STRONG_CANDIDATE", "WEAK_LEXICAL_MATCH"],
 ]:
-    if query is None:
-        return 0, (), (), 0, 0, "WEAK_LEXICAL_MATCH"
     query_terms = discovery_terms(query)
     if not query_terms:
         return 0, (), (), 0, 0, "WEAK_LEXICAL_MATCH"

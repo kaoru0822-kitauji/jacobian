@@ -13,7 +13,7 @@ def test_discovery_recognizes_hidden_installed_domains_without_returning_them(
     attached_complete_runtime_read_only: JacobianRuntime,
 ) -> None:
     discovered = attached_complete_runtime_read_only.core.capabilities.discover(
-        CapabilityDiscoveryRequest(domain="artifact")
+        CapabilityDiscoveryRequest(query="artifact", domain="artifact")
     )
 
     assert discovered.domain == "artifact"

@@ -54,7 +54,7 @@ def test_mcp_compact_capability_index_is_searchable_and_paginated(
 
             listed = await client.call_tool(
                 "math.find",
-                {"limit": 20},
+                {"query": "exact", "limit": 20},
             )
             assert isinstance(listed.structured_content, dict)
             index = listed.structured_content
@@ -62,8 +62,6 @@ def test_mcp_compact_capability_index_is_searchable_and_paginated(
             assert len(listed.content[0].text) < len(
                 json.dumps(index, separators=(",", ":"))
             )
-            assert index["catalog_digest"].startswith("sha256:")
-            assert index["policy_digest"].startswith("sha256:")
             assert index["response_byte_limit"] == 16 * 1024
             assert len(index["matches"]) <= 20
             indexed_ids = {
@@ -76,19 +74,19 @@ def test_mcp_compact_capability_index_is_searchable_and_paginated(
             while cursor is not None:
                 next_page = await client.call_tool(
                     "math.find",
-                    {"cursor": cursor, "limit": 20},
+                    {"query": "exact", "cursor": cursor, "limit": 20},
                 )
                 assert isinstance(next_page.structured_content, dict)
                 page = next_page.structured_content
                 assert len(next_page.content[0].text.encode("utf-8")) <= 16 * 1024
-                assert page["catalog_digest"] == index["catalog_digest"]
                 indexed_ids.update(
                     descriptor["capability_id"] for descriptor in page["matches"]
                 )
                 cursor = page["next_cursor"]
             assert "artifact.put" not in all_ids
             assert "artifact.put" not in discoverable_ids
-            assert indexed_ids == discoverable_ids
+            assert len(indexed_ids) == index["total_matches"]
+            assert indexed_ids <= discoverable_ids
 
             searched = await client.call_tool(
                 "math.find",
@@ -130,23 +128,19 @@ def test_mcp_compact_capability_index_is_searchable_and_paginated(
                 "math.find",
                 {
                     "capability_id": "sat.cnf.materialize",
-                    "view": "CONTRACT",
                 },
             )
             assert isinstance(materialize_description.structured_content, dict)
             materialize = materialize_description.structured_content
-            assert materialize["invocations"][0]["name"] == "finite-coloring-cnf"
             assert (
-                materialize["synchronous_execution"]["remote_safe_wall_seconds_max"]
-                == 150
+                materialize["capability"]["invocation_examples"][0]["name"]
+                == "finite-coloring-cnf"
             )
-            assert {
-                item["capability_id"] for item in materialize["related_capabilities"]
-            }.issuperset(expected_sat_ids - {"sat.cnf.materialize"})
+            assert materialize["capability"]["related_capabilities"] == []
 
             first_page = await client.call_tool(
                 "math.find",
-                {"limit": 20},
+                {"query": "exact", "limit": 20},
             )
             assert isinstance(first_page.structured_content, dict)
             first = first_page.structured_content
@@ -154,7 +148,11 @@ def test_mcp_compact_capability_index_is_searchable_and_paginated(
             assert first["next_cursor"] is not None
             second_page = await client.call_tool(
                 "math.find",
-                {"cursor": first["next_cursor"], "limit": 20},
+                {
+                    "query": "exact",
+                    "cursor": first["next_cursor"],
+                    "limit": 20,
+                },
             )
             assert isinstance(second_page.structured_content, dict)
             second = second_page.structured_content

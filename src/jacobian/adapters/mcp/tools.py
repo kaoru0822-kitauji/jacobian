@@ -9,36 +9,24 @@ from mcp.server.mcpserver import Context
 from mcp_types import CallToolResult, ResourceLink, TextContent
 from pydantic import BaseModel, ConfigDict, Field, RootModel, StrictInt
 
-from jacobian.adapters.mcp.constants import (
-    _CAPABILITY_SCOPE_RULE,
-    CAPABILITY_INSPECTION_RELATIONSHIPS_BYTE_LIMIT,
-)
 from jacobian.adapters.mcp.context import AppState, _runtime
 from jacobian.adapters.mcp.projections import (
-    _capability_descriptor_view,
     _capability_discovery_response,
-    _capability_inspection_extensions,
-    _compact_inspection_relationships,
 )
 from jacobian.adapters.mcp.tooling import (
     _invoke_capability_attempt,
 )
 from jacobian.contracts.capabilities import (
-    CapabilityCatalogRelationshipKind,
     CapabilityDescriptor,
-    CapabilityDiscoveryInspectCatalogRecoveryPath,
     CapabilityDiscoveryMatch,
-    CapabilityDiscoveryRecoveryPath,
     CapabilityDiscoveryRequest,
     CapabilityId,
     CapabilityInputKind,
     CapabilityProviderAvailability,
     CapabilityResult,
 )
-from jacobian.contracts.common import ArtifactUri, CheckerUri, Sha256Digest
+from jacobian.contracts.common import ArtifactUri
 from jacobian.runtime.model import JacobianRuntime
-
-CapabilityDescriptionView = Literal["SUMMARY", "CONTRACT", "FULL"]
 
 
 class _MCPOutputModel(BaseModel):
@@ -47,114 +35,11 @@ class _MCPOutputModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class _CapabilityDiscoveryFields(_MCPOutputModel):
-    """Shared catalog metadata with a closed MCP output shape."""
-
-    policy_profile: str
-    policy_digest: str
-
-
-class _SchemaSummary(_MCPOutputModel):
-    """Bounded facts extracted from a capability JSON Schema."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-    type: str | None
-    required: tuple[str, ...]
-    property_names: tuple[str, ...]
-    ref: str | None = Field(default=None, alias="$ref")
-    one_of_variants: StrictInt | None = None
-    any_of_variants: StrictInt | None = None
-
-
-class _RelatedCapability(_MCPOutputModel):
-    capability_id: CapabilityId
-    kind: CapabilityCatalogRelationshipKind | None = None
-    relationship: str
-
-
-class _DiscoveryInvocationExample(_MCPOutputModel):
-    payload: dict[str, Any]
-
-
 class _CapabilityDiscoveryOperationCard(CapabilityDiscoveryMatch):
     accepted_input_kinds: tuple[CapabilityInputKind, ...]
     accepted_artifact_types: tuple[ArtifactUri, ...]
     produced_artifact_types: tuple[ArtifactUri, ...]
-    output_schema_summary: _SchemaSummary
-    input_schema_summary: _SchemaSummary | None = None
-    scope: Literal["EXACT_SUPPLIED_INPUT_OR_CLAIM"]
     provider_availability: CapabilityProviderAvailability | Literal["UNKNOWN"]
-    related_capabilities: tuple[_RelatedCapability, ...]
-    invocation_example: _DiscoveryInvocationExample | None = None
-
-
-class _ProviderRuntimeProjection(_MCPOutputModel):
-    availability: CapabilityProviderAvailability
-    version: str | None = None
-    digest: Sha256Digest | None = None
-    checker_ids: tuple[CheckerUri, ...] = ()
-    diagnostic: str | None = None
-
-
-class _CapabilityDescriptorProjection(_MCPOutputModel):
-    """Typed SUMMARY/CONTRACT projection used only at the MCP boundary."""
-
-    capability_id: CapabilityId
-    version: str
-    title: str
-    description: str
-    provider: str
-    provider_runtime: _ProviderRuntimeProjection | None
-    tags: tuple[str, ...] | None = None
-    accepted_input_kinds: tuple[CapabilityInputKind, ...]
-    accepted_artifact_types: tuple[ArtifactUri, ...]
-    produced_artifact_types: tuple[ArtifactUri, ...]
-    input_schema_summary: _SchemaSummary | None = None
-    input_schema: dict[str, Any] | None = None
-    output_schema_summary: _SchemaSummary
-    has_invocation_examples: bool | None = None
-
-
-class _CapabilityScopeRule(_MCPOutputModel):
-    conclusion_scope: Literal["Only the exact supplied input or claim is covered."]
-    bounded_repetition: str
-
-
-class _CapabilityInvocationArguments(_MCPOutputModel):
-    capability_id: CapabilityId
-    payload: dict[str, Any]
-
-
-class _CapabilityInvocation(_MCPOutputModel):
-    name: str
-    description: str | None = None
-    tool: Literal["math.run"]
-    arguments: _CapabilityInvocationArguments
-
-
-class _SynchronousExecution(_MCPOutputModel):
-    remote_safe_wall_seconds_max: StrictInt
-    timeout_is_a_non_conclusion: bool
-    larger_search_requires_multiple_bounded_invocations: bool
-    backend_suitability: str
-
-
-class _NextCapabilityViews(_MCPOutputModel):
-    CONTRACT: str
-    FULL: str
-
-
-class _LeanWarmupHealth(_MCPOutputModel):
-    status: str
-    detail: str | None
-
-
-class _LeanCacheDescription(_MCPOutputModel):
-    key: str
-    max_entries: StrictInt
-    warmup_environment_variable: Literal["JACOBIAN_LEAN_WARMUP=1"]
-    mathlib_warmup: _LeanWarmupHealth
 
 
 class _CapabilitySearchArguments(_MCPOutputModel):
@@ -168,9 +53,12 @@ class _CapabilitySearchRecoveryPath(_MCPOutputModel):
     arguments: _CapabilitySearchArguments
 
 
-CapabilityErrorRecoveryPath = (
-    _CapabilitySearchRecoveryPath | CapabilityDiscoveryInspectCatalogRecoveryPath
-)
+class _CapabilityCatalogPointer(_MCPOutputModel):
+    action: Literal["inspect_catalog"]
+    resource_uri: Literal["capability://catalog"] = "capability://catalog"
+
+
+CapabilityErrorRecoveryPath = _CapabilitySearchRecoveryPath | _CapabilityCatalogPointer
 
 
 class _CapabilityDiscoveryErrorDetail(_MCPOutputModel):
@@ -182,12 +70,10 @@ class _CapabilityDiscoveryErrorDetail(_MCPOutputModel):
     available_recovery_paths: tuple[CapabilityErrorRecoveryPath, ...] = ()
 
 
-class _CapabilityDiscoveryResult(_CapabilityDiscoveryFields):
+class _CapabilityDiscoveryResult(_MCPOutputModel):
     kind: Literal["discovery"]
-    catalog_version: str
-    catalog_digest: str
     discovery_version: Literal["1"]
-    query: str | None = None
+    query: str
     domain: str | None = None
     domain_filter_status: Literal["UNFILTERED", "MATCHED", "UNKNOWN"]
     domain_filter_basis: str
@@ -207,29 +93,17 @@ class _CapabilityDiscoveryResult(_CapabilityDiscoveryFields):
         "NO_LEXICAL_MATCHES",
     ]
     portfolio_fit_basis: str
-    available_recovery_paths: tuple[CapabilityDiscoveryRecoveryPath, ...]
-    recovery_paths_are_unranked: bool
+    catalog_resource: Literal["capability://catalog"]
     response_byte_limit: StrictInt
     truncation_reason: str | None = None
     available_domains_total: StrictInt
     available_domains_truncated: bool
-    related_capabilities_truncated: bool
     match_metadata_truncated: bool
 
 
-class _CapabilityInspectionResult(_CapabilityDiscoveryFields):
+class _CapabilityInspectionResult(_MCPOutputModel):
     kind: Literal["capability"]
-    view: CapabilityDescriptionView
-    capability: _CapabilityDescriptorProjection | CapabilityDescriptor
-    scope_rule: _CapabilityScopeRule
-    related_capabilities_byte_limit: StrictInt
-    truncation_reason: str | None = None
-    related_capabilities_truncated: bool
-    invocations: tuple[_CapabilityInvocation, ...] | None = None
-    related_capabilities: tuple[_RelatedCapability, ...] | None = None
-    synchronous_execution: _SynchronousExecution | None = None
-    next_views: _NextCapabilityViews | None = None
-    cache: _LeanCacheDescription | None = None
+    capability: CapabilityDescriptor
 
 
 class _CapabilityDiscoveryError(_MCPOutputModel):
@@ -317,12 +191,7 @@ def _find_text_projection(response: dict[str, Any]) -> dict[str, Any]:
                         "accepted_input_kinds",
                         "accepted_artifact_types",
                         "produced_artifact_types",
-                        "input_schema_summary",
-                        "output_schema_summary",
-                        "scope",
                         "provider_availability",
-                        "related_capabilities",
-                        "invocation_example",
                         "lexical_fit",
                     )
                     if key in match
@@ -338,11 +207,8 @@ def _find_text_projection(response: dict[str, Any]) -> dict[str, Any]:
             "total_matches": response.get("total_matches"),
             "truncated": response.get("truncated"),
             "truncation_reason": response.get("truncation_reason"),
-            "related_capabilities_truncated": response.get(
-                "related_capabilities_truncated"
-            ),
             "next_cursor": response.get("next_cursor"),
-            "available_recovery_paths": response.get("available_recovery_paths"),
+            "catalog_resource": response.get("catalog_resource"),
         }
     capability = response.get("capability", {})
     capability_projection: dict[str, Any] = {
@@ -354,30 +220,13 @@ def _find_text_projection(response: dict[str, Any]) -> dict[str, Any]:
             "accepted_input_kinds",
             "accepted_artifact_types",
             "produced_artifact_types",
-            "input_schema_summary",
-            "output_schema_summary",
         )
         if key in capability
     }
-    if response.get("view") == "CONTRACT" and "input_schema" in capability:
-        capability_projection["input_schema"] = capability["input_schema"]
     projection: dict[str, Any] = {
         "kind": response.get("kind"),
-        "view": response.get("view"),
         "capability": capability_projection,
-        "scope_rule": response.get("scope_rule"),
     }
-    if response.get("invocations"):
-        projection["invocations"] = response["invocations"]
-    if response.get("related_capabilities"):
-        projection["related_capabilities"] = response["related_capabilities"]
-    projection["related_capabilities_byte_limit"] = response.get(
-        "related_capabilities_byte_limit"
-    )
-    projection["truncation_reason"] = response.get("truncation_reason")
-    projection["related_capabilities_truncated"] = response.get(
-        "related_capabilities_truncated"
-    )
     return projection
 
 
@@ -528,16 +377,6 @@ async def capability_describe(
             ),
         ),
     ] = None,
-    view: Annotated[
-        CapabilityDescriptionView,
-        Field(
-            description=(
-                "Exact lookup only: SUMMARY judges fit; CONTRACT adds the validated "
-                "input schema and invocation examples; FULL adds audit metadata. "
-                "Omit for discovery."
-            )
-        ),
-    ] = "SUMMARY",
     *,
     ctx: Context[AppState, Any],
 ) -> CapabilityDiscoveryToolResult:
@@ -559,10 +398,10 @@ async def capability_describe(
                 "discovery arguments or one exact capability_id in this call."
             )
         if capability_id is None:
-            if view != "SUMMARY":
+            if query is None:
                 raise ValueError(
-                    "view applies only to an exact capability_id inspection; omit it "
-                    "for search or browse."
+                    "math.find requires either a search query or an exact capability_id; "
+                    "read capability://catalog for the complete inventory."
                 )
             discovery_response = _capability_discovery_response(
                 active_runtime,
@@ -597,67 +436,8 @@ async def capability_describe(
             return _find_result(error_response)
         response: dict[str, Any] = {
             "kind": "capability",
-            "view": view,
-            "policy_profile": capability_catalog.policy_profile,
-            "policy_digest": capability_catalog.policy_digest,
-            "capability": _capability_descriptor_view(descriptor, view=view),
-            "scope_rule": _CAPABILITY_SCOPE_RULE,
-            "related_capabilities_byte_limit": (
-                CAPABILITY_INSPECTION_RELATIONSHIPS_BYTE_LIMIT
-            ),
-            "truncation_reason": None,
-            "related_capabilities_truncated": False,
+            "capability": descriptor.model_dump(mode="json"),
         }
-        if view == "SUMMARY":
-            response["next_views"] = {
-                "CONTRACT": (
-                    "Request before invocation for the validation-equivalent input "
-                    "schema and validated examples."
-                ),
-                "FULL": (
-                    "Request only for complete output schema, provider configuration, "
-                    "licensing, or audit metadata."
-                ),
-            }
-        else:
-            invocations = []
-            for example in descriptor.invocation_examples:
-                entry: dict[str, Any] = {
-                    "name": example.name,
-                    **(
-                        {
-                            "description": example.description,
-                        }
-                        if view == "FULL"
-                        else {}
-                    ),
-                    "tool": "math.run",
-                    "arguments": {
-                        "capability_id": descriptor.capability_id,
-                        "payload": example.input,
-                    },
-                }
-                invocations.append(entry)
-            response["invocations"] = invocations
-            response.update(
-                _capability_inspection_extensions(capability_id, descriptors)
-            )
-        if (
-            view != "SUMMARY"
-            and capability_id == "lean.check"
-            and active_runtime.portfolio.lean_checkers
-        ):
-            response["cache"] = {
-                "key": "exact content-addressed certificate and active checker digest",
-                "max_entries": 128,
-                "warmup_environment_variable": "JACOBIAN_LEAN_WARMUP=1",
-                "mathlib_warmup": (
-                    active_runtime.portfolio.lean.mathlib_warmup_health()
-                    if active_runtime.portfolio.lean is not None
-                    else {"status": "UNAVAILABLE", "detail": None}
-                ),
-            }
-        _compact_inspection_relationships(response)
         return _find_result(response)
 
 

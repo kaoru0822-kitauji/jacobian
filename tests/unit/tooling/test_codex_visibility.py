@@ -156,7 +156,6 @@ def test_visibility_classification_records_adoption_without_grading_shell(
             "math.find",
             {
                 "capability_id": "matrix.determinant.compute",
-                "view": "CONTRACT",
             },
             {"kind": "capability"},
         ),

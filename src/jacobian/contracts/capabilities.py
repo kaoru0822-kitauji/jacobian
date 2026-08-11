@@ -68,7 +68,7 @@ class CapabilityInvocationExample(ContractModel):
 class CapabilityDiscoveryRequest(ContractModel):
     """Compact installed-portfolio search, independent of any transport."""
 
-    query: str | None = Field(default=None, min_length=1, max_length=512)
+    query: str = Field(min_length=1, max_length=512)
     domain: str | None = Field(
         default=None,
         pattern=r"^[A-Za-z][A-Za-z0-9_-]{0,127}$",
@@ -80,7 +80,7 @@ class CapabilityDiscoveryRequest(ContractModel):
 
     @model_validator(mode="after")
     def reject_blank_filters(self) -> Self:
-        if self.query is not None and not self.query.strip():
+        if not self.query.strip():
             raise ValueError("query must contain a non-whitespace character")
         if self.domain is not None and not self.domain.strip():
             raise ValueError("domain must contain a non-whitespace character")
@@ -94,64 +94,6 @@ class CapabilityDiscoveryRequest(ContractModel):
         ):
             raise ValueError("TYPED_ARTIFACT input requires artifact_type")
         return self
-
-
-class CapabilityDiscoveryReformulateQueryRecoveryPath(ContractModel):
-    """Offer a differently worded query without prescribing one."""
-
-    action: Literal["reformulate_query"]
-    tool: Literal["math.find"] = "math.find"
-    change: Literal["Use different or broader mathematical language for query."] = (
-        "Use different or broader mathematical language for query."
-    )
-
-
-class CapabilityDiscoveryRemoveUnknownDomainRecoveryPath(ContractModel):
-    """Expose the rejected domain filter as one removable constraint."""
-
-    action: Literal["remove_unknown_domain_filter"]
-    tool: Literal["math.find"] = "math.find"
-    rejected_domain: str = Field(
-        pattern=r"^[A-Za-z][A-Za-z0-9_-]{0,127}$",
-    )
-    change: Literal["Retry without the unrecognized domain filter."] = (
-        "Retry without the unrecognized domain filter."
-    )
-
-
-class CapabilityDiscoveryRemoveFiltersRecoveryPath(ContractModel):
-    """Offer unfiltered discovery without ranking it above other choices."""
-
-    action: Literal["remove_filters"]
-    tool: Literal["math.find"] = "math.find"
-    change: Literal["Remove domain, input_kind, or artifact_type filters."] = (
-        "Remove domain, input_kind, or artifact_type filters."
-    )
-
-
-class CapabilityDiscoveryBrowseRecoveryPath(ContractModel):
-    """Expose the existing empty-query browse operation."""
-
-    action: Literal["browse"]
-    tool: Literal["math.find"] = "math.find"
-    arguments: dict[str, Any] = Field(default_factory=dict, max_length=0)
-
-
-class CapabilityDiscoveryInspectCatalogRecoveryPath(ContractModel):
-    """Expose the complete catalog resource as an alternative access path."""
-
-    action: Literal["inspect_catalog"]
-    resource_uri: Literal["capability://catalog"] = "capability://catalog"
-
-
-CapabilityDiscoveryRecoveryPath = Annotated[
-    CapabilityDiscoveryReformulateQueryRecoveryPath
-    | CapabilityDiscoveryRemoveUnknownDomainRecoveryPath
-    | CapabilityDiscoveryRemoveFiltersRecoveryPath
-    | CapabilityDiscoveryBrowseRecoveryPath
-    | CapabilityDiscoveryInspectCatalogRecoveryPath,
-    Field(discriminator="action"),
-]
 
 
 class CapabilityDiscoveryMatch(ContractModel):
@@ -176,7 +118,7 @@ class CapabilityDiscoveryResult(ContractModel):
     """Deterministically ranked compact installed outcomes."""
 
     discovery_version: Literal["1"] = "1"
-    query: str | None = None
+    query: str
     domain: str | None = None
     domain_filter_status: Literal["UNFILTERED", "MATCHED", "UNKNOWN"] = "UNFILTERED"
     domain_filter_basis: str = Field(
