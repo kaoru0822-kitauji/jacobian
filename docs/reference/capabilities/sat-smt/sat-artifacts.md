@@ -29,6 +29,13 @@ bytes, limits, checker, and certificate. Malformed, truncated, timed-out,
 cancelled, or rejected proofs return `UNKNOWN` and never provide evidence that
 the formula is satisfiable.
 
+`sat.lrat.verify` capability version 2 additionally returns `invalid_step`
+when the independent checker identifies a line-local replay failure. The typed
+witness contains the first proof line number, clause ID when parseable, stable
+failure code, exact bounded proof line, and raw checker message. Binding
+failures and other non-line-local rejections may omit the witness; no rejected
+LRAT proof establishes SAT.
+
 ## Registered descriptors
 
 `JacobianRuntime.core.sat.installation` exposes the content-addressed descriptor

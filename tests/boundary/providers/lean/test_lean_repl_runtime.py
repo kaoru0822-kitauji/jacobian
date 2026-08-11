@@ -271,6 +271,55 @@ def test_clean_execution_discards_every_repl_instance(
     assert all(session.closed for session in sessions)
 
 
+def test_persistent_validated_execution_reuses_one_bounded_session(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime = LeanExplorationReplRuntime(tmp_path, {})
+
+    class FakeSession:
+        calls = 0
+
+        def execute_validated(
+            self,
+            *,
+            command: str,
+            tactic: str,
+            pickle_path: Path | None = None,
+        ) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
+            assert command and tactic
+            assert pickle_path is None
+            self.calls += 1
+            return ({}, {}, {})
+
+        def close(self) -> None:
+            pass
+
+    session = FakeSession()
+    created = 0
+
+    def create(_environment: LeanEnvironment) -> FakeSession:
+        nonlocal created
+        created += 1
+        return session
+
+    monkeypatch.setattr(runtime, "_create_session", create)
+
+    runtime.execute_persistent_validated(
+        command="example : True := by sorry",
+        tactic="trivial",
+        environment=LeanEnvironment.CORE,
+    )
+    runtime.execute_persistent_validated(
+        command="example : True := by sorry",
+        tactic="trivial",
+        environment=LeanEnvironment.CORE,
+    )
+
+    assert created == 1
+    assert session.calls == 2
+
+
 def test_runtime_close_releases_retained_sessions(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

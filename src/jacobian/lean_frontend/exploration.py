@@ -22,19 +22,24 @@ from jacobian.canonical import (
 from jacobian.contracts.capabilities import (
     CapabilityProviderRuntime,
 )
-from jacobian.contracts.lean import LeanEnvironment
+from jacobian.contracts.lean import (
+    LeanDiagnostic,
+    LeanDiagnosticPhase,
+    LeanDiagnosticSource,
+    LeanEnvironment,
+)
 from jacobian.contracts.lean_exploration import (
     LeanPremiseRetrievalArtifact,
     LeanProofStateArtifact,
     LeanProofStateRequest,
     LeanProofStateTransitionArtifact,
-    LeanTacticDiagnostic,
     LeanTypedGoal,
 )
 from jacobian.contracts.lean_metavariable_fields import (
     LeanMetavariableFieldsArtifact,
     LeanMetavariableFieldsRequest,
 )
+from jacobian.lean_frontend.diagnostics import repl_diagnostics
 from jacobian.lean_frontend.helper_protocol import (
     LeanHelperErrorEnvelope,
     LeanHelperPayload,
@@ -47,7 +52,6 @@ from jacobian.lean_frontend.helper_protocol import (
 )
 from jacobian.lean_frontend.repl import (
     LeanExplorationReplRuntime,
-    _response_errors,
 )
 from jacobian.lean_frontend.repl_protocol import (
     LeanReplErrorResponse,
@@ -166,7 +170,7 @@ def install_lean_exploration_capabilities(
     )
     transition_schema_uri = schemas.register(
         name="jacobian.lean4-proof-state-transition",
-        version="2",
+        version="3",
         schema=LeanProofStateTransitionArtifact.model_json_schema(),
     )
     retrieval_schema_uri = schemas.register(
@@ -248,32 +252,17 @@ def _normalize_goal(goal: str) -> str:
 
 def _tactic_diagnostics(
     responses: LeanReplValidatedExecution,
-) -> tuple[LeanTacticDiagnostic, ...]:
-    diagnostics: list[LeanTacticDiagnostic] = []
-    for response in responses:
-        seen: set[str] = set()
-        for message in _response_errors(response):
-            if message in seen:
-                continue
-            seen.add(message)
-            diagnostics.append(LeanTacticDiagnostic(severity="ERROR", message=message))
-        if isinstance(response, LeanReplErrorResponse):
-            continue
-        for item in response.messages:
-            if item.data in seen:
-                continue
-            seen.add(item.data)
-            severity = (
-                "ERROR"
-                if item.severity == "error"
-                else ("WARNING" if item.severity == "warning" else "INFO")
-            )
-            diagnostics.append(
-                LeanTacticDiagnostic.model_validate(
-                    {"severity": severity, "message": item.data}
-                )
-            )
-    return tuple(diagnostics)
+    *,
+    final_phase: LeanDiagnosticPhase = LeanDiagnosticPhase.TACTIC_EXECUTION,
+    final_source: LeanDiagnosticSource = LeanDiagnosticSource.TACTIC,
+    final_column_offset: int = 0,
+) -> tuple[LeanDiagnostic, ...]:
+    return repl_diagnostics(
+        responses,
+        final_phase=final_phase,
+        final_source=final_source,
+        final_column_offset=final_column_offset,
+    )
 
 
 def _run_repl(

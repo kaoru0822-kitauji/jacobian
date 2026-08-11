@@ -353,7 +353,10 @@ def check_lrat(request: dict[str, Any]) -> dict[str, Any]:
         clauses, variable_count = _cnf(claim["payload"])
         limits = dict(payload["limits"])
         limits["variable_count"] = variable_count
-        accepted, detail = _replay(clauses, raw, limits)
+        try:
+            accepted, detail = _replay(clauses, raw, limits)
+        except (ValueError, OverflowError) as exc:
+            return _result(False, str(exc))
         return _result(
             accepted, detail if accepted else detail + "; empty clause absent"
         )

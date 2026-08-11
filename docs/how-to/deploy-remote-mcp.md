@@ -42,9 +42,14 @@ Choose one deployment mode:
 The host must already provide:
 
 - `uv`, Python 3, Git, and systemd for every mode;
-- Caddy for `domain` and `tailscale`; and
+- Caddy for `domain` and `tailscale`;
 - a connected Tailscale installation whose tailnet permits Funnel for
-  `tailscale`.
+  `tailscale`; and
+- `elan` when using `--with-lean`. The installer reads the committed
+  `lean/lean-toolchain`, installs that exact toolchain through elan, restores
+  the manifest-pinned Mathlib cache, and builds the checked-in Lean runtime.
+  The service-readable elan home is `/opt/jacobian/lean/elan`; it does not
+  depend on the invoking operator's home directory.
 
 The installer does not pipe remote installation scripts into a shell. Install
 those host dependencies through a reviewed package or the upstream documented
@@ -68,6 +73,22 @@ Inspect a complete plan without root or host mutation:
   --domain math.example.org \
   --dry-run
 ```
+
+To serve the pinned Lean CORE and MATHLIB portfolio, select the Lean release
+profile explicitly:
+
+```sh
+sudo ./deploy/install.sh \
+  --mode domain \
+  --domain math.example.org \
+  --with-lean
+```
+
+Core releases remain under `/opt/jacobian/releases/<git-sha>`; Lean-enabled
+releases use `/opt/jacobian/releases/<git-sha>-lean`. This prevents a core-only
+release at one revision from being mistaken for a later Lean-enabled build of
+the same source. The Lean build must complete before the release marker or
+`/opt/jacobian/current` activation is written.
 
 The installer archives committed `HEAD` to
 `/opt/jacobian/releases/<git-sha>`, syncs its locked non-development
@@ -308,6 +329,13 @@ Do not report a deployment complete until the service version, two-tool
 surface, catalog policy, required capabilities, and bounded discovery response
 all pass. Run deeper capability-specific smoke checks only for providers
 changed by the release.
+
+`--with-lean` adds `lean.check`, `lean.proof_state.apply_tactic`,
+`lean.term.apply`, and `lean.retrieve.premises` to the required catalog set. It
+then runs `deploy/smoke_lean.py`, which writes disposable tenant artifacts while
+checking CORE and MATHLIB proof acceptance plus accepted and rejected tactic
+transitions. This deeper smoke is deliberately separate from the general
+read-only deployment smoke.
 
 ## Roll back without rewriting the repository
 

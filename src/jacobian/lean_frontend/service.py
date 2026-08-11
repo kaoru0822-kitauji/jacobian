@@ -24,6 +24,7 @@ from jacobian.contracts.results import (
     Verification,
 )
 from jacobian.contracts.verification import VerificationRecord
+from jacobian.lean_frontend.diagnostics import checker_diagnostics
 from jacobian.references import LeanCheckerInstallation
 from jacobian.registry import CheckerRegistryError
 from jacobian.storage.errors import StorageError
@@ -168,11 +169,18 @@ class LeanService:
                             self._cache.move_to_end(certificate.artifact_uri)
                             while len(self._cache) > _RESULT_CACHE_SIZE:
                                 self._cache.popitem(last=False)
+        diagnostics = checker_diagnostics(
+            result,
+            statement=statement,
+            proof=proof,
+            environment=environment,
+        )
         return LeanVerifyResult(
             claim_uri=claim.artifact_uri,
             candidate_uri=candidate.artifact_uri,
             certificate_uri=certificate.artifact_uri,
             result=result,
+            diagnostics=diagnostics,
             cache_hit=cache_hit,
         )
 

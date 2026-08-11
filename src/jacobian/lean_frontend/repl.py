@@ -358,6 +358,35 @@ class LeanExplorationReplRuntime:
             finally:
                 session.close()
 
+    def execute_persistent_validated(
+        self,
+        *,
+        command: str,
+        tactic: str,
+        environment: LeanEnvironment,
+        pickle_path: Path | None = None,
+    ) -> LeanReplValidatedExecution:
+        """Replay and apply through a retained bounded environment session.
+
+        This backend candidate is intentionally not wired to an agent-facing
+        operation.  It exists so evaluation can compare the same validated
+        transition contract against clean-process replay without changing the
+        atomic capability surface.
+        """
+
+        with self._lock:
+            if self._closing or self._closed:
+                raise RuntimeError("Lean exploration runtime is closing")
+            session = self._sessions.get(environment)
+            if session is None:
+                session = self._create_session(environment)
+                self._sessions[environment] = session
+            return session.execute_validated(
+                command=command,
+                tactic=tactic,
+                pickle_path=pickle_path,
+            )
+
     def close(self) -> None:
         """Stop every exploration process without affecting independent checkers."""
 

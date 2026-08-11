@@ -101,6 +101,24 @@ flow, repeated calls, shell activity, tokens, time, and completion. This is
 workflow evidence, not a causal comparison: the public suite has no held-out
 performance claim.
 
+### Lean diagnostic recovery observations
+
+`benchmarks/config/lean-diagnostic-recovery-v1.json` freezes three deliberately
+broken Lean payloads across CORE, MATHLIB, and proof-edit validation. Run the
+control endpoint at the recorded base revision and the treatment endpoint at
+the candidate revision with
+`benchmarks.tooling.lean_diagnostic_recovery`. Model execution requires the
+explicit `--execute` guard. Use identical model, reasoning effort, tool mode,
+timeout, case selection, and repetitions in both conditions, then compare the
+two `report.json` files with the tool's `--compare CONTROL TREATMENT` mode.
+
+The classifier requires the exact injected payload to be the first Jacobian
+capability invocation and rejected before a later checker-backed success can
+count as a repair. It records repair success, observed diagnostic codes,
+repeated errors, tool calls, tokens, and latency in evaluation artifacts only;
+none of these metrics enters a runtime response. The public fixed cases support
+descriptive recovery observations, not a causal or held-out performance claim.
+
 ## Performance benchmarks
 
 ### Purpose
@@ -141,6 +159,17 @@ Wall time alone is insufficient. Record, where relevant:
 - cold and warm cache behavior;
 - p50 and p95 latency for repeated service operations;
 - startup and clean-process replay cost.
+
+For Lean proof-state backend comparisons, run
+`benchmarks.tooling.lean_repl_backend_benchmark` as a pyperf cell for each
+`CORE`/`MATHLIB`, `clean`/`persistent`, and prefix-length combination. The
+persistent candidate uses the same validated reconstruction-and-one-tactic
+contract but is not wired to an agent-facing operation. Compare the emitted
+same-host JSON files with pyperf; retain their corpus digests and correctness
+checks alongside latency. This is operational evidence only and does not relax
+the final `lean.check` boundary. Pass
+`--inherit-environ JACOBIAN_LEAN_BENCH_ENVIRONMENT,JACOBIAN_LEAN_BENCH_BACKEND,JACOBIAN_LEAN_BENCH_PREFIX_LENGTH`
+so pyperf workers receive the selected cell identity.
 
 ### Corpus design
 

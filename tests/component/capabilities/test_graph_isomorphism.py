@@ -172,10 +172,56 @@ def test_graph_isomorphism_verifies_a_negative_result(
     assert result.output["is_isomorphism"] is False
     assert result.output["conclusion"] == "FALSE"
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert result.output["first_violation"] == {
+        "kind": "ADJACENCY_MISMATCH",
+        "source_vertices": ["a", "b"],
+        "mapped_vertices": ["x", "y"],
+        "source_adjacent": True,
+        "target_adjacent": False,
+        "vertex": None,
+        "mapped_vertex": None,
+    }
     assert not any(
         relationship.relation_id == "graph.relation.isomorphic-via"
         for relationship in result.relationships
     )
+
+
+def test_graph_isomorphism_reports_missing_target_for_empty_source(
+    graph_isomorphism_services,
+) -> None:
+    left_graph_uri = _graph_uri(
+        graph_isomorphism_services,
+        vertices=[],
+        edges=[],
+    )
+    right_graph_uri = _graph_uri(
+        graph_isomorphism_services,
+        vertices=["target"],
+        edges=[],
+    )
+
+    result = graph_isomorphism_services.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.isomorphism.verify",
+            input={
+                "left_graph_uri": left_graph_uri,
+                "right_graph_uri": right_graph_uri,
+                "mapping": {},
+            },
+        )
+    )
+
+    assert result.output["conclusion"] == "FALSE"
+    assert result.output["first_violation"] == {
+        "kind": "TARGET_BIJECTION_MISMATCH",
+        "source_vertices": None,
+        "mapped_vertices": None,
+        "source_adjacent": None,
+        "target_adjacent": None,
+        "vertex": None,
+        "mapped_vertex": "target",
+    }
 
 
 def test_graph_isomorphism_keeps_checker_rejection_unknown(

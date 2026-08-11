@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from fractions import Fraction
 
 from jacobian.canonical import canonicalize_json
 from jacobian.contracts.capabilities import (
@@ -22,12 +23,15 @@ from jacobian.contracts.evidence import (
     CertificateEnvelope,
     EvidenceBindings,
 )
+from jacobian.contracts.exact import CanonicalRational
 from jacobian.contracts.polynomials import (
+    PolynomialCoefficientMismatch,
     PolynomialIdentityClaim,
     PolynomialIdentityOutput,
     PolynomialIdentityReplayPayload,
     PolynomialIdentityRequest,
     RationalPolynomial,
+    SparseRationalPolynomial,
 )
 from jacobian.contracts.results import (
     Conclusion,
@@ -53,11 +57,13 @@ class PolynomialIdentityAdapter:
         )
         self._descriptor = CapabilityDescriptor(
             capability_id="polynomial.identity.verify",
-            version="1",
-            title="Verify an exact polynomial identity",
+            version="2",
+            title="Compare exact polynomials coefficient by coefficient",
             description=(
                 "Independently compare every exact coefficient of two sparse "
-                "polynomials in one declared QQ polynomial ring."
+                "polynomials in one declared QQ polynomial ring. A false identity "
+                "returns the first canonical monomial coefficient mismatch and its "
+                "exact rational difference."
             ),
             provider="jacobian.sparse-polynomial-checker",
             provider_runtime=known_provider_runtime(
@@ -67,7 +73,15 @@ class PolynomialIdentityAdapter:
             ),
             input_schema=model_schema(PolynomialIdentityRequest),
             output_schema=model_schema(PolynomialIdentityOutput),
-            tags=("polynomial", "identity", "verification", "exact-rational"),
+            tags=(
+                "polynomial",
+                "identity",
+                "equality",
+                "verification",
+                "exact-rational",
+                "coefficient-mismatch",
+                "counter-witness",
+            ),
             invocation_examples=(
                 CapabilityInvocationExample(
                     name="zero_identity",
@@ -179,6 +193,11 @@ class PolynomialIdentityAdapter:
             Conclusion.FALSE: False,
             Conclusion.UNKNOWN: None,
         }[conclusion]
+        mismatch = (
+            _first_coefficient_mismatch(validated.left, validated.right)
+            if conclusion is Conclusion.FALSE
+            else None
+        )
         output = PolynomialIdentityOutput(
             identical=identical,
             conclusion=conclusion,
@@ -188,6 +207,7 @@ class PolynomialIdentityAdapter:
             certificate_uri=certificate_artifact.artifact_uri,
             verification_record_uri=record_uri,
             checker_id=checker_id,
+            first_coefficient_mismatch=mismatch,
         )
         return CapabilityResult(
             capability_id=self.descriptor.capability_id,
@@ -246,3 +266,25 @@ class PolynomialIdentityAdapter:
                 *((record_uri,) if record_uri is not None else ()),
             ),
         )
+
+
+def _first_coefficient_mismatch(
+    left: SparseRationalPolynomial,
+    right: SparseRationalPolynomial,
+) -> PolynomialCoefficientMismatch:
+    left_terms = {term.exponents: term.coefficient for term in left.terms}
+    right_terms = {term.exponents: term.coefficient for term in right.terms}
+    zero = CanonicalRational.from_fraction(Fraction(0))
+    for exponents in sorted(set(left_terms) | set(right_terms), reverse=True):
+        left_coefficient = left_terms.get(exponents, zero)
+        right_coefficient = right_terms.get(exponents, zero)
+        if left_coefficient != right_coefficient:
+            return PolynomialCoefficientMismatch(
+                exponents=exponents,
+                left_coefficient=left_coefficient,
+                right_coefficient=right_coefficient,
+                left_minus_right=CanonicalRational.from_fraction(
+                    left_coefficient.as_fraction() - right_coefficient.as_fraction()
+                ),
+            )
+    raise RuntimeError("false polynomial identity has no coefficient mismatch")

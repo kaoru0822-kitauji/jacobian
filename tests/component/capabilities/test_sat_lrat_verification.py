@@ -127,6 +127,24 @@ def test_negative_rat_hint_is_explicitly_unsupported(
     assert result.output["conclusion"] == "UNKNOWN"
 
 
+def test_rejected_lrat_reports_the_first_invalid_proof_step(
+    lrat_services,
+) -> None:
+    cnf = lrat_services.core.sat.put_cnf(variable_names=("x",), clauses=((-1,), (1,)))
+
+    result = _verify(lrat_services, cnf.artifact_uri, b"3 0 1 99 0\n")
+
+    assert result.output["status"] == "REJECTED"
+    assert result.output["conclusion"] == "UNKNOWN"
+    assert result.output["invalid_step"] == {
+        "line": 1,
+        "clause_id": 3,
+        "code": "HINT_REFERENCES_INACTIVE_CLAUSE",
+        "proof_line": "3 0 1 99 0",
+        "raw_checker_message": "line 1: hint references inactive clause",
+    }
+
+
 def test_timeout_and_cancellation_are_fail_closed(lrat_services) -> None:
     cnf = lrat_services.core.sat.put_cnf(variable_names=("x",), clauses=((-1,), (1,)))
 

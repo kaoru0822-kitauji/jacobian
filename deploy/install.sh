@@ -21,12 +21,15 @@ ALLOW_ANONYMOUS=0
 CONFIRM_PUBLIC_ANONYMOUS=0
 SKIP_SMOKE=0
 DRY_RUN=0
+WITH_LEAN=0
 
 BACKEND_PORT=8765
 INGRESS_PORT=8766
 RELEASE_ROOT="/opt/jacobian/releases"
 CURRENT_LINK="/opt/jacobian/current"
 PYTHON_INSTALL_ROOT="/opt/jacobian/python"
+LEAN_ELAN_HOME="/opt/jacobian/lean/elan"
+LEAN_SERVICE_PATH="${LEAN_ELAN_HOME}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 CONFIG_ROOT="/etc/jacobian-mcp"
 CADDY_CONFIG_ROOT="/etc/caddy-jacobian"
 SYSTEMD_ROOT="/etc/systemd/system"
@@ -78,6 +81,8 @@ Configuration:
   --anonymous-tenant-id ID      Shared anonymous namespace
                                 (default: jacobian-test).
   --confirm-public-anonymous    Also required when anonymous mode is public.
+  --with-lean                   Build and require the pinned Lean CORE + MATHLIB
+                                provider and checker portfolio.
   --skip-smoke                  Do not run the read-only MCP deployment smoke.
   --dry-run                     Validate arguments and print the deployment plan.
   -h, --help                    Show this help.
@@ -240,6 +245,36 @@ validate_release_runtime() {
         || die "release entrypoint is not executable by the jacobian service user"
 }
 
+validate_lean_release_runtime() {
+    local release_dir="$1"
+    local required
+    local required_paths=(
+        "lean/.lake/packages/mathlib/.lake/build/lib/lean/Mathlib.olean"
+        "lean/.lake/build/lib/lean/JacobianLeanRuntime.olean"
+        "lean/.lake/build/lib/lean/JacobianLeanProofState.olean"
+        "lean/.lake/build/bin/jacobian_lean_proof_state"
+    )
+
+    for required in "${required_paths[@]}"; do
+        [[ -f "${release_dir}/${required}" ]] || die \
+            "pinned Lean release component is unavailable: ${required}"
+    done
+    (
+        cd "${release_dir}"
+        "${RUNUSER_BIN}" --user jacobian -- \
+            env \
+            "ELAN_HOME=${LEAN_ELAN_HOME}" \
+            "PATH=${LEAN_SERVICE_PATH}" \
+            "${release_dir}/.venv/bin/python" - <<'PY'
+from jacobian_checkers import lean4
+
+executable, mathlib_runtime = lean4.inspect_runtime(require_mathlib=True)
+if not executable.is_file() or mathlib_runtime is None or not mathlib_runtime.is_dir():
+    raise SystemExit("pinned Lean provider is unavailable")
+PY
+    ) || die "pinned Lean provider failed its release readiness probe"
+}
+
 while (($#)); do
     case "$1" in
         --mode)
@@ -273,6 +308,10 @@ while (($#)); do
             ;;
         --confirm-public-anonymous)
             CONFIRM_PUBLIC_ANONYMOUS=1
+            shift
+            ;;
+        --with-lean)
+            WITH_LEAN=1
             shift
             ;;
         --skip-smoke)
@@ -324,7 +363,15 @@ GIT=(git -c "safe.directory=${REPO_ROOT}" -C "${REPO_ROOT}")
     || die "deploy/install.sh must be run from a Git clone"
 REVISION="$("${GIT[@]}" rev-parse HEAD)"
 SHORT_REVISION="$("${GIT[@]}" rev-parse --short=12 HEAD)"
-RELEASE_DIR="${RELEASE_ROOT}/${SHORT_REVISION}"
+RELEASE_PROFILE="core"
+if ((WITH_LEAN)); then
+    RELEASE_PROFILE="lean"
+fi
+RELEASE_SUFFIX=""
+if [[ "${RELEASE_PROFILE}" != "core" ]]; then
+    RELEASE_SUFFIX="-${RELEASE_PROFILE}"
+fi
+RELEASE_DIR="${RELEASE_ROOT}/${SHORT_REVISION}${RELEASE_SUFFIX}"
 
 PUBLIC_BASE_URL=""
 CONNECTOR_URL=""
@@ -385,6 +432,7 @@ Jacobian deployment plan
   backend:     jacobian-mcp.service on 127.0.0.1:${BACKEND_PORT}
   caddy:       $([[ "${MODE}" == "local" ]] && printf 'disabled' || printf 'enabled')
   funnel:      $([[ "${MODE}" == "tailscale" ]] && printf 'enabled' || printf 'disabled')
+  lean:        $(((WITH_LEAN)) && printf 'pinned CORE + MATHLIB runtime' || printf 'disabled')
   smoke:       $(((SKIP_SMOKE)) && printf 'skipped' || printf 'required')
 EOF
     exit 0
@@ -411,6 +459,16 @@ FLOCK_BIN="$(find_executable flock /usr/bin/flock || true)"
 [[ -n "${SYSTEMCTL_BIN}" && -n "${SYSTEMD_ANALYZE_BIN}" \
     && -n "${RUNUSER_BIN}" && -n "${FLOCK_BIN}" ]] || die \
     "this installer requires a systemd host"
+
+ELAN_BIN=""
+LEAN_TOOLCHAIN=""
+if ((WITH_LEAN)); then
+    ELAN_BIN="$(find_executable elan /usr/local/bin/elan /usr/bin/elan || true)"
+    [[ -n "${ELAN_BIN}" ]] || die \
+        "--with-lean requires an operator-installed elan launcher"
+    LEAN_TOOLCHAIN="$(tr -d '\r\n' <"${REPO_ROOT}/lean/lean-toolchain")"
+    [[ -n "${LEAN_TOOLCHAIN}" ]] || die "lean/lean-toolchain is empty"
+fi
 
 CADDY_BIN=""
 if [[ "${MODE}" != "local" ]]; then
@@ -464,13 +522,37 @@ if [[ ! -d "${RELEASE_DIR}" ]]; then
             --managed-python \
             --link-mode copy
     )
+    if ((WITH_LEAN)); then
+        log "building pinned Lean and Mathlib release runtime"
+        install -d -m 0755 "${LEAN_ELAN_HOME}/bin"
+        install -m 0755 "$(readlink -f "${ELAN_BIN}")" \
+            "${LEAN_ELAN_HOME}/bin/elan"
+        ELAN_HOME="${LEAN_ELAN_HOME}" \
+            "${LEAN_ELAN_HOME}/bin/elan" toolchain install "${LEAN_TOOLCHAIN}"
+        (
+            cd "${RELEASE_DIR}/lean"
+            ELAN_HOME="${LEAN_ELAN_HOME}" \
+                "${LEAN_ELAN_HOME}/bin/elan" run "${LEAN_TOOLCHAIN}" \
+                lake exe cache get
+            ELAN_HOME="${LEAN_ELAN_HOME}" \
+                "${LEAN_ELAN_HOME}/bin/elan" run "${LEAN_TOOLCHAIN}" \
+                lake build repl jacobian_lean_proof_state
+        )
+    fi
     chown -R root:root "${RELEASE_DIR}" "${PYTHON_INSTALL_ROOT}"
     RELEASE_WAS_BUILT=1
 elif [[ "$(cat "${RELEASE_DIR}/.git-revision" 2>/dev/null || true)" != "${REVISION}" ]]; then
     die "existing release directory is not bound to revision ${REVISION}"
+elif [[ "$(cat "${RELEASE_DIR}/.release-profile" 2>/dev/null || printf 'core')" \
+    != "${RELEASE_PROFILE}" ]]; then
+    die "existing release directory does not match profile ${RELEASE_PROFILE}"
 fi
 validate_release_runtime "${RELEASE_DIR}"
+if ((WITH_LEAN)); then
+    validate_lean_release_runtime "${RELEASE_DIR}"
+fi
 if ((RELEASE_WAS_BUILT)); then
+    printf '%s\n' "${RELEASE_PROFILE}" >"${RELEASE_DIR}/.release-profile"
     printf '%s\n' "${REVISION}" >"${RELEASE_DIR}/.git-revision"
     RELEASE_BUILD_DIR=""
 fi
@@ -563,7 +645,9 @@ fi
 
 RENDER_ROOT="$(mktemp -d)"
 
-sed "s|https://math-tools.example.org|${PUBLIC_BASE_URL}|g" \
+sed \
+    -e "s|https://math-tools.example.org|${PUBLIC_BASE_URL}|g" \
+    -e "s|/opt/jacobian/lean/elan|${LEAN_ELAN_HOME}|g" \
     "${REPO_ROOT}/deploy/systemd/jacobian-mcp.service" \
     >"${RENDER_ROOT}/jacobian-mcp.service"
 install -m 0644 "${RENDER_ROOT}/jacobian-mcp.service" \
@@ -651,13 +735,35 @@ if ((!SKIP_SMOKE)); then
         SMOKE_TOKEN_FILE="${TOKEN_DESTINATION}"
     fi
     SMOKE_SUCCEEDED=0
+    SMOKE_REQUIREMENTS=(
+        --require-capability graph.construct.explicit
+    )
+    if ((WITH_LEAN)); then
+        SMOKE_REQUIREMENTS+=(
+            --require-capability lean.check
+            --require-capability lean.proof_state.apply_tactic
+            --require-capability lean.term.apply
+            --require-capability lean.retrieve.premises
+        )
+    fi
     for attempt in {1..12}; do
         if JACOBIAN_MCP_AUTH_TOKENS_FILE="${SMOKE_TOKEN_FILE}" \
             "${RELEASE_DIR}/.venv/bin/python" \
             "${RELEASE_DIR}/deploy/smoke_remote.py" \
             "${CONNECTOR_URL}" \
             --expect-policy-profile DEFAULT \
-            --require-capability graph.construct.explicit; then
+            "${SMOKE_REQUIREMENTS[@]}"; then
+            if ((WITH_LEAN)) && ! \
+                JACOBIAN_MCP_AUTH_TOKENS_FILE="${SMOKE_TOKEN_FILE}" \
+                "${RELEASE_DIR}/.venv/bin/python" \
+                "${RELEASE_DIR}/deploy/smoke_lean.py" \
+                "${CONNECTOR_URL}"; then
+                if ((attempt < 12)); then
+                    sleep 5
+                    continue
+                fi
+                break
+            fi
             SMOKE_SUCCEEDED=1
             break
         fi

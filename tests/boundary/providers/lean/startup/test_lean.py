@@ -371,6 +371,11 @@ def test_core_lean_rejects_untrusted_or_invalid_proofs(
     assert rejected.result.conclusion is Conclusion.UNKNOWN
     assert rejected.result.assurance.verification is Verification.UNVERIFIED
     assert rejected.result.verification_record_uri is None
+    assert rejected.diagnostics
+    diagnostic = rejected.diagnostics[0]
+    assert diagnostic.code.startswith("LEAN_")
+    assert diagnostic.phase.value == "KERNEL_CHECK"
+    assert diagnostic.raw_backend_message
 
 
 def test_lean_reuses_only_an_exact_active_checker_result(

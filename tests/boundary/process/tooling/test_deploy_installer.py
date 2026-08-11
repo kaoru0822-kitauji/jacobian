@@ -46,6 +46,20 @@ def test_installer_help_exposes_three_deployment_modes() -> None:
     assert "--mode local" in completed.stdout
     assert "--mode domain" in completed.stdout
     assert "--mode tailscale" in completed.stdout
+    assert "--with-lean" in completed.stdout
+
+
+def test_lean_dry_run_uses_a_distinct_release_profile() -> None:
+    completed = _run("--with-lean", "--dry-run")
+
+    assert completed.returncode == 0, completed.stderr
+    release_line = next(
+        line
+        for line in completed.stdout.splitlines()
+        if line.strip().startswith("release:")
+    )
+    assert release_line.endswith("-lean")
+    assert "lean:        pinned CORE + MATHLIB runtime" in completed.stdout
 
 
 def test_domain_dry_run_reports_connector_without_requiring_root() -> None:
@@ -161,6 +175,50 @@ def test_release_runtime_is_checked_before_current_symlink_is_changed() -> None:
 
     assert validation < revision_marker < current_link
     assert '"${RUNUSER_BIN}" --user jacobian -- "${entrypoint}" --version' in source
+
+
+def test_lean_profile_is_built_and_validated_before_activation() -> None:
+    source = INSTALLER.read_text(encoding="utf-8")
+
+    install_toolchain = source.index(
+        '"${LEAN_ELAN_HOME}/bin/elan" toolchain install "${LEAN_TOOLCHAIN}"'
+    )
+    fetch_cache = source.index("lake exe cache get")
+    build_runtime = source.index("lake build repl jacobian_lean_proof_state")
+    validate = source.index('validate_lean_release_runtime "${RELEASE_DIR}"')
+    revision_marker = source.index(
+        'printf \'%s\\n\' "${REVISION}" >"${RELEASE_DIR}/.git-revision"'
+    )
+    current_link = source.index('ln -sfn "${RELEASE_DIR}" "${CURRENT_LINK}.new"')
+
+    assert install_toolchain < fetch_cache < build_runtime < validate
+    assert validate < revision_marker < current_link
+    assert '"ELAN_HOME=${LEAN_ELAN_HOME}"' in source
+    assert '"PATH=${LEAN_SERVICE_PATH}"' in source
+
+
+def test_systemd_service_can_read_the_operator_managed_lean_toolchain() -> None:
+    service = (REPOSITORY_ROOT / "deploy/systemd/jacobian-mcp.service").read_text(
+        encoding="utf-8"
+    )
+
+    assert "Environment=ELAN_HOME=/opt/jacobian/lean/elan" in service
+    assert "Environment=PATH=/opt/jacobian/lean/elan/bin:" in service
+    assert "ProtectHome=true" in service
+
+
+def test_lean_profile_requires_catalog_and_behavior_smokes() -> None:
+    source = INSTALLER.read_text(encoding="utf-8")
+    smoke_block = source[source.index('log "running the read-only deployment smoke"') :]
+
+    for capability_id in (
+        "lean.check",
+        "lean.proof_state.apply_tactic",
+        "lean.term.apply",
+        "lean.retrieve.premises",
+    ):
+        assert f"--require-capability {capability_id}" in smoke_block
+    assert '"${RELEASE_DIR}/deploy/smoke_lean.py"' in smoke_block
 
 
 def test_activation_arms_rollback_before_switching_current() -> None:
