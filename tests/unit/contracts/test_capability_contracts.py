@@ -7,11 +7,8 @@ from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
     CapabilityCatalog,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDiscoveryResult,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
 
@@ -108,45 +105,3 @@ def test_verified_result_publishes_its_record_as_a_first_class_artifact() -> Non
         artifact_uris=(RECORD_URI,),
     )
     assert result.artifact_uris == (RECORD_URI,)
-
-
-def test_complete_result_requires_an_explicit_scope() -> None:
-    with pytest.raises(
-        ValidationError, match="complete result requires explicit scope"
-    ):
-        CapabilityResult(
-            capability_id="graph.enumerate.nonisomorphic",
-            capability_version="1",
-            execution=Execution(status=ExecutionStatus.COMPLETED),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.COMPLETE,
-                basis="enumerator reported exhaustion",
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis="deterministic enumeration",
-            ),
-        )
-
-
-def test_failed_execution_cannot_claim_completeness() -> None:
-    with pytest.raises(ValidationError, match="failed execution cannot be complete"):
-        CapabilityResult(
-            capability_id="graph.enumerate.nonisomorphic",
-            capability_version="1",
-            execution=Execution(status=ExecutionStatus.TIMEOUT),
-            scope=CapabilityScope(
-                description="simple graphs on five vertices",
-                parameters={"vertices": 5},
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.COMPLETE,
-                basis="adapter reached its configured limit",
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.HEURISTIC,
-                basis="enumeration timed out",
-            ),
-        )

@@ -33,13 +33,10 @@ from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.graph_composition import (
     GraphCompositionRequest,
@@ -287,26 +284,6 @@ class GraphComposeAdapter:
                 "backend": backend,
                 "backend_version": backend_module.__version__,
             },
-            scope=CapabilityScope(
-                description=(
-                    f"deterministic {operation} of the supplied graph artifact(s)"
-                ),
-                parameters={
-                    "operation": operation,
-                    "left_graph_uri": validated.left_graph_uri,
-                    "right_graph_uri": validated.right_graph_uri,
-                },
-                artifact_uri=result_artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.COMPLETE,
-                basis=(
-                    "the deterministic composition was performed over the "
-                    "supplied graph artifact(s); no mathematical conclusion "
-                    "or independent verification is claimed"
-                ),
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis=(
@@ -493,31 +470,6 @@ class GraphEnumerateNonisomorphicAdapter:
                 "backend_version": backend_module.__version__,
                 "backend_boundary": _ENUMERATION_BACKEND_BOUNDARY,
             },
-            scope=CapabilityScope(
-                description=(
-                    "all NetworkX Graph Atlas representatives with exactly "
-                    f"the requested order {order}"
-                ),
-                parameters={
-                    "source": "networkx.graph_atlas_g",
-                    "backend_version": backend_module.__version__,
-                    "order": order,
-                    "enumerated_count": total_count,
-                    "backend_boundary": _ENUMERATION_BACKEND_BOUNDARY,
-                },
-                artifact_uri=scope_artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.COMPLETE,
-                basis=(
-                    "the maintained Graph Atlas backend was scanned to "
-                    "exhaustion for the requested order; the catalog covers "
-                    "the Graph Atlas representative set, not all "
-                    "nonisomorphic graphs of that order in existence; this "
-                    "enumeration was not independently checked"
-                ),
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis=(

@@ -16,13 +16,10 @@ from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
@@ -301,22 +298,6 @@ class GraphColoringEncodingAdapter:
                 runtime_ms=max(0, round((time.monotonic() - started) * 1000)),
             ),
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="one exact graph and color-count encoding",
-                parameters={
-                    "colors": validated.colors,
-                    "encoding_version": _ENCODING_VERSION,
-                },
-                artifact_uri=scope.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.COMPLETE,
-                basis=(
-                    "the complete canonical CNF and its graph-owned replay evidence "
-                    "were materialized"
-                ),
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis=(

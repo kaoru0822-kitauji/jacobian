@@ -33,8 +33,6 @@ from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInputKind,
@@ -43,7 +41,6 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderRuntime,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.lean import LeanEnvironment
 from jacobian.contracts.lean_statement import (
@@ -751,28 +748,6 @@ class LeanStatementProposalAdapter:
             capability_version=self.descriptor.version,
             execution=Execution(status=ExecutionStatus.COMPLETED),
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description=(
-                    "one Lean proposition directly elaborated against Prop"
-                    if validated.operation == "ELABORATE_PROPOSITION"
-                    else "one Lean statement elaborated with sorry as proof"
-                ),
-                parameters={
-                    "operation": validated.operation,
-                    "environment": validated.environment.value,
-                    "proposed_statement": validated.proposed_statement,
-                    "environment_digest": artifact_payload.environment_digest,
-                },
-                artifact_uri=artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.COMPLETE,
-                basis=(
-                    "the pinned Lean frontend elaborated the proposition or "
-                    "reported complete diagnostics for this bounded request"
-                ),
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis=(
@@ -902,39 +877,11 @@ class LeanStatementCompareAdapter:
             **artifact_payload.model_dump(mode="python"),
             comparison_uri=artifact.artifact_uri,
         )
-        completeness_status = (
-            CapabilityCompletenessStatus.COMPLETE
-            if elaboration_checked
-            else CapabilityCompletenessStatus.PARTIAL
-        )
-        completeness_basis = (
-            "both statements were elaborated and compared syntactically and "
-            "by axiom set"
-            if elaboration_checked
-            else "syntactic and axiom-set comparison completed; elaboration "
-            "was not checked because Lean is unavailable"
-        )
         return CapabilityResult(
             capability_id=self.descriptor.capability_id,
             capability_version=self.descriptor.version,
             execution=Execution(status=ExecutionStatus.COMPLETED),
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description=(
-                    "syntactic and axiom-set comparison of two Lean statements"
-                ),
-                parameters={
-                    "environment": validated.environment.value,
-                    "statement_a": validated.statement_a,
-                    "statement_b": validated.statement_b,
-                },
-                artifact_uri=artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=completeness_status,
-                basis=completeness_basis,
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis=(

@@ -11,7 +11,6 @@ from tests.component.providers.polynomial.polynomial_capabilities_support import
 
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
-    CapabilityCompletenessStatus,
     CapabilityRequest,
 )
 from jacobian.contracts.results import Conclusion, InputStatus
@@ -34,7 +33,6 @@ def test_rational_function_identity_cross_multiplies_exactly(
         "QQ_FRACTION_FIELD_CROSS_MULTIPLICATION"
     )
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
-    assert result.completeness.status is CapabilityCompletenessStatus.COMPLETE
 
     semantics_uri = runtime.polynomial.rational_function_identity_semantics_uri
     semantics = runtime.core.store.get(semantics_uri)
@@ -93,7 +91,6 @@ def test_rational_function_identity_preserves_checker_rejection_as_unknown(
     assert result.output["conclusion"] == Conclusion.UNKNOWN.value
     assert result.output["verification_record_uri"] is None
     assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
-    assert result.completeness.status is CapabilityCompletenessStatus.UNKNOWN
 
 
 def test_polynomial_identity_descriptor_example_is_directly_invocable(
@@ -234,4 +231,3 @@ def test_polynomial_identity_preserves_checker_rejection_as_unknown(
     assert result.output["conclusion"] == Conclusion.UNKNOWN.value
     assert result.output["verification_record_uri"] is None
     assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
-    assert result.completeness.status is CapabilityCompletenessStatus.UNKNOWN

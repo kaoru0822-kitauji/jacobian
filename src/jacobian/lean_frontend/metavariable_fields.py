@@ -22,15 +22,12 @@ from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInputKind,
     CapabilityProviderRuntime,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.lean_metavariable_fields import (
     LeanMetavariableFieldsArtifact,
@@ -265,27 +262,6 @@ class LeanMetavariableFieldsAdapter:
                 detail=None,
             ),
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description=(
-                    "structured metavariable and elaboration fields for one "
-                    "replayed proof state"
-                ),
-                parameters={
-                    "environment": validated.environment.value,
-                    "state_uri": validated.state_uri,
-                    "state_digest": bound_state.state_digest,
-                    "environment_digest": environment_digest,
-                },
-                artifact_uri=artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.COMPLETE,
-                basis=(
-                    "the helper reported every open goal's metavariable "
-                    "fields for this state"
-                ),
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis=(

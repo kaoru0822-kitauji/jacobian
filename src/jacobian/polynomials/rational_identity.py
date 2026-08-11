@@ -8,13 +8,10 @@ from jacobian.canonical import canonicalize_json
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityInvocationExample,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
 from jacobian.contracts.polynomials import (
@@ -236,27 +233,6 @@ class RationalFunctionIdentityAdapter:
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description=(
-                    "equality in the declared QQ fraction field; pointwise "
-                    "denominator-definedness is outside scope"
-                ),
-                parameters={"variables": list(validated.variables)},
-                artifact_uri=left.artifact_uri,
-            ),
-            completeness=(
-                CapabilityCompleteness(
-                    status=CapabilityCompletenessStatus.COMPLETE,
-                    basis="both sparse cross products were replayed independently",
-                    assurance_level=CapabilityAssuranceLevel.VERIFIED,
-                    verification_record_uri=record_uri,
-                )
-                if verified
-                else CapabilityCompleteness(
-                    status=CapabilityCompletenessStatus.UNKNOWN,
-                    basis="the independent checker did not accept the replay",
-                )
-            ),
             assurance=CapabilityAssurance(
                 level=(
                     CapabilityAssuranceLevel.VERIFIED

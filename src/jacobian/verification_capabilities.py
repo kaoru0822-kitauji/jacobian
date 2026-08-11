@@ -8,17 +8,13 @@ from jacobian.capability_service import CapabilityAdapter
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.common import ArtifactUri, CheckerUri
 from jacobian.contracts.results import (
     ContractModel,
-    Coverage,
     ExecutionStatus,
     ResultEnvelope,
     Verification,
@@ -93,21 +89,6 @@ class _VerificationProjection:
             references.add(envelope.verification_record_uri)
             record = self.verification.store.get(envelope.verification_record_uri)
             references.update(record.manifest.parents)
-        scope = (
-            CapabilityScope(
-                description=(
-                    "exact artifacts replayed by the installed domain checker"
-                ),
-                parameters=request.input,
-                artifact_uri=envelope.assurance.scope_uri,
-            )
-            if request.input or envelope.assurance.scope_uri is not None
-            else None
-        )
-        complete = (
-            envelope.execution.status is ExecutionStatus.COMPLETED
-            and envelope.assurance.coverage is Coverage.EXHAUSTIVE
-        )
         assurance_level = (
             CapabilityAssuranceLevel.VERIFIED
             if verified
@@ -118,27 +99,6 @@ class _VerificationProjection:
             capability_version="1",
             execution=envelope.execution,
             output=envelope.model_dump(mode="json"),
-            scope=scope,
-            completeness=CapabilityCompleteness(
-                status=(
-                    CapabilityCompletenessStatus.COMPLETE
-                    if complete
-                    else CapabilityCompletenessStatus.PARTIAL
-                ),
-                basis=(
-                    "the checker reported exhaustive coverage"
-                    if complete
-                    else "the checker made no exhaustive-coverage claim"
-                ),
-                assurance_level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified and complete
-                    else CapabilityAssuranceLevel.COMPUTED
-                ),
-                verification_record_uri=(
-                    envelope.verification_record_uri if verified and complete else None
-                ),
-            ),
             assurance=CapabilityAssurance(
                 level=assurance_level,
                 basis=(

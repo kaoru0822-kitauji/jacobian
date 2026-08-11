@@ -104,7 +104,6 @@ class CapabilityDispatchMixin:
             )
             if result.execution.status is not ExecutionStatus.COMPLETED:
                 return result
-        self._validate_artifact_references(result)
         self._validate_verified_result(result)
         log_invocation(result, started)
         return result

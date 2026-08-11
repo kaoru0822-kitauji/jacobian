@@ -87,7 +87,6 @@ def test_sat_cnf_materialization_capability_exposes_reusable_identity(
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.assurance.level.value == "COMPUTED"
-    assert result.completeness.status.value == "NOT_APPLICABLE"
     assert result.output["cnf_uri"] in result.artifact_uris
     resolved = services.core.sat.resolve_cnf(result.output["cnf_uri"])
     assert resolved.cnf.to_dimacs_bytes() == b"p cnf 2 2\n-1 2 0\n1 0\n"

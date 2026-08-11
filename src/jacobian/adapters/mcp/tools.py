@@ -319,9 +319,6 @@ def _run_text_projection(result: CapabilityResult) -> dict[str, Any]:
     for key in (
         "diagnostics",
         "artifact_uris",
-        "scope",
-        "completeness",
-        "relationships",
         "assurance",
     ):
         value = payload.get(key)

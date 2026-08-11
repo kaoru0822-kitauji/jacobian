@@ -8,13 +8,10 @@ from jacobian.canonical import canonicalize_json
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityInvocationExample,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.evidence import (
     CertificateEnvelope,
@@ -192,26 +189,6 @@ class PolynomialIdentityAdapter:
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="global coefficient equality in one declared QQ ring",
-                parameters={"variables": list(validated.variables)},
-                artifact_uri=left.artifact_uri,
-            ),
-            completeness=(
-                CapabilityCompleteness(
-                    status=CapabilityCompletenessStatus.COMPLETE,
-                    basis=(
-                        "every canonical sparse coefficient was replayed independently"
-                    ),
-                    assurance_level=CapabilityAssuranceLevel.VERIFIED,
-                    verification_record_uri=record_uri,
-                )
-                if verified
-                else CapabilityCompleteness(
-                    status=CapabilityCompletenessStatus.UNKNOWN,
-                    basis="the independent checker did not accept the replay",
-                )
-            ),
             assurance=CapabilityAssurance(
                 level=(
                     CapabilityAssuranceLevel.VERIFIED

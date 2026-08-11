@@ -14,14 +14,11 @@ from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInputKind,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
@@ -222,23 +219,6 @@ class SatLratVerificationAdapter:
                     detail="cancelled before independent LRAT replay",
                 ),
                 output=output.model_dump(mode="json"),
-                scope=CapabilityScope(
-                    description="the exact canonical CNF and exact LRAT proof bytes",
-                    parameters={
-                        "proof_format": proof.proof_format,
-                        "proof_format_version": proof.proof_format_version,
-                        "proof_digest": proof.proof_digest,
-                        "variable_map_digest": proof.cnf.variable_map_digest,
-                        "dimacs_digest": proof.cnf.dimacs_digest,
-                        "limits": validated.limits.model_dump(mode="json"),
-                    },
-                    artifact_uri=resolved.artifact.artifact_uri,
-                ),
-                completeness=CapabilityCompleteness(
-                    status=CapabilityCompletenessStatus.NOT_APPLICABLE,
-                    basis="cancelled certificate replay makes no completeness claim",
-                    assurance_level=CapabilityAssuranceLevel.HEURISTIC,
-                ),
                 assurance=CapabilityAssurance(
                     level=CapabilityAssuranceLevel.HEURISTIC,
                     basis="cancelled before checker execution; no conclusion follows",
@@ -309,27 +289,6 @@ class SatLratVerificationAdapter:
             capability_version=self.descriptor.version,
             execution=projected_execution,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="the exact canonical CNF and exact LRAT proof bytes",
-                parameters={
-                    "proof_format": proof.proof_format,
-                    "proof_format_version": proof.proof_format_version,
-                    "proof_digest": proof.proof_digest,
-                    "variable_map_digest": proof.cnf.variable_map_digest,
-                    "dimacs_digest": proof.cnf.dimacs_digest,
-                    "limits": validated.limits.model_dump(mode="json"),
-                },
-                artifact_uri=resolved.artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.NOT_APPLICABLE,
-                basis="certificate replay makes no search-completeness claim",
-                assurance_level=(
-                    CapabilityAssuranceLevel.HEURISTIC
-                    if status == "TIMEOUT"
-                    else CapabilityAssuranceLevel.COMPUTED
-                ),
-            ),
             assurance=CapabilityAssurance(
                 level=(
                     CapabilityAssuranceLevel.VERIFIED

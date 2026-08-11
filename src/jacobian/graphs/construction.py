@@ -11,14 +11,11 @@ from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInvocationExample,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.graph_composition import (
     GraphExplicitConstructionOutput,
@@ -142,24 +139,6 @@ class GraphExplicitConstructionAdapter:
                 runtime_ms=runtime_ms(started),
             ),
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="the complete caller-supplied finite simple graph",
-                parameters={
-                    "order": len(vertices),
-                    "size": len(edges),
-                    "graph_schema_uri": self.resources.graph.graph_schema_uri,
-                    "graph_semantics_uri": self.resources.graph.semantics_uri,
-                },
-                artifact_uri=stored.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.COMPLETE,
-                basis=(
-                    "the complete validated vertex and edge sets were canonically "
-                    "materialized"
-                ),
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis=(

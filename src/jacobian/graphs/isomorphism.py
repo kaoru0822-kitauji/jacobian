@@ -16,13 +16,10 @@ from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
@@ -326,34 +323,6 @@ class GraphIsomorphismAdapter:
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="every vertex pair in two explicit finite graphs",
-                parameters={
-                    "left_graph_uri": validated.left_graph_uri,
-                    "right_graph_uri": validated.right_graph_uri,
-                    "left_order": len(left.graph.vertices),
-                    "right_order": len(right.graph.vertices),
-                },
-                artifact_uri=pair.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=(
-                    CapabilityCompletenessStatus.COMPLETE
-                    if verified
-                    else CapabilityCompletenessStatus.UNKNOWN
-                ),
-                basis=(
-                    "the checker compared the complete finite adjacency relation"
-                    if verified
-                    else "the checker did not accept the replay inputs"
-                ),
-                assurance_level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-                verification_record_uri=record_uri,
-            ),
             assurance=CapabilityAssurance(
                 level=(
                     CapabilityAssuranceLevel.VERIFIED

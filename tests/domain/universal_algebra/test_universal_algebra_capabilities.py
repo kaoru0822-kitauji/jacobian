@@ -7,7 +7,6 @@ from tests.support.core_capability_harnesses import UniversalAlgebraTestServices
 
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
-    CapabilityCompletenessStatus,
     CapabilityRequest,
 )
 from jacobian.contracts.universal_algebra import (
@@ -208,7 +207,6 @@ def test_countermodel_search_reports_fixed_order_no_witness_without_conclusion(
     assert search.execution.status.value == "COMPLETED"
     assert search.output["status"] == "NO_WITNESS_FOUND"
     assert search.output["structure"] is None
-    assert search.scope.parameters["order"] == 1
     assert "conclusion" not in search.output
 
 
@@ -262,7 +260,6 @@ def test_finite_magma_table_enumeration_is_exact_and_canonical(
     assert result.output["ordering"] == "LEXICOGRAPHIC_ROW_MAJOR"
     assert result.output["completeness"] == "COMPLETE"
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    assert result.completeness.status is CapabilityCompletenessStatus.COMPLETE
     table_payloads = [
         runtime.core.store.get(uri).payload for uri in result.output["table_uris"]
     ]

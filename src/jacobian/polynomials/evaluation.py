@@ -10,13 +10,10 @@ from jacobian.canonical import canonicalize_json
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityInvocationExample,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.evidence import (
     CertificateEnvelope,
@@ -135,16 +132,7 @@ class PolynomialMapEvaluationAdapter:
             request=request,
             started=started,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="one exact point evaluation for one polynomial map",
-                parameters={
-                    "map_uri": map_uri,
-                    "point": point.model_dump(mode="json")["values"],
-                },
-                artifact_uri=map_uri,
-            ),
             artifact_uris=(map_uri, evaluation_uri),
-            completeness_basis="every coordinate was evaluated exactly at the point",
         )
 
 
@@ -309,22 +297,11 @@ class PolynomialJacobianAdapter:
             request=request,
             started=started,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="the full Jacobian matrix for one square polynomial map",
-                parameters={
-                    "map_uri": map_uri,
-                    "variable_order": list(polynomial_map.variables),
-                },
-                artifact_uri=map_uri,
-            ),
             artifact_uris=(
                 map_uri,
                 jacobian_artifact.artifact_uri,
                 claim_artifact.artifact_uri,
                 certificate_artifact.artifact_uri,
-            ),
-            completeness_basis=(
-                "every partial derivative and the exact determinant were computed"
             ),
         )
 
@@ -494,26 +471,6 @@ class PolynomialKellerConditionVerifyAdapter:
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="nonzero-constant Jacobian condition for one QQ map",
-                parameters={"map_uri": map_uri},
-                artifact_uri=map_uri,
-            ),
-            completeness=(
-                CapabilityCompleteness(
-                    status=CapabilityCompletenessStatus.COMPLETE,
-                    basis=(
-                        "the full sparse Jacobian and determinant were replayed "
-                        "independently"
-                    ),
-                    assurance_level=CapabilityAssuranceLevel.COMPUTED,
-                )
-                if verified
-                else CapabilityCompleteness(
-                    status=CapabilityCompletenessStatus.UNKNOWN,
-                    basis="the independent Keller-condition checker did not accept",
-                )
-            ),
             assurance=CapabilityAssurance(
                 level=(
                     CapabilityAssuranceLevel.VERIFIED

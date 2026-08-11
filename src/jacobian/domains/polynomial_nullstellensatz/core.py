@@ -15,15 +15,12 @@ from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInputKind,
     CapabilityProviderRuntime,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
@@ -166,16 +163,6 @@ class JacobianDegreeSliceMaterializeAdapter:
                 runtime_ms=max(0, round((time.monotonic() - started) * 1000)),
             ),
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="the fixed normalized QQ degree-(2,3) feasibility slice",
-                parameters={"chart_count": 12, "generator_count_per_chart": 10},
-                artifact_uri=stored.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.COMPLETE,
-                basis="all 3 by 4 nonzero-leading-coefficient charts were materialized",
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis="deterministic exact system materialization; no infeasibility claim",
@@ -375,29 +362,6 @@ class NullstellensatzVerificationAdapter:
                 )
             ),
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="all 12 charts in the exact bound system",
-                parameters={"chart_count": 12, "identity": "sum(h_i*f_i)=1"},
-                artifact_uri=system_artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=(
-                    CapabilityCompletenessStatus.COMPLETE
-                    if verified
-                    else CapabilityCompletenessStatus.UNKNOWN
-                ),
-                basis=(
-                    "the independent checker replayed all 12 identities"
-                    if verified
-                    else "no accepted checker result establishes complete identity coverage"
-                ),
-                assurance_level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else CapabilityAssuranceLevel.COMPUTED
-                ),
-                verification_record_uri=record_uri,
-            ),
             assurance=CapabilityAssurance(
                 level=(
                     CapabilityAssuranceLevel.VERIFIED

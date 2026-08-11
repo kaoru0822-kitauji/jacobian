@@ -40,13 +40,10 @@ from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
@@ -373,24 +370,9 @@ class PolynomialIntervalEncloseAdapter:
             request=request,
             started=started,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description=(
-                    "one closed rational interval for one univariate polynomial"
-                ),
-                parameters={
-                    "polynomial_uri": polynomial_artifact.artifact_uri,
-                    "interval": interval.model_dump(mode="json"),
-                    "degree": polynomial.degree,
-                },
-                artifact_uri=polynomial_artifact.artifact_uri,
-            ),
             artifact_uris=(
                 polynomial_artifact.artifact_uri,
                 enclosure_artifact.artifact_uri,
-            ),
-            completeness_basis=(
-                "the Bernstein-coefficient bound covers the entire declared "
-                "interval; the bound is a valid enclosure, not the exact range"
             ),
             assurance_basis=(
                 "deterministic exact SymPy rational arithmetic over QQ produced "
@@ -584,45 +566,6 @@ class PolynomialIntervalEnclosureVerifyAdapter:
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description=(
-                    "one closed rational interval for one univariate polynomial"
-                ),
-                parameters={
-                    "polynomial_uri": polynomial_artifact.artifact_uri,
-                    "interval": interval.model_dump(mode="json"),
-                    "degree": polynomial.degree,
-                },
-                artifact_uri=polynomial_artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=(
-                    CapabilityCompletenessStatus.COMPLETE
-                    if checked.execution.status is ExecutionStatus.COMPLETED
-                    else CapabilityCompletenessStatus.UNKNOWN
-                ),
-                basis=(
-                    "the independent checker replayed every Bernstein coefficient "
-                    "over the declared interval"
-                    if verified
-                    else (
-                        "the adapter packaged the claimed enclosure, but the "
-                        "checker did not accept the bound replay"
-                        if checked.execution.status is ExecutionStatus.COMPLETED
-                        else "checker execution did not establish complete coverage"
-                    )
-                ),
-                assurance_level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else (
-                        CapabilityAssuranceLevel.COMPUTED
-                        if checked.execution.status is ExecutionStatus.COMPLETED
-                        else CapabilityAssuranceLevel.HEURISTIC
-                    )
-                ),
-                verification_record_uri=record_uri,
-            ),
             assurance=CapabilityAssurance(
                 level=(
                     CapabilityAssuranceLevel.VERIFIED

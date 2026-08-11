@@ -7,11 +7,9 @@ from typing import Any, Protocol
 from jacobian.capability_errors import CapabilityError
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
-    CapabilityCompletenessStatus,
     CapabilityResult,
 )
 from jacobian.contracts.exact_domain_verification import InlineExactVerificationRecord
-from jacobian.contracts.results import Coverage
 from jacobian.contracts.verification import VerificationRecord
 from jacobian.storage.errors import StorageError
 
@@ -22,19 +20,6 @@ class VerificationOwner(Protocol):
 
 class CapabilityVerificationMixin:
     """Own the trust boundary between result projections and local records."""
-
-    @staticmethod
-    def _validate_artifact_references(result: CapabilityResult) -> None:
-        exposed = set(result.artifact_uris)
-        referenced: set[str] = set()
-        if result.scope is not None and result.scope.artifact_uri is not None:
-            referenced.add(result.scope.artifact_uri)
-        if result.completeness.verification_record_uri is not None:
-            referenced.add(result.completeness.verification_record_uri)
-        if referenced - exposed:
-            raise CapabilityError(
-                "capability result has first-class references missing from artifact_uris"
-            )
 
     def _validate_verified_result(
         self: VerificationOwner,
@@ -79,8 +64,6 @@ class CapabilityVerificationMixin:
                 "verified capability result omits verification-bound artifacts"
             )
         _validate_projected_output(result, record_uri, record)
-        record_parents = set(record_artifact.manifest.parents)
-        _validate_verified_completeness(result, record, record_parents)
 
 
 def _validate_inline_exact_record(
@@ -103,7 +86,6 @@ def _validate_inline_exact_record(
         raise CapabilityError(
             "verified capability result does not expose the inline record semantics"
         )
-    _validate_inline_exact_scope(result, record)
     projected_record = result.output.get("verification_record_uri")
     if projected_record is not None and projected_record != record_uri:
         raise CapabilityError(
@@ -117,29 +99,6 @@ def _validate_inline_exact_record(
         raise CapabilityError(
             "verified capability output differs from the checked conclusion"
         )
-    if result.completeness.assurance_level is CapabilityAssuranceLevel.VERIFIED:
-        raise CapabilityError(
-            "inline exact verification cannot certify artifact completeness"
-        )
-
-
-def _validate_inline_exact_scope(
-    result: CapabilityResult,
-    record: InlineExactVerificationRecord,
-) -> None:
-    scope = result.scope
-    if scope is None or scope.parameters is None:
-        raise CapabilityError("verified inline replay has no bound scope parameters")
-    expected = {
-        "operation_id": record.operation_id,
-        "claim_digest": record.bindings.claim_digest,
-        "candidate_digest": record.bindings.candidate_digest,
-        "semantics_digest": record.bindings.semantics_digest,
-        "checker_id": record.checker_id,
-        "witness_format": record.witness_format,
-    }
-    if scope.parameters != expected:
-        raise CapabilityError("verified inline replay scope does not bind its record")
 
 
 def _validate_projected_output(
@@ -160,27 +119,6 @@ def _validate_projected_output(
         raise CapabilityError(
             "verified capability output differs from the checked conclusion"
         )
-
-
-def _validate_verified_completeness(
-    result: CapabilityResult,
-    record: VerificationRecord,
-    record_parents: set[str],
-) -> None:
-    if (
-        result.completeness.status is CapabilityCompletenessStatus.COMPLETE
-        and result.completeness.assurance_level is CapabilityAssuranceLevel.VERIFIED
-    ):
-        if (
-            result.scope is None
-            or result.scope.artifact_uri is None
-            or result.scope.artifact_uri not in record_parents
-        ):
-            raise CapabilityError(
-                "verified completeness requires a checker-bound scope artifact"
-            )
-        if record.coverage not in {Coverage.EXHAUSTIVE, Coverage.BOUNDED}:
-            raise CapabilityError("verified completeness differs from checked coverage")
 
 
 __all__ = ["CapabilityVerificationMixin"]

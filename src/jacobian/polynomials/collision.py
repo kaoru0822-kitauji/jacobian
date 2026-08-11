@@ -10,12 +10,9 @@ from jacobian.canonical import format_canonical_integer
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.evidence import (
     EvidenceBindings,
@@ -242,23 +239,7 @@ class PolynomialCollisionAdapter:
             request=request,
             started=started,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description=(
-                    "exact comparison of two point-evaluation artifacts for one "
-                    "polynomial map"
-                ),
-                parameters={
-                    "candidate_uri": candidate_uri,
-                    "first_evaluation_uri": first_evaluation_artifact.artifact_uri,
-                    "second_evaluation_uri": second_evaluation_artifact.artifact_uri,
-                },
-                artifact_uri=candidate_uri,
-            ),
             artifact_uris=tuple(artifact_uris),
-            completeness_basis=(
-                "both supplied evaluation artifact payloads were structurally "
-                "validated and their declared values were compared exactly"
-            ),
             assurance_basis=(
                 "deterministic structural comparison of canonical rational payloads; "
                 "the source evaluations were not replayed and any candidate witness "
@@ -480,16 +461,6 @@ class PolynomialCollisionSearchAdapter:
                     witness_uri,
                 ]
             )
-        exhausted_grid = examined == grid_point_count
-        scope = CapabilityScope(
-            description="declared finite rational grid",
-            parameters={
-                "max_abs_numerator": validated.max_abs_numerator,
-                "max_denominator": validated.max_denominator,
-                "grid_point_count": grid_point_count,
-            },
-            artifact_uri=map_uri,
-        )
         artifact_uris = tuple(
             dict.fromkeys(uri for uri in artifacts if uri is not None)
         )
@@ -502,15 +473,6 @@ class PolynomialCollisionSearchAdapter:
                     runtime_ms=max(0, round((time.monotonic() - started) * 1000)),
                     detail="The client cancelled the collision-grid search.",
                 ),
-                completeness=CapabilityCompleteness(
-                    status=CapabilityCompletenessStatus.PARTIAL,
-                    basis=(
-                        "the deterministic grid prefix completed before client "
-                        "cancellation; no mathematical conclusion or independent "
-                        "verification is claimed"
-                    ),
-                    assurance_level=CapabilityAssuranceLevel.COMPUTED,
-                ),
                 assurance=CapabilityAssurance(
                     level=CapabilityAssuranceLevel.COMPUTED,
                     basis=(
@@ -519,7 +481,6 @@ class PolynomialCollisionSearchAdapter:
                     ),
                 ),
                 output=output.model_dump(mode="json"),
-                scope=scope,
                 artifact_uris=artifact_uris,
             )
         return _computed_result(
@@ -527,18 +488,7 @@ class PolynomialCollisionSearchAdapter:
             request=request,
             started=started,
             output=output.model_dump(mode="json"),
-            scope=scope,
             artifact_uris=artifact_uris,
-            completeness_basis=(
-                "the deterministic grid was fully enumerated"
-                if exhausted_grid
-                else "the canonical prefix through the first collision was enumerated"
-            ),
-            completeness_status=(
-                CapabilityCompletenessStatus.COMPLETE
-                if exhausted_grid
-                else CapabilityCompletenessStatus.PARTIAL
-            ),
             assurance_basis=(
                 "deterministic exact SymPy search; any returned witness remains "
                 "unverified until independent replay"
@@ -656,16 +606,6 @@ class PolynomialCollisionVerifyAdapter:
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="one direct collision witness over QQ",
-                parameters={"map_uri": map_uri},
-                artifact_uri=map_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.NOT_APPLICABLE,
-                basis="direct witness verification makes no search coverage claim",
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
             assurance=CapabilityAssurance(
                 level=(
                     CapabilityAssuranceLevel.VERIFIED
@@ -798,19 +738,6 @@ class PolynomialMapInverseCollisionVerifyAdapter:
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="one direct collision over QQ",
-                parameters={"map_uri": map_uri},
-                artifact_uri=map_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.NOT_APPLICABLE,
-                basis=(
-                    "a direct collision makes no bounded-search or global "
-                    "enumeration claim"
-                ),
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
             assurance=CapabilityAssurance(
                 level=(
                     CapabilityAssuranceLevel.VERIFIED

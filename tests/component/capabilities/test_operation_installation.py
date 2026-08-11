@@ -161,7 +161,6 @@ def test_synthetic_bundle_returns_an_inline_typed_result(
     assert result.output["result"] == {"doubled": 12}
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.artifact_uris == ()
-    assert result.scope is None
 
 
 def test_operation_uses_one_typed_parse_not_its_discovery_schema(
@@ -318,7 +317,6 @@ def test_materialized_operation_retains_artifacts_lineage_and_typed_preview(
     assert result.output["backend_version"] == "synthetic-1"
     assert result.output["preview"] == {"summary": "doubled=12"}
     assert result.output["preview_complete"] is True
-    assert result.scope is None
     input_artifact = operation_services.core.store.get(input_uri)
     output_artifact = operation_services.core.store.get(result_uri)
     assert input_artifact.payload == {"value": 6}

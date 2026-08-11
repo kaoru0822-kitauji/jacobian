@@ -17,8 +17,6 @@ from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInputKind,
@@ -27,7 +25,6 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderRuntime,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import (
@@ -201,23 +198,6 @@ class SatCnfMaterializationAdapter:
             capability_version=self.descriptor.version,
             execution=Execution(status=ExecutionStatus.COMPLETED),
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="the complete canonicalized CNF supplied in this request",
-                parameters={
-                    "declared_scope": "FULL_CNF",
-                    "variable_count": binding.variable_count,
-                    "clause_count": binding.clause_count,
-                },
-                artifact_uri=binding.cnf_artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.NOT_APPLICABLE,
-                basis=(
-                    "materialization stores one complete input CNF and makes no "
-                    "satisfiability or enumeration claim"
-                ),
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis=(
@@ -509,27 +489,6 @@ class SatAssignmentVerificationAdapter:
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="the full exact canonical CNF bound by the assignment",
-                parameters={
-                    "declared_scope": "FULL_CNF",
-                    "variable_count": resolved.assignment.cnf.variable_count,
-                    "clause_count": resolved.assignment.cnf.clause_count,
-                },
-                artifact_uri=resolved.cnf_artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.NOT_APPLICABLE,
-                basis=(
-                    "direct assignment replay checks one witness and makes no "
-                    "enumeration or UNSAT completeness claim"
-                ),
-                assurance_level=(
-                    CapabilityAssuranceLevel.COMPUTED
-                    if checked.execution.status is ExecutionStatus.COMPLETED
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-            ),
             assurance=CapabilityAssurance(
                 level=assurance_level,
                 basis=(
@@ -737,30 +696,6 @@ class SatUnsatProofVerificationAdapter:
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="the full exact canonical CNF bound by the raw proof",
-                parameters={
-                    "declared_scope": "CANONICAL_CNF_ONLY",
-                    "domain_encoding_verified": False,
-                    "variable_count": resolved.proof.cnf.variable_count,
-                    "clause_count": resolved.proof.cnf.clause_count,
-                    "proof_format": resolved.proof.proof_format,
-                    "proof_format_version": resolved.proof.proof_format_version,
-                },
-                artifact_uri=resolved.cnf_artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.NOT_APPLICABLE,
-                basis=(
-                    "certificate replay checks one exact proof and makes no "
-                    "enumeration-completeness claim"
-                ),
-                assurance_level=(
-                    CapabilityAssuranceLevel.COMPUTED
-                    if checked.execution.status is ExecutionStatus.COMPLETED
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-            ),
             assurance=CapabilityAssurance(
                 level=assurance_level,
                 basis=(

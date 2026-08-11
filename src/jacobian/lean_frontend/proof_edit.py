@@ -14,14 +14,11 @@ from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityProviderRuntime,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.lean_proof_edit import (
     LeanProofEditArtifact,
@@ -200,27 +197,6 @@ class LeanProofEditAdapter:
                 update={"runtime_ms": int((time.monotonic() - started) * 1000)}
             ),
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="one exact edited Lean proof for one unchanged statement",
-                parameters={
-                    "environment": validated.environment.value,
-                    "statement": validated.statement,
-                },
-                artifact_uri=artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.NOT_APPLICABLE,
-                basis=(
-                    "direct proof replay makes no search-completeness claim"
-                    if checked.result.execution.status is ExecutionStatus.COMPLETED
-                    else "the Lean checker did not complete; completeness is not applicable"
-                ),
-                assurance_level=(
-                    CapabilityAssuranceLevel.COMPUTED
-                    if checked.result.execution.status is ExecutionStatus.COMPLETED
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-            ),
             assurance=CapabilityAssurance(
                 level=(
                     CapabilityAssuranceLevel.VERIFIED

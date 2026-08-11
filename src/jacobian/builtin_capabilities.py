@@ -9,22 +9,18 @@ from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInvocationExample,
     CapabilityProviderRuntime,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.lean import (
     LeanDeclarationInspectOutput,
     LeanDeclarationInspectRequest,
     LeanDeclarationSearchOutput,
     LeanDeclarationSearchRequest,
-    LeanDeclarationSearchStopReason,
     LeanDependencyGraphOutput,
     LeanDependencyGraphRequest,
     LeanEnvironment,
@@ -183,39 +179,11 @@ class LeanDeclarationSearchAdapter:
             searched = self.declarations.search(query)
         except LeanDeclarationBackendError as exc:
             raise _declaration_invocation_error(exc) from exc
-        complete = searched.stop_reason is LeanDeclarationSearchStopReason.EXHAUSTED
         return CapabilityResult(
             capability_id=self.descriptor.capability_id,
             capability_version=self.descriptor.version,
             execution=Execution(status=ExecutionStatus.COMPLETED),
             output=searched.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="the installed pinned Lean declaration environment",
-                parameters={
-                    "environment": searched.environment.value,
-                    "environment_digest": searched.environment_digest,
-                    "matching": (
-                        "case-sensitive name substring and exact constants occurring "
-                        "in the elaborated type"
-                    ),
-                    "namespace_prefixes": list(query.namespace_prefixes),
-                    "kinds": [kind.value for kind in query.kinds],
-                },
-            ),
-            completeness=CapabilityCompleteness(
-                status=(
-                    CapabilityCompletenessStatus.COMPLETE
-                    if complete
-                    else CapabilityCompletenessStatus.PARTIAL
-                ),
-                basis=(
-                    "the deterministic declaration scan exhausted the declared "
-                    "environment and filters"
-                    if complete
-                    else "the result budget stopped the declaration scan"
-                ),
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis=(
@@ -265,19 +233,6 @@ class LeanDeclarationInspectAdapter:
             capability_version=self.descriptor.version,
             execution=Execution(status=ExecutionStatus.COMPLETED),
             output=inspected.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="one exact declaration in the pinned Lean environment",
-                parameters={
-                    "environment": inspected.environment.value,
-                    "environment_digest": inspected.environment_digest,
-                    "declaration_name": query.declaration_name,
-                },
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.COMPLETE,
-                basis="the exact declaration name resolved in the declared environment",
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis=(
@@ -345,37 +300,6 @@ class LeanDependencyGraphAdapter:
             capability_version=self.descriptor.version,
             execution=Execution(status=ExecutionStatus.COMPLETED),
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description=(
-                    "the bounded elaborated type/value dependency graph rooted at "
-                    "one declaration in the pinned Lean environment"
-                ),
-                parameters={
-                    "environment": graph.environment.value,
-                    "environment_digest": graph.environment_digest,
-                    "root_declaration": query.root_declaration,
-                    "max_depth": query.max_depth,
-                    "max_nodes": query.max_nodes,
-                },
-                artifact_uri=graph_artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=(
-                    CapabilityCompletenessStatus.COMPLETE
-                    if graph.closure_complete
-                    else CapabilityCompletenessStatus.PARTIAL
-                ),
-                basis=(
-                    "Lean's elaborated constant references exhausted the transitive "
-                    "dependency closure"
-                    if graph.closure_complete
-                    else (
-                        "the requested depth or node budget left the returned "
-                        "frontier unexpanded"
-                    )
-                ),
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis=(

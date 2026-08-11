@@ -22,15 +22,12 @@ from jacobian.checker_authorization import LeanCheckerInstallation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInputKind,
     CapabilityProviderRuntime,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.lean import LeanEnvironment
 from jacobian.contracts.lean_proof_state_inspect import (
@@ -143,22 +140,6 @@ class LeanProofStateInspectAdapter:
                 detail="read-only inspection; no Lean process was started",
             ),
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="one immutable proof state inspected without replay",
-                parameters={
-                    "environment": validated.environment.value,
-                    "state_uri": validated.state_uri,
-                    "state_digest": state.state_digest,
-                },
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.COMPLETE,
-                basis=(
-                    "the artifact's recorded goals are returned in full; "
-                    "no search or replay is performed"
-                ),
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis=(

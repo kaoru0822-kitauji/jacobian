@@ -14,13 +14,10 @@ from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
 from jacobian.contracts.graph_degree_sequence import (
@@ -236,22 +233,6 @@ class GraphDegreeSequenceAdapter:
                 runtime_ms=runtime_ms(started),
             ),
             output=output.model_dump(mode="json", exclude_none=True),
-            scope=CapabilityScope(
-                description="one finite nonnegative integer degree sequence",
-                parameters={
-                    "degree_sequence": list(sequence),
-                    "graph_model": "finite simple undirected graph",
-                },
-                artifact_uri=claim_artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.COMPLETE,
-                basis=(
-                    "the result carries either a full graph realization or one "
-                    "necessary-condition obstruction; verification remains separate"
-                ),
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis=(

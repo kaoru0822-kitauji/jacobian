@@ -15,8 +15,6 @@ from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationE
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInvocationExample,
@@ -24,7 +22,6 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderRuntime,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.polynomial_expressions import (
     SYMPY_POLYNOMIAL_NORMALIZATION_CONFIGURATION,
@@ -233,7 +230,6 @@ class SympyPolynomialExpressionNormalizeAdapter:
             expression_uri = self.expressions.put_expression(
                 validated.expression
             ).artifact_uri
-            resolved = self.expressions.resolve_expression(expression_uri)
         except (ValidationError, ValueError) as exc:
             budget_error = _expansion_budget_error(exc)
             if budget_error is not None:
@@ -345,42 +341,6 @@ class SympyPolynomialExpressionNormalizeAdapter:
                 detail=run.detail,
             ),
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="the full declared typed QQ-polynomial expression",
-                parameters={
-                    "declared_scope": "FULL_EXPRESSION",
-                    "variables": list(resolved.expression.variables),
-                    "node_count": resolved.binding.node_count,
-                    "depth": resolved.binding.depth,
-                    "expanded_term_upper_bound": (
-                        resolved.binding.expanded_term_upper_bound
-                    ),
-                    "coefficient_digit_budget": (
-                        resolved.binding.coefficient_digit_budget
-                    ),
-                    "wall_seconds": validated.resource_budget.wall_seconds,
-                },
-                artifact_uri=expression_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=(
-                    CapabilityCompletenessStatus.COMPLETE
-                    if normalization_uri is not None
-                    else CapabilityCompletenessStatus.UNKNOWN
-                ),
-                basis=(
-                    "one full canonical sparse coefficient map was produced; "
-                    "provider completion is not independent verification"
-                    if normalization_uri is not None
-                    else "the bounded provider attempt produced no normalization "
-                    "evidence; no mathematical conclusion follows"
-                ),
-                assurance_level=(
-                    CapabilityAssuranceLevel.COMPUTED
-                    if run.execution_status is ExecutionStatus.COMPLETED
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-            ),
             assurance=CapabilityAssurance(
                 level=(
                     CapabilityAssuranceLevel.COMPUTED

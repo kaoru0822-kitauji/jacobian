@@ -15,14 +15,11 @@ from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInputKind,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
 from jacobian.contracts.exact import CanonicalRational
@@ -229,25 +226,6 @@ class GraphNeighborhoodIndependenceAdapter:
                 runtime_ms=runtime_ms(started),
             ),
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description=(
-                    "all open neighborhoods of one finite simple undirected graph"
-                ),
-                parameters={
-                    "graph_uri": validated.graph_uri,
-                    "graph_order": graph.number_of_nodes(),
-                    "maximum_neighborhood_order": 24,
-                },
-                artifact_uri=validated.graph_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.COMPLETE,
-                basis=(
-                    "every open neighborhood was solved exactly within the "
-                    "advertised 24-vertex limit; verification remains separate"
-                ),
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis=(

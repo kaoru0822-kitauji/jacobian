@@ -11,7 +11,6 @@ from jacobian.canonical import loads_strict_json
 from jacobian.capability_service import CapabilityService
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
-    CapabilityCompletenessStatus,
     CapabilityRequest,
 )
 from jacobian.contracts.number_theory import (
@@ -229,7 +228,6 @@ def test_discrete_logarithm_timeout_is_an_artifact_free_non_conclusion(
     assert result.execution.status is ExecutionStatus.TIMEOUT
     assert result.diagnostics[0].code == "DISCRETE_LOGARITHM_TIMEOUT"
     assert result.artifact_uris == ()
-    assert result.completeness.status is CapabilityCompletenessStatus.NOT_APPLICABLE
     assert observed["timeout_seconds"] == 1.0
     assert observed["resource_limits"] == ProcessResourceLimits(
         cpu_seconds=2,

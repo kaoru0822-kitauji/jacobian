@@ -12,13 +12,10 @@ from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import (
@@ -296,42 +293,6 @@ class PolynomialExpressionNormalizationVerificationAdapter:
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description=(
-                    "the full typed source expression and every proposed canonical "
-                    "sparse coefficient"
-                ),
-                parameters={
-                    "declared_scope": "FULL_EXPRESSION",
-                    "variables": list(resolved.expression.variables),
-                    "node_count": resolved.candidate.source.node_count,
-                    "normalized_term_count": len(resolved.candidate.normalized.terms),
-                },
-                artifact_uri=resolved.expression_artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=(
-                    CapabilityCompletenessStatus.COMPLETE
-                    if verified
-                    else CapabilityCompletenessStatus.NOT_APPLICABLE
-                ),
-                basis=(
-                    "the independent checker replayed every node and canonical "
-                    "coefficient of the bound finite AST relation"
-                    if verified
-                    else "direct exact replay makes no accepted completeness claim"
-                ),
-                assurance_level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else (
-                        CapabilityAssuranceLevel.COMPUTED
-                        if checked.execution.status is ExecutionStatus.COMPLETED
-                        else CapabilityAssuranceLevel.HEURISTIC
-                    )
-                ),
-                verification_record_uri=record_uri,
-            ),
             assurance=CapabilityAssurance(
                 level=(
                     CapabilityAssuranceLevel.VERIFIED

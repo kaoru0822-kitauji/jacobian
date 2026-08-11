@@ -324,15 +324,6 @@ class CapabilityAssuranceLevel(StrEnum):
     VERIFIED = "VERIFIED"
 
 
-class CapabilityCompletenessStatus(StrEnum):
-    """How much of the explicitly declared scope an operation covered."""
-
-    NOT_APPLICABLE = "NOT_APPLICABLE"
-    UNKNOWN = "UNKNOWN"
-    PARTIAL = "PARTIAL"
-    COMPLETE = "COMPLETE"
-
-
 class CapabilityCatalogRelationshipKind(StrEnum):
     """Factual installed-capability relationship exposed by the catalog."""
 
@@ -439,49 +430,6 @@ class CapabilityAssurance(ContractModel):
         return self
 
 
-class CapabilityScope(ContractModel):
-    """Domain-owned scope parameters, optionally materialized as an artifact."""
-
-    description: str | None = Field(default=None, min_length=1, max_length=512)
-    parameters: dict[str, Any] = Field(default_factory=dict)
-    artifact_uri: ArtifactUri | None = None
-
-    @model_validator(mode="after")
-    def require_explicit_scope(self) -> Self:
-        canonicalize_json(self.parameters)
-        if not self.parameters and self.artifact_uri is None:
-            raise ValueError("scope requires parameters or an artifact URI")
-        return self
-
-
-class CapabilityCompleteness(ContractModel):
-    """Coverage claim over the result's exact declared scope."""
-
-    status: CapabilityCompletenessStatus = CapabilityCompletenessStatus.NOT_APPLICABLE
-    basis: str = Field(min_length=1, max_length=1024)
-    assurance_level: CapabilityAssuranceLevel = CapabilityAssuranceLevel.HEURISTIC
-    verification_record_uri: ArtifactUri | None = None
-
-    @model_validator(mode="after")
-    def bind_verified_completeness(self) -> Self:
-        if (
-            self.assurance_level is CapabilityAssuranceLevel.VERIFIED
-            and self.verification_record_uri is None
-        ):
-            raise ValueError("verified completeness requires a record URI")
-        if (
-            self.assurance_level is not CapabilityAssuranceLevel.VERIFIED
-            and self.verification_record_uri is not None
-        ):
-            raise ValueError("only verified completeness may carry a record URI")
-        if (
-            self.status is not CapabilityCompletenessStatus.COMPLETE
-            and self.assurance_level is CapabilityAssuranceLevel.VERIFIED
-        ):
-            raise ValueError("only complete coverage may be independently verified")
-        return self
-
-
 class CapabilityDiagnostic(ContractModel):
     """Actionable, stage-aware failure information without a truth claim."""
 
@@ -500,8 +448,6 @@ def _validate_capability_execution_lane(
     execution_status: str,
     diagnostics: tuple[CapabilityDiagnostic, ...],
     assurance_level: CapabilityAssuranceLevel,
-    completeness_status: CapabilityCompletenessStatus,
-    scope: CapabilityScope | None,
 ) -> None:
     if execution_status == "COMPLETED" and diagnostics:
         raise ValueError("completed capability execution cannot carry diagnostics")
@@ -510,27 +456,6 @@ def _validate_capability_execution_lane(
         and assurance_level is CapabilityAssuranceLevel.VERIFIED
     ):
         raise ValueError("failed capability execution cannot be verified")
-    if completeness_status is CapabilityCompletenessStatus.COMPLETE and scope is None:
-        raise ValueError("complete result requires explicit scope")
-    if (
-        execution_status != "COMPLETED"
-        and completeness_status is CapabilityCompletenessStatus.COMPLETE
-    ):
-        raise ValueError("failed execution cannot be complete")
-
-
-def _validate_verified_completeness(
-    completeness: CapabilityCompleteness,
-    assurance_level: CapabilityAssuranceLevel,
-    record_uri: ArtifactUri | None,
-) -> None:
-    if completeness.assurance_level is CapabilityAssuranceLevel.VERIFIED:
-        if assurance_level is not CapabilityAssuranceLevel.VERIFIED:
-            raise ValueError("verified completeness requires verified result assurance")
-        if completeness.verification_record_uri != record_uri:
-            raise ValueError(
-                "verified completeness must use the result verification record"
-            )
 
 
 class CapabilityResult(ContractModel):
@@ -541,12 +466,6 @@ class CapabilityResult(ContractModel):
     capability_version: str = Field(min_length=1, max_length=64)
     execution: Execution
     output: dict[str, Any] = Field(default_factory=dict)
-    scope: CapabilityScope | None = None
-    completeness: CapabilityCompleteness = Field(
-        default_factory=lambda: CapabilityCompleteness(
-            basis="the operation makes no completeness claim",
-        )
-    )
     diagnostics: tuple[CapabilityDiagnostic, ...] = ()
     assurance: CapabilityAssurance
     artifact_uris: tuple[ArtifactUri, ...] = ()
@@ -558,15 +477,8 @@ class CapabilityResult(ContractModel):
             self.execution.status.value,
             self.diagnostics,
             self.assurance.level,
-            self.completeness.status,
-            self.scope,
         )
         record_uri = self.assurance.verification_record_uri
-        _validate_verified_completeness(
-            self.completeness,
-            self.assurance.level,
-            record_uri,
-        )
         if record_uri is not None and record_uri not in self.artifact_uris:
             raise ValueError(
                 "the verification record must be included in artifact_uris"

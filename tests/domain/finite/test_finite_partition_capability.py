@@ -54,9 +54,6 @@ def test_finite_partition_verify_replays_with_an_authorized_checker(
     assert result.capability_id == "case.partition.finite.verify"
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
     assert result.assurance.verification_record_uri is not None
-    assert result.completeness.verification_record_uri == (
-        result.assurance.verification_record_uri
-    )
 
 
 def test_finite_partition_contract_and_result_preserve_semantic_boundary(
@@ -71,9 +68,7 @@ def test_finite_partition_contract_and_result_preserve_semantic_boundary(
     result = runtime.core.capabilities.invoke(_request(verify=True))
 
     assert "opaque caller-supplied strings" in producer.description
-    assert "external-domain completeness" in result.scope.description
     assert "member/case semantics were not checked" in result.assurance.basis
-    assert "member/case semantics" in result.completeness.basis
 
 
 def test_finite_partition_reports_conditional_disjointness_scope(
@@ -88,7 +83,6 @@ def test_finite_partition_reports_conditional_disjointness_scope(
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
     assert result.output["overlaps"] == ["0"]
     assert "disjointness was not required" in result.assurance.basis
-    assert "disjointness was not required" in result.completeness.basis
     certificate = runtime.core.store.get(result.output["certificate_uri"])
     assert certificate.payload["payload"]["replay"] == (
         "equality-based finite coverage and conditional disjointness"
@@ -117,4 +111,3 @@ def test_finite_partition_duplicate_case_ids_cannot_report_complete(
     )
 
     assert result.output["duplicate_case_ids"] == ["even"]
-    assert result.completeness.status.value == "PARTIAL"

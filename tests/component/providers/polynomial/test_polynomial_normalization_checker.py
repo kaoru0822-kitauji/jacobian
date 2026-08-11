@@ -9,7 +9,6 @@ from tests.support.rationals import rational_payload as _q
 
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
-    CapabilityCompletenessStatus,
 )
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.process_policy import ProcessResult, ProcessTermination
@@ -74,12 +73,7 @@ def test_independent_checker_verifies_full_ast_relation(
     assert verified.output["conclusion"] == "TRUE"
     assert verified.output["verification_record_uri"].startswith("artifact://sha256/")
     assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
-    assert verified.completeness.status is CapabilityCompletenessStatus.COMPLETE
-    assert verified.completeness.assurance_level is CapabilityAssuranceLevel.VERIFIED
-    assert (
-        verified.completeness.verification_record_uri
-        == verified.assurance.verification_record_uri
-    )
+    assert verified.assurance.verification_record_uri is not None
 
 
 def test_independent_checker_rejects_wrong_bound_coefficients(

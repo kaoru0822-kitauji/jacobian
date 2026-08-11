@@ -86,14 +86,6 @@ def test_rup_lrat_derives_empty_clause_and_binds_artifacts(
     assert result.output["verification_record_uri"] is not None
     proof = lrat_services.core.store.get(result.output["proof_uri"])
     assert proof.manifest.parents == (cnf.artifact_uri,)
-    assert (
-        proof.payload["cnf"]["variable_map_digest"]
-        == result.scope.parameters["variable_map_digest"]
-    )
-    assert (
-        proof.payload["cnf"]["dimacs_digest"]
-        == result.scope.parameters["dimacs_digest"]
-    )
 
 
 def test_invalid_or_incomplete_lrat_never_proves_sat_or_unsat(

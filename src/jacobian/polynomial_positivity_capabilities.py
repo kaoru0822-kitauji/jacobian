@@ -35,13 +35,10 @@ from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
@@ -392,25 +389,9 @@ class PolynomialIntervalPositivityDecideAdapter:
             request=request,
             started=started,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description=(
-                    "strict positivity of one univariate polynomial on one "
-                    "closed rational interval"
-                ),
-                parameters={
-                    "polynomial_uri": polynomial_artifact.artifact_uri,
-                    "interval": interval.model_dump(mode="json"),
-                    "degree": polynomial.degree,
-                },
-                artifact_uri=polynomial_artifact.artifact_uri,
-            ),
             artifact_uris=(
                 polynomial_artifact.artifact_uri,
                 decision_artifact.artifact_uri,
-            ),
-            completeness_basis=(
-                "Sturm's theorem counts every distinct real root in the "
-                "declared interval; the decision is exact and exhaustive"
             ),
             assurance_basis=(
                 "deterministic exact SymPy rational arithmetic over QQ produced "
@@ -625,46 +606,6 @@ class PolynomialIntervalPositivityVerifyAdapter:
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description=(
-                    "strict positivity of one univariate polynomial on one "
-                    "closed rational interval"
-                ),
-                parameters={
-                    "polynomial_uri": polynomial_artifact.artifact_uri,
-                    "interval": interval.model_dump(mode="json"),
-                    "degree": polynomial.degree,
-                },
-                artifact_uri=polynomial_artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=(
-                    CapabilityCompletenessStatus.COMPLETE
-                    if checked.execution.status is ExecutionStatus.COMPLETED
-                    else CapabilityCompletenessStatus.UNKNOWN
-                ),
-                basis=(
-                    "the independent checker replayed the full Sturm sequence "
-                    "over the declared interval"
-                    if verified
-                    else (
-                        "the adapter packaged the claimed decision, but the "
-                        "checker did not accept the Sturm replay"
-                        if checked.execution.status is ExecutionStatus.COMPLETED
-                        else "checker execution did not establish complete coverage"
-                    )
-                ),
-                assurance_level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else (
-                        CapabilityAssuranceLevel.COMPUTED
-                        if checked.execution.status is ExecutionStatus.COMPLETED
-                        else CapabilityAssuranceLevel.HEURISTIC
-                    )
-                ),
-                verification_record_uri=record_uri,
-            ),
             assurance=CapabilityAssurance(
                 level=(
                     CapabilityAssuranceLevel.VERIFIED

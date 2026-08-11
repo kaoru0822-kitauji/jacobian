@@ -21,8 +21,6 @@ from jacobian.contracts.capabilities import (
     CapabilityCatalogRelationship,
     CapabilityCatalogRelationshipKind,
     CapabilityCatalogRelationshipRegistration,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInputKind,
@@ -31,7 +29,6 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderRuntime,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import EvidenceBindings, WitnessEnvelope
@@ -623,23 +620,6 @@ class ExactComputedVerificationAdapter:
                 capability_version=self.descriptor.version,
                 execution=Execution(status=ExecutionStatus.COMPLETED),
                 output=output.model_dump(mode="json"),
-                scope=CapabilityScope(
-                    description="the authorized independent checker's bounded scope",
-                    parameters={
-                        "operation_id": declaration.declaration.capability_id,
-                        "scope_supported": False,
-                    },
-                    artifact_uri=(
-                        source_artifacts[0].artifact_uri
-                        if source_artifacts is not None
-                        else None
-                    ),
-                ),
-                completeness=CapabilityCompleteness(
-                    status=CapabilityCompletenessStatus.NOT_APPLICABLE,
-                    basis="the input lies outside this checker's declared scope",
-                    assurance_level=CapabilityAssuranceLevel.COMPUTED,
-                ),
                 assurance=CapabilityAssurance(
                     level=CapabilityAssuranceLevel.COMPUTED,
                     basis=(
@@ -765,26 +745,6 @@ class ExactComputedVerificationAdapter:
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="the exact inline operation input and result",
-                parameters={
-                    "operation_id": declaration.declaration.capability_id,
-                    "claim_digest": bindings.claim_digest,
-                    "candidate_digest": bindings.candidate_digest,
-                    "semantics_digest": bindings.semantics_digest,
-                    "checker_id": declaration.checker_id,
-                    "witness_format": declaration.declaration.format_id,
-                },
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.NOT_APPLICABLE,
-                basis="direct exact replay makes no search-completeness claim",
-                assurance_level=(
-                    CapabilityAssuranceLevel.COMPUTED
-                    if completed
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-            ),
             assurance=CapabilityAssurance(
                 level=(
                     CapabilityAssuranceLevel.VERIFIED
@@ -868,24 +828,6 @@ class ExactComputedVerificationAdapter:
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="the complete stored exact operation input and result",
-                parameters={
-                    "operation_id": self.declaration.declaration.capability_id,
-                    "input_uri": input_artifact.artifact_uri,
-                    "result_uri": result_artifact.artifact_uri,
-                },
-                artifact_uri=input_artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.NOT_APPLICABLE,
-                basis="direct exact replay makes no search-completeness claim",
-                assurance_level=(
-                    CapabilityAssuranceLevel.COMPUTED
-                    if completed
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-            ),
             assurance=CapabilityAssurance(
                 level=(
                     CapabilityAssuranceLevel.VERIFIED

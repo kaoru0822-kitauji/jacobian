@@ -193,8 +193,6 @@ def test_unsat_proof_is_verified_by_authorized_external_runtime(
     assert result.output["status"] == "VERIFIED_UNSAT"
     assert result.output["conclusion"] == "TRUE"
     assert result.output["verified_claim_scope"] == "CANONICAL_CNF_ONLY"
-    assert result.scope is not None
-    assert result.scope.parameters["domain_encoding_verified"] is False
     assert result.output["cnf_uri"] == cnf_uri
     assert result.output["proof_uri"] == proof_uri
     certificate_uri = result.output["certificate_uri"]

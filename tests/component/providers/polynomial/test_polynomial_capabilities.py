@@ -17,7 +17,6 @@ from tests.component.providers.polynomial.polynomial_capabilities_support import
 
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
-    CapabilityCompletenessStatus,
     CapabilityRequest,
 )
 
@@ -103,7 +102,6 @@ def test_polynomial_jacobian_and_collision_reproduce_public_counterexample(
     )
 
     assert jacobian.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    assert jacobian.completeness.status is CapabilityCompletenessStatus.COMPLETE
     assert jacobian.output["determinant"] == {
         "terms": [
             {
@@ -194,7 +192,6 @@ def test_polynomial_map_evaluation_is_exact_and_materialized(
     assert result.output["map_uri"] in result.artifact_uris
     assert result.output["evaluation_uri"] in result.artifact_uris
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    assert result.completeness.status is CapabilityCompletenessStatus.COMPLETE
 
 
 @pytest.mark.parametrize(

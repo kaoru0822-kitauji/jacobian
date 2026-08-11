@@ -14,8 +14,6 @@ from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInputKind,
@@ -23,7 +21,6 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderRuntime,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
@@ -288,31 +285,6 @@ class SmtUnsatProofVerificationAdapter:
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="the full exact SMT query bound by the Alethe proof",
-                parameters={
-                    "declared_scope": resolved.proof.declared_scope,
-                    "logic": resolved.proof.problem.logic,
-                    "profile": resolved.proof.problem.profile,
-                    "proof_format": resolved.proof.proof_format,
-                    "proof_format_version": resolved.proof.proof_format_version,
-                    "contains_holes": resolved.proof.contains_holes,
-                    "alethe_hole_count": resolved.proof.alethe_hole_count,
-                },
-                artifact_uri=resolved.problem_artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.NOT_APPLICABLE,
-                basis=(
-                    "certificate replay checks one exact proof and makes no "
-                    "enumeration-completeness claim"
-                ),
-                assurance_level=(
-                    CapabilityAssuranceLevel.COMPUTED
-                    if checked.execution.status is ExecutionStatus.COMPLETED
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-            ),
             assurance=CapabilityAssurance(
                 level=assurance_level,
                 basis=(

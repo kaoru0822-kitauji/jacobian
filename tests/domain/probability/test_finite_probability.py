@@ -9,7 +9,6 @@ from tests.support.services import DomainTestServices, open_domain_services
 
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
-    CapabilityCompletenessStatus,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
@@ -180,7 +179,6 @@ def test_zero_mass_conditioning_is_a_non_conclusion_without_artifacts(
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.diagnostics[0].code == "FINITE_CONDITIONING_ZERO_MASS"
     assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
-    assert result.completeness.status is CapabilityCompletenessStatus.NOT_APPLICABLE
     assert result.artifact_uris == ()
 
 

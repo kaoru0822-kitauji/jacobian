@@ -19,14 +19,11 @@ from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInvocationExample,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
@@ -500,7 +497,6 @@ class FiniteCoverageVerifyAdapter:
                 else CapabilityAssuranceLevel.HEURISTIC
             )
         )
-        complete = verified
         artifact_uris = [
             canonicalizer_uri,
             scope.artifact_uri,
@@ -516,33 +512,6 @@ class FiniteCoverageVerifyAdapter:
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="the exact typed finite scope bound to the page archive",
-                parameters={
-                    "canonicalizer_id": canonicalizer_id,
-                    "scope_item_count": len(validated.scope_items),
-                    "page_count": len(validated.pages),
-                    "archive_item_count": sum(
-                        len(page.items) for page in validated.pages
-                    ),
-                },
-                artifact_uri=scope.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=(
-                    CapabilityCompletenessStatus.COMPLETE
-                    if complete
-                    else CapabilityCompletenessStatus.PARTIAL
-                ),
-                basis=(
-                    "operator-authorized independent checker replayed every bound "
-                    "scope and page item exactly once"
-                    if verified
-                    else "exactly-once coverage was not independently accepted"
-                ),
-                assurance_level=assurance_level,
-                verification_record_uri=record_uri,
-            ),
             assurance=CapabilityAssurance(
                 level=assurance_level,
                 basis=(

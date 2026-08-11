@@ -17,13 +17,10 @@ from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
@@ -325,42 +322,6 @@ class PolynomialSystemSolutionAdapter:
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="all equations and inequations in one finite system",
-                parameters={
-                    "equation_count": len(validated.system.equations),
-                    "inequation_count": len(validated.system.inequations),
-                    "variables": list(validated.system.variables),
-                },
-                artifact_uri=system.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=(
-                    CapabilityCompletenessStatus.COMPLETE
-                    if checked.execution.status is ExecutionStatus.COMPLETED
-                    else CapabilityCompletenessStatus.UNKNOWN
-                ),
-                basis=(
-                    "the independent checker evaluated every declared constraint"
-                    if verified
-                    else (
-                        "the adapter computed every declared residual, but the "
-                        "checker did not accept the bound replay"
-                        if checked.execution.status is ExecutionStatus.COMPLETED
-                        else "checker execution did not establish complete coverage"
-                    )
-                ),
-                assurance_level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else (
-                        CapabilityAssuranceLevel.COMPUTED
-                        if checked.execution.status is ExecutionStatus.COMPLETED
-                        else CapabilityAssuranceLevel.HEURISTIC
-                    )
-                ),
-                verification_record_uri=record_uri,
-            ),
             assurance=CapabilityAssurance(
                 level=(
                     CapabilityAssuranceLevel.VERIFIED

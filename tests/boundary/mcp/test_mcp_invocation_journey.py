@@ -54,17 +54,7 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
             assert isinstance(result.structured_content, dict)
             assert "mcp_projection" not in result.structured_content
             assert result.structured_content["output"] == response["output"]
-            for semantic_field in (
-                "scope",
-                "completeness",
-                "relationships",
-                "assurance",
-            ):
-                if semantic_field in response:
-                    assert (
-                        response[semantic_field]
-                        == result.structured_content[semantic_field]
-                    )
+            assert response["assurance"] == result.structured_content["assurance"]
             runtime = contract["capability"]["provider_runtime"]
             assert runtime["provider"] == contract["capability"]["provider"]
             assert runtime["digest"] is not None

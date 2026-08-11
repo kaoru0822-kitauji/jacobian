@@ -10,7 +10,6 @@ import pytest
 from jacobian.bounded_process import bounded_process_cancellation
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
-    CapabilityCompletenessStatus,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
@@ -78,7 +77,6 @@ def test_collision_search_returns_first_deterministic_candidate(
     assert result.output["common_image"] == [{"num": "1", "den": "1"}]
     assert result.output["witness_uri"] in result.artifact_uris
     assert result.output["stop_reason"] == "FIRST_COLLISION"
-    assert result.completeness.status is CapabilityCompletenessStatus.COMPLETE
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
 
 
@@ -94,7 +92,6 @@ def test_collision_search_reports_partial_grid_after_early_collision(
     assert result.output["first_point"] == [{"num": "-1", "den": "1"}]
     assert result.output["second_point"] == [{"num": "0", "den": "1"}]
     assert result.output["stop_reason"] == "FIRST_COLLISION"
-    assert result.completeness.status is CapabilityCompletenessStatus.PARTIAL
 
 
 def test_collision_search_reports_exact_completed_not_found_scope(
@@ -109,7 +106,6 @@ def test_collision_search_reports_exact_completed_not_found_scope(
     assert result.output["witness_uri"] is None
     assert result.output["stop_reason"] == "GRID_EXHAUSTED"
     assert result.output["verification"] == "UNVERIFIED"
-    assert result.completeness.status is CapabilityCompletenessStatus.COMPLETE
 
 
 def test_collision_search_preserves_partial_evidence_when_cancelled(
@@ -126,7 +122,6 @@ def test_collision_search_preserves_partial_evidence_when_cancelled(
     assert result.output["stop_reason"] == "CANCELLED"
     assert result.output["examined_point_count"] == 0
     assert result.output["grid_point_count"] == 3
-    assert result.completeness.status is CapabilityCompletenessStatus.PARTIAL
     assert len(result.artifact_uris) == 1
 
 

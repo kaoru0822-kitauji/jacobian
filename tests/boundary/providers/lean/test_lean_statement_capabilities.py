@@ -15,7 +15,6 @@ from jacobian.artifacts import ArtifactService
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
-    CapabilityCompletenessStatus,
     CapabilityRequest,
 )
 from jacobian.contracts.lean_statement import LeanElaborationOption
@@ -387,7 +386,6 @@ def test_compare_works_without_lean_for_syntactic_comparison(
     assert result.output["statements_identical"] is True
     assert result.output["elaboration_checked"] is False
     assert result.output["both_elaborate"] is False
-    assert result.completeness.status is CapabilityCompletenessStatus.PARTIAL
 
 
 def test_execution_uses_the_exact_pinned_executable(

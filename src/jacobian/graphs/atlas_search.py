@@ -10,13 +10,10 @@ from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.domains._examples import example
@@ -202,25 +199,6 @@ class GraphAtlasSearchAdapter:
                 "backend": "networkx.graph_atlas_g",
                 "backend_version": nx().__version__,
             },
-            scope=CapabilityScope(
-                description=(
-                    "all Graph Atlas representatives with the requested exact order"
-                ),
-                parameters={
-                    "source": "networkx.graph_atlas_g",
-                    "backend_version": nx().__version__,
-                    "order": order,
-                },
-                artifact_uri=scope.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.COMPLETE,
-                basis=(
-                    "the maintained Graph Atlas provider was scanned to exhaustion; "
-                    "this computation was not independently checked"
-                ),
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis=(

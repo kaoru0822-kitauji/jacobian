@@ -16,13 +16,10 @@ from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.graph_invariants import (
     GraphInvariantBatchArtifact,
@@ -176,9 +173,6 @@ class GraphPropertyAdapter:
             **batch.model_dump(mode="python"),
             property_artifact_uri=property_artifact.artifact_uri,
         )
-        has_incomplete_results = any(
-            binding.result.status == "NOT_COMPUTED" for binding in bindings
-        )
         return CapabilityResult(
             capability_id=self.descriptor.capability_id,
             capability_version=self.descriptor.version,
@@ -187,30 +181,6 @@ class GraphPropertyAdapter:
                 runtime_ms=runtime_ms(started),
             ),
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="the requested property batch for one exact graph artifact",
-                parameters={
-                    "graph_uri": graph_uri,
-                    "registry_version": "1",
-                    "properties": list(names),
-                },
-                artifact_uri=graph_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=(
-                    CapabilityCompletenessStatus.PARTIAL
-                    if has_incomplete_results
-                    else CapabilityCompletenessStatus.COMPLETE
-                ),
-                basis=(
-                    "at least one requested invariant was not computed because "
-                    "the declared exact scope exceeded its safety boundary"
-                    if has_incomplete_results
-                    else "every requested invariant received a terminal COMPUTED, "
-                    "NOT_APPLICABLE, or UNSUPPORTED result under registry version 1"
-                ),
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis=(

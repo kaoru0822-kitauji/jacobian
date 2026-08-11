@@ -59,19 +59,6 @@ def test_inline_exact_replay_persists_only_its_bound_record(
     assert record.manifest.parents == (parsed.semantics_uri,)
     assert parsed.semantics_uri in verified.artifact_uris
     assert parsed.decision.accepted is True
-    assert verified.scope is not None
-    assert parsed.bindings.claim_digest == verified.scope.parameters["claim_digest"]
-    assert (
-        parsed.bindings.candidate_digest
-        == verified.scope.parameters["candidate_digest"]
-    )
-    assert (
-        parsed.bindings.semantics_digest
-        == verified.scope.parameters["semantics_digest"]
-    )
-    assert parsed.operation_id == verified.scope.parameters["operation_id"]
-    assert parsed.checker_id == verified.scope.parameters["checker_id"]
-    assert parsed.witness_format == verified.scope.parameters["witness_format"]
 
 
 def test_inline_exact_rejects_bounded_accepted_checker_decisions(

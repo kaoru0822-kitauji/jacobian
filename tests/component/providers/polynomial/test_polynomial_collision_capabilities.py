@@ -20,7 +20,6 @@ from tests.component.providers.polynomial.polynomial_capabilities_support import
 
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
-    CapabilityCompletenessStatus,
     CapabilityRequest,
 )
 from jacobian.contracts.evidence import EvidenceBindings, WitnessEnvelope, WitnessRole
@@ -200,7 +199,6 @@ def test_noncollision_is_computed_evidence_without_witness_or_conclusion(
     assert result.output["candidate_collision"] is False
     assert result.output["witness_uri"] is None
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    assert result.completeness.status is CapabilityCompletenessStatus.COMPLETE
     assert "conclusion" not in result.output
 
 

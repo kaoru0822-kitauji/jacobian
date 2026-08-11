@@ -14,12 +14,9 @@ from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
@@ -524,13 +521,6 @@ def _partition_result(
         if verification_result is not None
         else ExecutionStatus.COMPLETED
     )
-    complete = (
-        execution_status is ExecutionStatus.COMPLETED
-        and not material.missing
-        and not material.outside
-        and not material.duplicate_case_ids
-        and (not material.require_disjoint or not material.overlaps)
-    )
     verified_replay_basis = (
         "authorized checker replayed equality-based coverage and required "
         "disjointness within the caller-supplied universe"
@@ -563,29 +553,6 @@ def _partition_result(
             "overlaps": material.overlaps,
             "duplicate_case_ids": material.duplicate_case_ids,
         },
-        scope=CapabilityScope(
-            description=(
-                "the exact caller-supplied finite universe; external-domain "
-                "completeness and member semantics are not checked"
-            ),
-            parameters={"element_count": len(material.universe)},
-            artifact_uri=material.scope_uri,
-        ),
-        completeness=CapabilityCompleteness(
-            status=(
-                CapabilityCompletenessStatus.COMPLETE
-                if complete
-                else CapabilityCompletenessStatus.PARTIAL
-            ),
-            basis=(
-                f"{verified_replay_basis}; it did not check external-domain "
-                "completeness or member/case semantics"
-                if verified
-                else "generator-side membership accounting; not independently checked"
-            ),
-            assurance_level=assurance_level,
-            verification_record_uri=record_uri if verified else None,
-        ),
         assurance=CapabilityAssurance(
             level=assurance_level,
             basis=(

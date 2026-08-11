@@ -18,8 +18,6 @@ from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationE
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityProviderAvailability,
@@ -27,7 +25,6 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderRuntime,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.contracts.sat import (
@@ -616,15 +613,6 @@ def _completed_result(
             runtime_ms=run.runtime_ms,
         ),
         output=output,
-        scope=_scope(resolved),
-        completeness=CapabilityCompleteness(
-            status=CapabilityCompletenessStatus.UNKNOWN,
-            basis=(
-                "this bounded producer makes no exhaustive search or mathematical "
-                "completeness claim"
-            ),
-            assurance_level=CapabilityAssuranceLevel.COMPUTED,
-        ),
         assurance=CapabilityAssurance(
             level=CapabilityAssuranceLevel.COMPUTED,
             basis=basis,
@@ -649,15 +637,6 @@ def _failed_result(
             runtime_ms=run.runtime_ms,
             detail=run.diagnostic.message,
         ),
-        scope=_scope(resolved),
-        completeness=CapabilityCompleteness(
-            status=CapabilityCompletenessStatus.UNKNOWN,
-            basis=(
-                "the producer did not complete with usable evidence; no coverage "
-                "or mathematical conclusion follows"
-            ),
-            assurance_level=CapabilityAssuranceLevel.HEURISTIC,
-        ),
         diagnostics=(run.diagnostic,),
         assurance=CapabilityAssurance(
             level=CapabilityAssuranceLevel.HEURISTIC,
@@ -667,20 +646,6 @@ def _failed_result(
             ),
         ),
         artifact_uris=(resolved.artifact.artifact_uri,),
-    )
-
-
-def _scope(resolved: ResolvedSatCnf) -> CapabilityScope:
-    return CapabilityScope(
-        description="the full exact canonical CNF supplied to the producer",
-        parameters={
-            "declared_scope": "FULL_CNF",
-            "variable_count": len(resolved.cnf.variables),
-            "clause_count": len(resolved.cnf.clauses),
-            "projection_format": resolved.cnf.projection_format,
-            "projection_version": resolved.cnf.projection_version,
-        },
-        artifact_uri=resolved.artifact.artifact_uri,
     )
 
 

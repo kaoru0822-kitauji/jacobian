@@ -15,15 +15,12 @@ from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInputKind,
     CapabilityProviderRuntime,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.exact import CanonicalRational
 from jacobian.contracts.nullstellensatz import (
@@ -382,11 +379,6 @@ class SingularNullstellensatzCertificateAdapter:
             ),
             output={"error": diagnostic.model_dump(mode="json", exclude_none=True)},
             diagnostics=(diagnostic,),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.UNKNOWN,
-                basis="producer failure establishes no chart identity coverage",
-                assurance_level=CapabilityAssuranceLevel.HEURISTIC,
-            ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.HEURISTIC,
                 basis="producer did not complete; no infeasibility conclusion",
@@ -513,19 +505,6 @@ class SingularNullstellensatzCertificateAdapter:
                 runtime_ms=max(0, round((time.monotonic() - started) * 1000)),
             ),
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="all 12 charts in the bound normalized degree slice",
-                parameters={
-                    "chart_count": 12,
-                    "maximum_degree": validated.resource_budget.maximum_degree,
-                },
-                artifact_uri=system_artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.COMPLETE,
-                basis="Singular returned one multiplier for every generator in every chart",
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis="pinned Singular lift output; independent replay not yet invoked",

@@ -8,7 +8,6 @@ from tests.support.provider_lean import (
 
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
-    CapabilityCompletenessStatus,
     CapabilityRequest,
 )
 
@@ -45,7 +44,6 @@ def test_exact_proof_edit_is_bound_to_authorized_lean_check(
         == (result.output["verification_record_uri"])
     )
     assert result.output["verification_record_uri"] in result.artifact_uris
-    assert result.completeness.status is CapabilityCompletenessStatus.NOT_APPLICABLE
     assert result.output["proof_edit_uri"] in result.artifact_uris
     edit = authorized_complete_runtime.core.store.get(result.output["proof_edit_uri"])
     assert edit.payload["edited_proof"] == "by\n  trivial"
