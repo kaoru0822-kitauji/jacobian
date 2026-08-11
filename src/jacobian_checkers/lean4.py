@@ -586,6 +586,36 @@ def _mathlib_process_path(lake_command: tuple[str, ...]) -> str:
     )
 
 
+def _mathlib_git_config(runtime: Path) -> dict[str, str]:
+    """Authorize Git only for the exact manifest-owned package checkouts.
+
+    Immutable releases are root-owned while the checker runs as an unprivileged
+    service user. Lake invokes Git while assembling its environment, so pass
+    process-local ``safe.directory`` entries for the package roots that
+    :func:`_mathlib_runtime` has already validated. The service account never
+    receives a writable HOME or a persistent wildcard Git exception.
+    """
+
+    manifest = json.loads((runtime / "lake-manifest.json").read_text(encoding="utf-8"))
+    packages = manifest["packages"]
+    packages_directory = (runtime / ".lake" / "packages").resolve(strict=True)
+    checkouts: list[str] = []
+    for package in packages:
+        name = package["name"]
+        checkout = (packages_directory / name).resolve(strict=True)
+        if checkout.parent != packages_directory or not checkout.is_dir():
+            raise _LeanSetupError("MATHLIB_MANIFEST: a package checkout is unavailable")
+        checkouts.append(str(checkout))
+    environment = {
+        "GIT_CONFIG_COUNT": str(len(checkouts)),
+        "GIT_CONFIG_NOSYSTEM": "1",
+    }
+    for index, checkout in enumerate(checkouts):
+        environment[f"GIT_CONFIG_KEY_{index}"] = "safe.directory"
+        environment[f"GIT_CONFIG_VALUE_{index}"] = checkout
+    return environment
+
+
 def _run_lean(
     source: str,
     *,
@@ -594,6 +624,7 @@ def _run_lean(
     if environment_name == "CORE":
         command = list(_lean_command("lean"))
         _validate_lean(tuple(command))
+        mathlib_environment: dict[str, str] = {}
         memory_mb = "1024"
         timeout_seconds = 25
         cwd_context = tempfile.TemporaryDirectory(prefix="jacobian-lean-")
@@ -608,6 +639,7 @@ def _run_lean(
         # separately digest-authorized Lean sibling before Lake drives it.
         _validate_lean(_lean_command("lean"), cwd=runtime)
         mathlib_path = _mathlib_process_path(lake_command)
+        mathlib_environment = _mathlib_git_config(runtime)
         memory_mb = "8192"
         timeout_seconds = _MATHLIB_COMPILE_TIMEOUT_SECONDS
         cwd_context = tempfile.TemporaryDirectory(prefix="jacobian-lean-home-")
@@ -624,6 +656,7 @@ def _run_lean(
                 if environment_name == "MATHLIB"
                 else str(Path(command[0]).parent)
             ),
+            **mathlib_environment,
             **({"ELAN_HOME": elan_home} if elan_home is not None else {}),
         },
     )

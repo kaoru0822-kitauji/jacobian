@@ -212,6 +212,10 @@ def test_mathlib_validates_lean_before_the_digest_bound_lake_compiler(
         lambda _command: "/usr/bin",
     )
     monkeypatch.setattr(
+        "jacobian_checkers.lean4._mathlib_git_config",
+        lambda _runtime: {},
+    )
+    monkeypatch.setattr(
         "jacobian_checkers.lean4.execute_process",
         lambda *_args, **_kwargs: ProcessResult(
             termination=ProcessTermination.EXITED,
