@@ -250,8 +250,8 @@ validate_install_root() {
         /home/* | /root/* | /tmp/* | /var/tmp/*)
             die "--install-root must remain visible through the systemd sandbox; do not place it below /home, /root, /tmp, or /var/tmp"
             ;;
-        /run/*)
-            die "--install-root must be durable across reboots; do not place it below /run"
+        /run/* | /dev/shm/*)
+            die "--install-root must be durable across reboots; do not place it below /run or /dev/shm"
             ;;
     esac
     effective="$(resolve_effective_path "${value}")" || die \
@@ -262,8 +262,8 @@ validate_install_root() {
         /home/* | /root/* | /tmp/* | /var/tmp/*)
             die "--install-root resolves below a path hidden by the systemd sandbox: ${effective}"
             ;;
-        /run/*)
-            die "--install-root resolves below the volatile /run hierarchy: ${effective}"
+        /run/* | /dev/shm/*)
+            die "--install-root resolves below a volatile runtime hierarchy: ${effective}"
             ;;
     esac
     VALIDATED_INSTALL_ROOT="${effective}"
