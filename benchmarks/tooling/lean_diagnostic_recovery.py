@@ -36,6 +36,7 @@ from benchmarks.tooling.codex_visibility import (
 from benchmarks.tooling.command_runner import (
     ToolCommandStatus,
     git_head_sha,
+    git_tracked_worktree_is_clean,
     operator_environment,
     run_operator_command,
 )
@@ -246,6 +247,18 @@ def digest_suite(path: Path) -> str:
     """Bind an observation to the exact version-controlled suite bytes."""
 
     return _sha256_bytes(path.read_bytes())
+
+
+def _candidate_revision(root: Path) -> str:
+    if not git_tracked_worktree_is_clean(root):
+        raise SystemExit(
+            "recovery execution requires a clean tracked worktree; commit or "
+            "stash evaluator changes before running"
+        )
+    revision = git_head_sha(root)
+    if revision is None:
+        raise SystemExit("cannot bind recovery report to the candidate Git revision")
+    return revision
 
 
 def _diagnostic_codes(invocation: Mapping[str, Any]) -> tuple[str, ...]:
@@ -1048,9 +1061,7 @@ def main() -> None:
     suite_path = args.suite.resolve(strict=True)
     suite = load_suite(suite_path)
     suite_digest = digest_suite(suite_path)
-    source_candidate_revision = git_head_sha(_ROOT)
-    if source_candidate_revision is None:
-        raise SystemExit("cannot bind recovery report to the candidate Git revision")
+    source_candidate_revision = _candidate_revision(_ROOT)
     if _REVISION.fullmatch(args.deployed_revision) is None:
         raise SystemExit("--deployed-revision must be a 12- to 40-character Git SHA")
     expected_revision = (
@@ -1096,6 +1107,8 @@ def main() -> None:
             for case in selected
             for repetition in range(1, repetitions + 1)
         ]
+    if _candidate_revision(_ROOT) != source_candidate_revision:
+        raise SystemExit("candidate Git revision changed during recovery execution")
     report = {
         "schema_version": "1",
         "evidence_class": suite.evidence_class,

@@ -29,6 +29,7 @@ INSTALL_ROOT="/opt/jacobian"
 CONFIG_ROOT="/etc/jacobian-mcp"
 CADDY_CONFIG_ROOT="/etc/caddy-jacobian"
 SYSTEMD_ROOT="/etc/systemd/system"
+DEPLOY_LOCK_PATH="/run/lock/jacobian-mcp-install.lock"
 TAILSCALE_STATUS=""
 RENDER_ROOT=""
 RELEASE_BUILD_DIR=""
@@ -555,6 +556,10 @@ if [[ "${MODE}" != "local" ]]; then
         "caddy is required for public ingress; install it first"
 fi
 
+install -d -m 0755 "$(dirname -- "${DEPLOY_LOCK_PATH}")"
+exec 9>"${DEPLOY_LOCK_PATH}"
+"${FLOCK_BIN}" --nonblock 9 || die "another Jacobian deployment is in progress"
+
 if ! getent group jacobian >/dev/null; then
     groupadd --system jacobian
 fi
@@ -574,8 +579,6 @@ fi
 
 log "installing immutable release ${SHORT_REVISION}"
 install -d -m 0755 "${RELEASE_ROOT}" "${PYTHON_INSTALL_ROOT}"
-exec 9>"$(dirname -- "${RELEASE_ROOT}")/.install.lock"
-"${FLOCK_BIN}" --nonblock 9 || die "another Jacobian deployment is in progress"
 if [[ -e "${RELEASE_DIR}" && ! -d "${RELEASE_DIR}" ]]; then
     die "release path exists and is not a directory: ${RELEASE_DIR}"
 fi

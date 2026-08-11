@@ -278,7 +278,18 @@ def test_release_environment_is_built_at_its_final_path() -> None:
     assert "--managed-python" in release_block
     assert "--link-mode copy" in release_block
     assert 'mv "${RELEASE_CANDIDATE}" "${RELEASE_DIR}"' not in release_block
-    assert '"${FLOCK_BIN}" --nonblock 9' in release_block
+
+
+def test_deployment_lock_is_host_global_and_precedes_shared_host_mutations() -> None:
+    source = INSTALLER.read_text(encoding="utf-8")
+
+    assert 'DEPLOY_LOCK_PATH="/run/lock/jacobian-mcp-install.lock"' in source
+    assert 'exec 9>"${DEPLOY_LOCK_PATH}"' in source
+    assert '$(dirname -- "${RELEASE_ROOT}")/.install.lock' not in source
+    lock = source.index('"${FLOCK_BIN}" --nonblock 9')
+    first_shared_mutation = source.index("groupadd --system jacobian")
+
+    assert lock < first_shared_mutation
 
 
 def test_release_runtime_is_checked_before_current_symlink_is_changed() -> None:

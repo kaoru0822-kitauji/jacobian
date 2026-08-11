@@ -6,6 +6,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+import benchmarks.tooling.command_runner as command_runner_module
 import benchmarks.tooling.lean_diagnostic_recovery as recovery_module
 import pytest
 from benchmarks.tooling.codex_visibility import surface_snapshot_digest
@@ -338,6 +339,37 @@ def test_recovery_suite_bytes_have_a_stable_evaluation_identity() -> None:
     expected = "sha256:" + hashlib.sha256(SUITE.read_bytes()).hexdigest()
 
     assert digest_suite(SUITE) == expected
+
+
+@pytest.mark.parametrize("porcelain", (b" M evaluator.py\n", b"M  telemetry.py\n"))
+def test_recovery_source_preflight_rejects_unstaged_or_staged_changes(
+    monkeypatch: pytest.MonkeyPatch,
+    porcelain: bytes,
+) -> None:
+    def git_status(*args: Any, **kwargs: Any):
+        return command_runner_module.ToolCommandResult(
+            status=command_runner_module.ToolCommandStatus.EXITED,
+            exit_code=0,
+            stdout=porcelain,
+            stderr=b"",
+        )
+
+    monkeypatch.setattr(command_runner_module, "run_operator_command", git_status)
+
+    assert command_runner_module.git_tracked_worktree_is_clean(ROOT) is False
+
+
+def test_recovery_execution_refuses_a_dirty_evaluator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        recovery_module,
+        "git_tracked_worktree_is_clean",
+        lambda _root: False,
+    )
+
+    with pytest.raises(SystemExit, match="clean tracked worktree"):
+        recovery_module._candidate_revision(ROOT)
 
 
 def test_recovery_classification_separates_diagnostic_from_terminal_success() -> None:
