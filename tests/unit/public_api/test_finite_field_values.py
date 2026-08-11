@@ -104,3 +104,20 @@ def test_subspace_rejects_dependent_basis_matrices() -> None:
             basis_axis=basis_axis,
             basis=(matrix, matrix),
         )
+
+
+def test_rank_result_rejects_a_map_over_the_wrong_prime_field() -> None:
+    presentation = _presentation()
+    rows = Axis("rows", ("r1", "r2"))
+    basis_axis = Axis("basis", ("B1",))
+    zero = _element(presentation, (0, 0, 0))
+    one = _element(presentation, (1, 0, 0))
+    direction = ProjectivePoint(presentation, rows, (one, zero))
+    wrong_prime_map = FiniteLinearMap(
+        source_axis=basis_axis,
+        target_axis=Axis("target", ("t1", "t2")),
+        matrix=PrimeFieldMatrix(3, ((1,), (0,)), 1),
+    )
+
+    with pytest.raises(ValueError, match="prime field"):
+        RankResult(direction, wrong_prime_map)

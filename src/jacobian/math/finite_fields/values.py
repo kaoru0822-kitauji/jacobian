@@ -314,6 +314,8 @@ class RankResult:
     rank: int = field(init=False)
 
     def __post_init__(self) -> None:
+        if self.linear_map.matrix.prime != self.direction.presentation.characteristic:
+            raise ValueError("rank map must use the direction's prime field")
         object.__setattr__(self, "rank", rank(self.linear_map.matrix))
 
     @property
