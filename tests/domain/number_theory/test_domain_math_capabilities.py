@@ -367,7 +367,7 @@ def test_modular_polynomial_residue_image_is_discoverable_by_intent(
     assert discovered.matches[0].capability_id == (
         "modular.polynomial_residue_image.compute"
     )
-    assert discovered.matches[0].has_invocation_examples is True
+    assert discovered.matches[0].relevance_score > 0
 
 
 def test_number_theory_resource_atomics_are_exact_computed(

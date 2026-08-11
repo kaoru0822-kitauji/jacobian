@@ -36,7 +36,9 @@ def test_math_find_search_returns_compact_lexical_and_availability_facts(
             if item["capability_id"] == "matrix.determinant.compute"
         )
         assert match["provider_availability"] == "AVAILABLE"
-        assert match["lexical_fit"] == "STRONG_CANDIDATE"
+        assert match["relevance_score"] > 0
+        assert match["applicability"] == "NEEDS_MORE_TYPED_REQUIREMENTS"
+        assert match["applicability_code"] == "FULL_REQUEST_REQUIRED"
         assert "input_schema" not in match
         assert "output_schema_summary" not in match
         assert "invocation_example" not in match

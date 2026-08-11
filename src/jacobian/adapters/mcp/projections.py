@@ -109,8 +109,6 @@ def _capability_discovery_response(
         "catalog_resource": "capability://catalog",
         "response_byte_limit": CAPABILITY_DISCOVERY_RESPONSE_BYTE_LIMIT,
         "truncation_reason": None,
-        "available_domains_total": len(discovered_payload["available_domains"]),
-        "available_domains_truncated": False,
         "match_metadata_truncated": False,
     }
     matches = cast(list[dict[str, Any]], response["matches"])
@@ -122,18 +120,8 @@ def _capability_discovery_response(
         response["truncated"] = True
         response["next_cursor"] = matches[-1]["capability_id"]
         response["truncation_reason"] = "BYTE_LIMIT"
-    available_domains = cast(list[str], response["available_domains"])
-    while (
-        len(_mcp_text_json_bytes(response)) > CAPABILITY_DISCOVERY_RESPONSE_BYTE_LIMIT
-        and available_domains
-    ):
-        available_domains.pop()
-        response["available_domains_truncated"] = True
-        response["truncation_reason"] = "BYTE_LIMIT"
     compact_fields = (
         "tags",
-        "matched_on",
-        "matched_terms",
         "produced_artifact_types",
     )
     while (

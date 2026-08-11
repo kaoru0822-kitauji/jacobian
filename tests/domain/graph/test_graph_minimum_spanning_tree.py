@@ -219,7 +219,7 @@ def test_weighted_mst_intent_is_discoverable_and_example_is_valid(
     assert discovered.matches[0].capability_id == (
         "graph.spanning_tree.minimum.compute"
     )
-    assert discovered.matches[0].lexical_fit == "STRONG_CANDIDATE"
+    assert discovered.matches[0].relevance_score > 0
     descriptor = next(
         descriptor
         for descriptor in graph_optimization_services.core.capabilities.catalog().capabilities

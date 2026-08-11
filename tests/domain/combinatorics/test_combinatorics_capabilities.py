@@ -47,7 +47,7 @@ def test_binomial_is_discoverable_from_number_theory_language(
     )
 
     assert discovered.matches[0].capability_id == "combinatorics.compute.binomial"
-    assert discovered.matches[0].lexical_fit == "STRONG_CANDIDATE"
+    assert discovered.matches[0].relevance_score > 0
 
     result = domain_services.core.capabilities.invoke(
         CapabilityRequest(

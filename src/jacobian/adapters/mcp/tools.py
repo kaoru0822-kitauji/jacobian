@@ -107,29 +107,15 @@ class _CapabilityDiscoveryResult(_MCPOutputModel):
     discovery_version: Literal["1"]
     query: str
     domain: str | None = None
-    domain_filter_status: Literal["UNFILTERED", "MATCHED", "UNKNOWN"]
-    domain_filter_basis: str
-    resolved_input_kind: CapabilityInputKind | None = None
+    input_kind: CapabilityInputKind | None = None
     artifact_type: str | None = None
-    routing_status: Literal["UNFILTERED", "ROUTES_FOUND", "NO_ROUTE"]
-    routing_basis: str
     matches: tuple[_CapabilityDiscoveryOperationCard, ...]
     total_matches: StrictInt
     truncated: bool
     next_cursor: str | None = None
-    available_domains: list[str]
-    portfolio_fit: Literal[
-        "UNFILTERED",
-        "STRONG_CANDIDATES_FOUND",
-        "ONLY_WEAK_LEXICAL_MATCHES",
-        "NO_LEXICAL_MATCHES",
-    ]
-    portfolio_fit_basis: str
     catalog_resource: Literal["capability://catalog"]
     response_byte_limit: StrictInt
     truncation_reason: str | None = None
-    available_domains_total: StrictInt
-    available_domains_truncated: bool
     match_metadata_truncated: bool
 
 
@@ -224,18 +210,14 @@ def _find_text_projection(response: dict[str, Any]) -> dict[str, Any]:
                         "accepted_artifact_types",
                         "produced_artifact_types",
                         "provider_availability",
-                        "lexical_fit",
+                        "relevance_score",
+                        "applicability",
+                        "applicability_code",
                     )
                     if key in match
                 }
                 for match in response.get("matches", [])
             ],
-            "portfolio_fit": response.get("portfolio_fit"),
-            "portfolio_fit_basis": response.get("portfolio_fit_basis"),
-            "domain_filter_status": response.get("domain_filter_status"),
-            "domain_filter_basis": response.get("domain_filter_basis"),
-            "routing_status": response.get("routing_status"),
-            "routing_basis": response.get("routing_basis"),
             "total_matches": response.get("total_matches"),
             "truncated": response.get("truncated"),
             "truncation_reason": response.get("truncation_reason"),

@@ -103,15 +103,20 @@ class CapabilityDiscoveryMatch(ContractModel):
     title: str = Field(min_length=1, max_length=128)
     description: str = Field(min_length=1, max_length=512)
     tags: tuple[str, ...] = ()
-    matched_on: tuple[str, ...] = ()
-    matched_terms: tuple[str, ...] = ()
-    has_invocation_examples: bool = False
     relevance_score: int = Field(default=0, ge=0, strict=True)
-    query_term_count: int = Field(default=0, ge=0, strict=True)
-    query_coverage_milli: int = Field(default=0, ge=0, le=1000, strict=True)
-    lexical_fit: Literal["STRONG_CANDIDATE", "WEAK_LEXICAL_MATCH"] = (
-        "WEAK_LEXICAL_MATCH"
-    )
+    applicability: Literal[
+        "APPLICABLE",
+        "INCOMPATIBLE",
+        "NEEDS_MORE_TYPED_REQUIREMENTS",
+        "PROVIDER_UNAVAILABLE",
+        "CHECKER_UNAVAILABLE",
+        "PORTFOLIO_GAP",
+    ]
+    applicability_code: Literal[
+        "FULL_REQUEST_REQUIRED",
+        "INPUT_KIND_MISMATCH",
+        "ARTIFACT_TYPE_MISMATCH",
+    ]
 
 
 class CapabilityDiscoveryResult(ContractModel):
@@ -120,28 +125,12 @@ class CapabilityDiscoveryResult(ContractModel):
     discovery_version: Literal["1"] = "1"
     query: str
     domain: str | None = None
-    domain_filter_status: Literal["UNFILTERED", "MATCHED", "UNKNOWN"] = "UNFILTERED"
-    domain_filter_basis: str = Field(
-        default="No domain filter was supplied.",
-        min_length=1,
-        max_length=512,
-    )
-    resolved_input_kind: CapabilityInputKind | None = None
+    input_kind: CapabilityInputKind | None = None
     artifact_type: ArtifactUri | None = None
-    routing_status: Literal["UNFILTERED", "ROUTES_FOUND", "NO_ROUTE"] = "UNFILTERED"
-    routing_basis: str = Field(min_length=1, max_length=512)
     matches: tuple[CapabilityDiscoveryMatch, ...]
     total_matches: int = Field(ge=0, strict=True)
     truncated: bool
     next_cursor: CapabilityId | None = None
-    available_domains: tuple[str, ...] = ()
-    portfolio_fit: Literal[
-        "UNFILTERED",
-        "STRONG_CANDIDATES_FOUND",
-        "ONLY_WEAK_LEXICAL_MATCHES",
-        "NO_LEXICAL_MATCHES",
-    ] = "UNFILTERED"
-    portfolio_fit_basis: str = Field(min_length=1, max_length=512)
 
     @model_validator(mode="after")
     def bind_page_metadata(self) -> Self:
@@ -156,8 +145,6 @@ class CapabilityDiscoveryResult(ContractModel):
             not capability_ids or self.next_cursor != capability_ids[-1]
         ):
             raise ValueError("next_cursor must identify the final returned match")
-        if tuple(sorted(set(self.available_domains))) != self.available_domains:
-            raise ValueError("available domains must be unique and sorted")
         return self
 
 

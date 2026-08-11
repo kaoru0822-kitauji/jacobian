@@ -9,7 +9,7 @@ from jacobian.runtime.model import JacobianRuntime
 COMPOSITION_ADMISSION = "DISCOVERY"
 
 
-def test_discovery_recognizes_hidden_installed_domains_without_returning_them(
+def test_discovery_filters_hidden_and_nonmatching_domains(
     attached_complete_runtime_read_only: JacobianRuntime,
 ) -> None:
     discovered = attached_complete_runtime_read_only.core.capabilities.discover(
@@ -17,10 +17,7 @@ def test_discovery_recognizes_hidden_installed_domains_without_returning_them(
     )
 
     assert discovered.domain == "artifact"
-    assert discovered.domain_filter_status == "UNKNOWN"
-    assert "matches no installed capability" in discovered.domain_filter_basis
     assert discovered.matches == ()
-    assert "artifact" not in discovered.available_domains
 
 
 def test_small_bounded_operation_is_published_inline(
@@ -49,7 +46,7 @@ def test_materialize_to_width_produced_types_are_symmetric_and_discoverable(
     assert descriptors["poset.width.compute"].accepted_artifact_types == ()
 
 
-def test_discovery_distinguishes_strong_weak_and_absent_lexical_fit(
+def test_discovery_ranks_lexical_matches_and_returns_no_synthetic_fit_labels(
     attached_complete_runtime_read_only: JacobianRuntime,
 ) -> None:
     capabilities = attached_complete_runtime_read_only.core.capabilities
@@ -60,12 +57,11 @@ def test_discovery_distinguishes_strong_weak_and_absent_lexical_fit(
             limit=3,
         )
     )
-    assert strong.portfolio_fit == "STRONG_CANDIDATES_FOUND"
     assert strong.matches[0].capability_id == (
         "polynomial.jacobian_syzygy.minimum_degree.compute"
     )
-    assert strong.matches[0].lexical_fit == "STRONG_CANDIDATE"
-    assert strong.matches[0].query_coverage_milli == 1000
+    assert strong.matches[0].relevance_score > 0
+    assert strong.matches[0].applicability == "NEEDS_MORE_TYPED_REQUIREMENTS"
 
     gaussian = capabilities.discover(
         CapabilityDiscoveryRequest(
@@ -73,11 +69,10 @@ def test_discovery_distinguishes_strong_weak_and_absent_lexical_fit(
             limit=3,
         )
     )
-    assert gaussian.portfolio_fit == "STRONG_CANDIDATES_FOUND"
     assert gaussian.matches[0].capability_id == (
         "probability.gaussian_polynomial.moment.compute"
     )
-    assert gaussian.matches[0].lexical_fit == "STRONG_CANDIDATE"
+    assert gaussian.matches[0].relevance_score > 0
     assert "does not establish an identity for every order" in (
         gaussian.matches[0].description
     )
@@ -88,7 +83,6 @@ def test_discovery_distinguishes_strong_weak_and_absent_lexical_fit(
             limit=3,
         )
     )
-    assert reliability.portfolio_fit == "STRONG_CANDIDATES_FOUND"
     assert reliability.matches[0].capability_id == (
         "probability.graph_reliability.connection_probability.compute"
     )
@@ -102,7 +96,6 @@ def test_discovery_distinguishes_strong_weak_and_absent_lexical_fit(
             limit=3,
         )
     )
-    assert symmetry.portfolio_fit == "STRONG_CANDIDATES_FOUND"
     assert symmetry.matches[0].capability_id == (
         "graph.symmetry.generator_orbits.compute"
     )
@@ -111,7 +104,6 @@ def test_discovery_distinguishes_strong_weak_and_absent_lexical_fit(
         CapabilityDiscoveryRequest(query="quuxonium frobnicator", limit=3)
     )
     assert absent.matches == ()
-    assert absent.portfolio_fit == "NO_LEXICAL_MATCHES"
 
 
 def test_domain_intents_discover_poset_and_topology_operations(
@@ -138,4 +130,4 @@ def test_domain_intents_discover_poset_and_topology_operations(
         )
 
         assert discovered.matches[0].capability_id == capability_id, query
-        assert discovered.matches[0].lexical_fit == "STRONG_CANDIDATE", query
+        assert discovered.matches[0].relevance_score > 0, query

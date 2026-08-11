@@ -86,19 +86,13 @@ def test_installed_capability_discovery_is_compact_deterministic_and_transparent
     assert [match.capability_id for match in first.matches] == [
         "fixture_algebra.search.countermodel"
     ]
-    assert first.matches[0].matched_on == ("tags",)
-    assert first.matches[0].matched_terms == ("counterexample",)
-    assert first.matches[0].has_invocation_examples is True
-    assert first.matches[0].lexical_fit == "WEAK_LEXICAL_MATCH"
-    assert first.portfolio_fit == "ONLY_WEAK_LEXICAL_MATCHES"
+    assert first.matches[0].relevance_score > 0
+    assert first.matches[0].applicability == "NEEDS_MORE_TYPED_REQUIREMENTS"
+    assert first.matches[0].applicability_code == "FULL_REQUEST_REQUIRED"
     assert first.domain == "fixture_algebra"
-    assert first.domain_filter_status == "MATCHED"
-    assert "matches at least one installed capability" in first.domain_filter_basis
-    assert "fixture_algebra" in first.available_domains
-    assert "fixture_graph" in first.available_domains
 
 
-def test_discovery_distinguishes_unknown_domain_from_lexical_absence(
+def test_discovery_applies_domain_filter_without_extra_status_prose(
     capability_core_services: DomainTestServices,
 ) -> None:
     schema = {"type": "object"}
@@ -127,14 +121,9 @@ def test_discovery_distinguishes_unknown_domain_from_lexical_absence(
 
     assert discovered.matches == ()
     assert discovered.domain == "arithmetic"
-    assert discovered.domain_filter_status == "UNKNOWN"
-    assert "matches no installed capability" in discovered.domain_filter_basis
-    assert "lexical fit outside that filter was not assessed" in (
-        discovered.portfolio_fit_basis
-    )
 
 
-def test_discovery_rejects_unsupported_natural_language_proof_routes(
+def test_discovery_does_not_infer_input_types_from_query_wording(
     capability_core_services: DomainTestServices,
 ) -> None:
     schema = {"type": "object"}
@@ -163,12 +152,9 @@ def test_discovery_rejects_unsupported_natural_language_proof_routes(
         )
     )
 
-    assert discovered.resolved_input_kind == (
-        CapabilityInputKind.NATURAL_LANGUAGE_PROOF
-    )
-    assert discovered.routing_status == "NO_ROUTE"
-    assert discovered.matches == ()
-    assert "No installed capability accepts" in discovered.routing_basis
+    assert discovered.input_kind is None
+    assert discovered.matches[0].capability_id == "fixture_sat.proof.verify"
+    assert discovered.matches[0].applicability == "NEEDS_MORE_TYPED_REQUIREMENTS"
 
     formal_method = capability_core_services.core.capabilities.discover(
         CapabilityDiscoveryRequest(
@@ -176,8 +162,7 @@ def test_discovery_rejects_unsupported_natural_language_proof_routes(
             limit=20,
         )
     )
-    assert formal_method.resolved_input_kind is None
-    assert formal_method.routing_status == "UNFILTERED"
+    assert formal_method.input_kind is None
 
     written_formal_proof = capability_core_services.core.capabilities.discover(
         CapabilityDiscoveryRequest(
@@ -185,8 +170,7 @@ def test_discovery_rejects_unsupported_natural_language_proof_routes(
             limit=20,
         )
     )
-    assert written_formal_proof.resolved_input_kind is None
-    assert written_formal_proof.routing_status == "UNFILTERED"
+    assert written_formal_proof.input_kind is None
 
     explicitly_structured = capability_core_services.core.capabilities.discover(
         CapabilityDiscoveryRequest(
@@ -198,14 +182,16 @@ def test_discovery_rejects_unsupported_natural_language_proof_routes(
     assert [match.capability_id for match in explicitly_structured.matches] == [
         "fixture_sat.proof.verify"
     ]
-    assert explicitly_structured.routing_status == "ROUTES_FOUND"
+    assert explicitly_structured.matches[0].applicability == (
+        "NEEDS_MORE_TYPED_REQUIREMENTS"
+    )
 
     formal_intent = capability_core_services.core.capabilities.discover(
         CapabilityDiscoveryRequest(
             query="formal UNSAT proof",
         )
     )
-    assert formal_intent.resolved_input_kind is None
+    assert formal_intent.input_kind is None
     assert [match.capability_id for match in formal_intent.matches] == [
         "fixture_sat.proof.verify"
     ]
@@ -215,7 +201,7 @@ def test_discovery_rejects_unsupported_natural_language_proof_routes(
             query="verify an LRAT proof trace",
         )
     )
-    assert formal_trace.resolved_input_kind is None
+    assert formal_trace.input_kind is None
 
 
 def test_discovery_routes_only_declared_input_and_artifact_contracts(
@@ -273,7 +259,7 @@ def test_discovery_routes_only_declared_input_and_artifact_contracts(
     assert [match.capability_id for match in formal.matches] == [
         "fixture_claim.elaborate"
     ]
-    assert formal.routing_status == "ROUTES_FOUND"
+    assert formal.matches[0].applicability == "NEEDS_MORE_TYPED_REQUIREMENTS"
 
     typed = service.discover(
         CapabilityDiscoveryRequest(
@@ -283,7 +269,7 @@ def test_discovery_routes_only_declared_input_and_artifact_contracts(
         )
     )
     assert [match.capability_id for match in typed.matches] == ["fixture_claim.replay"]
-    assert typed.routing_status == "ROUTES_FOUND"
+    assert typed.matches[0].applicability == "NEEDS_MORE_TYPED_REQUIREMENTS"
 
     mismatched = service.discover(
         CapabilityDiscoveryRequest(
@@ -292,8 +278,11 @@ def test_discovery_routes_only_declared_input_and_artifact_contracts(
             artifact_type=other_schema_uri,
         )
     )
-    assert mismatched.matches == ()
-    assert mismatched.routing_status == "NO_ROUTE"
+    assert [match.capability_id for match in mismatched.matches] == [
+        "fixture_claim.replay"
+    ]
+    assert mismatched.matches[0].applicability == "INCOMPATIBLE"
+    assert mismatched.matches[0].applicability_code == "ARTIFACT_TYPE_MISMATCH"
 
     lexically_absent = service.discover(
         CapabilityDiscoveryRequest(
@@ -302,8 +291,6 @@ def test_discovery_routes_only_declared_input_and_artifact_contracts(
         )
     )
     assert lexically_absent.matches == ()
-    assert lexically_absent.routing_status == "ROUTES_FOUND"
-    assert lexically_absent.portfolio_fit == "NO_LEXICAL_MATCHES"
 
     incompatible_lexical_match = service.discover(
         CapabilityDiscoveryRequest(
@@ -311,9 +298,13 @@ def test_discovery_routes_only_declared_input_and_artifact_contracts(
             input_kind=CapabilityInputKind.STRUCTURED_REQUEST,
         )
     )
-    assert incompatible_lexical_match.matches == ()
-    assert incompatible_lexical_match.routing_status == "NO_ROUTE"
-    assert incompatible_lexical_match.portfolio_fit == "STRONG_CANDIDATES_FOUND"
+    assert incompatible_lexical_match.matches[0].capability_id == (
+        "fixture_claim.elaborate"
+    )
+    assert incompatible_lexical_match.matches[0].applicability == "INCOMPATIBLE"
+    assert incompatible_lexical_match.matches[0].applicability_code == (
+        "INPUT_KIND_MISMATCH"
+    )
 
 
 def test_discovery_artifact_type_requires_typed_artifact_input() -> None:

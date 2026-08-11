@@ -38,16 +38,17 @@ def _descriptor(capability_id: str) -> dict[str, object]:
 def test_discovery_page_metadata_is_bound_to_returned_matches() -> None:
     base = {
         "query": "gcd",
-        "routing_basis": "The request uses a compatible structured input.",
         "matches": [
             {
                 "capability_id": "integer.compute.gcd",
                 "title": "Compute gcd",
                 "description": "Compute one exact gcd.",
+                "relevance_score": 12,
+                "applicability": "NEEDS_MORE_TYPED_REQUIREMENTS",
+                "applicability_code": "FULL_REQUEST_REQUIRED",
             }
         ],
         "total_matches": 2,
-        "portfolio_fit_basis": "One lexical candidate was found.",
     }
     with pytest.raises(ValidationError, match="truncated must agree"):
         CapabilityDiscoveryResult.model_validate(

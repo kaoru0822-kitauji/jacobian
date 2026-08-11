@@ -128,7 +128,6 @@ def test_mcp_exposes_only_math_tools_with_read_only_resources(
             )
             assert isinstance(absent_result.structured_content, dict)
             absent = absent_result.structured_content
-            assert absent["portfolio_fit"] == "NO_LEXICAL_MATCHES"
             assert absent["matches"] == []
             assert absent["catalog_resource"] == "capability://catalog"
 
@@ -144,15 +143,8 @@ def test_mcp_exposes_only_math_tools_with_read_only_resources(
             )
             assert isinstance(unknown_domain_result.structured_content, dict)
             unknown_domain = unknown_domain_result.structured_content
-            assert unknown_domain["domain_filter_status"] == "UNKNOWN"
-            assert (
-                "matches no installed capability"
-                in unknown_domain["domain_filter_basis"]
-            )
-            assert (
-                "lexical fit outside that filter was not assessed"
-                in (unknown_domain["portfolio_fit_basis"])
-            )
+            assert unknown_domain["domain"] == "arithmetic"
+            assert unknown_domain["matches"] == []
             assert unknown_domain["catalog_resource"] == "capability://catalog"
 
             catalog_result = await client.read_resource("capability://catalog")

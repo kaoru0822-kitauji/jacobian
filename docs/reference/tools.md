@@ -55,6 +55,13 @@ Applicability uses stable outcomes: `APPLICABLE`, `INCOMPATIBLE`,
 `CHECKER_UNAVAILABLE`, and `PORTFOLIO_GAP`. A checker that requires two inputs
 is never reported as invocable from one.
 
+The current search request has no full operation payload, so it reports
+`NEEDS_MORE_TYPED_REQUIREMENTS` after a compatible coarse input filter and
+`INCOMPATIBLE` with `INPUT_KIND_MISMATCH` or `ARTIFACT_TYPE_MISMATCH` when a
+declared filter rules an operation out. It does not infer an input type from
+query wording or manufacture a strong/weak confidence label. Exact request
+compatibility and preflight remain facts of the selected operation invocation.
+
 The retrieval order is not a workflow recommendation. Search does not browse,
 serve inventory for an empty query, expose projection levels, publish
 `next_views`, reconstruct schemas as prose, or prescribe a next operation.
