@@ -342,14 +342,14 @@ def test_lean_profile_is_built_and_validated_before_activation() -> None:
         "lake build repl JacobianLeanRuntime jacobian_lean_proof_state"
     )
     validate = source.index('validate_lean_release_runtime "${RELEASE_DIR}"')
+    shared_toolchain_permissions = source.index('chmod -R a+rX "${LEAN_ELAN_HOME}"')
     revision_marker = source.index(
         'printf \'%s\\n\' "${REVISION}" >"${RELEASE_DIR}/.git-revision"'
     )
     current_link = source.index('ln -sfn "${RELEASE_DIR}" "${CURRENT_LINK}.new"')
 
-    assert (
-        inspect_toolchains < install_toolchain < fetch_cache < build_runtime < validate
-    )
+    assert inspect_toolchains < install_toolchain < fetch_cache < build_runtime
+    assert build_runtime < shared_toolchain_permissions < validate
     assert validate < revision_marker < current_link
     assert '"ELAN_HOME=${LEAN_ELAN_HOME}"' in source
     assert '"PATH=${LEAN_SERVICE_PATH}"' in source

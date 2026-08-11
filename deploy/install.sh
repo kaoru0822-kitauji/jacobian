@@ -653,6 +653,10 @@ elif [[ "$(cat "${RELEASE_DIR}/.release-profile" 2>/dev/null || printf 'core')" 
 fi
 validate_release_runtime "${RELEASE_DIR}"
 if ((WITH_LEAN)); then
+    # Elan's shared toolchain is outside the immutable release. Normalize it on
+    # every deployment so service readability does not depend on root's umask
+    # or on whether this invocation reused an existing release.
+    chmod -R a+rX "${LEAN_ELAN_HOME}"
     validate_lean_release_runtime "${RELEASE_DIR}"
 fi
 if ((RELEASE_WAS_BUILT)); then
