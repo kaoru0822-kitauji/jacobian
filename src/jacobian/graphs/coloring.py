@@ -14,8 +14,6 @@ from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationE
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityRequest,
@@ -298,13 +296,6 @@ class GraphColoringEncodingAdapter:
                 runtime_ms=max(0, round((time.monotonic() - started) * 1000)),
             ),
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "the producer materialized a bound encoding; only the independent "
-                    "graph-coloring checker can promote the semantic relation"
-                ),
-            ),
             artifact_uris=(
                 cnf_artifact.artifact_uri,
                 claim.artifact_uri,

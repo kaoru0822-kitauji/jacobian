@@ -10,8 +10,6 @@ from pydantic import ValidationError
 from jacobian.canonical import canonicalize_json
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityRequest,
@@ -166,13 +164,6 @@ class LeanPremiseRetrievalAdapter:
                 runtime_ms=_runtime_ms(started),
             ),
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "candidate tactics were emitted by pinned Mathlib exact?; "
-                    "they remain unverified until lean.check accepts exact source"
-                ),
-            ),
             artifact_uris=(artifact.artifact_uri,),
         )
 

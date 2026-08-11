@@ -120,7 +120,6 @@ async def main() -> None:
             },
         )
         assert computed["execution"]["status"] == "COMPLETED"
-        assert computed["assurance"]["level"] == "COMPUTED"
 
         # Separate checker tool.
         verification_descriptor = await tool(

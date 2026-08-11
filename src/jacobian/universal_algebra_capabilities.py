@@ -17,8 +17,6 @@ from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationE
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInvocationExample,
@@ -360,13 +358,6 @@ class UniversalAlgebraEvaluateLawsAdapter:
                 runtime_ms=max(0, round((time.monotonic() - started) * 1000)),
             ),
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "deterministic exact finite-table evaluation; the bundled "
-                    "certificate was not invoked"
-                ),
-            ),
             artifact_uris=(
                 problem_artifact.artifact_uri,
                 evaluation_artifact.artifact_uri,
@@ -541,14 +532,6 @@ class UniversalAlgebraSearchCountermodelAdapter:
                 runtime_ms=max(0, round((time.monotonic() - started) * 1000)),
             ),
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "bounded Z3 finite-table search; any returned table must be "
-                    "replayed with universal_algebra.evaluate_laws and its "
-                    "independent certificate checker"
-                ),
-            ),
             artifact_uris=(search_artifact.artifact_uri,),
         )
 
@@ -648,13 +631,6 @@ class FiniteMagmaTableEnumerateAdapter:
                 runtime_ms=max(0, round((time.monotonic() - started) * 1000)),
             ),
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "deterministic exact standard-library enumeration; no "
-                    "independent coverage checker was invoked"
-                ),
-            ),
             artifact_uris=(enumeration_artifact.artifact_uri, *table_uris),
         )
 

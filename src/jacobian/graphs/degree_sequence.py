@@ -12,8 +12,6 @@ from pydantic import ValidationError
 from jacobian.canonical import canonicalize_json
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityRequest,
@@ -233,13 +231,6 @@ class GraphDegreeSequenceAdapter:
                 runtime_ms=runtime_ms(started),
             ),
             output=output.model_dump(mode="json", exclude_none=True),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "deterministic NetworkX construction or exact integer "
-                    "obstruction; the bundled certificate was not invoked"
-                ),
-            ),
             artifact_uris=tuple(artifact_uris),
         )
 

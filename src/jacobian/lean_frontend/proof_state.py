@@ -11,8 +11,6 @@ from pydantic import ValidationError
 import jacobian.lean_frontend.exploration as _exploration_support
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInvocationExample,
@@ -394,14 +392,6 @@ class LeanProofStateAdapter:
                 ),
             ),
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "a clean pinned Lean process reconstructed the bound state "
-                    "and computed one transition; only lean.check can verify a "
-                    "completed theorem"
-                ),
-            ),
             artifact_uris=artifact_uris,
         )
 

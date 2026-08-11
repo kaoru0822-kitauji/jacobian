@@ -8,7 +8,6 @@ import pytest
 
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
@@ -75,7 +74,6 @@ def test_enclose_capability_computes_a_valid_bernstein_enclosure(
     )
 
     assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.output["verification"] == "UNVERIFIED"
     assert result.output["certificate_available"] is False
     assert result.output["checker_id"] is None
@@ -152,7 +150,6 @@ def test_verify_capability_confirms_a_valid_enclosure(installation) -> None:
     )
 
     assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
     assert result.output["enclosure_assurance"] == "VERIFIED"
     assert result.output["conclusion"] == "TRUE"
     assert result.output["checker_id"] is not None
@@ -183,7 +180,7 @@ def test_verify_capability_rejects_a_false_enclosure(installation) -> None:
     )
 
     assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert result.verification_record_uri is not None
     assert result.output["enclosure_assurance"] == "VERIFIED"
     assert result.output["conclusion"] == "FALSE"
 

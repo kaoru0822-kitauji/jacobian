@@ -15,10 +15,7 @@ from tests.component.providers.polynomial.polynomial_capabilities_support import
     poly_payload as _poly_payload,
 )
 
-from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
-    CapabilityRequest,
-)
+from jacobian.contracts.capabilities import CapabilityRequest
 
 
 def test_jacobian_canonically_omits_zero_partial_derivatives(
@@ -101,7 +98,6 @@ def test_polynomial_jacobian_and_collision_reproduce_public_counterexample(
         )
     )
 
-    assert jacobian.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert jacobian.output["determinant"] == {
         "terms": [
             {
@@ -144,7 +140,6 @@ def test_polynomial_jacobian_and_collision_reproduce_public_counterexample(
         )
     )
 
-    assert collision.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert (
         collision.output["first_evaluation_uri"]
         == first_evaluation.output["evaluation_uri"]
@@ -191,7 +186,6 @@ def test_polynomial_map_evaluation_is_exact_and_materialized(
     ]
     assert result.output["map_uri"] in result.artifact_uris
     assert result.output["evaluation_uri"] in result.artifact_uris
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
 
 
 @pytest.mark.parametrize(

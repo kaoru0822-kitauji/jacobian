@@ -318,8 +318,8 @@ def _run_text_projection(result: CapabilityResult) -> dict[str, Any]:
     }
     for key in (
         "diagnostics",
+        "verification_record_uri",
         "artifact_uris",
-        "assurance",
     ):
         value = payload.get(key)
         if value not in (None, [], (), {}):

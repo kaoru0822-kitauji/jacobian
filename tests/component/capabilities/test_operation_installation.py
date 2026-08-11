@@ -8,7 +8,6 @@ from pydantic import ConfigDict, Field, model_validator
 from tests.support.services import DomainTestServices, open_domain_services
 
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityDiagnostic,
     CapabilityRequest,
 )
@@ -159,7 +158,6 @@ def test_synthetic_bundle_returns_an_inline_typed_result(
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.output["result"] == {"doubled": 12}
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.artifact_uris == ()
 
 
@@ -309,7 +307,6 @@ def test_materialized_operation_retains_artifacts_lineage_and_typed_preview(
     )
 
     assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert len(result.artifact_uris) == 2
     input_uri, result_uri = result.artifact_uris
     assert result.output["input_uri"] == input_uri
@@ -493,7 +490,6 @@ def test_computed_adapter_preserves_operational_failure_status(
 
         assert result.execution.status is status
         assert result.diagnostics == (diagnostic,), status
-        assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC, status
         assert result.artifact_uris == (), status
 
 

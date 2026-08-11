@@ -12,10 +12,7 @@ from tests.support.services import (
     open_domain_services,
 )
 
-from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
-    CapabilityRequest,
-)
+from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.graphs.composition import install_graph_composition_capabilities
 from jacobian.graphs.installation import install_graph_capabilities
@@ -91,7 +88,6 @@ def test_compose_complement_returns_computed_graph_artifact(
     )
 
     assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert "conclusion" not in result.output
 
     payload = result.output["result_graph"]
@@ -211,7 +207,6 @@ def test_enumerate_returns_complete_atlas_catalog_with_boundary(
     )
 
     assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert "conclusion" not in result.output
 
     # The Graph Atlas has exactly 11 nonisomorphic graphs of order 4.

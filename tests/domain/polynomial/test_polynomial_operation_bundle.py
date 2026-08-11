@@ -4,9 +4,6 @@ from typing import Any, cast
 
 import pytest
 
-from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
-)
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.domains.polynomial import build_polynomial_bundle
 from jacobian.process_policy import ProcessResult, ProcessTermination
@@ -77,7 +74,6 @@ def test_polynomial_bundle_installs_and_computes_exact_invariants(
         },
     )
     assert gcd_result.execution.status is ExecutionStatus.COMPLETED
-    assert gcd_result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert gcd_result.output["result"] == {
         "gcd": _polynomial(["x"], [(1, 1, 1), (0, -1, 1)]),
         "bezout": {
@@ -222,7 +218,6 @@ def test_polynomial_bundle_installs_and_computes_exact_invariants(
         square_free_result,
     ):
         assert result.execution.status is ExecutionStatus.COMPLETED
-        assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
         assert result.artifact_uris == ()
 
     invalid_result = _invoke(

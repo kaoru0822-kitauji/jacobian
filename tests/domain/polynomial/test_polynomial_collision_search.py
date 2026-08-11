@@ -8,10 +8,7 @@ from typing import Any
 import pytest
 
 from jacobian.bounded_process import bounded_process_cancellation
-from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
-    CapabilityRequest,
-)
+from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.domains.polynomial import build_polynomial_bundle
 from jacobian.polynomials import install_polynomial_capabilities
@@ -77,7 +74,6 @@ def test_collision_search_returns_first_deterministic_candidate(
     assert result.output["common_image"] == [{"num": "1", "den": "1"}]
     assert result.output["witness_uri"] in result.artifact_uris
     assert result.output["stop_reason"] == "FIRST_COLLISION"
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
 
 
 def test_collision_search_reports_partial_grid_after_early_collision(

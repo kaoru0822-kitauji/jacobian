@@ -6,8 +6,6 @@ from dataclasses import dataclass
 
 from jacobian.capability_service import CapabilityAdapter
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityRequest,
     CapabilityResult,
@@ -89,26 +87,13 @@ class _VerificationProjection:
             references.add(envelope.verification_record_uri)
             record = self.verification.store.get(envelope.verification_record_uri)
             references.update(record.manifest.parents)
-        assurance_level = (
-            CapabilityAssuranceLevel.VERIFIED
-            if verified
-            else CapabilityAssuranceLevel.HEURISTIC
-        )
         return CapabilityResult(
             capability_id=self.capability_id,
             capability_version="1",
             execution=envelope.execution,
             output=envelope.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=assurance_level,
-                basis=(
-                    "accepted by the installed operator-authorized checker"
-                    if verified
-                    else "the checker did not accept a decisive replay"
-                ),
-                verification_record_uri=(
-                    envelope.verification_record_uri if verified else None
-                ),
+            verification_record_uri=(
+                envelope.verification_record_uri if verified else None
             ),
             artifact_uris=tuple(sorted(references)),
         )

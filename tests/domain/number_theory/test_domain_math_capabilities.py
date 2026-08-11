@@ -8,7 +8,6 @@ from tests.support.services import DomainTestServices, open_domain_services
 
 from jacobian.contracts import number_theory as number_theory_contracts
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityDiscoveryRequest,
     CapabilityRequest,
 )
@@ -80,7 +79,6 @@ def test_domain_error_fails_before_artifact_writes(domain_services) -> None:
 
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.diagnostics[0].code == "NUMBER_THEORY_OPERATION_NOT_APPLICABLE"
-    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
     assert result.artifact_uris == ()
 
 
@@ -141,7 +139,6 @@ def test_modular_polynomial_residue_image_is_complete_and_materialized(
     )
 
     assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     stored_result = _stored_modular_residue_result(domain_services, result)
     assert stored_result == {
         "semantics_version": "modular-polynomial-residue-image.v1",
@@ -404,7 +401,6 @@ def test_number_theory_resource_atomics_are_exact_computed(
             CapabilityRequest(capability_id=capability_id, input=payload)
         )
         assert result.execution.status is ExecutionStatus.COMPLETED
-        assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
         assert result.output["result"] == expected
 
 
@@ -418,7 +414,6 @@ def test_legendre_symbol_rejects_non_prime_before_conclusion(
         )
     )
     assert result.execution.status is ExecutionStatus.ERROR
-    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
     assert result.artifact_uris == ()
     assert result.diagnostics[0].code == "NUMBER_THEORY_OPERATION_NOT_APPLICABLE"
-    assert result.assurance.verification_record_uri is None
+    assert result.verification_record_uri is None

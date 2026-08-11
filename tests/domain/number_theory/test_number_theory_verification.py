@@ -9,7 +9,6 @@ from tests.support.exact_domain import open_exact_domain_services
 from tests.support.services import DomainTestServices
 
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
@@ -65,7 +64,7 @@ def test_prime_factorization_result_uses_independent_python_flint_replay(
         assert verified.output["status"] == "VERIFIED", value
         assert verified.output["operation_id"] == producer_id, value
         assert verified.output["verification_record_uri"] is not None, value
-        assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED, value
+        assert verified.verification_record_uri is not None, value
         assert verified.output["verification_record_uri"] in verified.artifact_uris, (
             value
         )
@@ -136,7 +135,7 @@ def test_powerful_number_result_uses_independent_python_flint_replay(
         assert verified.output["status"] == "VERIFIED", value
         assert verified.output["operation_id"] == producer_id, value
         assert verified.output["verification_record_uri"] is not None, value
-        assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED, value
+        assert verified.verification_record_uri is not None, value
         assert verified.output["verification_record_uri"] in verified.artifact_uris, (
             value
         )
@@ -205,7 +204,7 @@ def test_modular_residue_image_uses_independent_python_flint_replay(
     assert verified.output["status"] == "VERIFIED"
     assert verified.output["operation_id"] == producer_id
     assert verified.output["verification_record_uri"] is not None
-    assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert verified.verification_record_uri is not None
     assert verified.output["verification_record_uri"] in verified.artifact_uris
     provider_runtime = next(
         descriptor.provider_runtime
@@ -243,4 +242,4 @@ def test_modular_residue_verifier_replays_its_materialized_lineage(
     assert rejected.output["status"] == "VERIFIED"
     assert rejected.output["conclusion"] == "TRUE"
     assert rejected.output["verification_record_uri"] is not None
-    assert rejected.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert rejected.verification_record_uri is not None

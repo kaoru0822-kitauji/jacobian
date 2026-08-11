@@ -11,8 +11,6 @@ from jacobian.artifacts import ArtifactService
 from jacobian.canonical import format_canonical_integer
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityRequest,
@@ -155,9 +153,5 @@ class PolynomialSystemRationalSearchAdapter:
                 runtime_ms=max(0, round((time.monotonic() - started) * 1000)),
             ),
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis="deterministic exact rational enumeration; candidate remains unverified",
-            ),
             artifact_uris=uris,
         )

@@ -12,8 +12,6 @@ from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationE
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInputKind,
@@ -271,35 +269,11 @@ class SmtUnsatProofVerificationAdapter:
         ]
         if record_uri is not None:
             artifact_uris.append(record_uri)
-        assurance_level = (
-            CapabilityAssuranceLevel.VERIFIED
-            if verified
-            else (
-                CapabilityAssuranceLevel.COMPUTED
-                if checked.execution.status is ExecutionStatus.COMPLETED
-                else CapabilityAssuranceLevel.HEURISTIC
-            )
-        )
         return CapabilityResult(
             capability_id=self.descriptor.capability_id,
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=assurance_level,
-                basis=(
-                    "accepted by the operator-authorized external strict Carcara "
-                    "runtime bound into the checker registration"
-                    if verified
-                    else (
-                        "checker replay completed without accepting the proof; "
-                        "no opposite conclusion follows"
-                        if checked.execution.status is ExecutionStatus.COMPLETED
-                        else "checker execution did not complete; no mathematical "
-                        "conclusion follows"
-                    )
-                ),
-                verification_record_uri=record_uri,
-            ),
+            verification_record_uri=record_uri,
             artifact_uris=tuple(artifact_uris),
         )

@@ -12,8 +12,6 @@ from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationE
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInputKind,
@@ -219,10 +217,6 @@ class SatLratVerificationAdapter:
                     detail="cancelled before independent LRAT replay",
                 ),
                 output=output.model_dump(mode="json"),
-                assurance=CapabilityAssurance(
-                    level=CapabilityAssuranceLevel.HEURISTIC,
-                    basis="cancelled before checker execution; no conclusion follows",
-                ),
                 artifact_uris=(
                     resolved.artifact.artifact_uri,
                     proof_artifact.artifact_uri,
@@ -289,22 +283,6 @@ class SatLratVerificationAdapter:
             capability_version=self.descriptor.version,
             execution=projected_execution,
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else (
-                        CapabilityAssuranceLevel.HEURISTIC
-                        if status == "TIMEOUT"
-                        else CapabilityAssuranceLevel.COMPUTED
-                    )
-                ),
-                basis=(
-                    "independent checker accepted the exact bound LRAT proof"
-                    if verified
-                    else "proof was not accepted; this is not evidence of satisfiability"
-                ),
-                verification_record_uri=record_uri,
-            ),
+            verification_record_uri=record_uri,
             artifact_uris=tuple(uris),
         )

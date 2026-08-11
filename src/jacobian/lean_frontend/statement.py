@@ -31,8 +31,6 @@ from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInputKind,
@@ -748,14 +746,6 @@ class LeanStatementProposalAdapter:
             capability_version=self.descriptor.version,
             execution=Execution(status=ExecutionStatus.COMPLETED),
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "Lean elaboration reports whether the expression is a "
-                    "well-typed proposition in the bound environment; it does "
-                    "not establish truth, theoremhood, or semantic intent"
-                ),
-            ),
             artifact_uris=(artifact.artifact_uri,),
         )
 
@@ -882,14 +872,6 @@ class LeanStatementCompareAdapter:
             capability_version=self.descriptor.version,
             execution=Execution(status=ExecutionStatus.COMPLETED),
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "deterministic syntactic and axiom-set comparison; "
-                    "this does not certify semantic equivalence of the "
-                    "statements"
-                ),
-            ),
             artifact_uris=(artifact.artifact_uri,),
         )
 

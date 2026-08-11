@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityRequest,
     CapabilityResult,
@@ -52,10 +50,6 @@ class PolytopeSeparationAdapter:
             capability_version=self.descriptor.version,
             execution=envelope.execution,
             output=value.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis="deterministic local finite-polytope computation",
-            ),
             artifact_uris=_artifact_references(value),
         )
 

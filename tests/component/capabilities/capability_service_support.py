@@ -9,8 +9,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityInstallTier,
     CapabilityProviderAvailability,
@@ -98,10 +96,6 @@ class ComputedAdapter:
             capability_version=self.descriptor.version,
             execution=Execution(status=ExecutionStatus.COMPLETED),
             output={"value": int(request.input["value"]) * 2},
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis="deterministic integer arithmetic",
-            ),
         )
 
 
@@ -121,10 +115,6 @@ class InvalidOutputAdapter:
             capability_version=self.descriptor.version,
             execution=Execution(status=ExecutionStatus.COMPLETED),
             output={"value": "not-an-integer"},
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis="fixture malformed output",
-            ),
         )
 
 
@@ -155,10 +145,6 @@ class DiscoveryAdapter:
             capability_version=self.descriptor.version,
             execution=Execution(status=ExecutionStatus.COMPLETED),
             output={"value": request.input["value"]},
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis="deterministic discovery fixture",
-            ),
         )
 
 
@@ -198,10 +184,6 @@ class ForgedVerifiedAdapter:
             capability_id=self.descriptor.capability_id,
             capability_version=self.descriptor.version,
             execution=Execution(status=ExecutionStatus.COMPLETED),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.VERIFIED,
-                basis="adapter says so",
-                verification_record_uri=record_uri,
-            ),
+            verification_record_uri=record_uri,
             artifact_uris=(record_uri,),
         )

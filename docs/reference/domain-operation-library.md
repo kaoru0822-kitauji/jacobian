@@ -136,20 +136,20 @@ output, publication, replay, and aggregate allocation estimates where those are
 known without executing the operation.
 
 A request-to-result postcondition runs before anything is exposed. Failure
-publishes no value reference, artifact, or assurance.
+publishes no value reference, artifact, or verification record.
 
 Legacy envelope metadata is not part of `OperationSpec`. In particular, an
-ordinary operation does not configure generic assurance, completeness, scope,
-relationships, or obligations. Any temporary v2 response label is an outward
-compatibility projection and carries no mathematical or verification
-authority.
+ordinary operation does not configure generic completeness, scope,
+relationships, or obligations. A v2 result carries a `verification_record_uri`
+only when an independent checker accepted the result; that pointer carries no
+mathematical or verification authority beyond the record it identifies.
 
 ## Bounded searches
 
 A retained bounded search is an ordinary `OperationSpec`. Its domain-owned
 result records the facts callers need—for example `EXACT`, `INCOMPLETE`, or
 `UNKNOWN`, the admitted bounds, and any witness. It does not acquire generic
-scope, completeness, relationship, obligation, or assurance wrappers.
+scope, completeness, relationship, or obligation wrappers.
 
 `Completed` means the bounded computation returned a valid typed result; it
 does not imply exactness unless that result says so. Timeout, cancellation,

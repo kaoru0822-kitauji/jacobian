@@ -9,8 +9,6 @@ from pydantic import ValidationError
 
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInvocationExample,
@@ -139,12 +137,5 @@ class GraphExplicitConstructionAdapter:
                 runtime_ms=runtime_ms(started),
             ),
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "domain contract validation and deterministic canonicalization; "
-                    "no mathematical property was asserted"
-                ),
-            ),
             artifact_uris=(stored.artifact_uri,),
         )

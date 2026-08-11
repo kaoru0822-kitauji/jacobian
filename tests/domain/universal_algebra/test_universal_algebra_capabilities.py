@@ -5,10 +5,7 @@ from typing import Any
 import pytest
 from tests.support.core_capability_harnesses import UniversalAlgebraTestServices
 
-from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
-    CapabilityRequest,
-)
+from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.universal_algebra import (
     UniversalAlgebraCountermodelSearchRequest,
 )
@@ -120,7 +117,6 @@ def test_evaluate_laws_returns_exact_truth_and_counterexample(
         )
     )
 
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     records = {record["law_id"]: record for record in result.output["records"]}
     assert records["associative"] == {
         "law_id": "associative",
@@ -154,7 +150,7 @@ def test_evaluate_laws_returns_exact_truth_and_counterexample(
             input={"certificate_uri": result.output["certificate_uri"]},
         )
     )
-    assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert verified.verification_record_uri is not None
     assert "conclusion" not in result.output
 
 
@@ -259,7 +255,6 @@ def test_finite_magma_table_enumeration_is_exact_and_canonical(
     assert result.output["total_count"] == 16
     assert result.output["ordering"] == "LEXICOGRAPHIC_ROW_MAJOR"
     assert result.output["completeness"] == "COMPLETE"
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     table_payloads = [
         runtime.core.store.get(uri).payload for uri in result.output["table_uris"]
     ]

@@ -8,10 +8,7 @@ from tests.support.core_capability_harnesses import open_graph_core_services
 from tests.support.services import DomainTestServices
 
 from jacobian.artifacts import ArtifactValidationError
-from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
-    CapabilityRequest,
-)
+from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.graphs import GraphInstallation
 
@@ -207,7 +204,6 @@ def test_graph_atlas_search_is_bounded_complete_and_replayable(
         )
     )
 
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.output["match_count"] >= result.output["returned_count"] == 2
     assert result.output["truncated"] is (
         result.output["match_count"] > result.output["returned_count"]
@@ -246,7 +242,6 @@ def test_graph_atlas_search_reports_no_match_without_a_truth_claim(
 
     assert result.output["match_count"] == 0
     assert result.output["candidates"] == []
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert "conclusion" not in result.output
 
 
@@ -356,7 +351,6 @@ def test_graph_property_batch_materializes_exact_computed_artifact(
             "value": 0,
         },
     }
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     property_artifact = services.core.store.get(result.output["property_artifact_uri"])
     assert set(property_artifact.manifest.parents) == {
         graph_uri,
@@ -468,7 +462,6 @@ def test_graph_counterexample_invariant_batch_reproduces_path_five(
     assert properties["radius"]["value"] == 2
     assert properties["residue"]["value"] == 2
     assert set(properties["triangle_frequencies"]["value"].values()) == {0}
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
 
 
 def test_graph_invariant_batch_preserves_unsupported_and_not_applicable_results(
@@ -504,7 +497,6 @@ def test_graph_invariant_batch_preserves_unsupported_and_not_applicable_results(
     )
 
     assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     outcomes = {
         binding["invariant"]: binding["result"] for binding in result.output["results"]
     }

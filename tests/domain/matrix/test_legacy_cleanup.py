@@ -18,7 +18,6 @@ from tests.support.exact_domain import open_exact_domain_services
 from tests.support.rationals import rational_payload as _q
 
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
@@ -55,7 +54,6 @@ def test_pilot_provides_matrix_determinant_compute_without_legacy(
         )
     )
     assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.artifact_uris == ()
     assert result.output["result"]["determinant"] == _q(-2)
     assert result.output["result"]["method"] == "FRACTION_FREE_BAREISS"
@@ -72,7 +70,6 @@ def test_pilot_provides_matrix_rank_compute_without_legacy(
         )
     )
     assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.artifact_uris == ()
     assert result.output["result"]["rank"] == 2
     assert result.output["result"]["pivot_columns"] == [0, 1]
@@ -99,7 +96,7 @@ def test_pilot_provides_matrix_determinant_verify_without_legacy(
     )
     assert verified.execution.status is ExecutionStatus.COMPLETED
     assert verified.output["status"] == "VERIFIED"
-    assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert verified.verification_record_uri is not None
 
 
 def test_pilot_provides_matrix_rank_verify_without_legacy(
@@ -123,7 +120,7 @@ def test_pilot_provides_matrix_rank_verify_without_legacy(
     )
     assert verified.execution.status is ExecutionStatus.COMPLETED
     assert verified.output["status"] == "VERIFIED"
-    assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert verified.verification_record_uri is not None
 
 
 def test_legacy_matrix_capabilities_module_is_removed() -> None:

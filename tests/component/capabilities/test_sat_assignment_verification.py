@@ -16,7 +16,6 @@ from tests.support.services import (
 
 import jacobian_checkers.sat
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityInputKind,
     CapabilityInstallTier,
     CapabilityProviderAvailability,
@@ -185,12 +184,11 @@ def test_sat_assignment_is_verified_by_an_authorized_clean_process(
     result = _verify(sat_assignment_services, assignment_uri)
 
     assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
     assert result.output["status"] == "VERIFIED_SATISFYING"
     assert result.output["conclusion"] == "TRUE"
     assert result.output["cnf_uri"] == cnf_uri
     assert result.output["assignment_uri"] == assignment_uri
-    record_uri = result.assurance.verification_record_uri
+    record_uri = result.verification_record_uri
     assert record_uri is not None
     record_artifact = sat_assignment_services.core.store.get(record_uri)
     record = VerificationRecord.model_validate(record_artifact.payload)
@@ -213,11 +211,10 @@ def test_unsatisfying_assignment_is_rejected_without_an_opposite_conclusion(
     result = _verify(sat_assignment_services, assignment_uri)
 
     assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.output["status"] == "REJECTED"
     assert result.output["conclusion"] == "UNKNOWN"
     assert result.output["verification_record_uri"] is None
-    assert result.assurance.verification_record_uri is None
+    assert result.verification_record_uri is None
 
 
 def test_sat_assignment_verify_requires_operator_authorized_checker(
@@ -265,7 +262,7 @@ def test_misbound_assignment_artifact_fails_before_checker_dispatch(
     result = _verify(sat_assignment_services, forged.artifact_uri)
 
     assert result.execution.status is ExecutionStatus.ERROR
-    assert result.assurance.level is not CapabilityAssuranceLevel.VERIFIED
+    assert result.verification_record_uri is None
     assert called is False
 
 
@@ -286,10 +283,9 @@ def test_checker_timeout_cannot_create_a_sat_conclusion(
     result = _verify(sat_assignment_services, assignment_uri)
 
     assert result.execution.status is ExecutionStatus.TIMEOUT
-    assert result.assurance.level is not CapabilityAssuranceLevel.VERIFIED
     assert result.output["status"] == "TIMEOUT"
     assert result.output["conclusion"] == "UNKNOWN"
-    assert result.assurance.verification_record_uri is None
+    assert result.verification_record_uri is None
 
 
 def test_checker_error_cannot_create_a_sat_conclusion(
@@ -309,7 +305,6 @@ def test_checker_error_cannot_create_a_sat_conclusion(
     result = _verify(sat_assignment_services, assignment_uri)
 
     assert result.execution.status is ExecutionStatus.ERROR
-    assert result.assurance.level is not CapabilityAssuranceLevel.VERIFIED
     assert result.output["status"] == "ERROR"
     assert result.output["conclusion"] == "UNKNOWN"
-    assert result.assurance.verification_record_uri is None
+    assert result.verification_record_uri is None

@@ -14,8 +14,6 @@ from pydantic import ValidationError
 from jacobian.canonical import format_canonical_integer
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityRequest,
@@ -181,13 +179,6 @@ class GraphPropertyAdapter:
                 runtime_ms=runtime_ms(started),
             ),
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "deterministic exact NetworkX algorithms; no independent "
-                    "checker was invoked"
-                ),
-            ),
             artifact_uris=(
                 graph_uri,
                 property_artifact.artifact_uri,

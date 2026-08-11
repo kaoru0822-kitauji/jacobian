@@ -20,8 +20,6 @@ from pydantic import ValidationError
 import jacobian.lean_frontend.exploration as _exploration_support
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInputKind,
@@ -262,15 +260,6 @@ class LeanMetavariableFieldsAdapter:
                 detail=None,
             ),
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "a clean pinned Lean process reconstructed the bound "
-                    "state and exposed maintained MetaM fields; coercion "
-                    "provenance is UNAVAILABLE and this is not a "
-                    "theorem-verification record"
-                ),
-            ),
             artifact_uris=(validated.state_uri, artifact.artifact_uri),
         )
 

@@ -16,7 +16,6 @@ from jacobian.builtin_capabilities import (
 )
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityInstallTier,
     CapabilityProviderAvailability,
     CapabilityProviderDigestKind,
@@ -125,7 +124,6 @@ def test_search_adapter_exposes_bounded_computed_retrieval() -> None:
             },
         )
     )
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.output["environment_digest"] == _DIGEST
     assert result.output["declarations"][0]["name"] == "irrational_sqrt_two"
     assert backend.calls[0][1] == LeanDeclarationSearchQuery(
@@ -136,28 +134,6 @@ def test_search_adapter_exposes_bounded_computed_retrieval() -> None:
         kinds=(),
         limit=1,
     )
-
-
-def test_exhausted_search_reports_computed_complete_coverage() -> None:
-    backend = FakeBackend(
-        {
-            "operation": "search",
-            "declarations": [],
-            "scanned_declarations": 626_944,
-            "stop_reason": "EXHAUSTED",
-        }
-    )
-    adapter = LeanDeclarationSearchAdapter(LeanDeclarationService(backend), _RUNTIME)
-    result = adapter.invoke(
-        CapabilityRequest(
-            capability_id="lean.declaration.search",
-            input={
-                "environment": "MATHLIB",
-                "type_pattern": {"constants": ["Jacobian.DoesNotExist"]},
-            },
-        )
-    )
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
 
 
 def test_inspect_adapter_returns_docs_without_promoting_the_theorem() -> None:
@@ -182,8 +158,6 @@ def test_inspect_adapter_returns_docs_without_promoting_the_theorem() -> None:
             input={"environment": "CORE", "declaration_name": "Nat.add"},
         )
     )
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    assert result.assurance.verification_record_uri is None
     assert result.output["declaration"]["docstring"].startswith("Addition")
     assert result.output["environment_digest"] == _DIGEST
 
@@ -240,7 +214,6 @@ def test_dependency_adapter_exposes_partial_typed_subgraph(tmp_path: Path) -> No
             },
         )
     )
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.output["edges"][0]["kinds"] == ["TYPE", "VALUE"]
     assert result.output["closure_complete"] is False
     assert result.output["dependency_graph_uri"] in result.artifact_uris

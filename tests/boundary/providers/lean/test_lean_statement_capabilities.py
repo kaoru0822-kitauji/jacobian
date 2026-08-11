@@ -14,7 +14,6 @@ import jacobian.lean_frontend.statement as lean_statements
 from jacobian.artifacts import ArtifactService
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.lean_statement import LeanElaborationOption
@@ -79,8 +78,6 @@ def test_propose_elaborates_valid_statement(tmp_path: Path) -> None:
     assert result.output["sorry_count"] == 1
     assert result.output["verification"] == "UNVERIFIED"
     assert result.output["proposal_uri"] in result.artifact_uris
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    assert "does not establish truth" in result.assurance.basis
 
 
 @pytest.mark.skipif(
@@ -239,8 +236,6 @@ def test_propose_directly_elaborates_environment_bound_proposition(
         artifact.payload["elaborated_expression"]
         == result.output["elaborated_expression"]
     )
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    assert "does not establish truth" in result.assurance.basis
 
 
 def test_direct_elaboration_parser_preserves_multiline_core_expression() -> None:

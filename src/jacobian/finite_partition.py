@@ -12,8 +12,6 @@ from jacobian.canonical import canonicalize_json
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityRequest,
     CapabilityResult,
@@ -511,24 +509,10 @@ def _partition_result(
         artifact_uris.append(certificate_uri)
     if record_uri is not None:
         artifact_uris.append(record_uri)
-    assurance_level = (
-        CapabilityAssuranceLevel.VERIFIED
-        if verified
-        else CapabilityAssuranceLevel.COMPUTED
-    )
     execution_status = (
         verification_result.execution.status
         if verification_result is not None
         else ExecutionStatus.COMPLETED
-    )
-    verified_replay_basis = (
-        "authorized checker replayed equality-based coverage and required "
-        "disjointness within the caller-supplied universe"
-        if material.require_disjoint
-        else (
-            "authorized checker replayed equality-based coverage within the "
-            "caller-supplied universe; disjointness was not required"
-        )
     )
     return CapabilityResult(
         capability_id=capability_id,
@@ -553,16 +537,7 @@ def _partition_result(
             "overlaps": material.overlaps,
             "duplicate_case_ids": material.duplicate_case_ids,
         },
-        assurance=CapabilityAssurance(
-            level=assurance_level,
-            basis=(
-                f"{verified_replay_basis}; external-domain completeness and "
-                "member/case semantics were not checked"
-                if verified
-                else "partition was proposed and inspected by its generator only"
-            ),
-            verification_record_uri=record_uri if verified else None,
-        ),
+        verification_record_uri=(record_uri if verified else None),
         artifact_uris=tuple(artifact_uris),
     )
 

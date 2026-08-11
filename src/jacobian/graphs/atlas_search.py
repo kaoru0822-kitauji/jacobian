@@ -8,8 +8,6 @@ from typing import TYPE_CHECKING, Any, cast
 
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityRequest,
@@ -199,13 +197,6 @@ class GraphAtlasSearchAdapter:
                 "backend": "networkx.graph_atlas_g",
                 "backend_version": nx().__version__,
             },
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "deterministic NetworkX Graph Atlas enumeration and exact "
-                    "property filters; no independent checker was invoked"
-                ),
-            ),
             artifact_uris=artifact_uris,
         )
 

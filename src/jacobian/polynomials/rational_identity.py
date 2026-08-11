@@ -6,8 +6,6 @@ import hashlib
 
 from jacobian.canonical import canonicalize_json
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityInvocationExample,
     CapabilityRequest,
@@ -233,19 +231,7 @@ class RationalFunctionIdentityAdapter:
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-                basis=(
-                    "authorized independent sparse cross-multiplication replay"
-                    if verified
-                    else "the independent checker did not accept the replay"
-                ),
-                verification_record_uri=record_uri,
-            ),
+            verification_record_uri=(record_uri if verified else None),
             artifact_uris=(
                 left.artifact_uri,
                 right.artifact_uri,

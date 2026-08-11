@@ -5,10 +5,7 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 from jacobian.capability_errors import CapabilityError
-from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
-    CapabilityResult,
-)
+from jacobian.contracts.capabilities import CapabilityResult
 from jacobian.contracts.exact_domain_verification import InlineExactVerificationRecord
 from jacobian.contracts.verification import VerificationRecord
 from jacobian.storage.errors import StorageError
@@ -25,13 +22,9 @@ class CapabilityVerificationMixin:
         self: VerificationOwner,
         result: CapabilityResult,
     ) -> None:
-        if result.assurance.level is not CapabilityAssuranceLevel.VERIFIED:
-            return
-        record_uri = result.assurance.verification_record_uri
+        record_uri = result.verification_record_uri
         if record_uri is None:
-            raise CapabilityError(
-                "verified capability result has no verification record URI"
-            )
+            return
         try:
             record_artifact = self.store.get(record_uri)
             record = VerificationRecord.model_validate(record_artifact.payload)

@@ -2,10 +2,7 @@ from __future__ import annotations
 
 from tests.support.core_capability_harnesses import FiniteCoverageTestServices
 
-from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
-    CapabilityRequest,
-)
+from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
 
 
@@ -33,7 +30,7 @@ def test_finite_coverage_verifies_exactly_once_across_pages(
         _request(["alpha", "beta", "gamma"], [["alpha"], ["beta", "gamma"]])
     )
 
-    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert result.verification_record_uri is not None
     assert result.output["coverage_status"] == "EXACTLY_ONCE"
     assert result.output["conclusion"] == "TRUE"
     assert result.output["diagnostics"] == {
@@ -60,7 +57,6 @@ def test_finite_coverage_reports_omission_and_duplicate(
     )
 
     diagnostics = result.output["diagnostics"]
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.output["coverage_status"] == "INVALID"
     assert result.output["conclusion"] == "UNKNOWN"
     assert len(diagnostics["missing_keys"]) == 1
@@ -94,7 +90,7 @@ def test_finite_coverage_supports_registered_integer_canonicalizer(
         )
     )
 
-    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert result.verification_record_uri is not None
     assert result.output["canonicalizer_id"] == "finite.integer.decimal@1"
 
 

@@ -13,8 +13,6 @@ from pydantic import ValidationError
 from jacobian.canonical import canonicalize_json, format_canonical_integer
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInputKind,
@@ -379,10 +377,6 @@ class SingularNullstellensatzCertificateAdapter:
             ),
             output={"error": diagnostic.model_dump(mode="json", exclude_none=True)},
             diagnostics=(diagnostic,),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.HEURISTIC,
-                basis="producer did not complete; no infeasibility conclusion",
-            ),
         )
 
     def _resolve_request(
@@ -505,10 +499,6 @@ class SingularNullstellensatzCertificateAdapter:
                 runtime_ms=max(0, round((time.monotonic() - started) * 1000)),
             ),
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis="pinned Singular lift output; independent replay not yet invoked",
-            ),
             artifact_uris=(system_artifact.artifact_uri, stored.artifact_uri),
         )
 

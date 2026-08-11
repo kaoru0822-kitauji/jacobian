@@ -81,7 +81,6 @@ async def main() -> None:
         computed = computed_call.structured_content
         assert computed["execution"]["status"] == "COMPLETED"
         assert computed["output"]["result"]["determinant"] == rational(-1)
-        assert computed["assurance"]["level"] == "COMPUTED"
 
         verified_call = await client.call_tool(
             "math.run",
@@ -102,7 +101,7 @@ async def main() -> None:
         print("determinant:", computed["output"]["result"]["determinant"])
         print(
             "verification record:",
-            verified["assurance"]["verification_record_uri"],
+            verified["verification_record_uri"],
         )
 
 
@@ -115,10 +114,9 @@ Run it:
 uv run --locked python first_verified_result.py
 ```
 
-The producer computes `-1` with SymPy and returns it inline at `COMPUTED`
-assurance. The separate checker independently recomputes the determinant with
-Python-FLINT. An accepted check returns a verification record and resource
-links for its retained evidence.
+The producer computes `-1` with SymPy and returns it inline. The separate
+checker independently recomputes the determinant with Python-FLINT. An accepted
+check returns a verification record and resource links for its retained evidence.
 
 ## Failure states
 

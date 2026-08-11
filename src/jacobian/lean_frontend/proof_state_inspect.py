@@ -20,8 +20,6 @@ from jacobian.artifacts import ArtifactService
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.checker_authorization import LeanCheckerInstallation
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInputKind,
@@ -140,13 +138,6 @@ class LeanProofStateInspectAdapter:
                 detail="read-only inspection; no Lean process was started",
             ),
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "inspection returns the immutable artifact's recorded "
-                    "fields; it is not a theorem-verification record"
-                ),
-            ),
             artifact_uris=(validated.state_uri,),
         )
 

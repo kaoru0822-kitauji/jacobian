@@ -19,7 +19,7 @@ def test_mcp_exposes_only_math_tools_with_read_only_resources(
 ) -> None:
     server = create_server(tmp_path)
     assert server.instructions is not None
-    assert "assurance level VERIFIED" in server.instructions
+    assert "local verification record URI" in server.instructions
 
     async def scenario() -> None:
         from mcp import Client

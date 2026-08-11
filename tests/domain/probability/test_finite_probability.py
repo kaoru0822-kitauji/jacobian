@@ -7,10 +7,7 @@ import pytest
 from tests.support.rationals import rational_payload as _rational
 from tests.support.services import DomainTestServices, open_domain_services
 
-from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
-    CapabilityRequest,
-)
+from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.domains.probability import build_finite_probability_bundle
 
@@ -71,7 +68,6 @@ def test_finite_raw_moment_preserves_exact_contributions(
         item["contribution"] for item in result.output["result"]["contributions"]
     ] == [_rational(1, 2), _rational(9, 2)]
     assert result.output["result"]["verification"] == "UNVERIFIED"
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.artifact_uris == ()
 
 
@@ -127,7 +123,6 @@ def test_finite_event_probability_preserves_selected_atom_contributions(
             "probability": _rational(1, 4),
         },
     ]
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.artifact_uris == ()
 
 
@@ -178,7 +173,6 @@ def test_zero_mass_conditioning_is_a_non_conclusion_without_artifacts(
 
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.diagnostics[0].code == "FINITE_CONDITIONING_ZERO_MASS"
-    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
     assert result.artifact_uris == ()
 
 
@@ -315,7 +309,6 @@ def test_gaussian_polynomial_moment_preserves_complete_complex_contraction(
         _complex(-1),
     ]
     assert computed["completeness"] == "COMPLETE_BOUNDED_EXPANSION"
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.artifact_uris == ()
 
 
@@ -446,7 +439,6 @@ def test_gaussian_expansion_at_raised_bound_succeeds(
     computed = result.output["result"]
     assert computed["expansion_path_count"] == 65536
     assert computed["expanded_monomial_count"] == len(computed["contractions"])
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.artifact_uris == ()
 
 
@@ -618,7 +610,6 @@ def test_graph_reliability_exhausts_all_edge_states_exactly(
     assert computed["truncated"] is False
     assert computed["termination_reason"] == "EXHAUSTED"
     assert sum(1 for state in computed["states"] if state["terminals_connected"]) == 5
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
 
 
 def test_graph_reliability_disconnected_terminals_have_zero_probability(

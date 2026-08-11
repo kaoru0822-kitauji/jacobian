@@ -9,10 +9,7 @@ from tests.component.providers.polynomial.polynomial_capabilities_support import
     rational_function_identity_input as _rational_function_identity_input,
 )
 
-from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
-    CapabilityRequest,
-)
+from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.results import Conclusion, InputStatus
 
 
@@ -32,7 +29,7 @@ def test_rational_function_identity_cross_multiplies_exactly(
     assert result.output["equality_semantics"] == (
         "QQ_FRACTION_FIELD_CROSS_MULTIPLICATION"
     )
-    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert result.verification_record_uri is not None
 
     semantics_uri = runtime.polynomial.rational_function_identity_semantics_uri
     semantics = runtime.core.store.get(semantics_uri)
@@ -54,7 +51,7 @@ def test_rational_function_identity_reports_exact_difference(
 
     assert result.output["identical"] is False
     assert result.output["conclusion"] == Conclusion.FALSE.value
-    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert result.verification_record_uri is not None
 
 
 def test_rational_function_identity_rejects_zero_denominator(
@@ -90,7 +87,6 @@ def test_rational_function_identity_preserves_checker_rejection_as_unknown(
     assert result.output["identical"] is None
     assert result.output["conclusion"] == Conclusion.UNKNOWN.value
     assert result.output["verification_record_uri"] is None
-    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
 
 
 def test_polynomial_identity_descriptor_example_is_directly_invocable(
@@ -111,7 +107,7 @@ def test_polynomial_identity_descriptor_example_is_directly_invocable(
         )
     )
 
-    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert result.verification_record_uri is not None
 
 
 def test_polynomial_identity_verifies_equal_coefficients(
@@ -127,8 +123,7 @@ def test_polynomial_identity_verifies_equal_coefficients(
 
     assert result.output["identical"] is True
     assert result.output["conclusion"] == "TRUE"
-    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
-    assert result.assurance.verification_record_uri is not None
+    assert result.verification_record_uri is not None
     assert result.output["left_uri"] != result.output["right_uri"]
 
     semantics_uri = runtime.polynomial.identity_semantics_uri
@@ -176,8 +171,7 @@ def test_polynomial_identity_verifies_a_difference(
 
     assert result.output["identical"] is False
     assert result.output["conclusion"] == "FALSE"
-    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
-    assert result.assurance.verification_record_uri is not None
+    assert result.verification_record_uri is not None
     record = runtime.core.store.get(result.output["verification_record_uri"])
     assert record.payload["conclusion"] == Conclusion.FALSE.value
     assert record.payload["relation_id"] is None
@@ -209,7 +203,7 @@ def test_polynomial_identity_canonicalizes_duplicate_terms(
     assert result.execution.status.value == "COMPLETED"
     assert result.output["identical"] is True
     assert result.output["conclusion"] == Conclusion.TRUE.value
-    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert result.verification_record_uri is not None
 
 
 def test_polynomial_identity_preserves_checker_rejection_as_unknown(
@@ -230,4 +224,3 @@ def test_polynomial_identity_preserves_checker_rejection_as_unknown(
     assert result.output["identical"] is None
     assert result.output["conclusion"] == Conclusion.UNKNOWN.value
     assert result.output["verification_record_uri"] is None
-    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC

@@ -8,7 +8,6 @@ from tests.support.rationals import rational_payload
 from tests.support.services import DomainTestServices, open_domain_services
 
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
@@ -47,7 +46,6 @@ def test_arb_point_enclosure_returns_exact_dyadics(
     assert output["lower"]["mantissa"]
     assert output["upper"]["mantissa"]
     assert output["relative_accuracy_bits"] >= 120
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.artifact_uris == ()
 
 
@@ -93,4 +91,3 @@ def test_arb_nonfinite_and_timeout_are_non_conclusions(
     assert timed_out.execution.status is ExecutionStatus.TIMEOUT
     assert timed_out.output["error"]["code"] == "ARB_POINT_ENCLOSURE_TIMEOUT"
     assert timed_out.diagnostics[0].code == "ARB_POINT_ENCLOSURE_TIMEOUT"
-    assert timed_out.assurance.level is CapabilityAssuranceLevel.HEURISTIC

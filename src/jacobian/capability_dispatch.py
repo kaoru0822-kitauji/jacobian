@@ -15,8 +15,6 @@ from jacobian.capability_errors import (
 from jacobian.capability_telemetry import log_invocation
 from jacobian.capability_validation import json_value_type, validate_payload
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDiagnostic,
     CapabilityRequest,
     CapabilityResult,
@@ -318,10 +316,6 @@ def failed_result(
         execution=Execution(status=ExecutionStatus.ERROR, detail=diagnostic.message),
         output={"error": diagnostic.model_dump(mode="json", exclude_none=True)},
         diagnostics=(diagnostic,),
-        assurance=CapabilityAssurance(
-            level=CapabilityAssuranceLevel.HEURISTIC,
-            basis="execution or input failure; no mathematical conclusion",
-        ),
     )
 
 
@@ -369,10 +363,6 @@ def resolution_failure(
             **context,
         },
         diagnostics=(diagnostic,),
-        assurance=CapabilityAssurance(
-            level=CapabilityAssuranceLevel.HEURISTIC,
-            basis="capability resolution failed; no mathematical conclusion",
-        ),
     )
 
 

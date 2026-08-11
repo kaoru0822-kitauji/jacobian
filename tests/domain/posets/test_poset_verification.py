@@ -11,7 +11,6 @@ from tests.support.services import DomainTestServices
 
 from jacobian.checker_operations import derive_verification_capability_id
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
@@ -102,15 +101,12 @@ def test_poset_results_are_independently_verified(
                 ),
             )
         )
-        assert computed.assurance.level is CapabilityAssuranceLevel.COMPUTED, (
-            producer_id
-        )
         assert verified.execution.status is ExecutionStatus.COMPLETED, producer_id
         assert verified.output["status"] == "VERIFIED", producer_id
         assert verified.output["verification_record_uri"] in verified.artifact_uris, (
             producer_id
         )
-        assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED, (
+        assert verified.verification_record_uri is not None, (
             producer_id
         )
         assert len(verified.artifact_uris) == (

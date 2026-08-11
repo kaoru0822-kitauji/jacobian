@@ -13,8 +13,6 @@ from jacobian.capability_service import CapabilityInvocationError
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInputKind,
@@ -163,10 +161,6 @@ class JacobianDegreeSliceMaterializeAdapter:
                 runtime_ms=max(0, round((time.monotonic() - started) * 1000)),
             ),
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis="deterministic exact system materialization; no infeasibility claim",
-            ),
             artifact_uris=(stored.artifact_uri,),
         )
 
@@ -362,19 +356,7 @@ class NullstellensatzVerificationAdapter:
                 )
             ),
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else CapabilityAssuranceLevel.COMPUTED
-                ),
-                basis=(
-                    "operator-authorized standard-library exact replay"
-                    if verified
-                    else "certificate is persisted but has no accepted checker conclusion"
-                ),
-                verification_record_uri=record_uri,
-            ),
+            verification_record_uri=(record_uri if verified else None),
             artifact_uris=tuple(artifact_uris),
         )
 

@@ -14,7 +14,6 @@ from tests.support.state import copy_template
 
 from jacobian.adapters.mcp.server import create_server
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.checkers import CheckerDecision
@@ -130,8 +129,6 @@ def test_core_dependency_graph_is_bounded_and_materialized(tmp_path: Path) -> No
         )
     )
 
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    assert result.assurance.verification_record_uri is None
     assert result.output["nodes"][0] == {
         "name": "Nat.add_comm",
         "kind": "THEOREM",
@@ -182,8 +179,6 @@ def test_mathlib_discovery_composes_with_bound_sqrt_two_verification(
         )
     )
 
-    assert searched.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    assert searched.assurance.verification_record_uri is None
     assert searched.output["declarations"][0]["name"] == "irrational_sqrt_two"
     assert inspected.output["declaration"]["type"] == "Irrational √2"
     assert (

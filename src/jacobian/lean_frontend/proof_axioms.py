@@ -16,8 +16,6 @@ from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInvocationExample,
@@ -267,13 +265,6 @@ class LeanProofAxiomsAdapter:
                 detail=inspection["detail"],
             ),
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "facts parsed from the pinned Lean process; no trust policy "
-                    "or theorem verification is asserted"
-                ),
-            ),
             artifact_uris=(artifact.artifact_uri,),
         )
 

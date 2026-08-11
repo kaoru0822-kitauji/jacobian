@@ -7,7 +7,6 @@ from typing import Any
 from tests.support.capabilities import invoke_capability as _invoke
 from tests.support.rationals import rational_payload as _q
 
-from jacobian.contracts.capabilities import CapabilityAssuranceLevel
 from jacobian.contracts.results import ExecutionStatus
 
 
@@ -119,7 +118,6 @@ def test_sympy_normalizes_typed_multivariate_expression(
             {"coefficient": _q(-1), "exponents": [0, 2]},
         ]
     }
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     resolved = polynomial_normalization_services.core.polynomial_expressions.resolve_normalization(
         result.output["normalization_uri"]
     )

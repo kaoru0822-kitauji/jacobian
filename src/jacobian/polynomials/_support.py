@@ -15,8 +15,6 @@ from pydantic import Field, ValidationError, model_validator
 from jacobian.canonical import format_canonical_integer
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityRequest,
@@ -741,10 +739,6 @@ def _computed_result(
             runtime_ms=max(0, round((time.monotonic() - started) * 1000)),
         ),
         output=output,
-        assurance=CapabilityAssurance(
-            level=CapabilityAssuranceLevel.COMPUTED,
-            basis=assurance_basis,
-        ),
         artifact_uris=artifact_uris,
     )
 

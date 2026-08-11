@@ -9,7 +9,6 @@ from tests.component.capabilities.graph_capabilities_support import (
 )
 
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityInputKind,
     CapabilityRequest,
 )
@@ -71,7 +70,6 @@ def test_neighborhood_independence_reproduces_wowii_200_invariant(
         )
     )
 
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.output["total"] == 72
     assert result.output["average"] == {"num": "36", "den": "7"}
     assert len(result.output["records"]) == 14
@@ -95,7 +93,7 @@ def test_neighborhood_independence_reproduces_wowii_200_invariant(
         )
     )
 
-    assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert verified.verification_record_uri is not None
     assert verified.output["conclusion"] == Conclusion.TRUE.value
     assert verified.output["verification_record_uri"]
 

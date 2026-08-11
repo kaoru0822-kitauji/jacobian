@@ -16,8 +16,6 @@ from pydantic import ValidationError
 from jacobian.bounded_process import bounded_process_cancelled
 from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityProviderAvailability,
@@ -613,10 +611,6 @@ def _completed_result(
             runtime_ms=run.runtime_ms,
         ),
         output=output,
-        assurance=CapabilityAssurance(
-            level=CapabilityAssuranceLevel.COMPUTED,
-            basis=basis,
-        ),
         artifact_uris=artifact_uris,
     )
 
@@ -638,13 +632,6 @@ def _failed_result(
             detail=run.diagnostic.message,
         ),
         diagnostics=(run.diagnostic,),
-        assurance=CapabilityAssurance(
-            level=CapabilityAssuranceLevel.HEURISTIC,
-            basis=(
-                "the producer did not complete with usable bound evidence; no "
-                "mathematical conclusion follows"
-            ),
-        ),
         artifact_uris=(resolved.artifact.artifact_uri,),
     )
 

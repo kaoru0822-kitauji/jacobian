@@ -18,10 +18,7 @@ from tests.component.providers.polynomial.polynomial_capabilities_support import
     poly_payload as _poly_payload,
 )
 
-from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
-    CapabilityRequest,
-)
+from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.evidence import EvidenceBindings, WitnessEnvelope, WitnessRole
 from jacobian.contracts.results import Conclusion, InputStatus, Verification
 
@@ -96,7 +93,6 @@ def test_collision_checker_rejects_a_forged_image(
 
     assert rejected.output["input"]["status"] == InputStatus.REJECTED.value
     assert rejected.output["conclusion"] == Conclusion.UNKNOWN.value
-    assert rejected.assurance.level is CapabilityAssuranceLevel.HEURISTIC
     assert rejected.output["verification_record_uri"] is None
 
 
@@ -143,7 +139,6 @@ def test_collision_comparison_does_not_promote_forged_evaluations(
     )
 
     assert candidate.output["candidate_collision"] is True
-    assert candidate.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert candidate.output["verification"] == Verification.UNVERIFIED.value
 
     rejected = runtime.core.capabilities.invoke(
@@ -159,7 +154,6 @@ def test_collision_comparison_does_not_promote_forged_evaluations(
 
     assert rejected.output["input"]["status"] == InputStatus.REJECTED.value
     assert rejected.output["conclusion"] == Conclusion.UNKNOWN.value
-    assert rejected.assurance.level is CapabilityAssuranceLevel.HEURISTIC
 
 
 def test_noncollision_is_computed_evidence_without_witness_or_conclusion(
@@ -198,7 +192,6 @@ def test_noncollision_is_computed_evidence_without_witness_or_conclusion(
 
     assert result.output["candidate_collision"] is False
     assert result.output["witness_uri"] is None
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert "conclusion" not in result.output
 
 

@@ -6,7 +6,6 @@ import pytest
 
 from jacobian.artifacts import ArtifactService
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
@@ -120,7 +119,6 @@ def test_supported_row_materializes_deterministically(
     assert str(first_output["environment_digest"]).startswith("sha256:")
     assert first_output["execution_status"] == "NOT_EXECUTED"
     assert first_output["assurance"] == "UNVERIFIED"
-    assert first.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert str(first_output["normalized_source"]).endswith("\n")
 
 

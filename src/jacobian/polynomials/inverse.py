@@ -9,8 +9,6 @@ from typing import Any
 from jacobian.canonical import canonicalize_json
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityInvocationExample,
     CapabilityRequest,
@@ -550,14 +548,6 @@ class PolynomialMapInverseSynthesizeAdapter:
                 runtime_ms=elapsed_ms,
             ),
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "bounded exact symbolic synthesis; no failure status proves "
-                    "noninvertibility and only the separate verifier may certify "
-                    "a found candidate"
-                ),
-            ),
             artifact_uris=artifact_uris,
         )
 
@@ -815,19 +805,7 @@ class PolynomialMapInverseVerifyAdapter:
             capability_version=self.descriptor.version,
             execution=aggregate_checked.execution,
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-                basis=(
-                    "accepted by the authorized independent two-sided map checker"
-                    if verified
-                    else "the independent checker did not accept the inverse request"
-                ),
-                verification_record_uri=record_uri,
-            ),
+            verification_record_uri=(record_uri if verified else None),
             artifact_uris=tuple(
                 dict.fromkeys(
                     (

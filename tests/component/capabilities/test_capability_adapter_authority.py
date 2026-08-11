@@ -20,7 +20,6 @@ from tests.support.services import DomainTestServices, open_domain_services
 
 from jacobian.capability_service import CapabilityError
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
@@ -46,7 +45,6 @@ def test_external_adapter_invocation_is_recorded_and_retrievable(
     )
 
     assert result.output == {"value": 42}
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
 
 
 def test_provider_required_attributes_are_checked_before_first_use(

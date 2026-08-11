@@ -17,8 +17,6 @@ from jacobian.capability_service import (
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInvocationExample,
@@ -488,15 +486,6 @@ class FiniteCoverageVerifyAdapter:
             detail=detail,
         )
         record_uri = checked.verification_record_uri if verified else None
-        assurance_level = (
-            CapabilityAssuranceLevel.VERIFIED
-            if verified
-            else (
-                CapabilityAssuranceLevel.COMPUTED
-                if checked.execution.status is ExecutionStatus.COMPLETED
-                else CapabilityAssuranceLevel.HEURISTIC
-            )
-        )
         artifact_uris = [
             canonicalizer_uri,
             scope.artifact_uri,
@@ -512,15 +501,7 @@ class FiniteCoverageVerifyAdapter:
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=assurance_level,
-                basis=(
-                    "operator-authorized independent finite coverage checker accepted"
-                    if verified
-                    else "coverage diagnostics were computed but not verified"
-                ),
-                verification_record_uri=record_uri,
-            ),
+            verification_record_uri=record_uri,
             artifact_uris=tuple(artifact_uris),
         )
 

@@ -8,8 +8,6 @@ from itertools import product
 from jacobian.bounded_process import bounded_process_cancelled
 from jacobian.canonical import format_canonical_integer
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityRequest,
     CapabilityResult,
@@ -473,13 +471,6 @@ class PolynomialCollisionSearchAdapter:
                     runtime_ms=max(0, round((time.monotonic() - started) * 1000)),
                     detail="The client cancelled the collision-grid search.",
                 ),
-                assurance=CapabilityAssurance(
-                    level=CapabilityAssuranceLevel.COMPUTED,
-                    basis=(
-                        "deterministic exact SymPy search was cancelled before the "
-                        "declared grid was exhausted"
-                    ),
-                ),
                 output=output.model_dump(mode="json"),
                 artifact_uris=artifact_uris,
             )
@@ -606,19 +597,7 @@ class PolynomialCollisionVerifyAdapter:
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-                basis=(
-                    "accepted by the authorized independent Fraction-based checker"
-                    if verified
-                    else "the checker did not accept the claimed collision"
-                ),
-                verification_record_uri=record_uri,
-            ),
+            verification_record_uri=(record_uri if verified else None),
             artifact_uris=tuple(artifact_uris),
         )
 
@@ -738,19 +717,6 @@ class PolynomialMapInverseCollisionVerifyAdapter:
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-                basis=(
-                    "accepted by the authorized independent collision "
-                    "inverse-obstruction checker"
-                    if verified
-                    else "the independent inverse-obstruction checker did not accept"
-                ),
-                verification_record_uri=record_uri,
-            ),
+            verification_record_uri=(record_uri if verified else None),
             artifact_uris=tuple(artifact_uris),
         )

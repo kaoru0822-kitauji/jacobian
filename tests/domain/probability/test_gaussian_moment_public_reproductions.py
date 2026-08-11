@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any
 
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
@@ -51,7 +50,6 @@ def test_public_gaussian_moment_reproductions_reach_checker_bound_results(
         assert computed.output["result"]["completeness"] == (
             "COMPLETE_BOUNDED_EXPANSION"
         )
-        assert computed.assurance.level is CapabilityAssuranceLevel.COMPUTED
 
         verified = probability_services.core.capabilities.invoke(
             CapabilityRequest(
@@ -69,4 +67,4 @@ def test_public_gaussian_moment_reproductions_reach_checker_bound_results(
             "probability.gaussian_polynomial.moment.compute"
         )
         assert verified.output["verification_record_uri"] in verified.artifact_uris
-        assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
+        assert verified.verification_record_uri is not None

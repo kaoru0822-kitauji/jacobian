@@ -31,8 +31,6 @@ from pydantic import ValidationError
 from jacobian.artifacts import ArtifactService
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityRequest,
@@ -284,13 +282,6 @@ class GraphComposeAdapter:
                 "backend": backend,
                 "backend_version": backend_module.__version__,
             },
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "deterministic NetworkX graph composition; no independent "
-                    "checker was invoked"
-                ),
-            ),
             artifact_uris=(
                 *_composition_parents(validated),
                 result_artifact.artifact_uri,
@@ -470,14 +461,6 @@ class GraphEnumerateNonisomorphicAdapter:
                 "backend_version": backend_module.__version__,
                 "backend_boundary": _ENUMERATION_BACKEND_BOUNDARY,
             },
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "deterministic NetworkX Graph Atlas enumeration; "
-                    "nonisomorphism is provided by the backend and was not "
-                    "independently re-verified"
-                ),
-            ),
             artifact_uris=(scope_artifact.artifact_uri, *graph_uris),
         )
 

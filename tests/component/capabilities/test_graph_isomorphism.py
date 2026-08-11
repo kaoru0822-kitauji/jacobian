@@ -13,7 +13,6 @@ from tests.support.services import (
 )
 
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
@@ -147,7 +146,7 @@ def test_graph_isomorphism_verifies_a_valid_bijection(
     assert result.output["is_isomorphism"] is True
     assert result.output["conclusion"] == "TRUE"
     assert result.output["coverage"] == "EXHAUSTIVE"
-    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert result.verification_record_uri is not None
     assert result.output["verification_record_uri"] in result.artifact_uris
 
 
@@ -164,7 +163,7 @@ def test_graph_isomorphism_verifies_a_negative_result(
 
     assert result.output["is_isomorphism"] is False
     assert result.output["conclusion"] == "FALSE"
-    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert result.verification_record_uri is not None
 
 
 def test_graph_isomorphism_keeps_checker_rejection_unknown(
@@ -188,7 +187,6 @@ def test_graph_isomorphism_keeps_checker_rejection_unknown(
     assert result.output["conclusion"] == "UNKNOWN"
     assert result.output["coverage"] == "UNKNOWN"
     assert result.output["verification_record_uri"] is None
-    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
 
 
 def test_graph_isomorphism_accepts_graph_atlas_artifact_handoff(

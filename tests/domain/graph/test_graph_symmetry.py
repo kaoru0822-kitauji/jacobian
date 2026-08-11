@@ -8,7 +8,6 @@ from tests.support.services import DomainTestServices, open_domain_services
 
 from jacobian.canonical import canonicalize_json
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
@@ -86,7 +85,6 @@ def test_cycle_rotation_has_one_vertex_and_one_edge_orbit(
         computed["automorphism_group_completeness"]
         == "FULL_AUTOMORPHISM_GROUP_NOT_CLAIMED"
     )
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.artifact_uris == ()
 
 

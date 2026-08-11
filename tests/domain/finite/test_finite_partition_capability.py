@@ -2,10 +2,7 @@ from __future__ import annotations
 
 from tests.support.core_capability_harnesses import FinitePartitionTestServices
 
-from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
-    CapabilityRequest,
-)
+from jacobian.contracts.capabilities import CapabilityRequest
 
 
 def _request(
@@ -40,7 +37,6 @@ def test_finite_partition_produces_an_unverified_typed_result(
     )
 
     assert result.capability_id == "case.partition.finite"
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.output["missing"] == []
     assert result.output["verification_record_uri"] is None
 
@@ -52,11 +48,10 @@ def test_finite_partition_verify_replays_with_an_authorized_checker(
     result = runtime.core.capabilities.invoke(_request(verify=True))
 
     assert result.capability_id == "case.partition.finite.verify"
-    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
-    assert result.assurance.verification_record_uri is not None
+    assert result.verification_record_uri is not None
 
 
-def test_finite_partition_contract_and_result_preserve_semantic_boundary(
+def test_finite_partition_contract_preserves_semantic_boundary(
     finite_partition_services: FinitePartitionTestServices,
 ) -> None:
     runtime = finite_partition_services.services
@@ -65,10 +60,8 @@ def test_finite_partition_contract_and_result_preserve_semantic_boundary(
         for item in runtime.core.capabilities.catalog().capabilities
         if item.capability_id == "case.partition.finite"
     )
-    result = runtime.core.capabilities.invoke(_request(verify=True))
 
     assert "opaque caller-supplied strings" in producer.description
-    assert "member/case semantics were not checked" in result.assurance.basis
 
 
 def test_finite_partition_reports_conditional_disjointness_scope(
@@ -80,9 +73,8 @@ def test_finite_partition_reports_conditional_disjointness_scope(
 
     result = runtime.core.capabilities.invoke(request)
 
-    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert result.verification_record_uri is not None
     assert result.output["overlaps"] == ["0"]
-    assert "disjointness was not required" in result.assurance.basis
     certificate = runtime.core.store.get(result.output["certificate_uri"])
     assert certificate.payload["payload"]["replay"] == (
         "equality-based finite coverage and conditional disjointness"
@@ -95,7 +87,6 @@ def test_finite_partition_verify_fails_closed_on_incomplete_cases(
     runtime = finite_partition_services.services
     result = runtime.core.capabilities.invoke(_request(verify=True, missing_last=True))
 
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.output["missing"] == ["5"]
     assert result.output["verification_record_uri"] is None
 

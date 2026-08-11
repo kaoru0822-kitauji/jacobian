@@ -12,8 +12,6 @@ from pydantic import ValidationError
 from jacobian.artifacts import ArtifactService
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityProviderRuntime,
@@ -197,21 +195,8 @@ class LeanProofEditAdapter:
                 update={"runtime_ms": int((time.monotonic() - started) * 1000)}
             ),
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-                basis=(
-                    "the exact edited proof was accepted by the operator-authorized "
-                    "pinned Lean checker"
-                    if verified
-                    else "the edited proof has no completed authorized verification"
-                ),
-                verification_record_uri=(
-                    checked.result.verification_record_uri if verified else None
-                ),
+            verification_record_uri=(
+                checked.result.verification_record_uri if verified else None
             ),
             artifact_uris=(
                 checked.claim_uri,

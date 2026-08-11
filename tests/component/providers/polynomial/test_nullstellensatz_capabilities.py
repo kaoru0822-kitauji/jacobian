@@ -11,7 +11,6 @@ from tests.support.services import DomainTestServices, open_domain_services
 
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
     CapabilityResult,
 )
@@ -155,9 +154,8 @@ def test_authorized_checker_verifies_complete_bundle(tmp_path: Path) -> None:
         assert result.output["claim"] == "SYSTEM_INFEASIBLE"
         assert result.output["conclusion"] == "TRUE"
         assert result.output["assurance"] == "VERIFIED"
-        assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
         assert result.output["verification_record_uri"] in result.artifact_uris
-        assert result.assurance.verification_record_uri is not None
+        assert result.verification_record_uri is not None
 
 
 def test_unavailable_checker_never_false_certifies(tmp_path: Path) -> None:
@@ -184,7 +182,6 @@ def test_unavailable_checker_never_false_certifies(tmp_path: Path) -> None:
 
         assert result.output["conclusion"] == "UNKNOWN"
         assert result.output["verification_record_uri"] is None
-        assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
 
 
 def test_mutated_certificate_cannot_return_verified(tmp_path: Path) -> None:
@@ -222,7 +219,6 @@ def test_mutated_certificate_cannot_return_verified(tmp_path: Path) -> None:
         )
 
         assert result.output["conclusion"] == "UNKNOWN"
-        assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
         assert result.output["verification_record_uri"] is None
 
 
@@ -367,4 +363,3 @@ def test_checker_timeout_never_verifies(
         assert result.execution.status is ExecutionStatus.TIMEOUT
         assert result.output["conclusion"] == "UNKNOWN"
         assert result.output["verification_record_uri"] is None
-        assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED

@@ -13,8 +13,6 @@ from pydantic import ValidationError
 from jacobian.canonical import canonicalize_json, format_canonical_integer
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInputKind,
@@ -226,13 +224,6 @@ class GraphNeighborhoodIndependenceAdapter:
                 runtime_ms=runtime_ms(started),
             ),
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "NetworkX exact maximum-clique computations on complement "
-                    "neighborhoods; the bundled certificate was not invoked"
-                ),
-            ),
             artifact_uris=(
                 validated.graph_uri,
                 invariant_artifact.artifact_uri,

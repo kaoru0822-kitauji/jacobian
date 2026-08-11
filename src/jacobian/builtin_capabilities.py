@@ -7,8 +7,6 @@ from typing import Any
 from jacobian.artifacts import ArtifactService
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInvocationExample,
@@ -119,18 +117,8 @@ class LeanCheckAdapter:
                 "verification_record_uri": checked.result.verification_record_uri,
                 "cache_hit": checked.cache_hit,
             },
-            assurance=CapabilityAssurance(
-                level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-                basis=(
-                    "accepted by the pinned Lean checker"
-                    if verified
-                    else "Lean checker did not accept the supplied proof"
-                ),
-                verification_record_uri=checked.result.verification_record_uri,
+            verification_record_uri=(
+                checked.result.verification_record_uri if verified else None
             ),
             artifact_uris=(
                 checked.claim_uri,
@@ -184,13 +172,6 @@ class LeanDeclarationSearchAdapter:
             capability_version=self.descriptor.version,
             execution=Execution(status=ExecutionStatus.COMPLETED),
             output=searched.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "metadata read from the pinned Lean environment; retrieved "
-                    "declarations are evidence and do not verify a theorem"
-                ),
-            ),
         )
 
 
@@ -233,13 +214,6 @@ class LeanDeclarationInspectAdapter:
             capability_version=self.descriptor.version,
             execution=Execution(status=ExecutionStatus.COMPLETED),
             output=inspected.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "metadata read from the pinned Lean environment; inspecting a "
-                    "declaration does not verify a new theorem"
-                ),
-            ),
         )
 
 
@@ -300,14 +274,6 @@ class LeanDependencyGraphAdapter:
             capability_version=self.descriptor.version,
             execution=Execution(status=ExecutionStatus.COMPLETED),
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "dependency edges were extracted with Lean "
-                    "Expr.getUsedConstantsAsSet from the pinned environment; "
-                    "the graph does not verify a theorem"
-                ),
-            ),
             artifact_uris=(graph_artifact.artifact_uri,),
         )
 

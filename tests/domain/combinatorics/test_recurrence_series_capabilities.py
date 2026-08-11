@@ -8,7 +8,6 @@ import pytest
 from tests.support.services import DomainTestServices, open_domain_services
 
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityDiscoveryRequest,
     CapabilityRequest,
 )
@@ -121,7 +120,6 @@ def test_linear_recurrence_exposes_requested_values_and_complete_replay(
         )
     )
     assert prefix.execution.status is ExecutionStatus.COMPLETED
-    assert prefix.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert [item["value"]["num"] for item in prefix.output["result"]["values"]] == [
         "0",
         "1",
@@ -299,7 +297,6 @@ def test_rational_generating_function_exposes_exact_residual_congruence(
     )
     result = computed.output["result"]
     assert computed.execution.status is ExecutionStatus.COMPLETED
-    assert computed.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert [coefficient["num"] for coefficient in result["coefficients"]] == [
         "1",
         "1",

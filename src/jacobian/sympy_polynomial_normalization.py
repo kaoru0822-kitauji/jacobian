@@ -13,8 +13,6 @@ from pydantic import ValidationError
 from jacobian.canonical import canonicalize_json, loads_strict_json
 from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInvocationExample,
@@ -341,20 +339,6 @@ class SympyPolynomialExpressionNormalizeAdapter:
                 detail=run.detail,
             ),
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=(
-                    CapabilityAssuranceLevel.COMPUTED
-                    if run.execution_status is ExecutionStatus.COMPLETED
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-                basis=(
-                    "the pinned exact SymPy provider produced bound canonical "
-                    "coefficients, but provider success does not verify equivalence"
-                    if normalization_uri is not None
-                    else "provider execution did not complete; no mathematical "
-                    "conclusion follows"
-                ),
-            ),
             artifact_uris=(
                 (expression_uri, normalization_uri)
                 if normalization_uri is not None

@@ -16,8 +16,6 @@ from jacobian.checker_artifacts import put_witness_envelope
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation, ExactReplayCheckerDeclaration
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityCatalogRelationship,
     CapabilityCatalogRelationshipKind,
     CapabilityCatalogRelationshipRegistration,
@@ -620,13 +618,6 @@ class ExactComputedVerificationAdapter:
                 capability_version=self.descriptor.version,
                 execution=Execution(status=ExecutionStatus.COMPLETED),
                 output=output.model_dump(mode="json"),
-                assurance=CapabilityAssurance(
-                    level=CapabilityAssuranceLevel.COMPUTED,
-                    basis=(
-                        "checker scope was evaluated without making a "
-                        "mathematical conclusion"
-                    ),
-                ),
                 artifact_uris=(
                     (source_artifacts[0].artifact_uri, source_artifacts[1].artifact_uri)
                     if source_artifacts is not None
@@ -739,33 +730,12 @@ class ExactComputedVerificationAdapter:
             verification_record_uri=record_uri,
             detail=detail,
         )
-        completed = checked.execution.status is ExecutionStatus.COMPLETED
         return CapabilityResult(
             capability_id=self.descriptor.capability_id,
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else (
-                        CapabilityAssuranceLevel.COMPUTED
-                        if completed
-                        else CapabilityAssuranceLevel.HEURISTIC
-                    )
-                ),
-                basis=(
-                    "accepted in a clean process by the operator-authorized independent exact replay checker"
-                    if verified
-                    else (
-                        "checker replay completed without accepting the candidate; no opposite conclusion follows"
-                        if completed
-                        else "checker replay did not complete; no conclusion follows"
-                    )
-                ),
-                verification_record_uri=record_uri,
-            ),
+            verification_record_uri=record_uri,
             artifact_uris=(
                 (record_uri, declaration.semantics_uri)
                 if record_uri is not None
@@ -811,7 +781,6 @@ class ExactComputedVerificationAdapter:
             witness.artifact_uri,
             *((record_uri,) if record_uri is not None else ()),
         )
-        completed = checked.execution.status is ExecutionStatus.COMPLETED
         output = ExactComputedVerificationOutput(
             status=status,
             conclusion="TRUE" if verified else "UNKNOWN",
@@ -828,27 +797,7 @@ class ExactComputedVerificationAdapter:
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else (
-                        CapabilityAssuranceLevel.COMPUTED
-                        if completed
-                        else CapabilityAssuranceLevel.HEURISTIC
-                    )
-                ),
-                basis=(
-                    "accepted in a clean process by the operator-authorized independent exact replay checker"
-                    if verified
-                    else (
-                        "checker replay completed without accepting the candidate; no opposite conclusion follows"
-                        if completed
-                        else "checker replay did not complete; no conclusion follows"
-                    )
-                ),
-                verification_record_uri=record_uri,
-            ),
+            verification_record_uri=record_uri,
             artifact_uris=artifact_uris,
         )
 

@@ -9,7 +9,7 @@ from pydantic import Field, StringConstraints, model_validator
 
 from jacobian.canonical import canonicalize_json
 from jacobian.contracts.common import ArtifactUri, CheckerUri, Sha256Digest
-from jacobian.contracts.results import ContractModel, Execution
+from jacobian.contracts.results import ContractModel, Execution, ExecutionStatus
 
 CapabilityId = Annotated[
     str,
@@ -316,14 +316,6 @@ class CapabilityProviderRuntime(ContractModel):
         return self
 
 
-class CapabilityAssuranceLevel(StrEnum):
-    """Coarse model-facing assurance without hiding the detailed result record."""
-
-    HEURISTIC = "HEURISTIC"
-    COMPUTED = "COMPUTED"
-    VERIFIED = "VERIFIED"
-
-
 class CapabilityCatalogRelationshipKind(StrEnum):
     """Factual installed-capability relationship exposed by the catalog."""
 
@@ -408,28 +400,6 @@ class CapabilityRequest(ContractModel):
     input: dict[str, Any]
 
 
-class CapabilityAssurance(ContractModel):
-    level: CapabilityAssuranceLevel
-    basis: str = Field(min_length=1, max_length=1024)
-    verification_record_uri: ArtifactUri | None = None
-
-    @model_validator(mode="after")
-    def bind_verified_assurance(self) -> Self:
-        if (
-            self.level is CapabilityAssuranceLevel.VERIFIED
-            and self.verification_record_uri is None
-        ):
-            raise ValueError("verified capability assurance requires a record URI")
-        if (
-            self.level is not CapabilityAssuranceLevel.VERIFIED
-            and self.verification_record_uri is not None
-        ):
-            raise ValueError(
-                "only verified capability assurance may carry a record URI"
-            )
-        return self
-
-
 class CapabilityDiagnostic(ContractModel):
     """Actionable, stage-aware failure information without a truth claim."""
 
@@ -445,17 +415,19 @@ class CapabilityDiagnostic(ContractModel):
 
 
 def _validate_capability_execution_lane(
-    execution_status: str,
+    execution_status: ExecutionStatus,
     diagnostics: tuple[CapabilityDiagnostic, ...],
-    assurance_level: CapabilityAssuranceLevel,
+    verification_record_uri: ArtifactUri | None,
 ) -> None:
-    if execution_status == "COMPLETED" and diagnostics:
+    if execution_status is ExecutionStatus.COMPLETED and diagnostics:
         raise ValueError("completed capability execution cannot carry diagnostics")
     if (
-        execution_status != "COMPLETED"
-        and assurance_level is CapabilityAssuranceLevel.VERIFIED
+        execution_status is not ExecutionStatus.COMPLETED
+        and verification_record_uri is not None
     ):
-        raise ValueError("failed capability execution cannot be verified")
+        raise ValueError(
+            "failed capability execution cannot carry a verification record"
+        )
 
 
 class CapabilityResult(ContractModel):
@@ -467,19 +439,21 @@ class CapabilityResult(ContractModel):
     execution: Execution
     output: dict[str, Any] = Field(default_factory=dict)
     diagnostics: tuple[CapabilityDiagnostic, ...] = ()
-    assurance: CapabilityAssurance
+    verification_record_uri: ArtifactUri | None = None
     artifact_uris: tuple[ArtifactUri, ...] = ()
 
     @model_validator(mode="after")
     def enforce_lane_and_canonical_output(self) -> Self:
         canonicalize_json(self.output)
         _validate_capability_execution_lane(
-            self.execution.status.value,
+            self.execution.status,
             self.diagnostics,
-            self.assurance.level,
+            self.verification_record_uri,
         )
-        record_uri = self.assurance.verification_record_uri
-        if record_uri is not None and record_uri not in self.artifact_uris:
+        if (
+            self.verification_record_uri is not None
+            and self.verification_record_uri not in self.artifact_uris
+        ):
             raise ValueError(
                 "the verification record must be included in artifact_uris"
             )

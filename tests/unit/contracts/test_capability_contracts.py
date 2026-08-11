@@ -4,8 +4,6 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityCatalog,
     CapabilityDiscoveryResult,
     CapabilityResult,
@@ -71,11 +69,12 @@ def test_catalog_rejects_duplicate_or_nondeterministic_capability_ids() -> None:
         )
 
 
-def test_nonverified_assurance_cannot_smuggle_a_record_uri() -> None:
-    with pytest.raises(ValidationError, match="only verified"):
-        CapabilityAssurance(
-            level=CapabilityAssuranceLevel.COMPUTED,
-            basis="ordinary deterministic computation",
+def test_noncompleted_execution_cannot_carry_a_verification_record() -> None:
+    with pytest.raises(ValidationError, match="cannot carry a verification record"):
+        CapabilityResult(
+            capability_id="example.verify",
+            capability_version="1",
+            execution=Execution(status=ExecutionStatus.TIMEOUT),
             verification_record_uri=RECORD_URI,
         )
 
@@ -86,22 +85,14 @@ def test_verified_result_publishes_its_record_as_a_first_class_artifact() -> Non
             capability_id="example.verify",
             capability_version="1",
             execution=Execution(status=ExecutionStatus.COMPLETED),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.VERIFIED,
-                basis="independent checker accepted the claim",
-                verification_record_uri=RECORD_URI,
-            ),
+            verification_record_uri=RECORD_URI,
         )
 
     result = CapabilityResult(
         capability_id="example.verify",
         capability_version="1",
         execution=Execution(status=ExecutionStatus.COMPLETED),
-        assurance=CapabilityAssurance(
-            level=CapabilityAssuranceLevel.VERIFIED,
-            basis="independent checker accepted the claim",
-            verification_record_uri=RECORD_URI,
-        ),
+        verification_record_uri=RECORD_URI,
         artifact_uris=(RECORD_URI,),
     )
     assert result.artifact_uris == (RECORD_URI,)

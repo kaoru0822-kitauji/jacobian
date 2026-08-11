@@ -10,7 +10,6 @@ from jacobian.bounded_process import ProcessResourceLimits
 from jacobian.canonical import loads_strict_json
 from jacobian.capability_service import CapabilityService
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.number_theory import (
@@ -73,7 +72,6 @@ def test_jacobi_symbol_is_domain_owned_exact_computation(tmp_path: Path) -> None
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.output["result"] == {"a": "10", "n": 21, "jacobi": -1}
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
 
 
 def test_even_jacobi_denominator_fails_before_artifact_writes(
@@ -101,7 +99,6 @@ def test_chinese_remainder_returns_canonical_exact_solution(tmp_path: Path) -> N
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.output["result"] == {"residue": "23", "modulus": "105"}
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
 
 
 def test_chinese_remainder_reports_inconsistent_system_without_artifacts(
@@ -116,7 +113,6 @@ def test_chinese_remainder_reports_inconsistent_system_without_artifacts(
 
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.artifact_uris == ()
-    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
     assert result.diagnostics[0].code == "NUMBER_THEORY_OPERATION_NOT_APPLICABLE"
 
 
@@ -166,7 +162,6 @@ def test_discrete_logarithm_returns_typed_result(
         "modulus": 41,
         "discrete_log": 3,
     }
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.artifact_uris == ()
 
 
@@ -260,7 +255,6 @@ def test_factorization_is_complete_in_an_isolated_bounded_worker(
             {"prime": "5", "power": 1},
         ]
     }
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
 
 
 @pytest.mark.parametrize(
@@ -311,7 +305,6 @@ def test_powerful_number_decision_preserves_a_complete_factor_witness(
         "factors": factors,
         "violating_primes": violating_primes,
     }
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.artifact_uris == ()
 
 
@@ -422,7 +415,6 @@ def test_factorization_timeout_is_an_artifact_free_non_conclusion(
     assert result.execution.status is ExecutionStatus.TIMEOUT
     assert result.diagnostics[0].code == "INTEGER_FACTORIZATION_TIMEOUT"
     assert result.artifact_uris == ()
-    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
     limits = observed["resource_limits"]
     assert limits.cpu_seconds == 2
     assert limits.address_space_bytes == 512 * 1024 * 1024
@@ -470,7 +462,6 @@ def test_factorization_derived_timeout_is_a_non_conclusion(
     assert result.execution.status is ExecutionStatus.TIMEOUT
     assert result.diagnostics[0].code == "INTEGER_FACTORIZATION_TIMEOUT"
     assert result.artifact_uris == ()
-    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
 
 
 def test_in_process_factorization_dependencies_have_small_input_bounds() -> None:

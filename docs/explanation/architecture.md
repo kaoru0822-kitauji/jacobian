@@ -161,15 +161,14 @@ resource-limit-exceeded outcomes. Where practical it estimates work, output
 size, publication, checker replay, and aggregate allocation before work begins.
 
 A postcondition runs before publication. Failure exposes no value reference,
-artifact, or assurance. Terminal execution state remains separate from the
+artifact, or verification record. Terminal execution state remains separate from the
 mathematical result and from verification authority.
 
-The transitional v2 wire envelope may still project a `COMPUTED` label for a
-completed ordinary operation or a non-conclusive label for failure. Those are
-compatibility fields, not inputs to execution, discovery, publication, or
-mathematical identity. Ordinary operations do not manufacture generic scope,
-completeness, relationship, or obligation records around an already-typed
-result.
+The v2 wire envelope carries a top-level `verification_record_uri` when an
+independent checker accepted the result. That pointer is not an input to
+execution, discovery, publication, or mathematical identity. Ordinary
+operations do not manufacture generic scope, completeness, relationship, or
+obligation records around an already-typed result.
 
 ## Verification
 
