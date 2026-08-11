@@ -53,7 +53,11 @@ from jacobian.operation_installation import InstalledDomainBundle
 from jacobian.operations import (
     DomainBundle,
 )
-from jacobian.provider_runtime import source_provider_runtime
+from jacobian.provider_runtime import (
+    composite_provider_runtime,
+    known_provider_runtime,
+    source_provider_runtime,
+)
 from jacobian.providers.flint_runtime import (
     certified_snf_checker_provider_runtime,
     combinatorics_exact_checker_provider_runtime,
@@ -88,7 +92,33 @@ _ENTRYPOINT_PROVIDER_RUNTIME_KEYS = {
     "jacobian_checkers.finite_posets": "poset",
     "jacobian_checkers.exact_geometry": "geometry",
     "jacobian_checkers.matrix_normal_forms": "matrix-hnf",
+    "jacobian_checkers.finite_field_rank": "sympy",
 }
+
+
+def _finite_field_rank_checker_runtime(
+    *, checker_ids: tuple[str, ...] = ()
+) -> CapabilityProviderRuntime:
+    source = source_provider_runtime(
+        "jacobian.finite-field-rank-checker-source",
+        version="1",
+        entrypoint=(
+            "jacobian_checkers.finite_field_rank:check_finite_field_linear_map_rank"
+        ),
+        install_tier=CapabilityInstallTier.T0,
+        license_id="MIT",
+        features=("clean-process-checker",),
+    )
+    sympy = known_provider_runtime(
+        "jacobian.sympy",
+        features=("prime-field-rank-replay",),
+    )
+    return composite_provider_runtime(
+        "jacobian.finite-field-rank-checker",
+        components=(source, sympy),
+        features=("independent-prime-field-rank-replay",),
+        checker_ids=checker_ids,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,6 +178,7 @@ def install_exact_domain_checkers(
         "graded-syzygy": graded_syzygy_checker_provider_runtime,
         "projective-arrangement": projective_arrangement_checker_provider_runtime,
         "topology": topology_exact_checker_provider_runtime,
+        "sympy": _finite_field_rank_checker_runtime,
         "geometry": partial(
             source_provider_runtime,
             "jacobian.exact-geometry-checker",

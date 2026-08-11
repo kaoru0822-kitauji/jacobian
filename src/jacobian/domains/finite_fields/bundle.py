@@ -1,6 +1,9 @@
 """Installed finite-field operations over the authoritative native values."""
 
 from jacobian.contracts.capabilities import CapabilityDiagnostic
+from jacobian.domains.finite_fields.checkers import (
+    FINITE_FIELD_EXACT_REPLAY_CHECKERS,
+)
 from jacobian.domains.finite_fields.contracts import (
     LinearMapRankRequest,
     RestrictScalarsRequest,
@@ -59,13 +62,11 @@ def build_finite_field_bundle() -> DomainBundle:
                 request_field="direction",
             ),
         ),
-        output_ports=(
-            OutputPort(name="linear_map", value_type=FiniteLinearMap),
-        ),
+        output_ports=(OutputPort(name="linear_map", value_type=FiniteLinearMap),),
     )
     rank_operation = inline_operation(
         OperationSpec(
-            operation_id="finite_field.linear_map.rank",
+            operation_id="finite_field.linear_map.rank.compute",
             version="1",
             request_type=LinearMapRankRequest,
             result_type=RankResult,
@@ -103,6 +104,7 @@ def build_finite_field_bundle() -> DomainBundle:
         provider_runtime=provider,
         backend_version=f"python-flint-{PYTHON_FLINT_VERSION}",
         capabilities=(restrict_operation, rank_operation),
+        checker_declarations=FINITE_FIELD_EXACT_REPLAY_CHECKERS,
         diagnostics=DomainDiagnostics(
             invalid_request=CapabilityDiagnostic(
                 code="INVALID_FINITE_FIELD_REQUEST",

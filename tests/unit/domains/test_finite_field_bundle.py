@@ -12,7 +12,7 @@ def test_bundle_declares_two_atomic_port_bound_operations() -> None:
 
     assert bundle.capability_ids == (
         "finite_field.restrict_scalars.compute",
-        "finite_field.linear_map.rank",
+        "finite_field.linear_map.rank.compute",
     )
     restrict_operation, rank_operation = bundle.capabilities
     assert tuple(port.value_type for port in restrict_operation.input_ports) == (
