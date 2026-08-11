@@ -29,6 +29,7 @@ jacobian/math/finite_fields/
     __init__.py
     values.py
     operations.py
+    _sympy.py
     _flint.py
 ```
 

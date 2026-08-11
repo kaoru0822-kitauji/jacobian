@@ -1,4 +1,4 @@
-"""Provisional field-bound composition ports for typed operations."""
+"""Minimal supported composition ports for typed operations."""
 
 from __future__ import annotations
 

@@ -181,9 +181,10 @@ Composition tests use independent producer and consumer operations. They cover:
 - explicit transforms rather than hidden coercion; and
 - no assurance propagation through compatibility or carriers.
 
-Installation tests validate provisional port accessors against their declared
-value type. Port metadata remains provisional through #905 Slice A and is
-frozen only after Slice B proves reuse.
+Installation tests validate supported port accessors against their declared
+value type. #905 Slices A and B use the same whole-value input and output ports;
+the tests reject any declaration whose accessor disagrees with the Pydantic
+request or result type.
 
 ## #905 acceptance
 

@@ -44,8 +44,10 @@ The supported modules and symbols are:
 - `jacobian.math.prime_field_linear_algebra`: `PrimeFieldMatrix`, `rank`,
   `rref`, `nullspace`, `column_basis`, and `quotient_basis`; and
 - `jacobian.math.finite_fields`: exact presentation-, parent-, and axis-bound
-values plus projective normalization, projective-line enumeration, explicit
-restriction of scalars, direction-bound rank ledgers, and orbit aggregation.
+  values plus projective normalization, projective-line enumeration, explicit
+  restriction of scalars, direction-bound rank ledgers, orbit aggregation,
+  finite polynomial maps, complete tables, fibers, and bound collision and
+  permutation certificates.
 `projective_line` returns a `ProjectiveLine` value rather than an unbound tuple,
 so its presentation, axis, completeness, order, and digest remain attached.
 

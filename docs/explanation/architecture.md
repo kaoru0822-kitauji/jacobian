@@ -203,14 +203,19 @@ ValueInstance   exact semantic value and canonical digest
 ValueReference  opaque carrier, source port, provenance
 ```
 
-Initial internal ports are deliberately small and provisional through #905
-Slice A: an input port names one typed request field, and an output port exposes
-the whole typed result. Pydantic retains field cardinality and cross-field
-constraints. Installation verifies each declared field and result type.
-Compatibility requires exact type/version, parent, presentation, axes, and
-bases; all transformations are explicit. Slice B may justify bounded
-homogeneous collections or field extraction; neither is part of Slice A. The
-port contract is frozen only after Slice B demonstrates reuse.
+The supported internal port contract is deliberately small: an input port
+names one typed request field, and an output port exposes the whole typed
+result. Pydantic retains field cardinality and cross-field constraints.
+Installation verifies each declared field and result type. Compatibility
+requires exact type/version, parent, presentation, axes, and bases; all
+transformations are explicit.
+
+#905 Slices A and B use this same contract unchanged. Complete projective
+lines, finite map tables, fiber partitions, and certificates remain
+domain-owned semantic values, so the port layer needs no collection model,
+field extraction, cardinality language, coercion graph, or generalized
+unifier. That two-slice reuse freezes this minimal shape as the supported
+internal composition contract.
 
 Slice A's complete projective line is a domain-owned semantic value with a
 fixed presentation, axis, order, completeness check, and digest. It does not
