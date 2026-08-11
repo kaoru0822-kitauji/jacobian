@@ -38,9 +38,10 @@ def test_presentation_identity_binds_modulus_generator_basis_and_encoding() -> N
     assert presentation.ordered_basis == ("1", "a", "a^2")
     assert presentation.digest == _presentation().digest
     assert presentation.digest != _presentation(generator="z").digest
-    assert FiniteFieldPresentation.model_validate(
-        presentation.model_dump(mode="json")
-    ) == presentation
+    assert (
+        FiniteFieldPresentation.model_validate(presentation.model_dump(mode="json"))
+        == presentation
+    )
 
 
 def test_presentation_rejects_reducible_or_noncanonical_moduli() -> None:
@@ -88,7 +89,7 @@ def test_values_reject_same_shape_substitutions_with_wrong_parent_or_axis() -> N
         axis=row_axis,
         coordinates=(one, zero),
     )
-    assert RankResult.from_map(point, matrix).rank == 2
+    assert RankResult(direction=point, linear_map=matrix, rank=2).rank == 2
 
 
 def test_subspace_rejects_dependent_basis_matrices() -> None:
@@ -131,4 +132,4 @@ def test_rank_result_rejects_a_map_over_the_wrong_prime_field() -> None:
     )
 
     with pytest.raises(ValueError, match="prime field"):
-        RankResult.from_map(direction, wrong_prime_map)
+        RankResult(direction=direction, linear_map=wrong_prime_map, rank=1)

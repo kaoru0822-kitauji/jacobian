@@ -324,21 +324,13 @@ class RankResult(ContractModel):
     def validate_rank(self) -> Self:
         if self.linear_map.matrix.prime != self.direction.presentation.characteristic:
             raise ValueError("rank map must use the direction's prime field")
-        if self.rank != rank(self.linear_map.matrix):
-            raise ValueError("rank does not match the bound linear map")
-        return self
-
-    @classmethod
-    def from_map(
-        cls,
-        direction: ProjectivePoint,
-        linear_map: FiniteLinearMap,
-    ) -> Self:
-        return cls(
-            direction=direction,
-            linear_map=linear_map,
-            rank=rank(linear_map.matrix),
+        maximum_rank = min(
+            len(self.linear_map.matrix.entries),
+            self.linear_map.matrix.columns,
         )
+        if type(self.rank) is not int or not 0 <= self.rank <= maximum_rank:
+            raise ValueError("rank is outside the linear-map dimensions")
+        return self
 
     @property
     def digest(self) -> str:

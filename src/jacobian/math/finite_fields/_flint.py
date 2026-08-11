@@ -8,6 +8,7 @@ from jacobian.math.finite_fields.values import (
     FiniteFieldElement,
     FiniteFieldPresentation,
 )
+from jacobian.math.prime_field_linear_algebra import PrimeFieldMatrix
 
 
 def context(presentation: FiniteFieldPresentation) -> Any:
@@ -35,3 +36,14 @@ def coordinates(value: Any, *, degree: int) -> tuple[int, ...]:
     if len(result) > degree:
         raise ValueError("python-flint returned too many element coordinates")
     return result + (0,) * (degree - len(result))
+
+
+def matrix_rank(matrix: PrimeFieldMatrix) -> int:
+    """Compute rank with python-flint's maintained prime-field matrix type."""
+
+    if not matrix.entries or matrix.columns == 0:
+        return 0
+    from flint import nmod_mat
+
+    backend = nmod_mat([list(row) for row in matrix.entries], matrix.prime)
+    return int(backend.rank())
