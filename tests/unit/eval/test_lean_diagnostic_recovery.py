@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import pytest
 from benchmarks.tooling.lean_diagnostic_recovery import (
     classify_recovery,
     compare_reports,
+    digest_suite,
     load_suite,
     summarize_runs,
 )
@@ -24,6 +26,12 @@ def test_recovery_suite_freezes_control_treatment_and_injected_cases() -> None:
     assert len(suite.cases) == 3
     assert any("MATHLIB" in case.prompt for case in suite.cases)
     assert suite.causal_claim_authorized is False
+
+
+def test_recovery_suite_bytes_have_a_stable_evaluation_identity() -> None:
+    expected = "sha256:" + hashlib.sha256(SUITE.read_bytes()).hexdigest()
+
+    assert digest_suite(SUITE) == expected
 
 
 def test_recovery_classification_separates_diagnostic_from_terminal_success() -> None:

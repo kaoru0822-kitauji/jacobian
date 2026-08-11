@@ -151,6 +151,7 @@ def test_unified_exec_mode_is_opt_in(tmp_path: Path) -> None:
 
     assert "unified_exec" not in direct
     assert unified[-3:-1] == ("--enable", "unified_exec")
+    assert 'mcp_servers.jacobian.default_tools_approval_mode="approve"' in unified
 
 
 def test_codex_skill_keeps_bounded_stable_direct_run_contracts() -> None:

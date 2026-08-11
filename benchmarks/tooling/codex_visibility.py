@@ -48,6 +48,7 @@ _CODEX_ENVIRONMENT = (
     "all_proxy",
     "no_proxy",
 )
+_MCP_TOOL_APPROVAL_MODE = "approve"
 
 
 class CueLevel(StrEnum):
@@ -351,6 +352,11 @@ def _codex_arguments(
         f"model_reasoning_effort={json.dumps(reasoning_effort)}",
         "-c",
         f"mcp_servers.jacobian.url={json.dumps(mcp_url)}",
+        "-c",
+        (
+            "mcp_servers.jacobian.default_tools_approval_mode="
+            f"{json.dumps(_MCP_TOOL_APPROVAL_MODE)}"
+        ),
     ]
     if tool_mode is ToolMode.UNIFIED_EXEC:
         arguments.extend(("--enable", "unified_exec"))

@@ -19,7 +19,6 @@ from benchmarks.tooling.codex_visibility import (
     _codex_arguments,
     _command_version,
     _copy_skill,
-    _json_digest,
     _sha256_bytes,
     _validate_mcp_url,
     inspect_surface,
@@ -105,6 +104,12 @@ class RecoverySuite(BaseModel):
 
 def load_suite(path: Path) -> RecoverySuite:
     return RecoverySuite.model_validate_json(path.read_text(encoding="utf-8"))
+
+
+def digest_suite(path: Path) -> str:
+    """Bind an observation to the exact version-controlled suite bytes."""
+
+    return _sha256_bytes(path.read_bytes())
 
 
 def _diagnostic_codes(invocation: Mapping[str, Any]) -> tuple[str, ...]:
@@ -386,7 +391,9 @@ def main() -> None:
             "run mode requires --condition, --mcp-url, --model, and --output"
         )
     _validate_mcp_url(args.mcp_url)
-    suite = load_suite(args.suite.resolve(strict=True))
+    suite_path = args.suite.resolve(strict=True)
+    suite = load_suite(suite_path)
+    suite_digest = digest_suite(suite_path)
     repetitions = args.repetitions or suite.execution.repetitions_per_case
     timeout = args.timeout_seconds or suite.execution.timeout_seconds_per_rollout
     if not 1 <= repetitions <= 20 or timeout <= 0:
@@ -431,7 +438,7 @@ def main() -> None:
         "evidence_class": suite.evidence_class,
         "causal_claim_authorized": False,
         "suite_id": suite.suite_id,
-        "suite_digest": _json_digest(suite.model_dump(mode="json")),
+        "suite_digest": suite_digest,
         "condition": args.condition,
         "model": args.model,
         "reasoning_effort": args.reasoning_effort,

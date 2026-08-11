@@ -418,6 +418,55 @@ def test_lean_reuses_only_an_exact_active_checker_result(
     assert changed.cache_hit is False
 
 
+def test_lean_cache_never_reuses_a_rejected_checker_input(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
+    assert runtime.portfolio.lean is not None
+    decisions = iter(
+        (
+            CheckerDecision(
+                accepted=False,
+                conclusion=Conclusion.UNKNOWN,
+                arithmetic=Arithmetic.SYMBOLIC,
+                method=Method.CHECKED_CERTIFICATE,
+                coverage=Coverage.NOT_APPLICABLE,
+                detail="transient checker setup failure",
+            ),
+            CheckerDecision(
+                accepted=True,
+                conclusion=Conclusion.TRUE,
+                arithmetic=Arithmetic.SYMBOLIC,
+                method=Method.CHECKED_CERTIFICATE,
+                coverage=Coverage.NOT_APPLICABLE,
+                detail="accepted after checker recovery",
+            ),
+        )
+    )
+    calls = 0
+
+    def recover(**_: object) -> CheckerDecision:
+        nonlocal calls
+        calls += 1
+        return next(decisions)
+
+    monkeypatch.setattr(runtime.services.verification, "_run_checker", recover)
+
+    first = runtime.portfolio.lean.verify(statement="True", proof="by trivial")
+    recovered = runtime.portfolio.lean.verify(statement="True", proof="by trivial")
+    repeated = runtime.portfolio.lean.verify(statement="True", proof="by trivial")
+
+    assert first.result.input.status is InputStatus.REJECTED
+    assert first.cache_hit is False
+    assert recovered.result.assurance.verification is Verification.VERIFIED
+    assert recovered.cache_hit is False
+    assert repeated.cache_hit is True
+    assert calls == 2
+
+
 def test_lean_cache_does_not_reuse_a_revoked_checker_result(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

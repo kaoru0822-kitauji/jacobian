@@ -20,6 +20,7 @@ from jacobian.contracts.lean import (
 from jacobian.contracts.results import (
     Execution,
     ExecutionStatus,
+    InputStatus,
     ResultEnvelope,
     Verification,
 )
@@ -151,7 +152,10 @@ class LeanService:
                     checker_id=installation.checker_id,
                     timeout_seconds=installation.checker_timeout_seconds,
                 )
-                if result.execution.status is ExecutionStatus.COMPLETED:
+                if (
+                    result.execution.status is ExecutionStatus.COMPLETED
+                    and result.input.status is InputStatus.ACCEPTED
+                ):
                     try:
                         registration = (
                             self.verification.checker_registry.require_active(
