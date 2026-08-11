@@ -22,6 +22,7 @@ from jacobian.operations import (
     DomainBundle,
     DomainDiagnostics,
     DomainSemantics,
+    Effect,
     Failed,
     OperationAbortError,
     OperationRefusalError,
@@ -293,7 +294,7 @@ def test_materialized_operation_retains_artifacts_lineage_and_typed_preview(
         for descriptor in operation_services.core.capabilities.catalog().capabilities
         if descriptor.capability_id == "synthetic.materialize.double"
     )
-    assert descriptor.read_only is False
+    assert descriptor.read_only is True
     assert set(descriptor.output_schema["properties"]) == {
         "input_uri",
         "result_uri",
@@ -325,6 +326,33 @@ def test_materialized_operation_retains_artifacts_lineage_and_typed_preview(
     assert output_artifact.payload == {"doubled": 12}
     assert output_artifact.manifest.parents == (input_uri,)
     assert result.relationships == ()
+
+
+def test_catalog_effect_comes_from_operation_spec(
+    operation_services,
+) -> None:
+    bundle = _synthetic_bundle()
+    stateful = inline_operation(
+        OperationSpec(
+            operation_id="synthetic.stateful.double",
+            version="2",
+            title="Stateful double",
+            description="A synthetic stateful operation published inline.",
+            request_type=_SyntheticRequest,
+            result_type=_SyntheticResult,
+            execute=lambda request: _SyntheticResult(doubled=request.value * 2),
+            effect=Effect.STATEFUL,
+        )
+    )
+    _install(operation_services, replace(bundle, capabilities=(stateful,)))
+
+    descriptor = next(
+        descriptor
+        for descriptor in operation_services.core.capabilities.catalog().capabilities
+        if descriptor.capability_id == stateful.spec.operation_id
+    )
+
+    assert descriptor.read_only is False
 
 
 def test_materialized_operation_omits_preview_without_projection(

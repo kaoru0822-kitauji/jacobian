@@ -68,17 +68,7 @@ def _search_chromatic_number(
         )
     if output.status == "EXACT":
         return output
-    raise OperationAbortError(
-        ExecutionStatus.TIMEOUT,
-        CapabilityDiagnostic(
-            code="CHROMATIC_NUMBER_TIMEOUT",
-            stage="graph_optimization_search",
-            message=(
-                "The chromatic-number search exhausted its wall-clock budget "
-                "before establishing exactness."
-            ),
-        ),
-    )
+    return output
 
 
 CHROMATIC_NUMBER_CAPABILITY = inline_operation(

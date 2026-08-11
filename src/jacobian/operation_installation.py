@@ -35,7 +35,7 @@ from jacobian.operation_runtime import (
     enriched_invalid_request,
     operation_runtime,
 )
-from jacobian.operations import Completed, DomainBundle, Failed, OperationSpec
+from jacobian.operations import Completed, DomainBundle, Effect, Failed, OperationSpec
 from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.storage.repository import ArtifactRepository
 
@@ -200,7 +200,7 @@ class InstalledOperationAdapter:
             provider_runtime=runtime,
             input_schema=model_schema(self.spec.request_type),
             output_schema=model_schema(output_model),
-            read_only=(isinstance(publication, InlinePublication)),
+            read_only=(self.spec.effect is Effect.READ_ONLY),
             tags=self.spec.tags,
             produced_artifact_types=produced_artifact_types,
             invocation_examples=self.spec.invocation_examples,

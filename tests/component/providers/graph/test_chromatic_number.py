@@ -65,7 +65,7 @@ def test_chromatic_number_returns_first_satisfying_k_with_witness(
     )
 
 
-def test_chromatic_number_timeout_is_artifact_free_non_conclusion(
+def test_chromatic_number_timeout_returns_unknown_result_without_artifacts(
     graph_optimization_services: DomainTestServices,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -86,10 +86,12 @@ def test_chromatic_number_timeout_is_artifact_free_non_conclusion(
         },
     )
 
-    assert result.execution.status is ExecutionStatus.TIMEOUT
-    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
-    assert result.diagnostics[0].code == "CHROMATIC_NUMBER_TIMEOUT"
-    assert result.output["error"]["code"] == "CHROMATIC_NUMBER_TIMEOUT"
+    assert result.execution.status is ExecutionStatus.COMPLETED
+    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
+    output = result.output["result"]
+    assert output["status"] == "UNKNOWN"
+    assert output["solver_status"] == "UNKNOWN"
+    assert output["tested"] == [{"colors": 2, "status": "UNKNOWN"}]
     assert result.artifact_uris == ()
 
 
