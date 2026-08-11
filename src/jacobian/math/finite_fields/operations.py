@@ -180,10 +180,7 @@ def linear_map_rank(
 ) -> RankResult:
     """Compute prime-field rank while retaining the exact direction and map."""
 
-    return RankResult(
-        direction=direction,
-        linear_map=linear_map,
-    )
+    return RankResult.from_map(direction, linear_map)
 
 
 def direction_rank_ledger(
@@ -204,4 +201,4 @@ def direction_rank_ledger(
 def orbit_distribution(ledger: DirectionRankLedger) -> OrbitDistribution:
     """Aggregate projective orbit counts from a complete direction-rank ledger."""
 
-    return OrbitDistribution(ledger=ledger)
+    return OrbitDistribution.from_ledger(ledger)

@@ -27,9 +27,12 @@ def _slice_a_values() -> tuple[
     # The exact presentation, actions, and direction order are Theorem 1.2 of
     # https://arxiv.org/abs/2607.23857. Coefficients are low-degree first.
     presentation = finite_field(2, (1, 1, 0, 1))
-    rows = Axis("b", ("b1", "b2"))
-    columns = Axis("B^T b", ("y1", "y2"))
-    basis_axis = Axis("matrix subspace", ("B1", "B2", "B3", "B4"))
+    rows = Axis(name="b", labels=("b1", "b2"))
+    columns = Axis(name="B^T b", labels=("y1", "y2"))
+    basis_axis = Axis(
+        name="matrix subspace",
+        labels=("B1", "B2", "B3", "B4"),
+    )
 
     def e(coordinates: tuple[int, int, int]):
         return element(presentation, coordinates)
@@ -43,22 +46,35 @@ def _slice_a_values() -> tuple[
     one_plus_a2 = e((1, 0, 1))
     basis = (
         AxisBoundMatrix(
-            presentation, rows, columns, ((one, zero), (zero, zero))
+            presentation=presentation,
+            row_axis=rows,
+            column_axis=columns,
+            entries=((one, zero), (zero, zero)),
         ),
         AxisBoundMatrix(
-            presentation, rows, columns, ((zero, zero), (zero, one))
+            presentation=presentation,
+            row_axis=rows,
+            column_axis=columns,
+            entries=((zero, zero), (zero, one)),
         ),
         AxisBoundMatrix(
-            presentation, rows, columns, ((one_plus_a2, one), (a, a2))
+            presentation=presentation,
+            row_axis=rows,
+            column_axis=columns,
+            entries=((one_plus_a2, one), (a, a2)),
         ),
         AxisBoundMatrix(
-            presentation,
-            rows,
-            columns,
-            ((one_plus_a2, a2), (one_plus_a2, a2)),
+            presentation=presentation,
+            row_axis=rows,
+            column_axis=columns,
+            entries=((one_plus_a2, a2), (one_plus_a2, a2)),
         ),
     )
-    subspace = FiniteDimensionalSubspace(presentation, basis_axis, basis)
+    subspace = FiniteDimensionalSubspace(
+        presentation=presentation,
+        basis_axis=basis_axis,
+        basis=basis,
+    )
     paper_affine_order = (
         zero,
         one,
@@ -83,7 +99,10 @@ def test_exact_flint_presentation_and_element_coordinates_round_trip() -> None:
     assert presentation.ordered_basis == ("1", "a", "a^2")
     assert tuple(
         tuple(coordinate.coordinates for coordinate in point.coordinates)
-        for point in projective_line(presentation, Axis("b", ("b1", "b2")))[1:]
+        for point in projective_line(
+            presentation,
+            Axis(name="b", labels=("b1", "b2")),
+        )[1:]
     ) == tuple(
         ((1, 0, 0), coordinates)
         for coordinates in (
@@ -134,6 +153,9 @@ def test_slice_a_keeps_directions_bound_through_orbit_aggregation() -> None:
     assert tuple(entry.rank for entry in ledger.entries) == (3, 3, 3, 3, 3, 3, 4, 4, 4)
     assert distribution.counts == ((1, 9), (8, 48), (16, 12))
     assert distribution.ledger is ledger
+    assert type(distribution).model_validate(
+        distribution.model_dump(mode="json")
+    ) == distribution
 
 
 def test_slice_a_rejects_wrong_presentation_and_axis() -> None:
@@ -147,7 +169,7 @@ def test_slice_a_rejects_wrong_presentation_and_axis() -> None:
             element(other_presentation, (0, 0, 0)),
         ),
     )
-    wrong_axis = Axis("other b", subspace.row_axis.labels)
+    wrong_axis = Axis(name="other b", labels=subspace.row_axis.labels)
     wrong_axis_direction = projective_point(
         subspace.presentation,
         wrong_axis,

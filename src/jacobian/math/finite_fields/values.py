@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Self
 
 import rfc8785
+from pydantic import model_validator
 
 from jacobian.canonical import sha256_digest
+from jacobian.contracts.base import ContractModel
 from jacobian.math.prime_field_linear_algebra import PrimeFieldMatrix, rank
 
 
@@ -15,8 +16,7 @@ def _digest(payload: dict[str, Any]) -> str:
     return sha256_digest(rfc8785.dumps(payload))
 
 
-@dataclass(frozen=True, slots=True)
-class FiniteFieldPresentation:
+class FiniteFieldPresentation(ContractModel):
     """An exact polynomial presentation with a fixed power-basis encoding."""
 
     characteristic: int
@@ -24,7 +24,8 @@ class FiniteFieldPresentation:
     generator: str = "a"
     element_encoding_version: str = "power-basis-v1"
 
-    def __post_init__(self) -> None:
+    @model_validator(mode="after")
+    def validate_presentation(self) -> Self:
         from sympy import Poly, isprime, symbols
 
         if type(self.characteristic) is not int or not isprime(self.characteristic):
@@ -53,6 +54,7 @@ class FiniteFieldPresentation:
         )
         if not polynomial.is_irreducible:
             raise ValueError("modulus must be irreducible over the prime field")
+        return self
 
     @property
     def degree(self) -> int:
@@ -84,14 +86,14 @@ class FiniteFieldPresentation:
         )
 
 
-@dataclass(frozen=True, slots=True)
-class FiniteFieldElement:
+class FiniteFieldElement(ContractModel):
     """Power-basis coordinates bound to one exact field presentation."""
 
     presentation: FiniteFieldPresentation
     coordinates: tuple[int, ...]
 
-    def __post_init__(self) -> None:
+    @model_validator(mode="after")
+    def validate_coordinates(self) -> Self:
         if len(self.coordinates) != self.presentation.degree:
             raise ValueError("element coordinates must match the presentation degree")
         if any(
@@ -99,6 +101,7 @@ class FiniteFieldElement:
             for value in self.coordinates
         ):
             raise ValueError("element coordinates must be canonical field residues")
+        return self
 
     @property
     def is_zero(self) -> bool:
@@ -119,20 +122,21 @@ class FiniteFieldElement:
         )
 
 
-@dataclass(frozen=True, slots=True)
-class Axis:
+class Axis(ContractModel):
     """An ordered semantic axis."""
 
     name: str
     labels: tuple[str, ...]
 
-    def __post_init__(self) -> None:
+    @model_validator(mode="after")
+    def validate_axis(self) -> Self:
         if not self.name:
             raise ValueError("axis name must be nonempty")
         if not self.labels or any(not label for label in self.labels):
             raise ValueError("axis labels must be nonempty")
         if len(set(self.labels)) != len(self.labels):
             raise ValueError("axis labels must be unique")
+        return self
 
     @property
     def digest(self) -> str:
@@ -145,8 +149,7 @@ class Axis:
         )
 
 
-@dataclass(frozen=True, slots=True)
-class AxisBoundMatrix:
+class AxisBoundMatrix(ContractModel):
     """An immutable matrix bound to a field presentation and ordered axes."""
 
     presentation: FiniteFieldPresentation
@@ -154,7 +157,8 @@ class AxisBoundMatrix:
     column_axis: Axis
     entries: tuple[tuple[FiniteFieldElement, ...], ...]
 
-    def __post_init__(self) -> None:
+    @model_validator(mode="after")
+    def validate_matrix(self) -> Self:
         if len(self.entries) != len(self.row_axis.labels):
             raise ValueError("matrix rows must match the row axis")
         if any(len(row) != len(self.column_axis.labels) for row in self.entries):
@@ -165,6 +169,7 @@ class AxisBoundMatrix:
             for element in row
         ):
             raise ValueError("matrix entries must use the matrix field presentation")
+        return self
 
     @property
     def digest(self) -> str:
@@ -182,15 +187,15 @@ class AxisBoundMatrix:
         )
 
 
-@dataclass(frozen=True, slots=True)
-class FiniteDimensionalSubspace:
+class FiniteDimensionalSubspace(ContractModel):
     """An ordered independent matrix basis over the presentation's prime field."""
 
     presentation: FiniteFieldPresentation
     basis_axis: Axis
     basis: tuple[AxisBoundMatrix, ...]
 
-    def __post_init__(self) -> None:
+    @model_validator(mode="after")
+    def validate_subspace(self) -> Self:
         if len(self.basis) != len(self.basis_axis.labels):
             raise ValueError("subspace basis must match its basis axis")
         if not self.basis:
@@ -220,6 +225,7 @@ class FiniteDimensionalSubspace:
         )
         if rank(basis_matrix) != len(self.basis):
             raise ValueError("subspace basis matrices must be linearly independent")
+        return self
 
     @property
     def row_axis(self) -> Axis:
@@ -241,15 +247,15 @@ class FiniteDimensionalSubspace:
         )
 
 
-@dataclass(frozen=True, slots=True)
-class ProjectivePoint:
+class ProjectivePoint(ContractModel):
     """A normalized projective point over one field and coordinate axis."""
 
     presentation: FiniteFieldPresentation
     axis: Axis
     coordinates: tuple[FiniteFieldElement, ...]
 
-    def __post_init__(self) -> None:
+    @model_validator(mode="after")
+    def validate_point(self) -> Self:
         if len(self.coordinates) != len(self.axis.labels):
             raise ValueError("projective coordinates must match their axis")
         if any(
@@ -265,6 +271,7 @@ class ProjectivePoint:
             raise ValueError("projective coordinates cannot all be zero")
         if not first_nonzero.is_one:
             raise ValueError("projective coordinates must be normalized")
+        return self
 
     @property
     def digest(self) -> str:
@@ -278,19 +285,20 @@ class ProjectivePoint:
         )
 
 
-@dataclass(frozen=True, slots=True)
-class FiniteLinearMap:
+class FiniteLinearMap(ContractModel):
     """A matrix-defined linear map with exact source and target axes."""
 
     source_axis: Axis
     target_axis: Axis
     matrix: PrimeFieldMatrix
 
-    def __post_init__(self) -> None:
+    @model_validator(mode="after")
+    def validate_linear_map(self) -> Self:
         if self.matrix.columns != len(self.source_axis.labels):
             raise ValueError("linear-map columns must match the source axis")
         if len(self.matrix.entries) != len(self.target_axis.labels):
             raise ValueError("linear-map rows must match the target axis")
+        return self
 
     @property
     def digest(self) -> str:
@@ -305,18 +313,32 @@ class FiniteLinearMap:
         )
 
 
-@dataclass(frozen=True, slots=True)
-class RankResult:
+class RankResult(ContractModel):
     """The exact rank of a direction-bound finite linear map."""
 
     direction: ProjectivePoint
     linear_map: FiniteLinearMap
-    rank: int = field(init=False)
+    rank: int
 
-    def __post_init__(self) -> None:
+    @model_validator(mode="after")
+    def validate_rank(self) -> Self:
         if self.linear_map.matrix.prime != self.direction.presentation.characteristic:
             raise ValueError("rank map must use the direction's prime field")
-        object.__setattr__(self, "rank", rank(self.linear_map.matrix))
+        if self.rank != rank(self.linear_map.matrix):
+            raise ValueError("rank does not match the bound linear map")
+        return self
+
+    @classmethod
+    def from_map(
+        cls,
+        direction: ProjectivePoint,
+        linear_map: FiniteLinearMap,
+    ) -> Self:
+        return cls(
+            direction=direction,
+            linear_map=linear_map,
+            rank=rank(linear_map.matrix),
+        )
 
     @property
     def digest(self) -> str:
@@ -330,14 +352,14 @@ class RankResult:
         )
 
 
-@dataclass(frozen=True, slots=True)
-class DirectionRankLedger:
+class DirectionRankLedger(ContractModel):
     """An ordered, exact binding from projective directions to rank results."""
 
     subspace: FiniteDimensionalSubspace
     entries: tuple[RankResult, ...]
 
-    def __post_init__(self) -> None:
+    @model_validator(mode="after")
+    def validate_ledger(self) -> Self:
         if not self.entries:
             raise ValueError("direction-rank ledger must be nonempty")
         first = self.entries[0]
@@ -358,6 +380,7 @@ class DirectionRankLedger:
             raise ValueError("ledger directions must use the subspace row axis")
         if first.linear_map.source_axis != self.subspace.basis_axis:
             raise ValueError("ledger maps must use the subspace basis axis")
+        return self
 
     @property
     def digest(self) -> str:
@@ -370,30 +393,21 @@ class DirectionRankLedger:
         )
 
 
-@dataclass(frozen=True, slots=True)
-class OrbitDistribution:
+class OrbitDistribution(ContractModel):
     """Orbit-size counts derived from one exact direction-rank ledger."""
 
     ledger: DirectionRankLedger
-    counts: tuple[tuple[int, int], ...] = field(init=False)
+    counts: tuple[tuple[int, int], ...]
 
-    def __post_init__(self) -> None:
-        first = self.ledger.entries[0]
-        presentation = first.direction.presentation
-        expected_directions = (
-            presentation.order ** len(first.direction.axis.labels) - 1
-        ) // (presentation.order - 1)
-        if len(self.ledger.entries) != expected_directions:
-            raise ValueError("orbit aggregation requires every projective direction")
-        prime = presentation.characteristic
-        target_dimension = len(first.linear_map.target_axis.labels)
-        counts: dict[int, int] = {1: expected_directions}
-        for entry in self.ledger.entries:
-            orbit_size = prime**entry.rank
-            counts[orbit_size] = counts.get(orbit_size, 0) + prime ** (
-                target_dimension - entry.rank
-            )
-        object.__setattr__(self, "counts", tuple(sorted(counts.items())))
+    @model_validator(mode="after")
+    def validate_distribution(self) -> Self:
+        if self.counts != _orbit_counts(self.ledger):
+            raise ValueError("orbit counts do not match the direction-rank ledger")
+        return self
+
+    @classmethod
+    def from_ledger(cls, ledger: DirectionRankLedger) -> Self:
+        return cls(ledger=ledger, counts=_orbit_counts(ledger))
 
     @property
     def digest(self) -> str:
@@ -404,3 +418,22 @@ class OrbitDistribution:
                 "value_type": "orbit-distribution-v1",
             }
         )
+
+
+def _orbit_counts(ledger: DirectionRankLedger) -> tuple[tuple[int, int], ...]:
+    first = ledger.entries[0]
+    presentation = first.direction.presentation
+    expected_directions = (
+        presentation.order ** len(first.direction.axis.labels) - 1
+    ) // (presentation.order - 1)
+    if len(ledger.entries) != expected_directions:
+        raise ValueError("orbit aggregation requires every projective direction")
+    prime = presentation.characteristic
+    target_dimension = len(first.linear_map.target_axis.labels)
+    counts: dict[int, int] = {1: expected_directions}
+    for entry in ledger.entries:
+        orbit_size = prime**entry.rank
+        counts[orbit_size] = counts.get(orbit_size, 0) + prime ** (
+            target_dimension - entry.rank
+        )
+    return tuple(sorted(counts.items()))

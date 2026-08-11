@@ -5,15 +5,10 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
+from pydantic import Field, StrictInt, model_validator
 
+from jacobian.contracts.base import ContractModel
 from jacobian.contracts.common import ArtifactUri, CheckerUri, Sha256Digest
-
-
-class ContractModel(BaseModel):
-    """Closed, immutable base for public wire models."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
 
 class ExecutionStatus(StrEnum):
