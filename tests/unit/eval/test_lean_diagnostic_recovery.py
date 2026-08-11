@@ -6,6 +6,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+import benchmarks.tooling.lean_diagnostic_recovery as recovery_module
 import pytest
 from benchmarks.tooling.codex_visibility import surface_snapshot_digest
 from benchmarks.tooling.lean_diagnostic_recovery import (
@@ -913,6 +914,53 @@ def test_recovery_comparison_verifies_retained_artifact_digests(
             treatment_report_sha256=treatment_anchor,
             suite_path=SUITE,
         )
+
+
+def test_recovery_comparison_classifies_the_hash_verified_transcript_bytes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    control = _comparison_report("control")
+    treatment = _comparison_report("enriched-diagnostics")
+    control_path, treatment_path, control_anchor, treatment_anchor = (
+        _write_comparison_reports(tmp_path, control, treatment)
+    )
+    original_verified_artifact = recovery_module._verified_artifact
+    replaced = False
+
+    def replace_transcript_after_verification(*args: Any, **kwargs: Any):
+        nonlocal replaced
+        path, payload = original_verified_artifact(*args, **kwargs)
+        if not replaced and path.suffix == ".jsonl":
+            path.write_text(
+                json.dumps(
+                    {
+                        "type": "turn.completed",
+                        "usage": {"input_tokens": 999, "output_tokens": 999},
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            replaced = True
+        return path, payload
+
+    monkeypatch.setattr(
+        recovery_module,
+        "_verified_artifact",
+        replace_transcript_after_verification,
+    )
+
+    compared = compare_report_paths(
+        control_path,
+        treatment_path,
+        control_report_sha256=control_anchor,
+        treatment_report_sha256=treatment_anchor,
+        suite_path=SUITE,
+    )
+
+    assert replaced is True
+    assert compared["deltas"]["input_tokens"] == -30
 
 
 def test_recovery_comparison_binds_completion_to_the_command_receipt(

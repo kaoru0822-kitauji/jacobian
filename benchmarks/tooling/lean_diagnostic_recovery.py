@@ -40,7 +40,7 @@ from benchmarks.tooling.command_runner import (
     run_operator_command,
 )
 from jacobian.canonical import canonicalize_json, loads_strict_json
-from jacobian.eval.telemetry import parse_agent_transcript
+from jacobian.eval.telemetry import parse_agent_transcript, parse_agent_transcript_bytes
 
 _ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_SUITE = _ROOT / "benchmarks/config/lean-diagnostic-recovery-v1.json"
@@ -810,7 +810,7 @@ def _recomputed_run(
     report_root: Path,
 ) -> dict[str, Any]:
     command = _verified_command_receipt(run, report_root=report_root)
-    transcript_path, transcript_payload = _verified_artifact(
+    _, transcript_payload = _verified_artifact(
         report_root,
         name=run.artifacts.transcript,
         expected_digest=run.artifacts.transcript_sha256,
@@ -822,7 +822,7 @@ def _recomputed_run(
         expected_digest=run.artifacts.stderr_sha256,
     )
     try:
-        telemetry = parse_agent_transcript(transcript_path)
+        telemetry = parse_agent_transcript_bytes(transcript_payload)
         classified = classify_recovery(case, telemetry)
         completed = (
             command.status is ToolCommandStatus.EXITED and command.exit_code == 0

@@ -5,7 +5,10 @@ import json
 from pathlib import Path
 
 from jacobian.canonical import canonicalize_json
-from jacobian.eval.telemetry import parse_agent_transcript
+from jacobian.eval.telemetry import (
+    parse_agent_transcript,
+    parse_agent_transcript_bytes,
+)
 
 
 def _tool_event(
@@ -45,6 +48,22 @@ def test_agent_telemetry_records_itemless_turn_usage(tmp_path: Path) -> None:
     telemetry = parse_agent_transcript(transcript)
 
     assert telemetry["usage"] == usage
+
+
+def test_agent_telemetry_parses_preverified_bytes_without_a_path() -> None:
+    payload = (
+        json.dumps(
+            {
+                "type": "turn.completed",
+                "usage": {"input_tokens": 7, "output_tokens": 3},
+            }
+        ).encode()
+        + b"\n"
+    )
+
+    telemetry = parse_agent_transcript_bytes(payload)
+
+    assert telemetry["usage"] == {"input_tokens": 7, "output_tokens": 3}
 
 
 def test_agent_telemetry_preserves_discovery_to_invocation_dataflow(

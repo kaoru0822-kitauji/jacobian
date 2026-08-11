@@ -252,6 +252,8 @@ validate_install_root() {
     esac
     effective="$(resolve_effective_path "${value}")" || die \
         "--install-root has an unresolved or broken symlink ancestor"
+    [[ "${effective}" != "/" && "${effective}" =~ ^/[A-Za-z0-9._/-]+$ ]] || die \
+        "--install-root resolves to a non-root path with unsupported characters"
     case "${effective}/" in
         /home/* | /root/* | /run/user/* | /tmp/* | /var/tmp/*)
             die "--install-root resolves below a path hidden by the systemd sandbox: ${effective}"

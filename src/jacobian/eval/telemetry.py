@@ -572,11 +572,11 @@ def _transcript_payload(telemetry: _AgentTranscriptTelemetry) -> dict[str, Any]:
     }
 
 
-def parse_agent_transcript(path: Path) -> dict[str, Any]:
-    """Return calls, usage, failures, and successful capability dataflow."""
+def parse_agent_transcript_bytes(payload: bytes) -> dict[str, Any]:
+    """Parse already-read transcript bytes without reopening mutable evidence."""
 
     telemetry = _AgentTranscriptTelemetry()
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for line in payload.decode("utf-8", errors="strict").splitlines():
         try:
             event = json.loads(line)
         except json.JSONDecodeError:
@@ -598,3 +598,9 @@ def parse_agent_transcript(path: Path) -> dict[str, Any]:
             _process_mcp_tool_call(telemetry, item)
         _record_mcp_resource_telemetry(telemetry.resource_telemetry, item)
     return _transcript_payload(telemetry)
+
+
+def parse_agent_transcript(path: Path) -> dict[str, Any]:
+    """Return calls, usage, failures, and successful capability dataflow."""
+
+    return parse_agent_transcript_bytes(path.read_bytes())
