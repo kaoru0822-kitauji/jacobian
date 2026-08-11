@@ -27,6 +27,7 @@ LEAN_TOOLCHAIN = f"leanprover/lean4:v{LEAN_VERSION}"
 MATHLIB_COMMIT = "fabf563a7c95a166b8d7b6efca11c8b4dc9d911f"
 MATHLIB_AXIOMS = frozenset({"Classical.choice", "Quot.sound", "propext"})
 _TOOLCHAIN_PROBE_TIMEOUT_SECONDS = 15
+_PACKAGE_CHECKOUT_PROBE_TIMEOUT_SECONDS = 15
 _MATHLIB_COMPILE_TIMEOUT_SECONDS = 180
 _FORBIDDEN = re.compile(
     r"\b(?:admit|axiom|class|def|elab|end|example|import|instance|lemma|macro|"
@@ -36,7 +37,8 @@ _FORBIDDEN = re.compile(
 )
 _AXIOMS = re.compile(r"'jacobian_theorem' depends on axioms: \[([^\]]*)\]")
 _LEAN_ERROR = re.compile(
-    r"^[^\r\n]+:(?P<line>\d+):(?P<column>\d+):\s*error:\s*(?P<message>.+)$",
+    r"^[^\r\n]+:(?P<line>\d+):(?P<column>\d+):\s*"
+    r"error(?:\([^\r\n)]{1,128}\))?:\s*(?P<message>.+)$",
     re.MULTILINE,
 )
 _QUOTED_LOCAL_PATH = re.compile(
@@ -371,7 +373,7 @@ def _validate_package_checkout(
             ),
             environment=git_environment,
             cwd=str(checkout),
-            timeout_seconds=5.0,
+            timeout_seconds=float(_PACKAGE_CHECKOUT_PROBE_TIMEOUT_SECONDS),
             stdin_bytes=b"",
             stdout_limit_bytes=4096,
             stderr_limit_bytes=4096,
@@ -399,7 +401,7 @@ def _validate_package_checkout(
             ),
             environment=git_environment,
             cwd=str(checkout),
-            timeout_seconds=5.0,
+            timeout_seconds=float(_PACKAGE_CHECKOUT_PROBE_TIMEOUT_SECONDS),
             stdin_bytes=b"",
             stdout_limit_bytes=4096,
             stderr_limit_bytes=4096,

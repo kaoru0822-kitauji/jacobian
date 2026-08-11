@@ -40,6 +40,18 @@ def test_lean_rejection_has_a_generic_recovery_for_unknown_output() -> None:
     )
 
 
+def test_lean_rejection_accepts_named_lean_diagnostics() -> None:
+    detail = _lean_rejection(
+        "<stdin>:6:8: error(lean.unknownIdentifier): Unknown identifier "
+        "`not_a_mathlib_theorem`"
+    )
+
+    assert detail == (
+        "Lean rejected the proof at line 6, column 8: Unknown identifier "
+        "`not_a_mathlib_theorem`. Correct the proof body and retry."
+    )
+
+
 @pytest.mark.parametrize(
     "diagnostic",
     [

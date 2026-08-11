@@ -270,6 +270,7 @@ def test_mathlib_package_validation_authorizes_only_the_exact_checkout_for_git(
             "-C",
             str(checkout),
         )
+        assert request.timeout_seconds == 15.0
 
 
 def test_lean_checker_rejects_replaced_authorized_executable(
