@@ -93,6 +93,7 @@ _ENTRYPOINT_PROVIDER_RUNTIME_KEYS = {
     "jacobian_checkers.exact_geometry": "geometry",
     "jacobian_checkers.matrix_normal_forms": "matrix-hnf",
     "jacobian_checkers.finite_field_rank": "sympy",
+    "jacobian_checkers.finite_field_polynomial": "finite-field-polynomial",
 }
 
 
@@ -117,6 +118,29 @@ def _finite_field_rank_checker_runtime(
         "jacobian.finite-field-rank-checker",
         components=(source, sympy),
         features=("independent-prime-field-rank-replay",),
+        checker_ids=checker_ids,
+    )
+
+
+def _finite_field_polynomial_checker_runtime(
+    *, checker_ids: tuple[str, ...] = ()
+) -> CapabilityProviderRuntime:
+    source = source_provider_runtime(
+        "jacobian.finite-field-polynomial-checker-source",
+        version="1",
+        entrypoint="jacobian_checkers.finite_field_polynomial:check_finite_map_table",
+        install_tier=CapabilityInstallTier.T0,
+        license_id="MIT",
+        features=("clean-process-checker",),
+    )
+    sympy = known_provider_runtime(
+        "jacobian.sympy",
+        features=("finite-field-polynomial-replay",),
+    )
+    return composite_provider_runtime(
+        "jacobian.finite-field-polynomial-checker",
+        components=(source, sympy),
+        features=("independent-finite-field-polynomial-replay",),
         checker_ids=checker_ids,
     )
 
@@ -179,6 +203,7 @@ def install_exact_domain_checkers(
         "projective-arrangement": projective_arrangement_checker_provider_runtime,
         "topology": topology_exact_checker_provider_runtime,
         "sympy": _finite_field_rank_checker_runtime,
+        "finite-field-polynomial": _finite_field_polynomial_checker_runtime,
         "geometry": partial(
             source_provider_runtime,
             "jacobian.exact-geometry-checker",

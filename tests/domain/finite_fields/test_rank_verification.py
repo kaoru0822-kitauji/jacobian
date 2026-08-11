@@ -12,6 +12,7 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.domains.finite_fields import build_finite_field_bundle
 from jacobian.domains.finite_fields.contracts import (
+    FiniteMapTableRequest,
     LinearMapRankRequest,
     RestrictScalarsRequest,
 )
@@ -23,6 +24,10 @@ from jacobian.math.finite_fields import (
     FiniteFieldPresentation,
     FiniteLinearMap,
     ProjectivePoint,
+    element,
+    finite_field,
+    finite_polynomial,
+    finite_polynomial_map,
 )
 from jacobian.math.prime_field_linear_algebra import PrimeFieldMatrix
 
@@ -156,6 +161,49 @@ def test_operator_authorized_sympy_replay_checks_restriction_of_scalars(
     assert rejected.output["verification_record_uri"] is None
 
 
+def test_operator_authorized_sympy_replay_checks_complete_polynomial_table(
+    tmp_path: Path,
+) -> None:
+    presentation = finite_field(2, (1, 1, 1))
+    zero = element(presentation, (0, 0))
+    one = element(presentation, (1, 0))
+    request = FiniteMapTableRequest(
+        polynomial_map=finite_polynomial_map(
+            finite_polynomial(presentation, (zero, zero, zero, one))
+        )
+    )
+    input_payload = request.model_dump(mode="json")
+
+    with open_exact_domain_services(
+        tmp_path,
+        build_finite_field_bundle(),
+    ) as services:
+        computed = services.core.capabilities.invoke(
+            CapabilityRequest(
+                capability_id="finite_field.polynomial_map.table.compute",
+                input=input_payload,
+            )
+        )
+        candidate = computed.output["result"]
+        verified = services.core.capabilities.invoke(
+            CapabilityRequest(
+                capability_id="finite_field.polynomial_map.table.verify",
+                input={"input": input_payload, "candidate": candidate},
+            )
+        )
+        forged = deepcopy(candidate)
+        forged["entries"][2][1] = forged["entries"][0][1]
+        rejected = services.core.capabilities.invoke(
+            CapabilityRequest(
+                capability_id="finite_field.polynomial_map.table.verify",
+                input={"input": input_payload, "candidate": forged},
+            )
+        )
+
+    assert verified.output["status"] == "VERIFIED"
+    assert rejected.output["status"] == "REJECTED"
+
+
 def test_missing_flint_omits_only_flint_operations_and_their_checkers(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -194,6 +242,9 @@ def test_missing_flint_omits_only_flint_operations_and_their_checkers(
         "finite_field.polynomial_map.fibers.compute",
         "finite_field.polynomial_map.collision.compute",
         "finite_field.polynomial_map.permutation.compute",
+        "finite_field.polynomial_map.fibers.verify",
+        "finite_field.polynomial_map.collision.verify",
+        "finite_field.polynomial_map.permutation.verify",
     } <= ids
     assert {
         "finite_field.restrict_scalars.compute",
@@ -202,4 +253,5 @@ def test_missing_flint_omits_only_flint_operations_and_their_checkers(
         "finite_field.linear_map.rank.verify",
         "finite_field.direction_rank_ledger.compute",
         "finite_field.polynomial_map.table.compute",
+        "finite_field.polynomial_map.table.verify",
     }.isdisjoint(ids)
