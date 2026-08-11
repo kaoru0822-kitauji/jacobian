@@ -19,12 +19,15 @@ the installed catalog.
 
 ## Discover and describe
 
-Call `math.find` without a tool ID to receive installed matches.
+Call `math.find` with a search request to receive installed matches.
 Select by mathematical outcome and domain tags, then inspect the exact ID:
 
 ```json
 {
-  "capability_id": "polynomial.compute.gcd"
+  "request": {
+    "op": "inspect",
+    "capability_id": "polynomial.compute.gcd"
+  }
 }
 ```
 
@@ -96,7 +99,12 @@ async def main() -> None:
         described = await tool(
             client,
             "math.find",
-            {"capability_id": "polynomial.compute.gcd"},
+            {
+                "request": {
+                    "op": "inspect",
+                    "capability_id": "polynomial.compute.gcd",
+                }
+            },
         )
         assert described["capability"]["capability_id"] == "polynomial.compute.gcd"
 
@@ -118,7 +126,12 @@ async def main() -> None:
         verification_descriptor = await tool(
             client,
             "math.find",
-            {"capability_id": "polynomial.gcd.verify"},
+            {
+                "request": {
+                    "op": "inspect",
+                    "capability_id": "polynomial.gcd.verify",
+                }
+            },
         )
         assert (
             verification_descriptor["capability"]["capability_id"]

@@ -21,19 +21,18 @@ compatibility, or verification authority.
 Search uses a bounded lexical query:
 
 ```json
-{"op": "search", "query": "exact matrix determinant", "limit": 5}
+{"request": {"op": "search", "query": "exact matrix determinant", "limit": 5}}
 ```
 
 Exact inspection uses an operation ID:
 
 ```json
-{"op": "inspect", "capability_id": "matrix.determinant.compute"}
+{"request": {"op": "inspect", "capability_id": "matrix.determinant.compute"}}
 ```
 
-The public SDK shape may nest this discriminated request under `request` if the
-pinned MCP SDK cannot publish and enforce the flat union without handwritten
-schema or dispatch code. The semantic operations remain `search` and
-`inspect` either way.
+The request is nested because the pinned SDK publishes and enforces that
+discriminated union directly. Search-only fields cannot appear on inspection,
+and inspection IDs cannot appear on search.
 
 Search proceeds in this order:
 

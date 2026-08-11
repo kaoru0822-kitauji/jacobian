@@ -23,7 +23,12 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
         async with Client(create_server(tmp_path), raise_exceptions=True) as client:
             described = await client.call_tool(
                 "math.find",
-                {"capability_id": "integer.compute.gcd"},
+                {
+                    "request": {
+                        "op": "inspect",
+                        "capability_id": "integer.compute.gcd",
+                    }
+                },
             )
             assert isinstance(described.structured_content, dict)
             contract = described.structured_content
@@ -71,7 +76,10 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
             matching_description = await client.call_tool(
                 "math.find",
                 {
-                    "capability_id": ("graph.invariant.maximum_matching.compute"),
+                    "request": {
+                        "op": "inspect",
+                        "capability_id": ("graph.invariant.maximum_matching.compute"),
+                    }
                 },
             )
             assert isinstance(matching_description.structured_content, dict)
@@ -91,12 +99,15 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
             reliability_verifier_discovery = await client.call_tool(
                 "math.find",
                 {
-                    "query": (
-                        "independently verify exact graph reliability terminal "
-                        "connection probability edge subset enumeration"
-                    ),
-                    "domain": "graph",
-                    "limit": 10,
+                    "request": {
+                        "op": "search",
+                        "query": (
+                            "independently verify exact graph reliability terminal "
+                            "connection probability edge subset enumeration"
+                        ),
+                        "domain": "graph",
+                        "limit": 10,
+                    }
                 },
             )
             assert isinstance(reliability_verifier_discovery.structured_content, dict)
@@ -110,13 +121,19 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
             modular_compute = await client.call_tool(
                 "math.find",
                 {
-                    "capability_id": "modular.polynomial_residue_image.compute",
+                    "request": {
+                        "op": "inspect",
+                        "capability_id": ("modular.polynomial_residue_image.compute"),
+                    }
                 },
             )
             modular_verify = await client.call_tool(
                 "math.find",
                 {
-                    "capability_id": "modular.polynomial_residue_image.verify",
+                    "request": {
+                        "op": "inspect",
+                        "capability_id": ("modular.polynomial_residue_image.verify"),
+                    }
                 },
             )
             assert isinstance(modular_compute.structured_content, dict)

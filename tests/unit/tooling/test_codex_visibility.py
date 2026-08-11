@@ -146,7 +146,12 @@ def test_visibility_classification_records_adoption_without_grading_shell(
         tmp_path / "trace.jsonl",
         _mcp_event(
             "math.find",
-            {"query": "exact determinant"},
+            {
+                "request": {
+                    "op": "search",
+                    "query": "exact determinant",
+                }
+            },
             {
                 "kind": "discovery",
                 "matches": [{"capability_id": "matrix.determinant.compute"}],
@@ -155,7 +160,10 @@ def test_visibility_classification_records_adoption_without_grading_shell(
         _mcp_event(
             "math.find",
             {
-                "capability_id": "matrix.determinant.compute",
+                "request": {
+                    "op": "inspect",
+                    "capability_id": "matrix.determinant.compute",
+                }
             },
             {"kind": "capability"},
         ),

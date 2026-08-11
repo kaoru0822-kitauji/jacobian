@@ -53,15 +53,9 @@ def test_mcp_exposes_only_math_tools_with_read_only_resources(
                 tool.input_schema.get("additionalProperties") is False
                 for tool in tools.values()
             )
-            assert set(describe_schema["properties"]) == {
-                "capability_id",
-                "query",
-                "domain",
-                "input_kind",
-                "artifact_type",
-                "limit",
-                "cursor",
-            }
+            assert set(describe_schema["properties"]) == {"request"}
+            request_schema = describe_schema["properties"]["request"]
+            assert request_schema["discriminator"]["propertyName"] == "op"
             assert set(tools["math.run"].input_schema["properties"]) == {
                 "capability_id",
                 "payload",
@@ -102,7 +96,13 @@ def test_mcp_exposes_only_math_tools_with_read_only_resources(
 
             discovery_result = await client.call_tool(
                 "math.find",
-                {"query": "search mathematical knowledge", "limit": 3},
+                {
+                    "request": {
+                        "op": "search",
+                        "query": "search mathematical knowledge",
+                        "limit": 3,
+                    }
+                },
             )
             assert isinstance(discovery_result.structured_content, dict)
             discovery = discovery_result.structured_content
@@ -118,7 +118,13 @@ def test_mcp_exposes_only_math_tools_with_read_only_resources(
 
             absent_result = await client.call_tool(
                 "math.find",
-                {"query": "quuxonium frobnicator", "domain": "polynomial"},
+                {
+                    "request": {
+                        "op": "search",
+                        "query": "quuxonium frobnicator",
+                        "domain": "polynomial",
+                    }
+                },
             )
             assert isinstance(absent_result.structured_content, dict)
             absent = absent_result.structured_content
@@ -129,8 +135,11 @@ def test_mcp_exposes_only_math_tools_with_read_only_resources(
             unknown_domain_result = await client.call_tool(
                 "math.find",
                 {
-                    "query": "compute exact event probability",
-                    "domain": "arithmetic",
+                    "request": {
+                        "op": "search",
+                        "query": "compute exact event probability",
+                        "domain": "arithmetic",
+                    }
                 },
             )
             assert isinstance(unknown_domain_result.structured_content, dict)
@@ -158,7 +167,12 @@ def test_mcp_exposes_only_math_tools_with_read_only_resources(
             if "lean.check" in capability_ids:
                 lean_result = await client.call_tool(
                     "math.find",
-                    {"capability_id": "lean.check"},
+                    {
+                        "request": {
+                            "op": "inspect",
+                            "capability_id": "lean.check",
+                        }
+                    },
                 )
                 assert isinstance(lean_result.structured_content, dict)
                 lean_contract = lean_result.structured_content

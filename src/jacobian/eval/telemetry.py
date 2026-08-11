@@ -336,9 +336,8 @@ def _record_describe_and_attempt(
     arguments: object,
 ) -> None:
     if tool == "math.find":
-        if isinstance(arguments, Mapping) and isinstance(
-            arguments.get("capability_id"), str
-        ):
+        request = arguments.get("request") if isinstance(arguments, Mapping) else None
+        if isinstance(request, Mapping) and request.get("op") == "inspect":
             telemetry.capability_describe_exact_calls += 1
         else:
             telemetry.capability_describe_index_calls += 1
@@ -390,6 +389,8 @@ def _build_capability_description(
     response: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     matches = response.get("matches") if isinstance(response, Mapping) else None
+    request = arguments.get("request")
+    request = request if isinstance(request, Mapping) else {}
     return {
         "kind": (
             response.get("kind")
@@ -397,16 +398,14 @@ def _build_capability_description(
             else None
         ),
         "query": (
-            arguments.get("query") if isinstance(arguments.get("query"), str) else None
+            request.get("query") if isinstance(request.get("query"), str) else None
         ),
         "domain": (
-            arguments.get("domain")
-            if isinstance(arguments.get("domain"), str)
-            else None
+            request.get("domain") if isinstance(request.get("domain"), str) else None
         ),
         "capability_id": (
-            arguments.get("capability_id")
-            if isinstance(arguments.get("capability_id"), str)
+            request.get("capability_id")
+            if isinstance(request.get("capability_id"), str)
             else None
         ),
         "match_ids": _capability_match_ids(matches),

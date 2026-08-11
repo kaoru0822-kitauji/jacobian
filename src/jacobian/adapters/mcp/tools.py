@@ -42,15 +42,47 @@ class _CapabilityDiscoveryOperationCard(CapabilityDiscoveryMatch):
     provider_availability: CapabilityProviderAvailability | Literal["UNKNOWN"]
 
 
-class _CapabilitySearchArguments(_MCPOutputModel):
-    query: str
-    limit: Literal[5] = 5
+class _CapabilitySearchRequest(_MCPOutputModel):
+    op: Literal["search"]
+    query: Annotated[str, Field(min_length=1, max_length=512)]
+    domain: Annotated[
+        str | None,
+        Field(pattern=r"^[A-Za-z][A-Za-z0-9_-]{0,127}$"),
+    ] = None
+    input_kind: CapabilityInputKind | None = None
+    artifact_type: Annotated[
+        str | None,
+        Field(pattern=r"^artifact://sha256/[0-9a-f]{64}$"),
+    ] = None
+    limit: Annotated[StrictInt, Field(ge=1, le=20)] = 5
+    cursor: Annotated[
+        str | None,
+        Field(
+            max_length=128,
+            pattern=r"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$",
+        ),
+    ] = None
+
+
+class _CapabilityInspectRequest(_MCPOutputModel):
+    op: Literal["inspect"]
+    capability_id: CapabilityId
+
+
+CapabilityFindRequest = Annotated[
+    _CapabilitySearchRequest | _CapabilityInspectRequest,
+    Field(discriminator="op"),
+]
+
+
+class _CapabilityFindCallArguments(_MCPOutputModel):
+    request: _CapabilitySearchRequest
 
 
 class _CapabilitySearchRecoveryPath(_MCPOutputModel):
     action: Literal["search"]
     tool: Literal["math.find"] = "math.find"
-    arguments: _CapabilitySearchArguments
+    arguments: _CapabilityFindCallArguments
 
 
 class _CapabilityCatalogPointer(_MCPOutputModel):
@@ -259,7 +291,13 @@ def _unknown_capability_context(
             {
                 "action": "search",
                 "tool": "math.find",
-                "arguments": {"query": capability_id, "limit": 5},
+                "arguments": {
+                    "request": {
+                        "op": "search",
+                        "query": capability_id,
+                        "limit": 5,
+                    }
+                },
             },
             {
                 "action": "inspect_catalog",
@@ -312,107 +350,23 @@ def _run_text_projection(result: CapabilityResult) -> dict[str, Any]:
 
 
 async def capability_describe(
-    capability_id: Annotated[
-        CapabilityId | None,
-        Field(
-            description=(
-                "Exact installed ID; cannot be combined with discovery filters."
-            )
-        ),
-    ] = None,
-    query: Annotated[
-        str | None,
-        Field(
-            min_length=1,
-            max_length=512,
-            description=(
-                "Plain-language mathematical outcome to find, such as computing an "
-                "exact matrix determinant; no capability ID is required."
-            ),
-        ),
-    ] = None,
-    domain: Annotated[
-        str | None,
-        Field(
-            pattern=r"^[A-Za-z][A-Za-z0-9_-]{0,127}$",
-            description=(
-                "Optional domain tag filter, such as universal_algebra, graph, "
-                "polynomial, or lean."
-            ),
-        ),
-    ] = None,
-    input_kind: Annotated[
-        CapabilityInputKind | None,
-        Field(description=("Input boundary used to reject incompatible routes.")),
-    ] = None,
-    artifact_type: Annotated[
-        str | None,
-        Field(
-            pattern=r"^artifact://sha256/[0-9a-f]{64}$",
-            description=(
-                "Exact schema_uri from the stored artifact manifest; requires "
-                "TYPED_ARTIFACT."
-            ),
-        ),
-    ] = None,
-    limit: Annotated[
-        StrictInt | None,
-        Field(
-            ge=1,
-            le=20,
-            description=(
-                "Maximum compact discovery matches; defaults to 5. Lower values "
-                "reduce returned model context without changing match order."
-            ),
-        ),
-    ] = None,
-    cursor: Annotated[
-        str | None,
-        Field(
-            max_length=128,
-            pattern=r"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$",
-            description=(
-                "Opaque continuation ID from next_cursor. Reuse the same query, "
-                "domain, input kind, artifact type, and limit."
-            ),
-        ),
-    ] = None,
+    request: CapabilityFindRequest,
     *,
     ctx: Context[AppState, Any],
 ) -> CapabilityDiscoveryToolResult:
     with _runtime(ctx) as active_runtime:
-        search_arguments = (
-            query,
-            domain,
-            input_kind,
-            artifact_type,
-            limit,
-            cursor,
-        )
-        if capability_id is not None and any(
-            argument is not None for argument in search_arguments
-        ):
-            raise ValueError(
-                "capability_id is an exact lookup and cannot be combined with query, "
-                "domain, input_kind, artifact_type, limit, or cursor. Use either "
-                "discovery arguments or one exact capability_id in this call."
-            )
-        if capability_id is None:
-            if query is None:
-                raise ValueError(
-                    "math.find requires either a search query or an exact capability_id; "
-                    "read capability://catalog for the complete inventory."
-                )
+        if isinstance(request, _CapabilitySearchRequest):
             discovery_response = _capability_discovery_response(
                 active_runtime,
-                query=query,
-                domain=domain,
-                input_kind=input_kind,
-                artifact_type=artifact_type,
-                limit=limit,
-                cursor=cursor,
+                query=request.query,
+                domain=request.domain,
+                input_kind=request.input_kind,
+                artifact_type=request.artifact_type,
+                limit=request.limit,
+                cursor=request.cursor,
             )
             return _find_result(discovery_response)
+        capability_id = request.capability_id
         capability_catalog = active_runtime.core.capabilities.catalog()
         descriptors = {
             item.capability_id: item for item in capability_catalog.capabilities

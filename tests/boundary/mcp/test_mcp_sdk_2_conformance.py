@@ -58,6 +58,14 @@ def test_mcp_v2_static_validation_context_errors_and_structured_resources(
             }
             assert invoke.output_schema == CapabilityResult.model_json_schema()
             find = next(tool for tool in listed.tools if tool.name == "math.find")
+            assert set(find.input_schema["properties"]) == {"request"}
+            assert find.input_schema["properties"]["request"]["discriminator"] == {
+                "mapping": {
+                    "inspect": "#/$defs/_CapabilityInspectRequest",
+                    "search": "#/$defs/_CapabilitySearchRequest",
+                },
+                "propertyName": "op",
+            }
             assert find.output_schema["type"] == "object"
             assert find.output_schema["discriminator"] == {
                 "mapping": {
@@ -97,6 +105,18 @@ def test_mcp_v2_static_validation_context_errors_and_structured_resources(
                 await client.call_tool("math.find", {"unknown_key": "rejected"})
             assert '"code": "INVALID_INPUT"' in str(unknown.value)
 
+            mixed_find_request = await client.call_tool(
+                "math.find",
+                {
+                    "request": {
+                        "op": "search",
+                        "query": "matrix rank",
+                        "capability_id": "matrix.rank.compute",
+                    }
+                },
+            )
+            assert mixed_find_request.is_error is True
+
             with pytest.raises(MCPError) as retired_reasoning_input:
                 await client.call_tool(
                     "math.run",
@@ -111,7 +131,10 @@ def test_mcp_v2_static_validation_context_errors_and_structured_resources(
             contract_result = await client.call_tool(
                 "math.find",
                 {
-                    "capability_id": "polynomial.expression.normalize",
+                    "request": {
+                        "op": "inspect",
+                        "capability_id": "polynomial.expression.normalize",
+                    }
                 },
             )
             assert isinstance(contract_result.structured_content, dict)

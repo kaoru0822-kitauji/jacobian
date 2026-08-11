@@ -54,8 +54,11 @@ def test_agent_telemetry_preserves_discovery_to_invocation_dataflow(
         _tool_event(
             "math.find",
             {
-                "query": "find a graph counterexample",
-                "domain": "graph",
+                "request": {
+                    "op": "search",
+                    "query": "find a graph counterexample",
+                    "domain": "graph",
+                }
             },
             {
                 "kind": "discovery",
@@ -67,7 +70,12 @@ def test_agent_telemetry_preserves_discovery_to_invocation_dataflow(
         ),
         _tool_event(
             "math.find",
-            {"capability_id": "graph.search.atlas"},
+            {
+                "request": {
+                    "op": "inspect",
+                    "capability_id": "graph.search.atlas",
+                }
+            },
             {
                 "kind": "capability",
                 "capability": {"capability_id": "graph.search.atlas"},
@@ -126,17 +134,22 @@ def test_agent_telemetry_counts_response_bytes_and_repeated_calls(
     events = [
         _tool_event(
             "math.find",
-            {},
+            {"request": {"op": "search", "query": "SAT materialization"}},
             {"matches": [{"capability_id": "sat.cnf.materialize"}]},
         ),
         _tool_event(
             "math.find",
-            {},
+            {"request": {"op": "search", "query": "SAT materialization"}},
             {"matches": [{"capability_id": "sat.cnf.materialize"}]},
         ),
         _tool_event(
             "math.find",
-            {"capability_id": "sat.cnf.materialize"},
+            {
+                "request": {
+                    "op": "inspect",
+                    "capability_id": "sat.cnf.materialize",
+                }
+            },
             {"capability": {"capability_id": "sat.cnf.materialize"}},
         ),
     ]

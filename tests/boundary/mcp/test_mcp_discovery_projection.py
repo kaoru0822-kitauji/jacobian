@@ -20,9 +20,12 @@ def test_math_find_search_returns_compact_lexical_and_availability_facts(
             result = await client.call_tool(
                 "math.find",
                 {
-                    "query": "compute an exact matrix determinant",
-                    "domain": "matrix",
-                    "limit": 3,
+                    "request": {
+                        "op": "search",
+                        "query": "compute an exact matrix determinant",
+                        "domain": "matrix",
+                        "limit": 3,
+                    }
                 },
             )
 
@@ -56,7 +59,12 @@ def test_math_find_exact_inspection_returns_one_authoritative_descriptor(
         async with Client(create_server(tmp_path), raise_exceptions=True) as client:
             result = await client.call_tool(
                 "math.find",
-                {"capability_id": "polynomial.expression.normalize"},
+                {
+                    "request": {
+                        "op": "inspect",
+                        "capability_id": "polynomial.expression.normalize",
+                    }
+                },
             )
 
         assert isinstance(result.structured_content, dict)

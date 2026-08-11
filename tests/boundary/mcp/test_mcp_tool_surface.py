@@ -27,7 +27,12 @@ def test_math_tool_surface_is_consistent_across_discovery(tmp_path: Path) -> Non
 
             described = await client.call_tool(
                 "math.find",
-                {"capability_id": "integer.compute.gcd"},
+                {
+                    "request": {
+                        "op": "inspect",
+                        "capability_id": "integer.compute.gcd",
+                    }
+                },
             )
             assert described.structured_content is not None
             examples = described.structured_content["capability"]["invocation_examples"]
@@ -35,7 +40,12 @@ def test_math_tool_surface_is_consistent_across_discovery(tmp_path: Path) -> Non
 
             absent = await client.call_tool(
                 "math.find",
-                {"query": "quuxonium frobnicator"},
+                {
+                    "request": {
+                        "op": "search",
+                        "query": "quuxonium frobnicator",
+                    }
+                },
             )
             assert absent.structured_content is not None
             assert absent.structured_content["catalog_resource"] == (

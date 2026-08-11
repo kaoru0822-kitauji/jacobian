@@ -54,7 +54,7 @@ def test_mcp_compact_capability_index_is_searchable_and_paginated(
 
             listed = await client.call_tool(
                 "math.find",
-                {"query": "exact", "limit": 20},
+                {"request": {"op": "search", "query": "exact", "limit": 20}},
             )
             assert isinstance(listed.structured_content, dict)
             index = listed.structured_content
@@ -74,7 +74,14 @@ def test_mcp_compact_capability_index_is_searchable_and_paginated(
             while cursor is not None:
                 next_page = await client.call_tool(
                     "math.find",
-                    {"query": "exact", "cursor": cursor, "limit": 20},
+                    {
+                        "request": {
+                            "op": "search",
+                            "query": "exact",
+                            "cursor": cursor,
+                            "limit": 20,
+                        }
+                    },
                 )
                 assert isinstance(next_page.structured_content, dict)
                 page = next_page.structured_content
@@ -91,8 +98,11 @@ def test_mcp_compact_capability_index_is_searchable_and_paginated(
             searched = await client.call_tool(
                 "math.find",
                 {
-                    "query": "SAT UNSAT proof",
-                    "input_kind": "STRUCTURED_REQUEST",
+                    "request": {
+                        "op": "search",
+                        "query": "SAT UNSAT proof",
+                        "input_kind": "STRUCTURED_REQUEST",
+                    }
                 },
             )
             assert isinstance(searched.structured_content, dict)
@@ -110,11 +120,14 @@ def test_mcp_compact_capability_index_is_searchable_and_paginated(
             coloring_search = await client.call_tool(
                 "math.find",
                 {
-                    "query": (
-                        "finite coloring forbidden monochromatic triples exact "
-                        "finite existence certified exhaustive search"
-                    ),
-                    "limit": 20,
+                    "request": {
+                        "op": "search",
+                        "query": (
+                            "finite coloring forbidden monochromatic triples exact "
+                            "finite existence certified exhaustive search"
+                        ),
+                        "limit": 20,
+                    }
                 },
             )
             assert isinstance(coloring_search.structured_content, dict)
@@ -127,7 +140,10 @@ def test_mcp_compact_capability_index_is_searchable_and_paginated(
             materialize_description = await client.call_tool(
                 "math.find",
                 {
-                    "capability_id": "sat.cnf.materialize",
+                    "request": {
+                        "op": "inspect",
+                        "capability_id": "sat.cnf.materialize",
+                    }
                 },
             )
             assert isinstance(materialize_description.structured_content, dict)
@@ -140,7 +156,7 @@ def test_mcp_compact_capability_index_is_searchable_and_paginated(
 
             first_page = await client.call_tool(
                 "math.find",
-                {"query": "exact", "limit": 20},
+                {"request": {"op": "search", "query": "exact", "limit": 20}},
             )
             assert isinstance(first_page.structured_content, dict)
             first = first_page.structured_content
@@ -149,9 +165,12 @@ def test_mcp_compact_capability_index_is_searchable_and_paginated(
             second_page = await client.call_tool(
                 "math.find",
                 {
-                    "query": "exact",
-                    "cursor": first["next_cursor"],
-                    "limit": 20,
+                    "request": {
+                        "op": "search",
+                        "query": "exact",
+                        "cursor": first["next_cursor"],
+                        "limit": 20,
+                    }
                 },
             )
             assert isinstance(second_page.structured_content, dict)
@@ -165,9 +184,12 @@ def test_mcp_compact_capability_index_is_searchable_and_paginated(
             invalid_cursor = await client.call_tool(
                 "math.find",
                 {
-                    "query": "definitely-no-matching-capability",
-                    "cursor": first["next_cursor"],
-                    "limit": 20,
+                    "request": {
+                        "op": "search",
+                        "query": "definitely-no-matching-capability",
+                        "cursor": first["next_cursor"],
+                        "limit": 20,
+                    }
                 },
             )
             invalid = json.loads(invalid_cursor.content[0].text)
@@ -187,7 +209,7 @@ def test_mcp_text_projection_preserves_produced_artifact_types(
         async with Client(create_server(tmp_path), raise_exceptions=True) as client:
             listed = await client.call_tool(
                 "math.find",
-                {"query": "poset", "limit": 20},
+                {"request": {"op": "search", "query": "poset", "limit": 20}},
             )
             text = json.loads(listed.content[0].text)
             assert text["kind"] == "discovery"

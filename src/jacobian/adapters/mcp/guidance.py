@@ -36,18 +36,18 @@ task may benefit from exact computation, search, structural analysis, or a separ
 checker tool—even if shell code could also calculate the answer.
 
 Forms:
-- `query`: plain-language mathematical outcome (compact tool cards).
+- `request.op="search"`: plain-language mathematical outcome (compact cards).
 - Optional `domain` filter; `limit` 1-20 (default 5).
 - Follow `next_cursor` with the same query and filters to continue.
 - Ranking is deterministic lexical retrieval; matches are not recommendations.
-- `capability_id`: exact inspect with authoritative schemas and examples.
+- `request.op="inspect"`: exact ID with authoritative schemas and examples.
 
 Checker tools are separate IDs (often `*.verify`), not a switch on producers.
 
 Examples:
-- `{"query":"compute an exact matrix determinant","domain":"matrix","limit":3}`
-- `{"query":"find a counterexample to associativity","domain":"universal_algebra"}`
-- `{"capability_id":"polynomial.compute.gcd"}`
+- `{"request":{"op":"search","query":"exact matrix determinant","domain":"matrix","limit":3}}`
+- `{"request":{"op":"search","query":"counterexample to associativity"}}`
+- `{"request":{"op":"inspect","capability_id":"polynomial.compute.gcd"}}`
 """
 
 MATH_RUN_DESCRIPTION = """\

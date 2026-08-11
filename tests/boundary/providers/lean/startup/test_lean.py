@@ -313,12 +313,18 @@ def test_core_lean_check_runs_through_capability_mcp_surface(tmp_path: Path) -> 
         ) as client:
             described = await client.call_tool(
                 "math.find",
-                {"capability_id": "lean.check", "view": "CONTRACT"},
+                {
+                    "request": {
+                        "op": "inspect",
+                        "capability_id": "lean.check",
+                    }
+                },
             )
             assert isinstance(described.structured_content, dict)
             descriptor = described.structured_content
-            assert descriptor["invocations"][0]["name"] == "finite-witness-let"
-            assert descriptor["cache"]["mathlib_warmup"]["status"] == "NOT_STARTED"
+            assert descriptor["capability"]["invocation_examples"][0]["name"] == (
+                "finite-witness-let"
+            )
 
             response = await client.call_tool(
                 "math.run",

@@ -61,7 +61,12 @@ async def main() -> None:
     async with Client(server, raise_exceptions=True) as client:
         found = await client.call_tool(
             "math.find",
-            {"capability_id": "matrix.determinant.compute"},
+            {
+                "request": {
+                    "op": "inspect",
+                    "capability_id": "matrix.determinant.compute",
+                }
+            },
         )
         assert isinstance(found.structured_content, dict)
 
