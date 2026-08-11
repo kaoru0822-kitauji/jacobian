@@ -29,17 +29,13 @@ def finite_field(
     *,
     generator: str = "a",
 ) -> FiniteFieldPresentation:
-    """Construct and backend-check an exact finite-extension presentation."""
+    """Construct and validate an exact finite-extension presentation."""
 
-    presentation = FiniteFieldPresentation(
+    return FiniteFieldPresentation(
         characteristic=characteristic,
         modulus_coefficients=modulus_coefficients,
         generator=generator,
     )
-    from jacobian.math.finite_fields import _flint
-
-    _flint.context(presentation)
-    return presentation
 
 
 def element(
@@ -62,24 +58,16 @@ def projective_point(
         raise ValueError("projective coordinates must match their axis")
     if any(value.presentation != presentation for value in coordinates):
         raise ValueError("projective coordinates must share their presentation")
-    from jacobian.math.finite_fields import _flint
+    from jacobian.math.finite_fields import _sympy
 
-    active_context = _flint.context(presentation)
-    backend_values = tuple(
-        _flint.to_backend(value, active_context=active_context) for value in coordinates
-    )
-    backend_zero = active_context(0)
-    pivot = next((value for value in backend_values if value != backend_zero), None)
-    if pivot is None:
-        raise ValueError("projective coordinates cannot all be zero")
-    normalized = tuple(value / pivot for value in backend_values)
+    normalized = _sympy.normalize_projective_coordinates(presentation, coordinates)
     return ProjectivePoint(
         presentation=presentation,
         axis=axis,
         coordinates=tuple(
             FiniteFieldElement(
                 presentation=presentation,
-                coordinates=_flint.coordinates(value, degree=presentation.degree),
+                coordinates=value,
             )
             for value in normalized
         ),

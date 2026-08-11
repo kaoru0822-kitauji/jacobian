@@ -123,7 +123,11 @@ def _permutation_certificate(
 def build_finite_field_bundle() -> DomainBundle:
     provider = known_provider_runtime(
         "jacobian.sympy",
-        features=("finite-field-presentation", "projective-enumeration"),
+        features=(
+            "finite-field-presentation",
+            "projective-normalization",
+            "projective-enumeration",
+        ),
     )
     flint_provider = python_flint_finite_field_provider_runtime()
     projective_line_operation = inline_operation(

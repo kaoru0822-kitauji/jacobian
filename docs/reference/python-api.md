@@ -59,10 +59,11 @@ modules remain internal.
 
 Finite-extension values bind the exact modulus, generator, ordered power basis,
 and coordinate encoding. Matrix, subspace, projective, and linear-map values
-also bind their parents and ordered axes. Python-FLINT conversion stays private
-and lazy; importing `jacobian.math` does not probe or import the optional
-backend. Install the `flint` extra before calling operations that construct or
-normalize finite-extension values.
+also bind their parents and ordered axes. SymPy validates presentations and
+normalizes projective values. Python-FLINT conversion stays private and lazy;
+importing `jacobian.math` does not probe or import the optional backend. Install
+the `flint` extra only for FLINT-backed polynomial evaluation, restriction of
+scalars, and rank operations.
 
 This API is the authoritative mathematical implementation rather than a facade
 over `math.run`. Installed operations parse their typed request once, convert
