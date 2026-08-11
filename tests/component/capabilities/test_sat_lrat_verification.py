@@ -127,6 +127,47 @@ def test_negative_rat_hint_is_explicitly_unsupported(
     assert result.output["conclusion"] == "UNKNOWN"
 
 
+def test_rejected_lrat_reports_the_first_invalid_proof_step(
+    lrat_services,
+) -> None:
+    cnf = lrat_services.core.sat.put_cnf(variable_names=("x",), clauses=((-1,), (1,)))
+
+    result = _verify(lrat_services, cnf.artifact_uri, b"3 0 1 99 0\n")
+
+    assert result.output["status"] == "REJECTED"
+    assert result.output["conclusion"] == "UNKNOWN"
+    assert result.output["invalid_step"] == {
+        "line": 1,
+        "clause_id": 3,
+        "code": "HINT_REFERENCES_INACTIVE_CLAUSE",
+        "proof_line": "3 0 1 99 0",
+        "proof_line_truncated": False,
+        "raw_checker_message": "line 1: hint references inactive clause",
+    }
+
+
+def test_rejected_lrat_bounds_an_oversized_invalid_proof_line(
+    lrat_services,
+) -> None:
+    cnf = lrat_services.core.sat.put_cnf(variable_names=("x",), clauses=((-1,), (1,)))
+    oversized_line = "invalid-clause-id " + "1 " * 2500
+
+    result = _verify(
+        lrat_services,
+        cnf.artifact_uri,
+        (oversized_line + "\n").encode("ascii"),
+    )
+
+    assert result.execution.status is ExecutionStatus.COMPLETED
+    assert result.output["status"] == "REJECTED"
+    assert result.output["conclusion"] == "UNKNOWN"
+    invalid_step = result.output["invalid_step"]
+    assert invalid_step["code"] == "NON_INTEGER_TOKEN"
+    assert len(invalid_step["proof_line"]) == 4096
+    assert invalid_step["proof_line"] == oversized_line[:4096]
+    assert invalid_step["proof_line_truncated"] is True
+
+
 def test_timeout_and_cancellation_are_fail_closed(lrat_services) -> None:
     cnf = lrat_services.core.sat.put_cnf(variable_names=("x",), clauses=((-1,), (1,)))
 
@@ -144,6 +185,30 @@ def test_timeout_and_cancellation_are_fail_closed(lrat_services) -> None:
     assert cancelled.output["status"] == "CANCELLED"
     assert cancelled.output["conclusion"] == "UNKNOWN"
     assert cancelled.execution.status is ExecutionStatus.CANCELLED
+
+
+@pytest.mark.parametrize(
+    ("proof", "limits"),
+    (
+        (b"3 0 1 2 0\n4 0 1 2 0\n", {"max_steps": 1}),
+        (b"3 1 0 1 2 0\n", {"max_clause_literals": 0}),
+    ),
+)
+def test_lrat_resource_exhaustion_is_an_operational_error(
+    lrat_services,
+    proof: bytes,
+    limits: dict[str, int],
+) -> None:
+    cnf = lrat_services.core.sat.put_cnf(variable_names=("x",), clauses=((-1,), (1,)))
+
+    result = _verify(lrat_services, cnf.artifact_uri, proof, limits=limits)
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.output["status"] == "ERROR"
+    assert result.output["conclusion"] == "UNKNOWN"
+    assert result.output["invalid_step"] is None
+    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
+    assert result.completeness.assurance_level is CapabilityAssuranceLevel.HEURISTIC
 
 
 def test_capability_is_absent_without_operator_authorized_references(

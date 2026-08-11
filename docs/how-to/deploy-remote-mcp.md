@@ -42,9 +42,16 @@ Choose one deployment mode:
 The host must already provide:
 
 - `uv`, Python 3, Git, and systemd for every mode;
-- Caddy for `domain` and `tailscale`; and
+- Caddy for `domain` and `tailscale`;
 - a connected Tailscale installation whose tailnet permits Funnel for
-  `tailscale`.
+  `tailscale`; and
+- `elan` when using `--with-lean`. The installer reads the committed
+  `lean/lean-toolchain`, installs that exact toolchain through elan, restores
+  the manifest-pinned Mathlib cache, and builds the checked-in Lean runtime.
+  Under `sudo`, it resolves elan from the root execution path, standard system
+  locations, or the invoking user's account-local `~/.elan/bin/elan`.
+  The service-readable elan home defaults to `/opt/jacobian/lean/elan`; it does
+  not depend on the invoking operator's home directory.
 
 The installer does not pipe remote installation scripts into a shell. Install
 those host dependencies through a reviewed package or the upstream documented
@@ -68,6 +75,48 @@ Inspect a complete plan without root or host mutation:
   --domain math.example.org \
   --dry-run
 ```
+
+To serve the pinned Lean CORE and MATHLIB portfolio, select the Lean release
+profile explicitly:
+
+```sh
+sudo ./deploy/install.sh \
+  --mode domain \
+  --domain math.example.org \
+  --with-lean
+```
+
+All code and toolchain paths derive from one installation root. The default is
+`/opt/jacobian`; on a new VPS or a host with a separate application volume,
+select another absolute path without editing the unit templates:
+
+```sh
+sudo ./deploy/install.sh \
+  --install-root /srv/math/jacobian \
+  --mode domain \
+  --domain math.example.org \
+  --with-lean
+```
+
+This places `releases`, `current`, managed Python runtimes, and the shared elan
+home below `/srv/math/jacobian`, and renders both the authenticated unit and the
+anonymous override with those exact paths. Reuse the same option on every
+upgrade. State under `/var/lib/jacobian-mcp` and secrets under
+`/etc/jacobian-mcp` remain separate host data: copy and validate them explicitly
+during a VPS migration rather than treating an application release as a backup.
+The selected root must be durable across reboots and remain visible through the
+hardened systemd unit. The installer rejects `/run` and its descendants because
+they are volatile, and rejects `/home`, `/root`, `/tmp`, `/var/tmp`, and their
+descendants because `ProtectHome=true` and `PrivateTmp=true` hide those host
+paths from the service. Use an application path such as `/opt/jacobian` or
+`/srv/math/jacobian` instead.
+
+With the default installation root, core releases remain under
+`/opt/jacobian/releases/<git-sha>`; Lean-enabled releases use
+`/opt/jacobian/releases/<git-sha>-lean`. This prevents a core-only
+release at one revision from being mistaken for a later Lean-enabled build of
+the same source. The Lean build must complete before the release marker or
+`/opt/jacobian/current` activation is written.
 
 The installer archives committed `HEAD` to
 `/opt/jacobian/releases/<git-sha>`, syncs its locked non-development
@@ -308,6 +357,16 @@ Do not report a deployment complete until the service version, two-tool
 surface, catalog policy, required capabilities, and bounded discovery response
 all pass. Run deeper capability-specific smoke checks only for providers
 changed by the release.
+
+`--with-lean` adds `lean.check`, `lean.proof_state.apply_tactic`,
+`lean.term.apply`, and `lean.retrieve.premises` to the required catalog set. It
+then runs `deploy/smoke_lean.py`, which writes disposable tenant artifacts while
+checking CORE and MATHLIB proof acceptance, a real MATHLIB declaration search,
+plus accepted and rejected tactic transitions. The service also advertises the
+root-owned `.git-revision` captured at process start through
+`deployment://identity`; use that resource when an evaluation or operator
+record must bind observations to the exact deployed checkout. This deeper smoke
+is deliberately separate from the general read-only deployment smoke.
 
 ## Roll back without rewriting the repository
 

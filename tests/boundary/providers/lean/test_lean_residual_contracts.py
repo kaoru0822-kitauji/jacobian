@@ -366,6 +366,22 @@ def test_term_apply_fails_closed_on_rejected_term(
     assert result.output["accepted"] is False
     assert result.output["successor_states"] == []
     assert result.output["term_application"] == "LEAN_EXACT_ELABORATION"
+    assert result.output["diagnostics"] == [
+        {
+            "code": "LEAN_TYPE_MISMATCH",
+            "phase": "TERM_ELABORATION",
+            "severity": "ERROR",
+            "message": "Lean reported a type mismatch.",
+            "source_span": {
+                "source": "TERM",
+                "start": {"line": 0, "column": 0},
+                "end": {"line": 0, "column": 0},
+            },
+            "goal_index": 0,
+            "metavariable": None,
+            "raw_backend_message": "type mismatch: trivial has type True",
+        }
+    ]
 
 
 # ---------------------------------------------------------------------------

@@ -1012,6 +1012,28 @@ class PolynomialCollisionOutput(ContractModel):
         return self
 
 
+class PolynomialCoefficientMismatch(ContractModel):
+    """The first canonical monomial where two exact coefficients differ."""
+
+    exponents: tuple[int, ...] = Field(
+        min_length=1,
+        max_length=MAX_POLYNOMIAL_VARIABLES,
+    )
+    left_coefficient: CanonicalRational
+    right_coefficient: CanonicalRational
+    left_minus_right: CanonicalRational
+
+    @model_validator(mode="after")
+    def bind_exact_difference(self) -> Self:
+        if self.left_coefficient.as_fraction() == self.right_coefficient.as_fraction():
+            raise ValueError("coefficient mismatch must contain unequal coefficients")
+        if self.left_minus_right.as_fraction() != (
+            self.left_coefficient.as_fraction() - self.right_coefficient.as_fraction()
+        ):
+            raise ValueError("coefficient mismatch difference is not exact")
+        return self
+
+
 class PolynomialIdentityOutput(ContractModel):
     identical: bool | None
     conclusion: Conclusion
@@ -1021,6 +1043,7 @@ class PolynomialIdentityOutput(ContractModel):
     certificate_uri: ArtifactUri
     verification_record_uri: ArtifactUri | None = None
     checker_id: CheckerUri | None = None
+    first_coefficient_mismatch: PolynomialCoefficientMismatch | None = None
     exactness: PolynomialExactness = PolynomialExactness.EXACT
     determinism: PolynomialDeterminism = PolynomialDeterminism.DETERMINISTIC
 
@@ -1040,6 +1063,12 @@ class PolynomialIdentityOutput(ContractModel):
         decisive = self.conclusion in {Conclusion.TRUE, Conclusion.FALSE}
         if decisive != (self.verification_record_uri is not None):
             raise ValueError("a decisive identity conclusion requires a record")
+        if (self.first_coefficient_mismatch is not None) != (
+            self.conclusion is Conclusion.FALSE
+        ):
+            raise ValueError(
+                "a false polynomial identity requires one coefficient mismatch"
+            )
         return self
 
 

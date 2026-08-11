@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -46,6 +47,21 @@ def test_installer_help_exposes_three_deployment_modes() -> None:
     assert "--mode local" in completed.stdout
     assert "--mode domain" in completed.stdout
     assert "--mode tailscale" in completed.stdout
+    assert "--install-root" in completed.stdout
+    assert "--with-lean" in completed.stdout
+
+
+def test_lean_dry_run_uses_a_distinct_release_profile() -> None:
+    completed = _run("--with-lean", "--dry-run")
+
+    assert completed.returncode == 0, completed.stderr
+    release_line = next(
+        line
+        for line in completed.stdout.splitlines()
+        if line.strip().startswith("release:")
+    )
+    assert release_line.endswith("-lean")
+    assert "lean:        pinned CORE + MATHLIB runtime" in completed.stdout
 
 
 def test_domain_dry_run_reports_connector_without_requiring_root() -> None:
@@ -63,6 +79,145 @@ def test_domain_dry_run_reports_connector_without_requiring_root() -> None:
     assert "python:      /opt/jacobian/python" in completed.stdout
     assert "caddy:       enabled" in completed.stdout
     assert "funnel:      disabled" in completed.stdout
+
+
+def test_dry_run_derives_every_runtime_path_from_custom_install_root() -> None:
+    completed = _run(
+        "--install-root",
+        "/srv/math/jacobian",
+        "--with-lean",
+        "--dry-run",
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "install:     /srv/math/jacobian" in completed.stdout
+    assert "release:     /srv/math/jacobian/releases/" in completed.stdout
+    assert "python:      /srv/math/jacobian/python" in completed.stdout
+
+
+@pytest.mark.parametrize(
+    "root",
+    (
+        "relative/path",
+        "/",
+        "/srv/path with spaces",
+        "/srv/../jacobian",
+        "/home/apps/jacobian",
+        "/root",
+        "/run/jacobian",
+        "/run/user/1000/jacobian",
+        "/tmp/jacobian",
+        "/var/tmp/jacobian",
+    ),
+)
+def test_install_root_rejects_unsafe_or_ambiguous_paths(root: str) -> None:
+    completed = _run("--install-root", root, "--dry-run")
+
+    assert completed.returncode != 0
+    assert "--install-root" in completed.stderr
+
+
+def test_install_root_rejects_an_allowed_symlink_into_a_hidden_path(
+    tmp_path: Path,
+) -> None:
+    shared_memory = Path("/dev/shm")
+    if not shared_memory.is_dir() or not os.access(shared_memory, os.W_OK):
+        pytest.skip("a writable /dev/shm is required for the symlink sandbox check")
+    visible_parent = Path(
+        tempfile.mkdtemp(prefix="jacobian-install-root-", dir=shared_memory)
+    )
+    visible_link = visible_parent / "release-root"
+    try:
+        visible_link.symlink_to(tmp_path, target_is_directory=True)
+
+        completed = _run(
+            "--install-root",
+            str(visible_link / "jacobian"),
+            "--dry-run",
+        )
+
+        assert completed.returncode != 0
+        assert "resolves below a path hidden by the systemd sandbox" in completed.stderr
+    finally:
+        shutil.rmtree(visible_parent)
+
+
+def test_install_root_rejects_an_allowed_symlink_into_volatile_run() -> None:
+    shared_memory = Path("/dev/shm")
+    if not shared_memory.is_dir() or not os.access(shared_memory, os.W_OK):
+        pytest.skip("a writable /dev/shm is required for the symlink durability check")
+    visible_parent = Path(
+        tempfile.mkdtemp(prefix="jacobian-install-root-", dir=shared_memory)
+    )
+    visible_link = visible_parent / "release-root"
+    try:
+        visible_link.symlink_to("/run", target_is_directory=True)
+
+        completed = _run(
+            "--install-root",
+            str(visible_link / "jacobian"),
+            "--dry-run",
+        )
+
+        assert completed.returncode != 0
+        assert "resolves below the volatile /run hierarchy" in completed.stderr
+    finally:
+        shutil.rmtree(visible_parent)
+
+
+def test_install_root_canonicalizes_an_allowed_symlink_ancestor() -> None:
+    shared_memory = Path("/dev/shm")
+    if not shared_memory.is_dir() or not os.access(shared_memory, os.W_OK):
+        pytest.skip("a writable /dev/shm is required for the symlink sandbox check")
+    visible_parent = Path(
+        tempfile.mkdtemp(prefix="jacobian-install-root-", dir=shared_memory)
+    )
+    actual_root = visible_parent / "actual"
+    visible_link = visible_parent / "release-root"
+    try:
+        actual_root.mkdir()
+        visible_link.symlink_to(actual_root, target_is_directory=True)
+
+        completed = _run(
+            "--install-root",
+            str(visible_link / "jacobian"),
+            "--dry-run",
+        )
+
+        assert completed.returncode == 0, completed.stderr
+        assert f"install:     {actual_root}/jacobian" in completed.stdout
+    finally:
+        shutil.rmtree(visible_parent)
+
+
+@pytest.mark.parametrize("target_name", ("actual root", "actual|root"))
+def test_install_root_rejects_unsafe_resolved_symlink_targets(
+    target_name: str,
+) -> None:
+    shared_memory = Path("/dev/shm")
+    if not shared_memory.is_dir() or not os.access(shared_memory, os.W_OK):
+        pytest.skip("a writable /dev/shm is required for the symlink sandbox check")
+    visible_parent = Path(
+        tempfile.mkdtemp(prefix="jacobian-install-root-", dir=shared_memory)
+    )
+    actual_root = visible_parent / target_name
+    visible_link = visible_parent / "release-root"
+    try:
+        actual_root.mkdir()
+        visible_link.symlink_to(actual_root, target_is_directory=True)
+
+        completed = _run(
+            "--install-root",
+            str(visible_link / "jacobian"),
+            "--dry-run",
+        )
+
+        assert completed.returncode != 0
+        assert "resolves to a non-root path with unsupported characters" in (
+            completed.stderr
+        )
+    finally:
+        shutil.rmtree(visible_parent)
 
 
 def test_dry_run_never_echoes_supplied_credentials(tmp_path: Path) -> None:
@@ -147,7 +302,18 @@ def test_release_environment_is_built_at_its_final_path() -> None:
     assert "--managed-python" in release_block
     assert "--link-mode copy" in release_block
     assert 'mv "${RELEASE_CANDIDATE}" "${RELEASE_DIR}"' not in release_block
-    assert '"${FLOCK_BIN}" --nonblock 9' in release_block
+
+
+def test_deployment_lock_is_host_global_and_precedes_shared_host_mutations() -> None:
+    source = INSTALLER.read_text(encoding="utf-8")
+
+    assert 'DEPLOY_LOCK_PATH="/run/lock/jacobian-mcp-install.lock"' in source
+    assert 'exec 9>"${DEPLOY_LOCK_PATH}"' in source
+    assert '$(dirname -- "${RELEASE_ROOT}")/.install.lock' not in source
+    lock = source.index('"${FLOCK_BIN}" --nonblock 9')
+    first_shared_mutation = source.index("groupadd --system jacobian")
+
+    assert lock < first_shared_mutation
 
 
 def test_release_runtime_is_checked_before_current_symlink_is_changed() -> None:
@@ -157,10 +323,88 @@ def test_release_runtime_is_checked_before_current_symlink_is_changed() -> None:
     revision_marker = source.index(
         'printf \'%s\\n\' "${REVISION}" >"${RELEASE_DIR}/.git-revision"'
     )
+    marker_permissions = source.index('chmod 0644 "${RELEASE_DIR}/.git-revision"')
     current_link = source.index('ln -sfn "${RELEASE_DIR}" "${CURRENT_LINK}.new"')
 
-    assert validation < revision_marker < current_link
+    assert validation < revision_marker < marker_permissions < current_link
     assert '"${RUNUSER_BIN}" --user jacobian -- "${entrypoint}" --version' in source
+
+
+def test_lean_profile_is_built_and_validated_before_activation() -> None:
+    source = INSTALLER.read_text(encoding="utf-8")
+
+    install_toolchain = source.index(
+        '"${LEAN_ELAN_HOME}/bin/elan" toolchain install "${LEAN_TOOLCHAIN}"'
+    )
+    inspect_toolchains = source.index('"${LEAN_ELAN_HOME}/bin/elan" toolchain list')
+    fetch_cache = source.index("lake exe cache get")
+    build_runtime = source.index(
+        "lake build repl JacobianLeanRuntime jacobian_lean_proof_state"
+    )
+    validate = source.index('validate_lean_release_runtime "${RELEASE_DIR}"')
+    shared_toolchain_permissions = source.index('chmod -R a+rX "${LEAN_ELAN_HOME}"')
+    revision_marker = source.index(
+        'printf \'%s\\n\' "${REVISION}" >"${RELEASE_DIR}/.git-revision"'
+    )
+    current_link = source.index('ln -sfn "${RELEASE_DIR}" "${CURRENT_LINK}.new"')
+
+    assert inspect_toolchains < install_toolchain < fetch_cache < build_runtime
+    assert build_runtime < shared_toolchain_permissions < validate
+    assert validate < revision_marker < current_link
+    assert '"ELAN_HOME=${LEAN_ELAN_HOME}"' in source
+    assert '"PATH=${LEAN_SERVICE_PATH}"' in source
+    assert 'chmod -R a+rX "${RELEASE_DIR}/lean"' in source
+    assert "lean_provider_runtime(" in source
+    assert "CapabilityProviderAvailability.AVAILABLE" in source
+
+
+def test_lean_profile_finds_the_invoking_users_elan_under_sudo() -> None:
+    source = INSTALLER.read_text(encoding="utf-8")
+
+    resolve_home = source.index(
+        'INVOKING_HOME="$(getent passwd "${SUDO_USER}" | cut -d: -f6 || true)"'
+    )
+    elan_fallback = source.index('ELAN_FALLBACKS+=("${INVOKING_HOME}/.elan/bin/elan")')
+    resolve_elan = source.index('find_executable elan "${ELAN_FALLBACKS[@]}"')
+
+    assert resolve_home < elan_fallback < resolve_elan
+
+
+def test_systemd_service_can_read_the_operator_managed_lean_toolchain() -> None:
+    service = (REPOSITORY_ROOT / "deploy/systemd/jacobian-mcp.service").read_text(
+        encoding="utf-8"
+    )
+
+    assert "Environment=ELAN_HOME=/opt/jacobian/lean/elan" in service
+    assert "Environment=PATH=/opt/jacobian/lean/elan/bin:" in service
+    assert (
+        "Environment=JACOBIAN_DEPLOYMENT_REVISION_FILE="
+        "/opt/jacobian/current/.git-revision" in service
+    )
+    assert "ProtectHome=true" in service
+
+
+def test_installer_renders_custom_runtime_paths_into_service_and_override() -> None:
+    source = INSTALLER.read_text(encoding="utf-8")
+
+    assert '-e "s|/opt/jacobian/current|${CURRENT_LINK}|g"' in source
+    assert '-e "s|/opt/jacobian/lean/elan|${LEAN_ELAN_HOME}|g"' in source
+    assert source.count('-e "s|/opt/jacobian/current|${CURRENT_LINK}|g"') == 2
+
+
+def test_lean_profile_requires_catalog_and_behavior_smokes() -> None:
+    source = INSTALLER.read_text(encoding="utf-8")
+    smoke_block = source[source.index('log "running the read-only deployment smoke"') :]
+
+    for capability_id in (
+        "lean.check",
+        "lean.proof_state.apply_tactic",
+        "lean.term.apply",
+        "lean.retrieve.premises",
+    ):
+        assert f"--require-capability {capability_id}" in smoke_block
+    assert '--expect-revision "${REVISION}"' in smoke_block
+    assert '"${RELEASE_DIR}/deploy/smoke_lean.py"' in smoke_block
 
 
 def test_activation_arms_rollback_before_switching_current() -> None:

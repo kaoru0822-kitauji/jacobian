@@ -66,5 +66,16 @@ def test_lean_capability_projects_repairable_checker_diagnostics(
 
     assert result.output["input"]["status"] == "REJECTED"
     assert "forbidden Lean command" in result.output["input"]["errors"][0]
-    assert result.output["diagnostics"] == result.output["input"]["errors"]
+    assert result.output["diagnostics"] == [
+        {
+            "code": "LEAN_FORBIDDEN_SOURCE",
+            "phase": "KERNEL_CHECK",
+            "severity": "ERROR",
+            "message": "The source uses a forbidden Lean construct.",
+            "source_span": None,
+            "goal_index": None,
+            "metavariable": None,
+            "raw_backend_message": "proof contains a forbidden Lean command",
+        }
+    ]
     assert result.assurance.verification_record_uri is None

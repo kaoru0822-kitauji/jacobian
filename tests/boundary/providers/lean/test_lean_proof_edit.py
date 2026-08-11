@@ -99,6 +99,10 @@ def test_rejected_edit_keeps_checker_evidence_without_becoming_accepted(
     assert result.output["certificate_uri"] in result.artifact_uris
     assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
     assert result.assurance.verification_record_uri is None
+    assert result.output["baseline_diagnostics"] == []
+    assert result.output["diagnostics"]
+    assert result.output["diagnostics"][0]["phase"] == "KERNEL_CHECK"
+    assert result.output["diagnostics"][0]["source_span"]["source"] == "PROOF"
 
 
 def test_valid_edit_is_not_accepted_when_original_baseline_is_invalid(

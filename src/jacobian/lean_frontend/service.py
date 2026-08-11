@@ -21,10 +21,12 @@ from jacobian.contracts.lean import (
 from jacobian.contracts.results import (
     Execution,
     ExecutionStatus,
+    InputStatus,
     ResultEnvelope,
     Verification,
 )
 from jacobian.contracts.verification import VerificationRecord
+from jacobian.lean_frontend.diagnostics import checker_diagnostics
 from jacobian.registry import CheckerRegistryError
 from jacobian.storage.errors import StorageError
 from jacobian.storage.repository import ArtifactRepository
@@ -150,7 +152,10 @@ class LeanService:
                     checker_id=installation.checker_id,
                     timeout_seconds=installation.checker_timeout_seconds,
                 )
-                if result.execution.status is ExecutionStatus.COMPLETED:
+                if (
+                    result.execution.status is ExecutionStatus.COMPLETED
+                    and result.input.status is InputStatus.ACCEPTED
+                ):
                     try:
                         registration = (
                             self.verification.checker_registry.require_active(
@@ -168,11 +173,18 @@ class LeanService:
                             self._cache.move_to_end(certificate.artifact_uri)
                             while len(self._cache) > _RESULT_CACHE_SIZE:
                                 self._cache.popitem(last=False)
+        diagnostics = checker_diagnostics(
+            result,
+            statement=statement,
+            proof=proof,
+            environment=environment,
+        )
         return LeanVerifyResult(
             claim_uri=claim.artifact_uri,
             candidate_uri=candidate.artifact_uri,
             certificate_uri=certificate.artifact_uri,
             result=result,
+            diagnostics=diagnostics,
             cache_hit=cache_hit,
         )
 

@@ -32,6 +32,24 @@ before using any payload below.
 These tools form a portfolio, not a required workflow. Agents decide which to
 compose.
 
+## Lean diagnostics
+
+`lean.check` version 2, `lean.proof_state.apply_tactic` version 3,
+`lean.term.apply` version 2, and `lean.proof_edit.validate` version 3 share one
+Lean-owned diagnostic model. A diagnostic keeps a stable `code`, processing
+`phase`, severity, normalized message, optional payload-relative `source_span`,
+optional `goal_index` and metavariable, and the bounded path-redacted backend
+message. Source spans name the caller field (`STATEMENT`, `PROOF`, `TACTIC`, or
+`TERM`) and use zero-based positions; they never expose generated temporary
+file coordinates. `RUNTIME_SETUP` identifies toolchain, Mathlib-manifest, and
+bounded checker-start failures; it is operational evidence and never a proof
+repair verdict.
+
+Diagnostics explain a rejected candidate without changing its mathematical
+meaning. A rejected proof remains `UNKNOWN` and unverified, and a rejected
+tactic creates no successor state. Operational errors and absent diagnostics
+must not be interpreted as negative mathematical conclusions.
+
 ## Proof-state transitions
 
 `lean.proof_state.apply_tactic` accepts an environment, one statement, a

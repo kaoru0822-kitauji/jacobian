@@ -27,7 +27,16 @@ RAT hints, deletions, and other LRAT dialect extensions are unsupported and
 rejected. It binds the exact CNF object, variable map, DIMACS projection, proof
 bytes, limits, checker, and certificate. Malformed, truncated, timed-out,
 cancelled, or rejected proofs return `UNKNOWN` and never provide evidence that
-the formula is satisfiable.
+the formula is satisfiable. Exhausting the declared step or clause-literal
+budget is an operational `ERROR`, not an invalid-proof verdict.
+
+`sat.lrat.verify` capability version 2 additionally returns `invalid_step`
+when the independent checker identifies a line-local replay failure. The typed
+witness contains the first proof line number, clause ID when parseable, stable
+failure code, a proof-line prefix bounded to 4,096 characters, an explicit
+`proof_line_truncated` flag, and the raw checker message. Binding
+failures and other non-line-local rejections may omit the witness; no rejected
+LRAT proof establishes SAT.
 
 ## Registered descriptors
 

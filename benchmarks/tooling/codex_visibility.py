@@ -48,6 +48,7 @@ _CODEX_ENVIRONMENT = (
     "all_proxy",
     "no_proxy",
 )
+_MCP_TOOL_APPROVAL_MODE = "approve"
 
 
 class CueLevel(StrEnum):
@@ -136,6 +137,15 @@ def _sha256_bytes(value: bytes) -> str:
 
 def _json_digest(value: object) -> str:
     return _sha256_bytes(canonicalize_json(value))
+
+
+def surface_snapshot_digest(surface: Mapping[str, Any]) -> str:
+    """Digest exactly the server, instructions, tools, and catalog snapshot."""
+
+    fields = ("server", "instructions", "tools", "catalog")
+    if any(field not in surface for field in fields):
+        raise ValueError("MCP surface snapshot is incomplete")
+    return _json_digest({field: surface[field] for field in fields})
 
 
 def _is_verified_invocation(invocation: object) -> bool:
@@ -244,7 +254,12 @@ def classify_visibility(
     }
 
 
-async def inspect_surface(url: str, timeout_seconds: float) -> dict[str, Any]:
+async def inspect_surface(
+    url: str,
+    timeout_seconds: float,
+    *,
+    require_deployment_identity: bool = False,
+) -> dict[str, Any]:
     """Snapshot the exact MCP surface used by a visibility run."""
 
     token = os.environ.get("JACOBIAN_MCP_BEARER_TOKEN")
@@ -300,7 +315,22 @@ async def inspect_surface(url: str, timeout_seconds: float) -> dict[str, Any]:
                 "content_sha256": _sha256_bytes(catalog_content.text.encode("utf-8")),
             },
         }
-    return {**snapshot, "surface_digest": _json_digest(snapshot)}
+        if require_deployment_identity:
+            deployment_result = await client.read_resource("deployment://identity")
+            deployment_content = deployment_result.contents[0]
+            if not isinstance(deployment_content, TextResourceContents):
+                raise RuntimeError("deployment identity is not text")
+            deployment = json.loads(deployment_content.text)
+            if (
+                not isinstance(deployment, dict)
+                or deployment.get("schema_version") != "1"
+                or deployment.get("evidence") != "release-marker"
+                or not isinstance(deployment.get("revision"), str)
+                or deployment.get("package_version") != server_info.version
+            ):
+                raise RuntimeError("MCP deployment identity is malformed")
+            snapshot["deployment"] = deployment
+    return {**snapshot, "surface_digest": surface_snapshot_digest(snapshot)}
 
 
 def _codex_arguments(
@@ -330,6 +360,11 @@ def _codex_arguments(
         f"model_reasoning_effort={json.dumps(reasoning_effort)}",
         "-c",
         f"mcp_servers.jacobian.url={json.dumps(mcp_url)}",
+        "-c",
+        (
+            "mcp_servers.jacobian.default_tools_approval_mode="
+            f"{json.dumps(_MCP_TOOL_APPROVAL_MODE)}"
+        ),
     ]
     if tool_mode is ToolMode.UNIFIED_EXEC:
         arguments.extend(("--enable", "unified_exec"))

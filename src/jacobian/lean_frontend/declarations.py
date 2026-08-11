@@ -50,6 +50,7 @@ from jacobian.process_policy import (
 )
 from jacobian.providers.lean_runtime import (
     LeanRuntimeIdentityError,
+    lean_mathlib_git_config,
     lean_semantic_runtime_digest,
     require_lean_semantic_runtime_identity,
 )
@@ -559,6 +560,12 @@ class LeanSubprocessDeclarationBackend:
     ) -> dict[str, str]:
         lean_bin = str(self.lean_executable.parent)
         if environment is LeanEnvironment.MATHLIB:
+            mathlib_runtime = self.mathlib_runtime
+            if mathlib_runtime is None:
+                raise LeanDeclarationBackendError(
+                    "LEAN_ENVIRONMENT_UNAVAILABLE",
+                    "The pinned Lean MATHLIB environment is not installed.",
+                )
             # MATHLIB needs the host PATH (for elan/lake toolchain discovery)
             # and host HOME (for elan toolchain installs), with the pinned
             # Lean bin directory prepended to PATH.
@@ -568,7 +575,10 @@ class LeanSubprocessDeclarationBackend:
             )
             return worker_environment(
                 extra_variables=("HOME", "ELAN_HOME"),
-                overrides={"PATH": mathlib_path},
+                overrides={
+                    "PATH": mathlib_path,
+                    **lean_mathlib_git_config(mathlib_runtime),
+                },
             )
         # CORE uses an isolated HOME and a toolchain-only PATH.
         return worker_environment(

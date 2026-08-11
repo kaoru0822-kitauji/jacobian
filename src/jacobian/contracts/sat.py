@@ -514,6 +514,27 @@ class SatLratVerificationRequest(ContractModel):
         return self
 
 
+class SatLratInvalidProofStep(ContractModel):
+    """The first line-local failure found by bounded independent LRAT replay."""
+
+    line: StrictInt = Field(ge=1)
+    clause_id: StrictInt | None = Field(default=None, ge=1)
+    code: Literal[
+        "NON_INTEGER_TOKEN",
+        "INVALID_CLAUSE_ID",
+        "INVALID_ADDITION_FRAMING",
+        "INVALID_LITERAL",
+        "INVALID_HINT_COUNT",
+        "TAUTOLOGICAL_CANDIDATE",
+        "HINT_REFERENCES_INACTIVE_CLAUSE",
+        "HINT_NOT_UNIT_OR_CONFLICTING",
+        "RUP_NOT_ESTABLISHED",
+    ]
+    proof_line: str = Field(min_length=1, max_length=4096)
+    proof_line_truncated: bool
+    raw_checker_message: str = Field(min_length=1, max_length=1024)
+
+
 class SatLratVerificationOutput(ContractModel):
     """Fail-closed projection of independent LRAT replay."""
 
@@ -532,6 +553,7 @@ class SatLratVerificationOutput(ContractModel):
     checker_id: CheckerUri
     verification_record_uri: ArtifactUri | None = None
     detail: str = Field(min_length=1, max_length=1024)
+    invalid_step: SatLratInvalidProofStep | None = None
 
     @model_validator(mode="after")
     def bind_verified_projection(self) -> Self:
@@ -542,6 +564,8 @@ class SatLratVerificationOutput(ContractModel):
                 )
         elif self.conclusion != "UNKNOWN" or self.verification_record_uri is not None:
             raise ValueError("non-verified LRAT cannot carry a conclusion or record")
+        if self.invalid_step is not None and self.status != "REJECTED":
+            raise ValueError("only a rejected LRAT proof can carry an invalid step")
         return self
 
 

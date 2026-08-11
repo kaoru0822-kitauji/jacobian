@@ -8,12 +8,71 @@ from typing import Literal, Self
 from pydantic import Field, StrictBool, StrictInt, model_validator
 
 from jacobian.contracts.common import ArtifactUri, Sha256Digest
-from jacobian.contracts.results import ContractModel, ResultEnvelope
+from jacobian.contracts.results import (
+    Conclusion,
+    ContractModel,
+    Execution,
+    InputValidation,
+    ResultEnvelope,
+)
 
 
 class LeanEnvironment(StrEnum):
     CORE = "CORE"
     MATHLIB = "MATHLIB"
+
+
+class LeanDiagnosticPhase(StrEnum):
+    RUNTIME_SETUP = "RUNTIME_SETUP"
+    SOURCE_ELABORATION = "SOURCE_ELABORATION"
+    STATE_RECONSTRUCTION = "STATE_RECONSTRUCTION"
+    TACTIC_EXECUTION = "TACTIC_EXECUTION"
+    TERM_ELABORATION = "TERM_ELABORATION"
+    KERNEL_CHECK = "KERNEL_CHECK"
+
+
+class LeanDiagnosticSource(StrEnum):
+    STATEMENT = "STATEMENT"
+    PROOF = "PROOF"
+    TACTIC = "TACTIC"
+    TERM = "TERM"
+
+
+class LeanDiagnosticPosition(ContractModel):
+    """Zero-based position relative to one agent-supplied Lean payload field."""
+
+    line: StrictInt = Field(ge=0)
+    column: StrictInt = Field(ge=0)
+
+
+class LeanDiagnosticSourceSpan(ContractModel):
+    """A payload-relative source range, never a generated-file coordinate."""
+
+    source: LeanDiagnosticSource
+    start: LeanDiagnosticPosition
+    end: LeanDiagnosticPosition
+
+    @model_validator(mode="after")
+    def require_forward_source_range(self) -> Self:
+        if (self.end.line, self.end.column) < (
+            self.start.line,
+            self.start.column,
+        ):
+            raise ValueError("Lean diagnostic source span must not run backwards")
+        return self
+
+
+class LeanDiagnostic(ContractModel):
+    """Stable Lean-owned diagnostic adjacent to, but distinct from, a verdict."""
+
+    code: str = Field(pattern=r"^LEAN_[A-Z0-9_]+$", max_length=128)
+    phase: LeanDiagnosticPhase
+    severity: Literal["ERROR", "WARNING", "INFO"]
+    message: str = Field(min_length=1, max_length=2_000)
+    source_span: LeanDiagnosticSourceSpan | None = None
+    goal_index: StrictInt | None = Field(default=None, ge=0, le=63)
+    metavariable: str | None = Field(default=None, min_length=1, max_length=512)
+    raw_backend_message: str = Field(min_length=1, max_length=20_000)
 
 
 class LeanClaim(ContractModel):
@@ -35,6 +94,19 @@ class LeanVerifyResult(ContractModel):
     candidate_uri: ArtifactUri
     certificate_uri: ArtifactUri
     result: ResultEnvelope
+    diagnostics: tuple[LeanDiagnostic, ...] = ()
+    cache_hit: bool = False
+
+
+class LeanCheckOutput(ContractModel):
+    conclusion: Conclusion
+    execution: Execution
+    input: InputValidation
+    diagnostics: tuple[LeanDiagnostic, ...]
+    claim_uri: ArtifactUri
+    candidate_uri: ArtifactUri
+    certificate_uri: ArtifactUri
+    verification_record_uri: ArtifactUri | None = None
     cache_hit: bool = False
 
 
