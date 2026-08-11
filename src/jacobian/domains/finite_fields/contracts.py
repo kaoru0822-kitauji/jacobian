@@ -7,6 +7,8 @@ from jacobian.math.finite_fields import (
     FiniteDimensionalSubspace,
     FiniteFieldPresentation,
     FiniteLinearMap,
+    FiniteMapTable,
+    FinitePolynomialMap,
     ProjectiveLine,
     ProjectivePoint,
 )
@@ -36,10 +38,30 @@ class OrbitDistributionRequest(ContractModel):
     ledger: DirectionRankLedger
 
 
+class FiniteMapTableRequest(ContractModel):
+    polynomial_map: FinitePolynomialMap
+
+
+class FiberPartitionRequest(ContractModel):
+    table: FiniteMapTable
+
+
+class CollisionCertificateRequest(ContractModel):
+    table: FiniteMapTable
+
+
+class PermutationCertificateRequest(ContractModel):
+    table: FiniteMapTable
+
+
 __all__ = [
+    "CollisionCertificateRequest",
     "DirectionRankLedgerRequest",
+    "FiberPartitionRequest",
+    "FiniteMapTableRequest",
     "LinearMapRankRequest",
     "OrbitDistributionRequest",
+    "PermutationCertificateRequest",
     "ProjectiveLineRequest",
     "RestrictScalarsRequest",
 ]

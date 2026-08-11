@@ -174,9 +174,7 @@ def test_slice_a_keeps_directions_bound_through_orbit_aggregation() -> None:
 def test_slice_a_ports_compose_restriction_into_rank_without_wire_conversion() -> None:
     subspace, directions = _slice_a_values()
     direction = directions.points[0]
-    _, restrict_operation, rank_operation, _, _ = (
-        build_finite_field_bundle().capabilities
-    )
+    _, restrict_operation, rank_operation, *_ = build_finite_field_bundle().capabilities
 
     restrict_payload: dict[str, object] = {}
     for port, value in zip(
@@ -208,7 +206,7 @@ def test_slice_a_ports_compose_restriction_into_rank_without_wire_conversion() -
 
 def test_slice_a_ports_compose_projective_line_into_orbit_distribution() -> None:
     subspace, _ = _slice_a_values()
-    projective, _, _, ledger_operation, orbit_operation = (
+    projective, _, _, ledger_operation, orbit_operation, *_ = (
         build_finite_field_bundle().capabilities
     )
 

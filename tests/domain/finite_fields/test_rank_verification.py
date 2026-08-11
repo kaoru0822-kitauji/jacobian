@@ -191,6 +191,9 @@ def test_missing_flint_omits_only_flint_operations_and_their_checkers(
     assert {
         "finite_field.projective_line.enumerate",
         "finite_field.orbit_distribution.compute",
+        "finite_field.polynomial_map.fibers.compute",
+        "finite_field.polynomial_map.collision.compute",
+        "finite_field.polynomial_map.permutation.compute",
     } <= ids
     assert {
         "finite_field.restrict_scalars.compute",
@@ -198,4 +201,5 @@ def test_missing_flint_omits_only_flint_operations_and_their_checkers(
         "finite_field.linear_map.rank.compute",
         "finite_field.linear_map.rank.verify",
         "finite_field.direction_rank_ledger.compute",
+        "finite_field.polynomial_map.table.compute",
     }.isdisjoint(ids)

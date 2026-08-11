@@ -5,25 +5,38 @@ from jacobian.domains.finite_fields.checkers import (
     FINITE_FIELD_EXACT_REPLAY_CHECKERS,
 )
 from jacobian.domains.finite_fields.contracts import (
+    CollisionCertificateRequest,
     DirectionRankLedgerRequest,
+    FiberPartitionRequest,
+    FiniteMapTableRequest,
     LinearMapRankRequest,
     OrbitDistributionRequest,
+    PermutationCertificateRequest,
     ProjectiveLineRequest,
     RestrictScalarsRequest,
 )
 from jacobian.math.finite_fields import (
     Axis,
+    CollisionCertificate,
     DirectionRankLedger,
+    FiberPartition,
     FiniteDimensionalSubspace,
     FiniteFieldPresentation,
     FiniteLinearMap,
+    FiniteMapTable,
+    FinitePolynomialMap,
     OrbitDistribution,
+    PermutationCertificate,
     ProjectiveLine,
     ProjectivePoint,
     RankResult,
+    collision_certificate,
     direction_rank_ledger,
+    fiber_partition,
+    finite_map_table,
     linear_map_rank,
     orbit_distribution,
+    permutation_certificate,
     projective_line,
     restrict_scalars,
 )
@@ -42,6 +55,7 @@ from jacobian.provider_runtime import SYMPY_VERSION, known_provider_runtime
 from jacobian.providers.flint_runtime import python_flint_finite_field_provider_runtime
 
 _MAX_PROJECTIVE_POINTS = 4096
+_MAX_FINITE_MAP_ELEMENTS = 4096
 
 
 def _enumerate_projective_line(request: ProjectiveLineRequest) -> ProjectiveLine:
@@ -74,6 +88,36 @@ def _ledger(request: DirectionRankLedgerRequest) -> DirectionRankLedger:
 
 def _orbit_distribution(request: OrbitDistributionRequest) -> OrbitDistribution:
     return orbit_distribution(request.ledger)
+
+
+def _finite_map_table(request: FiniteMapTableRequest) -> FiniteMapTable:
+    return finite_map_table(request.polynomial_map)
+
+
+def _finite_map_preflight(request: FiniteMapTableRequest) -> PreflightResult:
+    count = request.polynomial_map.domain.order
+    if count > _MAX_FINITE_MAP_ELEMENTS:
+        return PreflightResult(
+            PreflightStatus.RESOURCE_LIMIT_EXCEEDED,
+            f"finite map has {count} inputs; limit is {_MAX_FINITE_MAP_ELEMENTS}",
+        )
+    return SUPPORTED
+
+
+def _fiber_partition(request: FiberPartitionRequest) -> FiberPartition:
+    return fiber_partition(request.table)
+
+
+def _collision_certificate(
+    request: CollisionCertificateRequest,
+) -> CollisionCertificate:
+    return collision_certificate(request.table)
+
+
+def _permutation_certificate(
+    request: PermutationCertificateRequest,
+) -> PermutationCertificate:
+    return permutation_certificate(request.table)
 
 
 def build_finite_field_bundle() -> DomainBundle:
@@ -202,6 +246,78 @@ def build_finite_field_bundle() -> DomainBundle:
         ),
         output_ports=(OutputPort(name="distribution", value_type=OrbitDistribution),),
     )
+    table_operation = inline_operation(
+        OperationSpec(
+            operation_id="finite_field.polynomial_map.table.compute",
+            version="1",
+            request_type=FiniteMapTableRequest,
+            result_type=FiniteMapTable,
+            execute=_finite_map_table,
+            preflight=_finite_map_preflight,
+            title="Evaluate a polynomial on its complete finite field",
+            description="Return the exact domain-bound map table in canonical order.",
+            tags=("finite-field", "polynomial", "map-table", "exact"),
+        ),
+        provider_runtime=flint_provider,
+        input_ports=(
+            InputPort(
+                name="polynomial_map",
+                value_type=FinitePolynomialMap,
+                request_field="polynomial_map",
+            ),
+        ),
+        output_ports=(OutputPort(name="table", value_type=FiniteMapTable),),
+    )
+    fiber_operation = inline_operation(
+        OperationSpec(
+            operation_id="finite_field.polynomial_map.fibers.compute",
+            version="1",
+            request_type=FiberPartitionRequest,
+            result_type=FiberPartition,
+            execute=_fiber_partition,
+            title="Partition a finite polynomial map into fibers",
+            description="Return every nonempty fiber bound to the exact map table.",
+            tags=("finite-field", "polynomial", "fibers", "exact"),
+        ),
+        input_ports=(
+            InputPort(name="table", value_type=FiniteMapTable, request_field="table"),
+        ),
+        output_ports=(OutputPort(name="fibers", value_type=FiberPartition),),
+    )
+    collision_operation = inline_operation(
+        OperationSpec(
+            operation_id="finite_field.polynomial_map.collision.compute",
+            version="1",
+            request_type=CollisionCertificateRequest,
+            result_type=CollisionCertificate,
+            execute=_collision_certificate,
+            title="Extract a finite polynomial-map collision",
+            description="Return two distinct inputs with the same exact table image.",
+            tags=("finite-field", "polynomial", "collision", "certificate"),
+        ),
+        input_ports=(
+            InputPort(name="table", value_type=FiniteMapTable, request_field="table"),
+        ),
+        output_ports=(OutputPort(name="collision", value_type=CollisionCertificate),),
+    )
+    permutation_operation = inline_operation(
+        OperationSpec(
+            operation_id="finite_field.polynomial_map.permutation.compute",
+            version="1",
+            request_type=PermutationCertificateRequest,
+            result_type=PermutationCertificate,
+            execute=_permutation_certificate,
+            title="Certify a finite polynomial permutation",
+            description="Return the exact inverse table of an injective finite map.",
+            tags=("finite-field", "polynomial", "permutation", "certificate"),
+        ),
+        input_ports=(
+            InputPort(name="table", value_type=FiniteMapTable, request_field="table"),
+        ),
+        output_ports=(
+            OutputPort(name="permutation", value_type=PermutationCertificate),
+        ),
+    )
     return DomainBundle(
         domain_id="finite_fields",
         schema_namespace="jacobian.finite-fields",
@@ -221,6 +337,10 @@ def build_finite_field_bundle() -> DomainBundle:
             rank_operation,
             ledger_operation,
             orbit_operation,
+            table_operation,
+            fiber_operation,
+            collision_operation,
+            permutation_operation,
         ),
         checker_declarations=FINITE_FIELD_EXACT_REPLAY_CHECKERS,
         diagnostics=DomainDiagnostics(

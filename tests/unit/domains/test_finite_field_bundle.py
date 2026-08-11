@@ -2,11 +2,16 @@ from jacobian.domains.finite_fields import build_finite_field_bundle
 from jacobian.domains.finite_fields.contracts import ProjectiveLineRequest
 from jacobian.math.finite_fields import (
     Axis,
+    CollisionCertificate,
     DirectionRankLedger,
+    FiberPartition,
     FiniteDimensionalSubspace,
     FiniteFieldPresentation,
     FiniteLinearMap,
+    FiniteMapTable,
+    FinitePolynomialMap,
     OrbitDistribution,
+    PermutationCertificate,
     ProjectiveLine,
     ProjectivePoint,
     RankResult,
@@ -24,8 +29,22 @@ def test_bundle_declares_atomic_port_bound_operations() -> None:
         "finite_field.linear_map.rank.compute",
         "finite_field.direction_rank_ledger.compute",
         "finite_field.orbit_distribution.compute",
+        "finite_field.polynomial_map.table.compute",
+        "finite_field.polynomial_map.fibers.compute",
+        "finite_field.polynomial_map.collision.compute",
+        "finite_field.polynomial_map.permutation.compute",
     )
-    projective, restrict_operation, rank_operation, ledger, orbit = bundle.capabilities
+    (
+        projective,
+        restrict_operation,
+        rank_operation,
+        ledger,
+        orbit,
+        table,
+        fibers,
+        collision,
+        permutation,
+    ) = bundle.capabilities
     assert projective.output_ports[0].value_type is ProjectiveLine
     assert tuple(port.value_type for port in restrict_operation.input_ports) == (
         FiniteDimensionalSubspace,
@@ -44,6 +63,12 @@ def test_bundle_declares_atomic_port_bound_operations() -> None:
     assert ledger.output_ports[0].value_type is DirectionRankLedger
     assert orbit.input_ports[0].value_type is DirectionRankLedger
     assert orbit.output_ports[0].value_type is OrbitDistribution
+    assert table.input_ports[0].value_type is FinitePolynomialMap
+    assert table.output_ports[0].value_type is FiniteMapTable
+    assert fibers.input_ports[0].value_type is FiniteMapTable
+    assert fibers.output_ports[0].value_type is FiberPartition
+    assert collision.output_ports[0].value_type is CollisionCertificate
+    assert permutation.output_ports[0].value_type is PermutationCertificate
 
 
 def test_projective_enumeration_refuses_large_output_before_allocation() -> None:

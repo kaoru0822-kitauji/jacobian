@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from jacobian.domains.finite_fields import build_finite_field_bundle
 from jacobian.math.finite_fields import (
     CollisionCertificate,
     FiberPartition,
@@ -107,3 +108,30 @@ def test_certificates_reject_values_not_bound_to_the_exact_table() -> None:
             table=permutation_table,
             inverse_entries=tuple(reversed(permutation.inverse_entries)),
         )
+
+
+def test_slice_b_reuses_the_same_ports_for_table_and_certificate_handoff() -> None:
+    polynomial_map = _map(3)
+    _, _, _, _, _, table_operation, fiber_operation, collision_operation, _ = (
+        build_finite_field_bundle().capabilities
+    )
+
+    table_payload = table_operation.input_ports[0].bind_to_request({}, polynomial_map)
+    table = table_operation.spec.execute(
+        table_operation.spec.request_type.model_validate(table_payload)
+    )
+    carried_table = table_operation.output_ports[0].extract_from_result(table)
+
+    fiber_payload = fiber_operation.input_ports[0].bind_to_request({}, carried_table)
+    partition = fiber_operation.spec.execute(
+        fiber_operation.spec.request_type.model_validate(fiber_payload)
+    )
+    collision_payload = collision_operation.input_ports[0].bind_to_request(
+        {}, carried_table
+    )
+    collision = collision_operation.spec.execute(
+        collision_operation.spec.request_type.model_validate(collision_payload)
+    )
+
+    assert partition.table is carried_table
+    assert collision.table is carried_table
