@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import shutil
 import threading
 import time
@@ -16,6 +15,9 @@ from pydantic import ValidationError
 
 from jacobian.checker_authorization import LeanCheckerInstallation
 from jacobian.contracts.lean import LeanEnvironment
+from jacobian.lean_frontend.process_environment import (
+    lean_elan_worker_environment,
+)
 from jacobian.lean_frontend.repl_protocol import (
     LeanReplCommandRequest,
     LeanReplCommandResponse,
@@ -37,7 +39,6 @@ from jacobian.process_policy import (
     InteractiveProcessRequest,
 )
 from jacobian.providers.lean_runtime import lean_mathlib_git_config
-from jacobian.worker_environment import worker_environment
 
 _RESOURCE_POLL_SECONDS = 0.1
 _DEFAULT_CORE_MAX_RSS_KB = 7 * 1024 * 1024
@@ -50,14 +51,7 @@ def _repl_process_environment(runtime: Path) -> dict[str, str]:
         if (runtime / "lake-manifest.json").is_file()
         else {}
     )
-    overrides["ELAN_HOME"] = os.environ.get(
-        "ELAN_HOME",
-        str(Path.home() / ".elan"),
-    )
-    return worker_environment(
-        extra_variables=("PATH",),
-        overrides=overrides,
-    )
+    return lean_elan_worker_environment(overrides=overrides)
 
 
 @dataclass(frozen=True, slots=True)

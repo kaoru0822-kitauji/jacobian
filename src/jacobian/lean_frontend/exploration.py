@@ -51,6 +51,9 @@ from jacobian.lean_frontend.helper_protocol import (
     LeanTypedGoalsHelperRequest,
     LeanTypedGoalsHelperResult,
 )
+from jacobian.lean_frontend.process_environment import (
+    lean_elan_worker_environment,
+)
 from jacobian.lean_frontend.repl import (
     LeanExplorationReplRuntime,
 )
@@ -72,7 +75,6 @@ from jacobian.providers.lean_runtime import (
 )
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.storage.repository import ArtifactRepository
-from jacobian.worker_environment import worker_environment
 
 
 class LeanHelperError(RuntimeError):
@@ -304,8 +306,7 @@ def _resolve_typed_goal_helper(
     if elan is None:
         raise RuntimeError("elan is unavailable")
     installation = resources.installations[request.environment]
-    environment = worker_environment(
-        extra_variables=("PATH", "ELAN_HOME"),
+    environment = lean_elan_worker_environment(
         overrides={
             **lean_mathlib_git_config(resources.runtime),
             "JACOBIAN_LEAN_PROOF_STATE_QUERY": str(query_path),
