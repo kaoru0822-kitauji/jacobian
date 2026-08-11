@@ -344,7 +344,16 @@ def _validate_package_checkout(
         or re.fullmatch(r"[0-9a-f]{40}", revision) is None
     ):
         raise RuntimeError("the mathlib manifest contains an invalid package")
-    checkout = packages_directory / name
+    try:
+        resolved_packages = packages_directory.resolve(strict=True)
+        checkout_candidate = resolved_packages / name
+        if checkout_candidate.is_symlink() or not checkout_candidate.is_dir():
+            raise RuntimeError("the mathlib package checkout is not a directory")
+        checkout = checkout_candidate.resolve(strict=True)
+    except OSError as exc:
+        raise RuntimeError("the mathlib package checkout is unavailable") from exc
+    if checkout.parent != resolved_packages:
+        raise RuntimeError("the mathlib package checkout escapes its package root")
     git_environment = worker_environment(locale="C")
     git_executable = shutil.which("git")
     if git_executable is None:
@@ -352,7 +361,14 @@ def _validate_package_checkout(
     rev_result = execute_process(
         ProcessRequest(
             executable=git_executable,
-            arguments=("-C", str(checkout), "rev-parse", "HEAD"),
+            arguments=(
+                "-c",
+                f"safe.directory={checkout}",
+                "-C",
+                str(checkout),
+                "rev-parse",
+                "HEAD",
+            ),
             environment=git_environment,
             cwd=str(checkout),
             timeout_seconds=5.0,
@@ -373,6 +389,8 @@ def _validate_package_checkout(
         ProcessRequest(
             executable=git_executable,
             arguments=(
+                "-c",
+                f"safe.directory={checkout}",
                 "-C",
                 str(checkout),
                 "status",

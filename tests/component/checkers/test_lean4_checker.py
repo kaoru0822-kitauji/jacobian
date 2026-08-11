@@ -218,6 +218,51 @@ def test_mathlib_checker_gives_lake_a_bounded_path_with_git(
     )
 
 
+def test_mathlib_package_validation_authorizes_only_the_exact_checkout_for_git(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    packages = tmp_path / "packages"
+    checkout = packages / "repl"
+    checkout.mkdir(parents=True)
+    git = tmp_path / "git"
+    git.write_bytes(b"git")
+    revision = "a" * 40
+    requests = []
+    monkeypatch.setattr(
+        lean4_checker.shutil,
+        "which",
+        lambda name: str(git) if name == "git" else None,
+    )
+
+    def execute(request):
+        requests.append(request)
+        return ProcessResult(
+            termination=ProcessTermination.EXITED,
+            returncode=0,
+            stdout=(revision.encode() if "rev-parse" in request.arguments else b""),
+            stderr=b"",
+            stdout_exceeded=False,
+            stderr_exceeded=False,
+        )
+
+    monkeypatch.setattr(lean4_checker, "execute_process", execute)
+
+    lean4_checker._validate_package_checkout(
+        packages,
+        {"type": "git", "name": "repl", "rev": revision},
+    )
+
+    assert len(requests) == 2
+    for request in requests:
+        assert request.arguments[:4] == (
+            "-c",
+            f"safe.directory={checkout}",
+            "-C",
+            str(checkout),
+        )
+
+
 def test_lean_checker_rejects_replaced_authorized_executable(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
