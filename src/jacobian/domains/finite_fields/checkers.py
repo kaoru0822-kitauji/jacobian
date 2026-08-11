@@ -1,9 +1,23 @@
 """Independent checker declarations for finite-field operations."""
 
 from jacobian.checker_operations import ExactReplayCheckerDeclaration
-from jacobian.domains.finite_fields.contracts import LinearMapRankRequest
+from jacobian.domains.finite_fields.contracts import (
+    LinearMapRankRequest,
+    RestrictScalarsRequest,
+)
 
 FINITE_FIELD_EXACT_REPLAY_CHECKERS = (
+    ExactReplayCheckerDeclaration(
+        "finite_field.restrict_scalars.compute",
+        RestrictScalarsRequest,
+        "check_finite_field_restriction",
+        "finite-field.restriction.sympy-replay",
+        entrypoint_module="jacobian_checkers.finite_field_rank",
+        replay_method="SymPy polynomial-quotient replay",
+        reason=(
+            "operator-authorized SymPy replay independent of the Python-FLINT producer"
+        ),
+    ),
     ExactReplayCheckerDeclaration(
         "finite_field.linear_map.rank.compute",
         LinearMapRankRequest,
