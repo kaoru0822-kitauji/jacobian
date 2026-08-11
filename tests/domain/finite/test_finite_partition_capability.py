@@ -4,7 +4,6 @@ from tests.support.core_capability_harnesses import FinitePartitionTestServices
 
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
-    CapabilityRelationshipStatus,
     CapabilityRequest,
 )
 
@@ -44,7 +43,6 @@ def test_finite_partition_produces_an_unverified_typed_result(
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.output["missing"] == []
     assert result.output["verification_record_uri"] is None
-    assert result.relationships[0].status is CapabilityRelationshipStatus.PROPOSED
 
 
 def test_finite_partition_verify_replays_with_an_authorized_checker(
@@ -59,7 +57,6 @@ def test_finite_partition_verify_replays_with_an_authorized_checker(
     assert result.completeness.verification_record_uri == (
         result.assurance.verification_record_uri
     )
-    assert result.relationships[0].status is CapabilityRelationshipStatus.VERIFIED
 
 
 def test_finite_partition_contract_and_result_preserve_semantic_boundary(

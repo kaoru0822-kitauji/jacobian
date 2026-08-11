@@ -20,8 +20,6 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
-    CapabilityRelationship,
-    CapabilityRelationshipStatus,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -355,26 +353,6 @@ class GraphIsomorphismAdapter:
                     else CapabilityAssuranceLevel.HEURISTIC
                 ),
                 verification_record_uri=record_uri,
-            ),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id="graph.relation.pair-scope",
-                    source_artifact_uris=source_graph_uris,
-                    target_artifact_uris=(pair.artifact_uri,),
-                ),
-                *(
-                    (
-                        CapabilityRelationship(
-                            relation_id="graph.relation.isomorphic-via",
-                            source_artifact_uris=source_graph_uris,
-                            target_artifact_uris=(mapping.artifact_uri,),
-                            status=CapabilityRelationshipStatus.VERIFIED,
-                            verification_record_uri=record_uri,
-                        ),
-                    )
-                    if conclusion == "TRUE" and record_uri is not None
-                    else ()
-                ),
             ),
             assurance=CapabilityAssurance(
                 level=(

@@ -17,8 +17,6 @@ from jacobian.contracts.capabilities import (
     CapabilityCompleteness,
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
-    CapabilityRelationship,
-    CapabilityRelationshipStatus,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -521,11 +519,6 @@ def _partition_result(
         if verified
         else CapabilityAssuranceLevel.COMPUTED
     )
-    relationship_status = (
-        CapabilityRelationshipStatus.VERIFIED
-        if verified
-        else CapabilityRelationshipStatus.PROPOSED
-    )
     execution_status = (
         verification_result.execution.status
         if verification_result is not None
@@ -592,16 +585,6 @@ def _partition_result(
             ),
             assurance_level=assurance_level,
             verification_record_uri=record_uri if verified else None,
-        ),
-        relationships=(
-            CapabilityRelationship(
-                relation_id="case.relation.partitions",
-                source_artifact_uris=(material.scope_uri,),
-                target_artifact_uris=(material.partition_uri,),
-                status=relationship_status,
-                obligation_uris=(material.claim_uri,),
-                verification_record_uri=record_uri if verified else None,
-            ),
         ),
         assurance=CapabilityAssurance(
             level=assurance_level,

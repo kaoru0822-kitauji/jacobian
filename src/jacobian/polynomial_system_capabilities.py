@@ -21,8 +21,6 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
-    CapabilityRelationship,
-    CapabilityRelationshipStatus,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -362,19 +360,6 @@ class PolynomialSystemSolutionAdapter:
                     )
                 ),
                 verification_record_uri=record_uri,
-            ),
-            relationships=(
-                (
-                    CapabilityRelationship(
-                        relation_id="polynomial.relation.satisfies-system",
-                        source_artifact_uris=(assignment.artifact_uri,),
-                        target_artifact_uris=(system.artifact_uri,),
-                        status=CapabilityRelationshipStatus.VERIFIED,
-                        verification_record_uri=record_uri,
-                    ),
-                )
-                if conclusion == "TRUE" and verified
-                else ()
             ),
             assurance=CapabilityAssurance(
                 level=(

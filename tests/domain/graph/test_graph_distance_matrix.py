@@ -68,7 +68,6 @@ def test_distance_matrix_is_complete_canonical_and_lineage_bound(
         "connected": True,
     }
     assert result.artifact_uris == ()
-    assert result.relationships == ()
 
 
 def test_distance_matrix_represents_disconnected_pairs_with_null(

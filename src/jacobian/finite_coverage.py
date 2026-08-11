@@ -24,8 +24,6 @@ from jacobian.contracts.capabilities import (
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInvocationExample,
-    CapabilityRelationship,
-    CapabilityRelationshipStatus,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -544,20 +542,6 @@ class FiniteCoverageVerifyAdapter:
                 ),
                 assurance_level=assurance_level,
                 verification_record_uri=record_uri,
-            ),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id="finite.relation.covers-exactly-once",
-                    source_artifact_uris=(scope.artifact_uri,),
-                    target_artifact_uris=(archive.artifact_uri,),
-                    status=(
-                        CapabilityRelationshipStatus.VERIFIED
-                        if verified
-                        else CapabilityRelationshipStatus.PROPOSED
-                    ),
-                    obligation_uris=(claim.artifact_uri,),
-                    verification_record_uri=record_uri,
-                ),
             ),
             assurance=CapabilityAssurance(
                 level=assurance_level,

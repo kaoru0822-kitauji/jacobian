@@ -136,7 +136,6 @@ def test_linear_recurrence_exposes_requested_values_and_complete_replay(
     assert [item["index"] for item in sparse.output["result"]["values"]] == [0, 2, 7]
     assert len(sparse.output["result"]["replay_prefix"]) == 8
     assert sparse.artifact_uris == ()
-    assert sparse.relationships == ()
 
 
 def test_polynomial_coefficient_recurrence_exposes_exact_terms_and_residuals(

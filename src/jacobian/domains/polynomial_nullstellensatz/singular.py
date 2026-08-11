@@ -21,7 +21,6 @@ from jacobian.contracts.capabilities import (
     CapabilityDiagnostic,
     CapabilityInputKind,
     CapabilityProviderRuntime,
-    CapabilityRelationship,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -526,13 +525,6 @@ class SingularNullstellensatzCertificateAdapter:
                 status=CapabilityCompletenessStatus.COMPLETE,
                 basis="Singular returned one multiplier for every generator in every chart",
                 assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id="polynomial.relation.infeasibility-certificate-for",
-                    source_artifact_uris=(stored.artifact_uri,),
-                    target_artifact_uris=(system_artifact.artifact_uri,),
-                ),
             ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,

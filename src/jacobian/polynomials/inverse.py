@@ -876,7 +876,6 @@ class PolynomialMapInverseVerifyAdapter:
                 ),
                 verification_record_uri=record_uri,
             ),
-            relationships=(),
             assurance=CapabilityAssurance(
                 level=(
                     CapabilityAssuranceLevel.VERIFIED

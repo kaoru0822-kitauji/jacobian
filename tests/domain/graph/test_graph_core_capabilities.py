@@ -11,7 +11,6 @@ from jacobian.artifacts import ArtifactValidationError
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityCompletenessStatus,
-    CapabilityRelationshipStatus,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
@@ -370,16 +369,6 @@ def test_graph_property_batch_materializes_exact_computed_artifact(
     }
     assert result.completeness.status is CapabilityCompletenessStatus.COMPLETE
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    assert len(result.relationships) == 1
-    relationship = result.relationships[0]
-    assert relationship.status is CapabilityRelationshipStatus.PROPOSED
-    assert relationship.source_artifact_uris == (graph_uri,)
-    assert (
-        relationship.target_artifact_uris[0] == (result.output["property_artifact_uri"])
-    )
-    assert set(relationship.target_artifact_uris[1:]) == {
-        binding["artifact_uri"] for binding in result.output["results"]
-    }
     property_artifact = services.core.store.get(result.output["property_artifact_uri"])
     assert set(property_artifact.manifest.parents) == {
         graph_uri,

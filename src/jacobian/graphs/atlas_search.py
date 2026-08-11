@@ -14,7 +14,6 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
-    CapabilityRelationship,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -187,14 +186,6 @@ class GraphAtlasSearchAdapter:
                 }
             )
         artifact_uris = (scope.artifact_uri, *graph_uris)
-        relationships = tuple(
-            CapabilityRelationship(
-                relation_id="graph.relation.atlas-member",
-                source_artifact_uris=(scope.artifact_uri,),
-                target_artifact_uris=(graph_uri,),
-            )
-            for graph_uri in graph_uris
-        )
         return CapabilityResult(
             capability_id=self.descriptor.capability_id,
             capability_version=self.descriptor.version,
@@ -230,7 +221,6 @@ class GraphAtlasSearchAdapter:
                 ),
                 assurance_level=CapabilityAssuranceLevel.COMPUTED,
             ),
-            relationships=relationships,
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis=(

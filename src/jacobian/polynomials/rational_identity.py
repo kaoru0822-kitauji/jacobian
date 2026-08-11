@@ -12,8 +12,6 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityInvocationExample,
-    CapabilityRelationship,
-    CapabilityRelationshipStatus,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -259,17 +257,6 @@ class RationalFunctionIdentityAdapter:
                     basis="the independent checker did not accept the replay",
                 )
             ),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id="polynomial.relation.rational-function-identity",
-                    source_artifact_uris=(left.artifact_uri,),
-                    target_artifact_uris=(right.artifact_uri,),
-                    status=CapabilityRelationshipStatus.VERIFIED,
-                    verification_record_uri=record_uri,
-                ),
-            )
-            if conclusion is Conclusion.TRUE and verified
-            else (),
             assurance=CapabilityAssurance(
                 level=(
                     CapabilityAssuranceLevel.VERIFIED

@@ -315,7 +315,6 @@ def test_powerful_number_decision_preserves_a_complete_factor_witness(
     }
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.artifact_uris == ()
-    assert result.relationships == ()
 
 
 @pytest.mark.parametrize("value", ["0", "-1", "-72"])

@@ -26,7 +26,6 @@ from jacobian.contracts.capabilities import (
     CapabilityInvocationExample,
     CapabilityProviderAvailability,
     CapabilityProviderRuntime,
-    CapabilityRelationship,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -386,13 +385,6 @@ class UniversalAlgebraEvaluateLawsAdapter:
                 ),
                 assurance_level=CapabilityAssuranceLevel.COMPUTED,
             ),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id="universal_algebra.relation.evaluation-of",
-                    source_artifact_uris=(problem_artifact.artifact_uri,),
-                    target_artifact_uris=(evaluation_artifact.artifact_uri,),
-                ),
-            ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis=(
@@ -731,14 +723,6 @@ class FiniteMagmaTableEnumerateAdapter:
                     "was exhausted exactly once"
                 ),
                 assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
-            relationships=tuple(
-                CapabilityRelationship(
-                    relation_id="universal_algebra.relation.enumeration-member",
-                    source_artifact_uris=(enumeration_artifact.artifact_uri,),
-                    target_artifact_uris=(table_uri,),
-                )
-                for table_uri in table_uris
             ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,

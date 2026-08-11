@@ -22,7 +22,6 @@ from jacobian.contracts.capabilities import (
     CapabilityInvocationExample,
     CapabilityProviderAvailability,
     CapabilityProviderRuntime,
-    CapabilityRelationship,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -337,17 +336,6 @@ class SympyPolynomialExpressionNormalizeAdapter:
                 )
             ),
         )
-        relationships = (
-            (
-                CapabilityRelationship(
-                    relation_id="polynomial.relation.expression-normalization-of",
-                    source_artifact_uris=(normalization_uri,),
-                    target_artifact_uris=(expression_uri,),
-                ),
-            )
-            if normalization_uri is not None
-            else ()
-        )
         return CapabilityResult(
             capability_id=self.descriptor.capability_id,
             capability_version=self.descriptor.version,
@@ -412,7 +400,6 @@ class SympyPolynomialExpressionNormalizeAdapter:
                 if normalization_uri is not None
                 else (expression_uri,)
             ),
-            relationships=relationships,
         )
 
 

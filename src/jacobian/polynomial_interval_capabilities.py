@@ -44,8 +44,6 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
-    CapabilityRelationship,
-    CapabilityRelationshipStatus,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -386,13 +384,6 @@ class PolynomialIntervalEncloseAdapter:
                 },
                 artifact_uri=polynomial_artifact.artifact_uri,
             ),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id="polynomial.relation.enclosure-of",
-                    source_artifact_uris=(polynomial_artifact.artifact_uri,),
-                    target_artifact_uris=(enclosure_artifact.artifact_uri,),
-                ),
-            ),
             artifact_uris=(
                 polynomial_artifact.artifact_uri,
                 enclosure_artifact.artifact_uri,
@@ -631,19 +622,6 @@ class PolynomialIntervalEnclosureVerifyAdapter:
                     )
                 ),
                 verification_record_uri=record_uri,
-            ),
-            relationships=(
-                (
-                    CapabilityRelationship(
-                        relation_id="polynomial.relation.valid-bernstein-enclosure",
-                        source_artifact_uris=(enclosure_artifact.artifact_uri,),
-                        target_artifact_uris=(polynomial_artifact.artifact_uri,),
-                        status=CapabilityRelationshipStatus.VERIFIED,
-                        verification_record_uri=record_uri,
-                    ),
-                )
-                if conclusion == "TRUE" and verified
-                else ()
             ),
             assurance=CapabilityAssurance(
                 level=(

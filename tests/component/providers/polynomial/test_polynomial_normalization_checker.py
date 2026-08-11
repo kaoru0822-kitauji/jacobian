@@ -80,11 +80,6 @@ def test_independent_checker_verifies_full_ast_relation(
         verified.completeness.verification_record_uri
         == verified.assurance.verification_record_uri
     )
-    assert verified.relationships[0].status.value == "VERIFIED"
-    assert (
-        verified.relationships[0].verification_record_uri
-        == verified.assurance.verification_record_uri
-    )
 
 
 def test_independent_checker_rejects_wrong_bound_coefficients(

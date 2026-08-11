@@ -324,13 +324,6 @@ class CapabilityAssuranceLevel(StrEnum):
     VERIFIED = "VERIFIED"
 
 
-class CapabilityRelationshipStatus(StrEnum):
-    """Whether a returned mathematical relationship has checker backing."""
-
-    PROPOSED = "PROPOSED"
-    VERIFIED = "VERIFIED"
-
-
 class CapabilityCompletenessStatus(StrEnum):
     """How much of the explicitly declared scope an operation covered."""
 
@@ -489,37 +482,6 @@ class CapabilityCompleteness(ContractModel):
         return self
 
 
-class CapabilityRelationship(ContractModel):
-    """A domain-owned relationship between exact immutable artifacts."""
-
-    relation_id: CapabilityId
-    source_artifact_uris: tuple[ArtifactUri, ...]
-    target_artifact_uris: tuple[ArtifactUri, ...]
-    status: CapabilityRelationshipStatus = CapabilityRelationshipStatus.PROPOSED
-    obligation_uris: tuple[ArtifactUri, ...] = ()
-    verification_record_uri: ArtifactUri | None = None
-
-    @model_validator(mode="after")
-    def require_bound_endpoints(self) -> Self:
-        if not self.source_artifact_uris or not self.target_artifact_uris:
-            raise ValueError("relationship requires source and target artifacts")
-        if len(set(self.source_artifact_uris)) != len(self.source_artifact_uris):
-            raise ValueError("relationship source artifacts must be unique")
-        if len(set(self.target_artifact_uris)) != len(self.target_artifact_uris):
-            raise ValueError("relationship target artifacts must be unique")
-        if (
-            self.status is CapabilityRelationshipStatus.VERIFIED
-            and self.verification_record_uri is None
-        ):
-            raise ValueError("verified relationship requires a record URI")
-        if (
-            self.status is CapabilityRelationshipStatus.PROPOSED
-            and self.verification_record_uri is not None
-        ):
-            raise ValueError("proposed relationship cannot carry a record URI")
-        return self
-
-
 class CapabilityDiagnostic(ContractModel):
     """Actionable, stage-aware failure information without a truth claim."""
 
@@ -557,23 +519,6 @@ def _validate_capability_execution_lane(
         raise ValueError("failed execution cannot be complete")
 
 
-def _validate_verified_relationships(
-    relationships: tuple[CapabilityRelationship, ...],
-    assurance_level: CapabilityAssuranceLevel,
-    record_uri: ArtifactUri | None,
-) -> None:
-    for relationship in relationships:
-        if relationship.status is CapabilityRelationshipStatus.VERIFIED:
-            if assurance_level is not CapabilityAssuranceLevel.VERIFIED:
-                raise ValueError(
-                    "verified relationship requires verified result assurance"
-                )
-            if relationship.verification_record_uri != record_uri:
-                raise ValueError(
-                    "verified relationship must use the result verification record"
-                )
-
-
 def _validate_verified_completeness(
     completeness: CapabilityCompleteness,
     assurance_level: CapabilityAssuranceLevel,
@@ -602,7 +547,6 @@ class CapabilityResult(ContractModel):
             basis="the operation makes no completeness claim",
         )
     )
-    relationships: tuple[CapabilityRelationship, ...] = ()
     diagnostics: tuple[CapabilityDiagnostic, ...] = ()
     assurance: CapabilityAssurance
     artifact_uris: tuple[ArtifactUri, ...] = ()
@@ -618,11 +562,6 @@ class CapabilityResult(ContractModel):
             self.scope,
         )
         record_uri = self.assurance.verification_record_uri
-        _validate_verified_relationships(
-            self.relationships,
-            self.assurance.level,
-            record_uri,
-        )
         _validate_verified_completeness(
             self.completeness,
             self.assurance.level,

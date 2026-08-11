@@ -157,7 +157,7 @@ def test_authorized_checker_verifies_complete_bundle(tmp_path: Path) -> None:
         assert result.output["assurance"] == "VERIFIED"
         assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
         assert result.output["verification_record_uri"] in result.artifact_uris
-        assert result.relationships[0].status.value == "VERIFIED"
+        assert result.assurance.verification_record_uri is not None
 
 
 def test_unavailable_checker_never_false_certifies(tmp_path: Path) -> None:
@@ -185,7 +185,6 @@ def test_unavailable_checker_never_false_certifies(tmp_path: Path) -> None:
         assert result.output["conclusion"] == "UNKNOWN"
         assert result.output["verification_record_uri"] is None
         assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-        assert not result.relationships
 
 
 def test_mutated_certificate_cannot_return_verified(tmp_path: Path) -> None:

@@ -8,7 +8,6 @@ from jacobian.capability_errors import CapabilityError
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityCompletenessStatus,
-    CapabilityRelationshipStatus,
     CapabilityResult,
 )
 from jacobian.contracts.exact_domain_verification import InlineExactVerificationRecord
@@ -32,12 +31,6 @@ class CapabilityVerificationMixin:
             referenced.add(result.scope.artifact_uri)
         if result.completeness.verification_record_uri is not None:
             referenced.add(result.completeness.verification_record_uri)
-        for relationship in result.relationships:
-            referenced.update(relationship.source_artifact_uris)
-            referenced.update(relationship.target_artifact_uris)
-            referenced.update(relationship.obligation_uris)
-            if relationship.verification_record_uri is not None:
-                referenced.add(relationship.verification_record_uri)
         if referenced - exposed:
             raise CapabilityError(
                 "capability result has first-class references missing from artifact_uris"
@@ -87,9 +80,6 @@ class CapabilityVerificationMixin:
             )
         _validate_projected_output(result, record_uri, record)
         record_parents = set(record_artifact.manifest.parents)
-        _validate_verified_relationships(
-            result, record_artifact, record, record_parents
-        )
         _validate_verified_completeness(result, record, record_parents)
 
 
@@ -126,13 +116,6 @@ def _validate_inline_exact_record(
     ):
         raise CapabilityError(
             "verified capability output differs from the checked conclusion"
-        )
-    if any(
-        relationship.status is CapabilityRelationshipStatus.VERIFIED
-        for relationship in result.relationships
-    ):
-        raise CapabilityError(
-            "inline exact verification cannot certify artifact relationships"
         )
     if result.completeness.assurance_level is CapabilityAssuranceLevel.VERIFIED:
         raise CapabilityError(
@@ -177,46 +160,6 @@ def _validate_projected_output(
         raise CapabilityError(
             "verified capability output differs from the checked conclusion"
         )
-
-
-def _validate_verified_relationships(
-    result: CapabilityResult,
-    record_artifact: Any,
-    record: VerificationRecord,
-    record_parents: set[str],
-) -> None:
-    for relationship in result.relationships:
-        if relationship.status is not CapabilityRelationshipStatus.VERIFIED:
-            continue
-        bound_artifacts = {
-            *relationship.source_artifact_uris,
-            *relationship.target_artifact_uris,
-            *relationship.obligation_uris,
-        }
-        if not bound_artifacts.issubset(record_parents):
-            raise CapabilityError(
-                "verified relationship record does not bind its artifacts"
-            )
-        if record_artifact.payload.get("relation_id") != relationship.relation_id:
-            raise CapabilityError(
-                "verified relationship differs from the checked relation"
-            )
-        if (
-            record.relationship_source_artifact_uris
-            != relationship.source_artifact_uris
-            or record.relationship_target_artifact_uris
-            != relationship.target_artifact_uris
-        ):
-            raise CapabilityError(
-                "verified relationship endpoints differ from the checked relation"
-            )
-        checked_obligations = (
-            (record.obligation_uri,) if record.obligation_uri is not None else ()
-        )
-        if relationship.obligation_uris != checked_obligations:
-            raise CapabilityError(
-                "verified relationship obligations differ from the checked relation"
-            )
 
 
 def _validate_verified_completeness(

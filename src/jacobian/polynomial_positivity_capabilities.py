@@ -39,8 +39,6 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
-    CapabilityRelationship,
-    CapabilityRelationshipStatus,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -406,13 +404,6 @@ class PolynomialIntervalPositivityDecideAdapter:
                 },
                 artifact_uri=polynomial_artifact.artifact_uri,
             ),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id="polynomial.relation.positivity-decision-of",
-                    source_artifact_uris=(polynomial_artifact.artifact_uri,),
-                    target_artifact_uris=(decision_artifact.artifact_uri,),
-                ),
-            ),
             artifact_uris=(
                 polynomial_artifact.artifact_uri,
                 decision_artifact.artifact_uri,
@@ -673,19 +664,6 @@ class PolynomialIntervalPositivityVerifyAdapter:
                     )
                 ),
                 verification_record_uri=record_uri,
-            ),
-            relationships=(
-                (
-                    CapabilityRelationship(
-                        relation_id="polynomial.relation.valid-positivity-decision",
-                        source_artifact_uris=(decision_artifact.artifact_uri,),
-                        target_artifact_uris=(polynomial_artifact.artifact_uri,),
-                        status=CapabilityRelationshipStatus.VERIFIED,
-                        verification_record_uri=record_uri,
-                    ),
-                )
-                if conclusion == "TRUE" and verified
-                else ()
             ),
             assurance=CapabilityAssurance(
                 level=(

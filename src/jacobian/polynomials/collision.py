@@ -13,8 +13,6 @@ from jacobian.contracts.capabilities import (
     CapabilityCompleteness,
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
-    CapabilityRelationship,
-    CapabilityRelationshipStatus,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -239,27 +237,6 @@ class PolynomialCollisionAdapter:
         ]
         if witness_uri is not None:
             artifact_uris.append(witness_uri)
-        relationships = [
-            CapabilityRelationship(
-                relation_id="polynomial.relation.evaluation-of",
-                source_artifact_uris=(candidate_uri,),
-                target_artifact_uris=(
-                    first_evaluation_artifact.artifact_uri,
-                    second_evaluation_artifact.artifact_uri,
-                ),
-            )
-        ]
-        if witness_uri is not None:
-            relationships.append(
-                CapabilityRelationship(
-                    relation_id="polynomial.relation.collision-derived-from",
-                    source_artifact_uris=(
-                        first_evaluation_artifact.artifact_uri,
-                        second_evaluation_artifact.artifact_uri,
-                    ),
-                    target_artifact_uris=(witness_uri,),
-                )
-            )
         return _computed_result(
             descriptor=self.descriptor,
             request=request,
@@ -277,7 +254,6 @@ class PolynomialCollisionAdapter:
                 },
                 artifact_uri=candidate_uri,
             ),
-            relationships=tuple(relationships),
             artifact_uris=tuple(artifact_uris),
             completeness_basis=(
                 "both supplied evaluation artifact payloads were structurally "
@@ -485,15 +461,6 @@ class PolynomialCollisionSearchAdapter:
             ),
         )
         artifacts = [map_uri, *evaluation_uris]
-        relationships: list[CapabilityRelationship] = []
-        if evaluation_uris:
-            relationships.append(
-                CapabilityRelationship(
-                    relation_id="polynomial.relation.evaluation-of",
-                    source_artifact_uris=(map_uri,),
-                    target_artifact_uris=tuple(evaluation_uris),
-                )
-            )
         if found is not None:
             (
                 first_evaluation_result,
@@ -512,30 +479,6 @@ class PolynomialCollisionSearchAdapter:
                     claim_uri,
                     witness_uri,
                 ]
-            )
-            relationships.extend(
-                (
-                    CapabilityRelationship(
-                        relation_id="polynomial.relation.injectivity-claim-of",
-                        source_artifact_uris=(map_uri,),
-                        target_artifact_uris=(claim_uri,),
-                    ),
-                    CapabilityRelationship(
-                        relation_id="polynomial.relation.collision-derived-from",
-                        source_artifact_uris=(
-                            first_evaluation_result,
-                            second_evaluation_result,
-                        ),
-                        target_artifact_uris=(witness_uri,),
-                    ),
-                    CapabilityRelationship(
-                        relation_id=(
-                            "polynomial.relation.collision-refutes-injectivity"
-                        ),
-                        source_artifact_uris=(witness_uri,),
-                        target_artifact_uris=(claim_uri,),
-                    ),
-                )
             )
         exhausted_grid = examined == grid_point_count
         scope = CapabilityScope(
@@ -577,7 +520,6 @@ class PolynomialCollisionSearchAdapter:
                 ),
                 output=output.model_dump(mode="json"),
                 scope=scope,
-                relationships=tuple(relationships),
                 artifact_uris=artifact_uris,
             )
         return _computed_result(
@@ -586,7 +528,6 @@ class PolynomialCollisionSearchAdapter:
             started=started,
             output=output.model_dump(mode="json"),
             scope=scope,
-            relationships=tuple(relationships),
             artifact_uris=artifact_uris,
             completeness_basis=(
                 "the deterministic grid was fully enumerated"
@@ -724,19 +665,6 @@ class PolynomialCollisionVerifyAdapter:
                 status=CapabilityCompletenessStatus.NOT_APPLICABLE,
                 basis="direct witness verification makes no search coverage claim",
                 assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id="polynomial.relation.collision-refutes-injectivity",
-                    source_artifact_uris=(witness_artifact.artifact_uri,),
-                    target_artifact_uris=(claim_artifact.artifact_uri,),
-                    status=(
-                        CapabilityRelationshipStatus.VERIFIED
-                        if verified
-                        else CapabilityRelationshipStatus.PROPOSED
-                    ),
-                    verification_record_uri=(record_uri),
-                ),
             ),
             assurance=CapabilityAssurance(
                 level=(
@@ -883,19 +811,6 @@ class PolynomialMapInverseCollisionVerifyAdapter:
                 ),
                 assurance_level=CapabilityAssuranceLevel.COMPUTED,
             ),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id=(
-                        "polynomial.relation.collision-refutes-two-sided-inverse"
-                    ),
-                    source_artifact_uris=(witness_artifact.artifact_uri,),
-                    target_artifact_uris=(claim.artifact_uri,),
-                    status=CapabilityRelationshipStatus.VERIFIED,
-                    verification_record_uri=record_uri,
-                ),
-            )
-            if verified
-            else (),
             assurance=CapabilityAssurance(
                 level=(
                     CapabilityAssuranceLevel.VERIFIED

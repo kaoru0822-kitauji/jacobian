@@ -37,7 +37,6 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
-    CapabilityRelationship,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -273,12 +272,6 @@ class GraphComposeAdapter:
             summary=f"Composition record: {operation}",
         )
 
-        relationship = CapabilityRelationship(
-            relation_id="graph.relation.composed-from",
-            source_artifact_uris=(result_artifact.artifact_uri,),
-            target_artifact_uris=_composition_parents(validated),
-        )
-
         return CapabilityResult(
             capability_id=self.descriptor.capability_id,
             capability_version=self.descriptor.version,
@@ -314,7 +307,6 @@ class GraphComposeAdapter:
                 ),
                 assurance_level=CapabilityAssuranceLevel.COMPUTED,
             ),
-            relationships=(relationship,),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis=(
@@ -484,15 +476,6 @@ class GraphEnumerateNonisomorphicAdapter:
                 }
             )
 
-        relationships = tuple(
-            CapabilityRelationship(
-                relation_id="graph.relation.enumerated-in",
-                source_artifact_uris=(scope_artifact.artifact_uri,),
-                target_artifact_uris=(graph_uri,),
-            )
-            for graph_uri in graph_uris
-        )
-
         return CapabilityResult(
             capability_id=self.descriptor.capability_id,
             capability_version=self.descriptor.version,
@@ -535,7 +518,6 @@ class GraphEnumerateNonisomorphicAdapter:
                 ),
                 assurance_level=CapabilityAssuranceLevel.COMPUTED,
             ),
-            relationships=relationships,
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis=(

@@ -11,7 +11,6 @@ from tests.support.polynomials import univariate_term as _term
 
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
-    CapabilityRelationshipStatus,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
@@ -309,9 +308,6 @@ def test_decide_capability_finds_positive_linear(installation) -> None:
     assert result.output["roots_in_open_interval"] == 0
     assert result.output["endpoint_root"] is False
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    assert result.relationships[0].relation_id == (
-        "polynomial.relation.positivity-decision-of"
-    )
 
 
 def test_decide_capability_detects_root_in_interval(installation) -> None:
@@ -393,10 +389,6 @@ def test_verify_capability_confirms_positive_decision(installation) -> None:
     assert result.output["conclusion"] == "TRUE"
     assert result.output["checker_id"] is not None
     assert result.output["verification_record_uri"] is not None
-    assert result.relationships[0].relation_id == (
-        "polynomial.relation.valid-positivity-decision"
-    )
-    assert result.relationships[0].status is CapabilityRelationshipStatus.VERIFIED
 
 
 def test_verify_capability_refutes_false_positive_claim(installation) -> None:
@@ -426,4 +418,3 @@ def test_verify_capability_refutes_false_positive_claim(installation) -> None:
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
     assert result.output["positivity_assurance"] == "VERIFIED"
     assert result.output["conclusion"] == "FALSE"
-    assert result.relationships == ()

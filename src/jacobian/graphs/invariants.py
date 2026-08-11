@@ -20,7 +20,6 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
-    CapabilityRelationship,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -211,16 +210,6 @@ class GraphPropertyAdapter:
                     "NOT_APPLICABLE, or UNSUPPORTED result under registry version 1"
                 ),
                 assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id="graph.relation.properties-of",
-                    source_artifact_uris=(graph_uri,),
-                    target_artifact_uris=(
-                        property_artifact.artifact_uri,
-                        *(binding.artifact_uri for binding in bindings),
-                    ),
-                ),
             ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,

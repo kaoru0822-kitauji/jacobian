@@ -224,7 +224,6 @@ def test_polynomial_bundle_installs_and_computes_exact_invariants(
         assert result.execution.status is ExecutionStatus.COMPLETED
         assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
         assert result.artifact_uris == ()
-        assert result.relationships == ()
 
     invalid_result = _invoke(
         runtime,

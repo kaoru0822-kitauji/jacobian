@@ -16,8 +16,6 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
-    CapabilityRelationship,
-    CapabilityRelationshipStatus,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -357,21 +355,6 @@ class PolynomialExpressionNormalizationVerificationAdapter:
                     )
                 ),
                 verification_record_uri=record_uri,
-            ),
-            relationships=(
-                (
-                    CapabilityRelationship(
-                        relation_id=("polynomial.relation.expression-normalization-of"),
-                        source_artifact_uris=(resolved.artifact.artifact_uri,),
-                        target_artifact_uris=(
-                            resolved.expression_artifact.artifact_uri,
-                        ),
-                        status=CapabilityRelationshipStatus.VERIFIED,
-                        verification_record_uri=record_uri,
-                    ),
-                )
-                if verified
-                else ()
             ),
             artifact_uris=tuple(artifact_uris),
         )

@@ -10,8 +10,6 @@ from jacobian.contracts.capabilities import (
     CapabilityCompleteness,
     CapabilityCompletenessStatus,
     CapabilityDiscoveryResult,
-    CapabilityRelationship,
-    CapabilityRelationshipStatus,
     CapabilityResult,
     CapabilityScope,
 )
@@ -150,32 +148,5 @@ def test_failed_execution_cannot_claim_completeness() -> None:
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.HEURISTIC,
                 basis="enumeration timed out",
-            ),
-        )
-
-
-def test_verified_relationship_must_use_result_checker_record() -> None:
-    other_record = "artifact://sha256/" + "b" * 64
-    with pytest.raises(
-        ValidationError,
-        match="verified relationship must use the result verification record",
-    ):
-        CapabilityResult(
-            capability_id="claim.derive.specialization",
-            capability_version="1",
-            execution=Execution(status=ExecutionStatus.COMPLETED),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id="claim.relation.specialization",
-                    source_artifact_uris=("artifact://sha256/" + "c" * 64,),
-                    target_artifact_uris=("artifact://sha256/" + "d" * 64,),
-                    status=CapabilityRelationshipStatus.VERIFIED,
-                    verification_record_uri=other_record,
-                ),
-            ),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.VERIFIED,
-                basis="independent checker accepted the relation",
-                verification_record_uri=RECORD_URI,
             ),
         )

@@ -120,10 +120,6 @@ def test_sympy_normalizes_typed_multivariate_expression(
         ]
     }
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    assert (
-        result.relationships[0].relation_id
-        == "polynomial.relation.expression-normalization-of"
-    )
     resolved = polynomial_normalization_services.core.polynomial_expressions.resolve_normalization(
         result.output["normalization_uri"]
     )

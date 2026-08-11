@@ -21,8 +21,6 @@ from jacobian.contracts.capabilities import (
     CapabilityDiagnostic,
     CapabilityInputKind,
     CapabilityProviderRuntime,
-    CapabilityRelationship,
-    CapabilityRelationshipStatus,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -399,19 +397,6 @@ class NullstellensatzVerificationAdapter:
                     else CapabilityAssuranceLevel.COMPUTED
                 ),
                 verification_record_uri=record_uri,
-            ),
-            relationships=(
-                (
-                    CapabilityRelationship(
-                        relation_id="polynomial.relation.infeasibility-certificate-for",
-                        source_artifact_uris=(bundle_artifact.artifact_uri,),
-                        target_artifact_uris=(system_artifact.artifact_uri,),
-                        status=CapabilityRelationshipStatus.VERIFIED,
-                        verification_record_uri=record_uri,
-                    ),
-                )
-                if verified
-                else ()
             ),
             assurance=CapabilityAssurance(
                 level=(

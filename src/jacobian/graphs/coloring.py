@@ -20,7 +20,6 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
-    CapabilityRelationship,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -317,13 +316,6 @@ class GraphColoringEncodingAdapter:
                     "were materialized"
                 ),
                 assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id="graph.relation.coloring-encoding-of",
-                    source_artifact_uris=(claim.artifact_uri,),
-                    target_artifact_uris=(scope.artifact_uri,),
-                ),
             ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,

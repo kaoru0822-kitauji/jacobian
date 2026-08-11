@@ -21,7 +21,6 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
-    CapabilityRelationship,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -732,7 +731,6 @@ def _computed_result(
     started: float,
     output: dict[str, Any],
     scope: CapabilityScope,
-    relationships: tuple[CapabilityRelationship, ...],
     artifact_uris: tuple[str, ...],
     completeness_basis: str,
     completeness_status: CapabilityCompletenessStatus = (
@@ -760,7 +758,6 @@ def _computed_result(
             ),
             assurance_level=CapabilityAssuranceLevel.COMPUTED,
         ),
-        relationships=relationships,
         assurance=CapabilityAssurance(
             level=CapabilityAssuranceLevel.COMPUTED,
             basis=assurance_basis,

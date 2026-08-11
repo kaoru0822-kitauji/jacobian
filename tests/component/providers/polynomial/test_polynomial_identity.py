@@ -12,7 +12,6 @@ from tests.component.providers.polynomial.polynomial_capabilities_support import
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityCompletenessStatus,
-    CapabilityRelationshipStatus,
     CapabilityRequest,
 )
 from jacobian.contracts.results import Conclusion, InputStatus
@@ -36,7 +35,6 @@ def test_rational_function_identity_cross_multiplies_exactly(
     )
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
     assert result.completeness.status is CapabilityCompletenessStatus.COMPLETE
-    assert len(result.relationships) == 1
 
     semantics_uri = runtime.polynomial.rational_function_identity_semantics_uri
     semantics = runtime.core.store.get(semantics_uri)
@@ -59,7 +57,6 @@ def test_rational_function_identity_reports_exact_difference(
     assert result.output["identical"] is False
     assert result.output["conclusion"] == Conclusion.FALSE.value
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
-    assert result.relationships == ()
 
 
 def test_rational_function_identity_rejects_zero_denominator(
@@ -135,8 +132,6 @@ def test_polynomial_identity_verifies_equal_coefficients(
     assert result.output["conclusion"] == "TRUE"
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
     assert result.assurance.verification_record_uri is not None
-    assert len(result.relationships) == 1
-    assert result.relationships[0].status is CapabilityRelationshipStatus.VERIFIED
     assert result.output["left_uri"] != result.output["right_uri"]
 
     semantics_uri = runtime.polynomial.identity_semantics_uri
@@ -186,7 +181,6 @@ def test_polynomial_identity_verifies_a_difference(
     assert result.output["conclusion"] == "FALSE"
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
     assert result.assurance.verification_record_uri is not None
-    assert result.relationships == ()
     record = runtime.core.store.get(result.output["verification_record_uri"])
     assert record.payload["conclusion"] == Conclusion.FALSE.value
     assert record.payload["relation_id"] is None
@@ -241,4 +235,3 @@ def test_polynomial_identity_preserves_checker_rejection_as_unknown(
     assert result.output["verification_record_uri"] is None
     assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
     assert result.completeness.status is CapabilityCompletenessStatus.UNKNOWN
-    assert result.relationships == ()

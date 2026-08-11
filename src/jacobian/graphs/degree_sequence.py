@@ -18,7 +18,6 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
-    CapabilityRelationship,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -252,13 +251,6 @@ class GraphDegreeSequenceAdapter:
                     "necessary-condition obstruction; verification remains separate"
                 ),
                 assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id="graph.relation.degree-sequence-result",
-                    source_artifact_uris=(claim_artifact.artifact_uri,),
-                    target_artifact_uris=(result_artifact.artifact_uri,),
-                ),
             ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,

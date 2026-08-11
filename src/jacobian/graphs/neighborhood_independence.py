@@ -20,7 +20,6 @@ from jacobian.contracts.capabilities import (
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInputKind,
-    CapabilityRelationship,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -248,13 +247,6 @@ class GraphNeighborhoodIndependenceAdapter:
                     "advertised 24-vertex limit; verification remains separate"
                 ),
                 assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id=("graph.relation.neighborhood-independence-profile-of"),
-                    source_artifact_uris=(validated.graph_uri,),
-                    target_artifact_uris=(invariant_artifact.artifact_uri,),
-                ),
             ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,

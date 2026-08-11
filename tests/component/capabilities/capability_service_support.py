@@ -16,8 +16,6 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderAvailability,
     CapabilityProviderDigestKind,
     CapabilityProviderRuntime,
-    CapabilityRelationship,
-    CapabilityRelationshipStatus,
     CapabilityRequest,
     CapabilityResult,
 )
@@ -206,79 +204,4 @@ class ForgedVerifiedAdapter:
                 verification_record_uri=record_uri,
             ),
             artifact_uris=(record_uri,),
-        )
-
-
-@dataclass(frozen=True)
-class OmittedRelationshipArtifactAdapter:
-    descriptor = CapabilityDescriptor(
-        capability_id="example.relationship",
-        version="1",
-        title="Return an unbound relationship",
-        description="Adversarial adapter that omits a relationship endpoint.",
-        provider="tests",
-        provider_runtime=TEST_RUNTIME,
-        input_schema={"type": "object"},
-        output_schema={"type": "object"},
-    )
-
-    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
-        return CapabilityResult(
-            capability_id=self.descriptor.capability_id,
-            capability_version=self.descriptor.version,
-            execution=Execution(status=ExecutionStatus.COMPLETED),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id="example.relation.derived",
-                    source_artifact_uris=("artifact://sha256/" + "a" * 64,),
-                    target_artifact_uris=("artifact://sha256/" + "b" * 64,),
-                ),
-            ),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis="adapter proposed a relationship",
-            ),
-        )
-
-
-@dataclass(frozen=True)
-class ForgedRelationshipVerificationAdapter:
-    verification_record_uri: str
-    artifact_uris: tuple[str, ...]
-    relation_id: str
-    source_uri: str
-    target_uri: str
-    obligation_uris: tuple[str, ...] = ()
-    descriptor = CapabilityDescriptor(
-        capability_id="example.forged-relationship",
-        version="1",
-        title="Mislabel a checked result as a verified relationship",
-        description="Adversarial adapter that reuses an unrelated valid record.",
-        provider="tests",
-        provider_runtime=TEST_RUNTIME,
-        input_schema={"type": "object"},
-        output_schema={"type": "object"},
-    )
-
-    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
-        return CapabilityResult(
-            capability_id=self.descriptor.capability_id,
-            capability_version=self.descriptor.version,
-            execution=Execution(status=ExecutionStatus.COMPLETED),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id=self.relation_id,
-                    source_artifact_uris=(self.source_uri,),
-                    target_artifact_uris=(self.target_uri,),
-                    obligation_uris=self.obligation_uris,
-                    status=CapabilityRelationshipStatus.VERIFIED,
-                    verification_record_uri=self.verification_record_uri,
-                ),
-            ),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.VERIFIED,
-                basis="reused a record that did not check this relation",
-                verification_record_uri=self.verification_record_uri,
-            ),
-            artifact_uris=self.artifact_uris,
         )

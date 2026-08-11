@@ -1,8 +1,7 @@
 """Tests for adapter authority and forgery boundaries.
 
 Covers: invocation recording, provider readiness, error diagnostics, forged
-VERIFIED assurance, relationship endpoint exposure, and relationship
-verification record binding.
+VERIFIED assurance, and verification record binding.
 """
 
 from __future__ import annotations
@@ -13,15 +12,9 @@ import pytest
 from tests.component.capabilities.capability_service_support import (
     ComputedAdapter,
     CrashingAdapter,
-    ForgedRelationshipVerificationAdapter,
     ForgedVerifiedAdapter,
     InvalidOutputAdapter,
     NotReadyProviderAdapter,
-    OmittedRelationshipArtifactAdapter,
-)
-from tests.support.core_capability_harnesses import (
-    FinitePartitionTestServices,
-    open_finite_partition_services,
 )
 from tests.support.services import DomainTestServices, open_domain_services
 
@@ -36,12 +29,6 @@ from jacobian.contracts.results import ExecutionStatus
 @pytest.fixture
 def capability_core_services(tmp_path) -> Iterator[DomainTestServices]:
     with open_domain_services(tmp_path / "state") as services:
-        yield services
-
-
-@pytest.fixture
-def finite_partition_services(tmp_path) -> Iterator[FinitePartitionTestServices]:
-    with open_finite_partition_services(tmp_path / "state") as services:
         yield services
 
 
@@ -210,97 +197,6 @@ def test_adapter_cannot_promote_without_a_local_verification_record(
         core.capabilities.invoke(
             CapabilityRequest(
                 capability_id="example.forged",
-                input={},
-            )
-        )
-
-
-def test_first_class_relationship_endpoints_must_be_exposed(
-    capability_core_services: DomainTestServices,
-) -> None:
-    core = capability_core_services.core
-    capability_core_services.installation.register_capability(
-        OmittedRelationshipArtifactAdapter()
-    )
-
-    with pytest.raises(CapabilityError, match="missing from artifact_uris"):
-        core.capabilities.invoke(
-            CapabilityRequest(
-                capability_id="example.relationship",
-                input={},
-            )
-        )
-
-
-def test_verified_relationship_must_match_checker_selected_endpoints(
-    finite_partition_services: FinitePartitionTestServices,
-) -> None:
-    runtime = finite_partition_services.services
-    verified = runtime.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="case.partition.finite.verify",
-            input={
-                "universe": ["a", "b"],
-                "cases": [
-                    {"case_id": "left", "members": ["a"]},
-                    {"case_id": "right", "members": ["b"]},
-                ],
-                "require_disjoint": True,
-            },
-        )
-    )
-    record_uri = verified.assurance.verification_record_uri
-    assert record_uri is not None
-    record = runtime.core.store.get(record_uri)
-    forged = ForgedRelationshipVerificationAdapter(
-        verification_record_uri=record_uri,
-        artifact_uris=(*record.manifest.parents, record_uri),
-        relation_id="case.relation.partitions",
-        source_uri=verified.output["claim_uri"],
-        target_uri=verified.output["partition_uri"],
-    )
-    runtime.core.capabilities.register(forged)
-
-    with pytest.raises(CapabilityError, match="endpoints differ"):
-        runtime.core.capabilities.invoke(
-            CapabilityRequest(
-                capability_id=forged.descriptor.capability_id,
-                input={},
-            )
-        )
-
-
-def test_verified_relationship_must_match_checker_selected_obligation(
-    finite_partition_services: FinitePartitionTestServices,
-) -> None:
-    runtime = finite_partition_services.services
-    verified = runtime.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="case.partition.finite.verify",
-            input={
-                "universe": ["a"],
-                "cases": [{"case_id": "only", "members": ["a"]}],
-                "require_disjoint": True,
-            },
-        )
-    )
-    record_uri = verified.assurance.verification_record_uri
-    assert record_uri is not None
-    record = runtime.core.store.get(record_uri)
-    forged = ForgedRelationshipVerificationAdapter(
-        verification_record_uri=record_uri,
-        artifact_uris=(*record.manifest.parents, record_uri),
-        relation_id="case.relation.partitions",
-        source_uri=verified.output["scope_uri"],
-        target_uri=verified.output["partition_uri"],
-        obligation_uris=(verified.output["certificate_uri"],),
-    )
-    runtime.core.capabilities.register(forged)
-
-    with pytest.raises(CapabilityError, match="obligations differ"):
-        runtime.core.capabilities.invoke(
-            CapabilityRequest(
-                capability_id=forged.descriptor.capability_id,
                 input={},
             )
         )

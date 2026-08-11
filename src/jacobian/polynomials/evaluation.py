@@ -14,8 +14,6 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityInvocationExample,
-    CapabilityRelationship,
-    CapabilityRelationshipStatus,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -144,13 +142,6 @@ class PolynomialMapEvaluationAdapter:
                     "point": point.model_dump(mode="json")["values"],
                 },
                 artifact_uri=map_uri,
-            ),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id="polynomial.relation.evaluation-of",
-                    source_artifact_uris=(map_uri,),
-                    target_artifact_uris=(evaluation_uri,),
-                ),
             ),
             artifact_uris=(map_uri, evaluation_uri),
             completeness_basis="every coordinate was evaluated exactly at the point",
@@ -325,13 +316,6 @@ class PolynomialJacobianAdapter:
                     "variable_order": list(polynomial_map.variables),
                 },
                 artifact_uri=map_uri,
-            ),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id="polynomial.relation.jacobian-of",
-                    source_artifact_uris=(map_uri,),
-                    target_artifact_uris=(jacobian_artifact.artifact_uri,),
-                ),
             ),
             artifact_uris=(
                 map_uri,
@@ -530,17 +514,6 @@ class PolynomialKellerConditionVerifyAdapter:
                     basis="the independent Keller-condition checker did not accept",
                 )
             ),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id="polynomial.relation.keller-condition",
-                    source_artifact_uris=(map_uri,),
-                    target_artifact_uris=(jacobian_uri,),
-                    status=CapabilityRelationshipStatus.VERIFIED,
-                    verification_record_uri=record_uri,
-                ),
-            )
-            if verified and conclusion is Conclusion.TRUE
-            else (),
             assurance=CapabilityAssurance(
                 level=(
                     CapabilityAssuranceLevel.VERIFIED

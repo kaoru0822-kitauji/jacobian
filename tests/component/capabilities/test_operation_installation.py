@@ -161,7 +161,6 @@ def test_synthetic_bundle_returns_an_inline_typed_result(
     assert result.output["result"] == {"doubled": 12}
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.artifact_uris == ()
-    assert result.relationships == ()
     assert result.scope is None
 
 
@@ -325,7 +324,6 @@ def test_materialized_operation_retains_artifacts_lineage_and_typed_preview(
     assert input_artifact.payload == {"value": 6}
     assert output_artifact.payload == {"doubled": 12}
     assert output_artifact.manifest.parents == (input_uri,)
-    assert result.relationships == ()
 
 
 def test_catalog_effect_comes_from_operation_spec(

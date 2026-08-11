@@ -9,7 +9,6 @@ import pytest
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
-    CapabilityRelationshipStatus,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
@@ -91,8 +90,6 @@ def test_enclose_capability_computes_a_valid_bernstein_enclosure(
     ]
     assert result.output["lo"] == {"num": "1", "den": "1"}
     assert result.output["hi"] == {"num": "3", "den": "1"}
-    assert result.relationships[0].relation_id == "polynomial.relation.enclosure-of"
-    assert result.relationships[0].status is CapabilityRelationshipStatus.PROPOSED
 
 
 def test_enclose_capability_handles_a_quadratic_on_a_shifted_interval(
@@ -160,10 +157,6 @@ def test_verify_capability_confirms_a_valid_enclosure(installation) -> None:
     assert result.output["conclusion"] == "TRUE"
     assert result.output["checker_id"] is not None
     assert result.output["verification_record_uri"] is not None
-    assert result.relationships[0].relation_id == (
-        "polynomial.relation.valid-bernstein-enclosure"
-    )
-    assert result.relationships[0].status is CapabilityRelationshipStatus.VERIFIED
 
 
 def test_verify_capability_rejects_a_false_enclosure(installation) -> None:
@@ -193,7 +186,6 @@ def test_verify_capability_rejects_a_false_enclosure(installation) -> None:
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
     assert result.output["enclosure_assurance"] == "VERIFIED"
     assert result.output["conclusion"] == "FALSE"
-    assert result.relationships == ()
 
 
 def test_enclose_capability_rejects_a_degenerate_interval(installation) -> None:
