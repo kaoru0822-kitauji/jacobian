@@ -142,7 +142,6 @@ def test_modular_polynomial_residue_image_is_complete_and_materialized(
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    assert result.obligations == ()
     stored_result = _stored_modular_residue_result(domain_services, result)
     assert stored_result == {
         "semantics_version": "modular-polynomial-residue-image.v1",

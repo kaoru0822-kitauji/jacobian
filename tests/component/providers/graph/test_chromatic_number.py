@@ -50,7 +50,6 @@ def test_chromatic_number_returns_first_satisfying_k_with_witness(
         "SATISFIABLE",
     ]
     assert result.artifact_uris == ()
-    assert result.obligations == ()
     assert result.relationships == ()
 
     coloring = output["coloring"]

@@ -49,7 +49,6 @@ def test_arb_point_enclosure_returns_exact_dyadics(
     assert output["relative_accuracy_bits"] >= 120
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.artifact_uris == ()
-    assert result.obligations == ()
 
 
 def test_arb_nonfinite_and_timeout_are_non_conclusions(
@@ -95,4 +94,3 @@ def test_arb_nonfinite_and_timeout_are_non_conclusions(
     assert timed_out.output["error"]["code"] == "ARB_POINT_ENCLOSURE_TIMEOUT"
     assert timed_out.diagnostics[0].code == "ARB_POINT_ENCLOSURE_TIMEOUT"
     assert timed_out.assurance.level is CapabilityAssuranceLevel.HEURISTIC
-    assert timed_out.obligations == ()

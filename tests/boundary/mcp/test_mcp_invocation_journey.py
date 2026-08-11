@@ -58,7 +58,6 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
                 "scope",
                 "completeness",
                 "relationships",
-                "obligations",
                 "assurance",
             ):
                 if semantic_field in response:

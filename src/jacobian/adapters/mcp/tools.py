@@ -322,7 +322,6 @@ def _run_text_projection(result: CapabilityResult) -> dict[str, Any]:
         "scope",
         "completeness",
         "relationships",
-        "obligations",
         "assurance",
     ):
         value = payload.get(key)

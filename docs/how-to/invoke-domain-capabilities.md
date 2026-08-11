@@ -180,16 +180,16 @@ First inspect operational state:
 
 Then inspect mathematical state:
 
-- `completeness.status = COMPLETE` means the operation's declared completion
-  predicate holds, but assurance may still be only `COMPUTED`;
-- `UNKNOWN` or `PARTIAL` means the result is not complete;
-- `obligations` identifies the open optimality or completeness claim; and
+- the operation's typed output owns its completion or coverage status;
+- `UNKNOWN`, `INCOMPLETE`, or a domain-specific partial status is not a
+  negative conclusion; and
 - the output may retain an incumbent, bounds, and a tested trace even when no
   conclusion is available.
 
 Never use `execution.status = COMPLETED` by itself as evidence of optimality.
-Keep the input, result, and obligation artifact URIs together so a later
-checker or resumed investigation can address the exact open claim.
+Keep the input and result artifact URIs together so a later checker can address
+the exact typed subject and candidate. The generic response envelope does not
+create an obligation lifecycle.
 
 ## When verification is unavailable
 
@@ -200,8 +200,7 @@ failed runtime measurement, configured exclusions, or a producer relation for
 which no independent checker is installed.
 
 You can still use the computed result as explicitly labeled evidence. Preserve
-its provider identity, artifacts, scope, completeness, and obligations, and
-report the missing verification path.
+its typed value and artifacts, and report the missing checker operation.
 
 See the [domain operation library reference](../reference/domain-operation-library.md)
 for the underlying producer and checker contracts.

@@ -24,8 +24,6 @@ from jacobian.contracts.capabilities import (
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInvocationExample,
-    CapabilityObligation,
-    CapabilityObligationStatus,
     CapabilityRelationship,
     CapabilityRelationshipStatus,
     CapabilityRequest,
@@ -558,17 +556,6 @@ class FiniteCoverageVerifyAdapter:
                         else CapabilityRelationshipStatus.PROPOSED
                     ),
                     obligation_uris=(claim.artifact_uri,),
-                    verification_record_uri=record_uri,
-                ),
-            ),
-            obligations=(
-                CapabilityObligation(
-                    obligation_uri=claim.artifact_uri,
-                    status=(
-                        CapabilityObligationStatus.DISCHARGED
-                        if verified
-                        else CapabilityObligationStatus.OPEN
-                    ),
                     verification_record_uri=record_uri,
                 ),
             ),

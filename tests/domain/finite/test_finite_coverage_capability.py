@@ -5,7 +5,6 @@ from tests.support.core_capability_harnesses import FiniteCoverageTestServices
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityCompletenessStatus,
-    CapabilityObligationStatus,
     CapabilityRelationshipStatus,
     CapabilityRequest,
 )
@@ -49,7 +48,6 @@ def test_finite_coverage_verifies_exactly_once_across_pages(
     assert len(result.output["page_uris"]) == 2
     assert result.output["verification_record_uri"] is not None
     assert result.relationships[0].status is CapabilityRelationshipStatus.VERIFIED
-    assert result.obligations[0].status is CapabilityObligationStatus.DISCHARGED
 
     archive = runtime.core.store.get(result.output["archive_uri"])
     assert set(result.output["page_uris"]).issubset(set(archive.manifest.parents))
@@ -75,7 +73,6 @@ def test_finite_coverage_reports_omission_and_duplicate(
     assert len(diagnostics["duplicate_occurrences"]) == 2
     assert result.output["verification_record_uri"] is None
     assert result.relationships[0].status is CapabilityRelationshipStatus.PROPOSED
-    assert result.obligations[0].status is CapabilityObligationStatus.OPEN
 
 
 def test_finite_coverage_reports_items_outside_scope(

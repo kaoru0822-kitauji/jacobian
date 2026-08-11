@@ -187,7 +187,6 @@ def test_graph_optimizer_returns_exact_typed_witness(
         assert len(output[witness_field]) == optimum, case
         assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED, case
         assert result.artifact_uris == (), case
-        assert result.obligations == (), case
         if capability_id == "graph.domination.minimum.compute":
             assert nx.is_dominating_set(relabeled, output["witness_vertices"]), case
         elif capability_id == "graph.matching.maximal.minimum.compute":

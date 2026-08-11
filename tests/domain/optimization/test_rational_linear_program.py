@@ -57,7 +57,6 @@ def test_rational_lp_produces_inspectable_primal_dual_certificate(
     assert output["dual_slacks"] == [_rational(0), _rational(1)]
     assert output["verification"] == "UNVERIFIED"
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    assert result.obligations == ()
 
 
 def test_rational_lp_dual_variables_are_unrestricted_and_dimension_bound(

@@ -8,7 +8,6 @@ from jacobian.capability_errors import CapabilityError
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityCompletenessStatus,
-    CapabilityObligationStatus,
     CapabilityRelationshipStatus,
     CapabilityResult,
 )
@@ -39,10 +38,6 @@ class CapabilityVerificationMixin:
             referenced.update(relationship.obligation_uris)
             if relationship.verification_record_uri is not None:
                 referenced.add(relationship.verification_record_uri)
-        for obligation in result.obligations:
-            referenced.add(obligation.obligation_uri)
-            if obligation.verification_record_uri is not None:
-                referenced.add(obligation.verification_record_uri)
         if referenced - exposed:
             raise CapabilityError(
                 "capability result has first-class references missing from artifact_uris"
@@ -95,7 +90,6 @@ class CapabilityVerificationMixin:
         _validate_verified_relationships(
             result, record_artifact, record, record_parents
         )
-        _validate_discharged_obligations(result, record_artifact, record_parents)
         _validate_verified_completeness(result, record, record_parents)
 
 
@@ -139,13 +133,6 @@ def _validate_inline_exact_record(
     ):
         raise CapabilityError(
             "inline exact verification cannot certify artifact relationships"
-        )
-    if any(
-        obligation.status is CapabilityObligationStatus.DISCHARGED
-        for obligation in result.obligations
-    ):
-        raise CapabilityError(
-            "inline exact verification cannot discharge artifact obligations"
         )
     if result.completeness.assurance_level is CapabilityAssuranceLevel.VERIFIED:
         raise CapabilityError(
@@ -229,24 +216,6 @@ def _validate_verified_relationships(
         if relationship.obligation_uris != checked_obligations:
             raise CapabilityError(
                 "verified relationship obligations differ from the checked relation"
-            )
-
-
-def _validate_discharged_obligations(
-    result: CapabilityResult,
-    record_artifact: Any,
-    record_parents: set[str],
-) -> None:
-    for obligation in result.obligations:
-        if obligation.status is not CapabilityObligationStatus.DISCHARGED:
-            continue
-        if (
-            obligation.obligation_uri not in record_parents
-            or record_artifact.payload.get("obligation_uri")
-            != obligation.obligation_uri
-        ):
-            raise CapabilityError(
-                "discharged obligation differs from the checked obligation"
             )
 
 

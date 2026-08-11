@@ -10,8 +10,6 @@ from jacobian.contracts.capabilities import (
     CapabilityCompleteness,
     CapabilityCompletenessStatus,
     CapabilityDiscoveryResult,
-    CapabilityObligation,
-    CapabilityObligationStatus,
     CapabilityRelationship,
     CapabilityRelationshipStatus,
     CapabilityResult,
@@ -179,28 +177,5 @@ def test_verified_relationship_must_use_result_checker_record() -> None:
                 level=CapabilityAssuranceLevel.VERIFIED,
                 basis="independent checker accepted the relation",
                 verification_record_uri=RECORD_URI,
-            ),
-        )
-
-
-def test_discharged_obligation_requires_verified_result() -> None:
-    with pytest.raises(
-        ValidationError,
-        match="discharged obligation requires verified result assurance",
-    ):
-        CapabilityResult(
-            capability_id="case.partition.finite",
-            capability_version="1",
-            execution=Execution(status=ExecutionStatus.COMPLETED),
-            obligations=(
-                CapabilityObligation(
-                    obligation_uri="artifact://sha256/" + "e" * 64,
-                    status=CapabilityObligationStatus.DISCHARGED,
-                    verification_record_uri=RECORD_URI,
-                ),
-            ),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis="partition was generated but not independently checked",
             ),
         )

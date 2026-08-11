@@ -169,7 +169,6 @@ def test_discrete_logarithm_returns_typed_result(
     }
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.artifact_uris == ()
-    assert result.obligations == ()
 
 
 def test_discrete_logarithm_reports_unsolvable_without_false_witness(

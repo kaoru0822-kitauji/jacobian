@@ -331,13 +331,6 @@ class CapabilityRelationshipStatus(StrEnum):
     VERIFIED = "VERIFIED"
 
 
-class CapabilityObligationStatus(StrEnum):
-    """Lifecycle of a proof obligation created by a capability."""
-
-    OPEN = "OPEN"
-    DISCHARGED = "DISCHARGED"
-
-
 class CapabilityCompletenessStatus(StrEnum):
     """How much of the explicitly declared scope an operation covered."""
 
@@ -527,28 +520,6 @@ class CapabilityRelationship(ContractModel):
         return self
 
 
-class CapabilityObligation(ContractModel):
-    """One materialized proof obligation and its checker-backed lifecycle."""
-
-    obligation_uri: ArtifactUri
-    status: CapabilityObligationStatus = CapabilityObligationStatus.OPEN
-    verification_record_uri: ArtifactUri | None = None
-
-    @model_validator(mode="after")
-    def require_record_for_discharge(self) -> Self:
-        if (
-            self.status is CapabilityObligationStatus.DISCHARGED
-            and self.verification_record_uri is None
-        ):
-            raise ValueError("discharged obligation requires a record URI")
-        if (
-            self.status is CapabilityObligationStatus.OPEN
-            and self.verification_record_uri is not None
-        ):
-            raise ValueError("open obligation cannot carry a record URI")
-        return self
-
-
 class CapabilityDiagnostic(ContractModel):
     """Actionable, stage-aware failure information without a truth claim."""
 
@@ -603,23 +574,6 @@ def _validate_verified_relationships(
                 )
 
 
-def _validate_discharged_obligations(
-    obligations: tuple[CapabilityObligation, ...],
-    assurance_level: CapabilityAssuranceLevel,
-    record_uri: ArtifactUri | None,
-) -> None:
-    for obligation in obligations:
-        if obligation.status is CapabilityObligationStatus.DISCHARGED:
-            if assurance_level is not CapabilityAssuranceLevel.VERIFIED:
-                raise ValueError(
-                    "discharged obligation requires verified result assurance"
-                )
-            if obligation.verification_record_uri != record_uri:
-                raise ValueError(
-                    "discharged obligation must use the result verification record"
-                )
-
-
 def _validate_verified_completeness(
     completeness: CapabilityCompleteness,
     assurance_level: CapabilityAssuranceLevel,
@@ -649,7 +603,6 @@ class CapabilityResult(ContractModel):
         )
     )
     relationships: tuple[CapabilityRelationship, ...] = ()
-    obligations: tuple[CapabilityObligation, ...] = ()
     diagnostics: tuple[CapabilityDiagnostic, ...] = ()
     assurance: CapabilityAssurance
     artifact_uris: tuple[ArtifactUri, ...] = ()
@@ -669,11 +622,6 @@ class CapabilityResult(ContractModel):
         record_uri = self.assurance.verification_record_uri
         _validate_verified_relationships(
             self.relationships,
-            self.assurance.level,
-            record_uri,
-        )
-        _validate_discharged_obligations(
-            self.obligations,
             self.assurance.level,
             record_uri,
         )

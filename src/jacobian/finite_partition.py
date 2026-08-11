@@ -17,8 +17,6 @@ from jacobian.contracts.capabilities import (
     CapabilityCompleteness,
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
-    CapabilityObligation,
-    CapabilityObligationStatus,
     CapabilityRelationship,
     CapabilityRelationshipStatus,
     CapabilityRequest,
@@ -528,11 +526,6 @@ def _partition_result(
         if verified
         else CapabilityRelationshipStatus.PROPOSED
     )
-    obligation_status = (
-        CapabilityObligationStatus.DISCHARGED
-        if verified
-        else CapabilityObligationStatus.OPEN
-    )
     execution_status = (
         verification_result.execution.status
         if verification_result is not None
@@ -607,13 +600,6 @@ def _partition_result(
                 target_artifact_uris=(material.partition_uri,),
                 status=relationship_status,
                 obligation_uris=(material.claim_uri,),
-                verification_record_uri=record_uri if verified else None,
-            ),
-        ),
-        obligations=(
-            CapabilityObligation(
-                obligation_uri=material.claim_uri,
-                status=obligation_status,
                 verification_record_uri=record_uri if verified else None,
             ),
         ),
