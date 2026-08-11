@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
+from functools import partial
 from typing import Any, Literal
 
 from pydantic import ValidationError
@@ -134,17 +135,21 @@ def install_exact_domain_checkers(
     """Install independent exact replay against dynamically registered schemas."""
 
     installer = CheckerInstaller(checkers)
-    provider_runtimes = {
-        "python-flint": exact_domain_checker_provider_runtime(),
-        "certified-snf": certified_snf_checker_provider_runtime(),
-        "finite-graph": graph_exact_checker_provider_runtime(),
-        "finite-probability": probability_exact_checker_provider_runtime(),
-        "combinatorics": combinatorics_exact_checker_provider_runtime(),
-        "poset": poset_exact_checker_provider_runtime(),
-        "graded-syzygy": graded_syzygy_checker_provider_runtime(),
-        "projective-arrangement": (projective_arrangement_checker_provider_runtime()),
-        "topology": topology_exact_checker_provider_runtime(),
-        "geometry": source_provider_runtime(
+    runtime_factories: dict[
+        str,
+        Callable[..., CapabilityProviderRuntime],
+    ] = {
+        "python-flint": exact_domain_checker_provider_runtime,
+        "certified-snf": certified_snf_checker_provider_runtime,
+        "finite-graph": graph_exact_checker_provider_runtime,
+        "finite-probability": probability_exact_checker_provider_runtime,
+        "combinatorics": combinatorics_exact_checker_provider_runtime,
+        "poset": poset_exact_checker_provider_runtime,
+        "graded-syzygy": graded_syzygy_checker_provider_runtime,
+        "projective-arrangement": projective_arrangement_checker_provider_runtime,
+        "topology": topology_exact_checker_provider_runtime,
+        "geometry": partial(
+            source_provider_runtime,
             "jacobian.exact-geometry-checker",
             version="1",
             entrypoint="jacobian_checkers.exact_geometry:check_exact_geometry",
@@ -152,7 +157,8 @@ def install_exact_domain_checkers(
             license_id="MIT",
             features=("standard-library-rational-replay", "clean-process-checker"),
         ),
-        "matrix-hnf": source_provider_runtime(
+        "matrix-hnf": partial(
+            source_provider_runtime,
             "jacobian.matrix-hnf-checker",
             version="1",
             entrypoint="jacobian_checkers.matrix_normal_forms:check_hermite_normal_form",
@@ -160,7 +166,8 @@ def install_exact_domain_checkers(
             license_id="MIT",
             features=("standard-library-integer-replay", "clean-process-checker"),
         ),
-        "linear-solution": source_provider_runtime(
+        "linear-solution": partial(
+            source_provider_runtime,
             "jacobian.rational-linear-checker",
             version="1",
             entrypoint="jacobian_checkers.linear:check_rational_solution",
@@ -168,7 +175,8 @@ def install_exact_domain_checkers(
             license_id="MIT",
             features=("standard-library-rational-replay", "clean-process-checker"),
         ),
-        "linear-inconsistency": source_provider_runtime(
+        "linear-inconsistency": partial(
+            source_provider_runtime,
             "jacobian.rational-linear-inconsistency-checker",
             version="1",
             entrypoint="jacobian_checkers.linear:check_rational_inconsistency",
@@ -176,6 +184,9 @@ def install_exact_domain_checkers(
             license_id="MIT",
             features=("standard-library-rational-replay", "clean-process-checker"),
         ),
+    }
+    provider_runtimes = {
+        runtime_key: factory() for runtime_key, factory in runtime_factories.items()
     }
     checker_ids: dict[str, str | None] = {}
     declarations_by_id: dict[str, ExactReplayCheckerDeclaration] = {}
@@ -254,77 +265,8 @@ def install_exact_domain_checkers(
         checker_ids=checker_ids,
         diagnostics=tuple(diagnostics),
         provider_runtimes={
-            "python-flint": exact_domain_checker_provider_runtime(
-                checker_ids=authorized_ids["python-flint"]
-            ),
-            "certified-snf": certified_snf_checker_provider_runtime(
-                checker_ids=authorized_ids["certified-snf"]
-            ),
-            "finite-graph": graph_exact_checker_provider_runtime(
-                checker_ids=authorized_ids["finite-graph"]
-            ),
-            "finite-probability": probability_exact_checker_provider_runtime(
-                checker_ids=authorized_ids["finite-probability"]
-            ),
-            "combinatorics": combinatorics_exact_checker_provider_runtime(
-                checker_ids=authorized_ids["combinatorics"]
-            ),
-            "poset": poset_exact_checker_provider_runtime(
-                checker_ids=authorized_ids["poset"]
-            ),
-            "graded-syzygy": graded_syzygy_checker_provider_runtime(
-                checker_ids=authorized_ids["graded-syzygy"]
-            ),
-            "projective-arrangement": (
-                projective_arrangement_checker_provider_runtime(
-                    checker_ids=authorized_ids["projective-arrangement"]
-                )
-            ),
-            "topology": topology_exact_checker_provider_runtime(
-                checker_ids=authorized_ids["topology"]
-            ),
-            "geometry": source_provider_runtime(
-                "jacobian.exact-geometry-checker",
-                version="1",
-                entrypoint="jacobian_checkers.exact_geometry:check_exact_geometry",
-                install_tier=CapabilityInstallTier.T1,
-                license_id="MIT",
-                features=(
-                    "standard-library-rational-replay",
-                    "clean-process-checker",
-                ),
-                checker_ids=authorized_ids["geometry"],
-            ),
-            "matrix-hnf": source_provider_runtime(
-                "jacobian.matrix-hnf-checker",
-                version="1",
-                entrypoint="jacobian_checkers.matrix_normal_forms:check_hermite_normal_form",
-                install_tier=CapabilityInstallTier.T1,
-                license_id="MIT",
-                features=("standard-library-integer-replay", "clean-process-checker"),
-                checker_ids=authorized_ids["matrix-hnf"],
-            ),
-            "linear-solution": source_provider_runtime(
-                "jacobian.rational-linear-checker",
-                version="1",
-                entrypoint="jacobian_checkers.linear:check_rational_solution",
-                install_tier=CapabilityInstallTier.T1,
-                license_id="MIT",
-                features=("standard-library-rational-replay", "clean-process-checker"),
-                checker_ids=authorized_ids["linear-solution"],
-            ),
-            "linear-inconsistency": source_provider_runtime(
-                "jacobian.rational-linear-inconsistency-checker",
-                version="1",
-                entrypoint="jacobian_checkers.linear:check_rational_inconsistency",
-                install_tier=CapabilityInstallTier.T1,
-                license_id="MIT",
-                features=(
-                    "standard-library-rational-replay",
-                    "clean-process-checker",
-                ),
-                checker_ids=authorized_ids["linear-inconsistency"],
-            ),
+            runtime_key: factory(checker_ids=authorized_ids[runtime_key])
+            for runtime_key, factory in runtime_factories.items()
         },
     )
 
