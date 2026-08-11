@@ -190,7 +190,7 @@ def test_system_elan_uses_the_original_user_toolchain_home(
     )
 
 
-def test_mathlib_validates_the_exact_lake_compiler_command(
+def test_mathlib_validates_lean_before_the_digest_bound_lake_compiler(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -225,7 +225,7 @@ def test_mathlib_validates_the_exact_lake_compiler_command(
 
     _run_lean("", environment_name="MATHLIB")
 
-    assert validated == [(("/usr/bin/lake", "env", "lean"), tmp_path)]
+    assert validated == [(("/usr/bin/lean",), tmp_path)]
 
 
 def test_source_accepts_let_expressions_and_inline_by_terms() -> None:

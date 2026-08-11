@@ -603,7 +603,10 @@ def _run_lean(
         runtime = _mathlib_runtime()
         lake_command = _lean_command("lake")
         command = [*lake_command, "env", "lean"]
-        _validate_lean(tuple(command), cwd=runtime)
+        # ``lake env lean`` is the compiler launcher, but Lake itself does not
+        # implement Lean's ``-V`` and ``-g`` identity probes. Validate the
+        # separately digest-authorized Lean sibling before Lake drives it.
+        _validate_lean(_lean_command("lean"), cwd=runtime)
         mathlib_path = _mathlib_process_path(lake_command)
         memory_mb = "8192"
         timeout_seconds = _MATHLIB_COMPILE_TIMEOUT_SECONDS
