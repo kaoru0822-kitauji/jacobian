@@ -25,6 +25,7 @@
       },
       "expected_diagnostic_codes": ["LEAN_TYPE_MISMATCH"],
       "terminal_capability_id": "lean.check",
+      "terminal_immutable_input_fields": ["statement", "environment"],
       "prompt": "Repair and independently verify this exact Lean CORE theorem. Your first Jacobian call must be lean.check with exactly statement `True`, proof `by\n  exact False.elim True.intro`, and environment `CORE`; do not silently fix it before observing that rejection. Then use the returned mathematical state or diagnostics to repair the proof and finish with a successful lean.check verification. Report the final proof and whether it was independently verified."
     },
     {
@@ -37,6 +38,7 @@
       },
       "expected_diagnostic_codes": ["LEAN_UNKNOWN_IDENTIFIER"],
       "terminal_capability_id": "lean.check",
+      "terminal_immutable_input_fields": ["statement", "environment"],
       "prompt": "Repair and independently verify this exact Lean MATHLIB theorem. Your first Jacobian call must be lean.check with exactly statement `∀ x : ℝ, x ^ 2 ≥ 0`, proof `by\n  intro x\n  exact not_a_mathlib_theorem x`, and environment `MATHLIB`; do not silently fix it before observing that rejection. Then use Mathlib premise/tactic support and the returned diagnostics to repair the proof, and finish with a successful MATHLIB lean.check verification. Report the final proof and whether it was independently verified."
     },
     {
@@ -50,6 +52,11 @@
       },
       "expected_diagnostic_codes": ["LEAN_TYPE_MISMATCH"],
       "terminal_capability_id": "lean.proof_edit.validate",
+      "terminal_immutable_input_fields": [
+        "environment",
+        "statement",
+        "original_proof"
+      ],
       "prompt": "Repair this exact Lean proof edit without changing the statement. Your first Jacobian call must be lean.proof_edit.validate with exactly environment `CORE`, statement `True`, original_proof `by\n  trivial`, and edited_proof `by\n  exact False.elim True.intro`; do not silently fix it before observing that rejection. Then repair only edited_proof and obtain an accepted checker-backed proof-edit result. Report the corrected edit and its assurance."
     }
   ],
@@ -71,7 +78,7 @@
   "invariants": [
     "Use the same suite digest, model, reasoning effort, tool mode, prompt, timeout, and repetition count in both conditions.",
     "The first exact injected payload must be attempted before any repair.",
-    "Only a terminal checker-backed accepted result counts as repair success.",
+    "Only a terminal checker-backed accepted result preserving the case's immutable claim inputs counts as repair success.",
     "Timeout, tool error, rejected input, and missing evidence remain non-conclusions.",
     "Recovery metrics are evaluation evidence and never fields in an agent-facing runtime response."
   ]

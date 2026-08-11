@@ -76,6 +76,15 @@ def test_recovery_suite_freezes_control_treatment_and_injected_cases() -> None:
     }
     assert len(suite.cases) == 3
     assert any("MATHLIB" in case.prompt for case in suite.cases)
+    assert suite.cases[0].terminal_immutable_input_fields == (
+        "statement",
+        "environment",
+    )
+    assert suite.cases[2].terminal_immutable_input_fields == (
+        "environment",
+        "statement",
+        "original_proof",
+    )
     assert suite.causal_claim_authorized is False
 
 
@@ -104,6 +113,11 @@ def test_recovery_classification_separates_diagnostic_from_terminal_success() ->
             },
             {
                 "capability_id": "lean.check",
+                "input": {
+                    "statement": case.injected_payload["statement"],
+                    "proof": "by\n  trivial",
+                    "environment": case.injected_payload["environment"],
+                },
                 "output": {"conclusion": "TRUE", "diagnostics": []},
                 "assurance": {
                     "level": "VERIFIED",
@@ -121,6 +135,41 @@ def test_recovery_classification_separates_diagnostic_from_terminal_success() ->
     assert result["repair_success"] is True
     assert result["math_run_call_count"] == 2
     assert result["repeated_error_count"] == 0
+
+
+def test_recovery_does_not_count_verification_of_a_different_claim() -> None:
+    case = load_suite(SUITE).cases[1]
+    telemetry = {
+        "capability_invocations": [
+            {
+                "capability_id": case.injected_capability_id,
+                "input": case.injected_payload,
+                "output": {
+                    "conclusion": "UNKNOWN",
+                    "diagnostics": [{"code": "LEAN_UNKNOWN_IDENTIFIER"}],
+                },
+                "assurance": {"level": "HEURISTIC"},
+            },
+            {
+                "capability_id": case.terminal_capability_id,
+                "input": {
+                    "statement": "True",
+                    "proof": "by trivial",
+                    "environment": "MATHLIB",
+                },
+                "output": {"conclusion": "TRUE", "diagnostics": []},
+                "assurance": {
+                    "level": "VERIFIED",
+                    "verification_record_uri": "artifact://sha256/" + "b" * 64,
+                },
+            },
+        ]
+    }
+
+    result = classify_recovery(case, telemetry)
+
+    assert result["injection_payload_exact"] is True
+    assert result["repair_success"] is False
 
 
 def test_recovery_summary_and_comparison_keep_efficiency_metrics_separate() -> None:

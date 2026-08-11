@@ -122,10 +122,13 @@ selected release path against the declared revision before starting a run.
 
 The classifier requires the exact injected payload to be the first Jacobian
 capability invocation and rejected before a later checker-backed success can
-count as a repair. It records repair success, observed diagnostic codes,
-repeated errors, tool calls, tokens, and latency in evaluation artifacts only;
-none of these metrics enters a runtime response. The public fixed cases support
-descriptive recovery observations, not a causal or held-out performance claim.
+count as a repair. That terminal result must also preserve the case's declared
+immutable input fields: statement and environment for `lean.check`, plus the
+original proof baseline for `lean.proof_edit.validate`. It records repair
+success, observed diagnostic codes, repeated errors, tool calls, tokens, and
+latency in evaluation artifacts only; none of these metrics enters a runtime
+response. The public fixed cases support descriptive recovery observations,
+not a causal or held-out performance claim.
 
 ## Performance benchmarks
 

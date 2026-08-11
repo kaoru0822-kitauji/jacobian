@@ -98,6 +98,25 @@ def test_repl_diagnostics_keep_other_source_warnings() -> None:
     assert diagnostics[0].raw_backend_message == "caller-visible source warning"
 
 
+def test_repl_diagnostics_bound_backend_text_and_metavariable() -> None:
+    raw = "type mismatch ?" + "a" * 25_000
+
+    diagnostics = repl_diagnostics(
+        (
+            _command_with_warning("declaration uses `sorry`"),
+            _proof_step(),
+            _proof_step(error=raw),
+        )
+    )
+
+    assert len(diagnostics) == 1
+    assert diagnostics[0].code == "LEAN_TYPE_MISMATCH"
+    assert len(diagnostics[0].raw_backend_message) == 20_000
+    assert diagnostics[0].raw_backend_message == raw[:20_000]
+    assert diagnostics[0].metavariable is not None
+    assert len(diagnostics[0].metavariable) == 512
+
+
 def test_checker_diagnostics_classify_setup_failure_as_operational() -> None:
     detail = (
         "MATHLIB_MANIFEST: a pinned mathlib package checkout failed integrity "

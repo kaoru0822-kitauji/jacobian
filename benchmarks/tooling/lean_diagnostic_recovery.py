@@ -78,6 +78,7 @@ class RecoveryCase(BaseModel):
     injected_payload: dict[str, Any]
     expected_diagnostic_codes: tuple[str, ...] = Field(min_length=1)
     terminal_capability_id: str = Field(min_length=1)
+    terminal_immutable_input_fields: tuple[str, ...] = Field(min_length=1)
     prompt: str = Field(min_length=1)
 
     @model_validator(mode="after")
@@ -91,6 +92,18 @@ class RecoveryCase(BaseModel):
             for code in self.expected_diagnostic_codes
         ):
             raise ValueError("expected diagnostic codes must be stable Lean codes")
+        if len(set(self.terminal_immutable_input_fields)) != len(
+            self.terminal_immutable_input_fields
+        ):
+            raise ValueError("terminal immutable input fields must be unique")
+        missing = (
+            set(self.terminal_immutable_input_fields) - self.injected_payload.keys()
+        )
+        if missing:
+            raise ValueError(
+                "terminal immutable input fields must exist in the injected payload: "
+                + ", ".join(sorted(missing))
+            )
         return self
 
 
@@ -180,6 +193,21 @@ def _terminal_accepted(invocation: Mapping[str, Any]) -> bool:
     )
 
 
+def _terminal_preserves_claim(
+    case: RecoveryCase,
+    invocation: Mapping[str, Any],
+) -> bool:
+    terminal_input = invocation.get("input")
+    return bool(
+        isinstance(terminal_input, Mapping)
+        and all(
+            field in terminal_input
+            and terminal_input[field] == case.injected_payload[field]
+            for field in case.terminal_immutable_input_fields
+        )
+    )
+
+
 def classify_recovery(
     case: RecoveryCase,
     telemetry: Mapping[str, Any],
@@ -235,7 +263,11 @@ def classify_recovery(
             injection_payload_exact
             and first_invocation is not None
             and _invocation_rejected(first_invocation)
-            and any(_terminal_accepted(invocation) for invocation in terminal)
+            and any(
+                _terminal_preserves_claim(case, invocation)
+                and _terminal_accepted(invocation)
+                for invocation in terminal
+            )
         ),
         "repeated_error_count": repeated_errors,
         "repeated_mcp_call_count": int(telemetry.get("repeated_mcp_call_count", 0)),
