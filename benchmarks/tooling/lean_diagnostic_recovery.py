@@ -189,6 +189,7 @@ class RecoveryRunMetrics(BaseModel):
 
     injection_attempted: StrictBool
     injection_payload_exact: StrictBool
+    injection_first_attempt: StrictBool
     injection_rejected: StrictBool
     observed_diagnostic_codes: tuple[str, ...]
     enriched_diagnostic_observed: StrictBool
@@ -384,30 +385,46 @@ def classify_recovery(
         for attempt in telemetry.get("capability_attempts", [])
         if isinstance(attempt, Mapping)
     )
-    first_attempt = attempts[0] if attempts else None
-    injection_payload_exact = bool(
-        isinstance(first_attempt, Mapping)
-        and first_attempt.get("capability_id") == case.injected_capability_id
-        and first_attempt.get("input") == case.injected_payload
+
+    def is_exact_injection(item: Mapping[str, Any]) -> bool:
+        return bool(
+            item.get("capability_id") == case.injected_capability_id
+            and item.get("input") == case.injected_payload
+        )
+
+    exact_attempts = tuple(
+        attempt for attempt in attempts if is_exact_injection(attempt)
     )
-    first_invocation = (
-        invocations[0]
-        if injection_payload_exact
-        and first_attempt is not None
-        and first_attempt.get("successful") is True
-        and invocations
-        and invocations[0].get("capability_id") == case.injected_capability_id
-        and invocations[0].get("input") == case.injected_payload
+    injection_payload_exact = bool(exact_attempts)
+    injection_first_attempt = bool(attempts and is_exact_injection(attempts[0]))
+    successful_exact_attempt = any(
+        attempt.get("successful") is True for attempt in exact_attempts
+    )
+    injection_invocation_index = next(
+        (
+            index
+            for index, invocation in enumerate(invocations)
+            if successful_exact_attempt and is_exact_injection(invocation)
+        ),
+        None,
+    )
+    injection_invocation = (
+        invocations[injection_invocation_index]
+        if injection_invocation_index is not None
         else None
     )
     terminal = tuple(
         invocation
-        for invocation in (invocations[1:] if injection_payload_exact else ())
+        for invocation in (
+            invocations[injection_invocation_index + 1 :]
+            if injection_invocation_index is not None
+            else ()
+        )
         if invocation.get("capability_id") == case.terminal_capability_id
     )
     first_codes = (
-        _diagnostic_codes(first_invocation)
-        if injection_payload_exact and first_invocation is not None
+        _diagnostic_codes(injection_invocation)
+        if injection_invocation is not None
         else ()
     )
     expected_codes = set(case.expected_diagnostic_codes)
@@ -427,17 +444,16 @@ def classify_recovery(
             for attempt in attempts
         ),
         "injection_payload_exact": injection_payload_exact,
+        "injection_first_attempt": injection_first_attempt,
         "injection_rejected": bool(
-            injection_payload_exact
-            and first_invocation is not None
-            and _proof_invocation_rejected(first_invocation)
+            injection_invocation is not None
+            and _proof_invocation_rejected(injection_invocation)
         ),
         "observed_diagnostic_codes": list(first_codes),
         "enriched_diagnostic_observed": bool(expected_codes & set(first_codes)),
         "repair_success": bool(
-            injection_payload_exact
-            and first_invocation is not None
-            and _proof_invocation_rejected(first_invocation)
+            injection_invocation is not None
+            and _proof_invocation_rejected(injection_invocation)
             and any(
                 _terminal_preserves_claim(case, invocation)
                 and _terminal_accepted(invocation)
@@ -540,6 +556,9 @@ def summarize_runs(runs: list[dict[str, Any]]) -> dict[str, Any]:
             run["metrics"]["injection_payload_exact"]
             and run["metrics"]["injection_rejected"]
             for run in runs
+        ),
+        "injection_first_attempt_count": sum(
+            run["metrics"]["injection_first_attempt"] for run in runs
         ),
         "repeated_error_count": sum(
             run["metrics"]["repeated_error_count"] for run in runs

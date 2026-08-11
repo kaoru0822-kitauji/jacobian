@@ -83,6 +83,7 @@ def _comparison_run(
         "metrics": {
             "injection_attempted": True,
             "injection_payload_exact": True,
+            "injection_first_attempt": True,
             "injection_rejected": True,
             "observed_diagnostic_codes": [],
             "repair_success": repair_success,
@@ -233,6 +234,7 @@ def _comparison_report(
     classified = {
         "injection_attempted": True,
         "injection_payload_exact": True,
+        "injection_first_attempt": True,
         "injection_rejected": True,
         "observed_diagnostic_codes": ["LEAN_TYPE_MISMATCH"] if not control else [],
         "enriched_diagnostic_observed": not control,
@@ -376,6 +378,7 @@ def test_recovery_classification_separates_diagnostic_from_terminal_success() ->
 
     assert result["injection_rejected"] is True
     assert result["injection_payload_exact"] is True
+    assert result["injection_first_attempt"] is True
     assert result["enriched_diagnostic_observed"] is True
     assert result["repair_success"] is True
     assert result["math_run_call_count"] == 2
@@ -582,6 +585,7 @@ def test_recovery_summary_and_comparison_keep_efficiency_metrics_separate(
     ]
     treatment_summary = summarize_runs(runs)
     assert treatment_summary["math_run_call_count"] == 2
+    assert treatment_summary["injection_first_attempt_count"] == 1
     control = _comparison_report("control")
     treatment = _comparison_report("enriched-diagnostics")
 
@@ -631,7 +635,9 @@ def test_recovery_does_not_count_a_repaired_call_before_exact_injection() -> Non
     result = _classify(case, telemetry)
 
     assert result["injection_attempted"] is True
-    assert result["injection_payload_exact"] is False
+    assert result["injection_payload_exact"] is True
+    assert result["injection_first_attempt"] is False
+    assert result["injection_rejected"] is True
     assert result["repair_success"] is False
 
 
@@ -683,8 +689,70 @@ def test_recovery_protocol_includes_failed_math_run_attempts() -> None:
     result = classify_recovery(case, telemetry)
 
     assert result["injection_attempted"] is True
-    assert result["injection_payload_exact"] is False
-    assert result["repair_success"] is False
+    assert result["injection_payload_exact"] is True
+    assert result["injection_first_attempt"] is False
+    assert result["injection_rejected"] is True
+    assert result["repair_success"] is True
+
+
+def test_recovery_success_allows_an_atomic_operation_before_injection() -> None:
+    case = load_suite(SUITE).cases[0]
+    rejected = {
+        "capability_id": case.injected_capability_id,
+        "input": case.injected_payload,
+        "output": {
+            "conclusion": "UNKNOWN",
+            "diagnostics": [{"code": "LEAN_TYPE_MISMATCH", "phase": "KERNEL_CHECK"}],
+        },
+        "assurance": {"level": "HEURISTIC"},
+    }
+    repaired_input = {
+        "statement": case.injected_payload["statement"],
+        "proof": "by\n  trivial",
+        "environment": case.injected_payload["environment"],
+    }
+    repaired = {
+        "capability_id": case.terminal_capability_id,
+        "input": repaired_input,
+        "output": {"conclusion": "TRUE", "diagnostics": []},
+        "assurance": {
+            "level": "VERIFIED",
+            "verification_record_uri": "artifact://sha256/" + "f" * 64,
+        },
+    }
+    unrelated = {
+        "capability_id": "arithmetic.gcd",
+        "input": {"values": [12, 18]},
+        "output": {"gcd": "6"},
+        "assurance": {"level": "COMPUTED"},
+    }
+    telemetry = {
+        "capability_attempts": [
+            {
+                "capability_id": unrelated["capability_id"],
+                "input": unrelated["input"],
+                "successful": True,
+            },
+            {
+                "capability_id": case.injected_capability_id,
+                "input": case.injected_payload,
+                "successful": True,
+            },
+            {
+                "capability_id": case.terminal_capability_id,
+                "input": repaired_input,
+                "successful": True,
+            },
+        ],
+        "capability_invocations": [unrelated, rejected, repaired],
+    }
+
+    result = classify_recovery(case, telemetry)
+
+    assert result["injection_payload_exact"] is True
+    assert result["injection_first_attempt"] is False
+    assert result["injection_rejected"] is True
+    assert result["repair_success"] is True
 
 
 def test_recovery_comparison_rejects_model_drift(tmp_path: Path) -> None:

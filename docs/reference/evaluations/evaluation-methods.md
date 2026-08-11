@@ -106,12 +106,13 @@ suite case. Reported call, token, rejection, diagnostic, repetition, and repair
 metrics must equal the recomputed values before any delta is emitted. The
 selected suite bytes and retained MCP surface are also rehashed.
 
-The exact injected payload must be the first Jacobian capability attempt,
-including unsuccessful `math.run` calls, and must produce proof-specific
-rejection evidence before a later checker-backed success can count as repair.
-Runtime setup, toolchain, Mathlib-manifest, and timeout failures remain
-non-conclusions. The terminal result must preserve each case's immutable claim
-fields. Recovery metrics remain evaluation artifacts and never enter an
+The exact injected payload may appear anywhere in the freely composed tool
+trace, but it must produce proof-specific rejection evidence before a later
+checker-backed success can count as repair. Whether it was the first Jacobian
+attempt is retained as a separate descriptive protocol field and never gates
+repair success. Runtime setup, toolchain, Mathlib-manifest, and timeout failures
+remain non-conclusions. The terminal result must preserve each case's immutable
+claim fields. Recovery metrics remain evaluation artifacts and never enter an
 agent-facing runtime response.
 
 ## Performance benchmarks
