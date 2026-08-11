@@ -224,6 +224,11 @@ validate_install_root() {
         && "${value}" != */. && "${value}" != *"/../"* \
         && "${value}" != */.. ]] || die \
         "--install-root must not contain empty, '.' or '..' path segments"
+    case "${value}/" in
+        /home/* | /root/* | /run/user/* | /tmp/* | /var/tmp/*)
+            die "--install-root must remain visible through the systemd sandbox; do not place it below /home, /root, /run/user, /tmp, or /var/tmp"
+            ;;
+    esac
 }
 
 validate_release_runtime() {

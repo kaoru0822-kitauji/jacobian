@@ -96,7 +96,17 @@ def test_dry_run_derives_every_runtime_path_from_custom_install_root() -> None:
 
 @pytest.mark.parametrize(
     "root",
-    ("relative/path", "/", "/srv/path with spaces", "/srv/../jacobian"),
+    (
+        "relative/path",
+        "/",
+        "/srv/path with spaces",
+        "/srv/../jacobian",
+        "/home/apps/jacobian",
+        "/root",
+        "/run/user/1000/jacobian",
+        "/tmp/jacobian",
+        "/var/tmp/jacobian",
+    ),
 )
 def test_install_root_rejects_unsafe_or_ambiguous_paths(root: str) -> None:
     completed = _run("--install-root", root, "--dry-run")

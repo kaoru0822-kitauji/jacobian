@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import threading
 import time
@@ -44,13 +45,17 @@ _DEFAULT_MATHLIB_MAX_RSS_KB = 9 * 1024 * 1024
 
 
 def _repl_process_environment(runtime: Path) -> dict[str, str]:
-    overrides = (
+    overrides = dict(
         lean_mathlib_git_config(runtime)
         if (runtime / "lake-manifest.json").is_file()
-        else None
+        else {}
+    )
+    overrides["ELAN_HOME"] = os.environ.get(
+        "ELAN_HOME",
+        str(Path.home() / ".elan"),
     )
     return worker_environment(
-        extra_variables=("PATH", "ELAN_HOME"),
+        extra_variables=("PATH",),
         overrides=overrides,
     )
 

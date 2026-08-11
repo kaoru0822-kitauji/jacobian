@@ -11,6 +11,7 @@ from jacobian.lean_frontend.repl import (
     LeanExplorationReplRuntime,
     LeanReplPolicy,
     PersistentLeanRepl,
+    _repl_process_environment,
 )
 from jacobian.lean_frontend.repl_protocol import LeanReplProofStepResponse
 
@@ -62,6 +63,31 @@ while True:
         proof_state += 1
     print(json.dumps(response), end="\n\n", flush=True)
 """
+
+
+def test_repl_environment_derives_default_elan_home_without_forwarding_home(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("ELAN_HOME", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    environment = _repl_process_environment(tmp_path)
+
+    assert environment["ELAN_HOME"] == str(tmp_path / ".elan")
+    assert "HOME" not in environment
+
+
+def test_repl_environment_preserves_explicit_elan_home(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    explicit = tmp_path / "shared-elan"
+    monkeypatch.setenv("ELAN_HOME", str(explicit))
+
+    environment = _repl_process_environment(tmp_path)
+
+    assert environment["ELAN_HOME"] == str(explicit)
 
 
 def test_persistent_repl_reuses_import_then_restarts_at_request_limit(
