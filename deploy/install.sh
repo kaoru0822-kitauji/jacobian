@@ -536,7 +536,7 @@ if [[ ! -d "${RELEASE_DIR}" ]]; then
                 lake exe cache get
             ELAN_HOME="${LEAN_ELAN_HOME}" \
                 "${LEAN_ELAN_HOME}/bin/elan" run "${LEAN_TOOLCHAIN}" \
-                lake build repl jacobian_lean_proof_state
+                lake build repl JacobianLeanRuntime jacobian_lean_proof_state
         )
     fi
     chown -R root:root "${RELEASE_DIR}" "${PYTHON_INSTALL_ROOT}"

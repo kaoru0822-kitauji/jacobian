@@ -184,7 +184,9 @@ def test_lean_profile_is_built_and_validated_before_activation() -> None:
         '"${LEAN_ELAN_HOME}/bin/elan" toolchain install "${LEAN_TOOLCHAIN}"'
     )
     fetch_cache = source.index("lake exe cache get")
-    build_runtime = source.index("lake build repl jacobian_lean_proof_state")
+    build_runtime = source.index(
+        "lake build repl JacobianLeanRuntime jacobian_lean_proof_state"
+    )
     validate = source.index('validate_lean_release_runtime "${RELEASE_DIR}"')
     revision_marker = source.index(
         'printf \'%s\\n\' "${REVISION}" >"${RELEASE_DIR}/.git-revision"'
