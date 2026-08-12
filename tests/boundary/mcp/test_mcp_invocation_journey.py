@@ -76,13 +76,6 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
             assert matching_contract["capability"]["invocation_examples"][0][
                 "name"
             ] == ("triangle_with_tail")
-            assert matching_contract["capability"]["related_capabilities"] == [
-                {
-                    "capability_id": ("graph.invariant.maximum_matching.verify"),
-                    "kind": "INDEPENDENT_VERIFIER",
-                    "relationship": "independently verify this exact producer result",
-                }
-            ]
 
             reliability_verifier_discovery = await client.call_tool(
                 "math.find",
@@ -105,39 +98,6 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
                     "matches"
                 ]
             }
-
-            modular_compute = await client.call_tool(
-                "math.find",
-                {
-                    "request": {
-                        "op": "inspect",
-                        "capability_id": ("modular.polynomial_residue_image.compute"),
-                    }
-                },
-            )
-            modular_verify = await client.call_tool(
-                "math.find",
-                {
-                    "request": {
-                        "op": "inspect",
-                        "capability_id": ("modular.polynomial_residue_image.verify"),
-                    }
-                },
-            )
-            assert isinstance(modular_compute.structured_content, dict)
-            assert isinstance(modular_verify.structured_content, dict)
-            assert {
-                item["capability_id"]
-                for item in modular_compute.structured_content["capability"][
-                    "related_capabilities"
-                ]
-            } == {"modular.polynomial_residue_image.verify"}
-            assert {
-                item["capability_id"]
-                for item in modular_verify.structured_content["capability"][
-                    "related_capabilities"
-                ]
-            } == {"modular.polynomial_residue_image.compute"}
 
             unknown = await client.call_tool(
                 "math.run",

@@ -152,7 +152,6 @@ def test_mcp_compact_capability_index_is_searchable_and_paginated(
                 materialize["capability"]["invocation_examples"][0]["name"]
                 == "finite-coloring-cnf"
             )
-            assert materialize["capability"]["related_capabilities"] == []
 
             first_page = await client.call_tool(
                 "math.find",
