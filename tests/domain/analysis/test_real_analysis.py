@@ -42,7 +42,6 @@ def test_arb_point_enclosure_returns_exact_dyadics(
     assert result.execution.status is ExecutionStatus.COMPLETED
     output = result.output["result"]
     assert output["status"] == "ENCLOSED"
-    assert output["conclusion"] == "UNKNOWN"
     assert output["lower"]["mantissa"]
     assert output["upper"]["mantissa"]
     assert output["relative_accuracy_bits"] >= 120
@@ -69,7 +68,6 @@ def test_arb_nonfinite_and_timeout_are_non_conclusions(
     assert output["status"] == "NONFINITE"
     assert output["lower"] is None
     assert output["upper"] is None
-    assert output["conclusion"] == "UNKNOWN"
 
     from jacobian.domains.analysis import operations
 

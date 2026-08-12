@@ -73,7 +73,6 @@ class ExactDyadic(ContractModel):
 
 class ArbPointEnclosureResult(ContractModel):
     status: Literal["ENCLOSED", "NONFINITE", "TIMEOUT", "BACKEND_ERROR"]
-    conclusion: Literal["UNKNOWN"] = "UNKNOWN"
     function: RealUnaryFunction
     argument: CanonicalRational
     precision_bits: StrictInt = Field(ge=32, le=4096)

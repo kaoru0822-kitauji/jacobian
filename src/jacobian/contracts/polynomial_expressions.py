@@ -438,13 +438,11 @@ class PolynomialExpressionNormalizeRequest(ContractModel):
 
 class PolynomialExpressionNormalizeOutput(ContractModel):
     status: Literal["NORMALIZATION_PRODUCED", "NO_NORMALIZATION_PRODUCED"]
-    conclusion: Literal["UNKNOWN"] = "UNKNOWN"
     expression_uri: ArtifactUri
     normalization_uri: ArtifactUri | None = None
     normalized: SparseRationalPolynomial | None = None
     exactness: Literal["EXACT_RATIONAL"] = "EXACT_RATIONAL"
     determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
-    verification_candidate_available: bool
     method: Literal["SYMPY_POLY_QQ_CANONICAL_TERMS"] = "SYMPY_POLY_QQ_CANONICAL_TERMS"
     backend: Literal["sympy"] = "sympy"
     backend_version: Literal["1.14.0"] = "1.14.0"
@@ -454,17 +452,13 @@ class PolynomialExpressionNormalizeOutput(ContractModel):
     def bind_candidate_projection(self) -> Self:
         produced = self.status == "NORMALIZATION_PRODUCED"
         if produced != (
-            self.normalization_uri is not None
-            and self.normalized is not None
-            and self.verification_candidate_available
+            self.normalization_uri is not None and self.normalized is not None
         ):
             raise ValueError(
                 "produced output requires one durable normalization candidate"
             )
         if not produced and (
-            self.normalization_uri is not None
-            or self.normalized is not None
-            or self.verification_candidate_available
+            self.normalization_uri is not None or self.normalized is not None
         ):
             raise ValueError("failed output cannot carry normalization evidence")
         return self

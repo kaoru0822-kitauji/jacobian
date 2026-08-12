@@ -87,7 +87,6 @@ def test_sympy_normalization_timeout_is_operational(
     )
     assert result.execution.status is ExecutionStatus.TIMEOUT
     assert result.output["status"] == "NO_NORMALIZATION_PRODUCED"
-    assert result.output["conclusion"] == "UNKNOWN"
     assert result.output["normalization_uri"] is None
     assert result.verification_record_uri is None
 
@@ -207,4 +206,3 @@ def test_invalid_worker_protocol_retains_no_normalization_evidence(
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.output["status"] == "NO_NORMALIZATION_PRODUCED"
     assert result.output["normalization_uri"] is None
-    assert result.output["conclusion"] == "UNKNOWN"

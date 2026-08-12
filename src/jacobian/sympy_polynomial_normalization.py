@@ -319,7 +319,6 @@ class SympyPolynomialExpressionNormalizeAdapter:
             expression_uri=expression_uri,
             normalization_uri=normalization_uri,
             normalized=run.normalized if normalization_uri is not None else None,
-            verification_candidate_available=normalization_uri is not None,
             detail=(
                 "Pinned SymPy produced canonical exact sparse QQ coefficients; "
                 "equality with the typed source expression remains unverified."
