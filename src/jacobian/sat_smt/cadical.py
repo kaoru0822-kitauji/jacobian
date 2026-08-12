@@ -333,6 +333,8 @@ class _CadicalBackend:
 class CadicalModelFindAdapter:
     """Attempt to produce one total assignment without validating it."""
 
+    typed_input = True
+
     def __init__(
         self,
         *,
@@ -381,9 +383,9 @@ class CadicalModelFindAdapter:
         ):
             run = _cancelled_after_solver(run)
         if run.execution_status is not ExecutionStatus.COMPLETED:
-            return _failed_result(self.descriptor, request, resolved, run)
+            return _failed_result(self.descriptor, resolved, run)
         if run.solver_status is None:
-            return _failed_result(self.descriptor, request, resolved, run)
+            return _failed_result(self.descriptor, resolved, run)
         assignment_uri: str | None = None
         assignment: dict[str, bool] | None = None
         if run.solver_status == "SATISFIABLE":
@@ -395,7 +397,6 @@ class CadicalModelFindAdapter:
             except ValueError:
                 return _failed_result(
                     self.descriptor,
-                    request,
                     resolved,
                     _CadicalRun(
                         execution_status=ExecutionStatus.ERROR,
@@ -450,23 +451,16 @@ class CadicalModelFindAdapter:
             artifacts.append(assignment_uri)
         return _completed_result(
             self.descriptor,
-            request,
-            resolved,
             run,
             output.model_dump(mode="json"),
             tuple(artifacts),
-            basis=(
-                "the pinned solver produced a bound candidate, but only an "
-                "independent assignment checker can verify it"
-                if assignment_uri is not None
-                else "the bounded solver attempt completed without a model; no "
-                "opposite mathematical conclusion follows"
-            ),
         )
 
 
 class CadicalUnsatProofFindAdapter:
     """Attempt to preserve raw text DRAT without validating the proof."""
+
+    typed_input = True
 
     def __init__(
         self,
@@ -516,13 +510,13 @@ class CadicalUnsatProofFindAdapter:
         ):
             run = _cancelled_after_solver(run)
         if run.execution_status is not ExecutionStatus.COMPLETED:
-            return _failed_result(self.descriptor, request, resolved, run)
+            return _failed_result(self.descriptor, resolved, run)
         if run.solver_status is None:
-            return _failed_result(self.descriptor, request, resolved, run)
+            return _failed_result(self.descriptor, resolved, run)
         proof_uri: str | None = None
         if run.solver_status == "UNSATISFIABLE":
             if run.proof is None:
-                return _failed_result(self.descriptor, request, resolved, run)
+                return _failed_result(self.descriptor, resolved, run)
             proof_uri = self.sat.put_proof(
                 cnf_uri=resolved.artifact.artifact_uri,
                 proof=run.proof,
@@ -552,18 +546,9 @@ class CadicalUnsatProofFindAdapter:
             artifacts.append(proof_uri)
         return _completed_result(
             self.descriptor,
-            request,
-            resolved,
             run,
             output.model_dump(mode="json"),
             tuple(artifacts),
-            basis=(
-                "the pinned solver produced bound raw proof bytes, but only an "
-                "independent proof checker can establish UNSAT"
-                if proof_uri is not None
-                else "the bounded solver attempt completed without a proof; no "
-                "opposite mathematical conclusion follows"
-            ),
         )
 
 
@@ -595,13 +580,9 @@ def _resolve_request(
 
 def _completed_result(
     descriptor: CapabilityDescriptor,
-    request: CapabilityRequest,
-    resolved: ResolvedSatCnf,
     run: _CadicalRun,
     output: dict[str, object],
     artifact_uris: tuple[str, ...],
-    *,
-    basis: str,
 ) -> CapabilityResult:
     return CapabilityResult(
         capability_id=descriptor.capability_id,
@@ -617,7 +598,6 @@ def _completed_result(
 
 def _failed_result(
     descriptor: CapabilityDescriptor,
-    request: CapabilityRequest,
     resolved: ResolvedSatCnf,
     run: _CadicalRun,
 ) -> CapabilityResult:

@@ -101,6 +101,8 @@ def install_sat_lrat_verifier(
 
 
 class SatLratVerificationAdapter:
+    typed_input = True
+
     def __init__(
         self,
         *,

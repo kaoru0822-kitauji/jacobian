@@ -163,6 +163,21 @@ def test_invalid_assignment_diagnostic_routes_through_public_capabilities(
     assert "SatArtifactService" not in hint
 
 
+def test_missing_assignment_is_reported_as_invalid_input(
+    sat_assignment_services,
+) -> None:
+    result = sat_assignment_services.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="sat.model.verify",
+            input={},
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "INVALID_REQUEST"
+    assert result.diagnostics[0].path == "assignment_uri"
+
+
 def test_sat_assignment_is_verified_by_an_authorized_clean_process(
     sat_assignment_services,
     monkeypatch: pytest.MonkeyPatch,

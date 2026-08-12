@@ -104,6 +104,8 @@ def install_smt_unsat_proof_checker(
 class SmtUnsatProofVerificationAdapter:
     """Verify one compatible Alethe proof; rejection establishes nothing."""
 
+    typed_input = True
+
     def __init__(
         self,
         *,

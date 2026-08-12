@@ -68,6 +68,8 @@ class SatUnsatProofCheckerInstallation:
 class SatCnfMaterializationAdapter:
     """Create one canonical CNF artifact without making a SAT conclusion."""
 
+    typed_input = True
+
     def __init__(self, sat: SatArtifactService) -> None:
         self.sat = sat
         self._descriptor = CapabilityDescriptor(
@@ -311,6 +313,8 @@ def install_sat_unsat_proof_checker(
 class SatAssignmentVerificationAdapter:
     """Verify one assignment; never infer UNSAT from assignment rejection."""
 
+    typed_input = True
+
     def __init__(
         self,
         *,
@@ -478,6 +482,8 @@ class SatAssignmentVerificationAdapter:
 
 class SatUnsatProofVerificationAdapter:
     """Verify one raw proof; rejection never establishes satisfiability."""
+
+    typed_input = True
 
     def __init__(
         self,

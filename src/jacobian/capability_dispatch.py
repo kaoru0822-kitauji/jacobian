@@ -6,11 +6,14 @@ import logging
 import time
 from typing import Any
 
+from pydantic import ValidationError
+
 from jacobian.capability_adapters import CapabilityAdapter, TypedInputAdapter
 from jacobian.capability_errors import (
     CapabilityError,
     CapabilityInvocationError,
     PayloadValidationError,
+    enriched_invalid_request,
 )
 from jacobian.capability_telemetry import log_invocation
 from jacobian.capability_validation import json_value_type, validate_payload
@@ -86,9 +89,8 @@ class CapabilityDispatchMixin:
         if invalid is not None:
             log_invocation(invalid, started)
             return invalid
-        if (
-            result.execution.status is ExecutionStatus.COMPLETED
-            and not isinstance(adapter, TypedInputAdapter)
+        if result.execution.status is ExecutionStatus.COMPLETED and not isinstance(
+            adapter, TypedInputAdapter
         ):
             result = _normalize_completed_adapter_output(
                 descriptor=descriptor,
@@ -181,6 +183,19 @@ def _adapter_execution_failure(
     request: CapabilityRequest,
     exc: Exception,
 ) -> CapabilityResult:
+    if isinstance(exc, ValidationError):
+        return failed_result(
+            descriptor=descriptor,
+            request=request,
+            diagnostic=enriched_invalid_request(
+                CapabilityDiagnostic(
+                    code="INVALID_REQUEST",
+                    stage="capability_input_validation",
+                    message="The capability request is invalid.",
+                ),
+                exc,
+            ),
+        )
     _LOGGER.warning(
         "capability %s stopped during execution",
         request.capability_id,

@@ -186,6 +186,8 @@ class _Cvc5Backend:
 class Cvc5UnsatProofFindAdapter:
     """Preserve raw cvc5 Alethe evidence without validating it."""
 
+    typed_input = True
+
     def __init__(
         self,
         *,
@@ -289,14 +291,14 @@ class Cvc5UnsatProofFindAdapter:
                 ),
             )
         if run.execution_status is not ExecutionStatus.COMPLETED:
-            return _failed_result(self.descriptor, request, resolved, run)
+            return _failed_result(self.descriptor, resolved, run)
         if run.solver_status is None:
-            return _failed_result(self.descriptor, request, resolved, run)
+            return _failed_result(self.descriptor, resolved, run)
         proof_uri: str | None = None
         holes: int | None = None
         if run.solver_status == "UNSATISFIABLE":
             if run.proof is None:
-                return _failed_result(self.descriptor, request, resolved, run)
+                return _failed_result(self.descriptor, resolved, run)
             proof_uri = self.smt.put_proof(
                 problem_uri=problem_uri,
                 proof=run.proof,
@@ -305,7 +307,7 @@ class Cvc5UnsatProofFindAdapter:
             ).artifact_uri
             holes = run.alethe_hole_count
             if holes is None:
-                return _failed_result(self.descriptor, request, resolved, run)
+                return _failed_result(self.descriptor, resolved, run)
         output = SmtUnsatProofFindOutput(
             status="PROOF_PRODUCED" if proof_uri is not None else "NO_PROOF_PRODUCED",
             solver_status=run.solver_status,
@@ -331,31 +333,17 @@ class Cvc5UnsatProofFindAdapter:
             artifacts.append(proof_uri)
         return _completed_result(
             self.descriptor,
-            request,
-            resolved,
             run,
             output.model_dump(mode="json"),
             tuple(artifacts),
-            basis=(
-                "the pinned solver produced bound raw Alethe bytes, but neither "
-                "its UNSAT status, lexical hole count, nor stored proof is an "
-                "independent verification"
-                if proof_uri is not None
-                else "the bounded solver attempt completed without proof evidence; "
-                "no opposite mathematical conclusion follows"
-            ),
         )
 
 
 def _completed_result(
     descriptor: CapabilityDescriptor,
-    request: CapabilityRequest,
-    resolved: ResolvedSmtProblem,
     run: _Cvc5Run,
     output: dict[str, object],
     artifact_uris: tuple[str, ...],
-    *,
-    basis: str,
 ) -> CapabilityResult:
     return CapabilityResult(
         capability_id=descriptor.capability_id,
@@ -371,7 +359,6 @@ def _completed_result(
 
 def _failed_result(
     descriptor: CapabilityDescriptor,
-    request: CapabilityRequest,
     resolved: ResolvedSmtProblem,
     run: _Cvc5Run,
 ) -> CapabilityResult:
