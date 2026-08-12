@@ -728,7 +728,7 @@ def _validate_internalcot(prefix: Path, config: Mapping[str, Any]) -> None:
         f"{prefix / 'node_modules/.bin'}:{environment.get('PATH', '')}"
     )
     workflow = run_operator_command(
-        str(prefix / "node_modules/.bin/internalcot"),
+        "internalcot",
         ("skill",),
         cwd=prefix,
         timeout_seconds=30,
