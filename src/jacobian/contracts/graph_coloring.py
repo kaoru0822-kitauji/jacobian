@@ -6,7 +6,7 @@ from typing import Annotated, Literal, Self
 
 from pydantic import Field, StrictInt, StringConstraints, model_validator
 
-from jacobian.contracts.common import ArtifactUri, CheckerUri, Sha256Digest
+from jacobian.contracts.common import ArtifactUri, Sha256Digest
 from jacobian.contracts.results import ContractModel
 from jacobian.contracts.sat import CanonicalCnf
 
@@ -90,7 +90,7 @@ class GraphColoringEncodingReplay(ContractModel):
 
 
 class GraphColoringEncodingOutput(ContractModel):
-    """Materialized encoding and its optional checker-backed certificate."""
+    """Materialized encoding and its replay certificate."""
 
     graph: ChromaticGraph
     colors: StrictInt = Field(ge=1, le=32)
@@ -99,7 +99,6 @@ class GraphColoringEncodingOutput(ContractModel):
     claim_uri: ArtifactUri
     candidate_uri: ArtifactUri
     certificate_uri: ArtifactUri
-    checker_id: CheckerUri | None = None
     variable_count: StrictInt = Field(ge=0, le=1_000_000)
     clause_count: StrictInt = Field(ge=0, le=1_000_000)
     encoding_version: Literal["exactly-one-and-edge-separation/v1"] = (

@@ -140,7 +140,6 @@ class PolynomialSystemRationalSearchAdapter:
             assignment=assignment,
             examined_assignment_count=examined,
             grid_assignment_count=grid_assignment_count,
-            checker_id=self.installation.checker_id,
         )
         uris = (system.artifact_uri,) + (
             (assignment_uri,) if assignment_uri is not None else ()

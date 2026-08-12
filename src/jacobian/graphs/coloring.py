@@ -284,7 +284,6 @@ class GraphColoringEncodingAdapter:
             claim_uri=claim.artifact_uri,
             candidate_uri=candidate.artifact_uri,
             certificate_uri=certificate.artifact_uri,
-            checker_id=self.installation.checker_id,
             variable_count=len(resolved.cnf.variables),
             clause_count=len(resolved.cnf.clauses),
         )
