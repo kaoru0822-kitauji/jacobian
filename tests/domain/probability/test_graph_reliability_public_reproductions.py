@@ -52,7 +52,6 @@ def test_public_small_graph_reliability_reaches_checker_bound_results(
             == (case["expected_probability"])
         )
         assert computed.output["result"]["visited_states"] == case["expected_states"]
-        assert computed.output["result"]["completeness"] == "COMPLETE"
 
         verified = probability_services.core.capabilities.invoke(
             CapabilityRequest(

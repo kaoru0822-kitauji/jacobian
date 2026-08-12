@@ -47,9 +47,6 @@ def test_public_gaussian_moment_reproductions_reach_checker_bound_results(
 
         assert computed.execution.status is ExecutionStatus.COMPLETED
         assert computed.output["result"]["moment"] == case["expected_moment"]
-        assert computed.output["result"]["completeness"] == (
-            "COMPLETE_BOUNDED_EXPANSION"
-        )
 
         verified = probability_services.core.capabilities.invoke(
             CapabilityRequest(

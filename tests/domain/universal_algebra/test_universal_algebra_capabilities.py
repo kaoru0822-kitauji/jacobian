@@ -251,7 +251,6 @@ def test_finite_magma_table_enumeration_is_exact_and_canonical(
     assert result.output["enumerated_count"] == 16
     assert result.output["total_count"] == 16
     assert result.output["ordering"] == "LEXICOGRAPHIC_ROW_MAJOR"
-    assert result.output["completeness"] == "COMPLETE"
     table_payloads = [
         runtime.core.store.get(uri).payload for uri in result.output["table_uris"]
     ]

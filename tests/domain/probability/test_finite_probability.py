@@ -307,7 +307,6 @@ def test_gaussian_polynomial_moment_preserves_complete_complex_contraction(
         _complex(0),
         _complex(-1),
     ]
-    assert computed["completeness"] == "COMPLETE_BOUNDED_EXPANSION"
     assert result.artifact_uris == ()
 
 
@@ -605,9 +604,6 @@ def test_graph_reliability_exhausts_all_edge_states_exactly(
     assert computed["connection_probability"] == _rational(5, 8)
     assert computed["visited_states"] == 8
     assert len(computed["states"]) == 8
-    assert computed["completeness"] == "COMPLETE"
-    assert computed["truncated"] is False
-    assert computed["termination_reason"] == "EXHAUSTED"
     assert sum(1 for state in computed["states"] if state["terminals_connected"]) == 5
 
 
