@@ -245,7 +245,17 @@ class InstalledOperationAdapter:
                 else enriched_invalid_request(base, exc)
             ) from exc
 
-        terminal = execute_operation(self.spec, parsed_request)
+        try:
+            terminal = execute_operation(self.spec, parsed_request)
+        except ValidationError as exc:
+            raise CapabilityInvocationError(
+                CapabilityDiagnostic(
+                    code="ADAPTER_EXECUTION_FAILED",
+                    stage="operation_result_validation",
+                    message="The operation returned an invalid typed result.",
+                    hint="Fix the operation implementation to satisfy its result contract.",
+                )
+            ) from exc
         publication = None
         if isinstance(terminal, Completed):
             runtime = self.operation.provider_binding.runtime
