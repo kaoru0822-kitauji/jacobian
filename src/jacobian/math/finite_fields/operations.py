@@ -277,15 +277,37 @@ def finite_map_table(polynomial_map: FinitePolynomialMap) -> FiniteMapTable:
     )
 
 
+class _InvalidFiniteMapTableError(ValueError):
+    """The table does not evaluate its bound polynomial."""
+
+
+def _validate_finite_map_table(table: FiniteMapTable) -> None:
+    """Require every table target to be the bound polynomial's exact image."""
+
+    from jacobian.math.finite_fields import _sympy
+
+    targets = _sympy.evaluate_polynomial_values(
+        table.map.polynomial,
+        tuple(source for source, _ in table.entries),
+    )
+    for (_, target), coordinates in zip(table.entries, targets, strict=True):
+        if target.coordinates != coordinates:
+            raise _InvalidFiniteMapTableError(
+                "finite map table targets must match the bound polynomial"
+            )
+
+
 def fiber_partition(table: FiniteMapTable) -> FiberPartition:
     """Partition the complete domain by exact map image."""
 
+    _validate_finite_map_table(table)
     return FiberPartition.from_table(table)
 
 
 def collision_certificate(table: FiniteMapTable) -> CollisionCertificate:
     """Return the first canonical collision in a non-injective finite table."""
 
+    _validate_finite_map_table(table)
     seen: dict[str, tuple[FiniteFieldElement, FiniteFieldElement]] = {}
     for source, target in table.entries:
         previous = seen.get(target.digest)
@@ -303,6 +325,7 @@ def collision_certificate(table: FiniteMapTable) -> CollisionCertificate:
 def permutation_certificate(table: FiniteMapTable) -> PermutationCertificate:
     """Return the exact inverse table of a finite polynomial permutation."""
 
+    _validate_finite_map_table(table)
     return PermutationCertificate(
         table=table,
         inverse_entries=tuple(

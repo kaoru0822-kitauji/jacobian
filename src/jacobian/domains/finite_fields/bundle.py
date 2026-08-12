@@ -40,6 +40,7 @@ from jacobian.math.finite_fields import (
     projective_line,
     restrict_scalars,
 )
+from jacobian.math.finite_fields.operations import _InvalidFiniteMapTableError
 from jacobian.operation_bindings import inline_operation
 from jacobian.operation_ports import InputPort, OutputPort
 from jacobian.operations import (
@@ -47,6 +48,7 @@ from jacobian.operations import (
     DomainBundle,
     DomainDiagnostics,
     DomainSemantics,
+    OperationRefusalError,
     OperationSpec,
     PreflightResult,
     PreflightStatus,
@@ -56,6 +58,7 @@ from jacobian.providers.flint_runtime import python_flint_finite_field_provider_
 
 _MAX_PROJECTIVE_POINTS = 4096
 _MAX_FINITE_MAP_ELEMENTS = 4096
+_MAX_FINITE_MAP_REPLAY_WORK = 1_000_000
 
 
 def _enumerate_projective_line(request: ProjectiveLineRequest) -> ProjectiveLine:
@@ -105,19 +108,76 @@ def _finite_map_preflight(request: FiniteMapTableRequest) -> PreflightResult:
 
 
 def _fiber_partition(request: FiberPartitionRequest) -> FiberPartition:
-    return fiber_partition(request.table)
+    try:
+        return fiber_partition(request.table)
+    except _InvalidFiniteMapTableError as exc:
+        raise _finite_map_table_refusal(exc) from exc
 
 
 def _collision_certificate(
     request: CollisionCertificateRequest,
 ) -> CollisionCertificate:
-    return collision_certificate(request.table)
+    try:
+        return collision_certificate(request.table)
+    except _InvalidFiniteMapTableError as exc:
+        raise _finite_map_table_refusal(exc) from exc
+    except ValueError as exc:
+        raise OperationRefusalError(
+            CapabilityDiagnostic(
+                code="FINITE_MAP_HAS_NO_COLLISION",
+                stage="finite_map_collision",
+                message=str(exc),
+                hint="Use a non-injective polynomial map.",
+            )
+        ) from exc
 
 
 def _permutation_certificate(
     request: PermutationCertificateRequest,
 ) -> PermutationCertificate:
-    return permutation_certificate(request.table)
+    try:
+        return permutation_certificate(request.table)
+    except _InvalidFiniteMapTableError as exc:
+        raise _finite_map_table_refusal(exc) from exc
+    except ValueError as exc:
+        raise OperationRefusalError(
+            CapabilityDiagnostic(
+                code="FINITE_MAP_NOT_PERMUTATION",
+                stage="finite_map_permutation",
+                message=str(exc),
+                hint="Use an injective polynomial map.",
+            )
+        ) from exc
+
+
+def _finite_map_table_refusal(error: ValueError) -> OperationRefusalError:
+    return OperationRefusalError(
+        CapabilityDiagnostic(
+            code="INVALID_FINITE_MAP_TABLE",
+            stage="finite_map_table_validation",
+            message=str(error),
+            hint="Use the complete table produced by the bound polynomial map.",
+        )
+    )
+
+
+def _finite_map_replay_preflight(
+    request: FiberPartitionRequest
+    | CollisionCertificateRequest
+    | PermutationCertificateRequest,
+) -> PreflightResult:
+    table = request.table
+    work = (
+        len(table.entries)
+        * len(table.map.polynomial.coefficients)
+        * table.map.domain.degree
+    )
+    if work > _MAX_FINITE_MAP_REPLAY_WORK:
+        return PreflightResult(
+            PreflightStatus.RESOURCE_LIMIT_EXCEEDED,
+            f"finite map replay work is {work}; limit is {_MAX_FINITE_MAP_REPLAY_WORK}",
+        )
+    return SUPPORTED
 
 
 def build_finite_field_bundle() -> DomainBundle:
@@ -125,6 +185,7 @@ def build_finite_field_bundle() -> DomainBundle:
         "jacobian.sympy",
         features=(
             "finite-field-presentation",
+            "finite-map-replay",
             "projective-normalization",
             "projective-enumeration",
         ),
@@ -279,10 +340,12 @@ def build_finite_field_bundle() -> DomainBundle:
             request_type=FiberPartitionRequest,
             result_type=FiberPartition,
             execute=_fiber_partition,
+            preflight=_finite_map_replay_preflight,
             title="Partition a finite polynomial map into fibers",
             description="Return every nonempty fiber bound to the exact map table.",
             tags=("finite-field", "polynomial", "fibers", "exact"),
         ),
+        provider_runtime=provider,
         input_ports=(
             InputPort(name="table", value_type=FiniteMapTable, request_field="table"),
         ),
@@ -295,10 +358,12 @@ def build_finite_field_bundle() -> DomainBundle:
             request_type=CollisionCertificateRequest,
             result_type=CollisionCertificate,
             execute=_collision_certificate,
+            preflight=_finite_map_replay_preflight,
             title="Extract a finite polynomial-map collision",
             description="Return two distinct inputs with the same exact table image.",
             tags=("finite-field", "polynomial", "collision", "certificate"),
         ),
+        provider_runtime=provider,
         input_ports=(
             InputPort(name="table", value_type=FiniteMapTable, request_field="table"),
         ),
@@ -311,10 +376,12 @@ def build_finite_field_bundle() -> DomainBundle:
             request_type=PermutationCertificateRequest,
             result_type=PermutationCertificate,
             execute=_permutation_certificate,
+            preflight=_finite_map_replay_preflight,
             title="Certify a finite polynomial permutation",
             description="Return the exact inverse table of an injective finite map.",
             tags=("finite-field", "polynomial", "permutation", "certificate"),
         ),
+        provider_runtime=provider,
         input_ports=(
             InputPort(name="table", value_type=FiniteMapTable, request_field="table"),
         ),

@@ -110,6 +110,23 @@ def test_certificates_reject_values_not_bound_to_the_exact_table() -> None:
         )
 
 
+def test_table_consumers_reject_unevaluated_targets() -> None:
+    identity_table = finite_map_table(_map(1))
+    zero = identity_table.entries[0][1]
+    forged = FiniteMapTable(
+        map=identity_table.map,
+        entries=tuple((source, zero) for source, _ in identity_table.entries),
+    )
+
+    for consumer in (
+        fiber_partition,
+        collision_certificate,
+        permutation_certificate,
+    ):
+        with pytest.raises(ValueError, match="bound polynomial"):
+            consumer(forged)
+
+
 def test_slice_b_reuses_the_same_ports_for_table_and_certificate_handoff() -> None:
     polynomial_map = _map(3)
     _, _, _, _, _, table_operation, fiber_operation, collision_operation, _ = (

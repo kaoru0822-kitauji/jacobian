@@ -5,7 +5,54 @@ from __future__ import annotations
 from jacobian.math.finite_fields.values import (
     FiniteFieldElement,
     FiniteFieldPresentation,
+    FinitePolynomial,
 )
+
+
+def evaluate_polynomial_values(
+    polynomial: FinitePolynomial,
+    values: tuple[FiniteFieldElement, ...],
+) -> tuple[tuple[int, ...], ...]:
+    """Evaluate several points with one prepared exact quotient presentation."""
+
+    from sympy import Poly, symbols
+
+    variable = symbols("z")
+    characteristic = polynomial.presentation.characteristic
+    modulus = Poly(
+        sum(
+            coefficient * variable**power
+            for power, coefficient in enumerate(
+                polynomial.presentation.modulus_coefficients
+            )
+        ),
+        variable,
+        modulus=characteristic,
+    )
+
+    def as_polynomial(element: FiniteFieldElement) -> Poly:
+        return Poly(
+            sum(
+                coefficient * variable**power
+                for power, coefficient in enumerate(element.coordinates)
+            ),
+            variable,
+            modulus=characteristic,
+        )
+
+    coefficients = tuple(as_polynomial(value) for value in polynomial.coefficients)
+
+    def evaluate(value: FiniteFieldElement) -> tuple[int, ...]:
+        point = as_polynomial(value)
+        evaluated = Poly(0, variable, modulus=characteristic)
+        for coefficient in reversed(coefficients):
+            evaluated = (evaluated * point + coefficient).rem(modulus)
+        return tuple(
+            int(evaluated.nth(power)) % characteristic
+            for power in range(polynomial.presentation.degree)
+        )
+
+    return tuple(evaluate(value) for value in values)
 
 
 def normalize_projective_coordinates(

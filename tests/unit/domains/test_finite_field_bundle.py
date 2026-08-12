@@ -72,6 +72,10 @@ def test_bundle_declares_atomic_port_bound_operations() -> None:
     assert fibers.output_ports[0].value_type is FiberPartition
     assert collision.output_ports[0].value_type is CollisionCertificate
     assert permutation.output_ports[0].value_type is PermutationCertificate
+    for consumer in (fibers, collision, permutation):
+        assert consumer.spec.preflight is not None
+        assert consumer.provider_binding.runtime is not None
+        assert "finite-map-replay" in consumer.provider_binding.runtime.features
 
 
 def test_projective_enumeration_refuses_large_output_before_allocation() -> None:
