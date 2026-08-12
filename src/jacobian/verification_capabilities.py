@@ -4,24 +4,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pydantic import ValidationError
+
+from jacobian.capability_errors import (
+    CapabilityInvocationError,
+    enriched_invalid_request,
+)
 from jacobian.capability_service import CapabilityAdapter
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
+    CapabilityDiagnostic,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.common import ArtifactUri, CheckerUri
 from jacobian.contracts.results import (
     ContractModel,
-    Coverage,
     ExecutionStatus,
     ResultEnvelope,
-    Verification,
 )
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.schema_registry import model_schema
@@ -47,6 +47,14 @@ class WitnessReplayRequest(ContractModel):
     claim_uri: ArtifactUri
     candidate_uri: ArtifactUri
     witness_uri: ArtifactUri
+
+
+_INVALID_REPLAY_REQUEST = CapabilityDiagnostic(
+    code="INVALID_REQUEST",
+    stage="capability_input_validation",
+    message="The checker replay request is invalid.",
+    hint="Inspect the checker operation and retry with its required artifact inputs.",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,72 +91,22 @@ class _VerificationProjection:
     ) -> CapabilityResult:
         verified = (
             envelope.execution.status is ExecutionStatus.COMPLETED
-            and envelope.assurance.verification is Verification.VERIFIED
             and envelope.verification_record_uri is not None
         )
         references = set(envelope.evidence_uris)
-        if envelope.assurance.scope_uri is not None:
-            references.add(envelope.assurance.scope_uri)
+        if envelope.scope_uri is not None:
+            references.add(envelope.scope_uri)
         if envelope.verification_record_uri is not None:
             references.add(envelope.verification_record_uri)
             record = self.verification.store.get(envelope.verification_record_uri)
             references.update(record.manifest.parents)
-        scope = (
-            CapabilityScope(
-                description=(
-                    "exact artifacts replayed by the installed domain checker"
-                ),
-                parameters=request.input,
-                artifact_uri=envelope.assurance.scope_uri,
-            )
-            if request.input or envelope.assurance.scope_uri is not None
-            else None
-        )
-        complete = (
-            envelope.execution.status is ExecutionStatus.COMPLETED
-            and envelope.assurance.coverage is Coverage.EXHAUSTIVE
-        )
-        assurance_level = (
-            CapabilityAssuranceLevel.VERIFIED
-            if verified
-            else CapabilityAssuranceLevel.HEURISTIC
-        )
         return CapabilityResult(
             capability_id=self.capability_id,
             capability_version="1",
             execution=envelope.execution,
             output=envelope.model_dump(mode="json"),
-            scope=scope,
-            completeness=CapabilityCompleteness(
-                status=(
-                    CapabilityCompletenessStatus.COMPLETE
-                    if complete
-                    else CapabilityCompletenessStatus.PARTIAL
-                ),
-                basis=(
-                    "the checker reported exhaustive coverage"
-                    if complete
-                    else "the checker made no exhaustive-coverage claim"
-                ),
-                assurance_level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified and complete
-                    else CapabilityAssuranceLevel.COMPUTED
-                ),
-                verification_record_uri=(
-                    envelope.verification_record_uri if verified and complete else None
-                ),
-            ),
-            assurance=CapabilityAssurance(
-                level=assurance_level,
-                basis=(
-                    "accepted by the installed operator-authorized checker"
-                    if verified
-                    else "the checker did not accept a decisive replay"
-                ),
-                verification_record_uri=(
-                    envelope.verification_record_uri if verified else None
-                ),
+            verification_record_uri=(
+                envelope.verification_record_uri if verified else None
             ),
             artifact_uris=tuple(sorted(references)),
         )
@@ -156,6 +114,8 @@ class _VerificationProjection:
 
 class CertificateVerificationAdapter:
     """Replay one domain certificate with its installation-bound checker."""
+
+    typed_input = True
 
     def __init__(self, projection: _VerificationProjection) -> None:
         self.projection = projection
@@ -166,7 +126,12 @@ class CertificateVerificationAdapter:
         return self._descriptor
 
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
-        validated = CertificateReplayRequest.model_validate(request.input)
+        try:
+            validated = CertificateReplayRequest.model_validate(request.input)
+        except ValidationError as exc:
+            raise CapabilityInvocationError(
+                enriched_invalid_request(_INVALID_REPLAY_REQUEST, exc)
+            ) from exc
         envelope = self.projection.verification.verify_certificate(
             certificate_uri=validated.certificate_uri,
             checker_id=self.projection.checker_id,
@@ -177,6 +142,8 @@ class CertificateVerificationAdapter:
 class WitnessVerificationAdapter:
     """Replay one domain witness with its installation-bound checker."""
 
+    typed_input = True
+
     def __init__(self, projection: _VerificationProjection) -> None:
         self.projection = projection
         self._descriptor = projection.descriptor(WitnessReplayRequest)
@@ -186,7 +153,12 @@ class WitnessVerificationAdapter:
         return self._descriptor
 
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
-        validated = WitnessReplayRequest.model_validate(request.input)
+        try:
+            validated = WitnessReplayRequest.model_validate(request.input)
+        except ValidationError as exc:
+            raise CapabilityInvocationError(
+                enriched_invalid_request(_INVALID_REPLAY_REQUEST, exc)
+            ) from exc
         envelope = self.projection.verification.verify_witness(
             claim_uri=validated.claim_uri,
             candidate_uri=validated.candidate_uri,

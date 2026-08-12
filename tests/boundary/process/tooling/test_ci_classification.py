@@ -208,12 +208,6 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             ),
         ),
         (
-            ("src/jacobian/contracts/plugins.py",),
-            _expected_plan(
-                "selective", *GENERIC_PYTHON_KEYS, "run-static", "run-build"
-            ),
-        ),
-        (
             ("src/jacobian_checkers/graph_invariants.py",),
             _expected_plan(
                 "selective",

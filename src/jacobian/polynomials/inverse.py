@@ -9,15 +9,10 @@ from typing import Any
 from jacobian.canonical import canonicalize_json
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityInvocationExample,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.evidence import (
     CertificateEnvelope,
@@ -553,46 +548,6 @@ class PolynomialMapInverseSynthesizeAdapter:
                 runtime_ms=elapsed_ms,
             ),
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="one finite polynomial inverse coefficient ansatz over QQ",
-                parameters={
-                    "inverse_degree_bound": validated.inverse_degree_bound,
-                    "support_mode": validated.support_mode.value,
-                    "unknown_count": len(unknown_names),
-                },
-                artifact_uri=synthesis.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=(
-                    CapabilityCompletenessStatus.COMPLETE
-                    if status
-                    in {
-                        PolynomialInverseSynthesisStatus.FOUND,
-                        PolynomialInverseSynthesisStatus.NO_CANDIDATE_WITHIN_ANSATZ,
-                        PolynomialInverseSynthesisStatus.UNDERDETERMINED,
-                    }
-                    else CapabilityCompletenessStatus.PARTIAL
-                ),
-                basis=(
-                    "the declared finite ansatz and exact coefficient system were solved"
-                    if status
-                    in {
-                        PolynomialInverseSynthesisStatus.FOUND,
-                        PolynomialInverseSynthesisStatus.NO_CANDIDATE_WITHIN_ANSATZ,
-                        PolynomialInverseSynthesisStatus.UNDERDETERMINED,
-                    }
-                    else "the declared synthesis operation did not complete"
-                ),
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "bounded exact symbolic synthesis; no failure status proves "
-                    "noninvertibility and only the separate verifier may certify "
-                    "a found candidate"
-                ),
-            ),
             artifact_uris=artifact_uris,
         )
 
@@ -850,46 +805,7 @@ class PolynomialMapInverseVerifyAdapter:
             capability_version=self.descriptor.version,
             execution=aggregate_checked.execution,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="both ordered polynomial compositions over QQ",
-                parameters={
-                    "source_variables": list(validated.source_variables),
-                    "target_variables": list(validated.target_variables),
-                },
-                artifact_uri=forward.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=(
-                    CapabilityCompletenessStatus.COMPLETE
-                    if verified
-                    else CapabilityCompletenessStatus.UNKNOWN
-                ),
-                basis=(
-                    "both complete composition residual families were independently replayed"
-                    if verified
-                    else "the aggregate independent checker did not accept the replay"
-                ),
-                assurance_level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else CapabilityAssuranceLevel.COMPUTED
-                ),
-                verification_record_uri=record_uri,
-            ),
-            relationships=(),
-            assurance=CapabilityAssurance(
-                level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-                basis=(
-                    "accepted by the authorized independent two-sided map checker"
-                    if verified
-                    else "the independent checker did not accept the inverse request"
-                ),
-                verification_record_uri=record_uri,
-            ),
+            verification_record_uri=(record_uri if verified else None),
             artifact_uris=tuple(
                 dict.fromkeys(
                     (

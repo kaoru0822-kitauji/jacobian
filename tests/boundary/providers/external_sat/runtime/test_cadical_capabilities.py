@@ -16,7 +16,6 @@ from tests.support.services import (
 
 from jacobian.bounded_process import bounded_process_cancellation
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityProviderAvailability,
     CapabilityRequest,
 )
@@ -175,8 +174,6 @@ def test_model_find_materializes_only_an_unverified_bound_assignment(
     assert result.output["solver_status"] == "SATISFIABLE"
     assert result.output["conclusion"] == "UNKNOWN"
     assert result.output["assignment"] == {"x": True, "y": False}
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    assert result.assurance.verification_record_uri is None
     assignment_uri = result.output["assignment_uri"]
     stored = runtime.core.store.get(assignment_uri)
     assignment = SatAssignmentArtifact.model_validate(stored.payload)
@@ -194,7 +191,7 @@ def test_model_find_materializes_only_an_unverified_bound_assignment(
         )
     )
     assert verified.output["status"] == "VERIFIED_SATISFYING"
-    assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert verified.verification_record_uri is not None
 
 
 def test_model_find_returns_named_values_after_lexicographic_remapping(
@@ -251,8 +248,6 @@ def test_proof_find_normalizes_deletions_without_self_verification(
     assert result.output["status"] == "PROOF_PRODUCED"
     assert result.output["solver_status"] == "UNSATISFIABLE"
     assert result.output["conclusion"] == "UNKNOWN"
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    assert result.assurance.verification_record_uri is None
     proof_uri = result.output["proof_uri"]
     stored = runtime.core.store.get(proof_uri)
     proof = SatProofArtifact.model_validate(stored.payload)
@@ -299,7 +294,7 @@ def test_cadical_deletion_heavy_proof_replays_in_strict_checker(
     )
 
     assert verified.output["status"] == "VERIFIED_UNSAT"
-    assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert verified.verification_record_uri is not None
 
 
 @pytest.mark.parametrize(
@@ -344,7 +339,6 @@ def test_opposite_or_unknown_solver_status_never_becomes_a_conclusion(
     assert result.output["solver_status"] == solver_status
     assert result.output["conclusion"] == "UNKNOWN"
     assert result.artifact_uris == (cnf.artifact_uri,)
-    assert result.assurance.verification_record_uri is None
 
 
 def test_timeout_is_operational_and_materializes_no_solver_evidence(
@@ -366,7 +360,6 @@ def test_timeout_is_operational_and_materializes_no_solver_evidence(
     assert result.output == {}
     assert result.diagnostics[0].code == "CADICAL_TIMEOUT"
     assert result.artifact_uris == (cnf.artifact_uri,)
-    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
 
 
 def test_client_cancellation_terminates_solver_and_materializes_no_evidence(

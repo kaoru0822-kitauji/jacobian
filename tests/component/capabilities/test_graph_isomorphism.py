@@ -13,8 +13,6 @@ from tests.support.services import (
 )
 
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
-    CapabilityRelationshipStatus,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
@@ -148,14 +146,7 @@ def test_graph_isomorphism_verifies_a_valid_bijection(
     assert result.output["is_isomorphism"] is True
     assert result.output["conclusion"] == "TRUE"
     assert result.output["coverage"] == "EXHAUSTIVE"
-    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
-    verified_relationships = [
-        relationship
-        for relationship in result.relationships
-        if relationship.status is CapabilityRelationshipStatus.VERIFIED
-    ]
-    assert len(verified_relationships) == 1
-    assert verified_relationships[0].relation_id == "graph.relation.isomorphic-via"
+    assert result.verification_record_uri is not None
     assert result.output["verification_record_uri"] in result.artifact_uris
 
 
@@ -172,7 +163,7 @@ def test_graph_isomorphism_verifies_a_negative_result(
 
     assert result.output["is_isomorphism"] is False
     assert result.output["conclusion"] == "FALSE"
-    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert result.verification_record_uri is not None
     assert result.output["first_violation"] == {
         "kind": "ADJACENCY_MISMATCH",
         "source_vertices": ["a", "b"],
@@ -182,10 +173,6 @@ def test_graph_isomorphism_verifies_a_negative_result(
         "vertex": None,
         "mapped_vertex": None,
     }
-    assert not any(
-        relationship.relation_id == "graph.relation.isomorphic-via"
-        for relationship in result.relationships
-    )
 
 
 def test_graph_isomorphism_preserves_an_empty_missing_vertex_label(
@@ -276,11 +263,6 @@ def test_graph_isomorphism_keeps_checker_rejection_unknown(
     assert result.output["conclusion"] == "UNKNOWN"
     assert result.output["coverage"] == "UNKNOWN"
     assert result.output["verification_record_uri"] is None
-    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
-    assert not any(
-        relationship.relation_id == "graph.relation.isomorphic-via"
-        for relationship in result.relationships
-    )
 
 
 def test_graph_isomorphism_accepts_graph_atlas_artifact_handoff(
@@ -313,11 +295,6 @@ def test_graph_isomorphism_accepts_graph_atlas_artifact_handoff(
     assert graph_uri in result.artifact_uris
     pair = graph_isomorphism_services.core.store.get(result.output["graph_pair_uri"])
     assert pair.manifest.parents == (graph_uri,)
-    assert any(
-        relationship.relation_id == "graph.relation.pair-scope"
-        and relationship.source_artifact_uris == (graph_uri,)
-        for relationship in result.relationships
-    )
 
 
 def test_graph_isomorphism_accepts_valid_unsorted_graph_artifacts(

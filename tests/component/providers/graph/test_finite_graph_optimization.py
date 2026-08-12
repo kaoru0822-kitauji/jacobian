@@ -10,7 +10,6 @@ import z3
 from tests.support.services import DomainTestServices
 
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
@@ -185,9 +184,7 @@ def test_graph_optimizer_returns_exact_typed_witness(
         assert output["lower_bound"] == optimum, case
         assert output["upper_bound"] == optimum, case
         assert len(output[witness_field]) == optimum, case
-        assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED, case
         assert result.artifact_uris == (), case
-        assert result.obligations == (), case
         if capability_id == "graph.domination.minimum.compute":
             assert nx.is_dominating_set(relabeled, output["witness_vertices"]), case
         elif capability_id == "graph.matching.maximal.minimum.compute":
@@ -239,7 +236,6 @@ def test_solver_timeout_is_artifact_free_non_conclusion(
 
     assert result.execution.status is ExecutionStatus.TIMEOUT
     assert result.output["error"]["code"] == "GRAPH_OPTIMIZATION_TIMEOUT"
-    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
     assert result.diagnostics[0].code == "GRAPH_OPTIMIZATION_TIMEOUT"
     assert result.artifact_uris == ()
 

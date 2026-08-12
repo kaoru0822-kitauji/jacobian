@@ -11,7 +11,6 @@ from tests.support.services import DomainTestServices
 
 from jacobian.checker_operations import derive_verification_capability_id
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
@@ -87,18 +86,13 @@ def test_recurrence_and_series_results_are_verified_and_forgery_rejected(
                 },
             )
         )
-        assert computed.assurance.level is CapabilityAssuranceLevel.COMPUTED, (
-            capability_id
-        )
         assert verified.execution.status is ExecutionStatus.COMPLETED, capability_id
         assert verified.output["status"] == "VERIFIED", capability_id
         assert verified.output["operation_id"] == capability_id, capability_id
         assert verified.output["verification_record_uri"] in verified.artifact_uris, (
             capability_id
         )
-        assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED, (
-            capability_id
-        )
+        assert verified.verification_record_uri is not None, capability_id
 
         forged_candidate = deepcopy(computed.output["result"])
         if capability_id == "combinatorics.recurrence.linear.evaluate":
@@ -119,9 +113,6 @@ def test_recurrence_and_series_results_are_verified_and_forgery_rejected(
         assert rejected.output["status"] == "REJECTED", capability_id
         assert rejected.output["conclusion"] == "UNKNOWN", capability_id
         assert rejected.output["verification_record_uri"] is None, capability_id
-        assert rejected.assurance.level is CapabilityAssuranceLevel.COMPUTED, (
-            capability_id
-        )
 
 
 def test_checker_runtime_binds_only_independent_source(

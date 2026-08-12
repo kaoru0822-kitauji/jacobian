@@ -9,15 +9,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityInstallTier,
     CapabilityProviderAvailability,
     CapabilityProviderDigestKind,
     CapabilityProviderRuntime,
-    CapabilityRelationship,
-    CapabilityRelationshipStatus,
     CapabilityRequest,
     CapabilityResult,
 )
@@ -100,10 +96,6 @@ class ComputedAdapter:
             capability_version=self.descriptor.version,
             execution=Execution(status=ExecutionStatus.COMPLETED),
             output={"value": int(request.input["value"]) * 2},
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis="deterministic integer arithmetic",
-            ),
         )
 
 
@@ -123,10 +115,6 @@ class InvalidOutputAdapter:
             capability_version=self.descriptor.version,
             execution=Execution(status=ExecutionStatus.COMPLETED),
             output={"value": "not-an-integer"},
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis="fixture malformed output",
-            ),
         )
 
 
@@ -157,10 +145,6 @@ class DiscoveryAdapter:
             capability_version=self.descriptor.version,
             execution=Execution(status=ExecutionStatus.COMPLETED),
             output={"value": request.input["value"]},
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis="deterministic discovery fixture",
-            ),
         )
 
 
@@ -182,39 +166,12 @@ class CrashingAdapter:
 
 
 @dataclass(frozen=True)
-class ForgedProviderAdapter:
-    descriptor = CapabilityDescriptor(
-        capability_id="example.forged-provider",
-        version="1",
-        title="Forge provider provenance",
-        description="Adversarial adapter that claims another provider identity.",
-        provider="tests",
-        provider_runtime=TEST_RUNTIME,
-        input_schema={"type": "object"},
-        output_schema={"type": "object"},
-    )
-
-    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
-        return CapabilityResult(
-            capability_id=self.descriptor.capability_id,
-            capability_version=self.descriptor.version,
-            execution=Execution(status=ExecutionStatus.COMPLETED),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis="fixture computation",
-            ),
-            provider="tests.other",
-            provider_digest="sha256:" + "b" * 64,
-        )
-
-
-@dataclass(frozen=True)
 class ForgedVerifiedAdapter:
     descriptor = CapabilityDescriptor(
         capability_id="example.forged",
         version="1",
         title="Forge a result",
-        description="Adversarial adapter used to test the assurance boundary.",
+        description="Adversarial adapter used to test the verification boundary.",
         provider="tests",
         provider_runtime=TEST_RUNTIME,
         input_schema={"type": "object"},
@@ -227,85 +184,6 @@ class ForgedVerifiedAdapter:
             capability_id=self.descriptor.capability_id,
             capability_version=self.descriptor.version,
             execution=Execution(status=ExecutionStatus.COMPLETED),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.VERIFIED,
-                basis="adapter says so",
-                verification_record_uri=record_uri,
-            ),
+            verification_record_uri=record_uri,
             artifact_uris=(record_uri,),
-        )
-
-
-@dataclass(frozen=True)
-class OmittedRelationshipArtifactAdapter:
-    descriptor = CapabilityDescriptor(
-        capability_id="example.relationship",
-        version="1",
-        title="Return an unbound relationship",
-        description="Adversarial adapter that omits a relationship endpoint.",
-        provider="tests",
-        provider_runtime=TEST_RUNTIME,
-        input_schema={"type": "object"},
-        output_schema={"type": "object"},
-    )
-
-    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
-        return CapabilityResult(
-            capability_id=self.descriptor.capability_id,
-            capability_version=self.descriptor.version,
-            execution=Execution(status=ExecutionStatus.COMPLETED),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id="example.relation.derived",
-                    source_artifact_uris=("artifact://sha256/" + "a" * 64,),
-                    target_artifact_uris=("artifact://sha256/" + "b" * 64,),
-                ),
-            ),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis="adapter proposed a relationship",
-            ),
-        )
-
-
-@dataclass(frozen=True)
-class ForgedRelationshipVerificationAdapter:
-    verification_record_uri: str
-    artifact_uris: tuple[str, ...]
-    relation_id: str
-    source_uri: str
-    target_uri: str
-    obligation_uris: tuple[str, ...] = ()
-    descriptor = CapabilityDescriptor(
-        capability_id="example.forged-relationship",
-        version="1",
-        title="Mislabel a checked result as a verified relationship",
-        description="Adversarial adapter that reuses an unrelated valid record.",
-        provider="tests",
-        provider_runtime=TEST_RUNTIME,
-        input_schema={"type": "object"},
-        output_schema={"type": "object"},
-    )
-
-    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
-        return CapabilityResult(
-            capability_id=self.descriptor.capability_id,
-            capability_version=self.descriptor.version,
-            execution=Execution(status=ExecutionStatus.COMPLETED),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id=self.relation_id,
-                    source_artifact_uris=(self.source_uri,),
-                    target_artifact_uris=(self.target_uri,),
-                    obligation_uris=self.obligation_uris,
-                    status=CapabilityRelationshipStatus.VERIFIED,
-                    verification_record_uri=self.verification_record_uri,
-                ),
-            ),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.VERIFIED,
-                basis="reused a record that did not check this relation",
-                verification_record_uri=self.verification_record_uri,
-            ),
-            artifact_uris=self.artifact_uris,
         )

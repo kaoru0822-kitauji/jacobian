@@ -4,8 +4,7 @@
 
 Jacobian tests observable mathematical behavior, typed boundaries, execution
 semantics, publication, and independent checker authority. The suite does not
-encode a required research workflow or preserve tests for deleted product
-subsystems.
+encode a required research sequence.
 
 ## Change matrix
 
@@ -100,8 +99,8 @@ behavioral regression proof is infeasible, state the proof gap.
 
 ## Documentation acceptance
 
-- no current-product page teaches the deleted workflow product, managed Skill,
-  reference-plugin emulation, compatibility aliases, or workflow resources;
+- no current-product page teaches a workflow engine, managed Skill, plugin
+  emulation, compatibility aliases, or workflow resources;
 - the README, `AGENTS.md`, product blueprint, and architecture express the same
   dependency direction;
 - examples pass complete request parsing and run where the documented provider
@@ -117,13 +116,11 @@ behavioral regression proof is infeasible, state the proof gap.
 - retained mathematical operations and independently authorized checkers still
   start and run;
 - missing optional providers remove only their affected operations;
-- workflow tests are deleted rather than ported to a replacement framework;
 - runtime startup and shutdown have fewer states and owners; and
 - source, tests, and documentation show material net deletion.
 
 Negative import and inventory tests must prove absence. Do not keep compatibility
-aliases, optional workflow profiles, or test-only registration paths merely to
-make old tests pass.
+aliases or test-only registration paths merely to make old tests pass.
 
 ## `jacobian.math` acceptance
 
@@ -181,9 +178,10 @@ Composition tests use independent producer and consumer operations. They cover:
 - explicit transforms rather than hidden coercion; and
 - no assurance propagation through compatibility or carriers.
 
-Installation tests validate provisional port accessors against their declared
-value type. Port metadata remains provisional through #905 Slice A and is
-frozen only after Slice B proves reuse.
+Installation tests validate supported port accessors against their declared
+value type. #905 Slices A and B use the same whole-value input and output ports;
+the tests reject any declaration whose accessor disagrees with the Pydantic
+request or result type.
 
 ## #905 acceptance
 
@@ -208,7 +206,7 @@ tables fail; producer and checker share no executable enumeration.
 
 MCP tests assert exactly two statically registered tools, generated schemas,
 strict extra-argument rejection, Pydantic structured output, `ResourceLink`
-only when needed, and stdio/HTTP parity. The no-Skill client journey covers:
+only when needed, and stdio/HTTP parity. The client journey covers:
 
 - search and exact inspection;
 - valid run;

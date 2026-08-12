@@ -11,16 +11,11 @@ from pydantic import ValidationError
 import jacobian.lean_frontend.exploration as _exploration_support
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInvocationExample,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.lean import LeanDiagnosticPhase, LeanDiagnosticSource
 from jacobian.contracts.lean_exploration import (
@@ -425,34 +420,6 @@ class LeanProofStateAdapter:
                 ),
             ),
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description=(
-                    "one tactic applied after clean replay and state validation"
-                ),
-                parameters={
-                    "environment": validated.environment.value,
-                    "statement": statement,
-                    "input_state_digest": input_state.state_digest,
-                    "environment_digest": environment_digest,
-                },
-                artifact_uri=artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.COMPLETE,
-                basis=(
-                    "Lean returned the complete successor-state list for this "
-                    "single tactic application"
-                ),
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "a clean pinned Lean process reconstructed the bound state "
-                    "and computed one transition; only lean.check can verify a "
-                    "completed theorem"
-                ),
-            ),
             artifact_uris=artifact_uris,
         )
 

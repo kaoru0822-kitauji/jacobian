@@ -1,15 +1,13 @@
 """Standalone authorization of retained polytope and Lean checkers.
 
 This module owns the operator-facing installation of the two retained checker
-families that are not coupled to the reference-plugin workflow graph:
+families:
 
 * finite-polytope convex-combination and linear-separator checkers, and
 * pinned Lean 4 kernel certificate checkers.
 
-It deliberately depends only on the operator-owned :class:`CheckerRegistry`,
-the shared :class:`SchemaRegistry`, and the artifact store.  It does not import
-or construct :class:`PluginRegistry`, :class:`ReferenceInstaller`, or any
-application workflow service.
+It depends only on the operator-owned :class:`CheckerRegistry`, the shared
+:class:`SchemaRegistry`, and the artifact store.
 """
 
 from __future__ import annotations

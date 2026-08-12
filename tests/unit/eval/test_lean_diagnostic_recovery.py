@@ -122,14 +122,14 @@ def _tool_event(
     payload: dict[str, object],
     *,
     output: dict[str, object],
-    assurance: dict[str, object],
+    verification_record_uri: str | None = None,
 ) -> dict[str, object]:
     response = {
         "capability_id": capability_id,
         "execution": {"status": "COMPLETED"},
         "output": output,
         "artifact_uris": [],
-        "assurance": assurance,
+        "verification_record_uri": verification_record_uri,
     }
     return {
         "type": "item.completed",
@@ -162,7 +162,6 @@ def _comparison_evidence(
                 else ["Lean rejected the proof: type mismatch"]
             ),
         },
-        assurance={"level": "HEURISTIC"},
     )
     if enriched:
         second = _tool_event(
@@ -173,10 +172,7 @@ def _comparison_evidence(
                 "environment": case.injected_payload["environment"],
             },
             output={"conclusion": "TRUE", "diagnostics": []},
-            assurance={
-                "level": "VERIFIED",
-                "verification_record_uri": "artifact://sha256/" + "f" * 64,
-            },
+            verification_record_uri="artifact://sha256/" + "f" * 64,
         )
     else:
         second = rejection
@@ -422,7 +418,6 @@ def test_recovery_classification_separates_diagnostic_from_terminal_success() ->
                         {"code": "LEAN_TYPE_MISMATCH", "phase": "KERNEL_CHECK"}
                     ],
                 },
-                "assurance": {"level": "HEURISTIC"},
             },
             {
                 "capability_id": "lean.check",
@@ -432,10 +427,7 @@ def test_recovery_classification_separates_diagnostic_from_terminal_success() ->
                     "environment": case.injected_payload["environment"],
                 },
                 "output": {"conclusion": "TRUE", "diagnostics": []},
-                "assurance": {
-                    "level": "VERIFIED",
-                    "verification_record_uri": "artifact://sha256/" + "a" * 64,
-                },
+                "verification_record_uri": "artifact://sha256/" + "a" * 64,
             },
         ],
     }
@@ -467,7 +459,6 @@ def test_recovery_does_not_count_verification_of_a_different_claim() -> None:
                         }
                     ],
                 },
-                "assurance": {"level": "HEURISTIC"},
             },
             {
                 "capability_id": case.terminal_capability_id,
@@ -477,10 +468,7 @@ def test_recovery_does_not_count_verification_of_a_different_claim() -> None:
                     "environment": "MATHLIB",
                 },
                 "output": {"conclusion": "TRUE", "diagnostics": []},
-                "assurance": {
-                    "level": "VERIFIED",
-                    "verification_record_uri": "artifact://sha256/" + "b" * 64,
-                },
+                "verification_record_uri": "artifact://sha256/" + "b" * 64,
             },
         ]
     }
@@ -529,7 +517,6 @@ def test_recovery_excludes_operational_failures_from_repairs(
                     "diagnostics": [diagnostic],
                     "input": {"status": "REJECTED", "errors": [input_error]},
                 },
-                "assurance": {"level": "HEURISTIC"},
             },
             {
                 "capability_id": case.terminal_capability_id,
@@ -539,10 +526,7 @@ def test_recovery_excludes_operational_failures_from_repairs(
                     "environment": case.injected_payload["environment"],
                 },
                 "output": {"conclusion": "TRUE", "diagnostics": []},
-                "assurance": {
-                    "level": "VERIFIED",
-                    "verification_record_uri": "artifact://sha256/" + "c" * 64,
-                },
+                "verification_record_uri": "artifact://sha256/" + "c" * 64,
             },
         ]
     }
@@ -588,7 +572,6 @@ def test_repeated_error_identity_is_condition_independent() -> None:
                         "conclusion": "UNKNOWN",
                         "diagnostics": diagnostic,
                     },
-                    "assurance": {"level": "HEURISTIC"},
                 }
                 for payload, diagnostic in zip(payloads, diagnostics, strict=True)
             ]
@@ -615,16 +598,12 @@ def test_recovery_keeps_legacy_proof_edit_control_observable() -> None:
                     "baseline_checker_execution_status": "COMPLETED",
                     "checker_execution_status": "COMPLETED",
                 },
-                "assurance": {"level": "HEURISTIC"},
             },
             {
                 "capability_id": case.terminal_capability_id,
                 "input": corrected,
                 "output": {"accepted": True},
-                "assurance": {
-                    "level": "VERIFIED",
-                    "verification_record_uri": "artifact://sha256/" + "d" * 64,
-                },
+                "verification_record_uri": "artifact://sha256/" + "d" * 64,
             },
         ]
     }
@@ -679,10 +658,7 @@ def test_recovery_does_not_count_a_repaired_call_before_exact_injection() -> Non
                 "capability_id": "lean.check",
                 "input": {"statement": "True", "proof": "by trivial"},
                 "output": {"conclusion": "TRUE"},
-                "assurance": {
-                    "level": "VERIFIED",
-                    "verification_record_uri": "artifact://sha256/" + "a" * 64,
-                },
+                "verification_record_uri": "artifact://sha256/" + "a" * 64,
             },
             {
                 "capability_id": "lean.check",
@@ -693,7 +669,6 @@ def test_recovery_does_not_count_a_repaired_call_before_exact_injection() -> Non
                         {"code": "LEAN_TYPE_MISMATCH", "phase": "KERNEL_CHECK"}
                     ],
                 },
-                "assurance": {"level": "HEURISTIC"},
             },
         ]
     }
@@ -716,7 +691,6 @@ def test_recovery_protocol_includes_failed_math_run_attempts() -> None:
             "conclusion": "UNKNOWN",
             "diagnostics": [{"code": "LEAN_TYPE_MISMATCH", "phase": "KERNEL_CHECK"}],
         },
-        "assurance": {"level": "HEURISTIC"},
     }
     repaired = {
         "capability_id": case.terminal_capability_id,
@@ -726,10 +700,7 @@ def test_recovery_protocol_includes_failed_math_run_attempts() -> None:
             "environment": case.injected_payload["environment"],
         },
         "output": {"conclusion": "TRUE", "diagnostics": []},
-        "assurance": {
-            "level": "VERIFIED",
-            "verification_record_uri": "artifact://sha256/" + "e" * 64,
-        },
+        "verification_record_uri": "artifact://sha256/" + "e" * 64,
     }
     telemetry = {
         "capability_attempts": [
@@ -770,7 +741,6 @@ def test_recovery_success_allows_an_atomic_operation_before_injection() -> None:
             "conclusion": "UNKNOWN",
             "diagnostics": [{"code": "LEAN_TYPE_MISMATCH", "phase": "KERNEL_CHECK"}],
         },
-        "assurance": {"level": "HEURISTIC"},
     }
     repaired_input = {
         "statement": case.injected_payload["statement"],
@@ -781,16 +751,12 @@ def test_recovery_success_allows_an_atomic_operation_before_injection() -> None:
         "capability_id": case.terminal_capability_id,
         "input": repaired_input,
         "output": {"conclusion": "TRUE", "diagnostics": []},
-        "assurance": {
-            "level": "VERIFIED",
-            "verification_record_uri": "artifact://sha256/" + "f" * 64,
-        },
+        "verification_record_uri": "artifact://sha256/" + "f" * 64,
     }
     unrelated = {
         "capability_id": "arithmetic.gcd",
         "input": {"values": [12, 18]},
         "output": {"gcd": "6"},
-        "assurance": {"level": "COMPUTED"},
     }
     telemetry = {
         "capability_attempts": [

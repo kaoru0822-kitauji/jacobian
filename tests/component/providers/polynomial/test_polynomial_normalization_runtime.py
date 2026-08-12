@@ -11,7 +11,6 @@ from tests.support.rationals import rational_payload as _q
 import jacobian.providers.sympy_runtime as sympy_runtime
 from jacobian.canonical import canonicalize_json
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityInstallTier,
     CapabilityProviderAvailability,
 )
@@ -88,9 +87,8 @@ def test_sympy_normalization_timeout_is_operational(
     )
     assert result.execution.status is ExecutionStatus.TIMEOUT
     assert result.output["status"] == "NO_NORMALIZATION_PRODUCED"
-    assert result.output["conclusion"] == "UNKNOWN"
     assert result.output["normalization_uri"] is None
-    assert result.assurance.level is not CapabilityAssuranceLevel.VERIFIED
+    assert result.verification_record_uri is None
 
 
 def test_sympy_worker_gets_only_fixed_environment_and_budget(
@@ -208,4 +206,3 @@ def test_invalid_worker_protocol_retains_no_normalization_evidence(
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.output["status"] == "NO_NORMALIZATION_PRODUCED"
     assert result.output["normalization_uri"] is None
-    assert result.output["conclusion"] == "UNKNOWN"

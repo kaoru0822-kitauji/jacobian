@@ -3,8 +3,7 @@
 This phase authorizes the retained polytope and Lean checker families through
 the standalone :mod:`jacobian.checker_authorization` module and then installs
 the Lean declaration, exploration, proof-axiom, proof-edit, and proof-state
-inspection capabilities.  It does not load external capability adapter
-entrypoints and it does not depend on the reference-plugin workflow graph.
+inspection capabilities.
 """
 
 from __future__ import annotations

@@ -32,10 +32,6 @@ def build_combinatorics_bundle() -> DomainBundle:
                     "finite rational-series truncations"
                 ),
                 "arithmetic": "exact integer and rational via maintained SymPy and stdlib APIs",
-                "assurance": (
-                    "producers are computed; declared recurrence and rational-series "
-                    "results may be submitted to an operator-authorized independent checker"
-                ),
             },
         ),
         provider_runtime=known_provider_runtime(

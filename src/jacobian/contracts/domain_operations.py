@@ -6,7 +6,7 @@ from typing import Self
 
 from pydantic import model_validator
 
-from jacobian.contracts.common import ArtifactUri
+from jacobian.contracts.common import ArtifactUri, ValueUri
 from jacobian.contracts.results import ContractModel
 
 
@@ -15,6 +15,14 @@ class InlineOperationOutput[ResultT: ContractModel](ContractModel):
 
     result: ResultT
     backend_version: str
+
+
+class ReferencedInlineOperationOutput[ResultT: ContractModel](ContractModel):
+    """Inline value with one or more runtime-local composition carriers."""
+
+    result: ResultT
+    backend_version: str
+    value_refs: dict[str, ValueUri]
 
 
 class DurableOperationOutput[PreviewT: ContractModel](ContractModel):

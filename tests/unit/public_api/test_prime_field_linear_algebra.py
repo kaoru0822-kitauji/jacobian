@@ -53,3 +53,24 @@ def test_input_rejects_nonprime_or_ragged_semantics() -> None:
         PrimeFieldMatrix(prime=4, entries=((1,),), columns=1)
     with pytest.raises(ValueError, match="column"):
         PrimeFieldMatrix(prime=2, entries=((1,),), columns=2)
+
+
+def test_matrix_rejects_noncanonical_entries() -> None:
+    with pytest.raises(ValueError, match="canonical"):
+        PrimeFieldMatrix(prime=2, entries=((3,),), columns=1)
+    with pytest.raises(ValueError, match="canonical"):
+        PrimeFieldMatrix(prime=3, entries=((1, -1),), columns=2)
+    with pytest.raises(ValueError, match="canonical"):
+        PrimeFieldMatrix(prime=2, entries=((1.0,),), columns=1)
+
+
+def test_matrix_accepts_canonical_residues_at_the_boundary() -> None:
+    matrix = PrimeFieldMatrix(prime=5, entries=((0, 4), (4, 0)), columns=2)
+    assert rank(matrix) == 2
+
+
+def test_matrix_rejects_oversized_dimensions_before_primality() -> None:
+    with pytest.raises(ValueError, match="dimension bound"):
+        PrimeFieldMatrix(prime=2, entries=(), columns=257)
+    with pytest.raises(ValueError, match="dimension bound"):
+        PrimeFieldMatrix(prime=2, entries=((),) * 257, columns=0)

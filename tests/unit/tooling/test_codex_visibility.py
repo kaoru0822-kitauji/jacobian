@@ -147,7 +147,12 @@ def test_visibility_classification_records_adoption_without_grading_shell(
         tmp_path / "trace.jsonl",
         _mcp_event(
             "math.find",
-            {"query": "exact determinant"},
+            {
+                "request": {
+                    "op": "search",
+                    "query": "exact determinant",
+                }
+            },
             {
                 "kind": "discovery",
                 "matches": [{"capability_id": "matrix.determinant.compute"}],
@@ -156,8 +161,10 @@ def test_visibility_classification_records_adoption_without_grading_shell(
         _mcp_event(
             "math.find",
             {
-                "capability_id": "matrix.determinant.compute",
-                "view": "CONTRACT",
+                "request": {
+                    "op": "inspect",
+                    "capability_id": "matrix.determinant.compute",
+                }
             },
             {"kind": "capability"},
         ),
@@ -171,10 +178,7 @@ def test_visibility_classification_records_adoption_without_grading_shell(
                 "capability_id": "matrix.determinant.compute",
                 "execution": {"status": "COMPLETED"},
                 "output": {"determinant": "7"},
-                "assurance": {
-                    "level": "COMPUTED",
-                    "verification_record_uri": None,
-                },
+                "verification_record_uri": None,
             },
         ),
         {
@@ -216,7 +220,7 @@ def test_visibility_classification_records_discovery_free_invocation(
             {
                 "capability_id": "matrix.determinant.compute",
                 "execution": {"status": "COMPLETED"},
-                "assurance": {"level": "COMPUTED"},
+                "verification_record_uri": None,
             },
         ),
     )
@@ -288,10 +292,7 @@ def test_visibility_classification_requires_bound_verified_evidence(
             {
                 "capability_id": "matrix.determinant.compute",
                 "execution": {"status": "COMPLETED"},
-                "assurance": {
-                    "level": "VERIFIED",
-                    "verification_record_uri": None,
-                },
+                "verification_record_uri": None,
             },
         ),
     )
@@ -309,10 +310,7 @@ def test_visibility_classification_rejects_unrelated_verified_invocation() -> No
         "capability_invocations": [
             {
                 "capability_id": "integer.gcd.verify",
-                "assurance": {
-                    "level": "VERIFIED",
-                    "verification_record_uri": "artifact://sha256/record",
-                },
+                "verification_record_uri": "artifact://sha256/record",
             }
         ],
     }

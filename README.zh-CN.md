@@ -175,7 +175,7 @@ Jacobian 将四项职责分开：
 
 对于代码仓库副本，`jacobian setup --source <checkout> --state-dir <path> --profile full-python` 会显式地将客户端绑定到该源代码环境；受维护的 `scripts/setup-agent` 封装器会先完成所需的锁定同步和 doctor 检查。
 
-服务器只公布两个能力入口：`math.find` 用于搜索、浏览或检查已安装的数学操作，`math.run` 用于执行其中一个操作。两者是可以自由组合的工具，不规定研究顺序；数学表示、分解、探索、验证时机和停止条件都由智能体决定。
+服务器只公布两个能力入口：`math.find` 用于搜索或检查已安装的数学操作，`math.run` 用于执行其中一个操作。完整 inventory 位于 `capability://catalog`。这些工具不规定研究顺序；数学表示、分解、探索、验证时机和停止条件都由智能体决定。
 
 支持 MCP resource 的客户端可以读取 `jacobian://instructions` 获取操作指南，读取 `capability://catalog` 获取完整的机器可读 inventory。支持 prompt 的客户端还可以选择请求 `jacobian-discover` 或 `jacobian-check-evidence`，以获得协议脚手架。
 

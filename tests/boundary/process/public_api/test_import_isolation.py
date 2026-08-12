@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 
@@ -9,6 +10,7 @@ def _imported_modules(target: str) -> set[str]:
         [sys.executable, "-c", f"import {target}, sys; print('\\n'.join(sys.modules))"],
         check=True,
         capture_output=True,
+        env={**os.environ, "SYMPY_GROUND_TYPES": "python"},
         text=True,
     )
     return set(completed.stdout.splitlines())
@@ -56,3 +58,44 @@ def test_native_matrices_does_not_import_capabilities_or_provider_loading() -> N
             "jacobian.store",
         ),
     )
+
+
+def test_native_finite_fields_does_not_eagerly_import_flint() -> None:
+    imported = _imported_modules("jacobian.math.finite_fields")
+    _assert_not_imported(imported, ("flint",))
+    _assert_not_imported(
+        imported,
+        (
+            "jacobian.adapters",
+            "jacobian.operation_installation",
+            "jacobian.providers",
+            "jacobian.runtime",
+            "jacobian.storage",
+        ),
+    )
+
+
+def test_sympy_finite_field_construction_and_projective_line_do_not_need_flint() -> (
+    None
+):
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import sys; "
+                "from jacobian.math.finite_fields import Axis, finite_field, "
+                "projective_line; "
+                "field = finite_field(2, (1, 1, 1)); "
+                "line = projective_line(field, Axis(name='p', labels=('x', 'y'))); "
+                "assert len(line.points) == 5; "
+                "assert 'flint' not in sys.modules"
+            ),
+        ],
+        check=True,
+        capture_output=True,
+        env={**os.environ, "SYMPY_GROUND_TYPES": "python"},
+        text=True,
+    )
+
+    assert completed.stderr == ""

@@ -8,7 +8,6 @@ from tests.support.services import DomainTestServices, open_domain_services
 
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
@@ -365,5 +364,4 @@ def test_graph_invariant_resource_atomics_are_exact_computed(
             CapabilityRequest(capability_id=capability_id, input=payload)
         )
         assert result.execution.status is ExecutionStatus.COMPLETED
-        assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
         assert result.output["result"] == expected

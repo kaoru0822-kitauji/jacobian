@@ -10,15 +10,10 @@ from pydantic import ValidationError
 from jacobian.canonical import canonicalize_json
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.lean import LeanEnvironment
 from jacobian.contracts.lean_exploration import (
@@ -169,30 +164,6 @@ class LeanPremiseRetrievalAdapter:
                 runtime_ms=_runtime_ms(started),
             ),
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="one explicit Lean goal under pinned Mathlib exact?",
-                parameters={
-                    "environment": "MATHLIB",
-                    "statement": validated.statement,
-                    "limit": validated.limit,
-                },
-                artifact_uri=artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.PARTIAL,
-                basis=(
-                    "Mathlib exact? suggestions are bounded and non-exhaustive; "
-                    "no suggestion is not a proof of absence"
-                ),
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "candidate tactics were emitted by pinned Mathlib exact?; "
-                    "they remain unverified until lean.check accepts exact source"
-                ),
-            ),
             artifact_uris=(artifact.artifact_uri,),
         )
 

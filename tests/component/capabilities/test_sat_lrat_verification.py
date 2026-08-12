@@ -12,10 +12,7 @@ from tests.support.services import (
     open_domain_services,
 )
 
-from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
-    CapabilityRequest,
-)
+from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.runtime import CheckerAuthorityMode
 from jacobian.sat_smt.sat_lrat import install_sat_lrat_verifier
@@ -82,18 +79,9 @@ def test_rup_lrat_derives_empty_clause_and_binds_artifacts(
 
     assert result.output["status"] == "VERIFIED_UNSAT"
     assert result.output["conclusion"] == "TRUE"
-    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
     assert result.output["verification_record_uri"] is not None
     proof = lrat_services.core.store.get(result.output["proof_uri"])
     assert proof.manifest.parents == (cnf.artifact_uri,)
-    assert (
-        proof.payload["cnf"]["variable_map_digest"]
-        == result.scope.parameters["variable_map_digest"]
-    )
-    assert (
-        proof.payload["cnf"]["dimacs_digest"]
-        == result.scope.parameters["dimacs_digest"]
-    )
 
 
 def test_invalid_or_incomplete_lrat_never_proves_sat_or_unsat(
@@ -207,8 +195,7 @@ def test_lrat_resource_exhaustion_is_an_operational_error(
     assert result.output["status"] == "ERROR"
     assert result.output["conclusion"] == "UNKNOWN"
     assert result.output["invalid_step"] is None
-    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
-    assert result.completeness.assurance_level is CapabilityAssuranceLevel.HEURISTIC
+    assert result.verification_record_uri is None
 
 
 def test_capability_is_absent_without_operator_authorized_references(

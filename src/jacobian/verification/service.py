@@ -29,17 +29,13 @@ from jacobian.contracts.exact_domain_verification import (
     inline_exact_value_digest,
 )
 from jacobian.contracts.results import (
-    Arithmetic,
-    Assurance,
     Conclusion,
     Coverage,
     Execution,
     ExecutionStatus,
     InputStatus,
     InputValidation,
-    Method,
     ResultEnvelope,
-    Verification,
 )
 from jacobian.contracts.verification import VerificationRecord
 from jacobian.process_policy import (
@@ -309,12 +305,6 @@ class VerificationService:
                         status=InputStatus.REJECTED, errors=(detail,)
                     ),
                     conclusion=Conclusion.UNKNOWN,
-                    assurance=Assurance(
-                        arithmetic=decision.arithmetic,
-                        method=decision.method,
-                        coverage=decision.coverage,
-                        verification=Verification.UNVERIFIED,
-                    ),
                     claim_digest=claim_digest,
                     semantics_digest=semantics_digest,
                     candidate_digest=candidate_digest,
@@ -357,14 +347,6 @@ class VerificationService:
                 ),
                 input=InputValidation(status=InputStatus.ACCEPTED),
                 conclusion=decision.conclusion,
-                assurance=Assurance(
-                    arithmetic=decision.arithmetic,
-                    method=decision.method,
-                    coverage=decision.coverage,
-                    verification=Verification.VERIFIED,
-                    checker_id=checker.checker_id,
-                    checker_digest=checker.executable_digest,
-                ),
                 claim_digest=claim_digest,
                 semantics_digest=semantics_digest,
                 candidate_digest=candidate_digest,
@@ -887,12 +869,6 @@ class VerificationService:
                 errors=(decision.detail,),
             ),
             conclusion=Conclusion.UNKNOWN,
-            assurance=Assurance(
-                arithmetic=decision.arithmetic,
-                method=decision.method,
-                coverage=decision.coverage,
-                verification=Verification.UNVERIFIED,
-            ),
             claim_digest=claim_digest,
             semantics_digest=semantics_digest,
             candidate_digest=candidate_digest,
@@ -951,15 +927,6 @@ class VerificationService:
         scope_uri: str | None = None,
         execution_detail: str | None = None,
     ) -> ResultEnvelope:
-        assurance = Assurance(
-            arithmetic=decision.arithmetic,
-            method=decision.method,
-            coverage=decision.coverage,
-            verification=Verification.VERIFIED,
-            checker_id=checker.checker_id,
-            checker_digest=checker.executable_digest,
-            scope_uri=scope_uri,
-        )
         record_artifact = self._commit_verification_record(
             checker_id=checker.checker_id,
             checker_digest=checker.executable_digest,
@@ -977,7 +944,7 @@ class VerificationService:
             ),
             input=InputValidation(status=InputStatus.ACCEPTED),
             conclusion=decision.conclusion,
-            assurance=assurance,
+            scope_uri=scope_uri,
             claim_digest=claim_digest,
             semantics_digest=semantics_digest,
             candidate_digest=candidate_digest,
@@ -1112,12 +1079,6 @@ class VerificationService:
                 errors=(detail,),
             ),
             conclusion=Conclusion.UNKNOWN,
-            assurance=Assurance(
-                arithmetic=Arithmetic.SYMBOLIC,
-                method=Method.DIRECT_WITNESS,
-                coverage=Coverage.NOT_APPLICABLE,
-                verification=Verification.UNVERIFIED,
-            ),
         )
 
     def _operational_failure(
@@ -1135,10 +1096,4 @@ class VerificationService:
             ),
             input=InputValidation(status=InputStatus.ACCEPTED),
             conclusion=Conclusion.UNKNOWN,
-            assurance=Assurance(
-                arithmetic=Arithmetic.SYMBOLIC,
-                method=Method.DIRECT_WITNESS,
-                coverage=Coverage.NOT_APPLICABLE,
-                verification=Verification.UNVERIFIED,
-            ),
         )

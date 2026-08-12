@@ -3,25 +3,20 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
+from functools import partial
 from typing import Any, Literal
 
 from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
+from jacobian.capability_errors import CapabilityError
 from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationError
 from jacobian.checker_artifacts import put_witness_envelope
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation, ExactReplayCheckerDeclaration
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
-    CapabilityCatalogRelationship,
-    CapabilityCatalogRelationshipKind,
-    CapabilityCatalogRelationshipRegistration,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInputKind,
@@ -30,7 +25,6 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderRuntime,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import EvidenceBindings, WitnessEnvelope
@@ -38,6 +32,7 @@ from jacobian.contracts.exact_domain_verification import (
     ExactComputedVerificationOutput,
     ExactComputedVerificationRequest,
     ExactDomainResultVerificationRequest,
+    InlineExactVerificationRecord,
     inline_exact_value_digest,
 )
 from jacobian.contracts.results import (
@@ -45,14 +40,17 @@ from jacobian.contracts.results import (
     ContractModel,
     Execution,
     ExecutionStatus,
-    Verification,
 )
 from jacobian.operation_bindings import DurablePublication
 from jacobian.operation_installation import InstalledDomainBundle
 from jacobian.operations import (
     DomainBundle,
 )
-from jacobian.provider_runtime import source_provider_runtime
+from jacobian.provider_runtime import (
+    composite_provider_runtime,
+    known_provider_runtime,
+    source_provider_runtime,
+)
 from jacobian.providers.flint_runtime import (
     certified_snf_checker_provider_runtime,
     combinatorics_exact_checker_provider_runtime,
@@ -87,7 +85,57 @@ _ENTRYPOINT_PROVIDER_RUNTIME_KEYS = {
     "jacobian_checkers.finite_posets": "poset",
     "jacobian_checkers.exact_geometry": "geometry",
     "jacobian_checkers.matrix_normal_forms": "matrix-hnf",
+    "jacobian_checkers.finite_field_rank": "sympy",
+    "jacobian_checkers.finite_field_polynomial": "finite-field-polynomial",
 }
+
+
+def _finite_field_rank_checker_runtime(
+    *, checker_ids: tuple[str, ...] = ()
+) -> CapabilityProviderRuntime:
+    source = source_provider_runtime(
+        "jacobian.finite-field-rank-checker-source",
+        version="1",
+        entrypoint=(
+            "jacobian_checkers.finite_field_rank:check_finite_field_linear_map_rank"
+        ),
+        install_tier=CapabilityInstallTier.T0,
+        license_id="MIT",
+        features=("clean-process-checker",),
+    )
+    sympy = known_provider_runtime(
+        "jacobian.sympy",
+        features=("prime-field-rank-replay",),
+    )
+    return composite_provider_runtime(
+        "jacobian.finite-field-rank-checker",
+        components=(source, sympy),
+        features=("independent-prime-field-rank-replay",),
+        checker_ids=checker_ids,
+    )
+
+
+def _finite_field_polynomial_checker_runtime(
+    *, checker_ids: tuple[str, ...] = ()
+) -> CapabilityProviderRuntime:
+    source = source_provider_runtime(
+        "jacobian.finite-field-polynomial-checker-source",
+        version="1",
+        entrypoint="jacobian_checkers.finite_field_polynomial:check_finite_map_table",
+        install_tier=CapabilityInstallTier.T0,
+        license_id="MIT",
+        features=("clean-process-checker",),
+    )
+    sympy = known_provider_runtime(
+        "jacobian.sympy",
+        features=("finite-field-polynomial-replay",),
+    )
+    return composite_provider_runtime(
+        "jacobian.finite-field-polynomial-checker",
+        components=(source, sympy),
+        features=("independent-finite-field-polynomial-replay",),
+        checker_ids=checker_ids,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,7 +146,6 @@ class ExactDomainCheckerInstallation:
     provider_runtimes: dict[str, CapabilityProviderRuntime]
     witness_schema_uri: str | None = None
     diagnostics: tuple[CapabilityDiagnostic, ...] = ()
-    catalog_relationships: tuple[CapabilityCatalogRelationshipRegistration, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,17 +181,23 @@ def install_exact_domain_checkers(
     """Install independent exact replay against dynamically registered schemas."""
 
     installer = CheckerInstaller(checkers)
-    provider_runtimes = {
-        "python-flint": exact_domain_checker_provider_runtime(),
-        "certified-snf": certified_snf_checker_provider_runtime(),
-        "finite-graph": graph_exact_checker_provider_runtime(),
-        "finite-probability": probability_exact_checker_provider_runtime(),
-        "combinatorics": combinatorics_exact_checker_provider_runtime(),
-        "poset": poset_exact_checker_provider_runtime(),
-        "graded-syzygy": graded_syzygy_checker_provider_runtime(),
-        "projective-arrangement": (projective_arrangement_checker_provider_runtime()),
-        "topology": topology_exact_checker_provider_runtime(),
-        "geometry": source_provider_runtime(
+    runtime_factories: dict[
+        str,
+        Callable[..., CapabilityProviderRuntime],
+    ] = {
+        "python-flint": exact_domain_checker_provider_runtime,
+        "certified-snf": certified_snf_checker_provider_runtime,
+        "finite-graph": graph_exact_checker_provider_runtime,
+        "finite-probability": probability_exact_checker_provider_runtime,
+        "combinatorics": combinatorics_exact_checker_provider_runtime,
+        "poset": poset_exact_checker_provider_runtime,
+        "graded-syzygy": graded_syzygy_checker_provider_runtime,
+        "projective-arrangement": projective_arrangement_checker_provider_runtime,
+        "topology": topology_exact_checker_provider_runtime,
+        "sympy": _finite_field_rank_checker_runtime,
+        "finite-field-polynomial": _finite_field_polynomial_checker_runtime,
+        "geometry": partial(
+            source_provider_runtime,
             "jacobian.exact-geometry-checker",
             version="1",
             entrypoint="jacobian_checkers.exact_geometry:check_exact_geometry",
@@ -152,7 +205,8 @@ def install_exact_domain_checkers(
             license_id="MIT",
             features=("standard-library-rational-replay", "clean-process-checker"),
         ),
-        "matrix-hnf": source_provider_runtime(
+        "matrix-hnf": partial(
+            source_provider_runtime,
             "jacobian.matrix-hnf-checker",
             version="1",
             entrypoint="jacobian_checkers.matrix_normal_forms:check_hermite_normal_form",
@@ -160,7 +214,8 @@ def install_exact_domain_checkers(
             license_id="MIT",
             features=("standard-library-integer-replay", "clean-process-checker"),
         ),
-        "linear-solution": source_provider_runtime(
+        "linear-solution": partial(
+            source_provider_runtime,
             "jacobian.rational-linear-checker",
             version="1",
             entrypoint="jacobian_checkers.linear:check_rational_solution",
@@ -168,7 +223,8 @@ def install_exact_domain_checkers(
             license_id="MIT",
             features=("standard-library-rational-replay", "clean-process-checker"),
         ),
-        "linear-inconsistency": source_provider_runtime(
+        "linear-inconsistency": partial(
+            source_provider_runtime,
             "jacobian.rational-linear-inconsistency-checker",
             version="1",
             entrypoint="jacobian_checkers.linear:check_rational_inconsistency",
@@ -176,6 +232,9 @@ def install_exact_domain_checkers(
             license_id="MIT",
             features=("standard-library-rational-replay", "clean-process-checker"),
         ),
+    }
+    provider_runtimes = {
+        runtime_key: factory() for runtime_key, factory in runtime_factories.items()
     }
     checker_ids: dict[str, str | None] = {}
     declarations_by_id: dict[str, ExactReplayCheckerDeclaration] = {}
@@ -254,77 +313,8 @@ def install_exact_domain_checkers(
         checker_ids=checker_ids,
         diagnostics=tuple(diagnostics),
         provider_runtimes={
-            "python-flint": exact_domain_checker_provider_runtime(
-                checker_ids=authorized_ids["python-flint"]
-            ),
-            "certified-snf": certified_snf_checker_provider_runtime(
-                checker_ids=authorized_ids["certified-snf"]
-            ),
-            "finite-graph": graph_exact_checker_provider_runtime(
-                checker_ids=authorized_ids["finite-graph"]
-            ),
-            "finite-probability": probability_exact_checker_provider_runtime(
-                checker_ids=authorized_ids["finite-probability"]
-            ),
-            "combinatorics": combinatorics_exact_checker_provider_runtime(
-                checker_ids=authorized_ids["combinatorics"]
-            ),
-            "poset": poset_exact_checker_provider_runtime(
-                checker_ids=authorized_ids["poset"]
-            ),
-            "graded-syzygy": graded_syzygy_checker_provider_runtime(
-                checker_ids=authorized_ids["graded-syzygy"]
-            ),
-            "projective-arrangement": (
-                projective_arrangement_checker_provider_runtime(
-                    checker_ids=authorized_ids["projective-arrangement"]
-                )
-            ),
-            "topology": topology_exact_checker_provider_runtime(
-                checker_ids=authorized_ids["topology"]
-            ),
-            "geometry": source_provider_runtime(
-                "jacobian.exact-geometry-checker",
-                version="1",
-                entrypoint="jacobian_checkers.exact_geometry:check_exact_geometry",
-                install_tier=CapabilityInstallTier.T1,
-                license_id="MIT",
-                features=(
-                    "standard-library-rational-replay",
-                    "clean-process-checker",
-                ),
-                checker_ids=authorized_ids["geometry"],
-            ),
-            "matrix-hnf": source_provider_runtime(
-                "jacobian.matrix-hnf-checker",
-                version="1",
-                entrypoint="jacobian_checkers.matrix_normal_forms:check_hermite_normal_form",
-                install_tier=CapabilityInstallTier.T1,
-                license_id="MIT",
-                features=("standard-library-integer-replay", "clean-process-checker"),
-                checker_ids=authorized_ids["matrix-hnf"],
-            ),
-            "linear-solution": source_provider_runtime(
-                "jacobian.rational-linear-checker",
-                version="1",
-                entrypoint="jacobian_checkers.linear:check_rational_solution",
-                install_tier=CapabilityInstallTier.T1,
-                license_id="MIT",
-                features=("standard-library-rational-replay", "clean-process-checker"),
-                checker_ids=authorized_ids["linear-solution"],
-            ),
-            "linear-inconsistency": source_provider_runtime(
-                "jacobian.rational-linear-inconsistency-checker",
-                version="1",
-                entrypoint="jacobian_checkers.linear:check_rational_inconsistency",
-                install_tier=CapabilityInstallTier.T1,
-                license_id="MIT",
-                features=(
-                    "standard-library-rational-replay",
-                    "clean-process-checker",
-                ),
-                checker_ids=authorized_ids["linear-inconsistency"],
-            ),
+            runtime_key: factory(checker_ids=authorized_ids[runtime_key])
+            for runtime_key, factory in runtime_factories.items()
         },
     )
 
@@ -370,7 +360,6 @@ def install_exact_domain_verification(
     ):
         return (), installation
     adapters: list[CapabilityAdapter] = []
-    catalog_relationships: list[CapabilityCatalogRelationshipRegistration] = []
     result_models = {
         operation.spec.operation_id: operation.spec.result_type
         for bundle, _installed_bundle in bundles.values()
@@ -407,38 +396,6 @@ def install_exact_domain_verification(
                 stored_result_input=declaration.capability_id in stored_producers,
             )
         )
-        verifier_id = declaration.verification_capability_id
-        if verifier_id is None:
-            raise ValueError("exact replay declaration has no verifier capability ID")
-        catalog_relationships.extend(
-            (
-                CapabilityCatalogRelationshipRegistration(
-                    source_capability_id=declaration.capability_id,
-                    related_capability=CapabilityCatalogRelationship(
-                        capability_id=verifier_id,
-                        kind=(CapabilityCatalogRelationshipKind.INDEPENDENT_VERIFIER),
-                        relationship=(
-                            "independently verify this exact producer result"
-                        ),
-                    ),
-                ),
-                CapabilityCatalogRelationshipRegistration(
-                    source_capability_id=verifier_id,
-                    related_capability=CapabilityCatalogRelationship(
-                        capability_id=declaration.capability_id,
-                        kind=(
-                            CapabilityCatalogRelationshipKind.VERIFIABLE_RESULT_PRODUCER
-                        ),
-                        relationship=(
-                            "produce the exact result accepted by this verifier"
-                        ),
-                    ),
-                ),
-            )
-        )
-    installation = replace(
-        installation, catalog_relationships=tuple(catalog_relationships)
-    )
     return tuple(adapters), installation
 
 
@@ -453,6 +410,9 @@ def _available_declaration_bundles(
         producer_capability_ids = {
             operation.spec.operation_id for operation in bundle.capabilities
         }
+        installed_producer_ids = {
+            adapter.descriptor.capability_id for adapter in installed.adapters
+        }
         for declaration in bundle.checker_declarations:
             if declaration.capability_id not in producer_capability_ids:
                 raise ValueError(
@@ -460,6 +420,11 @@ def _available_declaration_bundles(
                     f"schema: {domain_id}/{declaration.capability_id}"
                 )
             if declaration.capability_id not in installed.result_schema_uris:
+                continue
+            if (
+                installed.adapters
+                and declaration.capability_id not in installed_producer_ids
+            ):
                 continue
             previous = owners.setdefault(declaration.capability_id, domain_id)
             if previous != domain_id:
@@ -617,30 +582,6 @@ class ExactComputedVerificationAdapter:
                 capability_version=self.descriptor.version,
                 execution=Execution(status=ExecutionStatus.COMPLETED),
                 output=output.model_dump(mode="json"),
-                scope=CapabilityScope(
-                    description="the authorized independent checker's bounded scope",
-                    parameters={
-                        "operation_id": declaration.declaration.capability_id,
-                        "scope_supported": False,
-                    },
-                    artifact_uri=(
-                        source_artifacts[0].artifact_uri
-                        if source_artifacts is not None
-                        else None
-                    ),
-                ),
-                completeness=CapabilityCompleteness(
-                    status=CapabilityCompletenessStatus.NOT_APPLICABLE,
-                    basis="the input lies outside this checker's declared scope",
-                    assurance_level=CapabilityAssuranceLevel.COMPUTED,
-                ),
-                assurance=CapabilityAssurance(
-                    level=CapabilityAssuranceLevel.COMPUTED,
-                    basis=(
-                        "checker scope was evaluated without making a "
-                        "mathematical conclusion"
-                    ),
-                ),
                 artifact_uris=(
                     (source_artifacts[0].artifact_uri, source_artifacts[1].artifact_uri)
                     if source_artifacts is not None
@@ -731,11 +672,18 @@ class ExactComputedVerificationAdapter:
         verified = (
             checked.execution.status is ExecutionStatus.COMPLETED
             and checked.conclusion is Conclusion.TRUE
-            and checked.assurance.verification is Verification.VERIFIED
             and checked.verification_record_uri is not None
         )
         status = self._verification_status(checked.execution.status, verified)
         record_uri = checked.verification_record_uri if verified else None
+        if record_uri is not None:
+            record = InlineExactVerificationRecord.model_validate(
+                self.store.get(record_uri).payload
+            )
+            if record.bindings != bindings:
+                raise CapabilityError(
+                    "inline exact record does not bind the verified values"
+                )
         detail = checked.execution.detail or (
             checked.input.errors[0]
             if checked.input.errors
@@ -753,53 +701,12 @@ class ExactComputedVerificationAdapter:
             verification_record_uri=record_uri,
             detail=detail,
         )
-        completed = checked.execution.status is ExecutionStatus.COMPLETED
         return CapabilityResult(
             capability_id=self.descriptor.capability_id,
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="the exact inline operation input and result",
-                parameters={
-                    "operation_id": declaration.declaration.capability_id,
-                    "claim_digest": bindings.claim_digest,
-                    "candidate_digest": bindings.candidate_digest,
-                    "semantics_digest": bindings.semantics_digest,
-                    "checker_id": declaration.checker_id,
-                    "witness_format": declaration.declaration.format_id,
-                },
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.NOT_APPLICABLE,
-                basis="direct exact replay makes no search-completeness claim",
-                assurance_level=(
-                    CapabilityAssuranceLevel.COMPUTED
-                    if completed
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-            ),
-            assurance=CapabilityAssurance(
-                level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else (
-                        CapabilityAssuranceLevel.COMPUTED
-                        if completed
-                        else CapabilityAssuranceLevel.HEURISTIC
-                    )
-                ),
-                basis=(
-                    "accepted in a clean process by the operator-authorized independent exact replay checker"
-                    if verified
-                    else (
-                        "checker replay completed without accepting the candidate; no opposite conclusion follows"
-                        if completed
-                        else "checker replay did not complete; no conclusion follows"
-                    )
-                ),
-                verification_record_uri=record_uri,
-            ),
+            verification_record_uri=record_uri,
             artifact_uris=(
                 (record_uri, declaration.semantics_uri)
                 if record_uri is not None
@@ -825,7 +732,6 @@ class ExactComputedVerificationAdapter:
         verified = (
             checked.execution.status is ExecutionStatus.COMPLETED
             and checked.conclusion is Conclusion.TRUE
-            and checked.assurance.verification is Verification.VERIFIED
             and checked.verification_record_uri is not None
         )
         status = self._verification_status(checked.execution.status, verified)
@@ -845,7 +751,6 @@ class ExactComputedVerificationAdapter:
             witness.artifact_uri,
             *((record_uri,) if record_uri is not None else ()),
         )
-        completed = checked.execution.status is ExecutionStatus.COMPLETED
         output = ExactComputedVerificationOutput(
             status=status,
             conclusion="TRUE" if verified else "UNKNOWN",
@@ -862,45 +767,7 @@ class ExactComputedVerificationAdapter:
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="the complete stored exact operation input and result",
-                parameters={
-                    "operation_id": self.declaration.declaration.capability_id,
-                    "input_uri": input_artifact.artifact_uri,
-                    "result_uri": result_artifact.artifact_uri,
-                },
-                artifact_uri=input_artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.NOT_APPLICABLE,
-                basis="direct exact replay makes no search-completeness claim",
-                assurance_level=(
-                    CapabilityAssuranceLevel.COMPUTED
-                    if completed
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-            ),
-            assurance=CapabilityAssurance(
-                level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else (
-                        CapabilityAssuranceLevel.COMPUTED
-                        if completed
-                        else CapabilityAssuranceLevel.HEURISTIC
-                    )
-                ),
-                basis=(
-                    "accepted in a clean process by the operator-authorized independent exact replay checker"
-                    if verified
-                    else (
-                        "checker replay completed without accepting the candidate; no opposite conclusion follows"
-                        if completed
-                        else "checker replay did not complete; no conclusion follows"
-                    )
-                ),
-                verification_record_uri=record_uri,
-            ),
+            verification_record_uri=record_uri,
             artifact_uris=artifact_uris,
         )
 

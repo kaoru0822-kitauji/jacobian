@@ -7,10 +7,6 @@ from typing import Any
 from tests.support.capabilities import invoke_capability as _invoke
 from tests.support.rationals import rational_payload as _q
 
-from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
-    CapabilityCompletenessStatus,
-)
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.process_policy import ProcessResult, ProcessTermination
 
@@ -73,18 +69,7 @@ def test_independent_checker_verifies_full_ast_relation(
     assert verified.output["status"] == "VERIFIED_NORMALIZATION"
     assert verified.output["conclusion"] == "TRUE"
     assert verified.output["verification_record_uri"].startswith("artifact://sha256/")
-    assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
-    assert verified.completeness.status is CapabilityCompletenessStatus.COMPLETE
-    assert verified.completeness.assurance_level is CapabilityAssuranceLevel.VERIFIED
-    assert (
-        verified.completeness.verification_record_uri
-        == verified.assurance.verification_record_uri
-    )
-    assert verified.relationships[0].status.value == "VERIFIED"
-    assert (
-        verified.relationships[0].verification_record_uri
-        == verified.assurance.verification_record_uri
-    )
+    assert verified.verification_record_uri is not None
 
 
 def test_independent_checker_rejects_wrong_bound_coefficients(
@@ -109,7 +94,6 @@ def test_independent_checker_rejects_wrong_bound_coefficients(
     assert rejected.output["status"] == "REJECTED"
     assert rejected.output["conclusion"] == "UNKNOWN"
     assert rejected.output["verification_record_uri"] is None
-    assert rejected.assurance.level is not CapabilityAssuranceLevel.VERIFIED
 
 
 def test_normalization_checker_timeout_is_operational(
@@ -142,4 +126,3 @@ def test_normalization_checker_timeout_is_operational(
     assert result.output["status"] == "TIMEOUT"
     assert result.output["conclusion"] == "UNKNOWN"
     assert result.output["verification_record_uri"] is None
-    assert result.assurance.level is not CapabilityAssuranceLevel.VERIFIED

@@ -391,7 +391,6 @@ patterns = [
   "src/jacobian/checker_artifacts.py",
   "src/jacobian/registry.py",
   "src/jacobian/schema_registry.py",
-  "src/jacobian/plugins/registry.py",
 ]
 suites = [
   "unit",
@@ -438,7 +437,6 @@ patterns = [
   "src/jacobian/contracts/checkers.py",
   "src/jacobian/contracts/common.py",
   "src/jacobian/contracts/evidence.py",
-  "src/jacobian/contracts/plugins.py",
   "src/jacobian/contracts/results.py",
   "src/jacobian/contracts/verification.py",
 ]
@@ -640,7 +638,6 @@ patterns = [
   "tests/support/capability_installations.py",
   "tests/support/nullstellensatz.py",
   "tests/support/polynomials.py",
-  "tests/support/mcp.py",
   "tests/conftest.py",
 ]
 suites = [

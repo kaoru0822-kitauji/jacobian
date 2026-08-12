@@ -2,6 +2,7 @@
 
 from jacobian.math import (
     arithmetic,
+    finite_fields,
     graphs,
     matrices,
     polynomials,
@@ -10,6 +11,7 @@ from jacobian.math import (
 
 __all__ = [
     "arithmetic",
+    "finite_fields",
     "graphs",
     "matrices",
     "polynomials",

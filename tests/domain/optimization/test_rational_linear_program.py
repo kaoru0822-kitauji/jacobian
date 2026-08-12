@@ -9,7 +9,6 @@ from tests.support.rationals import rational_payload as _rational
 from tests.support.services import DomainTestServices, open_domain_services
 
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
@@ -48,16 +47,12 @@ def test_rational_lp_produces_inspectable_primal_dual_certificate(
     assert result.execution.status is ExecutionStatus.COMPLETED
     output = result.output["result"]
     assert output["status"] == "CERTIFICATE_PRODUCED"
-    assert output["conclusion"] == "UNKNOWN"
     assert output["primal_candidate"] == [_rational(1), _rational(0)]
     assert output["dual_candidate"] == [_rational(1)]
     assert output["primal_objective"] == _rational(1)
     assert output["dual_objective"] == _rational(1)
     assert output["primal_residuals"] == [_rational(0)]
     assert output["dual_slacks"] == [_rational(0), _rational(1)]
-    assert output["verification"] == "UNVERIFIED"
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    assert result.obligations == ()
 
 
 def test_rational_lp_dual_variables_are_unrestricted_and_dimension_bound(

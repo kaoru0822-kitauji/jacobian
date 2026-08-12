@@ -57,7 +57,7 @@ def install_verified_domain_bundles(
             bundle.domain_id: (bundle, installed.installed[bundle.domain_id])
             for bundle in bundles
         }
-        adapters, exact = install_exact_domain_verification(
+        adapters, _ = install_exact_domain_verification(
             services.core.store,
             services.core.schemas,
             services.core.artifacts,
@@ -68,11 +68,6 @@ def install_verified_domain_bundles(
         )
         for adapter in adapters:
             services.installation.register_capability(adapter)
-        for relationship in exact.catalog_relationships:
-            services.installation.register_checker_relationship(
-                relationship.source_capability_id,
-                relationship.related_capability,
-            )
     return installed.installed
 
 

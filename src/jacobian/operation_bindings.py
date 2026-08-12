@@ -9,12 +9,14 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 from jacobian.contracts.capabilities import (
     CapabilityInvocationExample,
     CapabilityProviderRuntime,
 )
 from jacobian.contracts.results import ContractModel
+from jacobian.operation_ports import InputPort, OutputPort, validate_ports
 from jacobian.operations import (
     OperationFailure,
     OperationRefusalError,
@@ -81,6 +83,20 @@ class InstalledOperation[
     spec: OperationSpec[RequestT, ResultT]
     publication: PublicationPolicy[RequestT, ResultT]
     provider_binding: ProviderBinding = ProviderBinding()
+    input_ports: tuple[InputPort[Any], ...] = ()
+    output_ports: tuple[OutputPort[Any], ...] = ()
+
+    def __post_init__(self) -> None:
+        if isinstance(self.publication, DurablePublication) and self.output_ports:
+            raise ValueError(
+                "durable operations cannot publish request-local output references"
+            )
+        validate_ports(
+            self.spec.request_type,
+            self.spec.result_type,
+            self.input_ports,
+            self.output_ports,
+        )
 
 
 def inline_operation[
@@ -90,6 +106,8 @@ def inline_operation[
     spec: OperationSpec[RequestT, ResultT],
     *,
     provider_runtime: CapabilityProviderRuntime | None = None,
+    input_ports: tuple[InputPort[Any], ...] = (),
+    output_ports: tuple[OutputPort[Any], ...] = (),
 ) -> InstalledOperation[RequestT, ResultT]:
     """Bind a semantic operation to inline publication."""
 
@@ -97,6 +115,8 @@ def inline_operation[
         spec=spec,
         publication=InlinePublication(),
         provider_binding=ProviderBinding(provider_runtime),
+        input_ports=input_ports,
+        output_ports=output_ports,
     )
 
 
@@ -112,6 +132,8 @@ def durable_operation[
     preview: Callable[[ResultT], PreviewT] | None = None,
     preview_complete: bool = False,
     provider_runtime: CapabilityProviderRuntime | None = None,
+    input_ports: tuple[InputPort[Any], ...] = (),
+    output_ports: tuple[OutputPort[Any], ...] = (),
 ) -> InstalledOperation[RequestT, ResultT]:
     """Bind a semantic operation to durable artifact publication."""
 
@@ -124,6 +146,8 @@ def durable_operation[
             preview_complete=preview_complete,
         ),
         provider_binding=ProviderBinding(provider_runtime),
+        input_ports=input_ports,
+        output_ports=output_ports,
     )
 
 

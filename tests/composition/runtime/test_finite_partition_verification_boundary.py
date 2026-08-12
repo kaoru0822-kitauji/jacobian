@@ -11,8 +11,6 @@ from tests.support.core_capability_harnesses import (
 )
 
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
-    CapabilityObligationStatus,
     CapabilityRequest,
 )
 from jacobian.contracts.checkers import CheckerDecision
@@ -79,6 +77,4 @@ def test_verification_rejects_checker_obligation_outside_request(
 
     result = runtime.core.capabilities.invoke(_request(verify=True))
 
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.output["verification_record_uri"] is None
-    assert result.obligations[0].status is CapabilityObligationStatus.OPEN

@@ -32,7 +32,6 @@ def build_lattice_bundle() -> DomainBundle:
                 "eta": "FLINT double 0.51",
                 "relation": "reduced_basis = transformation * source_basis",
                 "timeout": "operational TIMEOUT with no retained result artifacts",
-                "assurance": "computed; no independent checker",
             },
         ),
         provider_runtime=LATTICE_RUNTIME,

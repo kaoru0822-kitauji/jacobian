@@ -12,18 +12,9 @@ from jacobian.canonical import canonicalize_json
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
-    CapabilityObligation,
-    CapabilityObligationStatus,
-    CapabilityRelationship,
-    CapabilityRelationshipStatus,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
@@ -31,7 +22,6 @@ from jacobian.contracts.results import (
     Execution,
     ExecutionStatus,
     ResultEnvelope,
-    Verification,
 )
 from jacobian.domains._examples import example
 from jacobian.provider_runtime import known_provider_runtime
@@ -507,7 +497,7 @@ def _partition_result(
     )
     verified = (
         verification_result is not None
-        and verification_result.assurance.verification is Verification.VERIFIED
+        and verification_result.verification_record_uri is not None
     )
     artifact_uris = [
         material.scope_uri,
@@ -518,41 +508,10 @@ def _partition_result(
         artifact_uris.append(certificate_uri)
     if record_uri is not None:
         artifact_uris.append(record_uri)
-    assurance_level = (
-        CapabilityAssuranceLevel.VERIFIED
-        if verified
-        else CapabilityAssuranceLevel.COMPUTED
-    )
-    relationship_status = (
-        CapabilityRelationshipStatus.VERIFIED
-        if verified
-        else CapabilityRelationshipStatus.PROPOSED
-    )
-    obligation_status = (
-        CapabilityObligationStatus.DISCHARGED
-        if verified
-        else CapabilityObligationStatus.OPEN
-    )
     execution_status = (
         verification_result.execution.status
         if verification_result is not None
         else ExecutionStatus.COMPLETED
-    )
-    complete = (
-        execution_status is ExecutionStatus.COMPLETED
-        and not material.missing
-        and not material.outside
-        and not material.duplicate_case_ids
-        and (not material.require_disjoint or not material.overlaps)
-    )
-    verified_replay_basis = (
-        "authorized checker replayed equality-based coverage and required "
-        "disjointness within the caller-supplied universe"
-        if material.require_disjoint
-        else (
-            "authorized checker replayed equality-based coverage within the "
-            "caller-supplied universe; disjointness was not required"
-        )
     )
     return CapabilityResult(
         capability_id=capability_id,
@@ -577,56 +536,7 @@ def _partition_result(
             "overlaps": material.overlaps,
             "duplicate_case_ids": material.duplicate_case_ids,
         },
-        scope=CapabilityScope(
-            description=(
-                "the exact caller-supplied finite universe; external-domain "
-                "completeness and member semantics are not checked"
-            ),
-            parameters={"element_count": len(material.universe)},
-            artifact_uri=material.scope_uri,
-        ),
-        completeness=CapabilityCompleteness(
-            status=(
-                CapabilityCompletenessStatus.COMPLETE
-                if complete
-                else CapabilityCompletenessStatus.PARTIAL
-            ),
-            basis=(
-                f"{verified_replay_basis}; it did not check external-domain "
-                "completeness or member/case semantics"
-                if verified
-                else "generator-side membership accounting; not independently checked"
-            ),
-            assurance_level=assurance_level,
-            verification_record_uri=record_uri if verified else None,
-        ),
-        relationships=(
-            CapabilityRelationship(
-                relation_id="case.relation.partitions",
-                source_artifact_uris=(material.scope_uri,),
-                target_artifact_uris=(material.partition_uri,),
-                status=relationship_status,
-                obligation_uris=(material.claim_uri,),
-                verification_record_uri=record_uri if verified else None,
-            ),
-        ),
-        obligations=(
-            CapabilityObligation(
-                obligation_uri=material.claim_uri,
-                status=obligation_status,
-                verification_record_uri=record_uri if verified else None,
-            ),
-        ),
-        assurance=CapabilityAssurance(
-            level=assurance_level,
-            basis=(
-                f"{verified_replay_basis}; external-domain completeness and "
-                "member/case semantics were not checked"
-                if verified
-                else "partition was proposed and inspected by its generator only"
-            ),
-            verification_record_uri=record_uri if verified else None,
-        ),
+        verification_record_uri=(record_uri if verified else None),
         artifact_uris=tuple(artifact_uris),
     )
 

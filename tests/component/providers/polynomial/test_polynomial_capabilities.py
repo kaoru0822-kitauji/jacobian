@@ -15,11 +15,7 @@ from tests.component.providers.polynomial.polynomial_capabilities_support import
     poly_payload as _poly_payload,
 )
 
-from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
-    CapabilityCompletenessStatus,
-    CapabilityRequest,
-)
+from jacobian.contracts.capabilities import CapabilityRequest
 
 
 def test_jacobian_canonically_omits_zero_partial_derivatives(
@@ -102,8 +98,6 @@ def test_polynomial_jacobian_and_collision_reproduce_public_counterexample(
         )
     )
 
-    assert jacobian.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    assert jacobian.completeness.status is CapabilityCompletenessStatus.COMPLETE
     assert jacobian.output["determinant"] == {
         "terms": [
             {
@@ -112,10 +106,8 @@ def test_polynomial_jacobian_and_collision_reproduce_public_counterexample(
             }
         ]
     }
-    assert jacobian.output["backend"] == "sympy"
     assert jacobian.output["backend_version"]
     assert jacobian.output["certificate_uri"] in jacobian.artifact_uris
-    assert jacobian.output["checker_id"] == runtime.polynomial.jacobian_checker_id
     assert "conclusion" not in jacobian.output
 
     first_evaluation = runtime.core.capabilities.invoke(
@@ -146,7 +138,6 @@ def test_polynomial_jacobian_and_collision_reproduce_public_counterexample(
         )
     )
 
-    assert collision.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert (
         collision.output["first_evaluation_uri"]
         == first_evaluation.output["evaluation_uri"]
@@ -167,7 +158,6 @@ def test_polynomial_jacobian_and_collision_reproduce_public_counterexample(
         ]
     )
     assert collision.output["witness_uri"] in collision.artifact_uris
-    assert collision.output["checker_id"] == runtime.polynomial.collision_checker_id
     assert "conclusion" not in collision.output
 
 
@@ -193,8 +183,6 @@ def test_polynomial_map_evaluation_is_exact_and_materialized(
     ]
     assert result.output["map_uri"] in result.artifact_uris
     assert result.output["evaluation_uri"] in result.artifact_uris
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    assert result.completeness.status is CapabilityCompletenessStatus.COMPLETE
 
 
 @pytest.mark.parametrize(

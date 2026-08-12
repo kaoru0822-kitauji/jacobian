@@ -7,7 +7,6 @@ import z3  # type: ignore[import-untyped]
 from tests.support.services import DomainTestServices
 
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
     CapabilityResult,
 )
@@ -39,7 +38,6 @@ def test_chromatic_number_returns_first_satisfying_k_with_witness(
     )
 
     assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     output = result.output["result"]
     assert output["status"] == "EXACT"
     assert output["chromatic_number"] == 3
@@ -50,8 +48,6 @@ def test_chromatic_number_returns_first_satisfying_k_with_witness(
         "SATISFIABLE",
     ]
     assert result.artifact_uris == ()
-    assert result.obligations == ()
-    assert result.relationships == ()
 
     coloring = output["coloring"]
     assert set(coloring) == {"a", "b", "c"}
@@ -87,7 +83,6 @@ def test_chromatic_number_timeout_returns_unknown_result_without_artifacts(
     )
 
     assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     output = result.output["result"]
     assert output["status"] == "UNKNOWN"
     assert output["solver_status"] == "UNKNOWN"
@@ -108,7 +103,6 @@ def test_chromatic_number_rejects_repeated_undirected_edges(
     )
 
     assert result.execution.status is ExecutionStatus.ERROR
-    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
     assert result.diagnostics[0].code == "INVALID_CHROMATIC_NUMBER_REQUEST"
     assert result.artifact_uris == ()
 

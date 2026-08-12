@@ -9,7 +9,6 @@ from tests.component.capabilities.graph_capabilities_support import (
 )
 
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.results import Conclusion
@@ -31,7 +30,6 @@ def test_degree_sequence_realization_materializes_replayable_graph(
         )
     )
 
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.output["conclusion"] == "GRAPHICAL"
     assert result.output["graph_uri"] in result.artifact_uris
     assert result.output["certificate_uri"] in result.artifact_uris
@@ -43,7 +41,7 @@ def test_degree_sequence_realization_materializes_replayable_graph(
             },
         )
     )
-    assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert verified.verification_record_uri is not None
     assert verified.output["conclusion"] == Conclusion.TRUE.value
 
 
@@ -73,5 +71,21 @@ def test_degree_sequence_non_graphical_result_has_replayable_obstruction(
             },
         )
     )
-    assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert verified.verification_record_uri is not None
     assert verified.output["conclusion"] == Conclusion.FALSE.value
+
+
+def test_degree_sequence_replay_rejects_a_malformed_request(
+    authorized_graph_services: GraphTestServices,
+) -> None:
+    result = authorized_graph_services.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.degree_sequence.verify",
+            input={},
+        )
+    )
+
+    assert result.execution.status.value == "ERROR"
+    assert result.diagnostics[0].code == "INVALID_REQUEST"
+    assert result.diagnostics[0].stage == "capability_input_validation"
+    assert result.diagnostics[0].path == "certificate_uri"

@@ -6,7 +6,6 @@ from tests.support.rationals import rational_payload as _q
 
 from jacobian.checker_operations import derive_verification_capability_id
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
@@ -116,18 +115,13 @@ def test_probability_results_are_independently_replayed(
             )
         )
 
-        assert computed.assurance.level is CapabilityAssuranceLevel.COMPUTED, (
-            capability_id
-        )
         assert verified.execution.status is ExecutionStatus.COMPLETED, capability_id
         assert verified.output["status"] == "VERIFIED", capability_id
         assert verified.output["operation_id"] == capability_id, capability_id
         assert verified.output["verification_record_uri"] in verified.artifact_uris, (
             capability_id
         )
-        assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED, (
-            capability_id
-        )
+        assert verified.verification_record_uri is not None, capability_id
 
 
 def test_probability_checker_rejects_forged_event_mass(
@@ -154,7 +148,6 @@ def test_probability_checker_rejects_forged_event_mass(
     assert rejected.output["status"] == "REJECTED"
     assert rejected.output["conclusion"] == "UNKNOWN"
     assert rejected.output["verification_record_uri"] is None
-    assert rejected.assurance.level is CapabilityAssuranceLevel.COMPUTED
 
 
 def test_probability_checker_rejects_forged_graph_reliability(

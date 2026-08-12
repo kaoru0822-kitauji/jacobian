@@ -40,7 +40,6 @@ def build_graph_invariant_bundle() -> DomainBundle:
                     "maximum_matching",
                 ],
                 "spanning_tree_arithmetic": "exact SymPy integer determinant",
-                "assurance": "computed; no producer result is independently verified",
             },
         ),
         provider_runtime=composite_provider_runtime(

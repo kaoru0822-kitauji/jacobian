@@ -22,7 +22,7 @@ one Lean expression: no newlines, `:=`, or forbidden commands. The adapter
 constructs `exact <term>` and delegates to the proof-state adapter, so the
 returned transition artifact records the elaborated tactic, the successor-state
 artifact, structured goals, and the same `verification_boundary =
-LEAN_CHECK_REQUIRED` and `verification = UNVERIFIED` semantics.
+LEAN_CHECK_REQUIRED` semantics. It creates no verification record.
 
 Term application does not select terms, rank successors, or prescribe proof
 strategy. A completed transition still requires `lean.check` for theorem
@@ -42,8 +42,8 @@ started: the returned fields are exactly those recorded on the immutable
 artifact, so inspection is available whenever the artifact is available,
 regardless of whether the pinned Lean runtime is installed.
 
-The result reports `inspection = READ_ONLY_NO_REPLAY` and
-`verification = UNVERIFIED`. Stale or malformed state artifacts (whose
+The result reports `inspection = READ_ONLY_NO_REPLAY` and creates no
+verification record. Stale or malformed state artifacts (whose
 environment digest, source digest, or state digest no longer match) are
 rejected before any field is returned.
 
@@ -83,7 +83,7 @@ instrumentation. The `coercion_provenance_basis` field records the reason.
 
 ## Verification boundary
 
-All three contracts report `COMPUTED` assurance and `verification = UNVERIFIED`.
-None of them is a theorem-verification record. Only `lean.check`, using its
+None of the three contracts creates a theorem-verification record. Only
+`lean.check`, using its
 separate operator-authorized clean verification path, may verify the complete
 statement and proof.

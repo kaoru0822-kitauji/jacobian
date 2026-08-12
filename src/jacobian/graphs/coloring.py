@@ -14,16 +14,10 @@ from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationE
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
-    CapabilityRelationship,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
@@ -290,7 +284,6 @@ class GraphColoringEncodingAdapter:
             claim_uri=claim.artifact_uri,
             candidate_uri=candidate.artifact_uri,
             certificate_uri=certificate.artifact_uri,
-            checker_id=self.installation.checker_id,
             variable_count=len(resolved.cnf.variables),
             clause_count=len(resolved.cnf.clauses),
         )
@@ -302,36 +295,6 @@ class GraphColoringEncodingAdapter:
                 runtime_ms=max(0, round((time.monotonic() - started) * 1000)),
             ),
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="one exact graph and color-count encoding",
-                parameters={
-                    "colors": validated.colors,
-                    "encoding_version": _ENCODING_VERSION,
-                },
-                artifact_uri=scope.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.COMPLETE,
-                basis=(
-                    "the complete canonical CNF and its graph-owned replay evidence "
-                    "were materialized"
-                ),
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id="graph.relation.coloring-encoding-of",
-                    source_artifact_uris=(claim.artifact_uri,),
-                    target_artifact_uris=(scope.artifact_uri,),
-                ),
-            ),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "the producer materialized a bound encoding; only the independent "
-                    "graph-coloring checker can promote the semantic relation"
-                ),
-            ),
             artifact_uris=(
                 cnf_artifact.artifact_uri,
                 claim.artifact_uri,

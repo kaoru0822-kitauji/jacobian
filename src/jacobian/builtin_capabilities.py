@@ -5,17 +5,12 @@ from __future__ import annotations
 from jacobian.artifacts import ArtifactService
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInvocationExample,
     CapabilityProviderRuntime,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.lean import (
     LeanCheckOutput,
@@ -23,7 +18,6 @@ from jacobian.contracts.lean import (
     LeanDeclarationInspectRequest,
     LeanDeclarationSearchOutput,
     LeanDeclarationSearchRequest,
-    LeanDeclarationSearchStopReason,
     LeanDependencyGraphOutput,
     LeanDependencyGraphRequest,
     LeanEnvironment,
@@ -31,7 +25,6 @@ from jacobian.contracts.lean import (
 from jacobian.contracts.results import (
     Execution,
     ExecutionStatus,
-    Verification,
 )
 from jacobian.lean_frontend.declarations import (
     LeanDeclarationBackendError,
@@ -112,12 +105,9 @@ class LeanCheckAdapter:
             proof=str(payload["proof"]),
             environment=LeanEnvironment(str(payload.get("environment", "CORE"))),
         )
-        verified = (
-            checked.result.assurance.verification is Verification.VERIFIED
-            and checked.result.verification_record_uri is not None
-        )
+        verified = checked.result.verification_record_uri is not None
         evidence = (checked.certificate_uri,)
-        scope_uri = checked.result.assurance.scope_uri
+        scope_uri = checked.result.scope_uri
         output = LeanCheckOutput(
             conclusion=checked.result.conclusion,
             execution=checked.result.execution,
@@ -134,18 +124,8 @@ class LeanCheckAdapter:
             capability_version=self.descriptor.version,
             execution=checked.result.execution,
             output=output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-                basis=(
-                    "accepted by the pinned Lean checker"
-                    if verified
-                    else "Lean checker did not accept the supplied proof"
-                ),
-                verification_record_uri=checked.result.verification_record_uri,
+            verification_record_uri=(
+                checked.result.verification_record_uri if verified else None
             ),
             artifact_uris=(
                 checked.claim_uri,
@@ -194,46 +174,11 @@ class LeanDeclarationSearchAdapter:
             searched = self.declarations.search(query)
         except LeanDeclarationBackendError as exc:
             raise _declaration_invocation_error(exc) from exc
-        complete = searched.stop_reason is LeanDeclarationSearchStopReason.EXHAUSTED
         return CapabilityResult(
             capability_id=self.descriptor.capability_id,
             capability_version=self.descriptor.version,
             execution=Execution(status=ExecutionStatus.COMPLETED),
             output=searched.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="the installed pinned Lean declaration environment",
-                parameters={
-                    "environment": searched.environment.value,
-                    "environment_digest": searched.environment_digest,
-                    "matching": (
-                        "case-sensitive name substring and exact constants occurring "
-                        "in the elaborated type"
-                    ),
-                    "namespace_prefixes": list(query.namespace_prefixes),
-                    "kinds": [kind.value for kind in query.kinds],
-                },
-            ),
-            completeness=CapabilityCompleteness(
-                status=(
-                    CapabilityCompletenessStatus.COMPLETE
-                    if complete
-                    else CapabilityCompletenessStatus.PARTIAL
-                ),
-                basis=(
-                    "the deterministic declaration scan exhausted the declared "
-                    "environment and filters"
-                    if complete
-                    else "the result budget stopped the declaration scan"
-                ),
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "metadata read from the pinned Lean environment; retrieved "
-                    "declarations are evidence and do not verify a theorem"
-                ),
-            ),
         )
 
 
@@ -276,26 +221,6 @@ class LeanDeclarationInspectAdapter:
             capability_version=self.descriptor.version,
             execution=Execution(status=ExecutionStatus.COMPLETED),
             output=inspected.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="one exact declaration in the pinned Lean environment",
-                parameters={
-                    "environment": inspected.environment.value,
-                    "environment_digest": inspected.environment_digest,
-                    "declaration_name": query.declaration_name,
-                },
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.COMPLETE,
-                basis="the exact declaration name resolved in the declared environment",
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "metadata read from the pinned Lean environment; inspecting a "
-                    "declaration does not verify a new theorem"
-                ),
-            ),
         )
 
 
@@ -356,45 +281,6 @@ class LeanDependencyGraphAdapter:
             capability_version=self.descriptor.version,
             execution=Execution(status=ExecutionStatus.COMPLETED),
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description=(
-                    "the bounded elaborated type/value dependency graph rooted at "
-                    "one declaration in the pinned Lean environment"
-                ),
-                parameters={
-                    "environment": graph.environment.value,
-                    "environment_digest": graph.environment_digest,
-                    "root_declaration": query.root_declaration,
-                    "max_depth": query.max_depth,
-                    "max_nodes": query.max_nodes,
-                },
-                artifact_uri=graph_artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=(
-                    CapabilityCompletenessStatus.COMPLETE
-                    if graph.closure_complete
-                    else CapabilityCompletenessStatus.PARTIAL
-                ),
-                basis=(
-                    "Lean's elaborated constant references exhausted the transitive "
-                    "dependency closure"
-                    if graph.closure_complete
-                    else (
-                        "the requested depth or node budget left the returned "
-                        "frontier unexpanded"
-                    )
-                ),
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "dependency edges were extracted with Lean "
-                    "Expr.getUsedConstantsAsSet from the pinned environment; "
-                    "the graph does not verify a theorem"
-                ),
-            ),
             artifact_uris=(graph_artifact.artifact_uri,),
         )
 

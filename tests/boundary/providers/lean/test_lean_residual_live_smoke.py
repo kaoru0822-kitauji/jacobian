@@ -105,7 +105,6 @@ def test_live_term_apply_and_inspect_and_metavariable_round_trip(
     assert opened.output["completed"] is True
     assert opened.output["tactic"] == "exact True.intro"
     assert opened.output["term_application"] == "LEAN_EXACT_ELABORATION"
-    assert opened.output["verification"] == "UNVERIFIED"
 
     # 2. lean.proof_state.inspect: read the input state without replay.
     #    Reopen a non-completed state for inspection.
@@ -139,7 +138,6 @@ def test_live_term_apply_and_inspect_and_metavariable_round_trip(
         )
     )
     assert fields.output["coercion_provenance"] == "UNAVAILABLE"
-    assert fields.output["verification"] == "UNVERIFIED"
     mvar = fields.output["structured_metavariables"][0]
     assert mvar["kind"] in ("NATURAL", "SYNTHETIC", "SYNTHETIC_OPAQUE")
     assert mvar["is_assigned"] is False

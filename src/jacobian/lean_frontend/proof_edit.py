@@ -12,16 +12,11 @@ from pydantic import ValidationError
 from jacobian.artifacts import ArtifactService
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityProviderRuntime,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.lean_proof_edit import (
     LeanProofEditArtifact,
@@ -32,7 +27,6 @@ from jacobian.contracts.results import (
     Conclusion,
     ExecutionStatus,
     ResultEnvelope,
-    Verification,
 )
 from jacobian.lean_frontend.service import LeanService
 from jacobian.schema_registry import SchemaRegistry
@@ -213,42 +207,8 @@ class LeanProofEditAdapter:
                 update={"runtime_ms": int((time.monotonic() - started) * 1000)}
             ),
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="one exact edited Lean proof for one unchanged statement",
-                parameters={
-                    "environment": validated.environment.value,
-                    "statement": validated.statement,
-                },
-                artifact_uri=artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.NOT_APPLICABLE,
-                basis=(
-                    "direct proof replay makes no search-completeness claim"
-                    if checked.result.execution.status is ExecutionStatus.COMPLETED
-                    else "the Lean checker did not complete; completeness is not applicable"
-                ),
-                assurance_level=(
-                    CapabilityAssuranceLevel.COMPUTED
-                    if checked.result.execution.status is ExecutionStatus.COMPLETED
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-            ),
-            assurance=CapabilityAssurance(
-                level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-                basis=(
-                    "the exact edited proof was accepted by the operator-authorized "
-                    "pinned Lean checker"
-                    if verified
-                    else "the edited proof has no completed authorized verification"
-                ),
-                verification_record_uri=(
-                    checked.result.verification_record_uri if verified else None
-                ),
+            verification_record_uri=(
+                checked.result.verification_record_uri if verified else None
             ),
             artifact_uris=(
                 checked.claim_uri,
@@ -275,6 +235,5 @@ def _is_verified(result: ResultEnvelope) -> bool:
     return (
         result.execution.status is ExecutionStatus.COMPLETED
         and result.conclusion is Conclusion.TRUE
-        and result.assurance.verification is Verification.VERIFIED
         and result.verification_record_uri is not None
     )

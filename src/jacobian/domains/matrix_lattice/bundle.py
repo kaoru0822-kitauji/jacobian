@@ -30,7 +30,6 @@ def build_matrix_bundle() -> DomainBundle:
                 "smith_normal_form": (
                     "positive divisibility diagonal; transformations unavailable"
                 ),
-                "assurance": "computed; no producer result is independently verified",
             },
         ),
         provider_runtime=known_provider_runtime(
