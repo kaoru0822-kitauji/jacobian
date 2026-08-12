@@ -638,7 +638,6 @@ _GRAPH_CASES: tuple[
                 "determinism": "DETERMINISTIC",
                 "backend": "networkx",
                 "backend_version": "3.6.1",
-                "verification": "UNVERIFIED",
             },
         ),
     ),
