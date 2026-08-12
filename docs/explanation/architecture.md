@@ -153,10 +153,13 @@ external payload
   → one serialization
 ```
 
-Pydantic owns complete request validation. JSON Schema is generated for
-discovery and is not executed as an additional validation pass for built-ins.
-Provider and subprocess output is a separate untrusted boundary and is parsed
-independently.
+Pydantic owns complete request validation, including relationships among
+otherwise valid fields. Required agreement of parents, characteristics,
+presentations, axes, bases, labels, and bound identities is checked during the
+single request parse, before preflight or any provider call. JSON Schema is
+generated for discovery and is not executed as an additional validation pass
+for built-ins. Provider and subprocess output is a separate untrusted boundary
+and is parsed independently.
 
 Preflight distinguishes supported, unsupported, provider unavailable, and
 resource-limit-exceeded outcomes. Where practical it estimates work, output

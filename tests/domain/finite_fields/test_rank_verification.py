@@ -71,6 +71,17 @@ def _request() -> LinearMapRankRequest:
     return LinearMapRankRequest(direction=direction, linear_map=linear_map)
 
 
+def _cross_field_rank_payload() -> dict[str, object]:
+    request = _request()
+    payload = request.model_dump(mode="json")
+    linear_map = payload["linear_map"]
+    assert isinstance(linear_map, dict)
+    matrix = linear_map["matrix"]
+    assert isinstance(matrix, dict)
+    matrix["prime"] = 3
+    return payload
+
+
 def _restriction_request() -> RestrictScalarsRequest:
     presentation = FiniteFieldPresentation(
         characteristic=2,
@@ -99,6 +110,28 @@ def _restriction_request() -> RestrictScalarsRequest:
         coordinates=(one,),
     )
     return RestrictScalarsRequest(subspace=subspace, direction=direction)
+
+
+def test_rank_request_rejects_cross_field_values_before_execution(
+    tmp_path: Path,
+) -> None:
+    with open_exact_domain_services(
+        tmp_path,
+        build_finite_field_bundle(),
+    ) as services:
+        result = services.core.capabilities.invoke(
+            CapabilityRequest(
+                capability_id="finite_field.linear_map.rank.compute",
+                input=_cross_field_rank_payload(),
+            )
+        )
+
+    assert result.execution.status.value == "ERROR"
+    assert result.diagnostics[0].code == "INVALID_FINITE_FIELD_REQUEST"
+    assert result.diagnostics[0].stage == "finite_field_input_validation"
+    assert set(result.output) == {"error"}
+    assert result.verification_record_uri is None
+    assert result.artifact_uris == ()
 
 
 def test_operator_authorized_sympy_replay_accepts_rank_and_rejects_forgery(

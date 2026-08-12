@@ -1,5 +1,9 @@
 """Typed requests for atomic finite-field operations."""
 
+from typing import Self
+
+from pydantic import model_validator
+
 from jacobian.contracts.base import ContractModel
 from jacobian.math.finite_fields import (
     Axis,
@@ -22,6 +26,14 @@ class RestrictScalarsRequest(ContractModel):
 class LinearMapRankRequest(ContractModel):
     direction: ProjectivePoint
     linear_map: FiniteLinearMap
+
+    @model_validator(mode="after")
+    def require_shared_prime_field(self) -> Self:
+        if self.direction.presentation.characteristic != self.linear_map.matrix.prime:
+            raise ValueError(
+                "direction characteristic must match the linear-map matrix prime"
+            )
+        return self
 
 
 class ProjectiveLineRequest(ContractModel):
