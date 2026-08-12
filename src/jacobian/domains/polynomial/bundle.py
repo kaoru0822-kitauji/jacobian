@@ -50,7 +50,6 @@ def build_polynomial_bundle() -> DomainBundle:
                     "three-variable homogeneous coefficient maps use descending "
                     "lexicographic monomial bases and bounded exact rank search"
                 ),
-                "assurance": "computed; no independent checker",
             },
         ),
         provider_runtime=known_provider_runtime(

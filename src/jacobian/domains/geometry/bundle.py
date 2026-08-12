@@ -31,10 +31,6 @@ def build_geometry_bundle() -> DomainBundle:
                     "including bounded exact rational-weight convex triangulation"
                 ),
                 "degeneracy": "operation-specific and fail-closed",
-                "assurance": (
-                    "computed producers; selected results admit separately "
-                    "authorized independent exact replay"
-                ),
             },
         ),
         provider_runtime=known_provider_runtime(

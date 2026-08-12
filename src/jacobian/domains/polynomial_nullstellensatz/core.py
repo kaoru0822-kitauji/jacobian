@@ -378,7 +378,6 @@ def install_nullstellensatz_core(
                 "12 charts t*a_i*b_j-1, equivalent to nonzero quadratic and cubic top vectors"
             ),
             "certificate_identity": "sum(h_i*f_i)=1 in QQ[a20,...,b03,t]",
-            "assurance": "producer computed; only an operator-authorized independent replay verifies",
         },
     )
     system_schema_uri = context.schemas.register_model(

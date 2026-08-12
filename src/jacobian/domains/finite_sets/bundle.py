@@ -28,7 +28,6 @@ def build_finite_set_bundle() -> DomainBundle:
                 "description": "Finite sets of canonical integers with exact operations",
                 "element_type": "canonical integer",
                 "max_set_size": 128,
-                "assurance": "computed; no independent checker",
             },
         ),
         provider_runtime=jacobian_provider_runtime(

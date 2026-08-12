@@ -30,7 +30,6 @@ def build_sequence_bundle() -> DomainBundle:
                 "description": "Finite sequences of canonical integers with exact operations",
                 "element_type": "canonical integer",
                 "max_sequence_length": 256,
-                "assurance": "computed; no independent checker",
             },
         ),
         provider_runtime=jacobian_provider_runtime(

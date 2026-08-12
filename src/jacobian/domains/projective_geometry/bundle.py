@@ -30,7 +30,6 @@ def build_projective_geometry_bundle() -> DomainBundle:
                 "line_equation": "a*x + b*y + c*z = 0",
                 "flat_incidence": "exact homogeneous dot product equals zero",
                 "completion": "all distinct line pairs are grouped by exact cross product",
-                "assurance": "computed; complete finite materialization",
             },
         ),
         provider_runtime=known_provider_runtime(
