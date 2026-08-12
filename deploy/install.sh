@@ -8,6 +8,11 @@
 
 set -Eeuo pipefail
 
+# Root-run validation and smoke probes must not mutate an immutable release by
+# creating bytecode caches that inherit the operator's (possibly restrictive)
+# umask. The long-running service has its own systemd environment.
+export PYTHONDONTWRITEBYTECODE=1
+
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 source "${SCRIPT_DIR}/lib/service_state.sh"
@@ -293,6 +298,29 @@ validate_release_runtime() {
     esac
     "${RUNUSER_BIN}" --user jacobian -- "${entrypoint}" --version >/dev/null \
         || die "release entrypoint is not executable by the jacobian service user"
+}
+
+validate_service_readability() {
+    local issue
+    local runtime_root
+
+    for runtime_root in "$@"; do
+        [[ -d "${runtime_root}" ]] || die \
+            "runtime input root is unavailable: ${runtime_root}"
+        if ! issue="$(
+            "${RUNUSER_BIN}" --user jacobian -- \
+                find "${runtime_root}" \
+                \( \
+                    \( -type d \( ! -readable -o ! -executable \) \) -o \
+                    \( -type f ! -readable \) \
+                \) \
+                -print -quit 2>&1
+        )"; then
+            die "jacobian service user could not inspect ${runtime_root}: ${issue}"
+        fi
+        [[ -z "${issue}" ]] || die \
+            "runtime input is not readable by the jacobian service user: ${issue}"
+    done
 }
 
 validate_lean_release_runtime() {
@@ -662,7 +690,17 @@ fi
 if ((RELEASE_WAS_BUILT)); then
     printf '%s\n' "${RELEASE_PROFILE}" >"${RELEASE_DIR}/.release-profile"
     printf '%s\n' "${REVISION}" >"${RELEASE_DIR}/.git-revision"
-    chmod 0644 "${RELEASE_DIR}/.git-revision"
+    chmod 0644 \
+        "${RELEASE_DIR}/.release-profile" \
+        "${RELEASE_DIR}/.git-revision"
+fi
+
+RUNTIME_READ_ROOTS=("${RELEASE_DIR}" "${PYTHON_INSTALL_ROOT}")
+if ((WITH_LEAN)); then
+    RUNTIME_READ_ROOTS+=("${LEAN_ELAN_HOME}")
+fi
+validate_service_readability "${RUNTIME_READ_ROOTS[@]}"
+if ((RELEASE_WAS_BUILT)); then
     RELEASE_BUILD_DIR=""
 fi
 
@@ -886,6 +924,10 @@ if ((!SKIP_SMOKE)); then
     ((SMOKE_SUCCEEDED)) || die \
         "deployment smoke failed; inspect jacobian-mcp and ingress journals"
 fi
+
+# Recheck after root-run authentication and smoke probes. With rollback still
+# armed, any post-build mutation that makes runtime input private fails closed.
+validate_service_readability "${RUNTIME_READ_ROOTS[@]}"
 
 DEPLOYMENT_ACCEPTED=1
 ROLLBACK_ARMED=0

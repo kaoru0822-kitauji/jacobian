@@ -227,7 +227,12 @@ project references never retain a temporary build path. uv-managed Python
 runtimes live under `/opt/jacobian/python`, outside root's home directory. The
 installer checks the final console-script shebang, resolved Python path, and
 execution as the `jacobian` service user before atomically selecting the
-release through `/opt/jacobian/current`.
+release through `/opt/jacobian/current`. It disables Python bytecode writes in
+its root-run probes and audits the release, managed Python, and optional Lean
+toolchain as the service user both before activation and after smoke. This keeps
+runtime readability independent of the operator's `umask` and makes a
+post-build permission regression trigger rollback instead of accepting a
+partially private release.
 Before copying them manually, replace `math-tools.example.org`, verify the
 service accounts, Caddy binary, and `/opt/jacobian/current` checkout, and decide
 between the static-token baseline and the anonymous test override. Keep each
