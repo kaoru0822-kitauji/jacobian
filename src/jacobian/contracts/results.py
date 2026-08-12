@@ -148,7 +148,6 @@ class ResultEnvelope(ContractModel):
     semantics_digest: Sha256Digest | None = None
     candidate_digest: Sha256Digest | None = None
     evidence_uris: tuple[ArtifactUri, ...] = ()
-    trace_uri: ArtifactUri | None = None
     verification_record_uri: ArtifactUri | None = None
 
     @model_validator(mode="after")
