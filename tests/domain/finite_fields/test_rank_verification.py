@@ -117,6 +117,7 @@ def test_operator_authorized_sympy_replay_accepts_rank_and_rejects_forgery(
         )
 
     assert computed.output["result"]["rank"] == 1
+    assert computed.verification_record_uri is None
     assert verified.output["status"] == "VERIFIED"
     assert verified.output["verification_record_uri"] in verified.artifact_uris
     assert rejected.output["status"] == "REJECTED"

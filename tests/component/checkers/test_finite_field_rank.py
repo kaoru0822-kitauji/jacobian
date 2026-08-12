@@ -9,7 +9,10 @@ from jacobian_checkers.finite_field_rank import (
 
 
 def _rank_request(
-    *, rank: int = 1, candidate_entries: list[list[int]] | None = None
+    *,
+    rank: int = 1,
+    candidate_entries: list[list[int]] | None = None,
+    candidate_direction_coordinates: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
     presentation = {
         "characteristic": 2,
@@ -36,11 +39,18 @@ def _rank_request(
         **matrix,
         "entries": candidate_entries or [[1], [0]],
     }
+    candidate_direction = dict(direction)
+    if candidate_direction_coordinates is not None:
+        candidate_direction["coordinates"] = candidate_direction_coordinates
     return _request(
         "finite_field.linear_map.rank.compute",
         "finite-field.linear-map-rank.sympy-replay",
         {"direction": direction, "linear_map": linear_map},
-        {"direction": direction, "linear_map": candidate_map, "rank": rank},
+        {
+            "direction": candidate_direction,
+            "linear_map": candidate_map,
+            "rank": rank,
+        },
     )
 
 
@@ -61,6 +71,27 @@ def test_sympy_checker_rejects_wrong_rank() -> None:
 def test_sympy_checker_rejects_a_candidate_bound_to_another_map() -> None:
     decision = check_finite_field_linear_map_rank(
         _rank_request(candidate_entries=[[0], [0]])
+    )
+
+    assert decision["accepted"] is False
+    assert decision["conclusion"] == "UNKNOWN"
+
+
+def test_sympy_checker_rejects_a_candidate_bound_to_another_direction() -> None:
+    decision = check_finite_field_linear_map_rank(
+        _rank_request(
+            candidate_direction_coordinates=[
+                {
+                    "presentation": {
+                        "characteristic": 2,
+                        "modulus_coefficients": [1, 1, 1],
+                        "generator": "a",
+                        "element_encoding_version": "power-basis-v1",
+                    },
+                    "coordinates": [0, 1],
+                }
+            ]
+        )
     )
 
     assert decision["accepted"] is False
