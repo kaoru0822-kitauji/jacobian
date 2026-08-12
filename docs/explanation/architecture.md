@@ -266,9 +266,11 @@ later prove a common semantic need.
 ## Provider optionality
 
 Importing `jacobian.math` performs no provider probe. Private backend imports
-are lazy, optional providers are installation extras, and an unavailable
-provider removes only its affected installed operations. Provider identity is
-invocation provenance rather than mathematical value identity.
+are lazy even though the maintained Python backends are exact base-package
+dependencies. A missing or mismatched maintained Python backend is a broken
+installation and fails runtime construction; optional native/formal providers
+remain absent without affecting unrelated installed operations. Provider
+identity is invocation provenance rather than mathematical value identity.
 
 ## Host and protocol boundaries
 

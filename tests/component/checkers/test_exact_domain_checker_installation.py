@@ -385,7 +385,7 @@ def test_installer_omits_exact_replay_when_its_provider_is_unavailable(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """An unavailable optional backend omits its replay instead of failing install.
+    """An unavailable checker runtime omits its replay instead of failing install.
 
     Without an authorized checker the affected capabilities cannot reach
     ``VERIFIED``; they stay producer-only. Installation must still complete.

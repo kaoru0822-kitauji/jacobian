@@ -59,7 +59,7 @@ def python_flint_provider_runtime(
     *,
     refresh: bool = False,
 ) -> CapabilityProviderRuntime:
-    """Identify the exact optional Python-FLINT compatibility profile."""
+    """Identify the exact packaged Python-FLINT compatibility profile."""
 
     return _python_flint_runtime(
         required_attributes=("fmpq", "fmpq_mat"),
@@ -84,7 +84,7 @@ def python_flint_finite_field_provider_runtime(
     *,
     refresh: bool = False,
 ) -> CapabilityProviderRuntime:
-    """Identify the exact optional Python-FLINT finite-field API."""
+    """Identify the exact packaged Python-FLINT finite-field API."""
 
     return _python_flint_runtime(
         required_attributes=("fmpz_mod_poly_ctx", "fq_default_ctx", "nmod_mat"),

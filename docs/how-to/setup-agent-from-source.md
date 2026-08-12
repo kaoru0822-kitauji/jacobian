@@ -5,7 +5,7 @@ clone rather than the latest published Python package. From the repository
 root, run:
 
 ```sh
-./scripts/setup-agent --client codex --profile full-python --yes
+./scripts/setup-agent --client codex --profile core --yes
 ```
 
 Replace `codex` with `claude`, `cursor`, `gemini`, or `opencode`; repeat
@@ -54,10 +54,9 @@ not install prompts, skills, or client-specific mathematical workflows.
 
 | Profile | Installed or checked surface |
 | --- | --- |
-| `core` | Locked base dependencies, including SymPy and Z3 |
-| `full-python` | `core` plus all maintained Python extras: python-flint and cvc5 |
-| `lean` | `full-python` plus a build of the pinned `lean/lean-toolchain` project; `elan`/`lake` must already be on `PATH` |
-| `external-proof` | `full-python` plus fail-closed availability checks for pinned CaDiCaL, DRAT-trim, and Carcara executables |
+| `core` | Complete locked Python backend stack: SymPy, NetworkX, Z3, Python-FLINT, and cvc5 |
+| `lean` | `core` plus a build of the pinned `lean/lean-toolchain` project; `elan`/`lake` must already be on `PATH` |
+| `external-proof` | `core` plus fail-closed availability checks for pinned CaDiCaL, DRAT-trim, and Carcara executables |
 
 The `external-proof` profile does not download or trust native executables on
 the user's behalf. Their exact version and provenance contracts are defined in
@@ -69,11 +68,9 @@ instead of a floating Lean installation.
 
 These profiles configure an agent client against a source checkout. For
 ordinary contributor work that only needs to run the test suite, the
-`make setup PROFILE=core` quick path installs the same locked base surface
-(NetworkX, SymPy, and Z3) without writing client configuration; see
-[CONTRIBUTING.md](../../CONTRIBUTING.md). `make setup PROFILE=full-python`
-additionally requires every maintained Python extra. Optional backend
-installation is described in
+`make setup PROFILE=core` quick path installs the same complete Python backend
+stack without writing client configuration; see
+[CONTRIBUTING.md](../../CONTRIBUTING.md). Optional native backend installation is described in
 [Install optional backends](install-optional-backends.md).
 
 Add `--dev` when the clone also needs the locked development group. Use
