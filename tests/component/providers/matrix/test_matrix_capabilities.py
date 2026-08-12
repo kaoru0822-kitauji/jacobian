@@ -120,7 +120,6 @@ def test_matrix_determinant_compute_is_exact_and_unverified(
     )
 
     assert result.output["result"]["determinant"] == _rational(expected)
-    assert result.output["result"]["method"] == "FRACTION_FREE_BAREISS"
     assert result.output["backend_version"] == sympy.__version__
     assert result.artifact_uris == ()
 

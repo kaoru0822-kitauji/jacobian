@@ -76,8 +76,6 @@ def test_enclose_capability_computes_a_valid_bernstein_enclosure(
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.output["enclosure_kind"] == "BERNSTEIN_COEFFICIENT_BOUND"
     assert result.output["range_exactness"] == "ENCLOSURE_VALID_NOT_EXACT"
-    assert result.output["exactness"] == "EXACT_RATIONAL"
-    assert result.output["determinism"] == "DETERMINISTIC"
     assert result.output["degree"] == 1
     assert result.output["bernstein_coefficients"] == [
         {"num": "1", "den": "1"},

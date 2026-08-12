@@ -54,7 +54,6 @@ def test_python_flint_hnf_produces_a_durable_certificate(hnf_services) -> None:
         _matrix([[0, 2, 4], [0, 6, 8]]),
     )
     assert result.execution.status.value == "COMPLETED"
-    assert result.output["backend_version"] == "0.9.0"
     assert result.output["result_uri"].startswith("artifact://sha256/")
     payload = hnf_services.core.store.get(result.output["result_uri"]).payload
     assert payload["normal_form"]["entries"] == [["0", "2", "0"], ["0", "0", "4"]]

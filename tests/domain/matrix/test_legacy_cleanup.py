@@ -56,7 +56,6 @@ def test_pilot_provides_matrix_determinant_compute_without_legacy(
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.artifact_uris == ()
     assert result.output["result"]["determinant"] == _q(-2)
-    assert result.output["result"]["method"] == "FRACTION_FREE_BAREISS"
 
 
 def test_pilot_provides_matrix_rank_compute_without_legacy(

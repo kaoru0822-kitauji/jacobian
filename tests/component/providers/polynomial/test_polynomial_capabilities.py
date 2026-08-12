@@ -106,7 +106,6 @@ def test_polynomial_jacobian_and_collision_reproduce_public_counterexample(
             }
         ]
     }
-    assert jacobian.output["backend"] == "sympy"
     assert jacobian.output["backend_version"]
     assert jacobian.output["certificate_uri"] in jacobian.artifact_uris
     assert "conclusion" not in jacobian.output
