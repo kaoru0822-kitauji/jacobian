@@ -222,15 +222,15 @@ Slice A's complete projective line is a domain-owned semantic value with a
 fixed presentation, axis, order, completeness check, and digest. It does not
 make ports collection-aware.
 
-`value://opaque-id` tokens contain no serialized metadata. The request-local
-store owns tenant/session lifetime, semantic value, source operation, operation
-version, output port, bound identities, canonical digest, and invocation
-provenance. Resolution
-validates those stored facts against the target port. Durable promotion closes
-over every referenced value, parent, basis, and axis.
+`value://opaque-id` tokens contain no serialized metadata. The bounded in-memory
+store is owned by one local or tenant runtime and records the semantic value,
+source operation and version, output port, and canonical digest. Resolution
+checks the exact value class and then lets the assembled Pydantic request check
+its presentation, parent, axes, and bases. Closing the runtime invalidates all
+of its references. Durable promotion is not a supported operation; durable
+artifacts remain an explicit, separate publication path.
 
-Changing between inline, request-local, and durable carriers does not change a
-value or grant assurance.
+Using a request-local carrier does not change a value or grant assurance.
 
 ## Structural JSON
 
