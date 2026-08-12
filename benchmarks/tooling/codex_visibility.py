@@ -141,10 +141,7 @@ def _json_digest(value: object) -> str:
 def _is_verified_invocation(invocation: object) -> bool:
     if not isinstance(invocation, Mapping):
         return False
-    assurance = invocation.get("assurance")
-    if not isinstance(assurance, Mapping) or assurance.get("level") != "VERIFIED":
-        return False
-    uri = assurance.get("verification_record_uri")
+    uri = invocation.get("verification_record_uri")
     return isinstance(uri, str) and uri.startswith(_LOCAL_VERIFICATION_URI_PREFIX)
 
 

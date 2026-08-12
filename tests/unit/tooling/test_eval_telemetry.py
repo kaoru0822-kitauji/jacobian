@@ -92,8 +92,7 @@ def test_agent_telemetry_preserves_discovery_to_invocation_dataflow(
                 "execution": {"status": "COMPLETED"},
                 "output": {"status": "FOUND"},
                 "artifact_uris": [],
-                "assurance": {"level": "COMPUTED"},
-                "completeness": {"status": "COMPLETE"},
+                "verification_record_uri": None,
             },
         ),
     ]
@@ -223,8 +222,7 @@ def test_agent_telemetry_separates_wire_model_and_logical_invocation_bytes(
         "execution": {"status": "COMPLETED"},
         "output": {"status": "FOUND", "graphs": [{"edges": [[0, 1]]}]},
         "artifact_uris": ["artifact://sha256/" + ("a" * 64)],
-        "assurance": {"level": "COMPUTED"},
-        "completeness": {"status": "COMPLETE"},
+        "verification_record_uri": None,
     }
     event = {
         "type": "item.completed",

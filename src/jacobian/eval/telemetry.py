@@ -436,8 +436,7 @@ def _record_capability_invocation(
             "input": arguments.get("payload"),
             "output": response.get("output"),
             "artifact_uris": response.get("artifact_uris"),
-            "assurance": response.get("assurance"),
-            "completeness": response.get("completeness"),
+            "verification_record_uri": response.get("verification_record_uri"),
         }
     )
 
