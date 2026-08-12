@@ -38,15 +38,20 @@ def coordinates(value: Any, *, degree: int) -> tuple[int, ...]:
     return result + (0,) * (degree - len(result))
 
 
-def evaluate_polynomial(
+def evaluate_polynomial_values(
     coefficients: tuple[FiniteFieldElement, ...],
-    value: FiniteFieldElement,
-) -> tuple[int, ...]:
-    """Evaluate with FLINT's maintained finite-field polynomial type."""
+    values: tuple[FiniteFieldElement, ...],
+) -> tuple[tuple[int, ...], ...]:
+    """Evaluate several points with one prepared FLINT polynomial."""
 
     from flint import fq_default_poly_ctx
 
-    active_context = context(value.presentation)
+    if not values:
+        return ()
+    presentation = values[0].presentation
+    if any(value.presentation != presentation for value in values):
+        raise ValueError("polynomial values must share one field presentation")
+    active_context = context(presentation)
     polynomial_context: Any = fq_default_poly_ctx(active_context)
     polynomial = polynomial_context(
         [
@@ -54,8 +59,22 @@ def evaluate_polynomial(
             for coefficient in coefficients
         ]
     )
-    result = polynomial.evaluate(to_backend(value, active_context=active_context))
-    return coordinates(result, degree=value.presentation.degree)
+    return tuple(
+        coordinates(
+            polynomial.evaluate(to_backend(value, active_context=active_context)),
+            degree=presentation.degree,
+        )
+        for value in values
+    )
+
+
+def evaluate_polynomial(
+    coefficients: tuple[FiniteFieldElement, ...],
+    value: FiniteFieldElement,
+) -> tuple[int, ...]:
+    """Evaluate one point with FLINT's maintained finite-field polynomial type."""
+
+    return evaluate_polynomial_values(coefficients, (value,))[0]
 
 
 def matrix_rank(matrix: PrimeFieldMatrix) -> int:

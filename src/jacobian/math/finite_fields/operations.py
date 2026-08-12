@@ -286,11 +286,18 @@ def evaluate_finite_polynomial(
 def finite_map_table(polynomial_map: FinitePolynomialMap) -> FiniteMapTable:
     """Enumerate a complete finite polynomial-map table in canonical order."""
 
+    from jacobian.math.finite_fields import _flint
+
+    sources = _field_elements(polynomial_map.domain)
+    targets = _flint.evaluate_polynomial_values(
+        polynomial_map.polynomial.coefficients,
+        sources,
+    )
     return FiniteMapTable(
         map=polynomial_map,
         entries=tuple(
-            (value, evaluate_finite_polynomial(polynomial_map.polynomial, value))
-            for value in _field_elements(polynomial_map.domain)
+            (source, element(polynomial_map.codomain, coordinates))
+            for source, coordinates in zip(sources, targets, strict=True)
         ),
     )
 

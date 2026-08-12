@@ -2,9 +2,14 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian.domains.finite_fields import build_finite_field_bundle
-from jacobian.domains.finite_fields.contracts import ProjectiveLineRequest
+from jacobian.domains.finite_fields.contracts import (
+    DirectionRankLedgerRequest,
+    FiniteMapTableRequest,
+    ProjectiveLineRequest,
+)
 from jacobian.math.finite_fields import (
     Axis,
+    AxisBoundMatrix,
     CollisionCertificate,
     DirectionRankLedger,
     FiberPartition,
@@ -18,6 +23,11 @@ from jacobian.math.finite_fields import (
     ProjectiveLine,
     ProjectivePoint,
     RankResult,
+    element,
+    finite_field,
+    finite_polynomial,
+    finite_polynomial_map,
+    projective_line,
 )
 from jacobian.operation_execution import execute_operation
 from jacobian.operations import NonConclusion
@@ -86,6 +96,63 @@ def test_projective_enumeration_refuses_large_output_before_allocation() -> None
             modulus_coefficients=(1, 1, 1),
         ),
         axis=Axis(name="large", labels=tuple(f"x{index}" for index in range(7))),
+    )
+
+    terminal = execute_operation(operation.spec, request)
+
+    assert isinstance(terminal, NonConclusion)
+    assert terminal.diagnostic.code == "RESOURCE_LIMIT_EXCEEDED"
+
+
+def test_finite_map_table_refuses_excessive_polynomial_work() -> None:
+    operation = build_finite_field_bundle().capabilities[5]
+    presentation = finite_field(2, (1, 1, 0, 1, 1, 0, 0, 0, 1))
+    one = element(presentation, (1,) + (0,) * 7)
+    request = FiniteMapTableRequest(
+        polynomial_map=finite_polynomial_map(
+            finite_polynomial(presentation, (one,) * 512)
+        )
+    )
+
+    terminal = execute_operation(operation.spec, request)
+
+    assert isinstance(terminal, NonConclusion)
+    assert terminal.diagnostic.code == "RESOURCE_LIMIT_EXCEEDED"
+
+
+def test_direction_rank_ledger_refuses_excessive_aggregate_work() -> None:
+    operation = build_finite_field_bundle().capabilities[3]
+    presentation = finite_field(2, (1, 1, 1))
+    row_axis = Axis(name="rows", labels=("r0", "r1"))
+    column_axis = Axis(
+        name="columns",
+        labels=tuple(f"c{index}" for index in range(64)),
+    )
+    basis_axis = Axis(
+        name="basis",
+        labels=tuple(f"B{index}" for index in range(64)),
+    )
+    zero = element(presentation, (0, 0))
+    one = element(presentation, (1, 0))
+    basis = tuple(
+        AxisBoundMatrix(
+            presentation=presentation,
+            row_axis=row_axis,
+            column_axis=column_axis,
+            entries=(
+                tuple(one if column == index else zero for column in range(64)),
+                (zero,) * 64,
+            ),
+        )
+        for index in range(64)
+    )
+    request = DirectionRankLedgerRequest(
+        subspace=FiniteDimensionalSubspace(
+            presentation=presentation,
+            basis_axis=basis_axis,
+            basis=basis,
+        ),
+        directions=projective_line(presentation, row_axis),
     )
 
     terminal = execute_operation(operation.spec, request)

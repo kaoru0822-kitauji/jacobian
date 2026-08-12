@@ -61,8 +61,9 @@ from jacobian.providers.flint_runtime import python_flint_finite_field_provider_
 
 _MAX_PROJECTIVE_POINTS = 4096
 _MAX_FINITE_MAP_ELEMENTS = 4096
+_MAX_FINITE_MAP_WORK = 1_000_000
 _MAX_FINITE_MAP_REPLAY_WORK = 1_000_000
-_MAX_ORBIT_REPLAY_WORK = 1_000_000
+_MAX_DIRECTION_RANK_WORK = 1_000_000
 
 
 def _enumerate_projective_line(request: ProjectiveLineRequest) -> ProjectiveLine:
@@ -93,6 +94,33 @@ def _ledger(request: DirectionRankLedgerRequest) -> DirectionRankLedger:
     return direction_rank_ledger(request.subspace, request.directions)
 
 
+def _direction_rank_work(
+    subspace: FiniteDimensionalSubspace,
+    direction_count: int,
+) -> int:
+    source_dimension = len(subspace.basis)
+    target_dimension = len(subspace.column_axis.labels) * subspace.presentation.degree
+    restriction_work = (
+        source_dimension * len(subspace.row_axis.labels) * target_dimension
+    )
+    rank_work = (
+        target_dimension * source_dimension * min(target_dimension, source_dimension)
+    )
+    return direction_count * (restriction_work + rank_work)
+
+
+def _direction_rank_preflight(
+    request: DirectionRankLedgerRequest,
+) -> PreflightResult:
+    work = _direction_rank_work(request.subspace, len(request.directions.points))
+    if work > _MAX_DIRECTION_RANK_WORK:
+        return PreflightResult(
+            PreflightStatus.RESOURCE_LIMIT_EXCEEDED,
+            f"direction-rank work is {work}; limit is {_MAX_DIRECTION_RANK_WORK}",
+        )
+    return SUPPORTED
+
+
 def _orbit_distribution(request: OrbitDistributionRequest) -> OrbitDistribution:
     try:
         return orbit_distribution(request.ledger)
@@ -109,20 +137,11 @@ def _orbit_distribution(request: OrbitDistributionRequest) -> OrbitDistribution:
 
 def _orbit_replay_preflight(request: OrbitDistributionRequest) -> PreflightResult:
     ledger = request.ledger
-    subspace = ledger.subspace
-    source_dimension = len(subspace.basis)
-    target_dimension = len(subspace.column_axis.labels) * subspace.presentation.degree
-    restriction_work = (
-        source_dimension * len(subspace.row_axis.labels) * target_dimension
-    )
-    rank_work = (
-        target_dimension * source_dimension * min(target_dimension, source_dimension)
-    )
-    work = len(ledger.entries) * (restriction_work + rank_work)
-    if work > _MAX_ORBIT_REPLAY_WORK:
+    work = _direction_rank_work(ledger.subspace, len(ledger.entries))
+    if work > _MAX_DIRECTION_RANK_WORK:
         return PreflightResult(
             PreflightStatus.RESOURCE_LIMIT_EXCEEDED,
-            f"orbit replay work is {work}; limit is {_MAX_ORBIT_REPLAY_WORK}",
+            f"orbit replay work is {work}; limit is {_MAX_DIRECTION_RANK_WORK}",
         )
     return SUPPORTED
 
@@ -132,11 +151,22 @@ def _finite_map_table(request: FiniteMapTableRequest) -> FiniteMapTable:
 
 
 def _finite_map_preflight(request: FiniteMapTableRequest) -> PreflightResult:
-    count = request.polynomial_map.domain.order
+    polynomial_map = request.polynomial_map
+    count = polynomial_map.domain.order
     if count > _MAX_FINITE_MAP_ELEMENTS:
         return PreflightResult(
             PreflightStatus.RESOURCE_LIMIT_EXCEEDED,
             f"finite map has {count} inputs; limit is {_MAX_FINITE_MAP_ELEMENTS}",
+        )
+    work = (
+        count
+        * len(polynomial_map.polynomial.coefficients)
+        * polynomial_map.domain.degree
+    )
+    if work > _MAX_FINITE_MAP_WORK:
+        return PreflightResult(
+            PreflightStatus.RESOURCE_LIMIT_EXCEEDED,
+            f"finite map work is {work}; limit is {_MAX_FINITE_MAP_WORK}",
         )
     return SUPPORTED
 
@@ -306,6 +336,7 @@ def build_finite_field_bundle() -> DomainBundle:
             request_type=DirectionRankLedgerRequest,
             result_type=DirectionRankLedger,
             execute=_ledger,
+            preflight=_direction_rank_preflight,
             title="Compute ranks for a complete finite projective line",
             description="Return every direction with its restricted map and rank.",
             tags=("finite-field", "rank"),
