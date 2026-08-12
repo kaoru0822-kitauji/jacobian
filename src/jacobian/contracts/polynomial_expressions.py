@@ -441,11 +441,6 @@ class PolynomialExpressionNormalizeOutput(ContractModel):
     expression_uri: ArtifactUri
     normalization_uri: ArtifactUri | None = None
     normalized: SparseRationalPolynomial | None = None
-    exactness: Literal["EXACT_RATIONAL"] = "EXACT_RATIONAL"
-    determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
-    method: Literal["SYMPY_POLY_QQ_CANONICAL_TERMS"] = "SYMPY_POLY_QQ_CANONICAL_TERMS"
-    backend: Literal["sympy"] = "sympy"
-    backend_version: Literal["1.14.0"] = "1.14.0"
     detail: str = Field(min_length=1, max_length=1024)
 
     @model_validator(mode="after")

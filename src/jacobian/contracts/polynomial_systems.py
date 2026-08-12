@@ -127,8 +127,6 @@ class PolynomialSystemSolutionOutput(ContractModel):
     certificate_uri: ArtifactUri
     verification_record_uri: ArtifactUri | None = None
     checker_id: CheckerUri | None = None
-    exactness: Literal["EXACT_RATIONAL"] = "EXACT_RATIONAL"
-    determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
 
     @model_validator(mode="after")
     def preserve_truth_and_verification(self) -> Self:

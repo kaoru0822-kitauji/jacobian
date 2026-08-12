@@ -80,8 +80,6 @@ class ArbPointEnclosureResult(ContractModel):
     upper: ExactDyadic | None = None
     relative_accuracy_bits: StrictInt | None = None
     exact: bool = False
-    backend: Literal["python-flint"] = "python-flint"
-    backend_version: Literal["0.9.0"] = "0.9.0"
     detail: str = Field(min_length=1, max_length=1024)
 
     @model_validator(mode="after")
@@ -130,10 +128,6 @@ class FiniteRawMomentResult(ContractModel):
         min_length=1,
         max_length=256,
     )
-    exactness: Literal["EXACT_RATIONAL"] = "EXACT_RATIONAL"
-    determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
-    backend: Literal["python-flint"] = "python-flint"
-    backend_version: Literal["0.9.0"] = "0.9.0"
 
     @model_validator(mode="after")
     def bind_exact_contributions(self) -> Self:
@@ -207,8 +201,6 @@ class RationalLinearProgramResult(ContractModel):
     dual_objective: CanonicalRational | None = None
     primal_residuals: tuple[CanonicalRational, ...] | None = None
     dual_slacks: tuple[CanonicalRational, ...] | None = None
-    backend: Literal["sympy"] = "sympy"
-    backend_version: Literal["1.14.0"] = "1.14.0"
     detail: str = Field(min_length=1, max_length=1024)
 
     @model_validator(mode="after")

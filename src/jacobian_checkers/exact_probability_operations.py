@@ -14,12 +14,6 @@ from typing import Any
 from jacobian_checkers.bound_artifacts import bound_request as _bound_request
 
 _INTEGER = re.compile(r"^-?(?:0|[1-9][0-9]*)$")
-_META = {
-    "exactness": "EXACT_RATIONAL",
-    "determinism": "DETERMINISTIC",
-    "backend": "python-flint",
-    "backend_version": "0.9.0",
-}
 _GAUSSIAN_META = {
     "gaussian_model": "INDEPENDENT_STANDARD_REAL",
     "completeness": "COMPLETE_BOUNDED_EXPANSION",
@@ -144,9 +138,7 @@ def _distribution(value: object) -> list[tuple[Fraction, Fraction]]:
 
 
 def _metadata(result: dict[str, Any], fields: set[str]) -> bool:
-    return set(result) == fields | set(_META) and all(
-        result.get(key) == value for key, value in _META.items()
-    )
+    return set(result) == fields
 
 
 def _event(

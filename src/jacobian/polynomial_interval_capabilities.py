@@ -353,7 +353,6 @@ class PolynomialIntervalEncloseAdapter:
             bernstein_coefficients=enclosure.bernstein_coefficients,
             lo=enclosure.lo,
             hi=enclosure.hi,
-            backend_version=SYMPY_VERSION,
         )
         return _computed_result(
             descriptor=self.descriptor,

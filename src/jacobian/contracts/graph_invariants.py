@@ -197,11 +197,7 @@ class GraphNeighborhoodIndependenceOutput(ContractModel):
     records: tuple[GraphNeighborhoodIndependenceRecord, ...]
     total: int
     average: CanonicalRational
-    exactness: Literal["EXACT"] = "EXACT"
     completeness: Literal["COMPLETE"] = "COMPLETE"
-    determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
-    backend: Literal["networkx"] = "networkx"
-    backend_version: str
 
     @model_validator(mode="after")
     def require_consistent_summary(self) -> Self:

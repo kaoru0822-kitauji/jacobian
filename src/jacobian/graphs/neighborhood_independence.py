@@ -213,7 +213,6 @@ class GraphNeighborhoodIndependenceAdapter:
             records=tuple(records),
             total=total,
             average=average_wire,
-            backend_version=nx().__version__,
         )
         return CapabilityResult(
             capability_id=self.descriptor.capability_id,

@@ -271,9 +271,7 @@ class UniversalAlgebraEvaluationOutput(ContractModel):
     claim_uri: ArtifactUri
     certificate_uri: ArtifactUri
     records: tuple[MagmaLawEvaluationRecord, ...]
-    exactness: Literal["EXACT"] = "EXACT"
     completeness: Literal["COMPLETE"] = "COMPLETE"
-    determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
 
 
 class CountermodelSearchStatus(StrEnum):
@@ -341,7 +339,6 @@ class UniversalAlgebraCountermodelSearchOutput(ContractModel):
     structure: FiniteMagma | None = None
     source_records: tuple[MagmaLawEvaluationRecord, ...] | None = None
     target_record: MagmaLawEvaluationRecord | None = None
-    exactness: Literal["EXACT_FINITE_ENCODING"] = "EXACT_FINITE_ENCODING"
     scope: Literal["ONE_FIXED_CARRIER_ORDER"] = "ONE_FIXED_CARRIER_ORDER"
 
     @model_validator(mode="after")

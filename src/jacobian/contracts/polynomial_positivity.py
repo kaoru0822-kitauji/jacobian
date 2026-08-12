@@ -107,11 +107,6 @@ class PolynomialIntervalPositivityOutput(ContractModel):
     roots_in_open_interval: int = Field(ge=0)
     endpoint_root: bool
     positive: bool
-    exactness: Literal["EXACT_RATIONAL"] = "EXACT_RATIONAL"
-    determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
-    method: Literal["STURM_SEQUENCE"] = "STURM_SEQUENCE"
-    backend: Literal["sympy"] = "sympy"
-    backend_version: str = Field(min_length=1, max_length=64)
 
 
 class PolynomialIntervalPositivityVerifyRequest(ContractModel):
@@ -138,9 +133,6 @@ class PolynomialIntervalPositivityVerifyOutput(ContractModel):
     sign_changes_at_hi: int = Field(ge=0)
     roots_in_open_interval: int = Field(ge=0)
     endpoint_root: bool
-    exactness: Literal["EXACT_RATIONAL"] = "EXACT_RATIONAL"
-    determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
-    method: Literal["STURM_SEQUENCE"] = "STURM_SEQUENCE"
     conclusion: Literal["TRUE", "FALSE", "UNKNOWN"]
 
     @model_validator(mode="after")

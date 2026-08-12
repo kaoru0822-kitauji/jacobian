@@ -19,12 +19,6 @@ from jacobian_checkers.exact_probability_operations import (
     check_graph_connection_probability,
 )
 
-_META = {
-    "exactness": "EXACT_RATIONAL",
-    "determinism": "DETERMINISTIC",
-    "backend": "python-flint",
-    "backend_version": "0.9.0",
-}
 _BIT = {
     "atoms": [
         {"value": _q(0), "probability": _q(1, 2)},
@@ -152,7 +146,6 @@ _CASES: tuple[
                         "contribution": _q(1, 2),
                     },
                 ],
-                **_META,
             },
         ),
     ),
@@ -165,7 +158,6 @@ _CASES: tuple[
             {
                 "event_probability": _q(1, 2),
                 "selected_atoms": [_BIT["atoms"][1]],
-                **_META,
             },
         ),
     ),
@@ -185,7 +177,6 @@ _CASES: tuple[
                         "conditioned_probability": _q(1),
                     }
                 ],
-                **_META,
             },
         ),
     ),
@@ -207,7 +198,6 @@ _CASES: tuple[
                     {"source": _q(0), "target": _q(0), "probability": _q(1, 2)},
                     {"source": _q(1), "target": _q(0), "probability": _q(1, 2)},
                 ],
-                **_META,
             },
         ),
     ),
@@ -236,7 +226,6 @@ _CASES: tuple[
                     for right in (0, 1)
                 ],
                 "independence": "PRODUCT_MEASURE",
-                **_META,
             },
         ),
     ),

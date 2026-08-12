@@ -372,7 +372,6 @@ class PolynomialIntervalPositivityDecideAdapter:
             roots_in_open_interval=roots_in_open,
             endpoint_root=endpoint_root,
             positive=positive,
-            backend_version=SYMPY_VERSION,
         )
         return _computed_result(
             descriptor=self.descriptor,

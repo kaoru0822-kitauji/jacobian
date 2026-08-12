@@ -181,10 +181,6 @@ class PolynomialIntervalEnclosureOutput(ContractModel):
         "BERNSTEIN_COEFFICIENT_BOUND"
     )
     range_exactness: Literal["ENCLOSURE_VALID_NOT_EXACT"] = "ENCLOSURE_VALID_NOT_EXACT"
-    exactness: Literal["EXACT_RATIONAL"] = "EXACT_RATIONAL"
-    determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
-    backend: Literal["sympy"] = "sympy"
-    backend_version: str = Field(min_length=1, max_length=64)
 
 
 class PolynomialIntervalEnclosureVerifyOutput(ContractModel):
@@ -203,8 +199,6 @@ class PolynomialIntervalEnclosureVerifyOutput(ContractModel):
         "BERNSTEIN_COEFFICIENT_BOUND"
     )
     range_exactness: Literal["ENCLOSURE_VALID_NOT_EXACT"] = "ENCLOSURE_VALID_NOT_EXACT"
-    exactness: Literal["EXACT_RATIONAL"] = "EXACT_RATIONAL"
-    determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
     conclusion: Literal["TRUE", "FALSE", "UNKNOWN"]
 
     @model_validator(mode="after")
