@@ -110,7 +110,6 @@ def test_sympy_normalizes_typed_multivariate_expression(
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.output["status"] == "NORMALIZATION_PRODUCED"
     assert result.output["conclusion"] == "UNKNOWN"
-    assert result.output["verification"] == "UNVERIFIED"
     assert result.output["normalized"] == {
         "terms": [
             {"coefficient": _q(1), "exponents": [2, 0]},

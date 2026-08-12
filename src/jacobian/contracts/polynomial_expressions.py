@@ -444,7 +444,6 @@ class PolynomialExpressionNormalizeOutput(ContractModel):
     normalized: SparseRationalPolynomial | None = None
     exactness: Literal["EXACT_RATIONAL"] = "EXACT_RATIONAL"
     determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
-    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
     verification_candidate_available: bool
     method: Literal["SYMPY_POLY_QQ_CANONICAL_TERMS"] = "SYMPY_POLY_QQ_CANONICAL_TERMS"
     backend: Literal["sympy"] = "sympy"
