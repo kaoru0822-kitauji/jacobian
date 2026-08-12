@@ -67,7 +67,6 @@ def test_finite_raw_moment_preserves_exact_contributions(
     assert [
         item["contribution"] for item in result.output["result"]["contributions"]
     ] == [_rational(1, 2), _rational(9, 2)]
-    assert result.output["result"]["verification"] == "UNVERIFIED"
     assert result.artifact_uris == ()
 
 

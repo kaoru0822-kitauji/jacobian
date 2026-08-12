@@ -19,7 +19,6 @@ _META = {
     "determinism": "DETERMINISTIC",
     "backend": "python-flint",
     "backend_version": "0.9.0",
-    "verification": "UNVERIFIED",
 }
 _GAUSSIAN_META = {
     "gaussian_model": "INDEPENDENT_STANDARD_REAL",
@@ -28,7 +27,6 @@ _GAUSSIAN_META = {
     "determinism": "DETERMINISTIC",
     "backend": "python-flint",
     "backend_version": "0.9.0",
-    "verification": "UNVERIFIED",
 }
 # Independent bound mirror: the checker must not import producer contracts.
 # This must match MAX_GAUSSIAN_EXPANSION_PATHS in jacobian.contracts.probability.
@@ -44,7 +42,6 @@ _GRAPH_RELIABILITY_META = {
     "determinism": "DETERMINISTIC",
     "backend": "python-flint",
     "backend_version": "0.9.0",
-    "verification": "UNVERIFIED",
 }
 
 

@@ -24,7 +24,6 @@ _META = {
     "determinism": "DETERMINISTIC",
     "backend": "python-flint",
     "backend_version": "0.9.0",
-    "verification": "UNVERIFIED",
 }
 _BIT = {
     "atoms": [
@@ -39,7 +38,6 @@ _GAUSSIAN_META = {
     "determinism": "DETERMINISTIC",
     "backend": "python-flint",
     "backend_version": "0.9.0",
-    "verification": "UNVERIFIED",
 }
 _GRAPH_RELIABILITY_META = {
     "event": "TERMINALS_CONNECTED",
@@ -52,7 +50,6 @@ _GRAPH_RELIABILITY_META = {
     "determinism": "DETERMINISTIC",
     "backend": "python-flint",
     "backend_version": "0.9.0",
-    "verification": "UNVERIFIED",
 }
 
 

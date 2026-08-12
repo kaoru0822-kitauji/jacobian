@@ -240,7 +240,6 @@ class GaussianPolynomialMomentResult(ContractModel):
     determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
     backend: Literal["python-flint"] = "python-flint"
     backend_version: Literal["0.9.0"] = "0.9.0"
-    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
 
     @model_validator(mode="after")
     def bind_complete_contraction_ledger(self) -> Self:
@@ -393,7 +392,6 @@ class GraphConnectionProbabilityResult(ContractModel):
     determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
     backend: Literal["python-flint"] = "python-flint"
     backend_version: Literal["0.9.0"] = "0.9.0"
-    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
 
     @model_validator(mode="after")
     def bind_complete_state_mass(self) -> Self:
@@ -553,7 +551,6 @@ class FiniteEventProbabilityResult(ContractModel):
     determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
     backend: Literal["python-flint"] = "python-flint"
     backend_version: Literal["0.9.0"] = "0.9.0"
-    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
 
     @model_validator(mode="after")
     def bind_selected_atom_contributions(self) -> Self:
@@ -606,7 +603,6 @@ class FiniteConditionResult(ContractModel):
     determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
     backend: Literal["python-flint"] = "python-flint"
     backend_version: Literal["0.9.0"] = "0.9.0"
-    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
 
     @model_validator(mode="after")
     def bind_normalized_contributions(self) -> Self:
@@ -723,7 +719,6 @@ class FinitePushforwardResult(ContractModel):
     determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
     backend: Literal["python-flint"] = "python-flint"
     backend_version: Literal["0.9.0"] = "0.9.0"
-    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
 
     @model_validator(mode="after")
     def bind_aggregated_pushforward(self) -> Self:
@@ -822,7 +817,6 @@ class FiniteConvolutionResult(ContractModel):
     determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
     backend: Literal["python-flint"] = "python-flint"
     backend_version: Literal["0.9.0"] = "0.9.0"
-    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
 
     @model_validator(mode="after")
     def bind_aggregated_pairs(self) -> Self:
