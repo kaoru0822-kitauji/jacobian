@@ -315,7 +315,6 @@ def test_term_apply_elaborates_exact_term_and_returns_successor(
     assert result.output["term_application"] == "LEAN_EXACT_ELABORATION"
     assert result.output["term_apply_uri"] == result.output["transition_uri"]
     assert result.output["verification_boundary"] == "LEAN_CHECK_REQUIRED"
-    assert result.output["verification"] == "UNVERIFIED"
     assert result.output["successor_states"][0]["normalized_goals"] == []
 
 
@@ -411,7 +410,6 @@ def test_inspect_returns_recorded_goals_without_replay(
 
     assert result.capability_id == "lean.proof_state.inspect"
     assert result.output["inspection"] == "READ_ONLY_NO_REPLAY"
-    assert result.output["verification"] == "UNVERIFIED"
     assert result.output["completed"] is False
     assert result.output["goal_count"] == 2
     assert result.output["normalized_goals"] == [
@@ -543,7 +541,6 @@ def test_metavariable_fields_expose_structured_fields_and_unavailable_coercion(
     assert result.output["metavariable_schema_version"] == "1"
     assert result.output["coercion_provenance"] == "UNAVAILABLE"
     assert "Lean.Meta.Coe" in result.output["coercion_provenance_basis"]
-    assert result.output["verification"] == "UNVERIFIED"
     mvar = result.output["structured_metavariables"][0]
     assert mvar["goal_index"] == 0
     assert mvar["kind"] == "NATURAL"

@@ -57,8 +57,8 @@ Proof states and transitions have `COMPUTED` assurance only. A completed state
 means that exploratory Lean reported no remaining goals for that replayed
 prefix. It is not a theorem-verification record.
 
-Every result reports `verification = UNVERIFIED` and
-`verification_boundary = LEAN_CHECK_REQUIRED`. Only `lean.check`, using its
+Every result reports `verification_boundary = LEAN_CHECK_REQUIRED` and creates
+no verification record. Only `lean.check`, using its
 separate operator-authorized clean verification path, may verify the complete
 statement and proof.
 

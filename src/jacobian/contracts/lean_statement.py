@@ -2,8 +2,8 @@
 
 Each contract exposes exactly one inspectable artifact. None of these
 capabilities certify that a formal statement matches an informal claim,
-or that two statements are semantically equivalent. The ``verification`` field is always
-``UNVERIFIED`` to enforce the fail-closed boundary.
+or that two statements are semantically equivalent. These results create no
+verification record; theorem verification remains the responsibility of ``lean.check``.
 """
 
 from __future__ import annotations
@@ -111,10 +111,9 @@ class LeanStatementProposalArtifact(ContractModel):
 
 
 class LeanStatementProposalOutput(LeanStatementProposalArtifact):
-    """Proposal output with artifact URI and explicit UNVERIFIED label."""
+    """Statement-proposal output with its immutable artifact URI."""
 
     proposal_uri: ArtifactUri
-    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
 
 
 # ---------------------------------------------------------------------------
@@ -183,7 +182,6 @@ class LeanStatementComparisonArtifact(ContractModel):
 
 
 class LeanStatementComparisonOutput(LeanStatementComparisonArtifact):
-    """Comparison output with artifact URI and explicit UNVERIFIED label."""
+    """Statement-comparison output with its immutable artifact URI."""
 
     comparison_uri: ArtifactUri
-    verification: Literal["UNVERIFIED"] = "UNVERIFIED"

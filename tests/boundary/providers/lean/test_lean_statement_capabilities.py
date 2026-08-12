@@ -76,7 +76,6 @@ def test_propose_elaborates_valid_statement(tmp_path: Path) -> None:
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.output["elaborates"] is True
     assert result.output["sorry_count"] == 1
-    assert result.output["verification"] == "UNVERIFIED"
     assert result.output["proposal_uri"] in result.artifact_uris
 
 
@@ -227,7 +226,6 @@ def test_propose_directly_elaborates_environment_bound_proposition(
     assert result.output["options"][0] == {"name": "pp.all", "value": "true"}
     assert result.output["semantic_scope"] == "ELABORATION_ONLY"
     assert result.output["truth_status"] == "NOT_ASSESSED"
-    assert result.output["verification"] == "UNVERIFIED"
     assert result.output["environment_digest"].startswith("sha256:")
 
     artifact = propose.resources.store.get(result.output["proposal_uri"])
@@ -324,7 +322,6 @@ def test_compare_identical_statements(tmp_path: Path) -> None:
     assert result.output["axiom_sets_identical"] is True
     assert result.output["elaboration_checked"] is True
     assert result.output["both_elaborate"] is True
-    assert result.output["verification"] == "UNVERIFIED"
     assert result.output["comparison_uri"] in result.artifact_uris
 
 
