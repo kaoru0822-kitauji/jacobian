@@ -88,4 +88,3 @@ def test_rational_solution_search_reports_completed_bounded_absence(
     assert result.output["found"] is False
     assert result.output["examined_assignment_count"] == 3
     assert result.output["grid_assignment_count"] == 3
-    assert result.output["verification"] == "UNVERIFIED"

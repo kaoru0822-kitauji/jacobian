@@ -86,7 +86,6 @@ class PolynomialSystemRationalSearchOutput(ContractModel):
     examined_assignment_count: int = Field(ge=0, le=RATIONAL_SEARCH_GRID_LIMIT)
     grid_assignment_count: int = Field(ge=1, le=RATIONAL_SEARCH_GRID_LIMIT)
     checker_id: CheckerUri | None = None
-    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
     coverage: Literal["COMPLETE_SEARCH_OBJECTIVE"] = "COMPLETE_SEARCH_OBJECTIVE"
 
     @model_validator(mode="after")
