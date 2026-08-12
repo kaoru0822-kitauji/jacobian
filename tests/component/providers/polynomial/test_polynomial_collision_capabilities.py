@@ -139,7 +139,6 @@ def test_collision_comparison_does_not_promote_forged_evaluations(
     )
 
     assert candidate.output["candidate_collision"] is True
-    assert candidate.output["verification"] == "UNVERIFIED"
 
     rejected = runtime.core.capabilities.invoke(
         CapabilityRequest(

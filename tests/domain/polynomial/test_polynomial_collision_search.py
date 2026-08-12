@@ -101,7 +101,6 @@ def test_collision_search_reports_exact_completed_not_found_scope(
     assert result.output["grid_point_count"] == 3
     assert result.output["witness_uri"] is None
     assert result.output["stop_reason"] == "GRID_EXHAUSTED"
-    assert result.output["verification"] == "UNVERIFIED"
 
 
 def test_collision_search_preserves_partial_evidence_when_cancelled(

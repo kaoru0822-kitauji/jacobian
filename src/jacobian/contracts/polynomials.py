@@ -933,10 +933,6 @@ class PolynomialDeterminism(StrEnum):
     DETERMINISTIC = "DETERMINISTIC"
 
 
-class PolynomialVerificationStatus(StrEnum):
-    UNVERIFIED = "UNVERIFIED"
-
-
 class PolynomialEvaluationOutput(ContractModel):
     map_uri: ArtifactUri
     evaluation_uri: ArtifactUri
@@ -944,7 +940,6 @@ class PolynomialEvaluationOutput(ContractModel):
     image: tuple[CanonicalRational, ...]
     exactness: PolynomialExactness = PolynomialExactness.EXACT
     determinism: PolynomialDeterminism = PolynomialDeterminism.DETERMINISTIC
-    verification: PolynomialVerificationStatus = PolynomialVerificationStatus.UNVERIFIED
     certificate_available: Literal[False] = False
     checker_id: None = None
     backend: Literal["sympy"] = "sympy"
@@ -961,7 +956,6 @@ class PolynomialJacobianOutput(ContractModel):
     determinant: SparseRationalPolynomial
     exactness: PolynomialExactness = PolynomialExactness.EXACT
     determinism: PolynomialDeterminism = PolynomialDeterminism.DETERMINISTIC
-    verification: PolynomialVerificationStatus = PolynomialVerificationStatus.UNVERIFIED
     certificate_available: Literal[True] = True
     backend: Literal["sympy"] = "sympy"
     backend_version: str
@@ -981,7 +975,6 @@ class PolynomialCollisionOutput(ContractModel):
     checker_id: CheckerUri | None = None
     exactness: PolynomialExactness = PolynomialExactness.EXACT
     determinism: PolynomialDeterminism = PolynomialDeterminism.DETERMINISTIC
-    verification: PolynomialVerificationStatus = PolynomialVerificationStatus.UNVERIFIED
     certificate_available: bool
     comparison_method: Literal["EXACT_EVALUATION_ARTIFACT_COMPARISON"] = (
         "EXACT_EVALUATION_ARTIFACT_COMPARISON"
@@ -1127,7 +1120,6 @@ class PolynomialCollisionSearchOutput(ContractModel):
     witness_uri: ArtifactUri | None = None
     checker_id: CheckerUri | None = None
     stop_reason: PolynomialCollisionSearchStopReason
-    verification: PolynomialVerificationStatus = PolynomialVerificationStatus.UNVERIFIED
 
     @model_validator(mode="after")
     def require_complete_candidate_bundle(self) -> Self:
