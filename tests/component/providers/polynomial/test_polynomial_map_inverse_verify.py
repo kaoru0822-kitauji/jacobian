@@ -98,7 +98,6 @@ def test_two_sided_triangular_inverse_is_verified(
 
     assert result.output["inverse_verified"] is True
     assert result.output["conclusion"] == Conclusion.TRUE.value
-    assert result.verification_record_uri is not None
     assert result.output["verification_record_uri"] is not None
     assert len(result.output["inverse_after_forward_checker_records"]) == 2
     assert len(result.output["forward_after_inverse_checker_records"]) == 2

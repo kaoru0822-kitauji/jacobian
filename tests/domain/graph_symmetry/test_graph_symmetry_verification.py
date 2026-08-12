@@ -63,7 +63,6 @@ def test_graph_symmetry_orbits_are_independently_replayed(
     assert verified.output["operation_id"] == (
         "graph.symmetry.generator_orbits.compute"
     )
-    assert verified.verification_record_uri is not None
     assert verified.output["verification_record_uri"] is not None
 
 

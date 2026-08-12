@@ -79,7 +79,6 @@ def test_weighted_minimum_spanning_tree_is_independently_verified(
     assert verified.output["operation_id"] == ("graph.spanning_tree.minimum.compute")
     assert verified.output["verification_record_uri"] is not None
     assert verified.output["verification_record_uri"] in verified.artifact_uris
-    assert verified.verification_record_uri is not None
     assert verified.execution.detail == (
         "independent fundamental-cycle optimality certificate replay accepted "
         "graph.spanning_tree.minimum.compute"

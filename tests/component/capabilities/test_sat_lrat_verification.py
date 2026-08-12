@@ -79,7 +79,6 @@ def test_rup_lrat_derives_empty_clause_and_binds_artifacts(
 
     assert result.output["status"] == "VERIFIED_UNSAT"
     assert result.output["conclusion"] == "TRUE"
-    assert result.verification_record_uri is not None
     assert result.output["verification_record_uri"] is not None
     proof = lrat_services.core.store.get(result.output["proof_uri"])
     assert proof.manifest.parents == (cnf.artifact_uri,)

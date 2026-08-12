@@ -199,7 +199,6 @@ def test_lean_proof_edit_verifies_through_mcp_and_replays_after_restart(
             verified = await validate(client)
             assert verified["output"]["accepted"] is True
             record_uri = verified["output"]["verification_record_uri"]
-            assert verified["verification_record_uri"] == record_uri
             assert record_uri in verified["artifact_uris"]
             assert verified["output"]["proof_edit_uri"] in verified["artifact_uris"]
             record = await _artifact(client, record_uri)

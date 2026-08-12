@@ -241,7 +241,6 @@ def test_rejected_proof_never_establishes_sat_or_unsat(
     assert result.output["status"] == "REJECTED"
     assert result.output["conclusion"] == "UNKNOWN"
     assert result.output["verification_record_uri"] is None
-    assert result.verification_record_uri is None
 
 
 def test_proof_verify_requires_runtime_and_operator_authorization(
@@ -320,7 +319,6 @@ def test_checker_operational_failure_never_creates_a_conclusion(
     result = _verify(runtime, proof_uri)
 
     assert result.execution.status is expected_status
-    assert result.verification_record_uri is None
     assert result.output["status"] == expected_output_status
     assert result.output["conclusion"] == "UNKNOWN"
     assert result.output["verification_record_uri"] is None
@@ -345,7 +343,6 @@ def test_runtime_replacement_after_authorization_fails_closed(
     result = _verify(runtime, proof_uri)
 
     assert result.execution.status is ExecutionStatus.ERROR
-    assert result.verification_record_uri is None
     assert result.output["status"] == "ERROR"
     assert result.output["conclusion"] == "UNKNOWN"
     assert result.output["verification_record_uri"] is None

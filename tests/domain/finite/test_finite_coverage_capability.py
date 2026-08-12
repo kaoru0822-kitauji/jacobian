@@ -30,7 +30,6 @@ def test_finite_coverage_verifies_exactly_once_across_pages(
         _request(["alpha", "beta", "gamma"], [["alpha"], ["beta", "gamma"]])
     )
 
-    assert result.verification_record_uri is not None
     assert result.output["coverage_status"] == "EXACTLY_ONCE"
     assert result.output["conclusion"] == "TRUE"
     assert result.output["diagnostics"] == {

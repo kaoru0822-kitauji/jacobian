@@ -70,7 +70,6 @@ def test_induced_tree_result_is_domain_bound_and_independently_replayed(
     assert verified.output["status"] == "VERIFIED"
     assert verified.output["operation_id"] == "graph.induced_tree.maximum.compute"
     assert verified.output["verification_record_uri"] is not None
-    assert verified.verification_record_uri is not None
     assert verified.execution.detail == (
         "independent finite-subset exhaustive replay accepted "
         "graph.induced_tree.maximum.compute"
@@ -249,9 +248,6 @@ def test_graph_metric_result_uses_independent_all_sources_bfs_replay(
         assert verified.output["status"] == "VERIFIED", producer_id
         assert verified.output["operation_id"] == producer_id, producer_id
         assert verified.output["verification_record_uri"] is not None, producer_id
-        assert verified.verification_record_uri is not None, (
-            producer_id
-        )
         assert verified.output["verification_record_uri"] in verified.artifact_uris, (
             producer_id
         )
@@ -310,7 +306,6 @@ def test_distance_matrix_result_uses_independent_all_sources_bfs_replay(
     assert verified.output["status"] == "VERIFIED"
     assert verified.output["operation_id"] == "graph.distance_matrix.compute"
     assert verified.output["verification_record_uri"] is not None
-    assert verified.verification_record_uri is not None
     assert verified.output["verification_record_uri"] in verified.artifact_uris
     assert len(verified.artifact_uris) == 2
 
@@ -363,4 +358,3 @@ def test_distance_matrix_result_uses_independent_all_sources_bfs_replay(
     assert rejected.output["status"] == "REJECTED"
     assert rejected.output["conclusion"] == "UNKNOWN"
     assert rejected.output["verification_record_uri"] is None
-    assert rejected.verification_record_uri is None

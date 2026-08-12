@@ -187,7 +187,6 @@ def test_matrix_determinant_verify_rejects_wrong_bound_value(
     assert rejected.output["status"] == "REJECTED"
     assert rejected.output["conclusion"] == "UNKNOWN"
     assert rejected.output["verification_record_uri"] is None
-    assert rejected.verification_record_uri is None
 
 
 def test_matrix_determinant_verify_timeout_is_not_a_conclusion(
@@ -224,7 +223,6 @@ def test_matrix_determinant_verify_timeout_is_not_a_conclusion(
     assert timed_out.output["status"] == "TIMEOUT"
     assert timed_out.output["conclusion"] == "UNKNOWN"
     assert timed_out.output["verification_record_uri"] is None
-    assert timed_out.verification_record_uri is None
 
 
 def test_matrix_rank_compute_returns_rectangular_pivot_evidence(

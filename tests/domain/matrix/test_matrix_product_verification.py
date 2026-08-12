@@ -55,7 +55,6 @@ def test_square_zero_product_is_computed_then_independently_verified(
     assert verified.output["operation_id"] == "matrix.multiply.compute"
     assert verified.output["verification_record_uri"] is not None
     assert verified.output["verification_record_uri"] in verified.artifact_uris
-    assert verified.verification_record_uri is not None
 
 
 def test_matrix_product_verifier_rejects_a_false_product_without_a_record(

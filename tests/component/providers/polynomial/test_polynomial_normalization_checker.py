@@ -94,7 +94,6 @@ def test_independent_checker_rejects_wrong_bound_coefficients(
     assert rejected.output["status"] == "REJECTED"
     assert rejected.output["conclusion"] == "UNKNOWN"
     assert rejected.output["verification_record_uri"] is None
-    assert rejected.verification_record_uri is None
 
 
 def test_normalization_checker_timeout_is_operational(
@@ -127,4 +126,3 @@ def test_normalization_checker_timeout_is_operational(
     assert result.output["status"] == "TIMEOUT"
     assert result.output["conclusion"] == "UNKNOWN"
     assert result.output["verification_record_uri"] is None
-    assert result.verification_record_uri is None

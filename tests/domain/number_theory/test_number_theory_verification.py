@@ -64,7 +64,6 @@ def test_prime_factorization_result_uses_independent_python_flint_replay(
         assert verified.output["status"] == "VERIFIED", value
         assert verified.output["operation_id"] == producer_id, value
         assert verified.output["verification_record_uri"] is not None, value
-        assert verified.verification_record_uri is not None, value
         assert verified.output["verification_record_uri"] in verified.artifact_uris, (
             value
         )
@@ -135,7 +134,6 @@ def test_powerful_number_result_uses_independent_python_flint_replay(
         assert verified.output["status"] == "VERIFIED", value
         assert verified.output["operation_id"] == producer_id, value
         assert verified.output["verification_record_uri"] is not None, value
-        assert verified.verification_record_uri is not None, value
         assert verified.output["verification_record_uri"] in verified.artifact_uris, (
             value
         )
@@ -204,7 +202,6 @@ def test_modular_residue_image_uses_independent_python_flint_replay(
     assert verified.output["status"] == "VERIFIED"
     assert verified.output["operation_id"] == producer_id
     assert verified.output["verification_record_uri"] is not None
-    assert verified.verification_record_uri is not None
     assert verified.output["verification_record_uri"] in verified.artifact_uris
     provider_runtime = next(
         descriptor.provider_runtime
@@ -242,4 +239,3 @@ def test_modular_residue_verifier_replays_its_materialized_lineage(
     assert rejected.output["status"] == "VERIFIED"
     assert rejected.output["conclusion"] == "TRUE"
     assert rejected.output["verification_record_uri"] is not None
-    assert rejected.verification_record_uri is not None

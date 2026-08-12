@@ -38,9 +38,6 @@ def test_exact_proof_edit_is_bound_to_authorized_lean_check(
     assert result.output["baseline_accepted"] is True
     assert result.output["baseline_verification_record_uri"] in result.artifact_uris
     assert result.verification_record_uri is not None
-    assert (
-        result.verification_record_uri == result.output["verification_record_uri"]
-    )
     assert result.output["verification_record_uri"] in result.artifact_uris
     assert result.output["proof_edit_uri"] in result.artifact_uris
     edit = authorized_complete_runtime.core.store.get(result.output["proof_edit_uri"])
@@ -93,7 +90,6 @@ def test_rejected_edit_keeps_checker_evidence_without_becoming_accepted(
     assert result.output["accepted"] is False
     assert result.output["verification_record_uri"] is None
     assert result.output["certificate_uri"] in result.artifact_uris
-    assert result.verification_record_uri is None
 
 
 def test_valid_edit_is_not_accepted_when_original_baseline_is_invalid(

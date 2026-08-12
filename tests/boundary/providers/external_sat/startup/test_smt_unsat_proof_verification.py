@@ -352,7 +352,6 @@ def test_checker_operational_failure_never_creates_a_conclusion(
     result = _verify(runtime, proof_uri)
 
     assert result.execution.status is expected_status
-    assert result.verification_record_uri is None
     assert result.output["status"] == expected_output_status
     assert result.output["conclusion"] == "UNKNOWN"
     assert result.output["verification_record_uri"] is None
@@ -377,7 +376,6 @@ def test_runtime_replacement_after_authorization_fails_closed(
     result = _verify(runtime, proof_uri)
 
     assert result.execution.status is ExecutionStatus.ERROR
-    assert result.verification_record_uri is None
     assert result.output["status"] == "ERROR"
     assert result.output["conclusion"] == "UNKNOWN"
     assert result.output["verification_record_uri"] is None

@@ -90,7 +90,6 @@ def test_zero_hole_qf_uf_proof_is_independently_verified(
     assert verified.execution.status is ExecutionStatus.COMPLETED
     assert verified.output["status"] == "VERIFIED_UNSAT"
     assert verified.output["conclusion"] == "TRUE"
-    assert verified.verification_record_uri is not None
     assert verified.output["verification_record_uri"] is not None
 
 

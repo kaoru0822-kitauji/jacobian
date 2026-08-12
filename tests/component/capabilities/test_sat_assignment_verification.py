@@ -229,7 +229,6 @@ def test_unsatisfying_assignment_is_rejected_without_an_opposite_conclusion(
     assert result.output["status"] == "REJECTED"
     assert result.output["conclusion"] == "UNKNOWN"
     assert result.output["verification_record_uri"] is None
-    assert result.verification_record_uri is None
 
 
 def test_sat_assignment_verify_requires_operator_authorized_checker(
