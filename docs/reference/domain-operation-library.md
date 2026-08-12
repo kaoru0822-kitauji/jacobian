@@ -37,6 +37,16 @@ Public packages declare explicit `__all__` values. Value modules import no
 provider, runtime, storage, MCP, operation installation, publication, or
 checker-authority code. Private backend modules may import maintained
 third-party mathematics and remain lazy when the provider is optional.
+They stay small: backend calls, exact conversions, and backend-specific
+normalization belong there, but generic adapters, mirrored backend APIs, and a
+second wrapper type system do not. Public functions validate the documented
+semantic contract and delegate to these maintained libraries.
+
+**Wrap semantic contracts, not entire libraries.** Add a private backend
+boundary only when Jacobian must preserve semantics, convert exact values,
+normalize results, isolate an optional import, or contain a backend-specific
+quirk. A stable backend call that needs none of those may remain a direct call;
+do not reproduce a maintained library's API under Jacobian names.
 
 The cross-domain `jacobian.contracts` package is limited to passive primitives:
 digests, nominal reference identifiers, exact scalars, common bounded

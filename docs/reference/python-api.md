@@ -40,7 +40,9 @@ The supported modules and symbols are:
 - `jacobian.math.matrices`: `determinant`, `rank`, `rref`, `inverse`, and
   `trace`;
 - `jacobian.math.graphs`: `triangle_count`, `diameter`, and `is_eulerian`;
-- `jacobian.math.polynomials`: `derivative`, `gcdex`, and `resultant`; and
+- `jacobian.math.polynomials`: `derivative`, `discriminant`, `divide`,
+  `evaluate`, `factorization`, `gcdex`, `groebner_basis`, `integral`,
+  `partial_fractions`, `resultant`, and `square_free_decomposition`;
 - `jacobian.math.prime_field_linear_algebra`: `PrimeFieldMatrix`, `rank`,
   `rref`, `nullspace`, `column_basis`, and `quotient_basis`; and
 - `jacobian.math.finite_fields`: exact presentation-, parent-, and axis-bound
@@ -58,6 +60,15 @@ functions accept and return exact SymPy `Poly` values or their exact scalar
 results. Each module's
 `__all__` is the authoritative public symbol manifest; other implementation
 modules remain internal.
+
+Jacobian builds these functions on maintained mathematical libraries rather
+than reimplementing their algorithms. Small private modules such as `_sympy`
+and `_flint` contain lazy backend calls, exact conversions, and backend-specific
+normalization. They are implementation boundaries, not public wrapper APIs or
+a generic adapter framework. Public functions validate their documented
+semantic contract—for example, `groebner_basis` accepts only SymPy `Poly`
+values over `QQ`—and then delegate directly to the maintained backend.
+In short, Jacobian wraps semantic contracts, not entire libraries.
 
 Finite-extension values bind the exact modulus, generator, ordered power basis,
 and coordinate encoding. Matrix, subspace, projective, and linear-map values
