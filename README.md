@@ -66,8 +66,17 @@ For the Python distribution:
 python -m pip install jacobian
 ```
 
+That package includes Jacobian's exact maintained Python backend stack: SymPy,
+NetworkX, Z3, Python-FLINT, and cvc5. A normal Python or npm installation
+therefore exposes the same built-in Python-backed operation portfolio. The
+tested binary-install contract is CPython 3.12 or 3.13 on glibc Linux x86-64;
+the release gate installs the built wheel and starts Jacobian on both Python
+versions. Other systems may have compatible upstream wheels, but are not part
+of the tested release contract yet. In particular, Alpine/musl cannot install
+the complete mandatory stack from PyPI.
+
 The launcher supports Claude, Codex, Cursor, Gemini, and OpenCode. It requires
-Node.js 18 or newer plus Python 3.12/3.13 or
+Node.js 18 or newer plus CPython 3.12/3.13 or
 [`uv`](https://docs.astral.sh/uv/); the guided installer can install its pinned
 `uv` release after confirmation. Run `jacobian mcp` to start the server
 directly.
@@ -98,8 +107,8 @@ determinant pair through the public MCP surface.
 
 ## Available mathematics
 
-The installed operations vary with local providers, but the maintained
-portfolio covers work in:
+The installed operations vary with optional external providers, but the
+maintained portfolio covers work in:
 
 - polynomial maps and polynomial algebra;
 - exact linear algebra;
@@ -109,8 +118,9 @@ portfolio covers work in:
 - polytopes; and
 - Lean declaration discovery and proof checking.
 
-Some operations require optional local backends. Catalog membership means an
-operation is installed and invocable; it does not grant verification authority.
+Some operations require optional native or formal backends. Catalog membership
+means an operation is installed and invocable; it does not grant verification
+authority.
 Read `capability://catalog` or use `math.find` to inspect the current
 environment. Use `math.run` to invoke a selected operation.
 

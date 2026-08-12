@@ -73,10 +73,10 @@ In short, Jacobian wraps semantic contracts, not entire libraries.
 Finite-extension values bind the exact modulus, generator, ordered power basis,
 and coordinate encoding. Matrix, subspace, projective, and linear-map values
 also bind their parents and ordered axes. SymPy validates presentations and
-normalizes projective values. Python-FLINT conversion stays private and lazy;
-importing `jacobian.math` does not probe or import the optional backend. Install
-the `flint` extra only for FLINT-backed polynomial evaluation, restriction of
-scalars, and rank operations.
+normalizes projective values. Backend conversion stays private and lazy;
+importing `jacobian.math` does not probe or import backend implementations until
+a corresponding function is called. The maintained backends are exact package
+dependencies, but they do not become mathematical value identity.
 
 This API is the authoritative mathematical implementation rather than a facade
 over `math.run`. Installed operations parse their typed request once, convert

@@ -2,19 +2,18 @@
 
 [Documentation home](../index.md)
 
-Some Jacobian capabilities use mathematical backends that are not installed by
-default. Backend availability is not verification authority. Provider output
+Jacobian installs its maintained Python mathematical backends—SymPy, NetworkX,
+Z3, Python-FLINT, and cvc5—as exact package dependencies. A missing or
+mismatched Python backend is a broken installation, not a supported reduced
+catalog. Backend availability is not verification authority: provider output
 remains unverified until the appropriate independent checker accepts its bound
 witness or certificate.
 
-The optional providers currently include:
+Native executables and formal runtimes remain optional operator-installed
+components:
 
 - CaDiCaL, which finds SAT models and UNSAT proof artifacts;
-- cvc5, which produces SMT UNSAT proofs, with Carcara independently checking
-  Alethe;
-- the `flint` extra, which provides Python-FLINT/Arb operations for exact
-  rational systems, integer matrices and lattices, polynomials, and validated
-  numerical computation; and
+- Carcara, which independently checks Alethe proofs produced by cvc5; and
 - pinned Lean `CORE` and `MATHLIB` environments, which check formal
   certificates.
 
@@ -23,14 +22,12 @@ catalog. The [provider runtime contract](../reference/provider-runtime.md)
 defines how Jacobian measures provider availability, compatibility, identity,
 and checker runtimes. The
 [source setup profiles](setup-agent-from-source.md#profiles) provide maintained
-installation paths for `full-python`, `lean`, and `external-proof` checkouts.
+installation paths for `core`, `lean`, and `external-proof` checkouts.
 
-For ordinary contributor work, `make setup PROFILE=core` installs the locked
-development environment and diagnoses only the core provider surface
-(NetworkX, SymPy, and Z3); that is the contributor quick path described in
-[CONTRIBUTING.md](../../CONTRIBUTING.md). Use
-`make setup PROFILE=full-python` when the change requires every maintained
-Python extra. CI owns the full Lean and optional-provider environments, so you
+For ordinary contributor work, `make setup PROFILE=core` installs and diagnoses
+the complete locked Python backend surface; that is the contributor quick path
+described in [CONTRIBUTING.md](../../CONTRIBUTING.md). CI owns the full Lean and
+optional native-provider environments, so you
 do not need to prepare them locally unless you are reproducing a
 boundary-specific failure.
 

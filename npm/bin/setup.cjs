@@ -204,7 +204,7 @@ function buildSourceLauncher(
   elanHome = process.env.ELAN_HOME || "",
   leanRuntime = process.env.JACOBIAN_LEAN_RUNTIME || "",
 ) {
-  const profiles = new Set(["core", "full-python", "lean", "external-proof"]);
+  const profiles = new Set(["core", "lean", "external-proof"]);
   if (!profiles.has(profile)) {
     throw new Error(`Unknown Jacobian source profile: ${profile}.`);
   }

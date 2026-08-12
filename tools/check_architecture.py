@@ -123,7 +123,7 @@ _SUBPROCESS_ALLOWED_EXACT: frozenset[PurePosixPath] = frozenset(
             "test_smt_unsat_proof_verification.py"
         ),
         PurePosixPath(
-            "tests/boundary/providers/flint/startup/test_optional_provider_startup.py"
+            "tests/boundary/providers/flint/startup/test_required_provider_startup.py"
         ),
         PurePosixPath(
             "tests/boundary/providers/lean/test_lean_statement_capabilities.py"

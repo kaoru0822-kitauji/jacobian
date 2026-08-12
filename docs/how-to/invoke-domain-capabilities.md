@@ -14,7 +14,8 @@ installed tool ID or payload. The product surface is
    `*.verify` ID)—not a second mode on the producer.
 
 Do not infer availability or payload fields from examples. Provider health,
-configured exclusions, optional backends, and checker authorization all affect
+configured exclusions, optional native/formal backends, and checker
+authorization all affect
 the installed catalog.
 
 ## Discover and describe

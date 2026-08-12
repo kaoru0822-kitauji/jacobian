@@ -633,7 +633,6 @@ if [[ ! -d "${RELEASE_DIR}" ]]; then
             "${UV_BIN}" sync \
             --locked \
             --no-dev \
-            --all-extras \
             --managed-python \
             --link-mode copy
     )

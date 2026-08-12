@@ -301,7 +301,7 @@ test("buildSourceLauncher binds the exact checkout and state directory", () => {
     source,
     state,
     "/opt/uv",
-    "full-python",
+    "core",
     "/providers/bin:/usr/bin",
     "/environments/jacobian",
   );
@@ -316,7 +316,7 @@ test("buildSourceLauncher binds the exact checkout and state directory", () => {
     "--state-dir",
     state,
   ]);
-  assert.equal(launcher.profile, "full-python");
+  assert.equal(launcher.profile, "core");
   assert.equal(launcher.package, null);
   assert.deepEqual(launcher.env, {
     PATH: "/providers/bin:/usr/bin",
@@ -595,7 +595,7 @@ process.stdin.on("data", (chunk) => {
         source,
         stateDir,
         fakeUv,
-        "full-python",
+        "core",
         process.env.PATH,
       );
       const claude = clientDefinitions(home).find((definition) => definition.id === "claude");
@@ -1273,7 +1273,7 @@ test("source setup rejects an unsupported client before writing config", async (
         "--source",
         join(npmRoot, ".."),
         "--profile",
-        "full-python",
+        "core",
         "--client",
         "codxe",
         "--yes",

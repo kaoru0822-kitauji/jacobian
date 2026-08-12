@@ -11,7 +11,7 @@ setup: ## Install and diagnose a locked development profile (PROFILE=core).
 doctor: ## Diagnose a development profile without changing it (PROFILE=core).
 	uv run --locked --no-sync python tools/development_profiles.py doctor --profile "$(PROFILE)" --repo .
 
-setup-agent: ## Configure an agent against this source checkout (ARGS="--client codex --profile full-python").
+setup-agent: ## Configure an agent against this source checkout (ARGS="--client codex --profile core").
 	./scripts/setup-agent $(ARGS)
 
 JACOBIAN_REGISTRY_IMAGE ?= ghcr.io/morluto/jacobian

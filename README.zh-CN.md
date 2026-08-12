@@ -75,6 +75,10 @@ Python 发行版可以直接安装稳定版本：
 python -m pip install jacobian
 ```
 
+该 package 包含 Jacobian 维护的完整 Python backend：SymPy、NetworkX、Z3、
+Python-FLINT 和 cvc5。因此普通 Python 与 npm 安装会提供相同的内置 Python
+操作集合。
+
 启动器支持 Claude、Codex、Cursor、Gemini 和 OpenCode。它需要 Node.js 18 或更高版本，以及 Python 3.12 或 [`uv`](https://docs.astral.sh/uv/)；引导安装器可以在确认后安装仓库固定的 `uv` 版本。运行 `jacobian mcp` 可以直接启动服务器。这个不足 100 KB 的 npm 启动器没有 npm 运行时依赖；较大的下载来自本地 Python 数学运行时，而不是 JavaScript 依赖树。
 
 <details>
@@ -83,10 +87,10 @@ python -m pip install jacobian
 ```sh
 git clone https://github.com/morluto/jacobian.git
 cd jacobian
-./scripts/setup-agent --client codex --profile full-python --yes
+./scripts/setup-agent --client codex --profile core --yes
 ```
 
-该命令会执行锁定的完整 Python 环境同步，并配置所选智能体，让 MCP 从绝对源代码路径和状态路径启动，同时使用 `--no-sync`。它还会记录一份 doctor 报告，其中包含 Git 修订版本、包版本、catalog 摘要和 provider 可用性。关于 `core`、`full-python`、`lean` 和 `external-proof` 配置档案、试运行、可重复性及回滚行为，请参阅[从源代码检出配置智能体](docs/how-to/setup-agent-from-source.md)。
+该命令会执行锁定的完整 Python 环境同步，并配置所选智能体，让 MCP 从绝对源代码路径和状态路径启动，同时使用 `--no-sync`。它还会记录一份 doctor 报告，其中包含 Git 修订版本、包版本、catalog 摘要和 provider 可用性。关于 `core`、`lean` 和 `external-proof` 配置档案、试运行、可重复性及回滚行为，请参阅[从源代码检出配置智能体](docs/how-to/setup-agent-from-source.md)。
 
 使用 `uv run jacobian --help` 查看 CLI，或使用 `uv run jacobian-mcp` 启动 MCP 适配器。
 
@@ -173,7 +177,7 @@ Jacobian 将四项职责分开：
 
 `jacobian setup` 会向一个或多个受支持的客户端注册本地服务器。`jacobian upgrade` 会刷新启动器所管理环境中的固定 Python 内核；若要升级 npm 启动器本身，请使用 `npm install -g jacobian@latest`。
 
-对于代码仓库副本，`jacobian setup --source <checkout> --state-dir <path> --profile full-python` 会显式地将客户端绑定到该源代码环境；受维护的 `scripts/setup-agent` 封装器会先完成所需的锁定同步和 doctor 检查。
+对于代码仓库副本，`jacobian setup --source <checkout> --state-dir <path> --profile core` 会显式地将客户端绑定到该源代码环境；受维护的 `scripts/setup-agent` 封装器会先完成所需的锁定同步和 doctor 检查。
 
 服务器只公布两个能力入口：`math.find` 用于搜索或检查已安装的数学操作，`math.run` 用于执行其中一个操作。完整 inventory 位于 `capability://catalog`。这些工具不规定研究顺序；数学表示、分解、探索、验证时机和停止条件都由智能体决定。
 
@@ -193,11 +197,11 @@ sudo ./deploy/install.sh --mode tailscale
 
 ## 可选 backend
 
-部分能力使用默认未安装的 backend：
+维护的 Python backend 随 Jacobian 一起安装。以下原生可执行程序和形式化
+运行时仍由 operator 单独安装：
 
 - CaDiCaL 用于查找 SAT 模型和 UNSAT 证明 artifact。
-- cvc5 生成 SMT UNSAT 证明；Carcara 独立检查 Alethe。
-- `flint` extra 提供 Python-FLINT/Arb 操作，用于精确有理数系统、整数矩阵与格、多项式以及经过验证的数值计算。具体能力和独立重放支持取决于已安装的 catalog。
+- Carcara 独立检查 cvc5 生成的 Alethe 证明。
 - 固定版本的 Lean `CORE` 和 `MATHLIB` 环境用于检查形式化证书。
 
 Backend 可用不等于验证授权。Provider 的输出在相应的独立检查器接受其绑定的见证或证书之前，始终保持未验证状态。
