@@ -295,7 +295,6 @@ class TopologyExactResult(ContractModel):
     determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
     backend: Literal["jacobian.topology"] = "jacobian.topology"
     backend_version: Literal["1"] = "1"
-    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
 
 
 class SimplicialComplexCanonicalizationResult(TopologyExactResult):
