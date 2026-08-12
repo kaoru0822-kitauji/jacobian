@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import secrets
 import threading
+from collections import OrderedDict
 from dataclasses import dataclass
 
 from jacobian.canonical import canonicalize_json
@@ -36,7 +37,7 @@ class ValueReferenceStore:
     """Bounded in-memory value carriers scoped to one runtime owner."""
 
     def __init__(self) -> None:
-        self._values: dict[ValueUri, StoredValue] = {}
+        self._values: OrderedDict[ValueUri, StoredValue] = OrderedDict()
         self._total_bytes = 0
         self._lock = threading.RLock()
 
@@ -50,10 +51,14 @@ class ValueReferenceStore:
     ) -> ValueUri:
         encoded = canonicalize_json(value.model_dump(mode="json"))
         with self._lock:
-            if len(self._values) >= _MAX_REFERENCES:
-                raise ValueReferenceError("runtime value-reference limit exceeded")
-            if self._total_bytes + len(encoded) > _MAX_TOTAL_BYTES:
+            if len(encoded) > _MAX_TOTAL_BYTES:
                 raise ValueReferenceError("runtime value-reference byte limit exceeded")
+            while self._values and (
+                len(self._values) >= _MAX_REFERENCES
+                or self._total_bytes + len(encoded) > _MAX_TOTAL_BYTES
+            ):
+                _, evicted = self._values.popitem(last=False)
+                self._total_bytes -= evicted.canonical_bytes
             token = self._new_token()
             self._values[token] = StoredValue(
                 value=value.model_copy(deep=True),
@@ -84,6 +89,7 @@ class ValueReferenceStore:
                     f"value reference carries {stored.value_type.__name__}; "
                     f"expected {expected_type.__name__}"
                 )
+            self._values.move_to_end(value_ref)
             return stored.value.model_copy(deep=True)
 
     def inspect(self, value_ref: ValueUri) -> StoredValue:

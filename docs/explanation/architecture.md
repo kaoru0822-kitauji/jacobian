@@ -226,9 +226,10 @@ make ports collection-aware.
 store is owned by one local or tenant runtime and records the semantic value,
 source operation and version, output port, and canonical digest. Resolution
 checks the exact value class and then lets the assembled Pydantic request check
-its presentation, parent, axes, and bases. Closing the runtime invalidates all
-of its references. Durable promotion is not a supported operation; durable
-artifacts remain an explicit, separate publication path.
+its presentation, parent, axes, and bases. The store evicts least-recently-used
+references to stay within its fixed count and byte bounds; closing the runtime
+invalidates everything that remains. Durable promotion is not a supported
+operation; durable artifacts remain an explicit, separate publication path.
 
 Using a request-local carrier does not change a value or grant assurance.
 

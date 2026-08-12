@@ -96,11 +96,12 @@ The runtime resolves declared inputs, assembles one request, parses it once,
 runs preflight, executes one semantic operation, checks the request/result
 postcondition, and then publishes the result. Unknown top-level arguments and
 unknown selected-payload fields fail closed. References are opaque and scoped
-to the runtime that produced them; they carry no assurance and expire with
-that runtime. The catalog and inspection result list each operation's exact
-input and output ports. Because each CLI command owns and closes one runtime,
-request-local references are intended for MCP sessions and in-process hosts,
-not handoff between separate CLI invocations.
+to the runtime that produced them; they carry no assurance. The bounded store
+retains recently used references and may evict older ones, while closing the
+runtime invalidates all remaining references. The catalog and inspection result
+list each operation's exact input and output ports. Because each CLI command
+owns and closes one runtime, request-local references are intended for immediate
+MCP-session and in-process handoffs, not handoff between separate CLI invocations.
 
 Ordinary operations return a bounded mathematical value and execution status.
 Checker operations return an accepted, rejected, or non-conclusion verdict

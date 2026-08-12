@@ -54,3 +54,29 @@ def test_value_reference_rejects_wrong_types_other_runtimes_and_closed_lifetimes
     first.close()
     with pytest.raises(ValueReferenceError, match="another runtime"):
         first.resolve(value_ref, _Value)
+
+
+def test_value_reference_store_evicts_least_recently_used_values() -> None:
+    store = ValueReferenceStore()
+    references = [
+        store.put(
+            _Value(entries=(index,)),
+            operation_id="synthetic.value.produce",
+            operation_version="1",
+            output_port="value",
+        )
+        for index in range(256)
+    ]
+    store.resolve(references[0], _Value)
+
+    newest = store.put(
+        _Value(entries=(256,)),
+        operation_id="synthetic.value.produce",
+        operation_version="1",
+        output_port="value",
+    )
+
+    with pytest.raises(ValueReferenceError, match="another runtime"):
+        store.resolve(references[1], _Value)
+    assert store.resolve(references[0], _Value).entries == (0,)
+    assert store.resolve(newest, _Value).entries == (256,)
