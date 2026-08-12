@@ -279,6 +279,11 @@ deliberate text projection requires an explicit MCP result. The two fixed tools
 are statically registered; dynamic operation tools and compatibility aliases
 are not supported.
 
+Hosting has two constructors with separate ownership: `create_server` owns one
+local runtime, while `create_remote_server` owns authentication and isolated
+tenant runtimes. Remote admission, leases, eviction, and quarantine do not
+enter the local constructor.
+
 The CLI projects the same installed declarations and execution path through
 `catalog`, `inspect`, and `run`. Operator administration remains separate from
 the mathematical catalog.

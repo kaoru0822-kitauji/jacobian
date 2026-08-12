@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from jacobian.adapters.mcp.context import _public_tool_error
-from jacobian.adapters.mcp.server import create_server
+from jacobian.adapters.mcp.server import create_remote_server, create_server
 from jacobian.adapters.mcp.tooling import _request_id_digest, _request_trace_digest
 
 
@@ -149,9 +149,8 @@ def test_mcp_protocol_and_authentication_errors_remain_distinct(tmp_path: Path) 
         from mcp import Client
 
         async with Client(
-            create_server(
+            create_remote_server(
                 tmp_path,
-                tenant_isolation=True,
                 allow_anonymous=False,
             ),
             raise_exceptions=False,
