@@ -172,6 +172,12 @@ def test_polynomial_identity_verifies_a_difference(
     assert result.output["identical"] is False
     assert result.output["conclusion"] == "FALSE"
     assert result.verification_record_uri is not None
+    assert result.output["first_coefficient_mismatch"] == {
+        "exponents": [2, 0],
+        "left_coefficient": {"num": "2", "den": "1"},
+        "right_coefficient": {"num": "3", "den": "1"},
+        "left_minus_right": {"num": "-1", "den": "1"},
+    }
     record = runtime.core.store.get(result.output["verification_record_uri"])
     assert record.payload["conclusion"] == Conclusion.FALSE.value
     assert record.payload["relation_id"] is None

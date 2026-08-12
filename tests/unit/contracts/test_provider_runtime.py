@@ -34,9 +34,39 @@ from jacobian.providers.flint_runtime import (
 from jacobian.providers.lean_runtime import (
     LeanRuntimeIdentityError,
     lean_frontend_provider_runtime,
+    lean_mathlib_git_config,
     lean_provider_runtime,
     require_lean_semantic_runtime_identity,
 )
+
+
+def test_lean_mathlib_git_config_authorizes_only_manifest_checkouts(
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "project"
+    packages = project / ".lake" / "packages"
+    first = packages / "mathlib"
+    second = packages / "repl"
+    first.mkdir(parents=True)
+    second.mkdir()
+    (project / "lake-manifest.json").write_text(
+        '{"packagesDir":".lake/packages","packages":['
+        '{"type":"git","name":"mathlib"},'
+        '{"type":"git","name":"repl"}]}',
+        encoding="utf-8",
+    )
+
+    environment = lean_mathlib_git_config(project)
+
+    assert environment == {
+        "GIT_CONFIG_COUNT": "2",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": str(first.resolve()),
+        "GIT_CONFIG_KEY_1": "safe.directory",
+        "GIT_CONFIG_VALUE_1": str(second.resolve()),
+    }
 
 
 def _runtime(**updates: object) -> CapabilityProviderRuntime:

@@ -51,7 +51,7 @@ def install_lean_proof_edit_capability(
     semantics_uri = store.register_descriptor(
         kind="semantics",
         name="jacobian.lean4-proof-edit-validation",
-        version="2",
+        version="3",
         definition={
             "description": (
                 "an exact Lean proof edit checked against the unchanged statement "
@@ -63,7 +63,7 @@ def install_lean_proof_edit_capability(
     )
     schema_uri = schemas.register(
         name="jacobian.lean4-proof-edit",
-        version="2",
+        version="3",
         schema=LeanProofEditArtifact.model_json_schema(),
     )
     installation = LeanProofEditInstallation(
@@ -94,18 +94,29 @@ class LeanProofEditAdapter:
         self.installation = installation
         self._descriptor = CapabilityDescriptor(
             capability_id="lean.proof_edit.validate",
-            version="2",
-            title="Validate an exact Lean proof edit",
+            version="3",
+            title="Independently validate an exact Lean proof edit",
             description=(
                 "Bind an original and edited proof to one unchanged statement, then "
                 "submit the exact edited source through the operator-authorized "
-                "lean.check checker."
+                "Lean checker. Returns baseline and edited-proof diagnostics with "
+                "proof-relative source spans; acceptance requires a verification "
+                "record."
             ),
             provider="jacobian.lean4",
             provider_runtime=provider_runtime,
             input_schema=LeanProofEditRequest.model_json_schema(),
             output_schema=LeanProofEditOutput.model_json_schema(),
-            tags=("lean", "proof-edit", "validation", "checker"),
+            tags=(
+                "lean",
+                "proof-edit",
+                "validation",
+                "checker",
+                "proof-repair",
+                "diagnostics",
+                "type-mismatch",
+                "source-span",
+            ),
         )
 
     @property
@@ -160,11 +171,13 @@ class LeanProofEditAdapter:
             unified_diff=diff,
             baseline_checker_execution_status=baseline.result.execution.status,
             baseline_accepted=baseline_verified,
+            baseline_diagnostics=baseline.diagnostics,
             baseline_candidate_uri=baseline.candidate_uri,
             baseline_certificate_uri=baseline.certificate_uri,
             baseline_verification_record_uri=(baseline.result.verification_record_uri),
             checker_execution_status=checked.result.execution.status,
             accepted=verified,
+            diagnostics=checked.diagnostics,
             claim_uri=checked.claim_uri,
             candidate_uri=checked.candidate_uri,
             certificate_uri=checked.certificate_uri,

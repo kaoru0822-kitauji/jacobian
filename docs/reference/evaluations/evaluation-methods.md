@@ -72,6 +72,53 @@ Bind every run to:
 Report missing, stale, truncated, or unavailable evidence as unknown rather
 than an empty or negative observation.
 
+### Lean diagnostic recovery ablation
+
+`benchmarks/config/lean-diagnostic-recovery-v1.json` is a targeted engineering
+ablation, not the no-Jacobian toolbox outcome comparison above. It freezes three
+deliberately broken Lean payloads across CORE, MATHLIB, and proof-edit
+validation, then compares the recorded base revision with a candidate revision
+using `benchmarks.tooling.lean_diagnostic_recovery`. Both conditions expose only
+the Jacobian MCP surface; no Skill, prescribed workflow, or retry policy is
+added to either condition. The result supports descriptive diagnostic-recovery
+observations only and does not authorize a causal or held-out product claim.
+
+Model execution requires the explicit `--execute` guard. Hold model, reasoning
+effort, tool mode, timeout, case selection, and repetitions fixed. Each run
+prints its `report_sha256` trust anchor; retain that line outside the editable
+output directory in an append-only operator log or signed manifest. Then
+compare the two `report.json` files with `--compare CONTROL TREATMENT`,
+`--control-report-sha256`, and `--treatment-report-sha256`. An adjacent digest
+file inside either output directory is not an external trust anchor. Pass the
+exact selected release revision as `--deployed-revision`. The control must
+match the suite's `source_base_revision`; the treatment must match the
+candidate checkout running the harness. Managed deployments expose their
+root-owned release marker through `deployment://identity`; execution refuses to
+start unless that endpoint-observed full Git revision agrees with both the
+operator argument and the condition's source revision. This prevents a stale or
+swapped endpoint from being mislabeled as the selected release.
+
+Comparison fails closed on condition or run-plan drift, wrong source bindings,
+identical observed surfaces, incomplete case/repetition coverage, or stale
+summaries. Before parsing a report, it verifies the raw report bytes against the
+externally retained trust anchor. It then resolves each command receipt,
+transcript, and stderr file relative to that anchored report, rejects path and
+symlink escapes, verifies every artifact SHA-256 digest, derives process
+completion from the canonical command receipt, validates and reparses the
+retained JSONL transcript, and reruns the recovery classifier for the bound
+suite case. Reported call, token, rejection, diagnostic, repetition, and repair
+metrics must equal the recomputed values before any delta is emitted. The
+selected suite bytes and retained MCP surface are also rehashed.
+
+The exact injected payload may appear anywhere in the freely composed tool
+trace, but it must produce proof-specific rejection evidence before a later
+checker-backed success can count as repair. Whether it was the first Jacobian
+attempt is retained as a separate descriptive protocol field and never gates
+repair success. Runtime setup, toolchain, Mathlib-manifest, and timeout failures
+remain non-conclusions. The terminal result must preserve each case's immutable
+claim fields. Recovery metrics remain evaluation artifacts and never enter an
+agent-facing runtime response.
+
 ## Performance benchmarks
 
 Correctness gates and performance measurements remain separate. Use repeated
@@ -88,6 +135,16 @@ Representative groups include:
 - MCP stdio and HTTP round trips; and
 - SQLite BLOB storage at 1 KiB, 100 KiB, 1 MiB, and 10 MiB with concurrency
   1, 4, and 16, including crash/restart and backup/restore.
+
+For Lean proof-state backend comparisons, run
+`benchmarks.tooling.lean_repl_backend_benchmark` as a pyperf cell for each
+`CORE`/`MATHLIB`, `clean`/`persistent`, and prefix-length combination. The
+persistent candidate preserves the same atomic reconstruction-and-one-tactic
+contract and is not an agent-facing operation. Compare same-host JSON outputs,
+retain corpus digests and correctness checks with latency, and pass
+`--inherit-environ JACOBIAN_LEAN_BENCH_ENVIRONMENT,JACOBIAN_LEAN_BENCH_BACKEND,JACOBIAN_LEAN_BENCH_PREFIX_LENGTH`
+so pyperf workers receive the selected cell identity. This is operational
+evidence only and does not relax the final `lean.check` boundary.
 
 Performance never relaxes validation, evidence binding, resource admission, or
 checker independence. A fast checker that accepts forged evidence is broken.

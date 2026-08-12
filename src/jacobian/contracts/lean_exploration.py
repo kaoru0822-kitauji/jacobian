@@ -7,7 +7,10 @@ from typing import Annotated, Literal, Self
 from pydantic import Field, StrictBool, StrictInt, model_validator
 
 from jacobian.contracts.common import ArtifactUri, Sha256Digest
-from jacobian.contracts.lean import LeanEnvironment
+from jacobian.contracts.lean import (
+    LeanDiagnostic,
+    LeanEnvironment,
+)
 from jacobian.contracts.results import ContractModel
 
 LeanNormalizedGoal = Annotated[str, Field(min_length=1, max_length=20_000)]
@@ -78,11 +81,6 @@ class LeanProofStateArtifact(ContractModel):
         return self
 
 
-class LeanTacticDiagnostic(ContractModel):
-    severity: Literal["ERROR", "WARNING", "INFO"]
-    message: str = Field(min_length=1, max_length=20_000)
-
-
 class LeanProofSuccessorState(ContractModel):
     state_uri: ArtifactUri
     state_digest: Sha256Digest
@@ -97,7 +95,7 @@ class LeanProofSuccessorState(ContractModel):
 
 
 class LeanProofStateTransitionArtifact(ContractModel):
-    transition_schema_version: Literal["2"] = "2"
+    transition_schema_version: Literal["3"] = "3"
     environment: LeanEnvironment
     environment_digest: Sha256Digest
     source_digest: Sha256Digest
@@ -114,7 +112,7 @@ class LeanProofStateTransitionArtifact(ContractModel):
     accepted: StrictBool
     completed: StrictBool
     messages: tuple[str, ...]
-    diagnostics: tuple[LeanTacticDiagnostic, ...]
+    diagnostics: tuple[LeanDiagnostic, ...]
     lean_version: str
     lean_commit: str
     mathlib_commit: str | None = None

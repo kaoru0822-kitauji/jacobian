@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from jacobian.artifacts import ArtifactService
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
@@ -15,6 +13,7 @@ from jacobian.contracts.capabilities import (
     CapabilityResult,
 )
 from jacobian.contracts.lean import (
+    LeanCheckOutput,
     LeanDeclarationInspectOutput,
     LeanDeclarationInspectRequest,
     LeanDeclarationSearchOutput,
@@ -34,8 +33,6 @@ from jacobian.lean_frontend.declarations import (
 from jacobian.lean_frontend.service import LeanService
 from jacobian.schema_registry import model_schema
 
-_OBJECT_SCHEMA: dict[str, Any] = {"type": "object"}
-
 
 class LeanCheckAdapter:
     def __init__(
@@ -46,13 +43,14 @@ class LeanCheckAdapter:
         self.lean = lean
         self._descriptor = CapabilityDescriptor(
             capability_id="lean.check",
-            version="1",
-            title="Check a Lean proof",
+            version="2",
+            title="Independently check an exact Lean proof",
             description=(
                 "Compile and replay one proposition with the pinned CORE or MATHLIB "
                 "kernel profile. Statements are single Lean expressions, including "
                 "finite-witness let expressions; declarations and trust escapes are "
-                "forbidden."
+                "forbidden. Rejections include stable proof-repair diagnostics, "
+                "payload-relative source spans, and the bounded backend message."
             ),
             provider="jacobian.lean4",
             provider_runtime=provider_runtime,
@@ -66,8 +64,20 @@ class LeanCheckAdapter:
                 "required": ["statement", "proof"],
                 "additionalProperties": False,
             },
-            output_schema=_OBJECT_SCHEMA,
-            tags=("lean", "proof", "verification", "finite-witness"),
+            output_schema=LeanCheckOutput.model_json_schema(),
+            tags=(
+                "lean",
+                "proof",
+                "checker",
+                "verification",
+                "core",
+                "mathlib",
+                "finite-witness",
+                "proof-repair",
+                "diagnostics",
+                "type-mismatch",
+                "source-span",
+            ),
             invocation_examples=(
                 CapabilityInvocationExample(
                     name="finite-witness-let",
@@ -98,21 +108,22 @@ class LeanCheckAdapter:
         verified = checked.result.verification_record_uri is not None
         evidence = (checked.certificate_uri,)
         scope_uri = checked.result.scope_uri
+        output = LeanCheckOutput(
+            conclusion=checked.result.conclusion,
+            execution=checked.result.execution,
+            input=checked.result.input,
+            diagnostics=checked.diagnostics,
+            claim_uri=checked.claim_uri,
+            candidate_uri=checked.candidate_uri,
+            certificate_uri=checked.certificate_uri,
+            verification_record_uri=checked.result.verification_record_uri,
+            cache_hit=checked.cache_hit,
+        )
         return CapabilityResult(
             capability_id=self.descriptor.capability_id,
             capability_version=self.descriptor.version,
             execution=checked.result.execution,
-            output={
-                "conclusion": checked.result.conclusion.value,
-                "execution": checked.result.execution.model_dump(mode="json"),
-                "input": checked.result.input.model_dump(mode="json"),
-                "diagnostics": list(checked.result.input.errors),
-                "claim_uri": checked.claim_uri,
-                "candidate_uri": checked.candidate_uri,
-                "certificate_uri": checked.certificate_uri,
-                "verification_record_uri": checked.result.verification_record_uri,
-                "cache_hit": checked.cache_hit,
-            },
+            output=output.model_dump(mode="json"),
             verification_record_uri=(
                 checked.result.verification_record_uri if verified else None
             ),

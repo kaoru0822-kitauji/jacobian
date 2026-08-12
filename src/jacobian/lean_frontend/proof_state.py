@@ -17,6 +17,7 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
     CapabilityResult,
 )
+from jacobian.contracts.lean import LeanDiagnosticPhase, LeanDiagnosticSource
 from jacobian.contracts.lean_exploration import (
     LeanProofStateArtifact,
     LeanProofStateOutput,
@@ -52,18 +53,29 @@ class LeanProofStateAdapter:
         self.resources = resources
         self._descriptor = CapabilityDescriptor(
             capability_id="lean.proof_state.apply_tactic",
-            version="2",
-            title="Apply one Lean tactic to a replayable proof state",
+            version="3",
+            title="Apply one Lean tactic and inspect resulting goals",
             description=(
                 "Reconstruct and validate an immutable proof state in a clean "
-                "Lean process, apply one tactic, and return every durable "
-                "successor state or structured rejection diagnostics."
+                "Lean process, apply exactly one tactic, and return typed goals plus "
+                "a durable successor state. Tactic failures return stable repair "
+                "diagnostics, a goal index, and payload-relative source spans."
             ),
             provider="jacobian.lean4",
             provider_runtime=resources.provider_runtime,
             input_schema=LeanProofStateRequest.model_json_schema(),
             output_schema=LeanProofStateOutput.model_json_schema(),
-            tags=("lean", "proof-state", "tactic", "exploration"),
+            tags=(
+                "lean",
+                "proof-state",
+                "tactic",
+                "goals",
+                "exploration",
+                "proof-repair",
+                "diagnostics",
+                "tactic-error",
+                "source-span",
+            ),
             invocation_examples=(
                 CapabilityInvocationExample(
                     name="close_true_with_trivial",
@@ -235,6 +247,16 @@ class LeanProofStateAdapter:
         return responses, typed_goals, accepted
 
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        return self._invoke_with_diagnostic_context(request)
+
+    def _invoke_with_diagnostic_context(
+        self,
+        request: CapabilityRequest,
+        *,
+        diagnostic_phase: LeanDiagnosticPhase = (LeanDiagnosticPhase.TACTIC_EXECUTION),
+        diagnostic_source: LeanDiagnosticSource = LeanDiagnosticSource.TACTIC,
+        diagnostic_column_offset: int = 0,
+    ) -> CapabilityResult:
         validated = self._validate_request(request)
         started = time.monotonic()
         installation = self.resources.installations[validated.environment]
@@ -292,7 +314,13 @@ class LeanProofStateAdapter:
             input_state_uri = validated.state_uri
             input_state = bound_state
 
-        diagnostics = _tactic_diagnostics(responses)
+        diagnostics = _tactic_diagnostics(
+            responses,
+            statement=statement,
+            final_phase=diagnostic_phase,
+            final_source=diagnostic_source,
+            final_column_offset=diagnostic_column_offset,
+        )
         successor_states: tuple[LeanProofSuccessorState, ...] = ()
         successor_artifact_uris: tuple[str, ...] = ()
         goals: tuple[str, ...] = ()

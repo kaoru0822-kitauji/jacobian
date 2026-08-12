@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
 
@@ -14,13 +15,62 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.lean import LeanEnvironment
-from jacobian.lean_frontend.exploration import _Resources
+from jacobian.contracts.lean_exploration import LeanProofStateRequest
+from jacobian.lean_frontend.exploration import _resolve_typed_goal_helper, _Resources
 from jacobian.lean_frontend.proof_state import LeanProofStateAdapter
 from jacobian.lean_frontend.repl import _single_proof_state
 from jacobian.lean_frontend.repl_protocol import (
     LeanReplCommandResponse,
     LeanReplProofStepResponse,
 )
+
+
+def test_typed_goal_helper_derives_default_elan_home_without_forwarding_home(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / "operator-home"
+    runtime = tmp_path / "lean-runtime"
+    helper = runtime / ".lake" / "build" / "bin" / "jacobian_lean_proof_state"
+    helper.parent.mkdir(parents=True)
+    helper.touch()
+    monkeypatch.delenv("ELAN_HOME", raising=False)
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setattr(
+        "jacobian.lean_frontend.exploration.require_lean_semantic_runtime_identity",
+        lambda _runtime: None,
+    )
+    monkeypatch.setattr(
+        "jacobian.lean_frontend.exploration.lean_mathlib_git_config",
+        lambda _runtime: {},
+    )
+    monkeypatch.setattr(
+        "jacobian.lean_frontend.exploration.shutil.which",
+        lambda name: "/usr/bin/elan" if name == "elan" else None,
+    )
+    resources = cast(
+        _Resources,
+        SimpleNamespace(
+            runtime=runtime,
+            provider_runtime=object(),
+            installations={
+                LeanEnvironment.CORE: SimpleNamespace(lean_version="4.31.0")
+            },
+        ),
+    )
+
+    _elan, _arguments, environment = _resolve_typed_goal_helper(
+        resources,
+        LeanProofStateRequest(
+            environment=LeanEnvironment.CORE,
+            statement="True",
+            tactic="trivial",
+        ),
+        tmp_path / "query.json",
+    )
+
+    assert environment["ELAN_HOME"] == str(home / ".elan")
+    assert "HOME" not in environment
 
 
 def test_typed_goal_extraction_failure_is_a_structured_non_conclusion(

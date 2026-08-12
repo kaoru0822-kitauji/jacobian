@@ -9,7 +9,7 @@ decisions. Each contract is atomic, agent-visible, and freely composable.
 
 ## lean.term.apply
 
-`lean.term.apply` (version 1) applies one bounded Lean term to an immutable
+`lean.term.apply` (version 2) applies one bounded Lean term to an immutable
 replayable proof state by elaborating `exact <term>` through the maintained
 Lean REPL tactic protocol. It reuses the existing `lean.proof_state.apply_tactic`
 clean-replay path, immutable successor-state artifact type, resource bounds,
@@ -27,6 +27,11 @@ LEAN_CHECK_REQUIRED` semantics. It creates no verification record.
 Term application does not select terms, rank successors, or prescribe proof
 strategy. A completed transition still requires `lean.check` for theorem
 verification.
+
+Rejected terms use the shared Lean diagnostic model with phase
+`TERM_ELABORATION` and payload-relative source `TERM`. The adapter removes its
+internal `exact ` prefix from reported columns, so locations refer to the term
+the caller supplied.
 
 ## lean.proof_state.inspect
 

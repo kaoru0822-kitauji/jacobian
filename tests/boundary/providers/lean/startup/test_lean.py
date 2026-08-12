@@ -371,6 +371,11 @@ def test_core_lean_rejects_untrusted_or_invalid_proofs(
     assert rejected.result.conclusion is Conclusion.UNKNOWN
     assert rejected.result.verification_record_uri is None
     assert rejected.result.verification_record_uri is None
+    assert rejected.diagnostics
+    diagnostic = rejected.diagnostics[0]
+    assert diagnostic.code.startswith("LEAN_")
+    assert diagnostic.phase.value == "KERNEL_CHECK"
+    assert diagnostic.raw_backend_message
 
 
 def test_lean_reuses_only_an_exact_active_checker_result(
@@ -411,6 +416,55 @@ def test_lean_reuses_only_an_exact_active_checker_result(
         first.result.verification_record_uri
     )
     assert changed.cache_hit is False
+
+
+def test_lean_cache_never_reuses_a_rejected_checker_input(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
+    assert runtime.portfolio.lean is not None
+    decisions = iter(
+        (
+            CheckerDecision(
+                accepted=False,
+                conclusion=Conclusion.UNKNOWN,
+                arithmetic=Arithmetic.SYMBOLIC,
+                method=Method.CHECKED_CERTIFICATE,
+                coverage=Coverage.NOT_APPLICABLE,
+                detail="transient checker setup failure",
+            ),
+            CheckerDecision(
+                accepted=True,
+                conclusion=Conclusion.TRUE,
+                arithmetic=Arithmetic.SYMBOLIC,
+                method=Method.CHECKED_CERTIFICATE,
+                coverage=Coverage.NOT_APPLICABLE,
+                detail="accepted after checker recovery",
+            ),
+        )
+    )
+    calls = 0
+
+    def recover(**_: object) -> CheckerDecision:
+        nonlocal calls
+        calls += 1
+        return next(decisions)
+
+    monkeypatch.setattr(runtime.services.verification, "_run_checker", recover)
+
+    first = runtime.portfolio.lean.verify(statement="True", proof="by trivial")
+    recovered = runtime.portfolio.lean.verify(statement="True", proof="by trivial")
+    repeated = runtime.portfolio.lean.verify(statement="True", proof="by trivial")
+
+    assert first.result.input.status is InputStatus.REJECTED
+    assert first.cache_hit is False
+    assert recovered.result.verification_record_uri is not None
+    assert recovered.cache_hit is False
+    assert repeated.cache_hit is True
+    assert calls == 2
 
 
 def test_lean_cache_does_not_reuse_a_revoked_checker_result(

@@ -26,6 +26,10 @@ from jacobian.adapters.mcp.context import (
     _start_lean_warmup,
     _static_resource_runtime,
 )
+from jacobian.adapters.mcp.deployment_identity import (
+    DeploymentIdentity,
+    load_deployment_identity,
+)
 from jacobian.adapters.mcp.guidance import (
     MATH_FIND_DESCRIPTION,
     MATH_RUN_DESCRIPTION,
@@ -120,9 +124,11 @@ class JacobianCoreExtension(Extension):
         self,
         runtime: JacobianRuntime | None,
         tenant_router: TenantRuntimeRouter | None,
+        deployment_identity: DeploymentIdentity | None = None,
     ) -> None:
         self._runtime = runtime
         self._tenant_router = tenant_router
+        self._deployment_identity = deployment_identity
 
     def settings(self) -> dict[str, Any]:
         return {"version": "2"}
@@ -155,7 +161,7 @@ class JacobianCoreExtension(Extension):
         )
 
     def resources(self) -> tuple[ResourceBinding, ...]:
-        return (
+        bindings = [
             ResourceBinding(
                 FunctionResource.from_function(
                     self._capability_catalog,
@@ -168,13 +174,35 @@ class JacobianCoreExtension(Extension):
                     mime_type="application/json",
                 )
             ),
-        )
+        ]
+        if self._deployment_identity is not None:
+            bindings.append(
+                ResourceBinding(
+                    FunctionResource.from_function(
+                        self._managed_deployment_identity,
+                        uri="deployment://identity",
+                        name="deployment-identity",
+                        description=(
+                            "Immutable Git revision and package version for this "
+                            "managed Jacobian release."
+                        ),
+                        mime_type="application/json",
+                    )
+                )
+            )
+        return tuple(bindings)
 
     async def _capability_catalog(self) -> CapabilityCatalog:
         with _static_resource_runtime(
             self._runtime, self._tenant_router
         ) as active_runtime:
             return active_runtime.core.capabilities.catalog()
+
+    async def _managed_deployment_identity(self) -> DeploymentIdentity:
+        identity = self._deployment_identity
+        if identity is None:
+            raise RuntimeError("managed deployment identity is unavailable")
+        return identity
 
     async def intercept_tool_call(
         self,
@@ -418,6 +446,7 @@ def _build_server(
             JacobianCoreExtension(
                 runtime,
                 tenant_router,
+                load_deployment_identity(),
             )
         ],
     )
