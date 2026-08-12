@@ -109,7 +109,11 @@ _REDACTIONS: tuple[tuple[re.Pattern[str], str], ...] = (
         "[REDACTED_TEMP_PATH]",
     ),
 )
-_CONDITIONS = ("x+y+tau_tools", "x+y+b+tau_tools")
+_BASE_CONDITION = "x+y+tau_tools"
+_VISIBLE_CONDITION_BY_ARM = {
+    "control": "x+y+b+tau_tools",
+    "internalcot": "x+y+b_star+tau_tools",
+}
 _TARGETS = (
     "next_tool_action_class",
     "checker_state",
@@ -1707,6 +1711,7 @@ def _summarize_heldout_diagnostics(
     all_rows: Mapping[str, Sequence[Row]],
     eligibility: Mapping[str, object],
     *,
+    arm: str,
     seed: int,
     bootstrap_repetitions: int,
 ) -> tuple[
@@ -1726,7 +1731,8 @@ def _summarize_heldout_diagnostics(
             eligible_targets.append(target)
         predictions[target] = {}
         condition_metrics = {}
-        for condition_index, condition in enumerate(_CONDITIONS):
+        conditions = (_BASE_CONDITION, _VISIBLE_CONDITION_BY_ARM[arm])
+        for condition_index, condition in enumerate(conditions):
             heldout = _family_predictions(target_rows, condition)
             predictions[target][condition] = heldout
             condition_metrics[condition] = {
@@ -1818,7 +1824,7 @@ def _bootstrap_information_effects(
             item["task_id"]
             for arm in ("control", "internalcot")
             for target in eligible
-            for item in predictions[arm][target]["x+y+tau_tools"]
+            for item in predictions[arm][target][_BASE_CONDITION]
         }
     )
     random = Random(seed)
@@ -1830,7 +1836,8 @@ def _bootstrap_information_effects(
             target_values = []
             for target in eligible:
                 metrics = {}
-                for condition in _CONDITIONS:
+                conditions = (_BASE_CONDITION, _VISIBLE_CONDITION_BY_ARM[arm])
+                for condition in conditions:
                     source = predictions[arm][target][condition]
                     replicated = [
                         item
@@ -1840,7 +1847,7 @@ def _bootstrap_information_effects(
                     ]
                     metrics[condition] = _metrics(replicated)["macro_f1"]
                 target_values.append(
-                    metrics["x+y+b+tau_tools"] - metrics["x+y+tau_tools"]
+                    metrics[_VISIBLE_CONDITION_BY_ARM[arm]] - metrics[_BASE_CONDITION]
                 )
             increments[arm] = sum(target_values) / len(target_values)
             samples[arm].append(increments[arm])
@@ -1951,6 +1958,7 @@ def _analyze_intervention(
         results, eligible, predictions = _summarize_heldout_diagnostics(
             arm_rows,
             config["eligibility"],
+            arm=arm,
             seed=seed + (100 if arm == "internalcot" else 0),
             bootstrap_repetitions=repetitions,
         )
@@ -1976,10 +1984,10 @@ def _analyze_intervention(
     increments: dict[str, dict[str, Any]] = {}
     for arm in ("control", "internalcot"):
         per_target = {
-            target: arm_results[arm][target]["conditions"]["x+y+b+tau_tools"][
-                "macro_f1"
-            ]
-            - arm_results[arm][target]["conditions"]["x+y+tau_tools"]["macro_f1"]
+            target: arm_results[arm][target]["conditions"][
+                _VISIBLE_CONDITION_BY_ARM[arm]
+            ]["macro_f1"]
+            - arm_results[arm][target]["conditions"][_BASE_CONDITION]["macro_f1"]
             for target in eligible
         }
         increments[arm] = {

@@ -219,7 +219,8 @@ def test_condition_features_use_arm_specific_visible_source() -> None:
     assert "b:count" not in study._condition_features(control, "x+y+tau_tools")
     assert study._condition_features(control, "x+y+b+tau_tools")["b:count"] == 2.0
     assert (
-        study._condition_features(treatment, "x+y+b+tau_tools")["b_star:count"] == 3.0
+        study._condition_features(treatment, "x+y+b_star+tau_tools")["b_star:count"]
+        == 3.0
     )
 
 
@@ -307,6 +308,17 @@ def test_committed_report_is_bounded_ineligible_and_research_only() -> None:
     assert report["policy_equivalence_supported"] is False
     assert report["projection_count"] == 32
     assert "projections" not in report
+    control_conditions = report["observability"]["diagnostics_by_arm"]["control"][
+        "checker_state"
+    ]["conditions"]
+    treatment_conditions = report["observability"]["diagnostics_by_arm"]["internalcot"][
+        "checker_state"
+    ]["conditions"]
+    assert set(control_conditions) == {"x+y+tau_tools", "x+y+b+tau_tools"}
+    assert set(treatment_conditions) == {
+        "x+y+tau_tools",
+        "x+y+b_star+tau_tools",
+    }
     for key in (
         "config_sha256",
         "run_manifest_sha256",

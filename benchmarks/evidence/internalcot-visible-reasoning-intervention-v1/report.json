@@ -6,7 +6,7 @@
     "predictive_association_is_not_behavioral_effect": true,
     "transductive": false
   },
-  "analyzer_sha256": "sha256:6778352463d6d807c18fbee152d7aef00328410b59f0144b0cf3b04741d5c560",
+  "analyzer_sha256": "sha256:0e78e5e21252d106aacd5771a7398860d27c28cf243fef5c1c246ec06f4e2e58",
   "causal_claim_authorized": false,
   "collector_sha256": "sha256:ada247623e3d533b8383a49d91f868646987bc194520b494331368d293bbad3b",
   "config_sha256": "sha256:25ae0ecf5b2f918e02e8dc13fab20dc98d4a7f6a2f4ce7418154b139aff7088d",
@@ -352,7 +352,7 @@
             "NO_CHECKER": 10
           },
           "conditions": {
-            "x+y+b+tau_tools": {
+            "x+y+b_star+tau_tools": {
               "accuracy": 0.9375,
               "balanced_accuracy": 0.9166666666666667,
               "macro_f1": 0.9307359307359306,
@@ -394,7 +394,7 @@
             "REACHED": 15
           },
           "conditions": {
-            "x+y+b+tau_tools": {
+            "x+y+b_star+tau_tools": {
               "accuracy": 0.9375,
               "balanced_accuracy": 0.5,
               "macro_f1": 0.4838709677419355,
@@ -438,7 +438,7 @@
             "TERMINAL": 16
           },
           "conditions": {
-            "x+y+b+tau_tools": {
+            "x+y+b_star+tau_tools": {
               "accuracy": 0.618421052631579,
               "balanced_accuracy": 0.471875,
               "macro_f1": 0.4787962962962963,
@@ -480,7 +480,7 @@
             "RECOVERED": 1
           },
           "conditions": {
-            "x+y+b+tau_tools": {
+            "x+y+b_star+tau_tools": {
               "accuracy": 0.9375,
               "balanced_accuracy": 0.5,
               "macro_f1": 0.4838709677419355,
@@ -523,7 +523,7 @@
             "RECOVERED": 1
           },
           "conditions": {
-            "x+y+b+tau_tools": {
+            "x+y+b_star+tau_tools": {
               "accuracy": 0.8125,
               "balanced_accuracy": 0.4444444444444444,
               "macro_f1": 0.46296296296296297,
