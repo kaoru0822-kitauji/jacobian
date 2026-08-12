@@ -213,7 +213,6 @@ class PolynomialFactorizationResult(ContractModel):
     normalization: Literal["CONTENT_AND_MONIC_IRREDUCIBLES"] = (
         "CONTENT_AND_MONIC_IRREDUCIBLES"
     )
-    irreducibility_assurance: Literal["UNVERIFIED"] = "UNVERIFIED"
     product_reconstruction: Literal["EXACT"] = "EXACT"
 
     @model_validator(mode="after")

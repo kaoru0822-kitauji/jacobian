@@ -299,7 +299,6 @@ class PolynomialSystemSolutionAdapter:
             conclusion=conclusion,
             equation_residuals=equation_residuals,
             inequation_values=inequation_values,
-            residuals_assurance="VERIFIED" if verified else "COMPUTED",
             system_uri=system.artifact_uri,
             assignment_uri=assignment.artifact_uri,
             claim_uri=claim.artifact_uri,

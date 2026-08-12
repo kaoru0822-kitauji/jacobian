@@ -255,7 +255,6 @@ class FormalDatasetArtifact(ContractModel):
     execution_status: Literal["NOT_EXECUTED"] = "NOT_EXECUTED"
     diagnostic_baseline: FormalDatasetDiagnosticBaseline
     diagnostics: tuple[FormalDatasetDiagnostic, ...]
-    assurance: Literal["UNVERIFIED"] = "UNVERIFIED"
 
     @model_validator(mode="after")
     def verify_provenance_bindings(self) -> Self:

@@ -334,7 +334,6 @@ class NullstellensatzVerificationAdapter:
             verification_record_uri=record_uri,
             checker_id=checker_id,
             conclusion="TRUE" if verified else "UNKNOWN",
-            assurance="VERIFIED" if verified else "COMPUTED",
             checked_chart_count=12 if verified else 0,
         )
         artifact_uris = [

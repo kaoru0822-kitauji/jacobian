@@ -149,7 +149,6 @@ def test_authorized_checker_verifies_complete_bundle(tmp_path: Path) -> None:
 
         assert result.output["claim"] == "SYSTEM_INFEASIBLE"
         assert result.output["conclusion"] == "TRUE"
-        assert result.output["assurance"] == "VERIFIED"
         assert result.output["verification_record_uri"] in result.artifact_uris
         assert result.verification_record_uri is not None
 

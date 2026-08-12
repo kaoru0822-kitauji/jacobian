@@ -356,13 +356,6 @@ class PolynomialIntervalEncloseAdapter:
             hi=enclosure.hi,
             backend_version=SYMPY_VERSION,
         )
-        checker_hint = (
-            "invoke polynomial.interval.enclosure.verify with the authorized "
-            "Bernstein-coefficient checker to obtain a VERIFIED record"
-            if self.resources.installation.checker_id is not None
-            else "no independent checker is authorized in this installation; the "
-            "enclosure remains UNVERIFIED"
-        )
         return _computed_result(
             descriptor=self.descriptor,
             request=request,
@@ -371,11 +364,6 @@ class PolynomialIntervalEncloseAdapter:
             artifact_uris=(
                 polynomial_artifact.artifact_uri,
                 enclosure_artifact.artifact_uri,
-            ),
-            assurance_basis=(
-                "deterministic exact SymPy rational arithmetic over QQ produced "
-                "the Bernstein coefficients; the computation did not authorize or "
-                "invoke an independent checker; " + checker_hint
             ),
         )
 
@@ -548,7 +536,6 @@ class PolynomialIntervalEnclosureVerifyAdapter:
             bernstein_coefficients=validated.claimed_bernstein_coefficients,
             lo=validated.claimed_lo,
             hi=validated.claimed_hi,
-            enclosure_assurance="VERIFIED" if verified else "COMPUTED",
             conclusion=conclusion,
         )
         artifact_uris = [

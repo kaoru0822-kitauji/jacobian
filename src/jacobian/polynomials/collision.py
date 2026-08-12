@@ -238,11 +238,6 @@ class PolynomialCollisionAdapter:
             started=started,
             output=output.model_dump(mode="json"),
             artifact_uris=tuple(artifact_uris),
-            assurance_basis=(
-                "deterministic structural comparison of canonical rational payloads; "
-                "the source evaluations were not replayed and any candidate witness "
-                "remains unverified"
-            ),
         )
 
 
@@ -480,10 +475,6 @@ class PolynomialCollisionSearchAdapter:
             started=started,
             output=output.model_dump(mode="json"),
             artifact_uris=artifact_uris,
-            assurance_basis=(
-                "deterministic exact SymPy search; any returned witness remains "
-                "unverified until independent replay"
-            ),
         )
 
 

@@ -291,7 +291,6 @@ _POLY_CASES: tuple[
                 ],
                 "reconstructed": _poly(1, -2, 1),
                 "normalization": "CONTENT_AND_MONIC_IRREDUCIBLES",
-                "irreducibility_assurance": "UNVERIFIED",
                 "product_reconstruction": "EXACT",
             },
         ),

@@ -90,7 +90,7 @@ class GraphIsomorphismVerifyOutput(ContractModel):
     coverage: Literal["EXHAUSTIVE", "UNKNOWN"]
 
     @model_validator(mode="after")
-    def preserve_truth_and_checker_assurance(self) -> Self:
+    def preserve_truth_and_verification(self) -> Self:
         expected = {
             "TRUE": True,
             "FALSE": False,

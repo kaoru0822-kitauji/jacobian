@@ -96,7 +96,6 @@ def test_solution_capability_verifies_valid_assignment(
     assert result.output["satisfies"] is True
     assert result.output["equation_residuals"] == [{"num": "0", "den": "1"}]
     assert result.output["inequation_values"] == [{"num": "2", "den": "1"}]
-    assert result.output["residuals_assurance"] == "VERIFIED"
     assert result.verification_record_uri is not None
     certificate = polynomial_system_services.core.store.get(
         result.output["certificate_uri"]
@@ -131,7 +130,6 @@ def test_solution_capability_verifies_invalid_assignment(
 
     assert result.output["satisfies"] is False
     assert result.output["conclusion"] == "FALSE"
-    assert result.output["residuals_assurance"] == "VERIFIED"
     assert result.verification_record_uri is not None
     record = polynomial_system_services.core.store.get(
         result.output["verification_record_uri"]
@@ -163,7 +161,6 @@ def test_solution_capability_keeps_checker_failure_unknown(
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.output["satisfies"] is None
     assert result.output["conclusion"] == "UNKNOWN"
-    assert result.output["residuals_assurance"] == "COMPUTED"
     assert result.output["verification_record_uri"] is None
     assert result.verification_record_uri is None
 

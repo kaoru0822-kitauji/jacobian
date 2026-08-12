@@ -59,7 +59,6 @@ def test_factor_compute_preserves_multiplicity_and_reconstructs_exactly(
         ],
         "reconstructed": polynomial,
         "normalization": "CONTENT_AND_MONIC_IRREDUCIBLES",
-        "irreducibility_assurance": "UNVERIFIED",
         "product_reconstruction": "EXACT",
     }
 
@@ -78,7 +77,6 @@ def test_factor_compute_handles_zero_as_a_coefficient_not_a_unit(
         "factors": [],
         "reconstructed": _polynomial([]),
         "normalization": "CONTENT_AND_MONIC_IRREDUCIBLES",
-        "irreducibility_assurance": "UNVERIFIED",
         "product_reconstruction": "EXACT",
     }
 
@@ -104,6 +102,5 @@ def test_factor_compute_preserves_rational_coefficient_and_irreducible_factor(
         ],
         "reconstructed": polynomial,
         "normalization": "CONTENT_AND_MONIC_IRREDUCIBLES",
-        "irreducibility_assurance": "UNVERIFIED",
         "product_reconstruction": "EXACT",
     }

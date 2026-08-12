@@ -726,10 +726,6 @@ def _computed_result(
     started: float,
     output: dict[str, Any],
     artifact_uris: tuple[str, ...],
-    assurance_basis: str = (
-        "deterministic exact SymPy arithmetic over QQ; the computation did not "
-        "authorize or invoke an independent checker"
-    ),
 ) -> CapabilityResult:
     return CapabilityResult(
         capability_id=descriptor.capability_id,

@@ -375,13 +375,6 @@ class PolynomialIntervalPositivityDecideAdapter:
             positive=positive,
             backend_version=SYMPY_VERSION,
         )
-        checker_hint = (
-            "invoke polynomial.interval.positivity.verify with the authorized "
-            "Sturm-sequence checker to obtain a VERIFIED record"
-            if self.resources.installation.checker_id is not None
-            else "no independent checker is authorized in this installation; the "
-            "decision remains UNVERIFIED"
-        )
         return _computed_result(
             descriptor=self.descriptor,
             request=request,
@@ -390,11 +383,6 @@ class PolynomialIntervalPositivityDecideAdapter:
             artifact_uris=(
                 polynomial_artifact.artifact_uri,
                 decision_artifact.artifact_uri,
-            ),
-            assurance_basis=(
-                "deterministic exact SymPy rational arithmetic over QQ produced "
-                "the Sturm sequence and sign-change counts; the computation did "
-                "not authorize or invoke an independent checker; " + checker_hint
             ),
         )
 
@@ -588,7 +576,6 @@ class PolynomialIntervalPositivityVerifyAdapter:
             sign_changes_at_hi=validated.claimed_sign_changes_at_hi,
             roots_in_open_interval=validated.claimed_roots_in_open_interval,
             endpoint_root=validated.claimed_endpoint_root,
-            positivity_assurance="VERIFIED" if verified else "COMPUTED",
             conclusion=conclusion,
         )
         artifact_uris = [

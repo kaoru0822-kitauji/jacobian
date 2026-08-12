@@ -208,27 +208,15 @@ class PolynomialIntervalEnclosureVerifyOutput(ContractModel):
     range_exactness: Literal["ENCLOSURE_VALID_NOT_EXACT"] = "ENCLOSURE_VALID_NOT_EXACT"
     exactness: Literal["EXACT_RATIONAL"] = "EXACT_RATIONAL"
     determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
-    enclosure_assurance: Literal["COMPUTED", "VERIFIED"]
     conclusion: Literal["TRUE", "FALSE", "UNKNOWN"]
 
     @model_validator(mode="after")
-    def preserve_truth_and_assurance(self) -> Self:
-        if self.conclusion == "UNKNOWN" and self.enclosure_assurance == "VERIFIED":
-            raise ValueError("an unknown conclusion cannot carry verified assurance")
-        if self.enclosure_assurance == "VERIFIED" and (
-            self.verification_record_uri is None
-            or self.checker_id is None
-            or self.conclusion == "UNKNOWN"
+    def bind_verification_record(self) -> Self:
+        if self.verification_record_uri is not None and (
+            self.checker_id is None or self.conclusion == "UNKNOWN"
         ):
             raise ValueError(
-                "verified enclosure assurance requires a decisive checker-backed "
-                "record and checker identity"
-            )
-        if (
-            self.enclosure_assurance != "VERIFIED"
-            and self.verification_record_uri is not None
-        ):
-            raise ValueError(
-                "a verification record requires checker-verified enclosure assurance"
+                "an enclosure verification record requires a decisive conclusion "
+                "and checker identity"
             )
         return self

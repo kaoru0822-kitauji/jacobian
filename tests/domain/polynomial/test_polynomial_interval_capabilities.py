@@ -150,7 +150,6 @@ def test_verify_capability_confirms_a_valid_enclosure(installation) -> None:
     )
 
     assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.output["enclosure_assurance"] == "VERIFIED"
     assert result.output["conclusion"] == "TRUE"
     assert result.output["checker_id"] is not None
     assert result.output["verification_record_uri"] is not None
@@ -181,7 +180,6 @@ def test_verify_capability_rejects_a_false_enclosure(installation) -> None:
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.verification_record_uri is not None
-    assert result.output["enclosure_assurance"] == "VERIFIED"
     assert result.output["conclusion"] == "FALSE"
 
 

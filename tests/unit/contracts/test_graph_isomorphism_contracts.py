@@ -35,7 +35,7 @@ def _output(**updates: object) -> dict[str, object]:
         {"verification_record_uri": _ARTIFACT_URI},
     ],
 )
-def test_isomorphism_output_rejects_inconsistent_truth_or_assurance(
+def test_isomorphism_output_rejects_inconsistent_truth_or_verification(
     updates: dict[str, object],
 ) -> None:
     with pytest.raises(ValidationError):
