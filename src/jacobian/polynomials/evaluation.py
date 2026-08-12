@@ -285,7 +285,6 @@ class PolynomialJacobianAdapter:
             jacobian_uri=jacobian_artifact.artifact_uri,
             claim_uri=claim_artifact.artifact_uri,
             certificate_uri=certificate_artifact.artifact_uri,
-            checker_id=self.resources.installation.jacobian_checker_id,
             matrix=jacobian.matrix,
             determinant=jacobian.determinant,
             backend_version=SYMPY_VERSION,

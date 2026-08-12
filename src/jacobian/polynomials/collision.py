@@ -208,7 +208,6 @@ class PolynomialCollisionAdapter:
                 summary="unverified rational polynomial-map collision witness",
             )
             witness_uri = witness_artifact.artifact_uri
-        checker_id = self.resources.installation.collision_checker_id
         output = PolynomialCollisionOutput(
             claim_uri=claim_artifact.artifact_uri,
             candidate_uri=candidate_uri,
@@ -220,8 +219,6 @@ class PolynomialCollisionAdapter:
             second_image=second_image,
             candidate_collision=candidate_collision,
             witness_uri=witness_uri,
-            checker_id=checker_id,
-            certificate_available=witness_uri is not None and checker_id is not None,
         )
         artifact_uris = [
             candidate_uri,
@@ -422,7 +419,6 @@ class PolynomialCollisionSearchAdapter:
             second_evaluation_uri=second_evaluation_result,
             claim_uri=claim_uri,
             witness_uri=witness_uri,
-            checker_id=self.resources.installation.collision_checker_id,
             stop_reason=(
                 PolynomialCollisionSearchStopReason.FIRST_COLLISION
                 if found is not None
