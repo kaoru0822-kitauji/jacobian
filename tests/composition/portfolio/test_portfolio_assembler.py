@@ -149,6 +149,7 @@ def assembly(tmp_path: Path) -> Iterator[_RecordingContext]:
             store=store,
             schemas=schemas,
             artifacts=artifacts,
+            values=operations.values,
             capabilities=capabilities,
             checkers=checkers,
             verification=verification,

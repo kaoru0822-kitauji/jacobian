@@ -42,6 +42,8 @@ tool—even if shell code could also calculate the answer.
 Forms:
 - `request.op="search"`: plain-language mathematical outcome (compact cards).
 - Optional `domain` filter; `limit` 1-20 (default 5).
+- `input_kind="TYPED_ARTIFACT"` is only for an exact `artifact_type` URI; typed
+  inline matrix and polynomial payloads remain `STRUCTURED_REQUEST`.
 - Follow `next_cursor` with the same query and filters to continue.
 - Ranking is deterministic lexical retrieval; matches are not recommendations.
 - `request.op="inspect"`: exact ID with authoritative schemas and examples.
@@ -64,11 +66,17 @@ with math.find and copy its `invocation_examples`. Do not call math.run with an 
 `payload` merely to discover required fields; the inspect result is the authoritative
 contract.
 
+When a completed output contains `value_refs`, an inspected consumer may declare a
+matching named `input_port`. Bind that opaque runtime-local reference through
+`inputs`; keep the consumer's other request fields in `payload`. A value reference
+avoids retranscribing the typed value but carries no verification authority.
+
 Ordinary tools return calculations. Independent checking uses a separate checker
 tool ID (for example `polynomial.identity.verify`), not a switch on the producer.
 Failed, cancelled, timed-out, or incomplete runs are not mathematical conclusions.
 
 Examples:
 - `{"capability_id":"integer.compute.gcd","payload":{"left":"84","right":"30"}}`
+- `{"capability_id":"matrix.normal_form.smith.verify","payload":{"input":{"matrix":{"entries":[["2","4"],["6","8"]]}}},"inputs":{"candidate":{"value_ref":"value://..."}}}`
 - `{"capability_id":"polynomial.identity.verify","payload":{"variables":["x"],"left":{"terms":[]},"right":{"terms":[]}}}`
 """
