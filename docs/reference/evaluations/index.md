@@ -5,3 +5,4 @@
 - [Benchmark contracts](benchmark-contracts.md) — Harbor task contracts, dataset inventory, registry/suite/members, snapshot locks, task and verifier validation
 - [Evaluation methods](evaluation-methods.md) — workflow observation modes, metrics and interpretation, performance benchmark method, corpus design, runtime groups, regression policy
 - [Observable trajectory information](observable-trajectory-information.md) — the bounded `(x, y, b, τ_tools)` observation contract, privacy boundary, reproduction commands, and pilot decision
+- [Held-out observable trajectory replication](observable-trajectory-information-heldout.md) — complete-family holdout, task-block uncertainty, telemetry field ablations, and the fail-closed retention gate

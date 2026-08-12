@@ -1,0 +1,125 @@
+{
+  "schema_version": "2",
+  "study_id": "observable-trajectory-information-heldout-v2",
+  "status": "FROZEN_BEFORE_MODEL_RUNS",
+  "evidence_class": "BOUNDED_AUTHENTICATED_HELD_OUT_DIAGNOSTIC",
+  "causal_claim_authorized": false,
+  "frozen_against": {
+    "git_sha": "5f5f4f3cbd43508c8838821ddda4501b72cb03e7",
+    "git_ref": "origin/main",
+    "development_study": "observable-trajectory-information-v1"
+  },
+  "research_question": "Once task and final-output information are known, does bounded visible-summary structure add stable held-out diagnostic value beyond structured math.find/math.run telemetry?",
+  "prohibited_methods": [
+    "reuse of the v1 transductive scores as evidence",
+    "hidden chain-of-thought access or retention",
+    "ATIF reasoning_content access or retention",
+    "trace inversion or hidden-trace reconstruction",
+    "reasoning-student training or fine-tuning",
+    "feature, threshold, family, task, or stopping-rule tuning after v2 labels are observed",
+    "full-corpus text vectorization, clustering, embeddings, or vocabulary fitting"
+  ],
+  "observable_tuple": {
+    "x": "Frozen task instruction, input, public submission schema, task family, and predeclared task metadata.",
+    "y": "Final user-visible agent-message structure, submitted-artifact structure, and exact independent verifier reward plus diagnostics, with each target's own outcome masked.",
+    "b": "Non-final user-visible Codex agent_message items only, redacted and bounded to 512 UTF-8 bytes per message, 32 messages, and 8192 UTF-8 bytes per trial; only fixed structural and lexicon counts enter models.",
+    "tau_tools": "Ordered server log events for math.find/math.run plus joined capability-attempt identity, execution status, assurance, diagnostics, timing, response size, and bounded request/argument digest availability. No tool arguments or results."
+  },
+  "runtime": {
+    "agent": "codex",
+    "agent_authentication": "locally authenticated ChatGPT session",
+    "model": "gpt-5.4-mini",
+    "reasoning_effort": "medium",
+    "tool_mode": "unified_exec",
+    "web_search": "disabled",
+    "repetitions_per_task": 2,
+    "task_timeout_seconds": 900,
+    "sampling_seed": null,
+    "sampling_deterministic": false,
+    "mcp_transport": "streamable-http",
+    "mcp_authentication": "fresh anonymous loopback runtime per trial",
+    "capability_policy_profile": "COMPUTE_VERIFY_NO_RETRIEVAL",
+    "workspace_policy": "fresh copied public task workspace and fresh Jacobian state directory per trial",
+    "container_runtime": "not required; exact task verifiers replay in the maintained clean child-process harness"
+  },
+  "prompt": "Read instruction.md, input.json, and submission_schema.json. Solve the task completely. Inspect and use an applicable Jacobian mathematical operation before finalizing; if no operation is applicable, solve manually without forcing an irrelevant call. Write submission.json and every required evidence file in this workspace. Do not use the network or inspect files outside this workspace.",
+  "dataset": {
+    "id": "jacobian/mathematical-benchmarks-v1",
+    "selection_rule": "Twelve tasks absent from v1, frozen as four complete mathematical families before v2 labels, spanning checker-capable producer chains, structured finite computations, likely input failures, and manual negative controls.",
+    "tasks": [
+      {"id": "hermite-normal-form", "family": "matrix-certificates", "digest": "sha256:19223f7d5ef1a502b0a857a8ed8c5f7c9d8dddf17d5fc4b3ebf720c294ed3d9a"},
+      {"id": "matrix-square-zero-counterexample", "family": "matrix-certificates", "digest": "sha256:65887808b95ad5df89468c2141985a1949a0eae41e361d869a4ac9bbf8429c8a"},
+      {"id": "subset-incidence-determinant", "family": "matrix-certificates", "digest": "sha256:9c5e3b5a15b483edb5cd30015901e49f737e480096580d754e19cc310f7b2fe7"},
+      {"id": "polynomial-normalization", "family": "polynomial-field", "digest": "sha256:6d2a1bdd88939f92cb5c0c4dcef76468130e77e3301b6f8055448d01e2d68fa0"},
+      {"id": "inseparable-minimal-polynomial-audit", "family": "polynomial-field", "digest": "sha256:98586b5c373bb5dd1b690e60e4397fbfc173f6325ef64d1b008d8f7175c0a4a3"},
+      {"id": "newton-polygon-factorization-audit", "family": "polynomial-field", "digest": "sha256:3124ec0d3ff7ec13e4925dd5c622ff4c5f446ccc9aa2753d6564ef6a1c5cca02"},
+      {"id": "graph-artifact-composition", "family": "finite-discrete", "digest": "sha256:b9443acbabd824ddc007974712433cf2b7d942720d40f0865e9f9843bd6ddb4a"},
+      {"id": "finite-magma-countermodel", "family": "finite-discrete", "digest": "sha256:b801197a5af13ac57f44c3b9cd024f68104b0cd1ab7d2f53908642497e40fce6"},
+      {"id": "erdos-gallai-realization-audit", "family": "finite-discrete", "digest": "sha256:85b524e68324736bf010e297cd5dc9eeed26300d6826b5006ee4d9d2cb8cc9d5"},
+      {"id": "natural-subtraction-proof-repair", "family": "proof-repair-manual", "digest": "sha256:9362856c7043254a79cd19d58853ee88fb440f8f732182b37f070a5a18851968"},
+      {"id": "path-dependent-limit", "family": "proof-repair-manual", "digest": "sha256:0f5da406502175c758c006af30393366d2d86d71c88a3fb190d22a777a8ed409"},
+      {"id": "generated-lemma-vacuity-audit", "family": "proof-repair-manual", "digest": "sha256:5d3589e3bd8f855e30aaff89698529d2ceb91dd906f2a3d47f8778fe4b6edaaa"}
+    ]
+  },
+  "information_conditions": [
+    "x+y",
+    "x+y+b",
+    "x+y+tau_tools",
+    "x+y+b+tau_tools"
+  ],
+  "diagnostics": [
+    {"id": "next_tool_action_class", "classes": ["FIND", "RUN_PRODUCER", "RUN_CHECKER", "TERMINAL"]},
+    {"id": "checker_state", "classes": ["NO_CHECKER", "ACCEPTED_ONLY", "REJECTED"]},
+    {"id": "recovery_state", "classes": ["NO_RECOVERY_OPPORTUNITY", "RECOVERED", "UNRECOVERED"]},
+    {"id": "mathematical_milestone", "classes": ["REACHED", "NOT_REACHED"], "definition": "Independent verifier mathematical correctness equals 1.0 with that field masked from the predictor."},
+    {"id": "terminal_verifier_success", "classes": ["PASS", "FAIL"], "definition": "Exact aggregate verifier reward equals 1.0 with all verifier outcomes masked from the predictor."}
+  ],
+  "features": {
+    "development_boundary": "The fixed v1 structural features, lexicon, k-nearest-neighbor rule, and decision thresholds are reused unchanged in spirit; no v1 score or v2 label selects a feature.",
+    "tau_field_groups": {
+      "call_structure": ["event/tool/attempt counts", "find/producer/checker action counts", "action bigrams"],
+      "capability_identity": ["public capability ID and domain counts", "unique capability/domain counts", "checker-attempt count"],
+      "outcome": ["tool status", "execution status", "assurance", "diagnostic counts"],
+      "cost": ["log1p timing and response bytes"],
+      "binding": ["request and argument digest availability counts"]
+    }
+  },
+  "modeling": {
+    "classifier": "3-nearest-neighbor with train-fold min-max scaling, deterministic majority and lexicographic tie breaks",
+    "split": "leave-one-complete-family-out; all repetitions and prefix rows from the held-out family remain outside training",
+    "primary_metric": "macro_f1",
+    "secondary_metrics": ["balanced_accuracy", "accuracy"],
+    "uncertainty": "2000 fixed-seed task-block bootstrap resamples of already-held-out predictions",
+    "bootstrap_seed": 260307268,
+    "transductive": false,
+    "tau_ablation": "For each frozen field group, report add-only gain over x+y and drop-one loss from full tau_tools, both without refitting feature definitions.",
+    "task_identity_baselines": [
+      "family-held-out global-majority baseline",
+      "task-identity resubstitution upper bound, labeled non-generalizing and excluded from decisions"
+    ]
+  },
+  "eligibility": {
+    "minimum_completed_trials": 24,
+    "minimum_families": 4,
+    "minimum_eligible_diagnostics": 3,
+    "diagnostic_requires_at_least_classes": 2,
+    "minimum_server_tool_trajectories": 8,
+    "minimum_no_tool_trajectories": 2,
+    "minimum_checker_rejections": 2,
+    "minimum_recovered_trajectories": 1,
+    "minimum_tool_failure_trajectories": 2
+  },
+  "decision_rule": {
+    "data_minimization": "Eligible only if every eligible diagnostic has b incremental macro-F1 <= 0.02, the mean b increment is <= 0.01, tau_tools improves mean macro-F1 over x+y by >= 0.05, and the upper 95% task-bootstrap bound for mean b increment is <= 0.02.",
+    "preserve_b": "Eligible only if b improves macro-F1 by >= 0.05 on at least two eligible diagnostics, improves the eligible-diagnostic mean by >= 0.03, and the lower 95% task-bootstrap bound for the mean increment is > 0.",
+    "otherwise": "INCONCLUSIVE_RESEARCH_ONLY"
+  },
+  "retention": {
+    "raw_trials": "host-local, operator-controlled, not committed",
+    "committed_evidence": "frozen contract, implementation/tests, aggregate report, counts, metrics, limitations, and SHA-256 bindings only",
+    "publish_agent_messages": false,
+    "publish_tool_arguments_or_results": false,
+    "publish_hidden_reasoning": false,
+    "publish_verifier_internals": false
+  }
+}

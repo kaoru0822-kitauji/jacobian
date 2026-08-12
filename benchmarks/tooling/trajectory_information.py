@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from itertools import pairwise
 from pathlib import Path
 from random import Random
-from typing import Any
+from typing import Any, BinaryIO
 
 from benchmarks.tooling.command_runner import (
     ToolCommandRequest,
@@ -102,6 +102,20 @@ _TARGETS = (
     "terminal_verifier_success",
     "tool_use_failure_class",
 )
+_HELDOUT_TARGETS = (
+    "next_tool_action_class",
+    "checker_state",
+    "recovery_state",
+    "mathematical_milestone",
+    "terminal_verifier_success",
+)
+_TAU_FIELD_GROUPS = (
+    "call_structure",
+    "capability_identity",
+    "outcome",
+    "cost",
+    "binding",
+)
 
 
 def _read_json(path: Path) -> Any:
@@ -137,8 +151,8 @@ def _collector_digest() -> str:
 
 def _config(path: Path) -> dict[str, Any]:
     value = _read_json(path)
-    if not isinstance(value, dict) or value.get("schema_version") != "1":
-        raise HarborSuiteError("trajectory study config must be a schema-v1 object")
+    if not isinstance(value, dict) or value.get("schema_version") not in {"1", "2"}:
+        raise HarborSuiteError("trajectory study config must be a schema-v1/v2 object")
     if value.get("status") != "FROZEN_BEFORE_MODEL_RUNS":
         raise HarborSuiteError("trajectory study config is not frozen before runs")
     return value
@@ -152,6 +166,7 @@ def _selected_tasks(
     if not isinstance(tasks, list):
         raise HarborSuiteError("study config has no task list")
     values: list[dict[str, str]] = []
+    seen: set[str] = set()
     for item in tasks:
         if not (
             isinstance(item, dict)
@@ -159,6 +174,13 @@ def _selected_tasks(
             and isinstance(item.get("digest"), str)
         ):
             raise HarborSuiteError("study task records must bind IDs and digests")
+        if item["id"] in seen:
+            raise HarborSuiteError(f"duplicate study task ID: {item['id']}")
+        seen.add(item["id"])
+        if config.get("schema_version") == "2" and not isinstance(
+            item.get("family"), str
+        ):
+            raise HarborSuiteError("schema-v2 task records must bind a family")
         if not selected or item["id"] in selected:
             values.append(item)
     unknown = selected - {item["id"] for item in values}
@@ -195,6 +217,10 @@ def _run_server_command(
     request: ToolCommandRequest, results: list[ToolCommandResult]
 ) -> None:
     results.append(run_tool_command(request))
+
+
+def _write_stream(stream: BinaryIO, payload: bytes) -> None:
+    stream.write(payload)
 
 
 def _wait_for_port(
@@ -274,9 +300,14 @@ def _codex_arguments(
 
 
 def _run_trial(
-    *, task: Path, task_record: Mapping[str, str], config: Mapping[str, Any], root: Path
+    *,
+    task: Path,
+    task_record: Mapping[str, str],
+    config: Mapping[str, Any],
+    root: Path,
+    trial_id: str,
+    repetition: int,
 ) -> dict[str, Any]:
-    trial_id = task.name
     trial = root / trial_id
     if trial.exists():
         raise HarborSuiteError(f"refusing to overwrite trial: {trial}")
@@ -313,8 +344,8 @@ def _run_trial(
             stdout_limit_bytes=8 * 1024 * 1024,
             stderr_limit_bytes=32 * 1024 * 1024,
             cancellation_event=server_cancel,
-            stdout_sink=stdout_handle.write,
-            stderr_sink=log_handle.write,
+            stdout_sink=lambda payload: _write_stream(stdout_handle, payload),
+            stderr_sink=lambda payload: _write_stream(log_handle, payload),
         )
         server_worker = threading.Thread(
             target=_run_server_command,
@@ -388,8 +419,11 @@ def _run_trial(
     final_message = _final_agent_message(result.stdout)
     artifacts = _workspace_artifacts(workspace)
     record = {
-        "schema_version": "1",
+        "schema_version": config["schema_version"],
         "trial_id": trial_id,
+        "task_id": task.name,
+        "family": task_record.get("family", task.name),
+        "repetition": repetition,
         "task_digest": task_record["digest"],
         "source_sha": git_head_sha(ROOT),
         "command": {
@@ -752,6 +786,12 @@ def _tau_features(events: Sequence[Mapping[str, object]]) -> dict[str, float]:
     features["tau:checker_attempt_count"] = float(
         sum(value.endswith(".verify") for value in capability_ids)
     )
+    for capability_id, count in Counter(capability_ids).items():
+        features[f"tau:capability:{capability_id}"] = float(count)
+    for domain, count in Counter(
+        value.split(".", 1)[0] for value in capability_ids
+    ).items():
+        features[f"tau:domain:{domain}"] = float(count)
     for event in attempts.values():
         features[f"tau:execution:{event.get('execution_status')}"] = (
             features.get(f"tau:execution:{event.get('execution_status')}", 0.0) + 1.0
@@ -793,6 +833,15 @@ def _checker_label(events: Sequence[Mapping[str, object]]) -> str:
     return "REJECTED_RECOVERED" if recovered else "REJECTED_UNRECOVERED"
 
 
+def _checker_state(events: Sequence[Mapping[str, object]]) -> str:
+    label = _checker_label(events)
+    if label == "NO_CHECKER":
+        return "NO_CHECKER"
+    if label == "SUCCESS_WITHOUT_REJECTION":
+        return "ACCEPTED_ONLY"
+    return "REJECTED"
+
+
 def _failure_label(events: Sequence[Mapping[str, object]]) -> str:
     tools = [event for event in events if event.get("kind") == "TOOL_CALL"]
     runs = [event for event in tools if event.get("tool") == "math.run"]
@@ -818,6 +867,16 @@ def _failure_label(events: Sequence[Mapping[str, object]]) -> str:
     return "RECOVERED_AFTER_FAILURE" if recovered else "UNRECOVERED_FAILURE"
 
 
+def _recovery_state(events: Sequence[Mapping[str, object]]) -> str:
+    checker = _checker_label(events)
+    failure = _failure_label(events)
+    if checker == "REJECTED_RECOVERED" or failure == "RECOVERED_AFTER_FAILURE":
+        return "RECOVERED"
+    if checker == "REJECTED_UNRECOVERED" or failure == "UNRECOVERED_FAILURE":
+        return "UNRECOVERED"
+    return "NO_RECOVERY_OPPORTUNITY"
+
+
 @dataclass(frozen=True)
 class Row:
     task_id: str
@@ -825,12 +884,17 @@ class Row:
     x_y: Mapping[str, float]
     b: Mapping[str, float]
     tau: Mapping[str, float]
+    family_id: str = ""
 
 
 def _project_trial(
     task: Path, trial: Path
 ) -> tuple[dict[str, Any], dict[str, list[Row]]]:
     record = _read_json(trial / "trial.json")
+    task_id = record.get("task_id", task.name)
+    family_id = record.get("family", task_id)
+    if not isinstance(task_id, str) or not isinstance(family_id, str):
+        raise HarborSuiteError(f"invalid task/family identity: {trial.name}")
     transcript_path = trial / record["raw_artifacts"]["transcript"]["path"]
     server_path = trial / record["raw_artifacts"]["server_log"]["path"]
     if _sha256(transcript_path) != record["raw_artifacts"]["transcript"]["sha256"]:
@@ -847,6 +911,8 @@ def _project_trial(
     rows: dict[str, list[Row]] = defaultdict(list)
     trajectory_labels = {
         "checker_rejection_recovery": _checker_label(events),
+        "checker_state": _checker_state(events),
+        "recovery_state": _recovery_state(events),
         "mathematical_milestone": (
             "REACHED"
             if record["verifier"]["details"].get("correctness") == 1.0
@@ -860,7 +926,7 @@ def _project_trial(
     for target, label in trajectory_labels.items():
         rows[target].append(
             Row(
-                task_id=task.name,
+                task_id=task_id,
                 label=label,
                 x_y={
                     **base_x,
@@ -870,6 +936,7 @@ def _project_trial(
                 },
                 b=_b_features(messages),
                 tau=_tau_features(events),
+                family_id=family_id,
             )
         )
     attempts = {
@@ -903,7 +970,7 @@ def _project_trial(
         ]
         rows["next_tool_action_class"].append(
             Row(
-                task_id=task.name,
+                task_id=task_id,
                 label=label,
                 x_y={
                     **base_x,
@@ -916,10 +983,14 @@ def _project_trial(
                 },
                 b=_b_features(messages[:message_count]),
                 tau=_tau_features(prefix_events),
+                family_id=family_id,
             )
         )
     projection = {
-        "trial_id": task.name,
+        "trial_id": trial.name,
+        "task_id": task_id,
+        "family": family_id,
+        "repetition": record.get("repetition", 1),
         "status": "COMPLETE",
         "server_event_coverage": coverage,
         "summary_metrics": {
@@ -940,18 +1011,57 @@ def _project_trial(
             "capability_attempt_count": sum(
                 event.get("kind") == "CAPABILITY_ATTEMPT" for event in events
             ),
+            "successful_producer_checker_chain": _successful_producer_checker_chain(
+                events
+            ),
         },
         "labels": trajectory_labels,
     }
     return projection, rows
 
 
-def _condition_features(row: Row, condition: str) -> dict[str, float]:
+def _tau_field_group(name: str) -> str:
+    if name.startswith(("tau:action:", "tau:bigram:")) or name in {
+        "tau:event_count",
+        "tau:tool_call_count",
+        "tau:attempt_count",
+    }:
+        return "call_structure"
+    if name.startswith(("tau:capability:", "tau:domain:")) or name in {
+        "tau:unique_capability_count",
+        "tau:unique_domain_count",
+        "tau:checker_attempt_count",
+    }:
+        return "capability_identity"
+    if name.startswith(("tau:execution:", "tau:assurance:")) or name in {
+        "tau:error_count",
+        "tau:diagnostic_count",
+    }:
+        return "outcome"
+    if name in {"tau:duration_log1p_sum", "tau:response_bytes_log1p_sum"}:
+        return "cost"
+    if name in {"tau:request_digest_available", "tau:argument_digest_available"}:
+        return "binding"
+    raise HarborSuiteError(f"unclassified tau_tools feature: {name}")
+
+
+def _condition_features(
+    row: Row,
+    condition: str,
+    *,
+    tau_groups: frozenset[str] | None = None,
+) -> dict[str, float]:
     values = dict(row.x_y)
     if "+b" in condition:
         values.update(row.b)
     if "tau_tools" in condition:
-        values.update(row.tau)
+        values.update(
+            {
+                name: value
+                for name, value in row.tau.items()
+                if tau_groups is None or _tau_field_group(name) in tau_groups
+            }
+        )
     return values
 
 
@@ -970,10 +1080,18 @@ def _distance(
     return math.sqrt(total)
 
 
-def _predict(train: Sequence[Row], test: Row, condition: str) -> str:
+def _predict(
+    train: Sequence[Row],
+    test: Row,
+    condition: str,
+    *,
+    tau_groups: frozenset[str] | None = None,
+) -> str:
     if not train:
         raise HarborSuiteError("empty training fold")
-    vectors = [_condition_features(row, condition) for row in train]
+    vectors = [
+        _condition_features(row, condition, tau_groups=tau_groups) for row in train
+    ]
     names = sorted({name for vector in vectors for name in vector})
     ranges = {
         name: (
@@ -982,7 +1100,7 @@ def _predict(train: Sequence[Row], test: Row, condition: str) -> str:
         )
         for name in names
     }
-    test_vector = _condition_features(test, condition)
+    test_vector = _condition_features(test, condition, tau_groups=tau_groups)
     neighbors = sorted(
         (
             (_distance(vector, test_vector, ranges), row.task_id, row.label)
@@ -1009,6 +1127,56 @@ def _predictions(rows: Sequence[Row], condition: str) -> list[dict[str, str]]:
                     }
                 )
     return predictions
+
+
+def _family_predictions(
+    rows: Sequence[Row],
+    condition: str,
+    *,
+    tau_groups: frozenset[str] | None = None,
+) -> list[dict[str, str]]:
+    predictions = []
+    families = sorted({row.family_id for row in rows})
+    if "" in families or len(families) < 2:
+        raise HarborSuiteError("held-out analysis requires at least two named families")
+    for held_out in families:
+        train = [row for row in rows if row.family_id != held_out]
+        for row in rows:
+            if row.family_id == held_out:
+                predictions.append(
+                    {
+                        "task_id": row.task_id,
+                        "family": row.family_id,
+                        "truth": row.label,
+                        "prediction": _predict(
+                            train,
+                            row,
+                            condition,
+                            tau_groups=tau_groups,
+                        ),
+                    }
+                )
+    return predictions
+
+
+def _family_majority_predictions(rows: Sequence[Row]) -> list[dict[str, str]]:
+    values: list[dict[str, str]] = []
+    for held_out in sorted({row.family_id for row in rows}):
+        counts = Counter(row.label for row in rows if row.family_id != held_out)
+        if not counts:
+            raise HarborSuiteError("empty family-held-out majority fold")
+        prediction = sorted(counts, key=lambda label: (-counts[label], label))[0]
+        values.extend(
+            {
+                "task_id": row.task_id,
+                "family": row.family_id,
+                "truth": row.label,
+                "prediction": prediction,
+            }
+            for row in rows
+            if row.family_id == held_out
+        )
+    return values
 
 
 def _descriptive_value(value: float) -> str:
@@ -1237,7 +1405,7 @@ def run_study(args: argparse.Namespace) -> int:
     }
     selected = _selected_tasks(config, set(args.task))
     manifest = {
-        "schema_version": "1",
+        "schema_version": config["schema_version"],
         "study_id": config["study_id"],
         "config_sha256": _sha256(config_path),
         "collector_sha256": _collector_digest(),
@@ -1251,6 +1419,9 @@ def run_study(args: argparse.Namespace) -> int:
     if version.status is not ToolCommandStatus.EXITED or version.exit_code != 0:
         raise HarborSuiteError("codex --version failed")
     manifest["codex_version"] = version.stdout.decode("utf-8", errors="replace").strip()
+    repetitions = _safe_int(config["runtime"].get("repetitions_per_task"))
+    if repetitions < 1 or repetitions > 8:
+        raise HarborSuiteError("repetitions_per_task must be in [1, 8]")
     for item in selected:
         task = tasks_by_name.get(item["id"])
         if task is None:
@@ -1258,18 +1429,32 @@ def run_study(args: argparse.Namespace) -> int:
                 f"selected task is not a dataset member: {item['id']}"
             )
         _validate_task_digest(task, item["digest"])
-        record = _run_trial(task=task, task_record=item, config=config, root=output)
-        manifest["trials"].append(
-            {
-                "trial_id": item["id"],
-                "record": f"{item['id']}/trial.json",
-                "record_sha256": _sha256(output / item["id"] / "trial.json"),
-                "command_status": record["command"]["status"],
-                "verifier_reward": record["verifier"]["reward"],
-            }
-        )
-        _write_json(output / "manifest.json", manifest)
-        print(json.dumps(manifest["trials"][-1], sort_keys=True), flush=True)
+        for repetition in range(1, repetitions + 1):
+            trial_id = (
+                item["id"] if repetitions == 1 else f"{item['id']}--r{repetition:02d}"
+            )
+            record = _run_trial(
+                task=task,
+                task_record=item,
+                config=config,
+                root=output,
+                trial_id=trial_id,
+                repetition=repetition,
+            )
+            manifest["trials"].append(
+                {
+                    "trial_id": trial_id,
+                    "task_id": item["id"],
+                    "family": item.get("family", item["id"]),
+                    "repetition": repetition,
+                    "record": f"{trial_id}/trial.json",
+                    "record_sha256": _sha256(output / trial_id / "trial.json"),
+                    "command_status": record["command"]["status"],
+                    "verifier_reward": record["verifier"]["reward"],
+                }
+            )
+            _write_json(output / "manifest.json", manifest)
+            print(json.dumps(manifest["trials"][-1], sort_keys=True), flush=True)
     return 0
 
 
@@ -1310,6 +1495,372 @@ def _summarize_diagnostics(
     return results, eligible_targets
 
 
+def _bootstrap_metric(
+    predictions: Sequence[Mapping[str, str]],
+    *,
+    seed: int,
+    repetitions: int,
+) -> dict[str, float]:
+    task_ids = sorted({item["task_id"] for item in predictions})
+    if not task_ids:
+        return {"lower_95": 0.0, "upper_95": 0.0}
+    random = Random(seed)
+    samples = []
+    for _ in range(repetitions):
+        selected = [random.choice(task_ids) for _ in task_ids]
+        replicated = [
+            item
+            for task_id in selected
+            for item in predictions
+            if item["task_id"] == task_id
+        ]
+        samples.append(_metrics(replicated)["macro_f1"])
+    return {
+        "lower_95": _percentile(samples, 0.025),
+        "upper_95": _percentile(samples, 0.975),
+    }
+
+
+def _summarize_heldout_diagnostics(
+    all_rows: Mapping[str, Sequence[Row]],
+    eligibility: Mapping[str, object],
+    *,
+    seed: int,
+    bootstrap_repetitions: int,
+) -> tuple[
+    dict[str, dict[str, Any]],
+    list[str],
+    dict[str, dict[str, list[dict[str, str]]]],
+]:
+    results: dict[str, dict[str, Any]] = {}
+    eligible_targets: list[str] = []
+    predictions: dict[str, dict[str, list[dict[str, str]]]] = {}
+    minimum_classes = _safe_int(eligibility.get("diagnostic_requires_at_least_classes"))
+    for target_index, target in enumerate(_HELDOUT_TARGETS):
+        target_rows = all_rows[target]
+        labels = sorted({row.label for row in target_rows})
+        eligible = len(labels) >= minimum_classes
+        if eligible:
+            eligible_targets.append(target)
+        predictions[target] = {}
+        condition_metrics = {}
+        for condition_index, condition in enumerate(_CONDITIONS):
+            heldout = _family_predictions(target_rows, condition)
+            predictions[target][condition] = heldout
+            condition_metrics[condition] = {
+                **_metrics(heldout),
+                "task_bootstrap_95": _bootstrap_metric(
+                    heldout,
+                    seed=seed + target_index * 10 + condition_index,
+                    repetitions=bootstrap_repetitions,
+                ),
+            }
+        results[target] = {
+            "eligible": eligible,
+            "row_count": len(target_rows),
+            "task_count": len({row.task_id for row in target_rows}),
+            "family_count": len({row.family_id for row in target_rows}),
+            "class_counts": dict(
+                sorted(Counter(row.label for row in target_rows).items())
+            ),
+            "conditions": condition_metrics,
+            "baselines": {
+                "family_heldout_global_majority": _metrics(
+                    _family_majority_predictions(target_rows)
+                ),
+                "task_identity_resubstitution_upper_bound": _metrics(
+                    _task_identity_upper(target_rows)
+                ),
+            },
+        }
+    return results, eligible_targets, predictions
+
+
+def _tau_ablation_report(
+    all_rows: Mapping[str, Sequence[Row]],
+    results: Mapping[str, Mapping[str, Any]],
+    eligible_targets: Sequence[str],
+) -> dict[str, Any]:
+    groups = frozenset(_TAU_FIELD_GROUPS)
+    report: dict[str, Any] = {}
+    for group in _TAU_FIELD_GROUPS:
+        add_only: dict[str, float] = {}
+        drop_one: dict[str, float] = {}
+        for target in eligible_targets:
+            rows = all_rows[target]
+            add_metrics = _metrics(
+                _family_predictions(
+                    rows,
+                    "x+y+tau_tools",
+                    tau_groups=frozenset({group}),
+                )
+            )
+            drop_metrics = _metrics(
+                _family_predictions(
+                    rows,
+                    "x+y+tau_tools",
+                    tau_groups=groups - {group},
+                )
+            )
+            baseline = results[target]["conditions"]["x+y"]["macro_f1"]
+            full = results[target]["conditions"]["x+y+tau_tools"]["macro_f1"]
+            add_only[target] = add_metrics["macro_f1"] - baseline
+            drop_one[target] = full - drop_metrics["macro_f1"]
+        report[group] = {
+            "add_only_macro_f1_gain_over_x_y": add_only,
+            "mean_add_only_gain": (
+                sum(add_only.values()) / len(add_only) if add_only else 0.0
+            ),
+            "drop_one_macro_f1_loss_from_full_tau": drop_one,
+            "mean_drop_one_loss": (
+                sum(drop_one.values()) / len(drop_one) if drop_one else 0.0
+            ),
+        }
+    return report
+
+
+def _successful_producer_checker_chain(events: Sequence[Mapping[str, object]]) -> bool:
+    producer_positions = [
+        index
+        for index, event in enumerate(events)
+        if event.get("kind") == "CAPABILITY_ATTEMPT"
+        and not str(event.get("capability_id", "")).endswith(".verify")
+        and event.get("execution_status") == "COMPLETED"
+    ]
+    checker_positions = [
+        index
+        for index, event in enumerate(events)
+        if event.get("kind") == "CAPABILITY_ATTEMPT"
+        and str(event.get("capability_id", "")).endswith(".verify")
+        and event.get("execution_status") == "COMPLETED"
+        and event.get("assurance") == "VERIFIED"
+        and not event.get("diagnostic_codes")
+    ]
+    return any(
+        left < right for left in producer_positions for right in checker_positions
+    )
+
+
+def _analyze_heldout_study(
+    *,
+    config: Mapping[str, Any],
+    config_path: Path,
+    results_root: Path,
+    manifest: Mapping[str, Any],
+    collector_digest: str,
+    all_rows: Mapping[str, Sequence[Row]],
+    projections: Sequence[Mapping[str, Any]],
+    output: Path,
+) -> int:
+    tasks = config["dataset"]["tasks"]
+    repetitions = _safe_int(config["runtime"]["repetitions_per_task"])
+    configured = {
+        (item["id"], item["family"], repetition)
+        for item in tasks
+        for repetition in range(1, repetitions + 1)
+    }
+    observed = {
+        (item["task_id"], item["family"], _safe_int(item["repetition"]))
+        for item in projections
+    }
+    if observed != configured or len(projections) != len(configured):
+        raise HarborSuiteError("held-out trials do not exactly cover the frozen matrix")
+
+    modeling = config["modeling"]
+    bootstrap_repetitions = 2000
+    seed = _safe_int(modeling["bootstrap_seed"])
+    results, eligible_targets, predictions = _summarize_heldout_diagnostics(
+        all_rows,
+        config["eligibility"],
+        seed=seed,
+        bootstrap_repetitions=bootstrap_repetitions,
+    )
+    failure_counts = Counter(
+        item["labels"]["tool_use_failure_class"] for item in projections
+    )
+    checker_counts = Counter(item["labels"]["checker_state"] for item in projections)
+    recovery_counts = Counter(item["labels"]["recovery_state"] for item in projections)
+    server_tool_trajectories = sum(
+        _safe_int(item["tool_metrics"]["tool_call_count"]) > 0 for item in projections
+    )
+    no_tool = failure_counts["NO_SERVER_TOOL_USE"]
+    tool_failures = (
+        failure_counts["RECOVERED_AFTER_FAILURE"]
+        + failure_counts["UNRECOVERED_FAILURE"]
+    )
+    event_coverage = {
+        "server_tool_trajectories": server_tool_trajectories,
+        "successful_producer_checker_chains": sum(
+            bool(item["tool_metrics"]["successful_producer_checker_chain"])
+            for item in projections
+        ),
+        "checker_state_counts": dict(sorted(checker_counts.items())),
+        "recovery_state_counts": dict(sorted(recovery_counts.items())),
+        "tool_use_failure_class_counts": dict(sorted(failure_counts.items())),
+        "no_tool_trajectories": no_tool,
+        "checker_rejections": checker_counts["REJECTED"],
+        "recovered_trajectories": recovery_counts["RECOVERED"],
+        "tool_failure_trajectories": tool_failures,
+    }
+    eligibility = config["eligibility"]
+    coverage_checks = {
+        "completed_trials": len(projections)
+        >= _safe_int(eligibility["minimum_completed_trials"]),
+        "families": len({item["family"] for item in projections})
+        >= _safe_int(eligibility["minimum_families"]),
+        "eligible_diagnostics": len(eligible_targets)
+        >= _safe_int(eligibility["minimum_eligible_diagnostics"]),
+        "server_tool_trajectories": server_tool_trajectories
+        >= _safe_int(eligibility["minimum_server_tool_trajectories"]),
+        "no_tool_trajectories": no_tool
+        >= _safe_int(eligibility["minimum_no_tool_trajectories"]),
+        "checker_rejections": checker_counts["REJECTED"]
+        >= _safe_int(eligibility["minimum_checker_rejections"]),
+        "recovered_trajectories": recovery_counts["RECOVERED"]
+        >= _safe_int(eligibility["minimum_recovered_trajectories"]),
+        "tool_failure_trajectories": tool_failures
+        >= _safe_int(eligibility["minimum_tool_failure_trajectories"]),
+    }
+    dataset_eligible = all(coverage_checks.values())
+
+    interval = (
+        _bootstrap_increment(
+            predictions,
+            eligible_targets,
+            seed=seed + 1000,
+            repetitions=bootstrap_repetitions,
+        )
+        if eligible_targets
+        else {"lower_95": 0.0, "upper_95": 0.0}
+    )
+    decision = "INCONCLUSIVE_RESEARCH_ONLY"
+    reasons: list[str] = []
+    if dataset_eligible and eligible_targets:
+        decision, reasons = _decision(results, eligible_targets, interval)
+    else:
+        reasons.append(
+            "The frozen event-coverage or diagnostic-eligibility gate was not satisfied."
+        )
+    reasons.extend(
+        f"Coverage check failed: {name}."
+        for name, passed in coverage_checks.items()
+        if not passed
+    )
+
+    per_diagnostic_b = {
+        target: (
+            results[target]["conditions"]["x+y+b+tau_tools"]["macro_f1"]
+            - results[target]["conditions"]["x+y+tau_tools"]["macro_f1"]
+        )
+        for target in eligible_targets
+    }
+    per_diagnostic_tau = {
+        target: (
+            results[target]["conditions"]["x+y+tau_tools"]["macro_f1"]
+            - results[target]["conditions"]["x+y"]["macro_f1"]
+        )
+        for target in eligible_targets
+    }
+    report = {
+        "schema_version": "2",
+        "study_id": config["study_id"],
+        "evidence_class": config["evidence_class"],
+        "causal_claim_authorized": False,
+        "config_sha256": _sha256(config_path),
+        "run_manifest_sha256": _sha256(results_root / "manifest.json"),
+        "source_sha": manifest.get("source_sha"),
+        "collector_sha256": collector_digest,
+        "analysis": {
+            "mode": "FROZEN_FAMILY_HELD_OUT_KNN",
+            "held_out": True,
+            "transductive": False,
+            "split": modeling["split"],
+            "bootstrap_repetitions": bootstrap_repetitions,
+        },
+        "dataset": {
+            "trial_count": len(projections),
+            "task_count": len({item["task_id"] for item in projections}),
+            "family_count": len({item["family"] for item in projections}),
+            "eligible": dataset_eligible,
+            "coverage_checks": coverage_checks,
+        },
+        "event_coverage": event_coverage,
+        "diagnostics": results,
+        "eligible_diagnostics": eligible_targets,
+        "incremental_b_given_x_y_tau_tools": {
+            "per_diagnostic_macro_f1": per_diagnostic_b,
+            "mean_macro_f1": (
+                sum(per_diagnostic_b.values()) / len(per_diagnostic_b)
+                if per_diagnostic_b
+                else 0.0
+            ),
+            "task_bootstrap_95": interval,
+        },
+        "incremental_tau_tools_given_x_y": {
+            "per_diagnostic_macro_f1": per_diagnostic_tau,
+            "mean_macro_f1": (
+                sum(per_diagnostic_tau.values()) / len(per_diagnostic_tau)
+                if per_diagnostic_tau
+                else 0.0
+            ),
+        },
+        "tau_tools_field_ablation": _tau_ablation_report(
+            all_rows, results, eligible_targets
+        ),
+        "decision": decision,
+        "decision_reasons": reasons,
+        "projections": list(projections),
+        "retention": config["retention"],
+        "limitations": [
+            "This is a small, non-deterministic weak-model replication; complete-family holdout prevents family leakage but does not make the study causal.",
+            "Feature groups, thresholds, task families, repetitions, and stopping scope were frozen before v2 labels; no v1 transductive score enters this report.",
+            "Exact verifiers ran through the maintained clean child-process harness because a container runtime is not required for this operator study.",
+            "Task/output structure can dominate retrospective diagnostics; increments measure conditional predictive association only.",
+            "No hidden reasoning, raw prompts, agent-message text, tool arguments, tool results, or verifier internals are committed.",
+        ],
+    }
+    if output.exists():
+        raise SystemExit(f"output already exists: {output}")
+    _write_json(output, report)
+    print(
+        json.dumps(
+            {
+                "decision": decision,
+                "dataset": report["dataset"],
+                "event_coverage": event_coverage,
+            },
+            sort_keys=True,
+        )
+    )
+    print(f"report_sha256={_sha256(output)}")
+    return 0
+
+
+def _load_projected_trials(
+    *,
+    manifest: Mapping[str, Any],
+    results_root: Path,
+    tasks_by_name: Mapping[str, Path],
+) -> tuple[dict[str, list[Row]], list[dict[str, Any]]]:
+    all_rows: dict[str, list[Row]] = defaultdict(list)
+    projections = []
+    for trial_record in manifest.get("trials", []):
+        trial_id = trial_record["trial_id"]
+        task_id = trial_record.get("task_id", trial_id)
+        if not isinstance(trial_id, str) or not isinstance(task_id, str):
+            raise HarborSuiteError("run manifest has invalid trial/task identity")
+        trial_path = results_root / trial_id
+        if _sha256(trial_path / "trial.json") != trial_record["record_sha256"]:
+            raise HarborSuiteError(f"trial record digest mismatch: {trial_id}")
+        if task_id not in tasks_by_name:
+            raise HarborSuiteError(f"unknown task in run manifest: {task_id}")
+        projection, projected_rows = _project_trial(tasks_by_name[task_id], trial_path)
+        projections.append(projection)
+        for target, values in projected_rows.items():
+            all_rows[target].extend(values)
+    return all_rows, projections
+
+
 def analyze_study(args: argparse.Namespace) -> int:
     config_path = args.config.resolve(strict=True)
     config = _config(config_path)
@@ -1325,17 +1876,22 @@ def analyze_study(args: argparse.Namespace) -> int:
     tasks_by_name = {
         ref.path.name: ref.path for ref in get_suite("mathematical-benchmarks-v1").tasks
     }
-    all_rows: dict[str, list[Row]] = defaultdict(list)
-    projections = []
-    for trial_record in manifest.get("trials", []):
-        task_id = trial_record["trial_id"]
-        trial_path = results_root / task_id
-        if _sha256(trial_path / "trial.json") != trial_record["record_sha256"]:
-            raise HarborSuiteError(f"trial record digest mismatch: {task_id}")
-        projection, projected_rows = _project_trial(tasks_by_name[task_id], trial_path)
-        projections.append(projection)
-        for target, values in projected_rows.items():
-            all_rows[target].extend(values)
+    all_rows, projections = _load_projected_trials(
+        manifest=manifest,
+        results_root=results_root,
+        tasks_by_name=tasks_by_name,
+    )
+    if config["schema_version"] == "2":
+        return _analyze_heldout_study(
+            config=config,
+            config_path=config_path,
+            results_root=results_root,
+            manifest=manifest,
+            collector_digest=collector_digest,
+            all_rows=all_rows,
+            projections=projections,
+            output=args.output.resolve(),
+        )
     eligibility = config["eligibility"]
     completed = sum(item["status"] == "COMPLETE" for item in projections)
     server_tool_trajectories = sum(
