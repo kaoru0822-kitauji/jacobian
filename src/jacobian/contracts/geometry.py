@@ -314,10 +314,6 @@ class GeometryLineIntersectionResult(ContractModel):
         return self
 
 
-class GeometryPointSetResult(ContractModel):
-    points: tuple[RationalPoint2D, ...]
-
-
 class GeometryConvexHullResult(ContractModel):
     points: tuple[RationalPoint2D, ...] = Field(min_length=1, max_length=128)
 

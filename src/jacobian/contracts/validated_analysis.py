@@ -103,21 +103,6 @@ class ArbPointEnclosureResult(ContractModel):
         return self
 
 
-class ArbPointEnclosureObligation(ContractModel):
-    obligation_type: Literal["INDEPENDENT_ENCLOSURE_REPLAY"] = (
-        "INDEPENDENT_ENCLOSURE_REPLAY"
-    )
-    function: RealUnaryFunction
-    argument: CanonicalRational
-    precision_bits: StrictInt = Field(ge=32, le=4096)
-    claimed_lower: ExactDyadic | None = None
-    claimed_upper: ExactDyadic | None = None
-    status: Literal["ENCLOSED", "NONFINITE", "TIMEOUT", "BACKEND_ERROR"]
-    required_checker: Literal["AUTHORIZED_INDEPENDENT_BALL_ARITHMETIC"] = (
-        "AUTHORIZED_INDEPENDENT_BALL_ARITHMETIC"
-    )
-
-
 class FiniteRawMomentRequest(ContractModel):
     atoms: tuple[FiniteDistributionAtom, ...] = Field(
         min_length=1,
