@@ -36,7 +36,6 @@ from jacobian.contracts.results import (
     InputStatus,
     InputValidation,
     ResultEnvelope,
-    Verification,
 )
 from jacobian.contracts.verification import VerificationRecord
 from jacobian.process_policy import (
@@ -306,7 +305,6 @@ class VerificationService:
                         status=InputStatus.REJECTED, errors=(detail,)
                     ),
                     conclusion=Conclusion.UNKNOWN,
-                    verification=Verification.UNVERIFIED,
                     claim_digest=claim_digest,
                     semantics_digest=semantics_digest,
                     candidate_digest=candidate_digest,
@@ -349,7 +347,6 @@ class VerificationService:
                 ),
                 input=InputValidation(status=InputStatus.ACCEPTED),
                 conclusion=decision.conclusion,
-                verification=Verification.VERIFIED,
                 claim_digest=claim_digest,
                 semantics_digest=semantics_digest,
                 candidate_digest=candidate_digest,
@@ -872,7 +869,6 @@ class VerificationService:
                 errors=(decision.detail,),
             ),
             conclusion=Conclusion.UNKNOWN,
-            verification=Verification.UNVERIFIED,
             claim_digest=claim_digest,
             semantics_digest=semantics_digest,
             candidate_digest=candidate_digest,
@@ -948,7 +944,6 @@ class VerificationService:
             ),
             input=InputValidation(status=InputStatus.ACCEPTED),
             conclusion=decision.conclusion,
-            verification=Verification.VERIFIED,
             scope_uri=scope_uri,
             claim_digest=claim_digest,
             semantics_digest=semantics_digest,
@@ -1084,7 +1079,6 @@ class VerificationService:
                 errors=(detail,),
             ),
             conclusion=Conclusion.UNKNOWN,
-            verification=Verification.UNVERIFIED,
         )
 
     def _operational_failure(
@@ -1102,5 +1096,4 @@ class VerificationService:
             ),
             input=InputValidation(status=InputStatus.ACCEPTED),
             conclusion=Conclusion.UNKNOWN,
-            verification=Verification.UNVERIFIED,
         )

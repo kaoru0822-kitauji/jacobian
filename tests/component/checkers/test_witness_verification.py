@@ -15,7 +15,6 @@ from jacobian.contracts.results import (
     Coverage,
     ExecutionStatus,
     Method,
-    Verification,
 )
 from jacobian.process_policy import ProcessResult, ProcessTermination
 from jacobian.registry import CheckerRegistry
@@ -176,7 +175,7 @@ def test_checker_timeout_and_cancellation_are_non_conclusions(
 
         assert result.execution.status is expected_status
         assert result.conclusion is Conclusion.UNKNOWN, expected_status
-        assert result.verification is Verification.UNVERIFIED, expected_status
+        assert result.verification_record_uri is None, expected_status
         assert result.verification_record_uri is None, expected_status
 
 
@@ -303,7 +302,7 @@ def test_missing_verification_artifact_is_rejected_with_recovery(
         "Check the artifact URIs and retry.",
     )
     assert missing_uri not in result.input.errors[0]
-    assert result.verification is Verification.UNVERIFIED
+    assert result.verification_record_uri is None
 
 
 def test_corrupt_verification_artifact_is_an_operational_failure(
@@ -348,7 +347,7 @@ def test_omitted_path_witness_is_independently_verified(tmp_path: Path) -> None:
     )
 
     assert result.conclusion is Conclusion.FALSE
-    assert result.verification is Verification.VERIFIED
+    assert result.verification_record_uri is not None
     assert result.verification_record_uri is not None
 
 
@@ -396,7 +395,7 @@ def test_witness_checker_cannot_certify_artifacts_outside_its_request(
         )
 
         assert result.conclusion is Conclusion.UNKNOWN
-        assert result.verification is Verification.UNVERIFIED
+        assert result.verification_record_uri is None
         assert result.verification_record_uri is None
         assert result.input.status.value == "REJECTED"
         assert "outside its verification request" in result.input.errors[0]
@@ -435,7 +434,7 @@ def test_valid_witness_rebound_to_another_candidate_is_rejected(
     )
 
     assert result.conclusion is Conclusion.UNKNOWN
-    assert result.verification is Verification.UNVERIFIED
+    assert result.verification_record_uri is None
     assert result.input.status.value == "REJECTED"
     assert result.input.errors == (
         "The witness does not match the supplied claim and candidate. "
@@ -471,7 +470,7 @@ def test_witness_without_bound_artifact_parents_is_rejected(
     )
 
     assert result.conclusion is Conclusion.UNKNOWN
-    assert result.verification is Verification.UNVERIFIED
+    assert result.verification_record_uri is None
     assert result.input.status.value == "REJECTED"
 
 
@@ -501,7 +500,7 @@ def test_schema_label_cannot_authorize_an_invalid_candidate(tmp_path: Path) -> N
     )
 
     assert result.conclusion is Conclusion.UNKNOWN
-    assert result.verification is Verification.UNVERIFIED
+    assert result.verification_record_uri is None
     assert result.input.status.value == "REJECTED"
 
 
@@ -548,5 +547,5 @@ def test_revocation_during_checker_execution_prevents_commit(
     assert not worker.is_alive()
     result = result_holder[0]
     assert result.conclusion is Conclusion.UNKNOWN
-    assert result.verification is Verification.UNVERIFIED
+    assert result.verification_record_uri is None
     assert result.verification_record_uri is None

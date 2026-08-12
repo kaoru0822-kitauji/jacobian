@@ -25,7 +25,7 @@ from jacobian.contracts.polynomial_expressions import (
     PolynomialExpressionNormalizationVerificationOutput,
     PolynomialExpressionNormalizationVerificationRequest,
 )
-from jacobian.contracts.results import Conclusion, ExecutionStatus, Verification
+from jacobian.contracts.results import Conclusion, ExecutionStatus
 from jacobian.polynomial_expressions import (
     PolynomialExpressionArtifactError,
     PolynomialExpressionArtifactService,
@@ -237,7 +237,6 @@ class PolynomialExpressionNormalizationVerificationAdapter:
         verified = (
             checked.execution.status is ExecutionStatus.COMPLETED
             and checked.conclusion is Conclusion.TRUE
-            and checked.verification is Verification.VERIFIED
             and checked.verification_record_uri is not None
         )
         status: Literal[

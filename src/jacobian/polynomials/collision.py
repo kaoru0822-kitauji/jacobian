@@ -37,7 +37,6 @@ from jacobian.contracts.results import (
     Conclusion,
     Execution,
     ExecutionStatus,
-    Verification,
 )
 from jacobian.domains._examples import example
 from jacobian.polynomials._support import (
@@ -558,8 +557,7 @@ class PolynomialCollisionVerifyAdapter:
             checker_id=checker_id,
         )
         verified = (
-            checked.verification is Verification.VERIFIED
-            and checked.conclusion is Conclusion.FALSE
+            checked.conclusion is Conclusion.FALSE
             and checked.verification_record_uri is not None
         )
         record_uri = checked.verification_record_uri if verified else None
@@ -683,7 +681,6 @@ class PolynomialMapInverseCollisionVerifyAdapter:
         verified = (
             checked.verification_record_uri is not None
             and checked.conclusion is Conclusion.TRUE
-            and checked.verification is Verification.VERIFIED
         )
         record_uri = checked.verification_record_uri if verified else None
         output = PolynomialMapInverseCollisionVerifyOutput(

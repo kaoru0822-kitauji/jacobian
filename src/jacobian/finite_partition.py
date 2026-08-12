@@ -22,7 +22,6 @@ from jacobian.contracts.results import (
     Execution,
     ExecutionStatus,
     ResultEnvelope,
-    Verification,
 )
 from jacobian.domains._examples import example
 from jacobian.provider_runtime import known_provider_runtime
@@ -498,7 +497,7 @@ def _partition_result(
     )
     verified = (
         verification_result is not None
-        and verification_result.verification is Verification.VERIFIED
+        and verification_result.verification_record_uri is not None
     )
     artifact_uris = [
         material.scope_uri,

@@ -60,11 +60,6 @@ class Coverage(StrEnum):
     NOT_APPLICABLE = "NOT_APPLICABLE"
 
 
-class Verification(StrEnum):
-    UNVERIFIED = "UNVERIFIED"
-    VERIFIED = "VERIFIED"
-
-
 class Execution(ContractModel):
     status: ExecutionStatus
     runtime_ms: StrictInt | None = Field(default=None, ge=0)
@@ -85,13 +80,12 @@ class InputValidation(ContractModel):
 
 
 class ResultEnvelope(ContractModel):
-    """Separate execution, input, conclusion, verification, and evidence."""
+    """Separate execution, input, conclusion, and verification evidence."""
 
     schema_version: Literal["1"] = "1"
     execution: Execution
     input: InputValidation
     conclusion: Conclusion
-    verification: Verification
     scope_uri: ArtifactUri | None = None
     claim_digest: Sha256Digest | None = None
     semantics_digest: Sha256Digest | None = None
@@ -104,23 +98,19 @@ class ResultEnvelope(ContractModel):
         execution_failed = self.execution.status != ExecutionStatus.COMPLETED
         input_rejected = self.input.status == InputStatus.REJECTED
 
-        if execution_failed or input_rejected:
-            if self.conclusion not in {
-                Conclusion.UNKNOWN,
-                Conclusion.NOT_APPLICABLE,
-            }:
-                raise ValueError(
-                    "non-completed or rejected results cannot carry a "
-                    "mathematical conclusion"
-                )
-            if self.verification != Verification.UNVERIFIED:
-                raise ValueError("non-completed or rejected results cannot be verified")
-
+        if (execution_failed or input_rejected) and self.conclusion not in {
+            Conclusion.UNKNOWN,
+            Conclusion.NOT_APPLICABLE,
+        }:
+            raise ValueError(
+                "non-completed or rejected results cannot carry a "
+                "mathematical conclusion"
+            )
         self._require_verification_evidence()
         return self
 
     def _require_verification_evidence(self) -> None:
-        if self.verification == Verification.VERIFIED:
+        if self.verification_record_uri is not None:
             if self.conclusion not in {Conclusion.TRUE, Conclusion.FALSE}:
                 raise ValueError(
                     "verified results require a decisive mathematical conclusion"
@@ -131,14 +121,8 @@ class ResultEnvelope(ContractModel):
                 )
             if not self.evidence_uris:
                 raise ValueError("verified results require bound evidence")
-            if self.verification_record_uri is None:
-                raise ValueError(
-                    "verified results require an immutable verification record"
-                )
             if self.candidate_digest is None:
                 raise ValueError("verified results require a candidate binding")
-        elif self.verification_record_uri is not None:
-            raise ValueError("an unverified result cannot carry a verification record")
 
 
 def validate_result_envelope(

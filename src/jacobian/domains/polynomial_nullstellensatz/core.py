@@ -30,7 +30,7 @@ from jacobian.contracts.nullstellensatz import (
     NullstellensatzVerificationOutput,
     NullstellensatzVerificationRequest,
 )
-from jacobian.contracts.results import Execution, ExecutionStatus, Verification
+from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.domains.polynomial_nullstellensatz.system import (
     materialize_degree_23_system,
 )
@@ -323,7 +323,6 @@ class NullstellensatzVerificationAdapter:
         verified = bool(
             checked is not None
             and checked.execution.status is ExecutionStatus.COMPLETED
-            and checked.verification is Verification.VERIFIED
             and checked.verification_record_uri is not None
         )
         record_uri = checked.verification_record_uri if verified and checked else None

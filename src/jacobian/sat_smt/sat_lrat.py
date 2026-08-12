@@ -24,7 +24,6 @@ from jacobian.contracts.results import (
     Conclusion,
     Execution,
     ExecutionStatus,
-    Verification,
 )
 from jacobian.contracts.sat import (
     SatLratProofArtifact,
@@ -233,7 +232,6 @@ class SatLratVerificationAdapter:
         verified = (
             checked.execution.status is ExecutionStatus.COMPLETED
             and checked.conclusion is Conclusion.TRUE
-            and checked.verification is Verification.VERIFIED
             and checked.verification_record_uri is not None
         )
         detail = checked.execution.detail or (

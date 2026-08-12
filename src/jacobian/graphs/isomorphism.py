@@ -30,7 +30,7 @@ from jacobian.contracts.graph_isomorphism import (
     GraphVertexMapping,
     SimpleUndirectedGraph,
 )
-from jacobian.contracts.results import Conclusion, ExecutionStatus, Verification
+from jacobian.contracts.results import Conclusion, ExecutionStatus
 from jacobian.graphs.installation import GraphInstallation
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
@@ -280,7 +280,6 @@ class GraphIsomorphismAdapter:
         verified = (
             checked.execution.status is ExecutionStatus.COMPLETED
             and checked.conclusion in {Conclusion.TRUE, Conclusion.FALSE}
-            and checked.verification is Verification.VERIFIED
             and checked.verification_record_uri is not None
         )
         conclusion: Literal["TRUE", "FALSE", "UNKNOWN"]

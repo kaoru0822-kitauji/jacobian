@@ -27,7 +27,6 @@ from jacobian.contracts.results import (
     Conclusion,
     ExecutionStatus,
     ResultEnvelope,
-    Verification,
 )
 from jacobian.lean_frontend.service import LeanService
 from jacobian.schema_registry import SchemaRegistry
@@ -223,6 +222,5 @@ def _is_verified(result: ResultEnvelope) -> bool:
     return (
         result.execution.status is ExecutionStatus.COMPLETED
         and result.conclusion is Conclusion.TRUE
-        and result.verification is Verification.VERIFIED
         and result.verification_record_uri is not None
     )

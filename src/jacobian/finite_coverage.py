@@ -38,7 +38,7 @@ from jacobian.contracts.finite_coverage import (
     FiniteCoverageVerifyOutput,
     FiniteCoverageVerifyRequest,
 )
-from jacobian.contracts.results import Conclusion, ExecutionStatus, Verification
+from jacobian.contracts.results import Conclusion, ExecutionStatus
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema
@@ -454,7 +454,6 @@ class FiniteCoverageVerifyAdapter:
         verified = (
             checked.execution.status is ExecutionStatus.COMPLETED
             and checked.conclusion is Conclusion.TRUE
-            and checked.verification is Verification.VERIFIED
             and checked.verification_record_uri is not None
         )
         detail = checked.execution.detail

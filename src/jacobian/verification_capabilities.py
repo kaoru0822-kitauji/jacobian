@@ -22,7 +22,6 @@ from jacobian.contracts.results import (
     ContractModel,
     ExecutionStatus,
     ResultEnvelope,
-    Verification,
 )
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.schema_registry import model_schema
@@ -92,7 +91,6 @@ class _VerificationProjection:
     ) -> CapabilityResult:
         verified = (
             envelope.execution.status is ExecutionStatus.COMPLETED
-            and envelope.verification is Verification.VERIFIED
             and envelope.verification_record_uri is not None
         )
         references = set(envelope.evidence_uris)

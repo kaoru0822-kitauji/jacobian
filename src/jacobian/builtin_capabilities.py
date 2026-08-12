@@ -26,7 +26,6 @@ from jacobian.contracts.lean import (
 from jacobian.contracts.results import (
     Execution,
     ExecutionStatus,
-    Verification,
 )
 from jacobian.lean_frontend.declarations import (
     LeanDeclarationBackendError,
@@ -97,8 +96,7 @@ class LeanCheckAdapter:
             environment=LeanEnvironment(str(payload.get("environment", "CORE"))),
         )
         verified = (
-            checked.result.verification is Verification.VERIFIED
-            and checked.result.verification_record_uri is not None
+            checked.result.verification_record_uri is not None
         )
         evidence = (checked.certificate_uri,)
         scope_uri = checked.result.scope_uri

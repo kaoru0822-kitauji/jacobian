@@ -60,7 +60,6 @@ from jacobian.contracts.polynomials import (
 from jacobian.contracts.results import (
     Conclusion,
     ExecutionStatus,
-    Verification,
 )
 from jacobian.domains._examples import example
 from jacobian.polynomials._support import (
@@ -549,7 +548,6 @@ class PolynomialIntervalPositivityVerifyAdapter:
         verified = (
             checked.execution.status is ExecutionStatus.COMPLETED
             and checked.conclusion in {Conclusion.TRUE, Conclusion.FALSE}
-            and checked.verification is Verification.VERIFIED
             and checked.verification_record_uri is not None
         )
         conclusion: Literal["TRUE", "FALSE", "UNKNOWN"] = (

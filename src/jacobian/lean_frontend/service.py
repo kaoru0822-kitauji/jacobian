@@ -22,7 +22,6 @@ from jacobian.contracts.results import (
     Execution,
     ExecutionStatus,
     ResultEnvelope,
-    Verification,
 )
 from jacobian.contracts.verification import VerificationRecord
 from jacobian.registry import CheckerRegistryError
@@ -224,7 +223,7 @@ class LeanService:
             )
             healthy = (
                 checked.result.execution.status is ExecutionStatus.COMPLETED
-                and checked.result.verification is Verification.VERIFIED
+                and checked.result.verification_record_uri is not None
             )
             with self._cache_lock:
                 self._mathlib_warmup_status = "HEALTHY" if healthy else "UNHEALTHY"

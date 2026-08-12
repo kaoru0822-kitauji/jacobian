@@ -20,7 +20,7 @@ from tests.component.providers.polynomial.polynomial_capabilities_support import
 
 from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.evidence import EvidenceBindings, WitnessEnvelope, WitnessRole
-from jacobian.contracts.results import Conclusion, InputStatus, Verification
+from jacobian.contracts.results import Conclusion, InputStatus
 
 
 def test_collision_checker_rejects_a_forged_image(
@@ -139,7 +139,7 @@ def test_collision_comparison_does_not_promote_forged_evaluations(
     )
 
     assert candidate.output["candidate_collision"] is True
-    assert candidate.output["verification"] == Verification.UNVERIFIED.value
+    assert candidate.output["verification"] == "UNVERIFIED"
 
     rejected = runtime.core.capabilities.invoke(
         CapabilityRequest(

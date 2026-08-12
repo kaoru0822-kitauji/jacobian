@@ -22,7 +22,6 @@ from jacobian.contracts.results import (
     InputStatus,
     InputValidation,
     ResultEnvelope,
-    Verification,
 )
 from jacobian.domains.polynomial_nullstellensatz import (
     build_nullstellensatz_core_bundle,
@@ -337,7 +336,6 @@ def test_checker_timeout_never_verifies(
                 execution=Execution(status=ExecutionStatus.TIMEOUT),
                 input=InputValidation(status=InputStatus.ACCEPTED),
                 conclusion=Conclusion.UNKNOWN,
-                verification=Verification.UNVERIFIED,
             ),
         )
 

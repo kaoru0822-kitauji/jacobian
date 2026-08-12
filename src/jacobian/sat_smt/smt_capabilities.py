@@ -22,7 +22,7 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
-from jacobian.contracts.results import Conclusion, ExecutionStatus, Verification
+from jacobian.contracts.results import Conclusion, ExecutionStatus
 from jacobian.contracts.smt import (
     SmtUnsatProofVerificationOutput,
     SmtUnsatProofVerificationRequest,
@@ -222,7 +222,6 @@ class SmtUnsatProofVerificationAdapter:
         verified = (
             checked.execution.status is ExecutionStatus.COMPLETED
             and checked.conclusion is Conclusion.TRUE
-            and checked.verification is Verification.VERIFIED
             and checked.verification_record_uri is not None
         )
         status: Literal[

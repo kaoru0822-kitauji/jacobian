@@ -34,7 +34,6 @@ from jacobian.contracts.results import (
     Conclusion,
     Execution,
     ExecutionStatus,
-    Verification,
 )
 from jacobian.contracts.sat import (
     SatAssignmentVerificationOutput,
@@ -421,7 +420,6 @@ class SatAssignmentVerificationAdapter:
         verified = (
             checked.execution.status is ExecutionStatus.COMPLETED
             and checked.conclusion is Conclusion.TRUE
-            and checked.verification is Verification.VERIFIED
             and checked.verification_record_uri is not None
         )
         status: Literal[
@@ -605,7 +603,6 @@ class SatUnsatProofVerificationAdapter:
         verified = (
             checked.execution.status is ExecutionStatus.COMPLETED
             and checked.conclusion is Conclusion.TRUE
-            and checked.verification is Verification.VERIFIED
             and checked.verification_record_uri is not None
         )
         status: Literal[

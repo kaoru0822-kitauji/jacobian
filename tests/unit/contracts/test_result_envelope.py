@@ -15,7 +15,7 @@ def test_timeout_cannot_carry_a_verified_false_conclusion() -> None:
                 "execution": {"status": "TIMEOUT", "runtime_ms": 10},
                 "input": {"status": "ACCEPTED"},
                 "conclusion": "FALSE",
-                "verification": "VERIFIED",
+                "verification_record_uri": "artifact://sha256/" + "f" * 64,
                 "evidence_uris": ["artifact://sha256/" + "c" * 64],
             }
         )
@@ -28,21 +28,19 @@ def test_timeout_is_represented_as_unknown_unverified_execution() -> None:
             "execution": {"status": "TIMEOUT", "runtime_ms": 10},
             "input": {"status": "ACCEPTED"},
             "conclusion": "UNKNOWN",
-            "verification": "UNVERIFIED",
         }
     )
 
     assert result.model_dump(mode="json")["execution"]["status"] == "TIMEOUT"
 
 
-def test_unverified_result_cannot_smuggle_a_verification_record() -> None:
-    with pytest.raises(ValidationError, match="unverified result"):
+def test_verification_record_requires_a_decisive_conclusion() -> None:
+    with pytest.raises(ValidationError, match="decisive mathematical conclusion"):
         ResultEnvelope.model_validate(
             {
                 "execution": {"status": "COMPLETED"},
                 "input": {"status": "ACCEPTED"},
                 "conclusion": "UNKNOWN",
-                "verification": "UNVERIFIED",
                 "verification_record_uri": "artifact://sha256/" + "f" * 64,
             }
         )
@@ -150,7 +148,6 @@ def _verified_result(
         "execution": {"status": "COMPLETED"},
         "input": {"status": "ACCEPTED"},
         "conclusion": conclusion,
-        "verification": "VERIFIED",
         "claim_digest": "sha256:" + "c" * 64,
         "semantics_digest": "sha256:" + "d" * 64,
         "candidate_digest": "sha256:" + "e" * 64,

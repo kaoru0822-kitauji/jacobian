@@ -38,7 +38,6 @@ from jacobian.contracts.results import (
     ContractModel,
     Execution,
     ExecutionStatus,
-    Verification,
 )
 from jacobian.operation_bindings import DurablePublication
 from jacobian.operation_installation import InstalledDomainBundle
@@ -671,7 +670,6 @@ class ExactComputedVerificationAdapter:
         verified = (
             checked.execution.status is ExecutionStatus.COMPLETED
             and checked.conclusion is Conclusion.TRUE
-            and checked.verification is Verification.VERIFIED
             and checked.verification_record_uri is not None
         )
         status = self._verification_status(checked.execution.status, verified)
@@ -724,7 +722,6 @@ class ExactComputedVerificationAdapter:
         verified = (
             checked.execution.status is ExecutionStatus.COMPLETED
             and checked.conclusion is Conclusion.TRUE
-            and checked.verification is Verification.VERIFIED
             and checked.verification_record_uri is not None
         )
         status = self._verification_status(checked.execution.status, verified)

@@ -60,7 +60,6 @@ from jacobian.contracts.polynomial_intervals import (
 from jacobian.contracts.results import (
     Conclusion,
     ExecutionStatus,
-    Verification,
 )
 from jacobian.domains._examples import example
 from jacobian.polynomials._support import _computed_result, _validate_request
@@ -511,7 +510,6 @@ class PolynomialIntervalEnclosureVerifyAdapter:
         verified = (
             checked.execution.status is ExecutionStatus.COMPLETED
             and checked.conclusion in {Conclusion.TRUE, Conclusion.FALSE}
-            and checked.verification is Verification.VERIFIED
             and checked.verification_record_uri is not None
         )
         conclusion: Literal["TRUE", "FALSE", "UNKNOWN"] = (
