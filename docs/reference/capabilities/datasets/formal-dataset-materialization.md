@@ -70,10 +70,9 @@ As a standard domain operation, the capability response places the
 materialized record under `output.result` and exposes its content-addressed
 artifact as `output.result_uri`.
 
-The output explicitly reports `NOT_EXECUTED`. Version mismatches and missing
-project-file bindings produce typed diagnostics so a caller can provision the
-correct checkout before execution. The adapter never silently falls back to
-the host project.
+Version mismatches and missing project-file bindings produce typed diagnostics
+so a caller can provision the correct checkout before execution. The adapter
+never silently falls back to the host project.
 
 ## Trust boundary
 

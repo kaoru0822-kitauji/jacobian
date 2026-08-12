@@ -81,7 +81,6 @@ class LeanStatementProposalArtifact(ContractModel):
     mathlib_commit: str | None = None
     source_locator: str | None = None
     semantic_scope: Literal["ELABORATION_ONLY"] = "ELABORATION_ONLY"
-    truth_status: Literal["NOT_ASSESSED"] = "NOT_ASSESSED"
 
     @model_validator(mode="after")
     def require_operation_specific_shape(self) -> Self:

@@ -117,7 +117,6 @@ def test_supported_row_materializes_deterministically(
     assert str(first_output["row_digest"]).startswith("sha256:")
     assert str(first_output["normalized_source_digest"]).startswith("sha256:")
     assert str(first_output["environment_digest"]).startswith("sha256:")
-    assert first_output["execution_status"] == "NOT_EXECUTED"
     assert str(first_output["normalized_source"]).endswith("\n")
 
 

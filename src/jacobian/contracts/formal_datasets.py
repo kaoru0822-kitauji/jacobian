@@ -252,7 +252,6 @@ class FormalDatasetArtifact(ContractModel):
     environment: FormalDatasetEnvironment
     environment_digest: Sha256Digest
     preprocessing: tuple[FormalPreprocessingDecision, ...]
-    execution_status: Literal["NOT_EXECUTED"] = "NOT_EXECUTED"
     diagnostic_baseline: FormalDatasetDiagnosticBaseline
     diagnostics: tuple[FormalDatasetDiagnostic, ...]
 

@@ -225,7 +225,6 @@ def test_propose_directly_elaborates_environment_bound_proposition(
     assert "Eq" in result.output["used_declarations"]
     assert result.output["options"][0] == {"name": "pp.all", "value": "true"}
     assert result.output["semantic_scope"] == "ELABORATION_ONLY"
-    assert result.output["truth_status"] == "NOT_ASSESSED"
     assert result.output["environment_digest"].startswith("sha256:")
 
     artifact = propose.resources.store.get(result.output["proposal_uri"])
