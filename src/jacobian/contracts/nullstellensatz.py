@@ -144,7 +144,6 @@ class JacobianDegreeSliceMaterializeOutput(ContractModel):
     chart_count: Literal[12] = 12
     generator_count_per_chart: Literal[10] = 10
     coefficient_domain: Literal["QQ"] = "QQ"
-    conclusion: Literal["NOT_EVALUATED"] = "NOT_EVALUATED"
 
 
 class NullstellensatzResourceBudget(ContractModel):
