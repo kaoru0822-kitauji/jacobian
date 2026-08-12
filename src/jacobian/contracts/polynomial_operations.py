@@ -307,28 +307,6 @@ class PolynomialGroebnerBasisResult(ContractModel):
         return self
 
 
-class PolynomialGroebnerBasisObligation(ContractModel):
-    """Independent obligations needed to verify the computed ideal basis."""
-
-    obligation_schema_version: Literal["1"] = "1"
-    candidate_basis_available: Literal[True] = True
-    required_checks: tuple[
-        Literal[
-            "ORIGINAL_GENERATORS_REDUCE_TO_ZERO",
-            "BASIS_ELEMENTS_BELONG_TO_SOURCE_IDEAL",
-            "S_POLYNOMIALS_REDUCE_TO_ZERO",
-            "BASIS_IS_REDUCED_AND_MONIC",
-        ],
-        ...,
-    ] = (
-        "ORIGINAL_GENERATORS_REDUCE_TO_ZERO",
-        "BASIS_ELEMENTS_BELONG_TO_SOURCE_IDEAL",
-        "S_POLYNOMIALS_REDUCE_TO_ZERO",
-        "BASIS_IS_REDUCED_AND_MONIC",
-    )
-    verification_status: Literal["UNVERIFIED"] = "UNVERIFIED"
-
-
 class IntegerPolynomial(ContractModel):
     """Canonical dense polynomial in ``ZZ[x]``, highest degree first."""
 
@@ -556,7 +534,6 @@ __all__ = [
     "PolynomialFactorizationResult",
     "PolynomialGcdRequest",
     "PolynomialGcdResult",
-    "PolynomialGroebnerBasisObligation",
     "PolynomialGroebnerBasisRequest",
     "PolynomialGroebnerBasisResult",
     "PolynomialGroebnerBudget",
