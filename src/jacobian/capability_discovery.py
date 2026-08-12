@@ -32,12 +32,7 @@ class CapabilityDiscoveryMixin:
         self: DiscoveryOwner,
         request: CapabilityDiscoveryRequest,
     ) -> CapabilityDiscoveryResult:
-        catalog_descriptors = self.catalog().capabilities
-        descriptors = tuple(
-            descriptor
-            for descriptor in catalog_descriptors
-            if descriptor.discovery_visible
-        )
+        descriptors = self.catalog().capabilities
         normalized_domain = (
             normalize_domain(request.domain) if request.domain is not None else None
         )

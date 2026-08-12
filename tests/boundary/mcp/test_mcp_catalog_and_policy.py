@@ -49,7 +49,6 @@ def test_mcp_compact_capability_index_is_searchable_and_paginated(
             discoverable_ids = {
                 descriptor["capability_id"]
                 for descriptor in full_catalog["capabilities"]
-                if descriptor.get("discovery_visible", True)
             }
 
             listed = await client.call_tool(

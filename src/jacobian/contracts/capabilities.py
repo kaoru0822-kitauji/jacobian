@@ -330,7 +330,6 @@ class CapabilityDescriptor(ContractModel):
     )
     accepted_artifact_types: tuple[ArtifactUri, ...] = ()
     produced_artifact_types: tuple[ArtifactUri, ...] = ()
-    discovery_visible: bool = True
     invocation_examples: tuple[CapabilityInvocationExample, ...] = ()
 
     @model_validator(mode="after")
