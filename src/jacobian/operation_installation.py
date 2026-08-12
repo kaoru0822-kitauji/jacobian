@@ -180,11 +180,19 @@ class InstalledOperationAdapter:
         self.resources = resources
         publication = operation.publication
         if isinstance(publication, InlinePublication):
-            from jacobian.contracts.domain_operations import InlineOperationOutput
+            from jacobian.contracts.domain_operations import (
+                InlineOperationOutput,
+                ReferencedInlineOperationOutput,
+            )
 
+            inline_output = (
+                ReferencedInlineOperationOutput
+                if operation.output_ports
+                else InlineOperationOutput
+            )
             output_model = cast(
                 type[ContractModel],
-                InlineOperationOutput[self.spec.result_type],  # type: ignore[name-defined]
+                inline_output[self.spec.result_type],
             )
             produced_artifact_types: tuple[str, ...] = ()
         else:

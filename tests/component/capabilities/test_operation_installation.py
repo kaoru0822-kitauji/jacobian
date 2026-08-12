@@ -149,6 +149,7 @@ def test_synthetic_bundle_returns_an_inline_typed_result(
     assert descriptor.input_schema["additionalProperties"] is False
     result_schema = descriptor.output_schema["properties"]["result"]
     assert result_schema == {"$ref": "#/$defs/_SyntheticResult"}
+    assert "value_refs" not in descriptor.output_schema["properties"]
 
     result = operation_services.core.capabilities.invoke(
         CapabilityRequest(

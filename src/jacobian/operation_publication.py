@@ -10,6 +10,7 @@ from jacobian.canonical import canonicalize_json
 from jacobian.contracts.domain_operations import (
     DurableOperationOutput,
     InlineOperationOutput,
+    ReferencedInlineOperationOutput,
 )
 from jacobian.contracts.results import ContractModel
 from jacobian.operation_bindings import (
@@ -80,16 +81,21 @@ def publish_operation[
                 )
         except ValueReferenceError as exc:
             raise PublicationLimitError(str(exc)) from exc
-        output_type = cast(Any, InlineOperationOutput[operation.spec.result_type])  # type: ignore[name-defined]
+        output_contract = (
+            ReferencedInlineOperationOutput
+            if operation.output_ports
+            else InlineOperationOutput
+        )
+        output_type = cast(Any, output_contract[operation.spec.result_type])
+        output_payload = {
+            "result": result,
+            "backend_version": context.backend_version,
+        }
+        if value_refs:
+            output_payload["value_refs"] = value_refs
         output = cast(
             ContractModel,
-            output_type.model_validate(
-                {
-                    "result": result,
-                    "backend_version": context.backend_version,
-                    "value_refs": value_refs,
-                }
-            ),
+            output_type.model_validate(output_payload),
         )
         return PublishedOperation(
             output=output,

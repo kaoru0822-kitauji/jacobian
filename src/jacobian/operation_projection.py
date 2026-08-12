@@ -20,9 +20,6 @@ def project_operation_result(
     if isinstance(terminal, Completed):
         if publication is None:
             raise ValueError("completed operation requires publication")
-        output = publication.output.model_dump(mode="json")
-        if output.get("value_refs") == {}:
-            del output["value_refs"]
         return CapabilityResult(
             capability_id=operation_id,
             capability_version=version,
@@ -30,7 +27,7 @@ def project_operation_result(
                 status=ExecutionStatus.COMPLETED,
                 runtime_ms=terminal.runtime_ms,
             ),
-            output=output,
+            output=publication.output.model_dump(mode="json"),
             artifact_uris=publication.artifact_uris,
         )
 
