@@ -301,9 +301,6 @@ def test_decide_capability_finds_positive_linear(installation) -> None:
     assert result.output["exactness"] == "EXACT_RATIONAL"
     assert result.output["determinism"] == "DETERMINISTIC"
     assert result.output["method"] == "STURM_SEQUENCE"
-    assert result.output["verification"] == "UNVERIFIED"
-    assert result.output["certificate_available"] is False
-    assert result.output["checker_id"] is None
     assert result.output["roots_in_open_interval"] == 0
     assert result.output["endpoint_root"] is False
 

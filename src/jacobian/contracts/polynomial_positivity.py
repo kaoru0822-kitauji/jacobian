@@ -110,9 +110,6 @@ class PolynomialIntervalPositivityOutput(ContractModel):
     exactness: Literal["EXACT_RATIONAL"] = "EXACT_RATIONAL"
     determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
     method: Literal["STURM_SEQUENCE"] = "STURM_SEQUENCE"
-    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
-    certificate_available: Literal[False] = False
-    checker_id: None = None
     backend: Literal["sympy"] = "sympy"
     backend_version: str = Field(min_length=1, max_length=64)
 
