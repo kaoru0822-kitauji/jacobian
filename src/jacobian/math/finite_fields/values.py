@@ -11,6 +11,11 @@ from jacobian.canonical import sha256_digest
 from jacobian.contracts.base import ContractModel
 from jacobian.math.prime_field_linear_algebra import PrimeFieldMatrix, rank
 
+_MAX_FIELD_ORDER = 4096
+_MIN_MODULUS_COEFFICIENTS = 3
+_MAX_MODULUS_COEFFICIENTS = 17
+_MAX_AXIS_LABELS = 256
+
 
 def _digest(payload: dict[str, Any]) -> str:
     return sha256_digest(rfc8785.dumps(payload))
@@ -23,6 +28,35 @@ def _encoded_coordinates(value: FiniteFieldElement) -> int:
     )
 
 
+def _validate_presentation_shape(
+    characteristic: int,
+    modulus_coefficients: tuple[int, ...],
+    generator: str,
+    element_encoding_version: str,
+) -> None:
+    if type(characteristic) is not int or characteristic < 2:
+        raise ValueError("characteristic must be a prime integer")
+    if characteristic > _MAX_FIELD_ORDER:
+        raise ValueError("characteristic exceeds the supported field-order bound")
+    if not (
+        _MIN_MODULUS_COEFFICIENTS
+        <= len(modulus_coefficients)
+        <= _MAX_MODULUS_COEFFICIENTS
+    ):
+        raise ValueError("finite extension modulus length is outside its bound")
+    if modulus_coefficients[-1] != 1:
+        raise ValueError("modulus must be monic")
+    if any(
+        type(value) is not int or not 0 <= value < characteristic
+        for value in modulus_coefficients
+    ):
+        raise ValueError("modulus coefficients must be canonical field residues")
+    if not generator:
+        raise ValueError("generator must be nonempty")
+    if element_encoding_version != "power-basis-v1":
+        raise ValueError("unsupported finite-field element encoding")
+
+
 class FiniteFieldPresentation(ContractModel):
     """An exact polynomial presentation with a fixed power-basis encoding."""
 
@@ -33,23 +67,18 @@ class FiniteFieldPresentation(ContractModel):
 
     @model_validator(mode="after")
     def validate_presentation(self) -> Self:
+        _validate_presentation_shape(
+            self.characteristic,
+            self.modulus_coefficients,
+            self.generator,
+            self.element_encoding_version,
+        )
+        if self.characteristic**self.degree > _MAX_FIELD_ORDER:
+            raise ValueError("field order exceeds the supported bound")
         from sympy import Poly, isprime, symbols
 
-        if type(self.characteristic) is not int or not isprime(self.characteristic):
+        if not isprime(self.characteristic):
             raise ValueError("characteristic must be a prime integer")
-        if len(self.modulus_coefficients) < 3:
-            raise ValueError("finite extension modulus must have degree at least two")
-        if self.modulus_coefficients[-1] != 1:
-            raise ValueError("modulus must be monic")
-        if any(
-            type(value) is not int or not 0 <= value < self.characteristic
-            for value in self.modulus_coefficients
-        ):
-            raise ValueError("modulus coefficients must be canonical field residues")
-        if not self.generator:
-            raise ValueError("generator must be nonempty")
-        if self.element_encoding_version != "power-basis-v1":
-            raise ValueError("unsupported finite-field element encoding")
         variable = symbols("x")
         polynomial = Poly(
             sum(
@@ -141,6 +170,8 @@ class Axis(ContractModel):
             raise ValueError("axis name must be nonempty")
         if not self.labels or any(not label for label in self.labels):
             raise ValueError("axis labels must be nonempty")
+        if len(self.labels) > _MAX_AXIS_LABELS:
+            raise ValueError("axis exceeds the supported label bound")
         if len(set(self.labels)) != len(self.labels):
             raise ValueError("axis labels must be unique")
         return self
@@ -215,6 +246,13 @@ class FiniteDimensionalSubspace(ContractModel):
             for matrix in self.basis
         ):
             raise ValueError("subspace matrices must share their parent and axes")
+        flattened_dimension = (
+            len(first.row_axis.labels)
+            * len(first.column_axis.labels)
+            * self.presentation.degree
+        )
+        if flattened_dimension * len(self.basis) > _MAX_AXIS_LABELS**2:
+            raise ValueError("subspace rank matrix exceeds its supported bound")
         flattened = tuple(
             tuple(
                 coordinate
@@ -304,6 +342,8 @@ class ProjectiveLine(ContractModel):
         expected = (self.presentation.order ** len(self.axis.labels) - 1) // (
             self.presentation.order - 1
         )
+        if expected > _MAX_FIELD_ORDER:
+            raise ValueError("projective line exceeds the supported direction bound")
         if len(self.points) != expected:
             raise ValueError("projective line must contain every direction")
         if any(
@@ -467,6 +507,8 @@ class FinitePolynomial(ContractModel):
             raise ValueError("finite polynomial variable must be nonempty")
         if not self.coefficients:
             raise ValueError("finite polynomial requires a constant coefficient")
+        if len(self.coefficients) > _MAX_FIELD_ORDER:
+            raise ValueError("finite polynomial exceeds the supported degree bound")
         if any(
             coefficient.presentation != self.presentation
             for coefficient in self.coefficients
@@ -529,6 +571,8 @@ class FiniteMapTable(ContractModel):
     def validate_table(self) -> Self:
         if len(self.entries) != self.map.domain.order:
             raise ValueError("finite map table must enumerate the complete domain")
+        if self.map.domain.order > _MAX_FIELD_ORDER:
+            raise ValueError("finite map table exceeds the supported domain bound")
         inputs = tuple(source for source, _ in self.entries)
         if any(value.presentation != self.map.domain for value in inputs):
             raise ValueError("finite map table inputs must use the exact domain")

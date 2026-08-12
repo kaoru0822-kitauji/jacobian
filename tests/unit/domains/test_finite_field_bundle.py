@@ -1,3 +1,6 @@
+import pytest
+from pydantic import ValidationError
+
 from jacobian.domains.finite_fields import build_finite_field_bundle
 from jacobian.domains.finite_fields.contracts import ProjectiveLineRequest
 from jacobian.math.finite_fields import (
@@ -85,3 +88,25 @@ def test_projective_enumeration_refuses_large_output_before_allocation() -> None
 
     assert isinstance(terminal, NonConclusion)
     assert terminal.diagnostic.code == "RESOURCE_LIMIT_EXCEEDED"
+
+
+def test_oversized_presentation_rejects_during_request_parsing() -> None:
+    with pytest.raises(ValidationError, match="field-order bound"):
+        ProjectiveLineRequest(
+            presentation=FiniteFieldPresentation(
+                characteristic=99991,
+                modulus_coefficients=(1, 0, 1),
+            ),
+            axis=Axis(name="rows", labels=("r1", "r2")),
+        )
+
+
+def test_oversized_axis_rejects_during_request_parsing() -> None:
+    with pytest.raises(ValidationError, match="label bound"):
+        ProjectiveLineRequest(
+            presentation=FiniteFieldPresentation(
+                characteristic=2,
+                modulus_coefficients=(1, 1, 1),
+            ),
+            axis=Axis(name="large", labels=tuple(f"x{i}" for i in range(257))),
+        )

@@ -133,3 +133,55 @@ def test_rank_result_rejects_a_map_over_the_wrong_prime_field() -> None:
 
     with pytest.raises(ValueError, match="prime field"):
         RankResult(direction=direction, linear_map=wrong_prime_map, rank=1)
+
+
+def test_presentation_rejects_oversized_characteristic_before_primality() -> None:
+    with pytest.raises(ValueError, match="field-order bound"):
+        FiniteFieldPresentation(
+            characteristic=99991,
+            modulus_coefficients=(1, 0, 1),
+        )
+
+
+def test_presentation_rejects_oversized_field_order_before_irreducibility() -> None:
+    with pytest.raises(ValueError, match="field order"):
+        FiniteFieldPresentation(
+            characteristic=2,
+            modulus_coefficients=(1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1),
+        )
+
+
+def test_presentation_rejects_oversized_modulus_length() -> None:
+    with pytest.raises(ValueError, match="length"):
+        FiniteFieldPresentation(
+            characteristic=2,
+            modulus_coefficients=(1,) + (0,) * 17 + (1,),
+        )
+
+
+def test_axis_rejects_oversized_label_set() -> None:
+    with pytest.raises(ValueError, match="label bound"):
+        Axis(name="large", labels=tuple(f"x{i}" for i in range(257)))
+
+
+def test_subspace_rejects_oversized_rank_matrix_before_allocation() -> None:
+    presentation = _presentation()
+    row_axis = Axis(name="rows", labels=tuple(f"r{i}" for i in range(16)))
+    column_axis = Axis(name="columns", labels=tuple(f"c{i}" for i in range(16)))
+    zero = _element(presentation, (0, 0, 0))
+    matrix = AxisBoundMatrix(
+        presentation=presentation,
+        row_axis=row_axis,
+        column_axis=column_axis,
+        entries=((zero,) * 16,) * 16,
+    )
+
+    with pytest.raises(ValueError, match="rank matrix"):
+        FiniteDimensionalSubspace(
+            presentation=presentation,
+            basis_axis=Axis(
+                name="basis",
+                labels=tuple(f"b{i}" for i in range(86)),
+            ),
+            basis=(matrix,) * 86,
+        )

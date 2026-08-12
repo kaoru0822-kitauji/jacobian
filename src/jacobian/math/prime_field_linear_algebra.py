@@ -6,6 +6,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
+_MAX_DIMENSION = 256
+
 __all__ = [
     "PrimeFieldMatrix",
     "column_basis",
@@ -25,21 +27,31 @@ class PrimeFieldMatrix:
     columns: int
 
     def __post_init__(self) -> None:
-        from sympy import isprime
-
-        if type(self.prime) is not int or not isprime(self.prime):
+        if type(self.prime) is not int or self.prime < 2:
             raise ValueError("prime must be a prime integer")
         if type(self.columns) is not int or self.columns < 0:
             raise ValueError("columns must be a nonnegative integer")
+        if self.columns > _MAX_DIMENSION or len(self.entries) > _MAX_DIMENSION:
+            raise ValueError("matrix exceeds the supported dimension bound")
         if any(len(row) != self.columns for row in self.entries):
             raise ValueError("every matrix row must match the declared column count")
+        if any(
+            type(value) is not int or not 0 <= value < self.prime
+            for row in self.entries
+            for value in row
+        ):
+            raise ValueError("matrix entries must be canonical prime-field residues")
+        from sympy import isprime
+
+        if not isprime(self.prime):
+            raise ValueError("prime must be a prime integer")
 
 
 def _domain_matrix(matrix: PrimeFieldMatrix) -> Any:
     import sympy
     from sympy.polys.matrices import DomainMatrix
 
-    entries = [[value % matrix.prime for value in row] for row in matrix.entries]
+    entries = [list(row) for row in matrix.entries]
     return DomainMatrix(
         entries,
         (len(matrix.entries), matrix.columns),
