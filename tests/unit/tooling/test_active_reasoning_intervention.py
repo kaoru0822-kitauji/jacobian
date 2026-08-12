@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -130,6 +131,7 @@ def test_internalcot_projection_checks_structure_without_publishing_note_text() 
     assert study._note_prefix_counts(payload) == [1]
     assert behavior["host_command_count"] == 4
     assert behavior["reasoning_output_tokens"] == 3
+    assert behavior["internalcot_skill_bytes"] == len(workflow.encode())
     assert "secret derivation" in str(notes[0]["text"])
     assert "text" not in adherence
     assert "text" not in behavior
@@ -283,3 +285,46 @@ def test_server_command_uses_current_remote_host() -> None:
 
     assert "jacobian.adapters.mcp.remote_cli" in command[2]
     assert "--allow-anonymous" in command
+
+
+def test_committed_report_is_bounded_ineligible_and_research_only() -> None:
+    report = json.loads(
+        (
+            ROOT
+            / "benchmarks/evidence/internalcot-visible-reasoning-intervention-v1/report.json"
+        ).read_text()
+    )
+
+    assert report["study_id"] == "internalcot-visible-reasoning-intervention-v1"
+    assert report["dataset"]["trial_count"] == 32
+    assert report["dataset"]["pair_count"] == 16
+    assert report["dataset"]["treatment_adherent_count"] == 5
+    assert report["dataset"]["eligible"] is False
+    assert report["decision"] == "INCONCLUSIVE_RESEARCH_ONLY"
+    assert report["production_change_authorized"] is False
+    assert report["observability"]["strong_b_star_information"] is False
+    assert report["policy_intervention_detected"] is False
+    assert report["policy_equivalence_supported"] is False
+    assert report["projection_count"] == 32
+    assert "projections" not in report
+    for key in (
+        "config_sha256",
+        "run_manifest_sha256",
+        "collector_sha256",
+        "analyzer_sha256",
+        "projection_sha256",
+    ):
+        assert re.fullmatch(r"sha256:[0-9a-f]{64}", report[key])
+    assert all(item["model_calls"] == 0 for item in report["pre_run_failures"])
+    rendered = json.dumps(report)
+    for forbidden in (
+        '"aggregated_output":',
+        '"arguments":',
+        '"prompt":',
+        '"raw_artifacts":',
+        '"reasoning_content":',
+        '"submission":',
+        '"text":',
+        '"workspace_artifacts":',
+    ):
+        assert forbidden not in rendered

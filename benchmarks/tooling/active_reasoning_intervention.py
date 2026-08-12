@@ -612,6 +612,7 @@ def _intervention_trace(  # noqa: C901
 
     notes: list[dict[str, object]] = []
     skill_positions: list[int] = []
+    skill_visible_bytes = 0
     note_positions: list[int] = []
     substantive_positions: list[int] = []
     final_agent_position = 0
@@ -651,6 +652,7 @@ def _intervention_trace(  # noqa: C901
         if "internalcot skill" in command:
             if _sha256_bytes(output.encode("utf-8")) == expected_workflow_sha256:
                 skill_positions.append(position)
+                skill_visible_bytes += len(output.encode("utf-8"))
             continue
         if "internalcot note " in command:
             if output.startswith("internalcot>"):
@@ -692,6 +694,7 @@ def _intervention_trace(  # noqa: C901
         **usage,
         "host_command_count": float(host_command_count),
         "internalcot_command_count": float(len(skill_positions) + len(note_positions)),
+        "internalcot_skill_bytes": float(skill_visible_bytes),
     }
     return notes, adherence, behavior
 
@@ -1102,7 +1105,7 @@ class Row:
 
 
 def _project_trial(
-    task: Path, trial: Path
+    task: Path, trial: Path, config: Mapping[str, Any]
 ) -> tuple[dict[str, Any], dict[str, list[Row]]]:
     record = _read_json(trial / "trial.json")
     task_id = record.get("task_id", task.name)
@@ -1122,7 +1125,6 @@ def _project_trial(
     pair_id = record.get("pair_id")
     if arm not in {"control", "internalcot"} or not isinstance(pair_id, str):
         raise HarborSuiteError(f"invalid arm/pair binding: {trial.name}")
-    config = _config(_DEFAULT_CONFIG)
     notes, adherence, behavior = _intervention_trace(
         transcript,
         expected_workflow_sha256=config["internalcot"]["workflow_sha256"],
@@ -1257,7 +1259,8 @@ def _project_trial(
             "internalcot_note_count": len(notes),
             "internalcot_visible_bytes": sum(
                 _safe_int(item["original_utf8_bytes"]) for item in notes
-            ),
+            )
+            + _safe_int(behavior["internalcot_skill_bytes"]),
             "truncated_count": sum(
                 bool(item["truncated"]) for item in [*messages, *notes]
             ),
@@ -1324,13 +1327,15 @@ def _project_trial(
             ),
             "internalcot_visible_bytes": float(
                 sum(_safe_int(item["original_utf8_bytes"]) for item in notes)
-            ),
+            )
+            + behavior["internalcot_skill_bytes"],
             "total_visible_bytes": float(
                 sum(
                     _safe_int(item["original_utf8_bytes"])
                     for item in [*messages, *notes]
                 )
-            ),
+            )
+            + behavior["internalcot_skill_bytes"],
             "elapsed_seconds": float(record["command"]["elapsed_seconds"]),
         },
         "labels": trajectory_labels,
@@ -1742,6 +1747,7 @@ def _successful_producer_checker_chain(events: Sequence[Mapping[str, object]]) -
 
 def _load_projected_trials(
     *,
+    config: Mapping[str, Any],
     manifest: Mapping[str, Any],
     results_root: Path,
     tasks_by_name: Mapping[str, Path],
@@ -1758,7 +1764,9 @@ def _load_projected_trials(
             raise HarborSuiteError(f"trial record digest mismatch: {trial_id}")
         if task_id not in tasks_by_name:
             raise HarborSuiteError(f"unknown task in run manifest: {task_id}")
-        projection, projected_rows = _project_trial(tasks_by_name[task_id], trial_path)
+        projection, projected_rows = _project_trial(
+            tasks_by_name[task_id], trial_path, config
+        )
         projections.append(projection)
         for target, values in projected_rows.items():
             all_rows[target].extend(values)
@@ -1845,6 +1853,14 @@ def _paired_behavior(
     random = Random(seed)
     report: dict[str, Any] = {}
     for metric in metrics:
+        arm_values = {
+            arm: [
+                _safe_float(item["behavior_metrics"].get(metric))
+                for item in projections
+                if item["arm"] == arm
+            ]
+            for arm in ("control", "internalcot")
+        }
         differences = [
             value for task_id in task_ids for value in task_differences[metric][task_id]
         ]
@@ -1858,6 +1874,9 @@ def _paired_behavior(
             ]
             samples.append(sum(values) / len(values))
         report[metric] = {
+            "control_mean": sum(arm_values["control"]) / len(arm_values["control"]),
+            "internalcot_mean": sum(arm_values["internalcot"])
+            / len(arm_values["internalcot"]),
             "treatment_minus_control_mean": sum(differences) / len(differences),
             "task_bootstrap_95": {
                 "lower_95": _percentile(samples, 0.025),
@@ -1987,6 +2006,32 @@ def _analyze_intervention(
         for item in projections
         if item["arm"] == "internalcot"
     )
+    treatment_projections = [
+        item for item in projections if item["arm"] == "internalcot"
+    ]
+    adherence_condition_counts = {
+        "official_skill_loaded": sum(
+            bool(item["intervention_adherence"]["official_skill_loaded"])
+            for item in treatment_projections
+        ),
+        "minimum_two_successful_notes": sum(
+            _safe_int(item["intervention_adherence"]["successful_note_count"]) >= 2
+            for item in treatment_projections
+        ),
+        "first_note_before_substantive": sum(
+            bool(item["intervention_adherence"]["first_note_before_substantive"])
+            for item in treatment_projections
+        ),
+        "final_note_after_substantive_before_final": sum(
+            bool(
+                item["intervention_adherence"][
+                    "final_note_after_substantive_before_final"
+                ]
+            )
+            for item in treatment_projections
+        ),
+        "all_conditions": treatment_adherent,
+    }
     eligibility = config["eligibility"]
     coverage_checks = {
         "completed_trials": sum(
@@ -2053,11 +2098,24 @@ def _analyze_intervention(
             "task_count": len({item["task_id"] for item in projections}),
             "family_count": len({item["family"] for item in projections}),
             "treatment_adherent_count": treatment_adherent,
+            "treatment_adherence_condition_counts": adherence_condition_counts,
             "eligible": all(coverage_checks.values()),
             "coverage_checks": coverage_checks,
         },
         "event_coverage": {
+            "server_event_candidates": sum(
+                _safe_int(item["server_event_coverage"]["candidates"])
+                for item in projections
+            ),
+            "server_events_recorded": sum(
+                _safe_int(item["server_event_coverage"]["recorded"])
+                for item in projections
+            ),
             "server_tool_trajectories_by_arm": per_arm_tool,
+            "successful_producer_checker_chains": sum(
+                bool(item["tool_metrics"]["successful_producer_checker_chain"])
+                for item in projections
+            ),
             "tool_failure_state_counts_by_arm": {
                 arm: dict(sorted(values.items()))
                 for arm, values in failure_counts.items()
@@ -2097,7 +2155,22 @@ def _analyze_intervention(
                 else ["The frozen policy-equivalence rule was not satisfied."]
             ),
         ],
-        "projections": list(projections),
+        "projection_count": len(projections),
+        "projection_sha256": _json_digest(list(projections)),
+        "pre_run_failures": [
+            {
+                "stage": "pinned_internalcot_validation",
+                "model_calls": 0,
+                "accepted_trials": 0,
+                "outcome": "The bounded command wrapper rejected the first absolute-path validation attempt; validation was corrected before collection.",
+            },
+            {
+                "stage": "pinned_harbor_digest_validation",
+                "model_calls": 0,
+                "accepted_trials": 0,
+                "outcome": "The lightweight environment lacked Harbor; all eight frozen digests were revalidated with Harbor 0.20.0 before collection.",
+            },
+        ],
         "retention": config["retention"],
         "limitations": [
             "The selected tasks were previously observed in passive #1259 work; blocking controls task identity but this is not an unseen-task capability evaluation.",
@@ -2136,6 +2209,7 @@ def analyze_study(args: argparse.Namespace) -> int:
         ref.path.name: ref.path for ref in get_suite("mathematical-benchmarks-v1").tasks
     }
     all_rows, projections = _load_projected_trials(
+        config=config,
         manifest=manifest,
         results_root=results_root,
         tasks_by_name=tasks_by_name,

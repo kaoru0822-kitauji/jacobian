@@ -1,6 +1,6 @@
 # Internalcot visible-reasoning intervention
 
-Status: **frozen before accepted model runs; research-only**.
+Status: **completed; ineligible and research-only**.
 
 This bounded operator study asks whether the active
 [`internalcot`](https://github.com/morluto/internalcot) prompt, skill, and CLI
@@ -75,3 +75,47 @@ as contamination.
 The tasks were used in prior passive work. Pairing and complete-family holdout
 control known task identity within this intervention, but do not turn the study
 into an unseen-task capability evaluation.
+
+## Results
+
+The bounded aggregate report is
+[`benchmarks/evidence/internalcot-visible-reasoning-intervention-v1/report.json`](../../../benchmarks/evidence/internalcot-visible-reasoning-intervention-v1/report.json).
+All 32 trials and 16 pairs completed with normal command exits. Both arms used
+server tools in all 16 trials. The projector captured all candidate server
+events. It observed 13 accepted-only checker trajectories, 19 without a checker,
+one recovered tool-failure trajectory, and six discovery-only trajectories.
+There were no checker rejections and no no-tool trajectories.
+
+Only 5 of 16 treatment trials met every structural adherence condition. The
+frozen all-treatment adherence gate therefore failed. The no-tool,
+checker-rejection, recovery, and tool-failure coverage gates also failed. Three
+diagnostics were eligible in both arms: next action, checker state, and tool
+failure state.
+
+Conditional mean held-out macro-F1 gain was `+0.0060` for control `b` and
+`+0.0148` for treatment `b*`. The `b*` minus `b` increment was `+0.0088`, with
+a 95% task-bootstrap interval of `[-0.0560, 0.0727]`. The strong-`b*` rule was
+not satisfied. These are ineligible predictive associations, not passive
+observability evidence.
+
+Paired terminal verifier success and tool adoption were unchanged at `0.50`
+and `0.8125` in both arms. Treatment-minus-control mathematical correctness was
+`-0.0625`, checker use `-0.0625`, Jacobian calls `-0.25`, tool errors `-0.1875`,
+and retries `0`. No prespecified policy effect was detected, but the wide
+intervals also failed the policy-equivalence rule.
+
+The clearest effect was overhead. Treatment added means of 79,920 input tokens,
+930 output tokens, 490 reasoning-output tokens, 2.125 host commands, 6,118
+internalcot-visible bytes, 6,726 total visible bytes, and 20.6 seconds per pair.
+Intervals excluded zero for input tokens, reasoning-output tokens, host
+commands, and visible bytes; elapsed time did not.
+
+Two pre-run infrastructure attempts stopped before any model call or accepted
+trial: the first pinned-CLI validation used an incompatible command-wrapper
+form, and the lightweight environment lacked the pinned Harbor digest runtime.
+The accepted collection began only after direct package/workflow validation and
+all eight task digests passed under Harbor 0.20.0.
+
+The frozen decision is `INCONCLUSIVE_RESEARCH_ONLY`. This evidence does not
+support passive retention, a production observer, a reasoning protocol, or any
+other runtime change.
