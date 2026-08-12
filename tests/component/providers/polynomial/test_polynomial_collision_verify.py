@@ -45,7 +45,6 @@ def test_direct_collision_verifier_promotes_only_independent_replay(
     assert result.output["verification_input"] == {
         "status": InputStatus.ACCEPTED.value,
         "errors": [],
-        "warnings": [],
     }
     assert result.verification_record_uri is not None
     record_uri = result.output["verification_record_uri"]
@@ -64,7 +63,6 @@ def test_direct_collision_verifier_fails_closed_for_wrong_image(
     assert result.output["verification_input"] == {
         "status": InputStatus.REJECTED.value,
         "errors": ["declared collision does not replay exactly"],
-        "warnings": [],
     }
     assert result.output["verification_record_uri"] is None
     assert result.execution.status is ExecutionStatus.COMPLETED

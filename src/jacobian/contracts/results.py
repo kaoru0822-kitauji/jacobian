@@ -74,7 +74,6 @@ class Execution(ContractModel):
 class InputValidation(ContractModel):
     status: InputStatus
     errors: tuple[str, ...] = ()
-    warnings: tuple[str, ...] = ()
 
     @model_validator(mode="after")
     def accepted_input_has_no_errors(self) -> Self:

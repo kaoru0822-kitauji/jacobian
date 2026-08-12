@@ -158,7 +158,6 @@ def test_collision_inverse_obstruction_fails_closed_for_wrong_image(
     assert result.output["verification_input"] == {
         "status": InputStatus.REJECTED.value,
         "errors": ["declared collision does not replay exactly"],
-        "warnings": [],
     }
     assert result.output["verification_record_uri"] is None
 
