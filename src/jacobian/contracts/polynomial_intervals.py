@@ -183,9 +183,6 @@ class PolynomialIntervalEnclosureOutput(ContractModel):
     range_exactness: Literal["ENCLOSURE_VALID_NOT_EXACT"] = "ENCLOSURE_VALID_NOT_EXACT"
     exactness: Literal["EXACT_RATIONAL"] = "EXACT_RATIONAL"
     determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
-    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
-    certificate_available: Literal[False] = False
-    checker_id: None = None
     backend: Literal["sympy"] = "sympy"
     backend_version: str = Field(min_length=1, max_length=64)
 

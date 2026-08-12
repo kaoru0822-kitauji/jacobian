@@ -74,9 +74,6 @@ def test_enclose_capability_computes_a_valid_bernstein_enclosure(
     )
 
     assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.output["verification"] == "UNVERIFIED"
-    assert result.output["certificate_available"] is False
-    assert result.output["checker_id"] is None
     assert result.output["enclosure_kind"] == "BERNSTEIN_COEFFICIENT_BOUND"
     assert result.output["range_exactness"] == "ENCLOSURE_VALID_NOT_EXACT"
     assert result.output["exactness"] == "EXACT_RATIONAL"
