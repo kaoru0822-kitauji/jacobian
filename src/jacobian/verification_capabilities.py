@@ -92,12 +92,12 @@ class _VerificationProjection:
     ) -> CapabilityResult:
         verified = (
             envelope.execution.status is ExecutionStatus.COMPLETED
-            and envelope.assurance.verification is Verification.VERIFIED
+            and envelope.verification is Verification.VERIFIED
             and envelope.verification_record_uri is not None
         )
         references = set(envelope.evidence_uris)
-        if envelope.assurance.scope_uri is not None:
-            references.add(envelope.assurance.scope_uri)
+        if envelope.scope_uri is not None:
+            references.add(envelope.scope_uri)
         if envelope.verification_record_uri is not None:
             references.add(envelope.verification_record_uri)
             record = self.verification.store.get(envelope.verification_record_uri)

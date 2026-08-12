@@ -1,4 +1,4 @@
-"""Orthogonal operational, mathematical, and assurance result fields."""
+"""Orthogonal operational and mathematical result fields."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import Literal, Self
 from pydantic import Field, StrictInt, model_validator
 
 from jacobian.contracts.base import ContractModel as ContractModel
-from jacobian.contracts.common import ArtifactUri, CheckerUri, Sha256Digest
+from jacobian.contracts.common import ArtifactUri, Sha256Digest
 
 
 class ExecutionStatus(StrEnum):
@@ -85,65 +85,15 @@ class InputValidation(ContractModel):
         return self
 
 
-class Assurance(ContractModel):
-    """Arithmetic, method, coverage, and checker identity for a conclusion."""
-
-    arithmetic: Arithmetic
-    method: Method
-    coverage: Coverage
-    verification: Verification
-    checker_id: CheckerUri | None = None
-    checker_digest: Sha256Digest | None = None
-    scope_uri: ArtifactUri | None = None
-
-    @model_validator(mode="after")
-    def require_checker_identity_for_verified_assurance(self) -> Self:
-        if self.verification == Verification.VERIFIED:
-            if self.checker_id is None or self.checker_digest is None:
-                raise ValueError(
-                    "verified assurance requires checker_id and checker_digest"
-                )
-            if self.method not in {
-                Method.DIRECT_WITNESS,
-                Method.EXHAUSTIVE_FINITE,
-                Method.CHECKED_CERTIFICATE,
-            }:
-                raise ValueError(
-                    "verified assurance requires a replayable verification method"
-                )
-            if self.arithmetic == Arithmetic.FLOATING_HEURISTIC:
-                raise ValueError(
-                    "floating-point heuristic arithmetic cannot be verified"
-                )
-            if self.coverage in {Coverage.RESTRICTED, Coverage.SAMPLED}:
-                raise ValueError("restricted or sampled coverage cannot be verified")
-            if (
-                self.method == Method.DIRECT_WITNESS
-                and self.coverage != Coverage.NOT_APPLICABLE
-            ):
-                raise ValueError("direct witness verification has no coverage claim")
-            if (
-                self.method == Method.EXHAUSTIVE_FINITE
-                and self.coverage != Coverage.EXHAUSTIVE
-            ):
-                raise ValueError(
-                    "exhaustive finite verification requires exhaustive coverage"
-                )
-            if self.coverage == Coverage.BOUNDED and self.scope_uri is None:
-                raise ValueError(
-                    "bounded verified assurance requires an explicit scope"
-                )
-        return self
-
-
 class ResultEnvelope(ContractModel):
-    """Separate execution, input, conclusion, assurance, and evidence."""
+    """Separate execution, input, conclusion, verification, and evidence."""
 
     schema_version: Literal["1"] = "1"
     execution: Execution
     input: InputValidation
     conclusion: Conclusion
-    assurance: Assurance
+    verification: Verification
+    scope_uri: ArtifactUri | None = None
     claim_digest: Sha256Digest | None = None
     semantics_digest: Sha256Digest | None = None
     candidate_digest: Sha256Digest | None = None
@@ -164,14 +114,14 @@ class ResultEnvelope(ContractModel):
                     "non-completed or rejected results cannot carry a "
                     "mathematical conclusion"
                 )
-            if self.assurance.verification != Verification.UNVERIFIED:
+            if self.verification != Verification.UNVERIFIED:
                 raise ValueError("non-completed or rejected results cannot be verified")
 
         self._require_verification_evidence()
         return self
 
     def _require_verification_evidence(self) -> None:
-        if self.assurance.verification == Verification.VERIFIED:
+        if self.verification == Verification.VERIFIED:
             if self.conclusion not in {Conclusion.TRUE, Conclusion.FALSE}:
                 raise ValueError(
                     "verified results require a decisive mathematical conclusion"

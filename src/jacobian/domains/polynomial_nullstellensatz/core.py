@@ -323,7 +323,7 @@ class NullstellensatzVerificationAdapter:
         verified = bool(
             checked is not None
             and checked.execution.status is ExecutionStatus.COMPLETED
-            and checked.assurance.verification is Verification.VERIFIED
+            and checked.verification is Verification.VERIFIED
             and checked.verification_record_uri is not None
         )
         record_uri = checked.verification_record_uri if verified and checked else None

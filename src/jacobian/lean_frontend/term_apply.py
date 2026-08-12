@@ -152,7 +152,7 @@ class LeanTermApplyAdapter:
             capability_version=self.descriptor.version,
             execution=delegated.execution,
             output=output.model_dump(mode="json"),
-            assurance=delegated.assurance,
+            verification_record_uri=delegated.verification_record_uri,
             artifact_uris=delegated.artifact_uris,
         )
 

@@ -142,8 +142,7 @@ def test_exact_membership_witness_is_independently_replayed(
         checker_id=polytope_services.witness_checker_id,
     )
     assert verified.conclusion.value == "TRUE"
-    assert verified.assurance.arithmetic.value == "EXACT_RATIONAL"
-    assert verified.assurance.verification.value == "VERIFIED"
+    assert verified.verification.value == "VERIFIED"
     assert verified.verification_record_uri is not None
 
 
@@ -178,9 +177,7 @@ def test_exact_separator_is_generated_then_independently_checked(
         certificate_uri=proposed.certificate_uri,
     )
     assert verified.conclusion.value == "TRUE"
-    assert verified.assurance.arithmetic.value == "EXACT_RATIONAL"
-    assert verified.assurance.coverage.value == "EXHAUSTIVE"
-    assert verified.assurance.verification.value == "VERIFIED"
+    assert verified.verification.value == "VERIFIED"
 
 
 def test_separator_payload_tampering_fails_closed(
@@ -219,7 +216,7 @@ def test_separator_payload_tampering_fails_closed(
 
     assert result.input.status.value == "REJECTED"
     assert result.conclusion.value == "UNKNOWN"
-    assert result.assurance.verification.value == "UNVERIFIED"
+    assert result.verification.value == "UNVERIFIED"
     assert result.verification_record_uri is None
 
 

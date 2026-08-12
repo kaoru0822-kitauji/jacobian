@@ -192,7 +192,7 @@ def test_mathlib_discovery_composes_with_bound_sqrt_two_verification(
     )
 
     assert verified.result.conclusion is Conclusion.TRUE, verified.result.input.errors
-    assert verified.result.assurance.verification is Verification.VERIFIED
+    assert verified.result.verification is Verification.VERIFIED
     certificate = runtime.core.store.get(verified.certificate_uri)
     assert certificate.payload["payload"]["environment"] == "MATHLIB"
     assert certificate.payload["payload"]["allowed_axioms"] == [
@@ -247,7 +247,7 @@ def test_core_lean_induction_proof_creates_bound_verification_record(
     )
 
     assert verified.result.conclusion is Conclusion.TRUE
-    assert verified.result.assurance.verification is Verification.VERIFIED
+    assert verified.result.verification is Verification.VERIFIED
     assert verified.result.verification_record_uri is not None
     record = runtime.core.store.get(verified.result.verification_record_uri)
     certificate = runtime.core.store.get(verified.certificate_uri)
@@ -295,7 +295,7 @@ def test_core_lean_accepts_single_expression_witness_forms(
     verified = runtime.portfolio.lean.verify(statement=statement, proof=proof)
 
     assert verified.result.conclusion is Conclusion.TRUE
-    assert verified.result.assurance.verification is Verification.VERIFIED
+    assert verified.result.verification is Verification.VERIFIED
 
 
 def test_core_lean_check_runs_through_capability_mcp_surface(tmp_path: Path) -> None:
@@ -340,7 +340,7 @@ def test_core_lean_check_runs_through_capability_mcp_surface(tmp_path: Path) -> 
             assert isinstance(response.structured_content, dict)
             payload = response.structured_content
             assert payload["output"]["conclusion"] == "TRUE"
-            assert payload["assurance"]["level"] == "VERIFIED"
+            assert payload["verification_record_uri"] is not None
 
     asyncio.run(scenario())
 
@@ -370,7 +370,7 @@ def test_core_lean_rejects_untrusted_or_invalid_proofs(
 
     assert rejected.result.input.status is InputStatus.REJECTED
     assert rejected.result.conclusion is Conclusion.UNKNOWN
-    assert rejected.result.assurance.verification is Verification.UNVERIFIED
+    assert rejected.result.verification is Verification.UNVERIFIED
     assert rejected.result.verification_record_uri is None
 
 
@@ -440,9 +440,9 @@ def test_lean_cache_does_not_reuse_a_revoked_checker_result(
 
     repeated = runtime.portfolio.lean.verify(statement="1 + 1 = 2", proof="rfl")
 
-    assert first.result.assurance.verification is Verification.VERIFIED
+    assert first.result.verification is Verification.VERIFIED
     assert repeated.cache_hit is False
-    assert repeated.result.assurance.verification is Verification.UNVERIFIED
+    assert repeated.result.verification is Verification.UNVERIFIED
 
 
 def test_mathlib_warmup_starts_only_once(

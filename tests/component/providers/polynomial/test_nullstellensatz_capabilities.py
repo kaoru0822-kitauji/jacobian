@@ -16,15 +16,11 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.nullstellensatz import NullstellensatzCertificateBundle
 from jacobian.contracts.results import (
-    Arithmetic,
-    Assurance,
     Conclusion,
-    Coverage,
     Execution,
     ExecutionStatus,
     InputStatus,
     InputValidation,
-    Method,
     ResultEnvelope,
     Verification,
 )
@@ -342,12 +338,7 @@ def test_checker_timeout_never_verifies(
                 execution=Execution(status=ExecutionStatus.TIMEOUT),
                 input=InputValidation(status=InputStatus.ACCEPTED),
                 conclusion=Conclusion.UNKNOWN,
-                assurance=Assurance(
-                    arithmetic=Arithmetic.EXACT_RATIONAL,
-                    method=Method.CHECKED_CERTIFICATE,
-                    coverage=Coverage.EXHAUSTIVE,
-                    verification=Verification.UNVERIFIED,
-                ),
+                verification=Verification.UNVERIFIED,
             ),
         )
 

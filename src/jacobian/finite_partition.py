@@ -498,7 +498,7 @@ def _partition_result(
     )
     verified = (
         verification_result is not None
-        and verification_result.assurance.verification is Verification.VERIFIED
+        and verification_result.verification is Verification.VERIFIED
     )
     artifact_uris = [
         material.scope_uri,

@@ -224,7 +224,7 @@ class LeanService:
             )
             healthy = (
                 checked.result.execution.status is ExecutionStatus.COMPLETED
-                and checked.result.assurance.verification is Verification.VERIFIED
+                and checked.result.verification is Verification.VERIFIED
             )
             with self._cache_lock:
                 self._mathlib_warmup_status = "HEALTHY" if healthy else "UNHEALTHY"

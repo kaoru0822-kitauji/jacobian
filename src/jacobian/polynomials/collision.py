@@ -567,7 +567,7 @@ class PolynomialCollisionVerifyAdapter:
             checker_id=checker_id,
         )
         verified = (
-            checked.assurance.verification is Verification.VERIFIED
+            checked.verification is Verification.VERIFIED
             and checked.conclusion is Conclusion.FALSE
             and checked.verification_record_uri is not None
         )
@@ -692,7 +692,7 @@ class PolynomialMapInverseCollisionVerifyAdapter:
         verified = (
             checked.verification_record_uri is not None
             and checked.conclusion is Conclusion.TRUE
-            and checked.assurance.verification is Verification.VERIFIED
+            and checked.verification is Verification.VERIFIED
         )
         record_uri = checked.verification_record_uri if verified else None
         output = PolynomialMapInverseCollisionVerifyOutput(

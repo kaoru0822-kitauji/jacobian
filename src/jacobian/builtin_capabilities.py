@@ -97,11 +97,11 @@ class LeanCheckAdapter:
             environment=LeanEnvironment(str(payload.get("environment", "CORE"))),
         )
         verified = (
-            checked.result.assurance.verification is Verification.VERIFIED
+            checked.result.verification is Verification.VERIFIED
             and checked.result.verification_record_uri is not None
         )
         evidence = (checked.certificate_uri,)
-        scope_uri = checked.result.assurance.scope_uri
+        scope_uri = checked.result.scope_uri
         return CapabilityResult(
             capability_id=self.descriptor.capability_id,
             capability_version=self.descriptor.version,

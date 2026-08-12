@@ -223,6 +223,6 @@ def _is_verified(result: ResultEnvelope) -> bool:
     return (
         result.execution.status is ExecutionStatus.COMPLETED
         and result.conclusion is Conclusion.TRUE
-        and result.assurance.verification is Verification.VERIFIED
+        and result.verification is Verification.VERIFIED
         and result.verification_record_uri is not None
     )
