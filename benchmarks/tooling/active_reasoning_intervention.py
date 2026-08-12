@@ -734,6 +734,8 @@ def _validate_internalcot(prefix: Path, config: Mapping[str, Any]) -> None:
             environment=environment,
             cwd=str(prefix),
             timeout_seconds=30,
+            stdout_limit_bytes=64 * 1024,
+            stderr_limit_bytes=16 * 1024,
         )
     )
     if workflow.status is not ToolCommandStatus.EXITED or workflow.exit_code != 0:
