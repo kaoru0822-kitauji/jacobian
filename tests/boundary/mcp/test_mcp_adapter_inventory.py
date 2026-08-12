@@ -58,6 +58,7 @@ def test_mcp_exposes_only_math_tools_with_read_only_resources(
             assert request_schema["discriminator"]["propertyName"] == "op"
             assert set(tools["math.run"].input_schema["properties"]) == {
                 "capability_id",
+                "inputs",
                 "payload",
             }
             with pytest.raises(MCPError) as unknown_argument:
