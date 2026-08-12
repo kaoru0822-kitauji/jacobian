@@ -331,7 +331,9 @@ def _run_trial(
     state_dir.mkdir()
     _copy_visible_task(task, workspace)
     if arm == "internalcot":
-        skill_source = internalcot_prefix / "official-skill.md"
+        skill_source = (
+            internalcot_prefix / "node_modules/internalcot/skills/internalcot/SKILL.md"
+        )
         skill_target = workspace / ".agents/skills/internalcot/SKILL.md"
         skill_target.parent.mkdir(parents=True)
         shutil.copy2(skill_source, skill_target)
@@ -721,12 +723,27 @@ def _validate_internalcot(prefix: Path, config: Mapping[str, Any]) -> None:
     lock = _read_json(prefix / "package-lock.json")
     pinned = config["internalcot"]
     lock_package = lock.get("packages", {}).get("node_modules/internalcot", {})
+    environment = dict(operator_environment(include=("PATH",)))
+    environment["PATH"] = (
+        f"{prefix / 'node_modules/.bin'}:{environment.get('PATH', '')}"
+    )
+    workflow = run_operator_command(
+        str(prefix / "node_modules/.bin/internalcot"),
+        ("skill",),
+        cwd=prefix,
+        timeout_seconds=30,
+        environment=environment,
+    )
+    if workflow.status is not ToolCommandStatus.EXITED or workflow.exit_code != 0:
+        raise HarborSuiteError("pinned internalcot skill command failed")
     bindings = {
         "version": package.get("version"),
         "lock_version": lock_package.get("version"),
         "npm_integrity": lock_package.get("integrity"),
-        "skill_sha256": _sha256(prefix / "official-skill.md"),
-        "workflow_sha256": _sha256(prefix / "workflow.md"),
+        "skill_sha256": _sha256(
+            prefix / "node_modules/internalcot/skills/internalcot/SKILL.md"
+        ),
+        "workflow_sha256": _sha256_bytes(workflow.stdout),
     }
     expected = {
         "version": pinned["version"],

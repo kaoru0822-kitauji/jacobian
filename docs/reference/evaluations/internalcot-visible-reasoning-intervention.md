@@ -45,10 +45,10 @@ review.
 
 ## Execution and privacy
 
-Prepare an isolated prefix containing exactly `internalcot@0.2.3`, save the
-official discovery skill as `official-skill.md`, and save the exact output of
-`internalcot skill` as `workflow.md`. The runner verifies the package-lock
-integrity and both SHA-256 bindings before execution. Then run the substantive
+Prepare an isolated prefix containing exactly `internalcot@0.2.3`. The runner
+verifies the package-lock integrity, the packaged official discovery skill, and
+the exact output of `internalcot skill` against their frozen SHA-256 bindings
+before execution. Then run the substantive
 collection and analysis in named `tmux` sessions:
 
 ```bash
