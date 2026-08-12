@@ -28,7 +28,6 @@ class CapabilityInputKind(StrEnum):
     STRUCTURED_REQUEST = "STRUCTURED_REQUEST"
     FORMAL_PROPOSITION = "FORMAL_PROPOSITION"
     TYPED_ARTIFACT = "TYPED_ARTIFACT"
-    NATURAL_LANGUAGE_PROOF = "NATURAL_LANGUAGE_PROOF"
 
 
 def _validate_descriptor_input_contract(
@@ -105,12 +104,8 @@ class CapabilityDiscoveryMatch(ContractModel):
     tags: tuple[str, ...] = ()
     relevance_score: int = Field(default=0, ge=0, strict=True)
     applicability: Literal[
-        "APPLICABLE",
         "INCOMPATIBLE",
         "NEEDS_MORE_TYPED_REQUIREMENTS",
-        "PROVIDER_UNAVAILABLE",
-        "CHECKER_UNAVAILABLE",
-        "PORTFOLIO_GAP",
     ]
     applicability_code: Literal[
         "FULL_REQUEST_REQUIRED",

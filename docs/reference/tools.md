@@ -38,22 +38,19 @@ Search proceeds in this order:
 
 ```text
 lexical retrieval
-  → exact typed compatibility
-  → optional full-request preflight
+  → declared input-kind and artifact-type compatibility
 ```
 
-It returns lexical relevance plus factual execution metadata where known:
+It returns lexical relevance plus factual catalog metadata:
 
 - applicability status and stable mismatch code;
 - provider availability;
-- checker availability and checker scope;
-- effect; and
-- aggregate-cost admission status.
+- accepted input and artifact types; and
+- produced artifact types.
 
-Applicability uses stable outcomes: `APPLICABLE`, `INCOMPATIBLE`,
-`NEEDS_MORE_TYPED_REQUIREMENTS`, `PROVIDER_UNAVAILABLE`,
-`CHECKER_UNAVAILABLE`, and `PORTFOLIO_GAP`. A checker that requires two inputs
-is never reported as invocable from one.
+Applicability uses two outcomes: `INCOMPATIBLE` and
+`NEEDS_MORE_TYPED_REQUIREMENTS`. Search never reports an operation as
+invocable without validating its complete request.
 
 The current search request has no full operation payload, so it reports
 `NEEDS_MORE_TYPED_REQUIREMENTS` after a compatible coarse input filter and
