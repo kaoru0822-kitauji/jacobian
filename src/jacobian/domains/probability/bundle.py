@@ -38,8 +38,8 @@ def build_finite_probability_bundle() -> DomainBundle:
                 stage="finite_probability_input_validation",
                 message="Input does not satisfy the bounded exact-probability contract.",
                 hint=(
-                    "Use a bounded normalized finite distribution or a canonical "
-                    "bounded Gaussian polynomial, or a fully weighted small graph."
+                    "Use a bounded normalized finite distribution or a bounded "
+                    "Gaussian polynomial request, or a fully weighted small graph."
                 ),
             )
         ),
