@@ -18,7 +18,7 @@ def polynomial_resultant(left: Any, right: Any, generator: Any) -> Any:
 def polynomial_discriminant(polynomial: Any, generator: Any) -> Any:
     from sympy import discriminant
 
-    return discriminant(polynomial.as_expr(), generator)
+    return discriminant(polynomial, generator)
 
 
 def _monic_decomposition(

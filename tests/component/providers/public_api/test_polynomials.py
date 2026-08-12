@@ -68,3 +68,10 @@ def test_native_groebner_basis_rejects_non_rational_domains() -> None:
 
     with pytest.raises(ValueError, match="QQ domain"):
         polynomials.groebner_basis(generators, (x, y), "lex")
+
+
+def test_native_discriminant_preserves_the_polynomial_domain() -> None:
+    x = symbols("x")
+    polynomial = Poly(x**2 + x + 1, x, modulus=2)
+
+    assert polynomials.discriminant(polynomial, x) == 1
