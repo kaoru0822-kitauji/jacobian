@@ -70,7 +70,7 @@ _TOOL_CALL = re.compile(
     r".{0,512}?\bargument_digest=(sha256:(?:[0-9a-f]\s*){64})",
     re.DOTALL,
 )
-_CAPABILITY_ATTEMPT = re.compile(
+_CAPABILITY_ATTEMPT_WITH_ASSURANCE = re.compile(
     r"\bMCP capability attempt request_digest=([0-9a-f]{16}|none)\b"
     r".{0,512}?\btrace_digest=([0-9a-f]{8}|none)\b"
     r".{0,512}?\btrace_source=([^\s]+)\b"
@@ -78,6 +78,21 @@ _CAPABILITY_ATTEMPT = re.compile(
     r".{0,512}?\bcapability_version=([^\s]+)\b"
     r".{0,512}?\bexecution_status=([A-Z_]+)\b"
     r".{0,512}?\bassurance=([^\s]+)\b"
+    r".{0,512}?\bdiagnostic_codes=([^\s]+)\b"
+    r".{0,512}?\battempt_duration_ms=([0-9]+(?:\.[0-9]+)?)\b"
+    r".{0,512}?\boperation_runtime_ms=([^\s]+)\b"
+    r".{0,512}?\bresponse_bytes=(-?[0-9]+)\b"
+    r".{0,512}?\bargument_digest=(sha256:(?:[0-9a-f]\s*){64})",
+    re.DOTALL,
+)
+_CAPABILITY_ATTEMPT_WITH_EVIDENCE = re.compile(
+    r"\bMCP capability attempt request_digest=([0-9a-f]{16}|none)\b"
+    r".{0,512}?\btrace_digest=([0-9a-f]{8}|none)\b"
+    r".{0,512}?\btrace_source=([^\s]+)\b"
+    r".{0,512}?\bcapability_id=([^\s]+)\b"
+    r".{0,512}?\bcapability_version=([^\s]+)\b"
+    r".{0,512}?\bexecution_status=([A-Z_]+)\b"
+    r".{0,512}?\bverification_record_uri_present=(True|False)\b"
     r".{0,512}?\bdiagnostic_codes=([^\s]+)\b"
     r".{0,512}?\battempt_duration_ms=([0-9]+(?:\.[0-9]+)?)\b"
     r".{0,512}?\boperation_runtime_ms=([^\s]+)\b"
@@ -601,49 +616,56 @@ def _server_events(payload: str) -> tuple[list[dict[str, object]], dict[str, int
                 },
             )
         )
-    for match in _CAPABILITY_ATTEMPT.finditer(payload):
-        (
-            request_digest,
-            trace_digest,
-            trace_source,
-            capability_id,
-            capability_version,
-            execution_status,
-            assurance,
-            diagnostic_codes,
-            attempt_duration_ms,
-            operation_runtime_ms,
-            response_bytes,
-            argument_digest,
-        ) = match.groups()
-        events.append(
+    for pattern, outcome_kind in (
+        (_CAPABILITY_ATTEMPT_WITH_ASSURANCE, "assurance"),
+        (_CAPABILITY_ATTEMPT_WITH_EVIDENCE, "evidence"),
+    ):
+        for match in pattern.finditer(payload):
             (
-                match.start(),
-                {
-                    "kind": "CAPABILITY_ATTEMPT",
-                    "request_digest": request_digest,
-                    "trace_digest": trace_digest,
-                    "trace_source": trace_source,
-                    "capability_id": capability_id,
-                    "capability_version": capability_version,
-                    "execution_status": execution_status,
-                    "assurance": assurance,
-                    "diagnostic_codes": (
-                        []
-                        if diagnostic_codes in {"none", "-"}
-                        else diagnostic_codes.split(",")[:8]
-                    ),
-                    "attempt_duration_ms": float(attempt_duration_ms),
-                    "operation_runtime_ms": (
-                        None
-                        if operation_runtime_ms == "none"
-                        else float(operation_runtime_ms)
-                    ),
-                    "response_bytes": int(response_bytes),
-                    "argument_digest": re.sub(r"\s", "", argument_digest),
-                },
+                request_digest,
+                trace_digest,
+                trace_source,
+                capability_id,
+                capability_version,
+                execution_status,
+                outcome,
+                diagnostic_codes,
+                attempt_duration_ms,
+                operation_runtime_ms,
+                response_bytes,
+                argument_digest,
+            ) = match.groups()
+            events.append(
+                (
+                    match.start(),
+                    {
+                        "kind": "CAPABILITY_ATTEMPT",
+                        "request_digest": request_digest,
+                        "trace_digest": trace_digest,
+                        "trace_source": trace_source,
+                        "capability_id": capability_id,
+                        "capability_version": capability_version,
+                        "execution_status": execution_status,
+                        "assurance": outcome if outcome_kind == "assurance" else None,
+                        "verification_record_uri_present": (
+                            outcome == "True" if outcome_kind == "evidence" else None
+                        ),
+                        "diagnostic_codes": (
+                            []
+                            if diagnostic_codes in {"none", "-"}
+                            else diagnostic_codes.split(",")[:8]
+                        ),
+                        "attempt_duration_ms": float(attempt_duration_ms),
+                        "operation_runtime_ms": (
+                            None
+                            if operation_runtime_ms == "none"
+                            else float(operation_runtime_ms)
+                        ),
+                        "response_bytes": int(response_bytes),
+                        "argument_digest": re.sub(r"\s", "", argument_digest),
+                    },
+                )
             )
-        )
     ordered = [event for _, event in sorted(events, key=lambda item: item[0])]
     candidates = len(_SERVER_EVENT_MARKER.findall(payload))
     return ordered, {"candidates": candidates, "recorded": len(ordered)}
@@ -796,10 +818,29 @@ def _tau_features(events: Sequence[Mapping[str, object]]) -> dict[str, float]:
         features[f"tau:execution:{event.get('execution_status')}"] = (
             features.get(f"tau:execution:{event.get('execution_status')}", 0.0) + 1.0
         )
-        features[f"tau:assurance:{event.get('assurance')}"] = (
-            features.get(f"tau:assurance:{event.get('assurance')}", 0.0) + 1.0
-        )
+        assurance = event.get("assurance")
+        if isinstance(assurance, str):
+            features[f"tau:assurance:{assurance}"] = (
+                features.get(f"tau:assurance:{assurance}", 0.0) + 1.0
+            )
+        evidence_present = event.get("verification_record_uri_present")
+        if isinstance(evidence_present, bool):
+            evidence_label = "present" if evidence_present else "absent"
+            features[f"tau:evidence:{evidence_label}"] = (
+                features.get(f"tau:evidence:{evidence_label}", 0.0) + 1.0
+            )
     return features
+
+
+def _checker_attempt_accepted(event: Mapping[str, object]) -> bool:
+    return (
+        event.get("execution_status") == "COMPLETED"
+        and not event.get("diagnostic_codes")
+        and (
+            event.get("assurance") == "VERIFIED"
+            or event.get("verification_record_uri_present") is True
+        )
+    )
 
 
 def _checker_label(events: Sequence[Mapping[str, object]]) -> str:
@@ -811,13 +852,7 @@ def _checker_label(events: Sequence[Mapping[str, object]]) -> str:
     ]
     if not checkers:
         return "NO_CHECKER"
-    rejected = [
-        event
-        for event in checkers
-        if event.get("execution_status") != "COMPLETED"
-        or bool(event.get("diagnostic_codes"))
-        or event.get("assurance") != "VERIFIED"
-    ]
+    rejected = [event for event in checkers if not _checker_attempt_accepted(event)]
     if not rejected:
         return "SUCCESS_WITHOUT_REJECTION"
     last_rejection = max(events.index(event) for event in rejected)
@@ -825,9 +860,7 @@ def _checker_label(events: Sequence[Mapping[str, object]]) -> str:
         index > last_rejection
         and event.get("kind") == "CAPABILITY_ATTEMPT"
         and str(event.get("capability_id", "")).endswith(".verify")
-        and event.get("execution_status") == "COMPLETED"
-        and event.get("assurance") == "VERIFIED"
-        and not event.get("diagnostic_codes")
+        and _checker_attempt_accepted(event)
         for index, event in enumerate(events)
     )
     return "REJECTED_RECOVERED" if recovered else "REJECTED_UNRECOVERED"
@@ -992,6 +1025,7 @@ def _project_trial(
         "family": family_id,
         "repetition": record.get("repetition", 1),
         "status": "COMPLETE",
+        "command_status": record.get("command", {}).get("status", "UNKNOWN"),
         "server_event_coverage": coverage,
         "summary_metrics": {
             "message_count": len(messages),
@@ -1033,7 +1067,9 @@ def _tau_field_group(name: str) -> str:
         "tau:checker_attempt_count",
     }:
         return "capability_identity"
-    if name.startswith(("tau:execution:", "tau:assurance:")) or name in {
+    if name.startswith(
+        ("tau:execution:", "tau:assurance:", "tau:evidence:")
+    ) or name in {
         "tau:error_count",
         "tau:diagnostic_count",
     }:
@@ -1632,9 +1668,7 @@ def _successful_producer_checker_chain(events: Sequence[Mapping[str, object]]) -
         for index, event in enumerate(events)
         if event.get("kind") == "CAPABILITY_ATTEMPT"
         and str(event.get("capability_id", "")).endswith(".verify")
-        and event.get("execution_status") == "COMPLETED"
-        and event.get("assurance") == "VERIFIED"
-        and not event.get("diagnostic_codes")
+        and _checker_attempt_accepted(event)
     ]
     return any(
         left < right for left in producer_positions for right in checker_positions
@@ -1665,6 +1699,12 @@ def _analyze_heldout_study(
     }
     if observed != configured or len(projections) != len(configured):
         raise HarborSuiteError("held-out trials do not exactly cover the frozen matrix")
+
+    completed = sum(
+        item["status"] == "COMPLETE" and item["command_status"] == "EXITED"
+        for item in projections
+    )
+    command_status_counts = Counter(str(item["command_status"]) for item in projections)
 
     modeling = config["modeling"]
     bootstrap_repetitions = 2000
@@ -1704,7 +1744,7 @@ def _analyze_heldout_study(
     }
     eligibility = config["eligibility"]
     coverage_checks = {
-        "completed_trials": len(projections)
+        "completed_trials": completed
         >= _safe_int(eligibility["minimum_completed_trials"]),
         "families": len({item["family"] for item in projections})
         >= _safe_int(eligibility["minimum_families"]),
@@ -1770,15 +1810,23 @@ def _analyze_heldout_study(
         "run_manifest_sha256": _sha256(results_root / "manifest.json"),
         "source_sha": manifest.get("source_sha"),
         "collector_sha256": collector_digest,
+        "analyzer_sha256": _collector_digest(),
         "analysis": {
             "mode": "FROZEN_FAMILY_HELD_OUT_KNN",
             "held_out": True,
             "transductive": False,
             "split": modeling["split"],
             "bootstrap_repetitions": bootstrap_repetitions,
+            "outcome_telemetry": (
+                "Use logged assurance when present; current MCP logs expose "
+                "verification-record URI presence instead, which is retained as "
+                "evidence presence without inferring an assurance level."
+            ),
         },
         "dataset": {
             "trial_count": len(projections),
+            "completed_trial_count": completed,
+            "command_status_counts": dict(sorted(command_status_counts.items())),
             "task_count": len({item["task_id"] for item in projections}),
             "family_count": len({item["family"] for item in projections}),
             "eligible": dataset_eligible,
@@ -1816,6 +1864,7 @@ def _analyze_heldout_study(
             "Feature groups, thresholds, task families, repetitions, and stopping scope were frozen before v2 labels; no v1 transductive score enters this report.",
             "Exact verifiers ran through the maintained clean child-process harness because a container runtime is not required for this operator study.",
             "Task/output structure can dominate retrospective diagnostics; increments measure conditional predictive association only.",
+            "The frozen contract named assurance as an outcome field, but the bound current MCP logs expose verification-record URI presence; the analyzer records evidence presence and never promotes it to an assurance value.",
             "No hidden reasoning, raw prompts, agent-message text, tool arguments, tool results, or verifier internals are committed.",
         ],
     }
@@ -1893,7 +1942,10 @@ def analyze_study(args: argparse.Namespace) -> int:
             output=args.output.resolve(),
         )
     eligibility = config["eligibility"]
-    completed = sum(item["status"] == "COMPLETE" for item in projections)
+    completed = sum(
+        item["status"] == "COMPLETE" and item["command_status"] == "EXITED"
+        for item in projections
+    )
     server_tool_trajectories = sum(
         item["tool_metrics"]["tool_call_count"] > 0 for item in projections
     )
@@ -1934,6 +1986,7 @@ def analyze_study(args: argparse.Namespace) -> int:
         "run_manifest_sha256": _sha256(results_root / "manifest.json"),
         "source_sha": manifest.get("source_sha"),
         "collector_sha256": collector_digest,
+        "analyzer_sha256": _collector_digest(),
         "analysis": {
             "mode": "FROZEN_SIMPLEST_DEFENSIBLE_FALLBACK",
             "metric_semantics": "Transductive exact-signature purity over fixed corpus-independent presence bins; descriptive only.",

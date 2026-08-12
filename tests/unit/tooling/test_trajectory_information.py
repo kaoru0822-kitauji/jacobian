@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -113,6 +114,38 @@ def test_malformed_server_candidate_fails_coverage_closed() -> None:
 
     assert events == []
     assert coverage == {"candidates": 1, "recorded": 0}
+
+
+def test_current_server_evidence_projection_does_not_infer_assurance() -> None:
+    digest = "sha256:" + "3" * 64
+    payload = (
+        "INFO MCP capability attempt request_digest=cccccccccccccccc "
+        "trace_digest=cccccccc trace_source=request_id "
+        "capability_id=matrix.normal_form.hermite.verify capability_version=1 "
+        "execution_status=COMPLETED verification_record_uri_present=True "
+        "diagnostic_codes=none attempt_duration_ms=4.5 operation_runtime_ms=2 "
+        f"response_bytes=120 argument_digest={digest}"
+    )
+
+    events, coverage = study._server_events(payload)
+
+    assert coverage == {"candidates": 1, "recorded": 1}
+    assert events[0]["assurance"] is None
+    assert events[0]["verification_record_uri_present"] is True
+    assert study._checker_label(events) == "SUCCESS_WITHOUT_REJECTION"
+
+
+def test_checker_without_assurance_or_evidence_fails_closed() -> None:
+    event = {
+        "kind": "CAPABILITY_ATTEMPT",
+        "capability_id": "matrix.normal_form.hermite.verify",
+        "execution_status": "COMPLETED",
+        "assurance": None,
+        "verification_record_uri_present": False,
+        "diagnostic_codes": [],
+    }
+
+    assert study._checker_label([event]) == "REJECTED_UNRECOVERED"
 
 
 def test_condition_features_do_not_add_unselected_sources() -> None:
@@ -366,3 +399,51 @@ def test_committed_report_is_bounded_and_noncausal() -> None:
     assert report["retention"]["publish_hidden_reasoning"] is False
     assert report["retention"]["publish_agent_messages"] is False
     assert report["retention"]["publish_tool_arguments_or_results"] is False
+
+
+def test_committed_heldout_report_is_inductive_bounded_and_fail_closed() -> None:
+    report_path = (
+        REPOSITORY_ROOT
+        / "benchmarks/evidence/observable-trajectory-information-v2/report.json"
+    )
+    report = json.loads(report_path.read_text())
+
+    assert report["study_id"] == "observable-trajectory-information-heldout-v2"
+    assert report["analysis"]["held_out"] is True
+    assert report["analysis"]["transductive"] is False
+    assert report["dataset"]["completed_trial_count"] == 24
+    assert report["dataset"]["eligible"] is False
+    assert report["decision"] == "INCONCLUSIVE_RESEARCH_ONLY"
+    assert report["event_coverage"]["checker_rejections"] == 1
+    assert report["event_coverage"]["no_tool_trajectories"] == 1
+    assert re.fullmatch(r"sha256:[0-9a-f]{64}", report["collector_sha256"])
+    assert re.fullmatch(r"sha256:[0-9a-f]{64}", report["analyzer_sha256"])
+    assert report["retention"]["publish_hidden_reasoning"] is False
+    assert report["retention"]["publish_agent_messages"] is False
+    assert report["retention"]["publish_tool_arguments_or_results"] is False
+    assert all(
+        set(projection)
+        == {
+            "command_status",
+            "family",
+            "labels",
+            "repetition",
+            "server_event_coverage",
+            "status",
+            "summary_metrics",
+            "task_id",
+            "tool_metrics",
+            "trial_id",
+        }
+        for projection in report["projections"]
+    )
+    rendered = json.dumps(report)
+    for forbidden in (
+        '"arguments":',
+        '"prompt":',
+        '"raw_artifacts":',
+        '"reasoning_content":',
+        '"text":',
+        '"workspace_artifacts":',
+    ):
+        assert forbidden not in rendered

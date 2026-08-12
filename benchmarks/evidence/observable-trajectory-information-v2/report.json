@@ -1,0 +1,1282 @@
+{
+  "analysis": {
+    "bootstrap_repetitions": 2000,
+    "held_out": true,
+    "mode": "FROZEN_FAMILY_HELD_OUT_KNN",
+    "outcome_telemetry": "Use logged assurance when present; current MCP logs expose verification-record URI presence instead, which is retained as evidence presence without inferring an assurance level.",
+    "split": "leave-one-complete-family-out; all repetitions and prefix rows from the held-out family remain outside training",
+    "transductive": false
+  },
+  "analyzer_sha256": "sha256:4c325855dad319382cc26d8abdc65acb638655f831a6ff540db0ce105366133c",
+  "causal_claim_authorized": false,
+  "collector_sha256": "sha256:e719e6546c95df78dca06d54031be60e11db2b5c06341265f3df1c41e344f39e",
+  "config_sha256": "sha256:1d19ba593f462e0b183acddfab405ab8181fc43f11c066472f5651a94869aa12",
+  "dataset": {
+    "command_status_counts": {
+      "EXITED": 24
+    },
+    "completed_trial_count": 24,
+    "coverage_checks": {
+      "checker_rejections": false,
+      "completed_trials": true,
+      "eligible_diagnostics": true,
+      "families": true,
+      "no_tool_trajectories": false,
+      "recovered_trajectories": true,
+      "server_tool_trajectories": true,
+      "tool_failure_trajectories": true
+    },
+    "eligible": false,
+    "family_count": 4,
+    "task_count": 12,
+    "trial_count": 24
+  },
+  "decision": "INCONCLUSIVE_RESEARCH_ONLY",
+  "decision_reasons": [
+    "The frozen event-coverage or diagnostic-eligibility gate was not satisfied.",
+    "Coverage check failed: no_tool_trajectories.",
+    "Coverage check failed: checker_rejections."
+  ],
+  "diagnostics": {
+    "checker_state": {
+      "baselines": {
+        "family_heldout_global_majority": {
+          "accuracy": 0.8333333333333334,
+          "balanced_accuracy": 0.3333333333333333,
+          "macro_f1": 0.30303030303030304
+        },
+        "task_identity_resubstitution_upper_bound": {
+          "accuracy": 0.9166666666666666,
+          "balanced_accuracy": 0.65,
+          "macro_f1": 0.6023809523809524
+        }
+      },
+      "class_counts": {
+        "ACCEPTED_ONLY": 3,
+        "NO_CHECKER": 20,
+        "REJECTED": 1
+      },
+      "conditions": {
+        "x+y": {
+          "accuracy": 0.7916666666666666,
+          "balanced_accuracy": 0.31666666666666665,
+          "macro_f1": 0.29457364341085274,
+          "task_bootstrap_95": {
+            "lower_95": 0.2564102564102564,
+            "upper_95": 0.9565217391304348
+          }
+        },
+        "x+y+b": {
+          "accuracy": 0.7916666666666666,
+          "balanced_accuracy": 0.31666666666666665,
+          "macro_f1": 0.29457364341085274,
+          "task_bootstrap_95": {
+            "lower_95": 0.2564102564102564,
+            "upper_95": 0.48936170212765956
+          }
+        },
+        "x+y+b+tau_tools": {
+          "accuracy": 0.875,
+          "balanced_accuracy": 0.4444444444444444,
+          "macro_f1": 0.4767441860465116,
+          "task_bootstrap_95": {
+            "lower_95": 0.30303030303030304,
+            "upper_95": 1.0
+          }
+        },
+        "x+y+tau_tools": {
+          "accuracy": 0.9166666666666666,
+          "balanced_accuracy": 0.5555555555555555,
+          "macro_f1": 0.5841269841269842,
+          "task_bootstrap_95": {
+            "lower_95": 0.30303030303030304,
+            "upper_95": 1.0
+          }
+        }
+      },
+      "eligible": true,
+      "family_count": 4,
+      "row_count": 24,
+      "task_count": 12
+    },
+    "mathematical_milestone": {
+      "baselines": {
+        "family_heldout_global_majority": {
+          "accuracy": 0.75,
+          "balanced_accuracy": 0.5,
+          "macro_f1": 0.42857142857142855
+        },
+        "task_identity_resubstitution_upper_bound": {
+          "accuracy": 0.8333333333333334,
+          "balanced_accuracy": 0.8888888888888888,
+          "macro_f1": 0.8125
+        }
+      },
+      "class_counts": {
+        "NOT_REACHED": 6,
+        "REACHED": 18
+      },
+      "conditions": {
+        "x+y": {
+          "accuracy": 0.75,
+          "balanced_accuracy": 0.611111111111111,
+          "macro_f1": 0.6210526315789474,
+          "task_bootstrap_95": {
+            "lower_95": 0.39999999999999997,
+            "upper_95": 0.8883720930232559
+          }
+        },
+        "x+y+b": {
+          "accuracy": 0.7083333333333334,
+          "balanced_accuracy": 0.6388888888888888,
+          "macro_f1": 0.6307692307692307,
+          "task_bootstrap_95": {
+            "lower_95": 0.41463414634146345,
+            "upper_95": 0.7983193277310925
+          }
+        },
+        "x+y+b+tau_tools": {
+          "accuracy": 0.4583333333333333,
+          "balanced_accuracy": 0.41666666666666663,
+          "macro_f1": 0.40796963946869075,
+          "task_bootstrap_95": {
+            "lower_95": 0.2285714285714286,
+            "upper_95": 0.5872235872235871
+          }
+        },
+        "x+y+tau_tools": {
+          "accuracy": 0.5833333333333334,
+          "balanced_accuracy": 0.5,
+          "macro_f1": 0.4957983193277311,
+          "task_bootstrap_95": {
+            "lower_95": 0.3142857142857143,
+            "upper_95": 0.6666666666666666
+          }
+        }
+      },
+      "eligible": true,
+      "family_count": 4,
+      "row_count": 24,
+      "task_count": 12
+    },
+    "next_tool_action_class": {
+      "baselines": {
+        "family_heldout_global_majority": {
+          "accuracy": 0.5038759689922481,
+          "balanced_accuracy": 0.25,
+          "macro_f1": 0.16752577319587628
+        },
+        "task_identity_resubstitution_upper_bound": {
+          "accuracy": 0.5116279069767442,
+          "balanced_accuracy": 0.26503496503496504,
+          "macro_f1": 0.2059491978609626
+        }
+      },
+      "class_counts": {
+        "FIND": 65,
+        "RUN_CHECKER": 7,
+        "RUN_PRODUCER": 33,
+        "TERMINAL": 24
+      },
+      "conditions": {
+        "x+y": {
+          "accuracy": 0.4728682170542636,
+          "balanced_accuracy": 0.28895687645687645,
+          "macro_f1": 0.2711705685618729,
+          "task_bootstrap_95": {
+            "lower_95": 0.2181712962962963,
+            "upper_95": 0.3176372487706777
+          }
+        },
+        "x+y+b": {
+          "accuracy": 0.5348837209302325,
+          "balanced_accuracy": 0.3328671328671329,
+          "macro_f1": 0.3255952380952381,
+          "task_bootstrap_95": {
+            "lower_95": 0.25216450216450215,
+            "upper_95": 0.4096996753246753
+          }
+        },
+        "x+y+b+tau_tools": {
+          "accuracy": 0.5813953488372093,
+          "balanced_accuracy": 0.3923513986013986,
+          "macro_f1": 0.38247798110924563,
+          "task_bootstrap_95": {
+            "lower_95": 0.3137655880348049,
+            "upper_95": 0.4441005661854394
+          }
+        },
+        "x+y+tau_tools": {
+          "accuracy": 0.5193798449612403,
+          "balanced_accuracy": 0.389720695970696,
+          "macro_f1": 0.4006555937867267,
+          "task_bootstrap_95": {
+            "lower_95": 0.29834007061661655,
+            "upper_95": 0.47151616499442583
+          }
+        }
+      },
+      "eligible": true,
+      "family_count": 4,
+      "row_count": 129,
+      "task_count": 12
+    },
+    "recovery_state": {
+      "baselines": {
+        "family_heldout_global_majority": {
+          "accuracy": 0.8333333333333334,
+          "balanced_accuracy": 0.5,
+          "macro_f1": 0.45454545454545453
+        },
+        "task_identity_resubstitution_upper_bound": {
+          "accuracy": 0.8333333333333334,
+          "balanced_accuracy": 0.5,
+          "macro_f1": 0.45454545454545453
+        }
+      },
+      "class_counts": {
+        "NO_RECOVERY_OPPORTUNITY": 20,
+        "RECOVERED": 4
+      },
+      "conditions": {
+        "x+y": {
+          "accuracy": 0.75,
+          "balanced_accuracy": 0.45,
+          "macro_f1": 0.4285714285714286,
+          "task_bootstrap_95": {
+            "lower_95": 0.35135135135135137,
+            "upper_95": 0.4782608695652174
+          }
+        },
+        "x+y+b": {
+          "accuracy": 0.7916666666666666,
+          "balanced_accuracy": 0.475,
+          "macro_f1": 0.44186046511627913,
+          "task_bootstrap_95": {
+            "lower_95": 0.39999999999999997,
+            "upper_95": 0.4782608695652174
+          }
+        },
+        "x+y+b+tau_tools": {
+          "accuracy": 0.75,
+          "balanced_accuracy": 0.45,
+          "macro_f1": 0.4285714285714286,
+          "task_bootstrap_95": {
+            "lower_95": 0.3846153846153846,
+            "upper_95": 0.4666666666666667
+          }
+        },
+        "x+y+tau_tools": {
+          "accuracy": 0.7916666666666666,
+          "balanced_accuracy": 0.475,
+          "macro_f1": 0.44186046511627913,
+          "task_bootstrap_95": {
+            "lower_95": 0.39999999999999997,
+            "upper_95": 0.4782608695652174
+          }
+        }
+      },
+      "eligible": true,
+      "family_count": 4,
+      "row_count": 24,
+      "task_count": 12
+    },
+    "terminal_verifier_success": {
+      "baselines": {
+        "family_heldout_global_majority": {
+          "accuracy": 0.75,
+          "balanced_accuracy": 0.5,
+          "macro_f1": 0.42857142857142855
+        },
+        "task_identity_resubstitution_upper_bound": {
+          "accuracy": 1.0,
+          "balanced_accuracy": 1.0,
+          "macro_f1": 1.0
+        }
+      },
+      "class_counts": {
+        "FAIL": 18,
+        "PASS": 6
+      },
+      "conditions": {
+        "x+y": {
+          "accuracy": 0.8333333333333334,
+          "balanced_accuracy": 0.7777777777777777,
+          "macro_f1": 0.7777777777777777,
+          "task_bootstrap_95": {
+            "lower_95": 0.4000000000000001,
+            "upper_95": 1.0
+          }
+        },
+        "x+y+b": {
+          "accuracy": 0.7916666666666666,
+          "balanced_accuracy": 0.6944444444444444,
+          "macro_f1": 0.7051597051597052,
+          "task_bootstrap_95": {
+            "lower_95": 0.4000000000000001,
+            "upper_95": 1.0
+          }
+        },
+        "x+y+b+tau_tools": {
+          "accuracy": 0.75,
+          "balanced_accuracy": 0.611111111111111,
+          "macro_f1": 0.6210526315789474,
+          "task_bootstrap_95": {
+            "lower_95": 0.4000000000000001,
+            "upper_95": 0.9090909090909091
+          }
+        },
+        "x+y+tau_tools": {
+          "accuracy": 0.8333333333333334,
+          "balanced_accuracy": 0.7222222222222222,
+          "macro_f1": 0.7473684210526316,
+          "task_bootstrap_95": {
+            "lower_95": 0.4285714285714286,
+            "upper_95": 1.0
+          }
+        }
+      },
+      "eligible": true,
+      "family_count": 4,
+      "row_count": 24,
+      "task_count": 12
+    }
+  },
+  "eligible_diagnostics": [
+    "next_tool_action_class",
+    "checker_state",
+    "recovery_state",
+    "mathematical_milestone",
+    "terminal_verifier_success"
+  ],
+  "event_coverage": {
+    "checker_rejections": 1,
+    "checker_state_counts": {
+      "ACCEPTED_ONLY": 3,
+      "NO_CHECKER": 20,
+      "REJECTED": 1
+    },
+    "no_tool_trajectories": 1,
+    "recovered_trajectories": 4,
+    "recovery_state_counts": {
+      "NO_RECOVERY_OPPORTUNITY": 20,
+      "RECOVERED": 4
+    },
+    "server_tool_trajectories": 23,
+    "successful_producer_checker_chains": 4,
+    "tool_failure_trajectories": 4,
+    "tool_use_failure_class_counts": {
+      "CLEAN_EXECUTION": 17,
+      "DISCOVERY_ONLY": 2,
+      "NO_SERVER_TOOL_USE": 1,
+      "RECOVERED_AFTER_FAILURE": 4
+    }
+  },
+  "evidence_class": "BOUNDED_AUTHENTICATED_HELD_OUT_DIAGNOSTIC",
+  "incremental_b_given_x_y_tau_tools": {
+    "mean_macro_f1": -0.07059878332710574,
+    "per_diagnostic_macro_f1": {
+      "checker_state": -0.10738279808047257,
+      "mathematical_milestone": -0.08782867985904036,
+      "next_tool_action_class": -0.01817761267748108,
+      "recovery_state": -0.01328903654485053,
+      "terminal_verifier_success": -0.12631578947368416
+    },
+    "task_bootstrap_95": {
+      "lower_95": -0.11848062896542859,
+      "upper_95": -0.006034633755222818
+    }
+  },
+  "incremental_tau_tools_given_x_y": {
+    "mean_macro_f1": 0.055332746701894676,
+    "per_diagnostic_macro_f1": {
+      "checker_state": 0.2895533407161314,
+      "mathematical_milestone": -0.1252543122512163,
+      "next_tool_action_class": 0.12948502522485383,
+      "recovery_state": 0.01328903654485053,
+      "terminal_verifier_success": -0.03040935672514611
+    }
+  },
+  "limitations": [
+    "This is a small, non-deterministic weak-model replication; complete-family holdout prevents family leakage but does not make the study causal.",
+    "Feature groups, thresholds, task families, repetitions, and stopping scope were frozen before v2 labels; no v1 transductive score enters this report.",
+    "Exact verifiers ran through the maintained clean child-process harness because a container runtime is not required for this operator study.",
+    "Task/output structure can dominate retrospective diagnostics; increments measure conditional predictive association only.",
+    "The frozen contract named assurance as an outcome field, but the bound current MCP logs expose verification-record URI presence; the analyzer records evidence presence and never promotes it to an assurance value.",
+    "No hidden reasoning, raw prompts, agent-message text, tool arguments, tool results, or verifier internals are committed."
+  ],
+  "projections": [
+    {
+      "command_status": "EXITED",
+      "family": "matrix-certificates",
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "checker_state": "NO_CHECKER",
+        "mathematical_milestone": "REACHED",
+        "recovery_state": "NO_RECOVERY_OPPORTUNITY",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "CLEAN_EXECUTION"
+      },
+      "repetition": 1,
+      "server_event_coverage": {
+        "candidates": 6,
+        "recorded": 6
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 6,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1268
+      },
+      "task_id": "hermite-normal-form",
+      "tool_metrics": {
+        "capability_attempt_count": 1,
+        "event_count": 6,
+        "successful_producer_checker_chain": false,
+        "tool_call_count": 5
+      },
+      "trial_id": "hermite-normal-form--r01"
+    },
+    {
+      "command_status": "EXITED",
+      "family": "matrix-certificates",
+      "labels": {
+        "checker_rejection_recovery": "SUCCESS_WITHOUT_REJECTION",
+        "checker_state": "ACCEPTED_ONLY",
+        "mathematical_milestone": "REACHED",
+        "recovery_state": "NO_RECOVERY_OPPORTUNITY",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "CLEAN_EXECUTION"
+      },
+      "repetition": 2,
+      "server_event_coverage": {
+        "candidates": 7,
+        "recorded": 7
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 10,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1673
+      },
+      "task_id": "hermite-normal-form",
+      "tool_metrics": {
+        "capability_attempt_count": 2,
+        "event_count": 7,
+        "successful_producer_checker_chain": true,
+        "tool_call_count": 5
+      },
+      "trial_id": "hermite-normal-form--r02"
+    },
+    {
+      "command_status": "EXITED",
+      "family": "matrix-certificates",
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "checker_state": "NO_CHECKER",
+        "mathematical_milestone": "REACHED",
+        "recovery_state": "NO_RECOVERY_OPPORTUNITY",
+        "terminal_verifier_success": "PASS",
+        "tool_use_failure_class": "CLEAN_EXECUTION"
+      },
+      "repetition": 1,
+      "server_event_coverage": {
+        "candidates": 4,
+        "recorded": 4
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 9,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1559
+      },
+      "task_id": "matrix-square-zero-counterexample",
+      "tool_metrics": {
+        "capability_attempt_count": 1,
+        "event_count": 4,
+        "successful_producer_checker_chain": false,
+        "tool_call_count": 3
+      },
+      "trial_id": "matrix-square-zero-counterexample--r01"
+    },
+    {
+      "command_status": "EXITED",
+      "family": "matrix-certificates",
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "checker_state": "NO_CHECKER",
+        "mathematical_milestone": "REACHED",
+        "recovery_state": "NO_RECOVERY_OPPORTUNITY",
+        "terminal_verifier_success": "PASS",
+        "tool_use_failure_class": "CLEAN_EXECUTION"
+      },
+      "repetition": 2,
+      "server_event_coverage": {
+        "candidates": 4,
+        "recorded": 4
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 8,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1485
+      },
+      "task_id": "matrix-square-zero-counterexample",
+      "tool_metrics": {
+        "capability_attempt_count": 1,
+        "event_count": 4,
+        "successful_producer_checker_chain": false,
+        "tool_call_count": 3
+      },
+      "trial_id": "matrix-square-zero-counterexample--r02"
+    },
+    {
+      "command_status": "EXITED",
+      "family": "matrix-certificates",
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "checker_state": "NO_CHECKER",
+        "mathematical_milestone": "NOT_REACHED",
+        "recovery_state": "NO_RECOVERY_OPPORTUNITY",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "CLEAN_EXECUTION"
+      },
+      "repetition": 1,
+      "server_event_coverage": {
+        "candidates": 5,
+        "recorded": 5
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 11,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 2176
+      },
+      "task_id": "subset-incidence-determinant",
+      "tool_metrics": {
+        "capability_attempt_count": 1,
+        "event_count": 5,
+        "successful_producer_checker_chain": false,
+        "tool_call_count": 4
+      },
+      "trial_id": "subset-incidence-determinant--r01"
+    },
+    {
+      "command_status": "EXITED",
+      "family": "matrix-certificates",
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "checker_state": "NO_CHECKER",
+        "mathematical_milestone": "NOT_REACHED",
+        "recovery_state": "NO_RECOVERY_OPPORTUNITY",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "CLEAN_EXECUTION"
+      },
+      "repetition": 2,
+      "server_event_coverage": {
+        "candidates": 4,
+        "recorded": 4
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 8,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1568
+      },
+      "task_id": "subset-incidence-determinant",
+      "tool_metrics": {
+        "capability_attempt_count": 1,
+        "event_count": 4,
+        "successful_producer_checker_chain": false,
+        "tool_call_count": 3
+      },
+      "trial_id": "subset-incidence-determinant--r02"
+    },
+    {
+      "command_status": "EXITED",
+      "family": "polynomial-field",
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "checker_state": "NO_CHECKER",
+        "mathematical_milestone": "NOT_REACHED",
+        "recovery_state": "NO_RECOVERY_OPPORTUNITY",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "CLEAN_EXECUTION"
+      },
+      "repetition": 1,
+      "server_event_coverage": {
+        "candidates": 4,
+        "recorded": 4
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 9,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1664
+      },
+      "task_id": "polynomial-normalization",
+      "tool_metrics": {
+        "capability_attempt_count": 1,
+        "event_count": 4,
+        "successful_producer_checker_chain": false,
+        "tool_call_count": 3
+      },
+      "trial_id": "polynomial-normalization--r01"
+    },
+    {
+      "command_status": "EXITED",
+      "family": "polynomial-field",
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "checker_state": "NO_CHECKER",
+        "mathematical_milestone": "REACHED",
+        "recovery_state": "NO_RECOVERY_OPPORTUNITY",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "CLEAN_EXECUTION"
+      },
+      "repetition": 2,
+      "server_event_coverage": {
+        "candidates": 5,
+        "recorded": 5
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 9,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1804
+      },
+      "task_id": "polynomial-normalization",
+      "tool_metrics": {
+        "capability_attempt_count": 1,
+        "event_count": 5,
+        "successful_producer_checker_chain": false,
+        "tool_call_count": 4
+      },
+      "trial_id": "polynomial-normalization--r02"
+    },
+    {
+      "command_status": "EXITED",
+      "family": "polynomial-field",
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "checker_state": "NO_CHECKER",
+        "mathematical_milestone": "NOT_REACHED",
+        "recovery_state": "NO_RECOVERY_OPPORTUNITY",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "CLEAN_EXECUTION"
+      },
+      "repetition": 1,
+      "server_event_coverage": {
+        "candidates": 5,
+        "recorded": 5
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 9,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1731
+      },
+      "task_id": "inseparable-minimal-polynomial-audit",
+      "tool_metrics": {
+        "capability_attempt_count": 1,
+        "event_count": 5,
+        "successful_producer_checker_chain": false,
+        "tool_call_count": 4
+      },
+      "trial_id": "inseparable-minimal-polynomial-audit--r01"
+    },
+    {
+      "command_status": "EXITED",
+      "family": "polynomial-field",
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "checker_state": "NO_CHECKER",
+        "mathematical_milestone": "REACHED",
+        "recovery_state": "RECOVERED",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "RECOVERED_AFTER_FAILURE"
+      },
+      "repetition": 2,
+      "server_event_coverage": {
+        "candidates": 6,
+        "recorded": 6
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 9,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 2061
+      },
+      "task_id": "inseparable-minimal-polynomial-audit",
+      "tool_metrics": {
+        "capability_attempt_count": 2,
+        "event_count": 6,
+        "successful_producer_checker_chain": false,
+        "tool_call_count": 4
+      },
+      "trial_id": "inseparable-minimal-polynomial-audit--r02"
+    },
+    {
+      "command_status": "EXITED",
+      "family": "polynomial-field",
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "checker_state": "NO_CHECKER",
+        "mathematical_milestone": "REACHED",
+        "recovery_state": "NO_RECOVERY_OPPORTUNITY",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "CLEAN_EXECUTION"
+      },
+      "repetition": 1,
+      "server_event_coverage": {
+        "candidates": 6,
+        "recorded": 6
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 13,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 2544
+      },
+      "task_id": "newton-polygon-factorization-audit",
+      "tool_metrics": {
+        "capability_attempt_count": 1,
+        "event_count": 6,
+        "successful_producer_checker_chain": false,
+        "tool_call_count": 5
+      },
+      "trial_id": "newton-polygon-factorization-audit--r01"
+    },
+    {
+      "command_status": "EXITED",
+      "family": "polynomial-field",
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "checker_state": "NO_CHECKER",
+        "mathematical_milestone": "REACHED",
+        "recovery_state": "RECOVERED",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "RECOVERED_AFTER_FAILURE"
+      },
+      "repetition": 2,
+      "server_event_coverage": {
+        "candidates": 8,
+        "recorded": 8
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 9,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1885
+      },
+      "task_id": "newton-polygon-factorization-audit",
+      "tool_metrics": {
+        "capability_attempt_count": 2,
+        "event_count": 8,
+        "successful_producer_checker_chain": false,
+        "tool_call_count": 6
+      },
+      "trial_id": "newton-polygon-factorization-audit--r02"
+    },
+    {
+      "command_status": "EXITED",
+      "family": "finite-discrete",
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "checker_state": "NO_CHECKER",
+        "mathematical_milestone": "REACHED",
+        "recovery_state": "NO_RECOVERY_OPPORTUNITY",
+        "terminal_verifier_success": "PASS",
+        "tool_use_failure_class": "CLEAN_EXECUTION"
+      },
+      "repetition": 1,
+      "server_event_coverage": {
+        "candidates": 5,
+        "recorded": 5
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 8,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1544
+      },
+      "task_id": "graph-artifact-composition",
+      "tool_metrics": {
+        "capability_attempt_count": 1,
+        "event_count": 5,
+        "successful_producer_checker_chain": false,
+        "tool_call_count": 4
+      },
+      "trial_id": "graph-artifact-composition--r01"
+    },
+    {
+      "command_status": "EXITED",
+      "family": "finite-discrete",
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "checker_state": "NO_CHECKER",
+        "mathematical_milestone": "REACHED",
+        "recovery_state": "NO_RECOVERY_OPPORTUNITY",
+        "terminal_verifier_success": "PASS",
+        "tool_use_failure_class": "CLEAN_EXECUTION"
+      },
+      "repetition": 2,
+      "server_event_coverage": {
+        "candidates": 8,
+        "recorded": 8
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 9,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1897
+      },
+      "task_id": "graph-artifact-composition",
+      "tool_metrics": {
+        "capability_attempt_count": 2,
+        "event_count": 8,
+        "successful_producer_checker_chain": false,
+        "tool_call_count": 6
+      },
+      "trial_id": "graph-artifact-composition--r02"
+    },
+    {
+      "command_status": "EXITED",
+      "family": "finite-discrete",
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "checker_state": "NO_CHECKER",
+        "mathematical_milestone": "REACHED",
+        "recovery_state": "NO_RECOVERY_OPPORTUNITY",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "CLEAN_EXECUTION"
+      },
+      "repetition": 1,
+      "server_event_coverage": {
+        "candidates": 10,
+        "recorded": 10
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 12,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 2291
+      },
+      "task_id": "finite-magma-countermodel",
+      "tool_metrics": {
+        "capability_attempt_count": 3,
+        "event_count": 10,
+        "successful_producer_checker_chain": false,
+        "tool_call_count": 7
+      },
+      "trial_id": "finite-magma-countermodel--r01"
+    },
+    {
+      "command_status": "EXITED",
+      "family": "finite-discrete",
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "checker_state": "NO_CHECKER",
+        "mathematical_milestone": "NOT_REACHED",
+        "recovery_state": "NO_RECOVERY_OPPORTUNITY",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "CLEAN_EXECUTION"
+      },
+      "repetition": 2,
+      "server_event_coverage": {
+        "candidates": 14,
+        "recorded": 14
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 11,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 2307
+      },
+      "task_id": "finite-magma-countermodel",
+      "tool_metrics": {
+        "capability_attempt_count": 5,
+        "event_count": 14,
+        "successful_producer_checker_chain": false,
+        "tool_call_count": 9
+      },
+      "trial_id": "finite-magma-countermodel--r02"
+    },
+    {
+      "command_status": "EXITED",
+      "family": "finite-discrete",
+      "labels": {
+        "checker_rejection_recovery": "SUCCESS_WITHOUT_REJECTION",
+        "checker_state": "ACCEPTED_ONLY",
+        "mathematical_milestone": "REACHED",
+        "recovery_state": "NO_RECOVERY_OPPORTUNITY",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "CLEAN_EXECUTION"
+      },
+      "repetition": 1,
+      "server_event_coverage": {
+        "candidates": 12,
+        "recorded": 12
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 11,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 2267
+      },
+      "task_id": "erdos-gallai-realization-audit",
+      "tool_metrics": {
+        "capability_attempt_count": 4,
+        "event_count": 12,
+        "successful_producer_checker_chain": true,
+        "tool_call_count": 8
+      },
+      "trial_id": "erdos-gallai-realization-audit--r01"
+    },
+    {
+      "command_status": "EXITED",
+      "family": "finite-discrete",
+      "labels": {
+        "checker_rejection_recovery": "SUCCESS_WITHOUT_REJECTION",
+        "checker_state": "ACCEPTED_ONLY",
+        "mathematical_milestone": "REACHED",
+        "recovery_state": "NO_RECOVERY_OPPORTUNITY",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "CLEAN_EXECUTION"
+      },
+      "repetition": 2,
+      "server_event_coverage": {
+        "candidates": 11,
+        "recorded": 11
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 10,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1864
+      },
+      "task_id": "erdos-gallai-realization-audit",
+      "tool_metrics": {
+        "capability_attempt_count": 4,
+        "event_count": 11,
+        "successful_producer_checker_chain": true,
+        "tool_call_count": 7
+      },
+      "trial_id": "erdos-gallai-realization-audit--r02"
+    },
+    {
+      "command_status": "EXITED",
+      "family": "proof-repair-manual",
+      "labels": {
+        "checker_rejection_recovery": "REJECTED_RECOVERED",
+        "checker_state": "REJECTED",
+        "mathematical_milestone": "REACHED",
+        "recovery_state": "RECOVERED",
+        "terminal_verifier_success": "PASS",
+        "tool_use_failure_class": "RECOVERED_AFTER_FAILURE"
+      },
+      "repetition": 1,
+      "server_event_coverage": {
+        "candidates": 11,
+        "recorded": 11
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 9,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1697
+      },
+      "task_id": "natural-subtraction-proof-repair",
+      "tool_metrics": {
+        "capability_attempt_count": 3,
+        "event_count": 11,
+        "successful_producer_checker_chain": true,
+        "tool_call_count": 8
+      },
+      "trial_id": "natural-subtraction-proof-repair--r01"
+    },
+    {
+      "command_status": "EXITED",
+      "family": "proof-repair-manual",
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "checker_state": "NO_CHECKER",
+        "mathematical_milestone": "REACHED",
+        "recovery_state": "NO_RECOVERY_OPPORTUNITY",
+        "terminal_verifier_success": "PASS",
+        "tool_use_failure_class": "NO_SERVER_TOOL_USE"
+      },
+      "repetition": 2,
+      "server_event_coverage": {
+        "candidates": 0,
+        "recorded": 0
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 6,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1191
+      },
+      "task_id": "natural-subtraction-proof-repair",
+      "tool_metrics": {
+        "capability_attempt_count": 0,
+        "event_count": 0,
+        "successful_producer_checker_chain": false,
+        "tool_call_count": 0
+      },
+      "trial_id": "natural-subtraction-proof-repair--r02"
+    },
+    {
+      "command_status": "EXITED",
+      "family": "proof-repair-manual",
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "checker_state": "NO_CHECKER",
+        "mathematical_milestone": "REACHED",
+        "recovery_state": "NO_RECOVERY_OPPORTUNITY",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "DISCOVERY_ONLY"
+      },
+      "repetition": 1,
+      "server_event_coverage": {
+        "candidates": 1,
+        "recorded": 1
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 8,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1753
+      },
+      "task_id": "path-dependent-limit",
+      "tool_metrics": {
+        "capability_attempt_count": 0,
+        "event_count": 1,
+        "successful_producer_checker_chain": false,
+        "tool_call_count": 1
+      },
+      "trial_id": "path-dependent-limit--r01"
+    },
+    {
+      "command_status": "EXITED",
+      "family": "proof-repair-manual",
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "checker_state": "NO_CHECKER",
+        "mathematical_milestone": "REACHED",
+        "recovery_state": "NO_RECOVERY_OPPORTUNITY",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "DISCOVERY_ONLY"
+      },
+      "repetition": 2,
+      "server_event_coverage": {
+        "candidates": 1,
+        "recorded": 1
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 10,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1975
+      },
+      "task_id": "path-dependent-limit",
+      "tool_metrics": {
+        "capability_attempt_count": 0,
+        "event_count": 1,
+        "successful_producer_checker_chain": false,
+        "tool_call_count": 1
+      },
+      "trial_id": "path-dependent-limit--r02"
+    },
+    {
+      "command_status": "EXITED",
+      "family": "proof-repair-manual",
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "checker_state": "NO_CHECKER",
+        "mathematical_milestone": "REACHED",
+        "recovery_state": "NO_RECOVERY_OPPORTUNITY",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "CLEAN_EXECUTION"
+      },
+      "repetition": 1,
+      "server_event_coverage": {
+        "candidates": 3,
+        "recorded": 3
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 11,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1886
+      },
+      "task_id": "generated-lemma-vacuity-audit",
+      "tool_metrics": {
+        "capability_attempt_count": 1,
+        "event_count": 3,
+        "successful_producer_checker_chain": false,
+        "tool_call_count": 2
+      },
+      "trial_id": "generated-lemma-vacuity-audit--r01"
+    },
+    {
+      "command_status": "EXITED",
+      "family": "proof-repair-manual",
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "checker_state": "NO_CHECKER",
+        "mathematical_milestone": "NOT_REACHED",
+        "recovery_state": "RECOVERED",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "RECOVERED_AFTER_FAILURE"
+      },
+      "repetition": 2,
+      "server_event_coverage": {
+        "candidates": 5,
+        "recorded": 5
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 8,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1379
+      },
+      "task_id": "generated-lemma-vacuity-audit",
+      "tool_metrics": {
+        "capability_attempt_count": 2,
+        "event_count": 5,
+        "successful_producer_checker_chain": false,
+        "tool_call_count": 3
+      },
+      "trial_id": "generated-lemma-vacuity-audit--r02"
+    }
+  ],
+  "retention": {
+    "committed_evidence": "frozen contract, implementation/tests, aggregate report, counts, metrics, limitations, and SHA-256 bindings only",
+    "publish_agent_messages": false,
+    "publish_hidden_reasoning": false,
+    "publish_tool_arguments_or_results": false,
+    "publish_verifier_internals": false,
+    "raw_trials": "host-local, operator-controlled, not committed"
+  },
+  "run_manifest_sha256": "sha256:263c37729c9cc72e9cf9564091c9663ae332157be60f2f5c7e6979be817b96f1",
+  "schema_version": "2",
+  "source_sha": "3f045cad45fe12cbd3d88726c075efb819c8cf59",
+  "study_id": "observable-trajectory-information-heldout-v2",
+  "tau_tools_field_ablation": {
+    "binding": {
+      "add_only_macro_f1_gain_over_x_y": {
+        "checker_state": 0.008456659619450302,
+        "mathematical_milestone": 0.04561403508771933,
+        "next_tool_action_class": 0.02986550816093675,
+        "recovery_state": -0.013937282229965153,
+        "terminal_verifier_success": 0.06398046398046398
+      },
+      "drop_one_macro_f1_loss_from_full_tau": {
+        "checker_state": 0.0,
+        "mathematical_milestone": 0.0,
+        "next_tool_action_class": 5.106810914429216e-05,
+        "recovery_state": 0.0,
+        "terminal_verifier_success": 0.0
+      },
+      "mean_add_only_gain": 0.02679587692372104,
+      "mean_drop_one_loss": 1.0213621828858433e-05
+    },
+    "call_structure": {
+      "add_only_macro_f1_gain_over_x_y": {
+        "checker_state": 0.008456659619450302,
+        "mathematical_milestone": 0.003947368421052588,
+        "next_tool_action_class": 0.12210428523929673,
+        "recovery_state": -0.028571428571428525,
+        "terminal_verifier_success": 0.06398046398046398
+      },
+      "drop_one_macro_f1_loss_from_full_tau": {
+        "checker_state": 0.0,
+        "mathematical_milestone": 0.0,
+        "next_tool_action_class": 0.0874299571027462,
+        "recovery_state": -0.012684989429175397,
+        "terminal_verifier_success": 0.11659919028340082
+      },
+      "mean_add_only_gain": 0.033983469737767016,
+      "mean_drop_one_loss": 0.038268831591394326
+    },
+    "capability_identity": {
+      "add_only_macro_f1_gain_over_x_y": {
+        "checker_state": 0.008456659619450302,
+        "mathematical_milestone": -0.05741626794258381,
+        "next_tool_action_class": 0.016554935895869483,
+        "recovery_state": 0.025974025974025927,
+        "terminal_verifier_success": 0.0
+      },
+      "drop_one_macro_f1_loss_from_full_tau": {
+        "checker_state": 0.0,
+        "mathematical_milestone": 0.0,
+        "next_tool_action_class": -0.014601298443849775,
+        "recovery_state": 0.027226318774815683,
+        "terminal_verifier_success": -0.03040935672514611
+      },
+      "mean_add_only_gain": -0.0012861292906476197,
+      "mean_drop_one_loss": -0.00355686727883604
+    },
+    "cost": {
+      "add_only_macro_f1_gain_over_x_y": {
+        "checker_state": 0.008456659619450302,
+        "mathematical_milestone": 0.009716599190283337,
+        "next_tool_action_class": 0.029839532448228123,
+        "recovery_state": -0.013937282229965153,
+        "terminal_verifier_success": 0.06398046398046398
+      },
+      "drop_one_macro_f1_loss_from_full_tau": {
+        "checker_state": 0.0,
+        "mathematical_milestone": -0.029476405946994078,
+        "next_tool_action_class": -0.004350531063914254,
+        "recovery_state": 0.0,
+        "terminal_verifier_success": 0.0
+      },
+      "mean_add_only_gain": 0.019611194601692118,
+      "mean_drop_one_loss": -0.006765387402181666
+    },
+    "outcome": {
+      "add_only_macro_f1_gain_over_x_y": {
+        "checker_state": 0.18217054263565885,
+        "mathematical_milestone": -0.09577790630422223,
+        "next_tool_action_class": 0.053058765716338,
+        "recovery_state": 0.025974025974025927,
+        "terminal_verifier_success": 0.06398046398046398
+      },
+      "drop_one_macro_f1_loss_from_full_tau": {
+        "checker_state": 0.10738279808047257,
+        "mathematical_milestone": 0.029131652661064433,
+        "next_tool_action_class": 0.014646248732477885,
+        "recovery_state": 0.027226318774815683,
+        "terminal_verifier_success": 0.04220871589292641
+      },
+      "mean_add_only_gain": 0.0458811784004529,
+      "mean_drop_one_loss": 0.0441191468283514
+    }
+  }
+}
