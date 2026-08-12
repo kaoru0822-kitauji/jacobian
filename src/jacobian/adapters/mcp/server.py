@@ -139,7 +139,7 @@ class JacobianCoreExtension(Extension):
                 capability_describe,
                 kwargs={
                     "name": "math.find",
-                    "title": "Find an exact mathematical operation",
+                    "title": "Search installed Jacobian math tools",
                     "description": MATH_FIND_DESCRIPTION,
                     "annotations": _tool_annotations(read_only=True, idempotent=True),
                     "structured_output": True,
@@ -149,7 +149,7 @@ class JacobianCoreExtension(Extension):
                 capability_invoke,
                 kwargs={
                     "name": "math.run",
-                    "title": "Run a mathematical operation",
+                    "title": "Run one installed Jacobian math tool",
                     "description": MATH_RUN_DESCRIPTION,
                     # The selected operation may publish artifacts, so math.run is
                     # not globally read-only or idempotent. Retained operations are
