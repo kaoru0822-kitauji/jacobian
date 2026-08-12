@@ -409,6 +409,7 @@ async def _invoke_capability_attempt(
     *,
     capability_id: str,
     payload: dict[str, Any],
+    inputs: dict[str, str] | None = None,
     ctx: Any | None,
 ) -> CapabilityResult:
     started = time.monotonic()
@@ -416,6 +417,7 @@ async def _invoke_capability_attempt(
         {
             "capability_id": capability_id,
             "payload": payload,
+            "inputs": inputs or {},
         }
     )
     trace_digest, trace_source = _request_trace_digest(ctx)
@@ -424,6 +426,7 @@ async def _invoke_capability_attempt(
     request = CapabilityRequest(
         capability_id=capability_id,
         input=payload,
+        inputs=inputs or {},
     )
     try:
         result = await _run_blocking(

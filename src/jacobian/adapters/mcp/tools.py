@@ -24,8 +24,9 @@ from jacobian.contracts.capabilities import (
     CapabilityInputKind,
     CapabilityProviderAvailability,
     CapabilityResult,
+    CapabilityValuePort,
 )
-from jacobian.contracts.common import ArtifactUri
+from jacobian.contracts.common import ArtifactUri, ValueUri
 from jacobian.runtime.model import JacobianRuntime
 
 
@@ -35,10 +36,16 @@ class _MCPOutputModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class _ValueReferenceArgument(_MCPOutputModel):
+    value_ref: ValueUri
+
+
 class _CapabilityDiscoveryOperationCard(CapabilityDiscoveryMatch):
     accepted_input_kinds: tuple[CapabilityInputKind, ...]
     accepted_artifact_types: tuple[ArtifactUri, ...]
     produced_artifact_types: tuple[ArtifactUri, ...]
+    input_ports: tuple[CapabilityValuePort, ...]
+    output_ports: tuple[CapabilityValuePort, ...]
     provider_availability: CapabilityProviderAvailability | Literal["UNKNOWN"]
 
 
@@ -209,6 +216,8 @@ def _find_text_projection(response: dict[str, Any]) -> dict[str, Any]:
                         "accepted_input_kinds",
                         "accepted_artifact_types",
                         "produced_artifact_types",
+                        "input_ports",
+                        "output_ports",
                         "provider_availability",
                         "relevance_score",
                         "applicability",
@@ -234,6 +243,8 @@ def _find_text_projection(response: dict[str, Any]) -> dict[str, Any]:
             "accepted_input_kinds",
             "accepted_artifact_types",
             "produced_artifact_types",
+            "input_ports",
+            "output_ports",
         )
         if key in capability
     }
@@ -376,6 +387,7 @@ async def capability_describe(
 async def capability_invoke(
     capability_id: CapabilityId,
     payload: dict[str, Any],
+    inputs: dict[str, _ValueReferenceArgument] | None = None,
     *,
     ctx: Context[AppState, Any],
 ) -> CapabilityRunToolResult:
@@ -385,6 +397,11 @@ async def capability_invoke(
             active_runtime,
             capability_id=capability_id,
             payload=payload,
+            inputs=(
+                {name: binding.value_ref for name, binding in inputs.items()}
+                if inputs is not None
+                else {}
+            ),
             ctx=ctx,
         )
         result = _bounded_run_result(active_runtime, result)

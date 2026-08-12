@@ -8,7 +8,7 @@ from typing import Annotated, Any, Literal, Self
 from pydantic import Field, StringConstraints, model_validator
 
 from jacobian.canonical import canonicalize_json
-from jacobian.contracts.common import ArtifactUri, CheckerUri, Sha256Digest
+from jacobian.contracts.common import ArtifactUri, CheckerUri, Sha256Digest, ValueUri
 from jacobian.contracts.results import ContractModel, Execution, ExecutionStatus
 
 CapabilityId = Annotated[
@@ -62,6 +62,13 @@ class CapabilityInvocationExample(ContractModel):
     def require_canonical_input(self) -> Self:
         canonicalize_json(self.input)
         return self
+
+
+class CapabilityValuePort(ContractModel):
+    """One named whole-value composition port."""
+
+    name: str = Field(pattern=r"^[a-z][a-z0-9_]{0,63}$")
+    value_type: str = Field(min_length=1, max_length=128)
 
 
 class CapabilityDiscoveryRequest(ContractModel):
@@ -330,6 +337,8 @@ class CapabilityDescriptor(ContractModel):
     )
     accepted_artifact_types: tuple[ArtifactUri, ...] = ()
     produced_artifact_types: tuple[ArtifactUri, ...] = ()
+    input_ports: tuple[CapabilityValuePort, ...] = ()
+    output_ports: tuple[CapabilityValuePort, ...] = ()
     invocation_examples: tuple[CapabilityInvocationExample, ...] = ()
 
     @model_validator(mode="after")
@@ -340,6 +349,13 @@ class CapabilityDescriptor(ContractModel):
         )
         if len(set(self.produced_artifact_types)) != len(self.produced_artifact_types):
             raise ValueError("produced artifact types must be unique")
+        for ports, label in (
+            (self.input_ports, "input"),
+            (self.output_ports, "output"),
+        ):
+            names = tuple(port.name for port in ports)
+            if len(names) != len(set(names)):
+                raise ValueError(f"{label} port names must be unique")
         if len({example.name for example in self.invocation_examples}) != len(
             self.invocation_examples
         ):
@@ -358,6 +374,7 @@ class CapabilityRequest(ContractModel):
     request_version: Literal["1"] = "1"
     capability_id: CapabilityId
     input: dict[str, Any]
+    inputs: dict[str, ValueUri] = Field(default_factory=dict)
 
 
 class CapabilityDiagnostic(ContractModel):

@@ -87,6 +87,10 @@ class InstalledOperation[
     output_ports: tuple[OutputPort[Any], ...] = ()
 
     def __post_init__(self) -> None:
+        if isinstance(self.publication, DurablePublication) and self.output_ports:
+            raise ValueError(
+                "durable operations cannot publish request-local output references"
+            )
         validate_ports(
             self.spec.request_type,
             self.spec.result_type,

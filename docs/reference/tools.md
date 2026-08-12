@@ -79,21 +79,26 @@ Run one known operation with a payload:
 }
 ```
 
-After typed ports are available, callers may bind declared inputs by opaque
-request-local reference:
+Operations that declare typed ports may bind inputs by opaque request-local
+reference:
 
 ```json
 {
-  "capability_id": "matrix.rank.compute",
+  "capability_id": "finite_field.polynomial_map.fibers.compute",
   "payload": {},
-  "inputs": {"matrix": {"value_ref": "value://opaque-id"}}
+  "inputs": {
+    "table": {"value_ref": "value://AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}
+  }
 }
 ```
 
 The runtime resolves declared inputs, assembles one request, parses it once,
 runs preflight, executes one semantic operation, checks the request/result
 postcondition, and then publishes the result. Unknown top-level arguments and
-unknown selected-payload fields fail closed.
+unknown selected-payload fields fail closed. References are opaque and scoped
+to the runtime that produced them; they carry no assurance and expire with
+that runtime. The catalog and inspection result list each operation's exact
+input and output ports.
 
 Ordinary operations return a bounded mathematical value and execution status.
 Checker operations return an accepted, rejected, or non-conclusion verdict

@@ -10,6 +10,7 @@ from jacobian.contracts.capabilities import CapabilityProviderRuntime
 from jacobian.contracts.results import ContractModel
 from jacobian.operation_bindings import InstalledOperation
 from jacobian.operations import DomainBundle
+from jacobian.value_references import ValueReferenceStore
 
 type DomainOperation = InstalledOperation[Any, Any]
 
@@ -17,6 +18,7 @@ type DomainOperation = InstalledOperation[Any, Any]
 @dataclass(frozen=True, slots=True)
 class OperationResources:
     artifacts: ArtifactService
+    values: ValueReferenceStore
     semantics_uri: str
     input_schema_uris: dict[type[ContractModel], str]
     result_schema_uris: dict[str, str]

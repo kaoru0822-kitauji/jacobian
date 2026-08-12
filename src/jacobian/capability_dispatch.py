@@ -112,6 +112,14 @@ def _normalize_request(
 ) -> CapabilityRequest:
     """Use the adapter's typed parser or the external schema-only boundary."""
 
+    if request.inputs and not descriptor.input_ports:
+        raise PayloadValidationError(
+            "the selected capability declares no typed value inputs",
+            path="inputs",
+            actual_type="object",
+            expected="no value references",
+            details={"unknown_input_ports": sorted(request.inputs)},
+        )
     if isinstance(adapter, TypedInputAdapter):
         return request
     normalized_input = validate_payload(descriptor.input_schema, request.input)

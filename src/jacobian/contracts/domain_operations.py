@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Self
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
-from jacobian.contracts.common import ArtifactUri
+from jacobian.contracts.common import ArtifactUri, ValueUri
 from jacobian.contracts.results import ContractModel
 
 
@@ -15,6 +15,7 @@ class InlineOperationOutput[ResultT: ContractModel](ContractModel):
 
     result: ResultT
     backend_version: str
+    value_refs: dict[str, ValueUri] = Field(default_factory=dict)
 
 
 class DurableOperationOutput[PreviewT: ContractModel](ContractModel):

@@ -20,6 +20,7 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderAvailability,
     CapabilityRequest,
     CapabilityResult,
+    CapabilityValuePort,
 )
 from jacobian.contracts.results import ContractModel, ExecutionStatus
 from jacobian.operation_bindings import (
@@ -41,6 +42,7 @@ from jacobian.operation_runtime import (
 from jacobian.operations import Completed, DomainBundle, Effect, Failed, OperationSpec
 from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.storage.repository import ArtifactRepository
+from jacobian.value_references import ValueReferenceError, ValueReferenceStore
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,10 +84,12 @@ class OperationInstaller:
         store: ArtifactRepository,
         schemas: SchemaRegistry,
         artifacts: ArtifactService,
+        values: ValueReferenceStore | None = None,
     ) -> None:
         self.store = store
         self.schemas = schemas
         self.artifacts = artifacts
+        self.values = values or ValueReferenceStore()
 
     def install(self, bundle: DomainBundle) -> InstalledDomainBundle:
         self._validate_bundle(bundle)
@@ -114,6 +118,7 @@ class OperationInstaller:
         }
         resources = OperationResources(
             artifacts=self.artifacts,
+            values=self.values,
             semantics_uri=semantics_uri,
             input_schema_uris=input_schema_uris,
             result_schema_uris=result_schema_uris,
@@ -206,6 +211,20 @@ class InstalledOperationAdapter:
             read_only=(self.spec.effect is Effect.READ_ONLY),
             tags=self.spec.tags,
             produced_artifact_types=produced_artifact_types,
+            input_ports=tuple(
+                CapabilityValuePort(
+                    name=port.name,
+                    value_type=port.value_type.__name__,
+                )
+                for port in operation.input_ports
+            ),
+            output_ports=tuple(
+                CapabilityValuePort(
+                    name=port.name,
+                    value_type=port.value_type.__name__,
+                )
+                for port in operation.output_ports
+            ),
             invocation_examples=self.spec.invocation_examples,
         )
 
@@ -216,7 +235,16 @@ class InstalledOperationAdapter:
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
         maximum_bytes = self.resources.artifacts.store.limits.max_artifact_bytes
         try:
-            request_bytes = canonicalize_json(request.input)
+            assembled_input = self._bind_inputs(request)
+            bounded_input = {
+                key: (
+                    value.model_dump(mode="json")
+                    if isinstance(value, ContractModel)
+                    else value
+                )
+                for key, value in assembled_input.items()
+            }
+            request_bytes = canonicalize_json(bounded_input)
         except CanonicalizationError as exc:
             raise CapabilityInvocationError(
                 CapabilityDiagnostic(
@@ -236,7 +264,7 @@ class InstalledOperationAdapter:
                 )
             )
         try:
-            parsed_request = self.spec.request_type.model_validate(request.input)
+            parsed_request = self.spec.request_type.model_validate(assembled_input)
         except ValidationError as exc:
             base = self.spec.invalid_request or self.bundle.diagnostics.invalid_request
             raise CapabilityInvocationError(
@@ -271,6 +299,7 @@ class InstalledOperationAdapter:
                     terminal.value,
                     PublicationContext(
                         artifacts=self.resources.artifacts,
+                        values=self.resources.values,
                         semantics_uri=self.resources.semantics_uri,
                         input_schema_uri=self.resources.input_schema_uris[
                             self.spec.request_type
@@ -297,3 +326,34 @@ class InstalledOperationAdapter:
             terminal=terminal,
             publication=publication,
         )
+
+    def _bind_inputs(self, request: CapabilityRequest) -> dict[str, Any]:
+        if not request.inputs:
+            return request.input
+        ports = {port.name: port for port in self.operation.input_ports}
+        unknown = sorted(set(request.inputs) - set(ports))
+        if unknown:
+            raise CapabilityInvocationError(
+                CapabilityDiagnostic(
+                    code="UNKNOWN_INPUT_PORT",
+                    stage="operation_input_binding",
+                    message="Unknown operation input port: " + ", ".join(unknown),
+                    hint="Inspect the operation and use one of its declared input ports.",
+                )
+            )
+        assembled = request.input
+        try:
+            for name, value_ref in request.inputs.items():
+                port = ports[name]
+                value = self.resources.values.resolve(value_ref, port.value_type)
+                assembled = port.bind_to_request(assembled, value)
+        except (TypeError, ValueError, ValueReferenceError) as exc:
+            raise CapabilityInvocationError(
+                CapabilityDiagnostic(
+                    code="INCOMPATIBLE_VALUE_REFERENCE",
+                    stage="operation_input_binding",
+                    message=str(exc),
+                    hint="Use a value reference produced for this exact input port.",
+                )
+            ) from exc
+        return assembled

@@ -71,6 +71,8 @@ def validate_ports(
 
     _require_unique_names(input_ports, "input")
     _require_unique_names(output_ports, "output")
+    if len(output_ports) > 1:
+        raise ValueError("an operation result may expose at most one output port")
     bound_request_fields: set[str] = set()
     for input_port in input_ports:
         if input_port.request_field in bound_request_fields:

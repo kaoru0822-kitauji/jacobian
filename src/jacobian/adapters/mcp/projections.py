@@ -55,6 +55,12 @@ def _discovery_operation_card(
         ],
         "accepted_artifact_types": list(descriptor.accepted_artifact_types),
         "produced_artifact_types": list(descriptor.produced_artifact_types),
+        "input_ports": [
+            port.model_dump(mode="json") for port in descriptor.input_ports
+        ],
+        "output_ports": [
+            port.model_dump(mode="json") for port in descriptor.output_ports
+        ],
         "provider_availability": (
             runtime.availability.value if runtime is not None else "UNKNOWN"
         ),

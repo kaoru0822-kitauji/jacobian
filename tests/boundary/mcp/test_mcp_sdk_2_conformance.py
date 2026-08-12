@@ -54,6 +54,7 @@ def test_mcp_v2_static_validation_context_errors_and_structured_resources(
             invoke = next(tool for tool in listed.tools if tool.name == "math.run")
             assert set(invoke.input_schema["properties"]) == {
                 "capability_id",
+                "inputs",
                 "payload",
             }
             assert invoke.output_schema == CapabilityResult.model_json_schema()

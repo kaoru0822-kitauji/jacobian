@@ -46,8 +46,10 @@ inventory protocol, and an empty query is not browse mode.
 }
 ```
 
-Once typed composition lands, declared input ports may also bind opaque value
-references. The assembled request is still parsed exactly once.
+Declared input ports may also bind opaque runtime-local value references. The
+reference carries no assurance or serialized type metadata: the runtime checks
+its stored type and source port, assembles the request, and parses it exactly
+once. Closing the runtime invalidates its references.
 
 ## Dependency direction
 

@@ -17,6 +17,7 @@ from jacobian.operation_bindings import (
     InlinePublication,
     InstalledOperation,
 )
+from jacobian.value_references import ValueReferenceError, ValueReferenceStore
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,6 +25,7 @@ class PublicationContext:
     """Runtime resources required only while projecting a completed value."""
 
     artifacts: ArtifactService
+    values: ValueReferenceStore
     semantics_uri: str
     input_schema_uri: str
     result_schema_uri: str
@@ -55,6 +57,29 @@ def publish_operation[
 
     policy = operation.publication
     if isinstance(policy, InlinePublication):
+        projected_payload = {
+            "result": result.model_dump(mode="json"),
+            "backend_version": context.backend_version,
+            "value_refs": {
+                port.name: f"value://{'0' * 32}" for port in operation.output_ports
+            },
+        }
+        if len(canonicalize_json(projected_payload)) > policy.maximum_bytes:
+            raise PublicationLimitError(
+                f"inline result exceeds {policy.maximum_bytes} canonical bytes"
+            )
+        value_refs: dict[str, str] = {}
+        try:
+            for port in operation.output_ports:
+                value = port.extract_from_result(result)
+                value_refs[port.name] = context.values.put(
+                    value,
+                    operation_id=operation.spec.operation_id,
+                    operation_version=operation.spec.version,
+                    output_port=port.name,
+                )
+        except ValueReferenceError as exc:
+            raise PublicationLimitError(str(exc)) from exc
         output_type = cast(Any, InlineOperationOutput[operation.spec.result_type])  # type: ignore[name-defined]
         output = cast(
             ContractModel,
@@ -62,16 +87,10 @@ def publish_operation[
                 {
                     "result": result,
                     "backend_version": context.backend_version,
+                    "value_refs": value_refs,
                 }
             ),
         )
-        if (
-            len(canonicalize_json(output.model_dump(mode="json")))
-            > policy.maximum_bytes
-        ):
-            raise PublicationLimitError(
-                f"inline result exceeds {policy.maximum_bytes} canonical bytes"
-            )
         return PublishedOperation(
             output=output,
         )

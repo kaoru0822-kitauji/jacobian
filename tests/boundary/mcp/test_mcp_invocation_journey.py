@@ -10,6 +10,8 @@ import asyncio
 import json
 from pathlib import Path
 
+import pytest
+
 from jacobian.adapters.mcp.server import create_server
 
 MATH_TOOL_NAMES = {"math.find", "math.run"}
@@ -122,5 +124,72 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
             }
             assert "verification_record_uri" not in unknown_result
             assert unknown.structured_content["verification_record_uri"] is None
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.requires_provider("flint")
+def test_mcp_composes_finite_field_values_by_opaque_reference(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        from mcp import Client
+
+        from jacobian.math.finite_fields import (
+            element,
+            finite_field,
+            finite_polynomial,
+            finite_polynomial_map,
+        )
+
+        presentation = finite_field(2, (1, 1, 1))
+        zero = element(presentation, (0, 0))
+        one = element(presentation, (1, 0))
+        polynomial_map = finite_polynomial_map(
+            finite_polynomial(presentation, (zero, zero, zero, one))
+        )
+
+        async with Client(create_server(tmp_path), raise_exceptions=True) as client:
+            inspected = await client.call_tool(
+                "math.find",
+                {
+                    "request": {
+                        "op": "inspect",
+                        "capability_id": ("finite_field.polynomial_map.fibers.compute"),
+                    }
+                },
+            )
+            assert isinstance(inspected.structured_content, dict)
+            descriptor = inspected.structured_content["capability"]
+            assert descriptor["input_ports"] == [
+                {"name": "table", "value_type": "FiniteMapTable"}
+            ]
+
+            table_call = await client.call_tool(
+                "math.run",
+                {
+                    "capability_id": "finite_field.polynomial_map.table.compute",
+                    "payload": {
+                        "polynomial_map": polynomial_map.model_dump(mode="json")
+                    },
+                },
+            )
+            assert isinstance(table_call.structured_content, dict)
+            table_output = table_call.structured_content["output"]
+            value_ref = table_output["value_refs"]["table"]
+            assert value_ref.startswith("value://")
+
+            fibers_call = await client.call_tool(
+                "math.run",
+                {
+                    "capability_id": "finite_field.polynomial_map.fibers.compute",
+                    "payload": {},
+                    "inputs": {"table": {"value_ref": value_ref}},
+                },
+            )
+            assert isinstance(fibers_call.structured_content, dict)
+            fibers_output = fibers_call.structured_content["output"]
+            assert fibers_output["result"]["table"] == table_output["result"]
+            assert sorted(
+                len(sources) for _image, sources in fibers_output["result"]["fibers"]
+            ) == [1, 3]
 
     asyncio.run(scenario())

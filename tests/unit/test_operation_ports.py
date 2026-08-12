@@ -3,7 +3,11 @@ from __future__ import annotations
 import pytest
 
 from jacobian.contracts.base import ContractModel
-from jacobian.operation_bindings import InlinePublication, InstalledOperation
+from jacobian.operation_bindings import (
+    DurablePublication,
+    InlinePublication,
+    InstalledOperation,
+)
 from jacobian.operation_ports import InputPort, OutputPort
 from jacobian.operations import OperationSpec
 
@@ -98,4 +102,25 @@ def test_installation_rejects_ports_that_disagree_with_model_fields() -> None:
                     value_type=MatrixValue,
                 ),
             ),
+        )
+
+
+def test_installation_rejects_multiple_whole_result_output_ports() -> None:
+    with pytest.raises(ValueError, match="at most one output port"):
+        InstalledOperation(
+            spec=_spec(),
+            publication=InlinePublication(),
+            output_ports=(
+                OutputPort[RankResult](name="first", value_type=RankResult),
+                OutputPort[RankResult](name="second", value_type=RankResult),
+            ),
+        )
+
+
+def test_durable_publication_rejects_request_local_output_references() -> None:
+    with pytest.raises(ValueError, match="durable operations cannot publish"):
+        InstalledOperation(
+            spec=_spec(),
+            publication=DurablePublication(resource_reason="large result"),
+            output_ports=(OutputPort[RankResult](name="rank", value_type=RankResult),),
         )
