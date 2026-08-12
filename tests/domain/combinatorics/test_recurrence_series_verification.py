@@ -92,9 +92,7 @@ def test_recurrence_and_series_results_are_verified_and_forgery_rejected(
         assert verified.output["verification_record_uri"] in verified.artifact_uris, (
             capability_id
         )
-        assert verified.verification_record_uri is not None, (
-            capability_id
-        )
+        assert verified.verification_record_uri is not None, capability_id
 
         forged_candidate = deepcopy(computed.output["result"])
         if capability_id == "combinatorics.recurrence.linear.evaluate":

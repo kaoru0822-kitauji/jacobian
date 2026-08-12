@@ -121,9 +121,7 @@ def test_probability_results_are_independently_replayed(
         assert verified.output["verification_record_uri"] in verified.artifact_uris, (
             capability_id
         )
-        assert verified.verification_record_uri is not None, (
-            capability_id
-        )
+        assert verified.verification_record_uri is not None, capability_id
 
 
 def test_probability_checker_rejects_forged_event_mass(

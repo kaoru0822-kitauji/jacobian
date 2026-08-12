@@ -95,9 +95,7 @@ class LeanCheckAdapter:
             proof=str(payload["proof"]),
             environment=LeanEnvironment(str(payload.get("environment", "CORE"))),
         )
-        verified = (
-            checked.result.verification_record_uri is not None
-        )
+        verified = checked.result.verification_record_uri is not None
         evidence = (checked.certificate_uri,)
         scope_uri = checked.result.scope_uri
         return CapabilityResult(

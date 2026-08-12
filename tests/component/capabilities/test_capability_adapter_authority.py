@@ -185,6 +185,8 @@ def test_schema_invalid_adapter_output_returns_a_typed_failure(
     assert result.diagnostics[0].path == "value"
     assert result.diagnostics[0].actual_type == "string"
     assert result.diagnostics[0].expected == "JSON type integer"
+
+
 def test_adapter_cannot_promote_without_a_local_verification_record(
     capability_core_services: DomainTestServices,
 ) -> None:

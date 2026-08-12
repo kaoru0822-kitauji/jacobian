@@ -106,9 +106,7 @@ def test_poset_results_are_independently_verified(
         assert verified.output["verification_record_uri"] in verified.artifact_uris, (
             producer_id
         )
-        assert verified.verification_record_uri is not None, (
-            producer_id
-        )
+        assert verified.verification_record_uri is not None, producer_id
         assert len(verified.artifact_uris) == (
             4 if producer_id == "poset.linear_extensions.count" else 2
         ), producer_id
