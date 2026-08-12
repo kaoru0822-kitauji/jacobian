@@ -7,7 +7,34 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from sympy.matrices.matrixbase import MatrixBase
 
-__all__ = ["determinant", "inverse", "rank", "rref", "trace"]
+__all__ = [
+    "adjugate",
+    "characteristic_polynomial",
+    "determinant",
+    "inverse",
+    "multiply",
+    "rank",
+    "rref",
+    "smith_normal_form",
+    "solve_linear_system",
+    "trace",
+]
+
+
+def adjugate(matrix: MatrixBase) -> MatrixBase:
+    """Return the classical adjugate of a square matrix."""
+
+    from jacobian.math.matrices import _sympy
+
+    return _sympy.adjugate(matrix)
+
+
+def characteristic_polynomial(matrix: MatrixBase, variable: str) -> Any:
+    """Return the characteristic polynomial in the named variable."""
+
+    from jacobian.math.matrices import _sympy
+
+    return _sympy.characteristic_polynomial(matrix, variable)
 
 
 def determinant(matrix: MatrixBase) -> Any:
@@ -40,6 +67,33 @@ def inverse(matrix: MatrixBase) -> MatrixBase:
     from jacobian.math.matrices import _sympy
 
     return _sympy.inverse(matrix)
+
+
+def multiply(left: MatrixBase, right: MatrixBase) -> MatrixBase:
+    """Return the exact row-by-column matrix product."""
+
+    from jacobian.math.matrices import _sympy
+
+    return _sympy.matrix_product(left, right)
+
+
+def smith_normal_form(matrix: MatrixBase) -> MatrixBase:
+    """Return the Smith normal form of an exact integer matrix."""
+
+    from jacobian.math.matrices import _sympy
+
+    return _sympy.smith_normal_form(matrix)
+
+
+def solve_linear_system(
+    matrix: MatrixBase,
+    right_hand_side: MatrixBase,
+) -> tuple[MatrixBase, MatrixBase]:
+    """Solve an exact linear system, returning solution and parameters."""
+
+    from jacobian.math.matrices import _sympy
+
+    return _sympy.rational_linear_solve(matrix, right_hand_side)
 
 
 def trace(matrix: MatrixBase) -> Any:

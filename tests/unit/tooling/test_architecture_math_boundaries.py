@@ -97,6 +97,26 @@ def test_native_math_cannot_import_domain_operations(tmp_path: Path) -> None:
     assert "native-math-boundary" in _codes(tmp_path)
 
 
+def test_domains_cannot_import_private_math_backends(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "src/jacobian/domains/polynomial/operations.py",
+        "from jacobian.math.polynomials import _sympy\n",
+    )
+
+    assert "private-math-backend" in _codes(tmp_path)
+
+
+def test_domains_can_import_public_math_packages(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "src/jacobian/domains/polynomial/operations.py",
+        "from jacobian.math import polynomials\n",
+    )
+
+    assert "private-math-backend" not in _codes(tmp_path)
+
+
 def test_checker_cannot_import_producer_conversions_or_kernels(tmp_path: Path) -> None:
     _write(
         tmp_path,

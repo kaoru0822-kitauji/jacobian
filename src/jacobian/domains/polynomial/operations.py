@@ -32,7 +32,6 @@ from jacobian.domains.polynomial.conversions import (
     symbols_for_variables,
 )
 from jacobian.math import polynomials
-from jacobian.math.polynomials import _sympy
 
 _MAX_OUTPUT_TERMS = 1024
 
@@ -110,7 +109,7 @@ def polynomial_discriminant(
     variables = request.polynomial.variables
     variable_index = variables.index(request.variable)
     generator = symbols_for_variables(variables)[variable_index]
-    value = _sympy.polynomial_discriminant(
+    value = polynomials.discriminant(
         rational_polynomial_to_sympy(request.polynomial), generator
     )
     remaining_variables = tuple(
@@ -127,7 +126,7 @@ def polynomial_square_free_decomposition(
 ) -> PolynomialSquareFreeDecompositionResult:
     source = rational_polynomial_to_sympy(request.polynomial)
     coefficient, canonical_factors, reconstructed = (
-        _sympy.polynomial_square_free_decomposition(source)
+        polynomials.square_free_decomposition(source)
     )
     factors = tuple(
         PolynomialSquareFreeFactor(
@@ -163,9 +162,7 @@ def polynomial_factorization(
     request: PolynomialFactorRequest,
 ) -> PolynomialFactorizationResult:
     source = rational_polynomial_to_sympy(request.polynomial)
-    coefficient, canonical_factors, reconstructed = _sympy.polynomial_factorization(
-        source
-    )
+    coefficient, canonical_factors, reconstructed = polynomials.factorization(source)
     factors = tuple(
         sorted(
             (
@@ -193,7 +190,7 @@ def polynomial_groebner_basis(
     variables = request.generators[0].variables
     wire_basis = tuple(
         _result_polynomial(polynomial, variables)
-        for polynomial in _sympy.polynomial_groebner_basis(
+        for polynomial in polynomials.groebner_basis(
             tuple(
                 rational_polynomial_to_sympy(generator)
                 for generator in request.generators

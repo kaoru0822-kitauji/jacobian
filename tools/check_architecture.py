@@ -1,7 +1,7 @@
 """Static architecture enforcement for product source boundaries.
 
 This checker is an AST/filesystem tool that does not import the Jacobian
-runtime.  It enforces thirteen PR10 invariants:
+runtime.  It enforces fourteen PR10 invariants:
 
 1. **subprocess-confined**: direct ``subprocess`` usage and ``os.execvpe``/
    ``os.execvp`` are allowed only in ``bounded_process.py``,
@@ -49,7 +49,10 @@ runtime.  It enforces thirteen PR10 invariants:
 12. **output-only-contract**: superseded matrix input/output contract variants
     must not return after consolidation.
 
-13. **unsupported-surface**: removed experimental memory/search identifiers must
+13. **private-math-backend**: operation domains must use the supported
+    ``jacobian.math`` package rather than importing its private backend modules.
+
+14. **unsupported-surface**: removed experimental memory/search identifiers must
     not appear in supported product source, tests, schemas, catalog, or docs.
 
 The checker excludes ``wt-438/`` and generated directories from all scans.
@@ -833,6 +836,13 @@ _NATIVE_MATH_FORBIDDEN_IMPORT_PREFIXES = (
     "jacobian.operation_installation",
     "jacobian.installation",
 )
+_PRIVATE_MATH_BACKEND_PREFIXES = (
+    "jacobian.math.finite_fields._flint",
+    "jacobian.math.finite_fields._sympy",
+    "jacobian.math.graphs._networkx",
+    "jacobian.math.matrices._sympy",
+    "jacobian.math.polynomials._sympy",
+)
 _SUPERSEDED_MATRIX_CONTRACTS = frozenset(
     {
         "ExactRationalMatrix",
@@ -952,6 +962,29 @@ def _native_math_boundary_violations(
     return tuple(violations)
 
 
+def _private_math_backend_violations(
+    relative: PurePosixPath, tree: ast.AST
+) -> tuple[Violation, ...]:
+    if not _is_under(relative, PurePosixPath("src/jacobian/domains")):
+        return ()
+    violations: list[Violation] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.Import, ast.ImportFrom)):
+            continue
+        for reference in _import_references(relative, node):
+            if _imports_prefix(reference, _PRIVATE_MATH_BACKEND_PREFIXES):
+                violations.append(
+                    Violation(
+                        str(relative),
+                        "private-math-backend",
+                        "operation domains must call the supported jacobian.math "
+                        "API instead of a private backend module",
+                        node.lineno,
+                    )
+                )
+    return tuple(violations)
+
+
 def _checker_producer_isolation_violations(
     relative: PurePosixPath, tree: ast.AST
 ) -> tuple[Violation, ...]:
@@ -1054,7 +1087,11 @@ def _materialization_reason_violations(
         if name != "MaterializedOperation" and not name.startswith("materialized_"):
             continue
         reason = next(
-            (keyword.value for keyword in node.keywords if keyword.arg == "resource_reason"),
+            (
+                keyword.value
+                for keyword in node.keywords
+                if keyword.arg == "resource_reason"
+            ),
             None,
         )
         if reason is None or (
@@ -1329,6 +1366,7 @@ def _check_python_file(root: Path, path: Path) -> tuple[Violation, ...]:
     violations.extend(_unsafe_canonical_conversion_violations(relative, tree))
     violations.extend(_contract_dependency_leaf_violations(relative, tree))
     violations.extend(_native_math_boundary_violations(relative, tree))
+    violations.extend(_private_math_backend_violations(relative, tree))
     violations.extend(_checker_producer_isolation_violations(relative, tree))
     violations.extend(_erased_contract_operation_violations(relative, tree))
     violations.extend(_output_only_contract_violations(relative, tree))
