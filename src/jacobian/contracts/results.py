@@ -48,8 +48,6 @@ class Method(StrEnum):
     EXHAUSTIVE_FINITE = "EXHAUSTIVE_FINITE"
     CHECKED_CERTIFICATE = "CHECKED_CERTIFICATE"
     BOUNDED_SEARCH = "BOUNDED_SEARCH"
-    SAMPLING = "SAMPLING"
-    HEURISTIC = "HEURISTIC"
 
 
 class Coverage(StrEnum):
@@ -124,20 +122,3 @@ class ResultEnvelope(ContractModel):
             if self.candidate_digest is None:
                 raise ValueError("verified results require a candidate binding")
 
-
-def validate_result_envelope(
-    value: ResultEnvelope | dict[str, object],
-) -> ResultEnvelope:
-    """Revalidate a result at a trust or serialization boundary.
-
-    Pydantic's ``model_construct`` deliberately bypasses validation. Public
-    adapters and persistence code must call this function instead of trusting
-    the runtime type of an incoming model instance.
-    """
-
-    payload = (
-        value.model_dump(mode="json", warnings=False)
-        if isinstance(value, ResultEnvelope)
-        else value
-    )
-    return ResultEnvelope.model_validate(payload)

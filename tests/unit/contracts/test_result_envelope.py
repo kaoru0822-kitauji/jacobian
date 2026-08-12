@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian.contracts.checkers import CheckerDecision
-from jacobian.contracts.results import ResultEnvelope, validate_result_envelope
+from jacobian.contracts.results import ResultEnvelope
 
 
 def test_timeout_cannot_carry_a_verified_false_conclusion() -> None:
@@ -96,18 +96,6 @@ def test_checked_certificates_support_non_rational_proof_mechanisms(
     )
 
     assert decision.accepted is True
-
-
-def test_trust_boundary_revalidates_model_construct_instances() -> None:
-    malformed = ResultEnvelope.model_construct(
-        **_verified_result(
-            conclusion="UNKNOWN",
-            arithmetic="FLOATING_HEURISTIC",
-        )
-    )
-
-    with pytest.raises(ValidationError):
-        validate_result_envelope(malformed)
 
 
 def test_checker_relationship_requires_exact_artifact_endpoints() -> None:

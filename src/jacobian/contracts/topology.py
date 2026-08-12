@@ -784,9 +784,6 @@ __all__ = [
     "SparseBoundaryMatrix",
     "SparseMatrixEntry",
     "VertexLabel",
-    "canonical_simplex",
     "face_closure",
-    "is_bounded_prime",
-    "require_linear_algebra_bounds",
     "simplicial_complex_digest",
 ]
