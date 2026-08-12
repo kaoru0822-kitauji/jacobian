@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path
+from typing import Any
 
 import pytest
 from tests.support.exact_domain import open_exact_domain_services
@@ -11,12 +12,14 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderAvailability,
     CapabilityRequest,
 )
+from jacobian.contracts.results import ResultEnvelope
 from jacobian.domains.finite_fields import build_finite_field_bundle
 from jacobian.domains.finite_fields.contracts import (
     FiniteMapTableRequest,
     LinearMapRankRequest,
     RestrictScalarsRequest,
 )
+from jacobian.exact_domain_checkers import ExactComputedVerificationAdapter
 from jacobian.math.finite_fields import (
     Axis,
     AxisBoundMatrix,
@@ -33,6 +36,18 @@ from jacobian.math.finite_fields import (
 from jacobian.math.prime_field_linear_algebra import PrimeFieldMatrix
 
 pytestmark = pytest.mark.requires_provider("flint")
+
+
+def _omit_presentation_defaults(value: object) -> object:
+    if isinstance(value, dict):
+        return {
+            key: _omit_presentation_defaults(item)
+            for key, item in value.items()
+            if key not in {"generator", "element_encoding_version"}
+        }
+    if isinstance(value, list):
+        return [_omit_presentation_defaults(item) for item in value]
+    return value
 
 
 def _request() -> LinearMapRankRequest:
@@ -162,6 +177,73 @@ def test_inline_verification_record_rejects_unrelated_projected_identity(
 
         with pytest.raises(CapabilityError, match=f"different {field[:-3]}"):
             services.core.capabilities._validate_verified_result(forged)
+
+
+def test_inline_verification_record_rejects_stale_candidate_binding(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = _request()
+    input_payload = _omit_presentation_defaults(request.model_dump(mode="json"))
+    assert isinstance(input_payload, dict)
+
+    with open_exact_domain_services(
+        tmp_path,
+        build_finite_field_bundle(),
+    ) as services:
+        computed = services.core.capabilities.invoke(
+            CapabilityRequest(
+                capability_id="finite_field.linear_map.rank.compute",
+                input=input_payload,
+            )
+        )
+        adapter = services.core.capabilities._adapters[
+            "finite_field.linear_map.rank.verify"
+        ]
+        assert isinstance(adapter, ExactComputedVerificationAdapter)
+        verify_inline_exact = adapter.verification.verify_inline_exact
+        accepted: list[ResultEnvelope] = []
+
+        def capture_accepted_result(**kwargs: Any) -> ResultEnvelope:
+            result = verify_inline_exact(**kwargs)
+            accepted.append(result)
+            return result
+
+        monkeypatch.setattr(
+            adapter.verification,
+            "verify_inline_exact",
+            capture_accepted_result,
+        )
+        verified = services.core.capabilities.invoke(
+            CapabilityRequest(
+                capability_id="finite_field.linear_map.rank.verify",
+                input={
+                    "input": input_payload,
+                    "candidate": computed.output["result"],
+                },
+            )
+        )
+        assert verified.verification_record_uri is not None
+        assert len(accepted) == 1
+        monkeypatch.setattr(
+            adapter.verification,
+            "verify_inline_exact",
+            lambda **_: accepted[0],
+        )
+        stale_request = CapabilityRequest(
+            capability_id="finite_field.linear_map.rank.verify",
+            input={
+                "input": input_payload,
+                "candidate": {**computed.output["result"], "rank": 0},
+            },
+        )
+
+        rejected = services.core.capabilities.invoke(stale_request)
+
+    assert rejected.execution.status == "ERROR"
+    assert rejected.verification_record_uri is None
+    assert rejected.execution.detail is not None
+    assert "does not bind the verified values" in rejected.execution.detail
 
 
 def test_operator_authorized_sympy_replay_checks_restriction_of_scalars(

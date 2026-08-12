@@ -11,6 +11,7 @@ from typing import Any, Literal
 from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
+from jacobian.capability_errors import CapabilityError
 from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationError
 from jacobian.checker_artifacts import put_witness_envelope
 from jacobian.checker_installation import CheckerInstaller
@@ -31,6 +32,7 @@ from jacobian.contracts.exact_domain_verification import (
     ExactComputedVerificationOutput,
     ExactComputedVerificationRequest,
     ExactDomainResultVerificationRequest,
+    InlineExactVerificationRecord,
     inline_exact_value_digest,
 )
 from jacobian.contracts.results import (
@@ -674,6 +676,14 @@ class ExactComputedVerificationAdapter:
         )
         status = self._verification_status(checked.execution.status, verified)
         record_uri = checked.verification_record_uri if verified else None
+        if record_uri is not None:
+            record = InlineExactVerificationRecord.model_validate(
+                self.store.get(record_uri).payload
+            )
+            if record.bindings != bindings:
+                raise CapabilityError(
+                    "inline exact record does not bind the verified values"
+                )
         detail = checked.execution.detail or (
             checked.input.errors[0]
             if checked.input.errors
