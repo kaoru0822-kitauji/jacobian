@@ -208,9 +208,27 @@ def direction_rank_ledger(
     )
 
 
+class _InvalidDirectionRankLedgerError(ValueError):
+    """A ledger entry was not derived from its bound subspace and direction."""
+
+
+def _validate_direction_rank_ledger(ledger: DirectionRankLedger) -> None:
+    for entry in ledger.entries:
+        expected_map = restrict_scalars(ledger.subspace, entry.direction)
+        if entry.linear_map != expected_map:
+            raise _InvalidDirectionRankLedgerError(
+                "direction-rank ledger map does not match the bound subspace"
+            )
+        if entry.rank != linear_map_rank(entry.direction, expected_map).rank:
+            raise _InvalidDirectionRankLedgerError(
+                "direction-rank ledger rank does not match the bound linear map"
+            )
+
+
 def orbit_distribution(ledger: DirectionRankLedger) -> OrbitDistribution:
     """Aggregate projective orbit counts from a complete direction-rank ledger."""
 
+    _validate_direction_rank_ledger(ledger)
     return OrbitDistribution.from_ledger(ledger)
 
 

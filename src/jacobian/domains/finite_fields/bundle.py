@@ -40,7 +40,10 @@ from jacobian.math.finite_fields import (
     projective_line,
     restrict_scalars,
 )
-from jacobian.math.finite_fields.operations import _InvalidFiniteMapTableError
+from jacobian.math.finite_fields.operations import (
+    _InvalidDirectionRankLedgerError,
+    _InvalidFiniteMapTableError,
+)
 from jacobian.operation_bindings import inline_operation
 from jacobian.operation_ports import InputPort, OutputPort
 from jacobian.operations import (
@@ -59,6 +62,7 @@ from jacobian.providers.flint_runtime import python_flint_finite_field_provider_
 _MAX_PROJECTIVE_POINTS = 4096
 _MAX_FINITE_MAP_ELEMENTS = 4096
 _MAX_FINITE_MAP_REPLAY_WORK = 1_000_000
+_MAX_ORBIT_REPLAY_WORK = 1_000_000
 
 
 def _enumerate_projective_line(request: ProjectiveLineRequest) -> ProjectiveLine:
@@ -90,7 +94,37 @@ def _ledger(request: DirectionRankLedgerRequest) -> DirectionRankLedger:
 
 
 def _orbit_distribution(request: OrbitDistributionRequest) -> OrbitDistribution:
-    return orbit_distribution(request.ledger)
+    try:
+        return orbit_distribution(request.ledger)
+    except _InvalidDirectionRankLedgerError as exc:
+        raise OperationRefusalError(
+            CapabilityDiagnostic(
+                code="INVALID_DIRECTION_RANK_LEDGER",
+                stage="direction_rank_ledger_validation",
+                message=str(exc),
+                hint="Use a ledger computed from the exact bound subspace.",
+            )
+        ) from exc
+
+
+def _orbit_replay_preflight(request: OrbitDistributionRequest) -> PreflightResult:
+    ledger = request.ledger
+    subspace = ledger.subspace
+    source_dimension = len(subspace.basis)
+    target_dimension = len(subspace.column_axis.labels) * subspace.presentation.degree
+    restriction_work = (
+        source_dimension * len(subspace.row_axis.labels) * target_dimension
+    )
+    rank_work = (
+        target_dimension * source_dimension * min(target_dimension, source_dimension)
+    )
+    work = len(ledger.entries) * (restriction_work + rank_work)
+    if work > _MAX_ORBIT_REPLAY_WORK:
+        return PreflightResult(
+            PreflightStatus.RESOURCE_LIMIT_EXCEEDED,
+            f"orbit replay work is {work}; limit is {_MAX_ORBIT_REPLAY_WORK}",
+        )
+    return SUPPORTED
 
 
 def _finite_map_table(request: FiniteMapTableRequest) -> FiniteMapTable:
@@ -298,10 +332,12 @@ def build_finite_field_bundle() -> DomainBundle:
             request_type=OrbitDistributionRequest,
             result_type=OrbitDistribution,
             execute=_orbit_distribution,
+            preflight=_orbit_replay_preflight,
             title="Aggregate a complete direction-rank ledger",
             description="Return exact orbit-size counts bound to the full ledger.",
             tags=("finite-field", "orbit"),
         ),
+        provider_runtime=flint_provider,
         input_ports=(
             InputPort(
                 name="ledger",

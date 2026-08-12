@@ -7,6 +7,7 @@ from jacobian.domains.finite_fields import build_finite_field_bundle
 from jacobian.math.finite_fields import (
     Axis,
     AxisBoundMatrix,
+    DirectionRankLedger,
     FiniteDimensionalSubspace,
     FiniteFieldElement,
     ProjectiveLine,
@@ -169,6 +170,16 @@ def test_slice_a_keeps_directions_bound_through_orbit_aggregation() -> None:
         type(distribution).model_validate(distribution.model_dump(mode="json"))
         == distribution
     )
+
+
+def test_orbit_distribution_rejects_a_forged_in_range_rank() -> None:
+    subspace, directions = _slice_a_values()
+    ledger_payload = direction_rank_ledger(subspace, directions).model_dump(mode="json")
+    ledger_payload["entries"][0]["rank"] = 0
+    forged = DirectionRankLedger.model_validate(ledger_payload)
+
+    with pytest.raises(ValueError, match="rank does not match"):
+        orbit_distribution(forged)
 
 
 def test_slice_a_ports_compose_restriction_into_rank_without_wire_conversion() -> None:
