@@ -727,12 +727,14 @@ def _validate_internalcot(prefix: Path, config: Mapping[str, Any]) -> None:
     environment["PATH"] = (
         f"{prefix / 'node_modules/.bin'}:{environment.get('PATH', '')}"
     )
-    workflow = run_operator_command(
-        "internalcot",
-        ("skill",),
-        cwd=prefix,
-        timeout_seconds=30,
-        environment=environment,
+    workflow = run_tool_command(
+        ToolCommandRequest(
+            executable=str(prefix / "node_modules/.bin/internalcot"),
+            arguments=("skill",),
+            environment=environment,
+            cwd=str(prefix),
+            timeout_seconds=30,
+        )
     )
     if workflow.status is not ToolCommandStatus.EXITED or workflow.exit_code != 0:
         raise HarborSuiteError("pinned internalcot skill command failed")
