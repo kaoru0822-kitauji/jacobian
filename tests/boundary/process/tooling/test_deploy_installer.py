@@ -311,12 +311,37 @@ def test_release_runtime_is_checked_before_current_symlink_is_changed() -> None:
     revision_marker = source.index(
         'printf \'%s\\n\' "${REVISION}" >"${RELEASE_DIR}/.git-revision"'
     )
-    marker_permissions = source.index('chmod 0644 "${RELEASE_DIR}/.git-revision"')
+    marker_permissions = source.index(
+        '"${RELEASE_DIR}/.release-profile"', revision_marker
+    )
     current_link = source.index('ln -sfn "${RELEASE_DIR}" "${CURRENT_LINK}.new"')
 
     assert ownership < runtime_permissions < validation
     assert validation < revision_marker < marker_permissions < current_link
     assert '"${RUNUSER_BIN}" --user jacobian -- "${entrypoint}" --version' in source
+
+
+def test_runtime_inputs_remain_service_readable_after_root_probes() -> None:
+    source = INSTALLER.read_text(encoding="utf-8")
+
+    assert "export PYTHONDONTWRITEBYTECODE=1" in source
+    assert 'find "${runtime_root}"' in source
+    assert "-type d \\( ! -readable -o ! -executable \\)" in source
+    assert "-type f ! -readable" in source
+    assert 'RUNTIME_READ_ROOTS=("${RELEASE_DIR}" "${PYTHON_INSTALL_ROOT}")' in source
+    assert 'RUNTIME_READ_ROOTS+=("${LEAN_ELAN_HOME}")' in source
+
+    first_audit = source.index(
+        'validate_service_readability "${RUNTIME_READ_ROOTS[@]}"'
+    )
+    current_link = source.index('ln -sfn "${RELEASE_DIR}" "${CURRENT_LINK}.new"')
+    smoke = source.index('log "running the read-only deployment smoke"')
+    final_audit = source.rindex(
+        'validate_service_readability "${RUNTIME_READ_ROOTS[@]}"'
+    )
+    accepted = source.index("DEPLOYMENT_ACCEPTED=1")
+
+    assert first_audit < current_link < smoke < final_audit < accepted
 
 
 def test_lean_profile_is_built_and_validated_before_activation() -> None:
