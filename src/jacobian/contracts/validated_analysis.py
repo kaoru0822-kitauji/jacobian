@@ -217,14 +217,12 @@ class RationalLinearProgramRequest(ContractModel):
 
 class RationalLinearProgramResult(ContractModel):
     status: RationalLinearProgramStatus
-    conclusion: Literal["UNKNOWN"] = "UNKNOWN"
     primal_candidate: tuple[CanonicalRational, ...] | None = None
     dual_candidate: tuple[CanonicalRational, ...] | None = None
     primal_objective: CanonicalRational | None = None
     dual_objective: CanonicalRational | None = None
     primal_residuals: tuple[CanonicalRational, ...] | None = None
     dual_slacks: tuple[CanonicalRational, ...] | None = None
-    certificate_available: bool = False
     backend: Literal["sympy"] = "sympy"
     backend_version: Literal["1.14.0"] = "1.14.0"
     detail: str = Field(min_length=1, max_length=1024)
@@ -240,10 +238,7 @@ class RationalLinearProgramResult(ContractModel):
             self.primal_residuals,
             self.dual_slacks,
         )
-        if complete != (
-            self.certificate_available
-            and all(value is not None for value in certificate_fields)
-        ):
+        if complete != all(value is not None for value in certificate_fields):
             raise ValueError(
                 "a produced certificate requires both candidates and replay data"
             )

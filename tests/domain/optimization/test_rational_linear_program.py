@@ -47,7 +47,6 @@ def test_rational_lp_produces_inspectable_primal_dual_certificate(
     assert result.execution.status is ExecutionStatus.COMPLETED
     output = result.output["result"]
     assert output["status"] == "CERTIFICATE_PRODUCED"
-    assert output["conclusion"] == "UNKNOWN"
     assert output["primal_candidate"] == [_rational(1), _rational(0)]
     assert output["dual_candidate"] == [_rational(1)]
     assert output["primal_objective"] == _rational(1)
