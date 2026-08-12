@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any
+
+import pytest
 from sympy import Poly, apart, symbols
 
 from jacobian.math import polynomials
@@ -36,3 +40,20 @@ def test_native_polynomial_api_uses_exact_sympy_values() -> None:
     assert square_free_factors == ((left, 1),)
     assert square_free_reconstruction == left
     assert polynomials.resultant(left, right, x) == 0
+
+
+@pytest.mark.parametrize(
+    "decompose",
+    (polynomials.factorization, polynomials.square_free_decomposition),
+)
+def test_native_polynomial_decompositions_preserve_integer_leading_content(
+    decompose: Callable[[Poly], tuple[Any, tuple[tuple[Poly, int], ...], Poly]],
+) -> None:
+    x = symbols("x")
+    source = Poly((2 * x + 1) ** 2, x, domain="ZZ")
+
+    coefficient, factors, reconstructed = decompose(source)
+
+    assert coefficient == 4
+    assert factors == ((Poly(2 * x + 1, x, domain="ZZ").monic(), 2),)
+    assert reconstructed == source

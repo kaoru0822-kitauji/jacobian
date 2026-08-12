@@ -21,38 +21,50 @@ def polynomial_discriminant(polynomial: Any, generator: Any) -> Any:
     return discriminant(polynomial.as_expr(), generator)
 
 
-def polynomial_square_free_decomposition(
+def _monic_decomposition(
     source: Any,
+    decomposition: tuple[Any, list[tuple[Any, int]]],
+    *,
+    label: str,
 ) -> tuple[Any, tuple[tuple[Any, int], ...], Any]:
     from sympy import Poly
 
-    coefficient, raw_factors = source.sqf_list()
-    factors = tuple(
-        (factor.monic(), int(multiplicity)) for factor, multiplicity in raw_factors
-    )
+    coefficient, raw_factors = decomposition
+    factors = []
+    for factor, multiplicity in raw_factors:
+        coefficient *= factor.LC() ** int(multiplicity)
+        factors.append((factor.monic(), int(multiplicity)))
     reconstructed = Poly(coefficient, *source.gens, domain=source.domain)
     for factor, multiplicity in factors:
         reconstructed *= factor**multiplicity
+    reconstructed = Poly(
+        reconstructed.as_expr(),
+        *source.gens,
+        domain=source.domain,
+    )
     if reconstructed != source:
-        raise RuntimeError("SymPy square-free decomposition did not reconstruct input")
-    return coefficient, factors, reconstructed
+        raise RuntimeError(f"SymPy {label} did not reconstruct input")
+    return coefficient, tuple(factors), reconstructed
+
+
+def polynomial_square_free_decomposition(
+    source: Any,
+) -> tuple[Any, tuple[tuple[Any, int], ...], Any]:
+    return _monic_decomposition(
+        source,
+        source.sqf_list(),
+        label="square-free decomposition",
+    )
 
 
 def polynomial_factorization(
     source: Any,
 ) -> tuple[Any, tuple[tuple[Any, int], ...], Any]:
-    from sympy import Poly
-
-    coefficient, raw_factors = source.factor_list()
-    factors = tuple(
-        (factor.monic(), int(multiplicity)) for factor, multiplicity in raw_factors
+    return _monic_decomposition(
+        source,
+        source.factor_list(),
+        label="factorization",
     )
-    reconstructed = Poly(coefficient, *source.gens, domain=source.domain)
-    for factor, multiplicity in factors:
-        reconstructed *= factor**multiplicity
-    if reconstructed != source:
-        raise RuntimeError("SymPy factorization did not reconstruct input")
-    return coefficient, factors, reconstructed
 
 
 def polynomial_groebner_basis(
