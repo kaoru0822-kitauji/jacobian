@@ -83,7 +83,6 @@ class ArbPointEnclosureResult(ContractModel):
     exact: bool = False
     backend: Literal["python-flint"] = "python-flint"
     backend_version: Literal["0.9.0"] = "0.9.0"
-    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
     detail: str = Field(min_length=1, max_length=1024)
 
     @model_validator(mode="after")
@@ -151,7 +150,6 @@ class FiniteRawMomentResult(ContractModel):
     determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
     backend: Literal["python-flint"] = "python-flint"
     backend_version: Literal["0.9.0"] = "0.9.0"
-    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
 
     @model_validator(mode="after")
     def bind_exact_contributions(self) -> Self:
@@ -229,7 +227,6 @@ class RationalLinearProgramResult(ContractModel):
     certificate_available: bool = False
     backend: Literal["sympy"] = "sympy"
     backend_version: Literal["1.14.0"] = "1.14.0"
-    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
     detail: str = Field(min_length=1, max_length=1024)
 
     @model_validator(mode="after")

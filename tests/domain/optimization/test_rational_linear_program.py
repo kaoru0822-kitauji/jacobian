@@ -54,7 +54,6 @@ def test_rational_lp_produces_inspectable_primal_dual_certificate(
     assert output["dual_objective"] == _rational(1)
     assert output["primal_residuals"] == [_rational(0)]
     assert output["dual_slacks"] == [_rational(0), _rational(1)]
-    assert output["verification"] == "UNVERIFIED"
 
 
 def test_rational_lp_dual_variables_are_unrestricted_and_dimension_bound(
