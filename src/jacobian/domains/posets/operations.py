@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
+import importlib
 from typing import Any
-
-import networkx as nx
 
 from jacobian.contracts.posets import (
     FinitePoset,
@@ -39,8 +38,14 @@ from jacobian.operation_bindings import (
 from jacobian.operations import OperationSpec
 
 
-def _presentation_graph(request: FinitePosetRequest) -> nx.DiGraph[str]:
-    graph: nx.DiGraph[str] = nx.DiGraph()
+def _networkx() -> Any:
+    """Load the maintained graph backend only when a poset operation runs."""
+
+    return importlib.import_module("networkx")
+
+
+def _presentation_graph(request: FinitePosetRequest, nx: Any) -> Any:
+    graph = nx.DiGraph()
     graph.add_nodes_from(request.elements)
     graph.add_edges_from(
         (pair.lower, pair.upper)
@@ -51,7 +56,8 @@ def _presentation_graph(request: FinitePosetRequest) -> nx.DiGraph[str]:
 
 
 def _materialized_poset(request: FinitePosetRequest) -> FinitePoset:
-    graph = _presentation_graph(request)
+    nx = _networkx()
+    graph = _presentation_graph(request, nx)
     if request.interpretation is RelationInterpretation.COVER_EDGES:
         reduction_graph = graph
         closure_graph = nx.transitive_closure_dag(graph)
@@ -111,11 +117,12 @@ def _materialize(
 
 
 def _width(request: PosetRequest) -> PosetWidthResult:
+    nx = _networkx()
     poset = request.poset
     elements = poset.elements
     left_nodes = tuple(("L", element) for element in elements)
     right_nodes = tuple(("R", element) for element in elements)
-    graph: nx.Graph[tuple[str, str]] = nx.Graph()
+    graph = nx.Graph()
     graph.add_nodes_from(left_nodes, bipartite=0)
     graph.add_nodes_from(right_nodes, bipartite=1)
     graph.add_edges_from(
@@ -245,8 +252,9 @@ def _compute_mobius(
     *,
     include_recurrence: bool,
 ) -> MobiusFunctionResult:
+    nx = _networkx()
     poset = request.poset
-    graph: nx.DiGraph[str] = nx.DiGraph()
+    graph = nx.DiGraph()
     graph.add_nodes_from(poset.elements)
     graph.add_edges_from((pair.lower, pair.upper) for pair in poset.strict_order_pairs)
     topological = tuple(nx.lexicographical_topological_sort(graph, key=str))

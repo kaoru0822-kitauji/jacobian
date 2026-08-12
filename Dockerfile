@@ -14,7 +14,7 @@ COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
 COPY lean ./lean
 
-RUN uv sync --locked --no-dev --extra flint --extra smt
+RUN uv sync --locked --no-dev
 
 EXPOSE 8000
 VOLUME ["/var/lib/jacobian"]

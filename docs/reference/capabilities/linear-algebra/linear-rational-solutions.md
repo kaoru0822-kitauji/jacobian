@@ -19,12 +19,8 @@ outcomes. Their producers and verifiers are also separate operations:
 | `linear.rational_inconsistency.compute` | One normalized left witness `y` with proposed relations `y^T A = 0` and `y^T b = 1`, or no witness | `COMPUTED` when the bounded provider attempt completes; never self-verified |
 | `linear.rational_inconsistency.verify` | Independent replay of every left-witness equation and the nonzero pairing | `VERIFIED` only after the operator-authorized checker creates a durable verification record |
 
-The producers run only when the exact optional Python-FLINT distribution is
-available. Install the pinned wheel with:
-
-```sh
-uv sync --extra flint
-```
+The exact Python-FLINT distribution is pinned by the base Jacobian package and
+the locked source environment.
 
 The verifiers do not import Python-FLINT, SymPy, or the producers. They use
 standard-library `fractions.Fraction` arithmetic in the existing clean-process

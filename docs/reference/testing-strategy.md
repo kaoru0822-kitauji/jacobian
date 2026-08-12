@@ -115,7 +115,8 @@ behavioral regression proof is infeasible, state the proof gap.
 - removed operation IDs and resources are absent from catalog/MCP inventory;
 - retained mathematical operations and independently authorized checkers still
   start and run;
-- missing optional providers remove only their affected operations;
+- missing optional native or formal providers remove only their affected
+  operations; a missing packaged Python backend is an installation failure;
 - runtime startup and shutdown have fewer states and owners; and
 - source, tests, and documentation show material net deletion.
 
@@ -129,7 +130,7 @@ For each migrated domain:
 - Python callers construct no runtime, catalog, store, or MCP object;
 - installed operations call the same public semantic implementation;
 - every public function has one canonical semantic input type;
-- provider conversion stays private and optional imports are lazy;
+- provider conversion stays private and backend imports are lazy;
 - request parsing and result serialization each occur once;
 - no internal `CapabilityRequest` or `CapabilityResult` call remains;
 - constructor/backend and large-exact-value round trips are covered where the
