@@ -225,6 +225,9 @@ development workflow. For Harbor task authoring and verifier changes, use the
 repository-local [`harbor-benchmarks`](.agents/skills/harbor-benchmarks/SKILL.md)
 skill and its exact task validation path. Control/treatment model evaluations
 are explicit operator-run evidence exercises, not routine development gates.
+For source-grounded held-out reliability probes based on recently resolved
+conjectures, use
+[`recent-conjecture-evaluations`](.agents/skills/recent-conjecture-evaluations/SKILL.md).
 
 For remote MCP operation, use
 [Deploy the remote MCP server](docs/how-to/deploy-remote-mcp.md) and the
