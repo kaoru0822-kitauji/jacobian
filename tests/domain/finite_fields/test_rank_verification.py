@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from tests.support.exact_domain import open_exact_domain_services
 
+from jacobian.capability_service import CapabilityError
 from jacobian.contracts.capabilities import (
     CapabilityProviderAvailability,
     CapabilityRequest,
@@ -122,6 +123,45 @@ def test_operator_authorized_sympy_replay_accepts_rank_and_rejects_forgery(
     assert verified.output["verification_record_uri"] in verified.artifact_uris
     assert rejected.output["status"] == "REJECTED"
     assert rejected.output["verification_record_uri"] is None
+
+
+@pytest.mark.parametrize(
+    ("field", "unrelated"),
+    [
+        ("operation_id", "matrix.rank.compute"),
+        ("checker_id", "checker://sha256/" + "0" * 64),
+    ],
+)
+def test_inline_verification_record_rejects_unrelated_projected_identity(
+    tmp_path: Path,
+    field: str,
+    unrelated: str,
+) -> None:
+    request = _request()
+    input_payload = request.model_dump(mode="json")
+
+    with open_exact_domain_services(
+        tmp_path,
+        build_finite_field_bundle(),
+    ) as services:
+        computed = services.core.capabilities.invoke(
+            CapabilityRequest(
+                capability_id="finite_field.linear_map.rank.compute",
+                input=input_payload,
+            )
+        )
+        verified = services.core.capabilities.invoke(
+            CapabilityRequest(
+                capability_id="finite_field.linear_map.rank.verify",
+                input={"input": input_payload, "candidate": computed.output["result"]},
+            )
+        )
+        forged = verified.model_copy(
+            update={"output": {**verified.output, field: unrelated}}
+        )
+
+        with pytest.raises(CapabilityError, match=f"different {field[:-3]}"):
+            services.core.capabilities._validate_verified_result(forged)
 
 
 def test_operator_authorized_sympy_replay_checks_restriction_of_scalars(

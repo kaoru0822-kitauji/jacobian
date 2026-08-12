@@ -79,6 +79,12 @@ def _validate_inline_exact_record(
         raise CapabilityError(
             "verified capability result does not expose the inline record semantics"
         )
+    if result.output.get("operation_id") != record.operation_id:
+        raise CapabilityError(
+            "verified capability output projects a different operation"
+        )
+    if result.output.get("checker_id") != record.checker_id:
+        raise CapabilityError("verified capability output projects a different checker")
     projected_record = result.output.get("verification_record_uri")
     if projected_record is not None and projected_record != record_uri:
         raise CapabilityError(
@@ -99,6 +105,23 @@ def _validate_projected_output(
     record_uri: str,
     record: VerificationRecord,
 ) -> None:
+    projected_checker = result.output.get("checker_id")
+    if projected_checker is not None and projected_checker != record.checker_id:
+        raise CapabilityError("verified capability output projects a different checker")
+    for field in (
+        "claim_digest",
+        "semantics_digest",
+        "candidate_digest",
+        "scope_digest",
+        "encoding_digest",
+    ):
+        projected_digest = result.output.get(field)
+        if projected_digest is not None and projected_digest != getattr(
+            record.bindings, field
+        ):
+            raise CapabilityError(
+                f"verified capability output projects a different {field}"
+            )
     projected_record = result.output.get("verification_record_uri")
     if projected_record is not None and projected_record != record_uri:
         raise CapabilityError(
