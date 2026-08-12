@@ -121,4 +121,3 @@ class ResultEnvelope(ContractModel):
                 raise ValueError("verified results require bound evidence")
             if self.candidate_digest is None:
                 raise ValueError("verified results require a candidate binding")
-
