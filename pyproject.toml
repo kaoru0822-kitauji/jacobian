@@ -137,14 +137,9 @@ per_rule_ignores = { "DEP001" = ["harbor"], "DEP002" = ["cvc5", "mcp-types", "py
 root_package = "jacobian"
 
 [[tool.importlinter.contracts]]
-name = "Migrated math packages do not depend on runtime or installation"
+name = "The public math library does not depend on runtime or installation"
 type = "forbidden"
-source_modules = [
-    "jacobian.math.finite_fields",
-    "jacobian.math.graphs",
-    "jacobian.math.matrices",
-    "jacobian.math.polynomials",
-]
+source_modules = ["jacobian.math"]
 forbidden_modules = [
     "jacobian.adapters.mcp",
     "jacobian.capability_service",
