@@ -57,3 +57,14 @@ def test_native_polynomial_decompositions_preserve_integer_leading_content(
     assert coefficient == 4
     assert factors == ((Poly(2 * x + 1, x, domain="ZZ").monic(), 2),)
     assert reconstructed == source
+
+
+def test_native_groebner_basis_rejects_non_rational_domains() -> None:
+    x, y = symbols("x y")
+    generators = (
+        Poly(x + y, x, y, modulus=2),
+        Poly(x - y, x, y, modulus=2),
+    )
+
+    with pytest.raises(ValueError, match="QQ domain"):
+        polynomials.groebner_basis(generators, (x, y), "lex")

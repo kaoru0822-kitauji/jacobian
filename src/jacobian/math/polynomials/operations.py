@@ -93,10 +93,15 @@ def groebner_basis(
 ) -> tuple[Poly, ...]:
     """Return a reduced Gröbner basis over ``QQ``."""
 
+    from sympy import QQ
+
     from jacobian.math.polynomials import _sympy
 
+    canonical_generators = tuple(_poly(generator) for generator in generators)
+    if any(generator.domain != QQ for generator in canonical_generators):
+        raise ValueError("Gröbner basis generators must use the QQ domain")
     return _sympy.polynomial_groebner_basis(
-        tuple(_poly(generator) for generator in generators),
+        canonical_generators,
         variables,
         monomial_order,
     )
