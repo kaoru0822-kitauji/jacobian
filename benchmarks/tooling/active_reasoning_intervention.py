@@ -600,7 +600,39 @@ def _visible_messages(payload: bytes) -> tuple[list[dict[str, object]], list[int
     return summaries, tool_message_counts
 
 
-def _intervention_trace(  # noqa: C901
+def _command_trace(
+    item: Mapping[str, object],
+    *,
+    position: int,
+    expected_workflow_sha256: str,
+) -> tuple[str, dict[str, object] | None, int]:
+    command = item.get("command")
+    output = item.get("aggregated_output")
+    if not isinstance(command, str) or not isinstance(output, str):
+        return "substantive", None, 0
+    if "internalcot skill" in command:
+        if _sha256_bytes(output.encode("utf-8")) == expected_workflow_sha256:
+            return "skill", None, len(output.encode("utf-8"))
+        return "ignored", None, 0
+    if "internalcot note " not in command or not output.startswith("internalcot>"):
+        return ("ignored" if "internalcot note " in command else "substantive"), None, 0
+    bounded, original_bytes, truncated, redactions = _bounded_message(
+        output.removeprefix("internalcot>").lstrip()
+    )
+    return (
+        "note",
+        {
+            "source_position": position,
+            "text": bounded,
+            "original_utf8_bytes": original_bytes,
+            "truncated": truncated,
+            "redaction_count": redactions,
+        },
+        0,
+    )
+
+
+def _intervention_trace(
     payload: bytes, *, expected_workflow_sha256: str
 ) -> tuple[list[dict[str, object]], dict[str, object], dict[str, float]]:
     """Project note text only long enough to derive bounded features.
@@ -644,33 +676,19 @@ def _intervention_trace(  # noqa: C901
         if item_type != "command_execution":
             continue
         host_command_count += 1
-        command = item.get("command")
-        output = item.get("aggregated_output")
-        if not isinstance(command, str) or not isinstance(output, str):
+        kind, note, visible_bytes = _command_trace(
+            item,
+            position=position,
+            expected_workflow_sha256=expected_workflow_sha256,
+        )
+        if kind == "skill":
+            skill_positions.append(position)
+            skill_visible_bytes += visible_bytes
+        elif kind == "note" and note is not None:
+            notes.append(note)
+            note_positions.append(position)
+        elif kind == "substantive":
             substantive_positions.append(position)
-            continue
-        if "internalcot skill" in command:
-            if _sha256_bytes(output.encode("utf-8")) == expected_workflow_sha256:
-                skill_positions.append(position)
-                skill_visible_bytes += len(output.encode("utf-8"))
-            continue
-        if "internalcot note " in command:
-            if output.startswith("internalcot>"):
-                bounded, original_bytes, truncated, redactions = _bounded_message(
-                    output.removeprefix("internalcot>").lstrip()
-                )
-                notes.append(
-                    {
-                        "source_position": position,
-                        "text": bounded,
-                        "original_utf8_bytes": original_bytes,
-                        "truncated": truncated,
-                        "redaction_count": redactions,
-                    }
-                )
-                note_positions.append(position)
-            continue
-        substantive_positions.append(position)
     first_substantive = min(substantive_positions, default=final_agent_position)
     last_substantive = max(substantive_positions, default=0)
     adherence = {
@@ -1546,7 +1564,42 @@ def _percentile(values: Sequence[float], probability: float) -> float:
     return ordered[index]
 
 
-def run_study(args: argparse.Namespace) -> int:  # noqa: C901
+def _planned_trials(
+    config: Mapping[str, Any],
+    selected: Sequence[Mapping[str, str]],
+    tasks_by_name: Mapping[str, Path],
+    *,
+    subset_requested: bool,
+) -> list[tuple[Mapping[str, str], Path, str, int, str]]:
+    selected_by_id = {item["id"]: item for item in selected}
+    pair_plan = config.get("pair_plan")
+    if not isinstance(pair_plan, list) or len(pair_plan) != 16:
+        raise HarborSuiteError("frozen study requires exactly 16 paired blocks")
+    values: list[tuple[Mapping[str, str], Path, str, int, str]] = []
+    for pair in pair_plan:
+        if not isinstance(pair, Mapping):
+            raise HarborSuiteError("pair plan entries must be objects")
+        item = selected_by_id.get(str(pair.get("task_id")))
+        if item is None and subset_requested:
+            continue
+        if item is None:
+            raise HarborSuiteError(f"pair references unknown task: {pair!r}")
+        task = tasks_by_name.get(item["id"])
+        if task is None:
+            raise HarborSuiteError(
+                f"selected task is not a dataset member: {item['id']}"
+            )
+        _validate_task_digest(task, item["digest"])
+        arm_order = pair.get("arm_order")
+        if arm_order not in (["control", "internalcot"], ["internalcot", "control"]):
+            raise HarborSuiteError(f"invalid frozen arm order: {arm_order!r}")
+        pair_id = str(pair.get("pair_id"))
+        repetition = _safe_int(pair.get("repetition"))
+        values.extend((item, task, pair_id, repetition, arm) for arm in arm_order)
+    return values
+
+
+def run_study(args: argparse.Namespace) -> int:
     if not args.execute:
         raise SystemExit(
             "refusing paid/authenticated model execution without --execute"
@@ -1589,58 +1642,38 @@ def run_study(args: argparse.Namespace) -> int:  # noqa: C901
     if version.status is not ToolCommandStatus.EXITED or version.exit_code != 0:
         raise HarborSuiteError("codex --version failed")
     manifest["codex_version"] = version.stdout.decode("utf-8", errors="replace").strip()
-    selected_by_id = {item["id"]: item for item in selected}
-    pair_plan = config.get("pair_plan")
-    if not isinstance(pair_plan, list) or len(pair_plan) != 16:
-        raise HarborSuiteError("frozen study requires exactly 16 paired blocks")
-    for pair in pair_plan:
-        if not isinstance(pair, Mapping):
-            raise HarborSuiteError("pair plan entries must be objects")
-        item = selected_by_id.get(str(pair.get("task_id")))
-        if item is None:
-            if args.task:
-                continue
-            raise HarborSuiteError(f"pair references unknown task: {pair!r}")
-        task = tasks_by_name.get(item["id"])
-        if task is None:
-            raise HarborSuiteError(
-                f"selected task is not a dataset member: {item['id']}"
-            )
-        _validate_task_digest(task, item["digest"])
-        arm_order = pair.get("arm_order")
-        if arm_order not in (["control", "internalcot"], ["internalcot", "control"]):
-            raise HarborSuiteError(f"invalid frozen arm order: {arm_order!r}")
-        repetition = _safe_int(pair.get("repetition"))
-        pair_id = str(pair.get("pair_id"))
-        for arm in arm_order:
-            trial_id = f"{pair_id}--{arm}"
-            record = _run_trial(
-                task=task,
-                task_record=item,
-                config=config,
-                root=output,
-                trial_id=trial_id,
-                pair_id=pair_id,
-                arm=arm,
-                repetition=repetition,
-                internalcot_prefix=internalcot_prefix,
-            )
-            manifest["trials"].append(
-                {
-                    "trial_id": trial_id,
-                    "pair_id": pair_id,
-                    "arm": arm,
-                    "task_id": item["id"],
-                    "family": item.get("family", item["id"]),
-                    "repetition": repetition,
-                    "record": f"{trial_id}/trial.json",
-                    "record_sha256": _sha256(output / trial_id / "trial.json"),
-                    "command_status": record["command"]["status"],
-                    "verifier_reward": record["verifier"]["reward"],
-                }
-            )
-            _write_json(output / "manifest.json", manifest)
-            print(json.dumps(manifest["trials"][-1], sort_keys=True), flush=True)
+    planned = _planned_trials(
+        config, selected, tasks_by_name, subset_requested=bool(args.task)
+    )
+    for item, task, pair_id, repetition, arm in planned:
+        trial_id = f"{pair_id}--{arm}"
+        record = _run_trial(
+            task=task,
+            task_record=item,
+            config=config,
+            root=output,
+            trial_id=trial_id,
+            pair_id=pair_id,
+            arm=arm,
+            repetition=repetition,
+            internalcot_prefix=internalcot_prefix,
+        )
+        manifest["trials"].append(
+            {
+                "trial_id": trial_id,
+                "pair_id": pair_id,
+                "arm": arm,
+                "task_id": item["id"],
+                "family": item.get("family", item["id"]),
+                "repetition": repetition,
+                "record": f"{trial_id}/trial.json",
+                "record_sha256": _sha256(output / trial_id / "trial.json"),
+                "command_status": record["command"]["status"],
+                "verifier_reward": record["verifier"]["reward"],
+            }
+        )
+        _write_json(output / "manifest.json", manifest)
+        print(json.dumps(manifest["trials"][-1], sort_keys=True), flush=True)
     return 0
 
 
