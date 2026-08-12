@@ -73,3 +73,19 @@ def test_degree_sequence_non_graphical_result_has_replayable_obstruction(
     )
     assert verified.verification_record_uri is not None
     assert verified.output["conclusion"] == Conclusion.FALSE.value
+
+
+def test_degree_sequence_replay_rejects_a_malformed_request(
+    authorized_graph_services: GraphTestServices,
+) -> None:
+    result = authorized_graph_services.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.degree_sequence.verify",
+            input={},
+        )
+    )
+
+    assert result.execution.status.value == "ERROR"
+    assert result.diagnostics[0].code == "INVALID_REQUEST"
+    assert result.diagnostics[0].stage == "capability_input_validation"
+    assert result.diagnostics[0].path == "certificate_uri"

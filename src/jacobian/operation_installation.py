@@ -9,7 +9,11 @@ from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import CanonicalizationError, canonicalize_json
-from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationError
+from jacobian.capability_errors import (
+    CapabilityInvocationError,
+    enriched_invalid_request,
+)
+from jacobian.capability_service import CapabilityAdapter
 from jacobian.contracts.capabilities import (
     CapabilityDescriptor,
     CapabilityDiagnostic,
@@ -32,7 +36,6 @@ from jacobian.operation_publication import (
 from jacobian.operation_runtime import (
     DomainOperation,
     OperationResources,
-    enriched_invalid_request,
     operation_runtime,
 )
 from jacobian.operations import Completed, DomainBundle, Effect, Failed, OperationSpec
