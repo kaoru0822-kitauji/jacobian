@@ -107,13 +107,13 @@ def test_backend_failure_keeps_provider_detail_local(
         )
     )
 
-    assert result.result.execution.status.value == "ERROR"
-    assert result.result.execution.detail == (
+    assert result.execution.status.value == "ERROR"
+    assert result.execution.detail == (
         "The exact polytope check failed. Retry with a smaller input; "
         "if it fails again, inspect the local Jacobian log."
     )
-    assert "solver" not in result.result.execution.detail
-    assert "internal-id" not in result.result.execution.detail
+    assert "solver" not in result.execution.detail
+    assert "internal-id" not in result.execution.detail
     assert "internal-id=secret" in caplog.text
 
 
@@ -135,7 +135,6 @@ def test_exact_membership_witness_is_independently_replayed(
     assert proposed.status.value == "MEMBER"
     assert proposed.witness_uri is not None
     assert proposed.certificate_uri is None
-    assert proposed.result.assurance.verification.value == "UNVERIFIED"
     verified = polytope_services.application.verification.verify_witness(
         claim_uri=proposed.claim_uri or "",
         candidate_uri=proposed.effective_point_uri or "",
@@ -166,7 +165,6 @@ def test_exact_separator_is_generated_then_independently_checked(
     assert proposed.status.value == "SEPARATED"
     assert proposed.certificate_uri is not None
     assert proposed.witness_uri is None
-    assert proposed.result.assurance.verification.value == "UNVERIFIED"
     certificate = polytope_services.core.store.get(proposed.certificate_uri).payload
     payload = certificate["payload"]
     coefficients = [

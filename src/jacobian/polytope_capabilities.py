@@ -44,11 +44,10 @@ class PolytopeSeparationAdapter:
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
         parsed = PolytopeSeparateRequest.model_validate(request.input)
         value = self._service.separate(parsed)
-        envelope = value.result
         return CapabilityResult(
             capability_id=self.descriptor.capability_id,
             capability_version=self.descriptor.version,
-            execution=envelope.execution,
+            execution=value.execution,
             output=value.model_dump(mode="json"),
             artifact_uris=_artifact_references(value),
         )
