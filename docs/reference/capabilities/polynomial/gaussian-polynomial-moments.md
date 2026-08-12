@@ -54,8 +54,8 @@ remaining exponent vector
 
 The result separately reports raw expansion-path count, canonical expanded
 monomial count, `COMPLETE_BOUNDED_EXPANSION`, the Gaussian model
-`INDEPENDENT_STANDARD_REAL`, and `UNVERIFIED`. Order zero returns the moment
-one and its constant contraction.
+`INDEPENDENT_STANDARD_REAL`. It creates no verification record. Order zero
+returns the moment one and its constant contraction.
 
 ## Claim boundary
 

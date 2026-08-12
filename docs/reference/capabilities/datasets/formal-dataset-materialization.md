@@ -77,7 +77,7 @@ the host project.
 
 ## Trust boundary
 
-Materialization is `COMPUTED` and always `UNVERIFIED`. It does not establish:
+Materialization creates no verification record. It does not establish:
 
 - that the source compiles in the declared project;
 - that a proof is accepted;

@@ -7,9 +7,9 @@ coefficient bound.
 
 ``polynomial.interval.enclose`` (EXPLORE) computes the enclosure with pinned
 SymPy rational arithmetic and emits an inspectable enclosure artifact. The
-result is ``COMPUTED`` and ``UNVERIFIED``; the descriptor advertises the
-independent Bernstein-coefficient checker as the verification boundary, but the
-capability does not invoke it.
+result creates no verification record; the independent Bernstein-coefficient
+checker is the separate verification boundary, and the capability does not
+invoke it.
 
 ``polynomial.interval.enclosure.verify`` (VERIFY) packages the claimed
 enclosure as a replay certificate and asks the operator-authorized independent
@@ -255,9 +255,9 @@ class PolynomialIntervalEncloseAdapter:
                 "Compute an exact rational enclosure of the values of one "
                 "univariate rational polynomial on one closed rational interval "
                 "using the Bernstein-coefficient bound. The enclosure is a valid "
-                "superset of the range, not the exact image. The result is "
-                "UNVERIFIED; the advertised independent Bernstein-coefficient "
-                "checker is the verification boundary."
+                "superset of the range, not the exact image. The separate "
+                "independent Bernstein-coefficient checker is the verification "
+                "boundary."
             ),
             provider="jacobian.sympy",
             provider_runtime=known_provider_runtime(

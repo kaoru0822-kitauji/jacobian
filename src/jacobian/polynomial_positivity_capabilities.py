@@ -6,8 +6,8 @@ strictly positive on one closed rational interval, using Sturm's theorem.
 
 ``polynomial.interval.positivity.decide`` (EXPLORE) computes the Sturm
 sequence with pinned SymPy, counts sign changes at the interval endpoints,
-and determines whether p(x) > 0 for all x in [a,b]. The result is ``COMPUTED``
-and ``UNVERIFIED``.
+and determines whether p(x) > 0 for all x in [a,b]. It creates no verification
+record.
 
 ``polynomial.interval.positivity.verify`` (VERIFY) packages the claimed
 decision as a replay certificate and asks the operator-authorized independent
@@ -253,8 +253,8 @@ class PolynomialIntervalPositivityDecideAdapter:
                 "Decide exactly whether one univariate rational polynomial is "
                 "strictly positive (p(x) > 0) on one closed rational interval "
                 "using Sturm's theorem. The decision is EXACT and "
-                "DETERMINISTIC. The result is UNVERIFIED; the advertised "
-                "independent Sturm-sequence checker is the verification boundary."
+                "DETERMINISTIC. The separate independent Sturm-sequence checker "
+                "is the verification boundary."
             ),
             provider="jacobian.sympy",
             provider_runtime=known_provider_runtime(
