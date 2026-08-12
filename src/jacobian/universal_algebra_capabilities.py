@@ -347,7 +347,6 @@ class UniversalAlgebraEvaluateLawsAdapter:
             evaluation_uri=evaluation_artifact.artifact_uri,
             claim_uri=claim_artifact.artifact_uri,
             certificate_uri=certificate_artifact.artifact_uri,
-            checker_id=self.resources.installation.evaluation_checker_id,
             records=records,
         )
         return CapabilityResult(

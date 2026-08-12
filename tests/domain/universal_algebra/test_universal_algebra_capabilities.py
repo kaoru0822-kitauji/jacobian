@@ -140,9 +140,6 @@ def test_evaluate_laws_returns_exact_truth_and_counterexample(
         },
     }
     assert result.output["certificate_uri"] in result.artifact_uris
-    assert result.output["checker_id"] == (
-        universal_algebra_services.installation.evaluation_checker_id
-    )
     assert "verification_handoff" not in result.output
     verified = runtime.core.capabilities.invoke(
         CapabilityRequest(

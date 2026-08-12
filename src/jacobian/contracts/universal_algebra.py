@@ -7,7 +7,7 @@ from typing import Annotated, Literal, Self
 
 from pydantic import Field, StringConstraints, model_validator
 
-from jacobian.contracts.common import ArtifactUri, CheckerUri
+from jacobian.contracts.common import ArtifactUri
 from jacobian.contracts.results import ContractModel
 
 Identifier = Annotated[
@@ -174,7 +174,6 @@ class FiniteMagmaTableEnumerationOutput(ContractModel):
     ordering: Literal["LEXICOGRAPHIC_ROW_MAJOR"] = "LEXICOGRAPHIC_ROW_MAJOR"
     exactness: Literal["EXACT_FINITE"] = "EXACT_FINITE"
     completeness: Literal["COMPLETE"] = "COMPLETE"
-    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
 
     @model_validator(mode="after")
     def require_exact_output_count(self) -> Self:
@@ -271,13 +270,10 @@ class UniversalAlgebraEvaluationOutput(ContractModel):
     evaluation_uri: ArtifactUri
     claim_uri: ArtifactUri
     certificate_uri: ArtifactUri
-    checker_id: CheckerUri | None = None
     records: tuple[MagmaLawEvaluationRecord, ...]
     exactness: Literal["EXACT"] = "EXACT"
     completeness: Literal["COMPLETE"] = "COMPLETE"
     determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
-    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
-    certificate_available: Literal[True] = True
 
 
 class CountermodelSearchStatus(StrEnum):
@@ -347,10 +343,6 @@ class UniversalAlgebraCountermodelSearchOutput(ContractModel):
     target_record: MagmaLawEvaluationRecord | None = None
     exactness: Literal["EXACT_FINITE_ENCODING"] = "EXACT_FINITE_ENCODING"
     scope: Literal["ONE_FIXED_CARRIER_ORDER"] = "ONE_FIXED_CARRIER_ORDER"
-    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
-    verification_capability_id: Literal["universal_algebra.evaluate_laws"] = (
-        "universal_algebra.evaluate_laws"
-    )
 
     @model_validator(mode="after")
     def require_status_evidence_shape(self) -> Self:
