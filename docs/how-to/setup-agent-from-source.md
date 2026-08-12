@@ -18,7 +18,9 @@ uv run --project /absolute/path/to/jacobian --locked --no-sync \
 ```
 
 The bootstrap requires the uv version in [`.uv-version`](../../.uv-version),
-Python 3.12 or 3.13, Git, and Node.js 18 or newer. It requires a clean checkout,
+CPython 3.12 or 3.13, Git, and Node.js 18 or newer. The tested binary-install
+platform is glibc Linux x86-64; other platforms require a compatible wheel for
+every mandatory Python backend. It requires a clean checkout,
 performs a locked sync, initializes the state directory, and audits the exact
 Git revision, package version, catalog digest, and provider runtimes before it
 writes any client configuration. The audit is saved as

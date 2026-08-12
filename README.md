@@ -68,10 +68,15 @@ python -m pip install jacobian
 
 That package includes Jacobian's exact maintained Python backend stack: SymPy,
 NetworkX, Z3, Python-FLINT, and cvc5. A normal Python or npm installation
-therefore exposes the same built-in Python-backed operation portfolio.
+therefore exposes the same built-in Python-backed operation portfolio. The
+tested binary-install contract is CPython 3.12 or 3.13 on glibc Linux x86-64;
+the release gate installs the built wheel and starts Jacobian on both Python
+versions. Other systems may have compatible upstream wheels, but are not part
+of the tested release contract yet. In particular, Alpine/musl cannot install
+the complete mandatory stack from PyPI.
 
 The launcher supports Claude, Codex, Cursor, Gemini, and OpenCode. It requires
-Node.js 18 or newer plus Python 3.12/3.13 or
+Node.js 18 or newer plus CPython 3.12/3.13 or
 [`uv`](https://docs.astral.sh/uv/); the guided installer can install its pinned
 `uv` release after confirmation. Run `jacobian mcp` to start the server
 directly.
