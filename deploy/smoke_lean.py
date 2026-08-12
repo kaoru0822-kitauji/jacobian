@@ -58,7 +58,7 @@ def _require_verified(result: dict[str, Any], *, environment: str) -> None:
         raise RuntimeError(f"{environment} lean.check did not complete")
     if result.get("output", {}).get("conclusion") != "TRUE":
         raise RuntimeError(f"{environment} lean.check did not accept True")
-    if result.get("assurance", {}).get("level") != "VERIFIED":
+    if not result.get("verification_record_uri"):
         raise RuntimeError(f"{environment} lean.check was not independently verified")
 
 

@@ -150,7 +150,6 @@ def test_singular_boundary_fails_closed(
 
         assert result.execution.status.value == expected_status
         assert result.output["error"]["code"] == expected_code
-        assert result.assurance.level.value == "HEURISTIC"
         assert not result.artifact_uris
 
 

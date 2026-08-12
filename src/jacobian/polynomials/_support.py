@@ -15,16 +15,10 @@ from pydantic import Field, ValidationError, model_validator
 from jacobian.canonical import format_canonical_integer
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
-    CapabilityRelationship,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.exact import CanonicalRational, require_bounded_rational
 from jacobian.contracts.polynomials import (
@@ -731,17 +725,7 @@ def _computed_result(
     request: CapabilityRequest,
     started: float,
     output: dict[str, Any],
-    scope: CapabilityScope,
-    relationships: tuple[CapabilityRelationship, ...],
     artifact_uris: tuple[str, ...],
-    completeness_basis: str,
-    completeness_status: CapabilityCompletenessStatus = (
-        CapabilityCompletenessStatus.COMPLETE
-    ),
-    assurance_basis: str = (
-        "deterministic exact SymPy arithmetic over QQ; the computation did not "
-        "authorize or invoke an independent checker"
-    ),
 ) -> CapabilityResult:
     return CapabilityResult(
         capability_id=descriptor.capability_id,
@@ -751,20 +735,6 @@ def _computed_result(
             runtime_ms=max(0, round((time.monotonic() - started) * 1000)),
         ),
         output=output,
-        scope=scope,
-        completeness=CapabilityCompleteness(
-            status=completeness_status,
-            basis=(
-                f"{completeness_basis}; no mathematical conclusion or independent "
-                "verification is claimed"
-            ),
-            assurance_level=CapabilityAssuranceLevel.COMPUTED,
-        ),
-        relationships=relationships,
-        assurance=CapabilityAssurance(
-            level=CapabilityAssuranceLevel.COMPUTED,
-            basis=assurance_basis,
-        ),
         artifact_uris=artifact_uris,
     )
 

@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
-    CapabilityResult,
-)
+from jacobian.contracts.capabilities import CapabilityResult
 from jacobian.contracts.results import ContractModel, Execution, ExecutionStatus
 from jacobian.operation_publication import PublishedOperation
 from jacobian.operations import Completed, Failed, NonConclusion
@@ -32,10 +28,6 @@ def project_operation_result(
                 runtime_ms=terminal.runtime_ms,
             ),
             output=publication.output.model_dump(mode="json"),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis="completed mathematical computation; no checker invoked",
-            ),
             artifact_uris=publication.artifact_uris,
         )
 
@@ -51,10 +43,6 @@ def project_operation_result(
         execution=Execution(status=status, detail=diagnostic.message),
         output={"error": diagnostic.model_dump(mode="json", exclude_none=True)},
         diagnostics=(diagnostic,),
-        assurance=CapabilityAssurance(
-            level=CapabilityAssuranceLevel.HEURISTIC,
-            basis="operation did not establish a mathematical conclusion",
-        ),
     )
 
 

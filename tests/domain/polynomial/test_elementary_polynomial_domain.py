@@ -4,7 +4,6 @@ from pathlib import Path
 import pytest
 
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
@@ -297,7 +296,6 @@ def test_integer_polynomial_shift_is_exact_computed(
     )
 
     assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.output["result"] == {
         "shift": 2,
         "shifted": {

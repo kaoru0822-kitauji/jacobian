@@ -39,7 +39,6 @@ def build_arithmetic_bundle() -> DomainBundle:
                 "integer_encoding": "canonical decimal string",
                 "rational_encoding": "canonical reduced num/den with positive denominator",
                 "arithmetic": "exact via stdlib and maintained SymPy APIs",
-                "assurance": "computed; no independent checker",
             },
         ),
         provider_runtime=known_provider_runtime(

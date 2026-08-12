@@ -21,7 +21,7 @@ from jacobian.adapters.mcp.remote import (
     StaticTokenVerifier,
     load_static_token_file,
 )
-from jacobian.adapters.mcp.server import create_server
+from jacobian.adapters.mcp.server import create_remote_server
 
 
 def test_authenticated_streamable_http_isolates_tenant_memory(
@@ -58,9 +58,8 @@ def test_authenticated_streamable_http_isolates_tenant_memory(
         listener.listen()
         port = int(listener.getsockname()[1])
         public_base_url = f"http://127.0.0.1:{port}"
-        mcp_server = create_server(
+        mcp_server = create_remote_server(
             tmp_path / "state",
-            tenant_isolation=True,
             allow_anonymous=False,
             token_verifier=StaticTokenVerifier(load_static_token_file(token_file)),
             auth=AuthSettings(

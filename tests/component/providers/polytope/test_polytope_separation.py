@@ -107,13 +107,13 @@ def test_backend_failure_keeps_provider_detail_local(
         )
     )
 
-    assert result.result.execution.status.value == "ERROR"
-    assert result.result.execution.detail == (
+    assert result.execution.status.value == "ERROR"
+    assert result.execution.detail == (
         "The exact polytope check failed. Retry with a smaller input; "
         "if it fails again, inspect the local Jacobian log."
     )
-    assert "solver" not in result.result.execution.detail
-    assert "internal-id" not in result.result.execution.detail
+    assert "solver" not in result.execution.detail
+    assert "internal-id" not in result.execution.detail
     assert "internal-id=secret" in caplog.text
 
 
@@ -135,7 +135,6 @@ def test_exact_membership_witness_is_independently_replayed(
     assert proposed.status.value == "MEMBER"
     assert proposed.witness_uri is not None
     assert proposed.certificate_uri is None
-    assert proposed.result.assurance.verification.value == "UNVERIFIED"
     verified = polytope_services.application.verification.verify_witness(
         claim_uri=proposed.claim_uri or "",
         candidate_uri=proposed.effective_point_uri or "",
@@ -143,8 +142,7 @@ def test_exact_membership_witness_is_independently_replayed(
         checker_id=polytope_services.witness_checker_id,
     )
     assert verified.conclusion.value == "TRUE"
-    assert verified.assurance.arithmetic.value == "EXACT_RATIONAL"
-    assert verified.assurance.verification.value == "VERIFIED"
+    assert verified.verification_record_uri is not None
     assert verified.verification_record_uri is not None
 
 
@@ -166,7 +164,6 @@ def test_exact_separator_is_generated_then_independently_checked(
     assert proposed.status.value == "SEPARATED"
     assert proposed.certificate_uri is not None
     assert proposed.witness_uri is None
-    assert proposed.result.assurance.verification.value == "UNVERIFIED"
     certificate = polytope_services.core.store.get(proposed.certificate_uri).payload
     payload = certificate["payload"]
     coefficients = [
@@ -180,9 +177,7 @@ def test_exact_separator_is_generated_then_independently_checked(
         certificate_uri=proposed.certificate_uri,
     )
     assert verified.conclusion.value == "TRUE"
-    assert verified.assurance.arithmetic.value == "EXACT_RATIONAL"
-    assert verified.assurance.coverage.value == "EXHAUSTIVE"
-    assert verified.assurance.verification.value == "VERIFIED"
+    assert verified.verification_record_uri is not None
 
 
 def test_separator_payload_tampering_fails_closed(
@@ -221,7 +216,7 @@ def test_separator_payload_tampering_fails_closed(
 
     assert result.input.status.value == "REJECTED"
     assert result.conclusion.value == "UNKNOWN"
-    assert result.assurance.verification.value == "UNVERIFIED"
+    assert result.verification_record_uri is None
     assert result.verification_record_uri is None
 
 

@@ -24,8 +24,8 @@ fraction-free Bareiss method. It returns the bounded canonical determinant
 inline with its method and backend version; ordinary computation writes no
 artifact.
 
-The compute result remains `COMPUTED` and `UNVERIFIED`. Backend success is an
-execution result, not independent assurance. SymPy documents both the
+The compute result creates no verification record. Backend success is an
+execution result, not independent verification. SymPy documents both the
 [`Matrix.det` API][sympy-det] and its Bareiss method.
 
 ## Independent verification

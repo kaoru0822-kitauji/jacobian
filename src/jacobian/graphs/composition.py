@@ -5,7 +5,7 @@ Two domain-atomic graph capabilities backed by NetworkX:
 * ``graph.construct.compose`` — apply disjoint union, join, complement, or
   lexicographic product to existing simple-undirected-graph artifacts and
   materialize the result as a new graph artifact with deterministic
-  ``COMPUTED`` assurance.
+  a computed result.
 
 * ``graph.enumerate.nonisomorphic`` — enumerate all nonisomorphic simple
   undirected graphs of one exact order (0-7) from the NetworkX Graph Atlas
@@ -15,9 +15,9 @@ Two domain-atomic graph capabilities backed by NetworkX:
   existence.
 
 Both capabilities preserve the ``jacobian.simple-undirected-graph`` payload
-schema and semantics.  Neither returns a mathematical conclusion or
-``VERIFIED`` assurance.  Construction and enumeration are deterministic
-NetworkX operations; no independent checker is invoked.
+schema and semantics. Neither returns a mathematical conclusion or a
+verification record. Construction and enumeration are deterministic NetworkX
+operations; no independent checker is invoked.
 """
 
 from __future__ import annotations
@@ -31,16 +31,10 @@ from pydantic import ValidationError
 from jacobian.artifacts import ArtifactService
 from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
-    CapabilityRelationship,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.graph_composition import (
     GraphCompositionRequest,
@@ -273,12 +267,6 @@ class GraphComposeAdapter:
             summary=f"Composition record: {operation}",
         )
 
-        relationship = CapabilityRelationship(
-            relation_id="graph.relation.composed-from",
-            source_artifact_uris=(result_artifact.artifact_uri,),
-            target_artifact_uris=_composition_parents(validated),
-        )
-
         return CapabilityResult(
             capability_id=self.descriptor.capability_id,
             capability_version=self.descriptor.version,
@@ -294,34 +282,6 @@ class GraphComposeAdapter:
                 "backend": backend,
                 "backend_version": backend_module.__version__,
             },
-            scope=CapabilityScope(
-                description=(
-                    f"deterministic {operation} of the supplied graph artifact(s)"
-                ),
-                parameters={
-                    "operation": operation,
-                    "left_graph_uri": validated.left_graph_uri,
-                    "right_graph_uri": validated.right_graph_uri,
-                },
-                artifact_uri=result_artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.COMPLETE,
-                basis=(
-                    "the deterministic composition was performed over the "
-                    "supplied graph artifact(s); no mathematical conclusion "
-                    "or independent verification is claimed"
-                ),
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
-            relationships=(relationship,),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "deterministic NetworkX graph composition; no independent "
-                    "checker was invoked"
-                ),
-            ),
             artifact_uris=(
                 *_composition_parents(validated),
                 result_artifact.artifact_uri,
@@ -484,15 +444,6 @@ class GraphEnumerateNonisomorphicAdapter:
                 }
             )
 
-        relationships = tuple(
-            CapabilityRelationship(
-                relation_id="graph.relation.enumerated-in",
-                source_artifact_uris=(scope_artifact.artifact_uri,),
-                target_artifact_uris=(graph_uri,),
-            )
-            for graph_uri in graph_uris
-        )
-
         return CapabilityResult(
             capability_id=self.descriptor.capability_id,
             capability_version=self.descriptor.version,
@@ -510,40 +461,6 @@ class GraphEnumerateNonisomorphicAdapter:
                 "backend_version": backend_module.__version__,
                 "backend_boundary": _ENUMERATION_BACKEND_BOUNDARY,
             },
-            scope=CapabilityScope(
-                description=(
-                    "all NetworkX Graph Atlas representatives with exactly "
-                    f"the requested order {order}"
-                ),
-                parameters={
-                    "source": "networkx.graph_atlas_g",
-                    "backend_version": backend_module.__version__,
-                    "order": order,
-                    "enumerated_count": total_count,
-                    "backend_boundary": _ENUMERATION_BACKEND_BOUNDARY,
-                },
-                artifact_uri=scope_artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.COMPLETE,
-                basis=(
-                    "the maintained Graph Atlas backend was scanned to "
-                    "exhaustion for the requested order; the catalog covers "
-                    "the Graph Atlas representative set, not all "
-                    "nonisomorphic graphs of that order in existence; this "
-                    "enumeration was not independently checked"
-                ),
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
-            relationships=relationships,
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "deterministic NetworkX Graph Atlas enumeration; "
-                    "nonisomorphism is provided by the backend and was not "
-                    "independently re-verified"
-                ),
-            ),
             artifact_uris=(scope_artifact.artifact_uri, *graph_uris),
         )
 

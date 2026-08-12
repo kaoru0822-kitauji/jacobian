@@ -308,7 +308,6 @@ class SatModelFindOutput(ContractModel):
 
     status: Literal["ASSIGNMENT_PRODUCED", "NO_ASSIGNMENT_PRODUCED"]
     solver_status: Literal["SATISFIABLE", "UNSATISFIABLE", "UNKNOWN"]
-    conclusion: Literal["UNKNOWN"] = "UNKNOWN"
     cnf_uri: ArtifactUri
     assignment_uri: ArtifactUri | None = None
     assignment: dict[SatVariableName, StrictBool] | None = None
@@ -339,7 +338,6 @@ class SatUnsatProofFindOutput(ContractModel):
 
     status: Literal["PROOF_PRODUCED", "NO_PROOF_PRODUCED"]
     solver_status: Literal["SATISFIABLE", "UNSATISFIABLE", "UNKNOWN"]
-    conclusion: Literal["UNKNOWN"] = "UNKNOWN"
     cnf_uri: ArtifactUri
     proof_uri: ArtifactUri | None = None
     detail: str = Field(min_length=1, max_length=1024)

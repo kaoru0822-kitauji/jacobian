@@ -359,13 +359,10 @@ def _rejection_fingerprint(invocation: Mapping[str, Any]) -> tuple[str, str]:
 
 def _terminal_accepted(invocation: Mapping[str, Any]) -> bool:
     output = invocation.get("output")
-    assurance = invocation.get("assurance")
     return bool(
         isinstance(output, Mapping)
         and (output.get("accepted") is True or output.get("conclusion") == "TRUE")
-        and isinstance(assurance, Mapping)
-        and assurance.get("level") == "VERIFIED"
-        and isinstance(assurance.get("verification_record_uri"), str)
+        and isinstance(invocation.get("verification_record_uri"), str)
     )
 
 

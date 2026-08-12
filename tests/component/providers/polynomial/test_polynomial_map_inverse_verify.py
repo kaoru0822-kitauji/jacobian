@@ -10,7 +10,6 @@ from tests.component.providers.polynomial.polynomial_capabilities_support import
 
 import jacobian.polynomials._support as polynomial_support
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.polynomials import SparseRationalPolynomial
@@ -99,7 +98,6 @@ def test_two_sided_triangular_inverse_is_verified(
 
     assert result.output["inverse_verified"] is True
     assert result.output["conclusion"] == Conclusion.TRUE.value
-    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
     assert result.output["verification_record_uri"] is not None
     assert len(result.output["inverse_after_forward_checker_records"]) == 2
     assert len(result.output["forward_after_inverse_checker_records"]) == 2
@@ -152,7 +150,7 @@ def test_noncanonical_sparse_maps_are_normalized_before_verification(
     )
 
     assert normalized.output["inverse_verified"] is True
-    assert normalized.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert normalized.verification_record_uri is not None
     assert normalized.output["forward_map_uri"] == canonical.output["forward_map_uri"]
     assert normalized.output["inverse_map_uri"] == canonical.output["inverse_map_uri"]
     assert (
@@ -316,7 +314,7 @@ def test_cancelled_high_degree_terms_do_not_apply_operation_budget(
     )
 
     assert result.output["inverse_verified"] is True
-    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert result.verification_record_uri is not None
 
 
 def test_overlapping_variable_names_use_simultaneous_composition(
@@ -355,7 +353,7 @@ def test_overlapping_variable_names_use_simultaneous_composition(
 
     assert result.output["inverse_verified"] is True
     assert result.output["conclusion"] == Conclusion.TRUE.value
-    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert result.verification_record_uri is not None
 
 
 def test_unrepresentable_composition_is_rejected_before_artifacts(
@@ -396,7 +394,7 @@ def test_perturbed_inverse_coefficient_is_verified_false(
 
     assert result.output["inverse_verified"] is False
     assert result.output["conclusion"] == Conclusion.FALSE.value
-    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert result.verification_record_uri is not None
     residuals = authorized_polynomial_services.core.store.get(
         result.output["residuals_uri"]
     ).payload

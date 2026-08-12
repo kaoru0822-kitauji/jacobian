@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus, InputStatus
@@ -97,12 +96,9 @@ def test_keller_condition_verifies_the_published_style_exact_map(
 
     assert result.output["keller_condition_verified"] is True
     assert result.output["conclusion"] == "TRUE"
-    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert result.verification_record_uri is not None
     assert result.output["verification_record_uri"] in result.artifact_uris
     assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.relationships[0].relation_id == (
-        "polynomial.relation.keller-condition"
-    )
 
 
 def test_keller_condition_verifies_a_false_conclusion_for_nonconstant_determinant(
@@ -117,9 +113,8 @@ def test_keller_condition_verifies_a_false_conclusion_for_nonconstant_determinan
 
     assert result.output["keller_condition_verified"] is False
     assert result.output["conclusion"] == "FALSE"
-    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert result.verification_record_uri is not None
     assert result.output["verification_record_uri"] in result.artifact_uris
-    assert result.relationships == ()
 
 
 def test_collision_refutes_two_sided_inverse(
@@ -139,11 +134,8 @@ def test_collision_refutes_two_sided_inverse(
 
     assert result.output["noninvertibility_verified"] is True
     assert result.output["conclusion"] == "TRUE"
-    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert result.verification_record_uri is not None
     assert result.output["verification_record_uri"] in result.artifact_uris
-    assert result.relationships[0].relation_id == (
-        "polynomial.relation.collision-refutes-two-sided-inverse"
-    )
 
 
 def test_collision_inverse_obstruction_fails_closed_for_wrong_image(
@@ -166,9 +158,7 @@ def test_collision_inverse_obstruction_fails_closed_for_wrong_image(
     assert result.output["verification_input"] == {
         "status": InputStatus.REJECTED.value,
         "errors": ["declared collision does not replay exactly"],
-        "warnings": [],
     }
-    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
     assert result.output["verification_record_uri"] is None
 
 

@@ -357,54 +357,70 @@ def create_server(
     state_dir: str | Path | None = None,
     *,
     checker_authority: CheckerAuthorityMode | None = None,
-    tenant_isolation: bool = False,
+    capability_exclusions: frozenset[str] = frozenset(),
+    capability_policy: CapabilityPolicy | None = None,
+) -> MCPServer[AppState]:
+    """Create one local server owning one mathematical runtime."""
+
+    runtime = create_runtime(
+        _configured_root(state_dir),
+        checker_authority=_selected_checker_authority(checker_authority),
+        capability_exclusions=capability_exclusions,
+        capability_policy=capability_policy,
+    )
+    return _build_server(runtime=runtime, tenant_router=None)
+
+
+def create_remote_server(
+    state_dir: str | Path | None = None,
+    *,
+    checker_authority: CheckerAuthorityMode | None = None,
     allow_anonymous: bool = False,
     anonymous_tenant_id: str = "anonymous",
     token_verifier: Any | None = None,
     auth: Any | None = None,
-    capability_exclusions: frozenset[str] = frozenset(),
     capability_policy: CapabilityPolicy | None = None,
     max_tenant_runtimes: int | None = None,
     tenant_idle_timeout_seconds: float | None = None,
 ) -> MCPServer[AppState]:
-    """Create a local or tenant-routed adapter over a Jacobian runtime."""
-
-    if tenant_isolation and capability_exclusions:
-        raise ValueError("capability exclusions are supported only by local evaluation")
+    """Create one remote host routing requests to isolated tenant runtimes."""
 
     selected_authority = _selected_checker_authority(checker_authority)
     configured_root = _configured_root(state_dir)
-    runtime = (
-        None
-        if tenant_isolation
-        else create_runtime(
-            configured_root,
-            checker_authority=selected_authority,
-            capability_exclusions=capability_exclusions,
-            capability_policy=capability_policy,
-        )
+    tenant_router = TenantRuntimeRouter(
+        configured_root,
+        checker_authority=selected_authority,
+        allow_anonymous=allow_anonymous,
+        anonymous_tenant_id=anonymous_tenant_id,
+        capability_policy=capability_policy,
+        max_tenant_runtimes=(
+            DEFAULT_MAX_TENANT_RUNTIMES
+            if max_tenant_runtimes is None
+            else max_tenant_runtimes
+        ),
+        idle_timeout_seconds=(
+            DEFAULT_TENANT_IDLE_TIMEOUT_SECONDS
+            if tenant_idle_timeout_seconds is None
+            else tenant_idle_timeout_seconds
+        ),
     )
-    tenant_router = (
-        TenantRuntimeRouter(
-            configured_root,
-            checker_authority=selected_authority,
-            allow_anonymous=allow_anonymous,
-            anonymous_tenant_id=anonymous_tenant_id,
-            capability_policy=capability_policy,
-            max_tenant_runtimes=(
-                DEFAULT_MAX_TENANT_RUNTIMES
-                if max_tenant_runtimes is None
-                else max_tenant_runtimes
-            ),
-            idle_timeout_seconds=(
-                DEFAULT_TENANT_IDLE_TIMEOUT_SECONDS
-                if tenant_idle_timeout_seconds is None
-                else tenant_idle_timeout_seconds
-            ),
-        )
-        if tenant_isolation
-        else None
+    return _build_server(
+        runtime=None,
+        tenant_router=tenant_router,
+        token_verifier=token_verifier,
+        auth=auth,
     )
+
+
+def _build_server(
+    *,
+    runtime: JacobianRuntime | None,
+    tenant_router: TenantRuntimeRouter | None,
+    token_verifier: Any | None = None,
+    auth: Any | None = None,
+) -> MCPServer[AppState]:
+    """Register the fixed MCP projection over exactly one runtime owner."""
+
     worker_registry = MCPBlockingWorkerRegistry()
 
     @asynccontextmanager

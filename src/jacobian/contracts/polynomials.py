@@ -933,10 +933,6 @@ class PolynomialDeterminism(StrEnum):
     DETERMINISTIC = "DETERMINISTIC"
 
 
-class PolynomialVerificationStatus(StrEnum):
-    UNVERIFIED = "UNVERIFIED"
-
-
 class PolynomialEvaluationOutput(ContractModel):
     map_uri: ArtifactUri
     evaluation_uri: ArtifactUri
@@ -944,9 +940,6 @@ class PolynomialEvaluationOutput(ContractModel):
     image: tuple[CanonicalRational, ...]
     exactness: PolynomialExactness = PolynomialExactness.EXACT
     determinism: PolynomialDeterminism = PolynomialDeterminism.DETERMINISTIC
-    verification: PolynomialVerificationStatus = PolynomialVerificationStatus.UNVERIFIED
-    certificate_available: Literal[False] = False
-    checker_id: None = None
     backend: Literal["sympy"] = "sympy"
     backend_version: str
 
@@ -956,13 +949,10 @@ class PolynomialJacobianOutput(ContractModel):
     jacobian_uri: ArtifactUri
     claim_uri: ArtifactUri
     certificate_uri: ArtifactUri
-    checker_id: CheckerUri | None = None
     matrix: tuple[tuple[SparseRationalPolynomial, ...], ...]
     determinant: SparseRationalPolynomial
     exactness: PolynomialExactness = PolynomialExactness.EXACT
     determinism: PolynomialDeterminism = PolynomialDeterminism.DETERMINISTIC
-    verification: PolynomialVerificationStatus = PolynomialVerificationStatus.UNVERIFIED
-    certificate_available: Literal[True] = True
     backend: Literal["sympy"] = "sympy"
     backend_version: str
 
@@ -978,11 +968,8 @@ class PolynomialCollisionOutput(ContractModel):
     second_image: tuple[CanonicalRational, ...]
     candidate_collision: bool
     witness_uri: ArtifactUri | None = None
-    checker_id: CheckerUri | None = None
     exactness: PolynomialExactness = PolynomialExactness.EXACT
     determinism: PolynomialDeterminism = PolynomialDeterminism.DETERMINISTIC
-    verification: PolynomialVerificationStatus = PolynomialVerificationStatus.UNVERIFIED
-    certificate_available: bool
     comparison_method: Literal["EXACT_EVALUATION_ARTIFACT_COMPARISON"] = (
         "EXACT_EVALUATION_ARTIFACT_COMPARISON"
     )
@@ -1005,10 +992,6 @@ class PolynomialCollisionOutput(ContractModel):
             )
         if self.candidate_collision != (self.witness_uri is not None):
             raise ValueError("only candidate collisions may carry a witness")
-        if self.certificate_available != (
-            self.witness_uri is not None and self.checker_id is not None
-        ):
-            raise ValueError("certificate availability requires witness and checker")
         return self
 
 
@@ -1154,9 +1137,7 @@ class PolynomialCollisionSearchOutput(ContractModel):
     second_evaluation_uri: ArtifactUri | None = None
     claim_uri: ArtifactUri | None = None
     witness_uri: ArtifactUri | None = None
-    checker_id: CheckerUri | None = None
     stop_reason: PolynomialCollisionSearchStopReason
-    verification: PolynomialVerificationStatus = PolynomialVerificationStatus.UNVERIFIED
 
     @model_validator(mode="after")
     def require_complete_candidate_bundle(self) -> Self:

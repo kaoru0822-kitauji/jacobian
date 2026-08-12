@@ -51,9 +51,8 @@ errors rather than mathematical conclusions.
 Successful elaboration means only that Lean produced a well-typed expression
 of type `Prop` in the bound environment. The artifact therefore always reports:
 
-- `semantic_scope = ELABORATION_ONLY`;
-- `truth_status = NOT_ASSESSED`; and
-- `verification = UNVERIFIED`.
+- `semantic_scope = ELABORATION_ONLY`; and
+- no verification record.
 
 It does not show that the proposition is true, provable, equivalent to an
 informal claim, or appropriate for a proof task. No proof-state or session

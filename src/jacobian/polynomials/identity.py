@@ -7,17 +7,10 @@ from fractions import Fraction
 
 from jacobian.canonical import canonicalize_json
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityInvocationExample,
-    CapabilityRelationship,
-    CapabilityRelationshipStatus,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.evidence import (
     CertificateEnvelope,
@@ -214,50 +207,7 @@ class PolynomialIdentityAdapter:
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="global coefficient equality in one declared QQ ring",
-                parameters={"variables": list(validated.variables)},
-                artifact_uri=left.artifact_uri,
-            ),
-            completeness=(
-                CapabilityCompleteness(
-                    status=CapabilityCompletenessStatus.COMPLETE,
-                    basis=(
-                        "every canonical sparse coefficient was replayed independently"
-                    ),
-                    assurance_level=CapabilityAssuranceLevel.VERIFIED,
-                    verification_record_uri=record_uri,
-                )
-                if verified
-                else CapabilityCompleteness(
-                    status=CapabilityCompletenessStatus.UNKNOWN,
-                    basis="the independent checker did not accept the replay",
-                )
-            ),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id="polynomial.relation.identity",
-                    source_artifact_uris=(left.artifact_uri,),
-                    target_artifact_uris=(right.artifact_uri,),
-                    status=CapabilityRelationshipStatus.VERIFIED,
-                    verification_record_uri=record_uri,
-                ),
-            )
-            if conclusion is Conclusion.TRUE and verified
-            else (),
-            assurance=CapabilityAssurance(
-                level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-                basis=(
-                    "accepted by the authorized independent sparse-polynomial checker"
-                    if verified
-                    else "the independent checker did not accept the identity request"
-                ),
-                verification_record_uri=record_uri,
-            ),
+            verification_record_uri=(record_uri if verified else None),
             artifact_uris=(
                 left.artifact_uri,
                 right.artifact_uri,

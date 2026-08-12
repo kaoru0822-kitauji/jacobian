@@ -10,7 +10,6 @@ from tests.support.exact_domain import open_exact_domain_services
 from tests.support.services import DomainTestServices
 
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
@@ -71,7 +70,6 @@ def test_induced_tree_result_is_domain_bound_and_independently_replayed(
     assert verified.output["status"] == "VERIFIED"
     assert verified.output["operation_id"] == "graph.induced_tree.maximum.compute"
     assert verified.output["verification_record_uri"] is not None
-    assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
     assert verified.execution.detail == (
         "independent finite-subset exhaustive replay accepted "
         "graph.induced_tree.maximum.compute"
@@ -133,7 +131,7 @@ def test_maximum_matching_result_uses_independent_tutte_berge_replay(
     assert verified.output["operation_id"] == (
         "graph.invariant.maximum_matching.compute"
     )
-    assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert verified.verification_record_uri is not None
     assert verified.execution.detail == (
         "independent Tutte-Berge barrier replay accepted "
         "graph.invariant.maximum_matching.compute"
@@ -201,7 +199,7 @@ def test_maximum_matching_verifier_replays_a_64_vertex_certificate(
     )
 
     assert verified.output["status"] == "VERIFIED"
-    assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert verified.verification_record_uri is not None
 
 
 def test_graph_metric_result_uses_independent_all_sources_bfs_replay(
@@ -250,9 +248,6 @@ def test_graph_metric_result_uses_independent_all_sources_bfs_replay(
         assert verified.output["status"] == "VERIFIED", producer_id
         assert verified.output["operation_id"] == producer_id, producer_id
         assert verified.output["verification_record_uri"] is not None, producer_id
-        assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED, (
-            producer_id
-        )
         assert verified.output["verification_record_uri"] in verified.artifact_uris, (
             producer_id
         )
@@ -307,12 +302,10 @@ def test_distance_matrix_result_uses_independent_all_sources_bfs_replay(
         )
     )
 
-    assert computed.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert verified.execution.status is ExecutionStatus.COMPLETED
     assert verified.output["status"] == "VERIFIED"
     assert verified.output["operation_id"] == "graph.distance_matrix.compute"
     assert verified.output["verification_record_uri"] is not None
-    assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
     assert verified.output["verification_record_uri"] in verified.artifact_uris
     assert len(verified.artifact_uris) == 2
 
@@ -365,4 +358,3 @@ def test_distance_matrix_result_uses_independent_all_sources_bfs_replay(
     assert rejected.output["status"] == "REJECTED"
     assert rejected.output["conclusion"] == "UNKNOWN"
     assert rejected.output["verification_record_uri"] is None
-    assert rejected.assurance.level is not CapabilityAssuranceLevel.VERIFIED

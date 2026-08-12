@@ -159,9 +159,14 @@ checker authorization out of plugins and search code.
   shared files until their work is integrated.
 - Jacobian is pre-stable. Current reference documents and the installed catalog
   define the supported surface; they do not order capability research.
-- Validate the complete Pydantic request model before computation or artifact
-  writes. JSON Schema supports discovery; it does not replace cross-field
-  validation.
+- Validate the complete Pydantic request model before preflight, provider calls,
+  computation, allocation, or artifact writes. This includes relationships among
+  individually valid fields: parents, characteristics, presentations, axes,
+  bases, labels, and bound identities must agree where the operation requires
+  them. JSON Schema supports discovery; it does not replace cross-field model
+  validation. Exercise incompatible-but-individually-valid values through the
+  serialized installed-operation boundary and assert an invalid-request result
+  with no execution or publication.
 - A `COMPLETED` bounded operation may return a domain result marked `UNKNOWN` or
   `INCOMPLETE`. Execution completion alone does not establish optimality or a
   mathematical conclusion.

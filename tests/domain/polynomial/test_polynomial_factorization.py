@@ -3,7 +3,6 @@ from pathlib import Path
 
 import pytest
 
-from jacobian.contracts.capabilities import CapabilityAssuranceLevel
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.domains.polynomial import build_polynomial_bundle
 from tests.support.capabilities import invoke_capability as _invoke
@@ -49,7 +48,6 @@ def test_factor_compute_preserves_multiplicity_and_reconstructs_exactly(
     )
 
     assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.artifact_uris == ()
     assert result.output["result"] == {
         "coefficient": {"num": "1", "den": "1"},
@@ -61,7 +59,6 @@ def test_factor_compute_preserves_multiplicity_and_reconstructs_exactly(
         ],
         "reconstructed": polynomial,
         "normalization": "CONTENT_AND_MONIC_IRREDUCIBLES",
-        "irreducibility_assurance": "UNVERIFIED",
         "product_reconstruction": "EXACT",
     }
 
@@ -80,7 +77,6 @@ def test_factor_compute_handles_zero_as_a_coefficient_not_a_unit(
         "factors": [],
         "reconstructed": _polynomial([]),
         "normalization": "CONTENT_AND_MONIC_IRREDUCIBLES",
-        "irreducibility_assurance": "UNVERIFIED",
         "product_reconstruction": "EXACT",
     }
 
@@ -106,6 +102,5 @@ def test_factor_compute_preserves_rational_coefficient_and_irreducible_factor(
         ],
         "reconstructed": polynomial,
         "normalization": "CONTENT_AND_MONIC_IRREDUCIBLES",
-        "irreducibility_assurance": "UNVERIFIED",
         "product_reconstruction": "EXACT",
     }

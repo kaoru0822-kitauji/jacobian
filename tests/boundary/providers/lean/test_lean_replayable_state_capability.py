@@ -202,7 +202,6 @@ def test_apply_tactic_materializes_and_reuses_replayable_state(
     assert second.output["completed"] is True
     assert second.output["successor_states"][0]["normalized_goals"] == []
     assert second.output["verification_boundary"] == "LEAN_CHECK_REQUIRED"
-    assert second.output["verification"] == "UNVERIFIED"
     successor = adapter.resources.store.get(successor_uri)
     assert successor.payload["expiry"] == "IMMUTABLE_NO_EXPIRY"
     assert successor.payload["environment_digest"].startswith("sha256:")

@@ -56,12 +56,6 @@ def _rejected_checker_result(detail: str) -> ResultEnvelope:
             "execution": {"status": "COMPLETED"},
             "input": {"status": "REJECTED", "errors": [detail]},
             "conclusion": "UNKNOWN",
-            "assurance": {
-                "arithmetic": "SYMBOLIC",
-                "method": "CHECKED_CERTIFICATE",
-                "coverage": "NOT_APPLICABLE",
-                "verification": "UNVERIFIED",
-            },
         }
     )
 

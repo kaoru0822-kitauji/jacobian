@@ -134,8 +134,8 @@ has `y^T A = [0, 0]` and `y^T b = 1`. The producer returns this ordered row
 witness inline. The v2 verification request binds it to the exact supplied
 system and semantics without creating a producer-side artifact.
 
-The producer returns `CERTIFICATE_PRODUCED` with `UNKNOWN` conclusion and
-`UNVERIFIED` assurance. `NO_CERTIFICATE_PRODUCED`, timeout, cancellation,
+The producer returns `CERTIFICATE_PRODUCED` with `UNKNOWN` conclusion and no
+verification record. `NO_CERTIFICATE_PRODUCED`, timeout, cancellation,
 runtime replacement, or malformed output also remains `UNKNOWN`; none proves
 that the system is consistent.
 

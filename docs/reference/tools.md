@@ -21,40 +21,43 @@ compatibility, or verification authority.
 Search uses a bounded lexical query:
 
 ```json
-{"op": "search", "query": "exact matrix determinant", "limit": 5}
+{"request": {"op": "search", "query": "exact matrix determinant", "limit": 5}}
 ```
 
 Exact inspection uses an operation ID:
 
 ```json
-{"op": "inspect", "capability_id": "matrix.determinant.compute"}
+{"request": {"op": "inspect", "capability_id": "matrix.determinant.compute"}}
 ```
 
-The public SDK shape may nest this discriminated request under `request` if the
-pinned MCP SDK cannot publish and enforce the flat union without handwritten
-schema or dispatch code. The semantic operations remain `search` and
-`inspect` either way.
+The request is nested because the pinned SDK publishes and enforces that
+discriminated union directly. Search-only fields cannot appear on inspection,
+and inspection IDs cannot appear on search.
 
 Search proceeds in this order:
 
 ```text
 lexical retrieval
-  → exact typed compatibility
-  → optional full-request preflight
+  → declared input-kind and artifact-type compatibility
 ```
 
-It returns lexical relevance plus factual execution metadata where known:
+It returns lexical relevance plus factual catalog metadata:
 
 - applicability status and stable mismatch code;
 - provider availability;
-- checker availability and checker scope;
-- effect; and
-- aggregate-cost admission status.
+- accepted input and artifact types; and
+- produced artifact types.
 
-Applicability uses stable outcomes: `APPLICABLE`, `INCOMPATIBLE`,
-`NEEDS_MORE_TYPED_REQUIREMENTS`, `PROVIDER_UNAVAILABLE`,
-`CHECKER_UNAVAILABLE`, and `PORTFOLIO_GAP`. A checker that requires two inputs
-is never reported as invocable from one.
+Applicability uses two outcomes: `INCOMPATIBLE` and
+`NEEDS_MORE_TYPED_REQUIREMENTS`. Search never reports an operation as
+invocable without validating its complete request.
+
+The current search request has no full operation payload, so it reports
+`NEEDS_MORE_TYPED_REQUIREMENTS` after a compatible coarse input filter and
+`INCOMPATIBLE` with `INPUT_KIND_MISMATCH` or `ARTIFACT_TYPE_MISMATCH` when a
+declared filter rules an operation out. It does not infer an input type from
+query wording or manufacture a strong/weak confidence label. Exact request
+compatibility and preflight remain facts of the selected operation invocation.
 
 The retrieval order is not a workflow recommendation. Search does not browse,
 serve inventory for an empty query, expose projection levels, publish
@@ -76,21 +79,29 @@ Run one known operation with a payload:
 }
 ```
 
-After typed ports are available, callers may bind declared inputs by opaque
-request-local reference:
+Operations that declare typed ports may bind inputs by opaque request-local
+reference:
 
 ```json
 {
-  "capability_id": "matrix.rank.compute",
+  "capability_id": "finite_field.polynomial_map.fibers.compute",
   "payload": {},
-  "inputs": {"matrix": {"value_ref": "value://opaque-id"}}
+  "inputs": {
+    "table": {"value_ref": "value://AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}
+  }
 }
 ```
 
 The runtime resolves declared inputs, assembles one request, parses it once,
 runs preflight, executes one semantic operation, checks the request/result
 postcondition, and then publishes the result. Unknown top-level arguments and
-unknown selected-payload fields fail closed.
+unknown selected-payload fields fail closed. References are opaque and scoped
+to the runtime that produced them; they carry no assurance. The bounded store
+retains recently used references and may evict older ones, while closing the
+runtime invalidates all remaining references. The catalog and inspection result
+list each operation's exact input and output ports. Because each CLI command
+owns and closes one runtime, request-local references are intended for immediate
+MCP-session and in-process handoffs, not handoff between separate CLI invocations.
 
 Ordinary operations return a bounded mathematical value and execution status.
 Checker operations return an accepted, rejected, or non-conclusion verdict

@@ -71,7 +71,6 @@ class LeanProofStateArtifact(ContractModel):
     lean_commit: str
     mathlib_commit: str | None = None
     expiry: Literal["IMMUTABLE_NO_EXPIRY"] = "IMMUTABLE_NO_EXPIRY"
-    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
 
     @model_validator(mode="after")
     def require_completion_shape(self) -> Self:
@@ -146,7 +145,6 @@ class LeanProofStateTransitionArtifact(ContractModel):
 
 class LeanProofStateOutput(LeanProofStateTransitionArtifact):
     transition_uri: ArtifactUri
-    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
 
 
 class LeanPremiseRetrievalRequest(ContractModel):
@@ -195,4 +193,3 @@ class LeanPremiseRetrievalArtifact(ContractModel):
 
 class LeanPremiseRetrievalOutput(LeanPremiseRetrievalArtifact):
     retrieval_uri: ArtifactUri
-    verification: Literal["UNVERIFIED"] = "UNVERIFIED"

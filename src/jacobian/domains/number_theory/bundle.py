@@ -32,7 +32,6 @@ def build_number_theory_bundle() -> DomainBundle:
                     "and modular arithmetic over bounded inputs"
                 ),
                 "integer_encoding": "canonical decimal string",
-                "assurance": "computed; no independent checker",
             },
         ),
         provider_runtime=known_provider_runtime(

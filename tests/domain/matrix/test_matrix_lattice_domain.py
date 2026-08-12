@@ -12,7 +12,6 @@ from tests.support.services import (
 )
 
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityDiscoveryRequest,
     CapabilityRequest,
 )
@@ -235,7 +234,6 @@ def test_exact_matrix_domain_results_and_lineage(
             CapabilityRequest(capability_id=capability_id, input=payload)
         )
         assert result.execution.status is ExecutionStatus.COMPLETED
-        assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
         assert result.output["result"] == expected
         assert result.artifact_uris == ()
 
@@ -254,7 +252,7 @@ def test_rational_relation_intent_reuses_the_exact_nullspace_operation(
     )
 
     assert discovered.matches[0].capability_id == "matrix.nullspace.compute"
-    assert discovered.matches[0].lexical_fit == "STRONG_CANDIDATE"
+    assert discovered.matches[0].relevance_score > 0
     descriptor = next(
         descriptor
         for descriptor in matrix_domain_services.core.capabilities.catalog().capabilities
@@ -295,7 +293,7 @@ def test_matrix_multiplication_intent_is_discoverable(
     )
 
     assert discovered.matches[0].capability_id == "matrix.multiply.compute"
-    assert discovered.matches[0].lexical_fit == "STRONG_CANDIDATE"
+    assert discovered.matches[0].relevance_score > 0
     descriptor = next(
         descriptor
         for descriptor in matrix_domain_services.core.capabilities.catalog().capabilities
@@ -525,7 +523,6 @@ def test_lattice_lll_returns_exact_left_transformation(
     )
 
     assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     computed = _result_payload(runtime, result)
     reduced = [
         [int(value) for value in row] for row in computed["reduced_basis"]["entries"]

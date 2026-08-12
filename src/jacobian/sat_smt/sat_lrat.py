@@ -14,16 +14,11 @@ from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationE
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityInputKind,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
@@ -31,7 +26,6 @@ from jacobian.contracts.results import (
     Conclusion,
     Execution,
     ExecutionStatus,
-    Verification,
 )
 from jacobian.contracts.sat import (
     SatLratInvalidProofStep,
@@ -109,6 +103,8 @@ def install_sat_lrat_verifier(
 
 
 class SatLratVerificationAdapter:
+    typed_input = True
+
     def __init__(
         self,
         *,
@@ -238,27 +234,6 @@ class SatLratVerificationAdapter:
                     detail="cancelled before independent LRAT replay",
                 ),
                 output=output.model_dump(mode="json"),
-                scope=CapabilityScope(
-                    description="the exact canonical CNF and exact LRAT proof bytes",
-                    parameters={
-                        "proof_format": proof.proof_format,
-                        "proof_format_version": proof.proof_format_version,
-                        "proof_digest": proof.proof_digest,
-                        "variable_map_digest": proof.cnf.variable_map_digest,
-                        "dimacs_digest": proof.cnf.dimacs_digest,
-                        "limits": validated.limits.model_dump(mode="json"),
-                    },
-                    artifact_uri=resolved.artifact.artifact_uri,
-                ),
-                completeness=CapabilityCompleteness(
-                    status=CapabilityCompletenessStatus.NOT_APPLICABLE,
-                    basis="cancelled certificate replay makes no completeness claim",
-                    assurance_level=CapabilityAssuranceLevel.HEURISTIC,
-                ),
-                assurance=CapabilityAssurance(
-                    level=CapabilityAssuranceLevel.HEURISTIC,
-                    basis="cancelled before checker execution; no conclusion follows",
-                ),
                 artifact_uris=(
                     resolved.artifact.artifact_uri,
                     proof_artifact.artifact_uri,
@@ -273,7 +248,6 @@ class SatLratVerificationAdapter:
         verified = (
             checked.execution.status is ExecutionStatus.COMPLETED
             and checked.conclusion is Conclusion.TRUE
-            and checked.assurance.verification is Verification.VERIFIED
             and checked.verification_record_uri is not None
         )
         detail = checked.execution.detail or (
@@ -298,7 +272,6 @@ class SatLratVerificationAdapter:
         else:
             status = "ERROR"
         record_uri = checked.verification_record_uri if verified else None
-        operational = status in {"TIMEOUT", "CANCELLED", "ERROR"}
         projected_execution = (
             Execution(status=ExecutionStatus.TIMEOUT, detail=detail)
             if status == "TIMEOUT"
@@ -329,44 +302,7 @@ class SatLratVerificationAdapter:
             capability_version=self.descriptor.version,
             execution=projected_execution,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="the exact canonical CNF and exact LRAT proof bytes",
-                parameters={
-                    "proof_format": proof.proof_format,
-                    "proof_format_version": proof.proof_format_version,
-                    "proof_digest": proof.proof_digest,
-                    "variable_map_digest": proof.cnf.variable_map_digest,
-                    "dimacs_digest": proof.cnf.dimacs_digest,
-                    "limits": validated.limits.model_dump(mode="json"),
-                },
-                artifact_uri=resolved.artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.NOT_APPLICABLE,
-                basis="certificate replay makes no search-completeness claim",
-                assurance_level=(
-                    CapabilityAssuranceLevel.HEURISTIC
-                    if operational
-                    else CapabilityAssuranceLevel.COMPUTED
-                ),
-            ),
-            assurance=CapabilityAssurance(
-                level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else (
-                        CapabilityAssuranceLevel.HEURISTIC
-                        if operational
-                        else CapabilityAssuranceLevel.COMPUTED
-                    )
-                ),
-                basis=(
-                    "independent checker accepted the exact bound LRAT proof"
-                    if verified
-                    else "proof was not accepted; this is not evidence of satisfiability"
-                ),
-                verification_record_uri=record_uri,
-            ),
+            verification_record_uri=record_uri,
             artifact_uris=tuple(uris),
         )
 

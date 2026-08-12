@@ -46,8 +46,10 @@ inventory protocol, and an empty query is not browse mode.
 }
 ```
 
-Once typed composition lands, declared input ports may also bind opaque value
-references. The assembled request is still parsed exactly once.
+Declared input ports may also bind opaque runtime-local value references. The
+reference carries no assurance or serialized type metadata: the runtime checks
+its stored type and source port, assembles the request, and parses it exactly
+once. Closing the runtime invalidates its references.
 
 ## Dependency direction
 
@@ -151,25 +153,27 @@ external payload
   → one serialization
 ```
 
-Pydantic owns complete request validation. JSON Schema is generated for
-discovery and is not executed as an additional validation pass for built-ins.
-Provider and subprocess output is a separate untrusted boundary and is parsed
-independently.
+Pydantic owns complete request validation, including relationships among
+otherwise valid fields. Required agreement of parents, characteristics,
+presentations, axes, bases, labels, and bound identities is checked during the
+single request parse, before preflight or any provider call. JSON Schema is
+generated for discovery and is not executed as an additional validation pass
+for built-ins. Provider and subprocess output is a separate untrusted boundary
+and is parsed independently.
 
 Preflight distinguishes supported, unsupported, provider unavailable, and
 resource-limit-exceeded outcomes. Where practical it estimates work, output
 size, publication, checker replay, and aggregate allocation before work begins.
 
 A postcondition runs before publication. Failure exposes no value reference,
-artifact, or assurance. Terminal execution state remains separate from the
+artifact, or verification record. Terminal execution state remains separate from the
 mathematical result and from verification authority.
 
-The transitional v2 wire envelope may still project a `COMPUTED` label for a
-completed ordinary operation or a non-conclusive label for failure. Those are
-compatibility fields, not inputs to execution, discovery, publication, or
-mathematical identity. Ordinary operations do not manufacture generic scope,
-completeness, relationship, or obligation records around an already-typed
-result.
+The v2 wire envelope carries a top-level `verification_record_uri` when an
+independent checker accepted the result. That pointer is not an input to
+execution, discovery, publication, or mathematical identity. Ordinary
+operations do not manufacture generic scope, completeness, relationship, or
+obligation records around an already-typed result.
 
 ## Verification
 
@@ -203,24 +207,34 @@ ValueInstance   exact semantic value and canonical digest
 ValueReference  opaque carrier, source port, provenance
 ```
 
-Initial internal ports are deliberately small and provisional through #905
-Slice A: an input port binds one typed value to a request, and an output port
-extracts one typed value from a result. One port may carry one semantic value or
-one bounded homogeneous collection. Pydantic retains field cardinality and
-cross-field constraints. Installation verifies each typed accessor against its
-declared value type. Compatibility requires exact type/version, parent,
-presentation, axes, and bases; all transformations are explicit. The port
-contract is frozen only after Slice B demonstrates reuse.
+The supported internal port contract is deliberately small: an input port
+names one typed request field, and an output port exposes the whole typed
+result. Pydantic retains field cardinality and cross-field constraints.
+Installation verifies each declared field and result type. Compatibility
+requires exact type/version, parent, presentation, axes, and bases; all
+transformations are explicit.
 
-`value://opaque-id` tokens contain no serialized metadata. The request-local
-store owns tenant/session lifetime, semantic value, source operation, operation
-version, output port, bound identities, canonical digest, and invocation
-provenance. Resolution
-validates those stored facts against the target port. Durable promotion closes
-over every referenced value, parent, basis, and axis.
+#905 Slices A and B use this same contract unchanged. Complete projective
+lines, finite map tables, fiber partitions, and certificates remain
+domain-owned semantic values, so the port layer needs no collection model,
+field extraction, cardinality language, coercion graph, or generalized
+unifier. That two-slice reuse freezes this minimal shape as the supported
+internal composition contract.
 
-Changing between inline, request-local, and durable carriers does not change a
-value or grant assurance.
+Slice A's complete projective line is a domain-owned semantic value with a
+fixed presentation, axis, order, completeness check, and digest. It does not
+make ports collection-aware.
+
+`value://opaque-id` tokens contain no serialized metadata. The bounded in-memory
+store is owned by one local or tenant runtime and records the semantic value,
+source operation and version, output port, and canonical digest. Resolution
+checks the exact value class and then lets the assembled Pydantic request check
+its presentation, parent, axes, and bases. The store evicts least-recently-used
+references to stay within its fixed count and byte bounds; closing the runtime
+invalidates everything that remains. Durable promotion is not a supported
+operation; durable artifacts remain an explicit, separate publication path.
+
+Using a request-local carrier does not change a value or grant assurance.
 
 ## Structural JSON
 
@@ -268,6 +282,11 @@ are returned directly unless a genuine `ResourceLink`, custom metadata, or
 deliberate text projection requires an explicit MCP result. The two fixed tools
 are statically registered; dynamic operation tools and compatibility aliases
 are not supported.
+
+Hosting has two constructors with separate ownership: `create_server` owns one
+local runtime, while `create_remote_server` owns authentication and isolated
+tenant runtimes. Remote admission, leases, eviction, and quarantine do not
+enter the local constructor.
 
 The CLI projects the same installed declarations and execution path through
 `catalog`, `inspect`, and `run`. Operator administration remains separate from

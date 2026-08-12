@@ -8,17 +8,10 @@ from typing import cast
 
 from jacobian.canonical import canonicalize_json
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityInvocationExample,
-    CapabilityRelationship,
-    CapabilityRelationshipStatus,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.evidence import (
     CertificateEnvelope,
@@ -137,23 +130,7 @@ class PolynomialMapEvaluationAdapter:
             request=request,
             started=started,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="one exact point evaluation for one polynomial map",
-                parameters={
-                    "map_uri": map_uri,
-                    "point": point.model_dump(mode="json")["values"],
-                },
-                artifact_uri=map_uri,
-            ),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id="polynomial.relation.evaluation-of",
-                    source_artifact_uris=(map_uri,),
-                    target_artifact_uris=(evaluation_uri,),
-                ),
-            ),
             artifact_uris=(map_uri, evaluation_uri),
-            completeness_basis="every coordinate was evaluated exactly at the point",
         )
 
 
@@ -308,7 +285,6 @@ class PolynomialJacobianAdapter:
             jacobian_uri=jacobian_artifact.artifact_uri,
             claim_uri=claim_artifact.artifact_uri,
             certificate_uri=certificate_artifact.artifact_uri,
-            checker_id=self.resources.installation.jacobian_checker_id,
             matrix=jacobian.matrix,
             determinant=jacobian.determinant,
             backend_version=SYMPY_VERSION,
@@ -318,29 +294,11 @@ class PolynomialJacobianAdapter:
             request=request,
             started=started,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="the full Jacobian matrix for one square polynomial map",
-                parameters={
-                    "map_uri": map_uri,
-                    "variable_order": list(polynomial_map.variables),
-                },
-                artifact_uri=map_uri,
-            ),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id="polynomial.relation.jacobian-of",
-                    source_artifact_uris=(map_uri,),
-                    target_artifact_uris=(jacobian_artifact.artifact_uri,),
-                ),
-            ),
             artifact_uris=(
                 map_uri,
                 jacobian_artifact.artifact_uri,
                 claim_artifact.artifact_uri,
                 certificate_artifact.artifact_uri,
-            ),
-            completeness_basis=(
-                "every partial derivative and the exact determinant were computed"
             ),
         )
 
@@ -510,50 +468,6 @@ class PolynomialKellerConditionVerifyAdapter:
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="nonzero-constant Jacobian condition for one QQ map",
-                parameters={"map_uri": map_uri},
-                artifact_uri=map_uri,
-            ),
-            completeness=(
-                CapabilityCompleteness(
-                    status=CapabilityCompletenessStatus.COMPLETE,
-                    basis=(
-                        "the full sparse Jacobian and determinant were replayed "
-                        "independently"
-                    ),
-                    assurance_level=CapabilityAssuranceLevel.COMPUTED,
-                )
-                if verified
-                else CapabilityCompleteness(
-                    status=CapabilityCompletenessStatus.UNKNOWN,
-                    basis="the independent Keller-condition checker did not accept",
-                )
-            ),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id="polynomial.relation.keller-condition",
-                    source_artifact_uris=(map_uri,),
-                    target_artifact_uris=(jacobian_uri,),
-                    status=CapabilityRelationshipStatus.VERIFIED,
-                    verification_record_uri=record_uri,
-                ),
-            )
-            if verified and conclusion is Conclusion.TRUE
-            else (),
-            assurance=CapabilityAssurance(
-                level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-                basis=(
-                    "accepted by the authorized independent exact Keller-condition "
-                    "checker"
-                    if verified
-                    else "the independent Keller-condition checker did not accept"
-                ),
-                verification_record_uri=record_uri,
-            ),
+            verification_record_uri=(record_uri if verified else None),
             artifact_uris=tuple(artifact_uris),
         )

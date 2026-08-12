@@ -15,17 +15,10 @@ from jacobian.capability_service import CapabilityInvocationError
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
-    CapabilityAssurance,
-    CapabilityAssuranceLevel,
-    CapabilityCompleteness,
-    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
-    CapabilityRelationship,
-    CapabilityRelationshipStatus,
     CapabilityRequest,
     CapabilityResult,
-    CapabilityScope,
 )
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
@@ -40,7 +33,7 @@ from jacobian.contracts.graph_isomorphism import (
     GraphVertexMapping,
     SimpleUndirectedGraph,
 )
-from jacobian.contracts.results import Conclusion, ExecutionStatus, Verification
+from jacobian.contracts.results import Conclusion, ExecutionStatus
 from jacobian.graphs.installation import GraphInstallation
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
@@ -300,7 +293,6 @@ class GraphIsomorphismAdapter:
         verified = (
             checked.execution.status is ExecutionStatus.COMPLETED
             and checked.conclusion in {Conclusion.TRUE, Conclusion.FALSE}
-            and checked.assurance.verification is Verification.VERIFIED
             and checked.verification_record_uri is not None
         )
         conclusion: Literal["TRUE", "FALSE", "UNKNOWN"]
@@ -347,67 +339,7 @@ class GraphIsomorphismAdapter:
             capability_version=self.descriptor.version,
             execution=checked.execution,
             output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="every vertex pair in two explicit finite graphs",
-                parameters={
-                    "left_graph_uri": validated.left_graph_uri,
-                    "right_graph_uri": validated.right_graph_uri,
-                    "left_order": len(left.graph.vertices),
-                    "right_order": len(right.graph.vertices),
-                },
-                artifact_uri=pair.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=(
-                    CapabilityCompletenessStatus.COMPLETE
-                    if verified
-                    else CapabilityCompletenessStatus.UNKNOWN
-                ),
-                basis=(
-                    "the checker compared the complete finite adjacency relation"
-                    if verified
-                    else "the checker did not accept the replay inputs"
-                ),
-                assurance_level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-                verification_record_uri=record_uri,
-            ),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id="graph.relation.pair-scope",
-                    source_artifact_uris=source_graph_uris,
-                    target_artifact_uris=(pair.artifact_uri,),
-                ),
-                *(
-                    (
-                        CapabilityRelationship(
-                            relation_id="graph.relation.isomorphic-via",
-                            source_artifact_uris=source_graph_uris,
-                            target_artifact_uris=(mapping.artifact_uri,),
-                            status=CapabilityRelationshipStatus.VERIFIED,
-                            verification_record_uri=record_uri,
-                        ),
-                    )
-                    if conclusion == "TRUE" and record_uri is not None
-                    else ()
-                ),
-            ),
-            assurance=CapabilityAssurance(
-                level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-                basis=(
-                    "accepted by the authorized independent adjacency checker"
-                    if verified
-                    else "the independent checker did not accept the mapping"
-                ),
-                verification_record_uri=record_uri,
-            ),
+            verification_record_uri=record_uri,
             artifact_uris=tuple(artifact_uris),
         )
 

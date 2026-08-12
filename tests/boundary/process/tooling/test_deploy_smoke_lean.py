@@ -12,7 +12,7 @@ def test_verified_smoke_requires_completed_checker_backing() -> None:
     result = {
         "execution": {"status": "COMPLETED"},
         "output": {"conclusion": "TRUE"},
-        "assurance": {"level": "VERIFIED"},
+        "verification_record_uri": "artifact://sha256/example",
     }
 
     _require_verified(result, environment="MATHLIB")
@@ -20,7 +20,7 @@ def test_verified_smoke_requires_completed_checker_backing() -> None:
     for mutation in (
         {**result, "execution": {"status": "ERROR"}},
         {**result, "output": {"conclusion": "UNKNOWN"}},
-        {**result, "assurance": {"level": "COMPUTED"}},
+        {**result, "verification_record_uri": None},
     ):
         with pytest.raises(RuntimeError):
             _require_verified(mutation, environment="MATHLIB")

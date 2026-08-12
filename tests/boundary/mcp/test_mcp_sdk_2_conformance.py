@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import importlib.metadata
-import json
 from pathlib import Path
 
 import pytest
@@ -55,10 +54,19 @@ def test_mcp_v2_static_validation_context_errors_and_structured_resources(
             invoke = next(tool for tool in listed.tools if tool.name == "math.run")
             assert set(invoke.input_schema["properties"]) == {
                 "capability_id",
+                "inputs",
                 "payload",
             }
             assert invoke.output_schema == CapabilityResult.model_json_schema()
             find = next(tool for tool in listed.tools if tool.name == "math.find")
+            assert set(find.input_schema["properties"]) == {"request"}
+            assert find.input_schema["properties"]["request"]["discriminator"] == {
+                "mapping": {
+                    "inspect": "#/$defs/_CapabilityInspectRequest",
+                    "search": "#/$defs/_CapabilitySearchRequest",
+                },
+                "propertyName": "op",
+            }
             assert find.output_schema["type"] == "object"
             assert find.output_schema["discriminator"] == {
                 "mapping": {
@@ -74,7 +82,7 @@ def test_mcp_v2_static_validation_context_errors_and_structured_resources(
             ) >= {"kind", "matches", "total_matches", "truncated"}
             assert set(
                 find.output_schema["$defs"]["_CapabilityInspectionResult"]["required"]
-            ) >= {"kind", "view", "capability"}
+            ) >= {"kind", "capability"}
             assert (
                 find.output_schema["$defs"]["_CapabilityDiscoveryOperationCard"][
                     "additionalProperties"
@@ -98,6 +106,18 @@ def test_mcp_v2_static_validation_context_errors_and_structured_resources(
                 await client.call_tool("math.find", {"unknown_key": "rejected"})
             assert '"code": "INVALID_INPUT"' in str(unknown.value)
 
+            mixed_find_request = await client.call_tool(
+                "math.find",
+                {
+                    "request": {
+                        "op": "search",
+                        "query": "matrix rank",
+                        "capability_id": "matrix.rank.compute",
+                    }
+                },
+            )
+            assert mixed_find_request.is_error is True
+
             with pytest.raises(MCPError) as retired_reasoning_input:
                 await client.call_tool(
                     "math.run",
@@ -109,36 +129,24 @@ def test_mcp_v2_static_validation_context_errors_and_structured_resources(
                 )
             assert '"code": "INVALID_INPUT"' in str(retired_reasoning_input.value)
 
-            invalid_discovery_view = await client.call_tool(
+            contract_result = await client.call_tool(
                 "math.find",
                 {
-                    "query": "normalize a polynomial expression",
-                    "view": "FULL",
+                    "request": {
+                        "op": "inspect",
+                        "capability_id": "polynomial.expression.normalize",
+                    }
                 },
             )
-            assert invalid_discovery_view.is_error is True
-            invalid_view_error = json.loads(invalid_discovery_view.content[0].text)
-            assert invalid_view_error["error"]["code"] == "INVALID_INPUT"
-            assert invalid_view_error["error"]["stage"] == "math.find"
-
-            contract = json.loads(
-                (
-                    await client.call_tool(
-                        "math.find",
-                        {
-                            "capability_id": "polynomial.expression.normalize",
-                            "view": "CONTRACT",
-                        },
-                    )
-                )
-                .content[0]
-                .text
-            )
+            assert isinstance(contract_result.structured_content, dict)
+            contract = contract_result.structured_content
             result = await client.call_tool(
                 "math.run",
                 {
                     "capability_id": "polynomial.expression.normalize",
-                    "payload": contract["invocations"][0]["arguments"]["payload"],
+                    "payload": contract["capability"]["invocation_examples"][0][
+                        "input"
+                    ],
                 },
             )
             assert isinstance(result.structured_content, dict)

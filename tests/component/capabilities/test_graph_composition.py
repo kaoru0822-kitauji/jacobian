@@ -12,12 +12,7 @@ from tests.support.services import (
     open_domain_services,
 )
 
-from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
-    CapabilityCompletenessStatus,
-    CapabilityRelationshipStatus,
-    CapabilityRequest,
-)
+from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.graphs.composition import install_graph_composition_capabilities
 from jacobian.graphs.installation import install_graph_capabilities
@@ -93,11 +88,6 @@ def test_compose_complement_returns_computed_graph_artifact(
     )
 
     assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    assert result.completeness.status is CapabilityCompletenessStatus.COMPLETE
-    assert result.completeness.assurance_level is CapabilityAssuranceLevel.COMPUTED
-    assert result.scope is not None
-    assert result.scope.artifact_uri == result.output["result_graph_uri"]
     assert "conclusion" not in result.output
 
     payload = result.output["result_graph"]
@@ -118,13 +108,6 @@ def test_compose_complement_returns_computed_graph_artifact(
     assert composition.payload["right_graph_uri"] is None
     assert composition.payload["result_graph_uri"] == result.output["result_graph_uri"]
     assert composition.payload["backend"] == "networkx.complement"
-
-    # Relationship links the result back to its source.
-    assert len(result.relationships) == 1
-    rel = result.relationships[0]
-    assert rel.relation_id == "graph.relation.composed-from"
-    assert rel.status is CapabilityRelationshipStatus.PROPOSED
-    assert left_uri in rel.target_artifact_uris
 
     # Both the source, result, and composition record appear in artifact_uris.
     assert left_uri in result.artifact_uris
@@ -163,10 +146,6 @@ def test_compose_binary_operations_preserve_their_graph_contracts(
         assert composition.payload["operation"] == operation
         assert composition.payload["right_graph_uri"] == right_uri
         assert composition.payload["backend"] == backend
-        if operation == "DISJOINT_UNION":
-            relationship = result.relationships[0]
-            assert left_uri in relationship.target_artifact_uris
-            assert right_uri in relationship.target_artifact_uris
 
 
 def test_compose_rejects_invalid_inputs(graph_services: DomainTestServices) -> None:
@@ -228,11 +207,6 @@ def test_enumerate_returns_complete_atlas_catalog_with_boundary(
     )
 
     assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    assert result.completeness.status is CapabilityCompletenessStatus.COMPLETE
-    assert result.completeness.assurance_level is CapabilityAssuranceLevel.COMPUTED
-    assert result.scope is not None
-    assert result.scope.artifact_uri == result.output["scope_uri"]
     assert "conclusion" not in result.output
 
     # The Graph Atlas has exactly 11 nonisomorphic graphs of order 4.
@@ -261,12 +235,6 @@ def test_enumerate_returns_complete_atlas_catalog_with_boundary(
     assert scope.payload["order"] == 4
     assert scope.payload["enumerated_count"] == 11
     assert "not all nonisomorphic" in scope.payload["backend_boundary"]
-
-    # Every graph is linked to the scope.
-    assert len(result.relationships) == 11
-    for rel in result.relationships:
-        assert rel.relation_id == "graph.relation.enumerated-in"
-        assert rel.source_artifact_uris == (result.output["scope_uri"],)
 
     # Scope + all graphs appear in artifact_uris.
     assert result.output["scope_uri"] in result.artifact_uris

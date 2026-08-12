@@ -84,7 +84,6 @@ def build_graph_optimization_bundle() -> DomainBundle:
                     "canonical weight-and-endpoint edge insertion before maintained "
                     "Kruskal selection"
                 ),
-                "assurance": "computed; incomplete search is never a conclusion",
             },
         ),
         provider_runtime=composite_provider_runtime(

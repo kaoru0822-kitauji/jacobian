@@ -62,8 +62,8 @@ prefix before applying the new tactic, then returns:
 - Lean and Mathlib runtime identity; and
 - a transition artifact URI.
 
-`completed = true` means no goals remain after this transition. It is not proof
-verification, and the output is explicitly `UNVERIFIED`. Goal count, typed-goal
+`completed = true` means no goals remain after this transition. It creates no
+verification record. Goal count, typed-goal
 indices, and completion are cross-validated so malformed backend output fails
 closed.
 

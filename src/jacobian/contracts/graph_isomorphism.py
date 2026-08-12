@@ -142,7 +142,7 @@ class GraphIsomorphismVerifyOutput(ContractModel):
     first_violation: GraphIsomorphismViolation | None = None
 
     @model_validator(mode="after")
-    def preserve_truth_and_checker_assurance(self) -> Self:
+    def preserve_truth_and_verification(self) -> Self:
         expected = {
             "TRUE": True,
             "FALSE": False,

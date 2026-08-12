@@ -15,7 +15,7 @@ These contracts cover two domain-atomic graph operations:
 Both contracts preserve the existing ``jacobian.simple-undirected-graph``
 semantics and payload schema.  Neither contract carries a mathematical
 conclusion or verification record; construction and enumeration produce
-``COMPUTED`` assurance only.
+computed results only.
 """
 
 from __future__ import annotations
@@ -79,9 +79,6 @@ class GraphExplicitConstructionOutput(ContractModel):
     graph: SimpleUndirectedGraph
     order: StrictInt = Field(ge=0, le=256)
     size: StrictInt = Field(ge=0, le=32640)
-    canonicalization: Literal["SORTED_VERTICES_ASCENDING_ENDPOINT_EDGES"] = (
-        "SORTED_VERTICES_ASCENDING_ENDPOINT_EDGES"
-    )
 
 
 class GraphCompositionRequest(ContractModel):

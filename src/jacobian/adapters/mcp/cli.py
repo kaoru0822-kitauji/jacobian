@@ -121,7 +121,7 @@ def main() -> None:
         parser.error("--anonymous-tenant-id requires --allow-anonymous")
     args.path = args.path if args.path.startswith("/") else f"/{args.path}"
 
-    from jacobian.adapters.mcp.server import create_server
+    from jacobian.adapters.mcp.server import create_remote_server, create_server
     from jacobian.capability_service import CapabilityPolicy
 
     capability_policy = CapabilityPolicy(
@@ -172,9 +172,8 @@ def main() -> None:
             resource_server_url=AnyHttpUrl(f"{public_base_url}{args.path}"),
             required_scopes=["jacobian:use"],
         )
-    server = create_server(
+    server = create_remote_server(
         state_dir=args.state_dir,
-        tenant_isolation=True,
         allow_anonymous=args.allow_anonymous,
         anonymous_tenant_id=args.anonymous_tenant_id,
         token_verifier=token_verifier,

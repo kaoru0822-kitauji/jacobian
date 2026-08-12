@@ -8,7 +8,6 @@ from pydantic import ConfigDict, Field, model_validator
 from tests.support.services import DomainTestServices, open_domain_services
 
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityDiagnostic,
     CapabilityRequest,
 )
@@ -18,6 +17,7 @@ from jacobian.operation_bindings import (
     inline_operation,
 )
 from jacobian.operation_installation import OperationInstaller
+from jacobian.operation_ports import InputPort, OutputPort
 from jacobian.operations import (
     DomainBundle,
     DomainDiagnostics,
@@ -64,6 +64,10 @@ class _SyntheticResult(ContractModel):
 
 class _SyntheticPreview(ContractModel):
     summary: str
+
+
+class _ComposedRequest(ContractModel):
+    source: _SyntheticResult
 
 
 class _SchemaDiscoveryOnlyRequest(ContractModel):
@@ -126,11 +130,7 @@ def _synthetic_bundle() -> DomainBundle:
 
 
 def _install(runtime: DomainTestServices, bundle: DomainBundle) -> None:
-    installation = OperationInstaller(
-        runtime.core.store,
-        runtime.core.schemas,
-        runtime.core.artifacts,
-    ).install(bundle)
+    installation = runtime.core.operations.install(bundle)
     for adapter in installation.adapters:
         runtime.core.capabilities.register(adapter)
 
@@ -149,6 +149,7 @@ def test_synthetic_bundle_returns_an_inline_typed_result(
     assert descriptor.input_schema["additionalProperties"] is False
     result_schema = descriptor.output_schema["properties"]["result"]
     assert result_schema == {"$ref": "#/$defs/_SyntheticResult"}
+    assert "value_refs" not in descriptor.output_schema["properties"]
 
     result = operation_services.core.capabilities.invoke(
         CapabilityRequest(
@@ -159,10 +160,161 @@ def test_synthetic_bundle_returns_an_inline_typed_result(
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.output["result"] == {"doubled": 12}
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.artifact_uris == ()
-    assert result.relationships == ()
-    assert result.scope is None
+
+
+def test_declared_ports_publish_and_resolve_one_opaque_typed_value(
+    operation_services,
+) -> None:
+    bundle = _synthetic_bundle()
+    producer = inline_operation(
+        replace(
+            bundle.capabilities[0].spec,
+            operation_id="synthetic.compute.produce_double",
+        ),
+        output_ports=(OutputPort(name="value", value_type=_SyntheticResult),),
+    )
+    consumer = inline_operation(
+        OperationSpec(
+            operation_id="synthetic.compute.increment",
+            version="2",
+            title="Increment a typed synthetic value",
+            description="Consume one exact value reference without JSON rewriting.",
+            request_type=_ComposedRequest,
+            result_type=_SyntheticResult,
+            execute=lambda request: _SyntheticResult(
+                doubled=request.source.doubled + 1
+            ),
+        ),
+        input_ports=(
+            InputPort(
+                name="source",
+                value_type=_SyntheticResult,
+                request_field="source",
+            ),
+        ),
+    )
+    _install(
+        operation_services,
+        replace(bundle, capabilities=(producer, consumer)),
+    )
+
+    descriptors = {
+        descriptor.capability_id: descriptor
+        for descriptor in operation_services.core.capabilities.catalog().capabilities
+    }
+    assert descriptors[producer.spec.operation_id].output_ports[0].model_dump() == {
+        "name": "value",
+        "value_type": "_SyntheticResult",
+    }
+    assert descriptors[consumer.spec.operation_id].input_ports[0].model_dump() == {
+        "name": "source",
+        "value_type": "_SyntheticResult",
+    }
+
+    produced = operation_services.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id=producer.spec.operation_id,
+            input={"value": 6},
+        )
+    )
+    value_ref = produced.output["value_refs"]["value"]
+    stored = operation_services.core.values.inspect(value_ref)
+    assert stored.source_operation_id == producer.spec.operation_id
+    assert stored.source_operation_version == producer.spec.version
+    assert stored.source_port == "value"
+    assert stored.digest.startswith("sha256:")
+
+    consumed = operation_services.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id=consumer.spec.operation_id,
+            input={},
+            inputs={"source": value_ref},
+        )
+    )
+
+    assert consumed.execution.status is ExecutionStatus.COMPLETED
+    assert consumed.output["result"] == {"doubled": 13}
+
+
+def test_operation_without_input_ports_rejects_value_references(
+    operation_services,
+) -> None:
+    bundle = _synthetic_bundle()
+    _install(operation_services, bundle)
+
+    result = operation_services.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id=bundle.capabilities[0].spec.operation_id,
+            input={"value": 2},
+            inputs={"undeclared": "value://AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "INVALID_REQUEST"
+    assert result.diagnostics[0].path == "inputs"
+    assert result.diagnostics[0].details["unknown_input_ports"] == ["undeclared"]
+
+
+def test_value_reference_binding_rejects_unknown_ports_and_payload_conflicts(
+    operation_services,
+) -> None:
+    bundle = _synthetic_bundle()
+    producer = inline_operation(
+        replace(
+            bundle.capabilities[0].spec,
+            operation_id="synthetic.compute.produce_for_rejection",
+        ),
+        output_ports=(OutputPort(name="value", value_type=_SyntheticResult),),
+    )
+    consumer = inline_operation(
+        OperationSpec(
+            operation_id="synthetic.compute.consume_for_rejection",
+            version="2",
+            title="Consume a synthetic value",
+            description="Exercise fail-closed typed value binding.",
+            request_type=_ComposedRequest,
+            result_type=_SyntheticResult,
+            execute=lambda request: request.source,
+        ),
+        input_ports=(
+            InputPort(
+                name="source",
+                value_type=_SyntheticResult,
+                request_field="source",
+            ),
+        ),
+    )
+    _install(
+        operation_services,
+        replace(bundle, capabilities=(producer, consumer)),
+    )
+    produced = operation_services.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id=producer.spec.operation_id,
+            input={"value": 2},
+        )
+    )
+    value_ref = produced.output["value_refs"]["value"]
+
+    unknown_port = operation_services.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id=consumer.spec.operation_id,
+            input={},
+            inputs={"other": value_ref},
+        )
+    )
+    assert unknown_port.diagnostics[0].code == "UNKNOWN_INPUT_PORT"
+
+    conflicting_payload = operation_services.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id=consumer.spec.operation_id,
+            input={"source": {"doubled": 99}},
+            inputs={"source": value_ref},
+        )
+    )
+    assert conflicting_payload.diagnostics[0].code == "INCOMPATIBLE_VALUE_REFERENCE"
 
 
 def test_operation_uses_one_typed_parse_not_its_discovery_schema(
@@ -311,7 +463,6 @@ def test_materialized_operation_retains_artifacts_lineage_and_typed_preview(
     )
 
     assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert len(result.artifact_uris) == 2
     input_uri, result_uri = result.artifact_uris
     assert result.output["input_uri"] == input_uri
@@ -319,13 +470,11 @@ def test_materialized_operation_retains_artifacts_lineage_and_typed_preview(
     assert result.output["backend_version"] == "synthetic-1"
     assert result.output["preview"] == {"summary": "doubled=12"}
     assert result.output["preview_complete"] is True
-    assert result.scope is None
     input_artifact = operation_services.core.store.get(input_uri)
     output_artifact = operation_services.core.store.get(result_uri)
     assert input_artifact.payload == {"value": 6}
     assert output_artifact.payload == {"doubled": 12}
     assert output_artifact.manifest.parents == (input_uri,)
-    assert result.relationships == ()
 
 
 def test_catalog_effect_comes_from_operation_spec(
@@ -497,7 +646,6 @@ def test_computed_adapter_preserves_operational_failure_status(
 
         assert result.execution.status is status
         assert result.diagnostics == (diagnostic,), status
-        assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC, status
         assert result.artifact_uris == (), status
 
 

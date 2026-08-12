@@ -8,9 +8,6 @@ from tests.boundary.providers.external_sat.external_sat_support import (
 )
 from tests.support.capabilities import invoke_capability as _invoke
 
-from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
-)
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.contracts.sat import SatProofArtifact
 from jacobian.providers.external_solver_runtime import (
@@ -73,7 +70,7 @@ def test_cadical_text_proof_replays_in_pinned_drat_trim(
         assert verified.execution.status is ExecutionStatus.COMPLETED
         assert verified.output["status"] == "VERIFIED_UNSAT"
         assert verified.output["conclusion"] == "TRUE"
-        assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
+        assert verified.verification_record_uri is not None
 
         stored_proof = SatProofArtifact.model_validate(
             runtime.core.store.get(proof_uri).payload
@@ -91,7 +88,7 @@ def test_cadical_text_proof_replays_in_pinned_drat_trim(
         )
         assert rejected.output["status"] == "REJECTED"
         assert rejected.output["conclusion"] == "UNKNOWN"
-        assert rejected.assurance.verification_record_uri is None
+        assert rejected.verification_record_uri is None
 
         raw_proof = stored_proof.raw_bytes()
         assert raw_proof.endswith(b"0\n")
@@ -108,7 +105,7 @@ def test_cadical_text_proof_replays_in_pinned_drat_trim(
         )
         assert unsupported_replay.output["status"] == "REJECTED"
         assert unsupported_replay.output["conclusion"] == "UNKNOWN"
-        assert unsupported_replay.assurance.verification_record_uri is None
+        assert unsupported_replay.verification_record_uri is None
 
         concatenated_proof = runtime.core.sat.put_proof(
             cnf_uri=cnf.artifact_uri,
@@ -123,7 +120,7 @@ def test_cadical_text_proof_replays_in_pinned_drat_trim(
         )
         assert concatenated_replay.output["status"] == "REJECTED"
         assert concatenated_replay.output["conclusion"] == "UNKNOWN"
-        assert concatenated_replay.assurance.verification_record_uri is None
+        assert concatenated_replay.verification_record_uri is None
 
         satisfiable = runtime.core.sat.put_cnf(
             variable_names=("x",),
@@ -142,4 +139,4 @@ def test_cadical_text_proof_replays_in_pinned_drat_trim(
         )
         assert cross_replay.output["status"] == "REJECTED"
         assert cross_replay.output["conclusion"] == "UNKNOWN"
-        assert cross_replay.assurance.verification_record_uri is None
+        assert cross_replay.verification_record_uri is None

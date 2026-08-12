@@ -24,12 +24,29 @@ jacobian/math/matrices/
     values.py
     operations.py
     _sympy.py
+
+jacobian/math/finite_fields/
+    __init__.py
+    values.py
+    operations.py
+    _sympy.py
+    _flint.py
 ```
 
 Public packages declare explicit `__all__` values. Value modules import no
 provider, runtime, storage, MCP, operation installation, publication, or
 checker-authority code. Private backend modules may import maintained
 third-party mathematics and remain lazy when the provider is optional.
+They stay small: backend calls, exact conversions, and backend-specific
+normalization belong there, but generic adapters, mirrored backend APIs, and a
+second wrapper type system do not. Public functions validate the documented
+semantic contract and delegate to these maintained libraries.
+
+**Wrap semantic contracts, not entire libraries.** Add a private backend
+boundary only when Jacobian must preserve semantics, convert exact values,
+normalize results, isolate an optional import, or contain a backend-specific
+quirk. A stable backend call that needs none of those may remain a direct call;
+do not reproduce a maintained library's API under Jacobian names.
 
 The cross-domain `jacobian.contracts` package is limited to passive primitives:
 digests, nominal reference identifiers, exact scalars, common bounded
@@ -129,20 +146,20 @@ output, publication, replay, and aggregate allocation estimates where those are
 known without executing the operation.
 
 A request-to-result postcondition runs before anything is exposed. Failure
-publishes no value reference, artifact, or assurance.
+publishes no value reference, artifact, or verification record.
 
 Legacy envelope metadata is not part of `OperationSpec`. In particular, an
-ordinary operation does not configure generic assurance, completeness, scope,
-relationships, or obligations. Any temporary v2 response label is an outward
-compatibility projection and carries no mathematical or verification
-authority.
+ordinary operation does not configure generic completeness, scope,
+relationships, or obligations. A v2 result carries a `verification_record_uri`
+only when an independent checker accepted the result; that pointer carries no
+mathematical or verification authority beyond the record it identifies.
 
 ## Bounded searches
 
 A retained bounded search is an ordinary `OperationSpec`. Its domain-owned
 result records the facts callers need—for example `EXACT`, `INCOMPLETE`, or
 `UNKNOWN`, the admitted bounds, and any witness. It does not acquire generic
-scope, completeness, relationship, obligation, or assurance wrappers.
+scope, completeness, relationship, or obligation wrappers.
 
 `Completed` means the bounded computation returned a valid typed result; it
 does not imply exactness unless that result says so. Timeout, cancellation,

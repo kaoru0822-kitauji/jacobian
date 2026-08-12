@@ -11,7 +11,6 @@ from tests.boundary.providers.external_sat.external_sat_support import (
 from tests.support.provider_external_sat import external_sat_toolchain_available
 
 from jacobian.contracts.capabilities import (
-    CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
@@ -96,9 +95,8 @@ def test_sat_public_reproductions_reach_checker_bound_results(
                 )
             )
             assert verified.execution.status is ExecutionStatus.COMPLETED
-            assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
             assert verified.output["conclusion"] == "TRUE"
             assert verified.output["cnf_uri"] == cnf.artifact_uri
             assert verified.output[evidence_field] == evidence_uri
-            assert verified.assurance.verification_record_uri is not None
+            assert verified.verification_record_uri is not None
             assert case["required_capabilities"] == [find_id, verify_id]
