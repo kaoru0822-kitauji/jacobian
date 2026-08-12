@@ -74,9 +74,37 @@ def test_resolve_rejects_a_missing_packaged_python_backend(
 
     with pytest.raises(
         ProviderRuntimeError,
-        match=r"required Python provider jacobian\.networkx is unavailable",
+        match=r"required Python providers are unavailable: jacobian\.networkx",
     ):
         ProviderAvailabilityResolver().resolve()
+
+
+def test_packaged_backend_failure_reports_every_broken_provider() -> None:
+    missing = CapabilityProviderRuntime(
+        provider="jacobian.networkx",
+        availability=CapabilityProviderAvailability.UNAVAILABLE,
+        platform="test-platform",
+        install_tier=CapabilityInstallTier.T0,
+        license_id="BSD-3-Clause",
+        diagnostic="NetworkX is missing",
+    )
+    skewed = CapabilityProviderRuntime(
+        provider="jacobian.sympy",
+        availability=CapabilityProviderAvailability.UNAVAILABLE,
+        platform="test-platform",
+        install_tier=CapabilityInstallTier.T0,
+        license_id="BSD-3-Clause",
+        diagnostic="SymPy version does not match the pin",
+    )
+
+    with pytest.raises(ProviderRuntimeError) as raised:
+        provider_resolution._require_packaged_python_backends((missing, skewed))
+
+    assert str(raised.value) == (
+        "required Python providers are unavailable: "
+        "jacobian.networkx: NetworkX is missing; "
+        "jacobian.sympy: SymPy version does not match the pin"
+    )
 
 
 def test_lean_resolution_preserves_installed_checker_profile_inputs(

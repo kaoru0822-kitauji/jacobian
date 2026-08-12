@@ -314,6 +314,6 @@ def test_runtime_rejects_a_base_installation_without_cvc5(
 
     with pytest.raises(
         ProviderRuntimeError,
-        match="required Python provider cvc5 is unavailable",
+        match="required Python providers are unavailable: cvc5",
     ):
         create_runtime(tmp_path)

@@ -91,11 +91,18 @@ def _require_packaged_python_backends(
 ) -> None:
     """Reject an incomplete or version-skewed base installation."""
 
+    failures: dict[str, str] = {}
     for runtime in runtimes:
         if runtime.availability is CapabilityProviderAvailability.AVAILABLE:
             continue
         detail = runtime.diagnostic or "the pinned runtime identity is unavailable"
-        raise ProviderRuntimeError(
-            f"required Python provider {runtime.provider} is unavailable: {detail}",
-            code=ProviderRuntimeErrorCode.UNAVAILABLE,
-        )
+        failures.setdefault(runtime.provider, detail[:256])
+    if not failures:
+        return
+    diagnostic = "; ".join(
+        f"{provider}: {detail}" for provider, detail in failures.items()
+    )
+    raise ProviderRuntimeError(
+        f"required Python providers are unavailable: {diagnostic}",
+        code=ProviderRuntimeErrorCode.UNAVAILABLE,
+    )
