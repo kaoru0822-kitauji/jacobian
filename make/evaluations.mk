@@ -1,4 +1,4 @@
-.PHONY: agent-eval agent-eval-validate agent-eval-compare codex-visibility codex-tool-context provider-eval
+.PHONY: agent-eval agent-eval-validate agent-eval-compare codex-visibility codex-tool-context provider-eval trajectory-information trajectory-information-analyze
 
 JACOBIAN_ENABLED ?= 1
 ifneq ($(filter 0 1,$(JACOBIAN_ENABLED)),$(JACOBIAN_ENABLED))
@@ -136,3 +136,22 @@ provider-eval: ## Run pinned provider feasibility jobs (PROVIDER=cddlib|cgal|gud
 		-p benchmarks/datasets/provider-feasibility-v1 \
 		--include-task-name "$(PROVIDER)" \
 		$(EVAL_ARGS)
+
+TRAJECTORY_INFORMATION_CONFIG ?= benchmarks/config/trajectory-information-v1.json
+
+trajectory-information: ## Run bounded trajectory collection (TRAJECTORY_OUTPUT=..., TRAJECTORY_EXECUTE=1).
+	@set -e; \
+	if [ "$(TRAJECTORY_EXECUTE)" != "1" ]; then \
+		echo "Model execution is opt-in. Set TRAJECTORY_EXECUTE=1 after reviewing $(TRAJECTORY_INFORMATION_CONFIG)."; \
+		exit 0; \
+	fi; \
+	test -n "$(TRAJECTORY_OUTPUT)" || { echo "TRAJECTORY_OUTPUT is required" >&2; exit 2; }; \
+	$(UV_RUN) python -m benchmarks.tooling.trajectory_information run \
+		--config "$(TRAJECTORY_INFORMATION_CONFIG)" --output "$(TRAJECTORY_OUTPUT)" \
+		--execute $(if $(TRAJECTORY_TASK),--task "$(TRAJECTORY_TASK)",)
+
+trajectory-information-analyze: ## Analyze bound trajectory records (TRAJECTORY_RESULTS=..., TRAJECTORY_REPORT=...).
+	@test -n "$(TRAJECTORY_RESULTS)" -a -n "$(TRAJECTORY_REPORT)" || { echo "TRAJECTORY_RESULTS and TRAJECTORY_REPORT are required" >&2; exit 2; }
+	$(UV_RUN) python -m benchmarks.tooling.trajectory_information analyze \
+		--config "$(TRAJECTORY_INFORMATION_CONFIG)" --results "$(TRAJECTORY_RESULTS)" \
+		--output "$(TRAJECTORY_REPORT)"

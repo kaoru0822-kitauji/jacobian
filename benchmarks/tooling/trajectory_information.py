@@ -15,8 +15,8 @@ import math
 import re
 import shutil
 import socket
-import subprocess
 import sys
+import threading
 import time
 from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
@@ -27,11 +27,14 @@ from random import Random
 from typing import Any
 
 from benchmarks.tooling.command_runner import (
+    ToolCommandRequest,
+    ToolCommandResult,
     ToolCommandStatus,
     git_head_sha,
     git_tracked_worktree_is_clean,
     operator_environment,
     run_operator_command,
+    run_tool_command,
 )
 from benchmarks.tooling.errors import HarborSuiteError
 from benchmarks.tooling.harbor_suite import ROOT, get_suite, task_digest
@@ -188,11 +191,24 @@ def _free_port() -> int:
         return int(sock.getsockname()[1])
 
 
-def _wait_for_port(port: int, process: subprocess.Popen[bytes]) -> None:
+def _run_server_command(
+    request: ToolCommandRequest, results: list[ToolCommandResult]
+) -> None:
+    results.append(run_tool_command(request))
+
+
+def _wait_for_port(
+    port: int,
+    worker: threading.Thread,
+    results: Sequence[ToolCommandResult],
+) -> None:
     deadline = time.monotonic() + 120
     while time.monotonic() < deadline:
-        if process.poll() is not None:
-            raise HarborSuiteError("Jacobian MCP server exited during startup")
+        if not worker.is_alive():
+            status = results[0].status if results else "UNKNOWN"
+            raise HarborSuiteError(
+                f"Jacobian MCP server exited during startup: {status}"
+            )
         try:
             with socket.create_connection(("127.0.0.1", port), timeout=0.2):
                 return
@@ -283,17 +299,31 @@ def _run_trial(
     )
     started = time.monotonic()
     with server_stdout.open("wb") as stdout_handle, server_log.open("wb") as log_handle:
-        server = subprocess.Popen(
-            _server_command(state_dir=state_dir, port=port, trial_id=trial_id),
-            cwd=ROOT,
-            env=server_environment,
-            stdin=subprocess.DEVNULL,
-            stdout=stdout_handle,
-            stderr=log_handle,
-            start_new_session=True,
+        server_command = _server_command(
+            state_dir=state_dir, port=port, trial_id=trial_id
         )
+        server_cancel = threading.Event()
+        server_results: list[ToolCommandResult] = []
+        server_request = ToolCommandRequest(
+            executable=server_command[0],
+            arguments=server_command[1:],
+            environment=server_environment,
+            cwd=str(ROOT),
+            timeout_seconds=float(config["runtime"]["task_timeout_seconds"]) + 180,
+            stdout_limit_bytes=8 * 1024 * 1024,
+            stderr_limit_bytes=32 * 1024 * 1024,
+            cancellation_event=server_cancel,
+            stdout_sink=stdout_handle.write,
+            stderr_sink=log_handle.write,
+        )
+        server_worker = threading.Thread(
+            target=_run_server_command,
+            args=(server_request, server_results),
+            daemon=True,
+        )
+        server_worker.start()
         try:
-            _wait_for_port(port, server)
+            _wait_for_port(port, server_worker, server_results)
             runtime = config["runtime"]
             environment = dict(
                 operator_environment(
@@ -332,13 +362,24 @@ def _run_trial(
                 environment=environment,
             )
         finally:
-            if server.poll() is None:
-                server.terminate()
-                try:
-                    server.wait(timeout=20)
-                except subprocess.TimeoutExpired:
-                    server.kill()
-                    server.wait(timeout=10)
+            server_cancel.set()
+            server_worker.join(timeout=30)
+            if server_worker.is_alive():
+                raise HarborSuiteError(
+                    "Jacobian MCP server did not stop within the tooling deadline"
+                )
+            if not server_results:
+                raise HarborSuiteError("Jacobian MCP server produced no command result")
+            server_result = server_results[0]
+            if server_result.status not in {
+                ToolCommandStatus.CANCELLED,
+                ToolCommandStatus.EXITED,
+            }:
+                raise HarborSuiteError(
+                    f"Jacobian MCP server ended with {server_result.status}"
+                )
+            if server_result.stdout_exceeded or server_result.stderr_exceeded:
+                raise HarborSuiteError("Jacobian MCP server output exceeded its bound")
     transcript = trial / "codex.jsonl"
     stderr = trial / "codex.stderr"
     transcript.write_bytes(result.stdout)

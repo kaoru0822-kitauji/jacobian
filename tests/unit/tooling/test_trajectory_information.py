@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 from benchmarks.tooling import trajectory_information as study
+
+REPOSITORY_ROOT = Path(__file__).parents[3]
 
 
 def _event(item: dict[str, object]) -> str:
@@ -192,3 +195,28 @@ def test_macro_f1(
     )
 
     assert metrics["macro_f1"] == pytest.approx(expected)
+
+
+def test_committed_report_is_bounded_and_noncausal() -> None:
+    report_path = (
+        REPOSITORY_ROOT
+        / "benchmarks/evidence/observable-trajectory-information-v1/report.json"
+    )
+    report = json.loads(report_path.read_text())
+
+    assert report["study_id"] == "observable-trajectory-information-v1"
+    assert report["dataset"]["completed_trial_count"] == 12
+    assert report["analysis"] == {
+        "held_out": False,
+        "metric_semantics": (
+            "Transductive exact-signature purity over fixed corpus-independent "
+            "presence bins; descriptive only."
+        ),
+        "mode": "FROZEN_SIMPLEST_DEFENSIBLE_FALLBACK",
+        "transductive": True,
+    }
+    assert report["decision"] == "INCONCLUSIVE_RESEARCH_ONLY"
+    assert report["causal_claim_authorized"] is False
+    assert report["retention"]["publish_hidden_reasoning"] is False
+    assert report["retention"]["publish_agent_messages"] is False
+    assert report["retention"]["publish_tool_arguments_or_results"] is False

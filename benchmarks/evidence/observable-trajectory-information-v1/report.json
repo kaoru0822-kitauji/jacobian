@@ -1,0 +1,2779 @@
+{
+  "analysis": {
+    "held_out": false,
+    "metric_semantics": "Transductive exact-signature purity over fixed corpus-independent presence bins; descriptive only.",
+    "mode": "FROZEN_SIMPLEST_DEFENSIBLE_FALLBACK",
+    "transductive": true
+  },
+  "causal_claim_authorized": false,
+  "collector_sha256": "sha256:f9f647db183248ff3e8b93db20fcaf0c4de8364fe1160487ed51195e130f21d9",
+  "config_sha256": "sha256:b999f7a02e74e273cdc9eb80a18e08b63823355dccedbd230987a0ba757eeed9",
+  "dataset": {
+    "completed_trial_count": 12,
+    "eligible": true,
+    "no_run_or_failed_run_trajectory_count": 10,
+    "server_tool_trajectory_count": 8,
+    "trial_count": 12
+  },
+  "decision": "INCONCLUSIVE_RESEARCH_ONLY",
+  "decision_reasons": [
+    "Two pre-analysis execution approaches failed: loopback proxy leakage, then an unbound collector revision.",
+    "The frozen fallback permits deterministic descriptive condition coverage and exact contingency tables, not a production data-minimization decision."
+  ],
+  "diagnostics": {
+    "checker_rejection_recovery": {
+      "baselines": {
+        "global_majority_loto": {
+          "accuracy": 0.9166666666666666,
+          "balanced_accuracy": 0.5,
+          "macro_f1": 0.4782608695652174
+        },
+        "task_identity_resubstitution_upper_bound": {
+          "accuracy": 1.0,
+          "balanced_accuracy": 1.0,
+          "macro_f1": 1.0
+        }
+      },
+      "class_counts": {
+        "NO_CHECKER": 11,
+        "SUCCESS_WITHOUT_REJECTION": 1
+      },
+      "conditions": {
+        "x+y": {
+          "accuracy": 1.0,
+          "balanced_accuracy": 1.0,
+          "macro_f1": 1.0
+        },
+        "x+y+b": {
+          "accuracy": 1.0,
+          "balanced_accuracy": 1.0,
+          "macro_f1": 1.0
+        },
+        "x+y+b+tau_tools": {
+          "accuracy": 1.0,
+          "balanced_accuracy": 1.0,
+          "macro_f1": 1.0
+        },
+        "x+y+tau_tools": {
+          "accuracy": 1.0,
+          "balanced_accuracy": 1.0,
+          "macro_f1": 1.0
+        }
+      },
+      "eligible": true,
+      "exact_contingencies": {
+        "x+y": [
+          {
+            "label_counts": {
+              "NO_CHECKER": 3
+            },
+            "row_count": 3,
+            "signature_digest": "sha256:01beae57636cde72e975d561df8dcc9cc6e36292d22c1f982724f08eb99ec74a",
+            "task_count": 3
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:58952d4d00e2bd4604dcc9f9c69399cc1dc12f0acbee5a0eeae8a465aafe3797",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:71fd04f49c7d500b5965e8692222f4dfae6076345242c9fa7a3b5d0f026bcb01",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 2
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:9f5129c4d392e6bee7814cc11e8d87ae22e8fa518356bc954e9ca5dbfde3f56a",
+            "task_count": 2
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 2
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:a02072e82052f0049748782ec90501cb43efd2342d20d627f75977efebe62d2c",
+            "task_count": 2
+          },
+          {
+            "label_counts": {
+              "SUCCESS_WITHOUT_REJECTION": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:b4faa9b58d40c30823a3bd6d1d39eaaa2e858d50ad3ccf32eb0bf161c71f4097",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 2
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:cd5f9ce14ed373e75d013d3810058c03c3a992a66f32cd2e9cf9239305978bf0",
+            "task_count": 2
+          }
+        ],
+        "x+y+b": [
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:0bd6e83308504f016230d673e386afa7afe7dc33297611f52f080004f0dc2f29",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:1e19d0360a984a4dc69923176fc9344139a0e92bc6fc86e38391fdf7c8778981",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:33878bfaf4f0c4e6223062d24eb5a395b1fa36436d342445daa39d2f5c304987",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:4d18dea4e2de0ecf7d50c4f1c2a88938dc80ef7adf1e764c1bb36ff158bb8227",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "SUCCESS_WITHOUT_REJECTION": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:647b5cfc658a26f6e13a4e094fc7eba86591ec76a5c3cf5866eaf64140dbe46b",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:a435dc457f43ac100b8c627033263e6d70001c5043f7d61b7afc4d41d1085d1c",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:a902e0891dd16d2ef3a67b134af595f2c9ed359e7af7e7d6a51fa978d875716b",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:bc999657ea596b04694aaf80ee3f8e3ad1ccc3f2e3da058d4e6870f2af4ea205",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:c07613c573c6bce02f9fdf8c11a3d0299881d7f546c50080a680fdbf1bc671ef",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:db792991d5c08e6a0f246061b1e166ef1fc943d856b5f6cc7ba73dea13469924",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:ea43cc9feba84ab55d90f59af228d5405a5acbeb9973ad2124c5e13cad8880f7",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:f2bb4bd6341ea59db6b44a9ead8e8729d0d2db317bfa921c01abb6edbf7038f0",
+            "task_count": 1
+          }
+        ],
+        "x+y+b+tau_tools": [
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:11459a5528062c7e41be6bc999eeece40d0a2b3e7c80e8ee63859042b6b3d803",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:147efa23554c49f8eba2197ad010e8a18814915097691d0c05a036ffdeaea518",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:23c5030f745a05ef70637e758fec2141eed2c504a30b80a23ec17dcd7e4caead",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:54b77e4b6137d865f49ff1afa9aeb8f70a8993eca32b40958927c549f784f9fb",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:635418eafe679d7c60ee2bd6f8c6ddc41057eb2ce1e412e0791e9fda115d8e9d",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:75508fbd1591b1527e98bce521055da11782c957d1dc772cba8ca7a2ea4cb7bf",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "SUCCESS_WITHOUT_REJECTION": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:79a43b0ba907e170e919baff52d3ecb5c4b02c5054f83d6aff20404bfcee674e",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:7d37c02fb344e7e98b0d6c5b1fabf5f3a582a8fc863916b37a752b2434a7b31c",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:de4ee3111e905e709ff8aa58649bef7b64032f8b4d378a0ec1be73c1129cb5d7",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:e1cad6a109e787e6a7dd655816813e1edced5a2df1ce09a75a09b395c5facf0b",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:edc102b911958af655444eb8017f81f10cdd16c2ee8eab875fd2070bc29fe5d7",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:f95479b6eda68ca9de01df63185907b981697ef138b65408b62a471a18b68c0b",
+            "task_count": 1
+          }
+        ],
+        "x+y+tau_tools": [
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:23131f0fb8e32c548ab0d7cdb686984978e4412ac5759a1bfd2f13e94c35170d",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:53d9ad279ab8a4e15f4c10ef92dad0754132076176c772c59d2e484085a871fb",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:6118c4700a73c5f597312e6d273628e229462e34291fe7622fc42b20f985c966",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:76cb0f4231082aac7a0246d979b0d0fccc2c2cfec089eb08d125bb4a0a667cce",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 2
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:7df02291c17e28de2ac9015d751d36675c262621a794787ca9b7df15f70add6d",
+            "task_count": 2
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 2
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:884939c2fe8634c52b4a8e54af76114d16c503c298839ddf6ae3d0ec22dba0aa",
+            "task_count": 2
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:bc07645a45c29c3d866732c8f8d4d1c83e3af23f1eee74ab68dbaff432959710",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:c1f5e42856934161264be51db9de5be180890534835e8b0911b7271b4b1d2c8f",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "SUCCESS_WITHOUT_REJECTION": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:cfe7b4dabacdc41c016a8c378b71c41cf2cca18969cf2c707dd3c77a13975323",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:f6340639f330dd08cb868a6a7c7f1d9d2d66bce895a8c73a0b795082db999cc5",
+            "task_count": 1
+          }
+        ]
+      },
+      "row_count": 12,
+      "task_count": 12
+    },
+    "mathematical_milestone": {
+      "baselines": {
+        "global_majority_loto": {
+          "accuracy": 0.6666666666666666,
+          "balanced_accuracy": 0.5,
+          "macro_f1": 0.4
+        },
+        "task_identity_resubstitution_upper_bound": {
+          "accuracy": 1.0,
+          "balanced_accuracy": 1.0,
+          "macro_f1": 1.0
+        }
+      },
+      "class_counts": {
+        "NOT_REACHED": 4,
+        "REACHED": 8
+      },
+      "conditions": {
+        "x+y": {
+          "accuracy": 0.8333333333333334,
+          "balanced_accuracy": 0.875,
+          "macro_f1": 0.8285714285714285
+        },
+        "x+y+b": {
+          "accuracy": 1.0,
+          "balanced_accuracy": 1.0,
+          "macro_f1": 1.0
+        },
+        "x+y+b+tau_tools": {
+          "accuracy": 1.0,
+          "balanced_accuracy": 1.0,
+          "macro_f1": 1.0
+        },
+        "x+y+tau_tools": {
+          "accuracy": 0.9166666666666666,
+          "balanced_accuracy": 0.9375,
+          "macro_f1": 0.9111111111111112
+        }
+      },
+      "eligible": true,
+      "exact_contingencies": {
+        "x+y": [
+          {
+            "label_counts": {
+              "REACHED": 3
+            },
+            "row_count": 3,
+            "signature_digest": "sha256:0a6f7289624f7cd0f00e74ed5f0fd04552296f10b5167a3e7b1534b05a34b2f2",
+            "task_count": 3
+          },
+          {
+            "label_counts": {
+              "NOT_REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:579fec6097d2efb856b63e24abe0ef9406236d0bc9b08e204c5d6f8395667573",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:6440f70205677573fae259591df837a23690c921b508f36c18ae6d5ff4001ca9",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NOT_REACHED": 2,
+              "REACHED": 2
+            },
+            "row_count": 4,
+            "signature_digest": "sha256:96cd5254487cac90f29ee9dd03045ccef574430e14fce0eba36ad70832190c42",
+            "task_count": 4
+          },
+          {
+            "label_counts": {
+              "NOT_REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:c5b20d3e66b5f37a01fb0679575209db032647d01e3b156ac1c957b0a9919cb4",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "REACHED": 2
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:ee2a5842da44ef2b94ae04044f1d0d7b5bd53f473e4f848c91c09bbd459d89d4",
+            "task_count": 2
+          }
+        ],
+        "x+y+b": [
+          {
+            "label_counts": {
+              "REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:1886907fe286fa790c8902e5b700a101aac51f780d4bc5d75f2fc35e3c8a0d62",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:233e592d67f1eeefefed84ee8033b3f22dddd47365647519b61e8f301d8a3f50",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:275d014c9d501faf4a478b602dd26466dad2b907b5acd9ab8ac4944e5ce19cc3",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NOT_REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:296c2b8bfc0f11419236312c47c54d630609e03daaf223562e36e6c6fd2c851a",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:33e29d1a6f93cb65516ee6122a878f09a9d76f90fe6f329f2db64a5de8977e63",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NOT_REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:428e30ac0a35f6e547f44abc0d6a016068920aa123b17f27ea323b78e850b333",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:4d65daa96be3274e6dd29bd32bb335af78b09e04f77cf1bc259c8fde1a453da1",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NOT_REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:83e11a1e3c4a803548eb7bda948519d118cc5b491e1dd7693624680a1754320f",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:876dfe6b8a8c27e49953b8ce65ea489a26cef05853b16a11045caeabcf3caa60",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:8ed95c26c9126cf3a163ac35dbf97f5d5db0e3f21399a143d16d58149c6ce011",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:a3ec95208a4f8298edc73f5c17f85f17512dc27d3536387d1708d328270cfe9c",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NOT_REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:c02364a2361d5e34815c4f5396bc194a27c22001eae094cb6211b59b46cb0051",
+            "task_count": 1
+          }
+        ],
+        "x+y+b+tau_tools": [
+          {
+            "label_counts": {
+              "REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:1312ca118e9b461ae9a393d4852a9c92da0aced8c30866cfcbab75b93a8daf87",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NOT_REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:1cf49ab0f0e712f4aed4c467794fcca67ee2aaa94ab7e6564dcd6d298869ceff",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:2215c6e8d5f40602dd1e914ce2d8d91d9b6f7b53125460c45d31858a7281f304",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NOT_REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:2dedf610660762476bc4147ea24c694ca87c5f550db7bdde4b1b373a9ef28325",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:30d659736b93a4c481858aba85455bd1843809a5024cc174018210ceb4e0c360",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NOT_REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:3e7c27af5d7a33923a746c1224b68c0aff0d25e8a7dc4005e3113e492b760ae1",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:65db25516043cc29c6564b4a9b340e58f76bf89a2f8a6e132e9c17ceb32093be",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:a0684367fa68e632a3483df70e663bd2ae5bf85ffc909d6529d7bf8387d78954",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:b1d5a1d449cfe27b1fe5bb15c21f5d287ac22f64df24a60ec5a533449fdde4fa",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:d07eaca5db898363ebd85a15ee1390184fb108cadd3d152e2b24664aae1f8b65",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:eb0a161e726e24cfaeed7dd84ac8b43a4425a0ed6d4d45eb5ffe518fc0ebc111",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NOT_REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:f5a95cc26200d319faa3d8f79774dc037bb39b59ae32b9252f8e956065133dc1",
+            "task_count": 1
+          }
+        ],
+        "x+y+tau_tools": [
+          {
+            "label_counts": {
+              "REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:00ab04f6197cb299fd72a4af76b2d6a61ed3d1142c68c756566d1b4f312b6289",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:0ab883d6c35161d509356e66974c52bf2441ffe64f6e5fa5d9e09b59da738ef4",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "REACHED": 2
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:1eb04c6b70bd9fc1f84f0d2e6cf3a58b03fa5d7236665afdf1a789451b7d0510",
+            "task_count": 2
+          },
+          {
+            "label_counts": {
+              "NOT_REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:258d16e146d940849d88e32f8f1bce2c25a21cc4b5a9dabcae74838b1f6e2184",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NOT_REACHED": 2,
+              "REACHED": 1
+            },
+            "row_count": 3,
+            "signature_digest": "sha256:7e986ff83e2391bb8f1e7d67ea1b7a15a6d4b82b9b59fdeb83ad45a86d81564c",
+            "task_count": 3
+          },
+          {
+            "label_counts": {
+              "NOT_REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:8a57e0b4fda972343b447778851b2ac7efb15f1041ff47648d00cbd26bac3045",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:97f1341661ba4f299c5aff96d3cc5db96f084dd2ac919aa995734d64afdf0aab",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:b764dbc638649ef6ae781397ef543f8cb3dd76c4a97461e117cff6a78f574978",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "REACHED": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:db09d7893f424fca57589cb0afa8ad3bc34f9dcd33a4fa3b1e69b2a8e17102a1",
+            "task_count": 1
+          }
+        ]
+      },
+      "row_count": 12,
+      "task_count": 12
+    },
+    "next_tool_action_class": {
+      "baselines": {
+        "global_majority_loto": {
+          "accuracy": 0.45454545454545453,
+          "balanced_accuracy": 0.25,
+          "macro_f1": 0.15625
+        },
+        "task_identity_resubstitution_upper_bound": {
+          "accuracy": 0.6060606060606061,
+          "balanced_accuracy": 0.48333333333333334,
+          "macro_f1": 0.4455128205128205
+        }
+      },
+      "class_counts": {
+        "FIND": 15,
+        "RUN_CHECKER": 1,
+        "RUN_PRODUCER": 5,
+        "TERMINAL": 12
+      },
+      "conditions": {
+        "x+y": {
+          "accuracy": 0.7272727272727273,
+          "balanced_accuracy": 0.5291666666666667,
+          "macro_f1": 0.5361111111111111
+        },
+        "x+y+b": {
+          "accuracy": 0.8787878787878788,
+          "balanced_accuracy": 0.6291666666666667,
+          "macro_f1": 0.6472186700767263
+        },
+        "x+y+b+tau_tools": {
+          "accuracy": 1.0,
+          "balanced_accuracy": 1.0,
+          "macro_f1": 1.0
+        },
+        "x+y+tau_tools": {
+          "accuracy": 0.9090909090909091,
+          "balanced_accuracy": 0.9416666666666667,
+          "macro_f1": 0.9431977559607293
+        }
+      },
+      "eligible": true,
+      "exact_contingencies": {
+        "x+y": [
+          {
+            "label_counts": {
+              "TERMINAL": 2
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:123dbea275370f90aba66f2ef9097b965031aaa4df070192cf918a6121cfabfb",
+            "task_count": 2
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:182b760797e8926b1f0af2fe7c579daaee299e9dfcc1f6fcbfab2b63704b5267",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:28f01beabfbcc4ec606b6ce2d4d0306050ae10cc91cc08efa2c2f4241acee62f",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1,
+              "TERMINAL": 1
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:394ddead3b877b83c3d0621f212dafbd89a1cf368ab2061f81df5612f33c21ac",
+            "task_count": 2
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:4371d26321d4f52e229e2e6e5aa715c1f6fe56b504afdfe6d0a0120ca6595b42",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:55ae859e9e8bd5f33ade8f944aa22f6489bce08b99fb43738006856677b1b3f8",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1,
+              "RUN_PRODUCER": 1
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:561a52a8144a4b6de87909559c08616f281c5ab7d410059d1714fed8e13e5843",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:6422eadd8384c4ef1fc85499211d7533f378dae4631fc33b9255b7b45f262fd8",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 2
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:74971d34187951d64d314a70a6566967f77ee0ac153585759a6d10e0c9e5a8c7",
+            "task_count": 2
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:88003032f366d8f1004d1fbaf844d04bb53888bef26921234faafda29dbfe42c",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:8c60597828ed417765e4ab45bbb20fa29579fe20e467c7f69d98fd6290672402",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:8fbc8184f12042e05889e73558d7220ecf34b73839edfb67cb447334c59a0e6e",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1,
+              "RUN_CHECKER": 1,
+              "TERMINAL": 1
+            },
+            "row_count": 3,
+            "signature_digest": "sha256:a70bcc2cc3ee4ba4b603d5f95f818df2d8651cab1c710c82cd191736dd90626a",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1,
+              "TERMINAL": 1
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:c44650b23bdbda497001db993971de05e063045cdb05391f857913f3aa816954",
+            "task_count": 2
+          },
+          {
+            "label_counts": {
+              "FIND": 1,
+              "TERMINAL": 2
+            },
+            "row_count": 3,
+            "signature_digest": "sha256:c45b18c302bf7ad1bc5dca0d90ccca1a4fec6a0795ef23a557642d8737c6553e",
+            "task_count": 3
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:ddc6fda026dbb5acd094914c61e925421abb64b5597c392bd9d9cb5165b7a85d",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "RUN_PRODUCER": 3,
+              "TERMINAL": 1
+            },
+            "row_count": 4,
+            "signature_digest": "sha256:ec062e7060eca9db3b5bce00da660d61fc3a25beb71d09c8b764b0897f7f7d68",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1,
+              "TERMINAL": 1
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:ec53e9eb20d5f74599d4f535bd6f67582a801d21cff75dc38552f67a2891161a",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1,
+              "RUN_PRODUCER": 1
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:fc5b9c31edc44739f8691c58564e8186aa467fb85c9683f295e5d5c0ccba21dc",
+            "task_count": 1
+          }
+        ],
+        "x+y+b": [
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:043684de1ed6815d90bec73d8a28d55aaf774e5ea97355a654da287490529692",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:105d7706b54c7716b4965ff95dff5e2b4079a6ef0175af9f9011e619a4b09d12",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:20d309536f7dbf2d7165bd1efcb84f65bbf901f07da3a95a9b4790097867500c",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:25af87d646b2c4aafd6aeff40d3a9c5b33f5c791740a837516382a8cd1f873e5",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:2c1697330beb62370d592a88437db87fd6d7adc709f0fc8bfb6916777babcbad",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:30511d109db354feec05aea43949a8428ac153944c3e7e0d5e1cfff0884c5463",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:3161fa09cb8aee216dd73b858ad09e35ed08fcde53b8d863169e618354895c8d",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "RUN_PRODUCER": 2
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:3b62d6196b0e88b285bab3dfb8adc8d7e5ad1785b4bb5f37287351522e46996a",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:4633d6a5bce41095ed252e5399dbdabfb87fd721e830d46a0002f4ec89980e1f",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:5b3e5ad0c7b77438b445b704162c55f02b7ce5b122075ed628b75120bfe880cf",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:6c8e020619aaba4dbe7b164f5e821a1f6bff70d4a2ff1e27befdddd55d9eb9eb",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:6f5efd8166a48707810a1250c97875c12d1aa3a53b156e91cede1e1c28c7a2e8",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:78fbabfda73c47fbc8e3bc99065233457c366f6b15387619c0b1abde199c85f7",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:7b4b454582947e8bddfcae2b968f75b571d75d53afa88c2439e6011a2af27eff",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:80983c34798dec8e8e15c8f04d900e9226ff7adf765231208ed0801e5b4bc01f",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:83fd63eb9b69315f19b2b75a01fb70af96c1e6d70c3a26d415ea37e620f04121",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:87a6fbd006b4aa97f0802b3f1e4695424743810c245e02581280933999955e6a",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1,
+              "RUN_PRODUCER": 1
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:8a675978aa5b850c5d32a4c166d14c8b3206b05c6734f707b67ad736743184f1",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:961edc962e82456569f3ef3dc2865a0f0bcdff95391de7ea0fb408de13056e83",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1,
+              "RUN_PRODUCER": 1
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:9e3d9f5bd90fdb666029a1546490f2acf58a727b5e949b55bb81aa93b09cdf7f",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:aa9870653d5f306a831e2f59dc09e1ce83ea5fcced6cdf68d3ab89059be7bbb0",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:ab04ee25251102c29a77d2ea9fa3733572fcc237f5b645ff22970b05f83c7945",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:b9daca6f3f2c7dc66de8e5e4edb96917b598a504333c28ce29f71aec5cd13f0a",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "RUN_PRODUCER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:ceecc3184d0b5d1b92a2e5b5e17e928e830561cf0263ecfca66c2de534c1b483",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:d26e9e101771ec8ac99c9b48ea3b023c7102b3e019064342e7a3718585d46616",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:d2f75e7e6b8dfd6081fc3642db3f95c9854c22cfa9b2a8e294562ed34951dbec",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:f26c25d1100a7152ca35f6fffaab292c01768e3123bfdc3e5ad6728e1df6ba81",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1,
+              "RUN_CHECKER": 1,
+              "TERMINAL": 1
+            },
+            "row_count": 3,
+            "signature_digest": "sha256:fdc17cdb59c87774e18cadf95a97232e4fa152bdf2c6c14d83291faeb21a042a",
+            "task_count": 1
+          }
+        ],
+        "x+y+b+tau_tools": [
+          {
+            "label_counts": {
+              "RUN_PRODUCER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:0066189e2d602106ccb90680d1b4cb4306ee905b35ccfb35ff72a871bb43f451",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:08aa9bdf1f37562b4e5ee3a0e46f18556c2ba726703f5c58b2a9b94094e6bcfe",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:0d24b19893a4b56f43ee079b372cf4f6fa8bf5ea9b11524a9cb3406af16b7646",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:17c14c56ebd7ae145b0dd0df10db107318ad7b88f14478eee13cb60d2c47e90c",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:21896d447a743000649cfeb4cc83a71cb5dab1b33202ea5ef80bea8244a5f4d7",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:2a2b2668b680c56c75a9daf01c0476a275ad6dbbb2e356a89c4395f770ce4b2c",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:3113b5e3f7b91bcb80ae4d42a2f9ebc5d4a29aaa1416ebc9b91deece96272d6b",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:33b00d8480b447dbce95815857e98dcee7cb707dcd126b06d73eea5333202969",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:396c59b21968ee9f99875fdbdd6f78a3ade785557068a1664b91213306ca700e",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:3b361ca3388fe6b762caa8fcfc5b59fe83c536b08e7791358a9c49fe1de7be2a",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:3b9c06b4e6c451dc7c62766828db1ffab947540b0e4f7d77c872436f98c2c346",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:52a6ecb18aa7e1fadb6e8f1577cd77c08e46894cc4665959c30ba9433747a1f3",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:580efe9ef1f5695d108a91ae29d48362f6f79d7d42a7afc5d2f1d49eca9507c8",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "RUN_PRODUCER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:5a1541eba6e15240931b7c7397ad2290bdd8d677cd1197372eab2a82a1895c9b",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "RUN_PRODUCER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:6441c72c07b6b64731d7e0fddc0661b6240c92929cfed94643d6a093638cb50b",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:7c92f415bfc34527a9a02469f05e860e7b19420cdd88cd00c7ba9f171a78d484",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:7f1e13a6703ce97a1b6387083f303c90e45841d987c75d1cc60d2dfd72f9dea8",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:826e94bf9adc5e2cd1c54bbc82aef825de59938dc7403cc158a338f7a1a8d31e",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:87c61a7d7481d8fc2cb13e9afc97a43087173bd46938f3f8de10205533f27392",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:91001c988c4e2eef96e14941e9a90ccadaf4cb9164196fcec25ef784a29d3d82",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:9323ec525754155e6ee22852467668c83c4faa70e6855e36d81ef07e594d6186",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:94e5ed5822a5a58cb865b6efe033c0db1264bd3765590eb159de666aca4e4cd4",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:9fd41f3d465edc3d2da02c9550776367043b084b9bef706fc3c9018389f98d8f",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "RUN_PRODUCER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:a3810334582eafbdfb6cc1e5949b06e8a68a80b33a4723386be1b66e908a6f60",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:b0aa6fa8fad34b96eeed1991128ed28659be72ca4e447223ec2b7f2e5aa01bab",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:b39c370f0d9756c9559fb23093f48f6087b941d2b2c9a79d3401a9b4cd1686fb",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:b41154856a2e9d9e88f5fe5072d26a1cd6870132673dc0fb6d52d393b6304498",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:d338909acf01f7d256d860c5d7c310c337a6b78b4906555c3dd086b7b3c7b914",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:db76700a24a26140dd1c2103d9ec9e44571f4c5ab59fd8146a08fac8f08485de",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "RUN_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:dde4bf1b4e17f4f1b8ee79a4b995928d97257243dc4959f33da794d8486c86f1",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "RUN_PRODUCER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:e08badf1cd9b7996f30c604620dd5940118c2b0526b9500c74c1315b781b9d66",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:e24feff90fae34dd33257c070d276e3f0239df7d3f7b97b5ad1602dbcdae15cf",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:f3ed70adca1320ffd13b7eb4d188f3d63182779ea76b49a92c76185baeaf3742",
+            "task_count": 1
+          }
+        ],
+        "x+y+tau_tools": [
+          {
+            "label_counts": {
+              "FIND": 2
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:04d234dea6f379d87313be5af965e7c00fbe7ea9ef9739be081221009feb5b87",
+            "task_count": 2
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 2
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:05ad89ba9dceb4fbb34ef28c36148de3399c265b5188c8ea6693ef7af3c56b93",
+            "task_count": 2
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:0b690d4cb66ae11e5413cd5e5be3308ebc1e64b4566e2474649e5e968bc37fef",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:271bb2e563e1bb5d742d3fbdac98117e01b63f6c365203f321f74757516171eb",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "RUN_PRODUCER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:2fe29cb9e4a4e1bcd03c8d1ba9334d4530720fac418e5e894865e452e9636f9f",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:30815db75bdaa35b6d573e63abdfd201ae8e74da91588ca1cf72c0e0fa902d37",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:334969d50de1eff334eeaea491ebdfc2d205cf9971946cd7e89a972395275983",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "RUN_PRODUCER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:35254d68105ce7cc69613fdcf87f9e82bb9317c606923d4a33f793e853a9ef36",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "RUN_PRODUCER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:361fe8c0c6393e54f21d45963af0f09a3b396ea00eb69abb3a811bed68fe9afd",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:3b0d306bcda4a8e511a4b03c79ee785821b80d889ed8057ec8fcf352af717eda",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:3b5e38671ba369263037ec0714cc280d0ade231593225088084a44a4a713d1f3",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:3d4127b306a5f688eb7161e2fe213a72c95943e6a012001a5a52dd7dfa70da76",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:51213eb57dc2849c1ac88340a15aed8138ddf82dbcc3beeaa098b1e9843f6680",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:51836d341a549cbdea6ebdade850a37b5c255dbbbb945138565d03ac415ecf79",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:5a53353d46ebbe7addcb61aa0e3e4e72ad6dd00407ea9246256672eca041e821",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1,
+              "TERMINAL": 2
+            },
+            "row_count": 3,
+            "signature_digest": "sha256:5c8c995ccd5ac3bef96e6021f680e75b3f8d20414e390df85572e16204a299a3",
+            "task_count": 3
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:81f8221fad30f871e7b4df5740a59914889f9f0fa0734bf232d7518aeeae67ab",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "RUN_PRODUCER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:9871b5f1a13801562c2cf38aa574cb4ecdd87dd2517eec56d023841af1902751",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:9952b20aa1489dbca3dfc307fd903c51c9c28b013518368d9972cc5092adde7d",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:9af80d3becc62bd84f9f4d4071135ebaaeddcbfb026fe3065640dc3289e04a82",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "RUN_CHECKER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:9b7f92e7016bd46ee07294089be483853e0853e3e6e3e2fd13f5eafb610f8b21",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1,
+              "TERMINAL": 1
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:c0339b9d4d2b8f2d31e629d8635ebd0719f7112a11cf52abc40320ebf78b73cf",
+            "task_count": 2
+          },
+          {
+            "label_counts": {
+              "FIND": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:c4f2866ce2ac9fe27451050ee63316911a7d69609e0e7b222bc37bde4667d7ae",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FIND": 1,
+              "TERMINAL": 1
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:cf19d8fc4ee053df9bb8cc891d39af9c33e4dcab964b44293594ebcb0590573f",
+            "task_count": 2
+          },
+          {
+            "label_counts": {
+              "RUN_PRODUCER": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:e5598d7c0db2a091756cddfdbdd06f64532b42cba6e223d424740b4f78c278d7",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:e8bc535a98be145c978613ad018a44d60d3ccfa423ec4c806fb97291aaf4eb4c",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "TERMINAL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:fa701e54f9f36feb49ec72c9a384357c2a52fbf12dfac1cd0ac91e6c9d8d4ed3",
+            "task_count": 1
+          }
+        ]
+      },
+      "row_count": 33,
+      "task_count": 12
+    },
+    "terminal_verifier_success": {
+      "baselines": {
+        "global_majority_loto": {
+          "accuracy": 0.75,
+          "balanced_accuracy": 0.5,
+          "macro_f1": 0.42857142857142855
+        },
+        "task_identity_resubstitution_upper_bound": {
+          "accuracy": 1.0,
+          "balanced_accuracy": 1.0,
+          "macro_f1": 1.0
+        }
+      },
+      "class_counts": {
+        "FAIL": 9,
+        "PASS": 3
+      },
+      "conditions": {
+        "x+y": {
+          "accuracy": 0.9166666666666666,
+          "balanced_accuracy": 0.8333333333333333,
+          "macro_f1": 0.8736842105263158
+        },
+        "x+y+b": {
+          "accuracy": 1.0,
+          "balanced_accuracy": 1.0,
+          "macro_f1": 1.0
+        },
+        "x+y+b+tau_tools": {
+          "accuracy": 1.0,
+          "balanced_accuracy": 1.0,
+          "macro_f1": 1.0
+        },
+        "x+y+tau_tools": {
+          "accuracy": 1.0,
+          "balanced_accuracy": 1.0,
+          "macro_f1": 1.0
+        }
+      },
+      "eligible": true,
+      "exact_contingencies": {
+        "x+y": [
+          {
+            "label_counts": {
+              "FAIL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:1613b8381339a40a81aea53a94602488c96ec2b93ecc3d8e8aae13053cbdac7c",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FAIL": 3
+            },
+            "row_count": 3,
+            "signature_digest": "sha256:1aa263682b69b7afd83de7f34e7574a2a6d033e79c86855220555615a6a94bc7",
+            "task_count": 3
+          },
+          {
+            "label_counts": {
+              "PASS": 2
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:6355c9793736f0ee46381db5d60d00700a8a01c88644568b09711106a326b5fb",
+            "task_count": 2
+          },
+          {
+            "label_counts": {
+              "FAIL": 5,
+              "PASS": 1
+            },
+            "row_count": 6,
+            "signature_digest": "sha256:deed04f4e94edc7f93982af108d3b9325e862a65b7d61a7f7055cb0ccb4b05e1",
+            "task_count": 6
+          }
+        ],
+        "x+y+b": [
+          {
+            "label_counts": {
+              "FAIL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:0a616f1ba95d9cb31857513c40921fc8889244e896c2196c3a05e2127b6b0015",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FAIL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:0f898a1ed22d56f3ef33f228c3c7b0201e967d1c6e54078efe119c4539089147",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FAIL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:1417b7e0388a523effa8cd436fe5334c17f20eee67a620feeca8566ca3205cbe",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FAIL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:3721c80e0c1b6538d0c201061ff9d4f0a344e5290d51836521443a8a92b9bcbe",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FAIL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:60807ac23277594ab3807a77a160d029f06010cb92cec39b6365d7650d8af009",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "PASS": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:710baeca89d7d62b4cea7217bb00a3d309a883bc0e3fef17991e5653af1ad2c2",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "PASS": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:a23ac92e1beeca89f45b18656d93803b790fc36ddaf2dc742457ac88c71699c0",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FAIL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:b23203a2600b4de375facd28b93b473010e18a6f801953017c6a6b48df0e28ad",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "PASS": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:b43ac8da1094f476f24d622c8f0768c82e617d39083625fb7b35cc076514c431",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FAIL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:d0da50481a409450e0feef2b4684fc390738ce7a1ae688e738292b34ea3ec6fb",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FAIL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:e2eb0ea241491ff67e90c5decf286bc200d2ace3e265a065de5f6d9a6b56892f",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FAIL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:f33ab7e9ed66450dd4e2bca1068250439be8e0ab118d2fe2383054e2faea01bf",
+            "task_count": 1
+          }
+        ],
+        "x+y+b+tau_tools": [
+          {
+            "label_counts": {
+              "FAIL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:24c85cdbeccf36e365b06832b8bf98fa32941611aa155d557f50d60cd3367815",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FAIL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:39c94f8fa4b07b031ad51bbd372c776c7f356e1048b6c9010610c64b057bfd9e",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FAIL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:58c95bea0532fef4f08bdda77094e9566ffe7c1de8fda8724f1dec1685ab2ab0",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FAIL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:70221e8f2673d1f4dfb654c77264cb63c9b512aebd63d2a2ae69b85143f3bf8a",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "PASS": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:78bdbb2ce0adae1d916cd23c820653fa4f1383b04807b05e8e1d8fe53cc30bd2",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FAIL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:7998e2184c7a84489848f9f4e3b79bfc537f76c2b43234ff2d70b15a8fad80ba",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FAIL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:aba99878926061cc0367e08d3c79ba05e726f4bc5bba9d7a322bf681b3ff69de",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FAIL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:b74712ebbefd2f486363f293fdbc646da036b3f87a30776c040137cac3501647",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "PASS": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:d75af27a29758e5b52e41a9fa4076f4bbac8e0ef56f5b03bd23fbebf422f4197",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FAIL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:da49b51999a651a007cba15640b9d61240eb5d0537bda3e0955f0b5b8099eb32",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "PASS": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:db2118b5c65380c408a781b3bc727145f34b27b6ea72c00c5b922b43acc928be",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FAIL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:f0b9385bc70959027652c513c5125a21d959f67c3a1b947cda790577adbbc0b1",
+            "task_count": 1
+          }
+        ],
+        "x+y+tau_tools": [
+          {
+            "label_counts": {
+              "FAIL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:6de7792534ab97d94ae6aff1cf24c3df7c7a503cbccc5aa57640b5741758f304",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "PASS": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:74fb7097a2b8cc33d46b82153e75874e668e38e94c61e8a0b43cf3f9c73d48ca",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FAIL": 2
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:76c3c3b0f37a5e9e78eca8e41afde7d8fc9895eae04055ab1f22a34aa2ff9ad6",
+            "task_count": 2
+          },
+          {
+            "label_counts": {
+              "PASS": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:ae3fbc42f20541f970d73e2c02b372063ed49d3cef612cae4ae34bdce5bcb62d",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FAIL": 3
+            },
+            "row_count": 3,
+            "signature_digest": "sha256:badd39bf80530eb5ce5281942825bc5ec0bb00fe08696b653f4cf39c95699b98",
+            "task_count": 3
+          },
+          {
+            "label_counts": {
+              "PASS": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:be8e71cb2e0ebc0dda941fba30b28146b0699b84089a87b7e1e42e7b804b0138",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FAIL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:c9236a21ce1548f4c54e78406ce9c94096ecaa1d1f112475b6ea460cab1d4ec3",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FAIL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:d9c74ae388cbc62afd99bc8329b51763909331e66f2b555ed64553243b05e354",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "FAIL": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:f485761c20c648049ffa65f40245032f70d3337ea220394e09d89873b8e4c2b4",
+            "task_count": 1
+          }
+        ]
+      },
+      "row_count": 12,
+      "task_count": 12
+    },
+    "tool_use_failure_class": {
+      "baselines": {
+        "global_majority_loto": {
+          "accuracy": 0.5,
+          "balanced_accuracy": 0.3333333333333333,
+          "macro_f1": 0.2222222222222222
+        },
+        "task_identity_resubstitution_upper_bound": {
+          "accuracy": 1.0,
+          "balanced_accuracy": 1.0,
+          "macro_f1": 1.0
+        }
+      },
+      "class_counts": {
+        "CLEAN_EXECUTION": 2,
+        "DISCOVERY_ONLY": 6,
+        "NO_SERVER_TOOL_USE": 4
+      },
+      "conditions": {
+        "x+y": {
+          "accuracy": 0.75,
+          "balanced_accuracy": 0.7777777777777778,
+          "macro_f1": 0.7802197802197802
+        },
+        "x+y+b": {
+          "accuracy": 1.0,
+          "balanced_accuracy": 1.0,
+          "macro_f1": 1.0
+        },
+        "x+y+b+tau_tools": {
+          "accuracy": 1.0,
+          "balanced_accuracy": 1.0,
+          "macro_f1": 1.0
+        },
+        "x+y+tau_tools": {
+          "accuracy": 1.0,
+          "balanced_accuracy": 1.0,
+          "macro_f1": 1.0
+        }
+      },
+      "eligible": true,
+      "exact_contingencies": {
+        "x+y": [
+          {
+            "label_counts": {
+              "DISCOVERY_ONLY": 1,
+              "NO_SERVER_TOOL_USE": 2
+            },
+            "row_count": 3,
+            "signature_digest": "sha256:01beae57636cde72e975d561df8dcc9cc6e36292d22c1f982724f08eb99ec74a",
+            "task_count": 3
+          },
+          {
+            "label_counts": {
+              "DISCOVERY_ONLY": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:58952d4d00e2bd4604dcc9f9c69399cc1dc12f0acbee5a0eeae8a465aafe3797",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "CLEAN_EXECUTION": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:71fd04f49c7d500b5965e8692222f4dfae6076345242c9fa7a3b5d0f026bcb01",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "DISCOVERY_ONLY": 1,
+              "NO_SERVER_TOOL_USE": 1
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:9f5129c4d392e6bee7814cc11e8d87ae22e8fa518356bc954e9ca5dbfde3f56a",
+            "task_count": 2
+          },
+          {
+            "label_counts": {
+              "DISCOVERY_ONLY": 1,
+              "NO_SERVER_TOOL_USE": 1
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:a02072e82052f0049748782ec90501cb43efd2342d20d627f75977efebe62d2c",
+            "task_count": 2
+          },
+          {
+            "label_counts": {
+              "CLEAN_EXECUTION": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:b4faa9b58d40c30823a3bd6d1d39eaaa2e858d50ad3ccf32eb0bf161c71f4097",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "DISCOVERY_ONLY": 2
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:cd5f9ce14ed373e75d013d3810058c03c3a992a66f32cd2e9cf9239305978bf0",
+            "task_count": 2
+          }
+        ],
+        "x+y+b": [
+          {
+            "label_counts": {
+              "DISCOVERY_ONLY": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:0bd6e83308504f016230d673e386afa7afe7dc33297611f52f080004f0dc2f29",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "DISCOVERY_ONLY": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:1e19d0360a984a4dc69923176fc9344139a0e92bc6fc86e38391fdf7c8778981",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "DISCOVERY_ONLY": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:33878bfaf4f0c4e6223062d24eb5a395b1fa36436d342445daa39d2f5c304987",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "DISCOVERY_ONLY": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:4d18dea4e2de0ecf7d50c4f1c2a88938dc80ef7adf1e764c1bb36ff158bb8227",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "CLEAN_EXECUTION": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:647b5cfc658a26f6e13a4e094fc7eba86591ec76a5c3cf5866eaf64140dbe46b",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_SERVER_TOOL_USE": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:a435dc457f43ac100b8c627033263e6d70001c5043f7d61b7afc4d41d1085d1c",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_SERVER_TOOL_USE": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:a902e0891dd16d2ef3a67b134af595f2c9ed359e7af7e7d6a51fa978d875716b",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "DISCOVERY_ONLY": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:bc999657ea596b04694aaf80ee3f8e3ad1ccc3f2e3da058d4e6870f2af4ea205",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "DISCOVERY_ONLY": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:c07613c573c6bce02f9fdf8c11a3d0299881d7f546c50080a680fdbf1bc671ef",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_SERVER_TOOL_USE": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:db792991d5c08e6a0f246061b1e166ef1fc943d856b5f6cc7ba73dea13469924",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_SERVER_TOOL_USE": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:ea43cc9feba84ab55d90f59af228d5405a5acbeb9973ad2124c5e13cad8880f7",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "CLEAN_EXECUTION": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:f2bb4bd6341ea59db6b44a9ead8e8729d0d2db317bfa921c01abb6edbf7038f0",
+            "task_count": 1
+          }
+        ],
+        "x+y+b+tau_tools": [
+          {
+            "label_counts": {
+              "NO_SERVER_TOOL_USE": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:11459a5528062c7e41be6bc999eeece40d0a2b3e7c80e8ee63859042b6b3d803",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "DISCOVERY_ONLY": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:147efa23554c49f8eba2197ad010e8a18814915097691d0c05a036ffdeaea518",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "DISCOVERY_ONLY": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:23c5030f745a05ef70637e758fec2141eed2c504a30b80a23ec17dcd7e4caead",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "DISCOVERY_ONLY": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:54b77e4b6137d865f49ff1afa9aeb8f70a8993eca32b40958927c549f784f9fb",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_SERVER_TOOL_USE": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:635418eafe679d7c60ee2bd6f8c6ddc41057eb2ce1e412e0791e9fda115d8e9d",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "CLEAN_EXECUTION": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:75508fbd1591b1527e98bce521055da11782c957d1dc772cba8ca7a2ea4cb7bf",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "CLEAN_EXECUTION": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:79a43b0ba907e170e919baff52d3ecb5c4b02c5054f83d6aff20404bfcee674e",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_SERVER_TOOL_USE": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:7d37c02fb344e7e98b0d6c5b1fabf5f3a582a8fc863916b37a752b2434a7b31c",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "DISCOVERY_ONLY": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:de4ee3111e905e709ff8aa58649bef7b64032f8b4d378a0ec1be73c1129cb5d7",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "DISCOVERY_ONLY": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:e1cad6a109e787e6a7dd655816813e1edced5a2df1ce09a75a09b395c5facf0b",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_SERVER_TOOL_USE": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:edc102b911958af655444eb8017f81f10cdd16c2ee8eab875fd2070bc29fe5d7",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "DISCOVERY_ONLY": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:f95479b6eda68ca9de01df63185907b981697ef138b65408b62a471a18b68c0b",
+            "task_count": 1
+          }
+        ],
+        "x+y+tau_tools": [
+          {
+            "label_counts": {
+              "NO_SERVER_TOOL_USE": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:23131f0fb8e32c548ab0d7cdb686984978e4412ac5759a1bfd2f13e94c35170d",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "DISCOVERY_ONLY": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:53d9ad279ab8a4e15f4c10ef92dad0754132076176c772c59d2e484085a871fb",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "DISCOVERY_ONLY": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:6118c4700a73c5f597312e6d273628e229462e34291fe7622fc42b20f985c966",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_SERVER_TOOL_USE": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:76cb0f4231082aac7a0246d979b0d0fccc2c2cfec089eb08d125bb4a0a667cce",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "NO_SERVER_TOOL_USE": 2
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:7df02291c17e28de2ac9015d751d36675c262621a794787ca9b7df15f70add6d",
+            "task_count": 2
+          },
+          {
+            "label_counts": {
+              "DISCOVERY_ONLY": 2
+            },
+            "row_count": 2,
+            "signature_digest": "sha256:884939c2fe8634c52b4a8e54af76114d16c503c298839ddf6ae3d0ec22dba0aa",
+            "task_count": 2
+          },
+          {
+            "label_counts": {
+              "DISCOVERY_ONLY": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:bc07645a45c29c3d866732c8f8d4d1c83e3af23f1eee74ab68dbaff432959710",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "CLEAN_EXECUTION": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:c1f5e42856934161264be51db9de5be180890534835e8b0911b7271b4b1d2c8f",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "CLEAN_EXECUTION": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:cfe7b4dabacdc41c016a8c378b71c41cf2cca18969cf2c707dd3c77a13975323",
+            "task_count": 1
+          },
+          {
+            "label_counts": {
+              "DISCOVERY_ONLY": 1
+            },
+            "row_count": 1,
+            "signature_digest": "sha256:f6340639f330dd08cb868a6a7c7f1d9d2d66bce895a8c73a0b795082db999cc5",
+            "task_count": 1
+          }
+        ]
+      },
+      "row_count": 12,
+      "task_count": 12
+    }
+  },
+  "eligible_diagnostics": [
+    "next_tool_action_class",
+    "checker_rejection_recovery",
+    "mathematical_milestone",
+    "terminal_verifier_success",
+    "tool_use_failure_class"
+  ],
+  "evidence_class": "BOUNDED_AUTHENTICATED_POST_RUN_DIAGNOSTIC",
+  "incremental_b": {
+    "mean_macro_f1": 0.0291382265856319,
+    "per_diagnostic_macro_f1": {
+      "checker_rejection_recovery": 0.0,
+      "mathematical_milestone": 0.0888888888888888,
+      "next_tool_action_class": 0.0568022440392707,
+      "terminal_verifier_success": 0.0,
+      "tool_use_failure_class": 0.0
+    },
+    "task_bootstrap_95": null
+  },
+  "incremental_tau_tools": {
+    "mean_macro_f1": 0.16714446732864097
+  },
+  "limitations": [
+    "This is a small, non-deterministic, single-run-per-task workflow diagnostic, not a causal comparison or capability-stealing experiment.",
+    "Docker and Podman were unavailable; exact verifiers ran through the maintained clean child-process harness rather than Harbor containers.",
+    "The first infrastructure smoke sent loopback MCP traffic through the host proxy and received HTTP 502; study runs explicitly bind loopback NO_PROXY.",
+    "A first partial collection was excluded because its uncommitted collector bytes were not manifest-bound; accepted runs require a clean tracked tree and a collector SHA-256 binding.",
+    "After those two failures, the preregistered fallback replaces held-out k-nearest-neighbor modeling with labeled transductive descriptive signatures; no production decision can follow from these scores.",
+    "Task-visible final answers and verifier outcomes can dominate retrospective diagnostics; the study asks only for incremental observable information.",
+    "No raw agent messages, tool arguments, tool results, or hidden reasoning are committed."
+  ],
+  "projections": [
+    {
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "mathematical_milestone": "REACHED",
+        "terminal_verifier_success": "PASS",
+        "tool_use_failure_class": "DISCOVERY_ONLY"
+      },
+      "server_event_coverage": {
+        "candidates": 1,
+        "recorded": 1
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 7,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1266
+      },
+      "tool_metrics": {
+        "capability_attempt_count": 0,
+        "event_count": 1,
+        "tool_call_count": 1
+      },
+      "trial_id": "graph-counterexample"
+    },
+    {
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "mathematical_milestone": "REACHED",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "DISCOVERY_ONLY"
+      },
+      "server_event_coverage": {
+        "candidates": 1,
+        "recorded": 1
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 8,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1552
+      },
+      "tool_metrics": {
+        "capability_attempt_count": 0,
+        "event_count": 1,
+        "tool_call_count": 1
+      },
+      "trial_id": "finite-field-irreducibility-repair"
+    },
+    {
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "mathematical_milestone": "NOT_REACHED",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "DISCOVERY_ONLY"
+      },
+      "server_event_coverage": {
+        "candidates": 1,
+        "recorded": 1
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 7,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1369
+      },
+      "tool_metrics": {
+        "capability_attempt_count": 0,
+        "event_count": 1,
+        "tool_call_count": 1
+      },
+      "trial_id": "symbolic-block-determinant-decomposition"
+    },
+    {
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "mathematical_milestone": "REACHED",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "NO_SERVER_TOOL_USE"
+      },
+      "server_event_coverage": {
+        "candidates": 0,
+        "recorded": 0
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 5,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 952
+      },
+      "tool_metrics": {
+        "capability_attempt_count": 0,
+        "event_count": 0,
+        "tool_call_count": 0
+      },
+      "trial_id": "polynomial-map-collision"
+    },
+    {
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "mathematical_milestone": "NOT_REACHED",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "DISCOVERY_ONLY"
+      },
+      "server_event_coverage": {
+        "candidates": 1,
+        "recorded": 1
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 8,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1476
+      },
+      "tool_metrics": {
+        "capability_attempt_count": 0,
+        "event_count": 1,
+        "tool_call_count": 1
+      },
+      "trial_id": "divisor-minimizer-exchange-audit"
+    },
+    {
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "mathematical_milestone": "REACHED",
+        "terminal_verifier_success": "PASS",
+        "tool_use_failure_class": "CLEAN_EXECUTION"
+      },
+      "server_event_coverage": {
+        "candidates": 11,
+        "recorded": 11
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 10,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 2053
+      },
+      "tool_metrics": {
+        "capability_attempt_count": 4,
+        "event_count": 11,
+        "tool_call_count": 7
+      },
+      "trial_id": "local-ring-diagonal-similarity-certificate"
+    },
+    {
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "mathematical_milestone": "NOT_REACHED",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "DISCOVERY_ONLY"
+      },
+      "server_event_coverage": {
+        "candidates": 1,
+        "recorded": 1
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 8,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1687
+      },
+      "tool_metrics": {
+        "capability_attempt_count": 0,
+        "event_count": 1,
+        "tool_call_count": 1
+      },
+      "trial_id": "fractional-ratio-proof-repair"
+    },
+    {
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "mathematical_milestone": "REACHED",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "NO_SERVER_TOOL_USE"
+      },
+      "server_event_coverage": {
+        "candidates": 0,
+        "recorded": 0
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 5,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 976
+      },
+      "tool_metrics": {
+        "capability_attempt_count": 0,
+        "event_count": 0,
+        "tool_call_count": 0
+      },
+      "trial_id": "research-status-evidence-audit"
+    },
+    {
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "mathematical_milestone": "REACHED",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "NO_SERVER_TOOL_USE"
+      },
+      "server_event_coverage": {
+        "candidates": 0,
+        "recorded": 0
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 4,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 812
+      },
+      "tool_metrics": {
+        "capability_attempt_count": 0,
+        "event_count": 0,
+        "tool_call_count": 0
+      },
+      "trial_id": "finite-partition"
+    },
+    {
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "mathematical_milestone": "REACHED",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "DISCOVERY_ONLY"
+      },
+      "server_event_coverage": {
+        "candidates": 3,
+        "recorded": 3
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 10,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1652
+      },
+      "tool_metrics": {
+        "capability_attempt_count": 0,
+        "event_count": 3,
+        "tool_call_count": 3
+      },
+      "trial_id": "sat-witness"
+    },
+    {
+      "labels": {
+        "checker_rejection_recovery": "NO_CHECKER",
+        "mathematical_milestone": "REACHED",
+        "terminal_verifier_success": "PASS",
+        "tool_use_failure_class": "NO_SERVER_TOOL_USE"
+      },
+      "server_event_coverage": {
+        "candidates": 0,
+        "recorded": 0
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 6,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1085
+      },
+      "tool_metrics": {
+        "capability_attempt_count": 0,
+        "event_count": 0,
+        "tool_call_count": 0
+      },
+      "trial_id": "rational-linear-solution"
+    },
+    {
+      "labels": {
+        "checker_rejection_recovery": "SUCCESS_WITHOUT_REJECTION",
+        "mathematical_milestone": "NOT_REACHED",
+        "terminal_verifier_success": "FAIL",
+        "tool_use_failure_class": "CLEAN_EXECUTION"
+      },
+      "server_event_coverage": {
+        "candidates": 8,
+        "recorded": 8
+      },
+      "status": "COMPLETE",
+      "summary_metrics": {
+        "message_count": 7,
+        "redaction_count": 0,
+        "truncated_count": 0,
+        "utf8_bytes": 1133
+      },
+      "tool_metrics": {
+        "capability_attempt_count": 2,
+        "event_count": 8,
+        "tool_call_count": 6
+      },
+      "trial_id": "exact-farkas-ldl-slice"
+    }
+  ],
+  "retention": {
+    "committed_evidence": "study contract, implementation/tests, aggregate report, counts, metrics, limitations, and SHA-256 bindings only",
+    "publish_agent_messages": false,
+    "publish_hidden_reasoning": false,
+    "publish_tool_arguments_or_results": false,
+    "raw_trials": "host-local, operator-controlled, not committed"
+  },
+  "run_manifest_sha256": "sha256:8cd74ba21bb8a9fa621523ae4081a18d91503816db1e8dd37e7d2357e2527f5a",
+  "schema_version": "1",
+  "source_sha": "cd08a68d036a56229cd6402b4a29bf3320f3d4e3",
+  "study_id": "observable-trajectory-information-v1"
+}
