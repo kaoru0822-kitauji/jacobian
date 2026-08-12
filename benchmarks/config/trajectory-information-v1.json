@@ -1,0 +1,149 @@
+{
+  "schema_version": "1",
+  "study_id": "observable-trajectory-information-v1",
+  "status": "FROZEN_BEFORE_MODEL_RUNS",
+  "evidence_class": "BOUNDED_AUTHENTICATED_POST_RUN_DIAGNOSTIC",
+  "causal_claim_authorized": false,
+  "frozen_against": {
+    "git_sha": "9a619b1afd2e46ab63a76ae0fc2f6222444e673f",
+    "git_ref": "origin/main",
+    "paper": "arXiv:2603.07267v2"
+  },
+  "research_question": "Does server-observed math.find/math.run telemetry retain most useful trajectory-diagnostic information supplied by bounded user-visible agent messages, once task/input and final answer plus exact verifier outcome are already available?",
+  "prohibited_methods": [
+    "hidden chain-of-thought access or retention",
+    "ATIF reasoning_content access or retention",
+    "trace inversion or hidden-trace reconstruction",
+    "reasoning-student training or fine-tuning",
+    "text embeddings or text geometry fitted on the evaluation corpus",
+    "prompt, feature, label, task, or threshold tuning after labels are observed"
+  ],
+  "observable_tuple": {
+    "x": "Frozen task instruction, input, public submission schema, and task metadata.",
+    "y": "Final user-visible agent message, submitted artifacts, and exact independent verifier reward plus diagnostic outcome.",
+    "b": "Non-final user-visible Codex agent_message items only, redacted and bounded to 512 UTF-8 bytes per message, 32 messages, and 8192 UTF-8 bytes per trial.",
+    "tau_tools": "Ordered server log events for math.find/math.run plus joined capability-attempt ID, version, execution status, assurance, diagnostic codes, timing, response size, and bounded request/argument digests. No tool arguments or results."
+  },
+  "runtime": {
+    "agent": "codex",
+    "agent_authentication": "locally authenticated ChatGPT session",
+    "model": "gpt-5.4-mini",
+    "reasoning_effort": "medium",
+    "tool_mode": "unified_exec",
+    "web_search": "disabled",
+    "repetitions_per_task": 1,
+    "task_timeout_seconds": 900,
+    "sampling_seed": null,
+    "sampling_deterministic": false,
+    "mcp_transport": "streamable-http",
+    "mcp_authentication": "fresh anonymous loopback runtime per trial",
+    "capability_policy_profile": "COMPUTE_VERIFY_NO_RETRIEVAL",
+    "container_runtime": "not required; exact task verifiers replay in the maintained clean child-process harness"
+  },
+  "prompt": "Read instruction.md, input.json, and submission_schema.json. Solve the task completely. Use the available Jacobian mathematical tools when useful. Write submission.json and every required evidence file in this workspace. Do not use the network or inspect files outside this workspace.",
+  "dataset": {
+    "id": "jacobian/mathematical-benchmarks-v1",
+    "selection_rule": "Preselected medium/hard tasks spanning direct witnesses, proof repair, large exact certificates, producer/checker use, and evidence-sensitive verification.",
+    "tasks": [
+      {"id": "graph-counterexample", "digest": "sha256:4b3e12214c8672141adb377599748fda05345bdb365c8d82e0ba44048eff56b3"},
+      {"id": "finite-field-irreducibility-repair", "digest": "sha256:74d77a8a69bf40a9d4889fa8f27297bb8adba5f7afd916c0dab5f81c10ee90aa"},
+      {"id": "symbolic-block-determinant-decomposition", "digest": "sha256:97418a7c9eb7fecd07d51ab10f0d86165387ee99ab109d1b6d95ba66877c12fa"},
+      {"id": "polynomial-map-collision", "digest": "sha256:9243ca8ee4800cb8eae039a08e0414c7fcfd8e111c3d1a3c8d6fbbfc44884abd"},
+      {"id": "divisor-minimizer-exchange-audit", "digest": "sha256:a327d2123f0c98012c31476d3d10224b84b8e57b4e6c8a379c8135c654fe3b7d"},
+      {"id": "local-ring-diagonal-similarity-certificate", "digest": "sha256:f2327086c5fb1c051ca5a9d1ddf9e3fec06482f7413d3d507524fa8cb65ae2c1"},
+      {"id": "fractional-ratio-proof-repair", "digest": "sha256:18d805fa0d2d47b4d75d9d40d7527d785da5c6e63decb4e56924f29e20de174c"},
+      {"id": "research-status-evidence-audit", "digest": "sha256:e9f55d66d451c8e7b1fdcbfeb938dc79e11bc34823ce83fefdcc720535250e6a"},
+      {"id": "finite-partition", "digest": "sha256:ec50cd3d72cc6009f8bb6326c60c42ca2cb38e14b0aa382b930010f3d02b82bd"},
+      {"id": "sat-witness", "digest": "sha256:2f7412f1360f9a603dd931b02e6374801c6c6108abf9cba1fabd58bac36d81ba"},
+      {"id": "rational-linear-solution", "digest": "sha256:5c3710cd01c9fb7dab9e5fbe28d0b14d919bdea2732f4eb90517f8bd7bcab47e"},
+      {"id": "exact-farkas-ldl-slice", "digest": "sha256:5ff1eed2a5ff443222d181f3c676ac5012b4cd01189f1d983ef2e5256e447848"}
+    ]
+  },
+  "information_conditions": [
+    "x+y",
+    "x+y+b",
+    "x+y+tau_tools",
+    "x+y+b+tau_tools"
+  ],
+  "diagnostics": [
+    {
+      "id": "next_tool_action_class",
+      "unit": "server-event prefix",
+      "classes": ["FIND", "RUN_PRODUCER", "RUN_CHECKER", "TERMINAL"]
+    },
+    {
+      "id": "checker_rejection_recovery",
+      "unit": "trajectory",
+      "classes": ["NO_CHECKER", "SUCCESS_WITHOUT_REJECTION", "REJECTED_RECOVERED", "REJECTED_UNRECOVERED"]
+    },
+    {
+      "id": "mathematical_milestone",
+      "unit": "trajectory",
+      "classes": ["REACHED", "NOT_REACHED"],
+      "definition": "The independent verifier reports mathematical correctness 1.0, regardless of protocol, evidence, scope, assurance, or aggregate reward."
+    },
+    {
+      "id": "terminal_verifier_success",
+      "unit": "trajectory",
+      "classes": ["PASS", "FAIL"],
+      "definition": "Exact aggregate verifier reward equals 1.0. Direct reward and verifier-diagnostic fields are masked from predictors for this target."
+    },
+    {
+      "id": "tool_use_failure_class",
+      "unit": "trajectory",
+      "classes": ["NO_SERVER_TOOL_USE", "DISCOVERY_ONLY", "CLEAN_EXECUTION", "RECOVERED_AFTER_FAILURE", "UNRECOVERED_FAILURE"]
+    }
+  ],
+  "features": {
+    "x_y": [
+      "predeclared task metadata and bounded file/shape counts",
+      "final-message and submission/evidence structural counts",
+      "exact verifier diagnostics except fields masked for their own target"
+    ],
+    "b": [
+      "message count, byte count, truncation count, and redaction count",
+      "fixed case-insensitive lexicon counts: error, fail, retry, fallback, verify, checked, found, compute, wrote, complete, cannot, timeout"
+    ],
+    "tau_tools": [
+      "tool and capability-attempt counts and order",
+      "find/run/producer/checker/status/assurance/diagnostic counts",
+      "unique capability-domain and operation counts",
+      "fixed sequence unigram/bigram counts",
+      "log1p timing and response-byte summaries",
+      "request/argument digest availability counts"
+    ]
+  },
+  "modeling": {
+    "classifier": "3-nearest-neighbor with train-fold min-max scaling, deterministic majority and lexicographic tie breaks",
+    "split": "leave-one-task-out; all prefix rows from one task remain in the held-out fold",
+    "primary_metric": "macro_f1",
+    "secondary_metrics": ["balanced_accuracy", "accuracy"],
+    "uncertainty": "2000 fixed-seed task-block bootstrap resamples of held-out predictions",
+    "bootstrap_seed": 260307267,
+    "transductive": false,
+    "task_identity_baselines": [
+      "global-majority held-out baseline",
+      "task-identity resubstitution upper bound, labeled non-generalizing and excluded from decisions"
+    ]
+  },
+  "eligibility": {
+    "minimum_completed_trials": 10,
+    "minimum_eligible_diagnostics": 3,
+    "diagnostic_requires_at_least_classes": 2,
+    "minimum_server_tool_trajectories": 4,
+    "minimum_no_run_or_failed_run_trajectories": 2
+  },
+  "decision_rule": {
+    "data_minimization": "Eligible only if every eligible diagnostic has b incremental macro-F1 <= 0.02, the mean b increment is <= 0.01, tau_tools improves mean macro-F1 over x+y by >= 0.05, and the upper 95% task-bootstrap bound for mean b increment is <= 0.02.",
+    "preserve_b": "Eligible only if b improves macro-F1 by >= 0.05 on at least two eligible diagnostics, improves the eligible-diagnostic mean by >= 0.03, and the lower 95% task-bootstrap bound for the mean increment is > 0.",
+    "otherwise": "INCONCLUSIVE_RESEARCH_ONLY"
+  },
+  "fallback": "After two failed methodological implementations, keep these frozen labels/features and use deterministic descriptive condition coverage plus exact contingency tables; do not tune a third predictive method on the same labels.",
+  "retention": {
+    "raw_trials": "host-local, operator-controlled, not committed",
+    "committed_evidence": "study contract, implementation/tests, aggregate report, counts, metrics, limitations, and SHA-256 bindings only",
+    "publish_agent_messages": false,
+    "publish_tool_arguments_or_results": false,
+    "publish_hidden_reasoning": false
+  }
+}
