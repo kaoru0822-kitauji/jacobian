@@ -10,7 +10,7 @@ from jacobian.contracts.capabilities import CapabilityDiagnostic
 
 
 class CapabilityError(RuntimeError):
-    """A capability descriptor, request, or assurance boundary is invalid."""
+    """A capability descriptor, request, or verification boundary is invalid."""
 
 
 class PayloadValidationError(CapabilityError):

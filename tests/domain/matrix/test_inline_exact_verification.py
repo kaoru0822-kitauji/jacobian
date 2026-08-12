@@ -65,7 +65,7 @@ def test_inline_exact_rejects_bounded_accepted_checker_decisions(
     matrix_services: DomainTestServices,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Inline values have no scope artifact for a bounded verified assurance."""
+    """Inline values have no scope artifact for bounded verification."""
 
     runtime = matrix_services
 

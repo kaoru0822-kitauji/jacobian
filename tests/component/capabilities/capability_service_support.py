@@ -171,7 +171,7 @@ class ForgedVerifiedAdapter:
         capability_id="example.forged",
         version="1",
         title="Forge a result",
-        description="Adversarial adapter used to test the assurance boundary.",
+        description="Adversarial adapter used to test the verification boundary.",
         provider="tests",
         provider_runtime=TEST_RUNTIME,
         input_schema={"type": "object"},

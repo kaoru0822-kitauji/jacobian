@@ -1,7 +1,7 @@
 """Tests for adapter authority and forgery boundaries.
 
 Covers: invocation recording, provider readiness, error diagnostics, forged
-VERIFIED assurance, and verification record binding.
+verified status, and verification record binding.
 """
 
 from __future__ import annotations

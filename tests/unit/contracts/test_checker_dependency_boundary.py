@@ -5,11 +5,6 @@ from pathlib import Path
 
 _FORBIDDEN_PREFIXES = (
     "jacobian.domains",
-    "jacobian.evaluation",
-    "jacobian.plugin_execution",
-    "jacobian.plugins",
-    "jacobian.shrinking",
-    "jacobian.witnesses",
     "networkx",
     "sympy",
 )

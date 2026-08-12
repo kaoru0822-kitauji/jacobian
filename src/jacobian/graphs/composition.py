@@ -5,7 +5,7 @@ Two domain-atomic graph capabilities backed by NetworkX:
 * ``graph.construct.compose`` — apply disjoint union, join, complement, or
   lexicographic product to existing simple-undirected-graph artifacts and
   materialize the result as a new graph artifact with deterministic
-  ``COMPUTED`` assurance.
+  a computed result.
 
 * ``graph.enumerate.nonisomorphic`` — enumerate all nonisomorphic simple
   undirected graphs of one exact order (0-7) from the NetworkX Graph Atlas
@@ -15,9 +15,9 @@ Two domain-atomic graph capabilities backed by NetworkX:
   existence.
 
 Both capabilities preserve the ``jacobian.simple-undirected-graph`` payload
-schema and semantics.  Neither returns a mathematical conclusion or
-``VERIFIED`` assurance.  Construction and enumeration are deterministic
-NetworkX operations; no independent checker is invoked.
+schema and semantics. Neither returns a mathematical conclusion or a
+verification record. Construction and enumeration are deterministic NetworkX
+operations; no independent checker is invoked.
 """
 
 from __future__ import annotations

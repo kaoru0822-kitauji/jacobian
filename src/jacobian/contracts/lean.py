@@ -1,4 +1,4 @@
-"""Contracts for pinned Lean certificate workflows."""
+"""Contracts for pinned Lean certificate checkers."""
 
 from __future__ import annotations
 

@@ -118,5 +118,5 @@ def test_graph_coloring_encoding_replays_through_domain_checker(
 
     assert verified.execution.status is ExecutionStatus.COMPLETED
     assert verified.output["conclusion"] == "TRUE"
-    assert verified.output["assurance"]["verification"] == "VERIFIED"
+    assert verified.output["verification"] == "VERIFIED"
     assert verified.output["verification_record_uri"] is not None

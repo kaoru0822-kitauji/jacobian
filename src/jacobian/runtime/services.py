@@ -37,7 +37,7 @@ class CoreServices:
 
 @dataclass(frozen=True, slots=True)
 class RuntimeServices:
-    """Retained mathematical services with no workflow lifecycle."""
+    """Retained mathematical services."""
 
     core: CoreServices
     polytope: PolytopeService

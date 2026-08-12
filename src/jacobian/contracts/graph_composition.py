@@ -15,7 +15,7 @@ These contracts cover two domain-atomic graph operations:
 Both contracts preserve the existing ``jacobian.simple-undirected-graph``
 semantics and payload schema.  Neither contract carries a mathematical
 conclusion or verification record; construction and enumeration produce
-``COMPUTED`` assurance only.
+computed results only.
 """
 
 from __future__ import annotations
