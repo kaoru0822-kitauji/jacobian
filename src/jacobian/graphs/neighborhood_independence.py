@@ -210,7 +210,6 @@ class GraphNeighborhoodIndependenceAdapter:
             invariant_uri=invariant_artifact.artifact_uri,
             claim_uri=claim_artifact.artifact_uri,
             certificate_uri=certificate_artifact.artifact_uri,
-            checker_id=self.resources.neighborhood_checker_id,
             records=tuple(records),
             total=total,
             average=average_wire,

@@ -213,7 +213,6 @@ class GraphDegreeSequenceAdapter:
             result_uri=result_artifact.artifact_uri,
             claim_uri=claim_artifact.artifact_uri,
             certificate_uri=certificate_artifact.artifact_uri,
-            checker_id=self.resources.degree_sequence_checker_id,
             backend_version=nx().__version__,
         )
         artifact_uris = [

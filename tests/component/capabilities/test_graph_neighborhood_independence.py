@@ -78,10 +78,6 @@ def test_neighborhood_independence_reproduces_wowii_200_invariant(
         for record in result.output["records"]
     )
     assert result.output["certificate_uri"] in result.artifact_uris
-    assert (
-        result.output["checker_id"]
-        == authorized_graph_services.graph.neighborhood_checker_id
-    )
     assert "conclusion" not in result.output
 
     verified = authorized_graph_services.core.capabilities.invoke(
