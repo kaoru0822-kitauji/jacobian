@@ -462,6 +462,66 @@ def _install_memoryless_state_boundary(connection: sqlite3.Connection) -> None:
     )
 
 
+def _install_checker_manifest_boundary(connection: sqlite3.Connection) -> None:
+    """Cut over checker authorization to manifest-bound implementation identity."""
+
+    checker_count = int(
+        connection.execute("SELECT COUNT(*) FROM checkers").fetchone()[0]
+    )
+    if checker_count:
+        raise RuntimeError(
+            "checker manifest identity requires a fresh state directory; "
+            "existing checker authorizations cannot be migrated safely"
+        )
+    columns = {
+        str(row["name"]) for row in connection.execute("PRAGMA table_info(checkers)")
+    }
+    if "implementation_digest" in columns:
+        # The immutable migration ledger may have been lost after this boundary
+        # completed.  The current schema already has only manifest identity, so
+        # recording revision 9 is safe; no legacy identity is accepted.
+        connection.execute(
+            "UPDATE jacobian_state_format SET format_revision = 9 WHERE id = 0"
+        )
+        return
+    if "executable_digest" not in columns:
+        raise RuntimeError("checker table does not match the v1 authorization schema")
+    connection.execute(
+        "ALTER TABLE checkers RENAME COLUMN executable_digest TO implementation_digest"
+    )
+    connection.execute(
+        "UPDATE jacobian_state_format SET format_revision = 9 WHERE id = 0"
+    )
+
+
+def _install_checker_distribution_identity_boundary(
+    connection: sqlite3.Connection,
+) -> None:
+    """Require a fresh authorization state for manifest-bound Python dependencies."""
+
+    checker_count = int(
+        connection.execute("SELECT COUNT(*) FROM checkers").fetchone()[0]
+    )
+    if checker_count:
+        raise RuntimeError(
+            "checker distribution identity requires a fresh state directory; "
+            "existing checker authorizations cannot be migrated safely"
+        )
+    connection.execute(
+        "UPDATE jacobian_state_format SET format_revision = 10 WHERE id = 0"
+    )
+
+
+def _install_verification_record_manifest_boundary(
+    connection: sqlite3.Connection,
+) -> None:
+    """Cut over durable verification records to embedded checker manifests."""
+
+    connection.execute(
+        "UPDATE jacobian_state_format SET format_revision = 11 WHERE id = 0"
+    )
+
+
 STATE_MIGRATIONS = (
     Migration(
         revision=1,
@@ -521,7 +581,37 @@ STATE_MIGRATIONS = (
         ),
         apply=_install_memoryless_state_boundary,
     ),
+    Migration(
+        revision=9,
+        name="checker-manifest-identity-boundary-v1",
+        definition=(
+            "Replace broad package checker digests with versioned per-checker "
+            "manifests, rename the durable implementation digest column, and "
+            "reject existing authorizations rather than silently rebinding them."
+        ),
+        apply=_install_checker_manifest_boundary,
+    ),
+    Migration(
+        revision=10,
+        name="checker-distribution-identity-boundary-v1",
+        definition=(
+            "Bind checker manifests to separate checker and worker source closures "
+            "plus exact Python distribution RECORD digests; reject existing "
+            "authorizations rather than silently rebinding them."
+        ),
+        apply=_install_checker_distribution_identity_boundary,
+    ),
+    Migration(
+        revision=11,
+        name="verification-record-manifest-boundary-v1",
+        definition=(
+            "Require verification record v4 payloads to snapshot their complete "
+            "checker execution manifest; older record shapes remain owned by "
+            "their matching state revision and checkout."
+        ),
+        apply=_install_verification_record_manifest_boundary,
+    ),
 )
 
-SUPPORTED_STATE_FLOOR = 8
-CURRENT_STATE_FORMAT_REVISION = 8
+SUPPORTED_STATE_FLOOR = 11
+CURRENT_STATE_FORMAT_REVISION = 11

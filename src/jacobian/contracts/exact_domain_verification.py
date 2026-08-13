@@ -22,7 +22,7 @@ from pydantic import model_validator
 
 from jacobian.canonical import canonicalize_json, sha256_digest
 from jacobian.contracts.capabilities import CapabilityId
-from jacobian.contracts.checkers import CheckerDecision, EvidenceKind
+from jacobian.contracts.checkers import CheckerDecision, CheckerManifest, EvidenceKind
 from jacobian.contracts.common import ArtifactUri, CheckerUri, Sha256Digest
 from jacobian.contracts.evidence import EvidenceBindings
 from jacobian.contracts.results import ContractModel
@@ -78,6 +78,9 @@ class ExactComputedVerificationOutput(ContractModel):
     result_uri: ArtifactUri | None = None
     witness_uri: ArtifactUri | None = None
     checker_id: CheckerUri
+    claim_digest: Sha256Digest | None = None
+    semantics_digest: Sha256Digest | None = None
+    candidate_digest: Sha256Digest | None = None
     verification_record_uri: ArtifactUri | None = None
     detail: str
 
@@ -88,6 +91,13 @@ class ExactComputedVerificationOutput(ContractModel):
             raise ValueError("only VERIFIED output may carry a true conclusion")
         if verified != (self.verification_record_uri is not None):
             raise ValueError("only VERIFIED output may carry a verification record")
+        digests = (
+            self.claim_digest,
+            self.semantics_digest,
+            self.candidate_digest,
+        )
+        if verified != all(digest is not None for digest in digests):
+            raise ValueError("only VERIFIED output must carry every checked digest")
         return self
 
 
@@ -105,13 +115,14 @@ class InlineExactVerificationRecord(ContractModel):
     being promoted into artifacts merely to support verification.
     """
 
-    record_schema_version: Literal["1"] = "1"
+    record_schema_version: Literal["4"] = "4"
     evidence_kind: Literal[EvidenceKind.WITNESS] = EvidenceKind.WITNESS
     witness_format: str
     operation_id: CapabilityId
     format_version: Literal["1"] = "1"
     checker_id: CheckerUri
-    checker_digest: Sha256Digest
+    implementation_digest: Sha256Digest
+    checker_manifest: CheckerManifest
     runtime_digest: Sha256Digest | None = None
     environment_digest: Sha256Digest
     input_schema_uri: ArtifactUri
@@ -123,6 +134,10 @@ class InlineExactVerificationRecord(ContractModel):
 
     @model_validator(mode="after")
     def accepted_inline_replay_is_fully_bound(self) -> Self:
+        if self.implementation_digest != self.checker_manifest.implementation_digest():
+            raise ValueError(
+                "inline verification record digest must match its checker manifest"
+            )
         if (
             not self.decision.accepted
             or self.bindings.candidate_digest is None

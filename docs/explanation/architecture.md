@@ -180,9 +180,10 @@ mathematical result and from verification authority.
 
 `CapabilityResult` is a wire projection, not an in-process return type. Domain
 functions, operation executors, artifact services, and checker services return
-their owned typed values or terminal states. The final capability adapter
-constructs the wire envelope once, after publication has returned the complete
-artifact closure. Artifact-producing operations must not move storage writes
+their owned typed values or terminal states. The public dispatcher constructs
+the wire envelope once, after publication has returned the complete artifact
+closure; installed adapters return a typed projection rather than constructing
+the envelope themselves. Artifact-producing operations must not move storage writes
 into `OperationSpec.execute`; a domain-specific publisher may preserve an
 established durable schema and parent closure without expanding the generic
 publication policy.
@@ -198,7 +199,10 @@ obligation records around an already-typed result.
 A checker is a separate installed operation governed by a typed
 `VerificationProtocol[SubjectT, CandidateT, EvidenceT, DecisionT]`. Operator
 configuration authorizes checker identities; producer declarations and search
-code cannot authorize themselves.
+code cannot authorize themselves. Exact replay declarations bind their own
+provider-runtime factory. Installation groups those factories by the provider
+identity they probe; it does not keep a central entrypoint map or support
+matrix.
 
 The runtime keeps four narrow responsibilities:
 
@@ -213,6 +217,24 @@ and failure to find evidence are non-conclusions. The record binds the exact
 subject, candidate, evidence, protocol, semantics, scope, certificate format,
 and checker identity. Independent checker execution does not import or call the
 producer, proposal, search, or evaluation path it certifies.
+
+Checker identity comes from a versioned manifest for that checker, not from a
+digest of the whole Jacobian package. The manifest binds its exact entry point,
+separate checker and worker source closures, exact Python distributions, Python
+and provider runtime, passive contracts, and bounded-process policy. The worker
+admits only the declared first-party closure and manifest-bound third-party
+distributions, including imports requested dynamically during checker
+execution, and remeasures the complete
+manifest—including the current bytes of every indexed dependency file—around
+execution. Authorization performs the same measurement once; catalog and
+compatibility reads do not repeat that filesystem scan. A producer or unrelated
+checker edit therefore cannot change the identity, while a changed executable
+dependency cannot retain it.
+
+Verification record v4 snapshots that complete manifest and binds its canonical
+digest, so interpreting the checker identity never depends on a mutable
+authorization row. Record v3 belongs to state revision 10 and remains readable
+with the matching older checkout; the current runtime has no dual record shape.
 
 `VerificationResult` is the internal typed outcome of that checker execution,
 not a generic mathematical result envelope. Capability adapters project it
@@ -298,6 +320,13 @@ The local server contains catalog, execution, storage, provider declarations,
 and checker authority. Remote authentication, tenants, admission, leases,
 eviction, and quarantine belong to a separate remote host and do not enter the
 local mathematical server.
+
+Local artifact storage retains one concrete filesystem CAS with SQLite metadata.
+`ArtifactRepository` is its public aggregate; explicit transaction, blob, and
+metadata collaborators own the implementation. They are not interchangeable
+backend interfaces, and new storage abstractions require new workload evidence.
+The aggregate coordinates lifecycle and transactions; it does not mirror
+collaborator-private blob or recovery APIs.
 
 MCP uses SDK-derived typed schemas and structured output. Pydantic result models
 are returned directly unless a genuine `ResourceLink`, custom metadata, or

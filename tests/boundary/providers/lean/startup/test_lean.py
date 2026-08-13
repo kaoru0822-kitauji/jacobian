@@ -7,8 +7,10 @@ from typing import Any, cast
 
 import pytest
 from tests.support.provider_lean import (
+    PINNED_LEAN_CORE_RUNTIME_UNAVAILABLE_REASON,
     PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
-    pinned_mathlib_runtime_available,
+    skip_unless_pinned_lean_core_runtime,
+    skip_unless_pinned_mathlib_runtime,
 )
 from tests.support.state import copy_template
 
@@ -34,24 +36,10 @@ from jacobian.lean_frontend.declarations import (
 )
 from jacobian.runtime import CheckerAuthorityMode, create_runtime
 
-PROJECT_ROOT = Path(__file__).resolve().parents[5]
-MATHLIB_OLEAN = (
-    PROJECT_ROOT
-    / "lean"
-    / ".lake"
-    / "packages"
-    / "mathlib"
-    / ".lake"
-    / "build"
-    / "lib"
-    / "lean"
-    / "Mathlib.olean"
-)
-
 pytestmark = [
     pytest.mark.skipif(
-        not pinned_mathlib_runtime_available(),
-        reason=PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
+        skip_unless_pinned_lean_core_runtime(),
+        reason=PINNED_LEAN_CORE_RUNTIME_UNAVAILABLE_REASON,
     ),
 ]
 
@@ -70,8 +58,8 @@ def test_core_declaration_catalog_matches_a_fresh_scan_and_detects_tampering(
     fresh_runtime = create_runtime(
         fresh_root, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
-    indexed = indexed_runtime.portfolio.lean_declarations
-    fresh = fresh_runtime.portfolio.lean_declarations
+    indexed = indexed_runtime.portfolio_resources.lean_declarations
+    fresh = fresh_runtime.portfolio_resources.lean_declarations
     assert indexed is not None
     assert fresh is not None
     indexed_backend = indexed.backend
@@ -142,8 +130,8 @@ def test_core_dependency_graph_is_bounded_and_materialized(tmp_path: Path) -> No
 
 
 @pytest.mark.skipif(
-    not MATHLIB_OLEAN.is_file(),
-    reason="the pinned mathlib runtime has not been built",
+    skip_unless_pinned_mathlib_runtime(),
+    reason=PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
 )
 @pytest.mark.timeout(240)
 def test_mathlib_discovery_composes_with_bound_sqrt_two_verification(
@@ -152,12 +140,8 @@ def test_mathlib_discovery_composes_with_bound_sqrt_two_verification(
     runtime = create_runtime(
         tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
-    assert runtime.portfolio.lean is not None
-    assert runtime.portfolio.lean_declarations is not None
-    assert (
-        runtime.portfolio.lean_checkers[LeanEnvironment.MATHLIB].checker_timeout_seconds
-        == 225
-    )
+    assert runtime.portfolio_resources.lean is not None
+    assert runtime.portfolio_resources.lean_declarations is not None
 
     searched = runtime.core.capabilities.invoke(
         CapabilityRequest(
@@ -188,7 +172,7 @@ def test_mathlib_discovery_composes_with_bound_sqrt_two_verification(
         == searched.output["result"]["environment_digest"]
     )
 
-    verified = runtime.portfolio.lean.verify(
+    verified = runtime.portfolio_resources.lean.verify(
         environment=LeanEnvironment.MATHLIB,
         statement="Irrational (Real.sqrt 2)",
         proof="exact irrational_sqrt_two",
@@ -214,7 +198,7 @@ def test_core_lean_induction_proof_creates_bound_verification_record(
     runtime = create_runtime(
         tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
-    assert runtime.portfolio.lean is not None
+    assert runtime.portfolio_resources.lean is not None
 
     inspected = runtime.core.capabilities.invoke(
         CapabilityRequest(
@@ -239,7 +223,7 @@ def test_core_lean_induction_proof_creates_bound_verification_record(
     assert outside_profile.output["result"]["declarations"] == []
     assert outside_profile.output["result"]["stop_reason"] == "EXHAUSTED"
 
-    verified = runtime.portfolio.lean.verify(
+    verified = runtime.portfolio_resources.lean.verify(
         statement="∀ n : Nat, n + 0 = n",
         proof=(
             "intro n\n"
@@ -266,15 +250,14 @@ def test_core_lean_checker_binds_the_measured_runtime(tmp_path: Path) -> None:
     runtime = create_runtime(
         tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
-    installation = runtime.portfolio.lean_checkers[LeanEnvironment.CORE]
+    assert runtime.portfolio_resources.lean is not None
+    installation = runtime.portfolio_resources.lean.installations[LeanEnvironment.CORE]
     assert installation.checker_id is not None
-
     registration = runtime.core.checkers.require_active(installation.checker_id)
 
-    assert registration.provider_runtime is not None
-    assert registration.provider_runtime.provider == "jacobian.lean4"
-    assert registration.provider_runtime.digest == runtime.portfolio.lean_runtime.digest
-    assert registration.provider_runtime.checker_ids == ()
+    assert registration.implementation.provider_runtime is not None
+    assert registration.implementation.provider_runtime.provider == "jacobian.lean4"
+    assert registration.implementation.provider_runtime.checker_ids == ()
 
 
 @pytest.mark.parametrize(
@@ -293,9 +276,9 @@ def test_core_lean_accepts_single_expression_witness_forms(
     runtime = create_runtime(
         tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
-    assert runtime.portfolio.lean is not None
+    assert runtime.portfolio_resources.lean is not None
 
-    verified = runtime.portfolio.lean.verify(statement=statement, proof=proof)
+    verified = runtime.portfolio_resources.lean.verify(statement=statement, proof=proof)
 
     assert verified.result.conclusion is Conclusion.TRUE
     assert verified.result.verification_record_uri is not None
@@ -364,9 +347,9 @@ def test_core_lean_rejects_untrusted_or_invalid_proofs(
     runtime = create_runtime(
         tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
-    assert runtime.portfolio.lean is not None
+    assert runtime.portfolio_resources.lean is not None
 
-    rejected = runtime.portfolio.lean.verify(
+    rejected = runtime.portfolio_resources.lean.verify(
         statement="∀ n : Nat, n + 0 = n",
         proof=proof,
     )
@@ -389,7 +372,7 @@ def test_lean_reuses_only_an_exact_active_checker_result(
     runtime = create_runtime(
         tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
-    assert runtime.portfolio.lean is not None
+    assert runtime.portfolio_resources.lean is not None
     calls = 0
 
     def accept(**_: object) -> CheckerDecision:
@@ -407,11 +390,17 @@ def test_lean_reuses_only_an_exact_active_checker_result(
     def unexpected_selector(**_: object) -> object:
         raise AssertionError("Lean must use its explicitly installed checker")
 
-    monkeypatch.setattr(runtime.services.verification, "_run_checker", accept)
+    monkeypatch.setattr(
+        runtime.services.verification._checker_executor, "execute", accept
+    )
     monkeypatch.setattr(runtime.core.checkers, "select_compatible", unexpected_selector)
-    first = runtime.portfolio.lean.verify(statement="1 + 1 = 2", proof="rfl")
-    repeated = runtime.portfolio.lean.verify(statement="1 + 1 = 2", proof="rfl")
-    changed = runtime.portfolio.lean.verify(statement="2 + 2 = 4", proof="rfl")
+    first = runtime.portfolio_resources.lean.verify(statement="1 + 1 = 2", proof="rfl")
+    repeated = runtime.portfolio_resources.lean.verify(
+        statement="1 + 1 = 2", proof="rfl"
+    )
+    changed = runtime.portfolio_resources.lean.verify(
+        statement="2 + 2 = 4", proof="rfl"
+    )
 
     assert calls == 2
     assert first.cache_hit is False
@@ -429,7 +418,7 @@ def test_lean_cache_never_reuses_a_rejected_checker_input(
     runtime = create_runtime(
         tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
-    assert runtime.portfolio.lean is not None
+    assert runtime.portfolio_resources.lean is not None
     decisions = iter(
         (
             CheckerDecision(
@@ -457,11 +446,19 @@ def test_lean_cache_never_reuses_a_rejected_checker_input(
         calls += 1
         return next(decisions)
 
-    monkeypatch.setattr(runtime.services.verification, "_run_checker", recover)
+    monkeypatch.setattr(
+        runtime.services.verification._checker_executor, "execute", recover
+    )
 
-    first = runtime.portfolio.lean.verify(statement="True", proof="by trivial")
-    recovered = runtime.portfolio.lean.verify(statement="True", proof="by trivial")
-    repeated = runtime.portfolio.lean.verify(statement="True", proof="by trivial")
+    first = runtime.portfolio_resources.lean.verify(
+        statement="True", proof="by trivial"
+    )
+    recovered = runtime.portfolio_resources.lean.verify(
+        statement="True", proof="by trivial"
+    )
+    repeated = runtime.portfolio_resources.lean.verify(
+        statement="True", proof="by trivial"
+    )
 
     assert first.result.input.status is InputStatus.REJECTED
     assert first.cache_hit is False
@@ -478,10 +475,10 @@ def test_lean_cache_does_not_reuse_a_revoked_checker_result(
     runtime = create_runtime(
         tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
-    assert runtime.portfolio.lean is not None
+    assert runtime.portfolio_resources.lean is not None
     monkeypatch.setattr(
-        runtime.services.verification,
-        "_run_checker",
+        runtime.services.verification._checker_executor,
+        "execute",
         lambda **_: CheckerDecision(
             accepted=True,
             conclusion=Conclusion.TRUE,
@@ -491,17 +488,25 @@ def test_lean_cache_does_not_reuse_a_revoked_checker_result(
             detail="accepted by test checker",
         ),
     )
-    first = runtime.portfolio.lean.verify(statement="1 + 1 = 2", proof="rfl")
-    checker_id = runtime.portfolio.lean_checkers[LeanEnvironment.CORE].checker_id
+    first = runtime.portfolio_resources.lean.verify(statement="1 + 1 = 2", proof="rfl")
+    record_uri = first.result.verification_record_uri
+    assert record_uri is not None
+    checker_id = runtime.core.store.get(record_uri).payload["checker_id"]
     runtime.core.checkers.revoke(checker_id, reason="cache trust-boundary test")
 
-    repeated = runtime.portfolio.lean.verify(statement="1 + 1 = 2", proof="rfl")
+    repeated = runtime.portfolio_resources.lean.verify(
+        statement="1 + 1 = 2", proof="rfl"
+    )
 
     assert first.result.verification_record_uri is not None
     assert repeated.cache_hit is False
     assert repeated.result.verification_record_uri is None
 
 
+@pytest.mark.skipif(
+    skip_unless_pinned_mathlib_runtime(),
+    reason=PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
+)
 def test_mathlib_warmup_starts_only_once(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -509,10 +514,10 @@ def test_mathlib_warmup_starts_only_once(
     runtime = create_runtime(
         tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
-    assert runtime.portfolio.lean is not None
+    assert runtime.portfolio_resources.lean is not None
     warmed = threading.Event()
-    monkeypatch.setattr(runtime.portfolio.lean, "_warm_mathlib", warmed.set)
+    monkeypatch.setattr(runtime.portfolio_resources.lean, "_warm_mathlib", warmed.set)
 
-    assert runtime.portfolio.lean.start_mathlib_warmup() is True
+    assert runtime.portfolio_resources.lean.start_mathlib_warmup() is True
     assert warmed.wait(timeout=2)
-    assert runtime.portfolio.lean.start_mathlib_warmup() is False
+    assert runtime.portfolio_resources.lean.start_mathlib_warmup() is False

@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 from jacobian.contracts.capabilities import CapabilityDiagnostic
+from jacobian.domain_bundles import DomainBundle
 from jacobian.domains.graph_optimization.checkers import (
     GRAPH_INVARIANT_EXACT_REPLAY_CHECKERS,
+)
+from jacobian.domains.graph_optimization.distance_matrix import (
+    DISTANCE_MATRIX_OPERATION,
 )
 from jacobian.domains.graph_optimization.invariants import (
     EXACT_GRAPH_INVARIANT_CAPABILITIES,
 )
-from jacobian.operations import DomainBundle, DomainDiagnostics, DomainSemantics
+from jacobian.operations import DomainDiagnostics, DomainSemantics
 from jacobian.provider_runtime import (
     NETWORKX_VERSION,
     SYMPY_VERSION,
@@ -30,7 +34,10 @@ def build_graph_invariant_bundle() -> DomainBundle:
                 "graph_class": "finite simple undirected",
                 "maximum_order": 32,
                 "maximum_edges": 496,
+                "distance_matrix_maximum_order": 64,
+                "distance_matrix_maximum_edges": 2_016,
                 "exact_computations": [
+                    "distance_matrix",
                     "girth",
                     "diameter",
                     "edge_connectivity",
@@ -65,7 +72,7 @@ def build_graph_invariant_bundle() -> DomainBundle:
             ),
         ),
         backend_version=f"networkx-{NETWORKX_VERSION};sympy-{SYMPY_VERSION}",
-        capabilities=EXACT_GRAPH_INVARIANT_CAPABILITIES,
+        capabilities=(DISTANCE_MATRIX_OPERATION, *EXACT_GRAPH_INVARIANT_CAPABILITIES),
         diagnostics=DomainDiagnostics(
             invalid_request=CapabilityDiagnostic(
                 code="INVALID_GRAPH_INVARIANT_REQUEST",

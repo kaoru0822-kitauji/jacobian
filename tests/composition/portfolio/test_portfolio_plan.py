@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from jacobian.operations import DomainBundle
-from jacobian.portfolio import PortfolioPlan, build_builtin_portfolio
-from jacobian.portfolio.builtin import build_builtin_portfolio_components
+from jacobian.domain_bundles import DomainBundle
+from jacobian.portfolio.builtin import (
+    build_builtin_portfolio,
+    build_builtin_portfolio_components,
+)
+from jacobian.portfolio.model import PortfolioPlan
 
 
 def test_builtin_portfolio_is_an_explicit_plan_of_components() -> None:
@@ -46,7 +49,7 @@ def test_validate_rejects_non_domain_bundle_entries() -> None:
     impostor = object()
     plan = PortfolioPlan(components=(impostor,))  # type: ignore[arg-type]
 
-    with pytest.raises(TypeError, match="domain bundles or managed components"):
+    with pytest.raises(TypeError, match="domain bundles"):
         plan.validate()
 
 

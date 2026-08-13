@@ -241,6 +241,18 @@ def lean_semantic_runtime_digest(identity: Mapping[str, Any]) -> str:
     return "sha256:" + hashlib.sha256(canonicalize_json(dict(identity))).hexdigest()
 
 
+def lean_portable_semantic_runtime_digest(identity: Mapping[str, Any]) -> str:
+    """Digest semantic runtime content without binding its deployment root."""
+
+    portable = dict(identity)
+    project = portable.get("mathlib_project")
+    if isinstance(project, Mapping):
+        portable["mathlib_project"] = {
+            key: value for key, value in project.items() if key != "root"
+        }
+    return lean_semantic_runtime_digest(portable)
+
+
 def lean_provider_runtime(
     *,
     profiles: Mapping[str, Mapping[str, Any]],
@@ -272,14 +284,18 @@ def lean_provider_runtime(
             executable=executable,
             mathlib_runtime=mathlib_runtime,
         )
-    except (OSError, RuntimeError):
+    except (OSError, RuntimeError) as exc:
+        detail = str(exc).strip()
+        diagnostic = (
+            detail
+            if detail
+            else f"The pinned Lean {lean4.LEAN_VERSION} runtime is unavailable."
+        )
         return _unavailable_runtime(
             provider="jacobian.lean4",
             install_tier=CapabilityInstallTier.T3,
             license_id="Apache-2.0",
-            diagnostic=(
-                f"The pinned Lean {lean4.LEAN_VERSION} runtime is unavailable."
-            ),
+            diagnostic=diagnostic,
         )
     configuration: dict[str, Any] = {
         "executable": str(executable),
