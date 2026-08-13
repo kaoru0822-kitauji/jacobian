@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 from mcp.server import MCPServer
 
@@ -15,8 +16,15 @@ from jacobian.adapters.mcp.context import (
     _configured_root,
     _start_lean_warmup,
 )
-from jacobian.adapters.mcp.core import JacobianCoreExtension, JacobianMCPServer
-from jacobian.adapters.mcp.deployment_identity import load_deployment_identity
+from jacobian.adapters.mcp.core import (
+    JacobianMCPServer,
+    register_core_projection,
+    tool_runtime_scope,
+)
+from jacobian.adapters.mcp.deployment_identity import (
+    DeploymentIdentity,
+    load_deployment_identity,
+)
 from jacobian.adapters.mcp.guidance import SERVER_DESCRIPTION, SERVER_INSTRUCTIONS
 from jacobian.adapters.mcp.lifecycle import (
     runtime_lifespan,
@@ -68,20 +76,24 @@ def create_server_from_runtime(
         acquire_runtime=lambda: RuntimeLease(runtime),
         worker_registry=MCPBlockingWorkerRegistry(),
     )
-    return _build_local_server(
+    return _build_server(
         state=state,
         close_owner=close_owner,
         start_owner=start_owner,
+        deployment_identity=load_deployment_identity(),
     )
 
 
-def _build_local_server(
+def _build_server(
     *,
     state: AppState,
     close_owner: Callable[[], None],
     start_owner: Callable[[], None] | None = None,
+    deployment_identity: DeploymentIdentity | None = None,
+    token_verifier: Any | None = None,
+    auth: Any | None = None,
 ) -> MCPServer[AppState]:
-    """Register the fixed MCP projection over one local runtime owner."""
+    """Register Jacobian's fixed MCP projection over one runtime owner."""
 
     @asynccontextmanager
     async def lifespan(server: MCPServer[AppState]) -> AsyncIterator[AppState]:
@@ -100,8 +112,11 @@ def _build_local_server(
         instructions=SERVER_INSTRUCTIONS,
         version=__version__,
         lifespan=lifespan,
-        extensions=[JacobianCoreExtension(state, load_deployment_identity())],
+        token_verifier=token_verifier,
+        auth=auth,
+        middleware=[tool_runtime_scope],
     )
+    register_core_projection(server, state, deployment_identity)
     register_resources(server)
     return server
 

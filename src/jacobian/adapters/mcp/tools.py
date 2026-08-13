@@ -258,13 +258,8 @@ def _find_text_projection(response: dict[str, Any]) -> dict[str, Any]:
 def _find_result(response: dict[str, Any]) -> CallToolResult:
     if "error" in response and response.get("kind") != "error":
         response = {"kind": "error", **response}
-    structured = CapabilityDiscoveryResponse.model_validate(response)
     return _text_result(
-        structured.model_dump(
-            mode="json",
-            by_alias=True,
-            exclude_unset=True,
-        ),
+        response,
         _find_text_projection(response),
     )
 
@@ -334,7 +329,7 @@ def _run_text_projection(result: CapabilityResult) -> dict[str, Any]:
     return projection
 
 
-async def capability_describe(
+async def math_find(
     request: CapabilityFindRequest,
     *,
     ctx: Context[AppState, Any],
@@ -352,13 +347,8 @@ async def capability_describe(
             )
             return _find_result(discovery_response)
         capability_id = request.capability_id
-        capability_catalog = active_runtime.core.capabilities.catalog()
-        descriptors = {
-            item.capability_id: item for item in capability_catalog.capabilities
-        }
-        try:
-            descriptor = descriptors[capability_id]
-        except KeyError:
+        descriptor = active_runtime.core.capabilities.inspect(capability_id)
+        if descriptor is None:
             hint = "Call math.find with a mathematical query to search installed capabilities."
             error_response = {
                 "error": {
@@ -380,7 +370,7 @@ async def capability_describe(
         return _find_result(response)
 
 
-async def capability_invoke(
+async def math_run(
     capability_id: CapabilityId,
     payload: dict[str, Any],
     inputs: dict[str, _ValueReferenceArgument] | None = None,
