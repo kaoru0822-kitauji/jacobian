@@ -12,7 +12,11 @@ from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
 from jacobian.capability_adapters import CapabilityAdapter
-from jacobian.capability_errors import CapabilityError, CapabilityInvocationError
+from jacobian.capability_errors import (
+    CapabilityError,
+    CapabilityInvocationError,
+    enriched_invalid_request,
+)
 from jacobian.checker_artifacts import put_witness_envelope
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation, ExactReplayCheckerDeclaration
@@ -886,8 +890,17 @@ class ExactComputedVerificationAdapter:
             ValueError,
             ValueReferenceError,
         ) as exc:
-            raise CapabilityInvocationError(
-                CapabilityDiagnostic(
+            diagnostic = (
+                enriched_invalid_request(
+                    CapabilityDiagnostic(
+                        code="INVALID_REQUEST",
+                        stage="capability_input_validation",
+                        message="The capability request is invalid.",
+                    ),
+                    exc,
+                )
+                if isinstance(exc, ValidationError)
+                else CapabilityDiagnostic(
                     code="INVALID_EXACT_DOMAIN_INPUT",
                     stage="request_validation",
                     message=bounded_validation_exception_message(exc),
@@ -896,7 +909,8 @@ class ExactComputedVerificationAdapter:
                         "candidate must satisfy its result contract."
                     ),
                 )
-            ) from exc
+            )
+            raise CapabilityInvocationError(diagnostic) from exc
         return normalized_input, normalized_candidate
 
     def _resolve_stored_result(
