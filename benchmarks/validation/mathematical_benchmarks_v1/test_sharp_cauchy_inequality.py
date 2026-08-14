@@ -80,6 +80,35 @@ def test_sharp_cauchy_inequality_rejects_nonsharp_constant(tmp_path: Path) -> No
     assert rejected.reward == 0.0
 
 
+@pytest.mark.parametrize("replacement", [True, False])
+def test_sharp_cauchy_inequality_rejects_boolean_integer_evidence_alias(
+    tmp_path: Path,
+    replacement: bool,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "sharp-cauchy-inequality", "computed"
+    )
+    evidence_path = app / "evidence" / "inequality-certificate.json"
+    evidence = json.loads(
+        (task / "solution" / "inequality-certificate.json").read_text()
+    )
+    if replacement:
+        evidence["result"]["certificate"]["residual"][0]["coefficient"] = True
+    else:
+        evidence["result"]["certificate"]["residual"][0]["exponents"][0] = False
+    support._write_json(evidence_path, evidence)
+
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["evidence"][0]["sha256"] = support._digest(evidence_path)
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected.details["correctness"] == 1.0
+    assert rejected.details["evidence_validity"] == 0.0
+    assert rejected.reward == 0.0
+
+
 def test_sharp_cauchy_inequality_accepts_cauchy_composition_mode(
     tmp_path: Path,
 ) -> None:
