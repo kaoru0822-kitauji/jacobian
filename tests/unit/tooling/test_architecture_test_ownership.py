@@ -169,6 +169,57 @@ def test_discarded_complete_runtime_fixture_is_rejected(tmp_path: Path) -> None:
     ]
 
 
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from tests.support.catalog_build_runtime import create_catalog_build_runtime\n",
+        "import tests.support.catalog_build_runtime as runtime\n",
+        "from tests.support import catalog_build_runtime\n",
+        "from tests.support.complete_runtime_fixtures import fresh_complete_runtime\n",
+        "import tests.support.complete_runtime_fixtures as fixtures\n",
+        "from tests.support import complete_runtime_fixtures\n",
+    ],
+)
+def test_lean_behavior_module_cannot_import_complete_runtime(
+    tmp_path: Path,
+    source: str,
+) -> None:
+    _write(
+        tmp_path,
+        "tests/boundary/providers/lean/startup/test_lean.py",
+        source,
+    )
+
+    assert _ownership_messages(tmp_path) == [
+        "Lean behavior tests must use tests.support.lean_runtime "
+        "instead of the complete catalog-build runtime"
+    ]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "import tests.support.catalog_build_runtime as runtime\n",
+        "from tests.support import catalog_build_runtime\n",
+        "import tests.support.complete_runtime_fixtures as fixtures\n",
+        "from tests.support import complete_runtime_fixtures\n",
+    ],
+)
+def test_domain_module_cannot_import_complete_runtime_as_a_module(
+    tmp_path: Path,
+    source: str,
+) -> None:
+    _write(
+        tmp_path,
+        "tests/domain/polynomial/test_runtime.py",
+        source,
+    )
+
+    assert _ownership_messages(tmp_path) == [
+        "focused tests must use their owning seam instead of the complete runtime"
+    ]
+
+
 def test_cli_projection_tests_cannot_cold_start_the_complete_portfolio(
     tmp_path: Path,
 ) -> None:
@@ -203,6 +254,9 @@ def test_cli_init_complete_smoke_may_use_the_default_app(tmp_path: Path) -> None
     )
 
     assert _ownership_messages(tmp_path) == []
+
+
+def test_owned_composition_module_is_accepted(tmp_path: Path) -> None:
     _write(tmp_path, "tests/composition/interoperability/test_value_handoff.py")
 
     assert _ownership_messages(tmp_path) == []
