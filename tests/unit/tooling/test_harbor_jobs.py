@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
@@ -125,3 +127,64 @@ def test_paired_jobs_collect_runtime_evidence_available_in_each_condition() -> N
         {"source": "/logs/jacobian/mcp.log", "service": "jacobian"},
     ]
     assert control["artifacts"] == ["/logs/agent/trajectory.json"]
+
+
+def test_agent_eval_resolves_a_current_image_when_not_explicitly_set(
+    tmp_path: Path,
+) -> None:
+    """The treatment defaults to the clean revision's immutable registry image."""
+    runtime_snapshot = tmp_path / "runtime.json"
+    runtime_snapshot.write_text("{}", encoding="utf-8")
+    trace = tmp_path / "trace.txt"
+    selected = "registry.invalid/jacobian@sha256:" + "a" * 64
+    fake_uv = tmp_path / "uv"
+    fake_uv.write_text(
+        "#!/bin/sh\n"
+        'case "$*" in\n'
+        "  *'tools.manage_jacobian_image select'*)\n"
+        '    printf \'%s\\n\' "$*" >> "$TRACE"\n'
+        "    printf '%s\\n' \"$SELECTED_IMAGE\"\n"
+        "    ;;\n"
+        "  *'tools.manage_jacobian_image bind-runtime'*)\n"
+        '    printf \'bind image=%s\\n\' "$JACOBIAN_IMAGE" >> "$TRACE"\n'
+        "    ;;\n"
+        "esac\n",
+        encoding="utf-8",
+    )
+    fake_uv.chmod(0o755)
+    fake_harbor = tmp_path / "harbor"
+    fake_harbor.write_text(
+        '#!/bin/sh\nprintf \'harbor image=%s\\n\' "$JACOBIAN_IMAGE" >> "$TRACE"\n',
+        encoding="utf-8",
+    )
+    fake_harbor.chmod(0o755)
+    environment = os.environ | {
+        "JACOBIAN_IMAGE": "",
+        "SELECTED_IMAGE": selected,
+        "TRACE": str(trace),
+    }
+
+    completed = subprocess.run(
+        [
+            "make",
+            "agent-eval",
+            "EVAL_EXECUTE=1",
+            "JACOBIAN_MODEL=test-model",
+            f"RUNTIME_SNAPSHOT={runtime_snapshot}",
+            f"UV_RUN={fake_uv}",
+            f"HARBOR_RUNNER={fake_harbor}",
+            "JACOBIAN_REGISTRY_IMAGE=registry.invalid/jacobian",
+        ],
+        cwd=ROOT,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert trace.read_text(encoding="utf-8").splitlines() == [
+        "python -m tools.manage_jacobian_image select --registry-image registry.invalid/jacobian",
+        f"bind image={selected}",
+        f"harbor image={selected}",
+    ]

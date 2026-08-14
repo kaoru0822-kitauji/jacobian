@@ -16,3 +16,17 @@ they do not create Jacobian artifacts, workspaces, or verification records.
 Run each arm in a fresh temporary `CODEX_HOME`, never through direct host `codex exec`.
 The control must have no Jacobian MCP server; the treatment must expose only the
 intended Jacobian MCP configuration and no Jacobian Skill.
+
+For a Jacobian-enabled `make agent-eval` run, omit `JACOBIAN_IMAGE`. The target
+then resolves the current clean revision to the immutable
+`ghcr.io/morluto/jacobian@sha256:...` image before Harbor starts the sidecar.
+An explicit `JACOBIAN_IMAGE` is an override for a deliberately frozen run, so
+do not point it at a convenience or stale local tag. A dirty checkout instead
+builds `jacobian:local`; it is useful for local diagnostics but cannot support
+reproducible treatment evidence.
+
+`RUNTIME_SNAPSHOT` remains explicit: prepare a JSON record that freezes the
+model and treatment condition, then pass its path to both `agent-eval` and
+`agent-eval-validate`. The run binds the resolved image identity into that
+record. Use `make eval-image-pull` to inspect or pre-pull the same immutable
+image without starting a model run.

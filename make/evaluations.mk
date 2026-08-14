@@ -66,7 +66,12 @@ agent-eval: ## Run a Harbor evaluation (JACOBIAN_ENABLED=0|1, JACOBIAN_EVAL_PROX
 		export CODEX_FORCE_AUTH_JSON=1; \
 	fi; \
 	if [ "$(JACOBIAN_ENABLED)" = "1" ]; then \
-		test -n "$${JACOBIAN_IMAGE:-}" || { echo "JACOBIAN_IMAGE must be exported" >&2; exit 2; }; \
+		if [ -z "$${JACOBIAN_IMAGE:-}" ]; then \
+			JACOBIAN_IMAGE="$$( $(UV_RUN) python -m tools.manage_jacobian_image select \
+				--registry-image "$(JACOBIAN_REGISTRY_IMAGE)" )"; \
+			export JACOBIAN_IMAGE; \
+			echo "Resolved Jacobian evaluation image: $${JACOBIAN_IMAGE}"; \
+		fi; \
 		test -n "$(RUNTIME_SNAPSHOT)" || { echo "RUNTIME_SNAPSHOT is required for a Jacobian-enabled run" >&2; exit 2; }; \
 		$(UV_RUN) python -m tools.manage_jacobian_image bind-runtime \
 			--image "$${JACOBIAN_IMAGE}" --runtime-snapshot "$(RUNTIME_SNAPSHOT)"; \
