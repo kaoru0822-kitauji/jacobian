@@ -163,10 +163,23 @@ and middleware. It returns Pydantic results directly unless a real
 `ResourceLink`, custom metadata, or deliberate text projection requires an
 explicit MCP result.
 
-Because the pinned SDK does not publish strict extra-argument schemas, a narrow
-boundary shim rejects unknown call arguments. It can be deleted when the SDK
-publishes `additionalProperties: false` and rejects unknown arguments in
-conformance tests.
+The pinned SDK validates declared argument types, but its generated argument
+models currently inherit Pydantic's `extra="ignore"` behavior. An unknown or
+misspelled call argument can therefore be discarded before the tool handler
+runs, while the published schema does not consistently advertise
+`additionalProperties: false`. Jacobian's narrow boundary shim both publishes
+the closed schema and rejects unknown call arguments before SDK dispatch. The
+upstream report is [python-sdk#3067](https://github.com/modelcontextprotocol/python-sdk/issues/3067),
+with the proposed fix in [python-sdk#3068](https://github.com/modelcontextprotocol/python-sdk/pull/3068).
+
+The same shim rejects objects and arrays supplied as JSON strings. That is a
+Jacobian transport rule, not the upstream extra-argument bug: the SDK
+pre-parses stringified structured values for compatibility with clients that
+send them that way, while Jacobian requires structured JSON values to remain
+structured and does not repair transport input. The unknown-argument portion
+of the shim can be removed after a released SDK includes the upstream fix and
+the conformance tests pass without it. The stringified-structured-input check
+remains until Jacobian intentionally changes that transport contract.
 
 `math.find` is read-only and idempotent. `math.run` is non-destructive at the
 fixed MCP surface but is not globally read-only or idempotent; the selected
