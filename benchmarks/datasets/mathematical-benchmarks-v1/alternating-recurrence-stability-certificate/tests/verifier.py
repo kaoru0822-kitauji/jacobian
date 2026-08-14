@@ -159,7 +159,7 @@ def main() -> None:
     )
     assurance_ok = bool(contract and submission.get("claimed_assurance") == "COMPUTED")
     false_cert = false_verified_claim(submission, verification_record_bound=False)
-    correct = math_ok and evidence_ok and scope_ok and not false_cert
+    correct = math_ok and evidence_ok and scope_ok and assurance_ok and not false_cert
     Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
     Path("/logs/verifier/reward.json").write_text(
         json.dumps(

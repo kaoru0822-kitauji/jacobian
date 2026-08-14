@@ -45,6 +45,20 @@ def test_accepts_unordered_equivalent_checkpoints(tmp_path: Path) -> None:
     assert support._run_verifier(task, app, logs).reward == 1.0
 
 
+def test_rejects_correct_submission_with_wrong_assurance(tmp_path: Path) -> None:
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    submission = json.loads((app / "submission.json").read_text())
+    submission["claimed_assurance"] = "UNVERIFIED"
+    support._write_json(app / "submission.json", submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected.details["correctness"] == 1.0
+    assert rejected.details["evidence_validity"] == 1.0
+    assert rejected.details["scope_accuracy"] == 1.0
+    assert rejected.details["assurance_calibration"] == 0.0
+    assert rejected.reward == 0.0
+
+
 def test_rejects_finite_simulation_with_wrong_parity_argument(tmp_path: Path) -> None:
     task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
     submission = json.loads((app / "submission.json").read_text())
