@@ -47,7 +47,7 @@ text = (
     "Every divisor-count exponent shape corresponds to an integer partition. "
     "For a fixed partition, assigning the largest exponent to the smallest prime is minimal by exchange. "
     "The complete candidate tables therefore prove global minimality rather than sampling shapes. "
-    "The next minimizer divides the current one by the submitted exact quotient after both prime factorizations and divisor counts are checked."
+    "The current minimizer divides the next one by the submitted exact quotient after both prime factorizations and divisor counts are checked."
 )
 base = Path(os.environ.get("SOLUTION_DIR", "/app"))
 evidence = base / "evidence/answer.txt"

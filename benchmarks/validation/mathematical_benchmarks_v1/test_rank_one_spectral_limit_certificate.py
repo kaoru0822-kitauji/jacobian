@@ -31,6 +31,24 @@ def _rewrite(app: Path, submission: dict) -> None:
     support._write_json(app / "submission.json", submission)
 
 
+def test_public_schema_does_not_reveal_root_formula() -> None:
+    schema = json.loads(
+        (support.TASKS / TASK / "environment" / "submission_schema.json").read_text()
+    )
+    assert schema["$defs"]["result"]["properties"]["root_formula"] == {
+        "minLength": 1,
+        "type": "string",
+    }
+
+
+def test_rejects_wrong_root_formula(tmp_path: Path) -> None:
+    task, app, logs = _case(tmp_path)
+    submission = json.loads((app / "submission.json").read_text())
+    submission["result"]["root_formula"] = "4"
+    _rewrite(app, submission)
+    assert support._run_verifier(task, app, logs).details["correctness"] == 0.0
+
+
 def test_accepts_alternative_exact_checkpoints(tmp_path: Path) -> None:
     task, app, logs = _case(tmp_path)
     submission = json.loads((app / "submission.json").read_text())

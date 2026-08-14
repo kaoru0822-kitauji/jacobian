@@ -81,7 +81,8 @@
           "const": "DIAGONAL_MINUS_LAMBDA_ONES"
         },
         "root_formula": {
-          "const": "4*n*(n+1)/((n-1)*(n+2))"
+          "minLength": 1,
+          "type": "string"
         }
       },
       "required": [
