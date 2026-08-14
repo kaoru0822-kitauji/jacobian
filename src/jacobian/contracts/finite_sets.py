@@ -6,11 +6,13 @@ from typing import Self
 
 from pydantic import Field, model_validator
 
+from jacobian.canonical import parse_canonical_integer
 from jacobian.contracts.exact import CanonicalInteger
 from jacobian.contracts.results import ContractModel
 
 _MAX_SET_SIZE = 128
 _MAX_BINARY_SET_RESULT_SIZE = 2 * _MAX_SET_SIZE
+_MAX_COVERAGE_VALUES = 2 * _MAX_SET_SIZE
 
 
 class FiniteIntegerSet(ContractModel):
@@ -32,6 +34,32 @@ class FiniteSetPairRequest(ContractModel):
     right: FiniteIntegerSet
 
 
+class FiniteSetCoverageRequest(ContractModel):
+    """A finite integer scope and a bounded sequence intended to cover it once."""
+
+    scope: FiniteIntegerSet
+    values: tuple[CanonicalInteger, ...] = Field(max_length=_MAX_COVERAGE_VALUES)
+
+
+class FiniteSetCoverageResult(ContractModel):
+    """Exact diagnostics for a bounded exactly-once finite-set cover."""
+
+    holds: bool
+    missing: tuple[CanonicalInteger, ...] = Field(max_length=_MAX_SET_SIZE)
+    duplicates: tuple[CanonicalInteger, ...] = Field(max_length=_MAX_COVERAGE_VALUES)
+    outside: tuple[CanonicalInteger, ...] = Field(max_length=_MAX_COVERAGE_VALUES)
+
+    @model_validator(mode="after")
+    def require_canonical_diagnostics(self) -> Self:
+        for name in ("missing", "duplicates", "outside"):
+            values = [parse_canonical_integer(value) for value in getattr(self, name)]
+            if values != sorted(set(values)):
+                raise ValueError(f"coverage {name} values must be sorted and unique")
+        if self.holds != (not (self.missing or self.duplicates or self.outside)):
+            raise ValueError("coverage truth value and diagnostics disagree")
+        return self
+
+
 class FiniteSetElementListResult(ContractModel):
     """Sorted distinct integers produced by a binary set operation."""
 
@@ -41,7 +69,7 @@ class FiniteSetElementListResult(ContractModel):
 
     @model_validator(mode="after")
     def require_sorted_unique(self) -> Self:
-        values = [int(element) for element in self.elements]
+        values = [parse_canonical_integer(element) for element in self.elements]
         if values != sorted(values):
             raise ValueError("set element list must be sorted")
         if len(set(values)) != len(values):

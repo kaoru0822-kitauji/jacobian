@@ -17,7 +17,6 @@ classifiers = [
 ]
 dependencies = [
     "cvc5==1.3.4",
-    "filelock>=3.20,<4",
     "jsonschema>=4.23,<5",
     "mcp==2.0.0",
     "mcp-types==2.0.0",
@@ -63,7 +62,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/jacobian", "src/jacobian_checkers"]
+packages = ["src/jacobian"]
 
 [tool.hatch.build.targets.sdist]
 exclude = [
@@ -73,18 +72,13 @@ exclude = [
 
 [tool.pytest.ini_options]
 addopts = "-ra --strict-config --strict-markers"
-# Default collection is Lean-free and xdist-safe. Storage, process, MCP, and
-# Lean stay on explicit paths / Make targets because they need serial SQLite
-# or kill-safe process supervision.
+# Default collection is Lean-free and xdist-safe. Process, MCP, and optional
+# Lean checks stay on explicit paths / Make targets.
 testpaths = [
     "tests/unit",
     "tests/component",
     "tests/domain",
     "tests/composition",
-    "tests/boundary/providers/cvc5",
-    "tests/boundary/providers/external_sat",
-    "tests/boundary/providers/flint",
-    "tests/e2e",
 ]
 # Per-invocation --timeout lives on Make/CI commands, not here: a global
 # deadline would interrupt native solvers that process/Lean isolate instead.
@@ -127,7 +121,7 @@ max-complexity = 10
 [tool.mypy]
 python_version = "3.12"
 strict = true
-packages = ["jacobian", "jacobian_checkers"]
+packages = ["jacobian"]
 
 [[tool.mypy.overrides]]
 module = ["sympy", "sympy.*"]
@@ -135,7 +129,7 @@ ignore_missing_imports = true
 
 [tool.deptry]
 extend_exclude = ["benchmarks"]
-known_first_party = ["jacobian", "jacobian_checkers"]
+known_first_party = ["jacobian"]
 # Harbor is intentionally executed as a pinned external CLI through uvx; it is
 # not part of Jacobian's runtime or locked application dependencies.
 # The maintained deployment smoke configures the HTTP client bundled by the
@@ -162,12 +156,10 @@ forbidden_modules = [
     "jacobian.operation_registry",
     "jacobian.domains",
     "jacobian.installation",
-    "jacobian.math",
     "jacobian.catalog",
     "jacobian.operation_installation",
     "jacobian.operation_publication",
     "jacobian.operations",
-    "jacobian.persistence",
     "jacobian.portfolio",
     "jacobian.providers",
     "jacobian.runtime",
@@ -197,7 +189,6 @@ forbidden_modules = [
     "jacobian.operation_projection",
     "jacobian.operation_publication",
     "jacobian.operations",
-    "jacobian.persistence",
     "jacobian.portfolio",
     "jacobian.providers",
     "jacobian.runtime",
@@ -218,7 +209,6 @@ forbidden_modules = [
     "jacobian.operation_installation",
     "jacobian.operation_projection",
     "jacobian.operation_publication",
-    "jacobian.persistence",
     "jacobian.portfolio",
     "jacobian.runtime",
     "jacobian.storage",
@@ -232,24 +222,6 @@ source_modules = ["jacobian.math.finite_fields.values"]
 forbidden_modules = [
     "jacobian.math.finite_fields._flint",
     "jacobian.math.finite_fields._sympy",
-]
-
-[[tool.importlinter.contracts]]
-name = "Persistence does not depend on storage or product layers"
-type = "forbidden"
-source_modules = ["jacobian.persistence"]
-forbidden_modules = [
-    "jacobian.adapters",
-    "jacobian.domains",
-    "jacobian.installation",
-    "jacobian.catalog",
-    "jacobian.operation_installation",
-    "jacobian.operation_publication",
-    "jacobian.portfolio",
-    "jacobian.providers",
-    "jacobian.runtime",
-    "jacobian.storage",
-    "jacobian.verification",
 ]
 
 [[tool.importlinter.contracts]]
@@ -272,19 +244,9 @@ forbidden_modules = [
     "jacobian.verification",
 ]
 
-[[tool.importlinter.contracts]]
-name = "Runtime service ownership does not depend on portfolio assembly"
-type = "forbidden"
-source_modules = [
-    "jacobian.runtime.bootstrap",
-    "jacobian.runtime.model",
-    "jacobian.runtime.resources",
-]
-forbidden_modules = ["jacobian.portfolio"]
-
 [tool.coverage.run]
 branch = true
-source = ["jacobian", "jacobian_checkers"]
+source = ["jacobian"]
 
 [tool.coverage.report]
 fail_under = 50

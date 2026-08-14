@@ -2,25 +2,48 @@
 
 from __future__ import annotations
 
+from collections import Counter
+
+from jacobian.canonical import format_canonical_integer, parse_canonical_integer
 from jacobian.contracts.finite_sets import (
     FiniteSetBooleanResult,
     FiniteSetCardinalityResult,
+    FiniteSetCoverageRequest,
+    FiniteSetCoverageResult,
     FiniteSetElementListResult,
     FiniteSetPairRequest,
 )
 
 
+def decide_exact_cover(request: FiniteSetCoverageRequest) -> FiniteSetCoverageResult:
+    """Decide whether the supplied values contain every scope element exactly once."""
+
+    scope = {parse_canonical_integer(element) for element in request.scope.elements}
+    counts = Counter(parse_canonical_integer(element) for element in request.values)
+    missing = scope - counts.keys()
+    duplicates = {value for value, count in counts.items() if count > 1}
+    outside = counts.keys() - scope
+    return FiniteSetCoverageResult(
+        holds=not (missing or duplicates or outside),
+        missing=tuple(format_canonical_integer(value) for value in sorted(missing)),
+        duplicates=tuple(
+            format_canonical_integer(value) for value in sorted(duplicates)
+        ),
+        outside=tuple(format_canonical_integer(value) for value in sorted(outside)),
+    )
+
+
 def _pair(request: FiniteSetPairRequest) -> tuple[set[int], set[int]]:
     pair = request
     return (
-        {int(element) for element in pair.left.elements},
-        {int(element) for element in pair.right.elements},
+        {parse_canonical_integer(element) for element in pair.left.elements},
+        {parse_canonical_integer(element) for element in pair.right.elements},
     )
 
 
 def _element_list(values: set[int]) -> FiniteSetElementListResult:
     return FiniteSetElementListResult(
-        elements=tuple(str(value) for value in sorted(values)),
+        elements=tuple(format_canonical_integer(value) for value in sorted(values)),
     )
 
 
