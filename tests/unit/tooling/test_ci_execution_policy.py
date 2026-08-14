@@ -138,9 +138,9 @@ def test_full_lean_runs_on_merge_group_and_main() -> None:
     lean = workflow.split("  lean:", 1)[1].split("  coverage:", 1)[0]
     assert "if: github.event_name != 'pull_request'" in lean
     assert "JACOBIAN_LEAN_REQUIRED" not in lean
-    assert "use-github-cache: false" in action
-    assert "auto-config: false" in action
-    assert "use-mathlib-cache: false" in action
+    assert "python tools/setup_lean.py --repo ." in action
+    assert "lake-manifest.json" not in action
+    assert "leanprover/lean-action" not in action
     assert "JacobianLeanRuntime" not in action
     assert "jacobian_lean_proof_state" not in action
     assert "preflight_lean_runtime" not in action

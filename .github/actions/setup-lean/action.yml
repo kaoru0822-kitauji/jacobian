@@ -13,16 +13,16 @@ runs:
     - name: Start Lean setup timing
       shell: bash
       run: echo "LEAN_SETUP_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
-    - name: Set up the fixed Lean toolchain
-      uses: leanprover/lean-action@38fbc41a8c28c4cbaec22d7f7de508ec2e7c0dd9 # v1
-      with:
-        lake-package-directory: lean
-        auto-config: false
-        use-mathlib-cache: false
-        use-github-cache: false
-        build: false
-        test: false
-        lint: false
+    - name: Install elan
+      shell: bash
+      run: |
+        curl --fail --silent --show-error --location \
+          https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+          | sh -s -- -y --default-toolchain none
+        echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+    - name: Install the fixed Lean toolchain
+      shell: bash
+      run: python tools/setup_lean.py --repo .
     - name: Record Lean setup timing
       shell: bash
       env:
