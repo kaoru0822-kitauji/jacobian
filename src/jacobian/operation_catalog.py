@@ -17,7 +17,7 @@ from jacobian.contracts.operations import (
     OperationDiscoveryResult,
     OperationInputKind,
 )
-from jacobian.operation_declarations import OperationDeclaration
+from jacobian.operation_declarations import InlineOperation, OperationDeclaration
 from jacobian.operation_discovery import (
     discovery_relevance,
     input_acceptance,
@@ -35,6 +35,26 @@ class OperationCatalogError(RuntimeError):
     """Persisted catalog state is missing, malformed, or inconsistent."""
 
 
+OMITTED_PACKAGED_OPERATIONS_CODE = "omitted_packaged_operations"
+
+
+def omitted_packaged_operations(
+    diagnostics: tuple[dict[str, Any], ...],
+) -> frozenset[str]:
+    """Return packaged IDs omitted from one overlay snapshot, if recorded."""
+
+    for diagnostic in diagnostics:
+        if diagnostic.get("code") != OMITTED_PACKAGED_OPERATIONS_CODE:
+            continue
+        operation_ids = diagnostic.get("operation_ids")
+        if not isinstance(operation_ids, list):
+            raise OperationCatalogError(
+                "omitted packaged operations diagnostic is malformed"
+            )
+        return frozenset(str(operation_id) for operation_id in operation_ids)
+    return frozenset()
+
+
 class VisibilityPolicy(Protocol):
     @property
     def profile(self) -> str: ...
@@ -47,6 +67,30 @@ class VisibilityPolicy(Protocol):
     ) -> OperationDescriptor | None: ...
 
     def allows(self, operation_id: str, tags: tuple[str, ...]) -> bool: ...
+
+
+class OperationCatalogView(Protocol):
+    """Inspect, search, and locator surface used by serving dispatch."""
+
+    policy: VisibilityPolicy
+
+    def inspect(self, operation_id: str) -> OperationDescriptor | None: ...
+
+    def declaration_record(
+        self, operation_id: str
+    ) -> OperationDeclarationRecord | None: ...
+
+    def checker_binding(self, operation_id: str) -> OperationCheckerBinding | None: ...
+
+    def checker_bindings(
+        self, operation_id: str
+    ) -> tuple[OperationCheckerBinding, ...]: ...
+
+    def search(
+        self, request: OperationDiscoveryRequest
+    ) -> OperationDiscoveryResult: ...
+
+    def snapshot(self) -> OperationCatalogSnapshot: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,6 +202,17 @@ class OperationCatalogStore:
         with sqlite3.connect(self.database_path) as connection:
             connection.execute("PRAGMA foreign_keys = ON")
             connection.execute("BEGIN IMMEDIATE")
+            snapshot_diagnostics = [
+                diagnostic
+                for diagnostic in diagnostics
+                if diagnostic.get("code") != OMITTED_PACKAGED_OPERATIONS_CODE
+            ]
+            snapshot_diagnostics.append(
+                {
+                    "code": OMITTED_PACKAGED_OPERATIONS_CODE,
+                    "operation_ids": list(omitted_operations),
+                }
+            )
             cursor = connection.execute(
                 """
                 INSERT INTO operation_catalog_snapshots(
@@ -168,7 +223,7 @@ class OperationCatalogStore:
                 (
                     package_version,
                     checker_binding_digest,
-                    canonicalize_json(list(diagnostics)),
+                    canonicalize_json(snapshot_diagnostics),
                 ),
             )
             if cursor.lastrowid is None:
@@ -231,7 +286,7 @@ class OperationCatalogStore:
             revision=revision,
             operation_count=len(entries),
             omitted_operations=omitted_operations,
-            diagnostics=diagnostics,
+            diagnostics=tuple(snapshot_diagnostics),
         )
 
 
@@ -491,7 +546,7 @@ def operation_declaration_digest_from_descriptor(
 
 
 def operation_declaration_digest(
-    declaration: OperationDeclaration[Any, Any],
+    declaration: OperationDeclaration[Any, Any] | InlineOperation[Any, Any],
 ) -> str:
     """Digest the stable typed identity loaded again by selected execution."""
 
@@ -554,17 +609,21 @@ def _cursor_start(
 
 
 __all__ = [
+    "OMITTED_PACKAGED_OPERATIONS_CODE",
     "CatalogBuildResult",
     "CatalogHeader",
     "CompiledCatalogEntry",
     "OperationCatalog",
     "OperationCatalogError",
     "OperationCatalogStore",
+    "OperationCatalogView",
     "OperationCheckerBinding",
     "OperationDeclarationRecord",
     "OperationSearchCard",
+    "VisibilityPolicy",
     "declaration_digest",
     "exact_checker_declaration_digest",
+    "omitted_packaged_operations",
     "operation_declaration_digest",
     "operation_declaration_digest_from_descriptor",
     "public_operation_descriptor",

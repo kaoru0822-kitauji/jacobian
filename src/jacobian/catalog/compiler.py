@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from jacobian import __version__
 from jacobian.builtin_operation_modules import load_builtin_operation_modules
-from jacobian.catalog_build import build_catalog_operations
-from jacobian.catalog_build_context import create_catalog_build_context
+from jacobian.catalog.build import (
+    build_catalog_operations,
+    create_catalog_build_context,
+)
 from jacobian.contracts.operations import OperationDescriptor
 from jacobian.operation_catalog import (
     CatalogBuildResult,
@@ -19,7 +22,9 @@ from jacobian.operation_catalog import (
     operation_declaration_digest_from_descriptor,
     public_operation_descriptor,
 )
+from jacobian.operation_locators import FamilyLocator, ModuleLocator, encode_locator
 from jacobian.operation_visibility import OperationVisibilityPolicy
+from jacobian.package_index import load_package_index
 from jacobian.polytope import PolytopeService
 from jacobian.registry import CheckerRegistry
 from jacobian.runtime.bootstrap import bootstrap_services
@@ -48,14 +53,17 @@ def compile_operation_catalog(
         polytope = PolytopeService(core.store, core.schemas)
         runtime = JacobianRuntime(core, verification, polytope)
         context = create_catalog_build_context(
-            runtime.core,
+            core,
             verification,
             authorize_bundled_checkers=authorize_bundled_checkers,
         )
         resources = build_catalog_operations(context, polytope)
+        operations = core.operations
+        if operations is None:
+            raise RuntimeError("catalog compilation requires an operation collector")
         bound_descriptors = tuple(
             sorted(
-                core.operations.snapshot().operations,
+                operations.snapshot().operations,
                 key=lambda item: item.operation_id,
             )
         )
@@ -64,7 +72,16 @@ def compile_operation_catalog(
             public_operation_descriptor(descriptor) for descriptor in bound_descriptors
         )
         entries = _compiled_entries(descriptors)
-        return OperationCatalogStore(state_dir / "metadata.sqlite3").commit(
+        packaged = load_package_index()
+        bound_ids = {descriptor.operation_id for descriptor in bound_descriptors}
+        omitted_operations = tuple(
+            sorted(
+                operation_id
+                for operation_id in packaged.entries
+                if operation_id not in bound_ids
+            )
+        )
+        result = OperationCatalogStore(state_dir / "metadata.sqlite3").commit(
             package_version=__version__,
             checker_binding_digest=declaration_digest(
                 {
@@ -76,6 +93,13 @@ def compile_operation_catalog(
             ),
             entries=entries,
             checker_bindings=checker_bindings,
+            omitted_operations=omitted_operations,
+        )
+        return CatalogBuildResult(
+            revision=result.revision,
+            operation_count=len(bound_descriptors),
+            omitted_operations=omitted_operations,
+            diagnostics=result.diagnostics,
         )
     finally:
         try:
@@ -103,15 +127,14 @@ def _compiled_entries(
         for declaration in checker_declarations
         if declaration.verification_operation_id is not None
     }
+    packaged = load_package_index()
     return tuple(
         CompiledCatalogEntry(
             descriptor=descriptor,
-            declaration_module=(
-                declarations[descriptor.operation_id][0]
-                if descriptor.operation_id in declarations
-                else exact_verifiers[descriptor.operation_id][0]
-                if descriptor.operation_id in exact_verifiers
-                else _selected_operation_origin(descriptor.operation_id)
+            declaration_module=_persisted_locator(
+                descriptor.operation_id,
+                declarations,
+                exact_verifiers,
             ),
             declaration_digest=(
                 operation_declaration_digest(declarations[descriptor.operation_id][1])
@@ -125,17 +148,26 @@ def _compiled_entries(
             ),
         )
         for descriptor in descriptors
+        if not packaged.contains(descriptor.operation_id)
     )
 
 
-def _selected_operation_origin(operation_id: str) -> str:
+def _persisted_locator(
+    operation_id: str,
+    declarations: dict[str, tuple[str, Any]],
+    exact_verifiers: dict[str, tuple[str, Any]],
+) -> str:
+    if operation_id in declarations:
+        return encode_locator(ModuleLocator(module=declarations[operation_id][0]))
+    if operation_id in exact_verifiers:
+        return encode_locator(ModuleLocator(module=exact_verifiers[operation_id][0]))
     origin = selected_operation_origin(operation_id)
     if origin is None:
         raise ValueError(
             "catalog operation has no declaration or selected family owner: "
             f"{operation_id}"
         )
-    return origin
+    return encode_locator(FamilyLocator(family=origin))
 
 
 def _checker_bindings(

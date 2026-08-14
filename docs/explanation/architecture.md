@@ -82,14 +82,18 @@ Linter enforces the leaf boundaries and dependency direction. Operation
 declarations live outside `jacobian.math`.
 
 Domain declaration modules export immutable operation tuples and perform no
-installation. The catalog compiler imports them during `jacobian init` or
-`jacobian update`; serving resolves either the declaration module or an
-explicit family binding origin selected by `math.run`. Graph, polynomial,
-Lean, and SAT/SMT families own their selected IDs and binding logic; the
-runtime-local resolver only chooses that fixed family seam, validates identity,
-caches the adapter, and participates in shutdown. An operation may call a
-private computational backend, but that backend owns no runtime, storage,
-publication, installation, or checker authority.
+installation. Ordinary inline operations are `InlineOperation` values loaded
+from those modules; serving runs them without a state directory. Family
+operations contribute discovery cards from public request and result models.
+`jacobian init` and `jacobian update` compile overlay state for visibility,
+checkers, executables, and artifacts. SQLite overlay must not mirror built-in
+descriptors. Serving resolves either the declaration locator or an explicit
+family binding origin selected by `math.run`. Graph, polynomial, Lean, and
+SAT/SMT families own their selected IDs and binding logic; the runtime-local
+resolver only chooses that fixed family seam, validates identity, caches the
+adapter, and participates in shutdown. An operation may call a private
+computational backend, but that backend owns no runtime, storage, publication,
+installation, or checker authority.
 
 ## Mathematical value and backend layers
 
@@ -115,7 +119,10 @@ constructing backend values. Mathematical code never round-trips through JSON.
 
 ## Domain operation library
 
-`OperationDeclaration[RequestT, ResultT]` is the immutable semantic declaration:
+`OperationDeclaration[RequestT, ResultT]` is the immutable semantic declaration
+for durable, ported, or stateful operations. Ordinary read-only math uses
+`InlineOperation`, which has the same ID, models, and kernel callable without
+publication or port fields:
 
 ```python
 @dataclass(frozen=True, slots=True)

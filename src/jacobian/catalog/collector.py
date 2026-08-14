@@ -14,14 +14,18 @@ from jacobian.contracts.operations import (
 )
 from jacobian.operation_adapters import OperationAdapter
 from jacobian.operation_discovery import discover_operations
-from jacobian.operation_dispatch import dispatch_operation
-from jacobian.operation_registration import register_operation
+from jacobian.operation_dispatch import dispatch_operation, register_operation
 from jacobian.operation_visibility import OperationVisibilityPolicy
 from jacobian.storage.repository import ArtifactRepository
 
 
 class CatalogOperationCollector:
-    """Collect descriptors and adapters only while compiling a catalog."""
+    """Collect descriptors and adapters only while compiling a catalog.
+
+    Serving never constructs a collector. Domain tests and catalog compilation
+    may still invoke, inspect, or search the in-memory inventory after
+    ``register``.
+    """
 
     def __init__(
         self,

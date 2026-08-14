@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, replace
-from typing import Any
+from typing import Any, overload
 
 from jacobian.contracts.base import ContractModel
 from jacobian.contracts.operations import (
@@ -106,7 +106,61 @@ class OperationDeclaration[RequestT: ContractModel, ResultT: ContractModel]:
         )
 
 
-type OperationDeclarations = tuple[OperationDeclaration[Any, Any], ...]
+@dataclass(frozen=True, slots=True)
+class InlineOperation[RequestT: ContractModel, ResultT: ContractModel]:
+    """Immutable declaration for one ordinary inline mathematical operation."""
+
+    operation_id: str
+    version: str
+    title: str
+    description: str
+    request_type: type[RequestT]
+    result_type: type[ResultT]
+    run: Callable[[RequestT], ResultT]
+    tags: tuple[str, ...] = ()
+    examples: tuple[OperationExample, ...] = ()
+    invalid_request: OperationDiagnostic | None = None
+    enrich_invalid_request: bool = False
+
+    def __post_init__(self) -> None:
+        if not self.operation_id.strip() or not self.version.strip():
+            raise ValueError("inline operations require an ID and version")
+        if not self.title.strip() or not self.description.strip():
+            raise ValueError("inline operations require title and description")
+        if len(set(self.tags)) != len(self.tags):
+            raise ValueError("operation tags must be unique")
+        if any(not tag.strip() for tag in self.tags):
+            raise ValueError("operation tags must not be empty")
+        if len({example.name for example in self.examples}) != len(self.examples):
+            raise ValueError("operation example names must be unique")
+
+    @property
+    def execute(self) -> Callable[[RequestT], ResultT]:
+        return self.run
+
+
+type OperationSpec = OperationDeclaration[Any, Any] | InlineOperation[Any, Any]
+type OperationDeclarations = tuple[OperationSpec, ...]
+
+
+def _declaration_for_inline(
+    spec: OperationSpec,
+) -> OperationDeclaration[Any, Any]:
+    if isinstance(spec, OperationDeclaration):
+        return spec
+    return OperationDeclaration(
+        operation_id=spec.operation_id,
+        version=spec.version,
+        title=spec.title,
+        description=spec.description,
+        request_type=spec.request_type,
+        result_type=spec.result_type,
+        execute=spec.run,
+        tags=spec.tags,
+        examples=spec.examples,
+        invalid_request=spec.invalid_request,
+        enrich_invalid_request=spec.enrich_invalid_request,
+    )
 
 
 def with_invalid_request(
@@ -147,14 +201,14 @@ class InlineOperationFactory:
         *tags: str,
         examples: tuple[OperationExample, ...] = (),
         version: str = "2",
-    ) -> OperationDeclaration[RequestT, ResultT]:
-        def execute(request: RequestT) -> ResultT:
+    ) -> InlineOperation[RequestT, ResultT]:
+        def run(request: RequestT) -> ResultT:
             try:
                 return operation(request)
             except self.failure.exceptions as exc:
                 raise OperationRefusalError(self.failure.diagnostic(exc)) from exc
 
-        return OperationDeclaration(
+        return InlineOperation(
             operation_id=operation_id,
             version=version,
             title=title,
@@ -162,8 +216,7 @@ class InlineOperationFactory:
             tags=tags,
             request_type=request_type,
             result_type=result_type,
-            execute=execute,
-            publication=InlinePublication(),
+            run=run,
             examples=examples,
         )
 
@@ -217,11 +270,112 @@ class DurableOperationFactory:
         )
 
 
+@overload
+def inline_operation[
+    RequestT: ContractModel,
+    ResultT: ContractModel,
+](
+    spec: OperationDeclaration[RequestT, ResultT],
+) -> InlineOperation[RequestT, ResultT]: ...
+
+
+@overload
+def inline_operation[
+    RequestT: ContractModel,
+    ResultT: ContractModel,
+](
+    spec: OperationDeclaration[RequestT, ResultT],
+    *,
+    input_ports: tuple[InputPort[Any], ...],
+    output_ports: tuple[OutputPort[Any], ...] = (),
+) -> OperationDeclaration[RequestT, ResultT]: ...
+
+
+@overload
+def inline_operation[
+    RequestT: ContractModel,
+    ResultT: ContractModel,
+](
+    spec: OperationDeclaration[RequestT, ResultT],
+    *,
+    output_ports: tuple[OutputPort[Any], ...],
+    input_ports: tuple[InputPort[Any], ...] = (),
+) -> OperationDeclaration[RequestT, ResultT]: ...
+
+
+def inline_operation[
+    RequestT: ContractModel,
+    ResultT: ContractModel,
+](
+    spec: OperationSpec,
+    *,
+    input_ports: tuple[InputPort[Any], ...] = (),
+    output_ports: tuple[OutputPort[Any], ...] = (),
+) -> InlineOperation[Any, Any] | OperationDeclaration[Any, Any]:
+    """Bind a semantic operation to inline publication."""
+
+    if input_ports or output_ports:
+        declaration = _declaration_for_inline(spec)
+        return replace(
+            declaration,
+            publication=InlinePublication(),
+            input_ports=input_ports,
+            output_ports=output_ports,
+        )
+    if isinstance(spec, OperationDeclaration) and spec.effect is not Effect.READ_ONLY:
+        return replace(spec, publication=InlinePublication())
+    if isinstance(spec, InlineOperation):
+        return spec
+    return InlineOperation(
+        operation_id=spec.operation_id,
+        version=spec.version,
+        title=spec.title,
+        description=spec.description,
+        request_type=spec.request_type,
+        result_type=spec.result_type,
+        run=spec.execute,
+        tags=spec.tags,
+        examples=spec.examples,
+        invalid_request=spec.invalid_request,
+        enrich_invalid_request=spec.enrich_invalid_request,
+    )
+
+
+def durable_operation[
+    RequestT: ContractModel,
+    ResultT: ContractModel,
+    PreviewT: ContractModel,
+](
+    spec: OperationDeclaration[RequestT, ResultT],
+    *,
+    resource_reason: str,
+    preview_type: type[PreviewT] | None = None,
+    preview: Callable[[ResultT], PreviewT] | None = None,
+    preview_complete: bool = False,
+    input_ports: tuple[InputPort[Any], ...] = (),
+    output_ports: tuple[OutputPort[Any], ...] = (),
+) -> OperationDeclaration[RequestT, ResultT]:
+    """Bind a semantic operation to durable artifact publication."""
+
+    return replace(
+        spec,
+        publication=DurablePublication(
+            resource_reason=resource_reason,
+            preview_type=preview_type,
+            preview=preview,
+            preview_complete=preview_complete,
+        ),
+        input_ports=input_ports,
+        output_ports=output_ports,
+    )
+
+
 __all__ = [
     "SUPPORTED",
     "DurableOperationFactory",
     "DurablePublication",
     "Effect",
+    "InlineOperation",
     "InlineOperationFactory",
     "InlinePublication",
     "OperationAbortError",
@@ -230,8 +384,11 @@ __all__ = [
     "OperationExample",
     "OperationFailure",
     "OperationRefusalError",
+    "OperationSpec",
     "PreflightResult",
     "PreflightStatus",
     "PublicationPolicy",
+    "durable_operation",
+    "inline_operation",
     "with_invalid_request",
 ]

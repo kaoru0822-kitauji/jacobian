@@ -10,8 +10,11 @@ from jacobian.contracts.graph_optimization import (
 )
 from jacobian.contracts.operations import OperationDiagnostic
 from jacobian.domains.graph_optimization.operations import build_simple_graph
-from jacobian.operation_bindings import inline_operation
-from jacobian.operation_declarations import OperationDeclaration
+from jacobian.operation_declarations import (
+    InlineOperation,
+    OperationDeclaration,
+    inline_operation,
+)
 from jacobian.operations import (
     OperationRefusalError,
 )
@@ -104,7 +107,7 @@ def _execute(
         ) from exc
 
 
-HAMILTONIAN_PATH_OPERATION: OperationDeclaration[
+HAMILTONIAN_PATH_OPERATION: InlineOperation[
     GraphHamiltonianPathRequest,
     GraphHamiltonianPathResult,
 ] = inline_operation(

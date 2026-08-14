@@ -9,6 +9,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from jacobian.contracts.operations import (
+    OperationDescriptor,
     OperationDiagnostic,
     OperationRequest,
     OperationResult,
@@ -16,7 +17,6 @@ from jacobian.contracts.operations import (
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.operation_adapters import (
     OperationAdapter,
-    _validate_strict_json_model,
 )
 from jacobian.operation_errors import (
     OperationError,
@@ -24,7 +24,8 @@ from jacobian.operation_errors import (
     enriched_invalid_request,
 )
 from jacobian.operation_projection import OperationProjection, project_operation_result
-from jacobian.operation_telemetry import log_invocation
+from jacobian.operation_validation import validate_payload, validator
+from jacobian.operation_verification import validate_verified_result
 from jacobian.operations import Failed
 from jacobian.provider_runtime import (
     ProviderRuntimeError,
@@ -33,6 +34,60 @@ from jacobian.provider_runtime import (
 from jacobian.schema_registry import model_schema
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def register_operation(
+    adapter: OperationAdapter[Any],
+    adapters: dict[str, OperationAdapter[Any]],
+    descriptors: dict[str, OperationDescriptor],
+) -> None:
+    """Record one adapter after validating its advertised schemas and examples."""
+
+    descriptor = adapter.descriptor
+    if descriptor.operation_id in adapters:
+        raise OperationError(f"duplicate operation ID: {descriptor.operation_id}")
+    validator(descriptor.input_schema)
+    validator(descriptor.output_schema)
+    for example in descriptor.examples:
+        try:
+            validate_payload(descriptor.input_schema, example.input)
+        except OperationError as exc:
+            raise OperationError(
+                f"operation {descriptor.operation_id} invocation example "
+                f"{example.name!r} does not match its input schema"
+            ) from exc
+    descriptors[descriptor.operation_id] = descriptor.model_copy(deep=True)
+    adapters[descriptor.operation_id] = adapter
+
+
+def log_invocation(result: OperationResult, started: float) -> None:
+    elapsed_ms = round((time.monotonic() - started) * 1000)
+    diagnostic_codes = (
+        ",".join(diagnostic.code for diagnostic in result.diagnostics) or "-"
+    )
+    verification_record_uri_present = result.verification_record_uri is not None
+    _LOGGER.info(
+        (
+            "operation invocation operation_id=%s version=%s "
+            "status=%s verification_record_uri_present=%s elapsed_ms=%d diagnostics=%s"
+        ),
+        result.operation_id,
+        result.operation_version,
+        result.execution.status.value,
+        verification_record_uri_present,
+        elapsed_ms,
+        diagnostic_codes,
+        extra={
+            "jacobian_operation_id": result.operation_id,
+            "jacobian_operation_version": result.operation_version,
+            "jacobian_execution_status": result.execution.status.value,
+            "jacobian_verification_record_uri_present": verification_record_uri_present,
+            "jacobian_elapsed_ms": elapsed_ms,
+            "jacobian_diagnostic_codes": tuple(
+                diagnostic.code for diagnostic in result.diagnostics
+            ),
+        },
+    )
 
 
 def dispatch_operation(dispatch: Any, request: OperationRequest) -> OperationResult:
@@ -85,9 +140,8 @@ def dispatch_operation(dispatch: Any, request: OperationRequest) -> OperationRes
     if invalid is not None:
         log_invocation(invalid, started)
         return invalid
-    from jacobian.operation_verification import validate_verified_result
-
-    validate_verified_result(dispatch.store, result)
+    if dispatch.store is not None:
+        validate_verified_result(dispatch.store, result)
     log_invocation(result, started)
     return result
 
@@ -278,15 +332,9 @@ def _adapter_output_model_failure(
     output_type = type(output)
     if model_schema(output_type) == descriptor.output_schema:
         try:
-            # Validate the serialized contract rather than a Python-mode dump.
-            # Python-mode dumps turn nested dataclasses (for example
-            # PrimeFieldMatrix) into mappings, which strict model validation
-            # quite correctly rejects even though the published output is
-            # already a valid typed model.
-            _validate_strict_json_model(
-                output_type,
+            output_type.model_validate_json(
                 output.model_dump_json(warnings="error").encode(),
-                output.model_dump(mode="json"),
+                strict=True,
             )
         except (TypeError, ValueError, ValidationError):
             pass
@@ -310,4 +358,4 @@ def _adapter_output_model_failure(
     )
 
 
-__all__ = ["dispatch_operation"]
+__all__ = ["dispatch_operation", "log_invocation", "register_operation"]

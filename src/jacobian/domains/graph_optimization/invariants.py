@@ -38,8 +38,11 @@ from jacobian.contracts.results import ContractModel
 from jacobian.domains._examples import example
 from jacobian.domains.graph_optimization._providers import Z3_LOADER
 from jacobian.domains.graph_optimization.operations import build_simple_graph
-from jacobian.operation_bindings import inline_operation
-from jacobian.operation_declarations import OperationDeclaration
+from jacobian.operation_declarations import (
+    InlineOperation,
+    OperationDeclaration,
+    inline_operation,
+)
 from jacobian.operations import (
     OperationRefusalError,
 )
@@ -72,7 +75,7 @@ def _computed[
     *tags: str,
     version: str = "1",
     examples: tuple[OperationExample, ...] = (),
-) -> OperationDeclaration[GraphInvariantRequest, ResultT]:
+) -> InlineOperation[GraphInvariantRequest, ResultT]:
     def implementation(
         request: GraphInvariantRequest,
     ) -> ResultT:

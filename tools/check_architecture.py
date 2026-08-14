@@ -1,7 +1,7 @@
 """Static architecture enforcement for product source boundaries.
 
 This checker is an AST/filesystem tool that does not import the Jacobian
-runtime.  It enforces eighteen focused invariants:
+runtime.  It enforces nineteen focused invariants:
 
 1. **subprocess-confined**: direct ``subprocess`` usage and ``os.execvpe``/
    ``os.execvp`` are allowed only in ``bounded_process.py``,
@@ -68,6 +68,9 @@ runtime.  It enforces eighteen focused invariants:
     historical rollout buckets, and focused suites cannot acquire complete or
     multi-domain runtime fixtures by convenience.
 
+19. **inline-executor-boundary**: the ordinary inline executor must not import
+    storage, checkers, SAT/SMT, Lean, MCP, or tenant isolation.
+
 The checker excludes ``wt-438/`` and generated directories from all scans.
 ``CHANGELOG.md`` is excluded from the unsupported-surface text scan as
 genuinely historical record.
@@ -117,6 +120,7 @@ _SUBPROCESS_ALLOWED_EXACT: frozenset[PurePosixPath] = frozenset(
         PurePosixPath("tests/boundary/process/test_bounded_process.py"),
         PurePosixPath("tests/boundary/process/test_cvc5_worker_command_profile.py"),
         PurePosixPath("tests/boundary/process/test_process_policy.py"),
+        PurePosixPath("tests/boundary/process/test_inline_no_state_dir.py"),
         PurePosixPath("tests/boundary/process/test_rational_lp_worker_protocol.py"),
         PurePosixPath(
             "tests/boundary/process/polynomial/test_polynomial_system_adapter_guards.py"
@@ -259,6 +263,7 @@ _SHUTIL_WHICH_ALLOWED: frozenset[PurePosixPath] = frozenset(
         PurePosixPath("tools/source_agent_doctor.py"),
         # Test skip-condition checks for optional operator tools.
         PurePosixPath("tests/boundary/process/test_bounded_process.py"),
+        PurePosixPath("tests/boundary/process/test_inline_no_state_dir.py"),
         PurePosixPath("tests/boundary/process/tooling/test_deploy_installer.py"),
         PurePosixPath("tests/boundary/process/tooling/test_source_agent_bootstrap.py"),
     }
@@ -1035,13 +1040,13 @@ _CONTRACT_FORBIDDEN_IMPORT_PREFIXES = (
     "jacobian.persistence",
     "jacobian.artifacts",
     "jacobian.adapters.mcp",
+    "jacobian.catalog",
     "jacobian.operation_adapters",
     "jacobian.operation_binding",
     "jacobian.operation_catalog",
     "jacobian.operation_declarations",
     "jacobian.operation_dispatch",
     "jacobian.operation_projection",
-    "jacobian.operation_registration",
     "jacobian.operation_registry",
     "jacobian.operation_installation",
     "jacobian.installation",
@@ -1052,13 +1057,13 @@ _NATIVE_MATH_FORBIDDEN_IMPORT_PREFIXES = (
     "jacobian.persistence",
     "jacobian.artifacts",
     "jacobian.adapters.mcp",
+    "jacobian.catalog",
     "jacobian.operation_adapters",
     "jacobian.operation_binding",
     "jacobian.operation_catalog",
     "jacobian.operation_declarations",
     "jacobian.operation_dispatch",
     "jacobian.operation_projection",
-    "jacobian.operation_registration",
     "jacobian.operation_registry",
     "jacobian.operation_installation",
     "jacobian.installation",
@@ -1183,6 +1188,45 @@ def _native_math_boundary_violations(
                         "native-math-boundary",
                         "jacobian.math may import domain-owned kernels directly, "
                         "not domain operations or installation layers",
+                        node.lineno,
+                    )
+                )
+    return tuple(violations)
+
+
+_INLINE_EXECUTOR_PATH = PurePosixPath("src/jacobian/inline_execution.py")
+_INLINE_EXECUTOR_FORBIDDEN_IMPORT_PREFIXES = (
+    "jacobian.storage",
+    "jacobian.verification",
+    "jacobian.sat_smt",
+    "jacobian.lean_frontend",
+    "jacobian.adapters.mcp",
+    "jacobian.tenant",
+    "jacobian.artifacts",
+    "jacobian.registry",
+    "jacobian.operation_binding",
+    "jacobian.operation_catalog",
+    "jacobian.operation_publication",
+)
+
+
+def _inline_executor_boundary_violations(
+    relative: PurePosixPath, tree: ast.AST
+) -> tuple[Violation, ...]:
+    if relative != _INLINE_EXECUTOR_PATH:
+        return ()
+    violations: list[Violation] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.Import, ast.ImportFrom)):
+            continue
+        for reference in _import_references(relative, node):
+            if _imports_prefix(reference, _INLINE_EXECUTOR_FORBIDDEN_IMPORT_PREFIXES):
+                violations.append(
+                    Violation(
+                        str(relative),
+                        "inline-executor-boundary",
+                        "the inline executor must not import storage, checkers, "
+                        "SAT/SMT, Lean, MCP, tenant, or binder machinery",
                         node.lineno,
                     )
                 )
@@ -1632,6 +1676,7 @@ _CLI_COMPLETE_PORTFOLIO_ALLOWLIST = frozenset(
         "test_cli_help_exposes_only_math_and_operator_commands",
         "test_cli_init_reports_installed_operation_count",
         "test_cli_run_requires_exactly_one_payload_source",
+        "test_cli_run_matrix_determinant_without_state_directory",
     }
 )
 
@@ -1878,6 +1923,7 @@ def _check_python_file(root: Path, path: Path) -> tuple[Violation, ...]:
     violations.extend(_unsafe_canonical_conversion_violations(relative, tree))
     violations.extend(_contract_dependency_leaf_violations(relative, tree))
     violations.extend(_native_math_boundary_violations(relative, tree))
+    violations.extend(_inline_executor_boundary_violations(relative, tree))
     violations.extend(_private_math_backend_violations(relative, tree))
     violations.extend(_checker_producer_isolation_violations(relative, tree))
     violations.extend(_erased_contract_operation_violations(relative, tree))

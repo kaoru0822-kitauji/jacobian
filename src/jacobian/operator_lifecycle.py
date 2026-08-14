@@ -11,6 +11,7 @@ from jacobian.operation_catalog import (
     CatalogBuildResult,
     OperationCatalog,
     OperationCatalogError,
+    omitted_packaged_operations,
 )
 from jacobian.operation_visibility import OperationVisibilityPolicy
 from jacobian.persistence.migrations import (
@@ -19,6 +20,7 @@ from jacobian.persistence.migrations import (
     SUPPORTED_STATE_FLOOR,
 )
 from jacobian.persistence.state_health import StateHealth, inspect_state_health
+from jacobian.serving_catalog import ServingCatalog
 
 
 class CheckerAuthorization(StrEnum):
@@ -41,10 +43,13 @@ def initialize_state(
     if health.status == "COMPATIBLE":
         current = _load_current_catalog(state_dir)
         if current is not None:
+            serving = _load_serving_catalog(state_dir)
             return CatalogBuildResult(
                 revision=current.header.revision,
-                operation_count=len(current.snapshot().operations),
-                omitted_operations=(),
+                operation_count=len(serving.snapshot().operations),
+                omitted_operations=tuple(
+                    sorted(omitted_packaged_operations(current.header.diagnostics))
+                ),
                 diagnostics=current.header.diagnostics,
             )
     return _build_catalog(state_dir, checker_authorization)
@@ -90,11 +95,28 @@ def _load_current_catalog(state_dir: Path) -> OperationCatalog | None:
         return None
 
 
+def _load_serving_catalog(state_dir: Path) -> ServingCatalog:
+    try:
+        return ServingCatalog.open(
+            state_dir / "metadata.sqlite3",
+            OperationVisibilityPolicy(),
+            expected_package_version=__version__,
+        )
+    except OperationCatalogError as exc:
+        if "overlay is stale" in str(exc):
+            raise OperationCatalogError(
+                "STATE_UPDATE_REQUIRED: operation catalog overlay is stale; "
+                "run `jacobian update`"
+            ) from exc
+        raise
+
+
 def _build_catalog(
     state_dir: Path,
     checker_authorization: CheckerAuthorization,
 ) -> CatalogBuildResult:
-    from jacobian.catalog_compiler import compile_operation_catalog
+    # Compile-only import: operator command import must not assemble the catalog.
+    from jacobian.catalog.compiler import compile_operation_catalog
 
     return compile_operation_catalog(
         state_dir,
