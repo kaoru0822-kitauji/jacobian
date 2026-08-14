@@ -9,16 +9,15 @@ from tests.support.selected_runtime import selected_runtime_opener
 from typer.testing import CliRunner
 
 from jacobian.cli import CliState, JacobianGroup, app, create_cli_app
-from jacobian.domains.matrix_lattice import build_matrix_bundle
-from jacobian.domains.number_theory import build_number_theory_bundle
-from jacobian.runtime import CheckerAuthorityMode
+from jacobian.domains.matrix_lattice import matrix_operations
+from jacobian.domains.number_theory import number_theory_operations
 
 
 def test_cli_help_exposes_only_math_and_operator_commands() -> None:
     result = CliRunner().invoke(app, ["--help"])
 
     assert result.exit_code == 0
-    for command in ("init", "catalog", "inspect", "run", "provider-measure"):
+    for command in ("init", "update", "catalog", "inspect", "run"):
         assert command in result.stdout
     for deleted in ("search-enumerate", "experiment-inspect", "artifact-put"):
         assert deleted not in result.stdout
@@ -32,20 +31,30 @@ def test_cli_init_reports_installed_operation_count(tmp_path: Path) -> None:
 
     assert result.exit_code == 0, result.stderr
     assert f"Initialized Jacobian state in {tmp_path.resolve()}" in result.stdout
-    assert "Installed " in result.stdout
+    assert "Compiled " in result.stdout
     assert " mathematical operations." in result.stdout
+
+    repeated = CliRunner().invoke(
+        app,
+        ["--state-dir", str(tmp_path), "init"],
+    )
+
+    assert repeated.exit_code == 0, repeated.stderr
+    assert (
+        f"Jacobian state is already current in {tmp_path.resolve()}" in repeated.stdout
+    )
+    assert "Catalog contains " in repeated.stdout
+    assert "Compiled " not in repeated.stdout
 
 
 def test_cli_catalog_and_inspect_share_installed_declaration(tmp_path: Path) -> None:
     runner = CliRunner()
     selected = create_cli_app(
-        runtime_opener=selected_runtime_opener(build_matrix_bundle())
+        runtime_opener=selected_runtime_opener(matrix_operations())
     )
     common = [
         "--state-dir",
         str(tmp_path),
-        "--checker-authority",
-        "NONE",
     ]
 
     catalog_call = runner.invoke(selected, [*common, "catalog"])
@@ -58,8 +67,8 @@ def test_cli_catalog_and_inspect_share_installed_declaration(tmp_path: Path) -> 
     assert inspect_call.exit_code == 0, inspect_call.stderr
     catalog = json.loads(catalog_call.stdout)
     descriptor = json.loads(inspect_call.stdout)
-    assert descriptor["capability_id"] == "matrix.determinant.compute"
-    assert descriptor in catalog["capabilities"]
+    assert descriptor["operation_id"] == "matrix.determinant.compute"
+    assert descriptor in catalog["operations"]
 
 
 def test_cli_run_executes_one_installed_operation_from_inline_json(
@@ -82,7 +91,7 @@ def test_cli_run_executes_one_installed_operation_from_inline_json(
         }
     }
     selected = create_cli_app(
-        runtime_opener=selected_runtime_opener(build_matrix_bundle())
+        runtime_opener=selected_runtime_opener(matrix_operations())
     )
 
     result = CliRunner().invoke(
@@ -90,8 +99,6 @@ def test_cli_run_executes_one_installed_operation_from_inline_json(
         [
             "--state-dir",
             str(tmp_path),
-            "--checker-authority",
-            "NONE",
             "run",
             "matrix.determinant.compute",
             "--json",
@@ -112,7 +119,7 @@ def test_cli_run_reads_strict_json_file(tmp_path: Path) -> None:
     payload = tmp_path / "payload.json"
     payload.write_text('{"left":"12","right":"18"}', encoding="utf-8")
     selected = create_cli_app(
-        runtime_opener=selected_runtime_opener(build_number_theory_bundle())
+        runtime_opener=selected_runtime_opener(number_theory_operations())
     )
 
     result = CliRunner().invoke(
@@ -120,8 +127,6 @@ def test_cli_run_reads_strict_json_file(tmp_path: Path) -> None:
         [
             "--state-dir",
             str(tmp_path / "state"),
-            "--checker-authority",
-            "NONE",
             "run",
             "integer.compute.gcd",
             "--file",
@@ -163,10 +168,7 @@ def test_cli_cleanup_failure_propagates_after_successful_command(
 
     @test_app.callback()
     def configure_test_state(context: typer.Context) -> None:
-        context.obj = CliState(
-            tmp_path,
-            checker_authority=CheckerAuthorityMode.NONE,
-        )
+        context.obj = CliState(tmp_path)
 
     @test_app.command("succeed")
     def succeed() -> None:

@@ -64,6 +64,7 @@ validation does not depend on files from the agent context.
 ## Commands
 
 ```sh
+uv run --locked python -m benchmarks.tooling.mcp_cold_start_benchmark --state-dir .jacobian
 make harbor-plan BASE=origin/main
 make harbor-execution-check
 make harbor-check-task DATASET=mathematical-benchmarks-v1 TASKS="task-id"
@@ -124,7 +125,7 @@ Observation results are normalized into content-bound JSON before comparison.
 Correctness, evidence validity, scope, assurance calibration, false
 certification, tool traces, tokens, time, and cost remain separate. Reports
 from the public workflow suite are workflow evidence only, never causal
-capability evidence.
+operation evidence.
 
 The committed three-attempt control and treatment jobs are manual
 reproducibility fixtures. An operator may run `make agent-eval` with

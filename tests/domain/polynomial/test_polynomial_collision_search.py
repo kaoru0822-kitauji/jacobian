@@ -8,28 +8,26 @@ from typing import Any
 import pytest
 
 from jacobian.bounded_process import bounded_process_cancellation
-from jacobian.contracts.capabilities import CapabilityRequest
+from jacobian.contracts.operations import OperationRequest
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.domains.polynomial import build_polynomial_bundle
-from jacobian.polynomials import install_polynomial_capabilities
+from jacobian.domains.polynomial import polynomial_operations
+from jacobian.polynomials import build_polynomial_operations
 from tests.support.services import DomainTestServices, open_domain_services
 
 
 @pytest.fixture
 def domain_services(tmp_path: Path) -> Iterator[DomainTestServices]:
-    with open_domain_services(
-        tmp_path / "state", build_polynomial_bundle()
-    ) as services:
-        adapters, _installation = install_polynomial_capabilities(
+    with open_domain_services(tmp_path / "state", polynomial_operations()) as services:
+        adapters, _contracts = build_polynomial_operations(
             services.core.store,
             services.core.schemas,
             services.core.artifacts,
-            services.application.verification,
+            services.verification,
             services.core.checkers,
             authorize_checker=False,
         )
         for adapter in adapters:
-            services.installation.register_capability(adapter)
+            services.installation.register_operation(adapter)
         yield services
 
 
@@ -49,9 +47,9 @@ def _map(exponent: int) -> dict[str, object]:
     }
 
 
-def _request(exponent: int) -> CapabilityRequest:
-    return CapabilityRequest(
-        capability_id="polynomial.map.collision.search",
+def _request(exponent: int) -> OperationRequest:
+    return OperationRequest(
+        operation_id="polynomial.map.collision.search",
         input={
             "map": _map(exponent),
             "max_abs_numerator": 1,
@@ -64,7 +62,7 @@ def test_collision_search_returns_first_deterministic_candidate(
     domain_services,
 ) -> None:
 
-    result = domain_services.core.capabilities.invoke(_request(2))
+    result = domain_services.core.operations.invoke(_request(2))
 
     assert result.output["found"] is True
     assert result.output["grid_point_count"] == 3
@@ -80,7 +78,7 @@ def test_collision_search_reports_partial_grid_after_early_collision(
     domain_services,
 ) -> None:
 
-    result = domain_services.core.capabilities.invoke(_request(0))
+    result = domain_services.core.operations.invoke(_request(0))
 
     assert result.output["found"] is True
     assert result.output["grid_point_count"] == 3
@@ -94,7 +92,7 @@ def test_collision_search_reports_exact_completed_not_found_scope(
     domain_services,
 ) -> None:
 
-    result = domain_services.core.capabilities.invoke(_request(1))
+    result = domain_services.core.operations.invoke(_request(1))
 
     assert result.output["found"] is False
     assert result.output["examined_point_count"] == 3
@@ -110,7 +108,7 @@ def test_collision_search_preserves_partial_evidence_when_cancelled(
     cancellation_event.set()
 
     with bounded_process_cancellation(cancellation_event):
-        result = domain_services.core.capabilities.invoke(_request(1))
+        result = domain_services.core.operations.invoke(_request(1))
 
     assert result.execution.status is ExecutionStatus.CANCELLED
     assert result.output == {}
@@ -148,9 +146,9 @@ def test_collision_search_validates_grid_bound_before_artifact_writes(
         ],
     }
 
-    result = domain_services.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="polynomial.map.collision.search",
+    result = domain_services.core.operations.invoke(
+        OperationRequest(
+            operation_id="polynomial.map.collision.search",
             input={
                 "map": polynomial_map,
                 "max_abs_numerator": 8,

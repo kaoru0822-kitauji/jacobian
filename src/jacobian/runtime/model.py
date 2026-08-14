@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from jacobian.runtime.portfolio import PortfolioResources
-from jacobian.runtime.services import CoreServices, RuntimeServices
+from jacobian.polytope import PolytopeService
+from jacobian.runtime.resources import RuntimeResources
+from jacobian.verification.service import VerificationService
 
 
 class RuntimeClosedError(RuntimeError):
@@ -13,27 +14,21 @@ class RuntimeClosedError(RuntimeError):
 
 
 class JacobianRuntime:
-    """Own the explicit service graph and installed portfolio for one store."""
+    """Own one catalog-backed selected-operation execution runtime."""
 
     def __init__(
         self,
-        core: CoreServices,
-        services: RuntimeServices,
-        portfolio_resources: PortfolioResources,
-        start_lean_warmup: Callable[[], None],
+        core: RuntimeResources,
+        verification: VerificationService,
+        polytope: PolytopeService,
+        *,
+        close_resources: Callable[[], None] | None = None,
     ) -> None:
-        if services.core is not core:
-            raise ValueError("runtime services must belong to the supplied core")
         self._closed = False
         self.core = core
-        self.services = services
-        self.portfolio_resources = portfolio_resources
-        self._start_lean_warmup = start_lean_warmup
-
-    def start_lean_warmup(self) -> None:
-        """Warm the installed Lean backend when the portfolio provides one."""
-
-        self._start_lean_warmup()
+        self.verification = verification
+        self.polytope = polytope
+        self._close_resources = close_resources or (lambda: None)
 
     def close(self) -> None:
         """Release every runtime-owned resource."""
@@ -42,7 +37,7 @@ class JacobianRuntime:
             return
         failures: list[BaseException] = []
         for close in (
-            self.portfolio_resources.close,
+            self._close_resources,
             self.core.close,
         ):
             try:

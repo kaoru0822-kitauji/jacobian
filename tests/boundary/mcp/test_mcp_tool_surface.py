@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from jacobian.domains.number_theory import build_number_theory_bundle
+from jacobian.domains.number_theory import number_theory_operations
 from tests.boundary.mcp.mcp_support import open_focused_mcp_server
 
 MATH_TOOL_NAMES = {"math.find", "math.run"}
@@ -24,10 +24,10 @@ def test_math_tool_surface_is_consistent_across_discovery(tmp_path: Path) -> Non
             assert "authoritative for local search and exact operation inspection" in (
                 find_description
             )
-            assert "capability://catalog" in find_description
+            assert "operation://catalog" in find_description
             assert "authoritative runtime inventory" not in find_description
             run_description = tools["math.run"].description or ""
-            assert "select one item from `invocation_examples`" in run_description
+            assert "select one item from `examples`" in run_description
             assert "item's `input` object as the `payload`" in run_description
 
             described = await client.call_tool(
@@ -35,12 +35,12 @@ def test_math_tool_surface_is_consistent_across_discovery(tmp_path: Path) -> Non
                 {
                     "request": {
                         "op": "inspect",
-                        "capability_id": "integer.compute.gcd",
+                        "operation_id": "integer.compute.gcd",
                     }
                 },
             )
             assert described.structured_content is not None
-            examples = described.structured_content["capability"]["invocation_examples"]
+            examples = described.structured_content["operation"]["examples"]
             assert examples
 
             absent = await client.call_tool(
@@ -54,12 +54,12 @@ def test_math_tool_surface_is_consistent_across_discovery(tmp_path: Path) -> Non
             )
             assert absent.structured_content is not None
             assert absent.structured_content["catalog_resource"] == (
-                "capability://catalog"
+                "operation://catalog"
             )
 
     with open_focused_mcp_server(
         tmp_path,
-        build_number_theory_bundle(),
+        number_theory_operations(),
     ) as server:
         assert server.instructions is not None
         assert "math.find" in server.instructions

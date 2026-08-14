@@ -31,11 +31,10 @@ from jacobian.contracts.posets import (
 )
 from jacobian.domains._examples import example
 from jacobian.operation_bindings import (
-    InstalledOperation,
     durable_operation,
     inline_operation,
 )
-from jacobian.operations import OperationSpec
+from jacobian.operation_declarations import OperationDeclaration
 
 
 def _networkx() -> Any:
@@ -337,9 +336,9 @@ _DIAMOND: dict[str, Any] = {
     "reflexive_pairs": "FORBIDDEN",
 }
 
-FINITE_POSET_CAPABILITIES: tuple[InstalledOperation[Any, Any], ...] = (
+FINITE_POSET_OPERATIONS: tuple[OperationDeclaration[Any, Any], ...] = (
     inline_operation(
-        OperationSpec(
+        OperationDeclaration(
             operation_id="poset.finite.compute",
             version="4",
             title="Compute a canonical finite poset",
@@ -359,7 +358,7 @@ FINITE_POSET_CAPABILITIES: tuple[InstalledOperation[Any, Any], ...] = (
                 "transitive-closure",
                 "exact",
             ),
-            invocation_examples=(
+            examples=(
                 example(
                     "diamond",
                     "Materialize the four-element diamond from its cover relation.",
@@ -369,7 +368,7 @@ FINITE_POSET_CAPABILITIES: tuple[InstalledOperation[Any, Any], ...] = (
         )
     ),
     inline_operation(
-        OperationSpec(
+        OperationDeclaration(
             operation_id="poset.width.compute",
             version="4",
             title="Compute finite-poset width with dual witnesses",
@@ -393,7 +392,7 @@ FINITE_POSET_CAPABILITIES: tuple[InstalledOperation[Any, Any], ...] = (
         )
     ),
     durable_operation(
-        OperationSpec(
+        OperationDeclaration(
             operation_id="poset.linear_extensions.count",
             version="3",
             title="Count linear extensions of a bounded finite poset",
@@ -418,7 +417,7 @@ FINITE_POSET_CAPABILITIES: tuple[InstalledOperation[Any, Any], ...] = (
         ),
     ),
     inline_operation(
-        OperationSpec(
+        OperationDeclaration(
             operation_id="poset.mobius_function.compute",
             version="3",
             title="Compute finite-poset Möbius values",
@@ -439,7 +438,7 @@ FINITE_POSET_CAPABILITIES: tuple[InstalledOperation[Any, Any], ...] = (
         )
     ),
     durable_operation(
-        OperationSpec(
+        OperationDeclaration(
             operation_id="poset.mobius_function.recurrence.materialize",
             version="3",
             title="Materialize the finite-poset Möbius recurrence table",
@@ -465,4 +464,4 @@ FINITE_POSET_CAPABILITIES: tuple[InstalledOperation[Any, Any], ...] = (
     ),
 )
 
-__all__ = ["FINITE_POSET_CAPABILITIES"]
+__all__ = ["FINITE_POSET_OPERATIONS"]

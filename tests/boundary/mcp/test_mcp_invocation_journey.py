@@ -1,7 +1,7 @@
 """Owned MCP smoke journey: live SDK find → run without complete-runtime fixtures.
 
 ``create_server(tmp_path)`` installs a fresh server-owned runtime. Keep this
-module small; do not grow ordinary projection or capability matrices here.
+module small; do not grow ordinary projection or operation matrices here.
 """
 
 from __future__ import annotations
@@ -13,13 +13,12 @@ from pathlib import Path
 import pytest
 
 from jacobian.adapters.mcp.server import create_server
-from jacobian.runtime import CheckerAuthorityMode
 
 MATH_TOOL_NAMES = {"math.find", "math.run"}
 MCP_TOOL_NAMES = MATH_TOOL_NAMES
 
 
-def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
+def test_mcp_describes_and_invokes_operations(tmp_path: Path) -> None:
     async def scenario() -> None:
         from mcp import Client
 
@@ -29,23 +28,21 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
                 {
                     "request": {
                         "op": "inspect",
-                        "capability_id": "integer.compute.gcd",
+                        "operation_id": "integer.compute.gcd",
                     }
                 },
             )
             assert isinstance(described.structured_content, dict)
             contract = described.structured_content
-            assert contract["capability"]["capability_id"] == "integer.compute.gcd"
-            assert contract["capability"]["provider_runtime"]["digest"].startswith(
-                "sha256:"
-            )
-            assert "configuration" in contract["capability"]["provider_runtime"]
-            assert "output_schema" in contract["capability"]
+            assert contract["operation"]["operation_id"] == "integer.compute.gcd"
+            assert contract["operation"]["provider"] == "built-in"
+            assert "provider_runtime" not in contract["operation"]
+            assert "output_schema" in contract["operation"]
 
             result = await client.call_tool(
                 "math.run",
                 {
-                    "capability_id": "integer.compute.gcd",
+                    "operation_id": "integer.compute.gcd",
                     "payload": {"left": "84", "right": "30"},
                 },
             )
@@ -58,16 +55,13 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
             assert "mcp_projection" not in result.structured_content
             assert result.structured_content["output"] == response["output"]
             assert result.structured_content["verification_record_uri"] is None
-            runtime = contract["capability"]["provider_runtime"]
-            assert runtime["provider"] == contract["capability"]["provider"]
-            assert runtime["digest"] is not None
             assert "provider" not in result.structured_content
             assert "provider_digest" not in result.structured_content
 
             invalid = await client.call_tool(
                 "math.run",
                 {
-                    "capability_id": "integer.compute.gcd",
+                    "operation_id": "integer.compute.gcd",
                     "payload": {"left": "84", "unexpected": "30"},
                 },
             )
@@ -86,16 +80,16 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
                 {
                     "request": {
                         "op": "inspect",
-                        "capability_id": ("graph.invariant.maximum_matching.compute"),
+                        "operation_id": ("graph.invariant.maximum_matching.compute"),
                     }
                 },
             )
             assert isinstance(matching_description.structured_content, dict)
             matching_contract = matching_description.structured_content
-            assert matching_contract["capability"]["version"] == "3"
-            assert matching_contract["capability"]["invocation_examples"][0][
-                "name"
-            ] == ("triangle_with_tail")
+            assert matching_contract["operation"]["version"] == "3"
+            assert matching_contract["operation"]["examples"][0]["name"] == (
+                "triangle_with_tail"
+            )
 
             reliability_verifier_discovery = await client.call_tool(
                 "math.find",
@@ -113,7 +107,7 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
             )
             assert isinstance(reliability_verifier_discovery.structured_content, dict)
             assert "probability.graph_reliability.connection_probability.verify" in {
-                match["capability_id"]
+                match["operation_id"]
                 for match in reliability_verifier_discovery.structured_content[
                     "matches"
                 ]
@@ -122,23 +116,23 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
             unknown = await client.call_tool(
                 "math.run",
                 {
-                    "capability_id": "missing.capability",
+                    "operation_id": "missing.operation",
                     "payload": {},
                 },
             )
             unknown_result = json.loads(unknown.content[0].text)
             assert unknown.is_error is False
             assert unknown_result["execution"]["status"] == "ERROR"
-            assert unknown_result["output"]["error"]["code"] == "UNKNOWN_CAPABILITY"
-            assert "available_capability_ids" not in unknown_result["output"]
+            assert unknown_result["output"]["error"]["code"] == "UNKNOWN_OPERATION"
+            assert "available_operation_ids" not in unknown_result["output"]
             assert len(unknown.content[0].text.encode("utf-8")) < 2_048
             assert isinstance(unknown.structured_content, dict)
             output = unknown.structured_content["output"]
-            assert "available_capability_ids" not in output
-            assert len(output["nearby_capability_ids"]) <= 5
+            assert "available_operation_ids" not in output
+            assert len(output["nearby_operation_ids"]) <= 5
             assert output["available_recovery_paths"][-1] == {
                 "action": "inspect_catalog",
-                "resource_uri": "capability://catalog",
+                "resource_uri": "operation://catalog",
             }
             assert "verification_record_uri" not in unknown_result
             assert unknown.structured_content["verification_record_uri"] is None
@@ -169,7 +163,7 @@ def test_mcp_composes_finite_field_values_by_opaque_reference(tmp_path: Path) ->
         )
 
         async with Client(
-            create_server(tmp_path, checker_authority=CheckerAuthorityMode.NONE),
+            create_server(tmp_path),
             raise_exceptions=True,
         ) as client:
             inspected = await client.call_tool(
@@ -177,12 +171,12 @@ def test_mcp_composes_finite_field_values_by_opaque_reference(tmp_path: Path) ->
                 {
                     "request": {
                         "op": "inspect",
-                        "capability_id": ("finite_field.polynomial_map.fibers.compute"),
+                        "operation_id": ("finite_field.polynomial_map.fibers.compute"),
                     }
                 },
             )
             assert isinstance(inspected.structured_content, dict)
-            descriptor = inspected.structured_content["capability"]
+            descriptor = inspected.structured_content["operation"]
             assert descriptor["input_ports"] == [
                 {"name": "table", "value_type": "FiniteMapTable"}
             ]
@@ -190,7 +184,7 @@ def test_mcp_composes_finite_field_values_by_opaque_reference(tmp_path: Path) ->
             table_call = await client.call_tool(
                 "math.run",
                 {
-                    "capability_id": "finite_field.polynomial_map.table.compute",
+                    "operation_id": "finite_field.polynomial_map.table.compute",
                     "payload": {
                         "polynomial_map": polynomial_map.model_dump(mode="json")
                     },
@@ -204,7 +198,7 @@ def test_mcp_composes_finite_field_values_by_opaque_reference(tmp_path: Path) ->
             fibers_call = await client.call_tool(
                 "math.run",
                 {
-                    "capability_id": "finite_field.polynomial_map.fibers.compute",
+                    "operation_id": "finite_field.polynomial_map.fibers.compute",
                     "payload": {},
                     "inputs": {"table": {"value_ref": value_ref}},
                 },
@@ -234,7 +228,7 @@ def test_mcp_composes_finite_field_values_by_opaque_reference(tmp_path: Path) ->
             directions_call = await client.call_tool(
                 "math.run",
                 {
-                    "capability_id": "finite_field.projective_line.enumerate",
+                    "operation_id": "finite_field.projective_line.enumerate",
                     "payload": {
                         "presentation": presentation.model_dump(mode="json"),
                         "axis": rows.model_dump(mode="json"),
@@ -249,7 +243,7 @@ def test_mcp_composes_finite_field_values_by_opaque_reference(tmp_path: Path) ->
             incomplete_call = await client.call_tool(
                 "math.run",
                 {
-                    "capability_id": "finite_field.direction_rank_ledger.compute",
+                    "operation_id": "finite_field.direction_rank_ledger.compute",
                     "payload": {},
                     "inputs": {"directions": {"value_ref": directions_ref}},
                 },
@@ -260,7 +254,7 @@ def test_mcp_composes_finite_field_values_by_opaque_reference(tmp_path: Path) ->
             ledger_call = await client.call_tool(
                 "math.run",
                 {
-                    "capability_id": "finite_field.direction_rank_ledger.compute",
+                    "operation_id": "finite_field.direction_rank_ledger.compute",
                     "payload": {"subspace": subspace.model_dump(mode="json")},
                     "inputs": {"directions": {"value_ref": directions_ref}},
                 },

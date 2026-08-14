@@ -13,7 +13,7 @@ from jacobian.domains.polynomial_nullstellensatz.core import (
     install_nullstellensatz_core,
 )
 from jacobian.provider_runtime import known_provider_runtime
-from jacobian.runtime.config import CheckerAuthorityMode
+from tests.support.catalog_build_options import CheckerAuthorityMode
 from tests.support.services import (
     DomainTestServices,
     atomic_installation,
@@ -63,7 +63,7 @@ def open_nullstellensatz_services(
         with atomic_installation(services.core):
             installed = install_nullstellensatz_core(services.installation, runtime)
             for adapter in installed.adapters:
-                services.installation.register_capability(adapter)
+                services.installation.register_operation(adapter)
         yield services
 
 

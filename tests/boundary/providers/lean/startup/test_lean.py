@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-import threading
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
+from tests.support.catalog_build_options import CheckerAuthorityMode
+from tests.support.catalog_build_runtime import create_catalog_build_runtime
 from tests.support.provider_lean import (
     PINNED_LEAN_CORE_RUNTIME_UNAVAILABLE_REASON,
     PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
@@ -15,13 +16,13 @@ from tests.support.provider_lean import (
 from tests.support.state import copy_template
 
 from jacobian.adapters.mcp.server import create_server
-from jacobian.contracts.capabilities import (
-    CapabilityRequest,
-)
 from jacobian.contracts.checkers import CheckerDecision
 from jacobian.contracts.lean import (
     LeanDeclarationSearchRequest,
     LeanEnvironment,
+)
+from jacobian.contracts.operations import (
+    OperationRequest,
 )
 from jacobian.contracts.results import (
     Arithmetic,
@@ -34,7 +35,7 @@ from jacobian.lean_frontend.declarations import (
     LeanDeclarationBackendError,
     LeanSubprocessDeclarationBackend,
 )
-from jacobian.runtime import CheckerAuthorityMode, create_runtime
+from jacobian.operator_lifecycle import initialize_state
 
 pytestmark = [
     pytest.mark.skipif(
@@ -52,14 +53,14 @@ def test_core_declaration_catalog_matches_a_fresh_scan_and_detects_tampering(
     fresh_root = tmp_path / "fresh"
     copy_template(authorized_portfolio_template, indexed_root)
     copy_template(authorized_portfolio_template, fresh_root)
-    indexed_runtime = create_runtime(
+    indexed_runtime = create_catalog_build_runtime(
         indexed_root, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
-    fresh_runtime = create_runtime(
+    fresh_runtime = create_catalog_build_runtime(
         fresh_root, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
-    indexed = indexed_runtime.portfolio_resources.lean_declarations
-    fresh = fresh_runtime.portfolio_resources.lean_declarations
+    indexed = indexed_runtime.catalog_build_resources.lean_declarations
+    fresh = fresh_runtime.catalog_build_resources.lean_declarations
     assert indexed is not None
     assert fresh is not None
     indexed_backend = indexed.backend
@@ -100,13 +101,13 @@ def test_core_declaration_catalog_matches_a_fresh_scan_and_detects_tampering(
 
 
 def test_core_dependency_graph_is_bounded_and_materialized(tmp_path: Path) -> None:
-    runtime = create_runtime(
+    runtime = create_catalog_build_runtime(
         tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
 
-    result = runtime.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="lean.declaration.dependencies",
+    result = runtime.core.operations.invoke(
+        OperationRequest(
+            operation_id="lean.declaration.dependencies",
             input={
                 "environment": "CORE",
                 "root_declaration": "Nat.add_comm",
@@ -137,15 +138,15 @@ def test_core_dependency_graph_is_bounded_and_materialized(tmp_path: Path) -> No
 def test_mathlib_discovery_composes_with_bound_sqrt_two_verification(
     tmp_path: Path,
 ) -> None:
-    runtime = create_runtime(
+    runtime = create_catalog_build_runtime(
         tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
-    assert runtime.portfolio_resources.lean is not None
-    assert runtime.portfolio_resources.lean_declarations is not None
+    assert runtime.catalog_build_resources.lean is not None
+    assert runtime.catalog_build_resources.lean_declarations is not None
 
-    searched = runtime.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="lean.declaration.search",
+    searched = runtime.core.operations.invoke(
+        OperationRequest(
+            operation_id="lean.declaration.search",
             input={
                 "environment": "MATHLIB",
                 "name_contains": "irrational_sqrt_two",
@@ -153,9 +154,9 @@ def test_mathlib_discovery_composes_with_bound_sqrt_two_verification(
             },
         )
     )
-    inspected = runtime.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="lean.declaration.inspect",
+    inspected = runtime.core.operations.invoke(
+        OperationRequest(
+            operation_id="lean.declaration.inspect",
             input={
                 "environment": "MATHLIB",
                 "declaration_name": "irrational_sqrt_two",
@@ -172,7 +173,7 @@ def test_mathlib_discovery_composes_with_bound_sqrt_two_verification(
         == searched.output["result"]["environment_digest"]
     )
 
-    verified = runtime.portfolio_resources.lean.verify(
+    verified = runtime.catalog_build_resources.lean.verify(
         environment=LeanEnvironment.MATHLIB,
         statement="Irrational (Real.sqrt 2)",
         proof="exact irrational_sqrt_two",
@@ -195,23 +196,23 @@ def test_mathlib_discovery_composes_with_bound_sqrt_two_verification(
 def test_core_lean_induction_proof_creates_bound_verification_record(
     tmp_path: Path,
 ) -> None:
-    runtime = create_runtime(
+    runtime = create_catalog_build_runtime(
         tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
-    assert runtime.portfolio_resources.lean is not None
+    assert runtime.catalog_build_resources.lean is not None
 
-    inspected = runtime.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="lean.declaration.inspect",
+    inspected = runtime.core.operations.invoke(
+        OperationRequest(
+            operation_id="lean.declaration.inspect",
             input={
                 "environment": "CORE",
                 "declaration_name": "Nat.add",
             },
         )
     )
-    outside_profile = runtime.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="lean.declaration.search",
+    outside_profile = runtime.core.operations.invoke(
+        OperationRequest(
+            operation_id="lean.declaration.search",
             input={
                 "environment": "CORE",
                 "name_contains": "Lean.Meta.ppExpr",
@@ -223,7 +224,7 @@ def test_core_lean_induction_proof_creates_bound_verification_record(
     assert outside_profile.output["result"]["declarations"] == []
     assert outside_profile.output["result"]["stop_reason"] == "EXHAUSTED"
 
-    verified = runtime.portfolio_resources.lean.verify(
+    verified = runtime.catalog_build_resources.lean.verify(
         statement="∀ n : Nat, n + 0 = n",
         proof=(
             "intro n\n"
@@ -247,11 +248,13 @@ def test_core_lean_induction_proof_creates_bound_verification_record(
 
 
 def test_core_lean_checker_binds_the_measured_runtime(tmp_path: Path) -> None:
-    runtime = create_runtime(
+    runtime = create_catalog_build_runtime(
         tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
-    assert runtime.portfolio_resources.lean is not None
-    installation = runtime.portfolio_resources.lean.installations[LeanEnvironment.CORE]
+    assert runtime.catalog_build_resources.lean is not None
+    installation = runtime.catalog_build_resources.lean.installations[
+        LeanEnvironment.CORE
+    ]
     assert installation.checker_id is not None
     registration = runtime.core.checkers.require_active(installation.checker_id)
 
@@ -273,18 +276,22 @@ def test_core_lean_accepts_single_expression_witness_forms(
     statement: str,
     proof: str,
 ) -> None:
-    runtime = create_runtime(
+    runtime = create_catalog_build_runtime(
         tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
-    assert runtime.portfolio_resources.lean is not None
+    assert runtime.catalog_build_resources.lean is not None
 
-    verified = runtime.portfolio_resources.lean.verify(statement=statement, proof=proof)
+    verified = runtime.catalog_build_resources.lean.verify(
+        statement=statement, proof=proof
+    )
 
     assert verified.result.conclusion is Conclusion.TRUE
     assert verified.result.verification_record_uri is not None
 
 
-def test_core_lean_check_runs_through_capability_mcp_surface(tmp_path: Path) -> None:
+def test_core_lean_check_runs_through_operation_mcp_surface(tmp_path: Path) -> None:
+    initialize_state(tmp_path)
+
     async def scenario() -> None:
         from mcp import Client
 
@@ -297,20 +304,20 @@ def test_core_lean_check_runs_through_capability_mcp_surface(tmp_path: Path) -> 
                 {
                     "request": {
                         "op": "inspect",
-                        "capability_id": "lean.check",
+                        "operation_id": "lean.check",
                     }
                 },
             )
             assert isinstance(described.structured_content, dict)
             descriptor = described.structured_content
-            assert descriptor["capability"]["invocation_examples"][0]["name"] == (
+            assert descriptor["operation"]["examples"][0]["name"] == (
                 "finite-witness-let"
             )
 
             response = await client.call_tool(
                 "math.run",
                 {
-                    "capability_id": "lean.check",
+                    "operation_id": "lean.check",
                     "payload": {
                         "statement": "∀ n : Nat, n + 0 = n",
                         "proof": (
@@ -322,6 +329,39 @@ def test_core_lean_check_runs_through_capability_mcp_surface(tmp_path: Path) -> 
                     },
                 },
             )
+            assert response.is_error is False
+            assert isinstance(response.structured_content, dict)
+            payload = response.structured_content
+            assert payload["output"]["conclusion"] == "TRUE"
+            assert payload["verification_record_uri"] is not None
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.skipif(
+    skip_unless_pinned_mathlib_runtime(),
+    reason=PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
+)
+@pytest.mark.timeout(240)
+def test_mathlib_lean_check_uses_its_compiled_checker_binding(tmp_path: Path) -> None:
+    initialize_state(tmp_path)
+
+    async def scenario() -> None:
+        from mcp import Client
+
+        async with Client(create_server(tmp_path), raise_exceptions=True) as client:
+            response = await client.call_tool(
+                "math.run",
+                {
+                    "operation_id": "lean.check",
+                    "payload": {
+                        "environment": "MATHLIB",
+                        "statement": "Irrational (Real.sqrt 2)",
+                        "proof": "exact irrational_sqrt_two",
+                    },
+                },
+            )
+
             assert response.is_error is False
             assert isinstance(response.structured_content, dict)
             payload = response.structured_content
@@ -344,12 +384,12 @@ def test_core_lean_rejects_untrusted_or_invalid_proofs(
     tmp_path: Path,
     proof: str,
 ) -> None:
-    runtime = create_runtime(
+    runtime = create_catalog_build_runtime(
         tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
-    assert runtime.portfolio_resources.lean is not None
+    assert runtime.catalog_build_resources.lean is not None
 
-    rejected = runtime.portfolio_resources.lean.verify(
+    rejected = runtime.catalog_build_resources.lean.verify(
         statement="∀ n : Nat, n + 0 = n",
         proof=proof,
     )
@@ -369,10 +409,10 @@ def test_lean_reuses_only_an_exact_active_checker_result(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    runtime = create_runtime(
+    runtime = create_catalog_build_runtime(
         tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
-    assert runtime.portfolio_resources.lean is not None
+    assert runtime.catalog_build_resources.lean is not None
     calls = 0
 
     def accept(**_: object) -> CheckerDecision:
@@ -390,15 +430,15 @@ def test_lean_reuses_only_an_exact_active_checker_result(
     def unexpected_selector(**_: object) -> object:
         raise AssertionError("Lean must use its explicitly installed checker")
 
-    monkeypatch.setattr(
-        runtime.services.verification._checker_executor, "execute", accept
-    )
+    monkeypatch.setattr(runtime.verification._checker_executor, "execute", accept)
     monkeypatch.setattr(runtime.core.checkers, "select_compatible", unexpected_selector)
-    first = runtime.portfolio_resources.lean.verify(statement="1 + 1 = 2", proof="rfl")
-    repeated = runtime.portfolio_resources.lean.verify(
+    first = runtime.catalog_build_resources.lean.verify(
         statement="1 + 1 = 2", proof="rfl"
     )
-    changed = runtime.portfolio_resources.lean.verify(
+    repeated = runtime.catalog_build_resources.lean.verify(
+        statement="1 + 1 = 2", proof="rfl"
+    )
+    changed = runtime.catalog_build_resources.lean.verify(
         statement="2 + 2 = 4", proof="rfl"
     )
 
@@ -415,10 +455,10 @@ def test_lean_cache_never_reuses_a_rejected_checker_input(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    runtime = create_runtime(
+    runtime = create_catalog_build_runtime(
         tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
-    assert runtime.portfolio_resources.lean is not None
+    assert runtime.catalog_build_resources.lean is not None
     decisions = iter(
         (
             CheckerDecision(
@@ -446,17 +486,15 @@ def test_lean_cache_never_reuses_a_rejected_checker_input(
         calls += 1
         return next(decisions)
 
-    monkeypatch.setattr(
-        runtime.services.verification._checker_executor, "execute", recover
-    )
+    monkeypatch.setattr(runtime.verification._checker_executor, "execute", recover)
 
-    first = runtime.portfolio_resources.lean.verify(
+    first = runtime.catalog_build_resources.lean.verify(
         statement="True", proof="by trivial"
     )
-    recovered = runtime.portfolio_resources.lean.verify(
+    recovered = runtime.catalog_build_resources.lean.verify(
         statement="True", proof="by trivial"
     )
-    repeated = runtime.portfolio_resources.lean.verify(
+    repeated = runtime.catalog_build_resources.lean.verify(
         statement="True", proof="by trivial"
     )
 
@@ -472,12 +510,12 @@ def test_lean_cache_does_not_reuse_a_revoked_checker_result(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    runtime = create_runtime(
+    runtime = create_catalog_build_runtime(
         tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
-    assert runtime.portfolio_resources.lean is not None
+    assert runtime.catalog_build_resources.lean is not None
     monkeypatch.setattr(
-        runtime.services.verification._checker_executor,
+        runtime.verification._checker_executor,
         "execute",
         lambda **_: CheckerDecision(
             accepted=True,
@@ -488,36 +526,18 @@ def test_lean_cache_does_not_reuse_a_revoked_checker_result(
             detail="accepted by test checker",
         ),
     )
-    first = runtime.portfolio_resources.lean.verify(statement="1 + 1 = 2", proof="rfl")
+    first = runtime.catalog_build_resources.lean.verify(
+        statement="1 + 1 = 2", proof="rfl"
+    )
     record_uri = first.result.verification_record_uri
     assert record_uri is not None
     checker_id = runtime.core.store.get(record_uri).payload["checker_id"]
     runtime.core.checkers.revoke(checker_id, reason="cache trust-boundary test")
 
-    repeated = runtime.portfolio_resources.lean.verify(
+    repeated = runtime.catalog_build_resources.lean.verify(
         statement="1 + 1 = 2", proof="rfl"
     )
 
     assert first.result.verification_record_uri is not None
     assert repeated.cache_hit is False
     assert repeated.result.verification_record_uri is None
-
-
-@pytest.mark.skipif(
-    skip_unless_pinned_mathlib_runtime(),
-    reason=PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
-)
-def test_mathlib_warmup_starts_only_once(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    runtime = create_runtime(
-        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
-    )
-    assert runtime.portfolio_resources.lean is not None
-    warmed = threading.Event()
-    monkeypatch.setattr(runtime.portfolio_resources.lean, "_warm_mathlib", warmed.set)
-
-    assert runtime.portfolio_resources.lean.start_mathlib_warmup() is True
-    assert warmed.wait(timeout=2)
-    assert runtime.portfolio_resources.lean.start_mathlib_warmup() is False

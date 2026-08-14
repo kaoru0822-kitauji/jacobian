@@ -8,16 +8,17 @@ from pathlib import Path
 import pytest
 
 from jacobian.canonical import canonicalize_json
-from jacobian.contracts.capabilities import (
-    CapabilityInstallTier,
-    CapabilityProviderAvailability,
-    CapabilityProviderDigestKind,
-    CapabilityProviderRuntime,
-)
 from jacobian.contracts.checkers import EvidenceKind
+from jacobian.contracts.operations import (
+    ProviderAvailability,
+    ProviderDigestKind,
+    ProviderInstallTier,
+    ProviderObservation,
+)
 from jacobian.provider_runtime import python_distribution_provider_runtime
 from jacobian.registry import (
     CheckerCompatibilityError,
+    CheckerExecutableChangedError,
     CheckerNotFoundError,
     CheckerRegistry,
     CheckerRegistryError,
@@ -93,6 +94,35 @@ def test_revoked_checker_cannot_authorize_new_verification(tmp_path: Path) -> No
         "AUTHORIZED",
         "REVOKED",
     ]
+
+
+def test_catalog_binding_uses_persisted_checker_identity_without_remeasurement(
+    tmp_path: Path,
+) -> None:
+    registry = CheckerRegistry(ArtifactRepository(tmp_path))
+    checker = registry.authorize(
+        name="reject-all-v1",
+        entrypoint="jacobian_checkers.reject:check",
+        evidence_kind="WITNESS",
+        format_id="example.witness",
+        format_version="1",
+        claim_schema_uris=(CLAIM_SCHEMA_A,),
+        semantics_uris=(CLAIM_SCHEMA_A,),
+        candidate_schema_uris=(CLAIM_SCHEMA_A,),
+    )
+
+    assert (
+        registry.require_catalog_binding(
+            checker.checker_id,
+            implementation_digest=checker.implementation_digest,
+        )
+        == checker
+    )
+    with pytest.raises(CheckerExecutableChangedError, match="jacobian update"):
+        registry.require_catalog_binding(
+            checker.checker_id,
+            implementation_digest="sha256:" + "0" * 64,
+        )
 
 
 def test_checker_policy_lock_must_precede_store_transaction(tmp_path: Path) -> None:
@@ -270,14 +300,14 @@ def test_checker_selection_uses_authorized_external_runtime_identity(
     executable = tmp_path / "external-checker"
     executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     executable.chmod(0o755)
-    runtime = CapabilityProviderRuntime(
+    runtime = ProviderObservation(
         provider="external-checker",
-        availability=CapabilityProviderAvailability.AVAILABLE,
+        availability=ProviderAvailability.AVAILABLE,
         version="1",
         digest="sha256:" + hashlib.sha256(executable.read_bytes()).hexdigest(),
-        digest_kind=CapabilityProviderDigestKind.EXECUTABLE,
+        digest_kind=ProviderDigestKind.EXECUTABLE,
         platform="linux-x86_64",
-        install_tier=CapabilityInstallTier.T2,
+        install_tier=ProviderInstallTier.T2,
         license_id="MIT",
         configuration={"executable": str(executable.resolve())},
     )
@@ -322,11 +352,11 @@ def test_checker_registry_authorizes_python_distribution_runtime(
         distribution_name="pydantic",
         import_name="pydantic",
         required_attributes=("BaseModel",),
-        install_tier=CapabilityInstallTier.T1,
+        install_tier=ProviderInstallTier.T1,
         license_id="MIT",
         configuration={"import_name": "pydantic"},
     )
-    assert runtime.availability is CapabilityProviderAvailability.AVAILABLE
+    assert runtime.availability is ProviderAvailability.AVAILABLE
     store = ArtifactRepository(tmp_path)
     registry = CheckerRegistry(store)
 

@@ -5,11 +5,11 @@ import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from tests.support.catalog_build_options import CheckerAuthorityMode
+from tests.support.catalog_build_runtime import create_catalog_build_runtime
 from tests.support.state import publish_template, quiesce_sqlite_template
 
-from jacobian.runtime import CheckerAuthorityMode, create_runtime
 from jacobian.runtime.bootstrap import bootstrap_services
-from jacobian.runtime.config import RuntimeOptions
 from jacobian.storage.repository import ArtifactRepository
 
 
@@ -53,14 +53,14 @@ def _polynomial_expression_schema_uri(root: Path) -> str:
 
 
 def _build_sentinel_store(staging: Path) -> None:
-    core = bootstrap_services(staging, RuntimeOptions())
+    core = bootstrap_services(staging)
     core.close()
     quiesce_sqlite_template(staging)
 
 
 def test_store_close_removes_deferred_wal_files(tmp_path: Path) -> None:
     root = tmp_path / "state"
-    core = bootstrap_services(root, RuntimeOptions())
+    core = bootstrap_services(root)
     core.close()
 
     assert not (root / "metadata.sqlite3-wal").exists()
@@ -125,7 +125,7 @@ def test_complete_portfolio_template_is_quiescent_and_copyable(
         destination,
         descriptor_uri=_polynomial_expression_schema_uri(complete_portfolio_template),
     )
-    with create_runtime(
+    with create_catalog_build_runtime(
         destination, checker_authority=CheckerAuthorityMode.NONE
     ) as runtime:
-        assert runtime.core.capabilities.catalog().capabilities
+        assert runtime.core.operations.snapshot().operations

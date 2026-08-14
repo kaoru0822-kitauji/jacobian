@@ -10,21 +10,10 @@ from typing import Any, Literal, cast
 from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capability_adapters import CapabilityAdapter, parse_capability_input
-from jacobian.capability_errors import CapabilityError, CapabilityInvocationError
 from jacobian.checker_artifacts import put_witness_envelope
+from jacobian.checker_authorization import authorize_checker_operation
 from jacobian.checker_identity import batch_checker_manifest_measurement
-from jacobian.checker_installation import CheckerInstaller
-from jacobian.checker_operations import CheckerOperation, ExactReplayCheckerDeclaration
-from jacobian.contracts.capabilities import (
-    CapabilityDescriptor,
-    CapabilityDiagnostic,
-    CapabilityInputKind,
-    CapabilityProviderAvailability,
-    CapabilityProviderRuntime,
-    CapabilityRequest,
-    CapabilityValuePort,
-)
+from jacobian.checker_operations import AuthorizedChecker, CheckerOperation
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import EvidenceBindings, WitnessEnvelope
 from jacobian.contracts.exact_domain_verification import (
@@ -34,19 +23,32 @@ from jacobian.contracts.exact_domain_verification import (
     InlineExactVerificationRecord,
     inline_exact_value_digest,
 )
+from jacobian.contracts.operations import (
+    OperationDescriptor,
+    OperationDiagnostic,
+    OperationInputKind,
+    OperationRequest,
+    OperationValuePort,
+    ProviderAvailability,
+    ProviderObservation,
+)
 from jacobian.contracts.results import (
     Conclusion,
     ContractModel,
     ExecutionStatus,
 )
-from jacobian.domain_bundles import DomainBundle
+from jacobian.operation_adapters import OperationAdapter, parse_operation_input
+from jacobian.operation_binding import BoundOperationGroup, OperationBinder
 from jacobian.operation_bindings import DurablePublication
-from jacobian.operation_installation import InstalledDomainBundle
+from jacobian.operation_catalog import OperationCatalog, OperationCatalogError
+from jacobian.operation_declarations import OperationDeclaration, OperationDeclarations
+from jacobian.operation_errors import OperationError, OperationInvocationError
 from jacobian.operation_ports import InputPort
 from jacobian.operation_projection import OperationProjection
 from jacobian.operation_publication import PublishedOperation
 from jacobian.operations import Completed, Failed
 from jacobian.providers.flint_runtime import (
+    exact_domain_checker_provider_runtime,
     exact_domain_checker_source_provider_runtime,
 )
 from jacobian.registry import CheckerRegistry
@@ -60,21 +62,27 @@ from jacobian.verification.service import VerificationService
 
 _LOGGER = logging.getLogger(__name__)
 
+type ExactOperationGroup = tuple[
+    OperationDeclarations,
+    BoundOperationGroup,
+    tuple[AuthorizedChecker, ...],
+]
+
 
 @dataclass(frozen=True, slots=True)
 class ExactDomainCheckerInstallation:
     """Exact replay identities and non-conclusive installation diagnostics."""
 
     checker_ids: dict[str, str | None]
-    provider_runtimes: dict[str, CapabilityProviderRuntime]
+    provider_runtimes: dict[str, ProviderObservation]
     declaration_providers: dict[str, str]
     witness_schema_uri: str | None = None
-    diagnostics: tuple[CapabilityDiagnostic, ...] = ()
+    diagnostics: tuple[OperationDiagnostic, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
 class _InstalledDeclaration:
-    declaration: ExactReplayCheckerDeclaration
+    declaration: AuthorizedChecker
     result_model: type[ContractModel]
     input_schema_uri: str
     result_schema_uri: str
@@ -84,29 +92,28 @@ class _InstalledDeclaration:
 
 @dataclass(frozen=True, slots=True)
 class _DeclaredRuntimeGroup:
-    probe: CapabilityProviderRuntime
-    members: tuple[tuple[InstalledDomainBundle, ExactReplayCheckerDeclaration], ...]
+    probe: ProviderObservation
+    members: tuple[tuple[BoundOperationGroup, AuthorizedChecker], ...]
 
 
 def _declared_runtime_groups(
-    pairs: tuple[tuple[InstalledDomainBundle, ExactReplayCheckerDeclaration], ...],
+    pairs: tuple[tuple[BoundOperationGroup, AuthorizedChecker], ...],
 ) -> tuple[_DeclaredRuntimeGroup, ...]:
     grouped: dict[
         str,
         tuple[
-            CapabilityProviderRuntime,
-            list[tuple[InstalledDomainBundle, ExactReplayCheckerDeclaration]],
+            ProviderObservation,
+            list[tuple[BoundOperationGroup, AuthorizedChecker]],
         ],
     ] = {}
     for installed, declaration in pairs:
-        factory = object.__getattribute__(declaration, "provider_runtime_factory")
-        probe = factory() if factory is not None else declaration.provider_runtime
-        if probe is None:
-            continue
-        if not isinstance(probe, CapabilityProviderRuntime):
+        probe = declaration.observation_loader()
+        if not isinstance(probe, ProviderObservation):
             raise TypeError(
-                "provider runtime factory must return CapabilityProviderRuntime"
+                "checker observation loader must return ProviderObservation"
             )
+        if probe.checker_ids:
+            raise ValueError("checker declarations must not pre-authorize checker IDs")
         current = grouped.get(probe.provider)
         if current is None:
             grouped[probe.provider] = (probe, [(installed, declaration)])
@@ -128,31 +135,35 @@ def _declared_runtime_groups(
 
 
 def _authorize_replay_operation(
-    installer: CheckerInstaller,
+    checkers: CheckerRegistry,
     operation: CheckerOperation,
     *,
     authorize: bool,
-    provider_runtime: CapabilityProviderRuntime,
+    provider_runtime: ProviderObservation,
     source_available: bool,
     optional: bool,
-    capability_id: str,
-    diagnostics: list[CapabilityDiagnostic],
+    operation_id: str,
+    diagnostics: list[OperationDiagnostic],
 ) -> str | None:
-    if provider_runtime.availability is CapabilityProviderAvailability.AVAILABLE:
-        return installer.install(operation, authorize=authorize).checker_id
+    if provider_runtime.availability is ProviderAvailability.AVAILABLE:
+        return authorize_checker_operation(
+            checkers, operation, authorize=authorize
+        ).checker_id
     can_omit = optional and source_available
     if not can_omit:
-        return installer.install(operation, authorize=authorize).checker_id
-    diagnostic = CapabilityDiagnostic(
+        return authorize_checker_operation(
+            checkers, operation, authorize=authorize
+        ).checker_id
+    diagnostic = OperationDiagnostic(
         code="EXACT_REPLAY_PROVIDER_UNAVAILABLE",
         stage="provider_availability",
         message=(
-            f"Independent replay for {capability_id!r} is not installed: "
+            f"Independent replay for {operation_id!r} is not installed: "
             f"{provider_runtime.diagnostic or 'the provider is unavailable.'}"
         ),
         hint="Install or repair the optional python-flint backend, then retry.",
         details={
-            "capability_id": capability_id,
+            "operation_id": operation_id,
             "provider": provider_runtime.provider,
             "checker_authorization_affected": True,
         },
@@ -165,13 +176,13 @@ def _authorize_replay_operation(
 def _authorized_provider_runtimes(
     groups: tuple[_DeclaredRuntimeGroup, ...],
     checker_ids: Mapping[str, str | None],
-) -> dict[str, CapabilityProviderRuntime]:
-    provider_runtimes: dict[str, CapabilityProviderRuntime] = {}
+) -> dict[str, ProviderObservation]:
+    provider_runtimes: dict[str, ProviderObservation] = {}
     for group in groups:
         authorized = tuple(
             checker_id
             for _installed, declaration in group.members
-            if (checker_id := checker_ids[declaration.capability_id]) is not None
+            if (checker_id := checker_ids[declaration.operation_id]) is not None
         )
         runtime = group.probe.model_copy(update={"checker_ids": authorized})
         existing = provider_runtimes.get(runtime.provider)
@@ -194,21 +205,20 @@ def _authorized_provider_runtimes(
 def install_exact_domain_checkers(
     checkers: CheckerRegistry,
     *,
-    bundles: Mapping[str, tuple[DomainBundle, InstalledDomainBundle]],
+    groups: Mapping[str, ExactOperationGroup],
     authorize: bool,
 ) -> ExactDomainCheckerInstallation:
     """Install independent exact replay against dynamically registered schemas."""
 
-    installer = CheckerInstaller(checkers)
-    available_declarations = _available_declaration_bundles(bundles)
+    available_declarations = _available_declaration_groups(groups)
     checker_ids: dict[str, str | None] = {}
     declaration_providers: dict[str, str] = {}
-    diagnostics: list[CapabilityDiagnostic] = []
+    diagnostics: list[OperationDiagnostic] = []
     checker_ids.update(
-        (declaration.capability_id, None)
+        (declaration.operation_id, None)
         for _installed, declaration in available_declarations
     )
-    if not authorize and not installer.bind_existing:
+    if not authorize and not checkers.bind_existing_when_omitted:
         return ExactDomainCheckerInstallation(
             checker_ids=checker_ids,
             provider_runtimes={},
@@ -216,16 +226,16 @@ def install_exact_domain_checkers(
         )
     source_available = (
         exact_domain_checker_source_provider_runtime().availability
-        is CapabilityProviderAvailability.AVAILABLE
+        is ProviderAvailability.AVAILABLE
     )
     with batch_checker_manifest_measurement():
-        groups = _declared_runtime_groups(available_declarations)
-        for group in groups:
+        runtime_groups = _declared_runtime_groups(available_declarations)
+        for group in runtime_groups:
             for installed, declaration in group.members:
-                declaration_providers[declaration.capability_id] = group.probe.provider
+                declaration_providers[declaration.operation_id] = group.probe.provider
                 operation = CheckerOperation(
                     name=(
-                        f"{declaration.capability_id} independent "
+                        f"{declaration.operation_id} independent "
                         f"{declaration.replay_method}"
                     ),
                     entrypoint=(
@@ -239,25 +249,25 @@ def install_exact_domain_checkers(
                     ),
                     semantics_uris=(installed.semantics_uri,),
                     candidate_schema_uris=(
-                        installed.result_schema_uris[declaration.capability_id],
+                        installed.result_schema_uris[declaration.operation_id],
                     ),
                     reason=declaration.reason,
                     provider_runtime=group.probe,
                 )
-                checker_ids[declaration.capability_id] = _authorize_replay_operation(
-                    installer,
+                checker_ids[declaration.operation_id] = _authorize_replay_operation(
+                    checkers,
                     operation,
                     authorize=authorize,
                     provider_runtime=group.probe,
                     source_available=source_available,
                     optional=declaration.optional,
-                    capability_id=declaration.capability_id,
+                    operation_id=declaration.operation_id,
                     diagnostics=diagnostics,
                 )
     return ExactDomainCheckerInstallation(
         checker_ids=checker_ids,
         diagnostics=tuple(diagnostics),
-        provider_runtimes=_authorized_provider_runtimes(groups, checker_ids),
+        provider_runtimes=_authorized_provider_runtimes(runtime_groups, checker_ids),
         declaration_providers=declaration_providers,
     )
 
@@ -270,14 +280,14 @@ def install_exact_domain_verification(
     verification: VerificationService,
     checkers: CheckerRegistry,
     *,
-    bundles: Mapping[str, tuple[DomainBundle, InstalledDomainBundle]],
+    groups: Mapping[str, ExactOperationGroup],
     authorize: bool,
-) -> tuple[tuple[CapabilityAdapter[Any], ...], ExactDomainCheckerInstallation]:
-    """Authorize exact replay and expose per-producer verification capabilities.
+) -> tuple[tuple[OperationAdapter[Any], ...], ExactDomainCheckerInstallation]:
+    """Authorize exact replay and expose per-producer verification operations.
 
     Each authorized exact replay declaration becomes one
     :class:`ExactComputedVerificationAdapter` exposing a per-producer typed
-    verifier contract for inline results. The verifier capability ID, title,
+    verifier contract for inline results. The verifier operation ID, title,
     description, and tags come from the declaration's verification metadata,
     which is always complete after construction (explicit or strictly derived
     by stripping the producer verb and appending ``.verify``).
@@ -285,7 +295,7 @@ def install_exact_domain_verification(
 
     installed = install_exact_domain_checkers(
         checkers,
-        bundles=bundles,
+        groups=groups,
         authorize=authorize,
     )
     witness_schema_uri = schemas.register_model(
@@ -304,39 +314,42 @@ def install_exact_domain_verification(
         checker_id is not None for checker_id in installation.checker_ids.values()
     ):
         return (), installation
-    adapters: list[CapabilityAdapter[Any]] = []
+    adapters: list[OperationAdapter[Any]] = []
     result_models = {
-        operation.spec.operation_id: operation.spec.result_type
-        for bundle, _installed_bundle in bundles.values()
-        for operation in bundle.capabilities
+        _operation_spec(operation).operation_id: _operation_spec(operation).result_type
+        for operations, _bound_group, _declarations in groups.values()
+        for operation in operations
     }
     stored_producers = {
-        operation.spec.operation_id
-        for bundle, _installed_bundle in bundles.values()
-        for operation in bundle.capabilities
+        _operation_spec(operation).operation_id
+        for operations, _bound_group, _declarations in groups.values()
+        for operation in operations
         if isinstance(operation.publication, DurablePublication)
     }
     referenceable_results = {
-        operation.spec.operation_id: operation.spec.result_type
-        for bundle, _installed_bundle in bundles.values()
-        for operation in bundle.capabilities
+        _operation_spec(operation).operation_id: _operation_spec(operation).result_type
+        for operations, _bound_group, _declarations in groups.values()
+        for operation in operations
         if operation.output_ports
         and any(
-            port.value_type is operation.spec.result_type
+            port.value_type is _operation_spec(operation).result_type
             for port in operation.output_ports
         )
     }
-    for installed_bundle, declaration in _available_declaration_bundles(bundles):
-        if declaration.capability_id not in installed_bundle.result_schema_uris:
+    for bound_group, declaration in _available_declaration_groups(groups):
+        if declaration.operation_id not in bound_group.result_schema_uris:
             continue
-        if installation.checker_ids.get(declaration.capability_id) is None:
+        if installation.checker_ids.get(declaration.operation_id) is None:
             continue
         installed_declaration = _installed_declaration(
-            installed_bundle,
+            bound_group,
             declaration,
             installation,
-            result_models[declaration.capability_id],
+            result_models[declaration.operation_id],
         )
+        provider_runtime = installation.provider_runtimes[
+            installation.declaration_providers[declaration.operation_id]
+        ].model_copy(update={"checker_ids": (installed_declaration.checker_id,)})
         adapters.append(
             ExactComputedVerificationAdapter(
                 declaration=installed_declaration,
@@ -346,81 +359,163 @@ def install_exact_domain_verification(
                 values=values,
                 verification=verification,
                 witness_schema_uri=witness_schema_uri,
-                provider_runtime=installation.provider_runtimes[
-                    installation.declaration_providers[declaration.capability_id]
-                ],
-                stored_result_input=declaration.capability_id in stored_producers,
+                provider_runtime=provider_runtime,
+                stored_result_input=declaration.operation_id in stored_producers,
                 candidate_value_type=referenceable_results.get(
-                    declaration.capability_id
+                    declaration.operation_id
                 ),
             )
         )
     return tuple(adapters), installation
 
 
-def _available_declaration_bundles(
-    bundles: Mapping[str, tuple[DomainBundle, InstalledDomainBundle]],
-) -> tuple[tuple[InstalledDomainBundle, ExactReplayCheckerDeclaration], ...]:
-    """Pair domain-owned declarations with their unique installed producer."""
+def bind_selected_exact_verification(
+    *,
+    catalog: OperationCatalog,
+    operation_id: str,
+    operations: OperationDeclarations,
+    declarations: tuple[AuthorizedChecker, ...],
+    binder: OperationBinder,
+    verification: VerificationService,
+    checkers: CheckerRegistry,
+) -> OperationAdapter[Any]:
+    """Bind one catalog-selected verifier without probing or measuring providers."""
 
-    available: list[tuple[InstalledDomainBundle, ExactReplayCheckerDeclaration]] = []
+    matches = tuple(
+        declaration
+        for declaration in declarations
+        if declaration.verification_operation_id == operation_id
+    )
+    if len(matches) != 1:
+        raise OperationCatalogError(
+            f"exact verifier locator did not resolve exactly once: {operation_id}"
+        )
+    declaration = matches[0]
+    producers = tuple(
+        operation
+        for operation in operations
+        if operation.operation_id == declaration.operation_id
+    )
+    if len(producers) != 1:
+        raise OperationCatalogError(
+            f"exact verifier producer did not resolve exactly once: {operation_id}"
+        )
+    descriptor = catalog.inspect(operation_id)
+    binding = catalog.checker_binding(operation_id)
+    if descriptor is None or binding is None:
+        raise OperationCatalogError(
+            f"exact verifier catalog binding is incomplete; run `jacobian update`: {operation_id}"
+        )
+    checkers.require_catalog_binding(
+        binding.checker_id,
+        implementation_digest=binding.manifest_digest,
+    )
+    provider_runtime = exact_domain_checker_provider_runtime(
+        checker_ids=(binding.checker_id,)
+    )
+
+    producer = producers[0]
+    bound = binder.bind(operations)
+    installed = _InstalledDeclaration(
+        declaration=declaration,
+        result_model=producer.result_type,
+        input_schema_uri=bound.input_schema_uris[producer.request_type],
+        result_schema_uri=bound.result_schema_uris[producer.operation_id],
+        semantics_uri=bound.semantics_uri,
+        checker_id=binding.checker_id,
+    )
+    witness_schema_uri = binder.schemas.register_model(
+        name="jacobian.witness-envelope",
+        version="1",
+        model=WitnessEnvelope,
+    )
+    stored_result_input = isinstance(producer.publication, DurablePublication)
+    candidate_value_type = (
+        producer.result_type
+        if not stored_result_input
+        and any(
+            port.value_type is producer.result_type for port in producer.output_ports
+        )
+        else None
+    )
+    return ExactComputedVerificationAdapter(
+        declaration=installed,
+        store=binder.store,
+        schemas=binder.schemas,
+        artifacts=binder.artifacts,
+        values=binder.values,
+        verification=verification,
+        witness_schema_uri=witness_schema_uri,
+        provider_runtime=provider_runtime,
+        stored_result_input=stored_result_input,
+        candidate_value_type=candidate_value_type,
+    )
+
+
+def _available_declaration_groups(
+    groups: Mapping[str, ExactOperationGroup],
+) -> tuple[tuple[BoundOperationGroup, AuthorizedChecker], ...]:
+    """Pair checker declarations with their unique bound producer."""
+
+    available: list[tuple[BoundOperationGroup, AuthorizedChecker]] = []
     owners: dict[str, str] = {}
-    for domain_id, (bundle, installed) in bundles.items():
-        producer_capability_ids = {
-            operation.spec.operation_id for operation in bundle.capabilities
+    for module_name, (operations, installed, declarations) in groups.items():
+        producer_operation_ids = {
+            _operation_spec(operation).operation_id for operation in operations
         }
         installed_producer_ids = {
-            adapter.descriptor.capability_id for adapter in installed.adapters
+            adapter.descriptor.operation_id for adapter in installed.adapters
         }
-        for declaration in bundle.checker_declarations:
-            if declaration.capability_id not in producer_capability_ids:
+        for declaration in declarations:
+            if declaration.operation_id not in producer_operation_ids:
                 raise ValueError(
                     "exact replay declaration is not backed by a domain producer "
-                    f"schema: {domain_id}/{declaration.capability_id}"
+                    f"schema: {module_name}/{declaration.operation_id}"
                 )
-            if declaration.capability_id not in installed.result_schema_uris:
+            if declaration.operation_id not in installed.result_schema_uris:
                 continue
             if (
                 installed.adapters
-                and declaration.capability_id not in installed_producer_ids
+                and declaration.operation_id not in installed_producer_ids
             ):
                 continue
-            previous = owners.setdefault(declaration.capability_id, domain_id)
-            if previous != domain_id:
+            previous = owners.setdefault(declaration.operation_id, module_name)
+            if previous != module_name:
                 raise ValueError(
-                    "exact replay declaration is owned by multiple bundles: "
-                    f"{declaration.capability_id}"
+                    "exact replay declaration is owned by multiple groups: "
+                    f"{declaration.operation_id}"
                 )
             available.append((installed, declaration))
-    capability_ids = [declaration.capability_id for _, declaration in available]
-    if len(capability_ids) != len(set(capability_ids)):
+    operation_ids = [declaration.operation_id for _, declaration in available]
+    if len(operation_ids) != len(set(operation_ids)):
         duplicates = sorted(
-            capability_id
-            for capability_id in set(capability_ids)
-            if capability_ids.count(capability_id) > 1
+            operation_id
+            for operation_id in set(operation_ids)
+            if operation_ids.count(operation_id) > 1
         )
         if duplicates:
             raise ValueError(
-                "bundle repeats exact replay declarations: " + ", ".join(duplicates)
+                "operation group repeats exact replay declarations: "
+                + ", ".join(duplicates)
             )
     return tuple(available)
 
 
 def _installed_declaration(
-    bundle: InstalledDomainBundle,
-    declaration: ExactReplayCheckerDeclaration,
+    group: BoundOperationGroup,
+    declaration: AuthorizedChecker,
     installation: ExactDomainCheckerInstallation,
     result_model: type[ContractModel],
 ) -> _InstalledDeclaration:
-    checker_id = installation.checker_ids[declaration.capability_id]
+    checker_id = installation.checker_ids[declaration.operation_id]
     if checker_id is None:
         raise ValueError("exact-domain checker is not authorized")
     return _InstalledDeclaration(
         declaration=declaration,
         result_model=result_model,
-        input_schema_uri=bundle.input_schema_uris[declaration.request_model],
-        result_schema_uri=bundle.result_schema_uris[declaration.capability_id],
-        semantics_uri=bundle.semantics_uri,
+        input_schema_uri=group.input_schema_uris[declaration.request_model],
+        result_schema_uri=group.result_schema_uris[declaration.operation_id],
+        semantics_uri=group.semantics_uri,
         checker_id=checker_id,
     )
 
@@ -445,7 +540,7 @@ class ExactComputedVerificationAdapter:
         values: ValueReferenceStore,
         verification: VerificationService,
         witness_schema_uri: str,
-        provider_runtime: CapabilityProviderRuntime,
+        provider_runtime: ProviderObservation,
         stored_result_input: bool,
         candidate_value_type: type[ContractModel] | None,
     ) -> None:
@@ -474,19 +569,19 @@ class ExactComputedVerificationAdapter:
             if candidate_value_type is not None and not stored_result_input
             else None
         )
-        verification_capability_id = declaration.declaration.verification_capability_id
+        verification_operation_id = declaration.declaration.verification_operation_id
         verification_title = declaration.declaration.verification_title
         verification_description = declaration.declaration.verification_description
         if (
-            verification_capability_id is None
+            verification_operation_id is None
             or verification_title is None
             or verification_description is None
         ):
             raise ValueError(
                 "exact replay declaration has incomplete verifier metadata"
             )
-        self._descriptor = CapabilityDescriptor(
-            capability_id=verification_capability_id,
+        self._descriptor = OperationDescriptor(
+            operation_id=verification_operation_id,
             version="2" if self.candidate_port is not None else "1",
             title=verification_title,
             description=verification_description,
@@ -500,16 +595,16 @@ class ExactComputedVerificationAdapter:
             output_schema=model_schema(ExactComputedVerificationOutput),
             tags=declaration.declaration.verification_tags,
             accepted_input_kinds=(
-                (CapabilityInputKind.TYPED_ARTIFACT,)
+                (OperationInputKind.TYPED_ARTIFACT,)
                 if stored_result_input
-                else (CapabilityInputKind.STRUCTURED_REQUEST,)
+                else (OperationInputKind.STRUCTURED_REQUEST,)
             ),
             accepted_artifact_types=(
                 (declaration.result_schema_uri,) if stored_result_input else ()
             ),
             input_ports=(
                 (
-                    CapabilityValuePort(
+                    OperationValuePort(
                         name=self.candidate_port.name,
                         value_type=self.candidate_port.value_type.__name__,
                     ),
@@ -520,10 +615,10 @@ class ExactComputedVerificationAdapter:
         )
 
     @property
-    def descriptor(self) -> CapabilityDescriptor:
+    def descriptor(self) -> OperationDescriptor:
         return self._descriptor
 
-    def prepare(self, request: CapabilityRequest) -> ContractModel:
+    def prepare(self, request: OperationRequest) -> ContractModel:
         request_model: type[ContractModel] = (
             ExactDomainResultVerificationRequest
             if self.stored_result_input
@@ -544,10 +639,10 @@ class ExactComputedVerificationAdapter:
                     self.candidate_port.value_type,
                 )
                 payload = self.candidate_port.bind_to_request(payload, candidate)
-            return parse_capability_input(request_model, payload)
+            return parse_operation_input(request_model, payload)
         except (ValidationError, ValueError, ValueReferenceError) as exc:
-            raise CapabilityInvocationError(
-                CapabilityDiagnostic(
+            raise OperationInvocationError(
+                OperationDiagnostic(
                     code="INVALID_EXACT_DOMAIN_INPUT",
                     stage="request_validation",
                     message=bounded_validation_exception_message(exc),
@@ -582,7 +677,7 @@ class ExactComputedVerificationAdapter:
             output = ExactComputedVerificationOutput(
                 status="UNSUPPORTED",
                 conclusion="UNKNOWN",
-                operation_id=declaration.declaration.capability_id,
+                operation_id=declaration.declaration.operation_id,
                 input_uri=(
                     source_artifacts[0].artifact_uri
                     if source_artifacts is not None
@@ -600,7 +695,7 @@ class ExactComputedVerificationAdapter:
                 ),
             )
             return OperationProjection(
-                operation_id=self.descriptor.capability_id,
+                operation_id=self.descriptor.operation_id,
                 version=self.descriptor.version,
                 terminal=Completed(value=output),
                 publication=PublishedOperation(
@@ -628,12 +723,12 @@ class ExactComputedVerificationAdapter:
             semantics_artifact=semantics_artifact,
             candidate_artifact=result_artifact,
             payload={
-                "operation_id": declaration.declaration.capability_id,
+                "operation_id": declaration.declaration.operation_id,
                 "input_uri": input_artifact.artifact_uri,
                 "result_uri": result_artifact.artifact_uri,
             },
             summary=(
-                f"{declaration.declaration.capability_id} independent replay witness"
+                f"{declaration.declaration.operation_id} independent replay witness"
             ),
         )
         return self._verify_materialized_relation(
@@ -665,7 +760,7 @@ class ExactComputedVerificationAdapter:
             ),
         )
         checked = self.verification.verify_inline_exact(
-            operation_id=declaration.declaration.capability_id,
+            operation_id=declaration.declaration.operation_id,
             claim_schema_uri=declaration.input_schema_uri,
             candidate_schema_uri=declaration.result_schema_uri,
             semantics_uri=declaration.semantics_uri,
@@ -686,7 +781,7 @@ class ExactComputedVerificationAdapter:
                 self.store.get(record_uri).payload
             )
             if record.bindings != bindings:
-                raise CapabilityError(
+                raise OperationError(
                     "inline exact record does not bind the verified values"
                 )
         detail = checked.execution.detail or (
@@ -701,7 +796,7 @@ class ExactComputedVerificationAdapter:
         output = ExactComputedVerificationOutput(
             status=status,
             conclusion="TRUE" if verified else "UNKNOWN",
-            operation_id=declaration.declaration.capability_id,
+            operation_id=declaration.declaration.operation_id,
             checker_id=declaration.checker_id,
             claim_digest=bindings.claim_digest if verified else None,
             semantics_digest=bindings.semantics_digest if verified else None,
@@ -719,7 +814,7 @@ class ExactComputedVerificationAdapter:
             else Failed(
                 status=checked.execution.status,
                 runtime_ms=checked.execution.runtime_ms,
-                diagnostic=CapabilityDiagnostic(
+                diagnostic=OperationDiagnostic(
                     code="EXACT_REPLAY_EXECUTION_FAILED",
                     stage="exact_replay",
                     message=checked.execution.detail or detail,
@@ -727,7 +822,7 @@ class ExactComputedVerificationAdapter:
             )
         )
         return OperationProjection(
-            operation_id=self.descriptor.capability_id,
+            operation_id=self.descriptor.operation_id,
             version=self.descriptor.version,
             terminal=terminal,
             publication=PublishedOperation(
@@ -780,7 +875,7 @@ class ExactComputedVerificationAdapter:
         output = ExactComputedVerificationOutput(
             status=status,
             conclusion="TRUE" if verified else "UNKNOWN",
-            operation_id=self.declaration.declaration.capability_id,
+            operation_id=self.declaration.declaration.operation_id,
             input_uri=input_artifact.artifact_uri,
             result_uri=result_artifact.artifact_uri,
             witness_uri=witness.artifact_uri,
@@ -801,7 +896,7 @@ class ExactComputedVerificationAdapter:
             else Failed(
                 status=checked.execution.status,
                 runtime_ms=checked.execution.runtime_ms,
-                diagnostic=CapabilityDiagnostic(
+                diagnostic=OperationDiagnostic(
                     code="EXACT_REPLAY_EXECUTION_FAILED",
                     stage="exact_replay",
                     message=checked.execution.detail or detail,
@@ -809,7 +904,7 @@ class ExactComputedVerificationAdapter:
             )
         )
         return OperationProjection(
-            operation_id=self.descriptor.capability_id,
+            operation_id=self.descriptor.operation_id,
             version=self.descriptor.version,
             terminal=terminal,
             publication=PublishedOperation(
@@ -852,8 +947,8 @@ class ExactComputedVerificationAdapter:
             ValueError,
             ValueReferenceError,
         ) as exc:
-            raise CapabilityInvocationError(
-                CapabilityDiagnostic(
+            raise OperationInvocationError(
+                OperationDiagnostic(
                     code="INVALID_EXACT_DOMAIN_INPUT",
                     stage="request_validation",
                     message=bounded_validation_exception_message(exc),
@@ -892,8 +987,8 @@ class ExactComputedVerificationAdapter:
             )
             semantics_artifact = self.store.get(declaration.semantics_uri)
         except (SchemaRegistryError, StorageError, ValidationError, ValueError) as exc:
-            raise CapabilityInvocationError(
-                CapabilityDiagnostic(
+            raise OperationInvocationError(
+                OperationDiagnostic(
                     code="INVALID_EXACT_DOMAIN_RESULT",
                     stage="artifact_resolution",
                     message=bounded_validation_exception_message(exc),
@@ -910,3 +1005,7 @@ __all__ = [
     "install_exact_domain_checkers",
     "install_exact_domain_verification",
 ]
+
+
+def _operation_spec(operation: Any) -> Any:
+    return operation if isinstance(operation, OperationDeclaration) else operation.spec

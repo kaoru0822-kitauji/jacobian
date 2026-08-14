@@ -5,43 +5,53 @@ from __future__ import annotations
 from collections.abc import Sequence
 from pathlib import Path
 
-from jacobian.domain_bundles import DomainBundle
-from jacobian.installation.context import create_installation_context
-from jacobian.portfolio.domain_installation import DomainBundleInstaller
-from jacobian.portfolio.model import PortfolioPlan
+from jacobian.catalog_build_context import create_catalog_build_context
+from jacobian.operation_declarations import OperationDeclarations
+from jacobian.polytope import PolytopeService
 from jacobian.runtime.bootstrap import bootstrap_services
-from jacobian.runtime.config import CheckerAuthorityMode, RuntimeOptions
 from jacobian.runtime.model import JacobianRuntime
-from jacobian.runtime.portfolio import PortfolioResources
-from jacobian.runtime.services import build_runtime_services
+from jacobian.verification.service import VerificationService
+from tests.support.catalog_build_options import CheckerAuthorityMode
 from tests.support.services import atomic_installation
 
 
 def create_selected_runtime(
     root: str | Path,
-    bundles: Sequence[DomainBundle] = (),
+    bundles: Sequence[OperationDeclarations] = (),
     *,
     checker_authority: CheckerAuthorityMode = CheckerAuthorityMode.NONE,
     **_kwargs: object,
 ) -> JacobianRuntime:
-    """Compose one runtime that installs only the supplied domain bundles."""
+    """Compose one runtime that binds only the supplied operations."""
 
-    options = RuntimeOptions(checker_authority=checker_authority)
-    core = bootstrap_services(root, options)
+    core = bootstrap_services(
+        root,
+        bind_existing_checkers=(
+            checker_authority is CheckerAuthorityMode.HYDRATE_EXISTING
+        ),
+    )
     try:
-        services = build_runtime_services(core)
-        installation = create_installation_context(core, services, options)
+        verification = VerificationService(
+            core.store,
+            core.checkers,
+            core.schemas,
+            checker_timeout_seconds=105,
+        )
+        polytope = PolytopeService(core.store, core.schemas)
+        installation = create_catalog_build_context(
+            core,
+            verification,
+            authorize_bundled_checkers=(
+                checker_authority is CheckerAuthorityMode.INSTALL_BUNDLED
+            ),
+        )
         if bundles:
             with atomic_installation(core):
-                DomainBundleInstaller(installation).install(
-                    PortfolioPlan(components=tuple(bundles))
-                )
-        return JacobianRuntime(
-            core,
-            services,
-            PortfolioResources(),
-            start_lean_warmup=lambda: None,
-        )
+                for operations in bundles:
+                    bound = installation.binder.bind(operations)
+                    for adapter in bound.adapters:
+                        installation.register_operation(adapter)
+        return JacobianRuntime(core, verification, polytope)
     except BaseException as error:
         cleanup_failures: list[BaseException] = []
         try:
@@ -56,8 +66,8 @@ def create_selected_runtime(
         raise
 
 
-def selected_runtime_opener(*bundles: DomainBundle):
-    """Return a ``create_runtime``-shaped opener for the supplied bundles."""
+def selected_runtime_opener(*bundles: OperationDeclarations):
+    """Return a ``create_catalog_build_runtime``-shaped opener for the supplied bundles."""
 
     def opener(
         root: str | Path,

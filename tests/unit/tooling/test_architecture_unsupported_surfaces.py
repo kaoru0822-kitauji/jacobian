@@ -19,12 +19,13 @@ _S = "search"
 _RM = "Research" + "Memory"
 _RE = "Research" + "Episode"
 _KS_DOT = _K + "." + _S
+_CAP = "capab" + "ility"
 
 
 def test_research_memory_import_in_src_is_flagged(tmp_path: Path) -> None:
     _write(
         tmp_path,
-        "src/jacobian/capability_service.py",
+        "src/jacobian/operation_dispatcher.py",
         f"from jacobian.memory import {_RM}\n",
     )
     report = check_architecture(tmp_path)
@@ -48,8 +49,8 @@ def test_research_memory_import_in_tests_is_flagged(tmp_path: Path) -> None:
 def test_knowledge_search_string_in_src_is_flagged(tmp_path: Path) -> None:
     _write(
         tmp_path,
-        "src/jacobian/builtin_capabilities.py",
-        f'capability_id = "{_KS_DOT}"\n',
+        "src/jacobian/builtin_operations.py",
+        f'operation_id = "{_KS_DOT}"\n',
     )
     report = check_architecture(tmp_path)
     surf = [v for v in report.violations if v.code == "unsupported-surface"]
@@ -73,7 +74,7 @@ def test_knowledge_search_in_schema_is_flagged(tmp_path: Path) -> None:
     _write(
         tmp_path,
         "benchmarks/schemas/test-schema.json",
-        f'{{"capability_id": "{_KS_DOT}"}}\n',
+        f'{{"operation_id": "{_KS_DOT}"}}\n',
     )
     report = check_architecture(tmp_path)
     surf = [v for v in report.violations if v.code == "unsupported-surface"]
@@ -116,6 +117,28 @@ def test_generic_memory_word_is_not_flagged(tmp_path: Path) -> None:
 
 
 def test_changelog_is_excluded_from_surface_scan(tmp_path: Path) -> None:
-    _write(tmp_path, "CHANGELOG.md", f"# Changelog\n\nAdded {_KS_DOT} capability.\n")
+    _write(tmp_path, "CHANGELOG.md", f"# Changelog\n\nAdded {_KS_DOT} operation.\n")
+    report = check_architecture(tmp_path)
+    assert all(v.code != "unsupported-surface" for v in report.violations)
+
+
+def test_removed_capability_vocabulary_is_flagged(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "src/jacobian/contracts/old.py",
+        f"class Legacy{_CAP.title()}:\n    pass\n",
+    )
+    report = check_architecture(tmp_path)
+    violations = [v for v in report.violations if v.code == "unsupported-surface"]
+    assert len(violations) == 1
+    assert violations[0].path == "src/jacobian/contracts/old.py"
+
+
+def test_operation_migration_design_may_name_removed_contracts(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "docs/explanation/operation-runtime-target.md",
+        f"# Migration\n\nThe old `{_CAP}_id` field is removed.\n",
+    )
     report = check_architecture(tmp_path)
     assert all(v.code != "unsupported-surface" for v in report.violations)

@@ -1,26 +1,26 @@
-# Operation runtime target
+# Compiled operation architecture
 
 [Documentation home](../index.md)
 
-- Status: Accepted target for the next breaking release
-- Scope: planned operation declarations, compiled catalogs, and selected-operation execution
+- Status: Current architecture
+- Scope: operation declarations, compiled catalogs, and selected-operation execution
 
-This document records the accepted target architecture. It is not a claim that
-the current pre-stable release already implements every lifecycle described
-below. The current supported behavior remains defined by the [product model](product-blueprint.md),
-[architecture](architecture.md), and the reference contracts.
+This document records the catalog and selected-execution architecture behind
+Jacobian's two-tool MCP surface. The [product model](product-blueprint.md),
+[architecture](architecture.md), and reference contracts define its supported
+behavior.
 
 ## Vocabulary and wire cutover
 
 The public vocabulary is `operation` / `math operation`. The existing
-`math.find` and `math.run` tool names remain. In the next breaking release,
+`math.find` and `math.run` tool names remain. In this breaking release,
 `capability_id` becomes `operation_id`, `capability_version` becomes
 `operation_version`, and the complete inventory moves from
 `capability://catalog` to `operation://catalog`. There is no compatibility URI,
 field alias, or parallel contract. Operation ID values themselves do not
 change.
 
-The target contracts are `OperationRequest`, `OperationResult`,
+The public contracts are `OperationRequest`, `OperationResult`,
 `OperationDescriptor`, `OperationDiagnostic`, and `OperationCatalogSnapshot`.
 Checker operations remain ordinary catalog entries with distinct operation
 IDs; a producer is never switched into a checker role.
@@ -28,45 +28,49 @@ IDs; a producer is never switched into a checker role.
 ## Pure declarations and the compiled catalog
 
 An `OperationDeclaration` is immutable data describing one operation: its ID,
-version, title, description, tags, typed request and result models, binding,
-provider requirement, publication policy, ports, examples, preflight,
-postcondition, and effect. Bindings are one of `DirectKernel`,
-`BoundedWorker`, or `AuthorizedChecker`.
+version, title, description, tags, typed request and result models, execution,
+publication policy, ports, examples, preflight, postcondition, and effect.
+Ordinary operations call a typed mathematical kernel directly. Exceptional
+process and checker operations may name a bounded worker or an authorized
+checker identity.
 
 Declarations contain no stores, registered schema URIs, service objects, live
-providers, authorization records, or installer callbacks. A `DomainBundle` is
-likewise a passive declaration containing domain identity, semantics, and its
-operations. Built-in bundles are explicitly listed; third-party plugin
-discovery is not part of the target.
+providers, authorization records, or installer callbacks. Each mathematical
+domain exposes an immutable tuple of declarations from a pure declaration
+module. A fixed source-controlled module index lists the built-ins;
+third-party plugin discovery and a domain-bundle framework are not part of the
+architecture.
 
 `jacobian init` and `jacobian update` compile the declarations into one
 revisioned catalog. The persisted catalog has an active revision, compact
-search cards, exact descriptors, declaration locators and digests, provider
-inventory identity, and checker-binding identity. Search reads cards; exact
+search cards, exact descriptors, declaration locators and digests, and
+checker-binding identity. Search reads cards; exact
 inspection reads one descriptor. The full `operation://catalog` resource is
 materialized only when explicitly requested. Visibility filtering is applied
 to search, inspection, execution, and the resource without rebuilding the
 compiled snapshot.
 
-The catalog is inert searchable data. A locator such as a bundle module plus
+The catalog is inert searchable data. A declaration-module locator plus
 operation ID is resolved by `OperationRegistry` only after an operation is
 selected. The registry then verifies the loaded declaration against the
 persisted identity, schemas, and digest.
 
-## Providers, execution, and publication
+## Mathematical backends, execution, and publication
 
-Declarations name a `ProviderRequirement`; they do not load a backend.
-`init/update` record `ProviderObservation` values containing exact version,
-digest, platform, availability, and diagnostics. A small explicit mapping of
-built-in provider definitions resolves only the selected requirement. There is
-no entry-point discovery or dependency-injection container.
+Ordinary operations do not acquire operation-specific measured runtimes. Their
+maintained math-library dependencies are part of the Jacobian installation and
+are imported only by the selected declaration or its private backend module.
+Exact external executables and authorized checkers retain the identity and
+readiness observations required for reproducibility and fail-closed trust.
+There is no provider framework, entry-point discovery, or dependency-injection
+container.
 
-The intended execution path is:
+The execution path is:
 
 ```text
 OperationRequest
   → prepare_operation_request
-  → resolve selected declaration/provider/binding
+  → resolve selected declaration
   → execute_operation
   → publish_operation_result
   → OperationResult
@@ -88,8 +92,8 @@ publication operations need not be added to the native API.
 ## Startup, update, and checker authorization
 
 `init` creates a current state or reports that state is already current.
-`update` migrates existing state, refreshes provider observations, authorizes
-bundled checkers, compiles the catalog, and atomically selects the new
+`update` migrates existing state, refreshes exceptional external-runtime
+observations, authorizes bundled checkers, compiles the catalog, and atomically selects the new
 revision. Checker authorization is selected with
 `--checker-authorization bundled|none` on those operator commands. Serving
 does not migrate state, compile a catalog, or reconstruct checker manifests.
@@ -108,12 +112,14 @@ repairs state automatically; a successful update requires a restart.
 
 One installation owns one catalog and checker-authorization index. Remote
 tenants share those mathematical definitions while retaining isolated artifact
-stores and execution leases. Tenant-specific checker authorizations are not
+stores. Host-private request ownership keeps an active tenant runtime from
+being evicted while its work is still running; this is not an agent-visible
+execution-lease contract. Tenant-specific checker authorizations are not
 copied.
 
 ## Migration and non-goals
 
-The cutover is the next pre-1.0 breaking minor release (planned as `0.13.0`)
+The cutover ships in the next pre-1.0 breaking minor release (`0.13.0`)
 and uses the next state revision. Revision-11 artifacts remain readable during
 the update, while checker identity is remeasured rather than trusted from
 copied records. There are no compatibility aliases for the public wire
@@ -126,7 +132,7 @@ checker choice, and stopping. Catalog search remains factual and does not
 recommend a proof strategy or hidden next step.
 
 The lifecycle principle is intentionally similar to Code Mode and Executor:
-catalog entries are cheap, inert descriptions, while implementation and
-provider loading happen only after selection. This keeps startup catalog-only,
+catalog entries are cheap, inert descriptions, while implementation and any
+exceptional external runtime loading happen only after selection. This keeps startup catalog-only,
 discovery independent of execution services, and invocation proportional to
 the operation the agent actually chose.

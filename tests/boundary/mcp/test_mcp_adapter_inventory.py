@@ -10,7 +10,6 @@ from mcp.shared.exceptions import MCPError
 
 from jacobian.adapters.mcp.deployment_identity import DeploymentIdentity
 from jacobian.adapters.mcp.server import create_server
-from jacobian.runtime import CheckerAuthorityMode
 from tests.boundary.mcp.mcp_support import open_focused_mcp_server
 
 MATH_TOOL_NAMES = {"math.find", "math.run"}
@@ -38,7 +37,7 @@ def test_managed_server_advertises_immutable_deployment_identity(
             assert {
                 (resource.name, str(resource.uri)) for resource in resources.resources
             } == {
-                ("capability-catalog", "capability://catalog"),
+                ("operation-catalog", "operation://catalog"),
                 ("deployment-identity", "deployment://identity"),
             }
             result = await client.read_resource("deployment://identity")
@@ -53,7 +52,7 @@ def test_managed_server_advertises_immutable_deployment_identity(
 def test_mcp_exposes_only_math_tools_with_read_only_resources(
     tmp_path: Path,
 ) -> None:
-    server = create_server(tmp_path, checker_authority=CheckerAuthorityMode.NONE)
+    server = create_server(tmp_path)
     assert server.instructions is not None
     assert "local verification record URI" in server.instructions
 
@@ -91,7 +90,7 @@ def test_mcp_exposes_only_math_tools_with_read_only_resources(
             request_schema = describe_schema["properties"]["request"]
             assert request_schema["discriminator"]["propertyName"] == "op"
             assert set(tools["math.run"].input_schema["properties"]) == {
-                "capability_id",
+                "operation_id",
                 "inputs",
                 "payload",
             }
@@ -108,8 +107,8 @@ def test_mcp_exposes_only_math_tools_with_read_only_resources(
             }
             assert resource_inventory == {
                 (
-                    "capability-catalog",
-                    "capability://catalog",
+                    "operation-catalog",
+                    "operation://catalog",
                     "application/json",
                 ),
             }
@@ -164,7 +163,7 @@ def test_mcp_exposes_only_math_tools_with_read_only_resources(
             assert isinstance(absent_result.structured_content, dict)
             absent = absent_result.structured_content
             assert absent["matches"] == []
-            assert absent["catalog_resource"] == "capability://catalog"
+            assert absent["catalog_resource"] == "operation://catalog"
 
             unknown_domain_result = await client.call_tool(
                 "math.find",
@@ -180,37 +179,31 @@ def test_mcp_exposes_only_math_tools_with_read_only_resources(
             unknown_domain = unknown_domain_result.structured_content
             assert unknown_domain["domain"] == "arithmetic"
             assert unknown_domain["matches"] == []
-            assert unknown_domain["catalog_resource"] == "capability://catalog"
+            assert unknown_domain["catalog_resource"] == "operation://catalog"
 
-            catalog_result = await client.read_resource("capability://catalog")
+            catalog_result = await client.read_resource("operation://catalog")
             catalog = json.loads(catalog_result.contents[0].text)
-            capability_ids = {
-                descriptor["capability_id"] for descriptor in catalog["capabilities"]
+            operation_ids = {
+                descriptor["operation_id"] for descriptor in catalog["operations"]
             }
             assert all(
-                descriptor["provider_runtime"]["availability"] == "AVAILABLE"
-                for descriptor in catalog["capabilities"]
+                descriptor["provider"] == "built-in"
+                and "provider_runtime" not in descriptor
+                for descriptor in catalog["operations"]
             )
-            if "lean.check" in capability_ids:
+            if "lean.check" in operation_ids:
                 lean_result = await client.call_tool(
                     "math.find",
                     {
                         "request": {
                             "op": "inspect",
-                            "capability_id": "lean.check",
+                            "operation_id": "lean.check",
                         }
                     },
                 )
                 assert isinstance(lean_result.structured_content, dict)
                 lean_contract = lean_result.structured_content
-                lean_runtime = lean_contract["capability"]["provider_runtime"]
-                assert lean_runtime["install_tier"] == "T3"
-                assert (
-                    lean_runtime["configuration"]["profiles"]["MATHLIB"][
-                        "mathlib_commit"
-                    ]
-                    == "fabf563a7c95a166b8d7b6efca11c8b4dc9d911f"
-                )
+                assert "provider_runtime" not in lean_contract["operation"]
                 assert "runtime" not in lean_contract
 
     asyncio.run(scenario())

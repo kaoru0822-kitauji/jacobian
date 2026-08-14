@@ -14,12 +14,12 @@ import pytest
 
 from jacobian.artifacts import ArtifactService
 from jacobian.checker_authorization import LeanCheckerInstallation
-from jacobian.contracts.capabilities import (
-    CapabilityProviderAvailability,
-    CapabilityRequest,
-)
 from jacobian.contracts.lean import LeanEnvironment
-from jacobian.lean_frontend.exploration import install_lean_exploration_capabilities
+from jacobian.contracts.operations import (
+    OperationRequest,
+    ProviderAvailability,
+)
+from jacobian.lean_frontend.exploration import install_lean_exploration_operations
 from jacobian.operation_projection import project_operation_result
 from jacobian.providers.lean_runtime import lean_provider_runtime
 from jacobian.schema_registry import SchemaRegistry
@@ -73,9 +73,9 @@ def _live_adapters(tmp_path: Path):
         },
         checker_ids=tuple(inst.checker_id for inst in installations.values()),
     )
-    if runtime.availability is not CapabilityProviderAvailability.AVAILABLE:
+    if runtime.availability is not ProviderAvailability.AVAILABLE:
         pytest.skip(f"pinned Lean runtime unavailable: {runtime.diagnostic}")
-    adapters, _ = install_lean_exploration_capabilities(
+    adapters, _ = install_lean_exploration_operations(
         store,
         schemas,
         artifacts,
@@ -95,8 +95,8 @@ def test_live_term_apply_and_inspect_and_metavariable_round_trip(
     opened = project_operation_result(
         term_apply.invoke(
             term_apply.prepare(
-                CapabilityRequest(
-                    capability_id="lean.term.apply",
+                OperationRequest(
+                    operation_id="lean.term.apply",
                     input={
                         "environment": "CORE",
                         "statement": "True",
@@ -116,8 +116,8 @@ def test_live_term_apply_and_inspect_and_metavariable_round_trip(
     reopened = project_operation_result(
         proof_state.invoke(
             proof_state.prepare(
-                CapabilityRequest(
-                    capability_id="lean.proof_state.apply_tactic",
+                OperationRequest(
+                    operation_id="lean.proof_state.apply_tactic",
                     input={
                         "environment": "CORE",
                         "statement": "P → P",
@@ -132,8 +132,8 @@ def test_live_term_apply_and_inspect_and_metavariable_round_trip(
     inspected = project_operation_result(
         inspect.invoke(
             inspect.prepare(
-                CapabilityRequest(
-                    capability_id="lean.proof_state.inspect",
+                OperationRequest(
+                    operation_id="lean.proof_state.inspect",
                     input={"environment": "CORE", "state_uri": open_state_uri},
                 )
             )
@@ -147,8 +147,8 @@ def test_live_term_apply_and_inspect_and_metavariable_round_trip(
     fields = project_operation_result(
         metavariable.invoke(
             metavariable.prepare(
-                CapabilityRequest(
-                    capability_id="lean.proof_state.metavariable_fields",
+                OperationRequest(
+                    operation_id="lean.proof_state.metavariable_fields",
                     input={"environment": "CORE", "state_uri": open_state_uri},
                 )
             )

@@ -7,30 +7,30 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
+from tests.support.catalog_build_options import CheckerAuthorityMode
 from tests.support.services import (
     DomainTestServices,
     atomic_installation,
     open_domain_services,
 )
 
-from jacobian.contracts.capabilities import CapabilityProviderRuntime
-from jacobian.polynomial_expression_capabilities import (
+from jacobian.contracts.operations import ProviderObservation
+from jacobian.polynomial_expression_operations import (
     install_polynomial_expression_checker,
 )
 from jacobian.providers.sympy_runtime import (
     sympy_polynomial_normalization_provider_runtime,
 )
-from jacobian.runtime.config import CheckerAuthorityMode
 from jacobian.sympy_polynomial_normalization import (
-    install_sympy_polynomial_normalization_capability,
+    bind_sympy_polynomial_normalization,
 )
 
 
 @dataclass(frozen=True, slots=True)
 class PolynomialNormalizationTestServices(DomainTestServices):
-    """Services and measured provider owned by the normalization boundary."""
+    """Services and producer identity owned by the normalization boundary."""
 
-    provider_runtime: CapabilityProviderRuntime
+    producer: ProviderObservation
 
 
 @contextmanager
@@ -47,26 +47,27 @@ def open_polynomial_normalization_services(
     with open_domain_services(root, checker_authority=authority) as services:
         runtime = sympy_polynomial_normalization_provider_runtime()
         with atomic_installation(services.core):
-            producer = install_sympy_polynomial_normalization_capability(
+            producer = bind_sympy_polynomial_normalization(
                 services.core.polynomial_expressions,
                 runtime,
             )
-            services.installation.register_capability(producer)
+            services.installation.register_operation(producer)
             if with_checker:
                 checker, _installation = install_polynomial_expression_checker(
                     services.core.store,
                     services.core.schemas,
                     services.core.artifacts,
                     services.core.polynomial_expressions,
-                    services.application.verification,
+                    services.verification,
                     services.core.checkers,
                     authorize_checker=True,
                 )
                 assert checker is not None
-                services.installation.register_capability(checker)
+                services.installation.register_operation(checker)
         yield PolynomialNormalizationTestServices(
             core=services.core,
-            application=services.application,
+            verification=services.verification,
+            polytope=services.polytope,
             installation=services.installation,
-            provider_runtime=runtime,
+            producer=runtime,
         )

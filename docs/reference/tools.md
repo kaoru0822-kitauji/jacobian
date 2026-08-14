@@ -3,16 +3,16 @@
 [Documentation home](../index.md)
 
 - Status: Current MCP contract
-- Installed membership is runtime-defined
+- Availability is defined by the active operator-compiled catalog
 
 Jacobian exposes exactly two MCP tools.
 
 | Tool | Meaning |
 | --- | --- |
-| `math.find` | Search installed operations or inspect one exact ID |
+| `math.find` | Search available built-in operations or inspect one exact ID |
 | `math.run` | Execute one selected operation and return a mathematical value or checker verdict |
 
-The complete installed inventory is available from `capability://catalog`.
+The complete active inventory is available from `operation://catalog`.
 Catalog membership establishes availability, not recommendation,
 compatibility, or verification authority.
 
@@ -27,7 +27,7 @@ Search uses a bounded lexical query:
 Exact inspection uses an operation ID:
 
 ```json
-{"request": {"op": "inspect", "capability_id": "matrix.determinant.compute"}}
+{"request": {"op": "inspect", "operation_id": "matrix.determinant.compute"}}
 ```
 
 The request is nested because the pinned SDK publishes and enforces that
@@ -44,7 +44,6 @@ lexical retrieval
 It returns lexical relevance plus factual catalog metadata:
 
 - applicability status and stable mismatch code;
-- provider availability;
 - accepted input and artifact types; and
 - produced artifact types.
 
@@ -64,9 +63,9 @@ serve inventory for an empty query, expose projection levels, publish
 `next_views`, reconstruct schemas as prose, or prescribe a next operation.
 
 Exact inspection returns the authoritative typed request and result schemas,
-effect, provider requirements, preflight information, declared value ports, and
-bounded validated examples. Current availability remains sourced from the live
-catalog rather than static documentation.
+effect, preflight information, declared value ports, and bounded validated
+examples. Runtime and checker executable identities remain operator-owned
+internal state rather than discovery metadata.
 
 ## `math.run`
 
@@ -74,7 +73,7 @@ Run one known operation with a payload:
 
 ```json
 {
-  "capability_id": "integer.compute.gcd",
+  "operation_id": "integer.compute.gcd",
   "payload": {"left": "84", "right": "30"}
 }
 ```
@@ -84,7 +83,7 @@ reference:
 
 ```json
 {
-  "capability_id": "finite_field.polynomial_map.fibers.compute",
+  "operation_id": "finite_field.polynomial_map.fibers.compute",
   "payload": {},
   "inputs": {
     "table": {"value_ref": "value://AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}
@@ -99,7 +98,7 @@ input port:
 
 ```json
 {
-  "capability_id": "matrix.normal_form.smith.verify",
+  "operation_id": "matrix.normal_form.smith.verify",
   "payload": {"input": {"matrix": {"entries": [["2", "4"], ["6", "8"]]}}},
   "inputs": {
     "candidate": {"value_ref": "value://AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}
@@ -147,7 +146,7 @@ it. Carrier changes do not alter semantic identity or assurance.
 The generic public resources are:
 
 ```text
-capability://catalog
+operation://catalog
 artifact://...
 ```
 

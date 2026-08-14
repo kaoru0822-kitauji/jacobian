@@ -1,6 +1,6 @@
-"""Graph composition and bounded nonisomorphic enumeration capabilities.
+"""Graph composition and bounded nonisomorphic enumeration operations.
 
-Two domain-atomic graph capabilities backed by NetworkX:
+Two domain-atomic graph operations backed by NetworkX:
 
 * ``graph.construct.compose`` — apply disjoint union, join, complement, or
   lexicographic product to existing simple-undirected-graph artifacts and
@@ -14,7 +14,7 @@ Two domain-atomic graph capabilities backed by NetworkX:
   representative set, not all nonisomorphic graphs of that order in
   existence.
 
-Both capabilities preserve the ``jacobian.simple-undirected-graph`` payload
+Both operations preserve the ``jacobian.simple-undirected-graph`` payload
 schema and semantics. Neither returns a mathematical conclusion or a
 verification record. Construction and enumeration are deterministic NetworkX
 operations; no independent checker is invoked.
@@ -29,13 +29,6 @@ from typing import TYPE_CHECKING, Any, cast
 from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capability_adapters import parse_capability_input
-from jacobian.capability_errors import CapabilityInvocationError
-from jacobian.contracts.capabilities import (
-    CapabilityDescriptor,
-    CapabilityDiagnostic,
-    CapabilityRequest,
-)
 from jacobian.contracts.graph_composition import (
     GraphCompositionOutput,
     GraphCompositionRequest,
@@ -44,6 +37,11 @@ from jacobian.contracts.graph_composition import (
     GraphEnumerationOutput,
     GraphEnumerationRequest,
     GraphEnumerationScopeArtifact,
+)
+from jacobian.contracts.operations import (
+    OperationDescriptor,
+    OperationDiagnostic,
+    OperationRequest,
 )
 from jacobian.domains._examples import example
 from jacobian.graphs.artifacts import (
@@ -59,11 +57,13 @@ from jacobian.math.graphs import (
     SimpleUndirectedGraph,
     compose_graphs,
 )
+from jacobian.operation_adapters import parse_operation_input
+from jacobian.operation_declarations import OperationDeclaration
+from jacobian.operation_errors import OperationInvocationError
 from jacobian.operation_execution import execute_operation
 from jacobian.operation_projection import OperationProjection
 from jacobian.operation_publication import PublishedOperation
-from jacobian.operations import Completed, OperationSpec
-from jacobian.provider_runtime import known_provider_runtime
+from jacobian.operations import Completed
 from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.storage.repository import ArtifactRepository
 
@@ -78,16 +78,6 @@ _ENUMERATION_BACKEND_BOUNDARY = (
 )
 
 
-@dataclass(frozen=True, slots=True)
-class GraphCompositionInstallation:
-    """Installation record for graph composition and enumeration contracts."""
-
-    semantics_uri: str
-    graph_schema_uri: str
-    composition_result_schema_uri: str
-    enumeration_scope_schema_uri: str
-
-
 @dataclass(frozen=True)
 class GraphCompositionResources:
     """Shared resources for graph composition and enumeration adapters."""
@@ -100,26 +90,20 @@ class GraphCompositionResources:
     enumeration_scope_schema_uri: str
 
 
-def install_graph_composition_capabilities(
+def build_graph_composition_operations(
     store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
     *,
     semantics_uri: str,
     graph_schema_uri: str,
-) -> tuple[
-    tuple[
-        GraphComposeAdapter,
-        GraphEnumerateNonisomorphicAdapter,
-    ],
-    GraphCompositionInstallation,
-]:
+) -> tuple[GraphComposeAdapter, GraphEnumerateNonisomorphicAdapter]:
     """Register composition and enumeration schemas and return adapters.
 
-    This installer reuses the ``jacobian.simple-undirected-graph`` semantics
-    and graph payload schema already registered by the graph installation.
+    This builder reuses the ``jacobian.simple-undirected-graph`` semantics
+    and graph payload schema already registered in the shared graph resources.
     The caller must pass the existing ``semantics_uri`` and
-    ``graph_schema_uri`` from ``GraphInstallation``.
+    ``graph_schema_uri`` from ``GraphOperationResources``.
     """
 
     composition_result_schema_uri = schemas.register(
@@ -132,12 +116,6 @@ def install_graph_composition_capabilities(
         version="1",
         schema=model_schema(GraphEnumerationScopeArtifact),
     )
-    installation = GraphCompositionInstallation(
-        semantics_uri=semantics_uri,
-        graph_schema_uri=graph_schema_uri,
-        composition_result_schema_uri=composition_result_schema_uri,
-        enumeration_scope_schema_uri=enumeration_scope_schema_uri,
-    )
     resources = GraphCompositionResources(
         store=store,
         artifacts=artifacts,
@@ -147,11 +125,8 @@ def install_graph_composition_capabilities(
         enumeration_scope_schema_uri=enumeration_scope_schema_uri,
     )
     return (
-        (
-            GraphComposeAdapter(resources),
-            GraphEnumerateNonisomorphicAdapter(resources),
-        ),
-        installation,
+        GraphComposeAdapter(resources),
+        GraphEnumerateNonisomorphicAdapter(resources),
     )
 
 
@@ -165,7 +140,7 @@ class GraphComposeAdapter:
 
     def __init__(self, resources: GraphCompositionResources) -> None:
         self.resources = resources
-        self.spec = OperationSpec(
+        self.spec = OperationDeclaration(
             operation_id="graph.construct.compose",
             version="1",
             request_type=GraphCompositionInput,
@@ -180,34 +155,27 @@ class GraphComposeAdapter:
             ),
             tags=("graph", "construction", "composition"),
         )
-        self._descriptor = CapabilityDescriptor(
-            capability_id=self.spec.operation_id,
+        self._descriptor = OperationDescriptor(
+            operation_id=self.spec.operation_id,
             version=self.spec.version,
             title=self.spec.title,
             description=self.spec.description,
-            provider="jacobian.networkx",
-            provider_runtime=known_provider_runtime(
-                "jacobian.networkx",
-                features=(
-                    "graph-composition",
-                    "simple-undirected-graphs",
-                ),
-            ),
+            provider="built-in",
             input_schema=GraphCompositionRequest.model_json_schema(),
             output_schema=model_schema(GraphCompositionOutput),
             tags=self.spec.tags,
         )
 
     @property
-    def descriptor(self) -> CapabilityDescriptor:
+    def descriptor(self) -> OperationDescriptor:
         return self._descriptor
 
-    def prepare(self, request: CapabilityRequest) -> GraphCompositionRequest:
+    def prepare(self, request: OperationRequest) -> GraphCompositionRequest:
         try:
-            return parse_capability_input(GraphCompositionRequest, request.input)
+            return parse_operation_input(GraphCompositionRequest, request.input)
         except ValidationError as exc:
-            raise CapabilityInvocationError(
-                CapabilityDiagnostic(
+            raise OperationInvocationError(
+                OperationDiagnostic(
                     code="INVALID_COMPOSITION_REQUEST",
                     stage="request_validation",
                     message=("The complete graph-composition request is invalid."),
@@ -294,8 +262,8 @@ class GraphEnumerateNonisomorphicAdapter:
 
     def __init__(self, resources: GraphCompositionResources) -> None:
         self.resources = resources
-        self._descriptor = CapabilityDescriptor(
-            capability_id="graph.enumerate.nonisomorphic",
+        self._descriptor = OperationDescriptor(
+            operation_id="graph.enumerate.nonisomorphic",
             version="1",
             title="Enumerate nonisomorphic graphs",
             description=(
@@ -303,15 +271,7 @@ class GraphEnumerateNonisomorphicAdapter:
                 "exact order (0-7) from the NetworkX Graph Atlas backend and "
                 "materialize the catalog with an explicit backend boundary."
             ),
-            provider="jacobian.networkx",
-            provider_runtime=known_provider_runtime(
-                "jacobian.networkx",
-                features=(
-                    "graph-atlas",
-                    "nonisomorphic-enumeration",
-                    "simple-undirected-graphs",
-                ),
-            ),
+            provider="built-in",
             input_schema=GraphEnumerationRequest.model_json_schema(),
             output_schema=model_schema(GraphEnumerationOutput),
             tags=(
@@ -320,7 +280,7 @@ class GraphEnumerateNonisomorphicAdapter:
                 "nonisomorphic",
                 "bounded-search",
             ),
-            invocation_examples=(
+            examples=(
                 example(
                     "order_zero",
                     "Enumerate graphs of order zero.",
@@ -330,15 +290,15 @@ class GraphEnumerateNonisomorphicAdapter:
         )
 
     @property
-    def descriptor(self) -> CapabilityDescriptor:
+    def descriptor(self) -> OperationDescriptor:
         return self._descriptor
 
-    def prepare(self, request: CapabilityRequest) -> GraphEnumerationRequest:
+    def prepare(self, request: OperationRequest) -> GraphEnumerationRequest:
         try:
-            return parse_capability_input(GraphEnumerationRequest, request.input)
+            return parse_operation_input(GraphEnumerationRequest, request.input)
         except ValidationError as exc:
-            raise CapabilityInvocationError(
-                CapabilityDiagnostic(
+            raise OperationInvocationError(
+                OperationDiagnostic(
                     code="INVALID_ENUMERATION_REQUEST",
                     stage="request_validation",
                     message=("The complete graph-enumeration request is invalid."),
@@ -404,7 +364,7 @@ class GraphEnumerateNonisomorphicAdapter:
             backend_boundary=_ENUMERATION_BACKEND_BOUNDARY,
         )
         return OperationProjection(
-            operation_id=self.descriptor.capability_id,
+            operation_id=self.descriptor.operation_id,
             version=self.descriptor.version,
             terminal=Completed(
                 value=output,
@@ -439,8 +399,8 @@ def _require_right_graph(
     right: nx.Graph[Any] | None,
 ) -> nx.Graph[Any]:
     if right is None:
-        raise CapabilityInvocationError(
-            CapabilityDiagnostic(
+        raise OperationInvocationError(
+            OperationDiagnostic(
                 code="MISSING_RIGHT_GRAPH",
                 stage="composition",
                 message=f"{operation} requires a right graph.",

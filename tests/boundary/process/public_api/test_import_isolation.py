@@ -31,7 +31,7 @@ def test_native_namespace_does_not_import_runtime_or_transport() -> None:
     forbidden = (
         "jacobian.runtime",
         "jacobian.mcp",
-        "jacobian.operation_installation",
+        "jacobian.operation_binding",
         "jacobian.providers",
     )
     _assert_not_imported(_imported_modules("jacobian.math"), forbidden)
@@ -48,9 +48,9 @@ def test_runtime_assembly_does_not_import_packaged_backends(tmp_path: Path) -> N
     script = """
 import sys
 from pathlib import Path
-from jacobian.runtime import create_runtime
+from tests.support.catalog_build_runtime import create_catalog_build_runtime
 
-runtime = create_runtime(Path(sys.argv[1]))
+runtime = create_catalog_build_runtime(Path(sys.argv[1]))
 try:
     forbidden = {"networkx", "sympy", "flint", "z3", "cvc5"}
     imported = sorted(forbidden.intersection(sys.modules))
@@ -71,52 +71,27 @@ finally:
     assert completed.returncode == 0, completed.stderr
 
 
-def test_portfolio_leaf_import_does_not_load_assembly_or_domains() -> None:
+def test_backend_check_import_does_not_load_assembly_or_domains() -> None:
     _assert_not_imported(
-        _imported_modules("jacobian.portfolio.provider_resolution"),
+        _imported_modules("jacobian.maintained_backends"),
         (
             "jacobian.domains",
-            "jacobian.portfolio.assembler",
-            "jacobian.portfolio.builtin",
+            "jacobian.catalog_build",
+            "jacobian.builtin_operation_modules",
             "jacobian.runtime",
         ),
     )
 
 
-def test_portfolio_root_is_an_import_transparent_internal_namespace() -> None:
-    script = """
-import jacobian.portfolio as portfolio
-import sys
-
-assert portfolio.__all__ == ()
-assert not hasattr(portfolio, "PortfolioPlan")
-assert not hasattr(portfolio, "install_portfolio")
-children = sorted(
-    name for name in sys.modules if name.startswith("jacobian.portfolio.")
-)
-if children:
-    raise AssertionError(f"portfolio root imported child modules: {children}")
-"""
-    completed = subprocess.run(
-        [sys.executable, "-c", script],
-        check=False,
-        capture_output=True,
-        env={**os.environ, "SYMPY_GROUND_TYPES": "python"},
-        text=True,
-    )
-
-    assert completed.returncode == 0, completed.stderr
-
-
-def test_native_matrices_does_not_import_capabilities_or_provider_loading() -> None:
+def test_native_matrices_does_not_import_operations_or_provider_loading() -> None:
     _assert_not_imported(
         _imported_modules("jacobian.math.matrices"),
         (
             "jacobian.adapters",
             "jacobian.artifact_repository",
-            "jacobian.capability_dispatch",
-            "jacobian.capability_service",
-            "jacobian.operation_installation",
+            "jacobian.operation_dispatch",
+            "jacobian.catalog_operation_collector",
+            "jacobian.operation_binding",
             "jacobian.provider_runtime",
             "jacobian.providers",
             "jacobian.runtime",
@@ -132,7 +107,7 @@ def test_native_probability_import_does_not_load_wire_or_runtime_owner() -> None
         (
             "jacobian.domains.probability",
             "jacobian.operation_bindings",
-            "jacobian.operation_installation",
+            "jacobian.operation_binding",
             "jacobian.provider_runtime",
             "jacobian.providers",
             "jacobian.runtime",
@@ -148,7 +123,7 @@ def test_native_finite_fields_does_not_eagerly_import_flint() -> None:
         imported,
         (
             "jacobian.adapters",
-            "jacobian.operation_installation",
+            "jacobian.operation_binding",
             "jacobian.providers",
             "jacobian.runtime",
             "jacobian.storage",

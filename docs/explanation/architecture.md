@@ -4,9 +4,8 @@
 
 - Status: Current architecture
 
-The accepted next-breaking-release target is described in the
-[operation runtime target](operation-runtime-target.md). The contracts below
-describe the current release until that implementation lands.
+The [compiled operation architecture](operation-runtime-target.md) expands the
+catalog and selected-execution lifecycle described below.
 
 ## Purpose
 
@@ -15,28 +14,28 @@ exactly two MCP tools:
 
 ```text
 agent
-  ├── math.find ──► search or inspect installed operations
+  ├── math.find ──► search or inspect available built-in operations
   └── math.run  ──► one operation → mathematical value or checker verdict
 ```
 
 The agent owns strategy. The server owns typed execution, resource admission,
-publication, provider provenance, and checker authorization.
+publication, and checker authorization.
 
 ## Search and execute
 
 `math.find` performs lexical search or exact inspection. Search results are
-factual projections of installed declarations. Typed compatibility and
+factual projections of compiled declarations. Typed compatibility and
 preflight may narrow those results, but discovery does not plan a sequence or
 recommend a next operation.
 
-`capability://catalog` is the complete inventory. Search is not an alternate
+`operation://catalog` is the complete inventory. Search is not an alternate
 inventory protocol, and an empty query is not browse mode.
 
 `math.run` accepts an operation ID and payload:
 
 ```json
 {
-  "capability_id": "matrix.determinant.compute",
+  "operation_id": "matrix.determinant.compute",
   "payload": {
     "matrix": {
       "matrix_schema_version": "1",
@@ -61,13 +60,13 @@ once. Closing the runtime invalidates its references.
 MCP / CLI / hosts
     import runtime and public projections
 
-runtime
-    imports installed bindings, providers, storage, checker authority
+selected execution
+    imports one operation binding, storage, and checker authority as needed
 
-installed binding
-    = OperationSpec + PublicationPolicy + ProviderBinding
+operation declaration
+    = typed request/result + implementation + PublicationPolicy
 
-OperationSpec
+OperationDeclaration
     imports jacobian.math values and functions
 
 jacobian.math.<domain>
@@ -82,15 +81,12 @@ MCP, CLI, storage, installation, publication, or checker authority. Import
 Linter enforces the leaf boundaries and dependency direction. Operation
 declarations live outside `jacobian.math`.
 
-The portfolio composition root is the only owner that assembles runtime
-services and installation order. Ordinary `DomainBundle` values contain typed
-operation declarations only; they do not carry installer callbacks or runtime
-collaborators. A capability family with a genuinely specialized artifact or
-checker lifecycle is represented as an explicitly named managed portfolio
-component rather than widening the semantic bundle contract.
-An operation may still bind a typed computational backend, provided that
+Domain declaration modules export immutable operation tuples and perform no
+installation. The catalog compiler imports them during `jacobian init` or
+`jacobian update`; serving imports only the declaration module selected by
+`math.run`. An operation may call a private computational backend, but that
 backend owns no runtime, storage, publication, installation, or checker
-authority. This is execution dependency injection, not lifecycle ownership.
+authority.
 
 ## Mathematical value and backend layers
 
@@ -116,16 +112,20 @@ constructing backend values. Mathematical code never round-trips through JSON.
 
 ## Domain operation library
 
-`OperationSpec[RequestT, ResultT]` is the small semantic declaration:
+`OperationDeclaration[RequestT, ResultT]` is the immutable semantic declaration:
 
 ```python
 @dataclass(frozen=True, slots=True)
-class OperationSpec(Generic[RequestT, ResultT]):
+class OperationDeclaration(Generic[RequestT, ResultT]):
     operation_id: str
     version: str
+    title: str
+    description: str
     request_type: type[RequestT]
     result_type: type[ResultT]
     execute: Callable[[RequestT], ResultT]
+    publication: PublicationPolicy[ResultT] = InlinePublication()
+    tags: tuple[str, ...] = ()
     preflight: Callable[[RequestT], PreflightResult] | None = None
     postcondition: Callable[[RequestT, ResultT], None] | None = None
     effect: Effect = Effect.READ_ONLY
@@ -134,20 +134,10 @@ class OperationSpec(Generic[RequestT, ResultT]):
 The callable binds validated request fields to one public mathematical
 function; it is not another implementation of the mathematics.
 
-An installed binding adds transport and provider facts:
-
-```python
-@dataclass(frozen=True, slots=True)
-class InstalledOperation(Generic[RequestT, ResultT]):
-    spec: OperationSpec[RequestT, ResultT]
-    publication: PublicationPolicy[ResultT]
-    provider_binding: ProviderBinding
-```
-
 Publication may decide inline eligibility, bounded previews, request-local
 references, durable artifacts, and closure over referenced parents or axes. It
 does not own mathematical validation, applicability, checker authority,
-provider selection, effects, or parsing.
+effects, or parsing.
 
 Built-ins use a static explicit inventory. External operation packages and
 entry-point discovery are not supported.
@@ -156,7 +146,7 @@ entry-point discovery are not supported.
 
 ```text
 external payload
-  → resolve InstalledOperation
+  → resolve OperationDeclaration
   → one TypeAdapter parse
   → preflight
   → execute one semantic function
@@ -190,13 +180,13 @@ A postcondition runs before publication. Failure exposes no value reference,
 artifact, or verification record. Terminal execution state remains separate from the
 mathematical result and from verification authority.
 
-`CapabilityResult` is a wire projection, not an in-process return type. Domain
+`OperationResult` is a wire projection, not an in-process return type. Domain
 functions, operation executors, artifact services, and checker services return
 their owned typed values or terminal states. The public dispatcher constructs
 the wire envelope once, after publication has returned the complete artifact
 closure; installed adapters return a typed projection rather than constructing
 the envelope themselves. Artifact-producing operations must not move storage writes
-into `OperationSpec.execute`; a domain-specific publisher may preserve an
+into `OperationDeclaration.execute`; a domain-specific publisher may preserve an
 established durable schema and parent closure without expanding the generic
 publication policy.
 
@@ -208,13 +198,13 @@ obligation records around an already-typed result.
 
 ## Verification
 
-A checker is a separate installed operation governed by a typed
+A checker is a separate catalog operation governed by a typed
 `VerificationProtocol[SubjectT, CandidateT, EvidenceT, DecisionT]`. Operator
 configuration authorizes checker identities; producer declarations and search
-code cannot authorize themselves. Exact replay declarations bind their own
-provider-runtime factory. Installation groups those factories by the provider
-identity they probe; it does not keep a central entrypoint map or support
-matrix.
+code cannot authorize themselves. Exact replay declarations bind the checker
+implementation and any external executable identity it must remeasure. Catalog
+compilation authorizes those identities without creating a generic provider
+registry or support matrix.
 
 The runtime keeps four narrow responsibilities:
 
@@ -224,7 +214,7 @@ The runtime keeps four narrow responsibilities:
 - parse accepted, rejected, or non-conclusion decisions; and
 - commit a verification record only for a valid accepted decision.
 
-Timeout, cancellation, malformed output, unavailable providers, interruption,
+Timeout, cancellation, malformed output, unavailable executables, interruption,
 and failure to find evidence are non-conclusions. The record binds the exact
 subject, candidate, evidence, protocol, semantics, scope, certificate format,
 and checker identity. Independent checker execution does not import or call the
@@ -233,7 +223,8 @@ producer, proposal, search, or evaluation path it certifies.
 Checker identity comes from a versioned manifest for that checker, not from a
 digest of the whole Jacobian package. The manifest binds its exact entry point,
 separate checker and worker source closures, exact Python distributions, Python
-and provider runtime, passive contracts, and bounded-process policy. The worker
+and external executable identity, passive contracts, and bounded-process
+policy. The worker
 admits only the declared first-party closure and manifest-bound third-party
 distributions, including imports requested dynamically during checker
 execution, and remeasures the complete
@@ -249,7 +240,7 @@ authorization row. Record v3 belongs to state revision 10 and remains readable
 with the matching older checkout; the current runtime has no dual record shape.
 
 `VerificationResult` is the internal typed outcome of that checker execution,
-not a generic mathematical result envelope. Capability adapters project it
+not a generic mathematical result envelope. Operation adapters project it
 once into the ordinary operation response. Ordinary producers do not use it,
 so checker input validity, conclusions, and evidence bindings do not become
 knobs on every mathematical value.
@@ -305,31 +296,31 @@ canonicalizers.
 
 ## Bounded searches
 
-A retained bounded search uses the same `OperationSpec` path as any other
+A retained bounded search uses the same `OperationDeclaration` path as any other
 mathematical operation. Its domain-owned result carries the applicable status,
 bounds, coverage facts, and witness directly. `Completed` means only that this
 typed result was produced; exactness is established by the result's own status,
 not by a generic completeness envelope.
 
-Timeout, cancellation, provider error, and resource refusal publish no partial
+Timeout, cancellation, backend failure, and resource refusal publish no partial
 result or obligation artifact. Independent checker operations receive the
 typed subject and candidate they need. No `SearchSpec`, generic bounded-result
 wrapper, or bounded-operation adapter exists unless two surviving operations
 later prove a common semantic need.
 
-## Provider optionality
+## Backend optionality
 
-Importing `jacobian.math` performs no provider probe. Private backend imports
+Importing `jacobian.math` performs no backend probe. Private backend imports
 are lazy even though the maintained Python backends are exact base-package
 dependencies. A missing or mismatched maintained Python backend is a broken
-installation and fails runtime construction; optional native/formal providers
-remain absent without affecting unrelated installed operations. Provider
+installation and fails runtime construction; optional native/formal executables
+remain absent without affecting unrelated catalog operations. External
 identity is invocation provenance rather than mathematical value identity.
 
 ## Host and protocol boundaries
 
-The local server contains catalog, execution, storage, provider declarations,
-and checker authority. Remote authentication, tenants, admission, leases,
+The local server contains catalog, selected execution, storage, and checker
+authority. Remote authentication, tenants, admission, leases,
 eviction, and quarantine belong to a separate remote host and do not enter the
 local mathematical server.
 
@@ -348,15 +339,16 @@ are not supported.
 
 The fixed tools and resources are registered directly through the SDK. Jacobian
 does not advertise an MCP extension: it has no optional protocol methods,
-client-side extension, or negotiated result type. SDK middleware retains the
-runtime lease around tool calls, while the SDK owns protocol tracing and typed
-boundary validation.
+client-side extension, or negotiated result type. The SDK owns protocol tracing,
+typed boundary validation, and synchronous-handler thread offloading.
 
 Hosting has two constructors with separate ownership: `server.create_server`
 owns one concrete local runtime, while `remote.create_remote_server` owns
-authentication and isolated tenant runtimes. Their only shared request boundary
-acquires one runtime lease; local state has no nullable tenant router, and remote
-admission, eviction, and quarantine do not enter the local server module.
+authentication and isolated tenant runtimes. Their shared request boundary
+resolves one lazy runtime. Local requests need no lease. The remote host privately
+holds an active tenant runtime only long enough to prevent eviction during that
+request; this is not part of the mathematical or MCP contract. Remote admission,
+eviction, and quarantine do not enter the local server module.
 The `jacobian-mcp` entry point is local stdio only. Remote transports use the
 separate `jacobian-remote-mcp` operator entry point.
 

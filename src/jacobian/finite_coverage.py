@@ -3,26 +3,15 @@
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
-from jacobian.capability_adapters import CapabilityAdapter, parse_capability_input
-from jacobian.capability_errors import (
-    CapabilityInvocationError,
-    enriched_invalid_request,
-)
-from jacobian.checker_installation import CheckerInstaller
+from jacobian.checker_authorization import authorize_checker_operation
 from jacobian.checker_operations import CheckerOperation
-from jacobian.contracts.capabilities import (
-    CapabilityDescriptor,
-    CapabilityDiagnostic,
-    CapabilityInvocationExample,
-    CapabilityRequest,
-)
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
 from jacobian.contracts.finite_coverage import (
@@ -38,7 +27,19 @@ from jacobian.contracts.finite_coverage import (
     FiniteCoverageVerifyOutput,
     FiniteCoverageVerifyRequest,
 )
+from jacobian.contracts.operations import (
+    OperationDescriptor,
+    OperationDiagnostic,
+    OperationExample,
+    OperationRequest,
+)
 from jacobian.contracts.results import Conclusion, ExecutionStatus
+from jacobian.operation_adapters import OperationAdapter, parse_operation_input
+from jacobian.operation_catalog import OperationCatalog, OperationCatalogError
+from jacobian.operation_errors import (
+    OperationInvocationError,
+    enriched_invalid_request,
+)
 from jacobian.operation_projection import OperationProjection
 from jacobian.operation_publication import PublishedOperation
 from jacobian.operations import Completed, Failed
@@ -76,16 +77,12 @@ _CANONICALIZER_SPECS: dict[str, dict[str, str]] = {
 }
 
 
-def install_finite_coverage(
+def register_finite_coverage_resources(
     store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
-    verification: VerificationService,
-    checkers: CheckerRegistry,
-    *,
-    authorize_checker: bool,
-) -> tuple[CapabilityAdapter[Any] | None, FiniteCoverageInstallation]:
-    """Register v1 finite-coverage artifacts and optionally authorize replay."""
+) -> FiniteCoverageInstallation:
+    """Register passive finite-coverage contracts and canonicalizers."""
 
     semantics_uri = store.register_descriptor(
         kind="semantics",
@@ -146,29 +143,7 @@ def install_finite_coverage(
             summary=f"registered finite canonicalizer {canonicalizer_id}",
         )
         canonicalizer_uris[canonicalizer_id] = stored.artifact_uri
-
-    checker_id = (
-        CheckerInstaller(checkers)
-        .install(
-            CheckerOperation(
-                name="finite exactly-once paged coverage checker",
-                entrypoint=("jacobian_checkers.finite_coverage:check_finite_coverage"),
-                evidence_kind=EvidenceKind.CERTIFICATE,
-                format_id="finite.coverage",
-                format_version="1",
-                claim_schema_uris=(claim_schema_uri,),
-                semantics_uris=(semantics_uri,),
-                candidate_schema_uris=(archive_schema_uri,),
-                reason=(
-                    "operator requested independent standard-library replay of "
-                    "every canonical scope and archive item"
-                ),
-            ),
-            authorize=authorize_checker,
-        )
-        .checker_id
-    )
-    installation = FiniteCoverageInstallation(
+    return FiniteCoverageInstallation(
         semantics_uri=semantics_uri,
         canonicalizer_schema_uri=canonicalizer_schema_uri,
         scope_schema_uri=scope_schema_uri,
@@ -177,8 +152,74 @@ def install_finite_coverage(
         claim_schema_uri=claim_schema_uri,
         certificate_schema_uri=certificate_schema_uri,
         canonicalizer_uris=canonicalizer_uris,
-        checker_id=checker_id,
+        checker_id=None,
     )
+
+
+def bind_selected_finite_coverage(
+    store: ArtifactRepository,
+    schemas: SchemaRegistry,
+    artifacts: ArtifactService,
+    verification: VerificationService,
+    checkers: CheckerRegistry,
+    catalog: OperationCatalog,
+) -> OperationAdapter[Any]:
+    """Bind finite coverage from persisted checker authority."""
+
+    operation_id = "finite.coverage.verify"
+    binding = catalog.checker_binding(operation_id)
+    if binding is None:
+        raise OperationCatalogError(
+            f"checker binding is missing; run `jacobian update`: {operation_id}"
+        )
+    checkers.require_catalog_binding(
+        binding.checker_id,
+        implementation_digest=binding.manifest_digest,
+    )
+    installation = replace(
+        register_finite_coverage_resources(store, schemas, artifacts),
+        checker_id=binding.checker_id,
+    )
+    return FiniteCoverageVerifyAdapter(
+        store=store,
+        artifacts=artifacts,
+        verification=verification,
+        installation=installation,
+    )
+
+
+def install_finite_coverage(
+    store: ArtifactRepository,
+    schemas: SchemaRegistry,
+    artifacts: ArtifactService,
+    verification: VerificationService,
+    checkers: CheckerRegistry,
+    *,
+    authorize_checker: bool,
+) -> tuple[OperationAdapter[Any] | None, FiniteCoverageInstallation]:
+    """Register v1 finite-coverage artifacts and optionally authorize replay."""
+
+    resources = register_finite_coverage_resources(store, schemas, artifacts)
+
+    checker_id = authorize_checker_operation(
+        checkers,
+        CheckerOperation(
+            name="finite exactly-once paged coverage checker",
+            entrypoint=("jacobian_checkers.finite_coverage:check_finite_coverage"),
+            evidence_kind=EvidenceKind.CERTIFICATE,
+            format_id="finite.coverage",
+            format_version="1",
+            claim_schema_uris=(resources.claim_schema_uri,),
+            semantics_uris=(resources.semantics_uri,),
+            candidate_schema_uris=(resources.archive_schema_uri,),
+            reason=(
+                "operator requested independent standard-library replay of "
+                "every canonical scope and archive item"
+            ),
+        ),
+        authorize=authorize_checker,
+    ).checker_id
+    installation = replace(resources, checker_id=checker_id)
     adapter = (
         FiniteCoverageVerifyAdapter(
             store=store,
@@ -210,8 +251,8 @@ class FiniteCoverageVerifyAdapter:
         self.artifacts = artifacts
         self.verification = verification
         self.installation = installation
-        self._descriptor = CapabilityDescriptor(
-            capability_id="finite.coverage.verify",
+        self._descriptor = OperationDescriptor(
+            operation_id="finite.coverage.verify",
             version="1",
             title="Verify exactly-once coverage of a finite paged archive",
             description=(
@@ -233,8 +274,8 @@ class FiniteCoverageVerifyAdapter:
             input_schema=model_schema(FiniteCoverageVerifyRequest),
             output_schema=model_schema(FiniteCoverageVerifyOutput),
             tags=("finite", "coverage", "verification", "paged-archive"),
-            invocation_examples=(
-                CapabilityInvocationExample(
+            examples=(
+                OperationExample(
                     name="two_page_exact_coverage",
                     description=(
                         "Verify that two pages cover a three-item finite scope "
@@ -255,16 +296,16 @@ class FiniteCoverageVerifyAdapter:
         )
 
     @property
-    def descriptor(self) -> CapabilityDescriptor:
+    def descriptor(self) -> OperationDescriptor:
         return self._descriptor
 
-    def prepare(self, request: CapabilityRequest) -> FiniteCoverageVerifyRequest:
+    def prepare(self, request: OperationRequest) -> FiniteCoverageVerifyRequest:
         try:
-            return parse_capability_input(FiniteCoverageVerifyRequest, request.input)
+            return parse_operation_input(FiniteCoverageVerifyRequest, request.input)
         except ValidationError as exc:
-            raise CapabilityInvocationError(
+            raise OperationInvocationError(
                 enriched_invalid_request(
-                    CapabilityDiagnostic(
+                    OperationDiagnostic(
                         code="INVALID_FINITE_COVERAGE_REQUEST",
                         stage="request_validation",
                         message="The complete finite-coverage request is invalid.",
@@ -284,8 +325,8 @@ class FiniteCoverageVerifyAdapter:
             _canonical_key(canonicalizer_id, item) for item in validated.scope_items
         )
         if len(set(scope_keys)) != len(scope_keys):
-            raise CapabilityInvocationError(
-                CapabilityDiagnostic(
+            raise OperationInvocationError(
+                OperationDiagnostic(
                     code="DUPLICATE_FINITE_SCOPE_KEY",
                     stage="scope_canonicalization",
                     message=(
@@ -505,7 +546,7 @@ class FiniteCoverageVerifyAdapter:
             else Failed(
                 status=checked.execution.status,
                 runtime_ms=checked.execution.runtime_ms,
-                diagnostic=CapabilityDiagnostic(
+                diagnostic=OperationDiagnostic(
                     code="FINITE_COVERAGE_VERIFICATION_FAILED",
                     stage="finite_coverage_verification",
                     message=checked.execution.detail or detail,
@@ -513,7 +554,7 @@ class FiniteCoverageVerifyAdapter:
             )
         )
         return OperationProjection(
-            operation_id=self.descriptor.capability_id,
+            operation_id=self.descriptor.operation_id,
             version=self.descriptor.version,
             terminal=terminal,
             publication=PublishedOperation(

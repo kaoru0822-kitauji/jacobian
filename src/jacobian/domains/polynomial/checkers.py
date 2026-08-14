@@ -2,9 +2,9 @@
 
 from collections.abc import Callable
 
-from jacobian.checker_operations import ExactReplayCheckerDeclaration
-from jacobian.contracts.capabilities import CapabilityProviderRuntime
+from jacobian.checker_operations import AuthorizedChecker
 from jacobian.contracts.jacobian_syzygy import GradedJacobianSyzygyRequest
+from jacobian.contracts.operations import ProviderObservation
 from jacobian.contracts.polynomial_operations import (
     PolynomialDiscriminantRequest,
     PolynomialFactorRequest,
@@ -34,16 +34,14 @@ def _rational_decimal_digits(value: object) -> int | None:
 
 def _flint_exact_replay_runtime(
     *, checker_ids: tuple[str, ...] = (), refresh: bool = False
-) -> CapabilityProviderRuntime:
+) -> ProviderObservation:
     return flint_runtime.exact_domain_checker_provider_runtime(
         checker_ids=checker_ids,
         refresh=refresh,
     )
 
 
-def _graded_syzygy_runtime(
-    *, checker_ids: tuple[str, ...] = ()
-) -> CapabilityProviderRuntime:
+def _graded_syzygy_runtime(*, checker_ids: tuple[str, ...] = ()) -> ProviderObservation:
     return flint_runtime.graded_syzygy_checker_provider_runtime(checker_ids=checker_ids)
 
 
@@ -163,8 +161,8 @@ def _materialized_syzygy_supports(payload: object) -> bool:
     )
 
 
-POLYNOMIAL_EXACT_REPLAY_CHECKERS = (
-    ExactReplayCheckerDeclaration(
+POLYNOMIAL_AUTHORIZED_CHECKERS = (
+    AuthorizedChecker(
         "polynomial.jacobian_syzygy.minimum_degree.compute",
         GradedJacobianSyzygyRequest,
         "check_graded_jacobian_syzygy",
@@ -175,7 +173,7 @@ POLYNOMIAL_EXACT_REPLAY_CHECKERS = (
             "operator-authorized exact rational checker independently reconstructs "
             "the homogeneous coefficient maps without importing the SymPy producer"
         ),
-        verification_capability_id=("polynomial.jacobian_syzygy.minimum_degree.verify"),
+        verification_operation_id=("polynomial.jacobian_syzygy.minimum_degree.verify"),
         verification_title="Verify a first graded Jacobian syzygy degree",
         verification_description=(
             "Independently reconstruct every bounded homogeneous coefficient map, "
@@ -189,10 +187,10 @@ POLYNOMIAL_EXACT_REPLAY_CHECKERS = (
             "jacobian",
             "syzygy",
         ),
-        provider_runtime_factory=_graded_syzygy_runtime,
+        observation_loader=_graded_syzygy_runtime,
         supports_input=_materialized_syzygy_supports,
     ),
-    ExactReplayCheckerDeclaration(
+    AuthorizedChecker(
         "polynomial.jacobian_syzygy.coefficients.materialize",
         GradedJacobianSyzygyRequest,
         "check_materialized_graded_jacobian_syzygy",
@@ -204,7 +202,7 @@ POLYNOMIAL_EXACT_REPLAY_CHECKERS = (
             "the stored homogeneous coefficient ledger without importing the "
             "SymPy producer"
         ),
-        verification_capability_id=("polynomial.jacobian_syzygy.coefficients.verify"),
+        verification_operation_id=("polynomial.jacobian_syzygy.coefficients.verify"),
         verification_title="Verify a materialized Jacobian syzygy coefficient ledger",
         verification_description=(
             "Independently reconstruct every bounded homogeneous coefficient map, "
@@ -219,53 +217,53 @@ POLYNOMIAL_EXACT_REPLAY_CHECKERS = (
             "syzygy",
             "coefficient-ledger",
         ),
-        provider_runtime_factory=_graded_syzygy_runtime,
+        observation_loader=_graded_syzygy_runtime,
     ),
-    ExactReplayCheckerDeclaration(
+    AuthorizedChecker(
         "polynomial.compute.gcd",
         PolynomialGcdRequest,
         "check_polynomial_gcd",
         "polynomial.gcd.flint-replay",
-        provider_runtime_factory=_flint_exact_replay_runtime,
+        observation_loader=_flint_exact_replay_runtime,
         optional=True,
         supports_input=_univariate_polynomial("left", "right"),
     ),
-    ExactReplayCheckerDeclaration(
+    AuthorizedChecker(
         "polynomial.compute.resultant",
         PolynomialResultantRequest,
         "check_polynomial_resultant",
         "polynomial.resultant.flint-replay",
-        provider_runtime_factory=_flint_exact_replay_runtime,
+        observation_loader=_flint_exact_replay_runtime,
         optional=True,
         supports_input=_univariate_polynomial("left", "right"),
     ),
-    ExactReplayCheckerDeclaration(
+    AuthorizedChecker(
         "polynomial.compute.discriminant",
         PolynomialDiscriminantRequest,
         "check_polynomial_discriminant",
         "polynomial.discriminant.flint-replay",
-        provider_runtime_factory=_flint_exact_replay_runtime,
+        observation_loader=_flint_exact_replay_runtime,
         optional=True,
         supports_input=_univariate_polynomial("polynomial"),
     ),
-    ExactReplayCheckerDeclaration(
+    AuthorizedChecker(
         "polynomial.compute.square_free_decomposition",
         PolynomialSquareFreeRequest,
         "check_polynomial_square_free",
         "polynomial.square-free.flint-replay",
-        provider_runtime_factory=_flint_exact_replay_runtime,
+        observation_loader=_flint_exact_replay_runtime,
         optional=True,
         supports_input=_univariate_polynomial("polynomial"),
     ),
-    ExactReplayCheckerDeclaration(
+    AuthorizedChecker(
         "polynomial.factor.compute",
         PolynomialFactorRequest,
         "check_polynomial_factorization",
         "polynomial.factorization.flint-replay",
-        provider_runtime_factory=_flint_exact_replay_runtime,
+        observation_loader=_flint_exact_replay_runtime,
         optional=True,
         supports_input=_univariate_polynomial("polynomial"),
     ),
 )
 
-__all__ = ["POLYNOMIAL_EXACT_REPLAY_CHECKERS"]
+__all__ = ["POLYNOMIAL_AUTHORIZED_CHECKERS"]

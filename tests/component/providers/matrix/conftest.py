@@ -9,14 +9,14 @@ import pytest
 from tests.support.exact_domain import open_exact_domain_services
 from tests.support.services import open_domain_services
 
-from jacobian.domains.matrix_lattice import build_matrix_bundle
-from jacobian.runtime.services import CoreServices
+from jacobian.domains.matrix_lattice import matrix_operations
+from jacobian.runtime.resources import RuntimeResources
 from jacobian.verification.service import VerificationService
 
 
 @dataclass(frozen=True, slots=True)
 class MatrixRuntime:
-    core: CoreServices
+    core: RuntimeResources
     verification: VerificationService
 
 
@@ -26,7 +26,7 @@ def matrix_services(
 ) -> Iterator[MatrixRuntime]:
     with open_domain_services(
         tmp_path_factory.mktemp("matrix") / "state",
-        build_matrix_bundle(),
+        matrix_operations(),
     ) as services:
         yield MatrixRuntime(
             core=services.core,
@@ -40,7 +40,7 @@ def matrix_checker_services(
 ) -> Iterator[MatrixRuntime]:
     with open_exact_domain_services(
         tmp_path_factory.mktemp("matrix-checker") / "state",
-        build_matrix_bundle(),
+        matrix_operations(),
     ) as services:
         yield MatrixRuntime(
             core=services.core,

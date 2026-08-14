@@ -16,7 +16,6 @@ from jacobian.adapters.mcp.remote import (
     TenantRuntimeRouter,
     load_static_token_file,
 )
-from jacobian.runtime import CheckerAuthorityMode
 
 
 def test_static_tokens_bind_distinct_authenticated_subjects() -> None:
@@ -49,7 +48,12 @@ def test_remote_configuration_errors_name_the_rule_and_recovery(
     ):
         StaticTokenGrant(tenant_id="bad subject", token="a" * 32)
 
-    router = TenantRuntimeRouter(tmp_path, checker_authority=CheckerAuthorityMode.NONE)
+    router = TenantRuntimeRouter(
+        tmp_path,
+        runtime_factory=lambda *_args, **_kwargs: pytest.fail(
+            "authentication must precede runtime construction"
+        ),
+    )
     with pytest.raises(
         PermissionError,
         match="Authenticate with a configured bearer token and retry",

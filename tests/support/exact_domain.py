@@ -7,12 +7,11 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-from jacobian.domain_bundles import DomainBundle
-from jacobian.operation_installation import InstalledDomainBundle
-from jacobian.portfolio.core_installation import CoreApplicationInstaller
-from jacobian.portfolio.domain_installation import DomainBundleInstaller
-from jacobian.portfolio.model import PortfolioPlan
-from jacobian.runtime.config import CheckerAuthorityMode
+from jacobian.builtin_operation_modules import load_builtin_operation_modules
+from jacobian.catalog_operations import CatalogOperationBuilder
+from jacobian.operation_binding import BoundOperationGroup
+from jacobian.operation_declarations import OperationDeclarations
+from tests.support.catalog_build_options import CheckerAuthorityMode
 from tests.support.services import (
     DomainTestServices,
     atomic_installation,
@@ -24,54 +23,62 @@ from tests.support.services import (
 class VerifiedDomainTestServices(DomainTestServices):
     """Focused services plus the exact installed bundle resources."""
 
-    bundles: dict[str, InstalledDomainBundle]
+    operation_groups: dict[str, BoundOperationGroup]
 
 
 def install_verified_domain_bundles(
     services: DomainTestServices,
-    *bundles: DomainBundle,
-) -> dict[str, InstalledDomainBundle]:
+    *operation_groups: OperationDeclarations,
+) -> dict[str, BoundOperationGroup]:
     """Install selected bundles through the production portfolio path."""
 
-    if not bundles:
-        raise ValueError("at least one verified domain bundle is required")
+    if not operation_groups:
+        raise ValueError("at least one verified operation group is required")
+    builtin = {
+        tuple(operation.operation_id for operation in operations): (
+            module_name,
+            checker_declarations,
+        )
+        for module_name, operations, checker_declarations in (
+            load_builtin_operation_modules()
+        )
+    }
+    bound_by_name: dict[str, BoundOperationGroup] = {}
+    exact_groups = {}
     with atomic_installation(services.core):
-        installed = DomainBundleInstaller(services.installation).install(
-            PortfolioPlan(components=bundles)
+        for operations in operation_groups:
+            operation_ids = tuple(operation.operation_id for operation in operations)
+            module_name, checker_declarations = builtin[operation_ids]
+            bound = services.installation.binder.bind(operations)
+            for adapter in bound.adapters:
+                services.installation.register_operation(adapter)
+            name = operation_ids[0].split(".", maxsplit=1)[0]
+            bound_by_name[name] = bound
+            exact_groups[module_name] = operations, bound, checker_declarations
+        CatalogOperationBuilder(services.installation).bind_domain_verification(
+            exact_groups
         )
-        missing = tuple(
-            bundle.domain_id
-            for bundle in bundles
-            if bundle.domain_id not in installed.installed
-        )
-        if missing:
-            raise ValueError(
-                "verified domain installation omitted bundle(s): " + ", ".join(missing)
-            )
-        CoreApplicationInstaller(services.installation).install_domain_verification(
-            installed,
-            PortfolioPlan(components=bundles),
-        )
-    return installed.installed
+    return bound_by_name
 
 
 @contextmanager
 def open_exact_domain_services(
     root: str | Path,
-    *bundles: DomainBundle,
+    *operation_groups: OperationDeclarations,
     checker_authority: CheckerAuthorityMode = CheckerAuthorityMode.INSTALL_BUNDLED,
 ) -> Iterator[VerifiedDomainTestServices]:
-    """Open domain services with explicitly selected verified domain bundles.
+    """Open domain services with explicitly selected verified operations.
 
-    Ordinary domain fixtures declare their bundles rather than assembling the
-    installer/checker/adapter-registration recipe.
+    Ordinary domain fixtures declare their operations rather than assembling the
+    checker and adapter registration recipe.
     """
 
     with open_domain_services(root, checker_authority=checker_authority) as services:
-        installed = install_verified_domain_bundles(services, *bundles)
+        installed = install_verified_domain_bundles(services, *operation_groups)
         yield VerifiedDomainTestServices(
             core=services.core,
-            application=services.application,
+            verification=services.verification,
+            polytope=services.polytope,
             installation=services.installation,
-            bundles=installed,
+            operation_groups=installed,
         )

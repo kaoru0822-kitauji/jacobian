@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "provenance_status": "historical",
-  "historical_provenance_id": "jacobian.mathematical-benchmarks-v1.capability-gap-analysis",
+  "historical_provenance_id": "jacobian.mathematical-benchmarks-v1.operation-gap-analysis",
   "task_id": "research-status-evidence-audit",
   "analysis": {
     "mathematical_moves": [
@@ -9,7 +9,7 @@
       "Select only citations sufficient for each classification and enumerate unsupported inferences.",
       "Calibrate current-status claims against a frozen evidence cutoff without treating search absence as proof."
     ],
-    "current_capabilities": [],
+    "current_operations": [],
     "gap_classes": [
       "MISSING_OPERATION",
       "WEAK_DISCOVERY"
@@ -19,6 +19,6 @@
       "citation-status-evidence-audit"
     ],
     "disposition": "ACCEPT_CANDIDATE",
-    "next_action": "Use this as a regression case for citation sufficiency and evidence-bound research-status classification before stabilizing a provenance-audit capability."
+    "next_action": "Use this as a regression case for citation sufficiency and evidence-bound research-status classification before stabilizing a provenance-audit operation."
   }
 }

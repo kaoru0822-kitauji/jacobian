@@ -6,13 +6,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from jacobian.artifacts import ArtifactService
-from jacobian.contracts.capabilities import CapabilityProviderRuntime
 from jacobian.contracts.results import ContractModel
-from jacobian.domain_bundles import DomainBundle
-from jacobian.operation_bindings import InstalledOperation
+from jacobian.operation_declarations import OperationDeclaration
 from jacobian.value_references import ValueReferenceStore
 
-type DomainOperation = InstalledOperation[Any, Any]
+type DomainOperation = OperationDeclaration[Any, Any]
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,17 +22,7 @@ class OperationResources:
     result_schema_uris: dict[str, str]
 
 
-def operation_runtime(
-    operation: DomainOperation,
-    bundle: DomainBundle,
-) -> CapabilityProviderRuntime:
-    """Resolve provider identity at operation granularity."""
-
-    return operation.provider_binding.runtime or bundle.provider_runtime
-
-
 __all__ = [
     "DomainOperation",
     "OperationResources",
-    "operation_runtime",
 ]

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from tests.support.capabilities import invoke_capability as _invoke
+from tests.support.operations import invoke_operation as _invoke
 from tests.support.rationals import rational_payload as _q
 
 from jacobian.contracts.results import ExecutionStatus
@@ -82,7 +82,7 @@ def test_independent_checker_rejects_wrong_bound_coefficients(
     candidate = runtime.core.polynomial_expressions.put_normalization(
         expression_uri=expression_uri,
         normalized={"terms": []},
-        producer=runtime.provider_runtime,
+        producer=runtime.producer,
         resource_budget={"wall_seconds": 5},
     )
     rejected = _invoke(

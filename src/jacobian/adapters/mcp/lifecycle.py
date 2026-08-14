@@ -7,14 +7,6 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from jacobian.adapters.mcp.context import AppState
-from jacobian.adapters.mcp.tooling import MCPBlockingWorkerShutdownError
-from jacobian.runtime import CheckerAuthorityMode
-
-
-def selected_checker_authority(
-    authority: CheckerAuthorityMode | None,
-) -> CheckerAuthorityMode:
-    return authority or CheckerAuthorityMode.INSTALL_BUNDLED
 
 
 @asynccontextmanager
@@ -30,12 +22,7 @@ async def runtime_lifespan(
     try:
         yield state
     finally:
-        try:
-            await state.worker_registry.close()
-        except MCPBlockingWorkerShutdownError as exc:
-            state.worker_registry.defer_until_quiescent(close_owner)
-            raise exc from None
         close_owner()
 
 
-__all__ = ["runtime_lifespan", "selected_checker_authority"]
+__all__ = ["runtime_lifespan"]

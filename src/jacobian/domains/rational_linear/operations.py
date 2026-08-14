@@ -10,15 +10,15 @@ from pydantic import ValidationError
 
 from jacobian.bounded_process import ProcessResourceLimits
 from jacobian.canonical import canonicalize_json, loads_strict_json
-from jacobian.contracts.capabilities import (
-    CapabilityDiagnostic,
-    CapabilityProviderAvailability,
-)
 from jacobian.contracts.linear import (
     LinearRationalInconsistencyFindRequest,
     LinearRationalInconsistencyResult,
     LinearRationalSolutionFindRequest,
     LinearRationalSolutionResult,
+)
+from jacobian.contracts.operations import (
+    OperationDiagnostic,
+    ProviderAvailability,
 )
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.domains.rational_linear.protocol import (
@@ -51,7 +51,7 @@ class _RuntimeChangedError(RuntimeError):
 def _failure(code: str, status: ExecutionStatus, message: str) -> Never:
     raise OperationAbortError(
         status,
-        CapabilityDiagnostic(
+        OperationDiagnostic(
             code=code,
             stage="rational_linear_provider",
             message=message,
@@ -68,10 +68,7 @@ def _run(
     | None
 ):
     runtime = python_flint_provider_runtime(refresh=True)
-    if (
-        RUNTIME.availability is not CapabilityProviderAvailability.AVAILABLE
-        or runtime != RUNTIME
-    ):
+    if RUNTIME.availability is not ProviderAvailability.AVAILABLE or runtime != RUNTIME:
         return None
     budget = worker_request.request.resource_budget.wall_seconds
     completed = execute_process(

@@ -11,9 +11,9 @@ last-deployed notes outside source control; do not install configuration from
 operator scratch space or treat it as current.
 
 The server exposes `math.find` and `math.run`.
-Clients may read installed descriptors from `capability://catalog` and inspect
+Clients may read installed descriptors from `operation://catalog` and inspect
 exact contracts before invoking mathematical operations, which remain behind
-namespaced capability IDs.
+namespaced operation IDs.
 
 The tool names and schemas do not vary with deployment configuration.
 Evaluation harnesses may observe MCP traffic, but they do not add fields to
@@ -288,7 +288,7 @@ baseline for the localhost ports used by the hosted test service. It deletes
 authorization, cookie, OpenAI session/subject, and Tailscale identity headers
 from both log paths. `Traceparent` is reduced to Caddy's eight-hex-character
 SHA-256 correlation digest; Jacobian emits the same digest in its bounded
-`MCP capability attempt` record.
+`MCP operation attempt` record.
 
 Validate and reload a copied configuration before changing live traffic:
 
@@ -335,13 +335,13 @@ Python distribution version:
 uv run python deploy/smoke_remote.py \
   https://math-tools.example.org/mcp \
   --expect-policy-profile DEFAULT \
-  --require-capability graph.construct.explicit
+  --require-operation graph.construct.explicit
 ```
 
 For a token-protected endpoint, set `JACOBIAN_MCP_BEARER_TOKEN` in the smoke
 process environment without placing it on the command line. The script does
 not print the token and disables ambient proxy settings. It performs no state
-writes or capability invocations.
+writes or operation invocations.
 
 Confirm the ingress route independently:
 
@@ -359,8 +359,8 @@ sudo journalctl -u jacobian-caddy.service --since "10 minutes ago" --no-pager
 ```
 
 Do not report a deployment complete until the service version, two-tool
-surface, catalog policy, required capabilities, and bounded discovery response
-all pass. Run deeper capability-specific smoke checks only for providers
+surface, catalog policy, required operations, and bounded discovery response
+all pass. Run deeper operation-specific smoke checks only for providers
 changed by the release.
 
 `--with-lean` adds `lean.check`, `lean.proof_state.apply_tactic`,
@@ -389,22 +389,12 @@ a release that changes stored artifact formats, and verify
 backward compatibility before starting older code against newer state. Do not
 use `git reset --hard` as a deployment or rollback mechanism.
 
-## Warm the Mathlib profile when serving `lean.check`
-
-Set `JACOBIAN_LEAN_WARMUP=1` on a host that serves `lean.check`. Jacobian then
-checks a small pinned Mathlib theorem in the background when each tenant runtime
-is first used. This warms Lean and filesystem caches without delaying MCP
-startup.
-
 Lean results are cached only for an exact content-addressed certificate and
 the currently active checker implementation digest. The bounded in-memory cache holds 128
 entries; a changed proof, statement, environment, checker, or authorization
-state cannot reuse an entry. `math.find` for `lean.check` reports the
-cache policy and the MATHLIB warm-up state (`RUNNING`, `HEALTHY`, or
-`UNHEALTHY`). Before advertising a deployment, wait for `HEALTHY` and invoke a
-deployed smoke check with `statement: "True"`, `proof: "by trivial"`, and
-`environment: "MATHLIB"`. An unhealthy deployment must not recommend the
-MATHLIB profile.
+state cannot reuse an entry. Before advertising a deployment, invoke a deployed
+smoke check with `statement: "True"`, `proof: "by trivial"`, and
+`environment: "MATHLIB"`.
 
 Lean declaration discovery keeps its rebuildable catalog indexes below
 `<state-root>/cache/lean-declarations`; the installer derives that location from
@@ -460,7 +450,7 @@ subject to the same tenant-routing interface.
   larger searches instead of holding one HTTP request open.
 - Do not interpret HTTP success, solver completion, or an MCP response as a
   verified mathematical result.
-- Use the one-line `MCP capability attempt` records for operational counts.
+- Use the one-line `MCP operation attempt` records for operational counts.
   The attempt record distinguishes `COMPLETED`, `TIMEOUT`, `CANCELLED`, and
   `ERROR` and retains only bounded status/provenance fields and argument
   digests.

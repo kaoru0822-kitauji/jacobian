@@ -7,17 +7,12 @@ from pathlib import Path
 from typing import Any
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capability_adapters import CapabilityAdapter
-from jacobian.contracts.capabilities import (
-    CapabilityInstallTier,
-    CapabilityProviderAvailability,
-    CapabilityProviderDigestKind,
-    CapabilityProviderRuntime,
-    CapabilityRequest,
-)
 from jacobian.contracts.lean import LeanEnvironment
+from jacobian.contracts.operations import (
+    OperationRequest,
+)
 from jacobian.lean_frontend.declaration_operations import (
-    build_lean_declaration_query_bundle,
+    lean_declaration_query_operations,
 )
 from jacobian.lean_frontend.declaration_protocol import (
     LeanDeclarationBackendResult,
@@ -31,42 +26,18 @@ from jacobian.lean_frontend.declarations import (
     LeanDeclarationBackendError,
     LeanDeclarationService,
 )
-from jacobian.operation_installation import OperationInstaller
+from jacobian.operation_adapters import OperationAdapter
+from jacobian.operation_binding import OperationBinder
 from jacobian.operation_projection import OperationProjection, project_operation_result
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.storage.repository import ArtifactRepository
 
 _DIGEST = "sha256:" + "a" * 64
-_RUNTIME = CapabilityProviderRuntime(
-    provider="jacobian.lean4",
-    availability=CapabilityProviderAvailability.AVAILABLE,
-    version="4.31.0",
-    digest="sha256:" + "b" * 64,
-    digest_kind=CapabilityProviderDigestKind.EXECUTABLE,
-    platform="test",
-    install_tier=CapabilityInstallTier.T3,
-    license_id="Apache-2.0",
-    features=("CORE", "MATHLIB"),
-    configuration={
-        "profiles": {
-            "CORE": {
-                "lean_version": "4.31.0",
-                "lean_commit": "lean-commit",
-                "mathlib_commit": None,
-            },
-            "MATHLIB": {
-                "lean_version": "4.31.0",
-                "lean_commit": "lean-commit",
-                "mathlib_commit": "mathlib-commit",
-            },
-        }
-    },
-)
 
 
 def _invoke_public(
-    adapter: CapabilityAdapter[Any],
-    request: CapabilityRequest,
+    adapter: OperationAdapter[Any],
+    request: OperationRequest,
 ):
     projection = adapter.invoke(adapter.prepare(request))
     assert isinstance(projection, OperationProjection)
@@ -118,20 +89,19 @@ def _query_adapter(
     tmp_path: Path,
     backend: LeanDeclarationBackend,
     operation_id: str,
-) -> CapabilityAdapter:
+) -> OperationAdapter:
     store = ArtifactRepository(tmp_path)
     schemas = SchemaRegistry(store)
     artifacts = ArtifactService(store, schemas)
-    installation = OperationInstaller(store, schemas, artifacts).install(
-        build_lean_declaration_query_bundle(
+    installation = OperationBinder(store, schemas, artifacts).bind(
+        lean_declaration_query_operations(
             LeanDeclarationService(backend),
-            _RUNTIME,
         )
     )
     return next(
         adapter
         for adapter in installation.adapters
-        if adapter.descriptor.capability_id == operation_id
+        if adapter.descriptor.operation_id == operation_id
     )
 
 
@@ -161,15 +131,15 @@ def test_search_adapter_exposes_bounded_computed_retrieval(tmp_path: Path) -> No
         }
     )
     adapter = _query_adapter(tmp_path, backend, "lean.declaration.search")
-    assert adapter.descriptor.invocation_examples[0].input["name_contains"] == (
+    assert adapter.descriptor.examples[0].input["name_contains"] == (
         "irrational_sqrt_two"
     )
-    assert adapter.descriptor.invocation_examples[0].input["result_limit"] == 1
+    assert adapter.descriptor.examples[0].input["result_limit"] == 1
     assert "shell-searching" in adapter.descriptor.description
     result = _invoke_public(
         adapter,
-        CapabilityRequest(
-            capability_id="lean.declaration.search",
+        OperationRequest(
+            operation_id="lean.declaration.search",
             input={
                 "environment": "MATHLIB",
                 "name_contains": "irrational_sqrt_two",
@@ -210,13 +180,13 @@ def test_inspect_adapter_returns_docs_without_promoting_the_theorem(
         }
     )
     adapter = _query_adapter(tmp_path, backend, "lean.declaration.inspect")
-    assert adapter.descriptor.invocation_examples[0].input["declaration_name"] == (
+    assert adapter.descriptor.examples[0].input["declaration_name"] == (
         "irrational_sqrt_two"
     )
     result = _invoke_public(
         adapter,
-        CapabilityRequest(
-            capability_id="lean.declaration.inspect",
+        OperationRequest(
+            operation_id="lean.declaration.inspect",
             input={"environment": "CORE", "declaration_name": "Nat.add"},
         ),
     )
@@ -250,8 +220,8 @@ def test_dependency_adapter_exposes_partial_typed_subgraph(tmp_path: Path) -> No
     adapter = _query_adapter(tmp_path, backend, "lean.declaration.dependencies")
     result = _invoke_public(
         adapter,
-        CapabilityRequest(
-            capability_id="lean.declaration.dependencies",
+        OperationRequest(
+            operation_id="lean.declaration.dependencies",
             input={
                 "environment": "CORE",
                 "root_declaration": "Nat.add_assoc",
@@ -277,8 +247,8 @@ def test_missing_declaration_is_an_explicit_failed_operation(tmp_path: Path) -> 
     )
     result = _invoke_public(
         adapter,
-        CapabilityRequest(
-            capability_id="lean.declaration.inspect",
+        OperationRequest(
+            operation_id="lean.declaration.inspect",
             input={"environment": "CORE", "declaration_name": "Missing.name"},
         ),
     )

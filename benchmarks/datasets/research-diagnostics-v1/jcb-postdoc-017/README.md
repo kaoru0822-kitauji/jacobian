@@ -11,7 +11,7 @@ submodular-optimization
 - case_version: research-diagnostics-v1
 - contamination_class: public-answer-visible-diagnostic
 - fixture_digest: sha256:2eb4dae47798fc00527f4a79d212aca79039776cf24791ca839e0a5127278c7c
-- derivation: A five-element coverage function and rational marginal vector violate a proposed 4/3 upper bound. The counterexample has a tiny primal witness and a 32-constraint exact dual certificate, making it suitable for current rational optimization and finite-coverage capabilities.
+- derivation: A five-element coverage function and rational marginal vector violate a proposed 4/3 upper bound. The counterexample has a tiny primal witness and a 32-constraint exact dual certificate, making it suitable for current rational optimization and finite-coverage operations.
 
 ## Portfolio status
 
@@ -31,7 +31,7 @@ submodular-optimization
 - environment_mode: separate
 
 The task is self-contained and offline. The instruction names no tool,
-capability, or invocation order. The verifier is a separate clean-room Python
+operation, or invocation order. The verifier is a separate clean-room Python
 script that scores correctness, evidence validity, scope accuracy, assurance
 calibration, and aggregate reward; a wrong result or an unsupported VERIFIED
 claim forces the reward to zero.

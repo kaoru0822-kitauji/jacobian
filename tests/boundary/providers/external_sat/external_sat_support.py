@@ -6,24 +6,24 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from tests.support.artifacts import sha256_file
+from tests.support.catalog_build_options import CheckerAuthorityMode
 from tests.support.services import (
     DomainTestServices,
     atomic_installation,
     open_domain_services,
 )
 
-from jacobian.contracts.capabilities import CapabilityProviderRuntime
+from jacobian.contracts.operations import ProviderObservation
 from jacobian.providers.external_solver_runtime import (
     cadical_provider_runtime,
     drat_trim_provider_runtime,
 )
-from jacobian.runtime import CheckerAuthorityMode
-from jacobian.sat_smt.cadical import install_cadical_capabilities
-from jacobian.sat_smt.sat_capabilities import (
+from jacobian.sat_smt.cadical import install_cadical_operations
+from jacobian.sat_smt.sat_operations import (
     install_sat_assignment_checker,
     install_sat_unsat_proof_checker,
 )
-from jacobian.sat_smt.smt_capabilities import install_smt_unsat_proof_checker
+from jacobian.sat_smt.smt_operations import install_smt_unsat_proof_checker
 
 
 def fake_drat_trim(tmp_path: Path, body: str) -> Path:
@@ -99,7 +99,7 @@ def fake_carcara(tmp_path: Path, body: str) -> Path:
 @contextmanager
 def open_sat_proof_verifier_services(
     root: Path,
-    runtime: CapabilityProviderRuntime,
+    runtime: ProviderObservation,
     *,
     checker_authority: CheckerAuthorityMode,
 ) -> Iterator[DomainTestServices]:
@@ -115,20 +115,20 @@ def open_sat_proof_verifier_services(
                 services.core.schemas,
                 services.core.artifacts,
                 services.core.sat,
-                services.application.verification,
+                services.verification,
                 services.core.checkers,
                 runtime,
-                authorize_checker=services.installation.authorizes_bundled_checkers,
+                authorize_checker=services.installation.authorize_bundled_checkers,
             )
             if verifier is not None:
-                services.installation.register_capability(verifier)
+                services.installation.register_operation(verifier)
         yield services
 
 
 @contextmanager
 def open_smt_proof_verifier_services(
     root: Path,
-    runtime: CapabilityProviderRuntime,
+    runtime: ProviderObservation,
     *,
     checker_authority: CheckerAuthorityMode,
 ) -> Iterator[DomainTestServices]:
@@ -144,13 +144,13 @@ def open_smt_proof_verifier_services(
                 services.core.schemas,
                 services.core.artifacts,
                 services.core.smt,
-                services.application.verification,
+                services.verification,
                 services.core.checkers,
                 runtime,
-                authorize_checker=services.installation.authorizes_bundled_checkers,
+                authorize_checker=services.installation.authorize_bundled_checkers,
             )
             if verifier is not None:
-                services.installation.register_capability(verifier)
+                services.installation.register_operation(verifier)
         yield services
 
 
@@ -202,8 +202,8 @@ def _open_external_sat_services(
     with open_domain_services(root, checker_authority=authority) as services:
         with atomic_installation(services.core):
             cadical = cadical_provider_runtime()
-            for adapter in install_cadical_capabilities(services.core.sat, cadical):
-                services.installation.register_capability(adapter)
+            for adapter in install_cadical_operations(services.core.sat, cadical):
+                services.installation.register_operation(adapter)
 
             if install_assignment_checker:
                 assignment, _installation = install_sat_assignment_checker(
@@ -211,13 +211,13 @@ def _open_external_sat_services(
                     services.core.schemas,
                     services.core.artifacts,
                     services.core.sat,
-                    services.application.verification,
+                    services.verification,
                     services.core.checkers,
-                    authorize_checker=services.installation.authorizes_bundled_checkers,
+                    authorize_checker=services.installation.authorize_bundled_checkers,
                 )
                 if assignment is None:
                     raise RuntimeError("the SAT assignment checker was not installed")
-                services.installation.register_capability(assignment)
+                services.installation.register_operation(assignment)
 
             if install_proof_checker:
                 proof, _proof_installation = install_sat_unsat_proof_checker(
@@ -225,12 +225,12 @@ def _open_external_sat_services(
                     services.core.schemas,
                     services.core.artifacts,
                     services.core.sat,
-                    services.application.verification,
+                    services.verification,
                     services.core.checkers,
                     drat_trim_provider_runtime(),
-                    authorize_checker=services.installation.authorizes_bundled_checkers,
+                    authorize_checker=services.installation.authorize_bundled_checkers,
                 )
                 if proof is None:
                     raise RuntimeError("the SAT proof checker was not installed")
-                services.installation.register_capability(proof)
+                services.installation.register_operation(proof)
         yield services

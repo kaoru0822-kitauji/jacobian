@@ -1,13 +1,13 @@
 {
   "schema_version": "1",
   "provenance_status": "historical",
-  "historical_provenance_id": "jacobian.mathematical-benchmarks-v1.capability-gap-analysis",
+  "historical_provenance_id": "jacobian.mathematical-benchmarks-v1.operation-gap-analysis",
   "task_id": "nondifferentiable-maximum-construction",
   "analysis": {
     "mathematical_moves": [
       "Construct a continuous two-branch piecewise-linear function and compare one-sided slopes."
     ],
-    "current_capabilities": [],
+    "current_operations": [],
     "gap_classes": [
       "MISSING_OPERATION"
     ],

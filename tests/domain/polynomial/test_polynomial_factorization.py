@@ -4,16 +4,14 @@ from pathlib import Path
 import pytest
 
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.domains.polynomial import build_polynomial_bundle
-from tests.support.capabilities import invoke_capability as _invoke
+from jacobian.domains.polynomial import polynomial_operations
+from tests.support.operations import invoke_operation as _invoke
 from tests.support.services import DomainTestServices, open_domain_services
 
 
 @pytest.fixture
 def polynomial_services(tmp_path: Path) -> Iterator[DomainTestServices]:
-    with open_domain_services(
-        tmp_path / "state", build_polynomial_bundle()
-    ) as services:
+    with open_domain_services(tmp_path / "state", polynomial_operations()) as services:
         yield services
 
 

@@ -8,17 +8,17 @@ import pytest
 from tests.support.exact_domain import open_exact_domain_services
 from tests.support.services import DomainTestServices
 
-from jacobian.contracts.capabilities import CapabilityRequest
+from jacobian.contracts.operations import OperationRequest
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.domains.graph_optimization.invariant_bundle import (
-    build_graph_invariant_bundle,
+from jacobian.domains.graph_optimization.invariant_declarations import (
+    graph_invariant_operations,
 )
 
 
 @pytest.fixture
 def graph_services(tmp_path: Path) -> Iterator[DomainTestServices]:
     with open_exact_domain_services(
-        tmp_path / "state", build_graph_invariant_bundle()
+        tmp_path / "state", graph_invariant_operations()
     ) as services:
         yield services
 
@@ -27,18 +27,18 @@ def test_graph6_h24_decode_is_exact_and_independently_replayed(
     graph_services: DomainTestServices,
 ) -> None:
     payload = {"graph6": "W{CGW_@?Y??@?@?@_@??@??K_????G??C??B??@????_??B"}
-    computed = graph_services.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="graph.encoding.graph6.decode.compute", input=payload
+    computed = graph_services.core.operations.invoke(
+        OperationRequest(
+            operation_id="graph.encoding.graph6.decode.compute", input=payload
         )
     )
     decoded = computed.output["result"]
     assert decoded["order"] == 24
     assert len(decoded["edges"]) == 30
     assert max(decoded["degrees"]) == 3
-    verified = graph_services.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="graph.encoding.graph6.decode.verify",
+    verified = graph_services.core.operations.invoke(
+        OperationRequest(
+            operation_id="graph.encoding.graph6.decode.verify",
             input={"input": payload, "candidate": decoded},
         )
     )
@@ -52,17 +52,17 @@ def test_graph6_checker_rejects_wrong_edge_result(
     graph_services: DomainTestServices,
 ) -> None:
     payload = {"graph6": "Bw"}
-    computed = graph_services.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="graph.encoding.graph6.decode.compute", input=payload
+    computed = graph_services.core.operations.invoke(
+        OperationRequest(
+            operation_id="graph.encoding.graph6.decode.compute", input=payload
         )
     )
     forged = deepcopy(computed.output["result"])
     forged["edges"] = forged["edges"][:-1]
     forged["degrees"] = [2, 1, 1]
-    rejected = graph_services.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="graph.encoding.graph6.decode.verify",
+    rejected = graph_services.core.operations.invoke(
+        OperationRequest(
+            operation_id="graph.encoding.graph6.decode.verify",
             input={"input": payload, "candidate": forged},
         )
     )

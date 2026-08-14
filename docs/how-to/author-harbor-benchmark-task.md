@@ -26,7 +26,7 @@ task input and schemas; they do not run `apt-get`. Provider-specific tasks may
 install the dependencies that define that provider experiment. Use Harbor's
 native `public`, `no-network`, or `allowlist` task network policy. Proxy-backed
 operation belongs in the Harbor job composition and does not select an image.
-For a shared checker or provider runtime, keep the agent and verifier images
+For a shared checker or external executable, keep the agent and verifier images
 separate and pin the published `@sha256:` reference; see
 [reusable evaluation images](../reference/evaluations/benchmark-contracts.md#reusable-evaluation-images).
 
@@ -76,7 +76,7 @@ strictly read-only.
 
 Do not add task symlinks, aliases, or a second fixture home. The task
 README is maintainer context and is not injected into a trial. Instructions
-describe the requested outcome without prescribing Jacobian capabilities or a
+describe the requested outcome without prescribing Jacobian operations or a
 research strategy.
 
 Verifier attack tests should cover malformed and unknown fields, wrong answers,

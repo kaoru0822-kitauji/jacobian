@@ -11,15 +11,13 @@ from typing import Any
 from pydantic import ValidationError
 
 from jacobian.canonical import canonicalize_json, loads_strict_json
-from jacobian.capability_adapters import CapabilityAdapter, parse_capability_input
-from jacobian.capability_errors import CapabilityInvocationError
-from jacobian.contracts.capabilities import (
-    CapabilityDescriptor,
-    CapabilityDiagnostic,
-    CapabilityInvocationExample,
-    CapabilityProviderAvailability,
-    CapabilityProviderRuntime,
-    CapabilityRequest,
+from jacobian.contracts.operations import (
+    OperationDescriptor,
+    OperationDiagnostic,
+    OperationExample,
+    OperationRequest,
+    ProviderAvailability,
+    ProviderObservation,
 )
 from jacobian.contracts.polynomial_expressions import (
     POLYNOMIAL_EXPRESSION_PUBLIC_VALIDATION_MESSAGES,
@@ -30,6 +28,8 @@ from jacobian.contracts.polynomial_expressions import (
 )
 from jacobian.contracts.polynomials import SparseRationalPolynomial
 from jacobian.contracts.results import Execution, ExecutionStatus
+from jacobian.operation_adapters import OperationAdapter, parse_operation_input
+from jacobian.operation_errors import OperationInvocationError
 from jacobian.operation_projection import OperationProjection
 from jacobian.polynomial_expressions import PolynomialExpressionArtifactService
 from jacobian.polynomials._support import (
@@ -43,9 +43,6 @@ from jacobian.process_policy import (
     execute_process,
 )
 from jacobian.provider_runtime import SYMPY_VERSION
-from jacobian.providers.sympy_runtime import (
-    sympy_polynomial_normalization_provider_runtime,
-)
 from jacobian.schema_registry import model_schema
 from jacobian.sympy_polynomial_protocol import (
     make_sympy_polynomial_worker_request,
@@ -69,14 +66,14 @@ class _SympyNormalizationRun:
     detail: str | None = None
 
 
-def install_sympy_polynomial_normalization_capability(
+def bind_sympy_polynomial_normalization(
     expressions: PolynomialExpressionArtifactService,
-    runtime: CapabilityProviderRuntime,
-) -> CapabilityAdapter[Any]:
-    """Install the producer only for the exact supported SymPy profile."""
+    runtime: ProviderObservation,
+) -> OperationAdapter[Any]:
+    """Bind the producer to the supported SymPy artifact identity."""
 
     if (
-        runtime.availability is not CapabilityProviderAvailability.AVAILABLE
+        runtime.availability is not ProviderAvailability.AVAILABLE
         or runtime.provider != "jacobian.sympy"
         or runtime.version != SYMPY_VERSION
         or runtime.configuration != SYMPY_POLYNOMIAL_NORMALIZATION_CONFIGURATION
@@ -89,26 +86,11 @@ def install_sympy_polynomial_normalization_capability(
 
 
 class _SympyPolynomialNormalizationBackend:
-    def __init__(self, runtime: CapabilityProviderRuntime) -> None:
-        self.runtime = runtime
-
     def run(
         self,
         request: PolynomialExpressionNormalizeRequest,
     ) -> _SympyNormalizationRun:
         started = time.monotonic()
-        if (
-            sympy_polynomial_normalization_provider_runtime(refresh=True)
-            != self.runtime
-        ):
-            return _failure(
-                started,
-                ExecutionStatus.ERROR,
-                (
-                    "The installed SymPy runtime no longer matches the capability "
-                    "descriptor; no normalization evidence was retained."
-                ),
-            )
         worker_request = make_sympy_polynomial_worker_request(request.expression)
         completed = execute_process(
             ProcessRequest(
@@ -149,18 +131,6 @@ class _SympyPolynomialNormalizationBackend:
                     "protocol; no normalization evidence was retained."
                 ),
             )
-        if (
-            sympy_polynomial_normalization_provider_runtime(refresh=True)
-            != self.runtime
-        ):
-            return _failure(
-                started,
-                ExecutionStatus.ERROR,
-                (
-                    "The installed SymPy runtime changed during execution; no "
-                    "normalization evidence was retained."
-                ),
-            )
         return _SympyNormalizationRun(
             execution_status=ExecutionStatus.COMPLETED,
             runtime_ms=_runtime_ms(started),
@@ -175,12 +145,13 @@ class SympyPolynomialExpressionNormalizeAdapter:
         self,
         *,
         expressions: PolynomialExpressionArtifactService,
-        runtime: CapabilityProviderRuntime,
+        runtime: ProviderObservation,
     ) -> None:
         self.expressions = expressions
-        self.backend = _SympyPolynomialNormalizationBackend(runtime)
-        self._descriptor = CapabilityDescriptor(
-            capability_id="polynomial.expression.normalize",
+        self.producer = runtime
+        self.backend = _SympyPolynomialNormalizationBackend()
+        self._descriptor = OperationDescriptor(
+            operation_id="polynomial.expression.normalize",
             version="1",
             title="Normalize a typed rational polynomial expression",
             description=(
@@ -191,8 +162,7 @@ class SympyPolynomialExpressionNormalizeAdapter:
                 "normalizations do not verify an identity parameterized over all "
                 "orders. Verify each full expression relation separately."
             ),
-            provider="jacobian.sympy",
-            provider_runtime=runtime,
+            provider="built-in",
             input_schema=model_schema(PolynomialExpressionNormalizeRequest),
             output_schema=model_schema(PolynomialExpressionNormalizeOutput),
             tags=(
@@ -207,8 +177,8 @@ class SympyPolynomialExpressionNormalizeAdapter:
                 "exact-rational",
                 "sympy",
             ),
-            invocation_examples=(
-                CapabilityInvocationExample(
+            examples=(
+                OperationExample(
                     name="combine_like_terms",
                     description=(
                         "Normalize x + x to canonical sparse coefficients over QQ."
@@ -232,23 +202,23 @@ class SympyPolynomialExpressionNormalizeAdapter:
         )
 
     @property
-    def descriptor(self) -> CapabilityDescriptor:
+    def descriptor(self) -> OperationDescriptor:
         return self._descriptor
 
     def prepare(
         self,
-        request: CapabilityRequest,
+        request: OperationRequest,
     ) -> PolynomialExpressionNormalizeRequest:
         try:
-            return parse_capability_input(
+            return parse_operation_input(
                 PolynomialExpressionNormalizeRequest,
                 request.input,
             )
         except (ValidationError, ValueError) as exc:
             budget_error = _expansion_budget_error(exc)
             if budget_error is not None:
-                raise CapabilityInvocationError(
-                    CapabilityDiagnostic(
+                raise OperationInvocationError(
+                    OperationDiagnostic(
                         code="EXPANSION_TERM_BUDGET_EXCEEDED",
                         stage="bounded_normalization",
                         message=(
@@ -286,7 +256,7 @@ class SympyPolynomialExpressionNormalizeAdapter:
                             "alternatives": [
                                 "use a factored symbolic operation",
                                 "split the expression before normalization",
-                                "use a domain capability with bounded coefficient access",
+                                "use a domain operation with bounded coefficient access",
                             ],
                             "normalization_uri": None,
                             "checker_input_available": False,
@@ -294,8 +264,8 @@ class SympyPolynomialExpressionNormalizeAdapter:
                     )
                 ) from exc
             validation_errors, validation_error_count = _validation_errors(exc)
-            raise CapabilityInvocationError(
-                CapabilityDiagnostic(
+            raise OperationInvocationError(
+                OperationDiagnostic(
                     code="INVALID_TYPED_POLYNOMIAL_EXPRESSION",
                     stage="input_validation",
                     message=(
@@ -346,7 +316,7 @@ class SympyPolynomialExpressionNormalizeAdapter:
             normalization_uri = self.expressions.put_normalization(
                 expression_uri=expression_uri,
                 normalized=run.normalized,
-                producer=self.backend.runtime,
+                producer=self.producer,
                 resource_budget=validated.resource_budget,
             ).artifact_uri
         output = PolynomialExpressionNormalizeOutput(

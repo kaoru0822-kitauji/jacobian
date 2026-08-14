@@ -10,19 +10,19 @@ import pytest
 from tests.support.services import DomainTestServices, open_domain_services
 
 from jacobian.canonical import canonicalize_json
-from jacobian.contracts.capabilities import (
-    CapabilityRequest,
+from jacobian.contracts.operations import (
+    OperationRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.domains._certified_snf import smith_reduce
-from jacobian.domains.certified_snf import build_certified_snf_bundle
+from jacobian.domains.certified_snf import certified_snf_operations
 
 
 @pytest.fixture
 def domain_services(tmp_path: Path) -> Iterator[DomainTestServices]:
     with open_domain_services(
         tmp_path / "state",
-        build_certified_snf_bundle(),
+        certified_snf_operations(),
     ) as services:
         yield services
 
@@ -86,9 +86,9 @@ def _invariant_factors_from_determinantal_divisors(
 def test_certified_smith_materializes_both_full_basis_changes(
     domain_services: DomainTestServices,
 ) -> None:
-    result = domain_services.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="matrix.normal_form.smith.certified.compute",
+    result = domain_services.core.operations.invoke(
+        OperationRequest(
+            operation_id="matrix.normal_form.smith.certified.compute",
             input={
                 "matrix": {
                     "row_count": 2,
@@ -129,9 +129,9 @@ def test_maximum_certified_smith_payload_stays_within_artifact_budget(
     domain_services: DomainTestServices,
 ) -> None:
     factor = "1" + "0" * 31
-    result = domain_services.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="matrix.normal_form.smith.certified.compute",
+    result = domain_services.core.operations.invoke(
+        OperationRequest(
+            operation_id="matrix.normal_form.smith.certified.compute",
             input={
                 "matrix": {
                     "row_count": 16,
@@ -161,9 +161,9 @@ def test_dense_bounded_input_can_materialize_large_basis_changes(
         for _row in range(16)
     ]
 
-    result = domain_services.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="matrix.normal_form.smith.certified.compute",
+    result = domain_services.core.operations.invoke(
+        OperationRequest(
+            operation_id="matrix.normal_form.smith.certified.compute",
             input={
                 "matrix": {
                     "row_count": 16,

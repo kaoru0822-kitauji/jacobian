@@ -10,14 +10,15 @@ operations, also use the
 
 ## Product Constraints
 
-Jacobian is a **toolbox of atomic math tools** for agents. It is not a workflow
-engine: the agent owns decomposition, sequencing, checker choice, and stopping.
+Jacobian is an **MCP server with two tools for atomic mathematics**. It is not a
+workflow engine: the agent owns decomposition, sequencing, checker choice, and
+stopping.
 
 | Agent verb | MCP tool | Meaning |
 | --- | --- | --- |
 | Search | `math.find` | Find or inspect math tools (IDs, schemas, examples). |
 | Execute | `math.run` | Run **one** tool → **mathematical value** (or checker **verdict**). |
-| Inventory | `capability://catalog` | Full catalog when needed. |
+| Inventory | `operation://catalog` | Full catalog when needed. |
 
 See [product model](docs/explanation/product-blueprint.md) and
 [Search and execute](docs/explanation/architecture.md#search-and-execute).
@@ -33,7 +34,7 @@ belongs in the domain result that defines it.
 catalog ID** (e.g. `….verify`, `lean.check`), not a role on the producer. **No
 dual-mode tools.**
 
-- Server: typed contracts, resource bounds, catalog install, checker
+- Server: typed contracts, resource bounds, catalog compilation, checker
   authorization.
 - Model: representation, which tools to run, how to compose values, when to
   call checker tools, when to stop.
@@ -41,8 +42,18 @@ dual-mode tools.**
 - Evaluations reward correct math, useful intermediate values, safety, and
   efficiency—not a fixed tool-call sequence.
 
-**Naming.** Agent-facing: **math tool** / **operation**. Code/catalog often
-still say **capability** for the same thing. No parallel rename without a plan.
+**Naming.** Use **math tool** / **operation** throughout Jacobian-owned code,
+catalogs, documentation, tests, and wire contracts.
+
+**Lifecycle vocabulary.** A built-in operation is a typed mathematical
+function shipped by Jacobian. `jacobian init` and `jacobian update` compile
+those declarations into an inert searchable catalog; serving never discovers
+or installs operations. Reserve **installation** for Jacobian itself and
+optional external executables. Ordinary maintained libraries such as SymPy,
+NetworkX, FLINT, Z3, and cvc5 are private math backends, not operation-specific
+providers. Exact runtime identity belongs only to exceptional external
+executables and authorized checkers, and is not part of public operation
+descriptors.
 
 Tools stay atomic, searchable, and freely composable. No prescribed proof
 strategy, verification order, or stopping criteria in discovery, ranking,
@@ -68,7 +79,7 @@ explicit `__all__` values, and cover namespace and import isolation in the
 public-API tests. Do not re-export domain APIs from the root `jacobian`
 namespace. Native functions accept and return Python or maintained
 backend-native values and call typed mathematical kernels directly; they must
-not invoke `math.run`, construct a capability runtime, or expose MCP,
+not invoke `math.run`, construct an operation runtime, or expose MCP,
 artifact, provider-loading, or installation objects.
 
 ### Mathematical interoperability
@@ -95,13 +106,13 @@ results. Do not directly apply `int()` or `str()` to canonical components or
 change `sys.set_int_max_str_digits()` as a workaround. Keep backend coercion in
 thin adapters, and test above 4,300 digits whenever the contract permits it.
 
-Keep Pydantic models authoritative at capability, persistence, artifact, and
+Keep Pydantic models authoritative at operation, persistence, artifact, and
 wire boundaries. Domain implementations and operation factories must preserve
 their concrete request and result types: do not accept
 `Callable[[ContractModel], ContractModel]` or cast a validated request back to a
 domain model. A bounded operation records exact, incomplete, or unknown status
 in its domain result instead of adding generic completeness or obligation
-wrappers. When a native API and a capability expose the same outcome, share one
+wrappers. When a native API and an operation expose the same outcome, share one
 typed mathematical kernel and use explicit domain-owned conversions rather
 than duplicating the mathematics or introducing a generic conversion framework.
 
@@ -125,11 +136,11 @@ or return nested installation reports, provider bags, or phase-result mirrors
 that production immediately discards. Keep an installation result only when a
 later production phase consumes that exact typed fact.
 
-Construct wire envelopes only at the final capability or protocol projection.
+Construct wire envelopes only at the final operation or protocol projection.
 Mathematical functions, typed operation executors, artifact services, and
 checker services return their owned typed values or terminal states; they do
-not construct `CapabilityResult`. Do not hide artifact writes inside an
-`OperationSpec.execute` callable to satisfy this rule. When an operation needs
+not construct `OperationResult`. Do not hide artifact writes inside an
+`OperationDeclaration.execute` callable to satisfy this rule. When an operation needs
 a domain-specific durable schema or parent closure, keep that publication in a
 narrow named domain publisher and pass its typed projection to the one final
 envelope constructor.
@@ -152,20 +163,17 @@ when the result needs durable identity, independent retrieval, replay,
 resumability, evidence binding, or size-separated transport. Do not add
 persistence flags or generic retention policy to ordinary computations.
 
-Built-in mathematical producers belong in explicit domain bundles. Do not add
+Built-in mathematical producers belong in explicit declaration modules. Do not add
 global operation registries, recursive package discovery, import-time
 registration, or mechanical wrappers for backend functions. Producers remain
 capped at `COMPUTED`; domain-owned checker declarations do not authorize
 themselves.
 
-`DomainBundle` is a semantic declaration, not an installation escape hatch. It
-must not own installer callbacks, runtime services, storage collaborators, or
-dependency-resolution policy. A capability family that genuinely needs a
-special artifact/checker lifecycle is an explicitly named portfolio component
-at the composition root; do not add a generic knob to every ordinary bundle for
-one exceptional installer. An operation may bind a typed computational backend
-that owns no runtime, storage, publication, installation, or checker authority;
-that backend is part of execution, not application lifecycle.
+Declaration modules export immutable operation tuples. Do not add bundle
+objects, installer callbacks, runtime services, storage collaborators, or
+dependency-resolution policy around them. An operation may call a typed private
+computational backend; that backend is part of execution, not application
+lifecycle.
 
 Keep availability, recommendations, compatibility, and verification authority
 separate. Experimental contracts may break between versions; compatibility
@@ -199,7 +207,7 @@ checker authorization out of plugins and search code.
   branches, stage, commit, clean, or rewrite shared files until their work
   is integrated.
 - Jacobian is pre-stable. Current reference documents and the installed catalog
-  define the supported surface; they do not order capability research.
+  define the supported surface; they do not order operation research.
 - Validate the complete Pydantic request model before preflight, provider calls,
   computation, allocation, or artifact writes. This includes relationships among
   individually valid fields: parents, characteristics, presentations, axes,
@@ -225,14 +233,14 @@ checker authorization out of plugins and search code.
 - Include every first-class artifact reference, including verification records,
   in the result's `artifact_uris`.
 - An unavailable optional native or formal provider must remove only the
-  affected capabilities. A missing or mismatched maintained Python backend is
+  affected operations. A missing or mismatched maintained Python backend is
   a broken installation and must fail runtime construction clearly.
 - Keep `deep_review.md` local; it is ignored and is not design source material.
 - Keep worked cases in reference scenarios and benchmarks.
 
 ## Agent Workflow Entry Points
 
-Capability work remains agent-directed and is not coupled to a mandatory
+Operation work remains agent-directed and is not coupled to a mandatory
 development workflow. For Harbor task authoring and verifier changes, use the
 repository-local [`harbor-benchmarks`](.agents/skills/harbor-benchmarks/SKILL.md)
 skill and its exact task validation path. Control/treatment model evaluations
@@ -263,13 +271,13 @@ Non-obvious caveats:
 
 - If a fresh non-login shell can't find `uv`, run `export PATH="$HOME/.local/bin:$PATH"`.
 - Optional native and formal backends are absent by default and their
-  capabilities are correctly omitted: `lean.check` prints
+  operations are correctly omitted: `lean.check` prints
   `lean.check is not installed` on `init`/startup
   (the pinned Lean 4.31.0 toolchain is not installed), and external solver
   executables (`cadical`, `drat-trim`, `carcara`) are not on `PATH`. This does
   not break the kernel, catalog, or the core test suites. Only install Lean/elan
   or those executables when specifically exercising `lean_runtime` tests or SAT
-  proof-artifact capabilities.
+  proof-artifact operations.
 - `make test-unit` is the cheap unit lane. `make quick` adds lint; `make check`
   adds lint and typecheck. `make check-all` explicitly reproduces the Lean-free
   ordinary CI matrix. Use `make test-all-ci` only
@@ -285,7 +293,7 @@ Non-obvious caveats:
   into a host-contention detector rather than useful failure evidence.
 - SQLite is one visible contention point, but not the sole cause: full-runtime
   construction also performs durable filesystem publication, subprocess
-  startup, schema registration, and CPU-heavy capability setup. A timeout
+  startup, schema registration, and CPU-heavy operation setup. A timeout
   observed in `PRAGMA`, `fsync`, `os.link`, or process startup under concurrent
   suites must be reproduced with the owning focused test before it is treated
   as a product defect.

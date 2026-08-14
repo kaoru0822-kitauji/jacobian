@@ -4,9 +4,11 @@ import asyncio
 import json
 from pathlib import Path
 
+import pytest
+
 from jacobian.adapters.mcp.server import create_server
-from jacobian.domains.number_theory import build_number_theory_bundle
-from jacobian.runtime import CheckerAuthorityMode
+from jacobian.domains.number_theory import number_theory_operations
+from jacobian.registry import CheckerRegistry
 from tests.boundary.mcp.mcp_support import open_focused_mcp_server
 
 MATH_TOOL_NAMES = {"math.find", "math.run"}
@@ -21,13 +23,13 @@ def test_mcp_inline_results_do_not_emit_resource_links(
 
         with open_focused_mcp_server(
             tmp_path,
-            build_number_theory_bundle(),
+            number_theory_operations(),
         ) as server:
             async with Client(server, raise_exceptions=True) as client:
                 result = await client.call_tool(
                     "math.run",
                     {
-                        "capability_id": "integer.compute.gcd",
+                        "operation_id": "integer.compute.gcd",
                         "payload": {"left": "84", "right": "30"},
                     },
                 )
@@ -42,18 +44,24 @@ def test_mcp_inline_results_do_not_emit_resource_links(
 
 def test_mcp_materialized_results_emit_readable_native_resource_links(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    def reject_portfolio_assembly(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("SAT materialization must not assemble the portfolio")
+
+    monkeypatch.setattr(CheckerRegistry, "authorize", reject_portfolio_assembly)
+
     async def scenario() -> None:
         from mcp import Client
 
         async with Client(
-            create_server(tmp_path, checker_authority=CheckerAuthorityMode.NONE),
+            create_server(tmp_path),
             raise_exceptions=True,
         ) as client:
             result = await client.call_tool(
                 "math.run",
                 {
-                    "capability_id": "sat.cnf.materialize",
+                    "operation_id": "sat.cnf.materialize",
                     "payload": {
                         "variable_names": ["x"],
                         "clauses": [[1]],
@@ -71,5 +79,24 @@ def test_mcp_materialized_results_emit_readable_native_resource_links(
             envelope = json.loads(resource.contents[0].text)
             assert envelope["artifact_uri"] == artifact_uris[0]
             assert envelope["payload"]["clauses"] == [{"literals": [1]}]
+
+            for operation_id, payload in (
+                ("sat.model.verify", {}),
+                ("sat.unsat_proof.verify", {}),
+                ("sat.lrat.verify", {}),
+                ("smt.unsat_proof.verify", {}),
+                ("sat.model.find", {}),
+                ("sat.unsat_proof.find", {}),
+                ("smt.unsat_proof.find", {}),
+            ):
+                invalid_verification = await client.call_tool(
+                    "math.run",
+                    {"operation_id": operation_id, "payload": payload},
+                )
+                assert isinstance(invalid_verification.structured_content, dict)
+                assert (
+                    invalid_verification.structured_content["operation_id"]
+                    == operation_id
+                )
 
     asyncio.run(scenario())

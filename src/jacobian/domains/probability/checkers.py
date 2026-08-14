@@ -1,9 +1,9 @@
 """Independent checker declarations owned by the probability domain."""
 
-from jacobian.checker_operations import ExactReplayCheckerDeclaration
-from jacobian.contracts.capabilities import (
-    CapabilityInstallTier,
-    CapabilityProviderRuntime,
+from jacobian.checker_operations import AuthorizedChecker
+from jacobian.contracts.operations import (
+    ProviderInstallTier,
+    ProviderObservation,
 )
 from jacobian.contracts.probability import (
     FiniteConvolutionRequest,
@@ -30,7 +30,7 @@ _REASON = (
 
 def _mutual_information_checker_runtime(
     *, checker_ids: tuple[str, ...] = ()
-) -> CapabilityProviderRuntime:
+) -> ProviderObservation:
     """Measure the checker source only when authorization installs it."""
 
     return source_provider_runtime(
@@ -39,23 +39,21 @@ def _mutual_information_checker_runtime(
         entrypoint=(
             "jacobian_checkers.mutual_information:check_finite_joint_mutual_information"
         ),
-        install_tier=CapabilityInstallTier.T1,
+        install_tier=ProviderInstallTier.T1,
         license_id="MIT",
         features=("standard-library-fraction-replay", "clean-process-checker"),
         checker_ids=checker_ids,
     )
 
 
-def _probability_runtime(
-    *, checker_ids: tuple[str, ...] = ()
-) -> CapabilityProviderRuntime:
+def _probability_runtime(*, checker_ids: tuple[str, ...] = ()) -> ProviderObservation:
     return flint_runtime.probability_exact_checker_provider_runtime(
         checker_ids=checker_ids
     )
 
 
-PROBABILITY_EXACT_REPLAY_CHECKERS = (
-    ExactReplayCheckerDeclaration(
+PROBABILITY_AUTHORIZED_CHECKERS = (
+    AuthorizedChecker(
         "probability.joint.mutual_information.compute",
         FiniteJointTableMutualInformationRequest,
         "check_finite_joint_mutual_information",
@@ -66,8 +64,8 @@ PROBABILITY_EXACT_REPLAY_CHECKERS = (
             "operator-authorized standard-library Fraction checker independently "
             "reconstructs marginals, likelihood ratios, and the scaled log product"
         ),
-        provider_runtime_factory=_mutual_information_checker_runtime,
-        verification_capability_id="probability.joint.mutual_information.verify",
+        observation_loader=_mutual_information_checker_runtime,
+        verification_operation_id="probability.joint.mutual_information.verify",
         verification_title="Verify a finite-table mutual-information certificate",
         verification_description=(
             "Independently reconstruct ordered marginals, positive-support "
@@ -82,76 +80,76 @@ PROBABILITY_EXACT_REPLAY_CHECKERS = (
             "mutual-information",
         ),
     ),
-    ExactReplayCheckerDeclaration(
+    AuthorizedChecker(
         "probability.finite_distribution.raw_moment.compute",
         FiniteRawMomentRequest,
         "check_finite_raw_moment",
         "probability.finite-raw-moment.fraction-replay",
         entrypoint_module=_ENTRYPOINT,
-        provider_runtime_factory=_probability_runtime,
+        observation_loader=_probability_runtime,
         replay_method="standard-library Fraction replay",
         reason=_REASON,
     ),
-    ExactReplayCheckerDeclaration(
+    AuthorizedChecker(
         "probability.finite_distribution.event_probability.compute",
         FiniteEventRequest,
         "check_finite_event_probability",
         "probability.finite-event.fraction-replay",
         entrypoint_module=_ENTRYPOINT,
-        provider_runtime_factory=_probability_runtime,
+        observation_loader=_probability_runtime,
         replay_method="standard-library Fraction replay",
         reason=_REASON,
     ),
-    ExactReplayCheckerDeclaration(
+    AuthorizedChecker(
         "probability.finite_distribution.condition.compute",
         FiniteEventRequest,
         "check_finite_condition",
         "probability.finite-condition.fraction-replay",
         entrypoint_module=_ENTRYPOINT,
-        provider_runtime_factory=_probability_runtime,
+        observation_loader=_probability_runtime,
         replay_method="standard-library Fraction replay",
         reason=_REASON,
     ),
-    ExactReplayCheckerDeclaration(
+    AuthorizedChecker(
         "probability.finite_distribution.pushforward.compute",
         FinitePushforwardRequest,
         "check_finite_pushforward",
         "probability.finite-pushforward.fraction-replay",
         entrypoint_module=_ENTRYPOINT,
-        provider_runtime_factory=_probability_runtime,
+        observation_loader=_probability_runtime,
         replay_method="standard-library Fraction replay",
         reason=_REASON,
     ),
-    ExactReplayCheckerDeclaration(
+    AuthorizedChecker(
         "probability.finite_distribution.convolution.compute",
         FiniteConvolutionRequest,
         "check_finite_convolution",
         "probability.finite-convolution.fraction-replay",
         entrypoint_module=_ENTRYPOINT,
-        provider_runtime_factory=_probability_runtime,
+        observation_loader=_probability_runtime,
         replay_method="standard-library Fraction replay",
         reason=_REASON,
     ),
-    ExactReplayCheckerDeclaration(
+    AuthorizedChecker(
         "probability.gaussian_polynomial.moment.compute",
         CanonicalGaussianPolynomialMomentRequest,
         "check_gaussian_polynomial_moment",
         "probability.gaussian-polynomial-moment.fraction-replay",
         entrypoint_module=_ENTRYPOINT,
-        provider_runtime_factory=_probability_runtime,
+        observation_loader=_probability_runtime,
         replay_method="independent standard-library coefficient contraction",
         reason=_REASON,
     ),
-    ExactReplayCheckerDeclaration(
+    AuthorizedChecker(
         "probability.graph_reliability.connection_probability.compute",
         GraphConnectionProbabilityRequest,
         "check_graph_connection_probability",
         "probability.graph-reliability-connection.fraction-replay",
         entrypoint_module=_ENTRYPOINT,
-        provider_runtime_factory=_probability_runtime,
+        observation_loader=_probability_runtime,
         replay_method="independent exhaustive edge-subset replay",
         reason=_REASON,
-        verification_capability_id=(
+        verification_operation_id=(
             "probability.graph_reliability.connection_probability.verify"
         ),
         verification_title="Verify an exact terminal connection probability",
@@ -172,4 +170,4 @@ PROBABILITY_EXACT_REPLAY_CHECKERS = (
     ),
 )
 
-__all__ = ["PROBABILITY_EXACT_REPLAY_CHECKERS"]
+__all__ = ["PROBABILITY_AUTHORIZED_CHECKERS"]

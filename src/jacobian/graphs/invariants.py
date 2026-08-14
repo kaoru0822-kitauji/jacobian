@@ -1,4 +1,4 @@
-"""Fixed-registry graph invariant computation capability."""
+"""Fixed-registry graph invariant computation operation."""
 
 from __future__ import annotations
 
@@ -12,13 +12,6 @@ from typing import TYPE_CHECKING, Any, cast
 from pydantic import ValidationError
 
 from jacobian.canonical import format_canonical_integer
-from jacobian.capability_adapters import parse_capability_input
-from jacobian.capability_errors import CapabilityInvocationError
-from jacobian.contracts.capabilities import (
-    CapabilityDescriptor,
-    CapabilityDiagnostic,
-    CapabilityRequest,
-)
 from jacobian.contracts.graph_invariants import (
     GraphInvariantBatchArtifact,
     GraphInvariantBatchOutput,
@@ -27,16 +20,22 @@ from jacobian.contracts.graph_invariants import (
     GraphInvariantResult,
     GraphInvariantResultArtifact,
 )
+from jacobian.contracts.operations import (
+    OperationDescriptor,
+    OperationDiagnostic,
+    OperationRequest,
+)
 from jacobian.graphs.artifacts import (
     GraphArtifactResources,
     load_graph,
     nx,
     runtime_ms,
 )
+from jacobian.operation_adapters import parse_operation_input
+from jacobian.operation_errors import OperationInvocationError
 from jacobian.operation_projection import OperationProjection
 from jacobian.operation_publication import PublishedOperation
 from jacobian.operations import Completed
-from jacobian.provider_runtime import known_provider_runtime
 from jacobian.schema_registry import model_schema
 
 if TYPE_CHECKING:
@@ -82,34 +81,30 @@ class GraphPropertyAdapter:
         self.resources = resources
         input_schema = model_schema(GraphInvariantBatchRequest)
         input_schema["x-supported-invariants"] = list(PROPERTY_NAMES)
-        self._descriptor = CapabilityDescriptor(
-            capability_id="graph.compute.properties",
+        self._descriptor = OperationDescriptor(
+            operation_id="graph.compute.properties",
             version="2",
             title="Compute exact graph properties",
             description=(
                 "Classify and compute a requested batch against the fixed exact "
                 "graph-invariant registry, preserving every per-invariant outcome."
             ),
-            provider="jacobian.networkx",
-            provider_runtime=known_provider_runtime(
-                "jacobian.networkx",
-                features=("graph-properties", "simple-undirected-graphs"),
-            ),
+            provider="built-in",
             input_schema=input_schema,
             output_schema=model_schema(GraphInvariantBatchOutput),
             tags=("graph", "properties", "exact-computation"),
         )
 
     @property
-    def descriptor(self) -> CapabilityDescriptor:
+    def descriptor(self) -> OperationDescriptor:
         return self._descriptor
 
-    def prepare(self, request: CapabilityRequest) -> GraphInvariantBatchRequest:
+    def prepare(self, request: OperationRequest) -> GraphInvariantBatchRequest:
         try:
-            return parse_capability_input(GraphInvariantBatchRequest, request.input)
+            return parse_operation_input(GraphInvariantBatchRequest, request.input)
         except ValidationError as exc:
-            raise CapabilityInvocationError(
-                CapabilityDiagnostic(
+            raise OperationInvocationError(
+                OperationDiagnostic(
                     code="INVALID_GRAPH_INVARIANT_BATCH_REQUEST",
                     stage="request_validation",
                     message=(
@@ -176,7 +171,7 @@ class GraphPropertyAdapter:
             property_artifact_uri=property_artifact.artifact_uri,
         )
         return OperationProjection(
-            operation_id=self.descriptor.capability_id,
+            operation_id=self.descriptor.operation_id,
             version=self.descriptor.version,
             terminal=Completed(value=output, runtime_ms=runtime_ms(started)),
             publication=PublishedOperation(
@@ -234,8 +229,8 @@ def _independence_number_property(graph: nx_type.Graph[Any], name: str) -> Any:
         weight=None,
     )
     if len(independent_set) != independence_number:
-        raise CapabilityInvocationError(
-            CapabilityDiagnostic(
+        raise OperationInvocationError(
+            OperationDiagnostic(
                 code="INCONSISTENT_INDEPENDENCE_RESULT",
                 stage="backend_execution",
                 message=(

@@ -1,19 +1,14 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from pathlib import Path
 from typing import Any
 
 import pytest
-from tests.support.exact_domain import open_exact_domain_services
 
-from jacobian.capability_errors import CapabilityError
-from jacobian.contracts.capabilities import (
-    CapabilityProviderAvailability,
-    CapabilityRequest,
+from jacobian.contracts.operations import (
+    OperationRequest,
 )
 from jacobian.contracts.results import VerificationResult
-from jacobian.domains.finite_fields import build_finite_field_bundle
 from jacobian.domains.finite_fields.contracts import (
     FiniteMapTableRequest,
     LinearMapRankRequest,
@@ -34,6 +29,8 @@ from jacobian.math.finite_fields import (
     finite_polynomial_map,
 )
 from jacobian.math.prime_field_linear_algebra import PrimeFieldMatrix
+from jacobian.operation_errors import OperationError
+from jacobian.operation_verification import validate_verified_result
 
 pytestmark = pytest.mark.requires_provider("flint")
 
@@ -115,9 +112,9 @@ def _restriction_request() -> RestrictScalarsRequest:
 def test_rank_request_rejects_cross_field_values_before_execution(
     finite_field_services,
 ) -> None:
-    result = finite_field_services.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="finite_field.linear_map.rank.compute",
+    result = finite_field_services.core.operations.invoke(
+        OperationRequest(
+            operation_id="finite_field.linear_map.rank.compute",
             input=_cross_field_rank_payload(),
         )
     )
@@ -137,23 +134,23 @@ def test_operator_authorized_sympy_replay_accepts_rank_and_rejects_forgery(
     input_payload = request.model_dump(mode="json")
 
     services = finite_field_services
-    computed = services.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="finite_field.linear_map.rank.compute",
+    computed = services.core.operations.invoke(
+        OperationRequest(
+            operation_id="finite_field.linear_map.rank.compute",
             input=input_payload,
         )
     )
     candidate = computed.output["result"]
-    verified = services.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="finite_field.linear_map.rank.verify",
+    verified = services.core.operations.invoke(
+        OperationRequest(
+            operation_id="finite_field.linear_map.rank.verify",
             input={"input": input_payload, "candidate": candidate},
         )
     )
     forged = {**candidate, "rank": 0}
-    rejected = services.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="finite_field.linear_map.rank.verify",
+    rejected = services.core.operations.invoke(
+        OperationRequest(
+            operation_id="finite_field.linear_map.rank.verify",
             input={"input": input_payload, "candidate": forged},
         )
     )
@@ -185,15 +182,15 @@ def test_inline_verification_record_rejects_unrelated_projected_identity(
     input_payload = request.model_dump(mode="json")
 
     services = finite_field_services
-    computed = services.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="finite_field.linear_map.rank.compute",
+    computed = services.core.operations.invoke(
+        OperationRequest(
+            operation_id="finite_field.linear_map.rank.compute",
             input=input_payload,
         )
     )
-    verified = services.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="finite_field.linear_map.rank.verify",
+    verified = services.core.operations.invoke(
+        OperationRequest(
+            operation_id="finite_field.linear_map.rank.verify",
             input={"input": input_payload, "candidate": computed.output["result"]},
         )
     )
@@ -202,8 +199,8 @@ def test_inline_verification_record_rejects_unrelated_projected_identity(
     )
 
     expected = field[:-3] if field.endswith("_id") else field
-    with pytest.raises(CapabilityError, match=f"different {expected}"):
-        services.core.capabilities._validate_verified_result(forged)
+    with pytest.raises(OperationError, match=f"different {expected}"):
+        validate_verified_result(services.core.store, forged)
 
 
 def test_inline_verification_record_rejects_stale_candidate_binding(
@@ -216,13 +213,13 @@ def test_inline_verification_record_rejects_stale_candidate_binding(
 
     services = finite_field_services
     try:
-        computed = services.core.capabilities.invoke(
-            CapabilityRequest(
-                capability_id="finite_field.linear_map.rank.compute",
+        computed = services.core.operations.invoke(
+            OperationRequest(
+                operation_id="finite_field.linear_map.rank.compute",
                 input=input_payload,
             )
         )
-        adapter = services.core.capabilities._adapters[
+        adapter = services.core.operations._adapters[
             "finite_field.linear_map.rank.verify"
         ]
         assert isinstance(adapter, ExactComputedVerificationAdapter)
@@ -239,9 +236,9 @@ def test_inline_verification_record_rejects_stale_candidate_binding(
             "verify_inline_exact",
             capture_accepted_result,
         )
-        verified = services.core.capabilities.invoke(
-            CapabilityRequest(
-                capability_id="finite_field.linear_map.rank.verify",
+        verified = services.core.operations.invoke(
+            OperationRequest(
+                operation_id="finite_field.linear_map.rank.verify",
                 input={
                     "input": input_payload,
                     "candidate": computed.output["result"],
@@ -255,15 +252,15 @@ def test_inline_verification_record_rejects_stale_candidate_binding(
             "verify_inline_exact",
             lambda **_: accepted[0],
         )
-        stale_request = CapabilityRequest(
-            capability_id="finite_field.linear_map.rank.verify",
+        stale_request = OperationRequest(
+            operation_id="finite_field.linear_map.rank.verify",
             input={
                 "input": input_payload,
                 "candidate": {**computed.output["result"], "rank": 0},
             },
         )
 
-        rejected = services.core.capabilities.invoke(stale_request)
+        rejected = services.core.operations.invoke(stale_request)
     finally:
         monkeypatch.undo()
 
@@ -280,24 +277,24 @@ def test_operator_authorized_sympy_replay_checks_restriction_of_scalars(
     input_payload = request.model_dump(mode="json")
 
     services = finite_field_services
-    computed = services.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="finite_field.restrict_scalars.compute",
+    computed = services.core.operations.invoke(
+        OperationRequest(
+            operation_id="finite_field.restrict_scalars.compute",
             input=input_payload,
         )
     )
     candidate = computed.output["result"]
-    verified = services.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="finite_field.restrict_scalars.verify",
+    verified = services.core.operations.invoke(
+        OperationRequest(
+            operation_id="finite_field.restrict_scalars.verify",
             input={"input": input_payload, "candidate": candidate},
         )
     )
     forged = deepcopy(candidate)
     forged["matrix"]["entries"] = [[1], [0]]
-    rejected = services.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="finite_field.restrict_scalars.verify",
+    rejected = services.core.operations.invoke(
+        OperationRequest(
+            operation_id="finite_field.restrict_scalars.verify",
             input={"input": input_payload, "candidate": forged},
         )
     )
@@ -322,80 +319,27 @@ def test_operator_authorized_sympy_replay_checks_complete_polynomial_table(
     input_payload = request.model_dump(mode="json")
 
     services = finite_field_services
-    computed = services.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="finite_field.polynomial_map.table.compute",
+    computed = services.core.operations.invoke(
+        OperationRequest(
+            operation_id="finite_field.polynomial_map.table.compute",
             input=input_payload,
         )
     )
     candidate = computed.output["result"]
-    verified = services.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="finite_field.polynomial_map.table.verify",
+    verified = services.core.operations.invoke(
+        OperationRequest(
+            operation_id="finite_field.polynomial_map.table.verify",
             input={"input": input_payload, "candidate": candidate},
         )
     )
     forged = deepcopy(candidate)
     forged["entries"][2][1] = forged["entries"][0][1]
-    rejected = services.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="finite_field.polynomial_map.table.verify",
+    rejected = services.core.operations.invoke(
+        OperationRequest(
+            operation_id="finite_field.polynomial_map.table.verify",
             input={"input": input_payload, "candidate": forged},
         )
     )
 
     assert verified.output["status"] == "VERIFIED"
     assert rejected.output["status"] == "REJECTED"
-
-
-def test_missing_flint_omits_only_flint_operations_and_their_checkers(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from jacobian.providers.flint_runtime import (
-        python_flint_finite_field_provider_runtime,
-    )
-
-    unavailable = python_flint_finite_field_provider_runtime().model_copy(
-        update={
-            "availability": CapabilityProviderAvailability.UNAVAILABLE,
-            "version": None,
-            "digest": None,
-            "digest_kind": None,
-            "diagnostic": "python-flint is not installed",
-        }
-    )
-    monkeypatch.setattr(
-        "jacobian.domains.finite_fields.bundle."
-        "python_flint_finite_field_provider_runtime",
-        lambda: unavailable,
-    )
-
-    with open_exact_domain_services(
-        tmp_path,
-        build_finite_field_bundle(),
-    ) as services:
-        ids = {
-            descriptor.capability_id
-            for descriptor in services.core.capabilities.catalog().capabilities
-        }
-
-    assert {
-        "finite_field.projective_line.enumerate",
-        "finite_field.polynomial_map.fibers.compute",
-        "finite_field.polynomial_map.collision.compute",
-        "finite_field.polynomial_map.permutation.compute",
-        "finite_field.polynomial_map.fibers.verify",
-        "finite_field.polynomial_map.collision.verify",
-        "finite_field.polynomial_map.permutation.verify",
-    } <= ids
-    assert {
-        "finite_field.restrict_scalars.compute",
-        "finite_field.restrict_scalars.verify",
-        "finite_field.linear_map.rank.compute",
-        "finite_field.linear_map.rank.verify",
-        "finite_field.direction_rank_ledger.compute",
-        "finite_field.orbit_distribution.compute",
-        "finite_field.polynomial_map.table.compute",
-        "finite_field.polynomial_map.table.verify",
-    }.isdisjoint(ids)

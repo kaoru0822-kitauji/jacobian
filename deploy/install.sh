@@ -44,6 +44,7 @@ ROLLBACK_ARMED=0
 DEPLOYMENT_ACCEPTED=0
 PREVIOUS_RELEASE=""
 VALIDATED_INSTALL_ROOT=""
+STATE_DIR="/var/lib/jacobian-mcp"
 
 cleanup() {
     if [[ -n "${RELEASE_BUILD_DIR}" && -d "${RELEASE_BUILD_DIR}" ]]; then
@@ -144,6 +145,10 @@ rollback_deployment() {
     trap - ERR
     set +e
     printf 'error: deployment failed; restoring the previous activation\n' >&2
+    if [[ -f "${ROLLBACK_ROOT}/state.present" \
+        || -f "${ROLLBACK_ROOT}/state.absent" ]]; then
+        restore_file state "${STATE_DIR}" || rollback_failed=1
+    fi
     restore_file token "${TOKEN_DESTINATION}" || rollback_failed=1
     restore_file mcp-service "${SYSTEMD_ROOT}/jacobian-mcp.service" \
         || rollback_failed=1
@@ -345,7 +350,7 @@ validate_lean_release_runtime() {
             "PATH=${LEAN_SERVICE_PATH}" \
             "${release_dir}/.venv/bin/python" - <<'PY'
 from jacobian_checkers import lean4
-from jacobian.contracts.capabilities import CapabilityProviderAvailability
+from jacobian.contracts.operations import ProviderAvailability
 from jacobian.providers.lean_runtime import lean_provider_runtime
 
 executable, mathlib_runtime = lean4.inspect_runtime(require_mathlib=True)
@@ -358,7 +363,7 @@ runtime = lean_provider_runtime(
     },
     checker_ids=(),
 )
-if runtime.availability is not CapabilityProviderAvailability.AVAILABLE:
+if runtime.availability is not ProviderAvailability.AVAILABLE:
     raise SystemExit(runtime.diagnostic or "pinned Lean provider is unavailable")
 PY
     ) || die "pinned Lean provider failed its release readiness probe"
@@ -721,6 +726,10 @@ snapshot_systemd_service_state "${SYSTEMCTL_BIN}" "${ROLLBACK_ROOT}" \
 snapshot_systemd_service_state "${SYSTEMCTL_BIN}" "${ROLLBACK_ROOT}" \
     jacobian-funnel.service
 ROLLBACK_ARMED=1
+if [[ -f "${ROLLBACK_ROOT}/jacobian-mcp.service.active" ]]; then
+    "${SYSTEMCTL_BIN}" stop jacobian-mcp.service
+fi
+snapshot_file state "${STATE_DIR}"
 
 install -d -m 0755 "$(dirname -- "${CURRENT_LINK}")"
 ln -sfn "${RELEASE_DIR}" "${CURRENT_LINK}.new"
@@ -841,6 +850,18 @@ if [[ "${MODE}" == "tailscale" ]]; then
     "${SYSTEMD_ANALYZE_BIN}" verify "${SYSTEMD_ROOT}/jacobian-funnel.service"
 fi
 "${SYSTEMCTL_BIN}" daemon-reload
+install -d -o jacobian -g jacobian -m 0750 "${STATE_DIR}"
+STATE_COMMAND="init"
+if [[ -f "${STATE_DIR}/metadata.sqlite3" ]]; then
+    STATE_COMMAND="update"
+fi
+log "running jacobian ${STATE_COMMAND} before service activation"
+"${RUNUSER_BIN}" -u jacobian -- env \
+    "ELAN_HOME=${LEAN_ELAN_HOME}" \
+    "PATH=${LEAN_SERVICE_PATH}" \
+    "${RELEASE_DIR}/.venv/bin/jacobian" \
+    --state-dir "${STATE_DIR}" \
+    "${STATE_COMMAND}"
 "${SYSTEMCTL_BIN}" enable jacobian-mcp.service
 "${SYSTEMCTL_BIN}" restart jacobian-mcp.service
 
@@ -884,14 +905,14 @@ if ((!SKIP_SMOKE)); then
     fi
     SMOKE_SUCCEEDED=0
     SMOKE_REQUIREMENTS=(
-        --require-capability graph.construct.explicit
+        --require-operation graph.construct.explicit
     )
     if ((WITH_LEAN)); then
         SMOKE_REQUIREMENTS+=(
-            --require-capability lean.check
-            --require-capability lean.proof_state.apply_tactic
-            --require-capability lean.term.apply
-            --require-capability lean.retrieve.premises
+            --require-operation lean.check
+            --require-operation lean.proof_state.apply_tactic
+            --require-operation lean.term.apply
+            --require-operation lean.retrieve.premises
         )
     fi
     for attempt in {1..12}; do

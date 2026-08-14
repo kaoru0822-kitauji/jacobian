@@ -369,7 +369,7 @@ def test_lean_profile_is_built_and_validated_before_activation() -> None:
     assert '"PATH=${LEAN_SERVICE_PATH}"' in source
     assert 'chmod -R a+rX "${RELEASE_DIR}" "${PYTHON_INSTALL_ROOT}"' in source
     assert "lean_provider_runtime(" in source
-    assert "CapabilityProviderAvailability.AVAILABLE" in source
+    assert "ProviderAvailability.AVAILABLE" in source
 
 
 def test_lean_profile_finds_the_invoking_users_elan_under_sudo() -> None:
@@ -410,13 +410,13 @@ def test_lean_profile_requires_catalog_and_behavior_smokes() -> None:
     source = INSTALLER.read_text(encoding="utf-8")
     smoke_block = source[source.index('log "running the read-only deployment smoke"') :]
 
-    for capability_id in (
+    for operation_id in (
         "lean.check",
         "lean.proof_state.apply_tactic",
         "lean.term.apply",
         "lean.retrieve.premises",
     ):
-        assert f"--require-capability {capability_id}" in smoke_block
+        assert f"--require-operation {operation_id}" in smoke_block
     assert '--expect-revision "${REVISION}"' in smoke_block
     assert '"${RELEASE_DIR}/deploy/smoke_lean.py"' in smoke_block
 
@@ -433,6 +433,21 @@ def test_activation_arms_rollback_before_switching_current() -> None:
     assert 'return "${original_status}"' in source
     assert 'exit "${status}"' in source
     assert "rollback encountered additional failures" in source
+
+
+def test_installer_compiles_state_before_service_activation() -> None:
+    source = INSTALLER.read_text(encoding="utf-8")
+
+    snapshot = source.index('snapshot_file state "${STATE_DIR}"')
+    lifecycle = source.index('log "running jacobian ${STATE_COMMAND}')
+    restart = source.index('"${SYSTEMCTL_BIN}" restart jacobian-mcp.service', lifecycle)
+    assert snapshot < lifecycle < restart
+    assert source.index('"${SYSTEMCTL_BIN}" stop jacobian-mcp.service') < snapshot
+    assert 'restore_file state "${STATE_DIR}"' in source
+    assert '"${RUNUSER_BIN}" -u jacobian -- env' in source
+    assert '--state-dir "${STATE_DIR}"' in source
+    assert 'STATE_COMMAND="init"' in source
+    assert 'STATE_COMMAND="update"' in source
 
 
 def test_generated_token_is_written_only_to_the_restricted_file() -> None:

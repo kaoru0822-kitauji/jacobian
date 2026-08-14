@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from itertools import combinations
 from typing import Literal
 
@@ -11,15 +11,8 @@ from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
-from jacobian.capability_adapters import parse_capability_input
-from jacobian.capability_errors import CapabilityInvocationError
-from jacobian.checker_installation import CheckerInstaller
+from jacobian.checker_authorization import authorize_checker_operation
 from jacobian.checker_operations import CheckerOperation
-from jacobian.contracts.capabilities import (
-    CapabilityDescriptor,
-    CapabilityDiagnostic,
-    CapabilityRequest,
-)
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
 from jacobian.contracts.graph_isomorphism import (
@@ -33,8 +26,16 @@ from jacobian.contracts.graph_isomorphism import (
     GraphVertexMapping,
     SimpleUndirectedGraph,
 )
+from jacobian.contracts.operations import (
+    OperationDescriptor,
+    OperationDiagnostic,
+    OperationRequest,
+)
 from jacobian.contracts.results import Conclusion, ExecutionStatus
-from jacobian.graphs.installation import GraphInstallation
+from jacobian.graphs.operation_resources import GraphOperationResources
+from jacobian.operation_adapters import parse_operation_input
+from jacobian.operation_catalog import OperationCatalog, OperationCatalogError
+from jacobian.operation_errors import OperationInvocationError
 from jacobian.operation_projection import OperationProjection
 from jacobian.operation_publication import PublishedOperation
 from jacobian.operations import Completed, Failed
@@ -47,7 +48,7 @@ from jacobian.verification.service import VerificationService
 
 
 @dataclass(frozen=True, slots=True)
-class GraphIsomorphismInstallation:
+class GraphIsomorphismResources:
     semantics_uri: str
     source_graph_semantics_uri: str
     source_graph_schema_uri: str
@@ -64,16 +65,13 @@ class _SourceGraph:
     graph: SimpleUndirectedGraph
 
 
-def install_graph_isomorphism(
+def register_graph_isomorphism_resources(
     store: ArtifactRepository,
     schemas: SchemaRegistry,
-    artifacts: ArtifactService,
-    verification: VerificationService,
-    checkers: CheckerRegistry,
-    graph: GraphInstallation,
-    *,
-    authorize_checker: bool,
-) -> tuple[GraphIsomorphismAdapter | None, GraphIsomorphismInstallation]:
+    graph: GraphOperationResources,
+) -> GraphIsomorphismResources:
+    """Register passive isomorphism contracts without authorizing a checker."""
+
     semantics_uri = store.register_descriptor(
         kind="semantics",
         name="jacobian.simple-undirected-graph-isomorphism",
@@ -106,25 +104,7 @@ def install_graph_isomorphism(
         version="1",
         schema=model_schema(CertificateEnvelope),
     )
-    checker_id = (
-        CheckerInstaller(checkers)
-        .install(
-            CheckerOperation(
-                name="exact finite simple-graph isomorphism checker",
-                entrypoint="jacobian_checkers.graph_isomorphism:check_isomorphism",
-                evidence_kind=EvidenceKind.CERTIFICATE,
-                format_id="graph.isomorphism_replay",
-                format_version="1",
-                claim_schema_uris=(claim_schema_uri,),
-                semantics_uris=(semantics_uri,),
-                candidate_schema_uris=(mapping_schema_uri,),
-                reason="bundled independent adjacency-preservation checker",
-            ),
-            authorize=authorize_checker,
-        )
-        .checker_id
-    )
-    installation = GraphIsomorphismInstallation(
+    return GraphIsomorphismResources(
         semantics_uri=semantics_uri,
         source_graph_semantics_uri=graph.semantics_uri,
         source_graph_schema_uri=graph.graph_schema_uri,
@@ -132,18 +112,83 @@ def install_graph_isomorphism(
         mapping_schema_uri=mapping_schema_uri,
         claim_schema_uri=claim_schema_uri,
         certificate_schema_uri=certificate_schema_uri,
-        checker_id=checker_id,
+        checker_id=None,
     )
+
+
+def bind_selected_graph_isomorphism(
+    store: ArtifactRepository,
+    schemas: SchemaRegistry,
+    artifacts: ArtifactService,
+    verification: VerificationService,
+    checkers: CheckerRegistry,
+    graph: GraphOperationResources,
+    catalog: OperationCatalog,
+) -> GraphIsomorphismAdapter:
+    """Bind the selected verifier from persisted checker authority."""
+
+    operation_id = "graph.isomorphism.verify"
+    binding = catalog.checker_binding(operation_id)
+    if binding is None:
+        raise OperationCatalogError(
+            f"checker binding is missing; run `jacobian update`: {operation_id}"
+        )
+    checkers.require_catalog_binding(
+        binding.checker_id,
+        implementation_digest=binding.manifest_digest,
+    )
+    resources = replace(
+        register_graph_isomorphism_resources(store, schemas, graph),
+        checker_id=binding.checker_id,
+    )
+    return GraphIsomorphismAdapter(
+        store=store,
+        artifacts=artifacts,
+        verification=verification,
+        resources=resources,
+    )
+
+
+def build_graph_isomorphism_operation(
+    store: ArtifactRepository,
+    schemas: SchemaRegistry,
+    artifacts: ArtifactService,
+    verification: VerificationService,
+    checkers: CheckerRegistry,
+    graph: GraphOperationResources,
+    *,
+    authorize_checker: bool,
+) -> tuple[GraphIsomorphismAdapter | None, GraphIsomorphismResources]:
+    resources = register_graph_isomorphism_resources(store, schemas, graph)
+    semantics_uri = resources.semantics_uri
+    mapping_schema_uri = resources.mapping_schema_uri
+    claim_schema_uri = resources.claim_schema_uri
+    checker_id = authorize_checker_operation(
+        checkers,
+        CheckerOperation(
+            name="exact finite simple-graph isomorphism checker",
+            entrypoint="jacobian_checkers.graph_isomorphism:check_isomorphism",
+            evidence_kind=EvidenceKind.CERTIFICATE,
+            format_id="graph.isomorphism_replay",
+            format_version="1",
+            claim_schema_uris=(claim_schema_uri,),
+            semantics_uris=(semantics_uri,),
+            candidate_schema_uris=(mapping_schema_uri,),
+            reason="bundled independent adjacency-preservation checker",
+        ),
+        authorize=authorize_checker,
+    ).checker_id
+    resources = replace(resources, checker_id=checker_id)
     if checker_id is None:
-        return None, installation
+        return None, resources
     return (
         GraphIsomorphismAdapter(
             store=store,
             artifacts=artifacts,
             verification=verification,
-            installation=installation,
+            resources=resources,
         ),
-        installation,
+        resources,
     )
 
 
@@ -154,18 +199,18 @@ class GraphIsomorphismAdapter:
         store: ArtifactRepository,
         artifacts: ArtifactService,
         verification: VerificationService,
-        installation: GraphIsomorphismInstallation,
+        resources: GraphIsomorphismResources,
     ) -> None:
         self.store = store
         self.artifacts = artifacts
         self.verification = verification
-        self.installation = installation
-        if installation.checker_id is None:
+        self.resources = resources
+        if resources.checker_id is None:
             raise RuntimeError(
                 "graph isomorphism verify adapter requires an authorized checker"
             )
-        self._descriptor = CapabilityDescriptor(
-            capability_id="graph.isomorphism.verify",
+        self._descriptor = OperationDescriptor(
+            operation_id="graph.isomorphism.verify",
             version="2",
             title="Verify an explicit graph-isomorphism mapping",
             description=(
@@ -177,7 +222,7 @@ class GraphIsomorphismAdapter:
             provider_runtime=known_provider_runtime(
                 "jacobian.graph-isomorphism-checker",
                 features=("graph", "isomorphism", "direct-witness"),
-                checker_ids=(installation.checker_id,),
+                checker_ids=(resources.checker_id,),
             ),
             input_schema=model_schema(GraphIsomorphismVerifyRequest),
             output_schema=model_schema(GraphIsomorphismVerifyOutput),
@@ -194,17 +239,17 @@ class GraphIsomorphismAdapter:
         )
 
     @property
-    def descriptor(self) -> CapabilityDescriptor:
+    def descriptor(self) -> OperationDescriptor:
         return self._descriptor
 
-    def prepare(self, request: CapabilityRequest) -> GraphIsomorphismVerifyRequest:
-        return parse_capability_input(GraphIsomorphismVerifyRequest, request.input)
+    def prepare(self, request: OperationRequest) -> GraphIsomorphismVerifyRequest:
+        return parse_operation_input(GraphIsomorphismVerifyRequest, request.input)
 
     def invoke(self, validated: GraphIsomorphismVerifyRequest) -> OperationProjection:
-        checker_id = self.installation.checker_id
+        checker_id = self.resources.checker_id
         if checker_id is None:
-            raise CapabilityInvocationError(
-                CapabilityDiagnostic(
+            raise OperationInvocationError(
+                OperationDiagnostic(
                     code="GRAPH_ISOMORPHISM_CHECKER_UNAVAILABLE",
                     stage="isomorphism_verification",
                     message=(
@@ -225,15 +270,15 @@ class GraphIsomorphismAdapter:
             dict.fromkeys((validated.left_graph_uri, validated.right_graph_uri))
         )
         pair = self.artifacts.put(
-            schema_uri=self.installation.pair_schema_uri,
-            semantics_uri=self.installation.semantics_uri,
+            schema_uri=self.resources.pair_schema_uri,
+            semantics_uri=self.resources.semantics_uri,
             payload=GraphPair(
                 left_graph_uri=validated.left_graph_uri,
                 right_graph_uri=validated.right_graph_uri,
                 left_graph_digest=left.object_digest,
                 right_graph_digest=right.object_digest,
-                graph_schema_uri=self.installation.source_graph_schema_uri,
-                graph_semantics_uri=self.installation.source_graph_semantics_uri,
+                graph_schema_uri=self.resources.source_graph_schema_uri,
+                graph_semantics_uri=self.resources.source_graph_semantics_uri,
                 left=left.graph,
                 right=right.graph,
             ).model_dump(mode="json"),
@@ -241,16 +286,16 @@ class GraphIsomorphismAdapter:
             summary="finite simple-graph pair",
         )
         mapping = self.artifacts.put(
-            schema_uri=self.installation.mapping_schema_uri,
-            semantics_uri=self.installation.semantics_uri,
+            schema_uri=self.resources.mapping_schema_uri,
+            semantics_uri=self.resources.semantics_uri,
             payload=GraphVertexMapping(mapping=validated.mapping).model_dump(
                 mode="json"
             ),
             summary="proposed graph vertex mapping",
         )
         claim = self.artifacts.put(
-            schema_uri=self.installation.claim_schema_uri,
-            semantics_uri=self.installation.semantics_uri,
+            schema_uri=self.resources.claim_schema_uri,
+            semantics_uri=self.resources.semantics_uri,
             payload=GraphIsomorphismClaim(
                 graph_pair_uri=pair.artifact_uri,
                 mapping_uri=mapping.artifact_uri,
@@ -258,7 +303,7 @@ class GraphIsomorphismAdapter:
             parents=(pair.artifact_uri, mapping.artifact_uri),
             summary="explicit graph-isomorphism mapping claim",
         )
-        semantics = self.store.get(self.installation.semantics_uri)
+        semantics = self.store.get(self.resources.semantics_uri)
         replay = GraphIsomorphismReplay(
             graph_pair_uri=pair.artifact_uri,
             mapping_uri=mapping.artifact_uri,
@@ -266,8 +311,8 @@ class GraphIsomorphismAdapter:
             right_graph_uri=validated.right_graph_uri,
             left_graph_digest=left.object_digest,
             right_graph_digest=right.object_digest,
-            graph_schema_uri=self.installation.source_graph_schema_uri,
-            graph_semantics_uri=self.installation.source_graph_semantics_uri,
+            graph_schema_uri=self.resources.source_graph_schema_uri,
+            graph_semantics_uri=self.resources.source_graph_semantics_uri,
         ).model_dump(mode="json")
         certificate = CertificateEnvelope(
             certificate_type="graph.isomorphism_replay",
@@ -284,8 +329,8 @@ class GraphIsomorphismAdapter:
             payload=replay,
         )
         evidence = self.artifacts.put(
-            schema_uri=self.installation.certificate_schema_uri,
-            semantics_uri=self.installation.semantics_uri,
+            schema_uri=self.resources.certificate_schema_uri,
+            semantics_uri=self.resources.semantics_uri,
             payload=certificate.model_dump(mode="json"),
             parents=(claim.artifact_uri, mapping.artifact_uri, pair.artifact_uri),
             summary="graph-isomorphism adjacency replay certificate",
@@ -349,7 +394,7 @@ class GraphIsomorphismAdapter:
             else Failed(
                 status=checked.execution.status,
                 runtime_ms=checked.execution.runtime_ms,
-                diagnostic=CapabilityDiagnostic(
+                diagnostic=OperationDiagnostic(
                     code="GRAPH_ISOMORPHISM_VERIFICATION_FAILED",
                     stage="isomorphism_verification",
                     message=(
@@ -360,7 +405,7 @@ class GraphIsomorphismAdapter:
             )
         )
         return OperationProjection(
-            operation_id=self.descriptor.capability_id,
+            operation_id=self.descriptor.operation_id,
             version=self.descriptor.version,
             terminal=terminal,
             publication=PublishedOperation(
@@ -379,25 +424,25 @@ class GraphIsomorphismAdapter:
         try:
             artifact = self.store.get(graph_uri)
         except StorageError as exc:
-            raise CapabilityInvocationError(
-                CapabilityDiagnostic(
+            raise OperationInvocationError(
+                OperationDiagnostic(
                     code="GRAPH_ARTIFACT_NOT_FOUND",
                     stage="graph_resolution",
                     message=f"The graph artifact at {path} is unavailable.",
                     path=path,
                     hint=(
                         "Use a graph URI returned by graph.search.atlas or another "
-                        "installed graph capability."
+                        "installed graph operation."
                     ),
                 )
             ) from exc
         if (
-            artifact.manifest.schema_uri != self.installation.source_graph_schema_uri
+            artifact.manifest.schema_uri != self.resources.source_graph_schema_uri
             or artifact.manifest.semantics_uri
-            != self.installation.source_graph_semantics_uri
+            != self.resources.source_graph_semantics_uri
         ):
-            raise CapabilityInvocationError(
-                CapabilityDiagnostic(
+            raise OperationInvocationError(
+                OperationDiagnostic(
                     code="INCOMPATIBLE_GRAPH_ARTIFACT",
                     stage="graph_validation",
                     message=(
@@ -405,24 +450,24 @@ class GraphIsomorphismAdapter:
                         "undirected graph."
                     ),
                     path=path,
-                    schema_uri=self.installation.source_graph_schema_uri,
+                    schema_uri=self.resources.source_graph_schema_uri,
                     hint=(
                         "Use a graph URI returned by graph.search.atlas or another "
-                        "installed graph capability."
+                        "installed graph operation."
                     ),
                 )
             )
         try:
             graph = SimpleUndirectedGraph.model_validate(artifact.payload)
         except ValidationError as exc:
-            raise CapabilityInvocationError(
-                CapabilityDiagnostic(
+            raise OperationInvocationError(
+                OperationDiagnostic(
                     code="INCOMPATIBLE_GRAPH_ARTIFACT",
                     stage="graph_validation",
                     message=f"The graph artifact at {path} has a malformed payload.",
                     path=path,
-                    schema_uri=self.installation.source_graph_schema_uri,
-                    hint="Recreate the graph through its owning capability.",
+                    schema_uri=self.resources.source_graph_schema_uri,
+                    hint="Recreate the graph through its owning operation.",
                 )
             ) from exc
         return _SourceGraph(

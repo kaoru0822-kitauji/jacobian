@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -12,14 +13,12 @@ from mcp.server import MCPServer
 from jacobian import __version__
 from jacobian.adapters.mcp.context import (
     AppState,
-    RuntimeLease,
+    RuntimeAccess,
     _configured_root,
-    _start_lean_warmup,
 )
 from jacobian.adapters.mcp.core import (
     JacobianMCPServer,
     register_core_projection,
-    tool_runtime_scope,
 )
 from jacobian.adapters.mcp.deployment_identity import (
     DeploymentIdentity,
@@ -28,35 +27,79 @@ from jacobian.adapters.mcp.deployment_identity import (
 from jacobian.adapters.mcp.guidance import SERVER_DESCRIPTION, SERVER_INSTRUCTIONS
 from jacobian.adapters.mcp.lifecycle import (
     runtime_lifespan,
-    selected_checker_authority,
 )
 from jacobian.adapters.mcp.resources import register_resources
-from jacobian.adapters.mcp.tooling import MCPBlockingWorkerRegistry
-from jacobian.capability_service import CapabilityPolicy
-from jacobian.runtime import CheckerAuthorityMode, create_runtime
+from jacobian.operation_catalog import OperationCatalog
+from jacobian.operation_visibility import OperationVisibilityPolicy
+from jacobian.runtime.execution import create_execution_runtime
 from jacobian.runtime.model import JacobianRuntime
 
 
 def create_server(
     state_dir: str | Path | None = None,
     *,
-    checker_authority: CheckerAuthorityMode | None = None,
-    capability_exclusions: frozenset[str] = frozenset(),
-    capability_policy: CapabilityPolicy | None = None,
+    operation_policy: OperationVisibilityPolicy | None = None,
 ) -> MCPServer[AppState]:
-    """Create one local server owning one mathematical runtime."""
+    """Create a catalog-only host that lazily owns one execution runtime."""
 
-    runtime = create_runtime(
-        _configured_root(state_dir),
-        checker_authority=selected_checker_authority(checker_authority),
-        capability_exclusions=capability_exclusions,
-        capability_policy=capability_policy,
+    root = _configured_root(state_dir)
+    policy = operation_policy or OperationVisibilityPolicy()
+    catalog = OperationCatalog(
+        root / "metadata.sqlite3",
+        policy,
+        expected_package_version=__version__,
     )
-    return create_server_from_runtime(
-        runtime,
-        close_owner=runtime.close,
-        start_owner=lambda: _start_lean_warmup(runtime),
+    owner = _LazyLocalRuntime(
+        root,
+        catalog,
+        operation_policy=policy,
     )
+    state = AppState(
+        acquire_runtime=owner.acquire,
+        operation_catalog=catalog,
+    )
+    return _build_server(
+        state=state,
+        close_owner=owner.close,
+        deployment_identity=load_deployment_identity(),
+    )
+
+
+class _LazyLocalRuntime:
+    def __init__(
+        self,
+        root: Path,
+        catalog: OperationCatalog,
+        *,
+        operation_policy: OperationVisibilityPolicy,
+    ) -> None:
+        self.root = root
+        self.catalog = catalog
+        self.operation_policy = operation_policy
+        self._selected_runtime: JacobianRuntime | None = None
+        self._lock = threading.Lock()
+
+    def acquire(self, operation_id: str | None = None) -> RuntimeAccess:
+        del operation_id
+        with self._lock:
+            return RuntimeAccess(self._ensure_selected_runtime())
+
+    def _ensure_selected_runtime(self) -> JacobianRuntime:
+        if self._selected_runtime is None:
+            self._selected_runtime = create_execution_runtime(
+                self.root,
+                self.catalog,
+                operation_policy=self.operation_policy,
+            )
+        return self._selected_runtime
+
+    def close(self) -> None:
+        with self._lock:
+            runtimes = (self._selected_runtime,)
+            self._selected_runtime = None
+        for runtime in runtimes:
+            if runtime is not None:
+                runtime.close()
 
 
 def create_server_from_runtime(
@@ -73,8 +116,8 @@ def create_server_from_runtime(
     """
 
     state = AppState(
-        acquire_runtime=lambda: RuntimeLease(runtime),
-        worker_registry=MCPBlockingWorkerRegistry(),
+        acquire_runtime=lambda _operation_id: RuntimeAccess(runtime),
+        operation_catalog=runtime.core.operations,
     )
     return _build_server(
         state=state,
@@ -114,7 +157,6 @@ def _build_server(
         lifespan=lifespan,
         token_verifier=token_verifier,
         auth=auth,
-        middleware=[tool_runtime_scope],
     )
     register_core_projection(server, state, deployment_identity)
     register_resources(server)

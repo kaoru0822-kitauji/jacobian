@@ -1,4 +1,4 @@
-"""Adapter implementations for sparse rational polynomial-map capabilities."""
+"""Adapter implementations for sparse rational polynomial-map operations."""
 
 from __future__ import annotations
 
@@ -7,14 +7,14 @@ import time
 from typing import cast
 
 from jacobian.canonical import canonicalize_json
-from jacobian.contracts.capabilities import (
-    CapabilityDescriptor,
-    CapabilityInvocationExample,
-    CapabilityRequest,
-)
 from jacobian.contracts.evidence import (
     CertificateEnvelope,
     EvidenceBindings,
+)
+from jacobian.contracts.operations import (
+    OperationDescriptor,
+    OperationExample,
+    OperationRequest,
 )
 from jacobian.contracts.polynomials import (
     PolynomialEvaluationOutput,
@@ -57,23 +57,19 @@ class PolynomialMapEvaluationAdapter:
 
     def __init__(self, resources: PolynomialResources) -> None:
         self.resources = resources
-        self._descriptor = CapabilityDescriptor(
-            capability_id="polynomial.map.evaluate",
+        self._descriptor = OperationDescriptor(
+            operation_id="polynomial.map.evaluate",
             version="1",
             title="Evaluate a rational polynomial map",
             description=(
                 "Compute the exact rational image of one point under one sparse "
                 "square polynomial map over QQ."
             ),
-            provider="jacobian.sympy",
-            provider_runtime=known_provider_runtime(
-                "jacobian.sympy",
-                features=("rational-polynomial-evaluation",),
-            ),
+            provider="built-in",
             input_schema=model_schema(PolynomialEvaluationRequest),
             output_schema=model_schema(PolynomialEvaluationOutput),
             tags=("polynomial", "map", "evaluation", "exact-computation"),
-            invocation_examples=(
+            examples=(
                 example(
                     "identity_at_zero",
                     "Evaluate x at zero.",
@@ -98,10 +94,10 @@ class PolynomialMapEvaluationAdapter:
         )
 
     @property
-    def descriptor(self) -> CapabilityDescriptor:
+    def descriptor(self) -> OperationDescriptor:
         return self._descriptor
 
-    def prepare(self, request: CapabilityRequest) -> PolynomialEvaluationRequest:
+    def prepare(self, request: OperationRequest) -> PolynomialEvaluationRequest:
         return _validate_request(
             PolynomialEvaluationRequest,
             request.input,
@@ -141,8 +137,8 @@ class PolynomialJacobianAdapter:
 
     def __init__(self, resources: PolynomialResources) -> None:
         self.resources = resources
-        self._descriptor = CapabilityDescriptor(
-            capability_id="polynomial.map.compute_jacobian",
+        self._descriptor = OperationDescriptor(
+            operation_id="polynomial.map.compute_jacobian",
             version="1",
             title="Compute a polynomial-map Jacobian",
             description=(
@@ -156,15 +152,15 @@ class PolynomialJacobianAdapter:
                 "jacobian.sympy",
                 features=("symbolic-jacobian", "rational-polynomials"),
                 checker_ids=(
-                    (resources.installation.jacobian_checker_id,)
-                    if resources.installation.jacobian_checker_id is not None
+                    (resources.contracts.jacobian_checker_id,)
+                    if resources.contracts.jacobian_checker_id is not None
                     else ()
                 ),
             ),
             input_schema=model_schema(PolynomialJacobianRequest),
             output_schema=model_schema(PolynomialJacobianOutput),
             tags=("polynomial", "jacobian", "determinant", "exact-computation"),
-            invocation_examples=(
+            examples=(
                 example(
                     "identity_jacobian",
                     "Compute the Jacobian of x.",
@@ -188,10 +184,10 @@ class PolynomialJacobianAdapter:
         )
 
     @property
-    def descriptor(self) -> CapabilityDescriptor:
+    def descriptor(self) -> OperationDescriptor:
         return self._descriptor
 
-    def prepare(self, request: CapabilityRequest) -> PolynomialJacobianRequest:
+    def prepare(self, request: OperationRequest) -> PolynomialJacobianRequest:
         return _validate_request(
             PolynomialJacobianRequest,
             request.input,
@@ -248,21 +244,21 @@ class PolynomialJacobianAdapter:
             backend_version=SYMPY_VERSION,
         )
         jacobian_artifact = self.resources.artifacts.put(
-            schema_uri=self.resources.installation.jacobian_schema_uri,
-            semantics_uri=self.resources.installation.semantics_uri,
+            schema_uri=self.resources.contracts.jacobian_schema_uri,
+            semantics_uri=self.resources.contracts.semantics_uri,
             payload=jacobian.model_dump(mode="json"),
             parents=(map_uri,),
             summary="exact rational polynomial-map Jacobian",
         )
         claim = PolynomialJacobianClaim(source_map_uri=map_uri)
         claim_artifact = self.resources.artifacts.put(
-            schema_uri=self.resources.installation.jacobian_claim_schema_uri,
-            semantics_uri=self.resources.installation.semantics_uri,
+            schema_uri=self.resources.contracts.jacobian_claim_schema_uri,
+            semantics_uri=self.resources.contracts.semantics_uri,
             payload=claim.model_dump(mode="json"),
             parents=(map_uri, jacobian_artifact.artifact_uri),
             summary="exact polynomial Jacobian replay claim",
         )
-        semantics = self.resources.store.get(self.resources.installation.semantics_uri)
+        semantics = self.resources.store.get(self.resources.contracts.semantics_uri)
         source_map = self.resources.store.get(map_uri)
         certificate_payload = PolynomialJacobianReplayPayload(
             source_map_uri=map_uri,
@@ -284,8 +280,8 @@ class PolynomialJacobianAdapter:
             payload=certificate_payload,
         )
         certificate_artifact = self.resources.artifacts.put(
-            schema_uri=self.resources.installation.certificate_schema_uri,
-            semantics_uri=self.resources.installation.semantics_uri,
+            schema_uri=self.resources.contracts.certificate_schema_uri,
+            semantics_uri=self.resources.contracts.semantics_uri,
             payload=certificate.model_dump(mode="json"),
             parents=(
                 claim_artifact.artifact_uri,
@@ -321,11 +317,11 @@ class PolynomialKellerConditionVerifyAdapter:
 
     def __init__(self, resources: PolynomialResources) -> None:
         self.resources = resources
-        checker_id = resources.installation.keller_checker_id
+        checker_id = resources.contracts.keller_checker_id
         if checker_id is None:
             raise RuntimeError("checker is not installed")
-        self._descriptor = CapabilityDescriptor(
-            capability_id="polynomial.map.keller_condition.verify",
+        self._descriptor = OperationDescriptor(
+            operation_id="polynomial.map.keller_condition.verify",
             version="1",
             title="Verify a polynomial-map Keller condition",
             description=(
@@ -341,8 +337,8 @@ class PolynomialKellerConditionVerifyAdapter:
             input_schema=model_schema(PolynomialKellerConditionVerifyRequest),
             output_schema=model_schema(PolynomialKellerConditionVerifyOutput),
             tags=("polynomial", "map", "jacobian", "Keller", "verification"),
-            invocation_examples=(
-                CapabilityInvocationExample(
+            examples=(
+                OperationExample(
                     name="identity_keller_condition",
                     description=(
                         "Verify the identity map's constant nonzero Jacobian "
@@ -373,11 +369,11 @@ class PolynomialKellerConditionVerifyAdapter:
         )
 
     @property
-    def descriptor(self) -> CapabilityDescriptor:
+    def descriptor(self) -> OperationDescriptor:
         return self._descriptor
 
     def prepare(
-        self, request: CapabilityRequest
+        self, request: OperationRequest
     ) -> PolynomialKellerConditionVerifyRequest:
         return _validate_request(
             PolynomialKellerConditionVerifyRequest,
@@ -389,7 +385,7 @@ class PolynomialKellerConditionVerifyAdapter:
     def invoke(
         self, validated: PolynomialKellerConditionVerifyRequest
     ) -> OperationProjection:
-        checker_id = self.resources.installation.keller_checker_id
+        checker_id = self.resources.contracts.keller_checker_id
         if checker_id is None:
             raise _polynomial_error(
                 "POLYNOMIAL_KELLER_CHECKER_UNAVAILABLE",
@@ -409,8 +405,8 @@ class PolynomialKellerConditionVerifyAdapter:
         map_uri = jacobian.map_uri
         jacobian_uri = jacobian.jacobian_uri
         claim = self.resources.artifacts.put(
-            schema_uri=self.resources.installation.keller_claim_schema_uri,
-            semantics_uri=self.resources.installation.semantics_uri,
+            schema_uri=self.resources.contracts.keller_claim_schema_uri,
+            semantics_uri=self.resources.contracts.semantics_uri,
             payload=PolynomialKellerConditionClaim(
                 map_uri=map_uri,
                 jacobian_uri=jacobian_uri,
@@ -418,7 +414,7 @@ class PolynomialKellerConditionVerifyAdapter:
             parents=(map_uri, jacobian_uri),
             summary="polynomial-map Keller-condition claim",
         )
-        semantics = self.resources.store.get(self.resources.installation.semantics_uri)
+        semantics = self.resources.store.get(self.resources.contracts.semantics_uri)
         map_artifact = self.resources.store.get(map_uri)
         jacobian_artifact = self.resources.store.get(jacobian_uri)
         replay_payload = PolynomialKellerConditionReplayPayload(
@@ -441,8 +437,8 @@ class PolynomialKellerConditionVerifyAdapter:
             payload=replay_payload,
         )
         certificate_artifact = self.resources.artifacts.put(
-            schema_uri=self.resources.installation.certificate_schema_uri,
-            semantics_uri=self.resources.installation.semantics_uri,
+            schema_uri=self.resources.contracts.certificate_schema_uri,
+            semantics_uri=self.resources.contracts.semantics_uri,
             payload=certificate.model_dump(mode="json"),
             parents=(claim.artifact_uri, jacobian_uri, map_uri),
             summary="exact polynomial-map Keller-condition replay certificate",

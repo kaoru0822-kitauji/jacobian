@@ -15,11 +15,7 @@ from typing import Any
 from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
 
-from jacobian.adapters.mcp.tooling import (
-    AgentRecoveryError,
-    MCPBlockingWorkerRegistry,
-    blocking_worker_scope,
-)
+from jacobian.adapters.mcp.tooling import AgentRecoveryError
 from jacobian.runtime.model import JacobianRuntime
 
 _LOGGER = logging.getLogger(__name__)
@@ -27,13 +23,13 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclass(frozen=True, slots=True)
 class AppState:
-    acquire_runtime: Callable[[], RuntimeLease]
-    worker_registry: MCPBlockingWorkerRegistry
+    acquire_runtime: Callable[[str | None], RuntimeAccess]
+    operation_catalog: Any
 
 
 @dataclass(frozen=True, slots=True)
-class RuntimeLease:
-    """One request's runtime and optional release action."""
+class RuntimeAccess:
+    """A lazily acquired runtime and its private host release callback."""
 
     runtime: JacobianRuntime
     release: Callable[[], None] | None = None
@@ -54,11 +50,13 @@ _active_runtime: ContextVar[JacobianRuntime | None] = ContextVar(
 
 
 @contextmanager
-def _runtime(ctx: Context[Any, Any]) -> Iterator[JacobianRuntime]:
-    """Return a runtime, holding a tenant lease for the full request lifetime.
+def _runtime(
+    ctx: Context[Any, Any], operation_id: str | None = None
+) -> Iterator[JacobianRuntime]:
+    """Return a runtime, holding a tenant runtime hold for the full request lifetime.
 
-    When tenant isolation is active, the lease is held until the context
-    manager exits so the runtime cannot be evicted mid-request.
+    When tenant isolation is active, the host holds the runtime until the
+    context manager exits so it cannot be evicted mid-request.
     """
 
     active_runtime = _active_runtime.get()
@@ -72,55 +70,36 @@ def _runtime(ctx: Context[Any, Any]) -> Iterator[JacobianRuntime]:
             "Jacobian is unavailable for this request. Retry once; if it fails "
             "again, inspect the local Jacobian log."
         )
-    with _runtime_scope(state) as runtime:
+    with _runtime_scope(state, operation_id) as runtime:
         yield runtime
 
 
+def _catalog(ctx: Context[Any, Any]) -> Any:
+    """Return the deployment catalog without acquiring an execution runtime."""
+
+    state = ctx.request_context.lifespan_context
+    if not isinstance(state, AppState):
+        raise AgentRecoveryError(
+            "Jacobian is unavailable for this request. Retry once; if it fails "
+            "again, inspect the local Jacobian log."
+        )
+    return state.operation_catalog
+
+
 @contextmanager
-def _runtime_scope(state: AppState) -> Iterator[JacobianRuntime]:
+def _runtime_scope(
+    state: AppState, operation_id: str | None = None
+) -> Iterator[JacobianRuntime]:
     """Bind exactly one runtime and blocking-worker owner to an MCP request."""
 
-    lease = state.acquire_runtime()
-    with blocking_worker_scope(
-        state.worker_registry,
-        lease_release=lease.release,
-    ):
-        token: Token[JacobianRuntime | None] = _active_runtime.set(lease.runtime)
-        try:
-            _start_lean_warmup(lease.runtime)
-            yield lease.runtime
-        finally:
-            _active_runtime.reset(token)
-
-
-def _start_lean_warmup(runtime: JacobianRuntime) -> None:
-    if os.environ.get("JACOBIAN_LEAN_WARMUP") == "1":
-        runtime.start_lean_warmup()
-
-
-@contextmanager
-def _static_resource_runtime(
-    state: AppState,
-) -> Iterator[JacobianRuntime]:
-    """Route SDK static resources through the active authentication context.
-
-    MCP 2.0.0 does not inject ``Context`` into static resources, but its HTTP
-    authentication middleware still scopes the access token with a contextvar.
-    Template resources use native ``Context`` injection and ``_runtime`` instead.
-    """
-
-    active_runtime = _active_runtime.get()
-    if active_runtime is not None:
-        yield active_runtime
-        return
-
-    lease = state.acquire_runtime()
+    access = state.acquire_runtime(operation_id)
+    token: Token[JacobianRuntime | None] = _active_runtime.set(access.runtime)
     try:
-        _start_lean_warmup(lease.runtime)
-        yield lease.runtime
+        yield access.runtime
     finally:
-        if lease.release is not None:
-            lease.release()
+        _active_runtime.reset(token)
+        if access.release is not None:
+            access.release()
 
 
 def _configured_root(state_dir: str | Path | None) -> Path:

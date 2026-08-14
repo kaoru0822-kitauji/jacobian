@@ -12,40 +12,40 @@ from tests.support.graph_distance_cases import (
 )
 from tests.support.services import DomainTestServices, open_domain_services
 
-from jacobian.contracts.capabilities import (
-    CapabilityRequest,
-)
 from jacobian.contracts.graph_coloring import GraphChromaticNumberRequest
 from jacobian.contracts.graph_distance_matrix import GraphDistanceMatrixResult
 from jacobian.contracts.graph_optimization import (
     GraphHamiltonianPathRequest,
     GraphOptimizationRequest,
 )
+from jacobian.contracts.operations import (
+    OperationRequest,
+)
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.domains.graph_optimization import build_graph_invariant_bundle
+from jacobian.domains.graph_optimization import graph_invariant_operations
 
 
 @pytest.fixture
 def domain_services(tmp_path: Path) -> Iterator[DomainTestServices]:
     with open_domain_services(
-        tmp_path / "state", build_graph_invariant_bundle()
+        tmp_path / "state", graph_invariant_operations()
     ) as services:
         yield services
 
 
 def _invoke(domain_services, vertices: list[str], edges: list[list[str]]):
-    return domain_services.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="graph.distance_matrix.compute",
+    return domain_services.core.operations.invoke(
+        OperationRequest(
+            operation_id="graph.distance_matrix.compute",
             input={"graph": {"vertices": vertices, "edges": edges}},
         )
     )
 
 
 def _invoke_graph(domain_services, graph: dict[str, object]):
-    return domain_services.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="graph.distance_matrix.compute",
+    return domain_services.core.operations.invoke(
+        OperationRequest(
+            operation_id="graph.distance_matrix.compute",
             input={"graph": graph},
         )
     )

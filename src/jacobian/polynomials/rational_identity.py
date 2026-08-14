@@ -5,12 +5,12 @@ from __future__ import annotations
 import hashlib
 
 from jacobian.canonical import canonicalize_json
-from jacobian.contracts.capabilities import (
-    CapabilityDescriptor,
-    CapabilityInvocationExample,
-    CapabilityRequest,
-)
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
+from jacobian.contracts.operations import (
+    OperationDescriptor,
+    OperationExample,
+    OperationRequest,
+)
 from jacobian.contracts.polynomials import (
     RationalFunctionArtifact,
     RationalFunctionIdentityClaim,
@@ -35,9 +35,9 @@ class RationalFunctionIdentityAdapter:
 
     def __init__(self, resources: PolynomialResources) -> None:
         self.resources = resources
-        checker_id = resources.installation.rational_function_identity_checker_id
-        self._descriptor = CapabilityDescriptor(
-            capability_id="polynomial.rational_function.identity.verify",
+        checker_id = resources.contracts.rational_function_identity_checker_id
+        self._descriptor = OperationDescriptor(
+            operation_id="polynomial.rational_function.identity.verify",
             version="1",
             title="Verify an exact rational-function identity",
             description=(
@@ -59,8 +59,8 @@ class RationalFunctionIdentityAdapter:
                 "identity",
                 "verification",
             ),
-            invocation_examples=(
-                CapabilityInvocationExample(
+            examples=(
+                OperationExample(
                     name="cancel_common_factor",
                     description="Verify that (x²-1)/(x-1) equals x+1 in QQ(x).",
                     input=RationalFunctionIdentityRequest.model_validate(
@@ -121,10 +121,10 @@ class RationalFunctionIdentityAdapter:
         )
 
     @property
-    def descriptor(self) -> CapabilityDescriptor:
+    def descriptor(self) -> OperationDescriptor:
         return self._descriptor
 
-    def prepare(self, request: CapabilityRequest) -> RationalFunctionIdentityRequest:
+    def prepare(self, request: OperationRequest) -> RationalFunctionIdentityRequest:
         return _validate_request(
             RationalFunctionIdentityRequest,
             request.input,
@@ -133,7 +133,7 @@ class RationalFunctionIdentityAdapter:
         )
 
     def invoke(self, validated: RationalFunctionIdentityRequest) -> OperationProjection:
-        checker_id = self.resources.installation.rational_function_identity_checker_id
+        checker_id = self.resources.contracts.rational_function_identity_checker_id
         if checker_id is None:
             raise _polynomial_error(
                 "RATIONAL_FUNCTION_IDENTITY_CHECKER_UNAVAILABLE",
@@ -141,7 +141,7 @@ class RationalFunctionIdentityAdapter:
                 "No authorized rational-function identity checker is installed.",
             )
         semantics_uri = (
-            self.resources.installation.rational_function_identity_semantics_uri
+            self.resources.contracts.rational_function_identity_semantics_uri
         )
         left_payload = RationalFunctionArtifact(
             variables=validated.variables,
@@ -154,20 +154,20 @@ class RationalFunctionIdentityAdapter:
             denominator=validated.right.denominator,
         )
         left = self.resources.artifacts.put(
-            schema_uri=self.resources.installation.rational_function_left_schema_uri,
+            schema_uri=self.resources.contracts.rational_function_left_schema_uri,
             semantics_uri=semantics_uri,
             payload=left_payload.model_dump(mode="json"),
             summary="left exact rational function",
         )
         right = self.resources.artifacts.put(
-            schema_uri=self.resources.installation.rational_function_right_schema_uri,
+            schema_uri=self.resources.contracts.rational_function_right_schema_uri,
             semantics_uri=semantics_uri,
             payload=right_payload.model_dump(mode="json"),
             summary="right exact rational function",
         )
         claim = self.resources.artifacts.put(
             schema_uri=(
-                self.resources.installation.rational_function_identity_claim_schema_uri
+                self.resources.contracts.rational_function_identity_claim_schema_uri
             ),
             semantics_uri=semantics_uri,
             payload=RationalFunctionIdentityClaim(
@@ -200,7 +200,7 @@ class RationalFunctionIdentityAdapter:
             payload=replay_payload,
         )
         certificate_artifact = self.resources.artifacts.put(
-            schema_uri=self.resources.installation.certificate_schema_uri,
+            schema_uri=self.resources.contracts.certificate_schema_uri,
             semantics_uri=semantics_uri,
             payload=certificate.model_dump(mode="json"),
             parents=(claim.artifact_uri, right.artifact_uri, left.artifact_uri),

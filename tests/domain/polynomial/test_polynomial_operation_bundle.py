@@ -5,9 +5,9 @@ from typing import Any, cast
 import pytest
 
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.domains.polynomial import build_polynomial_bundle
+from jacobian.domains.polynomial import polynomial_operations
 from jacobian.process_policy import ProcessResult, ProcessTermination
-from tests.support.capabilities import invoke_capability as _invoke
+from tests.support.operations import invoke_operation as _invoke
 from tests.support.services import DomainTestServices, open_domain_services
 
 
@@ -15,9 +15,7 @@ from tests.support.services import DomainTestServices, open_domain_services
 def polynomial_services(tmp_path: Path) -> Iterator[DomainTestServices]:
     """Install only the polynomial operations exercised by this module."""
 
-    with open_domain_services(
-        tmp_path / "state", build_polynomial_bundle()
-    ) as services:
+    with open_domain_services(tmp_path / "state", polynomial_operations()) as services:
         yield services
 
 
@@ -50,8 +48,8 @@ def test_polynomial_bundle_installs_and_computes_exact_invariants(
     runtime = polynomial_services
 
     installed_ids = {
-        descriptor.capability_id
-        for descriptor in runtime.core.capabilities.catalog().capabilities
+        descriptor.operation_id
+        for descriptor in runtime.core.operations.snapshot().operations
     }
     assert {
         "polynomial.compute.gcd",
@@ -64,8 +62,8 @@ def test_polynomial_bundle_installs_and_computes_exact_invariants(
 
     groebner_descriptor = next(
         descriptor
-        for descriptor in runtime.core.capabilities.catalog().capabilities
-        if descriptor.capability_id == "polynomial.groebner_basis.compute"
+        for descriptor in runtime.core.operations.snapshot().operations
+        if descriptor.operation_id == "polynomial.groebner_basis.compute"
     )
     assert "commutative polynomial ring QQ[x_1,...,x_n]" in (
         groebner_descriptor.description or ""

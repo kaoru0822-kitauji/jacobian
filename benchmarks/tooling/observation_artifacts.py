@@ -21,11 +21,12 @@ from benchmarks.tooling.errors import HarborSuiteError
 _MCP_TOOL_CALL = re.compile(
     r"\bMCP tool call tool=(math\.(?:find|run))\b"
     r".{0,512}?\bstatus=(success|error)\b"
-    r".{0,512}?\brequest_digest=([0-9a-f]{16}|none)\b",
+    r".{0,512}?\brequest_digest=([0-9a-f]{16}|none)\b"
+    r".{0,512}?\bargument_digest=(sha256:(?:[0-9a-f]\s*){64})",
     re.DOTALL,
 )
-_MCP_CAPABILITY_ATTEMPT = re.compile(
-    r"\bMCP capability attempt request_digest=([0-9a-f]{16}|none)\b"
+_MCP_OPERATION_ATTEMPT = re.compile(
+    r"\bMCP operation attempt argument_digest=(sha256:(?:[0-9a-f]\s*){64})"
     r".{0,2048}?\bexecution_status=([A-Z_]+)\b",
     re.DOTALL,
 )
@@ -45,19 +46,19 @@ def _read_mcp_runtime_log(path: Path, calls: Counter[str]) -> int:
     text = path.read_text(encoding="utf-8")
     failed_attempts: Counter[str] = Counter()
     transport_errors: Counter[str] = Counter()
-    for match in _MCP_CAPABILITY_ATTEMPT.finditer(text):
-        request_digest, execution_status = match.groups()
+    for match in _MCP_OPERATION_ATTEMPT.finditer(text):
+        argument_digest, execution_status = match.groups()
         if execution_status != "COMPLETED":
-            failed_attempts[request_digest] += 1
+            failed_attempts[re.sub(r"\s", "", argument_digest)] += 1
     for match in _MCP_TOOL_CALL.finditer(text):
-        tool, status, request_digest = match.groups()
+        tool, status, _request_digest, argument_digest = match.groups()
         calls[tool] += 1
         if status == "error":
-            transport_errors[request_digest] += 1
-    request_digests = set(failed_attempts) | set(transport_errors)
+            transport_errors[re.sub(r"\s", "", argument_digest)] += 1
+    argument_digests = set(failed_attempts) | set(transport_errors)
     return sum(
         max(failed_attempts[digest], transport_errors[digest])
-        for digest in request_digests
+        for digest in argument_digests
     )
 
 

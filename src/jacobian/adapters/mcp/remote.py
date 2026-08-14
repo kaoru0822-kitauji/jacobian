@@ -16,22 +16,22 @@ from typing import Any, Literal
 from mcp.server import MCPServer
 from mcp.server.auth.provider import AccessToken
 
+from jacobian import __version__
 from jacobian.adapters.mcp.context import (
     AppState,
     AuthenticationError,
-    RuntimeLease,
+    RuntimeAccess,
     TenantRuntimeLimitError,
     _configured_root,
 )
 from jacobian.adapters.mcp.deployment_identity import load_deployment_identity
-from jacobian.adapters.mcp.lifecycle import (
-    selected_checker_authority,
-)
 from jacobian.adapters.mcp.server import _build_server
-from jacobian.adapters.mcp.tooling import MCPBlockingWorkerRegistry
-from jacobian.capability_service import CapabilityPolicy
-from jacobian.runtime import CheckerAuthorityMode, create_runtime
+from jacobian.operation_catalog import OperationCatalog
+from jacobian.operation_visibility import OperationVisibilityPolicy
+from jacobian.registry import CheckerRegistry
+from jacobian.runtime.execution import create_execution_runtime
 from jacobian.runtime.model import JacobianRuntime
+from jacobian.storage.repository import ArtifactRepository
 
 _TENANT_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 DEFAULT_MAX_TENANT_RUNTIMES = 32
@@ -45,12 +45,12 @@ class TenantRuntimeRouterClosedError(RuntimeError):
 @dataclass(slots=True)
 class _TenantRuntimeEntry:
     runtime: JacobianRuntime
-    active_leases: int
+    active_requests: int
     last_used: float
 
 
-class TenantRuntimeLease:
-    """One caller-owned hold preventing eviction or shutdown of a runtime."""
+class TenantRuntimeHold:
+    """Private host guard preventing eviction during an active request."""
 
     def __init__(
         self,
@@ -77,7 +77,7 @@ class TenantRuntimeLease:
 
 
 type _AcquisitionPlan = (
-    TenantRuntimeLease | tuple[str, _TenantRuntimeEntry] | Literal["CREATE", "WAIT"]
+    TenantRuntimeHold | tuple[str, _TenantRuntimeEntry] | Literal["CREATE", "WAIT"]
 )
 
 
@@ -134,14 +134,13 @@ class TenantRuntimeRouter:
         self,
         root: str | Path,
         *,
-        checker_authority: CheckerAuthorityMode = CheckerAuthorityMode.INSTALL_BUNDLED,
         allow_anonymous: bool = False,
         anonymous_tenant_id: str = "anonymous",
-        capability_policy: CapabilityPolicy | None = None,
+        operation_policy: OperationVisibilityPolicy | None = None,
         max_tenant_runtimes: int = DEFAULT_MAX_TENANT_RUNTIMES,
         idle_timeout_seconds: float = DEFAULT_TENANT_IDLE_TIMEOUT_SECONDS,
         clock: Callable[[], float] = time.monotonic,
-        runtime_factory: Callable[..., JacobianRuntime] = create_runtime,
+        runtime_factory: Callable[..., JacobianRuntime],
     ) -> None:
         if max_tenant_runtimes < 1:
             raise ValueError("max_tenant_runtimes must be positive")
@@ -153,10 +152,9 @@ class TenantRuntimeRouter:
                 "letters, digits, '.', '_', or '-', and be at most 128 characters"
             )
         self.root = Path(root)
-        self.checker_authority = checker_authority
         self.allow_anonymous = allow_anonymous
         self.anonymous_tenant_id = anonymous_tenant_id
-        self.capability_policy = capability_policy
+        self.operation_policy = operation_policy
         self.max_tenant_runtimes = max_tenant_runtimes
         self.idle_timeout_seconds = idle_timeout_seconds
         self._clock = clock
@@ -172,15 +170,15 @@ class TenantRuntimeRouter:
         self._shutdown_in_flight = False
 
     def runtime_for(self, subject: str | None) -> JacobianRuntime:
-        """Return a compatible unleased runtime for non-request local callers."""
+        """Return a compatible runtime for non-request local callers."""
 
-        lease = self.lease_for(subject)
+        hold = self.hold_for(subject)
         try:
-            return lease.runtime
+            return hold.runtime
         finally:
-            lease.release()
+            hold.release()
 
-    def lease_for(self, subject: str | None) -> TenantRuntimeLease:
+    def hold_for(self, subject: str | None) -> TenantRuntimeHold:
         """Acquire one tenant runtime, creating or evicting outside the lock."""
 
         tenant_key = self._tenant_key(subject)
@@ -191,7 +189,7 @@ class TenantRuntimeRouter:
                         "tenant runtime router is closing"
                     )
                 plan = self._plan_acquisition(tenant_key)
-                if isinstance(plan, TenantRuntimeLease):
+                if isinstance(plan, TenantRuntimeHold):
                     return plan
                 if plan == "WAIT":
                     self._condition.wait()
@@ -203,8 +201,7 @@ class TenantRuntimeRouter:
         try:
             runtime = self._runtime_factory(
                 self.root / "tenants" / tenant_key,
-                checker_authority=self.checker_authority,
-                capability_policy=self.capability_policy,
+                operation_policy=self.operation_policy,
             )
         except BaseException:
             with self._condition:
@@ -215,12 +212,12 @@ class TenantRuntimeRouter:
             self._creating.discard(tenant_key)
             entry = _TenantRuntimeEntry(
                 runtime=runtime,
-                active_leases=1,
+                active_requests=1,
                 last_used=self._clock(),
             )
             self._runtimes[tenant_key] = entry
             self._condition.notify_all()
-        return TenantRuntimeLease(self, tenant_key, runtime)
+        return TenantRuntimeHold(self, tenant_key, runtime)
 
     def _tenant_key(self, subject: str | None) -> str:
         tenant = subject
@@ -244,12 +241,12 @@ class TenantRuntimeRouter:
             return "WAIT"
         entry = self._runtimes.get(tenant_key)
         if entry is not None and not (
-            entry.active_leases == 0
+            entry.active_requests == 0
             and now - entry.last_used >= self.idle_timeout_seconds
         ):
-            entry.active_leases += 1
+            entry.active_requests += 1
             entry.last_used = now
-            return TenantRuntimeLease(self, tenant_key, entry.runtime)
+            return TenantRuntimeHold(self, tenant_key, entry.runtime)
         if entry is not None:
             return self._begin_eviction(tenant_key, self._runtimes.pop(tenant_key))
         quarantined = self._quarantined.pop(tenant_key, None)
@@ -276,7 +273,7 @@ class TenantRuntimeRouter:
         inactive = tuple(
             (key, candidate)
             for key, candidate in self._runtimes.items()
-            if candidate.active_leases == 0
+            if candidate.active_requests == 0
         )
         if not inactive:
             raise TenantRuntimeLimitError(
@@ -312,9 +309,9 @@ class TenantRuntimeRouter:
     def _release(self, tenant_key: str) -> None:
         with self._condition:
             entry = self._runtimes.get(tenant_key)
-            if entry is None or entry.active_leases < 1:
-                raise RuntimeError("tenant runtime lease ownership was lost")
-            entry.active_leases -= 1
+            if entry is None or entry.active_requests < 1:
+                raise RuntimeError("tenant runtime request ownership was lost")
+            entry.active_requests -= 1
             entry.last_used = self._clock()
             self._condition.notify_all()
 
@@ -325,7 +322,7 @@ class TenantRuntimeRouter:
             while (
                 self._creating
                 or self._evictions_in_flight
-                or any(entry.active_leases for entry in self._runtimes.values())
+                or any(entry.active_requests for entry in self._runtimes.values())
             ):
                 self._condition.wait()
             return tuple(self._runtimes.items()) + tuple(self._quarantined.items())
@@ -452,12 +449,11 @@ def _parse_token_record(index: int, record: Any) -> StaticTokenGrant:
 def create_remote_server(
     state_dir: str | Path | None = None,
     *,
-    checker_authority: CheckerAuthorityMode | None = None,
     allow_anonymous: bool = False,
     anonymous_tenant_id: str = "anonymous",
     token_verifier: Any | None = None,
     auth: Any | None = None,
-    capability_policy: CapabilityPolicy | None = None,
+    operation_policy: OperationVisibilityPolicy | None = None,
     max_tenant_runtimes: int | None = None,
     tenant_idle_timeout_seconds: float | None = None,
     runtime_factory: Callable[..., JacobianRuntime] | None = None,
@@ -466,12 +462,35 @@ def create_remote_server(
 
     from mcp.server.auth.middleware.auth_context import get_access_token
 
+    root = _configured_root(state_dir)
+    policy = operation_policy or OperationVisibilityPolicy()
+    catalog = OperationCatalog(
+        root / "metadata.sqlite3",
+        policy,
+        expected_package_version=__version__,
+    )
+    shared_store: ArtifactRepository | None = None
+    selected_factory = runtime_factory
+    if selected_factory is None:
+        shared_store = ArtifactRepository(root)
+        shared_checkers = CheckerRegistry(shared_store)
+
+        def selected_factory(
+            tenant_root: str | Path,
+            **_options: object,
+        ) -> JacobianRuntime:
+            return _create_tenant_runtime(
+                Path(tenant_root),
+                catalog,
+                shared_checkers,
+                policy,
+            )
+
     router = TenantRuntimeRouter(
-        _configured_root(state_dir),
-        checker_authority=selected_checker_authority(checker_authority),
+        root,
         allow_anonymous=allow_anonymous,
         anonymous_tenant_id=anonymous_tenant_id,
-        capability_policy=capability_policy,
+        operation_policy=policy,
         max_tenant_runtimes=(
             DEFAULT_MAX_TENANT_RUNTIMES
             if max_tenant_runtimes is None
@@ -482,23 +501,47 @@ def create_remote_server(
             if tenant_idle_timeout_seconds is None
             else tenant_idle_timeout_seconds
         ),
-        runtime_factory=create_runtime if runtime_factory is None else runtime_factory,
+        runtime_factory=selected_factory,
     )
 
-    def acquire_runtime() -> RuntimeLease:
+    def acquire_runtime(_operation_id: str | None = None) -> RuntimeAccess:
         access_token = get_access_token()
         subject = access_token.subject if access_token is not None else None
-        lease = router.lease_for(subject)
-        return RuntimeLease(lease.runtime, lease.release)
+        hold = router.hold_for(subject)
+        return RuntimeAccess(hold.runtime, hold.release)
 
     state = AppState(
         acquire_runtime=acquire_runtime,
-        worker_registry=MCPBlockingWorkerRegistry(),
+        operation_catalog=catalog,
     )
+
+    def close_owner() -> None:
+        try:
+            router.close()
+        finally:
+            if shared_store is not None:
+                shared_store.close()
+
     return _build_server(
         state=state,
-        close_owner=router.close,
+        close_owner=close_owner,
         deployment_identity=load_deployment_identity(),
         token_verifier=token_verifier,
         auth=auth,
+    )
+
+
+def _create_tenant_runtime(
+    tenant_root: Path,
+    catalog: OperationCatalog,
+    shared_checkers: CheckerRegistry,
+    operation_policy: OperationVisibilityPolicy,
+) -> JacobianRuntime:
+    """Create tenant-owned artifacts over deployment-owned mathematical state."""
+
+    return create_execution_runtime(
+        tenant_root,
+        catalog,
+        operation_policy=operation_policy,
+        checker_registry=shared_checkers,
     )

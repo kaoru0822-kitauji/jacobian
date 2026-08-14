@@ -20,7 +20,7 @@ This family adds two atomic mathematical outcomes:
   certificates needed to inspect every integral homology group of one finite
   simplicial complex.
 
-The corresponding operator-authorized verification capabilities are
+The corresponding operator-authorized verification operations are
 `matrix.normal_form.smith.certified.verify` and
 `topology.simplicial_homology.integral.verify`. Producers remain capped at
 `COMPUTED`; only an accepted independent replay can return `VERIFIED`.
@@ -68,7 +68,7 @@ bounded to 32,768 digits. Complete request validation occurs before computation
 or artifact writes.
 
 The producer delegates the Smith decomposition to SymPy's
-`smith_normal_decomp` over `ZZ` and has no optional-provider availability gate.
+`smith_normal_decomp` over `ZZ` and has no optional-executable availability gate.
 The canonical diagonal \(D\) and the invariant factors \(d_1,\ldots,d_r\) are
 mathematical invariants: they are determined by the determinantal divisors of
 \(A\) and do not depend on the backend. The unimodular transformations
@@ -90,7 +90,7 @@ invariant factors, not hidden runtime dependencies of the checker.
 ## Integral simplicial homology
 
 The input is the canonical materialized finite complex described by
-[Finite simplicial topology](../capabilities/finite-math/finite-simplicial-topology.md), plus an explicit
+[Finite simplicial topology](../operations/finite-math/finite-simplicial-topology.md), plus an explicit
 `REDUCED` or `UNREDUCED` convention. Every simplex uses lexicographic vertex
 orientation. For each dimension \(k\), the result exposes:
 

@@ -1,7 +1,7 @@
 """Independent checker declarations owned by the topology domain."""
 
-from jacobian.checker_operations import ExactReplayCheckerDeclaration
-from jacobian.contracts.capabilities import CapabilityProviderRuntime
+from jacobian.checker_operations import AuthorizedChecker
+from jacobian.contracts.operations import ProviderObservation
 from jacobian.contracts.topology import (
     ChainComplexRequest,
     IntegralSimplicialHomologyRequest,
@@ -17,52 +17,50 @@ _REASON = (
 )
 
 
-def _topology_runtime(
-    *, checker_ids: tuple[str, ...] = ()
-) -> CapabilityProviderRuntime:
+def _topology_runtime(*, checker_ids: tuple[str, ...] = ()) -> ProviderObservation:
     return flint_runtime.topology_exact_checker_provider_runtime(
         checker_ids=checker_ids
     )
 
 
-TOPOLOGY_EXACT_REPLAY_CHECKERS = (
-    ExactReplayCheckerDeclaration(
+TOPOLOGY_AUTHORIZED_CHECKERS = (
+    AuthorizedChecker(
         "topology.simplicial_complex.canonicalize",
         SimplicialComplexRequest,
         "check_simplicial_complex_canonicalization",
         "topology.simplicial-complex.closure-replay",
         entrypoint_module=_ENTRYPOINT,
-        provider_runtime_factory=_topology_runtime,
+        observation_loader=_topology_runtime,
         replay_method="independent finite face-closure replay",
         reason=_REASON,
     ),
-    ExactReplayCheckerDeclaration(
+    AuthorizedChecker(
         "topology.simplicial_complex.chain_complex.compute",
         ChainComplexRequest,
         "check_simplicial_chain_complex",
         "topology.simplicial-chain.boundary-replay",
         entrypoint_module=_ENTRYPOINT,
-        provider_runtime_factory=_topology_runtime,
+        observation_loader=_topology_runtime,
         replay_method="independent oriented-boundary replay",
         reason=_REASON,
     ),
-    ExactReplayCheckerDeclaration(
+    AuthorizedChecker(
         "topology.simplicial_homology.compute",
         SimplicialHomologyRequest,
         "check_simplicial_homology",
         "topology.simplicial-homology.modular-replay",
         entrypoint_module=_ENTRYPOINT,
-        provider_runtime_factory=_topology_runtime,
+        observation_loader=_topology_runtime,
         replay_method="independent modular quotient replay",
         reason=_REASON,
     ),
-    ExactReplayCheckerDeclaration(
+    AuthorizedChecker(
         "topology.simplicial_homology.integral.compute",
         IntegralSimplicialHomologyRequest,
         "check_integral_simplicial_homology",
         "topology.simplicial-homology.integral-smith-certificate-v1",
         entrypoint_module=_ENTRYPOINT,
-        provider_runtime_factory=_topology_runtime,
+        observation_loader=_topology_runtime,
         replay_method=(
             "independent integral chain and Smith transformation-certificate replay"
         ),
@@ -71,7 +69,7 @@ TOPOLOGY_EXACT_REPLAY_CHECKERS = (
             "boundary, validates both Smith certificates per dimension, and binds "
             "free and torsion generators to the canonical simplex bases"
         ),
-        verification_capability_id="topology.simplicial_homology.integral.verify",
+        verification_operation_id="topology.simplicial_homology.integral.verify",
         verification_title="Verify integral simplicial homology",
         verification_description=(
             "Independently verify every free rank, torsion factor, cycle generator, "
@@ -89,4 +87,4 @@ TOPOLOGY_EXACT_REPLAY_CHECKERS = (
     ),
 )
 
-__all__ = ["TOPOLOGY_EXACT_REPLAY_CHECKERS"]
+__all__ = ["TOPOLOGY_AUTHORIZED_CHECKERS"]

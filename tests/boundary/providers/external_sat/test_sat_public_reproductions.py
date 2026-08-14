@@ -10,8 +10,8 @@ from tests.boundary.providers.external_sat.external_sat_support import (
 )
 from tests.support.provider_external_sat import external_sat_toolchain_available
 
-from jacobian.contracts.capabilities import (
-    CapabilityRequest,
+from jacobian.contracts.operations import (
+    OperationRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
 
@@ -37,7 +37,7 @@ def _load_cases() -> list[dict[str, Any]]:
                 "variable_names": request["variables"],
                 "clauses": request["clauses"],
                 "expected_status": expected["expected_status"],
-                "required_capabilities": [
+                "required_operations": [
                     (
                         "sat.model.find"
                         if expected["expected_status"] == "SATISFIABLE"
@@ -72,9 +72,9 @@ def test_sat_public_reproductions_reach_checker_bound_results(
                 verify_id = "sat.unsat_proof.verify"
                 evidence_field = "proof_uri"
 
-            found = runtime.core.capabilities.invoke(
-                CapabilityRequest(
-                    capability_id=find_id,
+            found = runtime.core.operations.invoke(
+                OperationRequest(
+                    operation_id=find_id,
                     input={
                         "cnf_uri": cnf.artifact_uri,
                         "resource_budget": {"wall_seconds": 5},
@@ -88,9 +88,9 @@ def test_sat_public_reproductions_reach_checker_bound_results(
             if case["expected_status"] == "SATISFIABLE":
                 assert found.output["assignment"] is not None
 
-            verified = runtime.core.capabilities.invoke(
-                CapabilityRequest(
-                    capability_id=verify_id,
+            verified = runtime.core.operations.invoke(
+                OperationRequest(
+                    operation_id=verify_id,
                     input={evidence_field: evidence_uri},
                 )
             )
@@ -99,4 +99,4 @@ def test_sat_public_reproductions_reach_checker_bound_results(
             assert verified.output["cnf_uri"] == cnf.artifact_uri
             assert verified.output[evidence_field] == evidence_uri
             assert verified.verification_record_uri is not None
-            assert case["required_capabilities"] == [find_id, verify_id]
+            assert case["required_operations"] == [find_id, verify_id]
