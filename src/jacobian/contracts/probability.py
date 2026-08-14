@@ -364,6 +364,12 @@ class GraphReliabilityState(ContractModel):
     terminals_connected: bool
     state_probability: CanonicalRational
 
+    @model_validator(mode="after")
+    def require_bounded_probability(self) -> Self:
+        if not 0 <= self.state_probability.as_fraction() <= 1:
+            raise ValueError("graph reliability state probability must lie in [0, 1]")
+        return self
+
 
 class GraphConnectionProbabilityResult(ContractModel):
     terminals: tuple[str, str]
