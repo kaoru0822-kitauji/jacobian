@@ -119,11 +119,11 @@ copied.
 
 ## Migration and non-goals
 
-The cutover ships in the next pre-1.0 breaking minor release (`0.13.0`)
-and uses the next state revision. Revision-11 artifacts remain readable during
-the update, while checker identity is remeasured rather than trusted from
-copied records. There are no compatibility aliases for the public wire
-contract.
+Revision 12 is the current operation-catalog cutover. `jacobian update`
+migrates supported revision-11 stores, retires the superseded generic runtime
+tables, and selects the new catalog. Checker identity is remeasured rather
+than trusted from copied records. There are no compatibility aliases for the
+public wire contract.
 
 The target is not a workflow engine, automatic planner, plugin-discovery
 framework, generic dependency-injection system, universal backend wrapper, or
