@@ -1161,6 +1161,7 @@ __all__ = [
     "check_matrix_rank",
     "check_matrix_rref",
     "check_matrix_smith_normal_form",
+    "check_modular_polynomial_residue_image",
     "check_polynomial_discriminant",
     "check_polynomial_factorization",
     "check_polynomial_gcd",

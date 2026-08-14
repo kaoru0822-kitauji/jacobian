@@ -892,3 +892,13 @@ def _determinant(
         )
         result = _add_scaled(result, term, -1 if inversions % 2 else 1)
     return result
+
+
+__all__ = [
+    "check_collision",
+    "check_collision_refutes_inverse",
+    "check_identity",
+    "check_jacobian",
+    "check_keller_condition",
+    "check_map_inverse",
+]
