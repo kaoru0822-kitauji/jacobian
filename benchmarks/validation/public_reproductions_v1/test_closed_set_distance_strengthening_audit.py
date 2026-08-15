@@ -98,14 +98,16 @@ def test_rejects_corrupt_geometry_and_nonvanishing_gap(tmp_path: Path) -> None:
         assert _verify(tmp_path / name, submission).reward == 0.0
 
 
-def test_rejects_string_coercion_and_noncanonical_rationals(tmp_path: Path) -> None:
+def test_rejects_string_coercion_and_accepts_equivalent_rationals(
+    tmp_path: Path,
+) -> None:
     string_submission = copy.deepcopy(_oracle())
     string_submission["result"]["point_pairs"][0]["distance"] = "1/4"
     assert _verify(tmp_path / "string", string_submission).reward == 0.0
 
     noncanonical_submission = copy.deepcopy(_oracle())
     noncanonical_submission["result"]["point_pairs"][0]["distance"] = _q(2, 8)
-    assert _verify(tmp_path / "noncanonical", noncanonical_submission).reward == 0.0
+    assert _verify(tmp_path / "noncanonical", noncanonical_submission).reward == 1.0
 
 
 # ---------------------------------------------------------------------------

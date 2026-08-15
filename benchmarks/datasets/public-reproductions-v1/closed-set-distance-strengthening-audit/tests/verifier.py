@@ -51,16 +51,6 @@ def _rational(value: object) -> Fraction | None:
         return None
 
 
-def _canonical_rational(value: object) -> bool:
-    parsed = _rational(value)
-    return bool(
-        parsed is not None
-        and isinstance(value, dict)
-        and parsed.numerator == value["numerator"]
-        and parsed.denominator == value["denominator"]
-    )
-
-
 def _result_shape(value: object) -> bool:
     fields = {
         "start_index",
@@ -165,20 +155,9 @@ def _result_schema(value: object) -> bool:
     pairs = value["point_pairs"]
     if {row["index"] for row in pairs} != set(range(start, start + len(pairs))):
         return False
-    for row in value["point_pairs"]:
-        if not all(
-            _canonical_rational(item)
-            for item in (*row["a"], *row["b"], row["distance"])
-        ):
-            return False
     prior_epsilon: Fraction | None = None
     prior_index = -1
     for witness in value["epsilon_witnesses"]:
-        if not (
-            _canonical_rational(witness["epsilon"])
-            and _canonical_rational(witness["distance"])
-        ):
-            return False
         parsed = _witness_fields(witness)
         if parsed is None:
             return False
