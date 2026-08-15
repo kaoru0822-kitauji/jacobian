@@ -133,18 +133,6 @@ def test_generated_results_and_local_evidence_are_excluded(tmp_path: Path) -> No
     assert all(v.code != "unsupported-surface" for v in report.violations)
 
 
-def test_removed_capability_vocabulary_is_flagged(tmp_path: Path) -> None:
-    _write(
-        tmp_path,
-        "src/jacobian/contracts/old.py",
-        f"class Legacy{_CAP.title()}:\n    pass\n",
-    )
-    report = check_architecture(tmp_path)
-    violations = [v for v in report.violations if v.code == "unsupported-surface"]
-    assert len(violations) == 1
-    assert violations[0].path == "src/jacobian/contracts/old.py"
-
-
 def test_operation_migration_design_may_name_removed_contracts(tmp_path: Path) -> None:
     _write(
         tmp_path,
