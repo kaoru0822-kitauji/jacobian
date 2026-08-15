@@ -91,12 +91,12 @@
                     "coefficient": {
                       "additionalProperties": false,
                       "properties": {
-                    "den": {
-                      "minimum": 1,
-                      "type": "integer"
-                    },
-                    "num": {
-                      "type": "integer"
+                        "den": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "num": {
+                          "type": "integer"
                         }
                       },
                       "required": [

@@ -57,9 +57,9 @@
           },
           "torsion": {
             "items": {
-          "items": {
-            "minimum": 2,
-            "type": "integer"
+              "items": {
+                "minimum": 2,
+                "type": "integer"
               },
               "type": "array"
             },
