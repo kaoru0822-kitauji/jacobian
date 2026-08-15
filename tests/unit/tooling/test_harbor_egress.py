@@ -127,7 +127,9 @@ def test_proxy_observation_job_is_opt_in_and_preserves_local_mcp_access() -> Non
     assert "JACOBIAN_EVAL_GOST_CONFIG" in proxy_overlay
     assert "http://127.0.0.1:12346" in proxy_overlay
     assert "JACOBIAN_EVAL_CODEX_BINARY" in codex_overlay
+    assert "JACOBIAN_EVAL_CODEX_CODE_MODE_HOST" in codex_overlay
     assert "target: /usr/local/bin/codex" in codex_overlay
+    assert "target: /usr/local/bin/codex-code-mode-host" in codex_overlay
     assert proxy_job["artifacts"] == [
         "/logs/agent/trajectory.json",
         {"source": "/logs/jacobian/mcp.log", "service": "jacobian"},
@@ -181,6 +183,26 @@ def test_compose_overlays_parse_as_valid_yaml() -> None:
         assert isinstance(parsed["services"], dict), (
             f"{compose_path.name}: services must be a mapping"
         )
+
+
+def test_codex_overlay_mounts_the_complete_standalone_runtime() -> None:
+    parsed = yaml.safe_load(CODEX_COMPOSE.read_text(encoding="utf-8"))
+    volumes = parsed["services"]["main"]["volumes"]
+
+    assert volumes == [
+        {
+            "type": "bind",
+            "source": "${JACOBIAN_EVAL_CODEX_BINARY:?set JACOBIAN_EVAL_CODEX_BINARY to the standalone Codex executable}",
+            "target": "/usr/local/bin/codex",
+            "read_only": True,
+        },
+        {
+            "type": "bind",
+            "source": "${JACOBIAN_EVAL_CODEX_CODE_MODE_HOST:?set JACOBIAN_EVAL_CODEX_CODE_MODE_HOST to the Codex Code Mode host}",
+            "target": "/usr/local/bin/codex-code-mode-host",
+            "read_only": True,
+        },
+    ]
 
 
 def test_proxy_compose_overlay_declares_proxy_environment() -> None:

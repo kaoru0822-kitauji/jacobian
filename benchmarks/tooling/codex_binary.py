@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 
 _ELF_MAGIC = b"\x7fELF"
+_CODE_MODE_HOST = "codex-code-mode-host"
 
 
 def _is_linux_executable(path: Path) -> bool:
@@ -59,12 +60,29 @@ def resolve_codex_binary(candidate: Path) -> Path:
     )
 
 
+def resolve_codex_code_mode_host(candidate: Path) -> Path:
+    """Resolve the Code Mode host packaged beside a standalone Codex binary."""
+    binary = resolve_codex_binary(candidate)
+    host = binary.with_name(_CODE_MODE_HOST)
+    if _is_linux_executable(host):
+        return host
+    raise ValueError(
+        "Codex standalone runtime is incomplete; expected executable Code Mode "
+        f"host beside {binary}: {host}"
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--candidate", required=True, type=Path)
+    parser.add_argument("--code-mode-host", action="store_true")
     args = parser.parse_args()
     try:
-        resolved = resolve_codex_binary(args.candidate)
+        resolved = (
+            resolve_codex_code_mode_host(args.candidate)
+            if args.code_mode_host
+            else resolve_codex_binary(args.candidate)
+        )
     except ValueError as exc:
         parser.error(str(exc))
     print(resolved)

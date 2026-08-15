@@ -47,6 +47,7 @@ endif
 agent-eval: ## Run a Harbor evaluation (JACOBIAN_ENABLED=0|1, JACOBIAN_EVAL_PROXY=0|1, DATASET=mathematical-benchmarks-v1, EVAL_EXECUTE=1).
 	@set -e; \
 	CODEX_BINARY="$(JACOBIAN_EVAL_CODEX_BINARY)"; \
+	CODEX_CODE_MODE_HOST=""; \
 	if [ "$(EVAL_EXECUTE)" != "1" ]; then \
 		echo "Model execution is opt-in. Review the job, then run: make agent-eval DATASET=mathematical-benchmarks-v1 EVAL_EXECUTE=1"; \
 		exit 0; \
@@ -57,6 +58,7 @@ agent-eval: ## Run a Harbor evaluation (JACOBIAN_ENABLED=0|1, JACOBIAN_EVAL_PROX
 	fi; \
 	if [ "$(JACOBIAN_EVAL_PROXY)" = "1" ]; then \
 		CODEX_BINARY="$$( $(UV_RUN) python -m benchmarks.tooling.codex_binary --candidate "$$CODEX_BINARY" )"; \
+		CODEX_CODE_MODE_HOST="$$( $(UV_RUN) python -m benchmarks.tooling.codex_binary --candidate "$$CODEX_BINARY" --code-mode-host )"; \
 		JACOBIAN_EVAL_UPSTREAM_PROXY="$(JACOBIAN_EVAL_UPSTREAM_PROXY)" \
 			$(UV_RUN) python -m benchmarks.tooling.harbor_proxy \
 			--output "$(JACOBIAN_EVAL_GOST_CONFIG)"; \
@@ -80,6 +82,7 @@ agent-eval: ## Run a Harbor evaluation (JACOBIAN_ENABLED=0|1, JACOBIAN_EVAL_PROX
 	JACOBIAN_EVAL_ALL_PROXY="$(JACOBIAN_EVAL_ALL_PROXY)" \
 	JACOBIAN_EVAL_NO_PROXY="$(JACOBIAN_EVAL_NO_PROXY)" \
 	JACOBIAN_EVAL_CODEX_BINARY="$$CODEX_BINARY" \
+	JACOBIAN_EVAL_CODEX_CODE_MODE_HOST="$$CODEX_CODE_MODE_HOST" \
 	JACOBIAN_EVAL_GOST_CONFIG="$(JACOBIAN_EVAL_GOST_CONFIG)" \
 	$(HARBOR_RUNNER) run \
 		-c "$(EVAL_CONFIG)" \
