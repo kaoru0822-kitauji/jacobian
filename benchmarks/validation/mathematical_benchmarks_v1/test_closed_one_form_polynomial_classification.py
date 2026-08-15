@@ -47,8 +47,16 @@ def test_correct_constraint_rank_and_wrong_published_rank() -> None:
 def test_derivative_replays_potential() -> None:
     v = _module()
     terms = [
-        {"coefficient": "1", "x_power": 2, "y_power": 1},
-        {"coefficient": "1", "x_power": 1, "y_power": 2},
+        {
+            "coefficient": {"numerator": 1, "denominator": 1},
+            "x_power": 2,
+            "y_power": 1,
+        },
+        {
+            "coefficient": {"numerator": 1, "denominator": 1},
+            "x_power": 1,
+            "y_power": 2,
+        },
     ]
     assert v.derivative(terms, 0) == {(1, 1): Fraction(2), (0, 2): Fraction(1)}
     assert v.derivative(terms, 1) == {(2, 0): Fraction(1), (1, 1): Fraction(2)}
@@ -106,3 +114,18 @@ def test_verifier_rejects_boolean_matrix_entries(tmp_path: Path) -> None:
     rejected = _verifier._run_verifier(task, app, logs)
     assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
+
+
+def test_verifier_rejects_string_coerced_coefficient(tmp_path: Path) -> None:
+    from benchmarks.validation.mathematical_benchmarks_v1 import (
+        _fixtures,
+        _verifier,
+    )
+
+    task, app, logs = _fixtures._prepare_case(
+        tmp_path, "closed-one-form-polynomial-classification", "string-coefficient"
+    )
+    submission = json.loads((app / "submission.json").read_text())
+    submission["result"]["potentials"][0]["terms"][0]["coefficient"] = "1"
+    _fixtures._write_json(app / "submission.json", submission)
+    assert _verifier._run_verifier(task, app, logs).reward == 0.0
