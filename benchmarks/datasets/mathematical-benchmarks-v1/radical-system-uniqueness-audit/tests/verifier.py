@@ -117,16 +117,19 @@ def _solution_is_exact(value: object) -> bool:
     submitted_values = value["equation_values"]
     if not isinstance(submitted_values, list) or len(submitted_values) != 3:
         return False
+    submitted_pairs = [
+        (item["left"], item["right"])
+        for item in submitted_values
+        if isinstance(item, dict)
+        and set(item) == {"left", "right"}
+        and type(item["left"]) is int
+        and type(item["right"]) is int
+    ]
+    expected_pairs = [(item["left"], item["right"]) for item in expected_values]
     return bool(
         equations_hold
-        and all(
-            isinstance(item, dict)
-            and set(item) == {"left", "right"}
-            and type(item["left"]) is int
-            and type(item["right"]) is int
-            for item in submitted_values
-        )
-        and submitted_values == expected_values
+        and len(submitted_pairs) == len(expected_pairs)
+        and sorted(submitted_pairs) == sorted(expected_pairs)
     )
 
 

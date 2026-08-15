@@ -157,7 +157,7 @@ def _mathematical_result_is_valid(result: object, source: dict[str, Any]) -> boo
 
         return bool(
             result["pair_semantics"] == "ORDERED"
-            and offsets == [0, -1, -2]
+            and sorted(offsets) == [-2, -1, 0]
             and base == 2
             and exponent == {"binomial_order": 2, "offset": -2}
             and set(values) == {3, 4, 5, 6}

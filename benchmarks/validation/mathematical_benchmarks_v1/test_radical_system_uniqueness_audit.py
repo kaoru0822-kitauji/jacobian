@@ -35,3 +35,15 @@ def test_rejects_string_equation_values(tmp_path: Path) -> None:
     submission["result"]["solutions"][0]["equation_values"][0] = "81=81"
     _fixtures._write_json(path, submission)
     assert _verifier._run_verifier(task, app, logs).reward == 0.0
+
+
+def test_accepts_reordered_equation_values(tmp_path: Path) -> None:
+    task, app, logs = _fixtures._prepare_case(
+        tmp_path, "radical-system-uniqueness-audit", "computed"
+    )
+    path = app / "submission.json"
+    submission = json.loads(path.read_text())
+    values = submission["result"]["solutions"][0]["equation_values"]
+    submission["result"]["solutions"][0]["equation_values"] = list(reversed(values))
+    _fixtures._write_json(path, submission)
+    assert _verifier._run_verifier(task, app, logs).reward == 1.0
