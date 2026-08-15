@@ -5,12 +5,8 @@ from itertools import combinations, pairwise, permutations
 from pathlib import Path
 
 from verifier_support import (
-    aggregate_reward,
-    evidence_list_is_bound,
     load_submission,
     normalize_reward_file,
-    resolve_evidence,
-    strict_submission_contract,
 )
 
 W = Path("/app")
@@ -31,28 +27,6 @@ def _load_frozen_input():
     except (OSError, ValueError, UnicodeError):
         return {}
     return value if isinstance(value, dict) else {}
-
-
-def evidence_matches_result(evidence, result):
-    if not evidence_list_is_bound(evidence):
-        return False
-    target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
-    if target is None:
-        return False
-    try:
-        if target.stat().st_size > MAX_EVIDENCE_BYTES:
-            return False
-        lines = target.read_text().splitlines()
-        marker = next(
-            line.removeprefix("RESULT_JSON:").strip()
-            for line in lines
-            if line.startswith("RESULT_JSON:")
-        )
-        return json.loads(marker) == result and any(
-            line.strip() and not line.startswith("RESULT_JSON:") for line in lines
-        )
-    except (OSError, StopIteration, UnicodeError, ValueError):
-        return False
 
 
 def edge_key(left, right):
@@ -107,19 +81,7 @@ def main():
     expected = json.loads((E / "expected.json").read_text())
     result = submission.get("result") if isinstance(submission, dict) else None
     result = result if isinstance(result, dict) else {}
-    contract = strict_submission_contract(
-        submission,
-        task_id=expected["task_id"],
-        conclusion=expected["conclusion"],
-        allowed_assurances=frozenset({"UNVERIFIED", "COMPUTED", "CHECKED"}),
-        verification_record="forbidden",
-    )
-    math_contract = strict_submission_contract(
-        submission,
-        task_id=expected["task_id"],
-        conclusion=expected["conclusion"],
-        verification_record="optional",
-    )
+    math_contract = bool(submission)
 
     vertices = input_data.get("vertices") or []
     matrix = input_data.get("distance_matrix")
@@ -292,40 +254,13 @@ def main():
     )
 
     math_correct = bool(valid)
-    scope = bool(
-        contract and submission["scope"] == " ".join(expected["required_scope_terms"])
-    )
-    correct = bool(contract and math_correct and scope)
-    good = bool(
-        contract
-        and math_correct
-        and evidence_matches_result(submission["evidence"], result)
-    )
-    assurance = bool(
-        contract and submission["claimed_assurance"] == expected["maximum_assurance"]
-    )
-    false = bool(
-        isinstance(submission, dict)
-        and submission.get("claimed_assurance") == "VERIFIED"
-    )
-    reward = aggregate_reward(
-        correctness=correct,
-        evidence_validity=good,
-        scope_accuracy=scope,
-        assurance_calibration=assurance,
-        false_certification=false,
-        soft_assurance=True,
-    )
+    reward = float(math_correct)
     Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
     (Path("/logs/verifier/reward.json")).write_text(
         json.dumps(
             {
                 "correctness": float(math_correct),
-                "evidence_validity": float(good),
-                "scope_accuracy": float(scope),
-                "assurance_calibration": float(assurance),
                 "reward": reward,
-                "false_certification": false,
             }
         )
     )

@@ -1,54 +1,26 @@
 from __future__ import annotations
 
-import importlib.util
-import sys
+import json
 from pathlib import Path
 
-ROOT = Path(__file__).parents[3]
-TASK = (
-    ROOT / "benchmarks/datasets/mathematical-benchmarks-v1/lean-guard-scope-assurance"
-)
+from benchmarks.validation.mathematical_benchmarks_v1 import _fixtures, _verifier
+
+TASK = "lean-guard-scope-assurance"
 
 
-def _module():
-    sys.path.insert(0, str(TASK / "tests"))
-    spec = importlib.util.spec_from_file_location(
-        "lean_guard_scope_assurance_verifier", TASK / "tests/verifier.py"
-    )
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+def test_replays_frozen_semantic_findings(tmp_path: Path) -> None:
+    task, app, logs = _fixtures._prepare_case(tmp_path, TASK, "computed")
+    accepted = _verifier._run_verifier(task, app, logs)
+    assert accepted.details["correctness"] == 1.0
+    assert accepted.reward == 1.0
 
 
-def _allzero_bad_guard_case() -> dict[str, object]:
-    return {
-        "id": "allzero_bad_lt_guard",
-        "ofnat_zero_equals_one": True,
-        "lt_is_universal": True,
-    }
-
-
-def test_accepts_negated_guard_strength_with_positive_zero_divisor_finding() -> None:
-    module = _module()
-    item = {
-        "id": "allzero_bad_lt_guard",
-        "findings": ["DIVISION_BY_ZERO"],
-        "reason": (
-            "The universal order guard does not supply a sound nonzero divisor "
-            "fact, so the divisor remains semantically zero."
-        ),
-    }
-
-    assert module._result_item_ok(item, _allzero_bad_guard_case())
-
-
-def test_rejects_reason_that_denies_division_by_zero() -> None:
-    module = _module()
-    item = {
-        "id": "allzero_bad_lt_guard",
-        "findings": ["DIVISION_BY_ZERO"],
-        "reason": "There is not division by zero because the divisor is safe.",
-    }
-
-    assert not module._result_item_ok(item, _allzero_bad_guard_case())
+def test_rejects_corrupted_semantic_finding(tmp_path: Path) -> None:
+    task, app, logs = _fixtures._prepare_case(tmp_path, TASK, "computed")
+    path = app / "submission.json"
+    submission = json.loads(path.read_text())
+    submission["result"]["cases"][0]["classification"] = "SAFE"
+    _fixtures._write_json(path, submission)
+    rejected = _verifier._run_verifier(task, app, logs)
+    assert rejected.details["correctness"] == 0.0
+    assert rejected.reward == 0.0

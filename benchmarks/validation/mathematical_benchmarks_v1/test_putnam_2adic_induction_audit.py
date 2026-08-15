@@ -4,9 +4,29 @@ import json
 from pathlib import Path
 
 import pytest
-from benchmarks.validation.mathematical_benchmarks_v1 import support
+from benchmarks.validation.mathematical_benchmarks_v1 import (
+    _fixtures,
+    _verifier,
+)
 
 TASK = "putnam-2adic-induction-audit"
+
+
+def _case(tmp_path: Path):
+    return _fixtures._prepare_case(tmp_path, TASK, "computed")
+
+
+def _rewrite(app: Path, submission: dict) -> None:
+    _fixtures._write_json(app / "submission.json", submission)
+
+
+def test_oracle_passes(tmp_path: Path) -> None:
+    task, app, logs = _case(tmp_path)
+    submission = json.loads((app / "submission.json").read_text())
+    _rewrite(app, submission)
+    result = _verifier._run_verifier(task, app, logs)
+    assert result.details["correctness"] == 1.0
+    assert result.reward == pytest.approx(1.0)
 
 
 @pytest.mark.parametrize(
@@ -22,14 +42,23 @@ def test_rejects_corrupted_induction_certificates(
     path: tuple[object, ...],
     replacement: object,
 ) -> None:
-    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    task, app, logs = _case(tmp_path)
     submission = json.loads((app / "submission.json").read_text())
     target = submission["result"]
     for key in path[:-1]:
         target = target[key]
     target[path[-1]] = replacement
-    support._write_json(app / "submission.json", submission)
-
-    rejected = support._run_verifier(task, app, logs)
+    _rewrite(app, submission)
+    rejected = _verifier._run_verifier(task, app, logs)
     assert rejected.details["correctness"] == 0.0
     assert rejected.reward == 0.0
+
+
+def test_rejects_visible_input_tampering(tmp_path: Path) -> None:
+    task, app, logs = _case(tmp_path)
+    submission = json.loads((app / "submission.json").read_text())
+    _rewrite(app, submission)
+    (app / "input.json").write_text("{}")
+    result = _verifier._run_verifier(task, app, logs)
+    assert result.details["correctness"] == 0.0
+    assert result.reward == 0.0

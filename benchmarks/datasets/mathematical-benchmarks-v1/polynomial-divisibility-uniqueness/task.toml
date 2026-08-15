@@ -1,5 +1,5 @@
 schema_version = "1.4"
-artifacts = ["/app/submission.json", "/app/evidence"]
+artifacts = ["/app/submission.json"]
 
 [task]
 name = "jacobian/polynomial-divisibility-uniqueness"
@@ -14,7 +14,6 @@ primary_reasoning_objective = "symbolic divisibility and uniqueness reasoning"
 domain = "mathematical-sciences"
 primary_domain = "algebra"
 field = "algebra"
-assurance_ceiling = "COMPUTED"
 answer_visibility = "hidden-at-runtime"
 provenance_class = "public-curated-regression"
 required_provider = "core"

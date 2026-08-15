@@ -15,25 +15,17 @@ with the exact substituted values. The verifier independently performs the
 symbolic substitution and checks the checkpoints; valid alternative families
 are accepted.
 
-Write one digest-bound evidence object at
+Write one digest-bound task-specific witness object at
 `/app/evidence/precedence-audit.json`. It must contain exactly
-`schema_version`, `task_id`, `result`, and `limitations`, with the latter three
-equal to the submission. The only supported assurance is `COMPUTED`: this task
 checks an exact countermodel family but does not elaborate Lean or prove the
 informal minimum.
 
 <!-- BEGIN PUBLIC CONTRACT SUBMISSION BLOCK -->
 ## Submission
 
-Exact rational symbolic replay; Lean elaboration and the informal minimum remain outside scope.
+The verifier replays the task-specific mathematical predicate from the submitted result and validates the declared task-specific witness.
 
-Write `/app/submission.json` to the exact schema in `environment/submission_schema.json`. The submission envelope requires `task_id`, `conclusion`, `result`, `claimed_assurance`, `scope`, `completeness`, `evidence`, and `limitations`.
+Write `/app/submission.json` to the exact schema in `environment/submission_schema.json`. The submission requires a typed `result` and the declared `witness`.
 
-- **Conclusion:** one of `FORMALIZATION_CHANGES_SEMANTICS`
-- **Assurance:** scoreable values are `COMPUTED` (ceiling `COMPUTED`); the submission schema accepts any of `UNVERIFIED`, `COMPUTED`, `CHECKED`, `VERIFIED` but only scoreable assurances receive credit.
-- **Scope:** the exact value declared in `submission_schema.json`
-- **Completeness:** `COMPLETE`.
-- **Evidence:** 1-1 item(s); allowed path(s): `evidence/precedence-audit.json`; digest must match `^sha256:[0-9a-f]{64}$`.
-- **Evidence media types:** `application/json`.
-- **Required artifact filenames:** `evidence/precedence-audit.json`.
+- **Witness:** 1-1 item(s); allowed path(s): `evidence/precedence-audit.json`; digest must match `^sha256:[0-9a-f]{64}$`; media type(s): `application/json`.
 <!-- END PUBLIC CONTRACT SUBMISSION BLOCK -->

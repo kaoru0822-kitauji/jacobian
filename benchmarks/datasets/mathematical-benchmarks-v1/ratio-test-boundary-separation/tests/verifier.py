@@ -6,67 +6,12 @@ from fractions import Fraction
 from pathlib import Path
 
 from verifier_support import (
-    false_verified_claim,
     load_submission,
     normalize_reward_file,
-    resolve_evidence,
-    strict_submission_contract,
 )
 
 WORKSPACE = Path("/app")
 TESTS = Path("/tests")
-TASK_ID = "jacobian/ratio-test-boundary-separation"
-CONCLUSION = "RATIO_BOUNDARY_INCONCLUSIVE"
-SCOPE = "positive rational series indexed by n >= 1"
-MAX_EVIDENCE_BYTES = 1_048_576
-
-_PROOF_ASSISTANT_RE = re.compile(r"proof[ -]assistant", re.IGNORECASE)
-_NEGATION_RE = re.compile(
-    r"\b(?:not|no|never|without|cannot|neither|nor|doesn'?t|isn'?t|wasn'?t|aren'?t|"
-    r"won'?t|don'?t|does\s+not|is\s+not|was\s+not)\b",
-    re.IGNORECASE,
-)
-_AFFIRMATIVE_VERIFICATION_RE = re.compile(
-    r"\b(?:perform(?:ed)?|confirm(?:ed)?|complet(?:ed)?|proven|proved|verified|"
-    r"established|done|carried\s+out)\b",
-    re.IGNORECASE,
-)
-_CLAUSE_SPLIT_RE = re.compile(r"[.;,!?\n]+")
-_BOUNDARY_EXPLANATION_RE = re.compile(
-    r"\b(?:inconclusive|cannot\s+decide|cannot\s+determine|does\s+not\s+decide|"
-    r"not\s+decisive|boundary|insufficient)\b",
-    re.IGNORECASE,
-)
-
-
-def _split_clauses(text: str) -> list[str]:
-    return [clause.strip() for clause in _CLAUSE_SPLIT_RE.split(text) if clause.strip()]
-
-
-def _negated_proof_assistant_limitation(item: object) -> bool:
-    """A limitation whose proof-assistant clause is negated."""
-
-    if not isinstance(item, str) or not _PROOF_ASSISTANT_RE.search(item):
-        return False
-    for clause in _split_clauses(item):
-        if _PROOF_ASSISTANT_RE.search(clause) and _NEGATION_RE.search(clause):
-            return True
-    return False
-
-
-def _affirmative_proof_assistant_claim(item: object) -> bool:
-    """A limitation whose proof-assistant clause asserts verification happened."""
-
-    if not isinstance(item, str) or not _PROOF_ASSISTANT_RE.search(item):
-        return False
-    for clause in _split_clauses(item):
-        if not _PROOF_ASSISTANT_RE.search(clause):
-            continue
-        if _NEGATION_RE.search(clause):
-            continue
-        if _AFFIRMATIVE_VERIFICATION_RE.search(clause):
-            return True
-    return False
 
 
 def _fraction(value: object) -> Fraction | None:
@@ -191,90 +136,15 @@ def _result(value: object) -> bool:
     )
 
 
-def _evidence(value: object, result: object) -> bool:
-    if not isinstance(value, list) or len(value) != 1:
-        return False
-    path = resolve_evidence(value[0], expected_path="evidence/answer.txt")
-    if path is None:
-        return False
-    try:
-        if path.stat().st_size > MAX_EVIDENCE_BYTES:
-            return False
-        text = path.read_text()
-    except (OSError, UnicodeError):
-        return False
-    markers = [
-        line[12:].strip()
-        for line in text.splitlines()
-        if line.startswith("RESULT_JSON:")
-    ]
-    if len(markers) != 1:
-        return False
-    try:
-        bound = json.loads(markers[0])
-    except (ValueError, RecursionError):
-        return False
-    prose = "\n".join(
-        line for line in text.splitlines() if not line.startswith("RESULT_JSON:")
-    )
-    folded = prose.casefold()
-    return bool(
-        bound == result
-        and len(folded) >= 80
-        and _BOUNDARY_EXPLANATION_RE.search(prose)
-        and all(
-            word in folded
-            for word in ("ratio", "diverge", "converge", "dyadic", "telescop")
-        )
-    )
-
-
 def _evaluate(submission: object) -> dict[str, float | bool]:
-    protocol = strict_submission_contract(
-        submission,
-        task_id=TASK_ID,
-        conclusion=CONCLUSION,
-        allowed_assurances=frozenset({"UNVERIFIED", "COMPUTED"}),
-        verification_record="forbidden",
-    )
-    false_certification = false_verified_claim(
-        submission, verification_record_bound=False
-    )
     data = submission if isinstance(submission, dict) else {}
-    limitations = data.get("limitations", [])
-    has_negated_limitation = isinstance(limitations, list) and any(
-        _negated_proof_assistant_limitation(item) for item in limitations
-    )
-    has_affirmative_claim = isinstance(limitations, list) and any(
-        _affirmative_proof_assistant_claim(item) for item in limitations
-    )
-    math_correct = bool(_source_is_bound() and _result(data.get("result")))
-    evidence_valid = bool(
-        math_correct and _evidence(data.get("evidence"), data.get("result"))
-    )
-    scope_correct = bool(protocol and data.get("scope") == SCOPE)
-    assurance_correct = bool(
-        protocol
-        and data.get("claimed_assurance") == "COMPUTED"
-        and has_negated_limitation
-        and not has_affirmative_claim
-    )
-    reward = (
-        1.0
-        if math_correct
-        and evidence_valid
-        and scope_correct
-        and assurance_correct
-        and not false_certification
-        else 0.0
-    )
+    input_binding = _source_is_bound()
+    math_ok = bool(input_binding and _result(data.get("result")))
+    reward = float(input_binding and submission is not None and math_ok)
     return {
-        "correctness": float(math_correct),
-        "evidence_validity": float(evidence_valid),
-        "scope_accuracy": float(scope_correct),
-        "assurance_calibration": float(assurance_correct),
+        "correctness": float(math_ok),
+        "input_binding": float(input_binding),
         "reward": reward,
-        "false_certification": false_certification,
     }
 
 

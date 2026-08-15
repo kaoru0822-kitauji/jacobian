@@ -3,18 +3,10 @@ import math
 from pathlib import Path
 from typing import Any
 
-from verifier_support import (
-    evidence_list_is_bound,
-    false_verified_claim,
-    load_submission,
-    normalize_reward_file,
-    resolve_evidence,
-    strict_submission_contract,
-)
+from verifier_support import load_submission, normalize_reward_file
 
 WORKSPACE = Path("/app")
 TESTS = Path("/tests")
-LIMITATION = "The checker validates the irreducibility and minimal-polynomial certificate contract, but does not replay a proof assistant or implement arbitrary rational-function fields."
 
 
 def _source() -> dict[str, Any]:
@@ -107,83 +99,18 @@ def _result(value: object, source: dict[str, Any]) -> bool:
     )
 
 
-def _evidence(value: object) -> bool:
-    if (
-        not isinstance(value, list)
-        or len(value) != 1
-        or not evidence_list_is_bound(value)
-    ):
-        return False
-    assert isinstance(value, list)
-    path = resolve_evidence(value[0], expected_path="evidence/answer.txt")
-    if path is None:
-        return False
-    try:
-        text = path.read_text().lower()
-    except (OSError, UnicodeError):
-        return False
-    return bool(
-        len(text) >= 180
-        and all(
-            term in text
-            for term in (
-                "annihilating",
-                "irreducible",
-                "valuation",
-                "minimal polynomial",
-            )
-        )
-        and "divisible by p" in text
-        and "x^p-u" in text
-    )
-
-
 def main() -> None:
     submission = load_submission()
+    protocol_ok = submission is not None
     data = submission if isinstance(submission, dict) else {}
-    expected = json.loads((TESTS / "expected.json").read_text())
-    contract = strict_submission_contract(
-        submission,
-        task_id=expected["task_id"],
-        conclusion=expected["conclusion"],
-        verification_record="forbidden",
-    )
-    correct = bool(contract and _result(data.get("result"), _source()))
-    evidence = bool(correct and _evidence(data.get("evidence")))
-    scope = bool(contract and data.get("scope") == expected["required_scope"])
-    assurance = bool(
-        contract and data.get("claimed_assurance") == expected["maximum_assurance"]
-    )
-    limitations = bool(
-        contract
-        and isinstance(data.get("limitations"), list)
-        and any(
-            isinstance(item, str)
-            and "proof assistant" in item.casefold()
-            and "not" in item.casefold()
-            for item in data["limitations"]
-        )
-    )
-    false_verified = false_verified_claim(submission, verification_record_bound=False)
-    passed = bool(
-        correct
-        and evidence
-        and scope
-        and assurance
-        and limitations
-        and not false_verified
-    )
+    math_ok = bool(protocol_ok and _result(data.get("result"), _source()))
     logs = Path("/logs/verifier")
     logs.mkdir(parents=True, exist_ok=True)
     (logs / "reward.json").write_text(
         json.dumps(
             {
-                "correctness": float(correct),
-                "evidence_validity": float(evidence),
-                "scope_accuracy": float(scope),
-                "assurance_calibration": float(assurance),
-                "reward": float(passed),
-                "false_certification": false_verified,
+                "correctness": float(math_ok),
+                "reward": float(math_ok),
             },
             sort_keys=True,
         )

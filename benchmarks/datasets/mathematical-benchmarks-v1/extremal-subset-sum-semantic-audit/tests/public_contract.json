@@ -1,43 +1,6 @@
 {
-  "allowed_assurance": [
-    "UNVERIFIED",
-    "COMPUTED"
-  ],
-  "allowed_completeness": [
-    "COMPLETE"
-  ],
-  "assurance_ceiling": "COMPUTED",
-  "conclusion": {
-    "const": "PROPOSED_FORMALIZATION_NOT_FAITHFUL"
-  },
-  "evidence": {
-    "allowed_paths": [
-      "evidence/answer.txt"
-    ],
-    "digest_pattern": "^sha256:[0-9a-f]{64}$",
-    "max_items": 1,
-    "media_types": [
-      "text/plain"
-    ],
-    "min_items": 1,
-    "payload_shape": null
-  },
-  "limitations": {
-    "items": {
-      "type": "string"
-    },
-    "minItems": 1,
-    "type": "array"
-  },
-  "public_notes": "The verifier checks the declared result, semantic scope, completeness, digest-bound evidence, limitation claims, and assurance as separate protocol dimensions. State that Lean compilation is not assessed and do not claim that Lean or the corrected asymptotic conjecture was verified or proved.",
-  "required_artifact_filenames": [
-    "evidence/answer.txt"
-  ],
+  "public_notes": "The verifier replays the task-specific mathematical predicate from the submitted result.",
   "schema_version": "1",
-  "scope": {
-    "const": "semantic comparison of the frozen fixed-parameter and subset-sum contracts",
-    "type": "string"
-  },
   "submission_path": "/app/submission.json",
   "submission_result": {
     "additionalProperties": false,
@@ -166,49 +129,6 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,
     "properties": {
-      "claimed_assurance": {
-        "enum": [
-          "UNVERIFIED",
-          "COMPUTED",
-          "CHECKED",
-          "VERIFIED"
-        ]
-      },
-      "completeness": {
-        "const": "COMPLETE"
-      },
-      "conclusion": {
-        "const": "PROPOSED_FORMALIZATION_NOT_FAITHFUL"
-      },
-      "evidence": {
-        "items": {
-          "additionalProperties": false,
-          "properties": {
-            "path": {
-              "const": "evidence/answer.txt"
-            },
-            "sha256": {
-              "pattern": "^sha256:[0-9a-f]{64}$",
-              "type": "string"
-            }
-          },
-          "required": [
-            "path",
-            "sha256"
-          ],
-          "type": "object"
-        },
-        "maxItems": 1,
-        "minItems": 1,
-        "type": "array"
-      },
-      "limitations": {
-        "items": {
-          "type": "string"
-        },
-        "minItems": 1,
-        "type": "array"
-      },
       "result": {
         "additionalProperties": false,
         "properties": {
@@ -331,24 +251,10 @@
           "predicate_certificate"
         ],
         "type": "object"
-      },
-      "scope": {
-        "const": "semantic comparison of the frozen fixed-parameter and subset-sum contracts",
-        "type": "string"
-      },
-      "task_id": {
-        "const": "jacobian/extremal-subset-sum-semantic-audit"
       }
     },
     "required": [
-      "task_id",
-      "conclusion",
-      "result",
-      "claimed_assurance",
-      "scope",
-      "completeness",
-      "evidence",
-      "limitations"
+      "result"
     ],
     "type": "object"
   },

@@ -3,11 +3,8 @@ from fractions import Fraction
 from pathlib import Path
 
 from verifier_support import (
-    evidence_list_is_bound,
     load_submission,
     normalize_reward_file,
-    resolve_evidence,
-    strict_submission_contract,
 )
 
 W = Path("/app")
@@ -161,39 +158,9 @@ def certificate_valid(result, frozen):
     )
 
 
-def evidence_valid(evidence, result):
-    if (
-        not isinstance(evidence, list)
-        or len(evidence) != 1
-        or not evidence_list_is_bound(evidence)
-    ):
-        return False
-    target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
-    if target is None:
-        return False
-    try:
-        if target.stat().st_size > MAX_EVIDENCE_BYTES:
-            return False
-        text = target.read_text()
-        markers = [
-            line.removeprefix("RESULT_JSON:").strip()
-            for line in text.splitlines()
-            if line.startswith("RESULT_JSON:")
-        ]
-        prose = [
-            line.strip()
-            for line in text.splitlines()
-            if line.strip() and not line.startswith("RESULT_JSON:")
-        ]
-        return bool(len(markers) == 1 and json.loads(markers[0]) == result and prose)
-    except (OSError, UnicodeError, ValueError):
-        return False
-
-
 def main():
     submission = load_submission()
     frozen = load_frozen()
-    expected = json.loads((E / "expected.json").read_text())
     source = frozen.get("source") if isinstance(frozen, dict) else {}
     source_bound = bool(
         isinstance(source, dict)
@@ -202,54 +169,15 @@ def main():
         == "sha256:094bc10d13dd610b5f2a17f69203641a0cc05fbca5982df06d9e07c8d189a559"
         and source.get("license") == "CC 4.0"
     )
-    mathematical_contract = strict_submission_contract(
-        submission,
-        task_id=expected["task_id"],
-        conclusion=expected["conclusion"],
-        verification_record="optional",
-    )
-    public_contract = strict_submission_contract(
-        submission,
-        task_id=expected["task_id"],
-        conclusion=expected["conclusion"],
-        allowed_assurances=frozenset({"UNVERIFIED", "COMPUTED", "CHECKED"}),
-        verification_record="forbidden",
-    )
     result = submission.get("result") if isinstance(submission, dict) else {}
-    correctness = bool(
-        mathematical_contract and source_bound and certificate_valid(result, frozen)
-    )
-    evidence = bool(
-        mathematical_contract
-        and isinstance(result, dict)
-        and evidence_valid(submission.get("evidence"), result)
-    )
-    scope = bool(
-        mathematical_contract and submission.get("scope") == expected["required_scope"]
-    )
-    assurance = bool(
-        mathematical_contract
-        and submission.get("claimed_assurance") == expected["maximum_assurance"]
-    )
-    false_certification = bool(
-        isinstance(submission, dict)
-        and submission.get("claimed_assurance") == "VERIFIED"
-    )
-    reward = (
-        0.0
-        if not public_contract or not correctness or not evidence or false_certification
-        else 0.8 + 0.1 * scope + 0.1 * assurance
-    )
+    correctness = bool(source_bound and certificate_valid(result, frozen))
+    reward = float(correctness)
     Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
     Path("/logs/verifier/reward.json").write_text(
         json.dumps(
             {
                 "correctness": float(correctness),
-                "evidence_validity": float(evidence),
-                "scope_accuracy": float(scope),
-                "assurance_calibration": float(assurance),
                 "reward": reward,
-                "false_certification": false_certification,
             }
         )
     )

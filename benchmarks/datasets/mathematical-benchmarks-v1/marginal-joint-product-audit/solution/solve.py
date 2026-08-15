@@ -1,4 +1,3 @@
-import hashlib
 import json
 from collections import defaultdict
 from fractions import Fraction
@@ -46,28 +45,5 @@ result = {
     "witness_product_value": 1,
     "missing_assumption": "JOINT_CONVERGENCE",
 }
-evidence = (
-    "The marginal laws are constant in n, and every prelimit joint law is the "
-    "independent product coupling. The named limit variables have the same "
-    "marginals but a diagonal joint coupling, so their product law differs. "
-    "Marginal convergence alone therefore does not supply joint convergence "
-    "or independence of the limit pair.\n"
-    f"RESULT_JSON:{json.dumps(result, sort_keys=True, separators=(',', ':'))}\n"
-)
-Path("/app/evidence").mkdir(parents=True, exist_ok=True)
-Path("/app/evidence/answer.txt").write_text(evidence)
-digest = hashlib.sha256(evidence.encode()).hexdigest()
-submission = {
-    "task_id": "jacobian/marginal-joint-product-audit",
-    "conclusion": "MARGINAL_CONVERGENCE_INSUFFICIENT",
-    "result": result,
-    "claimed_assurance": "COMPUTED",
-    "scope": "frozen-four-point-marginal-and-submitted-couplings",
-    "completeness": "COMPLETE",
-    "evidence": [{"path": "evidence/answer.txt", "sha256": f"sha256:{digest}"}],
-    "limitations": [
-        "This exact finite-law countermodel does not machine-verify a general "
-        "weak-convergence theorem or disambiguate the original prose."
-    ],
-}
+submission = {"result": result}
 Path("/app/submission.json").write_text(json.dumps(submission, indent=2) + "\n")

@@ -2,25 +2,17 @@ from __future__ import annotations
 
 import json
 import math
-import re
 from fractions import Fraction
 from functools import reduce
 from pathlib import Path
 
 from verifier_support import (
-    evidence_list_is_bound,
-    false_verified_claim,
     load_submission,
     normalize_reward_file,
-    resolve_evidence,
-    strict_submission_contract,
 )
 
 WORKSPACE = Path("/app")
 TESTS = Path("/tests")
-TASK_ID = "jacobian/hyperplane-arrangement-regions"
-CONCLUSION = "REGION_COUNT_CERTIFIED"
-SCOPE = "the ten frozen cube and tetrahedron face planes"
 PLANES = {
     "cube_x0": (1, 0, 0, 0),
     "cube_x1": (1, 0, 0, 1),
@@ -34,42 +26,7 @@ PLANES = {
     "tetra_BA1C1": (1, -1, 1, 1),
 }
 PLANE_LABELS = tuple(PLANES)
-_NEGATED_PROOF_ASSISTANT = re.compile(
-    r"\b(?:not|no|without|doesn['']?t|does\s+not|cannot|never)\b"
-    r"[^.;\n]{0,80}\b(?:verif(?:y|ied|ies)|formaliz(?:e|ed|es)|"
-    r"prove(?:s|d)|certif(?:y|ied|ies))\b[^.;\n]{0,80}"
-    r"\b(?:proof assistant|lean)\b|"
-    r"\b(?:not|no|without|doesn['']?t|does\s+not|cannot|never)\b"
-    r"[^.;\n]{0,30}\b(?:proof assistant|lean)\b",
-    re.I,
-)
-_AFFIRMATIVE_PROOF_ASSISTANT = re.compile(
-    r"\b(?:verif(?:y|ied|ies)|formaliz(?:e|ed|es)|prove(?:s|d)|certif(?:y|ied|ies))\b"
-    r"[^.;\n]{0,80}\b(?:proof assistant|lean)\b|"
-    r"\b(?:proof assistant|lean)\b[^.;\n]{0,80}"
-    r"\b(?:verif(?:y|ied|ies)|formaliz(?:e|ed|es)|prove(?:s|d)|certif(?:y|ied|ies))\b",
-    re.I,
-)
 _EVIDENCE_STEMS = ("duplic", "restrict", "line", "region")
-
-
-def _limitation_is_valid(value: str) -> bool:
-    """Accept limitations that genuinely negate proof-assistant verification.
-
-    The negation must appear within 30 chars before the proof-assistant phrase
-    in the same clause, so an unrelated negation elsewhere does not rescue an
-    affirmative proof-assistant claim.
-    """
-
-    normalized = re.sub(r"[-_\s]+", " ", value.casefold()).strip()
-    if "proof assistant" not in normalized and "lean" not in normalized:
-        return False
-    for clause in re.split(r"[.;\n]", normalized):
-        if _AFFIRMATIVE_PROOF_ASSISTANT.search(clause) and not (
-            _NEGATED_PROOF_ASSISTANT.search(clause)
-        ):
-            return False
-    return _NEGATED_PROOF_ASSISTANT.search(normalized) is not None
 
 
 def _canonical(values: tuple[int, ...]) -> tuple[int, ...] | None:
@@ -211,90 +168,23 @@ def _result(value: object) -> bool:
     )
 
 
-def _evidence(value: object, result: object) -> bool:
-    if (
-        not isinstance(value, list)
-        or len(value) != 1
-        or not evidence_list_is_bound(value)
-    ):
-        return False
-    path = resolve_evidence(value[0], expected_path="evidence/answer.txt")
-    if path is None:
-        return False
-    try:
-        text = path.read_text()
-        markers = [
-            line[12:].strip()
-            for line in text.splitlines()
-            if line.startswith("RESULT_JSON:")
-        ]
-        bound = json.loads(markers[0]) if len(markers) == 1 else None
-    except (OSError, UnicodeError, ValueError, RecursionError):
-        return False
-    prose = "\n".join(
-        line for line in text.splitlines() if not line.startswith("RESULT_JSON:")
-    ).strip()
-    return bound == result and len(prose) >= 32
-
-
-def _evaluate(submission: object) -> dict[str, float | bool]:
-    protocol = strict_submission_contract(
-        submission,
-        task_id=TASK_ID,
-        conclusion=CONCLUSION,
-        allowed_assurances=frozenset({"UNVERIFIED", "COMPUTED"}),
-        verification_record="forbidden",
-    )
-    false_certification = false_verified_claim(
-        submission, verification_record_bound=False
-    )
-    envelope = isinstance(submission, dict)
-    mathematical = bool(
-        envelope and _source_is_bound() and _result(submission.get("result"))
-    )
-    evidence_valid = bool(
-        envelope and _evidence(submission.get("evidence"), submission.get("result"))
-    )
-    scope_accurate = bool(
-        protocol
-        and envelope
-        and submission.get("scope") == SCOPE
-        and submission.get("completeness") == "COMPLETE"
-        and any(
-            _limitation_is_valid(item)
-            for item in submission.get("limitations", [])
-            if isinstance(item, str)
-        )
-    )
-    assurance_calibrated = bool(
-        envelope
-        and submission.get("claimed_assurance") == "COMPUTED"
-        and not false_certification
-    )
-    correct_score = 1.0 if mathematical else 0.0
-    evidence_score = 1.0 if evidence_valid else 0.0
-    scope_score = 1.0 if scope_accurate else 0.0
-    assurance_score = 1.0 if assurance_calibrated else 0.0
-    reward = (
-        min(correct_score, evidence_score, scope_score, assurance_score)
-        if protocol
-        else 0.0
-    )
-    return {
-        "correctness": correct_score,
-        "evidence_validity": evidence_score,
-        "scope_accuracy": scope_score,
-        "assurance_calibration": assurance_score,
-        "reward": reward,
-        "false_certification": false_certification,
-    }
-
-
 def main() -> None:
+    submission = load_submission()
+    protocol_ok = submission is not None
+    data = submission if isinstance(submission, dict) else {}
+    math_ok = bool(protocol_ok and _source_is_bound() and _result(data.get("result")))
+    reward = float(protocol_ok and math_ok)
     destination = Path("/logs/verifier/reward.json")
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(
-        json.dumps(_evaluate(load_submission()), sort_keys=True) + "\n"
+        json.dumps(
+            {
+                "correctness": float(math_ok),
+                "reward": reward,
+            },
+            sort_keys=True,
+        )
+        + "\n"
     )
     normalize_reward_file(destination)
 

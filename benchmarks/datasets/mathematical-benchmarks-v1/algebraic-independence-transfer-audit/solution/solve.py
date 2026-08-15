@@ -1,4 +1,3 @@
-import hashlib
 import json
 from pathlib import Path
 
@@ -29,24 +28,4 @@ result = {
         term(-1, [0, 0, 3]),
     ],
 }
-text = (
-    "The first and second coordinate changes are birational with the displayed inverse formulas. The conjugate norm is computed exactly over QQ. The modular-form independence theorem remains a trusted premise.\nRESULT_JSON:"
-    + json.dumps(result, sort_keys=True, separators=(",", ":"))
-    + "\n"
-)
-Path("/app/evidence").mkdir(parents=True, exist_ok=True)
-Path("/app/evidence/answer.txt").write_text(text)
-digest = hashlib.sha256(text.encode()).hexdigest()
-submission = {
-    "task_id": "jacobian/algebraic-independence-transfer-audit",
-    "conclusion": "EXPLICIT_TRANSFER_CHAIN_REPAIRS_COMPRESSED_PROOF",
-    "result": result,
-    "claimed_assurance": "COMPUTED",
-    "scope": "exact-birational-and-quadratic-transfer-over-QQ",
-    "completeness": "COMPLETE",
-    "evidence": [{"path": "evidence/answer.txt", "sha256": f"sha256:{digest}"}],
-    "limitations": [
-        "The external algebraic-independence theorem for delta and its derivatives is a trusted premise and is not verified here."
-    ],
-}
-Path("/app/submission.json").write_text(json.dumps(submission, indent=2) + "\n")
+Path("/app/submission.json").write_text(json.dumps({"result": result}, indent=2) + "\n")

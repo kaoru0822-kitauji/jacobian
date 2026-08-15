@@ -9,22 +9,15 @@ Submit both full multiplication tensors, both unit vectors, the coordinate matri
 
 The verifier independently enumerates every possible linear functional (`5^5` for `A`, `5^3` for `B`) and checks multiplicativity on all basis pairs. It also rebuilds every product and power. A bijection on the three nonempty rational-point sets therefore coexists with a reducedness obstruction to algebra—and hence affine-scheme—isomorphism.
 
-The evidence file `evidence/answer.txt` must state the following three facts in the solver's own words: (1) both affine schemes are nonempty and have the same three rational points under the induced map; (2) A has a nonzero order-three nilpotent; (3) B is reduced, so the two schemes are not isomorphic. Additional derivation content is allowed and ignored.
+The submitted tensors, point map, and nilpotent are the executable certificate; no prose explanation or duplicate artifact is required.
 
 The public submission contract is generated below from `tests/public_contract.json`.
 
 <!-- BEGIN PUBLIC CONTRACT SUBMISSION BLOCK -->
 ## Submission
 
-Submit complete finite-algebra structure constants, exhaustive rational-point lists, the induced point bijection, and a reducedness-separating nilpotent certificate. The verifier reconstructs every operation over F_5. The limitations array records the exact obligation IDs `claim:finite-affine-countermodel` and `limitation:no-general-scheme-theorem` in that order; free-form mathematical explanation remains in the evidence artifact.
+The verifier replays the task-specific mathematical predicate from the submitted result.
 
-Write `/app/submission.json` to the exact schema in `environment/submission_schema.json`. The submission envelope requires `task_id`, `conclusion`, `result`, `claimed_assurance`, `scope`, `completeness`, `evidence`, and `limitations`.
+Write `/app/submission.json` to the exact schema in `environment/submission_schema.json`. The submission requires a typed `result`.
 
-- **Conclusion:** exactly `RATIONAL_POINT_BIJECTION_DOES_NOT_FORCE_SCHEME_ISOMORPHISM`
-- **Assurance:** scoreable values are `UNVERIFIED`, `COMPUTED` (ceiling `COMPUTED`); the submission schema accepts any of `UNVERIFIED`, `COMPUTED`, `CHECKED`, `VERIFIED` but only scoreable assurances receive credit.
-- **Scope:** the exact value declared in `submission_schema.json`
-- **Completeness:** `COMPLETE`.
-- **Evidence:** 1-1 item(s); allowed path(s): `evidence/answer.txt`; digest must match `^sha256:[0-9a-f]{64}$`.
-- **Evidence media types:** `text/plain`.
-- **Required artifact filenames:** `evidence/answer.txt`.
 <!-- END PUBLIC CONTRACT SUBMISSION BLOCK -->

@@ -5,12 +5,9 @@ from typing import Any
 
 from verifier_support import (
     MAX_INPUT_BYTES,
-    false_verified_claim,
     is_regular_bounded_file,
     load_submission,
     normalize_reward_file,
-    resolve_evidence,
-    strict_submission_contract,
     workspace_input_is_bound,
 )
 
@@ -301,27 +298,6 @@ def _result_is_valid(result: object, source: dict[str, Any]) -> bool:
     )
 
 
-def _evidence_matches_result(evidence: object, result: dict[str, Any]) -> bool:
-    if not isinstance(evidence, list) or len(evidence) != 1:
-        return False
-    target = resolve_evidence(
-        evidence[0],
-        expected_path="evidence/answer.txt",
-        max_bytes=MAX_EVIDENCE_BYTES,
-    )
-    if target is None:
-        return False
-    try:
-        markers = [
-            line.removeprefix("RESULT_JSON:").strip()
-            for line in target.read_text().splitlines()
-            if line.startswith("RESULT_JSON:")
-        ]
-        return len(markers) == 1 and _json_exact_equal(json.loads(markers[0]), result)
-    except (OSError, UnicodeError, ValueError, RecursionError, MemoryError):
-        return False
-
-
 def _json_exact_equal(left: object, right: object) -> bool:
     if type(left) is not type(right):
         return False
@@ -339,7 +315,7 @@ def _json_exact_equal(left: object, right: object) -> bool:
 def _evidence_descriptors_ok(evidence: object) -> bool:
     """Check the evidence descriptor shape, path, and digest syntax.
 
-    File-content binding is left to ``evidence_validity``; this predicate only
+    File-content binding is left to ``witness_validity``; this predicate only
     ensures the envelope descriptor matches the public schema so a malformed
     descriptor such as ``[null]`` is reported as a protocol failure.
     """
@@ -358,38 +334,10 @@ def main() -> None:
     submission = load_submission()
     data = submission if isinstance(submission, dict) else {}
     source = _load_frozen_input()
-    expected = json.loads((TESTS / "expected.json").read_text())
-    contract = strict_submission_contract(
-        submission,
-        task_id=expected["task_id"],
-        conclusion=expected["conclusion"],
-        verification_record="forbidden",
-    )
     result = data.get("result")
     math_correct = bool(_result_is_valid(result, source))
-    evidence_valid = bool(
-        isinstance(result, dict)
-        and _evidence_matches_result(data.get("evidence"), result)
-    )
-    scope_correct = bool(contract and data.get("scope") == expected["required_scope"])
-    assurance_correct = bool(
-        data.get("claimed_assurance") == expected["maximum_assurance"]
-    )
-    limitations_correct = bool(data.get("limitations") == [LIMITATION])
-    false_certification = false_verified_claim(
-        submission, verification_record_bound=False
-    )
-    protocol = bool(
-        contract
-        and _result_shape_is_valid(result)
-        and _evidence_descriptors_ok(data.get("evidence"))
-        and scope_correct
-        and assurance_correct
-        and limitations_correct
-    )
-    correct = bool(
-        protocol and math_correct and evidence_valid and not false_certification
-    )
+    protocol = _result_shape_is_valid(result)
+    correct = bool(protocol and math_correct)
     logs = Path("/logs/verifier")
     logs.mkdir(parents=True, exist_ok=True)
     (logs / "reward.json").write_text(
@@ -397,11 +345,7 @@ def main() -> None:
             {
                 "protocol_compliance": float(protocol),
                 "correctness": float(math_correct),
-                "evidence_validity": float(evidence_valid),
-                "scope_accuracy": float(scope_correct),
-                "assurance_calibration": float(assurance_correct),
                 "reward": float(correct),
-                "false_certification": false_certification,
             }
         )
     )

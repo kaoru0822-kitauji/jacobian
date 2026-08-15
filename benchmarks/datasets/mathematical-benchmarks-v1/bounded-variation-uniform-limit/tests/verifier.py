@@ -6,12 +6,9 @@ from fractions import Fraction
 from pathlib import Path
 
 from verifier_support import (
-    false_verified_claim,
     is_regular_bounded_file,
     load_submission,
     normalize_reward_file,
-    resolve_evidence,
-    strict_submission_contract,
 )
 
 WORKSPACE = Path("/app")
@@ -180,101 +177,13 @@ def _result(value: object) -> bool:
     return all(_checkpoint_ok(item, q, seen) for item in checkpoints)
 
 
-def _evidence(value: object, result: object) -> bool:
-    if not isinstance(value, list) or len(value) != 1:
-        return False
-    expected = WORKSPACE / "evidence/answer.txt"
-    if not is_regular_bounded_file(expected, max_bytes=16 * 1024 * 1024):
-        return False
-    path = resolve_evidence(
-        value[0], expected_path="evidence/answer.txt", max_bytes=16 * 1024 * 1024
-    )
-    if path is None:
-        return False
-    try:
-        text = path.read_text()
-    except (OSError, UnicodeError):
-        return False
-    markers = [
-        line[12:].strip()
-        for line in text.splitlines()
-        if line.startswith("RESULT_JSON:")
-    ]
-    if len(markers) != 1:
-        return False
-    try:
-        bound = json.loads(markers[0])
-    except (ValueError, RecursionError):
-        return False
-    # The required explanation is the typed ``result.argument`` object.  Any
-    # surrounding prose is optional and is deliberately not interpreted as a
-    # hidden keyword protocol.
-    return json.dumps(bound, sort_keys=True, separators=(",", ":")) == json.dumps(
-        result, sort_keys=True, separators=(",", ":")
-    )
-
-
-def _limitation_ok(limitations: object) -> bool:
-    return limitations == [LIMITATION]
-
-
 def _evaluate(submission: object) -> dict[str, float | bool]:
-    protocol = strict_submission_contract(
-        submission,
-        task_id=TASK_ID,
-        conclusion=CONCLUSION,
-        allowed_assurances=frozenset({"UNVERIFIED", "COMPUTED"}),
-        verification_record="forbidden",
-    )
-    false_certification = false_verified_claim(
-        submission, verification_record_bound=False
-    )
     data = submission if isinstance(submission, dict) else {}
-    limitations = data.get("limitations", [])
-    limitation_ok = _limitation_ok(limitations)
-    # Evaluate each diagnostic dimension independently of protocol validity so
-    # a protocol failure does not collapse mathematical correctness, evidence
-    # validity, scope accuracy, or assurance calibration to zero.  Protocol
-    # still gates the aggregate reward.  Scope requires a structurally valid
-    # envelope (dict with string claimed_assurance) but does not enforce the
-    # strict field set or allowed assurance levels.
-    structure_valid = bool(
-        isinstance(submission, dict)
-        and isinstance(data.get("claimed_assurance"), str)
-        and isinstance(data.get("scope"), str)
-        and isinstance(data.get("limitations"), list)
-    )
     math_correct = bool(_source_is_bound() and _result(data.get("result")))
-    evidence_valid = bool(
-        math_correct and _evidence(data.get("evidence"), data.get("result"))
-    )
-    scope_correct = bool(
-        structure_valid
-        and data.get("scope") == SCOPE
-        and data.get("completeness") == "COMPLETE"
-    )
-    assurance_correct = bool(
-        data.get("claimed_assurance") == "COMPUTED" and limitation_ok
-    )
-    reward = (
-        1.0
-        if protocol
-        and math_correct
-        and evidence_valid
-        and scope_correct
-        and assurance_correct
-        and not false_certification
-        else 0.0
-    )
+    reward = float(math_correct)
     return {
-        "protocol": protocol,
-        "protocol_compliance": float(protocol),
         "correctness": float(math_correct),
-        "evidence_validity": float(evidence_valid),
-        "scope_accuracy": float(scope_correct),
-        "assurance_calibration": float(assurance_correct),
         "reward": reward,
-        "false_certification": false_certification,
     }
 
 

@@ -4,20 +4,11 @@ from fractions import Fraction
 from pathlib import Path
 
 from verifier_support import (
-    evidence_list_is_bound,
-    false_verified_claim,
     load_submission,
     normalize_reward_file,
-    resolve_evidence,
-    strict_submission_contract,
 )
 
 W, T = Path("/app"), Path("/tests")
-LIMITATIONS = [
-    "STANDARD_POWER_LOG_INTEGRAL_CRITERION_TRUSTED",
-    "DECLARED_FUNCTION_FAMILY_ONLY",
-    "NO_PROOF_ASSISTANT_VERIFICATION",
-]
 MAX_EVIDENCE_BYTES = 64 * 1024
 
 
@@ -77,83 +68,18 @@ def _json_equal(left, right):
     )
 
 
-def valid_evidence(evidence, result):
-    """Bind evidence content to the submitted result via a RESULT_JSON line."""
-    if not isinstance(evidence, list) or len(evidence) != 1:
-        return False
-    if not evidence_list_is_bound(
-        evidence, expected_path="evidence/answer.txt", max_bytes=MAX_EVIDENCE_BYTES
-    ):
-        return False
-    target = resolve_evidence(
-        evidence[0], expected_path="evidence/answer.txt", max_bytes=MAX_EVIDENCE_BYTES
-    )
-    if target is None:
-        return False
-    try:
-        text = target.read_text()
-    except (OSError, UnicodeError):
-        return False
-    markers = [
-        line.removeprefix("RESULT_JSON:").strip()
-        for line in text.splitlines()
-        if line.startswith("RESULT_JSON:")
-    ]
-    if len(markers) != 1:
-        return False
-    try:
-        bound_result = json.loads(markers[0])
-    except (ValueError, RecursionError):
-        return False
-    if not isinstance(result, dict):
-        return False
-    return _json_equal(bound_result, result)
-
-
 def main():
-    expected = json.loads((T / "expected.json").read_text())
     submission = load_submission(W / "submission.json")
-    contract = strict_submission_contract(
-        submission,
-        task_id=expected["task_id"],
-        conclusion=expected["conclusion"],
-        completeness="COMPLETE_FOR_DECLARED_FAMILY",
-        allowed_assurances=frozenset({"COMPUTED"}),
-        verification_record="forbidden",
-    )
-    envelope = isinstance(submission, dict)
-    result = submission.get("result") if envelope else None
-    # Evaluate mathematical correctness independently of the assurance/contract
-    # envelope so an unsupported assurance claim does not collapse the
-    # correctness diagnostic to zero for an otherwise valid result.
-    math_ok = bool(envelope and frozen() and valid_result(result))
-    evidence_ok = bool(
-        envelope and frozen() and valid_evidence(submission.get("evidence"), result)
-    )
-    scope_ok = bool(
-        envelope
-        and submission.get("scope") == expected["required_scope"]
-        and submission.get("completeness") == "COMPLETE_FOR_DECLARED_FAMILY"
-        and submission.get("limitations") == LIMITATIONS
-    )
-    assurance_ok = bool(
-        envelope
-        and isinstance(submission.get("claimed_assurance"), str)
-        and submission.get("claimed_assurance") == "COMPUTED"
-    )
-    false_cert = false_verified_claim(submission, verification_record_bound=False)
-    correct = bool(contract and math_ok and scope_ok and evidence_ok and not false_cert)
-    reward = float(correct)
+    protocol_ok = submission is not None
+    result = submission.get("result") if protocol_ok else None
+    math_ok = bool(protocol_ok and frozen() and valid_result(result))
+    reward = float(math_ok)
     Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
     Path("/logs/verifier/reward.json").write_text(
         json.dumps(
             {
                 "correctness": float(math_ok),
-                "evidence_validity": float(evidence_ok),
-                "scope_accuracy": float(scope_ok),
-                "assurance_calibration": float(assurance_ok),
                 "reward": reward,
-                "false_certification": false_cert,
             }
         )
     )

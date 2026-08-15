@@ -2,55 +2,6 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
-    "claimed_assurance": {
-      "enum": [
-        "UNVERIFIED",
-        "COMPUTED",
-        "CHECKED",
-        "VERIFIED"
-      ]
-    },
-    "completeness": {
-      "enum": [
-        "COMPLETE",
-        "PARTIAL",
-        "UNKNOWN"
-      ]
-    },
-    "conclusion": {
-      "enum": [
-        "NONCLOSED_IMAGE_CERTIFIED",
-        "INSUFFICIENT_EVIDENCE"
-      ]
-    },
-    "evidence": {
-      "items": {
-        "additionalProperties": false,
-        "properties": {
-          "path": {
-            "const": "evidence/answer.txt"
-          },
-          "sha256": {
-            "pattern": "^sha256:[0-9a-f]{64}$",
-            "type": "string"
-          }
-        },
-        "required": [
-          "path",
-          "sha256"
-        ],
-        "type": "object"
-      },
-      "maxItems": 1,
-      "minItems": 1,
-      "type": "array"
-    },
-    "limitations": {
-      "items": {
-        "type": "string"
-      },
-      "type": "array"
-    },
     "result": {
       "additionalProperties": false,
       "properties": {
@@ -61,16 +12,14 @@
           "minItems": 100,
           "type": "array"
         },
-        "limit_preimage": {
-          "minLength": 1,
-          "type": "string"
-        },
-        "operator": {
-          "minLength": 1,
-          "type": "string"
-        },
         "operator_bound": {
           "type": "string"
+        },
+        "operator_kind": {
+          "enum": [
+            "DIAGONAL",
+            "WEIGHTED_SHIFT"
+          ]
         },
         "prefixes": {
           "items": {
@@ -121,56 +70,6 @@
           ],
           "type": "object"
         },
-        "projection": {
-          "minLength": 1,
-          "type": "string"
-        },
-        "proof_obligations": {
-          "additionalProperties": false,
-          "properties": {
-            "absent_preimage": {
-              "maxLength": 4096,
-              "minLength": 40,
-              "type": "string"
-            },
-            "boundedness": {
-              "maxLength": 4096,
-              "minLength": 40,
-              "type": "string"
-            },
-            "closedness": {
-              "maxLength": 4096,
-              "minLength": 40,
-              "type": "string"
-            },
-            "convergence": {
-              "maxLength": 4096,
-              "minLength": 40,
-              "type": "string"
-            },
-            "range_identification": {
-              "maxLength": 4096,
-              "minLength": 40,
-              "type": "string"
-            }
-          },
-          "required": [
-            "boundedness",
-            "closedness",
-            "range_identification",
-            "convergence",
-            "absent_preimage"
-          ],
-          "type": "object"
-        },
-        "space": {
-          "minLength": 1,
-          "type": "string"
-        },
-        "subspace": {
-          "minLength": 1,
-          "type": "string"
-        },
         "tail_bound": {
           "additionalProperties": false,
           "properties": {
@@ -195,35 +94,17 @@
         }
       },
       "required": [
-        "space",
-        "operator",
-        "subspace",
-        "projection",
         "operator_bound",
         "prefixes",
         "limit_coordinates",
         "tail_bound",
-        "limit_preimage",
-        "proof_obligations"
+        "operator_kind"
       ],
       "type": "object"
-    },
-    "scope": {
-      "type": "string"
-    },
-    "task_id": {
-      "const": "jacobian/nonclosed-projection-image"
     }
   },
   "required": [
-    "task_id",
-    "conclusion",
-    "result",
-    "claimed_assurance",
-    "scope",
-    "completeness",
-    "evidence",
-    "limitations"
+    "result"
   ],
   "type": "object"
 }

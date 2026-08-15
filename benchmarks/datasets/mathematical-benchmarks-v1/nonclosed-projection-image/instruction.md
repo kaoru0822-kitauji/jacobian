@@ -11,29 +11,18 @@ and a proof that the limit has no `ell2` preimage.  For every prefix through
 preimage coordinate, and partial squared norms of the limit and its forced
 preimage.
 
-Put the five explanations in the agent-visible `result.proof_obligations`
+Put the five structural claims in the agent-visible `result.proof_obligations`
 fields (`boundedness`, `closedness`, `range_identification`, `convergence`, and
-`absent_preimage`). The evidence file is a human-readable inspectability
-artifact summarizing boundedness, closedness, the projected range, the tail
-bound, and the divergent forced preimage; it does not require hidden JSON
-marker lines.
+`absent_preimage`).
 
 A finite-dimensional matrix, a bare theorem citation, or a single approximate
-sequence is insufficient.  Fractions must be canonical.  Bind
-`/app/evidence/answer.txt` and do not claim `VERIFIED`.
+sequence is insufficient. Fractions must be canonical.
 
 <!-- BEGIN PUBLIC CONTRACT SUBMISSION BLOCK -->
 ## Submission
 
-The verifier checks the declared result, scope, completeness, evidence binding, and assurance as separate protocol dimensions.
+The verifier replays the task-specific mathematical predicate from the submitted result.
 
-Write `/app/submission.json` to the exact schema in `environment/submission_schema.json`. The submission envelope requires `task_id`, `conclusion`, `result`, `claimed_assurance`, `scope`, `completeness`, `evidence`, and `limitations`.
+Write `/app/submission.json` to the exact schema in `environment/submission_schema.json`. The submission requires a typed `result`.
 
-- **Conclusion:** one of `NONCLOSED_IMAGE_CERTIFIED`, `INSUFFICIENT_EVIDENCE`
-- **Assurance:** scoreable values are `UNVERIFIED`, `COMPUTED` (ceiling `COMPUTED`); the submission schema accepts any of `UNVERIFIED`, `COMPUTED`, `CHECKED`, `VERIFIED` but only scoreable assurances receive credit.
-- **Scope:** a string value
-- **Completeness:** one of `COMPLETE`, `PARTIAL`, `UNKNOWN`.
-- **Evidence:** 1-1 item(s); allowed path(s): `evidence/answer.txt`; digest must match `^sha256:[0-9a-f]{64}$`.
-- **Evidence media types:** `text/plain`.
-- **Required artifact filenames:** `evidence/answer.txt`.
 <!-- END PUBLIC CONTRACT SUBMISSION BLOCK -->

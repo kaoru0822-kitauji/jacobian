@@ -4,17 +4,12 @@ from pathlib import Path
 from typing import Any
 
 from verifier_support import (
-    evidence_list_is_bound,
-    false_verified_claim,
     load_submission,
     normalize_reward_file,
-    resolve_evidence,
-    strict_submission_contract,
 )
 
 WORKSPACE = Path("/app")
 TESTS = Path("/tests")
-LIMITATION = "The verifier checks a complete finite incidence factorization and the general counting formula but does not replay the universal theorem in Lean."
 
 
 def _is_int(value: object) -> bool:
@@ -142,81 +137,17 @@ def _result(value: object, source: dict[str, Any]) -> bool:
     )
 
 
-def _evidence(value: object) -> bool:
-    # Thread PRRT_kwDOThEfjc6Vu43q: enforce the agent-visible maxItems: 1
-    # contract on the evidence list before resolving any descriptor.
-    if not isinstance(value, list) or len(value) != 1:
-        return False
-    if not evidence_list_is_bound(value):
-        return False
-    path = resolve_evidence(value[0], expected_path="evidence/answer.txt")
-    if path is None:
-        return False
-    try:
-        text = path.read_text().lower()
-    except (OSError, UnicodeError):
-        return False
-    return (
-        len(text) >= 100
-        and all(term in text for term in ("inclusion-exclusion", "zeta", "computed"))
-        and re.search(r"\b(?:even|nonempty)\b.{0,80}\bsubsets?\b", text)
-        and "determinant" in text
-    )
-
-
 def main() -> None:
     submission = load_submission()
     data = submission if isinstance(submission, dict) else {}
-    expected = json.loads((TESTS / "expected.json").read_text())
-    contract = strict_submission_contract(
-        submission,
-        task_id=expected["task_id"],
-        conclusion=expected["conclusion"],
-        verification_record="forbidden",
-    )
-    correct = bool(contract and _result(data.get("result"), _source()))
-    evidence = bool(correct and _evidence(data.get("evidence")))
-    scope = bool(
-        contract
-        and isinstance(data.get("scope"), str)
-        and "nonempty" in data["scope"].casefold()
-        and "subset" in data["scope"].casefold()
-        and "intersection" in data["scope"].casefold()
-    )
-    assurance = bool(
-        contract and data.get("claimed_assurance") == expected["maximum_assurance"]
-    )
-    limitations = bool(
-        contract
-        and isinstance(data.get("limitations"), list)
-        and any(
-            isinstance(item, str)
-            and "finite" in item.casefold()
-            and re.search(r"\b(?:not|doesn['']?t|without|cannot)\b", item, re.I)
-            and "lean" in item.casefold()
-            for item in data["limitations"]
-        )
-    )
-    false_verified = false_verified_claim(submission, verification_record_bound=False)
-    passed = bool(
-        correct
-        and evidence
-        and scope
-        and assurance
-        and limitations
-        and not false_verified
-    )
+    correct = bool(submission and _result(data.get("result"), _source()))
     logs = Path("/logs/verifier")
     logs.mkdir(parents=True, exist_ok=True)
     (logs / "reward.json").write_text(
         json.dumps(
             {
                 "correctness": float(correct),
-                "evidence_validity": float(evidence),
-                "scope_accuracy": float(scope),
-                "assurance_calibration": float(assurance),
-                "reward": float(passed),
-                "false_certification": false_verified,
+                "reward": float(correct),
             },
             sort_keys=True,
         )

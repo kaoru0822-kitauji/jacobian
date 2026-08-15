@@ -3,11 +3,8 @@ import json
 from pathlib import Path
 
 from verifier_support import (
-    evidence_list_is_bound,
     load_submission,
     normalize_reward_file,
-    resolve_evidence,
-    strict_submission_contract,
     workspace_input_is_bound,
 )
 
@@ -21,30 +18,6 @@ def load_json(path):
         return json.loads(path.read_text())
     except (OSError, ValueError):
         return None
-
-
-def evidence_matches_result(evidence, result):
-    if not isinstance(evidence, list) or len(evidence) != 1:
-        return False
-    if not evidence_list_is_bound(evidence):
-        return False
-    target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
-    if target is None:
-        return False
-    try:
-        text = target.read_text().casefold()
-        return all(
-            fragment in text
-            for fragment in (
-                "x diamond y = y",
-                "x=0",
-                "y=1",
-                "one-element",
-                "minimality",
-            )
-        )
-    except (OSError, UnicodeError):
-        return False
 
 
 def evaluate(term, table, assignment):
@@ -160,58 +133,16 @@ def main():
     input_binding = workspace_input_is_bound()
     submission = load_submission(require_input_binding=False)
     fixture = load_json(E / FIXTURE_NAME)
-    expected = load_json(E / "expected.json")
-    if not isinstance(expected, dict):
-        expected = {}
-    math_contract = strict_submission_contract(
-        submission,
-        task_id=expected.get("task_id", "invalid"),
-        conclusion=expected.get("conclusion", "invalid"),
-        verification_record="optional",
-    )
-    accepted_contract = strict_submission_contract(
-        submission,
-        task_id=expected.get("task_id", "invalid"),
-        conclusion=expected.get("conclusion", "invalid"),
-        allowed_assurances=frozenset({"UNVERIFIED", "COMPUTED", "CHECKED"}),
-        verification_record="forbidden",
-    )
     result = submission.get("result") if isinstance(submission, dict) else None
-    math_correct = bool(
-        math_contract and fixture is not None and result_valid(result, fixture)
-    )
-    correct = bool(accepted_contract and input_binding and math_correct)
-    evidence = bool(
-        math_contract and evidence_matches_result(submission.get("evidence"), result)
-    )
-    scope = bool(
-        math_contract and submission.get("scope") == expected.get("required_scope")
-    )
-    assurance = bool(
-        math_contract
-        and submission.get("claimed_assurance") == expected.get("maximum_assurance")
-    )
-    false_certification = bool(
-        isinstance(submission, dict)
-        and submission.get("claimed_assurance") == "VERIFIED"
-    )
-    reward = (
-        0.0
-        if not correct or not evidence or false_certification
-        else 0.8 + 0.1 * scope + 0.1 * assurance
-    )
+    math_correct = bool(fixture is not None and result_valid(result, fixture))
+    reward = float(input_binding and math_correct)
     Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
     Path("/logs/verifier/reward.json").write_text(
         json.dumps(
             {
-                "protocol_compliance": float(bool(math_contract)),
                 "input_binding": float(input_binding),
                 "correctness": float(math_correct),
-                "evidence_validity": float(evidence),
-                "scope_accuracy": float(scope),
-                "assurance_calibration": float(assurance),
                 "reward": reward,
-                "false_certification": false_certification,
             }
         )
     )

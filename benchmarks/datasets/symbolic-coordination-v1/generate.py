@@ -334,9 +334,8 @@ def inverse_case(
 ) -> dict[str, object]:
     supplied = {
         "evidence_schema_version": "1",
-        "status": "CHECKED" if checked_directions else "COMPUTED",
+        "status": "COMPUTED",
         "checked_directions": list(checked_directions),
-        "claimed_assurance": "VERIFIED" if checked_directions else "COMPUTED",
         "note": "Non-authoritative supplied material; independently replay both directions.",
     }
     return {
@@ -346,10 +345,6 @@ def inverse_case(
         "forward_map": forward,
         "candidate_inverse": candidate,
         "supplied_evidence": supplied,
-        "expected_completeness": "COMPLETE",
-        "required_limitations": [
-            "NO_CLAIM_BEYOND_SUPPLIED_CANDIDATE_AND_EXACT_QQ_COMPOSITIONS"
-        ],
         "note": note,
     }
 
@@ -368,10 +363,6 @@ def keller_case(slug: str, forward: dict[str, object], *, note: str):
         "case_type": "keller",
         "forward_map": forward,
         "supplied_certificate": supplied,
-        "expected_completeness": "COMPLETE",
-        "required_limitations": [
-            "KELLER_CONDITION_DOES_NOT_LICENSE_GLOBAL_INVERTIBILITY"
-        ],
         "note": note,
     }
 
@@ -424,30 +415,12 @@ def collision_case(
     }
     if stop_reason == "GRID_EXHAUSTED" and found is not None:
         raise ValueError(f"{slug} is not collision-free on the grid")
-    limitations = (
-        ["NO_CLAIM_OUTSIDE_EXACT_COLLISION_WITNESS"]
-        if stop_reason == "FOUND"
-        else ["NO_GLOBAL_INJECTIVITY_OR_INVERTIBILITY_CONCLUSION"]
-        if stop_reason == "GRID_EXHAUSTED"
-        else [
-            "SEARCH_NONCONCLUSION",
-            "NO_GLOBAL_INJECTIVITY_OR_INVERTIBILITY_CONCLUSION",
-        ]
-    )
     return {
         "slug": slug,
         "family": "bounded-collision-scope",
         "case_type": "collision",
         "forward_map": forward,
         "search_record": record,
-        "expected_completeness": (
-            "UNKNOWN"
-            if stop_reason == "TIMEOUT"
-            else "PARTIAL"
-            if stop_reason == "INCOMPLETE"
-            else "COMPLETE"
-        ),
-        "required_limitations": limitations,
         "note": note,
     }
 
@@ -737,14 +710,6 @@ def bind_case(case: dict[str, object]) -> dict[str, object]:
             "case_id": slug,
             "case_version": CASE_VERSION,
             "claim_id": f"claim://symbolic-coordination-v1/{slug}",
-            "scope_id": f"scope://symbolic-coordination-v1/{slug}",
-            "required_scope": (
-                f"EXACT_TWO_SIDED_COMPOSITION_OVER_QQ:{slug}"
-                if value["case_type"] == "inverse"
-                else f"KELLER_CONDITION_ONLY_OVER_QQ:{slug}"
-                if value["case_type"] == "keller"
-                else f"DECLARED_RATIONAL_GRID_AND_SUPPLIED_SEARCH_RECORD:{slug}"
-            ),
             "case_note": note,
         }
     )
@@ -762,7 +727,6 @@ def bind_case(case: dict[str, object]) -> dict[str, object]:
         "binding_schema_version": "1",
         "claim_id": value["claim_id"],
         "semantics_id": SEMANTICS_ID,
-        "scope_id": value["scope_id"],
         "forward_map_sha256": sha256_object(value["forward_map"]),
         "subject_sha256": sha256_object(subject),
         "checker_id": CHECKER_ID,
@@ -841,22 +805,13 @@ def collision_certificate(data: dict[str, object]):
     }
 
 
-def solution(data: dict[str, object]) -> tuple[dict[str, object], bytes]:
+def solution(data: dict[str, object]) -> dict[str, object]:
     if data["case_type"] == "inverse":
         verdict, certificate_value = inverse_certificate(data)
     elif data["case_type"] == "keller":
         verdict, certificate_value = keller_certificate(data)
     else:
         verdict, certificate_value = collision_certificate(data)
-    conclusion = {
-        "VALID_TWO_SIDED_INVERSE": "TRUE",
-        "INVALID_INVERSE_CANDIDATE": "FALSE",
-        "KELLER_CONDITION_ONLY": "TRUE",
-        "NOT_KELLER": "FALSE",
-        "COLLISION_FOUND": "TRUE",
-        "NO_COLLISION_IN_DECLARED_GRID": "FALSE",
-        "UNKNOWN": "UNKNOWN",
-    }[verdict]
     result = {
         "case_id": data["case_id"],
         "family": data["family"],
@@ -864,48 +819,7 @@ def solution(data: dict[str, object]) -> tuple[dict[str, object], bytes]:
         "bindings": data["bindings"],
         "certificate": certificate_value,
     }
-    evidence = {
-        "schema_version": "1",
-        "task_id": data["task_id"],
-        "result": result,
-        "scope": data["required_scope"],
-        "completeness": data["expected_completeness"],
-        "limitations": data["required_limitations"],
-    }
-    evidence_bytes = json_bytes(evidence)
-    submission = {
-        "task_id": data["task_id"],
-        "conclusion": conclusion,
-        "result": result,
-        "claimed_assurance": "CHECKED",
-        "scope": data["required_scope"],
-        "completeness": data["expected_completeness"],
-        "evidence": [
-            {
-                "path": "evidence/certificate.json",
-                "sha256": sha256_bytes(evidence_bytes),
-            }
-        ],
-        "limitations": data["required_limitations"],
-    }
-    return submission, evidence_bytes
-
-
-_COLLISION_WITNESS_LIMITATIONS = ["NO_CLAIM_OUTSIDE_EXACT_COLLISION_WITNESS"]
-
-
-def _limitations_schema(data: dict[str, object]) -> dict[str, object]:
-    """Allow collision-witness limitations when a timeout/incomplete search may
-    still yield an exact collision witness in the declared grid."""
-
-    required = data["required_limitations"]
-    if (
-        data["case_type"] == "collision"
-        and required != _COLLISION_WITNESS_LIMITATIONS
-        and data["search_record"].get("stop_reason") in {"TIMEOUT", "INCOMPLETE"}
-    ):
-        return {"enum": [required, _COLLISION_WITNESS_LIMITATIONS]}
-    return {"const": required}
+    return {"result": result}
 
 
 def submission_schema_parts(data: dict[str, object]) -> dict[str, object]:
@@ -1111,19 +1025,8 @@ def submission_schema_parts(data: dict[str, object]) -> dict[str, object]:
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "additionalProperties": False,
-        "required": [
-            "task_id",
-            "conclusion",
-            "result",
-            "claimed_assurance",
-            "scope",
-            "completeness",
-            "evidence",
-            "limitations",
-        ],
+        "required": ["result"],
         "properties": {
-            "task_id": {"const": data["task_id"]},
-            "conclusion": {"enum": ["TRUE", "FALSE", "UNKNOWN"]},
             "result": {
                 "type": "object",
                 "additionalProperties": False,
@@ -1146,29 +1049,6 @@ def submission_schema_parts(data: dict[str, object]) -> dict[str, object]:
                     "certificate": {"oneOf": certificate_variants},
                 },
             },
-            "claimed_assurance": {"const": "CHECKED"},
-            "scope": {"const": data["required_scope"]},
-            "completeness": {
-                "enum": sorted({str(data["expected_completeness"]), "COMPLETE"})
-            },
-            "evidence": {
-                "type": "array",
-                "minItems": 1,
-                "maxItems": 1,
-                "items": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "required": ["path", "sha256"],
-                    "properties": {
-                        "path": {"const": "evidence/certificate.json"},
-                        "sha256": {
-                            "type": "string",
-                            "pattern": "^sha256:[0-9a-f]{64}$",
-                        },
-                    },
-                },
-            },
-            "limitations": _limitations_schema(data),
         },
         "$defs": {
             "rational": rational_schema,
@@ -1183,39 +1063,19 @@ def submission_schema_parts(data: dict[str, object]) -> dict[str, object]:
 def public_contract(data: dict[str, object]) -> PublicContract:
     """Build the canonical public protocol and its deterministic projection."""
 
-    legacy_schema = submission_schema_parts(data)
-    properties = legacy_schema["properties"]
+    schema = submission_schema_parts(data)
+    properties = schema["properties"]
     declaration = {
         "schema_version": "1",
         "task_id": data["task_id"],
         "submission_path": "/app/submission.json",
-        "assurance_ceiling": "CHECKED",
-        "allowed_assurance": ["UNVERIFIED", "COMPUTED", "CHECKED"],
-        "allowed_completeness": properties["completeness"]["enum"],
-        "conclusion": properties["conclusion"],
-        "scope": {"type": "string", "const": data["required_scope"]},
-        "evidence": {
-            "min_items": 1,
-            "max_items": 1,
-            "allowed_paths": ["evidence/certificate.json"],
-            "digest_pattern": "^sha256:[0-9a-f]{64}$",
-            "media_types": ["application/json"],
-        },
-        "required_artifact_filenames": ["evidence/certificate.json"],
         "public_notes": (
-            "Write evidence/certificate.json as a JSON wrapper with exactly "
-            'these fields: schema_version (the string \\"1\\"), task_id '
-            f'(the string \\"{data["task_id"]}\\"), result (an exact copy of '
-            "the submission result object), scope (an exact copy of the "
-            "submission scope), completeness (an exact copy of the submission "
-            "completeness), and limitations (an exact copy of the submission "
-            "limitations). Bind that exact regular file by SHA-256. The "
-            "verifier independently checks the mathematics, input and artifact "
-            "identities, declared scope, completeness, and assurance."
+            "Submit the terminal certificate inside result. The verifier replays "
+            "the exact polynomial-map predicate and checks the frozen claim "
+            "bindings carried by the result."
         ),
         "submission_result": properties["result"],
-        "limitations": properties["limitations"],
-        "schema_definitions": legacy_schema["$defs"],
+        "schema_definitions": schema["$defs"],
     }
     draft = PublicContract.model_validate(declaration)
     declaration["submission_schema"] = json.loads(render_submission_schema(draft))
@@ -1229,7 +1089,7 @@ def render_task(
     task = DATASET / slug
     input_content = json_bytes(data)
     fixture_digest = sha256_bytes(input_content)
-    submission, evidence = solution(data)
+    submission = solution(data)
     contract = public_contract(data)
     contract_value = contract.model_dump(mode="json", exclude_none=True)
     schema_text = render_submission_schema(contract)
@@ -1238,7 +1098,7 @@ def render_task(
         f"Assess one exact polynomial-map claim in the {data['family']} pilot family."
     )
     task_toml = f'''schema_version = "1.4"
-artifacts = ["/app/submission.json", "/app/evidence"]
+artifacts = ["/app/submission.json"]
 
 [task]
 name = "jacobian/{slug}"
@@ -1251,7 +1111,6 @@ evaluation_kind = "workflow"
 domain = "mathematical-sciences"
 field = "algebra"
 primary_domain = "algebra"
-assurance_ceiling = "CHECKED"
 answer_visibility = "hidden-at-runtime"
 provenance_class = "deterministic-hand-auditable-pilot"
 fixture_digest = "{fixture_digest}"
@@ -1293,7 +1152,6 @@ storage_mb = 4096
 - case version: `{CASE_VERSION}`
 - generator: `{GENERATOR_VERSION}`
 - fixture digest: `{fixture_digest}`
-- assurance ceiling: `CHECKED`
 - note: {data["case_note"]}
 
 ## Verification boundary
@@ -1301,37 +1159,26 @@ storage_mb = 4096
 The task is offline and solvable without Jacobian. The instruction names no
 operation or tool order. The task-local clean-room verifier imports neither
 Jacobian nor the generator; it replays exact rational polynomial arithmetic,
-scope, input and artifact bindings, evidence digest, and assurance. `VERIFIED`
-is unauthorized in this pilot and receives zero reward.
+input and claim bindings. Reward is binary: the replayed mathematical
+predicate and every required binding must hold.
 """.encode()
     instruction_base = f"""# Exact polynomial-map claim assessment
 
 Assess the `{data["family"]}` claim frozen in `input.json` under exact rational
 polynomial semantics. Supplied candidates, provider statuses, partial direction
-checks, and search records are evidence to audit, not authority. Return the
-terminal certificate described by `submission_schema.json`, bind it to the
-exact claim, map, subject, semantics, scope, and checker identities in the
-input, and write the mirrored JSON certificate to
-`evidence/certificate.json` with its SHA-256 digest.
+checks, and search records are inputs to audit, not authority. Return the
+terminal certificate in the `result` described by `submission_schema.json`.
+Its bindings must identify the exact claim, map, subject, semantics, and
+checker identities frozen in the input.
 
 For an inverse claim, the certificate must expose both ordered composition
 residual families. A Keller-condition certificate licenses only its exact
 constant nonzero Jacobian claim. A bounded search licenses only an exact
 collision witness, complete declared-grid exhaustion, or an honest
 non-conclusion matching timeout or incomplete execution. Any mathematically
-valid collision witness in the declared grid is acceptable.
-
-The `conclusion` field is determined by the terminal `verdict`:
-
-| Verdict | Conclusion |
-|---|---|
-| `VALID_TWO_SIDED_INVERSE` | `TRUE` |
-| `INVALID_INVERSE_CANDIDATE` | `FALSE` |
-| `KELLER_CONDITION_ONLY` | `TRUE` |
-| `NOT_KELLER` | `FALSE` |
-| `COLLISION_FOUND` | `TRUE` |
-| `NO_COLLISION_IN_DECLARED_GRID` | `FALSE` |
-| `UNKNOWN` | `UNKNOWN` |
+valid collision witness in the declared grid is acceptable. The terminal
+`verdict` is a semantic field of the mathematical result; do not add a
+separate generic conclusion or assurance claim.
 
 Use any mathematical method. No external service or special tool is required.
 """
@@ -1346,10 +1193,7 @@ RUN chmod +x /tests/test.sh
 '''.encode()
     solve_sh = b"""#!/bin/sh
 set -eu
-mkdir -p /app/evidence
 cp /solution/submission.json /app/submission.json
-cp /solution/certificate.json /app/evidence/certificate.json
-cp /solution/answer.txt /app/answer.txt
 """
     member = f'''schema_version = "2"
 task_id = "{slug}"
@@ -1360,7 +1204,6 @@ field = "algebra"
 primary_domain = "algebra"
 provenance_class = "deterministic-hand-auditable-pilot"
 provenance_ref = "authored:symbolic-coordination-v1/{CASE_VERSION}#{slug}"
-assurance_ceiling = "CHECKED"
 required_provider = "core"
 environment_profile = "core-python-minimal-verifier"
 verifier_contract_version = "1"
@@ -1373,10 +1216,6 @@ evaluation_owner = "jacobian/symbolic-coordination-v1"
         task / "environment/Dockerfile": environment_docker,
         task / "environment/input.json": input_content,
         task / "environment/submission_schema.json": schema_text.encode(),
-        task / "solution/answer.txt": (
-            str(submission["result"]["verdict"]) + "\n"
-        ).encode(),
-        task / "solution/certificate.json": evidence,
         task / "solution/submission.json": json_bytes(submission),
         task / "solution/solve.sh": solve_sh,
         task / "tests/Dockerfile": tests_docker,

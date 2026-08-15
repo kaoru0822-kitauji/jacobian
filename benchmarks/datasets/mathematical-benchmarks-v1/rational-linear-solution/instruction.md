@@ -1,24 +1,16 @@
 # Exact rational linear solution
 
 Solve the exact linear system in `input.json` over the rationals. Return one
-canonical rational string for each declared variable, and show substitution
-into every equation in `evidence/answer.txt`, include its SHA-256 digest, and
-write `submission.json` to the exact agent-visible `submission_schema.json`.
-The task does not expose an independent uniqueness certificate, so claim at
-most `COMPUTED`.
+canonical rational string for each declared variable. Write `submission.json`
+and the declared task-specific witness at `evidence/answer.txt` to the exact
+agent-visible schema.
 
 <!-- BEGIN PUBLIC CONTRACT SUBMISSION BLOCK -->
 ## Submission
 
-The verifier checks the declared result, scope, completeness, evidence binding, and assurance as separate protocol dimensions.
+The verifier replays the task-specific mathematical predicate from the submitted result and validates the declared task-specific witness.
 
-Write `/app/submission.json` to the exact schema in `environment/submission_schema.json`. The submission envelope requires `task_id`, `conclusion`, `result`, `claimed_assurance`, `scope`, `completeness`, `evidence`, and `limitations`.
+Write `/app/submission.json` to the exact schema in `environment/submission_schema.json`. The submission requires a typed `result` and the declared `witness`.
 
-- **Conclusion:** exactly `UNIQUE_SOLUTION`
-- **Assurance:** scoreable values are `UNVERIFIED`, `COMPUTED` (ceiling `COMPUTED`); the submission schema accepts any of `UNVERIFIED`, `COMPUTED`, `CHECKED`, `VERIFIED` but only scoreable assurances receive credit.
-- **Scope:** the exact value declared in `submission_schema.json`
-- **Completeness:** `COMPLETE`.
-- **Evidence:** 1-1 item(s); allowed path(s): `evidence/answer.txt`; digest must match `^sha256:[0-9a-f]{64}$`.
-- **Evidence media types:** `text/plain`.
-- **Required artifact filenames:** `evidence/answer.txt`.
+- **Witness:** 1-1 item(s); allowed path(s): `evidence/answer.txt`; digest must match `^sha256:[0-9a-f]{64}$`; media type(s): `text/plain`.
 <!-- END PUBLIC CONTRACT SUBMISSION BLOCK -->

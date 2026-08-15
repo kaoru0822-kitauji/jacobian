@@ -1,27 +1,13 @@
 import json
-import re
 from pathlib import Path
 
 from verifier_support import (
-    MAX_SUBMISSION_BYTES,
-    is_regular_bounded_file,
     load_submission,
     normalize_reward_file,
-    resolve_evidence,
-    strict_submission_contract,
     workspace_input_is_bound,
 )
 
-W = Path("/app")
 E = Path("/tests")
-LIMITATION_OBLIGATIONS = (
-    "claim:finite-action-counterexample",
-    "limitation:no-general-classification-theorem",
-)
-
-
-def _limitations_valid(value: object) -> bool:
-    return isinstance(value, list) and value == list(LIMITATION_OBLIGATIONS)
 
 
 def matrix(value, q):
@@ -163,111 +149,10 @@ def certificate_valid(result, frozen):
         return False
 
 
-ALLOWED_ASSURANCES = frozenset({"UNVERIFIED", "COMPUTED"})
-_EXPLANATION_FACTS = {
-    "elementwise_nonzero": (
-        re.compile(
-            r"\b(?:each|every)\s+(?:group\s+)?element\b.{0,128}"
-            r"\b(?:fix|preserv|stabil|invarian).{0,64}"
-            r"\b(?:non[- ]?zero|nontrivial)\b",
-            re.DOTALL,
-        ),
-        re.compile(
-            r"\b(?:non[- ]?zero|nontrivial)\b.{0,64}"
-            r"\b(?:fixed|invariant)\b.{0,96}\b(?:each|every)\b",
-            re.DOTALL,
-        ),
-        re.compile(
-            r"\b(?:each|every)\s+(?:group\s+)?element\b.{0,128}"
-            r"\b(?:non[- ]?zero|nontrivial)\b.{0,32}\b(?:fixed|invariant)\b",
-            re.DOTALL,
-        ),
-    ),
-    "no_common_nonzero": (
-        re.compile(
-            r"\b(?:no|without)\b.{0,64}\b(?:common|global|shared)\b"
-            r".{0,96}\b(?:fixed|invariant|vector|subspace)\b",
-            re.DOTALL,
-        ),
-        re.compile(
-            r"\b(?:common|global|shared)\b.{0,96}"
-            r"\b(?:zero|trivial|absent|empty|does\s+not\s+exist)\b",
-            re.DOTALL,
-        ),
-    ),
-    "quantifier_separation": (
-        re.compile(r"\bquantifier\b.{0,96}\b(?:order|swap|separat)"),
-        re.compile(r"\b(?:does\s+not|doesn't|fails?\s+to|cannot)\s+imply\b"),
-        re.compile(r"\b(?:counterexample|refut)"),
-        re.compile(r"\bseparat"),
-    ),
-}
-
-
-def _quantifier_explanation_valid(path: Path) -> bool:
-    """Stream evidence and require the three documented mathematical facts."""
-
-    matched = dict.fromkeys(_EXPLANATION_FACTS, False)
-    carry = ""
-    try:
-        with path.open("r", encoding="utf-8") as stream:
-            while chunk := stream.read(65_536):
-                window = (carry + chunk).lower()
-                for name, alternatives in _EXPLANATION_FACTS.items():
-                    if not matched[name] and any(
-                        pattern.search(window) for pattern in alternatives
-                    ):
-                        matched[name] = True
-                carry = window[-384:]
-    except (OSError, UnicodeError, MemoryError):
-        return False
-    return all(matched.values())
-
-
-def raw_submission():
-    path = W / "submission.json"
-    if not is_regular_bounded_file(path, max_bytes=MAX_SUBMISSION_BYTES):
-        return None
-    try:
-        value = json.loads(path.read_text())
-    except (OSError, ValueError, UnicodeError, RecursionError, MemoryError):
-        return None
-    return value if isinstance(value, dict) else None
-
-
-def evidence_valid(descriptors):
-    # The finite group/action certificate is replayed from the typed result.
-    # The public evidence contract promises one bound text artifact that
-    # must contain a meaningful quantifier-failure explanation.
-    if not isinstance(descriptors, list) or len(descriptors) != 1:
-        return False
-    target = resolve_evidence(
-        descriptors[0], expected_path="evidence/answer.txt", max_bytes=None
-    )
-    if target is None:
-        return False
-    return _quantifier_explanation_valid(target)
-
-
 def main():
-    raw = raw_submission()
     input_binding = workspace_input_is_bound()
     submission = load_submission(require_input_binding=False)
     frozen = json.loads((E / "input.json").read_text())
-    expected = json.loads((E / "expected.json").read_text())
-    math_contract = strict_submission_contract(
-        submission,
-        task_id=expected["task_id"],
-        conclusion=expected["conclusion"],
-        verification_record="optional",
-    )
-    accepted_contract = strict_submission_contract(
-        submission,
-        task_id=expected["task_id"],
-        conclusion=expected["conclusion"],
-        allowed_assurances=frozenset({"UNVERIFIED", "COMPUTED"}),
-        verification_record="forbidden",
-    )
     source = frozen.get("source", {})
     source_bound = bool(
         source.get("revision") == "f5935720f176cedff4ecd8ebf83d1696e31cfac8"
@@ -276,47 +161,17 @@ def main():
         == "sha256:8be03d5c7464658a27833f65a0d8b8198ea5d2d0658d088f667bb30754dd36da"
         and source.get("license") == "MIT"
     )
-    result = raw.get("result") if isinstance(raw, dict) else None
+    result = submission.get("result") if isinstance(submission, dict) else None
     mathematical = bool(source_bound and certificate_valid(result, frozen))
-    evidence = bool(isinstance(raw, dict) and evidence_valid(raw.get("evidence")))
-    scope = bool(
-        isinstance(raw, dict) and raw.get("scope") == expected["required_scope"]
-    )
-    assurance = bool(
-        isinstance(raw, dict)
-        and isinstance(raw.get("claimed_assurance"), str)
-        and raw.get("claimed_assurance") in ALLOWED_ASSURANCES
-    )
-    limitation = bool(
-        isinstance(raw, dict) and _limitations_valid(raw.get("limitations"))
-    )
-    false_certification = bool(
-        isinstance(raw, dict) and raw.get("claimed_assurance") == "VERIFIED"
-    )
-    correct = bool(
-        accepted_contract
-        and input_binding
-        and mathematical
-        and evidence
-        and scope
-        and assurance
-        and limitation
-        and not false_certification
-    )
+    correct = bool(input_binding and mathematical)
     reward = 1.0 if correct else 0.0
     Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
     Path("/logs/verifier/reward.json").write_text(
         json.dumps(
             {
-                "protocol_compliance": float(bool(math_contract)),
                 "input_binding": float(input_binding),
                 "correctness": float(mathematical),
-                "evidence_validity": float(evidence),
-                "scope_accuracy": float(scope),
-                "assurance_calibration": float(assurance),
-                "limitation_accuracy": float(limitation),
                 "reward": reward,
-                "false_certification": false_certification,
             }
         )
     )

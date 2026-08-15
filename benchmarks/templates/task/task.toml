@@ -1,5 +1,5 @@
 schema_version = "1.4"
-artifacts = ["/app/submission.json", "/app/evidence"]
+artifacts = ["/app/submission.json"]
 
 [task]
 name = "jacobian/<dataset>-<task-slug>"
@@ -11,7 +11,6 @@ keywords = ["mathematics"]
 evaluation_kind = "<workflow|public-reproduction|research-diagnostic|performance|provider-feasibility|example>"
 domain = "mathematical-sciences"
 field = "<field>"
-assurance_ceiling = "COMPUTED"
 answer_visibility = "hidden-at-runtime"
 provenance_class = "<provenance class>"
 fixture_digest = "sha256:<fixture digest>"

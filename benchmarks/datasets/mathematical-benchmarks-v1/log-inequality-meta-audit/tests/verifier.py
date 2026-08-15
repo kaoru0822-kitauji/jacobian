@@ -2,38 +2,13 @@ import json
 from pathlib import Path
 
 from verifier_support import (
-    evidence_list_is_bound,
-    false_verified_claim,
+    aggregate_reward,
     load_submission,
     normalize_reward_file,
-    resolve_evidence,
-    strict_submission_contract,
 )
 
 W = Path("/app")
 E = Path("/tests")
-
-
-def evidence_matches_result(evidence, result):
-    if not evidence_list_is_bound(evidence, expected_path="evidence/answer.txt"):
-        return False
-    target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
-    if target is None:
-        return False
-    try:
-        text = target.read_text().casefold()
-        return all(
-            fragment in text
-            for fragment in (
-                "x^2+y^2=z^2=12",
-                "18^4=104976",
-                "6^7",
-                "universal claim is false",
-                "score 0",
-            )
-        )
-    except (OSError, UnicodeError):
-        return False
 
 
 def _valid_layered_audit(result, source):
@@ -131,38 +106,15 @@ def _valid_layered_audit(result, source):
 
 def main():
     submission = load_submission()
+    protocol_ok = submission is not None
     source = json.loads(next(E.glob("*input*.json")).read_text())
-    expected = json.loads((E / "expected.json").read_text())
-    contract = strict_submission_contract(
-        submission,
-        task_id=expected["task_id"],
-        conclusion=expected["conclusion"],
-        verification_record="forbidden",
-    )
     math_correct = bool(
-        contract and _valid_layered_audit(submission.get("result"), source)
+        protocol_ok and _valid_layered_audit(submission.get("result"), source)
     )
-    evidence_valid = bool(
-        contract
-        and evidence_matches_result(
-            submission.get("evidence"), submission.get("result")
-        )
-    )
-    scope_correct = bool(
-        contract and submission.get("scope") == expected["required_scope"]
-    )
-    assurance_correct = bool(
-        contract
-        and submission.get("claimed_assurance") == expected["maximum_assurance"]
-    )
-    false_certification = false_verified_claim(
-        submission, verification_record_bound=False
-    )
-    correct = bool(contract and math_correct and not false_certification)
-    reward = (
-        0.0
-        if not correct or not evidence_valid
-        else 0.8 + 0.1 * scope_correct + 0.1 * assurance_correct
+    reward = aggregate_reward(
+        correctness=math_correct,
+        witness_validity=True,
+        protocol_ok=protocol_ok,
     )
 
     Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
@@ -170,11 +122,7 @@ def main():
         json.dumps(
             {
                 "correctness": float(math_correct),
-                "evidence_validity": float(evidence_valid),
-                "scope_accuracy": float(scope_correct),
-                "assurance_calibration": float(assurance_correct),
                 "reward": reward,
-                "false_certification": false_certification,
             }
         )
     )

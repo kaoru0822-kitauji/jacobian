@@ -7,22 +7,14 @@ candidate tables: one row for every integer partition of `k` (respectively
 exponent shape. Submit the prime-exponent factorizations, divisor counts,
 minimizers, and their integer quotient.
 
-Write `/app/submission.json` using the public schema and bind explanatory prose
-at `/app/evidence/answer.txt`. Candidate-table order is free, but coverage must
-be exact. Claim `COMPUTED`; no proof-assistant verification is available.
+Write `/app/submission.json` using the public schema. Candidate-table order is
+free, but coverage must be exact.
 
 <!-- BEGIN PUBLIC CONTRACT SUBMISSION BLOCK -->
 ## Submission
 
-The verifier independently enumerates every exponent partition and recomputes its optimal prime assignment.
+The verifier replays the task-specific mathematical predicate from the submitted result.
 
-Write `/app/submission.json` to the exact schema in `environment/submission_schema.json`. The submission envelope requires `task_id`, `conclusion`, `result`, `claimed_assurance`, `scope`, `completeness`, `evidence`, and `limitations`.
+Write `/app/submission.json` to the exact schema in `environment/submission_schema.json`. The submission requires a typed `result`.
 
-- **Conclusion:** exactly `CONSECUTIVE_MINIMIZERS_CERTIFIED`
-- **Assurance:** scoreable values are `UNVERIFIED`, `COMPUTED` (ceiling `COMPUTED`); the submission schema accepts any of `UNVERIFIED`, `COMPUTED`, `CHECKED`, `VERIFIED` but only scoreable assurances receive credit.
-- **Scope:** the exact value declared in `submission_schema.json`
-- **Completeness:** `COMPLETE`.
-- **Evidence:** 1-1 item(s); allowed path(s): `evidence/answer.txt`; digest must match `^sha256:[0-9a-f]{64}$`.
-- **Evidence media types:** `text/plain`.
-- **Required artifact filenames:** `evidence/answer.txt`.
 <!-- END PUBLIC CONTRACT SUBMISSION BLOCK -->

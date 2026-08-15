@@ -4,37 +4,13 @@ from fractions import Fraction
 from pathlib import Path
 
 from verifier_support import (
-    aggregate_reward,
-    evidence_list_is_bound,
     load_submission,
     normalize_reward_file,
-    resolve_evidence,
-    strict_submission_contract,
+    workspace_input_is_bound,
 )
 
 W = Path("/app")
 E = Path("/tests")
-
-
-def evidence_matches_result(evidence, result):
-    if not evidence_list_is_bound(evidence):
-        return False
-    target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
-    if target is None:
-        return False
-    try:
-        text = target.read_text()
-        marker = next(
-            line.removeprefix("RESULT_JSON:").strip()
-            for line in text.splitlines()
-            if line.startswith("RESULT_JSON:")
-        )
-        return json.loads(marker) == result and any(
-            line.strip() and not line.startswith("RESULT_JSON:")
-            for line in text.splitlines()
-        )
-    except (OSError, StopIteration, UnicodeError, ValueError):
-        return False
 
 
 def q(value):
@@ -54,22 +30,9 @@ def q(value):
 def main():
     s = load_submission()
     x = json.loads(next(E.glob("*input*.json")).read_text())
-    e = json.loads((E / "expected.json").read_text())
+    input_binding = workspace_input_is_bound()
     r = s.get("result") if isinstance(s, dict) else None
     r = r if isinstance(r, dict) else {}
-    contract = strict_submission_contract(
-        s,
-        task_id=e["task_id"],
-        conclusion=e["conclusion"],
-        allowed_assurances=frozenset({"UNVERIFIED", "COMPUTED"}),
-        verification_record="forbidden",
-    )
-    math_contract = strict_submission_contract(
-        s,
-        task_id=e["task_id"],
-        conclusion=e["conclusion"],
-        verification_record="optional",
-    )
 
     n = x["domain_size"]
     self_hit = Fraction(2 * n - 1, n * n)
@@ -80,8 +43,8 @@ def main():
         for target in range(1, n + 1)
     )
     expectation = other_hit * squared_sum
-    valid = (
-        math_contract
+    math_ok = bool(
+        isinstance(s, dict)
         and set(r)
         == {
             "self_hit_probability",
@@ -96,30 +59,14 @@ def main():
         and q(r.get("expected_value")) == expectation
         and expectation != 2025
     )
-    math_correct = bool(valid)
-    correct = bool(contract and math_correct)
-    good = bool(math_contract and evidence_matches_result(s["evidence"], r))
-    scope = bool(math_contract and s["scope"] == " ".join(e["required_scope_terms"]))
-    assurance = bool(math_contract and s["claimed_assurance"] == e["maximum_assurance"])
-    false = bool(isinstance(s, dict) and s.get("claimed_assurance") == "VERIFIED")
-    reward = aggregate_reward(
-        correctness=correct,
-        evidence_validity=good,
-        scope_accuracy=scope,
-        assurance_calibration=assurance,
-        false_certification=false,
-        soft_assurance=True,
-    )
+    reward = float(math_ok and input_binding)
     Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
     (Path("/logs/verifier/reward.json")).write_text(
         json.dumps(
             {
-                "correctness": float(math_correct),
-                "evidence_validity": float(good),
-                "scope_accuracy": float(scope),
-                "assurance_calibration": float(assurance),
+                "correctness": float(math_ok),
+                "input_binding": float(input_binding),
                 "reward": reward,
-                "false_certification": false,
             }
         )
     )

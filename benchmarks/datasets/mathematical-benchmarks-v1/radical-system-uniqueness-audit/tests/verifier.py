@@ -4,11 +4,9 @@ from pathlib import Path
 from typing import Any
 
 from verifier_support import (
-    evidence_list_is_bound,
+    aggregate_reward,
     load_submission,
     normalize_reward_file,
-    resolve_evidence,
-    strict_submission_contract,
 )
 
 WORKSPACE = Path("/app")
@@ -161,74 +159,22 @@ def _certificate_is_valid(value: object) -> bool:
     )
 
 
-def _evidence_is_valid(value: object) -> bool:
-    if (
-        not isinstance(value, list)
-        or len(value) != 1
-        or not evidence_list_is_bound(value)
-    ):
-        return False
-    target = resolve_evidence(value[0], expected_path="evidence/answer.txt")
-    if target is None:
-        return False
-    try:
-        text = target.read_text()
-    except (OSError, UnicodeError):
-        return False
-    return (
-        len(text) >= 180
-        and all(term in text for term in ("u>=0", "u=0", "u=-1", "(2025,64,25)"))
-        and all(
-            term in text.casefold()
-            for term in ("principal", "excludes", "substitution")
-        )
-        and "not a solution" not in text.casefold()
-    )
-
-
 def main() -> None:
     submission = load_submission()
-    expected = json.loads((TESTS / "expected.json").read_text())
     source = _load_bound_input()
-    math_contract = strict_submission_contract(
-        submission,
-        task_id=expected["task_id"],
-        conclusion=expected["conclusion"],
-        verification_record="optional",
-    )
-    contract = strict_submission_contract(
-        submission,
-        task_id=expected["task_id"],
-        conclusion=expected["conclusion"],
-        allowed_assurances=frozenset({"UNVERIFIED", "COMPUTED", "CHECKED"}),
-        verification_record="forbidden",
-    )
+    protocol_ok = submission is not None
     source_ok = bool(
         source.get("substitution") == "u = b^(1/6)"
         and source.get("source", {}).get("row_sha256")
         == "sha256:b9a10fbc445876cc412565550ef03722124d698b9ad52d0f1f6aacd0e97b823c"
     )
     math_correct = bool(
-        math_contract
-        and source_ok
-        and _certificate_is_valid(submission.get("result"))
-        and submission.get("completeness") == "COMPLETE"
+        protocol_ok and source_ok and _certificate_is_valid(submission.get("result"))
     )
-    evidence = bool(math_contract and _evidence_is_valid(submission.get("evidence")))
-    scope = bool(math_contract and submission.get("scope") == expected["scope"])
-    assurance = bool(
-        math_contract
-        and submission.get("claimed_assurance") == expected["maximum_assurance"]
-    )
-    false_certification = bool(
-        isinstance(submission, dict)
-        and submission.get("claimed_assurance") == "VERIFIED"
-    )
-    correct = bool(contract and math_correct and evidence and scope and assurance)
-    reward = (
-        0.0
-        if not correct or false_certification
-        else 0.8 + 0.1 * scope + 0.1 * assurance
+    reward = aggregate_reward(
+        correctness=math_correct,
+        witness_validity=True,
+        protocol_ok=protocol_ok,
     )
     output = Path("/logs/verifier/reward.json")
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -236,11 +182,7 @@ def main() -> None:
         json.dumps(
             {
                 "correctness": float(math_correct),
-                "evidence_validity": float(evidence),
-                "scope_accuracy": float(scope),
-                "assurance_calibration": float(assurance),
                 "reward": reward,
-                "false_certification": false_certification,
             }
         )
     )

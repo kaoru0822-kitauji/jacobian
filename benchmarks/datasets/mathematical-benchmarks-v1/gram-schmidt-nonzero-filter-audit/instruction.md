@@ -11,23 +11,16 @@ as reduced rational coordinates, together with the zero-residual indices and
 the two filter outcomes. The verifier independently replays exact rational
 Gram-Schmidt and rank computation; valid alternative vector systems pass.
 
-Write one digest-bound evidence object at
+Write one digest-bound task-specific witness object at
 `/app/evidence/gram-schmidt-audit.json`, containing exactly `schema_version`,
-`task_id`, `result`, and `limitations`. Only `COMPUTED` is supported. The task
 does not elaborate Lean or machine-check the surrounding Mathlib theorem.
 
 <!-- BEGIN PUBLIC CONTRACT SUBMISSION BLOCK -->
 ## Submission
 
-Exact rational finite-dimensional replay; Lean elaboration remains outside scope.
+The verifier replays the task-specific mathematical predicate from the submitted result and validates the declared task-specific witness.
 
-Write `/app/submission.json` to the exact schema in `environment/submission_schema.json`. The submission envelope requires `task_id`, `conclusion`, `result`, `claimed_assurance`, `scope`, `completeness`, `evidence`, and `limitations`.
+Write `/app/submission.json` to the exact schema in `environment/submission_schema.json`. The submission requires a typed `result` and the declared `witness`.
 
-- **Conclusion:** exactly `FORMAL_FILTER_INCLUDES_ZERO_RESIDUALS`
-- **Assurance:** scoreable values are `COMPUTED` (ceiling `COMPUTED`); the submission schema accepts any of `UNVERIFIED`, `COMPUTED`, `CHECKED`, `VERIFIED` but only scoreable assurances receive credit.
-- **Scope:** the exact value declared in `submission_schema.json`
-- **Completeness:** `COMPLETE`.
-- **Evidence:** 1-1 item(s); allowed path(s): `evidence/gram-schmidt-audit.json`; digest must match `^sha256:[0-9a-f]{64}$`.
-- **Evidence media types:** `application/json`.
-- **Required artifact filenames:** `evidence/gram-schmidt-audit.json`.
+- **Witness:** 1-1 item(s); allowed path(s): `evidence/gram-schmidt-audit.json`; digest must match `^sha256:[0-9a-f]{64}$`; media type(s): `application/json`.
 <!-- END PUBLIC CONTRACT SUBMISSION BLOCK -->

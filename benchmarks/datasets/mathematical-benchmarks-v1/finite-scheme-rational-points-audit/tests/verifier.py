@@ -1,68 +1,16 @@
 import itertools
 import json
-import re
 from pathlib import Path
 
 from verifier_support import (
-    MAX_SUBMISSION_BYTES,
-    aggregate_reward,
-    evidence_list_is_bound,
-    false_verified_claim,
-    is_regular_bounded_file,
     load_submission,
     normalize_reward_file,
-    resolve_evidence,
-    strict_submission_contract,
     workspace_input_is_bound,
 )
 
 WORKSPACE = Path("/app")
 TESTS = Path("/tests")
 P = 5
-LIMITATION_OBLIGATIONS = (
-    "claim:finite-affine-countermodel",
-    "limitation:no-general-scheme-theorem",
-)
-
-
-def _limitations_valid(value: object) -> bool:
-    return isinstance(value, list) and value == list(LIMITATION_OBLIGATIONS)
-
-
-# Published reward-bearing prose obligations for evidence/answer.txt.  The
-# verifier checks that the evidence text states all three facts, accepting
-# mathematically equivalent phrasing while rejecting unrelated or empty text.
-_EVIDENCE_FACTS = {
-    "rational_points": (re.compile(r"\brational\s+points?\b"),),
-    "same_nonempty_set": (
-        re.compile(r"\b(?:same|equal)\b.{0,64}\brational\s+points?\b"),
-        re.compile(r"\b(?:bijection|bijective)\b"),
-        re.compile(r"\beach\b.{0,32}\bthree\s+rational\s+points?\b"),
-    ),
-    "induced_map": (
-        re.compile(r"\binduced\s+map\b"),
-        re.compile(r"\bpullback\b"),
-    ),
-    "nonzero_nilpotent": (
-        re.compile(r"\bnon[- ]?zero\b.{0,64}\bnilpotent\b"),
-        re.compile(r"\bnilpotent\b.{0,64}\bnon[- ]?zero\b"),
-    ),
-    "order_three": (
-        re.compile(r"\border[- ](?:three|3)\b"),
-        re.compile(r"\bcube\b.{0,32}\bzero\b"),
-        re.compile(r"\bthird\s+power\b.{0,32}\bzero\b"),
-    ),
-    "b_reduced": (
-        re.compile(r"\bb\b.{0,32}\breduced\b"),
-        re.compile(r"\bsecond\s+(?:algebra|scheme)\b.{0,32}\breduced\b"),
-    ),
-    "not_isomorphic": (
-        re.compile(r"\bnot\s+isomorphic\b"),
-        re.compile(r"\bnon[- ]?isomorphic\b"),
-        re.compile(r"\b(?:cannot|can't)\s+be\s+isomorphic\b"),
-        re.compile(r"\bno\s+isomorphism\b"),
-    ),
-}
 EXPECTED_COLUMNS = [[1, 0, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 1, 0, 0]]
 
 
@@ -122,26 +70,6 @@ def _is_int_vector(value, length, lo, hi):
         and len(value) == length
         and all(type(x) is int and lo <= x <= hi for x in value)
     )
-
-
-def evidence_text_is_valid(path: Path) -> bool:
-    """Stream evidence and require every published mathematical fact."""
-
-    matched = dict.fromkeys(_EVIDENCE_FACTS, False)
-    carry = ""
-    try:
-        with path.open("r", encoding="utf-8") as stream:
-            while chunk := stream.read(65_536):
-                window = (carry + chunk).lower()
-                for name, alternatives in _EVIDENCE_FACTS.items():
-                    if not matched[name] and any(
-                        pattern.search(window) for pattern in alternatives
-                    ):
-                        matched[name] = True
-                carry = window[-256:]
-    except (OSError, UnicodeError, MemoryError):
-        return False
-    return all(matched.values())
 
 
 def valid_morphism(columns, a_table, b_table, a_unit, b_unit):
@@ -253,76 +181,20 @@ def valid_result(result):
     return result["b_reduced"] is True and not b_has_nilpotent
 
 
-def evidence_ok(evidence):
-    # The finite-algebra certificate is independently replayed from the typed
-    # result.  The public evidence contract requires one bound text file that
-    # states the three published mathematical obligations.
-    if not evidence_list_is_bound(evidence):
-        return False
-    resolved = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
-    if resolved is None:
-        return False
-    return evidence_text_is_valid(resolved)
-
-
-def raw_submission():
-    path = WORKSPACE / "submission.json"
-    if not is_regular_bounded_file(path, max_bytes=MAX_SUBMISSION_BYTES):
-        return None
-    try:
-        value = json.loads(path.read_text())
-    except (OSError, ValueError, UnicodeError, RecursionError, MemoryError):
-        return None
-    return value if isinstance(value, dict) else None
-
-
 def main():
-    raw = raw_submission()
-    expected = json.loads((TESTS / "expected.json").read_text())
     input_binding = workspace_input_is_bound()
     submission = load_submission(
         WORKSPACE / "submission.json", require_input_binding=False
     )
-    contract = strict_submission_contract(
-        submission,
-        task_id=expected["task_id"],
-        conclusion=expected["conclusion"],
-        allowed_assurances=frozenset({"UNVERIFIED", "COMPUTED"}),
-        verification_record="forbidden",
-    )
-    result = raw.get("result") if isinstance(raw, dict) else None
+    result = submission.get("result") if isinstance(submission, dict) else None
     mathematical = valid_result(result)
-    evidence = bool(isinstance(raw, dict) and evidence_ok(raw.get("evidence")))
-    scope = bool(
-        isinstance(raw, dict)
-        and raw.get("scope") == "finite-affine-schemes-over-F5-certificate"
-        and raw.get("completeness") == "COMPLETE"
-        and _limitations_valid(raw.get("limitations"))
-    )
-    assurance = bool(
-        isinstance(raw, dict) and raw.get("claimed_assurance") == "COMPUTED"
-    )
-    false_certification = false_verified_claim(raw, verification_record_bound=False)
     (Path("/logs/verifier")).mkdir(parents=True, exist_ok=True)
     (Path("/logs/verifier/reward.json")).write_text(
         json.dumps(
             {
-                "protocol_compliance": float(bool(contract)),
                 "input_binding": float(input_binding),
                 "correctness": float(mathematical),
-                "evidence_validity": float(evidence),
-                "scope_accuracy": float(scope),
-                "assurance_calibration": float(assurance),
-                "reward": aggregate_reward(
-                    correctness=mathematical,
-                    evidence_validity=evidence,
-                    scope_accuracy=scope,
-                    assurance_calibration=assurance,
-                    false_certification=false_certification,
-                    protocol_ok=bool(contract and input_binding),
-                    soft_assurance=True,
-                ),
-                "false_certification": false_certification,
+                "reward": float(input_binding and mathematical),
             }
         )
     )

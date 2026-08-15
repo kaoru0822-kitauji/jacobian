@@ -6,17 +6,13 @@ from pathlib import Path
 from typing import Any
 
 from verifier_support import (
-    MAX_SUBMISSION_BYTES,
-    _public_submission_is_valid,
-    false_verified_claim,
-    is_regular_bounded_file,
+    load_submission_raw,
     normalize_reward_file,
     resolve_evidence,
-    strict_submission_contract,
+    submission_matches_public_schema,
     workspace_input_is_bound,
 )
 
-WORKSPACE = Path("/app")
 TESTS = Path("/tests")
 LIMITATION = "The certificate refutes the published singleton claim and proves sufficiency for its submitted family member; it does not independently prove necessity for every possible trip."
 RATIONAL = re.compile(r"^-?(?:0|[1-9][0-9]{0,63})(?:/[1-9][0-9]{0,63})?$")
@@ -30,17 +26,6 @@ def _load() -> dict[str, Any]:
     except (OSError, ValueError):
         return {}
     return value if isinstance(value, dict) else {}
-
-
-def _submission() -> dict[str, Any] | None:
-    path = WORKSPACE / "submission.json"
-    if not is_regular_bounded_file(path, max_bytes=MAX_SUBMISSION_BYTES):
-        return None
-    try:
-        value = json.loads(path.read_text())
-    except (OSError, ValueError, RecursionError, MemoryError):
-        return None
-    return value if isinstance(value, dict) else None
 
 
 def _fraction(value: object) -> Fraction | None:
@@ -144,7 +129,7 @@ def _stream_matches_certificate(path: Path, expected: list[str]) -> bool:
     return line_index == len(expected_bytes)
 
 
-def _evidence(value: object, result: object) -> bool:
+def _witness(value: object, result: object) -> bool:
     if not isinstance(value, list) or len(value) != 1:
         return False
     if not isinstance(result, dict):
@@ -190,59 +175,26 @@ def _evidence(value: object, result: object) -> bool:
 
 
 def main() -> None:
-    submission = _submission()
+    submission = load_submission_raw(require_input_binding=False)
     data = submission if isinstance(submission, dict) else {}
     input_bound = workspace_input_is_bound()
-    expected = json.loads((TESTS / "expected.json").read_text())
-    envelope_contract = strict_submission_contract(
-        submission,
-        task_id=expected["task_id"],
-        conclusion=expected["conclusion"],
-        allowed_assurances=frozenset({"COMPUTED"}),
-        min_limitations=1,
-        verification_record="forbidden",
-    )
     contract = bool(
-        envelope_contract
-        and _public_submission_is_valid(submission)
+        submission_matches_public_schema(submission)
         and _result_protocol_valid(data.get("result"))
     )
     math_correct = _result(data.get("result"), _load())
-    evidence_valid = _evidence(data.get("evidence"), data.get("result"))
-    scope_correct = data.get("scope") == expected["required_scope"]
-    assurance_correct = data.get("claimed_assurance") == expected["maximum_assurance"]
-    limitations = data.get("limitations")
-    limitations_correct = isinstance(limitations, list) and LIMITATION in limitations
-    completeness_correct = data.get("completeness") == "COMPLETE"
-    false_certification = false_verified_claim(
-        submission, verification_record_bound=False
-    )
-    correct = (
-        input_bound
-        and contract
-        and math_correct
-        and evidence_valid
-        and scope_correct
-        and assurance_correct
-        and completeness_correct
-        and limitations_correct
-        and not false_certification
-    )
+    witness_valid = _witness(data.get("witness"), data.get("result"))
+    correct = input_bound and contract and math_correct and witness_valid
     output = Path("/logs/verifier")
     output.mkdir(parents=True, exist_ok=True)
     (output / "reward.json").write_text(
         json.dumps(
             {
                 "correctness": float(math_correct),
-                "evidence_validity": float(evidence_valid),
+                "witness_validity": float(witness_valid),
                 "input_binding": float(input_bound),
-                "scope_accuracy": float(scope_correct),
-                "assurance_calibration": float(assurance_correct),
-                "completeness_accuracy": float(completeness_correct),
-                "limitations_accuracy": float(limitations_correct),
                 "protocol_compliance": float(contract),
                 "reward": float(correct),
-                "false_certification": false_certification,
             }
         )
     )

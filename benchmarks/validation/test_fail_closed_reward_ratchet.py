@@ -56,9 +56,8 @@ KNOWN_LEAKY_REWARD_VERIFIERS: frozenset[str] = frozenset()
 _REQUIRED_TEMPLATE_EXPORTS = frozenset(
     {
         "aggregate_reward",
-        "evidence_list_is_bound",
+        "witness_list_is_bound",
         "load_submission",
-        "strict_submission_contract",
     }
 )
 

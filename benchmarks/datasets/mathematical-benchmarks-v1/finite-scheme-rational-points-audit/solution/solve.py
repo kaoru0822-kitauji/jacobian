@@ -1,4 +1,3 @@
-import hashlib
 import itertools
 import json
 from pathlib import Path
@@ -54,25 +53,4 @@ result = {
     },
     "b_reduced": True,
 }
-text = (
-    "Both affine schemes are nonempty and have the same three rational points under the induced map. A has a nonzero order-three nilpotent while B is reduced, so they are not isomorphic.\nRESULT_JSON:"
-    + json.dumps(result, sort_keys=True, separators=(",", ":"))
-    + "\n"
-)
-Path("/app/evidence").mkdir(parents=True, exist_ok=True)
-Path("/app/evidence/answer.txt").write_text(text)
-digest = hashlib.sha256(text.encode()).hexdigest()
-submission = {
-    "task_id": "jacobian/finite-scheme-rational-points-audit",
-    "conclusion": "RATIONAL_POINT_BIJECTION_DOES_NOT_FORCE_SCHEME_ISOMORPHISM",
-    "result": result,
-    "claimed_assurance": "COMPUTED",
-    "scope": "finite-affine-schemes-over-F5-certificate",
-    "completeness": "COMPLETE",
-    "evidence": [{"path": "evidence/answer.txt", "sha256": f"sha256:{digest}"}],
-    "limitations": [
-        "claim:finite-affine-countermodel",
-        "limitation:no-general-scheme-theorem",
-    ],
-}
-Path("/app/submission.json").write_text(json.dumps(submission, indent=2) + "\n")
+Path("/app/submission.json").write_text(json.dumps({"result": result}, indent=2) + "\n")

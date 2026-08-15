@@ -3,17 +3,12 @@ from pathlib import Path
 from typing import Any
 
 from verifier_support import (
-    evidence_list_is_bound,
-    false_verified_claim,
     load_submission,
     normalize_reward_file,
-    resolve_evidence,
-    strict_submission_contract,
 )
 
 WORKSPACE = Path("/app")
 TESTS = Path("/tests")
-MAX_EVIDENCE_BYTES = 1_048_576
 MAX_DELTA_ITEMS = 32
 MAX_DELTA_ABS = 16
 MAX_DELTA_PRIME = 10_000
@@ -205,64 +200,17 @@ def _result_is_valid(result: object, source: dict[str, Any]) -> bool:
     return False
 
 
-def _evidence_is_valid(evidence: object) -> bool:
-    if not evidence_list_is_bound(evidence, expected_path="evidence/answer.txt"):
-        return False
-    if not isinstance(evidence, list) or len(evidence) != 1:
-        return False
-    target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
-    if target is None:
-        return False
-    try:
-        if target.stat().st_size > MAX_EVIDENCE_BYTES:
-            return False
-        text = target.read_text().strip()
-    except (OSError, UnicodeError):
-        return False
-    return len(text) >= 20
-
-
 def main() -> None:
     submission = load_submission()
     data = submission if isinstance(submission, dict) else {}
-    expected = json.loads((TESTS / "expected.json").read_text())
-    contract = strict_submission_contract(
-        submission,
-        task_id=expected["task_id"],
-        conclusion=expected["conclusion"],
-        verification_record="forbidden",
-    )
-    math_correct = bool(
-        contract and _result_is_valid(data.get("result"), _load_frozen_input())
-    )
-    evidence_valid = bool(math_correct and _evidence_is_valid(data.get("evidence")))
-    scope_correct = bool(contract and data.get("scope") == expected["required_scope"])
-    assurance_correct = bool(
-        contract and data.get("claimed_assurance") == expected["maximum_assurance"]
-    )
-    limitations_correct = bool(contract and LIMITATION in data.get("limitations", []))
-    false_certification = false_verified_claim(
-        submission, verification_record_bound=False
-    )
-    correct = bool(
-        math_correct
-        and evidence_valid
-        and scope_correct
-        and assurance_correct
-        and limitations_correct
-        and not false_certification
-    )
+    math_correct = bool(_result_is_valid(data.get("result"), _load_frozen_input()))
     logs = Path("/logs/verifier")
     logs.mkdir(parents=True, exist_ok=True)
     (logs / "reward.json").write_text(
         json.dumps(
             {
                 "correctness": float(math_correct),
-                "evidence_validity": float(evidence_valid),
-                "scope_accuracy": float(scope_correct),
-                "assurance_calibration": float(assurance_correct),
-                "reward": float(correct),
-                "false_certification": false_certification,
+                "reward": float(math_correct),
             }
         )
     )

@@ -11,23 +11,14 @@ chosen partial-sum checkpoints for the convergent witness.
 
 The verifier independently evaluates every rational checkpoint and replays the
 submitted symbolic identities. A conclusion label or numerical sampling alone
-is insufficient. The evidence must contain exactly one `RESULT_JSON:` line
-equal to the submitted `result` and explain why a ratio limit equal to one is
-inconclusive — both outcomes must be discussed. Do not claim proof-assistant
-verification.
+is insufficient: the result must demonstrate why a ratio limit equal to one is
+inconclusive through both outcomes.
 
 <!-- BEGIN PUBLIC CONTRACT SUBMISSION BLOCK -->
 ## Submission
 
-The verifier checks the declared result, scope, completeness, evidence binding, and assurance as separate protocol dimensions.
+The verifier replays the task-specific mathematical predicate from the submitted result.
 
-Write `/app/submission.json` to the exact schema in `environment/submission_schema.json`. The submission envelope requires `task_id`, `conclusion`, `result`, `claimed_assurance`, `scope`, `completeness`, `evidence`, and `limitations`.
+Write `/app/submission.json` to the exact schema in `environment/submission_schema.json`. The submission requires a typed `result`.
 
-- **Conclusion:** exactly `RATIO_BOUNDARY_INCONCLUSIVE`
-- **Assurance:** scoreable values are `UNVERIFIED`, `COMPUTED` (ceiling `COMPUTED`); the submission schema accepts any of `UNVERIFIED`, `COMPUTED`, `CHECKED`, `VERIFIED` but only scoreable assurances receive credit.
-- **Scope:** the exact value declared in `submission_schema.json`
-- **Completeness:** `COMPLETE`.
-- **Evidence:** 1-1 item(s); allowed path(s): `evidence/answer.txt`; digest must match `^sha256:[0-9a-f]{64}$`.
-- **Evidence media types:** `text/plain`.
-- **Required artifact filenames:** `evidence/answer.txt`.
 <!-- END PUBLIC CONTRACT SUBMISSION BLOCK -->

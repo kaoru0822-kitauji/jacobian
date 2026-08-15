@@ -1,40 +1,6 @@
 {
-  "allowed_assurance": [
-    "UNVERIFIED",
-    "COMPUTED",
-    "CHECKED"
-  ],
-  "allowed_completeness": [
-    "COMPLETE"
-  ],
-  "assurance_ceiling": "CHECKED",
-  "conclusion": {
-    "enum": [
-      "TRUE",
-      "FALSE",
-      "UNKNOWN"
-    ]
-  },
-  "evidence": {
-    "allowed_paths": [
-      "evidence/certificate.json"
-    ],
-    "digest_pattern": "^sha256:[0-9a-f]{64}$",
-    "max_items": 1,
-    "media_types": [
-      "application/json"
-    ],
-    "min_items": 1
-  },
-  "limitations": {
-    "const": [
-      "KELLER_CONDITION_DOES_NOT_LICENSE_GLOBAL_INVERTIBILITY"
-    ]
-  },
-  "public_notes": "Write evidence/certificate.json as a JSON wrapper with exactly these fields: schema_version (the string \\\"1\\\"), task_id (the string \\\"jacobian/symbolic-coordination-keller-only-03\\\"), result (an exact copy of the submission result object), scope (an exact copy of the submission scope), completeness (an exact copy of the submission completeness), and limitations (an exact copy of the submission limitations). Bind that exact regular file by SHA-256. The verifier independently checks the mathematics, input and artifact identities, declared scope, completeness, and assurance.",
-  "required_artifact_filenames": [
-    "evidence/certificate.json"
-  ],
+  "public_notes": "Submit the terminal certificate inside result. The verifier replays the exact polynomial-map predicate and checks the frozen claim bindings carried by the result.",
+  "required_witness_filenames": [],
   "schema_definitions": {
     "grid": {
       "additionalProperties": false,
@@ -155,10 +121,6 @@
     }
   },
   "schema_version": "1",
-  "scope": {
-    "const": "KELLER_CONDITION_ONLY_OVER_QQ:symbolic-coordination-keller-only-03",
-    "type": "string"
-  },
   "submission_path": "/app/submission.json",
   "submission_result": {
     "additionalProperties": false,
@@ -178,9 +140,6 @@
           "forward_map_sha256": {
             "const": "sha256:5c5d8a401056f4e365f1bfdd6f8fdf4dbd4990e64ea70d29bcdc9025f75e11ab"
           },
-          "scope_id": {
-            "const": "scope://symbolic-coordination-v1/symbolic-coordination-keller-only-03"
-          },
           "semantics_id": {
             "const": "exact-sparse-polynomial-maps-over-QQ@1"
           },
@@ -192,7 +151,6 @@
           "binding_schema_version",
           "claim_id",
           "semantics_id",
-          "scope_id",
           "forward_map_sha256",
           "subject_sha256",
           "checker_id"
@@ -534,51 +492,6 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,
     "properties": {
-      "claimed_assurance": {
-        "enum": [
-          "UNVERIFIED",
-          "COMPUTED",
-          "CHECKED",
-          "VERIFIED"
-        ]
-      },
-      "completeness": {
-        "const": "COMPLETE"
-      },
-      "conclusion": {
-        "enum": [
-          "TRUE",
-          "FALSE",
-          "UNKNOWN"
-        ]
-      },
-      "evidence": {
-        "items": {
-          "additionalProperties": false,
-          "properties": {
-            "path": {
-              "const": "evidence/certificate.json"
-            },
-            "sha256": {
-              "pattern": "^sha256:[0-9a-f]{64}$",
-              "type": "string"
-            }
-          },
-          "required": [
-            "path",
-            "sha256"
-          ],
-          "type": "object"
-        },
-        "maxItems": 1,
-        "minItems": 1,
-        "type": "array"
-      },
-      "limitations": {
-        "const": [
-          "KELLER_CONDITION_DOES_NOT_LICENSE_GLOBAL_INVERTIBILITY"
-        ]
-      },
       "result": {
         "additionalProperties": false,
         "properties": {
@@ -597,9 +510,6 @@
               "forward_map_sha256": {
                 "const": "sha256:5c5d8a401056f4e365f1bfdd6f8fdf4dbd4990e64ea70d29bcdc9025f75e11ab"
               },
-              "scope_id": {
-                "const": "scope://symbolic-coordination-v1/symbolic-coordination-keller-only-03"
-              },
               "semantics_id": {
                 "const": "exact-sparse-polynomial-maps-over-QQ@1"
               },
@@ -611,7 +521,6 @@
               "binding_schema_version",
               "claim_id",
               "semantics_id",
-              "scope_id",
               "forward_map_sha256",
               "subject_sha256",
               "checker_id"
@@ -829,26 +738,19 @@
           "certificate"
         ],
         "type": "object"
-      },
-      "scope": {
-        "const": "KELLER_CONDITION_ONLY_OVER_QQ:symbolic-coordination-keller-only-03",
-        "type": "string"
-      },
-      "task_id": {
-        "const": "jacobian/symbolic-coordination-keller-only-03"
       }
     },
     "required": [
-      "task_id",
-      "conclusion",
-      "result",
-      "claimed_assurance",
-      "scope",
-      "completeness",
-      "evidence",
-      "limitations"
+      "result"
     ],
     "type": "object"
   },
-  "task_id": "jacobian/symbolic-coordination-keller-only-03"
+  "task_id": "jacobian/symbolic-coordination-keller-only-03",
+  "witness": {
+    "allowed_paths": [],
+    "digest_pattern": "^sha256:[0-9a-f]{64}$",
+    "max_items": 0,
+    "media_types": [],
+    "min_items": 0
+  }
 }

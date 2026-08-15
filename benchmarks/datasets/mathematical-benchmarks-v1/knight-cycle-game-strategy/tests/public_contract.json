@@ -1,50 +1,7 @@
 {
-  "allowed_assurance": [
-    "UNVERIFIED",
-    "COMPUTED"
-  ],
-  "allowed_completeness": [
-    "COMPLETE",
-    "PARTIAL",
-    "UNKNOWN"
-  ],
-  "assurance_ceiling": "COMPUTED",
-  "conclusion": {
-    "enum": [
-      "OPTIMUM_STRATEGIES_CERTIFIED",
-      "INSUFFICIENT_EVIDENCE"
-    ]
-  },
-  "evidence": {
-    "allowed_paths": [
-      "evidence/answer.txt"
-    ],
-    "digest_pattern": "^sha256:[0-9a-f]{64}$",
-    "max_items": 1,
-    "media_types": [
-      "text/plain"
-    ],
-    "min_items": 1,
-    "payload_shape": null
-  },
-  "limitations": {
-    "items": {
-      "type": "string"
-    },
-    "type": "array"
-  },
-  "public_notes": "The verifier checks the declared result, scope, completeness, evidence binding, and assurance as separate protocol dimensions.",
-  "required_artifact_filenames": [
-    "evidence/answer.txt"
-  ],
+  "public_notes": "The verifier replays the task-specific mathematical predicate from the submitted result.",
   "schema_definitions": {},
   "schema_version": "1",
-  "scope": {
-    "const": "20x20 board, squared-distance-5 red conflicts, alternating Amy-first play",
-    "enum": null,
-    "pattern": null,
-    "type": "string"
-  },
   "submission_path": "/app/submission.json",
   "submission_result": {
     "additionalProperties": false,
@@ -160,55 +117,6 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,
     "properties": {
-      "claimed_assurance": {
-        "enum": [
-          "UNVERIFIED",
-          "COMPUTED",
-          "CHECKED",
-          "VERIFIED"
-        ]
-      },
-      "completeness": {
-        "enum": [
-          "COMPLETE",
-          "PARTIAL",
-          "UNKNOWN"
-        ]
-      },
-      "conclusion": {
-        "enum": [
-          "OPTIMUM_STRATEGIES_CERTIFIED",
-          "INSUFFICIENT_EVIDENCE"
-        ]
-      },
-      "evidence": {
-        "items": {
-          "additionalProperties": false,
-          "properties": {
-            "path": {
-              "const": "evidence/answer.txt"
-            },
-            "sha256": {
-              "pattern": "^sha256:[0-9a-f]{64}$",
-              "type": "string"
-            }
-          },
-          "required": [
-            "path",
-            "sha256"
-          ],
-          "type": "object"
-        },
-        "maxItems": 1,
-        "minItems": 1,
-        "type": "array"
-      },
-      "limitations": {
-        "items": {
-          "type": "string"
-        },
-        "type": "array"
-      },
       "result": {
         "additionalProperties": false,
         "properties": {
@@ -318,27 +226,12 @@
           "upper_strategy"
         ],
         "type": "object"
-      },
-      "scope": {
-        "const": "20x20 board, squared-distance-5 red conflicts, alternating Amy-first play",
-        "type": "string"
-      },
-      "task_id": {
-        "const": "jacobian/knight-cycle-game-strategy"
       }
     },
     "required": [
-      "task_id",
-      "conclusion",
-      "result",
-      "claimed_assurance",
-      "scope",
-      "completeness",
-      "evidence",
-      "limitations"
+      "result"
     ],
     "type": "object"
   },
-  "task_id": "jacobian/knight-cycle-game-strategy",
-  "verification_record": null
+  "task_id": "jacobian/knight-cycle-game-strategy"
 }

@@ -16,26 +16,13 @@ consistently, instantiates the conclusion, and requires one final stack item
 equal to the target. Merely naming the two repaired labels or asserting the
 target is insufficient.
 
-Write `submission.json` to the provided schema. Write `evidence/answer.txt`
-with exactly one line beginning `RESULT_JSON:` followed by the exact compact
-JSON serialization of `result`. The other text must explain the assertion
-applications using the ordered stack and its variable unification/substitution;
-unrelated or marker-only text is not evidence. Digest-bind that file and claim
-at most `COMPUTED`.
-The evidence file must not exceed 16 MiB.
+Write `submission.json` to the provided schema.
 
 <!-- BEGIN PUBLIC CONTRACT SUBMISSION BLOCK -->
 ## Submission
 
-The verifier checks the declared result, scope, completeness, evidence binding, and assurance as separate protocol dimensions.
+The verifier replays the task-specific mathematical predicate from the submitted result.
 
-Write `/app/submission.json` to the exact schema in `environment/submission_schema.json`. The submission envelope requires `task_id`, `conclusion`, `result`, `claimed_assurance`, `scope`, `completeness`, `evidence`, and `limitations`.
+Write `/app/submission.json` to the exact schema in `environment/submission_schema.json`. The submission requires a typed `result`.
 
-- **Conclusion:** exactly `PROOF_REPAIRED_AND_REPLAYED`
-- **Assurance:** scoreable values are `UNVERIFIED`, `COMPUTED` (ceiling `COMPUTED`); the submission schema accepts any of `UNVERIFIED`, `COMPUTED`, `CHECKED`, `VERIFIED` but only scoreable assurances receive credit.
-- **Scope:** the exact value declared in `submission_schema.json`
-- **Completeness:** `COMPLETE`.
-- **Evidence:** 1-1 item(s); allowed path(s): `evidence/answer.txt`; digest must match `^sha256:[0-9a-f]{64}$`.
-- **Evidence media types:** `text/plain`.
-- **Required artifact filenames:** `evidence/answer.txt`.
 <!-- END PUBLIC CONTRACT SUBMISSION BLOCK -->

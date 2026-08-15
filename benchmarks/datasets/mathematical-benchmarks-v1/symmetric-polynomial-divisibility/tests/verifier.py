@@ -1,21 +1,15 @@
 import json
-import re
 from fractions import Fraction
 from pathlib import Path
 
 from verifier_support import (
-    evidence_list_is_bound,
-    false_verified_claim,
     load_submission,
     normalize_reward_file,
-    resolve_evidence,
-    strict_submission_contract,
 )
 
 W = Path("/app")
 E = Path("/tests")
 ZERO = (0, 0, 0, 0)
-MAX_EVIDENCE_BYTES = 1_048_576
 
 
 def _load_frozen_input():
@@ -140,93 +134,17 @@ def _result_is_valid(result, frozen):
     )
 
 
-def _evidence_matches(evidence):
-    if (
-        not isinstance(evidence, list)
-        or len(evidence) != 1
-        or not evidence_list_is_bound(evidence, expected_path="evidence/answer.txt")
-    ):
-        return False
-    target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
-    if target is None:
-        return False
-    try:
-        if target.stat().st_size > MAX_EVIDENCE_BYTES:
-            return False
-        text = target.read_text().casefold()
-    except (OSError, UnicodeError):
-        return False
-    return (
-        len(text) >= 120
-        and all(word in text for word in ("identity", "coefficient", "divisible"))
-        and re.search(r"(?:linear|quadratic).{0,120}(?:generator|multiple)", text)
-        and re.search(r"(?:integral|integer).{0,120}(?:divis|modular)", text)
-    )
-
-
 def main():
     submission = load_submission()
     data = submission if isinstance(submission, dict) else {}
     frozen = _load_frozen_input()
-    expected = json.loads((E / "expected.json").read_text())
-    contract = strict_submission_contract(
-        submission,
-        task_id=expected["task_id"],
-        conclusion=expected["conclusion"],
-        verification_record="forbidden",
-    )
-    math_correct = bool(contract and _result_is_valid(data.get("result"), frozen))
-    evidence_valid = bool(
-        contract and math_correct and _evidence_matches(data.get("evidence"))
-    )
-    scope_text = (
-        data.get("scope").casefold() if isinstance(data.get("scope"), str) else ""
-    )
-    scope_correct = bool(
-        contract
-        and all(term in scope_text for term in ("ideal", "integer", "divis"))
-        and not re.search(
-            r"(?:\b(?:no|not|without|excluding|exclude|only)\b"
-            r"[\s_-]{0,20}(?:ideal|integer|divis)|"
-            r"\bno[_-](?:ideal|integer|divis))",
-            scope_text,
-        )
-    )
-    assurance_correct = bool(
-        contract and data.get("claimed_assurance") == expected["maximum_assurance"]
-    )
-    limitation_correct = bool(
-        contract
-        and any(
-            isinstance(item, str)
-            and "proof assistant" in item.casefold()
-            and re.search(r"\b(?:not|no|doesn['']?t|without|cannot)\b", item, re.I)
-            for item in data.get("limitations", [])
-        )
-    )
-    false_certification = false_verified_claim(
-        submission, verification_record_bound=False
-    )
-    correct = bool(
-        contract
-        and math_correct
-        and evidence_valid
-        and scope_correct
-        and assurance_correct
-        and limitation_correct
-        and not false_certification
-    )
-    reward = 0.0 if not correct else 0.8 + 0.1 * scope_correct + 0.1 * assurance_correct
+    math_correct = bool(submission and _result_is_valid(data.get("result"), frozen))
     Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
     Path("/logs/verifier/reward.json").write_text(
         json.dumps(
             {
                 "correctness": float(math_correct),
-                "evidence_validity": float(evidence_valid),
-                "scope_accuracy": float(scope_correct),
-                "assurance_calibration": float(assurance_correct),
-                "reward": reward,
-                "false_certification": false_certification,
+                "reward": float(math_correct),
             }
         )
     )

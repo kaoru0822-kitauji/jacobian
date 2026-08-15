@@ -5,7 +5,6 @@ The frozen input gives a cyclic system over the complex numbers, a pairwise-dist
 Submit `/app/submission.json` following `/app/submission_schema.json`, plus a
 digest-bound JSON envelope at
 `/app/evidence/cyclic-elimination-certificate.json`. The envelope must contain
-exactly `schema_version` (value `"1"`), `task_id`, `result`, and `limitations`,
 with the latter three matching the submission.
 
 Your result must contain:
@@ -17,20 +16,13 @@ Your result must contain:
 - the rational candidate excluded by the original system, together with the exact elementary-symmetric invariants on that branch and the nonzero residual in the product consequence
   `(a^2-6)(b^2-6)(c^2-6)=abc`.
 
-Claim `COMPUTED` assurance and complete scope exactly as specified by the schema. This benchmark checks an exact algebraic audit of the frozen system; it does not machine-check the original contest solution or provide proof-assistant verification.
 
 <!-- BEGIN PUBLIC CONTRACT SUBMISSION BLOCK -->
 ## Submission
 
-The verifier independently replays the exact elimination, proposed-value evaluations, radical roots, and excluded-branch residual.
+The verifier replays the task-specific mathematical predicate from the submitted result and validates the declared task-specific witness.
 
-Write `/app/submission.json` to the exact schema in `environment/submission_schema.json`. The submission envelope requires `task_id`, `conclusion`, `result`, `claimed_assurance`, `scope`, `completeness`, `evidence`, and `limitations`.
+Write `/app/submission.json` to the exact schema in `environment/submission_schema.json`. The submission requires a typed `result` and the declared `witness`.
 
-- **Conclusion:** exactly `CLAIM_INCONSISTENT`
-- **Assurance:** scoreable values are `UNVERIFIED`, `COMPUTED` (ceiling `COMPUTED`); the submission schema accepts any of `UNVERIFIED`, `COMPUTED`, `CHECKED`, `VERIFIED` but only scoreable assurances receive credit.
-- **Scope:** the exact value declared in `submission_schema.json`
-- **Completeness:** `COMPLETE`.
-- **Evidence:** 1-1 item(s); allowed path(s): `evidence/cyclic-elimination-certificate.json`; digest must match `^sha256:[0-9a-f]{64}$`.
-- **Evidence media types:** `application/json`.
-- **Required artifact filenames:** `evidence/cyclic-elimination-certificate.json`.
+- **Witness:** 1-1 item(s); allowed path(s): `evidence/cyclic-elimination-certificate.json`; digest must match `^sha256:[0-9a-f]{64}$`; media type(s): `application/json`.
 <!-- END PUBLIC CONTRACT SUBMISSION BLOCK -->

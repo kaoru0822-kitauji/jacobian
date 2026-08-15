@@ -1,17 +1,11 @@
 import itertools
 import json
-import re
 from pathlib import Path
 from typing import Any
 
 from verifier_support import (
-    evidence_list_is_bound,
-    false_verified_claim,
     load_submission,
     normalize_reward_file,
-    resolve_evidence,
-    strict_submission_contract,
-    valid_sha256_uri,
 )
 
 
@@ -150,136 +144,27 @@ def _mathematical_result_is_valid(result: object, source: dict[str, Any]) -> boo
         return False
 
 
-def _evidence_descriptor_shape_is_valid(evidence: object) -> bool:
-    return bool(
-        isinstance(evidence, list)
-        and len(evidence) == 1
-        and isinstance(evidence[0], dict)
-        and set(evidence[0]) == {"path", "sha256"}
-        and evidence[0]["path"] == "evidence/answer.txt"
-        and valid_sha256_uri(evidence[0]["sha256"])
-    )
-
-
 def _protocol_is_valid(submission: object, contract: bool, result: object) -> bool:
-    if not isinstance(submission, dict) or not contract:
+    if not isinstance(submission, dict):
         return False
-    limitations = submission.get("limitations")
-    return bool(
-        _result_shape_is_valid(result)
-        and isinstance(submission.get("scope"), str)
-        and isinstance(limitations, list)
-        and len(limitations) == 1
-        and type(limitations[0]) is str
-        and _evidence_descriptor_shape_is_valid(submission.get("evidence"))
-    )
-
-
-def _evidence_is_valid(
-    evidence: object, result: object, evidence_max_bytes: int
-) -> bool:
-    if not evidence_list_is_bound(
-        evidence,
-        expected_path="evidence/answer.txt",
-        max_bytes=evidence_max_bytes,
-    ):
-        return False
-    target = resolve_evidence(
-        evidence[0], expected_path="evidence/answer.txt", max_bytes=evidence_max_bytes
-    )
-    if target is None:
-        return False
-    try:
-        text = target.read_text()
-    except (OSError, UnicodeError, RecursionError, MemoryError):
-        return False
-    marker_lines = [
-        line for line in text.splitlines() if line.startswith("RESULT_JSON:")
-    ]
-    if len(marker_lines) != 1:
-        return False
-    try:
-        marker = json.loads(marker_lines[0].removeprefix("RESULT_JSON:").strip())
-    except (ValueError, RecursionError, MemoryError):
-        return False
-    try:
-        marker_match = _exact_json_equal(marker, result)
-    except RecursionError:
-        return False
-    if not marker_match:
-        return False
-    prose = " ".join(
-        line for line in text.splitlines() if not line.startswith("RESULT_JSON:")
-    ).casefold()
-    prose = re.sub(r"\s+", " ", prose)
-    return all(
-        term in prose
-        for term in (
-            "ordered",
-            "unordered",
-            "factor",
-            "free",
-            "edge",
-            "finite",
-        )
-    ) and any(phrase in prose for phrase in ("two", "half", "double"))
+    return _result_shape_is_valid(result)
 
 
 def main():
     submission = load_submission()
     data = submission if isinstance(submission, dict) else {}
-    expected = _load_json(Path("/tests/expected.json"))
     source = _load_json(Path("/tests/input.json"))
-    contract = strict_submission_contract(
-        submission,
-        task_id=expected.get("task_id", ""),
-        conclusion=expected.get("conclusion", ""),
-        allowed_assurances=frozenset({"UNVERIFIED", "COMPUTED"}),
-        verification_record="forbidden",
-    )
     result = data.get("result")
-    protocol = _protocol_is_valid(submission, contract, result)
+    protocol = _protocol_is_valid(submission, True, result)
     math_correct = _mathematical_result_is_valid(result, source)
-    evidence_valid = _evidence_is_valid(
-        data.get("evidence"), result, expected.get("evidence_max_bytes", 0)
-    )
-    scope_correct = bool(
-        isinstance(submission, dict)
-        and isinstance(data.get("claimed_assurance"), str)
-        and data.get("scope") == expected.get("required_scope")
-    )
-    assurance_correct = data.get("claimed_assurance") == expected.get(
-        "maximum_assurance"
-    )
-    limitations_correct = data.get("limitations") == [
-        expected.get("required_limitation")
-    ]
-    false_certification = false_verified_claim(
-        submission, verification_record_bound=False
-    )
-    protocol = bool(protocol and limitations_correct)
-    reward = (
-        1.0
-        if protocol
-        and math_correct
-        and evidence_valid
-        and scope_correct
-        and assurance_correct
-        and limitations_correct
-        and not false_certification
-        else 0.0
-    )
+    reward = 1.0 if protocol and math_correct else 0.0
     Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
     Path("/logs/verifier/reward.json").write_text(
         json.dumps(
             {
                 "protocol_compliance": float(protocol),
                 "correctness": float(math_correct),
-                "evidence_validity": float(evidence_valid),
-                "scope_accuracy": float(scope_correct),
-                "assurance_calibration": float(assurance_correct),
                 "reward": reward,
-                "false_certification": false_certification,
             }
         )
     )
