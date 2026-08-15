@@ -93,6 +93,23 @@ def test_rejects_boolean_in_integer_certificate_fields(tmp_path: Path) -> None:
     assert rejected.reward == 0.0
 
 
+def test_rejects_boolean_alias_only_in_evidence(tmp_path: Path) -> None:
+    task, app, logs = _case(tmp_path)
+    submission = _base_submission(app)
+    evidence = json.loads((app / "evidence/local-audit.json").read_text())
+    evidence["result"]["ramified_witness"]["gcd"] = True
+    evidence["result"]["ramified_witness"]["v3"] = True
+    raw = json.dumps(evidence, separators=(",", ":")).encode()
+    (app / "evidence/local-audit.json").write_bytes(raw)
+    submission["evidence"][0]["sha256"] = "sha256:" + hashlib.sha256(raw).hexdigest()
+    support._write_json(app / "submission.json", submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected.details["correctness"] == 1.0
+    assert rejected.details["evidence_validity"] == 0.0
+    assert rejected.reward == 0.0
+
+
 def test_rejects_boolean_in_residue_pair_coordinates(tmp_path: Path) -> None:
     task, app, logs = _case(tmp_path)
     submission = _base_submission(app)
