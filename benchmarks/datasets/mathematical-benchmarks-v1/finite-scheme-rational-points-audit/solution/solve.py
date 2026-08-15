@@ -71,7 +71,8 @@ submission = {
     "completeness": "COMPLETE",
     "evidence": [{"path": "evidence/answer.txt", "sha256": f"sha256:{digest}"}],
     "limitations": [
-        "The verifier certifies one finite affine countermodel over F_5, not a general theorem about schemes or functors of points."
+        "claim:finite-affine-countermodel",
+        "limitation:no-general-scheme-theorem",
     ],
 }
 Path("/app/submission.json").write_text(json.dumps(submission, indent=2) + "\n")
