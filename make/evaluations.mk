@@ -36,12 +36,11 @@ EVAL_CONFIG ?= benchmarks/config/mathematical-benchmarks-v1-control.json
 endif
 override MCP_CONFIG :=
 else
+MCP_CONFIG ?= benchmarks/config/jacobian-loopback.mcp.json
 ifeq ($(JACOBIAN_EVAL_PROXY),1)
 EVAL_CONFIG ?= benchmarks/datasets/$(or $(DATASET),mathematical-benchmarks-v1)/jobs/jacobian-observation-proxy.json
-MCP_CONFIG ?= benchmarks/config/jacobian-loopback.mcp.json
 else
 EVAL_CONFIG ?= benchmarks/datasets/$(or $(DATASET),mathematical-benchmarks-v1)/jobs/jacobian-observation.json
-MCP_CONFIG ?= benchmarks/config/jacobian.mcp.json
 endif
 endif
 

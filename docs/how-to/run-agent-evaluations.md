@@ -30,3 +30,11 @@ model and treatment condition, then pass its path to both `agent-eval` and
 `agent-eval-validate`. The run binds the resolved image identity into that
 record. Use `make eval-image-pull` to inspect or pre-pull the same immutable
 image without starting a model run.
+
+Harbor egress control shares the treatment services' network namespace, so
+every Jacobian-enabled run reaches its local sidecar through
+`http://127.0.0.1:8000/mcp`. This local endpoint is independent of upstream
+egress. By default, Codex reaches its provider directly. Set
+`JACOBIAN_EVAL_PROXY=1` only when the host requires a configured upstream HTTP,
+HTTPS, or SOCKS proxy; it changes provider egress without changing the
+Jacobian MCP endpoint.

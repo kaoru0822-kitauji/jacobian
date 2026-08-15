@@ -6,6 +6,7 @@ import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
+import pytest
 from benchmarks.tooling.benchmark_contracts import (
     benchmark_contract_inventory,
     collect_contract_failures,
@@ -188,3 +189,56 @@ def test_agent_eval_resolves_a_current_image_when_not_explicitly_set(
         f"bind image={selected}",
         f"harbor image={selected}",
     ]
+
+
+@pytest.mark.parametrize(
+    ("proxy", "expected_job"),
+    [
+        ("0", "jacobian-observation.json"),
+        ("1", "jacobian-observation-proxy.json"),
+    ],
+)
+def test_agent_eval_keeps_the_local_mcp_endpoint_independent_of_egress_proxy(
+    tmp_path: Path,
+    proxy: str,
+    expected_job: str,
+) -> None:
+    """Harbor egress control shares service networking, so MCP stays on loopback."""
+    runtime_snapshot = tmp_path / "runtime.json"
+    runtime_snapshot.write_text("{}", encoding="utf-8")
+    trace = tmp_path / "harbor-args.txt"
+    fake_uv = tmp_path / "uv"
+    fake_uv.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    fake_uv.chmod(0o755)
+    fake_harbor = tmp_path / "harbor"
+    fake_harbor.write_text(
+        '#!/bin/sh\nprintf \'%s\\n\' "$@" > "$TRACE"\n',
+        encoding="utf-8",
+    )
+    fake_harbor.chmod(0o755)
+
+    completed = subprocess.run(
+        [
+            "make",
+            "agent-eval",
+            "EVAL_EXECUTE=1",
+            "JACOBIAN_MODEL=test-model",
+            f"RUNTIME_SNAPSHOT={runtime_snapshot}",
+            "JACOBIAN_IMAGE=jacobian:test",
+            f"JACOBIAN_EVAL_PROXY={proxy}",
+            "JACOBIAN_EVAL_HTTP_PROXY=http://proxy.invalid:7890",
+            f"UV_RUN={fake_uv}",
+            f"HARBOR_RUNNER={fake_harbor}",
+        ],
+        cwd=ROOT,
+        env=os.environ | {"TRACE": str(trace)},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    arguments = trace.read_text(encoding="utf-8").splitlines()
+    assert arguments[arguments.index("-c") + 1].endswith(expected_job)
+    mcp_index = arguments.index("--mcp-config")
+    assert arguments[mcp_index + 1] == "benchmarks/config/jacobian-loopback.mcp.json"

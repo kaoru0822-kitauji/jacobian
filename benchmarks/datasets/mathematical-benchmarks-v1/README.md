@@ -48,9 +48,11 @@ make agent-eval DATASET=mathematical-benchmarks-v1 \
   TASKS=graph-counterexample EVAL_EXECUTE=1
 ```
 
-The task bundles and Harbor task digests must be identical between these
-jobs. Set `JACOBIAN_EVAL_PROXY=1` to apply the same optional proxy overlay to
-both jobs; only the treatment adds the Jacobian sidecar and MCP config. This
+The task bundles and Harbor task digests must be identical between these jobs.
+All Jacobian treatments reach the local sidecar through
+`http://127.0.0.1:8000/mcp`, independent of external networking. Set
+`JACOBIAN_EVAL_PROXY=1` only to apply the same optional upstream egress proxy
+to both jobs; only the treatment adds the Jacobian sidecar and MCP config. This
 paired setup is for workflow comparison; the public dataset is not held-out
 evidence.
 
