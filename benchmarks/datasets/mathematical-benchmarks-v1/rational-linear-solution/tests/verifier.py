@@ -38,7 +38,7 @@ def main():
         s,
         task_id=e["task_id"],
         conclusion=e["conclusion"],
-        allowed_assurances=frozenset({"UNVERIFIED", "COMPUTED", "CHECKED"}),
+        allowed_assurances=frozenset({"UNVERIFIED", "COMPUTED"}),
         verification_record="forbidden",
     )
     math_contract = strict_submission_contract(
@@ -64,9 +64,9 @@ def main():
     )
     math_correct = bool(valid)
     correct = bool(contract and math_correct)
-    good = bool(contract and evidence_list_is_bound(s["evidence"]))
-    scope = bool(contract and s["scope"] == " ".join(e["required_scope_terms"]))
-    assurance = bool(contract and s["claimed_assurance"] == e["maximum_assurance"])
+    good = bool(math_contract and evidence_list_is_bound(s["evidence"]))
+    scope = bool(math_contract and s["scope"] == " ".join(e["required_scope_terms"]))
+    assurance = bool(math_contract and s["claimed_assurance"] == e["maximum_assurance"])
     false = bool(isinstance(s, dict) and s.get("claimed_assurance") == "VERIFIED")
     reward = aggregate_reward(
         correctness=correct,
