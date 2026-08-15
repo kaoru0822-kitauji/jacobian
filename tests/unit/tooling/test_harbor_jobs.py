@@ -235,3 +235,46 @@ def test_agent_eval_keeps_the_local_mcp_endpoint_independent_of_egress_proxy(
     attempts_index = arguments.index("--n-attempts")
     assert arguments[attempts_index + 1] == "2"
     assert "reasoning_effort=high" in arguments
+
+
+@pytest.mark.parametrize(
+    ("configured_proxy", "expects_warning"),
+    [
+        ("", False),
+        ("http://proxy.invalid:7890", True),
+    ],
+)
+def test_agent_eval_reports_direct_egress_and_only_warns_for_a_configured_proxy(
+    tmp_path: Path, configured_proxy: str, expects_warning: bool
+) -> None:
+    fake_harbor = tmp_path / "harbor"
+    fake_harbor.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    fake_harbor.chmod(0o755)
+
+    completed = run_operator_command(
+        "make",
+        (
+            "agent-eval",
+            "EVAL_EXECUTE=1",
+            "JACOBIAN_MODEL=test-model",
+            "JACOBIAN_IMAGE=jacobian:test",
+            "JACOBIAN_EVAL_PROXY=0",
+            f"JACOBIAN_EVAL_HTTP_PROXY={configured_proxy}",
+            f"JACOBIAN_EVAL_HTTPS_PROXY={configured_proxy}",
+            f"JACOBIAN_EVAL_ALL_PROXY={configured_proxy}",
+            f"HARBOR_RUNNER={fake_harbor}",
+        ),
+        cwd=ROOT,
+        environment=os.environ,
+        timeout_seconds=120.0,
+    )
+
+    assert completed.status is ToolCommandStatus.EXITED
+    assert completed.exit_code == 0, completed.stderr.decode("utf-8", errors="replace")
+    output = completed.stdout.decode("utf-8", errors="replace")
+    assert "Provider egress: direct" in output
+    warning = "Detected HTTP_PROXY / HTTPS_PROXY / ALL_PROXY on the host."
+    hint = "If this network requires the proxy, rerun with JACOBIAN_EVAL_PROXY=1."
+    assert (warning in output) is expects_warning
+    assert (hint in output) is expects_warning
+    assert "proxy.invalid" not in output

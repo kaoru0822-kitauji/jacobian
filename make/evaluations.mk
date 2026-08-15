@@ -59,6 +59,15 @@ agent-eval: ## Run a Harbor observation (JACOBIAN_ENABLED=0|1, DATASET=..., TASK
 		exit 2; \
 	fi; \
 	if [ "$(JACOBIAN_EVAL_PROXY)" = "1" ]; then \
+		echo "Provider egress: proxy"; \
+	else \
+		echo "Provider egress: direct"; \
+		if [ -n "$(JACOBIAN_EVAL_HTTP_PROXY)$(JACOBIAN_EVAL_HTTPS_PROXY)$(JACOBIAN_EVAL_ALL_PROXY)" ]; then \
+			echo "Detected HTTP_PROXY / HTTPS_PROXY / ALL_PROXY on the host."; \
+			echo "If this network requires the proxy, rerun with JACOBIAN_EVAL_PROXY=1."; \
+		fi; \
+	fi; \
+	if [ "$(JACOBIAN_EVAL_PROXY)" = "1" ]; then \
 		CODEX_BINARY="$$( $(UV_RUN) python -m benchmarks.tooling.codex_binary --candidate "$$CODEX_BINARY" )"; \
 		CODEX_CODE_MODE_HOST="$$( $(UV_RUN) python -m benchmarks.tooling.codex_binary --candidate "$$CODEX_BINARY" --code-mode-host )"; \
 		JACOBIAN_EVAL_UPSTREAM_PROXY="$(JACOBIAN_EVAL_UPSTREAM_PROXY)" \
