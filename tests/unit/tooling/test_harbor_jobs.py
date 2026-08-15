@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
@@ -12,6 +11,7 @@ from benchmarks.tooling.benchmark_contracts import (
     collect_contract_failures,
     validate_job_contract,
 )
+from benchmarks.tooling.command_runner import ToolCommandStatus, run_operator_command
 from benchmarks.tooling.harbor_suite import load_registry
 
 ROOT = Path(__file__).parents[3]
@@ -165,9 +165,9 @@ def test_agent_eval_resolves_a_current_image_when_not_explicitly_set(
         "TRACE": str(trace),
     }
 
-    completed = subprocess.run(
-        [
-            "make",
+    completed = run_operator_command(
+        "make",
+        (
             "agent-eval",
             "EVAL_EXECUTE=1",
             "JACOBIAN_MODEL=test-model",
@@ -175,15 +175,14 @@ def test_agent_eval_resolves_a_current_image_when_not_explicitly_set(
             f"UV_RUN={fake_uv}",
             f"HARBOR_RUNNER={fake_harbor}",
             "JACOBIAN_REGISTRY_IMAGE=registry.invalid/jacobian",
-        ],
+        ),
         cwd=ROOT,
-        env=environment,
-        check=False,
-        capture_output=True,
-        text=True,
+        environment=environment,
+        timeout_seconds=120.0,
     )
 
-    assert completed.returncode == 0, completed.stderr
+    assert completed.status is ToolCommandStatus.EXITED
+    assert completed.exit_code == 0, completed.stderr.decode("utf-8", errors="replace")
     assert trace.read_text(encoding="utf-8").splitlines() == [
         "python -m tools.manage_jacobian_image select --registry-image registry.invalid/jacobian",
         f"bind image={selected}",
@@ -217,9 +216,9 @@ def test_agent_eval_keeps_the_local_mcp_endpoint_independent_of_egress_proxy(
     )
     fake_harbor.chmod(0o755)
 
-    completed = subprocess.run(
-        [
-            "make",
+    completed = run_operator_command(
+        "make",
+        (
             "agent-eval",
             "EVAL_EXECUTE=1",
             "JACOBIAN_MODEL=test-model",
@@ -229,15 +228,14 @@ def test_agent_eval_keeps_the_local_mcp_endpoint_independent_of_egress_proxy(
             "JACOBIAN_EVAL_HTTP_PROXY=http://proxy.invalid:7890",
             f"UV_RUN={fake_uv}",
             f"HARBOR_RUNNER={fake_harbor}",
-        ],
+        ),
         cwd=ROOT,
-        env=os.environ | {"TRACE": str(trace)},
-        check=False,
-        capture_output=True,
-        text=True,
+        environment=os.environ | {"TRACE": str(trace)},
+        timeout_seconds=120.0,
     )
 
-    assert completed.returncode == 0, completed.stderr
+    assert completed.status is ToolCommandStatus.EXITED
+    assert completed.exit_code == 0, completed.stderr.decode("utf-8", errors="replace")
     arguments = trace.read_text(encoding="utf-8").splitlines()
     assert arguments[arguments.index("-c") + 1].endswith(expected_job)
     mcp_index = arguments.index("--mcp-config")

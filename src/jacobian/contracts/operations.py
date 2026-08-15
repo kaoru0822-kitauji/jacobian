@@ -99,6 +99,43 @@ class OperationDiscoveryResult(ContractModel):
         return self
 
 
+class OperationBrowseCard(ContractModel):
+    """One compact operation card in deterministic catalog order."""
+
+    operation_id: OperationId
+    title: str = Field(min_length=1, max_length=128)
+    description: str = Field(min_length=1, max_length=512)
+    tags: tuple[str, ...] = ()
+
+
+class OperationBrowseResult(ContractModel):
+    """One cursor-paged, unranked view of the immutable operation library."""
+
+    discovery_version: Literal["1"] = "1"
+    domain: str | None = None
+    operations: tuple[OperationBrowseCard, ...]
+    total_operations: int = Field(ge=0, strict=True)
+    truncated: bool
+    next_cursor: OperationId | None = None
+
+    @model_validator(mode="after")
+    def bind_page_metadata(self) -> Self:
+        operation_ids = tuple(operation.operation_id for operation in self.operations)
+        if operation_ids != tuple(sorted(set(operation_ids))):
+            raise ValueError("browse operations must have unique sorted operation IDs")
+        if self.total_operations < len(self.operations):
+            raise ValueError(
+                "total_operations cannot be smaller than the returned page"
+            )
+        if self.truncated != (self.next_cursor is not None):
+            raise ValueError("truncated must agree with next_cursor")
+        if self.next_cursor is not None and (
+            not operation_ids or self.next_cursor != operation_ids[-1]
+        ):
+            raise ValueError("next_cursor must identify the final returned operation")
+        return self
+
+
 class OperationDescriptor(ContractModel):
     """One installed operation advertised by an operator-installed adapter."""
 

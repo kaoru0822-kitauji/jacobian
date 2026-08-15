@@ -12,9 +12,11 @@ from jacobian.adapters.mcp.context import (
     _catalog,
 )
 from jacobian.adapters.mcp.projections import (
+    _operation_browse_response,
     _operation_discovery_response,
 )
 from jacobian.contracts.operation_find import (
+    OperationBrowseRequest,
     OperationFindRequest,
     OperationFindResponse,
     OperationInspectionResult,
@@ -45,6 +47,14 @@ def math_find(
             cursor=request.cursor,
         )
         return _find_result(discovery_response)
+    if isinstance(request, OperationBrowseRequest):
+        browse_response = _operation_browse_response(
+            active_catalog,
+            domain=request.domain,
+            limit=request.limit,
+            cursor=request.cursor,
+        )
+        return _find_result(browse_response)
     operation_id = request.operation_id
     descriptor = active_catalog.inspect(operation_id)
     if descriptor is None:

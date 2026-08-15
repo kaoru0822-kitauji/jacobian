@@ -118,3 +118,62 @@ def test_mcp_compact_operation_index_is_searchable_and_paginated() -> None:
             assert invalid["error"]["code"] == "INVALID_CURSOR"
 
     asyncio.run(scenario())
+
+
+def test_mcp_operation_browse_pages_the_complete_immutable_library() -> None:
+    async def scenario() -> None:
+        from mcp import Client
+
+        async with Client(
+            create_server(),
+            raise_exceptions=True,
+        ) as client:
+            resource_result = await client.read_resource("operation://catalog")
+            full_catalog = json.loads(resource_result.contents[0].text)
+            catalog_ids = [
+                descriptor["operation_id"] for descriptor in full_catalog["operations"]
+            ]
+
+            request: dict[str, object] = {"op": "browse", "limit": 20}
+            browsed_ids: list[str] = []
+            while True:
+                page_result = await client.call_tool("math.find", {"request": request})
+                assert isinstance(page_result.structured_content, dict)
+                page = page_result.structured_content
+                assert page["kind"] == "browse"
+                assert len(page_result.content[0].text.encode("utf-8")) <= 16 * 1024
+                assert json.loads(page_result.content[0].text) == page
+                assert page["response_byte_limit"] == 16 * 1024
+                assert len(page["operations"]) <= 20
+                assert all(
+                    "input_schema" not in operation
+                    and "output_schema" not in operation
+                    and "examples" not in operation
+                    for operation in page["operations"]
+                )
+                page_ids = [
+                    operation["operation_id"] for operation in page["operations"]
+                ]
+                assert page_ids == sorted(page_ids)
+                browsed_ids.extend(page_ids)
+                cursor = page["next_cursor"]
+                if cursor is None:
+                    break
+                request["cursor"] = cursor
+
+            assert browsed_ids == catalog_ids
+            assert len(set(browsed_ids)) == len(catalog_ids)
+
+            invalid_cursor = await client.call_tool(
+                "math.find",
+                {
+                    "request": {
+                        "op": "browse",
+                        "cursor": "integer.compute.unknown",
+                    }
+                },
+            )
+            invalid = json.loads(invalid_cursor.content[0].text)
+            assert invalid["error"]["code"] == "INVALID_CURSOR"
+
+    asyncio.run(scenario())

@@ -37,7 +37,7 @@ def register_core_projection(
         title="Run one installed Jacobian math tool",
         description=MATH_RUN_DESCRIPTION,
         annotations=ToolAnnotations(
-            read_only_hint=False,
+            read_only_hint=True,
             destructive_hint=False,
             idempotent_hint=False,
             open_world_hint=False,
