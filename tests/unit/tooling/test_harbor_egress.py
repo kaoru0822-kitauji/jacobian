@@ -80,6 +80,10 @@ def test_agent_eval_forwards_web_search_setting_to_harbor() -> None:
     assert "JACOBIAN_EVAL_CODEX_BINARY" not in evaluations
     assert "benchmarks.tooling.codex_binary" not in evaluations
     assert "JACOBIAN_EVAL_UPSTREAM_PROXY" in evaluations
+    assert "JACOBIAN_EVAL_PROXY_BUILDER" in evaluations
+    assert "JACOBIAN_EVAL_BUILDX_BUILDER" in evaluations
+    assert "agent-eval-proxy-builder-create" in evaluations
+    assert 'BUILDX_BUILDER="$(JACOBIAN_EVAL_BUILDX_BUILDER)"' in evaluations
     assert "export CODEX_FORCE_AUTH_JSON=1" in evaluations
     assert "benchmarks.tooling.harbor_proxy" in evaluations
     assert 'if [ "$(JACOBIAN_EVAL_PROXY)" = "1" ]; then' in evaluations
@@ -106,6 +110,9 @@ def test_agent_eval_docs_exclude_host_codex_from_the_control_protocol() -> None:
     assert "control must have no Jacobian MCP server" in guide
     assert "treatment must" in guide
     assert "no Jacobian Skill" in guide
+    assert "Build images through an opt-in proxy builder" in guide
+    assert "JACOBIAN_EVAL_BUILDX_BUILDER=jacobian-eval-proxy" in guide
+    assert "Docker daemon proxy" in guide
 
 
 def test_proxy_observation_job_is_opt_in_and_preserves_local_mcp_access() -> None:
