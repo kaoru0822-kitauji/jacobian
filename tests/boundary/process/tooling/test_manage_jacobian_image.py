@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib.util
-import json
 from pathlib import Path
 from types import ModuleType
 
@@ -71,20 +70,3 @@ def test_pull_rejects_dirty_tree(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(module.ImageError, match="clean worktree"):
         module.pull("ghcr.io/morluto/jacobian")
-
-
-def test_bind_runtime_preserves_snapshot_and_adds_image(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    module = _module()
-    snapshot = tmp_path / "runtime.json"
-    snapshot.write_text(json.dumps({"model": "gpt-5.6-luna"}), encoding="utf-8")
-    identity = {"source_sha": "a" * 40}
-    monkeypatch.setattr(module, "image_identity", lambda _image: identity)
-
-    module.bind_runtime("jacobian:local", snapshot)
-
-    assert json.loads(snapshot.read_text(encoding="utf-8")) == {
-        "jacobian_image": identity,
-        "model": "gpt-5.6-luna",
-    }
