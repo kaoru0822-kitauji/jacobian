@@ -16,6 +16,7 @@ def test_rejects_string_and_noncanonical_rationals(tmp_path: Path) -> None:
     for scenario, value in (
         ("string", "1"),
         ("noncanonical", {"numerator": 2, "denominator": 2}),
+        ("oversized", {"numerator": 1 << 1_024, "denominator": 1}),
     ):
         task, app, logs = _fixtures._prepare_case(tmp_path / scenario, TASK, "computed")
         submission_path = app / "submission.json"

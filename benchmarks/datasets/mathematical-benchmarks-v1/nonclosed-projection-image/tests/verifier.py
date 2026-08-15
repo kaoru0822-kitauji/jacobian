@@ -12,6 +12,9 @@ from verifier_support import (
 WORKSPACE = Path("/app")
 TESTS = Path("/tests")
 MAX_INPUT_BYTES = 1_048_576
+# Keep exact-rational arithmetic bounded before repeated squaring and summation
+# build progressively larger common denominators in the tail checks.
+MAX_FRACTION_BITS = 1_024
 # Minimum number of submitted limit coordinates so the tail bound is exercised
 # well past the prefix instead of only at the truncation point.
 MIN_VERIFICATION_TERMS = 100
@@ -66,7 +69,13 @@ def _fraction(value: object) -> Fraction | None:
         return None
     numerator = value["numerator"]
     denominator = value["denominator"]
-    if type(numerator) is not int or type(denominator) is not int or denominator < 1:
+    if (
+        type(numerator) is not int
+        or type(denominator) is not int
+        or denominator < 1
+        or numerator.bit_length() > MAX_FRACTION_BITS
+        or denominator.bit_length() > MAX_FRACTION_BITS
+    ):
         return None
     result = Fraction(numerator, denominator)
     return (
