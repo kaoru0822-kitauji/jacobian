@@ -14,8 +14,11 @@ E = Path("/tests")
 
 def _math(s, x, e):
     r = s.get("result", {})
+    candidate = r.get("candidate_tactic")
     return (
-        r.get("candidate_tactic") == e["expected_candidate_tactic"]
+        isinstance(candidate, dict)
+        and set(candidate) == {"command", "theorem", "arguments"}
+        and candidate == e["expected_candidate_tactic"]
         and r.get("exhaustive") is e["expected_exhaustive"]
     )
 

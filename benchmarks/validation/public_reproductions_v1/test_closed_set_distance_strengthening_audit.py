@@ -48,9 +48,18 @@ def _verify(tmp_path: Path, submission: dict[str, object]):
     return _run_verifier(*_prepare(tmp_path, submission))
 
 
+def _q(numerator: int, denominator: int = 1) -> dict[str, int]:
+    return {"numerator": numerator, "denominator": denominator}
+
+
 def _pairs(start: int) -> list[dict[str, object]]:
     return [
-        {"index": n, "a": [str(n), "0"], "b": [str(n), f"1/{n}"], "distance": f"1/{n}"}
+        {
+            "index": n,
+            "a": [_q(n), _q(0)],
+            "b": [_q(n), _q(1, n)],
+            "distance": _q(1, n),
+        }
         for n in range(start, start + 8)
     ]
 
@@ -61,10 +70,10 @@ def test_oracle_and_alternative_family_are_accepted(tmp_path: Path) -> None:
     alternative["result"]["start_index"] = 7
     alternative["result"]["point_pairs"] = _pairs(7)
     alternative["result"]["epsilon_witnesses"] = [
-        {"epsilon": "1/4", "index": 7, "distance": "1/7"},
-        {"epsilon": "1/8", "index": 9, "distance": "1/9"},
-        {"epsilon": "1/16", "index": 17, "distance": "1/17"},
-        {"epsilon": "1/32", "index": 33, "distance": "1/33"},
+        {"epsilon": _q(1, 4), "index": 7, "distance": _q(1, 7)},
+        {"epsilon": _q(1, 8), "index": 9, "distance": _q(1, 9)},
+        {"epsilon": _q(1, 16), "index": 17, "distance": _q(1, 17)},
+        {"epsilon": _q(1, 32), "index": 33, "distance": _q(1, 33)},
     ]
     assert _verify(tmp_path / "alternative", alternative).reward == 1.0
 
@@ -73,20 +82,32 @@ def test_rejects_corrupt_geometry_and_nonvanishing_gap(tmp_path: Path) -> None:
     for name, mutation in [
         (
             "coordinate",
-            lambda result: result["point_pairs"][3]["b"].__setitem__(1, "1/8"),
+            lambda result: result["point_pairs"][3]["b"].__setitem__(1, _q(1, 8)),
         ),
         (
             "distance",
-            lambda result: result["epsilon_witnesses"][2].update(distance="1/10"),
+            lambda result: result["epsilon_witnesses"][2].update(distance=_q(1, 10)),
         ),
         (
             "ordering",
-            lambda result: result["epsilon_witnesses"][2].update(epsilon="1/4"),
+            lambda result: result["epsilon_witnesses"][2].update(epsilon=_q(1, 4)),
         ),
     ]:
         submission = copy.deepcopy(_oracle())
         mutation(submission["result"])
         assert _verify(tmp_path / name, submission).reward == 0.0
+
+
+def test_rejects_string_coercion_and_accepts_equivalent_rationals(
+    tmp_path: Path,
+) -> None:
+    string_submission = copy.deepcopy(_oracle())
+    string_submission["result"]["point_pairs"][0]["distance"] = "1/4"
+    assert _verify(tmp_path / "string", string_submission).reward == 0.0
+
+    noncanonical_submission = copy.deepcopy(_oracle())
+    noncanonical_submission["result"]["point_pairs"][0]["distance"] = _q(2, 8)
+    assert _verify(tmp_path / "noncanonical", noncanonical_submission).reward == 1.0
 
 
 # ---------------------------------------------------------------------------
@@ -98,10 +119,10 @@ def test_accepts_epsilon_witnesses_above_one(tmp_path: Path) -> None:
     """T2: the public contract allows any positive epsilon; no hidden < 1 bound."""
     submission = copy.deepcopy(_oracle())
     submission["result"]["epsilon_witnesses"] = [
-        {"epsilon": "2", "index": 4, "distance": "1/4"},
-        {"epsilon": "3/2", "index": 6, "distance": "1/6"},
-        {"epsilon": "1", "index": 11, "distance": "1/11"},
-        {"epsilon": "1/2", "index": 21, "distance": "1/21"},
+        {"epsilon": _q(2), "index": 4, "distance": _q(1, 4)},
+        {"epsilon": _q(3, 2), "index": 6, "distance": _q(1, 6)},
+        {"epsilon": _q(1), "index": 11, "distance": _q(1, 11)},
+        {"epsilon": _q(1, 2), "index": 21, "distance": _q(1, 21)},
     ]
     result = _verify(tmp_path / "epsilon-above-one", submission)
     assert result.reward == 1.0

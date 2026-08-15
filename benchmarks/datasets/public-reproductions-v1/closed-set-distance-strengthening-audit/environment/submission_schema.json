@@ -1,4 +1,23 @@
 {
+  "$defs": {
+    "rational": {
+      "additionalProperties": false,
+      "properties": {
+        "denominator": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "numerator": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "numerator",
+        "denominator"
+      ],
+      "type": "object"
+    }
+  },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
@@ -13,12 +32,10 @@
             "additionalProperties": false,
             "properties": {
               "distance": {
-                "maxLength": 128,
-                "type": "string"
+                "$ref": "#/$defs/rational"
               },
               "epsilon": {
-                "maxLength": 128,
-                "type": "string"
+                "$ref": "#/$defs/rational"
               },
               "index": {
                 "maximum": 100000,
@@ -52,8 +69,7 @@
             "properties": {
               "a": {
                 "items": {
-                  "maxLength": 128,
-                  "type": "string"
+                  "$ref": "#/$defs/rational"
                 },
                 "maxItems": 2,
                 "minItems": 2,
@@ -61,16 +77,14 @@
               },
               "b": {
                 "items": {
-                  "maxLength": 128,
-                  "type": "string"
+                  "$ref": "#/$defs/rational"
                 },
                 "maxItems": 2,
                 "minItems": 2,
                 "type": "array"
               },
               "distance": {
-                "maxLength": 128,
-                "type": "string"
+                "$ref": "#/$defs/rational"
               },
               "index": {
                 "type": "integer"

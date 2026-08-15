@@ -7,8 +7,9 @@ cross-distance from below.
 Diagnose this semantic strengthening by constructing two disjoint locally finite subsets of the
 rational plane whose distance infimum is zero. Choose a start index from 4 through 20 and submit
 eight consecutive indexed point pairs. For every row use `A_n = (n,0)` and `B_n = (n,1/n)`, with
-canonical rational coordinate and distance strings. Also submit four to eight distinct positive
-canonical rational epsilons in strictly decreasing order, each paired with an index `N` such that
+each exact rational coordinate and distance represented as an integer `numerator` and positive
+integer `denominator` in lowest terms. Also submit four to eight distinct positive canonical
+rational epsilons in strictly decreasing order, each paired with an index `N` such that
 `N` is at least the start index and `1/N < epsilon`; indices must strictly increase.
 
 Identify the natural and predicted conclusions, their semantic relationship, the missing assumption,

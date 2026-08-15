@@ -1,6 +1,7 @@
 {
   "result": {
-    "boundary_note": "The mutated image does not equal the true common image of the two points, so non-invertibility is not established; this is a bounded non-conclusion."
+    "both_points_map_to_claimed_image": false,
+    "noninvertibility_verified": false
   },
   "witness": [
     {

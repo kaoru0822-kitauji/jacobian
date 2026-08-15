@@ -1,6 +1,12 @@
 {
   "result": {
-    "candidate_tactic": "exact Nat.gcd_zero_right n",
+    "candidate_tactic": {
+      "arguments": [
+        "n"
+      ],
+      "command": "exact",
+      "theorem": "Nat.gcd_zero_right"
+    },
     "exhaustive": false
   },
   "witness": [
