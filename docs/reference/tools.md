@@ -2,7 +2,8 @@
 
 Jacobian exposes two MCP tools for atomic mathematics.
 
-- `math.find` searches the immutable built-in operation catalog.
+- `math.find` searches, browses, or inspects the immutable built-in operation
+  catalog.
 - `math.run` executes one operation with a typed `payload`.
 
 `math.run` accepts no state directory, artifact input, value reference, port
@@ -18,6 +19,15 @@ generic verification records.
 {"operation_id":"integer.compute.gcd","payload":{"left":"84","right":"30"}}
 ```
 
-Small results are returned directly. The sole built-in MCP resource is
-`operation://catalog`, the immutable catalog view. The server registers its
-typed Pydantic tools directly with the MCP Python SDK.
+Use `math.find` progressively: `search` finds a few relevance-ranked candidates,
+`browse` pages compact operation cards in operation-ID order (optionally within a
+domain), and `inspect` supplies the selected operation's exact input/output
+schemas and valid examples. Reuse relevant fields from each direct `math.run`
+value in the next payload; the agent owns the evolving conjecture and hypothesis.
+
+`browse` is recomputed from immutable declarations on every request. Its cursor is
+only caller-supplied pagination state, so it creates no catalog identity, saved
+session, artifact, value reference, or server-side record. The sole built-in MCP
+resource, `operation://catalog`, remains an exact bulk export rather than the
+ordinary agent discovery path. The server registers typed Pydantic tools directly
+with the MCP Python SDK.

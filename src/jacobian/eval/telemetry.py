@@ -526,7 +526,9 @@ def _build_operation_description(
     arguments: Mapping[str, Any],
     response: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
-    matches = response.get("matches") if isinstance(response, Mapping) else None
+    cards = None
+    if isinstance(response, Mapping):
+        cards = response.get("matches", response.get("operations"))
     request = arguments.get("request")
     request = request if isinstance(request, Mapping) else {}
     return {
@@ -546,7 +548,7 @@ def _build_operation_description(
             if isinstance(request.get("operation_id"), str)
             else None
         ),
-        "match_ids": _operation_match_ids(matches),
+        "match_ids": _operation_match_ids(cards),
     }
 
 

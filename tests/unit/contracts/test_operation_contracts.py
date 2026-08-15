@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian.contracts.operations import (
+    OperationBrowseResult,
     OperationCatalogSnapshot,
     OperationDiscoveryResult,
 )
@@ -45,6 +46,39 @@ def test_discovery_page_metadata_is_bound_to_returned_matches() -> None:
                 **base,
                 "truncated": True,
                 "next_cursor": "integer.compute.lcm",
+            }
+        )
+
+
+def test_browse_page_metadata_requires_sorted_compact_operation_cards() -> None:
+    base = {
+        "operations": [
+            {
+                "operation_id": "integer.compute.gcd",
+                "title": "Compute gcd",
+                "description": "Compute one exact gcd.",
+            }
+        ],
+        "total_operations": 2,
+    }
+    with pytest.raises(ValidationError, match="truncated must agree"):
+        OperationBrowseResult.model_validate(
+            {**base, "truncated": True, "next_cursor": None}
+        )
+    with pytest.raises(ValidationError, match="unique sorted"):
+        OperationBrowseResult.model_validate(
+            {
+                **base,
+                "operations": [
+                    *base["operations"],
+                    {
+                        "operation_id": "integer.compute.factorial",
+                        "title": "Compute factorial",
+                        "description": "Compute one exact factorial.",
+                    },
+                ],
+                "total_operations": 2,
+                "truncated": False,
             }
         )
 

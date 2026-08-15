@@ -28,7 +28,7 @@ These documents define the current product contract:
 | What is Jacobian? | [Product model](explanation/product-blueprint.md) | Product and ownership model |
 | How is it structured? | [Architecture](explanation/architecture.md) | Dependencies and trust boundaries |
 | What does MCP expose? | [Tool surface](reference/tools.md) | Fixed MCP projection |
-| What operations are available? | Runtime `operation://catalog` | Current immutable server inventory |
+| What operations are available? | `math.find` browse or runtime `operation://catalog` | Current immutable server inventory |
 | What work is open? | GitHub issues (e.g. architecture epics) | Implementation priorities live in issues, not a parallel goals doc |
 
 ## How-to guides
@@ -69,8 +69,8 @@ operation contract.
 small mathematical workloads for documentation and testing; they are not
 runtime workflows.
 
-Use the runtime `operation://catalog` and `math.find` for the immutable
-operation inventory and exact operation schemas.
+Use `math.find` browse for compact inventory pages and inspection for exact
+operation schemas. `operation://catalog` remains the immutable bulk export.
 
 ## Explanation
 

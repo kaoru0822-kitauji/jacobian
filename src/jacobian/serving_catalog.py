@@ -6,6 +6,7 @@ from typing import Any
 
 from jacobian.builtin_operation_modules import load_builtin_operation_modules
 from jacobian.contracts.operations import (
+    OperationBrowseResult,
     OperationCatalogSnapshot,
     OperationDescriptor,
     OperationDiscoveryRequest,
@@ -13,7 +14,7 @@ from jacobian.contracts.operations import (
     OperationExample,
 )
 from jacobian.math_tools import MathTool
-from jacobian.operation_discovery import discover_operations
+from jacobian.operation_discovery import browse_operations, discover_operations
 
 
 class ServingCatalog:
@@ -45,6 +46,22 @@ class ServingCatalog:
 
     def search(self, request: OperationDiscoveryRequest) -> OperationDiscoveryResult:
         return discover_operations(self.snapshot(), request)
+
+    def browse(
+        self,
+        *,
+        domain: str | None,
+        limit: int,
+        cursor: str | None,
+    ) -> OperationBrowseResult:
+        """Return a fresh compact page from the immutable declaration snapshot."""
+
+        return browse_operations(
+            self.snapshot(),
+            domain=domain,
+            limit=limit,
+            cursor=cursor,
+        )
 
     def snapshot(self) -> OperationCatalogSnapshot:
         operations = tuple(

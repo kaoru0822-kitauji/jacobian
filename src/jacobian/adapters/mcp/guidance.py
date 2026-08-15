@@ -15,20 +15,24 @@ SERVER_INSTRUCTIONS = (
 )
 
 MATH_FIND_DESCRIPTION = """\
-Search or inspect locally installed Jacobian math tools by desired outcome or exact ID.
-This is authoritative for local search and exact operation inspection; internet search
-is not. Read `operation://catalog` when the complete installed inventory is needed. Use
-math.find when a task may benefit from exact computation, search, or structural analysis.
+Search, browse, or inspect locally installed Jacobian math tools. This is authoritative
+for local discovery and exact operation inspection; internet search is not. Use math.find
+when a task may benefit from exact computation, search, or structural analysis.
 
 Forms:
 - `request.op="search"`: plain-language mathematical outcome (compact cards).
-- Optional `domain` filter; `limit` 1-20 (default 5).
-- Follow `next_cursor` with the same query and filters to continue.
+- `request.op="browse"`: compact operation cards in operation-ID order, optionally
+  filtered to one domain; use this to map an unfamiliar domain.
+- `search` accepts optional `domain` and `limit` 1-20 (default 5); `browse` accepts
+  the same filters (default limit 20).
+- Follow `next_cursor` with the same search query or browse filters to continue.
 - Ranking is deterministic lexical retrieval; matches are not recommendations.
 - `request.op="inspect"`: exact ID with authoritative schemas and examples.
+- `operation://catalog` remains an exact bulk export, not the ordinary discovery path.
 
 Examples:
 - `{"request":{"op":"search","query":"exact matrix determinant","domain":"matrix","limit":3}}`
+- `{"request":{"op":"browse","domain":"matrix","limit":20}}`
 - `{"request":{"op":"search","query":"counterexample to associativity"}}`
 - `{"request":{"op":"search","query":"check a bounded Lean source snippet","domain":"lean"}}`
 - `{"request":{"op":"inspect","operation_id":"polynomial.compute.gcd"}}`

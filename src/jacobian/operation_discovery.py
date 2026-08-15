@@ -6,6 +6,8 @@ import re
 from typing import Protocol
 
 from jacobian.contracts.operations import (
+    OperationBrowseCard,
+    OperationBrowseResult,
     OperationCatalogSnapshot,
     OperationDiscoveryMatch,
     OperationDiscoveryRequest,
@@ -96,6 +98,54 @@ def discover_operations(
     )
 
 
+def browse_operations(
+    catalog: OperationCatalogSnapshot,
+    *,
+    domain: str | None,
+    limit: int,
+    cursor: str | None,
+) -> OperationBrowseResult:
+    """Page a filtered immutable snapshot in operation-ID order without ranking."""
+
+    normalized_domain = normalize_domain(domain) if domain is not None else None
+    operations = tuple(
+        OperationBrowseCard(
+            operation_id=descriptor.operation_id,
+            title=descriptor.title,
+            description=descriptor.description,
+            tags=descriptor.tags,
+        )
+        for descriptor in catalog.operations
+        if normalized_domain is None or matches_domain(descriptor, normalized_domain)
+    )
+    start = 0
+    if cursor is not None:
+        try:
+            start = (
+                next(
+                    index
+                    for index, operation in enumerate(operations)
+                    if operation.operation_id == cursor
+                )
+                + 1
+            )
+        except StopIteration:
+            raise OperationDiscoveryCursorError(
+                "cursor is not present in the filtered operation result"
+            ) from None
+    page = operations[start : start + limit]
+    next_cursor = (
+        page[-1].operation_id if page and start + len(page) < len(operations) else None
+    )
+    return OperationBrowseResult(
+        domain=normalized_domain,
+        operations=page,
+        total_operations=len(operations),
+        truncated=next_cursor is not None,
+        next_cursor=next_cursor,
+    )
+
+
 def normalize_discovery_text(value: str) -> str:
     return "-".join(_DISCOVERY_TOKEN_PATTERN.findall(value.casefold()))
 
@@ -159,6 +209,7 @@ def matches_domain(operation: SearchableOperation, normalized_domain: str) -> bo
 
 
 __all__ = [
+    "browse_operations",
     "discover_operations",
     "discovery_relevance",
     "matches_domain",

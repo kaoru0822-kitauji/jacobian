@@ -78,8 +78,8 @@ SAT and SMT operations use the maintained Z3 Python binding directly. The
 optional `lean.check` operation runs one bounded source snippet in the fixed
 Lean service environment. It creates only a request-scoped temporary directory
 and returns typed diagnostics; it does not expose a proof-state session or
-retain source. Read `operation://catalog` or use `math.find` to inspect the
-immutable catalog, then call `math.run` once.
+retain source. Use `math.find` to search a capability, browse an unfamiliar
+domain, and inspect one operation before calling `math.run` once.
 
 See the [domain operation library](docs/reference/domain-operation-library.md)
 for the maintained operation portfolio and

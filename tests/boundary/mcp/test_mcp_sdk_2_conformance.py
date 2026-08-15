@@ -45,12 +45,20 @@ def test_mcp_v2_uses_sdk_typed_tools_lifespan_and_structured_resources(
             assert set(find.input_schema["properties"]) == {"request"}
             assert find.input_schema["properties"]["request"]["discriminator"] == {
                 "mapping": {
+                    "browse": "#/$defs/OperationBrowseRequest",
                     "inspect": "#/$defs/OperationInspectRequest",
                     "search": "#/$defs/OperationSearchRequest",
                 },
                 "propertyName": "op",
             }
             assert find.output_schema["type"] == "object"
+
+            browse = await client.call_tool(
+                "math.find",
+                {"request": {"op": "browse", "domain": "matrix", "limit": 1}},
+            )
+            assert isinstance(browse.structured_content, dict)
+            assert browse.structured_content["kind"] == "browse"
 
             serialized_tools = serialize_server_result(
                 "tools/list",

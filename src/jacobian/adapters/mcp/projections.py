@@ -53,40 +53,92 @@ def _operation_discovery_response(
                 ),
             }
         }
-    discovered_payload = discovered.model_dump(mode="json")
-    response = {
-        "kind": "discovery",
-        **discovered_payload,
-        "catalog_resource": "operation://catalog",
-        "response_byte_limit": OPERATION_DISCOVERY_RESPONSE_BYTE_LIMIT,
-        "truncation_reason": None,
-        "match_metadata_truncated": False,
-    }
-    matches = cast(list[dict[str, Any]], response["matches"])
+    response = _compact_operation_cards_response(
+        {
+            "kind": "discovery",
+            **discovered.model_dump(mode="json"),
+            "catalog_resource": "operation://catalog",
+            "response_byte_limit": OPERATION_DISCOVERY_RESPONSE_BYTE_LIMIT,
+            "truncation_reason": None,
+            "match_metadata_truncated": False,
+        },
+        cards_key="matches",
+        metadata_truncated_key="match_metadata_truncated",
+    )
+    return response
+
+
+def _operation_browse_response(
+    runtime: Any,
+    *,
+    domain: str | None,
+    limit: int | None,
+    cursor: str | None,
+) -> dict[str, Any]:
+    try:
+        operations = getattr(getattr(runtime, "core", None), "operations", runtime)
+        browsed = operations.browse(
+            domain=domain,
+            limit=limit if limit is not None else 20,
+            cursor=cursor,
+        )
+    except OperationDiscoveryCursorError:
+        return {
+            "error": {
+                "code": "INVALID_CURSOR",
+                "stage": "operation_discovery",
+                "message": "The operation browse cursor is not in this result set.",
+                "hint": (
+                    "Restart browsing without a cursor, or reuse the same domain "
+                    "and limit that produced next_cursor."
+                ),
+            }
+        }
+    return _compact_operation_cards_response(
+        {
+            "kind": "browse",
+            **browsed.model_dump(mode="json"),
+            "catalog_resource": "operation://catalog",
+            "response_byte_limit": OPERATION_DISCOVERY_RESPONSE_BYTE_LIMIT,
+            "truncation_reason": None,
+            "operation_metadata_truncated": False,
+        },
+        cards_key="operations",
+        metadata_truncated_key="operation_metadata_truncated",
+    )
+
+
+def _compact_operation_cards_response(
+    response: dict[str, Any],
+    *,
+    cards_key: str,
+    metadata_truncated_key: str,
+) -> dict[str, Any]:
+    """Enforce the adapter's compact-response policy without retaining state."""
+
+    cards = cast(list[dict[str, Any]], response[cards_key])
     while (
         len(_mcp_text_json_bytes(response)) > OPERATION_DISCOVERY_RESPONSE_BYTE_LIMIT
-        and len(matches) > 1
+        and len(cards) > 1
     ):
-        matches.pop()
+        cards.pop()
         response["truncated"] = True
-        response["next_cursor"] = matches[-1]["operation_id"]
+        response["next_cursor"] = cards[-1]["operation_id"]
         response["truncation_reason"] = "BYTE_LIMIT"
     compact_fields = ("tags",)
     while len(_mcp_text_json_bytes(response)) > OPERATION_DISCOVERY_RESPONSE_BYTE_LIMIT:
         removed = False
-        for match in matches:
+        for card in cards:
             for field in compact_fields:
-                values = match.get(field)
+                values = card.get(field)
                 if isinstance(values, list) and values:
                     values.pop()
                     removed = True
-                    response["match_metadata_truncated"] = True
+                    response[metadata_truncated_key] = True
                     response["truncation_reason"] = "BYTE_LIMIT"
                     break
             if removed:
                 break
         if not removed:
-            raise RuntimeError(
-                "compact operation discovery response exceeds its hard byte limit"
-            )
+            raise RuntimeError("compact operation response exceeds its hard byte limit")
     return response
