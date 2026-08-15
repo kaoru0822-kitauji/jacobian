@@ -20,30 +20,32 @@ changes. Pass `TASKS="..."` for a bounded Oracle; `FULL=1` is reserved for an
 intentional complete dataset sweep. Focused commands require explicit task IDs
 and never fall back to all tasks.
 
-The standalone observation job uses the Jacobian MCP sidecar and is an
-explicit operator-run evidence exercise, not a routine authoring or
-pull-request gate. It is selected with:
+The standalone observation job uses the Jacobian MCP sidecar. Use it to inspect
+how a model applies the public tools; Harbor retains the resolved config and
+task lock, trajectory, verifier result, submitted artifacts, and MCP log for
+review. A one-attempt run is:
 
 ```sh
-make agent-eval DATASET=mathematical-benchmarks-v1 \
-  JACOBIAN_ENABLED=1 EVAL_EXECUTE=1
+JACOBIAN_MODEL=gpt-5.6-luna make agent-eval \
+  DATASET=mathematical-benchmarks-v1 TASKS=graph-counterexample \
+  EVAL_EXECUTE=1 EVAL_ATTEMPTS=1 EVAL_REASONING_EFFORT=high
 ```
 
-Use `TASKS=graph-counterexample` for a small run. Harbor loads the task bundles
-from this dataset directory and applies the task-name filter; Jacobian does not
-render or rewrite a Harbor task selection. The MCP endpoint is supplied through
-Harbor's external MCP configuration, not through task TOMLs.
+Set `EVAL_ATTEMPTS` for more rollouts. Harbor loads the task bundles from this
+dataset directory and applies the task-name filter; Jacobian does not render or
+rewrite a Harbor task selection. The MCP endpoint is supplied through Harbor's
+external MCP configuration, not through task TOMLs.
 
 For a paired control/treatment run, use the same task filter and model in both
 jobs:
 
 ```sh
 # Control: no Jacobian sidecar or MCP config.
-make agent-eval DATASET=mathematical-benchmarks-v1 \
+JACOBIAN_MODEL=gpt-5.6-luna make agent-eval DATASET=mathematical-benchmarks-v1 \
   JACOBIAN_ENABLED=0 TASKS=graph-counterexample EVAL_EXECUTE=1
 
 # Treatment: Jacobian sidecar and MCP config.
-make agent-eval DATASET=mathematical-benchmarks-v1 \
+JACOBIAN_MODEL=gpt-5.6-luna make agent-eval DATASET=mathematical-benchmarks-v1 \
   JACOBIAN_ENABLED=1 \
   TASKS=graph-counterexample EVAL_EXECUTE=1
 ```
@@ -61,7 +63,7 @@ task set, and prompt condition in a separate result root:
 
 ```sh
 make agent-eval \
-  DATASET=mathematical-benchmarks-v1 JACOBIAN_ENABLED=1 \
+  JACOBIAN_MODEL=gpt-5.6-luna DATASET=mathematical-benchmarks-v1 JACOBIAN_ENABLED=1 \
   TASKS=graph-counterexample EVAL_EXECUTE=1 \
   EVAL_ARGS="--job-name adoption --jobs-dir benchmarks/results/adoption"
 ```

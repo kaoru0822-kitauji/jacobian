@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build, resolve, and bind Jacobian evaluation container identities."""
+"""Build and resolve Jacobian evaluation container identities."""
 
 from __future__ import annotations
 
@@ -198,25 +198,6 @@ def select(registry_image: str) -> str:
     return pull(registry_image)
 
 
-def bind_runtime(image: str, runtime_snapshot: Path) -> None:
-    try:
-        payload = json.loads(runtime_snapshot.read_text(encoding="utf-8"))
-    except FileNotFoundError as exc:
-        raise ImageError(
-            f"runtime snapshot does not exist: {runtime_snapshot}"
-        ) from exc
-    except json.JSONDecodeError as exc:
-        raise ImageError(
-            f"runtime snapshot is not valid JSON: {runtime_snapshot}"
-        ) from exc
-    if not isinstance(payload, dict):
-        raise ImageError("runtime snapshot must be a JSON object")
-    payload["jacobian_image"] = image_identity(image)
-    runtime_snapshot.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -227,9 +208,6 @@ def main() -> int:
     pull_parser.add_argument("--revision")
     select_parser = subparsers.add_parser("select")
     select_parser.add_argument("--registry-image", required=True)
-    bind_parser = subparsers.add_parser("bind-runtime")
-    bind_parser.add_argument("--image", required=True)
-    bind_parser.add_argument("--runtime-snapshot", type=Path, required=True)
     args = parser.parse_args()
     try:
         if args.command == "build":
@@ -238,8 +216,6 @@ def main() -> int:
             print(pull(args.registry_image, args.revision))
         elif args.command == "select":
             print(select(args.registry_image))
-        else:
-            bind_runtime(args.image, args.runtime_snapshot)
     except ImageError as exc:
         print(f"image error: {exc}", file=sys.stderr)
         return 2

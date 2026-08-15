@@ -42,7 +42,7 @@ complete a specific task.
 - [Run the MCP visibility evaluation](how-to/run-codex-visibility-evaluation.md)
 - [Deploy the remote MCP server](how-to/deploy-remote-mcp.md)
 - [Author a Harbor benchmark task](how-to/author-harbor-benchmark-task.md)
-- [Run agent evaluations](how-to/run-agent-evaluations.md)
+- [Run agent observations](how-to/run-agent-evaluations.md)
 
 ## Reference
 

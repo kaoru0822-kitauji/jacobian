@@ -1,17 +1,25 @@
-# Run agent evaluations
+# Run agent observations
 
 [Documentation home](../index.md) · [Evaluation reference](../reference/evaluations/evaluation-methods.md)
 
-Agent evaluations are explicit operator-run Harbor experiments. Freeze the
-task, model, environment, budget, repetitions, and treatment definition before
-running them. Compare a no-Jacobian control with a treatment exposing only the
-public `math.find` and `math.run` surface; do not add a prescribed tool-call
-sequence or server-side workflow.
+Use Harbor to see how an agent performs on a bounded mathematical task with the
+public Jacobian tools available. A normal run is an observation: Harbor records
+the resolved configuration and task digest in `config.json` and `lock.json`,
+then retains the trajectory, verifier reward, submitted artifacts, and the
+Jacobian MCP log. Review the resulting job directory with `harbor view`.
 
-Validate the selected task with its Harbor workflow before spending model or
-Oracle resources. Publish results with task and environment digests, measured
-outcomes, and limitations. The resulting logs and scores are evaluation data;
-they do not create Jacobian artifacts, workspaces, or verification records.
+Run the task's exact Oracle once before using a new or changed benchmark, then
+launch any number of model observations against that fixed task:
+
+```sh
+JACOBIAN_MODEL=gpt-5.6-luna make agent-eval \
+  DATASET=mathematical-benchmarks-v1 TASKS=graph-counterexample \
+  EVAL_EXECUTE=1 EVAL_ATTEMPTS=1 EVAL_REASONING_EFFORT=high
+```
+
+Set `EVAL_ATTEMPTS` for repeated rollouts. `EVAL_ARGS` remains available for
+Harbor options such as a job name or a separate results directory, but no
+hand-authored runtime snapshot is required for an ordinary observation.
 
 Run each arm in a fresh temporary `CODEX_HOME`, never through direct host `codex exec`.
 The control must have no Jacobian MCP server; the treatment must expose only the
@@ -25,11 +33,12 @@ do not point it at a convenience or stale local tag. A dirty checkout instead
 builds `jacobian:local`; it is useful for local diagnostics but cannot support
 reproducible treatment evidence.
 
-`RUNTIME_SNAPSHOT` remains explicit: prepare a JSON record that freezes the
-model and treatment condition, then pass its path to both `agent-eval` and
-`agent-eval-validate`. The run binds the resolved image identity into that
-record. Use `make eval-image-pull` to inspect or pre-pull the same immutable
-image without starting a model run.
+For a comparative claim, run matched control and treatment conditions and use
+the stricter normalization and comparison workflow. Freeze a snapshot only at
+an intentional publication or comparison boundary; it is not a prerequisite
+for exploring model behavior or reviewing a Harbor run. Use
+`make eval-image-pull` to inspect or pre-pull the treatment image without
+starting a model run.
 
 Harbor egress control shares the treatment services' network namespace, so
 every Jacobian-enabled run reaches its local sidecar through

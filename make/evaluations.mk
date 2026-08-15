@@ -6,6 +6,8 @@ $(error JACOBIAN_ENABLED must be exactly 0 or 1 (got '$(JACOBIAN_ENABLED)'))
 endif
 
 CODEX_WEB_SEARCH ?= disabled
+EVAL_ATTEMPTS ?=
+EVAL_REASONING_EFFORT ?=
 JACOBIAN_EVAL_PROXY ?= 0
 JACOBIAN_EVAL_CODEX_BINARY ?= $(shell command -v codex 2>/dev/null)
 define _jacobian_eval_container_proxy
@@ -44,7 +46,7 @@ EVAL_CONFIG ?= benchmarks/datasets/$(or $(DATASET),mathematical-benchmarks-v1)/j
 endif
 endif
 
-agent-eval: ## Run a Harbor evaluation (JACOBIAN_ENABLED=0|1, JACOBIAN_EVAL_PROXY=0|1, DATASET=mathematical-benchmarks-v1, EVAL_EXECUTE=1).
+agent-eval: ## Run a Harbor observation (JACOBIAN_ENABLED=0|1, DATASET=..., TASKS=..., JACOBIAN_MODEL=..., EVAL_EXECUTE=1).
 	@set -e; \
 	CODEX_BINARY="$(JACOBIAN_EVAL_CODEX_BINARY)"; \
 	CODEX_CODE_MODE_HOST=""; \
@@ -73,9 +75,6 @@ agent-eval: ## Run a Harbor evaluation (JACOBIAN_ENABLED=0|1, JACOBIAN_EVAL_PROX
 			export JACOBIAN_IMAGE; \
 			echo "Resolved Jacobian evaluation image: $${JACOBIAN_IMAGE}"; \
 		fi; \
-		test -n "$(RUNTIME_SNAPSHOT)" || { echo "RUNTIME_SNAPSHOT is required for a Jacobian-enabled run" >&2; exit 2; }; \
-		$(UV_RUN) python -m tools.manage_jacobian_image bind-runtime \
-			--image "$${JACOBIAN_IMAGE}" --runtime-snapshot "$(RUNTIME_SNAPSHOT)"; \
 	fi; \
 	JACOBIAN_EVAL_HTTP_PROXY="$(JACOBIAN_EVAL_HTTP_PROXY)" \
 	JACOBIAN_EVAL_HTTPS_PROXY="$(JACOBIAN_EVAL_HTTPS_PROXY)" \
@@ -89,8 +88,10 @@ agent-eval: ## Run a Harbor evaluation (JACOBIAN_ENABLED=0|1, JACOBIAN_EVAL_PROX
 		-a codex \
 		-m "$${JACOBIAN_MODEL}" \
 		--ak "web_search=$(CODEX_WEB_SEARCH)" \
+		$(if $(EVAL_REASONING_EFFORT),--ak "reasoning_effort=$(EVAL_REASONING_EFFORT)",) \
 		$(if $(MCP_CONFIG),--mcp-config "$(MCP_CONFIG)",) \
 		$(if $(TASKS),-p "benchmarks/datasets/$(or $(DATASET),mathematical-benchmarks-v1)" $(foreach task,$(TASKS),--include-task-name "$(task)"),) \
+		$(if $(EVAL_ATTEMPTS),--n-attempts "$(EVAL_ATTEMPTS)",) \
 		$(EVAL_ARGS)
 
 agent-eval-validate: ## Normalize one observation (RESULTS=..., JOB=..., CONDITION=..., OUTPUT=...).
