@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import runpy
 from fractions import Fraction
 from pathlib import Path
 
@@ -99,3 +100,27 @@ def test_string_coerced_density_is_rejected(tmp_path: Path) -> None:
         ).reward
         == 0.0
     )
+
+
+def test_oracle_generator_emits_typed_rationals(tmp_path: Path, monkeypatch) -> None:
+    generated: dict[str, str] = {}
+    original_write_text = Path.write_text
+
+    def capture(self: Path, data: str, *args, **kwargs) -> int:
+        assert self == Path("/app/submission.json")
+        generated["submission"] = data
+        return len(data)
+
+    monkeypatch.setattr(Path, "write_text", capture)
+    runpy.run_path(
+        "benchmarks/datasets/mathematical-benchmarks-v1/"
+        "positive-lower-density-separation/solution/solve.py"
+    )
+    monkeypatch.setattr(Path, "write_text", original_write_text)
+
+    submission = json.loads(generated["submission"])
+    assert submission["result"]["lower_density"] == _q(Fraction(1, 4))
+    assert submission["result"]["levels"][0]["included_density"] == _q(Fraction(2, 3))
+    task, app, logs = _fixtures._prepare_case(tmp_path, TASK, "generated-oracle")
+    _fixtures._write_json(app / "submission.json", submission)
+    assert _verifier._run_verifier(task, app, logs).reward == 1.0
