@@ -16,7 +16,7 @@ The public submission contract is generated below from `tests/public_contract.js
 <!-- BEGIN PUBLIC CONTRACT SUBMISSION BLOCK -->
 ## Submission
 
-Submit complete finite-algebra structure constants, exhaustive rational-point lists, the induced point bijection, and a reducedness-separating nilpotent certificate. The verifier reconstructs every operation over F_5. In the solver's own words, the limitations array must disclose that this is one finite affine countermodel over F_5, not a general theorem about schemes or functors of points.
+Submit complete finite-algebra structure constants, exhaustive rational-point lists, the induced point bijection, and a reducedness-separating nilpotent certificate. The verifier reconstructs every operation over F_5. The limitations array records the exact obligation IDs `claim:finite-affine-countermodel` and `limitation:no-general-scheme-theorem` in that order; free-form mathematical explanation remains in the evidence artifact.
 
 Write `/app/submission.json` to the exact schema in `environment/submission_schema.json`. The submission envelope requires `task_id`, `conclusion`, `result`, `claimed_assurance`, `scope`, `completeness`, `evidence`, and `limitations`.
 

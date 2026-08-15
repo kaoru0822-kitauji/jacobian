@@ -87,12 +87,17 @@
       "type": "array"
     },
     "limitations": {
-      "items": {
-        "minLength": 1,
-        "type": "string"
-      },
-      "maxItems": 1,
-      "minItems": 1,
+      "items": false,
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "const": "claim:finite-affine-countermodel"
+        },
+        {
+          "const": "limitation:no-general-scheme-theorem"
+        }
+      ],
       "type": "array"
     },
     "result": {

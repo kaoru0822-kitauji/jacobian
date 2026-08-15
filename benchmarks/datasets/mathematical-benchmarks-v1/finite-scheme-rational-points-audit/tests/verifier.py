@@ -19,21 +19,14 @@ from verifier_support import (
 WORKSPACE = Path("/app")
 TESTS = Path("/tests")
 P = 5
-LIMITATION = "The verifier certifies one finite affine countermodel over F_5, not a general theorem about schemes or functors of points."
+LIMITATION_OBLIGATIONS = (
+    "claim:finite-affine-countermodel",
+    "limitation:no-general-scheme-theorem",
+)
 
 
 def _limitations_valid(value: object) -> bool:
-    if not (isinstance(value, list) and len(value) == 1 and isinstance(value[0], str)):
-        return False
-    text = value[0].casefold()
-    return (
-        any(term in text for term in ("f_5", "f5", "finite affine", "countermodel"))
-        and any(term in text for term in ("scheme", "functor", "rational point"))
-        and any(
-            term in text
-            for term in ("not general", "not a general", "only", "one finite")
-        )
-    )
+    return isinstance(value, list) and value == list(LIMITATION_OBLIGATIONS)
 
 
 # Published reward-bearing prose obligations for evidence/answer.txt.  The
