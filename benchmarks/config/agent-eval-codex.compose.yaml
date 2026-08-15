@@ -7,5 +7,8 @@ services:
         read_only: true
       - type: bind
         source: ${JACOBIAN_EVAL_CODEX_CODE_MODE_HOST:?set JACOBIAN_EVAL_CODEX_CODE_MODE_HOST to the Codex Code Mode host}
-        target: /usr/local/bin/codex-code-mode-host
+        # The task image installs Codex with npm. Docker follows the
+        # /usr/local/bin/codex launcher symlink when mounting the standalone
+        # executable, so Codex resolves this companion beside that npm target.
+        target: /usr/local/lib/node_modules/@openai/codex/bin/codex-code-mode-host
         read_only: true
