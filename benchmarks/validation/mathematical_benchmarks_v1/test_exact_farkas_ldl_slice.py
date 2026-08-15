@@ -42,15 +42,7 @@ def _bind_farkas_slice(app: Path, submission: dict) -> None:
     support._write_json(app / "submission.json", submission)
 
 
-def test_exact_farkas_slice_accepts_sylvester_certificate(tmp_path: Path) -> None:
-    task, app, logs = _prepare_farkas_slice_case(tmp_path)
-    accepted = support._run_verifier(task, app, logs)
-    assert accepted.details["correctness"] == 1.0
-    assert accepted.reward == pytest.approx(1.0)
-
-
-def test_exact_farkas_slice_accepts_ldl_certificate(tmp_path: Path) -> None:
-    task, app, logs = _prepare_farkas_slice_case(tmp_path)
+def _ldl_submission(app: Path) -> dict:
     frozen = json.loads((app / "input.json").read_text())
     matrix = [
         [Fraction(item["numerator"], item["denominator"]) for item in row]
@@ -77,11 +69,53 @@ def test_exact_farkas_slice_accepts_ldl_certificate(tmp_path: Path) -> None:
         "l": [[encode(item) for item in row] for row in lower],
         "d": [encode(item) for item in diagonal],
     }
+    return submission
+
+
+def test_exact_farkas_slice_accepts_sylvester_certificate(tmp_path: Path) -> None:
+    task, app, logs = _prepare_farkas_slice_case(tmp_path)
+    accepted = support._run_verifier(task, app, logs)
+    assert accepted.details["correctness"] == 1.0
+    assert accepted.reward == pytest.approx(1.0)
+
+
+def test_exact_farkas_slice_accepts_ldl_certificate(tmp_path: Path) -> None:
+    task, app, logs = _prepare_farkas_slice_case(tmp_path)
+    submission = _ldl_submission(app)
     _bind_farkas_slice(app, submission)
 
     accepted = support._run_verifier(task, app, logs)
     assert accepted.details["correctness"] == 1.0
     assert accepted.reward == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize(
+    ("row", "column", "replacement"),
+    [(0, 0, True), (0, 1, False)],
+    ids=("true-for-one", "false-for-zero"),
+)
+def test_exact_farkas_slice_rejects_boolean_integer_evidence_alias(
+    tmp_path: Path,
+    row: int,
+    column: int,
+    replacement: bool,
+) -> None:
+    task, app, logs = _prepare_farkas_slice_case(tmp_path)
+    submission = _ldl_submission(app)
+    _bind_farkas_slice(app, submission)
+    evidence_path = app / "evidence" / "farkas-slice-certificate.json"
+    evidence = json.loads(evidence_path.read_text())
+    evidence["result"]["positive_definite_certificate"]["l"][row][column][
+        "numerator"
+    ] = replacement
+    support._write_json(evidence_path, evidence)
+    submission["evidence"][0]["sha256"] = support._digest(evidence_path)
+    support._write_json(app / "submission.json", submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected.details["correctness"] == 1.0
+    assert rejected.details["evidence_validity"] == 0.0
+    assert rejected.reward == 0.0
 
 
 def test_exact_farkas_slice_rejects_corrupted_minor(tmp_path: Path) -> None:

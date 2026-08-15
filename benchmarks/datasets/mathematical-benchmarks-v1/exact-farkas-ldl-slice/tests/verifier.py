@@ -17,6 +17,30 @@ MAX_INPUT_BYTES = 1_048_576
 MAX_SUBMISSION_BYTES = 1_048_576
 
 
+def _json_equal(left: object, right: object) -> bool:
+    """Compare JSON recursively without Python's bool/int coercion."""
+
+    if isinstance(left, bool) or isinstance(right, bool):
+        return type(left) is type(right) and left == right
+    if type(left) is int or type(right) is int:
+        return type(left) is type(right) and left == right
+    if isinstance(left, dict) or isinstance(right, dict):
+        return (
+            isinstance(left, dict)
+            and isinstance(right, dict)
+            and left.keys() == right.keys()
+            and all(_json_equal(left[key], right[key]) for key in left)
+        )
+    if isinstance(left, list) or isinstance(right, list):
+        return (
+            isinstance(left, list)
+            and isinstance(right, list)
+            and len(left) == len(right)
+            and all(_json_equal(a, b) for a, b in zip(left, right, strict=True))
+        )
+    return type(left) is type(right) and left == right
+
+
 def _load_frozen():
     try:
         frozen_path = E / "input.json"
@@ -206,8 +230,8 @@ def main():
         and set(evidence) == {"schema_version", "task_id", "result", "limitations"}
         and evidence["schema_version"] == "1"
         and evidence["task_id"] == expected["task_id"]
-        and evidence["result"] == submission.get("result")
-        and evidence["limitations"] == submission.get("limitations")
+        and _json_equal(evidence["result"], submission.get("result"))
+        and _json_equal(evidence["limitations"], submission.get("limitations"))
     )
     scope_ok = bool(
         structure_ok
