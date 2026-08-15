@@ -357,6 +357,8 @@ def validate(selection: TaskSelection) -> tuple[tuple[str, str, str], ...]:
             arguments: tuple[str, ...] = (
                 "run",
                 "--locked",
+                "python",
+                "-m",
                 "pytest",
                 "-n",
                 "0",

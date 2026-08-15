@@ -214,6 +214,10 @@ def test_validate_orders_stages_isolates_pytest_and_reports_oracle_evidence(
     host_commands = [
         arguments for label, arguments in calls if label.startswith("host:")
     ]
+    assert all(
+        command[:5] == ("run", "--locked", "python", "-m", "pytest")
+        for command in host_commands
+    )
     assert host_commands[0][-1] == "benchmarks/validation/test_leaf.py"
     assert host_commands[1][-2:] == ("-k", "task-a")
     assert all("-n" in command and "0" in command for command in host_commands)
