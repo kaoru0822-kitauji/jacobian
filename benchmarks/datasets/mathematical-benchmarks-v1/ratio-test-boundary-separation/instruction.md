@@ -8,6 +8,10 @@ the harmonic series diverges while the telescoping series converges.
 Supply the exact ratio and ratio-error identities for each witness, nine
 dyadic lower-bound blocks for the divergent witness, and at least four freely
 chosen partial-sum checkpoints for the convergent witness.
+Represent exact rational values as numerator/positive-denominator objects.
+Represent every term, ratio, and ratio-error formula as ascending numerator
+and denominator coefficient arrays in `n`; represent the telescoping identity
+as its two signed rational-function terms.
 
 The verifier independently evaluates every rational checkpoint and replays the
 submitted symbolic identities. A conclusion label or numerical sampling alone

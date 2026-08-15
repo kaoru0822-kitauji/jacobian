@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 from fractions import Fraction
 from pathlib import Path
 
@@ -15,14 +14,37 @@ TESTS = Path("/tests")
 
 
 def _fraction(value: object) -> Fraction | None:
-    if not isinstance(value, str) or not re.fullmatch(
-        r"-?(?:0|[1-9][0-9]*)(?:/[1-9][0-9]*)?", value
+    if not isinstance(value, dict) or set(value) != {"numerator", "denominator"}:
+        return None
+    numerator = value["numerator"]
+    denominator = value["denominator"]
+    if type(numerator) is not int or type(denominator) is not int or denominator < 1:
+        return None
+    return Fraction(numerator, denominator)
+
+
+def _polynomial(value: object) -> tuple[int, ...] | None:
+    if (
+        not isinstance(value, list)
+        or not 1 <= len(value) <= 4
+        or not all(type(coefficient) is int for coefficient in value)
+        or value[-1] == 0
     ):
         return None
-    try:
-        return Fraction(value)
-    except (ValueError, ZeroDivisionError):
+    return tuple(value)
+
+
+def _rational_function(
+    value: object,
+) -> tuple[tuple[int, ...], tuple[int, ...]] | None:
+    if not isinstance(value, dict) or set(value) != {
+        "numerator_coefficients",
+        "denominator_coefficients",
+    }:
         return None
+    numerator = _polynomial(value["numerator_coefficients"])
+    denominator = _polynomial(value["denominator_coefficients"])
+    return (numerator, denominator) if numerator is not None and denominator else None
 
 
 def _source_is_bound() -> bool:
@@ -48,10 +70,12 @@ def _divergent(value: object) -> bool:
         "blocks",
     }:
         return False
-    if (value["term"], value["ratio"], value["ratio_error"]) != (
-        "1/n",
-        "n/(n+1)",
-        "1/(n+1)",
+    if tuple(
+        _rational_function(value[field]) for field in ("term", "ratio", "ratio_error")
+    ) != (
+        ((1,), (0, 1)),
+        ((0, 1), (1, 1)),
+        ((1,), (1, 1)),
     ):
         return False
     blocks = value["blocks"]
@@ -88,6 +112,23 @@ def _divergent(value: object) -> bool:
     return True
 
 
+def _convergent_formulas_ok(value: dict) -> bool:
+    telescoping = value["telescoping_identity"]
+    if not isinstance(telescoping, list) or len(telescoping) != 2:
+        return False
+    return (
+        _rational_function(value["term"]),
+        tuple(_rational_function(term) for term in telescoping),
+        _rational_function(value["ratio"]),
+        _rational_function(value["ratio_error"]),
+    ) == (
+        ((1,), (0, 1, 1)),
+        (((1,), (0, 1)), ((-1,), (1, 1))),
+        ((0, 1), (2, 1)),
+        ((2,), (2, 1)),
+    )
+
+
 def _convergent(value: object) -> bool:
     if not isinstance(value, dict) or set(value) != {
         "term",
@@ -97,12 +138,7 @@ def _convergent(value: object) -> bool:
         "checkpoints",
     }:
         return False
-    if (
-        value["term"],
-        value["telescoping_identity"],
-        value["ratio"],
-        value["ratio_error"],
-    ) != ("1/(n*(n+1))", "1/n-1/(n+1)", "n/(n+2)", "2/(n+2)"):
+    if not _convergent_formulas_ok(value):
         return False
     checkpoints = value["checkpoints"]
     if not isinstance(checkpoints, list) or not 4 <= len(checkpoints) <= 12:

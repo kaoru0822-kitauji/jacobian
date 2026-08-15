@@ -1,4 +1,47 @@
 {
+  "$defs": {
+    "polynomial": {
+      "items": {
+        "type": "integer"
+      },
+      "maxItems": 4,
+      "minItems": 1,
+      "type": "array"
+    },
+    "rational": {
+      "additionalProperties": false,
+      "properties": {
+        "denominator": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "numerator": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "numerator",
+        "denominator"
+      ],
+      "type": "object"
+    },
+    "rational_function": {
+      "additionalProperties": false,
+      "properties": {
+        "denominator_coefficients": {
+          "$ref": "#/$defs/polynomial"
+        },
+        "numerator_coefficients": {
+          "$ref": "#/$defs/polynomial"
+        }
+      },
+      "required": [
+        "numerator_coefficients",
+        "denominator_coefficients"
+      ],
+      "type": "object"
+    }
+  },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
@@ -17,10 +60,10 @@
                     "type": "integer"
                   },
                   "partial_sum": {
-                    "type": "string"
+                    "$ref": "#/$defs/rational"
                   },
                   "tail": {
-                    "type": "string"
+                    "$ref": "#/$defs/rational"
                   }
                 },
                 "required": [
@@ -35,16 +78,21 @@
               "type": "array"
             },
             "ratio": {
-              "type": "string"
+              "$ref": "#/$defs/rational_function"
             },
             "ratio_error": {
-              "type": "string"
+              "$ref": "#/$defs/rational_function"
             },
             "telescoping_identity": {
-              "type": "string"
+              "items": {
+                "$ref": "#/$defs/rational_function"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
             },
             "term": {
-              "type": "string"
+              "$ref": "#/$defs/rational_function"
             }
           },
           "required": [
@@ -64,7 +112,7 @@
                 "additionalProperties": false,
                 "properties": {
                   "block_lower_bound": {
-                    "type": "string"
+                    "$ref": "#/$defs/rational"
                   },
                   "count": {
                     "type": "integer"
@@ -79,7 +127,7 @@
                     "type": "integer"
                   },
                   "term_lower_bound": {
-                    "type": "string"
+                    "$ref": "#/$defs/rational"
                   }
                 },
                 "required": [
@@ -97,13 +145,13 @@
               "type": "array"
             },
             "ratio": {
-              "type": "string"
+              "$ref": "#/$defs/rational_function"
             },
             "ratio_error": {
-              "type": "string"
+              "$ref": "#/$defs/rational_function"
             },
             "term": {
-              "type": "string"
+              "$ref": "#/$defs/rational_function"
             }
           },
           "required": [

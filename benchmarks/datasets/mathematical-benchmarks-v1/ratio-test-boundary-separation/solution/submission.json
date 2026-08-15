@@ -4,108 +4,256 @@
       "checkpoints": [
         {
           "N": 3,
-          "partial_sum": "3/4",
-          "tail": "1/4"
+          "partial_sum": {
+            "denominator": 4,
+            "numerator": 3
+          },
+          "tail": {
+            "denominator": 4,
+            "numerator": 1
+          }
         },
         {
           "N": 7,
-          "partial_sum": "7/8",
-          "tail": "1/8"
+          "partial_sum": {
+            "denominator": 8,
+            "numerator": 7
+          },
+          "tail": {
+            "denominator": 8,
+            "numerator": 1
+          }
         },
         {
           "N": 12,
-          "partial_sum": "12/13",
-          "tail": "1/13"
+          "partial_sum": {
+            "denominator": 13,
+            "numerator": 12
+          },
+          "tail": {
+            "denominator": 13,
+            "numerator": 1
+          }
         },
         {
           "N": 25,
-          "partial_sum": "25/26",
-          "tail": "1/26"
+          "partial_sum": {
+            "denominator": 26,
+            "numerator": 25
+          },
+          "tail": {
+            "denominator": 26,
+            "numerator": 1
+          }
         }
       ],
-      "ratio": "n/(n+2)",
-      "ratio_error": "2/(n+2)",
-      "telescoping_identity": "1/n-1/(n+1)",
-      "term": "1/(n*(n+1))"
+      "ratio": {
+        "denominator_coefficients": [
+          2,
+          1
+        ],
+        "numerator_coefficients": [
+          0,
+          1
+        ]
+      },
+      "ratio_error": {
+        "denominator_coefficients": [
+          2,
+          1
+        ],
+        "numerator_coefficients": [
+          2
+        ]
+      },
+      "telescoping_identity": [
+        {
+          "denominator_coefficients": [
+            0,
+            1
+          ],
+          "numerator_coefficients": [
+            1
+          ]
+        },
+        {
+          "denominator_coefficients": [
+            1,
+            1
+          ],
+          "numerator_coefficients": [
+            -1
+          ]
+        }
+      ],
+      "term": {
+        "denominator_coefficients": [
+          0,
+          1,
+          1
+        ],
+        "numerator_coefficients": [
+          1
+        ]
+      }
     },
     "divergent_witness": {
       "blocks": [
         {
-          "block_lower_bound": "1/2",
+          "block_lower_bound": {
+            "denominator": 2,
+            "numerator": 1
+          },
           "count": 4,
           "end": 7,
           "level": 2,
           "start": 4,
-          "term_lower_bound": "1/8"
+          "term_lower_bound": {
+            "denominator": 8,
+            "numerator": 1
+          }
         },
         {
-          "block_lower_bound": "1/2",
+          "block_lower_bound": {
+            "denominator": 2,
+            "numerator": 1
+          },
           "count": 8,
           "end": 15,
           "level": 3,
           "start": 8,
-          "term_lower_bound": "1/16"
+          "term_lower_bound": {
+            "denominator": 16,
+            "numerator": 1
+          }
         },
         {
-          "block_lower_bound": "1/2",
+          "block_lower_bound": {
+            "denominator": 2,
+            "numerator": 1
+          },
           "count": 16,
           "end": 31,
           "level": 4,
           "start": 16,
-          "term_lower_bound": "1/32"
+          "term_lower_bound": {
+            "denominator": 32,
+            "numerator": 1
+          }
         },
         {
-          "block_lower_bound": "1/2",
+          "block_lower_bound": {
+            "denominator": 2,
+            "numerator": 1
+          },
           "count": 32,
           "end": 63,
           "level": 5,
           "start": 32,
-          "term_lower_bound": "1/64"
+          "term_lower_bound": {
+            "denominator": 64,
+            "numerator": 1
+          }
         },
         {
-          "block_lower_bound": "1/2",
+          "block_lower_bound": {
+            "denominator": 2,
+            "numerator": 1
+          },
           "count": 64,
           "end": 127,
           "level": 6,
           "start": 64,
-          "term_lower_bound": "1/128"
+          "term_lower_bound": {
+            "denominator": 128,
+            "numerator": 1
+          }
         },
         {
-          "block_lower_bound": "1/2",
+          "block_lower_bound": {
+            "denominator": 2,
+            "numerator": 1
+          },
           "count": 128,
           "end": 255,
           "level": 7,
           "start": 128,
-          "term_lower_bound": "1/256"
+          "term_lower_bound": {
+            "denominator": 256,
+            "numerator": 1
+          }
         },
         {
-          "block_lower_bound": "1/2",
+          "block_lower_bound": {
+            "denominator": 2,
+            "numerator": 1
+          },
           "count": 256,
           "end": 511,
           "level": 8,
           "start": 256,
-          "term_lower_bound": "1/512"
+          "term_lower_bound": {
+            "denominator": 512,
+            "numerator": 1
+          }
         },
         {
-          "block_lower_bound": "1/2",
+          "block_lower_bound": {
+            "denominator": 2,
+            "numerator": 1
+          },
           "count": 512,
           "end": 1023,
           "level": 9,
           "start": 512,
-          "term_lower_bound": "1/1024"
+          "term_lower_bound": {
+            "denominator": 1024,
+            "numerator": 1
+          }
         },
         {
-          "block_lower_bound": "1/2",
+          "block_lower_bound": {
+            "denominator": 2,
+            "numerator": 1
+          },
           "count": 1024,
           "end": 2047,
           "level": 10,
           "start": 1024,
-          "term_lower_bound": "1/2048"
+          "term_lower_bound": {
+            "denominator": 2048,
+            "numerator": 1
+          }
         }
       ],
-      "ratio": "n/(n+1)",
-      "ratio_error": "1/(n+1)",
-      "term": "1/n"
+      "ratio": {
+        "denominator_coefficients": [
+          1,
+          1
+        ],
+        "numerator_coefficients": [
+          0,
+          1
+        ]
+      },
+      "ratio_error": {
+        "denominator_coefficients": [
+          1,
+          1
+        ],
+        "numerator_coefficients": [
+          1
+        ]
+      },
+      "term": {
+        "denominator_coefficients": [
+          0,
+          1
+        ],
+        "numerator_coefficients": [
+          1
+        ]
+      }
     },
     "ratio_limit": "1"
   }
