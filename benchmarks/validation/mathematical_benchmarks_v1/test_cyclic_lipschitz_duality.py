@@ -32,3 +32,4 @@ def test_fraction_rejects_nonfinite_and_unbounded_values():
     assert loaded.fraction("1e1000000000") is None
     assert loaded.fraction({"numerator": True, "denominator": 1}) is None
     assert loaded.fraction({"numerator": 1, "denominator": 0}) is None
+    assert loaded.fraction({"numerator": 1 << 1_024, "denominator": 1}) is None

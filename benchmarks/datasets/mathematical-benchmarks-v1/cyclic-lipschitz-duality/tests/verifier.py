@@ -10,6 +10,9 @@ from verifier_support import (
 
 FROZEN_INPUT = Path(__file__).with_name("input.json")
 REQUIRED_RESULT_FIELDS = frozenset({"sequence", "flow", "primal_value", "dual_value"})
+# Keep the exact sums below bounded-cost arithmetic even for a submission that
+# otherwise fits within the outer JSON-size limit.
+MAX_FRACTION_BITS = 1_024
 
 
 def load_instance(path=FROZEN_INPUT):
@@ -49,7 +52,13 @@ def fraction(value):
         return None
     numerator = value["numerator"]
     denominator = value["denominator"]
-    if type(numerator) is not int or type(denominator) is not int or denominator < 1:
+    if (
+        type(numerator) is not int
+        or type(denominator) is not int
+        or denominator < 1
+        or numerator.bit_length() > MAX_FRACTION_BITS
+        or denominator.bit_length() > MAX_FRACTION_BITS
+    ):
         return None
     result = Fraction(numerator, denominator)
     return (
