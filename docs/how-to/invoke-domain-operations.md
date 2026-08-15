@@ -2,7 +2,7 @@
 
 Use `math.find` progressively, then call `math.run` once with the selected
 operation ID and a `payload` matching its request model. Use `search` when the
-capability is unknown, `browse` for compact operation-ID-sorted pages in an
+operation is unknown, `browse` for compact operation-ID-sorted pages in an
 unfamiliar domain, and `inspect` for the selected operation's exact typed request,
 result, and valid examples. For example:
 
