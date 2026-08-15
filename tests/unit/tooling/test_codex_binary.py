@@ -4,7 +4,10 @@ import os
 from pathlib import Path
 
 import pytest
-from benchmarks.tooling.codex_binary import resolve_codex_binary
+from benchmarks.tooling.codex_binary import (
+    resolve_codex_binary,
+    resolve_codex_code_mode_host,
+)
 
 
 def _write_executable(path: Path, content: bytes) -> Path:
@@ -33,6 +36,19 @@ def test_resolve_codex_binary_finds_native_payload_for_npm_launcher(
     )
 
     assert resolve_codex_binary(launcher) == native.resolve()
+
+
+def test_resolve_codex_code_mode_host_requires_the_companion_binary(
+    tmp_path: Path,
+) -> None:
+    binary = _write_executable(tmp_path / "codex", b"\x7fELFfixture")
+
+    with pytest.raises(ValueError, match="runtime is incomplete"):
+        resolve_codex_code_mode_host(binary)
+
+    host = _write_executable(tmp_path / "codex-code-mode-host", b"\x7fELFfixture")
+
+    assert resolve_codex_code_mode_host(binary) == host.resolve()
 
 
 def test_resolve_codex_binary_rejects_launcher_without_native_payload(

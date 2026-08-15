@@ -37,4 +37,6 @@ every Jacobian-enabled run reaches its local sidecar through
 egress. By default, Codex reaches its provider directly. Set
 `JACOBIAN_EVAL_PROXY=1` only when the host requires a configured upstream HTTP,
 HTTPS, or SOCKS proxy; it changes provider egress without changing the
-Jacobian MCP endpoint.
+Jacobian MCP endpoint. Proxy mode automatically resolves and mounts the
+complete local standalone Codex runtime, including its Code Mode host; do not
+mount the `codex` executable alone.
