@@ -13,7 +13,25 @@
   "required_witness_filenames": [
     "evidence/distance-audit.json"
   ],
-  "schema_definitions": {},
+  "schema_definitions": {
+    "rational": {
+      "additionalProperties": false,
+      "properties": {
+        "denominator": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "numerator": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "numerator",
+        "denominator"
+      ],
+      "type": "object"
+    }
+  },
   "schema_version": "1",
   "submission_path": "/app/submission.json",
   "submission_result": {
@@ -27,12 +45,10 @@
           "additionalProperties": false,
           "properties": {
             "distance": {
-              "maxLength": 128,
-              "type": "string"
+              "$ref": "#/$defs/rational"
             },
             "epsilon": {
-              "maxLength": 128,
-              "type": "string"
+              "$ref": "#/$defs/rational"
             },
             "index": {
               "maximum": 100000,
@@ -66,8 +82,7 @@
           "properties": {
             "a": {
               "items": {
-                "maxLength": 128,
-                "type": "string"
+                "$ref": "#/$defs/rational"
               },
               "maxItems": 2,
               "minItems": 2,
@@ -75,16 +90,14 @@
             },
             "b": {
               "items": {
-                "maxLength": 128,
-                "type": "string"
+                "$ref": "#/$defs/rational"
               },
               "maxItems": 2,
               "minItems": 2,
               "type": "array"
             },
             "distance": {
-              "maxLength": 128,
-              "type": "string"
+              "$ref": "#/$defs/rational"
             },
             "index": {
               "type": "integer"
@@ -129,6 +142,25 @@
   },
   "submission_schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$defs": {
+      "rational": {
+        "additionalProperties": false,
+        "properties": {
+          "denominator": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "numerator": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "numerator",
+          "denominator"
+        ],
+        "type": "object"
+      }
+    },
     "additionalProperties": false,
     "properties": {
       "result": {
@@ -141,13 +173,11 @@
             "items": {
               "additionalProperties": false,
               "properties": {
-                "distance": {
-                  "maxLength": 128,
-                  "type": "string"
-                },
-                "epsilon": {
-                  "maxLength": 128,
-                  "type": "string"
+              "distance": {
+                "$ref": "#/$defs/rational"
+              },
+              "epsilon": {
+                "$ref": "#/$defs/rational"
                 },
                 "index": {
                   "maximum": 100000,
@@ -179,27 +209,24 @@
             "items": {
               "additionalProperties": false,
               "properties": {
-                "a": {
-                  "items": {
-                    "maxLength": 128,
-                    "type": "string"
+              "a": {
+                "items": {
+                  "$ref": "#/$defs/rational"
                   },
                   "maxItems": 2,
                   "minItems": 2,
                   "type": "array"
                 },
-                "b": {
-                  "items": {
-                    "maxLength": 128,
-                    "type": "string"
+              "b": {
+                "items": {
+                  "$ref": "#/$defs/rational"
                   },
                   "maxItems": 2,
                   "minItems": 2,
                   "type": "array"
                 },
-                "distance": {
-                  "maxLength": 128,
-                  "type": "string"
+              "distance": {
+                "$ref": "#/$defs/rational"
                 },
                 "index": {
                   "type": "integer"

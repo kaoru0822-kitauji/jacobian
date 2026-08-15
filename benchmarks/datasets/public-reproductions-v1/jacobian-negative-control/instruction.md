@@ -1,6 +1,6 @@
 # Negative control for a polynomial-map collision
 
-The `claimed_image` in `input.json` has been mutated away from the true common image. Determine whether the two points still share that claimed image. If they do not, return `UNKNOWN` with a short boundary note. Write `submission.json` to the exact agent-visible `submission_schema.json`, record the calculation in `evidence/answer.txt`, and include that file's SHA-256 digest in the witness list.
+The `claimed_image` in `input.json` has been mutated away from the true common image. Determine whether both points map to that claimed image and whether the supplied data verifies non-invertibility. Return those two conclusions as booleans. Write `submission.json` to the exact agent-visible `submission_schema.json`, record the calculation and the bounded `UNKNOWN` conclusion in `evidence/answer.txt`, and include that file's SHA-256 digest in the witness list.
 
 <!-- BEGIN PUBLIC CONTRACT SUBMISSION BLOCK -->
 ## Submission

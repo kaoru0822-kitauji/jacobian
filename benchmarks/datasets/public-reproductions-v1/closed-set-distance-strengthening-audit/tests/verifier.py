@@ -1,5 +1,4 @@
 import json
-import re
 from fractions import Fraction
 from pathlib import Path
 from typing import Any
@@ -16,9 +15,6 @@ from verifier_support import (
 
 WORKSPACE, TESTS = Path("/app"), Path("/tests")
 EVIDENCE_PATH = "evidence/distance-audit.json"
-_CANONICAL_RATIONAL = re.compile(r"-?(?:0|[1-9][0-9]*)(?:/[1-9][0-9]*)?\Z")
-_RATIONAL = re.compile(r"[+-]?[0-9]+(?:/[+-]?[1-9][0-9]*)?\Z")
-MAX_RATIONAL_TEXT = 128
 
 
 def _frozen() -> dict[str, Any]:
@@ -43,14 +39,14 @@ def _integer(value: object) -> int | None:
 
 
 def _rational(value: object) -> Fraction | None:
-    if (
-        not isinstance(value, str)
-        or len(value) > MAX_RATIONAL_TEXT
-        or _RATIONAL.fullmatch(value) is None
-    ):
+    if not isinstance(value, dict) or set(value) != {"numerator", "denominator"}:
+        return None
+    numerator = value["numerator"]
+    denominator = value["denominator"]
+    if type(numerator) is not int or type(denominator) is not int or denominator <= 0:
         return None
     try:
-        return Fraction(value)
+        return Fraction(numerator, denominator)
     except (ValueError, ZeroDivisionError, OverflowError):
         return None
 
@@ -59,14 +55,10 @@ def _canonical_rational(value: object) -> bool:
     parsed = _rational(value)
     return bool(
         parsed is not None
-        and isinstance(value, str)
-        and _CANONICAL_RATIONAL.fullmatch(value) is not None
-        and str(parsed) == value
+        and isinstance(value, dict)
+        and parsed.numerator == value["numerator"]
+        and parsed.denominator == value["denominator"]
     )
-
-
-def _text(value: object) -> bool:
-    return isinstance(value, str) and len(value) <= MAX_RATIONAL_TEXT
 
 
 def _result_shape(value: object) -> bool:
@@ -99,21 +91,21 @@ def _result_shape(value: object) -> bool:
             or type(row["index"]) is not int
             or not isinstance(row["a"], list)
             or len(row["a"]) != 2
-            or not all(_text(item) for item in row["a"])
+            or not all(_rational(item) is not None for item in row["a"])
             or not isinstance(row["b"], list)
             or len(row["b"]) != 2
-            or not all(_text(item) for item in row["b"])
-            or not _text(row["distance"])
+            or not all(_rational(item) is not None for item in row["b"])
+            or _rational(row["distance"]) is None
         ):
             return False
     for witness in value["epsilon_witnesses"]:
         if (
             not isinstance(witness, dict)
             or set(witness) != {"epsilon", "index", "distance"}
-            or not _text(witness["epsilon"])
+            or _rational(witness["epsilon"]) is None
             or type(witness["index"]) is not int
             or not 4 <= witness["index"] <= 100000
-            or not _text(witness["distance"])
+            or _rational(witness["distance"]) is None
         ):
             return False
     return bool(

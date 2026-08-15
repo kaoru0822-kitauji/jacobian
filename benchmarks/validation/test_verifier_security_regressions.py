@@ -131,3 +131,38 @@ def test_public_reproductions_reject_schema_invalid_integer_coercion(
     _write_json(submission_path, submission)
     rejected = _run_verifier(task, app, logs)
     assert rejected.reward == 0.0
+
+
+def test_negative_control_recomputes_the_claimed_image(tmp_path: Path) -> None:
+    task, app, logs = _solution_case(
+        tmp_path, "public-reproductions-v1", "jacobian-negative-control"
+    )
+    assert _run_verifier(task, app, logs).reward == pytest.approx(1.0)
+
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"] = {
+        "both_points_map_to_claimed_image": True,
+        "noninvertibility_verified": True,
+    }
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected.details["correctness"] == pytest.approx(0.0)
+    assert rejected.reward == pytest.approx(0.0)
+
+
+def test_lean_retrieval_rejects_free_form_tactic_text(tmp_path: Path) -> None:
+    task, app, logs = _solution_case(
+        tmp_path, "public-reproductions-v1", "lean-retrieval"
+    )
+    assert _run_verifier(task, app, logs).reward == pytest.approx(1.0)
+
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["candidate_tactic"] = "exact Nat.gcd_zero_right n"
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected.details["correctness"] == pytest.approx(0.0)
+    assert rejected.reward == pytest.approx(0.0)

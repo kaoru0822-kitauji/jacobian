@@ -6,7 +6,33 @@
       "additionalProperties": false,
       "properties": {
         "candidate_tactic": {
-          "type": "string"
+          "additionalProperties": false,
+          "properties": {
+            "arguments": {
+              "items": {
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "maxItems": 8,
+              "type": "array"
+            },
+            "command": {
+              "enum": [
+                "exact"
+              ],
+              "type": "string"
+            },
+            "theorem": {
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "command",
+            "theorem",
+            "arguments"
+          ],
+          "type": "object"
         },
         "exhaustive": {
           "type": "boolean"
