@@ -16,9 +16,12 @@ def _term(t):
     if not isinstance(t, dict):
         return None
     c = t.get("coefficient")
-    if not isinstance(c, dict):
+    if not isinstance(c, dict) or set(c) != {"num", "den"}:
         return None
-    return (c.get("num"), c.get("den"), tuple(t.get("exponents", [])))
+    num, den = c.get("num"), c.get("den")
+    if type(num) is not int or type(den) is not int or den <= 0:
+        return None
+    return (num, den, tuple(t.get("exponents", [])))
 
 
 def _poly(terms):

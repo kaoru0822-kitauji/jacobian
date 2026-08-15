@@ -2,12 +2,12 @@
   "result": {
     "moment": {
       "imaginary": {
-        "den": "1",
-        "num": "0"
+        "den": 1,
+        "num": 0
       },
       "real": {
-        "den": "1",
-        "num": "12"
+        "den": 1,
+        "num": 12
       }
     }
   },

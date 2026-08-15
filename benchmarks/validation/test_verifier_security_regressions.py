@@ -131,3 +131,37 @@ def test_public_reproductions_reject_schema_invalid_integer_coercion(
     _write_json(submission_path, submission)
     rejected = _run_verifier(task, app, logs)
     assert rejected.reward == 0.0
+
+
+@pytest.mark.parametrize(
+    ("task_name", "path", "invalid"),
+    (
+        ("gaussian-complex-cancellation", ("moment", "real", "num"), "0"),
+        ("gaussian-sixth-moment", ("moment", "real", "num"), "15"),
+        ("gaussian-two-sum-fourth-moment", ("moment", "real", "num"), "12"),
+        ("integral-circle", ("torsion",), [["2"]]),
+        ("integral-projective-plane", ("torsion", 1, 0), "2"),
+        ("reduced-point", ("torsion",), [["2"]]),
+        ("jacobian-keller", ("determinant", "terms", 0, "coefficient", "num"), "-2"),
+    ),
+)
+def test_exact_numeric_results_reject_string_coercion(
+    tmp_path: Path,
+    task_name: str,
+    path: tuple[str | int, ...],
+    invalid: object,
+) -> None:
+    task, app, logs = _solution_case(tmp_path, "public-reproductions-v1", task_name)
+    assert _run_verifier(task, app, logs).reward == pytest.approx(1.0)
+
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    parent = submission["result"]
+    for part in path[:-1]:
+        parent = parent[part]
+    parent[path[-1]] = invalid
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected.details["correctness"] == pytest.approx(0.0)
+    assert rejected.reward == pytest.approx(0.0)

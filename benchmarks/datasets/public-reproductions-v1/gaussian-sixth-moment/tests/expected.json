@@ -1,1 +1,1 @@
-{"task_id":"jacobian/gaussian-sixth-moment","conclusion":"TRUE","maximum_assurance":"COMPUTED","required_scope_terms":["jacobian/gaussian-sixth-moment","complete finite input"],"expected_moment":{"real":{"num":"15","den":"1"},"imaginary":{"num":"0","den":"1"}}}
+{"task_id":"jacobian/gaussian-sixth-moment","conclusion":"TRUE","maximum_assurance":"COMPUTED","required_scope_terms":["jacobian/gaussian-sixth-moment","complete finite input"],"expected_moment":{"real":{"num":15,"den":1},"imaginary":{"num":0,"den":1}}}

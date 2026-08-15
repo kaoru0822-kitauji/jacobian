@@ -22,9 +22,12 @@ def _math(s, x, e):
         return False
     if fr != e["expected_free_ranks"]:
         return False
-    return [[str(v) for v in row] for row in tor] == [
-        [str(v) for v in row] for row in e["expected_torsion"]
-    ]
+    if any(
+        not isinstance(row, list) or any(type(value) is not int for value in row)
+        for row in tor
+    ):
+        return False
+    return tor == e["expected_torsion"]
 
 
 def main():

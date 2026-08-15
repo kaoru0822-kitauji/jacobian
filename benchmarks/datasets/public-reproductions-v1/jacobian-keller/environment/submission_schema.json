@@ -16,10 +16,11 @@
                     "additionalProperties": false,
                     "properties": {
                       "den": {
-                        "type": "string"
+                        "minimum": 1,
+                        "type": "integer"
                       },
                       "num": {
-                        "type": "string"
+                        "type": "integer"
                       }
                     },
                     "required": [

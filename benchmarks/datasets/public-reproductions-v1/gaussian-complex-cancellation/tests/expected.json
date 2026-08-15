@@ -1,1 +1,1 @@
-{"task_id":"jacobian/gaussian-complex-cancellation","conclusion":"TRUE","maximum_assurance":"COMPUTED","required_scope_terms":["jacobian/gaussian-complex-cancellation","complete finite input"],"expected_moment":{"real":{"num":"0","den":"1"},"imaginary":{"num":"0","den":"1"}}}
+{"task_id":"jacobian/gaussian-complex-cancellation","conclusion":"TRUE","maximum_assurance":"COMPUTED","required_scope_terms":["jacobian/gaussian-complex-cancellation","complete finite input"],"expected_moment":{"real":{"num":0,"den":1},"imaginary":{"num":0,"den":1}}}

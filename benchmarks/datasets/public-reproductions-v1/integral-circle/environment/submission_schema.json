@@ -14,7 +14,8 @@
         "torsion": {
           "items": {
             "items": {
-              "type": "string"
+              "minimum": 2,
+              "type": "integer"
             },
             "type": "array"
           },

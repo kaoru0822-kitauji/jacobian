@@ -13,10 +13,10 @@ E = Path("/tests")
 
 
 def _frac(v):
-    if not isinstance(v, dict):
+    if not isinstance(v, dict) or set(v) != {"num", "den"}:
         return None
     num, den = v.get("num"), v.get("den")
-    if not isinstance(num, str) or not isinstance(den, str):
+    if type(num) is not int or type(den) is not int or den <= 0:
         return None
     return (num, den)
 
