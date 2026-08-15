@@ -129,6 +129,7 @@ def test_proxy_observation_job_is_opt_in_and_preserves_local_mcp_access() -> Non
     assert "JACOBIAN_EVAL_CODEX_BINARY" in codex_overlay
     assert "JACOBIAN_EVAL_CODEX_CODE_MODE_HOST" in codex_overlay
     assert "target: /usr/local/bin/codex" in codex_overlay
+    assert "target: /usr/local/bin/codex-code-mode-host" in codex_overlay
     assert (
         "target: /usr/local/lib/node_modules/@openai/codex/bin/codex-code-mode-host"
         in codex_overlay
@@ -197,6 +198,12 @@ def test_codex_overlay_mounts_the_complete_standalone_runtime() -> None:
             "type": "bind",
             "source": "${JACOBIAN_EVAL_CODEX_BINARY:?set JACOBIAN_EVAL_CODEX_BINARY to the standalone Codex executable}",
             "target": "/usr/local/bin/codex",
+            "read_only": True,
+        },
+        {
+            "type": "bind",
+            "source": "${JACOBIAN_EVAL_CODEX_CODE_MODE_HOST:?set JACOBIAN_EVAL_CODEX_CODE_MODE_HOST to the Codex Code Mode host}",
+            "target": "/usr/local/bin/codex-code-mode-host",
             "read_only": True,
         },
         {
