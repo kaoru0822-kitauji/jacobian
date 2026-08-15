@@ -62,15 +62,18 @@ def _source() -> dict[str, Any]:
 
 
 def _fraction(value: object) -> Fraction | None:
-    if not isinstance(value, str) or len(value) > 128:
+    if not isinstance(value, dict) or set(value) != {"numerator", "denominator"}:
         return None
-    if not value.replace("/", "", 1).lstrip("+-").isdigit():
+    numerator = value["numerator"]
+    denominator = value["denominator"]
+    if type(numerator) is not int or type(denominator) is not int or denominator < 1:
         return None
-    try:
-        result = Fraction(value)
-    except (ValueError, ZeroDivisionError):
-        return None
-    return result if str(result) == value else None
+    result = Fraction(numerator, denominator)
+    return (
+        result
+        if result.numerator == numerator and result.denominator == denominator
+        else None
+    )
 
 
 def _positive_fraction(value: object) -> Fraction | None:
