@@ -1,5 +1,4 @@
 import json
-import re
 from fractions import Fraction
 from pathlib import Path
 
@@ -10,7 +9,6 @@ from verifier_support import (
 )
 
 FROZEN_INPUT = Path(__file__).with_name("input.json")
-RATIONAL_RE = re.compile(r"-?(?:0|[1-9][0-9]*)(?:/[1-9][0-9]*)?")
 REQUIRED_RESULT_FIELDS = frozenset({"sequence", "flow", "primal_value", "dual_value"})
 
 
@@ -46,14 +44,19 @@ def load_instance(path=FROZEN_INPUT):
     }
 
 
-def fraction(text):
-    if type(text) is not str or len(text) > 128 or RATIONAL_RE.fullmatch(text) is None:
+def fraction(value):
+    if not isinstance(value, dict) or set(value) != {"numerator", "denominator"}:
         return None
-    try:
-        value = Fraction(text)
-    except (ValueError, ZeroDivisionError, TypeError, OverflowError):
+    numerator = value["numerator"]
+    denominator = value["denominator"]
+    if type(numerator) is not int or type(denominator) is not int or denominator < 1:
         return None
-    return value if str(value) == text else None
+    result = Fraction(numerator, denominator)
+    return (
+        result
+        if result.numerator == numerator and result.denominator == denominator
+        else None
+    )
 
 
 def minimum_cost(instance=None):
@@ -90,8 +93,6 @@ def valid(result, instance=None):
             or not isinstance(result["flow"], list)
             or len(result["sequence"]) != cycle_size
             or len(result["flow"]) != cycle_size
-            or any(type(value) is not str for value in result["sequence"])
-            or any(type(value) is not str for value in result["flow"])
         ):
             return False
         sequence = [fraction(value) for value in result["sequence"]]
@@ -129,8 +130,8 @@ def result_contract(result, instance):
         and isinstance(result["flow"], list)
         and len(result["sequence"]) == cycle_size
         and len(result["flow"]) == cycle_size
-        and all(type(value) is str for value in result["sequence"])
-        and all(type(value) is str for value in result["flow"])
+        and all(fraction(value) is not None for value in result["sequence"])
+        and all(fraction(value) is not None for value in result["flow"])
         and type(result["primal_value"]) is str
         and type(result["dual_value"]) is str
     )

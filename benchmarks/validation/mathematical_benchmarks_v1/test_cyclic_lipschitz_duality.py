@@ -23,11 +23,12 @@ def test_independent_dual_cost():
 
 
 def test_noncanonical_fraction_rejected():
-    assert module().fraction("2/4") is None
+    assert module().fraction({"numerator": 2, "denominator": 4}) is None
 
 
 def test_fraction_rejects_nonfinite_and_unbounded_values():
     loaded = module()
     assert loaded.fraction(float("inf")) is None
     assert loaded.fraction("1e1000000000") is None
-    assert loaded.fraction("1" * 129) is None
+    assert loaded.fraction({"numerator": True, "denominator": 1}) is None
+    assert loaded.fraction({"numerator": 1, "denominator": 0}) is None
