@@ -117,6 +117,7 @@
               "type": "array"
             },
             "multiplicity": {
+              "maximum": 8,
               "minimum": 1,
               "type": "integer"
             }
@@ -248,6 +249,7 @@
                 "type": "array"
               },
               "multiplicity": {
+                "maximum": 8,
                 "minimum": 1,
                 "type": "integer"
               }

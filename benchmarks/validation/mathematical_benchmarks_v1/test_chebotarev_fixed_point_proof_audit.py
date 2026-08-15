@@ -19,3 +19,12 @@ def test_rejects_mod2_factor_string(tmp_path: Path) -> None:
     submission["result"]["mod2_factor"] = "(x+1)^4"
     _fixtures._write_json(path, submission)
     assert _verifier._run_verifier(task, app, logs).reward == 0.0
+
+
+def test_rejects_mod2_factor_multiplicity_above_schema_bound(tmp_path: Path) -> None:
+    task, app, logs = _fixtures._prepare_case(tmp_path, TASK, "computed")
+    path = app / "submission.json"
+    submission = json.loads(path.read_text())
+    submission["result"]["mod2_factor"]["multiplicity"] = 9
+    _fixtures._write_json(path, submission)
+    assert _verifier._run_verifier(task, app, logs).reward == 0.0
