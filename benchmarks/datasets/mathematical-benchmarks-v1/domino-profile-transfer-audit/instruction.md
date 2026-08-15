@@ -2,8 +2,11 @@
 
 Audit the proposed remainder for a `3 x 2021` board with one corner removed.
 Use the frozen three-bit profile semantics, but derive the state transitions
-yourself. Submit `/app/submission.json` following the public schema and
-digest-bound prose at `/app/evidence/answer.txt`.
+yourself. Submit `/app/submission.json` following the public schema and a
+digest-bound JSON envelope at
+`/app/evidence/profile-transfer-certificate.json`. The envelope must contain
+exactly `schema_version` (value `"1"`), `task_id`, `result`, and `limitations`,
+with the latter three matching the submission.
 
 Your certificate must include the chosen missing corner row, the complete
 `8 x 8` transition matrix modulo 19, the initial profile vector, and the full
@@ -18,7 +21,7 @@ matrix. Claim `COMPUTED` assurance and complete scope.
 <!-- BEGIN PUBLIC CONTRACT SUBMISSION BLOCK -->
 ## Submission
 
-The verifier independently reconstructs and replays the exact profile-transfer certificate.
+The verifier independently reconstructs and replays the exact profile-transfer certificate. The evidence artifact is a structured JSON envelope that binds the submitted result and limitations.
 
 Write `/app/submission.json` to the exact schema in `environment/submission_schema.json`. The submission envelope requires `task_id`, `conclusion`, `result`, `claimed_assurance`, `scope`, `completeness`, `evidence`, and `limitations`.
 
@@ -26,7 +29,7 @@ Write `/app/submission.json` to the exact schema in `environment/submission_sche
 - **Assurance:** scoreable values are `UNVERIFIED`, `COMPUTED` (ceiling `COMPUTED`); the submission schema accepts any of `UNVERIFIED`, `COMPUTED`, `CHECKED`, `VERIFIED` but only scoreable assurances receive credit.
 - **Scope:** the exact value declared in `submission_schema.json`
 - **Completeness:** `COMPLETE`.
-- **Evidence:** 1-1 item(s); allowed path(s): `evidence/answer.txt`; digest must match `^sha256:[0-9a-f]{64}$`.
-- **Evidence media types:** `text/plain`.
-- **Required artifact filenames:** `evidence/answer.txt`.
+- **Evidence:** 1-1 item(s); allowed path(s): `evidence/profile-transfer-certificate.json`; digest must match `^sha256:[0-9a-f]{64}$`.
+- **Evidence media types:** `application/json`.
+- **Required artifact filenames:** `evidence/profile-transfer-certificate.json`.
 <!-- END PUBLIC CONTRACT SUBMISSION BLOCK -->
