@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import importlib.util
 import json
-import sys
 from pathlib import Path
+
+from benchmarks.validation._source_module import load_task_verifier
 
 ROOT = Path(__file__).parents[3]
 TASK = ROOT / "benchmarks/datasets/conjecture-probes-v1/tutte-flow-domain-audit"
@@ -12,14 +12,7 @@ REPAIR = [2, 1, 4, 3, 1, 1, 3, 3, 3, 1, 2, 1, 2, 1, 4]
 
 
 def _module():
-    sys.path.insert(0, str(TASK / "tests"))
-    spec = importlib.util.spec_from_file_location(
-        "tutte_flow_verifier", TASK / "tests/verifier.py"
-    )
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return load_task_verifier(TASK, module_name="tutte_flow_verifier")
 
 
 def test_raw_submission_is_bounded_before_read(monkeypatch):

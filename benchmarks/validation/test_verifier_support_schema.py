@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import json
 import sys
 from pathlib import Path
 from types import ModuleType
 
 import pytest
+from benchmarks.validation._source_module import load_source_module
 
 _TEMPLATE = (
     Path(__file__).resolve().parents[1]
@@ -20,17 +20,7 @@ _TEMPLATE = (
 )
 
 
-def _load_module(module_name: str, path: Path) -> ModuleType:
-    spec = importlib.util.spec_from_file_location(module_name, path)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    with pytest.MonkeyPatch.context() as module_state:
-        module_state.setitem(sys.modules, module_name, module)
-        spec.loader.exec_module(module)
-    return module
-
-
-_VS = _load_module("_vs_under_test", _TEMPLATE)
+_VS = load_source_module("_vs_under_test", _TEMPLATE)
 
 
 @pytest.mark.parametrize("preserve_existing", [False, True])
@@ -52,7 +42,7 @@ def test_load_module_scopes_sys_modules_registration(
     else:
         monkeypatch.delitem(sys.modules, module_name, raising=False)
 
-    loaded = _load_module(module_name, source)
+    loaded = load_source_module(module_name, source)
 
     assert vars(loaded)["registered_while_loading"] is loaded
     if preserve_existing:

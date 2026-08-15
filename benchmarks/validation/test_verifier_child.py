@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 from benchmarks.validation._verifier_child import (
@@ -45,8 +47,12 @@ def _workspace(tmp_path: Path) -> tuple[Path, Path, Path]:
 
 def test_verifier_runs_in_fresh_interpreter_without_task_bytecode(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     task, app, logs = _workspace(tmp_path)
+    parent_support = ModuleType("verifier_support")
+    monkeypatch.setitem(sys.modules, "verifier_support", parent_support)
+    parent_path = tuple(sys.path)
 
     first = run_verifier_in_child(task=task, app=app, logs=logs)
     second = run_verifier_in_child(task=task, app=app, logs=logs)
@@ -54,6 +60,8 @@ def test_verifier_runs_in_fresh_interpreter_without_task_bytecode(
     assert first.reward == 1.0
     assert first.details == {"load_count": 1}
     assert second == first
+    assert sys.modules["verifier_support"] is parent_support
+    assert tuple(sys.path) == parent_path
     assert not list(task.rglob("*.pyc"))
     assert not list(app.rglob("*.pyc"))
 

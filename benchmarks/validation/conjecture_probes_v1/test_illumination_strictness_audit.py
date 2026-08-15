@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import io
 import json
 import shutil
-import sys
 from itertools import product
 from pathlib import Path
 
 import pytest
+from benchmarks.validation._source_module import (
+    load_source_module,
+    load_task_verifier,
+)
 from benchmarks.validation._verifier_child import run_verifier_in_child
 
 ROOT = Path(__file__).parents[3]
@@ -18,31 +20,13 @@ VERTICES = list(product((-1, 1), repeat=3))
 
 
 def _module():
-    saved_path = sys.path[:]
-    saved_modules = dict(sys.modules)
-    try:
-        sys.path.insert(0, str(TASK / "tests"))
-        spec = importlib.util.spec_from_file_location(
-            "illumination_verifier", TASK / "tests/verifier.py"
-        )
-        assert spec and spec.loader
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        return module
-    finally:
-        sys.path[:] = saved_path
-        sys.modules.clear()
-        sys.modules.update(saved_modules)
+    return load_task_verifier(TASK, module_name="illumination_verifier")
 
 
 def _support_module():
-    spec = importlib.util.spec_from_file_location(
+    return load_source_module(
         "illumination_verifier_support", TASK / "tests/verifier_support.py"
     )
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 def _child_case(tmp_path: Path) -> tuple[Path, Path]:
