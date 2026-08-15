@@ -133,6 +133,25 @@ def test_nonlinear_recurrence_rejects_boolean_coefficients(
     assert rejected.reward == 0.0
 
 
+def test_nonlinear_recurrence_rejects_boolean_aliases_in_evidence_only(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_nonlinear_recurrence_case(tmp_path)
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    evidence_path = app / "evidence" / "nonlinear-recurrence-certificate.json"
+    evidence = json.loads(evidence_path.read_text())
+    evidence["result"]["potential_identity_coefficients"] = [True, -2, True]
+    support._write_json(evidence_path, evidence)
+    submission["evidence"][0]["sha256"] = support._digest(evidence_path)
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected.details["correctness"] == 1.0
+    assert rejected.details["evidence_validity"] == 0.0
+    assert rejected.reward == 0.0
+
+
 def test_nonlinear_recurrence_rejects_float_index_fields(
     tmp_path: Path,
 ) -> None:
