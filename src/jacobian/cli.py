@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -12,10 +11,6 @@ from typer import _click
 from typer.core import TyperGroup
 
 from jacobian.canonical import loads_strict_json
-from jacobian.contracts.operations import (
-    OperationCatalogSnapshot,
-    OperationDescriptor,
-)
 from jacobian.serving_catalog import ServingCatalog
 
 
@@ -45,58 +40,25 @@ class JacobianGroup(TyperGroup):
                 err=True,
             )
             raise typer.Exit(code=1) from None
-        finally:
-            state = ctx.obj
-            if isinstance(state, CliState):
-                active_failure = sys.exception()
-                try:
-                    state.close()
-                except BaseException as cleanup_exc:
-                    if active_failure is None:
-                        raise
-                    active_failure.add_note(f"CLI cleanup also failed: {cleanup_exc}")
 
 
-class CliState:
-    def __init__(
-        self,
-    ) -> None:
-        self._catalog: ServingCatalog | None = None
-
-    @property
-    def catalog(self) -> ServingCatalog:
-        if self._catalog is None:
-            self._catalog = ServingCatalog.open()
-        return self._catalog
-
-    def catalog_snapshot(self) -> OperationCatalogSnapshot:
-        return self.catalog.snapshot()
-
-    def inspect(self, operation_id: str) -> OperationDescriptor | None:
-        return self.catalog.inspect(operation_id)
-
-    def close(self) -> None:
-        pass
-
-
-def catalog(context: typer.Context) -> None:
+def catalog() -> None:
     """Print the complete installed operation catalog."""
 
-    value = _state(context).catalog_snapshot()
+    value = ServingCatalog.open().snapshot()
     _emit(value.model_dump(mode="json"))
 
 
-def inspect_operation(context: typer.Context, operation_id: str) -> None:
+def inspect_operation(operation_id: str) -> None:
     """Print one exact installed operation declaration."""
 
-    descriptor = _state(context).inspect(operation_id)
+    descriptor = ServingCatalog.open().inspect(operation_id)
     if descriptor is None:
         raise ValueError(f"operation {operation_id!r} is not installed")
     _emit(descriptor.model_dump(mode="json"))
 
 
 def run_operation(
-    context: typer.Context,
     operation_id: str,
     json_payload: Annotated[
         str | None,
@@ -119,13 +81,12 @@ def run_operation(
     payload = loads_strict_json(source)
     if not isinstance(payload, dict):
         raise ValueError("operation payload must be a JSON object")
-    state = _state(context)
     from jacobian.operation_dispatcher import invoke_operation
 
     result = invoke_operation(
         operation_id,
         payload,
-        state.catalog,
+        ServingCatalog.open(),
     )
     _emit(result.model_dump(mode="json"))
 
@@ -140,12 +101,6 @@ def create_cli_app() -> typer.Typer:
         no_args_is_help=True,
     )
 
-    @application.callback()
-    def configure(
-        context: typer.Context,
-    ) -> None:
-        context.obj = CliState()
-
     application.command("catalog")(catalog)
     application.command("inspect")(inspect_operation)
     application.command("run")(run_operation)
@@ -153,13 +108,6 @@ def create_cli_app() -> typer.Typer:
 
 
 app = create_cli_app()
-
-
-def _state(context: typer.Context) -> CliState:
-    state = context.obj
-    if not isinstance(state, CliState):
-        raise RuntimeError("CLI state was not initialized")
-    return state
 
 
 def _emit(payload: Any) -> None:
