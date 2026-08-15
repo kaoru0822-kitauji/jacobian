@@ -8,6 +8,7 @@ from verifier_support import (
     normalize_reward_file,
     resolve_evidence,
     strict_submission_contract,
+    workspace_input_is_bound,
 )
 
 W = Path("/app")
@@ -156,9 +157,9 @@ def result_valid(result, fixture):
 
 
 def main():
-    submission = load_submission()
+    input_binding = workspace_input_is_bound()
+    submission = load_submission(require_input_binding=False)
     fixture = load_json(E / FIXTURE_NAME)
-    canonical_fixture = load_json(E / FIXTURE_NAME)
     expected = load_json(E / "expected.json")
     if not isinstance(expected, dict):
         expected = {}
@@ -176,11 +177,10 @@ def main():
         verification_record="forbidden",
     )
     result = submission.get("result") if isinstance(submission, dict) else None
-    fixture_bound = bool(fixture is not None and fixture == canonical_fixture)
     math_correct = bool(
-        math_contract and fixture_bound and result_valid(result, fixture)
+        math_contract and fixture is not None and result_valid(result, fixture)
     )
-    correct = bool(accepted_contract and math_correct)
+    correct = bool(accepted_contract and input_binding and math_correct)
     evidence = bool(
         math_contract and evidence_matches_result(submission.get("evidence"), result)
     )
@@ -204,6 +204,8 @@ def main():
     Path("/logs/verifier/reward.json").write_text(
         json.dumps(
             {
+                "protocol_compliance": float(bool(math_contract)),
+                "input_binding": float(input_binding),
                 "correctness": float(math_correct),
                 "evidence_validity": float(evidence),
                 "scope_accuracy": float(scope),
