@@ -14,45 +14,14 @@ from verifier_support import (
 
 W = Path("/app")
 E = Path("/tests")
-LIMITATION = (
-    "The verifier checks one finite linear action and does not machine-prove "
-    "a general classification theorem."
+LIMITATION_OBLIGATIONS = (
+    "claim:finite-action-counterexample",
+    "limitation:no-general-classification-theorem",
 )
 
 
 def _limitations_valid(value: object) -> bool:
-    if not (isinstance(value, list) and len(value) == 1 and isinstance(value[0], str)):
-        return False
-    text = value[0].casefold()
-    if any(
-        term in text
-        for term in (
-            "proof-assistant verified",
-            "formally verified",
-            "complete classification",
-        )
-    ):
-        return False
-    return (
-        any(
-            term in text
-            for term in ("finite", "frozen", "one action", "counterexample")
-        )
-        and any(
-            term in text
-            for term in ("classification", "general theorem", "general result")
-        )
-        and any(
-            term in text
-            for term in (
-                "not prove",
-                "does not prove",
-                "not formal",
-                "not machine",
-                "only",
-            )
-        )
-    )
+    return isinstance(value, list) and value == list(LIMITATION_OBLIGATIONS)
 
 
 def matrix(value, q):
