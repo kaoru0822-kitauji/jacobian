@@ -103,7 +103,9 @@ def _divergent(value: object) -> bool:
     )
     if not all(
         _rational_functions_equal(_rational_function(value[field]), formula)
-        for field, formula in zip(("term", "ratio", "ratio_error"), expected, strict=True)
+        for field, formula in zip(
+            ("term", "ratio", "ratio_error"), expected, strict=True
+        )
     ):
         return False
     blocks = value["blocks"]
