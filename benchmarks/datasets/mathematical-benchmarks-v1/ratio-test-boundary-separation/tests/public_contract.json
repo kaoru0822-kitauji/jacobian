@@ -163,7 +163,7 @@
         "type": "object"
       },
       "ratio_limit": {
-        "const": "1"
+        "$ref": "#/$defs/rational"
       }
     },
     "required": [
@@ -295,7 +295,7 @@
             "type": "object"
           },
           "ratio_limit": {
-            "const": "1"
+            "$ref": "#/$defs/rational"
           }
         },
         "required": [

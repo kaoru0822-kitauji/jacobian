@@ -28,10 +28,12 @@ def _polynomial(value: object) -> tuple[int, ...] | None:
         not isinstance(value, list)
         or not 1 <= len(value) <= 4
         or not all(type(coefficient) is int for coefficient in value)
-        or value[-1] == 0
     ):
         return None
-    return tuple(value)
+    coefficients = list(value)
+    while len(coefficients) > 1 and coefficients[-1] == 0:
+        coefficients.pop()
+    return tuple(coefficients)
 
 
 def _rational_function(
@@ -44,7 +46,31 @@ def _rational_function(
         return None
     numerator = _polynomial(value["numerator_coefficients"])
     denominator = _polynomial(value["denominator_coefficients"])
-    return (numerator, denominator) if numerator is not None and denominator else None
+    if numerator is None or denominator is None or not any(denominator):
+        return None
+    return numerator, denominator
+
+
+def _multiply_polynomials(
+    left: tuple[int, ...], right: tuple[int, ...]
+) -> tuple[int, ...]:
+    result = [0] * (len(left) + len(right) - 1)
+    for left_power, left_coefficient in enumerate(left):
+        for right_power, right_coefficient in enumerate(right):
+            result[left_power + right_power] += left_coefficient * right_coefficient
+    while len(result) > 1 and result[-1] == 0:
+        result.pop()
+    return tuple(result)
+
+
+def _rational_functions_equal(
+    left: tuple[tuple[int, ...], tuple[int, ...]] | None,
+    right: tuple[tuple[int, ...], tuple[int, ...]],
+) -> bool:
+    return left is not None and (
+        _multiply_polynomials(left[0], right[1])
+        == _multiply_polynomials(right[0], left[1])
+    )
 
 
 def _source_is_bound() -> bool:
@@ -70,12 +96,14 @@ def _divergent(value: object) -> bool:
         "blocks",
     }:
         return False
-    if tuple(
-        _rational_function(value[field]) for field in ("term", "ratio", "ratio_error")
-    ) != (
+    expected = (
         ((1,), (0, 1)),
         ((0, 1), (1, 1)),
         ((1,), (1, 1)),
+    )
+    if not all(
+        _rational_functions_equal(_rational_function(value[field]), formula)
+        for field, formula in zip(("term", "ratio", "ratio_error"), expected, strict=True)
     ):
         return False
     blocks = value["blocks"]
@@ -116,16 +144,23 @@ def _convergent_formulas_ok(value: dict) -> bool:
     telescoping = value["telescoping_identity"]
     if not isinstance(telescoping, list) or len(telescoping) != 2:
         return False
-    return (
-        _rational_function(value["term"]),
-        tuple(_rational_function(term) for term in telescoping),
-        _rational_function(value["ratio"]),
-        _rational_function(value["ratio_error"]),
-    ) == (
-        ((1,), (0, 1, 1)),
-        (((1,), (0, 1)), ((-1,), (1, 1))),
-        ((0, 1), (2, 1)),
-        ((2,), (2, 1)),
+    term, ratio, ratio_error = (
+        _rational_function(value[field]) for field in ("term", "ratio", "ratio_error")
+    )
+    first, second = (_rational_function(item) for item in telescoping)
+    expected_first, expected_second = ((1,), (0, 1)), ((-1,), (1, 1))
+    telescope_matches = (
+        _rational_functions_equal(first, expected_first)
+        and _rational_functions_equal(second, expected_second)
+    ) or (
+        _rational_functions_equal(first, expected_second)
+        and _rational_functions_equal(second, expected_first)
+    )
+    return bool(
+        _rational_functions_equal(term, ((1,), (0, 1, 1)))
+        and telescope_matches
+        and _rational_functions_equal(ratio, ((0, 1), (2, 1)))
+        and _rational_functions_equal(ratio_error, ((2,), (2, 1)))
     )
 
 
@@ -166,7 +201,7 @@ def _result(value: object) -> bool:
     return bool(
         isinstance(value, dict)
         and set(value) == {"ratio_limit", "divergent_witness", "convergent_witness"}
-        and value["ratio_limit"] == "1"
+        and _fraction(value["ratio_limit"]) == 1
         and _divergent(value["divergent_witness"])
         and _convergent(value["convergent_witness"])
     )

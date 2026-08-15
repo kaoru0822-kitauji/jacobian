@@ -255,6 +255,6 @@
         ]
       }
     },
-    "ratio_limit": "1"
+    "ratio_limit": {"numerator": 1, "denominator": 1}
   }
 }
