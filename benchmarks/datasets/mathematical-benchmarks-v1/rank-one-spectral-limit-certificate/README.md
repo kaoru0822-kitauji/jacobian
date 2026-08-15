@@ -1,4 +1,8 @@
 # Rank-one spectral limit certificate
+
+This is the canonical rank-one matrix limit regression; an earlier redundant
+determinant-formulation bundle has been retired from the active dataset.
+
 Regression benchmark derived from ByteDance-Seed/BeyondAIME test row 1 at immutable revision `c705198ae1043810b1e1693bd879250b51a7a523` (CC0-1.0), canonical row digest `sha256:23a5c730b9558129a2c9d9c82105a2c3112703b92c5aa4620b872e3be3df02d6`.
 
 The task requires discovering the diagonal-minus-rank-one structure, deriving the unique determinant root, telescoping its reciprocal sum, and binding several freely chosen exact checkpoints to the general formula.
