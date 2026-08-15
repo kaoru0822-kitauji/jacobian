@@ -15,7 +15,6 @@ import math
 import os
 import signal
 import subprocess
-import sys
 import tempfile
 import threading
 import time
@@ -40,7 +39,6 @@ _CANCELLATION_EVENT: ContextVar[threading.Event | None] = ContextVar(
     default=None,
 )
 _PIPE_DRAIN_GRACE_SECONDS = 0.5
-_RESOURCE_POLL_SECONDS = 0.1
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,117 +50,6 @@ class BoundedProcessResult:
     stderr_exceeded: bool
     timed_out: bool
     cancelled: bool = False
-    peak_rss_bytes: int | None = None
-
-
-def _read_proc_status(pid_dir: Path) -> tuple[int, int] | None:
-    """Return ``(parent_pid, rss_bytes)`` for one ``/proc/<pid>`` entry."""
-
-    try:
-        status = (pid_dir / "status").read_text(encoding="ascii")
-    except (OSError, UnicodeDecodeError):
-        return None
-    parent = 0
-    rss_kb = 0
-    for line in status.splitlines():
-        if line.startswith("PPid:"):
-            try:
-                parent = int(line.split()[1])
-            except (IndexError, ValueError):
-                return None
-        elif line.startswith("VmRSS:"):
-            try:
-                rss_kb = int(line.split()[1])
-            except (IndexError, ValueError):
-                return None
-    return parent, rss_kb * 1024
-
-
-def _read_proc_pss_bytes(pid_dir: Path) -> int | None:
-    """Return proportional resident memory from ``smaps_rollup`` when available.
-
-    Summing ``VmRSS`` for a process tree counts shared Lean and Mathlib pages
-    once for every process that maps them.  PSS apportions those shared pages,
-    so it represents the tree's actual memory footprint much more closely.
-    """
-
-    try:
-        lines = (pid_dir / "smaps_rollup").read_text(encoding="ascii").splitlines()
-    except (OSError, UnicodeDecodeError):
-        return None
-    for line in lines:
-        if not line.startswith("Pss:"):
-            continue
-        try:
-            return int(line.split()[1]) * 1024
-        except (IndexError, ValueError):
-            return None
-    return None
-
-
-def _collect_linux_processes() -> dict[int, tuple[int, int]] | None:
-    """Read all ``/proc`` process statuses, or ``None`` if procfs is unavailable."""
-
-    processes: dict[int, tuple[int, int]] = {}
-    try:
-        for entry in Path("/proc").iterdir():
-            if not entry.name.isdigit():
-                continue
-            parsed = _read_proc_status(entry)
-            if parsed is not None:
-                processes[int(entry.name)] = parsed
-    except OSError:
-        return None
-    return processes
-
-
-def _descendant_pids(processes: dict[int, tuple[int, int]], root_pid: int) -> set[int]:
-    """Collect ``root_pid`` plus all transitive children."""
-
-    descendants = {root_pid}
-    changed = True
-    while changed:
-        changed = False
-        for pid, (parent, _rss) in processes.items():
-            if parent in descendants and pid not in descendants:
-                descendants.add(pid)
-                changed = True
-    return descendants
-
-
-def _linux_process_tree_rss_bytes(root_pid: int) -> int | None:
-    """Return current RSS for a Linux process tree, or ``None`` elsewhere."""
-
-    if not sys.platform.startswith("linux"):
-        return None
-    processes = _collect_linux_processes()
-    if processes is None:
-        return None
-    descendants = _descendant_pids(processes, root_pid)
-    return sum(processes.get(pid, (0, 0))[1] for pid in descendants)
-
-
-def _linux_process_tree_memory_bytes(root_pid: int) -> int | None:
-    """Return proportional memory for a Linux process tree.
-
-    ``smaps_rollup`` PSS avoids counting shared pages once for every process
-    that maps them. Constrained or older procfs installations fall back to
-    VmRSS, retaining a conservative bound.
-    """
-
-    if not sys.platform.startswith("linux"):
-        return None
-    processes = _collect_linux_processes()
-    if processes is None:
-        return None
-    descendants = _descendant_pids(processes, root_pid)
-    memory_bytes = 0
-    for pid in descendants:
-        pss_bytes = _read_proc_pss_bytes(Path("/proc") / str(pid))
-        memory_bytes += (
-            processes.get(pid, (0, 0))[1] if pss_bytes is None else pss_bytes
-        )
-    return memory_bytes
 
 
 @contextmanager
@@ -376,19 +263,15 @@ def _monitor_bounded_process(
     deadline: float,
     cancellation_event: threading.Event | None,
     platform_tools: ProcessPlatformTools | None,
-) -> tuple[bool, bool, int | None]:
+) -> tuple[bool, bool]:
     """Poll the child until exit, timeout, or cancellation.
 
-    Returns ``(timed_out, cancelled, peak_rss_bytes)``.
+    Returns ``(timed_out, cancelled)``.
     """
 
     timed_out = False
     cancelled = False
-    peak_rss_bytes: int | None = None
     while process.poll() is None:
-        current_rss = _linux_process_tree_rss_bytes(process.pid)
-        if current_rss is not None:
-            peak_rss_bytes = max(peak_rss_bytes or 0, current_rss)
         if cancellation_event is not None and cancellation_event.is_set():
             cancelled = True
             _kill_process_tree(process, platform_tools)
@@ -404,7 +287,7 @@ def _monitor_bounded_process(
             process.wait(timeout=min(0.1, remaining))
         except subprocess.TimeoutExpired:
             continue
-    return timed_out, cancelled, peak_rss_bytes
+    return timed_out, cancelled
 
 
 def _drain_reader_threads(
@@ -532,7 +415,7 @@ def run_bounded_process(
 
         deadline = time.monotonic() + timeout_seconds
         try:
-            timed_out, cancelled, peak_rss_bytes = _monitor_bounded_process(
+            timed_out, cancelled = _monitor_bounded_process(
                 process,
                 deadline=deadline,
                 cancellation_event=cancellation_event,
@@ -563,7 +446,6 @@ def run_bounded_process(
         stderr_exceeded=stderr_exceeded.is_set(),
         timed_out=timed_out,
         cancelled=cancelled,
-        peak_rss_bytes=peak_rss_bytes,
     )
 
 

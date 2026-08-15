@@ -22,7 +22,7 @@ makes the implication fail. Bind that file by SHA-256.
 <!-- BEGIN PUBLIC CONTRACT SUBMISSION BLOCK -->
 ## Submission
 
-The verifier independently generates the finite group, checks determinant one and every elementwise fixed vector, and computes the common fixed-space intersection. The evidence file must contain a mathematical explanation covering the elementwise fixed vectors, the absence of a common fixed vector, and the quantifier-order separation; unrelated or empty text does not earn evidence credit. In the solver's own words, the limitations array must disclose that this finite action does not prove a general classification theorem.
+The verifier independently generates the finite group, checks determinant one and every elementwise fixed vector, and computes the common fixed-space intersection. The evidence file remains qualitative prose and must explain the elementwise fixed vectors, absence of a common fixed vector, and quantifier-order separation; unrelated or empty text does not earn evidence credit. The limitations array records the exact obligation IDs `claim:finite-action-counterexample` and `limitation:no-general-classification-theorem` in that order.
 
 Write `/app/submission.json` to the exact schema in `environment/submission_schema.json`. The submission envelope requires `task_id`, `conclusion`, `result`, `claimed_assurance`, `scope`, `completeness`, `evidence`, and `limitations`.
 

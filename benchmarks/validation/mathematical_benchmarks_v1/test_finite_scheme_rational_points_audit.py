@@ -20,7 +20,21 @@ def _mutate(tmp_path: Path, mutation):
     return support._run_verifier(task, app, logs)
 
 
-def test_accepts_equivalent_limitation_wording(tmp_path: Path) -> None:
+def test_accepts_exact_limitation_obligation_ids(tmp_path: Path) -> None:
+    reward = _mutate(
+        tmp_path,
+        lambda submission: submission.update(
+            limitations=[
+                "claim:finite-affine-countermodel",
+                "limitation:no-general-scheme-theorem",
+            ]
+        ),
+    )
+    assert reward.details["scope_accuracy"] == 1.0
+    assert reward.reward == 1.0
+
+
+def test_rejects_legacy_limitation_prose(tmp_path: Path) -> None:
     reward = _mutate(
         tmp_path,
         lambda submission: submission.update(
@@ -29,8 +43,42 @@ def test_accepts_equivalent_limitation_wording(tmp_path: Path) -> None:
             ]
         ),
     )
-    assert reward.details["scope_accuracy"] == 1.0
-    assert reward.reward == 1.0
+    assert reward.details["scope_accuracy"] == 0.0
+    assert reward.reward == 0.0
+
+
+def test_rejects_unknown_or_contradictory_limitation_id(tmp_path: Path) -> None:
+    reward = _mutate(
+        tmp_path,
+        lambda submission: submission.update(
+            limitations=[
+                "claim:finite-affine-countermodel",
+                "claim:general-scheme-theorem-proved",
+            ]
+        ),
+    )
+    assert reward.details["scope_accuracy"] == 0.0
+    assert reward.reward == 0.0
+
+
+def test_rejects_affirmative_generalization_with_limiting_vocabulary(
+    tmp_path: Path,
+) -> None:
+    reward = _mutate(
+        tmp_path,
+        lambda submission: submission.update(
+            limitations=[
+                "This finite F5 countermodel proves a general theorem about schemes "
+                "while only describing one finite case."
+            ]
+        ),
+    )
+    assert reward.details["correctness"] == 1.0
+    assert reward.details["evidence_validity"] == 1.0
+    assert reward.details["input_binding"] == 1.0
+    assert reward.details["assurance_calibration"] == 1.0
+    assert reward.details["scope_accuracy"] == 0.0
+    assert reward.reward == 0.0
 
 
 def test_oracle_countermodel_is_accepted(tmp_path: Path) -> None:

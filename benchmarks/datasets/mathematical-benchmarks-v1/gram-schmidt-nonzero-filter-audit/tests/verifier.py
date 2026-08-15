@@ -13,6 +13,26 @@ from verifier_support import (
 W, E = Path("/app"), Path("/tests")
 
 
+def _json_equal(left: object, right: object) -> bool:
+    """Compare JSON recursively without Python numeric coercions."""
+
+    if isinstance(left, dict) or isinstance(right, dict):
+        return (
+            isinstance(left, dict)
+            and isinstance(right, dict)
+            and left.keys() == right.keys()
+            and all(_json_equal(left[key], right[key]) for key in left)
+        )
+    if isinstance(left, list) or isinstance(right, list):
+        return (
+            isinstance(left, list)
+            and isinstance(right, list)
+            and len(left) == len(right)
+            and all(_json_equal(a, b) for a, b in zip(left, right, strict=True))
+        )
+    return type(left) is type(right) and left == right
+
+
 def rat(value):
     if (
         not isinstance(value, dict)
@@ -151,8 +171,8 @@ def main():
         and set(evidence) == {"schema_version", "task_id", "result", "limitations"}
         and evidence["schema_version"] == "1"
         and evidence["task_id"] == submission["task_id"]
-        and evidence["result"] == result
-        and evidence["limitations"] == submission["limitations"]
+        and _json_equal(evidence["result"], result)
+        and _json_equal(evidence["limitations"], submission["limitations"])
     )
     scope_ok = bool(
         contract

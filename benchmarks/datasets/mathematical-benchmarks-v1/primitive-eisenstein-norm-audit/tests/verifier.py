@@ -21,6 +21,26 @@ LIMITATIONS = [
 ]
 
 
+def _json_equal(left: object, right: object) -> bool:
+    """Compare JSON recursively without Python's bool/int coercion."""
+
+    if isinstance(left, dict) or isinstance(right, dict):
+        return (
+            isinstance(left, dict)
+            and isinstance(right, dict)
+            and left.keys() == right.keys()
+            and all(_json_equal(left[key], right[key]) for key in left)
+        )
+    if isinstance(left, list) or isinstance(right, list):
+        return (
+            isinstance(left, list)
+            and isinstance(right, list)
+            and len(left) == len(right)
+            and all(_json_equal(a, b) for a, b in zip(left, right, strict=True))
+        )
+    return type(left) is type(right) and left == right
+
+
 def frozen_contract() -> dict:
     try:
         app = W / "input.json"
@@ -158,8 +178,8 @@ def main() -> None:
         and set(evidence) == {"schema_version", "task_id", "result", "limitations"}
         and evidence.get("schema_version") == "1"
         and evidence.get("task_id") == expected["task_id"]
-        and evidence.get("result") == submission.get("result")
-        and evidence.get("limitations") == LIMITATIONS
+        and _json_equal(evidence.get("result"), submission.get("result"))
+        and _json_equal(evidence.get("limitations"), LIMITATIONS)
     )
     scope_ok = bool(
         contract

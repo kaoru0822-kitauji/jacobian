@@ -1,6 +1,6 @@
 {
+  "schema_version": "1",
   "task_id": "jacobian/domino-profile-transfer-audit",
-  "conclusion": "PROPOSED_REMAINDER_INCORRECT_REPAIRED",
   "result": {
     "removed_row": 0,
     "transition_matrix": [[0,1,0,0,1,0,0,1],[1,0,0,0,0,0,1,0],[0,0,0,0,0,1,0,0],[0,0,0,0,1,0,0,0],[1,0,0,1,0,0,0,0],[0,0,1,0,0,0,0,0],[0,1,0,0,0,0,0,0],[1,0,0,0,0,0,0,0]],
@@ -18,9 +18,7 @@
     "remainder": 1,
     "diagnosis": "PROPOSED_DECOMPOSITION_DOES_NOT_PARTITION_ALL_TILINGS"
   },
-  "claimed_assurance": "COMPUTED",
-  "scope": "domino-profile-transfer-audit exact modulo-19 certificate",
-  "completeness": "COMPLETE",
-  "evidence": [{"path":"evidence/profile-transfer-certificate.json","sha256":"sha256:6ee66ff4f53c6ea4af66559c700aa42f153cfc80b4843542e19e72ff5396fc2a"}],
-  "limitations": ["The verifier proves the exact finite-state modulo-19 computation; it does not formalize the source narrative in a proof assistant."]
+  "limitations": [
+    "The verifier proves the exact finite-state modulo-19 computation; it does not formalize the source narrative in a proof assistant."
+  ]
 }

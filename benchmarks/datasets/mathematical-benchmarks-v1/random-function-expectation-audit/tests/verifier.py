@@ -61,7 +61,7 @@ def main():
         s,
         task_id=e["task_id"],
         conclusion=e["conclusion"],
-        allowed_assurances=frozenset({"UNVERIFIED", "COMPUTED", "CHECKED"}),
+        allowed_assurances=frozenset({"UNVERIFIED", "COMPUTED"}),
         verification_record="forbidden",
     )
     math_contract = strict_submission_contract(

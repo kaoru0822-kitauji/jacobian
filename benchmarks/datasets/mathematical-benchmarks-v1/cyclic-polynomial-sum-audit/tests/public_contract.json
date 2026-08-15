@@ -4,16 +4,16 @@
   "assurance_ceiling": "COMPUTED",
   "conclusion": {"const": "CLAIM_INCONSISTENT"},
   "evidence": {
-    "allowed_paths": ["evidence/answer.txt"],
+    "allowed_paths": ["evidence/cyclic-elimination-certificate.json"],
     "digest_pattern": "^sha256:[0-9a-f]{64}$",
     "max_items": 1,
-    "media_types": ["text/plain"],
+    "media_types": ["application/json"],
     "min_items": 1,
     "payload_shape": null
   },
   "limitations": {"items": {"type": "string"}, "type": "array"},
   "public_notes": "The verifier independently replays the exact elimination, proposed-value evaluations, radical roots, and excluded-branch residual.",
-  "required_artifact_filenames": ["evidence/answer.txt"],
+  "required_artifact_filenames": ["evidence/cyclic-elimination-certificate.json"],
   "schema_definitions": {
     "rational_string": {"type": "string", "pattern": "^-?(0|[1-9][0-9]*)(/[1-9][0-9]*)?$"},
     "quadratic_root": {
@@ -103,7 +103,7 @@
           "type": "object", "additionalProperties": false,
           "required": ["path", "sha256"],
           "properties": {
-            "path": {"const": "evidence/answer.txt"},
+            "path": {"const": "evidence/cyclic-elimination-certificate.json"},
             "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
           }
         }

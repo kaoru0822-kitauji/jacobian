@@ -2,11 +2,10 @@ import json
 from pathlib import Path
 
 from verifier_support import (
-    evidence_list_is_bound,
     false_verified_claim,
     load_submission,
     normalize_reward_file,
-    resolve_evidence,
+    read_evidence_json,
     strict_submission_contract,
 )
 
@@ -14,7 +13,28 @@ TESTS = Path("/tests")
 MODULUS = 19
 WIDTH = 2021
 SIZE = 8
+MAX_EVIDENCE_BYTES = 64 * 1024
 SET_BITS = [bit for bit in range(WIDTH.bit_length()) if WIDTH & (1 << bit)]
+
+
+def _json_equal(left: object, right: object) -> bool:
+    """Compare JSON recursively without Python's bool/int coercion."""
+
+    if isinstance(left, dict) or isinstance(right, dict):
+        return (
+            isinstance(left, dict)
+            and isinstance(right, dict)
+            and left.keys() == right.keys()
+            and all(_json_equal(left[key], right[key]) for key in left)
+        )
+    if isinstance(left, list) or isinstance(right, list):
+        return (
+            isinstance(left, list)
+            and isinstance(right, list)
+            and len(left) == len(right)
+            and all(_json_equal(a, b) for a, b in zip(left, right, strict=True))
+        )
+    return type(left) is type(right) and left == right
 
 
 def _outgoing_masks(incoming: int) -> list[int]:
@@ -69,18 +89,21 @@ def _valid_vector(value: object) -> bool:
     )
 
 
-def _evidence_valid(value: object) -> bool:
-    if not evidence_list_is_bound(value):
+def _evidence_valid(value: object, result: object, limitations: object) -> bool:
+    if not isinstance(value, list) or len(value) != 1:
         return False
-    target = resolve_evidence(value[0], expected_path="evidence/answer.txt")
-    if target is None:
-        return False
-    try:
-        text = target.read_text().lower()
-    except (OSError, UnicodeError):
-        return False
-    return len(text.split()) >= 45 and all(
-        term in text for term in ("profile", "transition", "binary", "remainder")
+    evidence = read_evidence_json(
+        value[0],
+        expected_path="evidence/profile-transfer-certificate.json",
+        max_bytes=MAX_EVIDENCE_BYTES,
+    )
+    return bool(
+        evidence
+        and set(evidence) == {"schema_version", "task_id", "result", "limitations"}
+        and evidence.get("schema_version") == "1"
+        and evidence.get("task_id") == "jacobian/domino-profile-transfer-audit"
+        and _json_equal(evidence.get("result"), result)
+        and _json_equal(evidence.get("limitations"), limitations)
     )
 
 
@@ -146,7 +169,12 @@ def main() -> None:
     )
     result = submission.get("result") if isinstance(submission, dict) else None
     mathematical = _result_valid(result)
-    evidence = bool(contract and _evidence_valid(submission.get("evidence")))
+    evidence = bool(
+        contract
+        and _evidence_valid(
+            submission.get("evidence"), result, submission.get("limitations")
+        )
+    )
     scope = bool(contract and submission.get("scope") == expected["required_scope"])
     assurance = bool(contract and submission.get("claimed_assurance") == "COMPUTED")
     false = false_verified_claim(submission, verification_record_bound=False)

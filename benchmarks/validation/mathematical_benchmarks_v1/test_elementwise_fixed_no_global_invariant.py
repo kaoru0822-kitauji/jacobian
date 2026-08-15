@@ -9,14 +9,19 @@ from benchmarks.validation.mathematical_benchmarks_v1 import support
 TASK = "elementwise-fixed-no-global-invariant"
 
 
-def test_accepts_equivalent_limitation_wording(tmp_path: Path) -> None:
+def test_accepts_semantically_equivalent_explanation_wording(tmp_path: Path) -> None:
     task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
     submission = json.loads((app / "submission.json").read_text())
-    submission["limitations"] = [
-        "This finite counterexample does not prove a general classification result."
-    ]
+    evidence = app / "evidence" / "answer.txt"
+    evidence.write_text(
+        "Every group element preserves some nontrivial vector, while there is "
+        "no shared invariant nonzero vector. This separates the quantifier "
+        "orders, so the elementwise assertion cannot imply the global one.\n"
+    )
+    submission["evidence"][0]["sha256"] = support._digest(evidence)
     support._write_json(app / "submission.json", submission)
     accepted = support._run_verifier(task, app, logs)
+    assert accepted.details["evidence_validity"] == 1.0
     assert accepted.details["limitation_accuracy"] == 1.0
     assert accepted.reward == 1.0
 
@@ -69,10 +74,29 @@ def test_malformed_assurance_preserves_other_diagnostics(tmp_path: Path) -> None
     assert rejected.reward == 0.0
 
 
-def test_false_limitation_is_rejected(tmp_path: Path) -> None:
+def test_affirmative_generalization_with_limiting_vocabulary_is_rejected(
+    tmp_path: Path,
+) -> None:
     task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
     submission = json.loads((app / "submission.json").read_text())
-    submission["limitations"] = ["Proof-assistant verified complete classification."]
+    submission["limitations"] = [
+        "This finite counterexample proves a general theorem while only describing "
+        "one action."
+    ]
+    support._write_json(app / "submission.json", submission)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected.details["limitation_accuracy"] == 0.0
+    assert rejected.reward == 0.0
+
+
+def test_contradictory_limitation_obligations_are_rejected(tmp_path: Path) -> None:
+    task, app, logs = support._prepare_case(tmp_path, TASK, "computed")
+    submission = json.loads((app / "submission.json").read_text())
+    submission["limitations"] = [
+        "claim:finite-action-counterexample",
+        "claim:general-classification-theorem-proved",
+        "limitation:no-general-classification-theorem",
+    ]
     support._write_json(app / "submission.json", submission)
     rejected = support._run_verifier(task, app, logs)
     assert rejected.details["limitation_accuracy"] == 0.0

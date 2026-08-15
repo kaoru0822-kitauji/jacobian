@@ -4,16 +4,40 @@ from fractions import Fraction
 from pathlib import Path
 
 from verifier_support import (
-    evidence_list_is_bound,
     false_verified_claim,
     load_submission,
     normalize_reward_file,
-    resolve_evidence,
+    read_evidence_json,
     strict_submission_contract,
 )
 
 APP = Path("/app")
 TESTS = Path("/tests")
+MAX_EVIDENCE_BYTES = 64 * 1024
+
+
+def _json_equal(left: object, right: object) -> bool:
+    """Compare JSON recursively without Python's bool/int coercion."""
+
+    if isinstance(left, bool) or isinstance(right, bool):
+        return type(left) is type(right) and left == right
+    if type(left) is int or type(right) is int:
+        return type(left) is type(right) and left == right
+    if isinstance(left, dict) or isinstance(right, dict):
+        return (
+            isinstance(left, dict)
+            and isinstance(right, dict)
+            and left.keys() == right.keys()
+            and all(_json_equal(left[key], right[key]) for key in left)
+        )
+    if isinstance(left, list) or isinstance(right, list):
+        return (
+            isinstance(left, list)
+            and isinstance(right, list)
+            and len(left) == len(right)
+            and all(_json_equal(a, b) for a, b in zip(left, right, strict=True))
+        )
+    return type(left) is type(right) and left == right
 
 
 def _fraction(value: object) -> Fraction | None:
@@ -33,18 +57,22 @@ def _poly_value(coefficients: list[int], value: Fraction) -> Fraction:
     return result
 
 
-def _evidence_is_valid(evidence: object) -> bool:
-    if not evidence_list_is_bound(evidence):
+def _evidence_is_valid(evidence: object, result: object, limitations: object) -> bool:
+    if not isinstance(evidence, list) or len(evidence) != 1:
         return False
-    target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
-    if target is None:
-        return False
-    try:
-        text = target.read_text().lower()
-    except (OSError, UnicodeError):
-        return False
-    required = ("pairwise distinct", "a+b", "product", "residual", "-3/2")
-    return len(text.split()) >= 45 and all(fragment in text for fragment in required)
+    payload = read_evidence_json(
+        evidence[0],
+        expected_path="evidence/cyclic-elimination-certificate.json",
+        max_bytes=MAX_EVIDENCE_BYTES,
+    )
+    return bool(
+        payload
+        and set(payload) == {"schema_version", "task_id", "result", "limitations"}
+        and payload.get("schema_version") == "1"
+        and payload.get("task_id") == "jacobian/cyclic-polynomial-sum-audit"
+        and _json_equal(payload.get("result"), result)
+        and _json_equal(payload.get("limitations"), limitations)
+    )
 
 
 def _branch_is_valid(value: object) -> bool:
@@ -139,18 +167,30 @@ def main() -> None:
     source = json.loads((TESTS / "input.json").read_text())
     expected = json.loads((TESTS / "expected.json").read_text())
     result = submission.get("result") if isinstance(submission, dict) else None
+    structure = strict_submission_contract(
+        submission,
+        task_id=expected["task_id"],
+        conclusion=expected["conclusion"],
+        allowed_assurances=frozenset({"UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"}),
+        verification_record="optional",
+    )
     contract = strict_submission_contract(
         submission,
         task_id=expected["task_id"],
         conclusion=expected["conclusion"],
-        allowed_assurances=frozenset({"UNVERIFIED", "COMPUTED", "CHECKED"}),
+        allowed_assurances=frozenset({"UNVERIFIED", "COMPUTED"}),
         verification_record="forbidden",
     )
-    mathematical = _result_is_valid(result, source)
-    evidence = bool(contract and _evidence_is_valid(submission.get("evidence")))
-    scope = bool(contract and submission.get("scope") == expected["required_scope"])
+    mathematical = bool(structure and _result_is_valid(result, source))
+    evidence = bool(
+        structure
+        and _evidence_is_valid(
+            submission.get("evidence"), result, submission.get("limitations")
+        )
+    )
+    scope = bool(structure and submission.get("scope") == expected["required_scope"])
     assurance = bool(
-        contract
+        structure
         and submission.get("claimed_assurance") == expected["maximum_assurance"]
     )
     false = false_verified_claim(submission, verification_record_bound=False)
