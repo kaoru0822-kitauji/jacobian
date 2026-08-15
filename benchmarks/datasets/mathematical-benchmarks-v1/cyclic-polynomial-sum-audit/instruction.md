@@ -2,7 +2,11 @@
 
 The frozen input gives a cyclic system over the complex numbers, a pairwise-distinctness condition, and a proposed pair of possible values for `s = a+b+c`. Audit that proposal exactly.
 
-Submit `/app/submission.json` following `/app/submission_schema.json`, plus digest-bound prose at `/app/evidence/answer.txt`.
+Submit `/app/submission.json` following `/app/submission_schema.json`, plus a
+digest-bound JSON envelope at
+`/app/evidence/cyclic-elimination-certificate.json`. The envelope must contain
+exactly `schema_version` (value `"1"`), `task_id`, `result`, and `limitations`,
+with the latter three matching the submission.
 
 Your result must contain:
 
@@ -12,8 +16,6 @@ Your result must contain:
 - all remaining real roots of the necessary polynomial after any root excluded by pairwise distinctness is removed, represented as quadratic irrational objects `{"rational":"p/q","radical_coefficient":"r/t","radicand":d}` in increasing order;
 - the rational candidate excluded by the original system, together with the exact elementary-symmetric invariants on that branch and the nonzero residual in the product consequence
   `(a^2-6)(b^2-6)(c^2-6)=abc`.
-
-The evidence prose must explain the derivation in your own words, including how pairwise distinctness is used. It must not merely repeat the JSON fields.
 
 Claim `COMPUTED` assurance and complete scope exactly as specified by the schema. This benchmark checks an exact algebraic audit of the frozen system; it does not machine-check the original contest solution or provide proof-assistant verification.
 
@@ -28,7 +30,7 @@ Write `/app/submission.json` to the exact schema in `environment/submission_sche
 - **Assurance:** scoreable values are `UNVERIFIED`, `COMPUTED` (ceiling `COMPUTED`); the submission schema accepts any of `UNVERIFIED`, `COMPUTED`, `CHECKED`, `VERIFIED` but only scoreable assurances receive credit.
 - **Scope:** the exact value declared in `submission_schema.json`
 - **Completeness:** `COMPLETE`.
-- **Evidence:** 1-1 item(s); allowed path(s): `evidence/answer.txt`; digest must match `^sha256:[0-9a-f]{64}$`.
-- **Evidence media types:** `text/plain`.
-- **Required artifact filenames:** `evidence/answer.txt`.
+- **Evidence:** 1-1 item(s); allowed path(s): `evidence/cyclic-elimination-certificate.json`; digest must match `^sha256:[0-9a-f]{64}$`.
+- **Evidence media types:** `application/json`.
+- **Required artifact filenames:** `evidence/cyclic-elimination-certificate.json`.
 <!-- END PUBLIC CONTRACT SUBMISSION BLOCK -->

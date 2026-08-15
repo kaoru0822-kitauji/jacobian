@@ -1,10 +1,13 @@
 {
+  "schema_version": "1",
   "task_id": "jacobian/cyclic-polynomial-sum-audit",
-  "conclusion": "CLAIM_INCONSISTENT",
   "result": {
     "necessary_polynomial": [2, -1, -11, 12],
     "proposed_evaluations": ["0", "39/2"],
-    "proposed_classifications": ["PASSES_NECESSARY_CONDITION", "FAILS_NECESSARY_CONDITION"],
+    "proposed_classifications": [
+      "PASSES_NECESSARY_CONDITION",
+      "FAILS_NECESSARY_CONDITION"
+    ],
     "remaining_real_roots": [
       {"rational": "-1/2", "radical_coefficient": "-1/2", "radicand": 17},
       {"rational": "-1/2", "radical_coefficient": "1/2", "radicand": 17}
@@ -18,9 +21,7 @@
       "residual": "-775/256"
     }
   },
-  "claimed_assurance": "COMPUTED",
-  "scope": "cyclic-polynomial-sum-audit exact elimination certificate",
-  "completeness": "COMPLETE",
-  "evidence": [{"path": "evidence/cyclic-elimination-certificate.json", "sha256": "sha256:6edc5890d9c7daa194263fef372b45490a3c803fd1d3b3be08f916d9800522a9"}],
-  "limitations": ["Exact algebraic replay only; no proof-assistant verification of the source solution."]
+  "limitations": [
+    "Exact algebraic replay only; no proof-assistant verification of the source solution."
+  ]
 }
