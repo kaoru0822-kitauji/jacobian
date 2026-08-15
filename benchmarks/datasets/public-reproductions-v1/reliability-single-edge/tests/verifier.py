@@ -1,4 +1,5 @@
 import json
+from fractions import Fraction
 from pathlib import Path
 
 from verifier_support import (
@@ -18,7 +19,10 @@ def _frac(v):
     num, den = v.get("num"), v.get("den")
     if type(num) is not int or type(den) is not int or den <= 0:
         return None
-    return (num, den)
+    try:
+        return Fraction(num, den)
+    except (OverflowError, ValueError, ZeroDivisionError):
+        return None
 
 
 def _math(s, x, e):

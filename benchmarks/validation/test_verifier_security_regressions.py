@@ -57,15 +57,21 @@ def test_reliability_recomputes_input_and_rejects_coerced_state_count(
     assert rejected.reward == 0.0
 
 
+@pytest.mark.parametrize(
+    ("task_name", "probability"),
+    (
+        ("reliability-series-path", {"num": 2, "den": 6}),
+        ("reliability-single-edge", {"num": 2, "den": 6}),
+        ("reliability-triangle-fair", {"num": 10, "den": 16}),
+    ),
+)
 def test_reliability_accepts_equivalent_unreduced_probability(
-    tmp_path: Path,
+    tmp_path: Path, task_name: str, probability: dict[str, int]
 ) -> None:
-    task, app, logs = _solution_case(
-        tmp_path, "public-reproductions-v1", "reliability-triangle-fair"
-    )
+    task, app, logs = _solution_case(tmp_path, "public-reproductions-v1", task_name)
     submission_path = app / "submission.json"
     submission = json.loads(submission_path.read_text())
-    submission["result"]["probability"] = {"num": 10, "den": 16}
+    submission["result"]["probability"] = probability
     _write_json(submission_path, submission)
 
     accepted = _run_verifier(task, app, logs)
