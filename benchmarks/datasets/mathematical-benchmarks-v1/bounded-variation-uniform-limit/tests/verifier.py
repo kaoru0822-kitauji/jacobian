@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 from fractions import Fraction
 from pathlib import Path
 
@@ -18,10 +17,6 @@ CONCLUSION = "UNIFORM_CONVERGENCE_DOES_NOT_FORCE_VARIATION_CONVERGENCE"
 SCOPE = "the full sequence on [0,2*pi] and all submitted exact checkpoints"
 LIMITATION = "NO_PROOF_ASSISTANT_VERIFICATION"
 
-# Accept any ordering of q, n, x in the sine argument and q, n in the
-# denominator, with or without explicit multiplication signs.
-_SEQUENCE_RE = re.compile(r"^sin\(([qnx])\*([qnx])\*([qnx])\)/\(([qn])\*([qn])\)$")
-
 
 def _is_int(value: object) -> bool:
     """Accept only true integers, rejecting booleans and floats."""
@@ -30,27 +25,21 @@ def _is_int(value: object) -> bool:
 
 
 def _fraction(value: object) -> Fraction | None:
-    if not isinstance(value, str) or not re.fullmatch(
-        r"-?(?:0|[1-9][0-9]*)(?:/[1-9][0-9]*)?", value
-    ):
+    if not isinstance(value, dict) or set(value) != {"numerator", "denominator"}:
         return None
-    try:
-        return Fraction(value)
-    except (ValueError, ZeroDivisionError):
+    numerator = value["numerator"]
+    denominator = value["denominator"]
+    if not _is_int(numerator) or not _is_int(denominator) or denominator < 1:
         return None
+    return Fraction(numerator, denominator)
 
 
 def _valid_sequence(seq: object) -> bool:
-    """Accept equivalent serializations of ``sin(q*n*x)/(q*n)``."""
-
-    if not isinstance(seq, str):
-        return False
-    match = _SEQUENCE_RE.fullmatch(seq.replace(" ", ""))
-    return bool(
-        match
-        and set(match.group(1, 2, 3)) == {"q", "n", "x"}
-        and set(match.group(4, 5)) == {"q", "n"}
-    )
+    return seq == {
+        "function": "SIN",
+        "argument_exponents": {"q": 1, "n": 1, "x": 1},
+        "denominator_exponents": {"q": 1, "n": 1},
+    }
 
 
 def _source_is_bound() -> bool:
@@ -104,14 +93,13 @@ def _variation_formula_ok(value: object) -> bool:
         }
         and _is_int(value.get("endpoint_segment_count"))
         and value.get("endpoint_segment_count") == 2
-        and isinstance(value.get("interior_segment_count"), str)
-        and value.get("interior_segment_count") == "2*q*n-1"
+        and value.get("interior_segment_count")
+        == {"frequency_multiplier": 2, "constant": -1}
         and _is_int(value.get("endpoint_jump_multiplier"))
         and value.get("endpoint_jump_multiplier") == 1
         and _is_int(value.get("interior_jump_multiplier"))
         and value.get("interior_jump_multiplier") == 2
-        and isinstance(value.get("total_variation"), str)
-        and value.get("total_variation") == "4"
+        and _fraction(value.get("total_variation")) == 4
     )
 
 

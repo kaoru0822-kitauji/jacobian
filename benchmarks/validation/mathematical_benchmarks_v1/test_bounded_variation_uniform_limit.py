@@ -11,6 +11,10 @@ from benchmarks.validation.mathematical_benchmarks_v1 import (
 TASK = "bounded-variation-uniform-limit"
 
 
+def _rational(numerator: int, denominator: int = 1) -> dict[str, int]:
+    return {"numerator": numerator, "denominator": denominator}
+
+
 def _case(tmp_path: Path):
     return _fixtures._prepare_case(tmp_path, TASK, "computed")
 
@@ -33,11 +37,11 @@ def test_alternative_scale_and_indices_pass(tmp_path: Path) -> None:
             {
                 "n": n,
                 "frequency": k,
-                "amplitude": f"1/{k}",
+                "amplitude": _rational(1, k),
                 "interior_segments": 2 * k - 1,
-                "endpoint_contribution": f"2/{k}",
-                "interior_contribution": f"{4 * k - 2}/{k}",
-                "total_variation": "4",
+                "endpoint_contribution": _rational(2, k),
+                "interior_contribution": _rational(4 * k - 2, k),
+                "total_variation": _rational(4),
             }
         )
     _fixtures._write_json(path, submission)
@@ -68,7 +72,7 @@ def test_wrong_variation_is_rejected(tmp_path: Path) -> None:
         _mutate(
             tmp_path,
             lambda s: s["result"]["variation_formula"].__setitem__(
-                "total_variation", "0"
+                "total_variation", _rational(0)
             ),
         )
         == 0.0
@@ -121,12 +125,21 @@ def test_bool_in_endpoint_jump_multiplier_is_rejected(tmp_path: Path) -> None:
     assert _mutate(tmp_path, mutate) == 0.0
 
 
-def test_equivalent_sequence_serialization_passes(tmp_path: Path) -> None:
-    """``sin(n*q*x)/(n*q)`` is mathematically identical to ``sin(q*n*x)/(q*n)``."""
-
+def test_legacy_sequence_string_is_rejected(tmp_path: Path) -> None:
     task, app, logs = _case(tmp_path)
     path = app / "submission.json"
     submission = json.loads(path.read_text())
     submission["result"]["sequence"] = "sin(n*q*x)/(n*q)"
+    _fixtures._write_json(path, submission)
+    assert _verifier._run_verifier(task, app, logs).reward == 0.0
+
+
+def test_equivalent_unreduced_rational_passes(tmp_path: Path) -> None:
+    task, app, logs = _case(tmp_path)
+    path = app / "submission.json"
+    submission = json.loads(path.read_text())
+    value = submission["result"]["checkpoints"][0]["amplitude"]
+    value["numerator"] *= 2
+    value["denominator"] *= 2
     _fixtures._write_json(path, submission)
     assert _verifier._run_verifier(task, app, logs).reward == 1.0
