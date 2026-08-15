@@ -41,7 +41,7 @@ def test_reliability_recomputes_input_and_rejects_coerced_state_count(
     )
     expected_path = task / "tests" / "expected.json"
     expected = json.loads(expected_path.read_text())
-    expected["expected_probability"] = {"num": "0", "den": "1"}
+    expected["expected_probability"] = {"num": 0, "den": 1}
     copied_task = tmp_path / "reliability-task"
     shutil.copytree(task, copied_task)
     _write_json(copied_task / "tests" / "expected.json", expected)
@@ -57,15 +57,21 @@ def test_reliability_recomputes_input_and_rejects_coerced_state_count(
     assert rejected.reward == 0.0
 
 
+@pytest.mark.parametrize(
+    ("task_name", "probability"),
+    (
+        ("reliability-series-path", {"num": 2, "den": 6}),
+        ("reliability-single-edge", {"num": 2, "den": 6}),
+        ("reliability-triangle-fair", {"num": 10, "den": 16}),
+    ),
+)
 def test_reliability_accepts_equivalent_unreduced_probability(
-    tmp_path: Path,
+    tmp_path: Path, task_name: str, probability: dict[str, int]
 ) -> None:
-    task, app, logs = _solution_case(
-        tmp_path, "public-reproductions-v1", "reliability-triangle-fair"
-    )
+    task, app, logs = _solution_case(tmp_path, "public-reproductions-v1", task_name)
     submission_path = app / "submission.json"
     submission = json.loads(submission_path.read_text())
-    submission["result"]["probability"] = {"num": "10", "den": "16"}
+    submission["result"]["probability"] = probability
     _write_json(submission_path, submission)
 
     accepted = _run_verifier(task, app, logs)
@@ -81,7 +87,7 @@ def test_reliability_rejects_oversized_fraction_without_crashing(
     )
     submission_path = app / "submission.json"
     submission = json.loads(submission_path.read_text())
-    submission["result"]["probability"] = {"num": "9" * 5000, "den": "1"}
+    submission["result"]["probability"] = {"num": 10**4000, "den": 1}
     _write_json(submission_path, submission)
 
     rejected = run_verifier_in_child(task=task, app=app, logs=logs)
@@ -131,3 +137,35 @@ def test_public_reproductions_reject_schema_invalid_integer_coercion(
     _write_json(submission_path, submission)
     rejected = _run_verifier(task, app, logs)
     assert rejected.reward == 0.0
+
+
+@pytest.mark.parametrize(
+    ("task_name", "path", "invalid"),
+    (
+        ("reliability-series-path", ("probability", "num"), "1"),
+        ("reliability-single-edge", ("probability", "num"), "1"),
+        ("reliability-triangle-fair", ("probability", "num"), "5"),
+        ("smith-rank-deficient", ("invariant_factors", 0), "2"),
+        ("smith-rectangular", ("invariant_factors", 1), "6"),
+    ),
+)
+def test_exact_numeric_results_reject_string_coercion(
+    tmp_path: Path,
+    task_name: str,
+    path: tuple[str | int, ...],
+    invalid: object,
+) -> None:
+    task, app, logs = _solution_case(tmp_path, "public-reproductions-v1", task_name)
+    assert _run_verifier(task, app, logs).reward == pytest.approx(1.0)
+
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    parent = submission["result"]
+    for part in path[:-1]:
+        parent = parent[part]
+    parent[path[-1]] = invalid
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected.details["correctness"] == pytest.approx(0.0)
+    assert rejected.reward == pytest.approx(0.0)
