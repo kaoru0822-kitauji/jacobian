@@ -1,0 +1,4 @@
+interface:
+  display_name: "Jacobian Mathematical Investigation"
+  short_description: "Use typed tools for mathematical investigation"
+  default_prompt: "Use $jacobian-math to investigate this mathematical problem with Jacobian."
