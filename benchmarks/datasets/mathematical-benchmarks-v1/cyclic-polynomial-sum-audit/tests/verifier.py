@@ -6,6 +6,7 @@ from pathlib import Path
 from verifier_support import (
     load_submission,
     normalize_reward_file,
+    workspace_input_is_bound,
 )
 
 TESTS = Path("/tests")
@@ -136,22 +137,24 @@ def _result_is_valid(result: object, source: dict[str, object]) -> bool:
 
 
 def main() -> None:
-    submission = load_submission()
+    _input_binding = workspace_input_is_bound()
+    submission = load_submission(require_input_binding=False)
     source = json.loads((TESTS / "input.json").read_text())
     data = submission if isinstance(submission, dict) else {}
     result = data.get("result")
     math_correct = bool(
         isinstance(submission, dict) and _result_is_valid(result, source)
     )
-    correct = bool(math_correct)
+    reward = float(_input_binding and math_correct)
     logs = Path("/logs/verifier")
     logs.mkdir(parents=True, exist_ok=True)
     (logs / "reward.json").write_text(
         json.dumps(
             {
                 "correctness": float(math_correct),
-                "witness_validity": 1.0 if correct else 0.0,
-                "reward": float(correct),
+                "input_binding": float(_input_binding),
+                "witness_validity": 1.0 if math_correct else 0.0,
+                "reward": reward,
             }
         )
     )
