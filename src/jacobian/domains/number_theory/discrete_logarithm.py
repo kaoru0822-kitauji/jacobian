@@ -52,5 +52,10 @@ DISCRETE_LOGARITHM_OPERATION = number_theory_operation(
             "Solve 2^x = 1 modulo 3.",
             {"base": 2, "target": 1, "modulus": 3},
         ),
+        example(
+            "three_to_two_mod_five",
+            "Solve 3^x = 2 modulo 5; base and target must each be less than the modulus.",
+            {"base": 3, "target": 2, "modulus": 5},
+        ),
     ),
 )

@@ -46,6 +46,11 @@ MODULAR_OPERATIONS = (
                 "Compute the Jacobi symbol (10/21).",
                 {"a": "10", "n": 21},
             ),
+            example(
+                "jacobi_7_15",
+                "Compute the Jacobi symbol (7/15); the denominator n must be odd.",
+                {"a": "7", "n": 15},
+            ),
         ),
     ),
     number_theory_operation(
@@ -120,7 +125,7 @@ MODULAR_OPERATIONS = (
         examples=(
             example(
                 "cubic_residue_image_mod_7",
-                "Enumerate the complete image of four times x cubed modulo 7.",
+                "Enumerate four times x cubed modulo 7; variable names and exponent vectors must be unique and ordered, with canonical residues.",
                 {
                     "modulus": 7,
                     "variables": [
@@ -152,7 +157,7 @@ MODULAR_OPERATIONS = (
         examples=(
             example(
                 "cubic_assignment_ledger_mod_7",
-                "Compute the assignment ledger for four times x cubed modulo 7.",
+                "Compute the assignment ledger for four times x cubed modulo 7; names and exponent vectors must be unique and ordered.",
                 {
                     "modulus": 7,
                     "variables": [
@@ -180,6 +185,11 @@ MODULAR_OPERATIONS = (
                 "crt_2_mod_3_3_mod_5",
                 "Solve x=2 mod 3 and x=3 mod 5.",
                 {"residues": [2, 3], "moduli": [3, 5]},
+            ),
+            example(
+                "crt_three_congruences",
+                "Solve three congruences; residues and moduli must have equal lengths and each residue must be canonical.",
+                {"residues": [1, 4, 0], "moduli": [2, 5, 7]},
             ),
         ),
     ),

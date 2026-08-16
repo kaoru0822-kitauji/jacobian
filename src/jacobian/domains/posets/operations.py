@@ -357,6 +357,20 @@ FINITE_POSET_OPERATIONS: MathTools = (
                 "Materialize the four-element diamond from its cover relation.",
                 _DIAMOND,
             ),
+            example(
+                "three_element_chain",
+                "Materialize the chain 0<1<2; the relation must be antisymmetric and acyclic.",
+                {
+                    "elements": ["0", "1", "2"],
+                    "relation": [
+                        {"lower": "0", "upper": "1"},
+                        {"lower": "0", "upper": "2"},
+                        {"lower": "1", "upper": "2"},
+                    ],
+                    "interpretation": "COMPARABLE_PAIRS",
+                    "reflexive_pairs": "FORBIDDEN",
+                },
+            ),
         ),
     ),
     MathTool(
@@ -409,6 +423,11 @@ FINITE_POSET_OPERATIONS: MathTools = (
                 "Count the linear extensions of the canonical diamond.",
                 {"poset": _MATERIALIZED_DIAMOND},
             ),
+            example(
+                "diamond_complete_mobius_scope",
+                "Count the diamond's linear extensions; the poset must have at most 14 elements.",
+                {"poset": _MATERIALIZED_DIAMOND},
+            ),
         ),
     ),
     MathTool(
@@ -434,6 +453,17 @@ FINITE_POSET_OPERATIONS: MathTools = (
                 "materialized_diamond",
                 "Compute every Möbius value of the canonical diamond.",
                 {"poset": _MATERIALIZED_DIAMOND},
+            ),
+            example(
+                "diamond_selected_interval",
+                "Compute the selected Möbius interval [0,1]; selected endpoints must satisfy lower <= upper in the poset.",
+                {
+                    "poset": _MATERIALIZED_DIAMOND,
+                    "scope": "SELECTED_INTERVALS",
+                    "intervals": [
+                        {"lower": "0", "upper": "1"},
+                    ],
+                },
             ),
         ),
     ),

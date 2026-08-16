@@ -179,6 +179,38 @@ PROJECTIVE_LINE_ARRANGEMENT_OPERATION: MathTool[
                 ]
             },
         ),
+        example(
+            "three_coordinate_lines",
+            "Compute the flat lattice of three coordinate lines; labels must be unique and lines projectively distinct.",
+            {
+                "lines": [
+                    {
+                        "label": "x",
+                        "coefficients": [
+                            {"num": "1", "den": "1"},
+                            {"num": "0", "den": "1"},
+                            {"num": "0", "den": "1"},
+                        ],
+                    },
+                    {
+                        "label": "y",
+                        "coefficients": [
+                            {"num": "0", "den": "1"},
+                            {"num": "1", "den": "1"},
+                            {"num": "0", "den": "1"},
+                        ],
+                    },
+                    {
+                        "label": "z",
+                        "coefficients": [
+                            {"num": "0", "den": "1"},
+                            {"num": "0", "den": "1"},
+                            {"num": "1", "den": "1"},
+                        ],
+                    },
+                ]
+            },
+        ),
     ),
 )
 

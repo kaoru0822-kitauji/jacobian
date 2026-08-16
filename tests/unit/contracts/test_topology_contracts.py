@@ -11,12 +11,16 @@ from jacobian.contracts.topology import (
     SimplicialComplexRequest,
     SimplicialHomologyRequest,
 )
-from jacobian.domains.topology.operations import (
-    _canonical_complex,
-    _canonicalize,
-    _chain_result,
-    _homology,
-)
+from jacobian.serving_catalog import ServingCatalog
+
+_CANALOG = ServingCatalog.open()
+
+
+def _canonical_complex(vertices, facets):
+    """Build a canonical FiniteSimplicialComplex via the public operation."""
+    request = SimplicialComplexRequest(vertices=vertices, facets=facets)
+    operation = _CANALOG.operation("topology.simplicial_complex.canonicalize")
+    return operation.run(request).complex
 
 
 def test_facet_request_rejects_duplicates_nonmaximal_faces_and_hidden_isolates() -> (
@@ -59,26 +63,46 @@ def test_chain_and_homology_requests_validate_prime_semantics() -> None:
 
 
 def test_canonical_complex_composes_as_the_authoritative_object() -> None:
-    canonical = _canonicalize(
-        SimplicialComplexRequest(
-            vertices=("c", "a", "b"),
-            facets=(("b", "a"), ("c", "b"), ("c", "a")),
-        )
+    request = SimplicialComplexRequest(
+        vertices=("c", "a", "b"),
+        facets=(("b", "a"), ("c", "b"), ("c", "a")),
     )
-
+    canonical = _CANALOG.operation("topology.simplicial_complex.canonicalize").run(
+        request
+    )
     complex_ = canonical.complex
-    chain = _chain_result(
+
+    chain_operation = _CANALOG.operation(
+        "topology.simplicial_complex.chain_complex.compute"
+    )
+    chain = chain_operation.run(
         ChainComplexRequest(
             complex=complex_,
             coefficient_ring=ChainCoefficientRing.PRIME_FIELD,
             prime=2,
         )
     )
-    homology = _homology(SimplicialHomologyRequest(complex=complex_, prime=2))
+
+    homology_operation = _CANALOG.operation("topology.simplicial_homology.compute")
+    homology = homology_operation.run(
+        SimplicialHomologyRequest(complex=complex_, prime=2)
+    )
 
     assert chain.complex_digest == complex_.complex_digest
     assert homology.complex_digest == complex_.complex_digest
     assert tuple(group.betti_number for group in homology.groups) == (1, 1)
+
+
+def test_integral_homology_runs_through_the_public_operation() -> None:
+    complex_ = _canonical_complex(("a", "b", "c"), (("a", "b"), ("a", "c"), ("b", "c")))
+    operation = _CANALOG.operation("topology.simplicial_homology.integral.compute")
+    assert operation is not None
+
+    result = operation.run(IntegralSimplicialHomologyRequest(complex=complex_))
+
+    assert result.complex_digest == complex_.complex_digest
+    assert result.coefficient_ring == "ZZ"
+    assert tuple(group.betti_number for group in result.groups) == (1, 1)
 
 
 def test_chain_bounds_are_checked_after_materialization_but_before_computation() -> (
@@ -90,7 +114,9 @@ def test_chain_bounds_are_checked_after_materialization_but_before_computation()
     )
     complex_ = _canonical_complex(vertices, facets)
 
-    assert complex_.closure_size == 8 * 255
+    assert complex_.closure_size == 8 * (
+        2**8 - 1
+    )  # 8 simplices, each closing to 2^8-1 faces
     with pytest.raises(ValidationError, match="chain group"):
         SimplicialHomologyRequest(complex=complex_, prime=2)
 
@@ -135,7 +161,7 @@ def test_integral_homology_has_tighter_certificate_size_bounds() -> None:
         projective_plane_facets,
     )
     assert max(total_rank_too_large.f_vector) <= 16
-    assert sum(total_rank_too_large.f_vector) == 33
+    assert sum(total_rank_too_large.f_vector) == 33  # exceeds the 32-bound
     with pytest.raises(ValidationError, match="total chain rank at most 32"):
         IntegralSimplicialHomologyRequest(complex=total_rank_too_large)
 

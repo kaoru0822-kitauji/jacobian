@@ -67,6 +67,18 @@ ROOT_ISOLATION_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
                     ]
                 },
             ),
+            example(
+                "cubic_with_leading_nonzero",
+                "Isolate the three real roots of x^3-x; the leading coefficient must be nonzero.",
+                {
+                    "coefficients_descending": [
+                        {"num": "1", "den": "1"},
+                        {"num": "0", "den": "1"},
+                        {"num": "-1", "den": "1"},
+                        {"num": "0", "den": "1"},
+                    ]
+                },
+            ),
         ),
     ),
     ri_operation(

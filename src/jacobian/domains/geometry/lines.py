@@ -52,6 +52,32 @@ LINE_OPERATIONS = (
                     },
                 },
             ),
+            example(
+                "parallel_diagonal_lines",
+                "Decide whether two diagonal lines are parallel; each line needs two distinct points.",
+                {
+                    "first_line": {
+                        "first": {
+                            "x": {"num": "0", "den": "1"},
+                            "y": {"num": "0", "den": "1"},
+                        },
+                        "second": {
+                            "x": {"num": "1", "den": "1"},
+                            "y": {"num": "1", "den": "1"},
+                        },
+                    },
+                    "second_line": {
+                        "first": {
+                            "x": {"num": "0", "den": "1"},
+                            "y": {"num": "1", "den": "1"},
+                        },
+                        "second": {
+                            "x": {"num": "1", "den": "1"},
+                            "y": {"num": "2", "den": "1"},
+                        },
+                    },
+                },
+            ),
         ),
     ),
     geometry_operation(

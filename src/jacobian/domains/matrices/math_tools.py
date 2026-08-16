@@ -106,6 +106,31 @@ MATRIX_DETERMINANT_COMPUTE = matrix_operation(
                 }
             },
         ),
+        example(
+            "determinant_3x3_identity",
+            "Compute the determinant of a 3x3 identity (1); the matrix must be square (rows == columns).",
+            {
+                "matrix": {
+                    "entries": [
+                        [
+                            {"num": "1", "den": "1"},
+                            {"num": "0", "den": "1"},
+                            {"num": "0", "den": "1"},
+                        ],
+                        [
+                            {"num": "0", "den": "1"},
+                            {"num": "1", "den": "1"},
+                            {"num": "0", "den": "1"},
+                        ],
+                        [
+                            {"num": "0", "den": "1"},
+                            {"num": "0", "den": "1"},
+                            {"num": "1", "den": "1"},
+                        ],
+                    ]
+                }
+            },
+        ),
     ),
     version="3",
 )
@@ -178,6 +203,36 @@ MATRIX_OPERATIONS = (
                     "rhs": [{"num": "3", "den": "1"}, {"num": "4", "den": "1"}],
                 },
             ),
+            example(
+                "solve_3x3_diagonal",
+                "Solve a 3x3 diagonal system; the matrix must be square and rhs length must match its order.",
+                {
+                    "matrix": {
+                        "entries": [
+                            [
+                                {"num": "2", "den": "1"},
+                                {"num": "0", "den": "1"},
+                                {"num": "0", "den": "1"},
+                            ],
+                            [
+                                {"num": "0", "den": "1"},
+                                {"num": "3", "den": "1"},
+                                {"num": "0", "den": "1"},
+                            ],
+                            [
+                                {"num": "0", "den": "1"},
+                                {"num": "0", "den": "1"},
+                                {"num": "4", "den": "1"},
+                            ],
+                        ]
+                    },
+                    "rhs": [
+                        {"num": "4", "den": "1"},
+                        {"num": "6", "den": "1"},
+                        {"num": "8", "den": "1"},
+                    ],
+                },
+            ),
         ),
     ),
     matrix_operation(
@@ -195,6 +250,15 @@ MATRIX_OPERATIONS = (
                 "adjugate_two_by_two",
                 "Compute the adjugate of a 2x2 integer matrix.",
                 {"matrix": {"entries": [["1", "2"], ["3", "4"]]}},
+            ),
+            example(
+                "adjugate_3x3_diagonal",
+                "Compute the adjugate of a 3x3 diagonal matrix; the matrix must be square.",
+                {
+                    "matrix": {
+                        "entries": [["2", "0", "0"], ["0", "3", "0"], ["0", "0", "4"]]
+                    }
+                },
             ),
         ),
     ),
@@ -214,6 +278,15 @@ MATRIX_OPERATIONS = (
                 "Compute the inverse of a nonsingular 2x2 integer matrix.",
                 {"matrix": {"entries": [["1", "2"], ["3", "4"]]}},
             ),
+            example(
+                "inverse_diagonal_3x3",
+                "Compute the inverse of a 3x3 diagonal matrix; the matrix must be square and nonsingular.",
+                {
+                    "matrix": {
+                        "entries": [["2", "0", "0"], ["0", "3", "0"], ["0", "0", "4"]]
+                    }
+                },
+            ),
         ),
     ),
     matrix_operation(
@@ -231,6 +304,15 @@ MATRIX_OPERATIONS = (
                 "trace_two_by_two",
                 "Compute the trace of a 2x2 integer matrix.",
                 {"matrix": {"entries": [["1", "2"], ["3", "4"]]}},
+            ),
+            example(
+                "trace_diagonal_3x3",
+                "Compute the trace (6) of a 3x3 diagonal matrix; the matrix must be square.",
+                {
+                    "matrix": {
+                        "entries": [["1", "0", "0"], ["0", "2", "0"], ["0", "0", "3"]]
+                    }
+                },
             ),
         ),
     ),
@@ -286,6 +368,24 @@ MATRIX_OPERATIONS = (
                                 {"num": "1", "den": "1"},
                                 {"num": "1", "den": "1"},
                             ],
+                        ]
+                    },
+                },
+            ),
+            example(
+                "multiply_square_matrices",
+                "Multiply two 2x2 matrices; the left column count must equal the right row count.",
+                {
+                    "left": {
+                        "entries": [
+                            [{"num": "1", "den": "1"}, {"num": "0", "den": "1"}],
+                            [{"num": "0", "den": "1"}, {"num": "1", "den": "1"}],
+                        ]
+                    },
+                    "right": {
+                        "entries": [
+                            [{"num": "2", "den": "1"}, {"num": "0", "den": "1"}],
+                            [{"num": "0", "den": "1"}, {"num": "2", "den": "1"}],
                         ]
                     },
                 },
@@ -381,6 +481,31 @@ MATRIX_OPERATIONS = (
                     }
                 },
             ),
+            example(
+                "characteristic_diagonal_3x3",
+                "Compute the characteristic polynomial of a diagonal 3x3; the matrix must be square.",
+                {
+                    "matrix": {
+                        "entries": [
+                            [
+                                {"num": "1", "den": "1"},
+                                {"num": "0", "den": "1"},
+                                {"num": "0", "den": "1"},
+                            ],
+                            [
+                                {"num": "0", "den": "1"},
+                                {"num": "2", "den": "1"},
+                                {"num": "0", "den": "1"},
+                            ],
+                            [
+                                {"num": "0", "den": "1"},
+                                {"num": "0", "den": "1"},
+                                {"num": "3", "den": "1"},
+                            ],
+                        ]
+                    }
+                },
+            ),
         ),
     ),
     matrix_operation(
@@ -429,6 +554,31 @@ MATRIX_OPERATIONS = (
                             [
                                 {"num": "3", "den": "1"},
                                 {"num": "4", "den": "1"},
+                            ],
+                        ]
+                    }
+                },
+            ),
+            example(
+                "permanent_identity_3x3",
+                "Compute the permanent (1) of a 3x3 identity; the matrix must be square.",
+                {
+                    "matrix": {
+                        "entries": [
+                            [
+                                {"num": "1", "den": "1"},
+                                {"num": "0", "den": "1"},
+                                {"num": "0", "den": "1"},
+                            ],
+                            [
+                                {"num": "0", "den": "1"},
+                                {"num": "1", "den": "1"},
+                                {"num": "0", "den": "1"},
+                            ],
+                            [
+                                {"num": "0", "den": "1"},
+                                {"num": "0", "den": "1"},
+                                {"num": "1", "den": "1"},
                             ],
                         ]
                     }

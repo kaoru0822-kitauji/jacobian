@@ -29,6 +29,11 @@ SET_OPERATION_OPERATIONS = (
                 "Union two overlapping finite sets.",
                 {"left": {"elements": ["1", "2"]}, "right": {"elements": ["2", "3"]}},
             ),
+            example(
+                "union_disjoint_sets",
+                "Compute the union of two disjoint sets; each set's elements must be unique.",
+                {"left": {"elements": ["1", "5"]}, "right": {"elements": ["2", "3"]}},
+            ),
         ),
     ),
     finite_set_operation(
