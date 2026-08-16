@@ -7,15 +7,11 @@ SERVER_DESCRIPTION = (
 )
 
 SERVER_INSTRUCTIONS = (
-    "RECOMMENDED for bounded mathematical computation:\n"
-    "- math.run instead of an ad-hoc CAS or solver script, or lengthy exact manual "
-    "calculation: returns a typed result from an installed operation.\n"
-    "- math.find before math.run when no matching operation is known: searches the "
-    "local operation catalog and provides exact input schemas and examples.\n\n"
-    "Use the typed math.run output for the requested claim. The model owns "
-    "representation, decomposition, composition, and stopping. Jacobian retains no "
-    "workspace, artifact, replay record, or proof session. A timeout, incomplete "
-    "search, or missing witness is not a mathematical conclusion."
+    "Jacobian provides local typed operations for mathematical computation and "
+    "structural analysis. Reach for math.find and math.run proactively when a problem "
+    "contains an exact computation, finite search, or structural analysis that may "
+    "match an installed operation. Use math.find to discover or inspect operations and "
+    "math.run to execute them; compose returned values with Python for multi-step work."
 )
 
 MATH_FIND_DESCRIPTION = """\
