@@ -1,47 +1,26 @@
 {
   "public_notes": "The verifier replays the task-specific mathematical predicate from the submitted result.",
   "schema_definitions": {
-    "certificate": {
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "properties": {
-            "d": {
-              "items": {
-                "$ref": "#/$defs/rat"
-              },
-              "maxItems": 4,
-              "minItems": 4,
-              "type": "array"
-            },
-            "l": {
-              "$ref": "#/$defs/matrix4"
-            }
+    "ldl_certificate": {
+      "additionalProperties": false,
+      "properties": {
+        "d": {
+          "items": {
+            "$ref": "#/$defs/rat"
           },
-          "required": [
-            "l",
-            "d"
-          ],
-          "type": "object"
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
         },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "leading_principal_determinants": {
-              "items": {
-                "$ref": "#/$defs/rat"
-              },
-              "maxItems": 4,
-              "minItems": 4,
-              "type": "array"
-            }
-          },
-          "required": [
-            "leading_principal_determinants"
-          ],
-          "type": "object"
+        "l": {
+          "$ref": "#/$defs/matrix4"
         }
-      ]
+      },
+      "required": [
+        "l",
+        "d"
+      ],
+      "type": "object"
     },
     "matrix4": {
       "items": {
@@ -69,27 +48,48 @@
       "type": "object"
     },
     "result": {
-      "additionalProperties": false,
-      "properties": {
-        "positive_definite_certificate": {
-          "$ref": "#/$defs/certificate"
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "positive_definite_certificate": {
+              "$ref": "#/$defs/ldl_certificate"
+            },
+            "proof_mode": {
+              "const": "LDL"
+            },
+            "scalar_replay": {
+              "$ref": "#/$defs/scalar"
+            }
+          },
+          "required": [
+            "proof_mode",
+            "scalar_replay",
+            "positive_definite_certificate"
+          ],
+          "type": "object"
         },
-        "proof_mode": {
-          "enum": [
-            "LDL",
-            "SYLVESTER"
-          ]
-        },
-        "scalar_replay": {
-          "$ref": "#/$defs/scalar"
+        {
+          "additionalProperties": false,
+          "properties": {
+            "positive_definite_certificate": {
+              "$ref": "#/$defs/sylvester_certificate"
+            },
+            "proof_mode": {
+              "const": "SYLVESTER"
+            },
+            "scalar_replay": {
+              "$ref": "#/$defs/scalar"
+            }
+          },
+          "required": [
+            "proof_mode",
+            "scalar_replay",
+            "positive_definite_certificate"
+          ],
+          "type": "object"
         }
-      },
-      "required": [
-        "proof_mode",
-        "scalar_replay",
-        "positive_definite_certificate"
-      ],
-      "type": "object"
+      ]
     },
     "row4": {
       "items": {
@@ -122,6 +122,23 @@
         "objective"
       ],
       "type": "object"
+    },
+    "sylvester_certificate": {
+      "additionalProperties": false,
+      "properties": {
+        "leading_principal_determinants": {
+          "items": {
+            "$ref": "#/$defs/rat"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        }
+      },
+      "required": [
+        "leading_principal_determinants"
+      ],
+      "type": "object"
     }
   },
   "schema_version": "1",
@@ -131,47 +148,26 @@
   },
   "submission_schema": {
     "$defs": {
-      "certificate": {
-        "oneOf": [
-          {
-            "additionalProperties": false,
-            "properties": {
-              "d": {
-                "items": {
-                  "$ref": "#/$defs/rat"
-                },
-                "maxItems": 4,
-                "minItems": 4,
-                "type": "array"
-              },
-              "l": {
-                "$ref": "#/$defs/matrix4"
-              }
+      "ldl_certificate": {
+        "additionalProperties": false,
+        "properties": {
+          "d": {
+            "items": {
+              "$ref": "#/$defs/rat"
             },
-            "required": [
-              "l",
-              "d"
-            ],
-            "type": "object"
+            "maxItems": 4,
+            "minItems": 4,
+            "type": "array"
           },
-          {
-            "additionalProperties": false,
-            "properties": {
-              "leading_principal_determinants": {
-                "items": {
-                  "$ref": "#/$defs/rat"
-                },
-                "maxItems": 4,
-                "minItems": 4,
-                "type": "array"
-              }
-            },
-            "required": [
-              "leading_principal_determinants"
-            ],
-            "type": "object"
+          "l": {
+            "$ref": "#/$defs/matrix4"
           }
-        ]
+        },
+        "required": [
+          "l",
+          "d"
+        ],
+        "type": "object"
       },
       "matrix4": {
         "items": {
@@ -199,27 +195,48 @@
         "type": "object"
       },
       "result": {
-        "additionalProperties": false,
-        "properties": {
-          "positive_definite_certificate": {
-            "$ref": "#/$defs/certificate"
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "positive_definite_certificate": {
+                "$ref": "#/$defs/ldl_certificate"
+              },
+              "proof_mode": {
+                "const": "LDL"
+              },
+              "scalar_replay": {
+                "$ref": "#/$defs/scalar"
+              }
+            },
+            "required": [
+              "proof_mode",
+              "scalar_replay",
+              "positive_definite_certificate"
+            ],
+            "type": "object"
           },
-          "proof_mode": {
-            "enum": [
-              "LDL",
-              "SYLVESTER"
-            ]
-          },
-          "scalar_replay": {
-            "$ref": "#/$defs/scalar"
+          {
+            "additionalProperties": false,
+            "properties": {
+              "positive_definite_certificate": {
+                "$ref": "#/$defs/sylvester_certificate"
+              },
+              "proof_mode": {
+                "const": "SYLVESTER"
+              },
+              "scalar_replay": {
+                "$ref": "#/$defs/scalar"
+              }
+            },
+            "required": [
+              "proof_mode",
+              "scalar_replay",
+              "positive_definite_certificate"
+            ],
+            "type": "object"
           }
-        },
-        "required": [
-          "proof_mode",
-          "scalar_replay",
-          "positive_definite_certificate"
-        ],
-        "type": "object"
+        ]
       },
       "row4": {
         "items": {
@@ -250,6 +267,23 @@
           "c00_y",
           "m00",
           "objective"
+        ],
+        "type": "object"
+      },
+      "sylvester_certificate": {
+        "additionalProperties": false,
+        "properties": {
+          "leading_principal_determinants": {
+            "items": {
+              "$ref": "#/$defs/rat"
+            },
+            "maxItems": 4,
+            "minItems": 4,
+            "type": "array"
+          }
+        },
+        "required": [
+          "leading_principal_determinants"
         ],
         "type": "object"
       }
