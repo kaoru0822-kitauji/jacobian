@@ -139,7 +139,6 @@ def main():
     math_ok = bool(protocol_ok and valid(result))
     reward = aggregate_reward(
         correctness=math_ok,
-        witness_validity=True,
         protocol_ok=protocol_ok,
     )
     if not _input_binding:
@@ -150,7 +149,6 @@ def main():
             {
                 "correctness": float(math_ok),
                 "input_binding": float(_input_binding),
-                "witness_validity": 1.0 if math_ok else 0.0,
                 "reward": reward,
             }
         )

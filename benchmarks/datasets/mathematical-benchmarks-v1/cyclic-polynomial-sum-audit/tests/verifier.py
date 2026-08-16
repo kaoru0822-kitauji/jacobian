@@ -153,7 +153,6 @@ def main() -> None:
             {
                 "correctness": float(math_correct),
                 "input_binding": float(_input_binding),
-                "witness_validity": 1.0 if math_correct else 0.0,
                 "reward": reward,
             }
         )

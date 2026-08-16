@@ -21,7 +21,7 @@ def _is_integer(value):
     """
     if isinstance(value, bool):
         return False
-    if isinstance(value, int):
+    if isinstance(value, int) and not isinstance(value, bool):
         return True
     if isinstance(value, float):
         return value.is_integer()
