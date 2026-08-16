@@ -11,6 +11,7 @@ type BuiltinOperationModule = tuple[str, str]
 type LoadedOperationModule = tuple[str, MathTools]
 
 BUILTIN_OPERATION_MODULES: tuple[BuiltinOperationModule, ...] = (
+    ("jacobian.domains.boolean", "boolean_operations"),
     ("jacobian.domains.arithmetic", "arithmetic_operations"),
     ("jacobian.domains.number_theory", "number_theory_operations"),
     ("jacobian.domains.combinatorics", "combinatorics_operations"),
@@ -37,6 +38,7 @@ BUILTIN_OPERATION_MODULES: tuple[BuiltinOperationModule, ...] = (
     ),
     ("jacobian.domains.certified_snf", "certified_snf_operations"),
     ("jacobian.domains.matrices", "matrix_operations"),
+    ("jacobian.domains.symbolic_matrix", "symbolic_matrix_operations"),
     (
         "jacobian.domains.rational_linear",
         "rational_linear_operations",
