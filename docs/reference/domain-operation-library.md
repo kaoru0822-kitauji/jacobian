@@ -72,6 +72,12 @@ A heuristic or approximation may be useful only when its result contract states
 that limited scope. It must not return a negative decision, exact invariant, or
 optimum that the implementation cannot establish.
 
+Verify that the adapter preserves the claimed semantics. Do not present a
+heuristic, approximation, or solver `UNKNOWN` as an exact conclusion; coerce
+exact values to floating point; confuse similarly named invariants; or discard
+backend information the result contract needs, such as multiplicities, bases,
+or witnesses.
+
 Before declaring the operation, provide tests for:
 
 - a known-answer input and its claimed mathematical result;
