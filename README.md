@@ -18,10 +18,13 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/morluto/jacobian" alt="MIT license"></a>
 </p>
 
-Jacobian is an MCP server that gives AI agents two tools for high-level
-mathematics. `math.find` discovers typed mathematical operations and
-`math.run` executes one selected operation. The same mathematical library is
-also available through a CLI and native Python API.
+Jacobian is an MCP server that gives AI agents atomic, composable tools for
+higher mathematics. It exposes two tools: `math.find` searches an immutable
+library of typed mathematical operations, and `math.run` executes exactly one
+of them and returns its concrete typed result. Each operation is one bounded,
+exact computation: a typed request in, a typed mathematical value out, with
+no workflow, state, or intermediate runtime between them. The same
+mathematical library is also available through a CLI and native Python API.
 
 ## Quickstart
 
@@ -89,23 +92,23 @@ for the maintained operation portfolio and
 
 ## Status
 
-Jacobian 0.11.0 is pre-stable. Its published package and operation contracts
+Jacobian 0.12.0 is pre-stable. Its published package and operation contracts
 describe the supported surface; experimental operation contracts may change
 between releases.
 
 ## Documentation
 
-- [Documentation home](docs/index.md) — tutorials, how-to guides, reference,
+- [Documentation home](docs/index.md): tutorials, how-to guides, reference,
   and explanations
-- [Architecture](docs/explanation/architecture.md) — runtime structure and
+- [Architecture](docs/explanation/architecture.md): runtime structure and
   trust boundaries
-- [Product model](docs/explanation/product-blueprint.md) — operation contracts,
+- [Product model](docs/explanation/product-blueprint.md): operation contracts,
   ownership, and project boundaries
-- [Tool reference](docs/reference/tools.md) — MCP resources and invocation
+- [Tool reference](docs/reference/tools.md): MCP resources and invocation
   contracts
-- [Backend requirements](docs/how-to/install-native-and-formal-providers.md)
-  — maintained Python backends and optional Lean
-- [Remote deployment](docs/how-to/deploy-remote-mcp.md) — HTTP deployment and
+- [Backend requirements](docs/how-to/install-native-and-formal-providers.md):
+  maintained Python backends and optional Lean
+- [Remote deployment](docs/how-to/deploy-remote-mcp.md): HTTP deployment and
   authentication
 
 ## Contributing

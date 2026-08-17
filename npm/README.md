@@ -1,7 +1,7 @@
 # jacobian
 
 A thin deterministic npm carrier for
-[Jacobian](https://github.com/morluto/jacobian) — the MCP server, CLI, and
+[Jacobian](https://github.com/morluto/jacobian): the MCP server, CLI, and
 Python library that exposes a portfolio of composable operations with
 mathematically atomic, agent-visible outcomes to AI agents investigating
 conjectures and other mathematical problems.
@@ -49,8 +49,8 @@ this carrier does not.
 
 ## Environment
 
-- `JACOBIAN_UV_BIN` — override the `uvx` executable used to launch the server.
-- `JACOBIAN_PACKAGE` — override the pinned Python package spec (default:
+- `JACOBIAN_UV_BIN`: override the `uvx` executable used to launch the server.
+- `JACOBIAN_PACKAGE`: override the pinned Python package spec (default:
   `jacobian==<version>` matching this carrier).
 
 ## Results

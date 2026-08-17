@@ -18,9 +18,11 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/morluto/jacobian" alt="MIT 许可证"></a>
 </p>
 
-Jacobian 是一个为 AI 智能体提供高等数学工具的 MCP 服务器。`math.find`
-用于发现类型化的数学操作，`math.run` 用于执行选定的操作。同一套数学库也可通过
-CLI 和原生 Python API 使用。
+Jacobian 是一个为 AI 智能体提供高等数学工具的 MCP 服务器，提供原子化、可组合的
+数学计算。它只暴露两个工具：`math.find` 在不可变的类型化数学操作库中进行搜索，
+`math.run` 精确执行其中一个操作并返回其具体的有界结果。每个操作都是一次有界、
+精确的计算：输入一个类型化请求，输出一个类型化数学值，两者之间没有工作流、
+状态或中间运行时。同一套数学库也可通过 CLI 和原生 Python API 使用。
 
 ## 快速开始
 
@@ -80,18 +82,18 @@ SAT 和 SMT 操作直接使用维护良好的 Z3 Python 绑定。可选的 `lean
 
 ## 状态
 
-Jacobian 0.11.0 仍处于预稳定阶段。已发布的软件包和操作契约描述了受支持的
+Jacobian 0.12.0 仍处于预稳定阶段。已发布的软件包和操作契约描述了受支持的
 接口；实验性操作契约可能在不同版本之间变化。
 
 ## 文档
 
-- [文档首页](docs/index.md) — 教程、操作指南、参考资料和说明
-- [架构](docs/explanation/architecture.md) — 运行时结构和信任边界
-- [产品模型](docs/explanation/product-blueprint.md) — 操作契约、所有权和项目边界
-- [工具参考](docs/reference/tools.md) — MCP 资源和调用契约
-- [后端要求](docs/how-to/install-native-and-formal-providers.md) — 维护中的 Python
+- [文档首页](docs/index.md)：教程、操作指南、参考资料和说明
+- [架构](docs/explanation/architecture.md)：运行时结构和信任边界
+- [产品模型](docs/explanation/product-blueprint.md)：操作契约、所有权和项目边界
+- [工具参考](docs/reference/tools.md)：MCP 资源和调用契约
+- [后端要求](docs/how-to/install-native-and-formal-providers.md)：维护中的 Python
   后端和可选的 Lean
-- [远程部署](docs/how-to/deploy-remote-mcp.md) — HTTP 部署和身份验证
+- [远程部署](docs/how-to/deploy-remote-mcp.md)：HTTP 部署和身份验证
 
 ## 贡献
 
