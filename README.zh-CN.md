@@ -78,7 +78,7 @@ SAT 和 SMT 操作直接使用维护良好的 Z3 Python 绑定。可选的 `lean
 搜索操作、浏览陌生领域，并在调用 `math.run` 前检查单个操作。
 
 请参阅[领域操作库](docs/reference/domain-operation-library.md)了解维护中的操作
-组合，并参阅[后端要求](docs/how-to/install-native-and-formal-providers.md)。
+组合，并参阅[后端要求](docs/how-to/backend-requirements.md)。
 
 ## 状态
 
@@ -91,7 +91,7 @@ Jacobian 0.12.0 仍处于预稳定阶段。已发布的软件包和操作契约�
 - [架构](docs/explanation/architecture.md)：运行时结构和信任边界
 - [产品模型](docs/explanation/product-blueprint.md)：操作契约、所有权和项目边界
 - [工具参考](docs/reference/tools.md)：MCP 资源和调用契约
-- [后端要求](docs/how-to/install-native-and-formal-providers.md)：维护中的 Python
+- [后端要求](docs/how-to/backend-requirements.md)：维护中的 Python
   后端和可选的 Lean
 - [远程部署](docs/how-to/deploy-remote-mcp.md)：HTTP 部署和身份验证
 

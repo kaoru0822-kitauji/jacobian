@@ -88,7 +88,7 @@ domain, and inspect one operation before calling `math.run` once.
 
 See the [domain operation library](docs/reference/domain-operation-library.md)
 for the maintained operation portfolio and
-[backend requirements](docs/how-to/install-native-and-formal-providers.md).
+[backend requirements](docs/how-to/backend-requirements.md).
 
 ## Status
 
@@ -106,7 +106,7 @@ between releases.
   ownership, and project boundaries
 - [Tool reference](docs/reference/tools.md): MCP resources and invocation
   contracts
-- [Backend requirements](docs/how-to/install-native-and-formal-providers.md):
+- [Backend requirements](docs/how-to/backend-requirements.md):
   maintained Python backends and optional Lean
 - [Remote deployment](docs/how-to/deploy-remote-mcp.md): HTTP deployment and
   authentication

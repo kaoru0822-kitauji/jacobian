@@ -1,5 +1,4 @@
 .git
-.jacobian
 .venv
 benchmarks/results
 build

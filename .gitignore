@@ -4,7 +4,6 @@ deep_review.md
 # Environment files
 .env
 .env.*
-!.env.example
 
 # OS files
 .DS_Store
@@ -25,7 +24,6 @@ Thumbs.db
 coverage.json
 coverage.xml
 .hypothesis/
-.jacobian/
 .diagnostics/
 .import_linter_cache/
 .mypy_cache/

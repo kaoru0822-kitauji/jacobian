@@ -13,7 +13,7 @@ assignees: []
 <!-- Which area is affected? kernel, checker, cli, mcp, docs, ci, deps, security -->
 
 **Component**
-<!-- Which part of Jacobian is affected? (e.g., artifact store, CLI, MCP adapter, checker, plugin) -->
+<!-- Which part of Jacobian is affected? (e.g., math domain, CLI, MCP adapter, checker, docs) -->
 
 **Observed behavior**
 <!-- What happened? Include exact error messages or unexpected output. -->

@@ -37,7 +37,7 @@ How-to guides assume you already understand Jacobian's basic model and need to
 complete a specific task.
 
 - [Discover and invoke domain math tools](how-to/invoke-domain-operations.md)
-- [Install native providers](how-to/install-native-and-formal-providers.md)
+- [Backend requirements](how-to/backend-requirements.md)
 - [Troubleshoot Z3 installation on macOS](how-to/troubleshoot-z3-macos.md)
 - [Run the MCP visibility evaluation](how-to/run-codex-visibility-evaluation.md)
 - [Deploy the remote MCP server](how-to/deploy-remote-mcp.md)

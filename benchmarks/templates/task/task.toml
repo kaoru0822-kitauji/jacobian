@@ -8,7 +8,7 @@ description = "<Short task description>"
 keywords = ["mathematics"]
 
 [metadata]
-evaluation_kind = "<workflow|public-reproduction|research-diagnostic|performance|provider-feasibility|example>"
+evaluation_kind = "<workflow|public-reproduction|conjecture-probe|assurance|regression|example>"
 domain = "mathematical-sciences"
 field = "<field>"
 answer_visibility = "hidden-at-runtime"
