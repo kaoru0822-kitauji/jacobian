@@ -6,6 +6,9 @@ from jacobian.catalog.models import MathTools
 from jacobian.math.additive_combinatorics._tools import (
     TOOLS as ADDITIVE_COMBINATORICS_TOOLS,
 )
+from jacobian.math.algebraic_combinatorics._tools import (
+    TOOLS as ALGEBRAIC_COMBINATORICS_TOOLS,
+)
 from jacobian.math.analysis._tools import TOOLS as ANALYSIS_TOOLS
 from jacobian.math.arithmetic._tools import TOOLS as ARITHMETIC_TOOLS
 from jacobian.math.arithmetic_counting._tools import TOOLS as ARITHMETIC_COUNTING_TOOLS
@@ -14,16 +17,26 @@ from jacobian.math.arithmetic_functions._tools import (
 )
 from jacobian.math.boolean._tools import TOOLS as BOOLEAN_TOOLS
 from jacobian.math.boolean_analysis._tools import TOOLS as BOOLEAN_ANALYSIS_TOOLS
+from jacobian.math.canonical_forms._tools import TOOLS as CANONICAL_FORMS_TOOLS
 from jacobian.math.certified_snf._tools import TOOLS as CERTIFIED_SNF_TOOLS
 from jacobian.math.code_theory._tools import TOOLS as CODE_THEORY_TOOLS
 from jacobian.math.combinatorics._tools import TOOLS as COMBINATORICS_TOOLS
 from jacobian.math.convex_analysis._tools import TOOLS as CONVEX_ANALYSIS_TOOLS
+from jacobian.math.diophantine_approximation._tools import (
+    TOOLS as DIOPHANTINE_APPROXIMATION_TOOLS,
+)
 from jacobian.math.directed_graph._tools import TOOLS as DIRECTED_GRAPH_TOOLS
 from jacobian.math.discrepancy_theory._tools import TOOLS as DISCREPANCY_THEORY_TOOLS
+from jacobian.math.electrical_networks._tools import (
+    TOOLS as ELECTRICAL_NETWORKS_TOOLS,
+)
 from jacobian.math.euclidean_geometry._tools import TOOLS as EUCLIDEAN_GEOMETRY_TOOLS
 from jacobian.math.exact_geometry._tools import TOOLS as EXACT_GEOMETRY_TOOLS
 from jacobian.math.finite_fields._tools import TOOLS as FINITE_FIELDS_TOOLS
 from jacobian.math.finite_game_theory._tools import TOOLS as FINITE_GAME_THEORY_TOOLS
+from jacobian.math.finite_metric_spaces._tools import (
+    TOOLS as FINITE_METRIC_SPACES_TOOLS,
+)
 from jacobian.math.finite_sets._tools import TOOLS as FINITE_SETS_TOOLS
 from jacobian.math.formal_power_series._tools import TOOLS as FORMAL_POWER_SERIES_TOOLS
 from jacobian.math.geometry._tools import TOOLS as GEOMETRY_TOOLS
@@ -36,6 +49,7 @@ from jacobian.math.graph_polynomials._tools import TOOLS as GRAPH_POLYNOMIALS_TO
 from jacobian.math.graph_realization._tools import TOOLS as GRAPH_REALIZATION_TOOLS
 from jacobian.math.graph_spectral._tools import TOOLS as GRAPH_SPECTRAL_TOOLS
 from jacobian.math.graph_symmetry._tools import TOOLS as GRAPH_SYMMETRY_TOOLS
+from jacobian.math.graph_transforms._tools import TOOLS as GRAPH_TRANSFORMS_TOOLS
 from jacobian.math.graphs._tools import TOOLS as GRAPHS_TOOLS
 from jacobian.math.group._tools import TOOLS as GROUP_TOOLS
 from jacobian.math.lattices._tools import TOOLS as LATTICES_TOOLS
@@ -59,7 +73,9 @@ from jacobian.math.posets._tools import TOOLS as POSETS_TOOLS
 from jacobian.math.probability._tools import TOOLS as PROBABILITY_TOOLS
 from jacobian.math.projective_geometry._tools import TOOLS as PROJECTIVE_GEOMETRY_TOOLS
 from jacobian.math.rational_linear._tools import TOOLS as RATIONAL_LINEAR_TOOLS
+from jacobian.math.real_algebra._tools import TOOLS as REAL_ALGEBRA_TOOLS
 from jacobian.math.recurrence_solving._tools import TOOLS as RECURRENCE_SOLVING_TOOLS
+from jacobian.math.regular_languages._tools import TOOLS as REGULAR_LANGUAGES_TOOLS
 from jacobian.math.root_isolation._tools import TOOLS as ROOT_ISOLATION_TOOLS
 from jacobian.math.sequences._tools import TOOLS as SEQUENCES_TOOLS
 from jacobian.math.submodular_opt._tools import TOOLS as SUBMODULAR_OPT_TOOLS
@@ -81,6 +97,7 @@ BUILTIN_TOOLS: MathTools = (
     *MARKOV_CHAIN_TOOLS,
     *ARITHMETIC_TOOLS,
     *NUMBER_THEORY_TOOLS,
+    *DIOPHANTINE_APPROXIMATION_TOOLS,
     *COMBINATORICS_TOOLS,
     *FINITE_SETS_TOOLS,
     *FINITE_FIELDS_TOOLS,
@@ -91,8 +108,10 @@ BUILTIN_TOOLS: MathTools = (
     *GRAPH_OPTIMIZATION_TOOLS,
     *GRAPHS_TOOLS,
     *GRAPH_SYMMETRY_TOOLS,
+    *GRAPH_TRANSFORMS_TOOLS,
     *CERTIFIED_SNF_TOOLS,
     *MATRICES_TOOLS,
+    *CANONICAL_FORMS_TOOLS,
     *SYMBOLIC_MATRIX_TOOLS,
     *RATIONAL_LINEAR_TOOLS,
     *LATTICES_TOOLS,
@@ -121,6 +140,11 @@ BUILTIN_TOOLS: MathTools = (
     *POLYNOMIAL_MAPS_TOOLS,
     *EUCLIDEAN_GEOMETRY_TOOLS,
     *FINITE_GAME_THEORY_TOOLS,
+    *ELECTRICAL_NETWORKS_TOOLS,
+    *REGULAR_LANGUAGES_TOOLS,
+    *ALGEBRAIC_COMBINATORICS_TOOLS,
+    *REAL_ALGEBRA_TOOLS,
+    *FINITE_METRIC_SPACES_TOOLS,
 )
 
 __all__ = ["BUILTIN_TOOLS"]
