@@ -2,6 +2,7 @@
 
 from jacobian.catalog._examples import example
 from jacobian.math.geometry._models import (
+    CircumcircleRequest,
     GeometryCircleResult,
     GeometryOrientationResult,
     GeometryPointResult,
@@ -75,7 +76,7 @@ TRIANGLE_OPERATIONS = (
         "geometry.triangle.compute.circumcircle",
         "Construct triangle circumcircle",
         "Construct the exact circumcenter and squared radius of a nondegenerate rational triangle.",
-        PointTripleRequest,
+        CircumcircleRequest,
         GeometryCircleResult,
         circumcircle,
         "geometry",

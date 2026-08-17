@@ -39,7 +39,13 @@ def rational_matrix_to_sympy(
 
     return sympy.Matrix(
         [
-            [sympy.Rational(value.num, value.den) for value in row]
+            [
+                sympy.Rational(
+                    parse_canonical_integer(value.num),
+                    parse_canonical_integer(value.den),
+                )
+                for value in row
+            ]
             for row in matrix.entries
         ]
     )

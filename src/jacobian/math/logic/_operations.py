@@ -29,6 +29,9 @@ _MAX_LITERALS = 32_768
 _MAX_SMTLIB_BYTES = 128_000
 _MAX_MODEL_BYTES = 64_000
 _LEAN_TOOLCHAIN = "leanprover/lean4:v4.31.0"
+_SUPPORTED_SMTLIB_COMMANDS = frozenset(
+    {"set-logic", "declare-const", "declare-fun", "assert", "check-sat"}
+)
 
 
 class CanonicalCnf(StrictModel):
@@ -170,8 +173,16 @@ def _consume_smtlib_string(source: str, position: int) -> int:
 
 
 def _consume_smtlib_quoted_symbol(source: str, position: int) -> int:
-    closing = source.find("|", position + 1)
-    return len(source) if closing == -1 else closing + 1
+    r"""Scan a quoted SMT-LIB symbol, handling escaped bars (\| inside |...|)."""
+    pos = position + 1
+    while pos < len(source):
+        if source[pos] == chr(92) and pos + 1 < len(source) and source[pos + 1] == "|":
+            pos += 2
+        elif source[pos] == "|":
+            return pos + 1
+        else:
+            pos += 1
+    return len(source)
 
 
 def _consume_smtlib_atom(source: str, position: int) -> int:
@@ -270,6 +281,9 @@ class SmtSolveRequest(StrictModel):
             raise ValueError("SMT-LIB input must contain exactly one check-sat command")
         if commands[-1:] != (("check-sat",),):
             raise ValueError("SMT-LIB input must end with its check-sat command")
+        for command in commands:
+            if command and command[0] not in _SUPPORTED_SMTLIB_COMMANDS:
+                raise ValueError(f"unsupported SMT-LIB command: {command[0]}")
         return self
 
 
@@ -400,7 +414,7 @@ def solve_smt(request: SmtSolveRequest) -> SmtSolveResult:
         raise ValueError(
             "SMT-LIB input could not be parsed by the declared logic"
         ) from exc
-    solver = z3.Solver()
+    solver = z3.SolverFor(request.logic.value)
     solver.set(timeout=request.timeout_ms)
     solver.add(assertions)
     outcome = solver.check()
