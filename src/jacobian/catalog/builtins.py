@@ -13,6 +13,9 @@ from jacobian.math.algebraic_combinatorics._tools import (
 from jacobian.math.analysis._tools import TOOLS as ANALYSIS_TOOLS
 from jacobian.math.arithmetic._tools import TOOLS as ARITHMETIC_TOOLS
 from jacobian.math.arithmetic_counting._tools import TOOLS as ARITHMETIC_COUNTING_TOOLS
+from jacobian.math.arithmetic_dynamics._tools import (
+    TOOLS as ARITHMETIC_DYNAMICS_TOOLS,
+)
 from jacobian.math.arithmetic_functions._tools import (
     TOOLS as ARITHMETIC_FUNCTIONS_TOOLS,
 )
@@ -34,11 +37,18 @@ from jacobian.math.finite_metric_spaces._tools import (
     TOOLS as FINITE_METRIC_SPACES_TOOLS,
 )
 from jacobian.math.finite_sets._tools import TOOLS as FINITE_SETS_TOOLS
+from jacobian.math.finite_state_transducers._tools import (
+    TOOLS as FINITE_STATE_TRANSDUCER_TOOLS,
+)
+from jacobian.math.finite_topology._tools import TOOLS as FINITE_TOPOLOGY_TOOLS
 from jacobian.math.formal_power_series._tools import TOOLS as FORMAL_POWER_SERIES_TOOLS
 from jacobian.math.geometry._tools import TOOLS as GEOMETRY_TOOLS
 from jacobian.math.geometry.euclidean._tools import TOOLS as EUCLIDEAN_GEOMETRY_TOOLS
 from jacobian.math.geometry.exact._tools import TOOLS as EXACT_GEOMETRY_TOOLS
 from jacobian.math.geometry.projective._tools import TOOLS as PROJECTIVE_GEOMETRY_TOOLS
+from jacobian.math.graphical_models._tools import (
+    TOOLS as GRAPHICAL_MODEL_TOOLS,
+)
 from jacobian.math.graphs._tools import TOOLS as GRAPHS_TOOLS
 from jacobian.math.graphs.coloring._tools import TOOLS as GRAPH_COLORING_OPS_TOOLS
 from jacobian.math.graphs.decomposition._tools import TOOLS as GRAPH_DECOMPOSITION_TOOLS
@@ -52,6 +62,7 @@ from jacobian.math.graphs.spectral._tools import TOOLS as GRAPH_SPECTRAL_TOOLS
 from jacobian.math.graphs.symmetry._tools import TOOLS as GRAPH_SYMMETRY_TOOLS
 from jacobian.math.graphs.transforms._tools import TOOLS as GRAPH_TRANSFORMS_TOOLS
 from jacobian.math.group._tools import TOOLS as GROUP_TOOLS
+from jacobian.math.impartial_games._tools import TOOLS as IMPARTIAL_GAMES_TOOLS
 from jacobian.math.lattices._tools import TOOLS as LATTICES_TOOLS
 from jacobian.math.logic._tools import TOOLS as LOGIC_TOOLS
 from jacobian.math.markov_chain._tools import TOOLS as MARKOV_CHAIN_TOOLS
@@ -68,6 +79,7 @@ from jacobian.math.numerical_semigroups._tools import (
     TOOLS as NUMERICAL_SEMIGROUPS_TOOLS,
 )
 from jacobian.math.optimization._tools import TOOLS as OPTIMIZATION_TOOLS
+from jacobian.math.petri_nets._tools import TOOLS as PETRI_NET_TOOLS
 from jacobian.math.polynomials._tools import TOOLS as POLYNOMIAL_TOOLS
 from jacobian.math.polynomials.maps._tools import TOOLS as POLYNOMIAL_MAPS_TOOLS
 from jacobian.math.polynomials.multivariate._tools import (
@@ -81,7 +93,11 @@ from jacobian.math.regular_languages._tools import TOOLS as REGULAR_LANGUAGES_TO
 from jacobian.math.root_isolation._tools import TOOLS as ROOT_ISOLATION_TOOLS
 from jacobian.math.sequences._tools import TOOLS as SEQUENCES_TOOLS
 from jacobian.math.submodular_opt._tools import TOOLS as SUBMODULAR_OPT_TOOLS
+from jacobian.math.symbolic_dynamics._tools import TOOLS as SYMBOLIC_DYNAMICS_TOOLS
+from jacobian.math.term_rewriting._tools import TOOLS as TERM_REWRITING_TOOLS
 from jacobian.math.topology._tools import TOOLS as TOPOLOGY_TOOLS
+from jacobian.math.tree_automata._tools import TOOLS as TREE_AUTOMATA_TOOLS
+from jacobian.math.words._tools import TOOLS as WORDS_TOOLS
 
 _BUILTIN_CANDIDATES: MathTools = (
     *BOOLEAN_TOOLS,
@@ -97,6 +113,7 @@ _BUILTIN_CANDIDATES: MathTools = (
     *NUMBER_FIELD_TOOLS,
     *MARKOV_CHAIN_TOOLS,
     *ARITHMETIC_TOOLS,
+    *ARITHMETIC_DYNAMICS_TOOLS,
     *NUMBER_THEORY_TOOLS,
     *DIOPHANTINE_APPROXIMATION_TOOLS,
     *COMBINATORICS_TOOLS,
@@ -141,11 +158,20 @@ _BUILTIN_CANDIDATES: MathTools = (
     *POLYNOMIAL_MAPS_TOOLS,
     *EUCLIDEAN_GEOMETRY_TOOLS,
     *FINITE_GAME_THEORY_TOOLS,
+    *IMPARTIAL_GAMES_TOOLS,
+    *WORDS_TOOLS,
+    *SYMBOLIC_DYNAMICS_TOOLS,
+    *FINITE_TOPOLOGY_TOOLS,
     *ELECTRICAL_NETWORKS_TOOLS,
     *REGULAR_LANGUAGES_TOOLS,
     *ALGEBRAIC_COMBINATORICS_TOOLS,
     *REAL_ALGEBRA_TOOLS,
     *FINITE_METRIC_SPACES_TOOLS,
+    *PETRI_NET_TOOLS,
+    *TERM_REWRITING_TOOLS,
+    *TREE_AUTOMATA_TOOLS,
+    *GRAPHICAL_MODEL_TOOLS,
+    *FINITE_STATE_TRANSDUCER_TOOLS,
 )
 
 BUILTIN_TOOLS: MathTools = curate_public_tools(_BUILTIN_CANDIDATES)

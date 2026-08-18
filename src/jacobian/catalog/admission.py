@@ -87,6 +87,31 @@ OPERATION_ADMISSIONS: tuple[OperationAdmission, ...] = (
         "ordinary finite prefix sum without catalog-level leverage",
     ),
     OperationAdmission(
+        "arithmetic_dynamics.cycle.multiplier.compute",
+        AdmissionDecision.KEEP,
+        "exact multiplier spectrum of a rational map at a cycle",
+    ),
+    OperationAdmission(
+        "arithmetic_dynamics.dynatomic_polynomial.compute",
+        AdmissionDecision.KEEP,
+        "exact dynatomic polynomial for a bounded iteration depth",
+    ),
+    OperationAdmission(
+        "arithmetic_dynamics.finite_field.functional_graph.compute",
+        AdmissionDecision.KEEP,
+        "exact functional graph of a map over a finite field",
+    ),
+    OperationAdmission(
+        "arithmetic_dynamics.map.iterate.compute",
+        AdmissionDecision.KEEP,
+        "exact rational map iterate over an explicit domain",
+    ),
+    OperationAdmission(
+        "arithmetic_dynamics.point.orbit.compute",
+        AdmissionDecision.KEEP,
+        "exact orbit computation with typed periodicity",
+    ),
+    OperationAdmission(
         "boolean.erasure_noise.compute",
         AdmissionDecision.KEEP,
         "distinct exact bounded mathematical value or invariant with material computational or reliability leverage",
@@ -547,6 +572,21 @@ OPERATION_ADMISSIONS: tuple[OperationAdmission, ...] = (
         native_symbol="jacobian.math.formal_power_series.truncate",
     ),
     OperationAdmission(
+        "game.impartial.birthday.compute",
+        AdmissionDecision.KEEP,
+        "exact birthday rank certificate for a bounded impartial game position",
+    ),
+    OperationAdmission(
+        "game.impartial.grundy_table.compute",
+        AdmissionDecision.KEEP,
+        "complete Grundy table over a bounded impartial game state space",
+    ),
+    OperationAdmission(
+        "game.subtraction.grundy_prefix.compute",
+        AdmissionDecision.KEEP,
+        "complete Grundy prefix with periodic tail certificate for a bounded subtraction game",
+    ),
+    OperationAdmission(
         "game_theory.best_response.compute",
         AdmissionDecision.DROP,
         "misnamed pure maximin row calculation that is not a best response without an opponent strategy",
@@ -935,6 +975,21 @@ OPERATION_ADMISSIONS: tuple[OperationAdmission, ...] = (
         "graph.symmetry.generator_orbits.compute",
         AdmissionDecision.KEEP,
         "distinct exact bounded mathematical value or invariant with material computational or reliability leverage",
+    ),
+    OperationAdmission(
+        "graphical_model.d_separation.compute",
+        AdmissionDecision.KEEP,
+        "exact d-separation verdict for a bounded directed acyclic graphical model",
+    ),
+    OperationAdmission(
+        "graphical_model.factor.marginalize",
+        AdmissionDecision.KEEP,
+        "exact bounded factor marginalization",
+    ),
+    OperationAdmission(
+        "graphical_model.factor.multiply",
+        AdmissionDecision.KEEP,
+        "exact bounded factor multiplication",
     ),
     OperationAdmission(
         "group.element_order.compute",
@@ -1369,9 +1424,44 @@ OPERATION_ADMISSIONS: tuple[OperationAdmission, ...] = (
         "distinct exact bounded mathematical value or invariant with material computational or reliability leverage",
     ),
     OperationAdmission(
+        "number_theory.numerical_semigroup.betti_elements.compute",
+        AdmissionDecision.KEEP,
+        "exact complete Betti enumeration replacing the capped heuristic search after the #1977 contract repair",
+    ),
+    OperationAdmission(
+        "number_theory.numerical_semigroup.catenary_degree.compute",
+        AdmissionDecision.KEEP,
+        "complete global catenary-degree invariant rebuilt on the repaired Betti basis after the #1977 contract repair",
+    ),
+    OperationAdmission(
+        "number_theory.numerical_semigroup.delta_set.compute",
+        AdmissionDecision.KEEP,
+        "complete global delta-set invariant rebuilt on the repaired Betti basis after the #1977 contract repair",
+    ),
+    OperationAdmission(
+        "number_theory.numerical_semigroup.factorization_graph.compute",
+        AdmissionDecision.KEEP,
+        "reusable factorization graph and component construction",
+    ),
+    OperationAdmission(
+        "number_theory.numerical_semigroup.factorizations.compute",
+        AdmissionDecision.KEEP,
+        "complete bounded factorization family for one element",
+    ),
+    OperationAdmission(
         "number_theory.numerical_semigroup.membership.compute",
         AdmissionDecision.KEEP,
         "distinct exact bounded mathematical value or invariant with material computational or reliability leverage",
+    ),
+    OperationAdmission(
+        "number_theory.numerical_semigroup.minimal_presentation.compute",
+        AdmissionDecision.KEEP,
+        "minimal presentation rebuilt on the exact Betti basis after the #1977 contract repair",
+    ),
+    OperationAdmission(
+        "number_theory.numerical_semigroup.presentation_binomials.compute",
+        AdmissionDecision.KEEP,
+        "unit binomial coefficients of the repaired minimal presentation after the #1977 contract repair",
     ),
     OperationAdmission(
         "number_theory.numerical_semigroup.summary.compute",
@@ -1382,6 +1472,16 @@ OPERATION_ADMISSIONS: tuple[OperationAdmission, ...] = (
         "optimization.linear.rational_optimum.compute",
         AdmissionDecision.KEEP,
         "distinct exact or explicitly bounded search outcome with material computational leverage",
+    ),
+    OperationAdmission(
+        "petri_net.fire_transition.compute",
+        AdmissionDecision.KEEP,
+        "exact transition firing with typed marking semantics",
+    ),
+    OperationAdmission(
+        "petri_net.reachability_graph.compute",
+        AdmissionDecision.KEEP,
+        "bounded reachability construction with an explicit typed completeness frontier after the #1978 contract repair",
     ),
     OperationAdmission(
         "polynomial.compute.discriminant",
@@ -1868,6 +1968,56 @@ OPERATION_ADMISSIONS: tuple[OperationAdmission, ...] = (
         "distinct exact or explicitly bounded search outcome with material computational leverage",
     ),
     OperationAdmission(
+        "symbolic_dynamics.block_language.compute",
+        AdmissionDecision.KEEP,
+        "complete block language of a bounded shift presentation",
+    ),
+    OperationAdmission(
+        "symbolic_dynamics.finite_type_shift.construct",
+        AdmissionDecision.KEEP,
+        "exact finite-type shift presentation from a bounded edge label set",
+    ),
+    OperationAdmission(
+        "symbolic_dynamics.higher_block.compute",
+        AdmissionDecision.KEEP,
+        "exact higher-block presentation of a bounded shift",
+    ),
+    OperationAdmission(
+        "symbolic_dynamics.periodic_point_profile.compute",
+        AdmissionDecision.KEEP,
+        "complete periodic point profile of a bounded shift",
+    ),
+    OperationAdmission(
+        "term_rewriting.matching.compute",
+        AdmissionDecision.KEEP,
+        "typed first-order term matching with a complete substitution result",
+    ),
+    OperationAdmission(
+        "term_rewriting.rewrite_step.compute",
+        AdmissionDecision.KEEP,
+        "explicit one-step rewrite choices with a typed rewrite application result",
+    ),
+    OperationAdmission(
+        "term_rewriting.unification.compute",
+        AdmissionDecision.KEEP,
+        "most general unifier certificate for a bounded first-order unification problem",
+    ),
+    OperationAdmission(
+        "topology.beat_points.compute",
+        AdmissionDecision.KEEP,
+        "complete beat-point witness family for a bounded finite topology",
+    ),
+    OperationAdmission(
+        "topology.connected_components.compute",
+        AdmissionDecision.KEEP,
+        "complete connected component partition of a bounded finite topology",
+    ),
+    OperationAdmission(
+        "topology.is_continuous.compute",
+        AdmissionDecision.KEEP,
+        "exact continuity verdict between bounded finite topologies",
+    ),
+    OperationAdmission(
         "topology.simplicial_complex.canonicalize",
         AdmissionDecision.KEEP,
         "reusable typed mathematical construction or transformation with a distinct discovery intent",
@@ -1886,6 +2036,51 @@ OPERATION_ADMISSIONS: tuple[OperationAdmission, ...] = (
         "topology.simplicial_homology.integral.compute",
         AdmissionDecision.KEEP,
         "distinct exact bounded mathematical value or invariant with material computational or reliability leverage",
+    ),
+    OperationAdmission(
+        "topology.specialization_preorder.compute",
+        AdmissionDecision.KEEP,
+        "complete specialization preorder of a bounded finite topology",
+    ),
+    OperationAdmission(
+        "transducer.relation.path.replay.compute",
+        AdmissionDecision.KEEP,
+        "exact path replay over a rational transducer relation",
+    ),
+    OperationAdmission(
+        "transducer.subsequential.compose.compute",
+        AdmissionDecision.KEEP,
+        "exact composition of bounded subsequential transducers",
+    ),
+    OperationAdmission(
+        "transducer.subsequential.run.compute",
+        AdmissionDecision.KEEP,
+        "exact subsequential transducer run with complete output",
+    ),
+    OperationAdmission(
+        "tree_automaton.accepted_tree_count.compute",
+        AdmissionDecision.KEEP,
+        "exact bounded accepted-tree enumeration for a deterministic bottom-up tree automaton",
+    ),
+    OperationAdmission(
+        "tree_automaton.run.compute",
+        AdmissionDecision.KEEP,
+        "typed bottom-up tree automaton run with a complete accepted or rejected verdict",
+    ),
+    OperationAdmission(
+        "word.factors.length.compute",
+        AdmissionDecision.KEEP,
+        "complete bounded factor table of a finite word",
+    ),
+    OperationAdmission(
+        "word.periods.compute",
+        AdmissionDecision.KEEP,
+        "complete period set with border certificate for a finite word",
+    ),
+    OperationAdmission(
+        "word_morphism.incidence_matrix.compute",
+        AdmissionDecision.KEEP,
+        "exact incidence matrix of a bounded word morphism",
     ),
 )
 

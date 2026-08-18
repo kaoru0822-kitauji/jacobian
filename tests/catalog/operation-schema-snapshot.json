@@ -33,6 +33,26 @@
       "input_schema": "sha256:20b4c230ebb07f71a42ca556fe06af50c7291fc7eb38900b4bbf97b91b444069",
       "output_schema": "sha256:c04f28adf8e19ec9e91a974e70b06f35a2cf6d5ada333611957f474fc72e2b02"
     },
+    "arithmetic_dynamics.cycle.multiplier.compute": {
+      "input_schema": "sha256:57816446c877b77427a93e85b7706779c39e1fbc608f2c3dc437197d762e572d",
+      "output_schema": "sha256:310ee652220022b42fdfdef8e0053c74225ea0146c4b622d89a065a72b83cd82"
+    },
+    "arithmetic_dynamics.dynatomic_polynomial.compute": {
+      "input_schema": "sha256:6e528491f4836c8182c3d7f1cdd18d2f790a1754e8c9dea1651d519d56b057f6",
+      "output_schema": "sha256:bead2c6a536038fa3001f70167f1bfce25d4fe1850411bc53f265d51bc3073f1"
+    },
+    "arithmetic_dynamics.finite_field.functional_graph.compute": {
+      "input_schema": "sha256:80e02af4cfd7c6222079b1d29b5c0069f57532a3347b189fd25354e454a06e67",
+      "output_schema": "sha256:ba8460d032367b942f6d03bba5ccc0924f8072d3a01fd3b319a4b0f0a535ebb4"
+    },
+    "arithmetic_dynamics.map.iterate.compute": {
+      "input_schema": "sha256:7f590a1c0d824db49cb0854574817bbe7a35c4f4f5df67e70fa3110e532b8a55",
+      "output_schema": "sha256:a81024bfccf9f824e658fd6a67a2c983468ee1bd7220889ecb175f35cf2e4849"
+    },
+    "arithmetic_dynamics.point.orbit.compute": {
+      "input_schema": "sha256:84af2c23c824cbffa52f44f1455773d08256cd7c881e5431e65a6b2e5a7e9224",
+      "output_schema": "sha256:e90d983727267c2701cdc1fc179fb24f2bfceb93c1e55393f3136980de66f9e3"
+    },
     "boolean.erasure_noise.compute": {
       "input_schema": "sha256:5d30c772c330454e3fc49026c61ae8ca0e71eb2dab87420292e0c67a59473e2d",
       "output_schema": "sha256:107269b473b6bcd7c1a8129669b2fb4b5890ca71706258bb0c8bec08488a1c27"
@@ -172,6 +192,18 @@
     "formal_series.rational.reversion.compute": {
       "input_schema": "sha256:202657e86345b3d795db45c9fffe94c46b9906bb366324624b8226bde095efd3",
       "output_schema": "sha256:aee79d380ed29b04d5a56ec0d02842a03bf904f3593e0523cebc0c62b096e7b8"
+    },
+    "game.impartial.birthday.compute": {
+      "input_schema": "sha256:379407668c26d6a7985bd76783a8436a55783f7945fdf58cbc1c0f1f7e7a1b8e",
+      "output_schema": "sha256:b762e201606d3bdb7138b6873a29c9313f08bfdb098cb376af26f75caef619b6"
+    },
+    "game.impartial.grundy_table.compute": {
+      "input_schema": "sha256:3c346097fe1d909f964a5e372f9b91811aa626380659e3ce196810f78656a21a",
+      "output_schema": "sha256:3c7e03c4a0196a97f8bef785640deb36ecc923cdc7f121c6746bf79a8a24b8c3"
+    },
+    "game.subtraction.grundy_prefix.compute": {
+      "input_schema": "sha256:95f79e6ad73fe029c3f8945a3438dbd8d8413575c727e0a7e531bf1ab31131e6",
+      "output_schema": "sha256:0d1653a50b7bf7441da2fd64ff942fc5e40627aa4a7d97f1c735e5d862d6eb2d"
     },
     "game_theory.nash_equilibrium.compute": {
       "input_schema": "sha256:fd3bbd5d7284ea00acb0389777e444d5b79922dcd6ca059c21c857431896a543",
@@ -384,6 +416,18 @@
     "graph.symmetry.generator_orbits.compute": {
       "input_schema": "sha256:bd2cceea682c8950634db91dc40c9c61a68faab498f5136ca4bfb6d79582f37a",
       "output_schema": "sha256:2cdd532a4b56ad6ddfa8a877d2ce569ae0b45a1ba42ca8b8632361a190cbee69"
+    },
+    "graphical_model.d_separation.compute": {
+      "input_schema": "sha256:c6c37dfe498c44e76aac2cc82e27e735d19d474db3e6b6dcd0dd65a88a064743",
+      "output_schema": "sha256:6ba43536d42f9a15a27c1d3a1276ba494e18dc7c10888dc6de419e6141db7ff3"
+    },
+    "graphical_model.factor.marginalize": {
+      "input_schema": "sha256:bd9e593d402b832a86fb48ce46111c2122867822b821d376e2a0546d48975caa",
+      "output_schema": "sha256:321d0dfb30e981091468635e561cb8975ac14e7a7a6cbfaf5ee44999ec74d3d3"
+    },
+    "graphical_model.factor.multiply": {
+      "input_schema": "sha256:c4466feaf7ec9a660c3fb10e51505f876fadd4dcf001e635a6cb0f755d4825f9",
+      "output_schema": "sha256:032babbe346ba4f9581d8a7504d0d37015f8402862959764fa49da54e8d5be9f"
     },
     "group.element_order.compute": {
       "input_schema": "sha256:e286318c67b90da67d141f6d89e3be60ffa325fee0f23d660b5b1486e09ccdac",
@@ -625,9 +669,37 @@
       "input_schema": "sha256:eca1fbc54c3d5c72d4711197aae16587172e4c4686055e9ca64222481fa5275a",
       "output_schema": "sha256:7297a74c4f3c5ac3de2f6c77dd3d44fa8690f14affdc3745a09e52dd49bcda60"
     },
+    "number_theory.numerical_semigroup.betti_elements.compute": {
+      "input_schema": "sha256:be456ffbca1d5991b1f6d71da7d9f95af266bf0d6b7353fa31b269683ddd296b",
+      "output_schema": "sha256:447d13297a29ab144e8227fab8dce79bd2bbd7892c93d8baf86095a441b7b7be"
+    },
+    "number_theory.numerical_semigroup.catenary_degree.compute": {
+      "input_schema": "sha256:856d4fe5bc8ca0d87e72f5c11d7ba428e0718fa57326681ba07d00683c5e6af5",
+      "output_schema": "sha256:57501586cad5abdab52fb06cf1e1a1298371265480ad87027a66c2e23dad55e1"
+    },
+    "number_theory.numerical_semigroup.delta_set.compute": {
+      "input_schema": "sha256:6c06ade9881834813f6206e6cccb9964fdd5d453f508126271ad3882223027a4",
+      "output_schema": "sha256:c639da2f4d746cf248ead0eb3612809b71ce29eb6e7dc60461cd7bf3688cdfd2"
+    },
+    "number_theory.numerical_semigroup.factorization_graph.compute": {
+      "input_schema": "sha256:05bbb230aeda5586efcd8f16ca080b649049435ea4071addd571fb7a73061333",
+      "output_schema": "sha256:b5b11505b6ac493eebab59400767006da27903cee99e119afa94664ec945708f"
+    },
+    "number_theory.numerical_semigroup.factorizations.compute": {
+      "input_schema": "sha256:c8e61f5287124813f89c50444fce3308c4d682e8235a5f9e8dc0d4657ebc880e",
+      "output_schema": "sha256:be1675a3c0b957485b643458156b256c00af6038600350b5034cba2ffa6e2339"
+    },
     "number_theory.numerical_semigroup.membership.compute": {
       "input_schema": "sha256:994409947c1647431e8aaac86516c11d1b17f31f5aaf635b14094f4130591ccc",
       "output_schema": "sha256:ea2ccebf9418464b7974ab4af6d63b82a8217ab7c1fe34658cfa0b27e868e5b5"
+    },
+    "number_theory.numerical_semigroup.minimal_presentation.compute": {
+      "input_schema": "sha256:7250a5e807ac6735e054ab4a0269a4843fa0f21886be4dca00d75faa9a3c2d90",
+      "output_schema": "sha256:00f0c9060d793c839c1d65f20670d2305e30cacfca67fa368bcb7f4fc5030184"
+    },
+    "number_theory.numerical_semigroup.presentation_binomials.compute": {
+      "input_schema": "sha256:1617ffcc889add1183d14d2cb29b9d09b9727502f1a3b20edd65330d74c1d231",
+      "output_schema": "sha256:8e0a845d3897fde9c3f1077fee7628467a0c8acf204f6bfd9b48de5c31dd2905"
     },
     "number_theory.numerical_semigroup.summary.compute": {
       "input_schema": "sha256:a96330f2cbf2fa44aa4ee06fa965ca37fa86281b96ab336eae54554a779888ea",
@@ -636,6 +708,14 @@
     "optimization.linear.rational_optimum.compute": {
       "input_schema": "sha256:d880bc90d2c4886d904e1228ec305b546d7bb963973fa1bf9a557eff4cc6122c",
       "output_schema": "sha256:e53c4d5fc2cea6398960c8346f73f945cbb4a04201832d8e1d1714de105d3bac"
+    },
+    "petri_net.fire_transition.compute": {
+      "input_schema": "sha256:94d2ac5f44d2c91cdb382a029abf9861b1b084eb8341715c0cb372ca54c560dd",
+      "output_schema": "sha256:8efc16c31ff354161694ecc2583a9ca798c61d898e150388d745ac71e4cee4ef"
+    },
+    "petri_net.reachability_graph.compute": {
+      "input_schema": "sha256:b6b01d34a22460c831f5f9ba4a9aa793229b29977ea2f004eed4bd0e7781641b",
+      "output_schema": "sha256:04cc9f3583373b6889e817e0b53a3e498521f9b5f8b27360bb6f6e5df8df5c46"
     },
     "polynomial.compute.discriminant": {
       "input_schema": "sha256:9af3f974bfb7cbebc9412d544839dff3e281ac89c44209486243ab81bdd58dd4",
@@ -785,6 +865,50 @@
       "input_schema": "sha256:7b72b4b078d5fd79204326017e9f7e540cb2db2674d5ee2d9528d0a6b8026ca2",
       "output_schema": "sha256:92e1adfe39049966ea27b5d3e2d7993feb5b87dc8732f42b5f49ca9531f1f4bc"
     },
+    "term_rewriting.matching.compute": {
+      "input_schema": "sha256:c96eac4da31e2b63291f171b62af3b184cbca9f8470a0208d05257829da4149a",
+      "output_schema": "sha256:069c8c20fdf9176965a2fd13d5707ebc83b721bc49c678eae9276ba67435a805"
+    },
+    "term_rewriting.rewrite_step.compute": {
+      "input_schema": "sha256:8633ded7906c0bf15142abc8eb1dc0ba300c8ed95bfda4e50591ef4e20bba856",
+      "output_schema": "sha256:524ab1b0dad03f372fc4fc421c3edf1ad5ee2db2c6d994c7eae0899e37bbd030"
+    },
+    "term_rewriting.unification.compute": {
+      "input_schema": "sha256:91fae06f015576650d539360812fe6b5fb83d0d1daef2c638ec1ecf89c61fdc8",
+      "output_schema": "sha256:952e8e6b11226618a720eade04823a988ca16353c390af347718a95eb005f352"
+    },
+    "symbolic_dynamics.block_language.compute": {
+      "input_schema": "sha256:4edfe17c558e8d68d6712c87044d79575f8ed79211caaa11780b0155a2e04486",
+      "output_schema": "sha256:9fade77cd353c1419034544a4535aa34a06751903461e95822061e049a229fbe"
+    },
+    "symbolic_dynamics.finite_type_shift.construct": {
+      "input_schema": "sha256:9fbbad09c68b17a4f6f6b73fee76df05ba68728c5bc8b7b321c56db38cf93f6c",
+      "output_schema": "sha256:a6a8c36608de2ce71310be70a83eeafea57e4ae44f3007c9e14207d6a0bd92dc"
+    },
+    "symbolic_dynamics.higher_block.compute": {
+      "input_schema": "sha256:3f7401291970feda3cd82ea59d2f1a61dc0be77a027eb675f5dd2d5eb0ebb3f0",
+      "output_schema": "sha256:8491aee08f8b27d36cff8602dae5ef796d6668437728aaa2d2a418f057d3bccf"
+    },
+    "symbolic_dynamics.periodic_point_profile.compute": {
+      "input_schema": "sha256:6fe2dad3e326ae6f9346acf2a3132556f39486d0dcd0797243c43db268f5dfbb",
+      "output_schema": "sha256:c56aef92368f3913b4905ed910924166f6bfb6569d11a3a4a1447bce0b41eee3"
+    },
+    "topology.beat_points.compute": {
+      "input_schema": "sha256:a00d2102d50d76b5f6fdf4b25820d1c398b1dc7bb6834f3461be21a6d23d205c",
+      "output_schema": "sha256:9f057dc8e926a14438a3e8a3292b4a1bf3d1a3438f81dda00f7ae4761a07775d"
+    },
+    "topology.connected_components.compute": {
+      "input_schema": "sha256:0d6868e161f26e4a12a2b13f97cfc1983587a83ce641350b6fa619fba8472c2e",
+      "output_schema": "sha256:c7d036c91ed7fc7a756f3c2a785d3332c42bdb467b1a853b9b7cfde755a5c423"
+    },
+    "topology.is_continuous.compute": {
+      "input_schema": "sha256:5d1d3f06fc0a5cb203a0cdb07fa4b363de819afc9efdf8f1c2c5045dfdd2c8b9",
+      "output_schema": "sha256:e6a33a03a415383b36cdd84dd7c4b83adda8bd1568945c26663186d762209857"
+    },
+    "topology.specialization_preorder.compute": {
+      "input_schema": "sha256:95484f2ac51b9c006fbd114e84696fa988c0af644a4f0cdb4f8ecc54779d83ad",
+      "output_schema": "sha256:78bef8b229f7faba03658833811b676ebb5abe445ae4f445b512bba96f777f6a"
+    },
     "topology.simplicial_complex.canonicalize": {
       "input_schema": "sha256:0231994adad255d263488096fd5792b8a3cf90fd8e478e3e189536874bdb53b5",
       "output_schema": "sha256:8a552aeb19d458d766bcfab00a59087018214ac376e021c2236ab1aa380972f1"
@@ -800,6 +924,38 @@
     "topology.simplicial_homology.integral.compute": {
       "input_schema": "sha256:ae5513f34822ee0e5602f3a67701a3de98a4f3595422d2ae8d8d53e45b3cf60b",
       "output_schema": "sha256:0b9ca74c0cd26174705d7dff455d0513a03c8f9bd5d62148fefd675632b3f5dc"
+    },
+    "transducer.relation.path.replay.compute": {
+      "input_schema": "sha256:e4ce664ecbe2b5ab94ed27d5f967263806832a671478d9f456a08c0d26c45344",
+      "output_schema": "sha256:9a7c083b5f6a4a8bfbfceaf0e4be6bdf40179efc5524bbe577d32875d20052e8"
+    },
+    "transducer.subsequential.compose.compute": {
+      "input_schema": "sha256:c1e3e17efd8b5ee350b54f868bce26131520f2e6795a651136068912b46cdff4",
+      "output_schema": "sha256:7a978b7d74c9a14f2e26cc56c057e29ded68f787db0eb613174d79a00eec648f"
+    },
+    "transducer.subsequential.run.compute": {
+      "input_schema": "sha256:0edd13bdb831c2b2549e7fa90d16f21a910e3fff6cb88c6aa09728ae218f3244",
+      "output_schema": "sha256:76e8854270db520c0af105495d5f3ae850199c34124268e9f4ca2f698d17f377"
+    },
+    "tree_automaton.accepted_tree_count.compute": {
+      "input_schema": "sha256:af92a45ff48db188731ed3338c7869aa04a01278c0a16e377be186a6539101ac",
+      "output_schema": "sha256:a315f5d2d4514df1c0e41e5b675d9533ab1808b2872574bf2ae3c0587a324098"
+    },
+    "tree_automaton.run.compute": {
+      "input_schema": "sha256:61bc44d47623089db1a9f3f590f462cc2d1ac8cb70bcffe27db76553fbc08fcd",
+      "output_schema": "sha256:67b7e7b060986da4ebd31b9389319612d7e17883863029226414cba47d86dc01"
+    },
+    "word.factors.length.compute": {
+      "input_schema": "sha256:83a5e15f179ea6db06c71db515052fa0ba1989c236774d02dd66c93b2fb6f499",
+      "output_schema": "sha256:35a29bd2500aca39630759902ee22dea83c9e0fe292b7bbf971d17dc9cc6b025"
+    },
+    "word.periods.compute": {
+      "input_schema": "sha256:fd433607162771e58a57f2f7945c766408d40b2a2836938f30c26aa87044a4bb",
+      "output_schema": "sha256:f907920fe270f4c1e163a28875e68e081ee58f1f3348879dce1c764b306b838f"
+    },
+    "word_morphism.incidence_matrix.compute": {
+      "input_schema": "sha256:697d1e446d014e9d9c94a9df525f32d9570c340e108e8c3f16262dc7e37cccb5",
+      "output_schema": "sha256:c48bd3fca2c875b8419489adf84e2bb67f323d035c3f78906e0350b064511dcc"
     }
   }
 }
