@@ -33,6 +33,7 @@ from jacobian.math.finite_metric_spaces._tools import (
     TOOLS as FINITE_METRIC_SPACES_TOOLS,
 )
 from jacobian.math.finite_sets._tools import TOOLS as FINITE_SETS_TOOLS
+from jacobian.math.finite_topology._tools import TOOLS as FINITE_TOPOLOGY_TOOLS
 from jacobian.math.formal_power_series._tools import TOOLS as FORMAL_POWER_SERIES_TOOLS
 from jacobian.math.geometry._tools import TOOLS as GEOMETRY_TOOLS
 from jacobian.math.geometry.euclidean._tools import TOOLS as EUCLIDEAN_GEOMETRY_TOOLS
@@ -140,6 +141,7 @@ BUILTIN_TOOLS: MathTools = (
     *POLYNOMIAL_MAPS_TOOLS,
     *EUCLIDEAN_GEOMETRY_TOOLS,
     *FINITE_GAME_THEORY_TOOLS,
+    *FINITE_TOPOLOGY_TOOLS,
     *ELECTRICAL_NETWORKS_TOOLS,
     *REGULAR_LANGUAGES_TOOLS,
     *ALGEBRAIC_COMBINATORICS_TOOLS,
