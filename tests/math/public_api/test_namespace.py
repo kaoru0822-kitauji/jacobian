@@ -16,6 +16,7 @@ PUBLIC_API = {
         "polynomials",
         "prime_field_linear_algebra",
         "probability",
+        "tree_automata",
     ),
     "jacobian.math.finite_fields": (
         "Axis",
@@ -116,6 +117,13 @@ PUBLIC_API = {
         "MutualInformationResult",
         "MutualInformationTerm",
         "mutual_information",
+    ),
+    "jacobian.math.tree_automata": (
+        "BottomUpTreeAutomaton",
+        "RankedTree",
+        "TreeAutomatonTransition",
+        "accepted_tree_count",
+        "run_tree_automaton",
     ),
 }
 
