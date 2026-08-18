@@ -28,19 +28,21 @@ def test_mcp_describes_and_invokes_operations(tmp_path: Path) -> None:
                 {
                     "request": {
                         "op": "inspect",
-                        "operation_id": "integer.compute.gcd",
+                        "operation_id": "integer.compute.extended_gcd",
                     }
                 },
             )
             assert isinstance(described.structured_content, dict)
             contract = described.structured_content
-            assert contract["operation"]["operation_id"] == "integer.compute.gcd"
+            assert (
+                contract["operation"]["operation_id"] == "integer.compute.extended_gcd"
+            )
             assert "output_schema" in contract["operation"]
 
             result = await client.call_tool(
                 "math.run",
                 {
-                    "operation_id": "integer.compute.gcd",
+                    "operation_id": "integer.compute.extended_gcd",
                     "payload": {"left": "84", "right": "30"},
                 },
             )
@@ -50,6 +52,11 @@ def test_mcp_describes_and_invokes_operations(tmp_path: Path) -> None:
             assert isinstance(result.structured_content, dict)
             assert "mcp_projection" not in result.structured_content
             assert result.structured_content["output"] == response["output"]
+            assert result.structured_content["output"] == {
+                "gcd": "6",
+                "left_coefficient": "-1",
+                "right_coefficient": "3",
+            }
             assert "provider" not in result.structured_content
             assert "provider_digest" not in result.structured_content
 
@@ -86,7 +93,7 @@ def test_mcp_describes_and_invokes_operations(tmp_path: Path) -> None:
             invalid = await client.call_tool(
                 "math.run",
                 {
-                    "operation_id": "integer.compute.gcd",
+                    "operation_id": "integer.compute.extended_gcd",
                     "payload": {"left": "84", "unexpected": "30"},
                 },
             )
@@ -126,7 +133,7 @@ def test_mcp_describes_and_invokes_operations(tmp_path: Path) -> None:
 
 
 @pytest.mark.requires_provider("flint")
-def test_mcp_composes_finite_field_values_by_inline_typed_payload(
+def test_mcp_composes_public_finite_field_values_with_native_projections(
     tmp_path: Path,
 ) -> None:
     async def scenario() -> None:
@@ -134,7 +141,11 @@ def test_mcp_composes_finite_field_values_by_inline_typed_payload(
             Axis,
             AxisBoundMatrix,
             FiniteDimensionalSubspace,
+            FiniteMapTable,
+            ProjectiveLine,
+            direction_rank_ledger,
             element,
+            fiber_partition,
             finite_field,
             finite_polynomial,
             finite_polynomial_map,
@@ -152,7 +163,7 @@ def test_mcp_composes_finite_field_values_by_inline_typed_payload(
             create_server(),
             raise_exceptions=True,
         ) as client:
-            inspected = await client.call_tool(
+            excluded = await client.call_tool(
                 "math.find",
                 {
                     "request": {
@@ -161,7 +172,21 @@ def test_mcp_composes_finite_field_values_by_inline_typed_payload(
                     }
                 },
             )
-            assert isinstance(inspected.structured_content, dict)
+            assert excluded.is_error is False
+            assert excluded.structured_content == {
+                "kind": "error",
+                "error": {
+                    "code": "UNKNOWN_OPERATION",
+                    "stage": "operation_resolution",
+                    "message": (
+                        "Unknown operation: finite_field.polynomial_map.fibers.compute"
+                    ),
+                    "hint": (
+                        "Call math.find with a mathematical query to search "
+                        "installed operations."
+                    ),
+                },
+            }
 
             table_call = await client.call_tool(
                 "math.run",
@@ -178,19 +203,10 @@ def test_mcp_composes_finite_field_values_by_inline_typed_payload(
             assert "value_refs" not in table_output
             table_value = table_output
 
-            fibers_call = await client.call_tool(
-                "math.run",
-                {
-                    "operation_id": "finite_field.polynomial_map.fibers.compute",
-                    "payload": {"table": table_value},
-                },
-            )
-            assert isinstance(fibers_call.structured_content, dict)
-            fibers_output = fibers_call.structured_content["output"]
-            assert fibers_output["table"] == table_value
-            assert sorted(
-                len(sources) for _image, sources in fibers_output["fibers"]
-            ) == [1, 3]
+            table = FiniteMapTable.model_validate(table_value)
+            fibers = fiber_partition(table)
+            assert fibers.table == table
+            assert sorted(len(sources) for _image, sources in fibers.fibers) == [1, 3]
 
             rows = Axis(name="b", labels=("b1", "b2"))
             columns = Axis(name="image", labels=("y1",))
@@ -223,29 +239,8 @@ def test_mcp_composes_finite_field_values_by_inline_typed_payload(
             assert "value_refs" not in directions_output
             directions_value = directions_output
 
-            incomplete_call = await client.call_tool(
-                "math.run",
-                {
-                    "operation_id": "finite_field.direction_rank_ledger.compute",
-                    "payload": {"directions": directions_value},
-                },
-            )
-            assert incomplete_call.is_error is True
-            assert incomplete_call.structured_content is None
-
-            ledger_call = await client.call_tool(
-                "math.run",
-                {
-                    "operation_id": "finite_field.direction_rank_ledger.compute",
-                    "payload": {
-                        "subspace": subspace.model_dump(mode="json"),
-                        "directions": directions_value,
-                    },
-                },
-            )
-            assert isinstance(ledger_call.structured_content, dict)
-            ledger_output = ledger_call.structured_content["output"]
-            assert ledger_call.structured_content["runtime_ms"] >= 0
-            assert len(ledger_output["entries"]) == 5
+            directions = ProjectiveLine.model_validate(directions_value)
+            ledger = direction_rank_ledger(subspace, directions)
+            assert len(ledger.entries) == 5
 
     asyncio.run(scenario())

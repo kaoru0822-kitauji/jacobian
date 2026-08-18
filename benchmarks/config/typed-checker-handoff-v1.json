@@ -3,12 +3,12 @@
   "suite_id": "typed-checker-handoff-v1",
   "cases": [
     {
-      "case_id": "scalar-gcd",
+      "case_id": "extended-gcd-certificate",
       "cue_level": "EXPLICIT",
-      "prompt": "Use the Jacobian MCP server. Discover or inspect the exact operation contract, then compute gcd(3918848, 1653264). Report the exact integer result. Do not use shell, Python, or mental arithmetic when Jacobian offers the operation.",
+      "prompt": "Use the Jacobian MCP server. Discover or inspect the exact operation contract, then compute gcd(3918848, 1653264) together with exact Bezout coefficients. Report the certificate. Do not use shell, Python, or mental arithmetic when Jacobian offers the operation.",
       "expectation": "USE",
       "expected_operation_ids": [
-        "integer.compute.gcd"
+        "integer.compute.extended_gcd"
       ]
     },
     {

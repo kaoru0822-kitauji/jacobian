@@ -3,8 +3,12 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from jacobian.math.markov_chain import stationary_distribution
 from jacobian.math.markov_chain._models import TransitionMatrixRequest
-from jacobian.math.markov_chain._operations import compute_ergodic_decision
+from jacobian.math.markov_chain._operations import (
+    compute_ergodic_decision,
+    compute_stationary_distribution,
+)
 
 
 def test_ergodicity_uses_irreducibility_and_period_not_square_positivity() -> None:
@@ -58,6 +62,49 @@ def test_aperiodicity_is_checked_for_each_communicating_class() -> None:
     assert result.is_irreducible is False
     assert result.is_aperiodic is True
     assert result.is_ergodic is False
+
+
+def test_stationary_family_exposes_every_closed_class() -> None:
+    request = TransitionMatrixRequest.model_validate(
+        {
+            "matrix": [
+                [
+                    {"num": "0", "den": "1"},
+                    {"num": "1", "den": "2"},
+                    {"num": "1", "den": "2"},
+                ],
+                [
+                    {"num": "0", "den": "1"},
+                    {"num": "1", "den": "1"},
+                    {"num": "0", "den": "1"},
+                ],
+                [
+                    {"num": "0", "den": "1"},
+                    {"num": "0", "den": "1"},
+                    {"num": "1", "den": "1"},
+                ],
+            ]
+        }
+    )
+
+    result = compute_stationary_distribution(request)
+
+    assert result.unique is False
+    assert [item.closed_class for item in result.extreme_distributions] == [(1,), (2,)]
+    assert [
+        [value.as_fraction() for value in item.distribution]
+        for item in result.extreme_distributions
+    ] == [[0, 1, 0], [0, 0, 1]]
+
+
+def test_native_singular_stationary_helper_rejects_nonunique_chain() -> None:
+    matrix = [
+        [{"num": "1", "den": "1"}, {"num": "0", "den": "1"}],
+        [{"num": "0", "den": "1"}, {"num": "1", "den": "1"}],
+    ]
+
+    with pytest.raises(ValueError, match="does not have a unique"):
+        stationary_distribution(matrix)
 
 
 @pytest.mark.parametrize(

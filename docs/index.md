@@ -53,6 +53,7 @@ expectations.
 
 - [Tool surface](reference/tools.md) — MCP resources, tools, and invocation contracts
 - [Domain operation library](reference/domain-operation-library.md) — built-in direct-operation contracts
+- [Public operation admission](reference/public-operation-admission.md) — catalog curation gates and decisions
 - [Native Python API](reference/python-api.md) — supported native-value modules
 - [Testing strategy](reference/testing-strategy.md) — validation layers, commands, and CI responsibilities
 

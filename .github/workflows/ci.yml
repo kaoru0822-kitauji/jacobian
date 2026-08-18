@@ -137,7 +137,7 @@ jobs:
             --only-binary :all: "$wheel"
           "$environment/bin/jacobian" --help
           "$environment/bin/jacobian-mcp" --help
-          "$environment/bin/jacobian" run integer.compute.gcd \
+          "$environment/bin/jacobian" run integer.compute.extended_gcd \
             --json '{"left":"84","right":"30"}'
       - if: matrix.python-version == '3.13'
         uses: ./.github/actions/setup-python-tests

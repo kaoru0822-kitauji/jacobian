@@ -1,23 +1,35 @@
 """Native-value mathematical APIs supported by Jacobian."""
 
 from jacobian.math import (
+    algebraic_combinatorics,
     arithmetic,
+    combinatorics,
+    diophantine_approximation,
     finite_abelian_groups,
     finite_fields,
+    finite_metric_spaces,
+    formal_power_series,
     graphs,
     matrices,
     polynomials,
     prime_field_linear_algebra,
     probability,
+    regular_languages,
 )
 
 __all__ = [
+    "algebraic_combinatorics",
     "arithmetic",
+    "combinatorics",
+    "diophantine_approximation",
     "finite_abelian_groups",
     "finite_fields",
+    "finite_metric_spaces",
+    "formal_power_series",
     "graphs",
     "matrices",
     "polynomials",
     "prime_field_linear_algebra",
     "probability",
+    "regular_languages",
 ]

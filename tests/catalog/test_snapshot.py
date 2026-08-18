@@ -41,13 +41,13 @@ def test_operation_ids_and_request_result_schemas_match_snapshot() -> None:
     }
 
     assert snapshot.catalog_version == expected["catalog_version"]
-    assert len(actual) == 360
+    assert len(actual) == 200
     assert actual == expected["operations"]
 
 
 def test_catalog_rejects_duplicate_tool_ids() -> None:
     catalog = Catalog.open()
-    operation = catalog.operation("integer.compute.gcd")
+    operation = catalog.operation("integer.compute.extended_gcd")
     assert operation is not None
 
     with pytest.raises(ValueError, match="duplicate built-in operation ID"):
@@ -84,23 +84,23 @@ def test_representative_search_browse_and_inspect_results_are_stable() -> None:
         OperationDiscoveryRequest(query="finite field factorization", limit=5)
     )
     browse = catalog.browse(domain="graph", limit=5, cursor=None)
-    inspected = catalog.inspect("integer.compute.gcd")
+    inspected = catalog.inspect("integer.compute.extended_gcd")
 
     assert [match.operation_id for match in search.matches] == [
         "finite_field.restrict_scalars.compute",
         "finite_abelian_group.exact_factorization.compute",
         "finite_field.linear_map.rank.compute",
         "finite_field.polynomial_map.table.compute",
-        "finite_field.direction_rank_ledger.compute",
+        "finite_field.projective_line.enumerate",
     ]
     assert [operation.operation_id for operation in browse.operations] == [
         "electrical_network.effective_resistance.compute",
         "electrical_network.laplacian.compute",
         "electrical_network.node_potentials.compute",
         "graph.coloring.k_colorability.decide",
-        "graph.complement.compute",
+        "graph.cut.minimum_st.compute",
     ]
-    assert browse.total_operations == 55
+    assert browse.total_operations == 44
     assert inspected is not None
-    assert inspected.operation_id == "integer.compute.gcd"
+    assert inspected.operation_id == "integer.compute.extended_gcd"
     assert inspected.version == "2"

@@ -6,6 +6,10 @@ Jacobian exposes two MCP tools for atomic mathematics.
   catalog.
 - `math.run` executes one operation with a typed `payload`.
 
+Built-in membership follows the
+[public mathematical operation admission contract](public-operation-admission.md),
+which keeps the public catalog distinct from the broader native Python API.
+
 `math.run` accepts no state directory, artifact input, value reference, port
 binder, replay record, or generic verification plan. Its small final envelope
 names the operation, version, runtime, and typed `output`; the output is the
@@ -16,7 +20,7 @@ and source checks return their own typed verdicts; the server does not create
 generic verification records.
 
 ```json
-{"operation_id":"integer.compute.gcd","payload":{"left":"84","right":"30"}}
+{"operation_id":"integer.compute.extended_gcd","payload":{"left":"84","right":"30"}}
 ```
 
 Use `math.find` progressively: `search` finds a few relevance-ranked candidates,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from jacobian.catalog.admission import curate_public_tools
 from jacobian.catalog.models import MathTools
 from jacobian.math.additive_combinatorics._tools import (
     TOOLS as ADDITIVE_COMBINATORICS_TOOLS,
@@ -82,7 +83,7 @@ from jacobian.math.sequences._tools import TOOLS as SEQUENCES_TOOLS
 from jacobian.math.submodular_opt._tools import TOOLS as SUBMODULAR_OPT_TOOLS
 from jacobian.math.topology._tools import TOOLS as TOPOLOGY_TOOLS
 
-BUILTIN_TOOLS: MathTools = (
+_BUILTIN_CANDIDATES: MathTools = (
     *BOOLEAN_TOOLS,
     *GROUP_TOOLS,
     *GRAPH_COLORING_OPS_TOOLS,
@@ -146,5 +147,7 @@ BUILTIN_TOOLS: MathTools = (
     *REAL_ALGEBRA_TOOLS,
     *FINITE_METRIC_SPACES_TOOLS,
 )
+
+BUILTIN_TOOLS: MathTools = curate_public_tools(_BUILTIN_CANDIDATES)
 
 __all__ = ["BUILTIN_TOOLS"]
