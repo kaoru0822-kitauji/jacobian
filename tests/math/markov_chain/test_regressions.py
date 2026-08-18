@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from fractions import Fraction
+
 import pytest
 from pydantic import ValidationError
 
@@ -105,6 +107,64 @@ def test_native_singular_stationary_helper_rejects_nonunique_chain() -> None:
 
     with pytest.raises(ValueError, match="does not have a unique"):
         stationary_distribution(matrix)
+
+
+def test_stationary_family_solves_each_nonsingleton_closed_class_exactly() -> None:
+    request = TransitionMatrixRequest.model_validate(
+        {
+            "matrix": [
+                [
+                    {"num": "0", "den": "1"},
+                    {"num": "1", "den": "1"},
+                    {"num": "0", "den": "1"},
+                    {"num": "0", "den": "1"},
+                    {"num": "0", "den": "1"},
+                ],
+                [
+                    {"num": "1", "den": "1"},
+                    {"num": "0", "den": "1"},
+                    {"num": "0", "den": "1"},
+                    {"num": "0", "den": "1"},
+                    {"num": "0", "den": "1"},
+                ],
+                [
+                    {"num": "0", "den": "1"},
+                    {"num": "0", "den": "1"},
+                    {"num": "1", "den": "2"},
+                    {"num": "1", "den": "2"},
+                    {"num": "0", "den": "1"},
+                ],
+                [
+                    {"num": "0", "den": "1"},
+                    {"num": "0", "den": "1"},
+                    {"num": "1", "den": "4"},
+                    {"num": "3", "den": "4"},
+                    {"num": "0", "den": "1"},
+                ],
+                [
+                    {"num": "1", "den": "3"},
+                    {"num": "0", "den": "1"},
+                    {"num": "0", "den": "1"},
+                    {"num": "2", "den": "3"},
+                    {"num": "0", "den": "1"},
+                ],
+            ]
+        }
+    )
+
+    result = compute_stationary_distribution(request)
+
+    assert [item.closed_class for item in result.extreme_distributions] == [
+        (0, 1),
+        (2, 3),
+    ]
+    assert [
+        [value.as_fraction() for value in item.distribution]
+        for item in result.extreme_distributions
+    ] == [
+        [Fraction(1, 2), Fraction(1, 2), 0, 0, 0],
+        [0, 0, Fraction(1, 3), Fraction(2, 3), 0],
+    ]
 
 
 @pytest.mark.parametrize(

@@ -100,6 +100,25 @@ class TestNashEquilibrium:
         assert result.col_strategy == ("0", "1")
         assert result.value == "-3"
 
+    def test_fractional_payoffs_are_scaled_before_exact_linear_programming(self):
+        values = (Fraction(1, 3), Fraction(-2, 5), Fraction(7, 4), Fraction(1, 2))
+        req = ZeroSumGameRequest(
+            payoff_matrix=PayoffMatrix(
+                n_rows=2,
+                n_cols=2,
+                entries=tuple(
+                    {"num": str(value.numerator), "den": str(value.denominator)}
+                    for value in values
+                ),
+            ),
+        )
+
+        result = compute_nash_equilibrium(req)
+
+        assert result.row_strategy == ("0", "1")
+        assert result.col_strategy == ("0", "1")
+        assert result.value == "1/2"
+
     def test_maximin_uses_actual_payoff(self):
         req = ZeroSumGameRequest(
             payoff_matrix=PayoffMatrix(

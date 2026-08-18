@@ -6,10 +6,13 @@ import importlib
 from collections import Counter
 from pathlib import Path
 
+import pytest
+
 from jacobian.catalog.admission import (
     OPERATION_ADMISSIONS,
     REVIEWED_BASE_REVISION,
     AdmissionDecision,
+    curate_public_tools,
 )
 from jacobian.catalog.builtins import _BUILTIN_CANDIDATES, BUILTIN_TOOLS
 
@@ -39,6 +42,13 @@ def test_public_catalog_contains_only_admitted_atomic_operations() -> None:
 
     assert {tool.operation_id for tool in BUILTIN_TOOLS} == expected
     assert len(BUILTIN_TOOLS) == 200
+
+
+def test_catalog_construction_fails_closed_on_duplicate_candidates() -> None:
+    duplicate_candidates = (*_BUILTIN_CANDIDATES, _BUILTIN_CANDIDATES[0])
+
+    with pytest.raises(ValueError, match="candidate operation IDs must be unique"):
+        curate_public_tools(duplicate_candidates)
 
 
 def test_native_only_decisions_resolve_to_supported_public_symbols() -> None:

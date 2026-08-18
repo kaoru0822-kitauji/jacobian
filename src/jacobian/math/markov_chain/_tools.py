@@ -66,6 +66,7 @@ MARKOV_CHAIN_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
                 },
             ),
         ),
+        version="2",
     ),
     mc_operation(
         "probability.markov_chain.ergodic.decide",

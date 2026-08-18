@@ -1896,7 +1896,10 @@ def curate_public_tools(candidates: MathTools) -> MathTools:
     records = {record.operation_id: record for record in OPERATION_ADMISSIONS}
     if len(records) != len(OPERATION_ADMISSIONS):
         raise ValueError("operation admission IDs must be unique")
-    candidate_ids = {tool.operation_id for tool in candidates}
+    candidate_sequence = tuple(tool.operation_id for tool in candidates)
+    candidate_ids = set(candidate_sequence)
+    if len(candidate_ids) != len(candidate_sequence):
+        raise ValueError("candidate operation IDs must be unique")
     record_ids = set(records)
     if candidate_ids != record_ids:
         missing = sorted(candidate_ids - record_ids)

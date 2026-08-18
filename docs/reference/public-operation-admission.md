@@ -61,6 +61,27 @@ needs a fresh row.
 The same review covered every open mathematical pull request at its frozen head;
 see the [dated open-PR audit](open-math-pr-audit-2026-08-17.md).
 
+## Migration from the uncurated catalog
+
+Consumers must rediscover operations against the current catalog instead of
+assuming that every previous candidate remains callable. A `NATIVE_ONLY` row's
+`native_symbol` names its supported `jacobian.math` replacement; a `DROP` row
+has no compatibility operation. The schema snapshot records the complete set of
+200 public IDs.
+
+Three retained contracts also changed during the audit:
+
+- `game_theory.nash_equilibrium.compute` version 2 uses exact primal and dual
+  linear programs, including for games with negative values.
+- `probability.markov_chain.stationary_distribution.compute` version 2 returns
+  the extreme stationary distribution for every closed communicating class and
+  states whether the family is unique. The singular native
+  `stationary_distribution` helper rejects non-unique chains; use
+  `stationary_distribution_extremes` for the complete family.
+- `metric_space.profile.compute` version 2 reports
+  `DIRECT_DISTANCE_MATRIX_SCAN`, matching its direct scan of the supplied
+  distance matrix.
+
 ## Review procedure
 
 For a catalog-changing pull request:
