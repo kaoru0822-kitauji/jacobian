@@ -80,6 +80,7 @@ from jacobian.math.regular_languages._tools import TOOLS as REGULAR_LANGUAGES_TO
 from jacobian.math.root_isolation._tools import TOOLS as ROOT_ISOLATION_TOOLS
 from jacobian.math.sequences._tools import TOOLS as SEQUENCES_TOOLS
 from jacobian.math.submodular_opt._tools import TOOLS as SUBMODULAR_OPT_TOOLS
+from jacobian.math.symbolic_dynamics._tools import TOOLS as SYMBOLIC_DYNAMICS_TOOLS
 from jacobian.math.topology._tools import TOOLS as TOPOLOGY_TOOLS
 
 BUILTIN_TOOLS: MathTools = (
@@ -140,6 +141,7 @@ BUILTIN_TOOLS: MathTools = (
     *POLYNOMIAL_MAPS_TOOLS,
     *EUCLIDEAN_GEOMETRY_TOOLS,
     *FINITE_GAME_THEORY_TOOLS,
+    *SYMBOLIC_DYNAMICS_TOOLS,
     *ELECTRICAL_NETWORKS_TOOLS,
     *REGULAR_LANGUAGES_TOOLS,
     *ALGEBRAIC_COMBINATORICS_TOOLS,

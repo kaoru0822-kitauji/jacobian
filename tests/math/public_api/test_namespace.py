@@ -16,6 +16,7 @@ PUBLIC_API = {
         "polynomials",
         "prime_field_linear_algebra",
         "probability",
+        "symbolic_dynamics",
     ),
     "jacobian.math.finite_fields": (
         "Axis",
@@ -116,6 +117,18 @@ PUBLIC_API = {
         "MutualInformationResult",
         "MutualInformationTerm",
         "mutual_information",
+    ),
+    "jacobian.math.symbolic_dynamics": (
+        "AdjacencyShift",
+        "BlockPresentation",
+        "ForbiddenBlockShift",
+        "LabeledTransition",
+        "adjacency_shift",
+        "block_language",
+        "finite_type_presentation",
+        "higher_block_presentation",
+        "normalize_forbidden_blocks",
+        "periodic_point_profile",
     ),
 }
 
