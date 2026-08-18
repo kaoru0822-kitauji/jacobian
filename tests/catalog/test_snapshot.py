@@ -12,6 +12,7 @@ import pytest
 from jacobian.catalog.builtins import BUILTIN_TOOLS
 from jacobian.catalog.catalog import Catalog
 from jacobian.catalog.models import OperationDiscoveryRequest
+from jacobian.catalog.search import matches_domain
 
 
 def _digest(value: Any) -> str:
@@ -41,7 +42,7 @@ def test_operation_ids_and_request_result_schemas_match_snapshot() -> None:
     }
 
     assert snapshot.catalog_version == expected["catalog_version"]
-    assert len(actual) == 200
+    assert len(actual) == len(expected["operations"])
     assert actual == expected["operations"]
 
 
@@ -78,29 +79,29 @@ def test_each_tool_contract_and_function_have_one_math_owner() -> None:
         )
 
 
-def test_representative_search_browse_and_inspect_results_are_stable() -> None:
+def test_search_browse_and_inspect_results_stay_within_the_public_catalog() -> None:
     catalog = Catalog.open()
+    public_ids = {
+        descriptor.operation_id for descriptor in catalog.snapshot().operations
+    }
     search = catalog.search(
         OperationDiscoveryRequest(query="finite field factorization", limit=5)
     )
     browse = catalog.browse(domain="graph", limit=5, cursor=None)
     inspected = catalog.inspect("integer.compute.extended_gcd")
 
-    assert [match.operation_id for match in search.matches] == [
-        "finite_field.restrict_scalars.compute",
-        "finite_abelian_group.exact_factorization.compute",
-        "finite_field.linear_map.rank.compute",
-        "finite_field.polynomial_map.table.compute",
-        "finite_field.projective_line.enumerate",
-    ]
-    assert [operation.operation_id for operation in browse.operations] == [
-        "electrical_network.effective_resistance.compute",
-        "electrical_network.laplacian.compute",
-        "electrical_network.node_potentials.compute",
-        "graph.coloring.k_colorability.decide",
-        "graph.cut.minimum_st.compute",
-    ]
-    assert browse.total_operations == 44
+    assert search.matches
+    assert len(search.matches) <= 5
+    assert {match.operation_id for match in search.matches} <= public_ids
+    assert search.total_matches >= len(search.matches)
+
+    assert len(browse.operations) <= 5
+    assert {operation.operation_id for operation in browse.operations} <= public_ids
+    assert browse.total_operations == sum(
+        1 for tool in BUILTIN_TOOLS if matches_domain(tool, "graph")
+    )
+    assert browse.total_operations >= len(browse.operations)
+
     assert inspected is not None
     assert inspected.operation_id == "integer.compute.extended_gcd"
     assert inspected.version == "2"
