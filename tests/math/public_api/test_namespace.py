@@ -9,6 +9,7 @@ import jacobian
 PUBLIC_API = {
     "jacobian.math": (
         "arithmetic",
+        "arithmetic_dynamics",
         "finite_abelian_groups",
         "finite_fields",
         "graphs",
@@ -59,6 +60,20 @@ PUBLIC_API = {
         "reciprocal",
         "sign",
         "sum_rationals",
+    ),
+    "jacobian.math.arithmetic_dynamics": (
+        "FunctionalGraph",
+        "OrbitComputation",
+        "RepeatEvidence",
+        "cycle_multiplier",
+        "dynatomic_polynomial",
+        "finite_field_functional_graph",
+        "fixed_point_equation",
+        "iterate_polynomial",
+        "orbit_prefix",
+        "polynomial_coefficients",
+        "polynomial_from_coefficients",
+        "validate_cycle",
     ),
     "jacobian.math.graphs": (
         "GraphCompositionInput",

@@ -2,6 +2,7 @@
 
 from jacobian.math import (
     arithmetic,
+    arithmetic_dynamics,
     finite_abelian_groups,
     finite_fields,
     graphs,
@@ -13,6 +14,7 @@ from jacobian.math import (
 
 __all__ = [
     "arithmetic",
+    "arithmetic_dynamics",
     "finite_abelian_groups",
     "finite_fields",
     "graphs",
