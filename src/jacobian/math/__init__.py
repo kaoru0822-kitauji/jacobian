@@ -9,6 +9,7 @@ from jacobian.math import (
     polynomials,
     prime_field_linear_algebra,
     probability,
+    words,
 )
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "polynomials",
     "prime_field_linear_algebra",
     "probability",
+    "words",
 ]

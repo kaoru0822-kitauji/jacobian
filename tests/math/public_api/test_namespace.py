@@ -16,6 +16,7 @@ PUBLIC_API = {
         "polynomials",
         "prime_field_linear_algebra",
         "probability",
+        "words",
     ),
     "jacobian.math.finite_fields": (
         "Axis",
@@ -116,6 +117,22 @@ PUBLIC_API = {
         "MutualInformationResult",
         "MutualInformationTerm",
         "mutual_information",
+    ),
+    "jacobian.math.words": (
+        "FactorAnalysis",
+        "FiniteWord",
+        "PeriodAnalysis",
+        "WordMorphism",
+        "apply_morphism",
+        "compose_morphisms",
+        "conjugates",
+        "factor_occurrences",
+        "factors_of_length",
+        "incidence_matrix",
+        "parikh_vector",
+        "periods",
+        "prefix_function",
+        "primitive_root",
     ),
 }
 
