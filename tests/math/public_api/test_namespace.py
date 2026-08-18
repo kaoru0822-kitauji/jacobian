@@ -13,6 +13,7 @@ PUBLIC_API = {
         "finite_fields",
         "graphs",
         "matrices",
+        "petri_nets",
         "polynomials",
         "prime_field_linear_algebra",
         "probability",
@@ -88,6 +89,14 @@ PUBLIC_API = {
         "smith_normal_form",
         "solve_linear_system",
         "trace",
+    ),
+    "jacobian.math.petri_nets": (
+        "Marking",
+        "PetriNet",
+        "compute_incidence_matrix",
+        "enabled_transitions",
+        "fire_transition",
+        "reachability_graph",
     ),
     "jacobian.math.polynomials": (
         "derivative",
