@@ -16,6 +16,7 @@ PUBLIC_API = {
         "polynomials",
         "prime_field_linear_algebra",
         "probability",
+        "term_rewriting",
     ),
     "jacobian.math.finite_fields": (
         "Axis",
@@ -116,6 +117,18 @@ PUBLIC_API = {
         "MutualInformationResult",
         "MutualInformationTerm",
         "mutual_information",
+    ),
+    "jacobian.math.term_rewriting": (
+        "RewriteApplication",
+        "RewriteRule",
+        "Term",
+        "apply_substitution",
+        "match",
+        "normal_form",
+        "rewrite_steps",
+        "selected_rewrite_step",
+        "term_at_position",
+        "unify",
     ),
 }
 
