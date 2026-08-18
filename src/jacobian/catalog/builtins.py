@@ -38,6 +38,9 @@ from jacobian.math.geometry._tools import TOOLS as GEOMETRY_TOOLS
 from jacobian.math.geometry.euclidean._tools import TOOLS as EUCLIDEAN_GEOMETRY_TOOLS
 from jacobian.math.geometry.exact._tools import TOOLS as EXACT_GEOMETRY_TOOLS
 from jacobian.math.geometry.projective._tools import TOOLS as PROJECTIVE_GEOMETRY_TOOLS
+from jacobian.math.graphical_models._tools import (
+    TOOLS as GRAPHICAL_MODEL_TOOLS,
+)
 from jacobian.math.graphs._tools import TOOLS as GRAPHS_TOOLS
 from jacobian.math.graphs.coloring._tools import TOOLS as GRAPH_COLORING_OPS_TOOLS
 from jacobian.math.graphs.decomposition._tools import TOOLS as GRAPH_DECOMPOSITION_TOOLS
@@ -145,6 +148,7 @@ BUILTIN_TOOLS: MathTools = (
     *ALGEBRAIC_COMBINATORICS_TOOLS,
     *REAL_ALGEBRA_TOOLS,
     *FINITE_METRIC_SPACES_TOOLS,
+    *GRAPHICAL_MODEL_TOOLS,
 )
 
 __all__ = ["BUILTIN_TOOLS"]

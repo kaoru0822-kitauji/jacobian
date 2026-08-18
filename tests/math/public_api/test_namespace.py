@@ -11,6 +11,7 @@ PUBLIC_API = {
         "arithmetic",
         "finite_abelian_groups",
         "finite_fields",
+        "graphical_models",
         "graphs",
         "matrices",
         "polynomials",
@@ -72,6 +73,13 @@ PUBLIC_API = {
         "independence_number",
         "is_eulerian",
         "triangle_count",
+    ),
+    "jacobian.math.graphical_models": (
+        "Factor",
+        "d_separation",
+        "factor_marginalize",
+        "factor_multiply",
+        "variable_elimination",
     ),
     "jacobian.math.matrices": (
         "SmithNormalForm",
