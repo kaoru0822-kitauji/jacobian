@@ -44,8 +44,9 @@ def mc_operation[RequestT: StrictModel, ResultT: StrictModel](
 MARKOV_CHAIN_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     mc_operation(
         "probability.markov_chain.stationary_distribution.compute",
-        "Compute the stationary distribution of a Markov chain",
-        "Compute the exact stationary distribution of a finite Markov chain using SymPy eigenvector computation.",
+        "Compute the stationary-distribution family of a Markov chain",
+        "Compute the canonical extreme stationary distribution on every closed "
+        "communicating class; their convex hull is the complete stationary family.",
         TransitionMatrixRequest,
         StationaryDistributionResult,
         compute_stationary_distribution,
@@ -65,6 +66,7 @@ MARKOV_CHAIN_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
                 },
             ),
         ),
+        version="2",
     ),
     mc_operation(
         "probability.markov_chain.ergodic.decide",

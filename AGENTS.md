@@ -160,7 +160,7 @@ state migration, backup/restore, or application-managed rollback. The checked-in
 - For Harbor authoring or verifier changes, use the repository-local
   `harbor-benchmarks` skill. For recent-conjecture reliability probes, use the
   `recent-conjecture-evaluations` skill.
-- A quick smoke is `uv run jacobian run integer.compute.gcd --json
+- A quick smoke is `uv run jacobian run integer.compute.extended_gcd --json
   '{"left":"84","right":"30"}'`; use `uv run jacobian-mcp` for local stdio
   or `uv run jacobian-remote-mcp --host 127.0.0.1 --port 8000
   --allow-anonymous` only for an explicit local remote test.

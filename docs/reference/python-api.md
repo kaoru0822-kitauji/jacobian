@@ -26,3 +26,11 @@ Native values are not wire envelopes. An operation parses one typed request,
 calls the same domain kernel, and serializes one typed result at the final MCP
 boundary. No native API exposes MCP, operation catalog, persistence,
 publication, or checker objects.
+
+The native surface also retains useful deterministic helpers intentionally
+excluded from `math.find`, including classical combinatorial numbers, basic
+formal-series transformations, Young-diagram projections, graph transforms and
+decomposition projections, DFA complement, continued-fraction convergents, and
+finite-metric balls. Their absence from the public operation catalog is
+deliberate: native availability does not create a distinct agent discovery
+intent.

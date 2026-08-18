@@ -41,7 +41,7 @@ def test_wheel_job_covers_supported_pythons_and_313_compatibility_smoke() -> Non
 
     assert 'python-version: ["3.12", "3.13"]' in wheel
     assert "--only-binary :all:" in wheel
-    assert '"$environment/bin/jacobian" run integer.compute.gcd' in wheel
+    assert '"$environment/bin/jacobian" run integer.compute.extended_gcd' in wheel
     assert "make test-compatibility" in wheel
     assert "make test\n" not in wheel
 
