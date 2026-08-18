@@ -13,6 +13,11 @@ Jacobian gives agents atomic, composable tools for higher mathematics:
 discovering, running, and combining typed computations to investigate
 conjectures, build examples, calculate invariants, and check bounded claims.
 
+**Jacobian's hypothesis is that mathematical reasoning benefits from an
+executable vocabulary of small, exact operations.** Prefer reusable
+mathematical primitives over large solvers or workflows: Jacobian supplies the
+mathematical moves; the model decides how to compose them into larger solutions.
+
 It is a **stateless MCP server for atomic, composable mathematics** with two
 tools:
 
