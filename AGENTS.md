@@ -39,10 +39,11 @@ math.run(operation ID, JSON)
   -> return its concrete typed mathematical result
 ```
 
-The domain function may use SymPy, FLINT, NetworkX, Z3, or another
-maintained library as a private computational engine. Jacobian owns the public
-mathematical semantics and types; the library does not become a provider,
-runtime, worker, or second operation surface.
+The domain function may use a maintained library as a private computational
+engine; prefer an established backend over hand-rolling a kernel whenever it
+can perform the bounded computation. Jacobian owns the public mathematical
+semantics and types; the library does not become a provider, runtime, worker,
+or second operation surface.
 
 ## Non-negotiable boundaries
 
@@ -59,7 +60,11 @@ runtime, worker, or second operation surface.
 - Built-in tools are explicit immutable `MathTool` tuples: discovery metadata
   plus one direct typed domain function. Do not add import-time registration,
   recursive discovery, generic registries, runtime services, installer
-  callbacks, or declaration bundles.
+  callbacks, or declaration bundles. Every catalog candidate requires an
+  explicit admission row in `src/jacobian/catalog/admission.py`; catalog
+  construction fails closed without one (see the
+  [public operation admission](docs/reference/public-operation-admission.md)
+  contract).
 - Keep operations composable and domain-owned. Discovery must not prescribe a
   proof strategy, next step, or stopping rule.
 - Jacobian is pre-stable. Do not preserve a false request, result, or identity
@@ -91,7 +96,9 @@ the operation returns a concrete mathematical value or certificate.
   worker output. SAT and SMT use their maintained Python APIs directly.
 - Native public functions belong under `jacobian.math`, have explicit `__all__`,
   call typed kernels directly, and never invoke `math.run` or expose MCP,
-  runtime, installation, or storage objects.
+  runtime, installation, or storage objects. They accept domain values or a
+  maintained backend type that already carries the complete mathematical
+  meaning (see the [native Python API](docs/reference/python-api.md) contract).
 
 ### Mathematical boundedness is a proof obligation
 
