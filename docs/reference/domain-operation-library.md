@@ -69,6 +69,14 @@ process invocation.
 
 ## Operation preflight
 
+First diagnose the gap: a missing operation is only one of several possible
+responses to an observed composition failure. Classify the failure as
+representation, interoperability, discovery, contract, scale/backend, operation,
+or reasoning before designing an implementation (see
+[Executable mathematical vocabulary](../explanation/executable-mathematical-vocabulary.md)).
+Only a genuine operation gap proceeds to the
+[admission contract](public-operation-admission.md).
+
 Do not add a public operation until its stated mathematical claim has a bounded,
 appropriate implementation. A public operation is the `MathTool` contract—its
 identifier, typed request and result, scope, and mathematical claim—not merely
