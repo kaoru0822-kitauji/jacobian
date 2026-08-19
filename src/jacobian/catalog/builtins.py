@@ -56,6 +56,12 @@ from jacobian.math.combinatorics._admission import (
     ADMISSIONS as COMBINATORICS_ADMISSIONS,
 )
 from jacobian.math.combinatorics._tools import TOOLS as COMBINATORICS_TOOLS
+from jacobian.math.commutative_algebra_ops._admission import (
+    ADMISSIONS as COMMUTATIVE_ALGEBRA_OPS_ADMISSIONS,
+)
+from jacobian.math.commutative_algebra_ops._tools import (
+    TOOLS as COMMUTATIVE_ALGEBRA_OPS_TOOLS,
+)
 from jacobian.math.convex_analysis._admission import (
     ADMISSIONS as CONVEX_ANALYSIS_ADMISSIONS,
 )
@@ -156,6 +162,10 @@ from jacobian.math.graphs.isomorphism._admission import (
     ADMISSIONS as GRAPHS_ISOMORPHISM_ADMISSIONS,
 )
 from jacobian.math.graphs.isomorphism._tools import TOOLS as GRAPH_ISOMORPHISM_TOOLS
+from jacobian.math.graphs.morphisms._admission import (
+    ADMISSIONS as GRAPHS_MORPHISMS_ADMISSIONS,
+)
+from jacobian.math.graphs.morphisms._tools import TOOLS as GRAPHS_MORPHISMS_TOOLS
 from jacobian.math.graphs.optimization._admission import (
     ADMISSIONS as GRAPHS_OPTIMIZATION_ADMISSIONS,
 )
@@ -296,11 +306,13 @@ _BUILTIN_CANDIDATES: MathTools = (
     *GRAPH_COLORING_OPS_TOOLS,
     *GRAPH_SPECTRAL_TOOLS,
     *GRAPH_FLOW_TOOLS,
+    *GRAPHS_MORPHISMS_TOOLS,
     *GRAPH_DECOMPOSITION_TOOLS,
     *GRAPH_ISOMORPHISM_TOOLS,
     *ROOT_ISOLATION_TOOLS,
     *RECURRENCE_SOLVING_TOOLS,
     *CODE_THEORY_TOOLS,
+    *COMMUTATIVE_ALGEBRA_OPS_TOOLS,
     *NUMBER_FIELD_TOOLS,
     *MARKOV_CHAIN_TOOLS,
     *ARITHMETIC_TOOLS,
@@ -379,6 +391,7 @@ _RAW_ADMISSIONS: tuple[OperationAdmission, ...] = (
     *BOOLEAN_ADMISSIONS,
     *BOOLEAN_ANALYSIS_ADMISSIONS,
     *CODE_THEORY_ADMISSIONS,
+    *COMMUTATIVE_ALGEBRA_OPS_ADMISSIONS,
     *COMBINATORICS_ADMISSIONS,
     *COMBINATORIAL_MAPS_ADMISSIONS,
     *CONVEX_ANALYSIS_ADMISSIONS,
@@ -403,6 +416,7 @@ _RAW_ADMISSIONS: tuple[OperationAdmission, ...] = (
     *GRAPHS_DECOMPOSITION_ADMISSIONS,
     *GRAPHS_DIRECTED_ADMISSIONS,
     *GRAPHS_FLOW_ADMISSIONS,
+    *GRAPHS_MORPHISMS_ADMISSIONS,
     *GRAPHS_ISOMORPHISM_ADMISSIONS,
     *GRAPHS_OPTIMIZATION_ADMISSIONS,
     *GRAPHS_POLYNOMIALS_ADMISSIONS,
