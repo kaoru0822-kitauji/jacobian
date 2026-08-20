@@ -76,6 +76,9 @@ from jacobian.math.finite_topology._admission import (
 from jacobian.math.formal_power_series._admission import (
     REGISTRATION as FORMAL_POWER_SERIES_REGISTRATION,
 )
+from jacobian.math.galois_theory._admission import (
+    REGISTRATION as GALOIS_THEORY_REGISTRATION,
+)
 from jacobian.math.geometry._admission import REGISTRATION as GEOMETRY_REGISTRATION
 from jacobian.math.geometry.euclidean._admission import (
     REGISTRATION as GEOMETRY_EUCLIDEAN_REGISTRATION,
@@ -244,6 +247,7 @@ _BUILTIN_REGISTRATIONS = (
     FINITE_STATE_TRANSDUCERS_REGISTRATION,
     FINITE_TOPOLOGY_REGISTRATION,
     FORMAL_POWER_SERIES_REGISTRATION,
+    GALOIS_THEORY_REGISTRATION,
     GEOMETRY_REGISTRATION,
     GEOMETRY_EUCLIDEAN_REGISTRATION,
     GEOMETRY_EXACT_REGISTRATION,
