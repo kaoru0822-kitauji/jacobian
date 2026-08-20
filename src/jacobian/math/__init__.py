@@ -29,6 +29,7 @@ from jacobian.math import (
     symbolic_dynamics,
     term_rewriting,
     tree_automata,
+    universal_algebra,
     words,
 )
 
@@ -61,5 +62,6 @@ __all__ = [
     "symbolic_dynamics",
     "term_rewriting",
     "tree_automata",
+    "universal_algebra",
     "words",
 ]
