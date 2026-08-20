@@ -6,6 +6,7 @@ from jacobian._models import StrictModel
 from jacobian.catalog._examples import example
 from jacobian.catalog.models import MathTool, OperationExample
 from jacobian.math.matrices.symbolic._models import (
+    SquareSymbolicMatrixRequest,
     SymbolicCharacteristicPolynomialResult,
     SymbolicDeterminantResult,
     SymbolicEigenvaluesResult,
@@ -52,7 +53,7 @@ SYMBOLIC_MATRIX_OPERATIONS = (
         "matrix.symbolic.determinant.compute",
         "Compute an exact symbolic matrix determinant (det) over QQ(t_1, ..., t_n)",
         "Compute the determinant of a square matrix whose entries are rational functions in declared algebraically independent variables, using SymPy's exact fraction-free Bareiss algorithm.",
-        SymbolicMatrixRequest,
+        SquareSymbolicMatrixRequest,
         SymbolicDeterminantResult,
         compute_symbolic_determinant,
         "matrix",
@@ -72,6 +73,7 @@ SYMBOLIC_MATRIX_OPERATIONS = (
                 },
             ),
         ),
+        version="2",
     ),
     symbolic_matrix_operation(
         "matrix.symbolic.rank.compute",
@@ -102,7 +104,7 @@ SYMBOLIC_MATRIX_OPERATIONS = (
         "matrix.symbolic.characteristic_polynomial.compute",
         "Compute an exact symbolic characteristic polynomial",
         "Compute the dense monic coefficients of det(lambda I - A) for a square symbolic matrix whose entries are rational functions in declared algebraically independent variables.",
-        SymbolicMatrixRequest,
+        SquareSymbolicMatrixRequest,
         SymbolicCharacteristicPolynomialResult,
         compute_symbolic_characteristic_polynomial,
         "matrix",
@@ -122,12 +124,13 @@ SYMBOLIC_MATRIX_OPERATIONS = (
                 },
             ),
         ),
+        version="2",
     ),
     symbolic_matrix_operation(
         "matrix.symbolic.eigenvalues.compute",
         "Compute exact symbolic eigenvalues",
         "Compute the exact eigenvalues with algebraic multiplicities of a square symbolic matrix using SymPy's eigenvals. Entries may be rational functions in declared algebraically independent variables; eigenvalues are returned as canonical SymPy expression strings.",
-        SymbolicMatrixRequest,
+        SquareSymbolicMatrixRequest,
         SymbolicEigenvaluesResult,
         compute_symbolic_eigenvalues,
         "matrix",
@@ -147,6 +150,7 @@ SYMBOLIC_MATRIX_OPERATIONS = (
                 },
             ),
         ),
+        version="2",
     ),
 )
 

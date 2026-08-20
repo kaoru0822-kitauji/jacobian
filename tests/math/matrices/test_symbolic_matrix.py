@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from jacobian.math.matrices.symbolic._models import (
+    SquareSymbolicMatrixRequest,
     SymbolicCharacteristicPolynomialResult,
     SymbolicDeterminantResult,
     SymbolicEigenvaluesResult,
@@ -17,6 +19,7 @@ from jacobian.math.matrices.symbolic._operations import (
     compute_symbolic_eigenvalues,
     compute_symbolic_rank,
 )
+from jacobian.math.matrices.symbolic._tools import TOOLS
 
 
 def _request(
@@ -25,6 +28,16 @@ def _request(
     if variables is None:
         variables = []
     return SymbolicMatrixRequest.model_validate(
+        {"matrix": {"variables": variables, "entries": entries}}
+    )
+
+
+def _square_request(
+    entries: list[list[str]], variables: list[str] | None = None
+) -> SquareSymbolicMatrixRequest:
+    if variables is None:
+        variables = []
+    return SquareSymbolicMatrixRequest.model_validate(
         {"matrix": {"variables": variables, "entries": entries}}
     )
 
@@ -89,16 +102,64 @@ def test_symbolic_eigenvalues_of_quadratic_algebraic_entries() -> None:
     assert result.multiplicities == (1, 1)
 
 
-def test_symbolic_determinant_requires_square_matrix() -> None:
-    request = _request([["a", "b", "c"]], ["a", "b", "c"])
-    with pytest.raises(ValueError, match="square"):
-        compute_symbolic_determinant(request)
+@pytest.mark.parametrize(
+    "operation_id",
+    (
+        "matrix.symbolic.determinant.compute",
+        "matrix.symbolic.characteristic_polynomial.compute",
+        "matrix.symbolic.eigenvalues.compute",
+    ),
+)
+def test_square_only_symbolic_descriptors_reject_rectangular_input(
+    operation_id: str,
+) -> None:
+    operation = next(tool for tool in TOOLS if tool.operation_id == operation_id)
+    with pytest.raises(ValidationError, match="square"):
+        operation.request_type.model_validate(
+            {"matrix": {"variables": ["a", "b"], "entries": [["a", "b"]]}}
+        )
 
 
-def test_symbolic_eigenvalues_requires_square_matrix() -> None:
+def test_rectangular_accepted_by_rank_request() -> None:
+    """Rectangular matrices remain valid for the rank operation."""
     request = _request([["a", "b", "c"]], ["a", "b", "c"])
-    with pytest.raises(ValueError, match="square"):
-        compute_symbolic_eigenvalues(request)
+    result = compute_symbolic_rank(request)
+    assert result.rank == 1
+
+
+def test_symbolic_determinant_of_one_by_one() -> None:
+    result = compute_symbolic_determinant(_square_request([["a"]], ["a"]))
+    assert result.determinant == "a"
+
+
+def test_symbolic_characteristic_polynomial_of_one_by_one() -> None:
+    result = compute_symbolic_characteristic_polynomial(_square_request([["a"]], ["a"]))
+    assert result.degree == 1
+    assert result.coefficients_descending == ("1", "-a")
+
+
+def test_symbolic_eigenvalues_of_one_by_one() -> None:
+    result = compute_symbolic_eigenvalues(_square_request([["a"]], ["a"]))
+    assert result.eigenvalues == ("a",)
+    assert result.multiplicities == (1,)
+
+
+def test_square_request_accepts_32x32() -> None:
+    """32x32 boundary shape validates for all square-only operations."""
+    entries = [["1"] * 32 for _ in range(32)]
+    SquareSymbolicMatrixRequest.model_validate(
+        {"matrix": {"variables": [], "entries": entries}}
+    )
+
+
+def test_symbolic_descriptors_publish_their_actual_request_boundaries() -> None:
+    request_types = {tool.operation_id: tool.request_type for tool in TOOLS}
+    assert request_types == {
+        "matrix.symbolic.determinant.compute": SquareSymbolicMatrixRequest,
+        "matrix.symbolic.rank.compute": SymbolicMatrixRequest,
+        "matrix.symbolic.characteristic_polynomial.compute": SquareSymbolicMatrixRequest,
+        "matrix.symbolic.eigenvalues.compute": SquareSymbolicMatrixRequest,
+    }
 
 
 def test_symbolic_matrix_rejects_non_rectangular() -> None:
