@@ -30,6 +30,7 @@ ROOT_MATH_DOMAINS = (
     "formal_power_series",
     "graphical_models",
     "graphs",
+    "greedoids",
     "impartial_games",
     "matrices",
     "numerical_semigroups",
