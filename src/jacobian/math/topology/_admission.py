@@ -35,6 +35,11 @@ ADMISSIONS: tuple[OperationAdmission, ...] = (
         AdmissionDecision.KEEP,
         "exact f-vector, h-vector, and Euler characteristic of a simplicial complex",
     ),
+    OperationAdmission(
+        "topology.simplicial_complex.link.compute",
+        AdmissionDecision.KEEP,
+        "exact link of a simplex with maximal facets of the link complex",
+    ),
 )
 
 REGISTRATION = OperationRegistration(TOOLS, ADMISSIONS)

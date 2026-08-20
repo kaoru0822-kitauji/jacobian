@@ -33,6 +33,8 @@ from jacobian.math.topology._models import (
     IntegralSimplicialHomologyResult,
     IntegralTorsionGenerator,
     IntegralVector,
+    LinkRequest,
+    LinkResult,
     ModularVector,
     SimplexBasis,
     SimplicialComplexCanonicalizationResult,
@@ -728,4 +730,31 @@ def compute_f_vector(request: FVectorRequest) -> FVectorResult:
         h_vector=tuple(h_vector),
         euler_characteristic=euler,
         dimension=max_dim,
+    )
+
+
+def compute_link(request: LinkRequest) -> LinkResult:
+    """Compute the link of a simplex in a simplicial complex."""
+    target = frozenset(request.simplex)
+    link_simplices: set[frozenset[str]] = set()
+    for facet in request.complex.facets:
+        remainder = frozenset(facet) - target
+        if target.issubset(facet) and remainder:
+            link_simplices.add(remainder)
+
+    link_facets = {
+        simplex
+        for simplex in link_simplices
+        if not any(simplex < other for other in link_simplices)
+    }
+    ordered_facets = tuple(
+        tuple(sorted(simplex))
+        for simplex in sorted(
+            link_facets, key=lambda value: (-len(value), sorted(value))
+        )
+    )
+    return LinkResult(
+        simplex=request.simplex,
+        link_facets=ordered_facets,
+        link_is_empty=not ordered_facets,
     )
