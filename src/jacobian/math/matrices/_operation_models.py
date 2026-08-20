@@ -177,8 +177,6 @@ class SquareIntegerMatrixRequest(StrictModel):
 
 
 class RationalLinearSolveRequest(StrictModel):
-    """A square rational system whose coefficient matrix is nonsingular."""
-
     matrix: RationalMatrix
     rhs: tuple[CanonicalRational, ...] = Field(
         min_length=1,
@@ -196,16 +194,6 @@ class RationalLinearSolveRequest(StrictModel):
         for value in self.rhs:
             _check_integer_digits(value.num)
             _check_integer_digits(value.den)
-        from sympy import Matrix, Rational
-
-        raw = Matrix(
-            [
-                [Rational(*value.as_integer_ratio()) for value in row]
-                for row in self.matrix.entries
-            ]
-        )
-        if raw.det() == 0:
-            raise ValueError("matrix is singular; unique solution does not exist")
         return self
 
 
@@ -309,11 +297,35 @@ class MatrixProductResult(StrictModel):
 
 
 class RationalLinearSolveResult(StrictModel):
-    solution: tuple[CanonicalRational, ...] = Field(
+    """Result of solving a linear system Ax=b over QQ.
+
+    The outcome discriminates between:
+    - UNIQUE: the system has a unique solution (solution field is populated)
+    - INCONSISTENT: the system has no solution
+    - NON_UNIQUE: the system has infinitely many solutions (non-unique)
+    """
+
+    outcome: Literal["UNIQUE", "INCONSISTENT", "NON_UNIQUE"]
+    solution: tuple[CanonicalRational, ...] | None = Field(
+        default=None,
         min_length=1,
         max_length=MAX_MATRIX_DIMENSION,
     )
-    convention: Literal["UNIQUE_SOLUTION_OVER_QQ"] = "UNIQUE_SOLUTION_OVER_QQ"
+    convention: Literal["LINEAR_SYSTEM_CLASSIFICATION_OVER_QQ"] = (
+        "LINEAR_SYSTEM_CLASSIFICATION_OVER_QQ"
+    )
+
+    @model_validator(mode="after")
+    def require_outcome_solution_consistency(self) -> Self:
+        if self.outcome == "UNIQUE":
+            if self.solution is None:
+                raise ValueError("a unique solution must populate the solution field")
+        else:
+            if self.solution is not None:
+                raise ValueError(
+                    "a non-unique or inconsistent result must not populate the solution field"
+                )
+        return self
 
 
 class MatrixAdjugateResult(StrictModel):
