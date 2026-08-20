@@ -192,6 +192,7 @@ from jacobian.math.probability._admission import (
 from jacobian.math.projective_coords_ops._admission import (
     REGISTRATION as PROJECTIVE_COORDS_OPS_REGISTRATION,
 )
+from jacobian.math.quivers._admission import REGISTRATION as QUIVERS_REGISTRATION
 from jacobian.math.recurrence_solving._admission import (
     REGISTRATION as RECURRENCE_SOLVING_REGISTRATION,
 )
@@ -291,6 +292,7 @@ _BUILTIN_REGISTRATIONS = (
     POSETS_REGISTRATION,
     PROBABILITY_REGISTRATION,
     PROJECTIVE_COORDS_OPS_REGISTRATION,
+    QUIVERS_REGISTRATION,
     RECURRENCE_SOLVING_REGISTRATION,
     REGULAR_LANGUAGES_REGISTRATION,
     ROOT_ISOLATION_REGISTRATION,
