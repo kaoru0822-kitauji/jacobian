@@ -71,6 +71,15 @@ another system, ask what mathematical fact or object it needed rather than which
 helper function it called. Work backward from that result to the stable
 mathematical boundary.
 
+Treat the trajectory as evidence, not as the operation specification. Bind an
+availability claim to the catalog and repository revision visible in that
+session, and distinguish an operation that was unavailable, undiscovered,
+unselected, called incorrectly, or genuinely insufficient. Preserve the exact
+scope of the fallback result as well: a numerical candidate, finite search, or
+successful one-off computation does not establish an exact general contract.
+Verify the current catalog and source before turning the observation into an
+operation proposal.
+
 For example, bespoke enumeration of simple cycles of a fixed length may expose
 a need for a fixed-length-cycle witness. Inspection may reveal a deeper reusable
 relation such as finite subgraph embedding. The deeper abstraction is not
