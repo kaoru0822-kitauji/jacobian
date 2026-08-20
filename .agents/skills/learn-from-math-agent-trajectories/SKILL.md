@@ -124,6 +124,17 @@ postcondition with typed inputs and an exact, incomplete, or unknown result. It
 must not encode the motivating conjecture, prescribe a proof strategy, or
 claim an asymptotic theorem that still requires model reasoning.
 
+Separate gap diagnosis from public-operation admission. First decide whether
+the trajectory establishes a reusable missing mathematical postcondition on
+the inspected surface. Recording that gap does not assert that the result
+belongs in the agent-visible catalog. Then report the admission evidence
+separately: it may support public consideration, suggest a native-only helper,
+or leave the disposition unresolved. Public-admission concerns such as weak
+leverage over ordinary Python or a cheap projection can change the eventual
+disposition without erasing an otherwise well-evidenced gap. Conversely, an
+absent convenience is not an operation gap unless the missing postcondition is
+independently canonical or reusable.
+
 ## Turn observations into repository learning
 
 Choose the smallest durable action supported by the evidence:
@@ -131,7 +142,9 @@ Choose the smallest durable action supported by the evidence:
 - update a repo-local skill for a reusable agent decision rule;
 - improve discovery metadata when an existing operation was hard to find;
 - repair an operation contract when a selected tool was hard to call or use;
-- propose a new operation for a repeated, stable bounded postcondition;
+- record an operation gap for a repeated, stable bounded postcondition, and
+  propose public admission only when the separate admission evidence supports
+  it;
 - update product documentation only for a public contract or durable product
   behavior that users need outside agent instructions;
 - preserve a trajectory as an evaluation when it has a frozen input,
@@ -162,6 +175,9 @@ Lead with what the trajectory teaches, not a chronological replay. Include:
 - focused skill, operation, discovery, contract, documentation, or evaluation
   actions; and
 - unresolved mathematical work that still requires proof or human judgment.
+
+For each operation-gap finding, state the gap verdict and the admission posture
+separately. Do not make a reader infer one from the other.
 
 Keep confirmed facts, plausible hypotheses, and open questions visibly
 separate. The retrospective succeeds when another agent or maintainer can
