@@ -20,11 +20,6 @@ ADMISSIONS: tuple[OperationAdmission, ...] = (
         AdmissionDecision.KEEP,
         "distinct exact bounded predicate or candidate check with typed semantics",
     ),
-    OperationAdmission(
-        "graph.independent_set.maximum.compute",
-        AdmissionDecision.KEEP,
-        "distinct exact or explicitly bounded search outcome with material computational leverage",
-    ),
 )
 
 REGISTRATION = OperationRegistration(TOOLS, ADMISSIONS)
