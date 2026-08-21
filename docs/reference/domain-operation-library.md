@@ -85,6 +85,7 @@ applicable` with a reason; it must not be omitted.
 
 - Mathematical input domain:
 - Canonical public value type:
+- Producer/consumer closure, or why not applicable:
 - Degenerate inputs:
 - Parent/ring/field identity:
 - Deterministic work bound:
@@ -177,6 +178,50 @@ morphism whose behavior is part of its contract. Never silently map unmatched
 variables to zero. Backend generator inference, ambient rings, and automatic
 coercion are private conveniences and do not define Jacobian's public
 semantics.
+
+Each mathematical value has one canonical type owned by its domain. A producer
+returns that type and downstream consumers accept it unchanged. An operation
+request may contain the value alongside genuine operation parameters, but must
+not redefine the value as a parallel collection of fields. Callers must not
+have to remember and reattach a field, ordered axis, ranked signature, ambient
+dimension, or other mathematical context. This closure rule applies to empty
+and degenerate values too: for example, a zero-row matrix still retains its
+declared column axis.
+
+When a producer-consumer relationship exists, the operation review artifact
+must name it and its tests must pass the producer's serialized value directly
+through the consumer's typed boundary. Do not introduce a generic value
+registry or universal mathematical-object base class for this purpose; reuse
+the owner domain's concrete value type.
+
+Classify public outputs before choosing their schema:
+
+| Output kind | Contract |
+| --- | --- |
+| Canonical value | A complete reusable mathematical object accepted by its downstream consumers. |
+| Source-bound result | A source value plus a conclusion or certificate whose defining relation is validated. |
+| Display projection | A human-readable summary that is not accepted as a composable mathematical value. |
+
+For every producer or materially changed consumer, answer all of the following
+in the producer/consumer closure field of the review artifact:
+
+- What domain-owned canonical type does the producer return?
+- Which downstream operations consume that type?
+- Can its serialized value be supplied to each consumer unchanged?
+- Does it retain its parent, presentation, ordered axes, ambient dimension, and
+  normalization where those determine its meaning?
+- What mathematical context remains present for empty, zero, identity, or
+  otherwise degenerate values?
+- Is each decision or certificate bound to the source value it concerns?
+- Can result validation replay the defining relation within the declared work
+  bound?
+
+Decision and profile results are relations, not detached booleans or numbers.
+Retain the source values needed to state the relation and replay its defining
+equation in result validation. A compact result may omit a large derivation
+ledger when bounded replay from the retained source is deterministic, but it
+must not accept an authored conclusion merely because its scalar fields have
+the right shape.
 
 Backend integration follows the reusable
 [mathematical backend contract](mathematical-backends.md).
