@@ -111,6 +111,36 @@ def factorization_lengths(generators: tuple[int, ...], target: int) -> tuple[int
     return tuple(sorted(lengths[target]))
 
 
+def factorization_length_extrema(
+    generators: tuple[int, ...], target: int
+) -> tuple[int, int]:
+    """Compute the minimum and maximum factorization lengths without sets."""
+    if target < 0:
+        raise ValueError("target must be non-negative")
+    minimum: list[int | None] = [None] * (target + 1)
+    maximum: list[int | None] = [None] * (target + 1)
+    minimum[0] = maximum[0] = 0
+    for value in range(1, target + 1):
+        min_candidates: list[int] = []
+        max_candidates: list[int] = []
+        for generator in generators:
+            predecessor = value - generator
+            if predecessor >= 0:
+                min_length = minimum[predecessor]
+                max_length = maximum[predecessor]
+                if min_length is not None and max_length is not None:
+                    min_candidates.append(min_length)
+                    max_candidates.append(max_length)
+        if min_candidates:
+            minimum[value] = min(min_candidates) + 1
+            maximum[value] = max(max_candidates) + 1
+    min_result = minimum[target]
+    max_result = maximum[target]
+    if min_result is None or max_result is None:
+        raise ValueError("target is not in the numerical semigroup")
+    return min_result, max_result
+
+
 def catenary_degree_from_factorizations(
     family: tuple[tuple[int, ...], ...],
 ) -> int:
@@ -296,6 +326,7 @@ __all__ = [
     "catenary_degree_from_factorizations",
     "delta_periodicity_bound",
     "factorization_count",
+    "factorization_length_extrema",
     "factorization_lengths",
     "factorization_predecessors",
     "factorizations",
