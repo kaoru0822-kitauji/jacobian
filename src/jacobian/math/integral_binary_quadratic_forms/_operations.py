@@ -1,5 +1,4 @@
 """Exact bounded integral binary quadratic form operations."""
-# mypy: disable-error-code="no-untyped-def,no-untyped-call,return-value,type-arg,misc"
 
 from jacobian.math.integral_binary_quadratic_forms._models import (
     BinaryQuadraticFormCheckRequest,
@@ -52,7 +51,7 @@ def _check_reduced(a: int, b: int, c: int) -> bool:
 
 def _reduce_step(
     a: int, b: int, c: int
-) -> tuple[int, int, int, int, int, int, int, int, int]:
+) -> tuple[int, int, int, int, int, int, int, int, int, int]:
     """One reduction step.
 
     Returns (a, b, c, p, q, r, s, new_a, new_b, new_c).
@@ -71,7 +70,10 @@ def _reduce_step(
         # Find n such that |b + 2n*a| <= a
         # b' = b + 2n*a, we want -a <= b' <= a
         # n = round(-b / (2*a))
-        n = round(-b / (2 * a))
+        quotient, remainder = divmod(abs(b), 2 * a)
+        if remainder * 2 >= 2 * a:
+            quotient += 1
+        n = -quotient if b > 0 else quotient
         # T^n = [[1,n],[0,1]]
         new_b = b + 2 * n * a
         new_c = c + n * b + n * n * a
@@ -89,14 +91,28 @@ def _reduce_step(
     return a, b, c, 1, 0, 0, 1, a, b, c
 
 
-def _reduce(a: int, b: int, c: int) -> tuple[int, int, int, int, int, int, int, list]:
+def _reduce(
+    a: int, b: int, c: int
+) -> tuple[
+    int,
+    int,
+    int,
+    int,
+    int,
+    int,
+    int,
+    list[tuple[int, int, int, int, int, int, int, int, int, int]],
+]:
     """Full Gauss reduction.
 
     Returns (ra, rb, rc, p, q, r, s, steps).
     """
 
     # Compose two SL_2(Z) matrices
-    def compose(m1, m2):
+    def compose(
+        m1: tuple[tuple[int, int], tuple[int, int]],
+        m2: tuple[tuple[int, int], tuple[int, int]],
+    ) -> tuple[tuple[int, int], tuple[int, int]]:
         p1, q1 = m1[0]
         r1, s1 = m1[1]
         p2, q2 = m2[0]
@@ -108,7 +124,7 @@ def _reduce(a: int, b: int, c: int) -> tuple[int, int, int, int, int, int, int, 
 
     cur_a, cur_b, cur_c = a, b, c
     matrix = ((1, 0), (0, 1))
-    steps = []
+    steps: list[tuple[int, int, int, int, int, int, int, int, int, int]] = []
     max_iter = 100
     for _ in range(max_iter):
         if _check_reduced(cur_a, cur_b, cur_c):
@@ -258,11 +274,20 @@ def compute_reduced_classes(
 ) -> ReducedClassesResult:
     """Enumerate all reduced primitive positive-definite classes of a discriminant."""
 
-    D = request.discriminant  # noqa: N806  # noqa: N806
-    if D >= -2:
-        return ReducedClassesResult(discriminant=D, classes=(), class_number=0)
-    if D % 4 not in (0, 1):
-        return ReducedClassesResult(discriminant=D, classes=(), class_number=0)
+    classes = _enumerate_reduced_classes(request.discriminant)
+    return ReducedClassesResult(
+        discriminant=request.discriminant,
+        classes=classes,
+        class_number=len(classes),
+    )
+
+
+def _enumerate_reduced_classes(discriminant: int) -> tuple[tuple[int, int, int], ...]:
+    """Enumerate every reduced primitive class without constructing a result."""
+    if discriminant >= -2:
+        return ()
+    if discriminant % 4 not in (0, 1):
+        return ()
 
     classes: list[tuple[int, int, int]] = []
     # For reduced forms: |b| <= a <= c, b^2 - 4ac = D
@@ -274,11 +299,11 @@ def compute_reduced_classes(
     # So a <= sqrt(|D|/3) (standard bound)
     import math
 
-    a_bound = math.isqrt(abs(D) // 3) + 1
+    a_bound = math.isqrt(abs(discriminant) // 3) + 1
     for a in range(1, a_bound + 1):
         # b ranges from -a to a
         for b in range(-a, a + 1):
-            num = b * b - D  # = 4ac
+            num = b * b - discriminant  # = 4ac
             if num % (4 * a) != 0:
                 continue
             c_val = num // (4 * a)
@@ -293,8 +318,4 @@ def compute_reduced_classes(
                 classes.append((a, b, c_val))
 
     classes.sort()
-    return ReducedClassesResult(
-        discriminant=D,
-        classes=tuple(classes),
-        class_number=len(classes),
-    )
+    return tuple(classes)

@@ -11,6 +11,18 @@ from jacobian._models import StrictModel
 MAX_COEFFICIENT = 10**6
 
 
+def _require_positive_primitive_form(form: tuple[int, int, int]) -> None:
+    a, b, c = form
+    if any(abs(value) > MAX_COEFFICIENT for value in form):
+        raise ValueError("form coefficients exceed the supported bound")
+    if a <= 0 or b * b - 4 * a * c >= 0:
+        raise ValueError("form must be positive definite")
+    from math import gcd
+
+    if gcd(gcd(abs(a), abs(b)), abs(c)) != 1:
+        raise ValueError("form must be primitive")
+
+
 class BinaryQuadraticFormCheckRequest(StrictModel):
     """Request to check integer coefficients as a primitive positive-definite form."""
 
@@ -32,23 +44,13 @@ class BinaryQuadraticFormEvaluateRequest(StrictModel):
 class BinaryQuadraticFormReduceRequest(StrictModel):
     """Request Gauss reduction of a primitive positive-definite form."""
 
-    a: int = Field(ge=-MAX_COEFFICIENT, le=MAX_COEFFICIENT)
-    b: int = Field(ge=-MAX_COEFFICIENT, le=MAX_COEFFICIENT)
-    c: int = Field(ge=-MAX_COEFFICIENT, le=MAX_COEFFICIENT)
+    a: int
+    b: int
+    c: int
 
     @model_validator(mode="after")
     def require_valid_form(self) -> Self:
-        if self.a <= 0:
-            raise ValueError("a must be positive for positive-definite")
-        disc = self.b * self.b - 4 * self.a * self.c
-        if disc >= 0:
-            raise ValueError("discriminant must be negative")
-        if disc % 4 not in (0, 1):
-            raise ValueError("discriminant must be 0 or 1 mod 4")
-        from math import gcd
-
-        if gcd(gcd(self.a, self.b), self.c) != 1:
-            raise ValueError("form must be primitive")
+        _require_positive_primitive_form((self.a, self.b, self.c))
         return self
 
 
@@ -57,6 +59,12 @@ class BinaryQuadraticFormProperEquivRequest(StrictModel):
 
     form1: tuple[int, int, int]
     form2: tuple[int, int, int]
+
+    @model_validator(mode="after")
+    def require_valid_forms(self) -> Self:
+        _require_positive_primitive_form(self.form1)
+        _require_positive_primitive_form(self.form2)
+        return self
 
 
 class BinaryQuadraticFormReducedClassesRequest(StrictModel):
@@ -85,6 +93,7 @@ class BinaryQuadraticFormCheckResult(StrictModel):
                 raise ValueError("accepted form must carry discriminant")
             if self.discriminant != self.b**2 - 4 * self.a * self.c:
                 raise ValueError("discriminant must be b^2 - 4ac")
+            _require_positive_primitive_form((self.a, self.b, self.c))
             if self.gram is not None and self.gram != (
                 (self.a, self.b),
                 (self.b, self.c),
@@ -140,12 +149,6 @@ class ReducedBinaryQuadraticFormResult(StrictModel):
 
         if not _check_reduced(self.reduced_a, self.reduced_b, self.reduced_c):
             raise ValueError("reduced form must satisfy |b|<=a<=c with tie-breaking")
-        if (
-            self.a == self.reduced_a
-            and self.b == self.reduced_b
-            and self.c == self.reduced_c
-        ):
-            return self
         p, q = self.matrix[0]
         r, s = self.matrix[1]
         if p * s - q * r != 1:
@@ -176,6 +179,8 @@ class ProperEquivalenceResult(StrictModel):
 
     @model_validator(mode="after")
     def bind_equivalence(self) -> Self:
+        if self.status == "PROPERLY_EQUIVALENT" and self.matrix is None:
+            raise ValueError("proper equivalence requires a witness matrix")
         if self.status == "PROPERLY_EQUIVALENT" and self.matrix is not None:
             p, q = self.matrix[0]
             r, s = self.matrix[1]
@@ -203,6 +208,8 @@ class ReducedClassesResult(StrictModel):
 
         if self.class_number != len(self.classes):
             raise ValueError("class_number must equal the number of classes")
+        if self.discriminant > -3:
+            raise ValueError("discriminant must be at most -3")
         for a, b, c in self.classes:
             if b * b - 4 * a * c != self.discriminant:
                 raise ValueError("every class must have the requested discriminant")
@@ -211,4 +218,10 @@ class ReducedClassesResult(StrictModel):
         seen = set(self.classes)
         if len(seen) != len(self.classes):
             raise ValueError("classes must be distinct")
+        from jacobian.math.integral_binary_quadratic_forms._operations import (
+            _enumerate_reduced_classes,
+        )
+
+        if self.classes != _enumerate_reduced_classes(self.discriminant):
+            raise ValueError("classes must be the complete reduced class set")
         return self

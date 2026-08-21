@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from typing import Self
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
 from jacobian._models import StrictModel
 from jacobian.math.root_systems._cartan import require_finite_type
 
 MAX_RANK = 8
+MAX_REFLECTION_COORDINATE = ((1 << 53) - 1) // (1 + 3 * MAX_RANK)
 
 
 class CartanMatrixRequest(StrictModel):
@@ -64,14 +65,6 @@ class PositiveRootsResult(CartanMatrixRequest):
         if self.positive_roots != expected or self.num_positive_roots != len(expected):
             raise ValueError("positive roots are not bound to the Cartan matrix")
         return self
-
-
-class SimpleReflectionResult(StrictModel):
-    """Result of applying a simple reflection to a vector."""
-
-    vector: tuple[int, ...]
-    simple_index: int
-    reflected_vector: tuple[int, ...]
 
 
 class RootComponentData(StrictModel):
@@ -138,4 +131,87 @@ class RootSystemDataResult(StrictModel):
             )
         if self.components != tuple(expected_components):
             raise ValueError("component data is not bound to the Cartan matrix")
+        return self
+
+
+class SimpleReflectionRequest(StrictModel):
+    """Request to apply a simple reflection s_i to a root lattice vector."""
+
+    matrix: tuple[tuple[int, ...], ...]
+    vector: tuple[int, ...] = Field(min_length=1)
+    simple_index: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def require_valid(self) -> Self:
+        n = len(self.matrix)
+        if n < 1 or n > MAX_RANK:
+            raise ValueError(f"rank must be between 1 and {MAX_RANK}")
+        if self.simple_index >= n:
+            raise ValueError("simple_index out of range")
+        if len(self.vector) != n:
+            raise ValueError("vector length must match rank")
+        if any(
+            abs(coordinate) > MAX_REFLECTION_COORDINATE for coordinate in self.vector
+        ):
+            raise ValueError(
+                "vector coordinates must fit the bounded reflected-coordinate domain"
+            )
+        CartanMatrixRequest(matrix=self.matrix)
+        return self
+
+
+class SimpleReflectionResult(StrictModel):
+    """Result of applying a simple reflection to a vector."""
+
+    matrix: tuple[tuple[int, ...], ...]
+    vector: tuple[int, ...]
+    simple_index: int
+    reflected_vector: tuple[int, ...]
+
+    @model_validator(mode="after")
+    def bind_reflection(self) -> Self:
+        from jacobian.math.root_systems._operations import _apply_reflection
+
+        SimpleReflectionRequest(
+            matrix=self.matrix,
+            vector=self.vector,
+            simple_index=self.simple_index,
+        )
+        reflected = _apply_reflection(
+            [list(row) for row in self.matrix], list(self.vector), self.simple_index
+        )
+        if self.reflected_vector != tuple(reflected):
+            raise ValueError("reflected_vector must be s_i(vector)")
+        return self
+
+
+class WeylGroupDataRequest(CartanMatrixRequest):
+    """Request Weyl group data from a Cartan matrix."""
+
+    matrix: tuple[tuple[int, ...], ...]
+
+
+class WeylGroupDataResult(StrictModel):
+    """Weyl group data from a Cartan matrix."""
+
+    matrix: tuple[tuple[int, ...], ...]
+    rank: int
+    group_order: int
+    longest_element: tuple[int, ...]
+    coxeter_number: int
+
+    @model_validator(mode="after")
+    def bind_weyl_data(self) -> Self:
+        from jacobian.math.root_systems._operations import _weyl_group_data
+
+        CartanMatrixRequest(matrix=self.matrix)
+        order, longest, coxeter = _weyl_group_data([list(row) for row in self.matrix])
+        if self.rank != len(self.matrix):
+            raise ValueError("rank must match the Cartan matrix")
+        if self.group_order != order:
+            raise ValueError("group_order must be |W|")
+        if self.longest_element != longest:
+            raise ValueError("longest_element must be the longest Weyl group element")
+        if self.coxeter_number != coxeter:
+            raise ValueError("coxeter_number must be h")
         return self
