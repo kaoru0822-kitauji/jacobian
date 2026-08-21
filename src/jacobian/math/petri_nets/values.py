@@ -16,9 +16,6 @@ MAX_REACHABILITY_STATES = 100_000
 MAX_REACHABILITY_STATE_TOKEN_CELLS = 100_000
 MAX_REACHABILITY_FIRING_RECORDS = 100_000
 MAX_REACHABILITY_EXPLORATION_WORK = 1_000_000
-MAX_REACHABILITY_RESULT_BYTES = 8_000_000
-_MAX_REACHABILITY_FIXED_RESULT_BYTES = 64_000
-_REACHABILITY_PUBLIC_BFS_PASSES = 2
 
 
 class PetriNet(StrictModel):
@@ -43,17 +40,13 @@ class PetriNet(StrictModel):
         for row in self.pre:
             if len(row) != self.transition_count:
                 raise ValueError("pre row must have transition_count entries")
-            if any(not 0 <= w <= MAX_PETRI_ARC_WEIGHT for w in row):
-                raise ValueError(
-                    f"pre weights must be between 0 and {MAX_PETRI_ARC_WEIGHT}"
-                )
+            if any(w < 0 for w in row):
+                raise ValueError("pre weights must be non-negative")
         for row in self.post:
             if len(row) != self.transition_count:
                 raise ValueError("post row must have transition_count entries")
-            if any(not 0 <= w <= MAX_PETRI_ARC_WEIGHT for w in row):
-                raise ValueError(
-                    f"post weights must be between 0 and {MAX_PETRI_ARC_WEIGHT}"
-                )
+            if any(w < 0 for w in row):
+                raise ValueError("post weights must be non-negative")
         return self
 
 
@@ -64,10 +57,8 @@ class Marking(StrictModel):
 
     @model_validator(mode="after")
     def require_valid_marking(self) -> Self:
-        if any(not 0 <= t <= MAX_PETRI_MARKING for t in self.tokens):
-            raise ValueError(
-                f"marking tokens must be between 0 and {MAX_PETRI_MARKING}"
-            )
+        if any(t < 0 for t in self.tokens):
+            raise ValueError("marking tokens must be non-negative")
         return self
 
 
@@ -78,28 +69,16 @@ class FiringSequence(StrictModel):
 
 
 def require_reachability_bounds(net: PetriNet, max_states: int) -> None:
-    """Admit one native or public BFS request under the aggregate envelope."""
-
-    if not 1 <= max_states <= MAX_REACHABILITY_STATES:
-        raise ValueError(f"max_states must be between 1 and {MAX_REACHABILITY_STATES}")
+    """Admit BFS work jointly with state, place, and transition dimensions."""
     state_cells = max_states * net.place_count
     firing_records = max_states * net.transition_count
-    exploration_work = (
-        _REACHABILITY_PUBLIC_BFS_PASSES * firing_records * net.place_count
-    )
-    estimated_result_bytes = (
-        _MAX_REACHABILITY_FIXED_RESULT_BYTES
-        + 6 * state_cells
-        + firing_records * (64 + 6 * net.place_count)
-    )
+    exploration_work = 2 * firing_records * net.place_count
     if state_cells > MAX_REACHABILITY_STATE_TOKEN_CELLS:
         raise ValueError("reachability state-token cells exceed the work bound")
     if firing_records > MAX_REACHABILITY_FIRING_RECORDS:
         raise ValueError("reachability firing records exceed the work bound")
     if exploration_work > MAX_REACHABILITY_EXPLORATION_WORK:
         raise ValueError("reachability exploration exceeds the work bound")
-    if estimated_result_bytes > MAX_REACHABILITY_RESULT_BYTES:
-        raise ValueError("reachability result exceeds the byte bound")
 
 
 __all__ = [
@@ -109,7 +88,6 @@ __all__ = [
     "MAX_PETRI_TRANSITIONS",
     "MAX_REACHABILITY_EXPLORATION_WORK",
     "MAX_REACHABILITY_FIRING_RECORDS",
-    "MAX_REACHABILITY_RESULT_BYTES",
     "MAX_REACHABILITY_STATES",
     "MAX_REACHABILITY_STATE_TOKEN_CELLS",
     "FiringSequence",

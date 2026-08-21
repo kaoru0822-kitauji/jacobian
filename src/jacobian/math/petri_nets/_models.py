@@ -62,13 +62,9 @@ class FireTransitionResult(StrictModel):
     def require_consistent_outcome(self) -> Self:
         if self.status == "ESCAPES_DECLARED_ENVELOPE":
             if self.new_marking is not None or self.envelope_escape is None:
-                raise ValueError(
-                    "envelope escape must carry only the successor witness"
-                )
-            if any(token < 0 for token in self.envelope_escape):
-                raise ValueError("envelope escape tokens must be nonnegative")
+                raise ValueError("envelope escape must carry only the successor")
             if all(token <= MAX_PETRI_MARKING for token in self.envelope_escape):
-                raise ValueError("envelope escape must contain an out-of-range token")
+                raise ValueError("envelope escape must exceed the marking bound")
         elif self.new_marking is None or self.envelope_escape is not None:
             raise ValueError("ordinary firing outcomes must carry only a marking")
         return self
@@ -89,8 +85,7 @@ class IncidenceMatrixResult(StrictModel):
 class ReachabilityRequest(StrictModel):
     """Compute the bounded reachability graph from an initial marking.
 
-    The state count is admitted jointly with place and transition dimensions,
-    bounding state cells, firing records, exploration work, and result bytes.
+    Bounds the state space to avoid unbounded exploration.
     """
 
     net: PetriNet
@@ -105,86 +100,40 @@ class ReachabilityRequest(StrictModel):
         return self
 
 
-class ReachabilityFrontier(StrictModel):
-    """One enabled firing omitted because its target is outside the state bound."""
-
-    source_state: int = Field(ge=0)
-    transition: int = Field(ge=0)
-    target_marking: tuple[int, ...]
-
-
-class ReachabilityEnvelopeEscape(ReachabilityFrontier):
-    """First deterministic firing whose successor exceeds the marking domain."""
-
-    @model_validator(mode="after")
-    def require_outside_marking_envelope(self) -> Self:
-        if not any(token > MAX_PETRI_MARKING for token in self.target_marking):
-            raise ValueError("escape target must exceed the marking envelope")
-        return self
-
-
 class ReachabilityResult(StrictModel):
-    """A complete graph, bounded prefix, or marking-envelope escape.
+    """The bounded reachability graph.
 
     Each state is a marking tuple. The graph is a mapping from marking
-    to a list of (transition, resulting_marking) pairs. An envelope escape is
-    a typed non-conclusion carrying the first deterministic firing witness.
+    to a list of (transition, resulting_marking) pairs.
     """
 
-    net: PetriNet
-    initial_marking: Marking
-    max_states: int = Field(ge=1, le=MAX_REACHABILITY_STATES)
     states: tuple[tuple[int, ...], ...]
     edges: tuple[tuple[int, int, int], ...]
-    status: Literal["COMPLETE", "TRUNCATED", "ESCAPES_DECLARED_ENVELOPE"]
-    frontier: tuple[ReachabilityFrontier, ...]
-    envelope_escape: ReachabilityEnvelopeEscape | None = None
+    truncated: bool
+
+
+class SiphonTrapRequest(StrictModel):
+    """Check for siphons and traps in a Petri net."""
+
+    net: PetriNet
 
     @model_validator(mode="after")
-    def require_exact_bounded_graph(self) -> Self:
-        from jacobian.math.petri_nets.operations import reachability_graph
-
-        expected_states, expected_edges, expected_frontier, expected_escape = (
-            reachability_graph(
-                self.net,
-                self.initial_marking,
-                self.max_states,
+    def require_bounded_places(self) -> Self:
+        if self.net.place_count > 20:
+            raise ValueError(
+                "siphon/trap check supports at most 20 places for exact enumeration"
             )
-        )
-        if self.states != tuple(expected_states):
-            raise ValueError("states must equal the deterministic BFS states")
-        if self.edges != tuple(expected_edges):
-            raise ValueError("edges must equal the deterministic BFS edges")
-        if self.frontier != tuple(
-            ReachabilityFrontier(
-                source_state=source,
-                transition=transition,
-                target_marking=target,
-            )
-            for source, transition, target in expected_frontier
-        ):
-            raise ValueError("frontier must equal the deterministic BFS frontier")
-        expected_escape_value = (
-            None
-            if expected_escape is None
-            else ReachabilityEnvelopeEscape(
-                source_state=expected_escape[0],
-                transition=expected_escape[1],
-                target_marking=expected_escape[2],
-            )
-        )
-        if self.envelope_escape != expected_escape_value:
-            raise ValueError("envelope escape must equal the deterministic BFS witness")
-        expected_status = (
-            "ESCAPES_DECLARED_ENVELOPE"
-            if expected_escape is not None
-            else "TRUNCATED"
-            if expected_frontier
-            else "COMPLETE"
-        )
-        if self.status != expected_status:
-            raise ValueError("status must agree with the deterministic BFS outcome")
         return self
+
+
+class SiphonTrapResult(StrictModel):
+    """Minimal siphons and traps of the net.
+
+    Each siphon/trap is represented as a tuple of place indices.
+    """
+
+    siphons: tuple[tuple[int, ...], ...]
+    traps: tuple[tuple[int, ...], ...]
 
 
 __all__ = [
@@ -194,8 +143,8 @@ __all__ = [
     "FireTransitionResult",
     "IncidenceMatrixRequest",
     "IncidenceMatrixResult",
-    "ReachabilityEnvelopeEscape",
-    "ReachabilityFrontier",
     "ReachabilityRequest",
     "ReachabilityResult",
+    "SiphonTrapRequest",
+    "SiphonTrapResult",
 ]

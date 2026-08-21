@@ -9,14 +9,16 @@ from jacobian.math.petri_nets._models import (
     FireTransitionResult,
     IncidenceMatrixRequest,
     IncidenceMatrixResult,
-    ReachabilityEnvelopeEscape,
-    ReachabilityFrontier,
     ReachabilityRequest,
     ReachabilityResult,
+    SiphonTrapRequest,
+    SiphonTrapResult,
 )
 from jacobian.math.petri_nets.operations import (
     compute_incidence_matrix,
     enabled_transitions,
+    find_minimal_siphons,
+    find_minimal_traps,
     fire_transition,
     reachability_graph,
 )
@@ -27,6 +29,7 @@ __all__ = [
     "compute_fire_transition",
     "compute_incidence",
     "compute_reachability",
+    "compute_siphon_trap",
 ]
 
 
@@ -58,37 +61,20 @@ def compute_incidence(request: IncidenceMatrixRequest) -> IncidenceMatrixResult:
 
 
 def compute_reachability(request: ReachabilityRequest) -> ReachabilityResult:
-    states, edges, frontier, envelope_escape = reachability_graph(
+    states, edges, truncated = reachability_graph(
         request.net, request.initial_marking, request.max_states
     )
     return ReachabilityResult(
-        net=request.net,
-        initial_marking=request.initial_marking,
-        max_states=request.max_states,
         states=tuple(states),
         edges=tuple(edges),
-        status=(
-            "ESCAPES_DECLARED_ENVELOPE"
-            if envelope_escape is not None
-            else "TRUNCATED"
-            if frontier
-            else "COMPLETE"
-        ),
-        frontier=tuple(
-            ReachabilityFrontier(
-                source_state=source,
-                transition=transition,
-                target_marking=target,
-            )
-            for source, transition, target in frontier
-        ),
-        envelope_escape=(
-            None
-            if envelope_escape is None
-            else ReachabilityEnvelopeEscape(
-                source_state=envelope_escape[0],
-                transition=envelope_escape[1],
-                target_marking=envelope_escape[2],
-            )
-        ),
+        truncated=truncated,
+    )
+
+
+def compute_siphon_trap(request: SiphonTrapRequest) -> SiphonTrapResult:
+    siphons = find_minimal_siphons(request.net)
+    traps = find_minimal_traps(request.net)
+    return SiphonTrapResult(
+        siphons=tuple(tuple(sorted(s)) for s in siphons),
+        traps=tuple(tuple(sorted(t)) for t in traps),
     )

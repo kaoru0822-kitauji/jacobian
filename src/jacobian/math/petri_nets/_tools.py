@@ -7,14 +7,23 @@ from jacobian._models import StrictModel
 from jacobian.catalog._examples import example
 from jacobian.catalog.models import MathTool, OperationExample
 from jacobian.math.petri_nets._models import (
+    EnabledTransitionsRequest,
+    EnabledTransitionsResult,
     FireTransitionRequest,
     FireTransitionResult,
+    IncidenceMatrixRequest,
+    IncidenceMatrixResult,
     ReachabilityRequest,
     ReachabilityResult,
+    SiphonTrapRequest,
+    SiphonTrapResult,
 )
 from jacobian.math.petri_nets._operations import (
+    compute_enabled_transitions,
     compute_fire_transition,
+    compute_incidence,
     compute_reachability,
+    compute_siphon_trap,
 )
 
 
@@ -57,13 +66,45 @@ _NET = {
     },
 }
 
+_NET2 = {
+    "net": {
+        "place_count": 2,
+        "transition_count": 2,
+        "pre": [[1, 0], [0, 0]],
+        "post": [[0, 0], [0, 1]],
+    },
+}
+
 PETRI_NET_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+    _op(
+        "petri_net.enabled_transitions.compute",
+        "Find enabled transitions in a Petri net",
+        "Return the indices of all transitions enabled at the given marking, "
+        "where a transition is enabled iff every place has enough tokens for "
+        "its pre-condition.",
+        EnabledTransitionsRequest,
+        EnabledTransitionsResult,
+        compute_enabled_transitions,
+        "petri-net",
+        "enabled",
+        "exact",
+        examples=(
+            example(
+                "simple_net",
+                "Enabled transitions of a 2-place, 2-transition net.",
+                {
+                    "net": _NET["net"],
+                    "marking": {"tokens": [2, 0]},
+                },
+            ),
+        ),
+    ),
     _op(
         "petri_net.fire_transition.compute",
         "Fire one transition in a Petri net",
-        "Fire a single transition at the given marking. Return the canonical "
-        "resulting marking, report that the transition is not enabled, or "
-        "return the exact successor when it leaves the declared envelope.",
+        "Fire a single transition at the given marking and return whether it "
+        "succeeded and the resulting marking. If the transition is not "
+        "enabled, it does not fire.",
         FireTransitionRequest,
         FireTransitionResult,
         compute_fire_transition,
@@ -83,13 +124,29 @@ PETRI_NET_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
         ),
     ),
     _op(
+        "petri_net.incidence_matrix.compute",
+        "Compute the incidence matrix of a Petri net",
+        "Return the incidence matrix C = Post - Pre for the given Petri net.",
+        IncidenceMatrixRequest,
+        IncidenceMatrixResult,
+        compute_incidence,
+        "petri-net",
+        "incidence",
+        "exact",
+        examples=(
+            example(
+                "simple_net_incidence",
+                "Incidence matrix of a 2-place, 2-transition net.",
+                {"net": _NET2["net"]},
+            ),
+        ),
+    ),
+    _op(
         "petri_net.reachability_graph.compute",
         "Compute the bounded reachability graph of a Petri net",
-        "Return an exact BFS reachability graph when exploration closes within "
-        "max_states. If the bound is exhausted, return TRUNCATED with every "
-        "enabled omitted firing in an explicit replayable frontier. If a firing "
-        "exceeds the marking envelope, return ESCAPES_DECLARED_ENVELOPE with "
-        "the exact firing witness.",
+        "Return the bounded reachability graph from an initial marking via "
+        "BFS, including all reachable markings and firing edges. The graph "
+        "is truncated at max_states to bound the state space.",
         ReachabilityRequest,
         ReachabilityResult,
         compute_reachability,
@@ -104,6 +161,35 @@ PETRI_NET_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
                     "net": _NET["net"],
                     "initial_marking": {"tokens": [1, 0]},
                     "max_states": 100,
+                },
+            ),
+        ),
+    ),
+    _op(
+        "petri_net.siphon_trap.check",
+        "Check for siphons and traps in a Petri net",
+        "Return all minimal siphons and minimal traps of the given Petri net. "
+        "A siphon is a set of places that never gains tokens once it loses "
+        "them; a trap is a set of places that never loses tokens once it has "
+        "them.",
+        SiphonTrapRequest,
+        SiphonTrapResult,
+        compute_siphon_trap,
+        "petri-net",
+        "siphon",
+        "trap",
+        "exact",
+        examples=(
+            example(
+                "cyclic_net",
+                "Siphons and traps of a cyclic 2-place net.",
+                {
+                    "net": {
+                        "place_count": 2,
+                        "transition_count": 2,
+                        "pre": [[1, 0], [0, 1]],
+                        "post": [[0, 1], [1, 0]],
+                    },
                 },
             ),
         ),
