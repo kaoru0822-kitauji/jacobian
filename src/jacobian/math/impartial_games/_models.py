@@ -16,10 +16,14 @@ from jacobian.math.impartial_games.values import (
     MAX_HEAP_BOUND,
     MAX_HEAP_SIZE,
     MAX_HEAPS,
+    MAX_POSITIONS,
     MAX_SUBTRACTION_VALUE,
     MAX_SUBTRACTION_WORK,
     ImpartialGame,
 )
+
+MAX_COMPONENT_GRUNDY = MAX_POSITIONS - 1
+MAX_DISJUNCTIVE_GRUNDY = (1 << MAX_COMPONENT_GRUNDY.bit_length()) - 1
 
 
 class GrundyTableRequest(StrictModel):
@@ -181,3 +185,69 @@ class OutcomeProfileResult(StrictModel):
     n_positions: tuple[str, ...]
     grundy_values: tuple[tuple[str, int], ...]
     terminal_positions: tuple[str, ...]
+
+
+# ---------------------------------------------------------------------------
+# Disjunctive sum operation
+# ---------------------------------------------------------------------------
+
+
+class DisjunctiveSumRequest(StrictModel):
+    """A disjunctive sum of finite impartial game components.
+
+    Each component specifies a game DAG and the label of the starting
+    position whose Grundy value represents that component in the sum.
+    The Grundy value of the disjunctive sum is the bitwise XOR of the
+    component Grundy values.
+    """
+
+    components: tuple[ImpartialGame, ...] = Field(min_length=1, max_length=MAX_HEAPS)
+    start_positions: tuple[str, ...] = Field(min_length=1, max_length=MAX_HEAPS)
+
+    @model_validator(mode="after")
+    def require_matching_bounded(self) -> Self:
+        if len(self.components) != len(self.start_positions):
+            raise ValueError("components and start_positions must have equal length")
+        for index, (game, start) in enumerate(
+            zip(self.components, self.start_positions, strict=True)
+        ):
+            if start not in game.positions:
+                raise ValueError(
+                    f"start position {index!r} is not in component {index}'s positions"
+                )
+        return self
+
+
+class DisjunctiveSumResult(StrictModel):
+    """The exact Grundy value of a disjunctive sum of impartial games."""
+
+    grundy_value: int = Field(ge=0, le=MAX_DISJUNCTIVE_GRUNDY)
+    component_grundy_values: tuple[int, ...] = Field(
+        min_length=1,
+        max_length=MAX_HEAPS,
+    )
+    is_p_position: bool
+    component_count: int = Field(ge=1, le=MAX_HEAPS)
+
+    @model_validator(mode="after")
+    def require_exact_disjunctive_invariants(self) -> Self:
+        if self.component_count != len(self.component_grundy_values):
+            raise ValueError(
+                "component_count must match component_grundy_values length"
+            )
+        if any(
+            not 0 <= value <= MAX_COMPONENT_GRUNDY
+            for value in self.component_grundy_values
+        ):
+            raise ValueError(
+                f"component Grundy values must be between 0 and {MAX_COMPONENT_GRUNDY}"
+            )
+        from functools import reduce
+        from operator import xor
+
+        expected = reduce(xor, self.component_grundy_values, 0)
+        if self.grundy_value != expected:
+            raise ValueError("grundy_value must be XOR of component_grundy_values")
+        if self.is_p_position != (expected == 0):
+            raise ValueError("is_p_position must agree with grundy_value == 0")
+        return self
