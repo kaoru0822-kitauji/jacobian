@@ -103,6 +103,15 @@ value; it does not widen or discover that domain. Backend result validation
 checks integration and reconstruction. Result validation must never compensate
 for an overbroad request contract.
 
+Public numeric values are canonical exact rationals. IEEE doubles may exist
+only inside a private kernel; any double crossing the boundary is carried as
+its exact dyadic rational (`Fraction(float(v))` is lossless), because the
+transport rejects JSON floating points and results must stay reconstructible.
+Numerical backends such as Golub-Welsch therefore compute in floats but return
+dyadic-exact values with their admission bounded to the finite-double range.
+This invariant is enforced by the canonical transport and the integration
+examples lane; meet it at design time rather than relying on those tripwires.
+
 Do not add a public operation until its stated mathematical claim has a bounded,
 appropriate implementation. A public operation is the `MathTool` contract—its
 identifier, typed request and result, scope, and mathematical claim—not merely
