@@ -89,7 +89,11 @@ algebraic realizability. Preserve useful code and exact outputs when they are
 needed to reproduce a finding.
 
 At every bespoke-code escape, state the desired mathematical postcondition.
-Then inspect the session-visible Jacobian surface when possible:
+Audit the mathematical move even when the agent never mentioned or used
+Jacobian. Tool non-use is not itself the finding; handwritten code is evidence
+of a demanded operation, which must then be classified as existing, missing,
+or unsuitable for public admission. Then inspect the session-visible Jacobian
+surface when possible:
 
 1. Was a matching operation available?
 2. Could natural `math.find` language discover it?
