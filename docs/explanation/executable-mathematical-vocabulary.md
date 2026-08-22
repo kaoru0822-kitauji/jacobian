@@ -71,6 +71,11 @@ another system, ask what mathematical fact or object it needed rather than which
 helper function it called. Work backward from that result to the stable
 mathematical boundary.
 
+Whether the agent invoked Jacobian is not a prerequisite for gap discovery.
+Bespoke mathematical code can reveal a missing reusable postcondition;
+availability, discovery, selection, and execution are separate adoption
+questions.
+
 Treat the trajectory as evidence, not as the operation specification. Bind an
 availability claim to the catalog and repository revision visible in that
 session, and distinguish an operation that was unavailable, undiscovered,
