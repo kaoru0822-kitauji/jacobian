@@ -272,6 +272,51 @@ the rejected adversarial case and a useful case near the boundary. Do not use a
 post-hoc output-term cap, truncation, sentinel, or host exception as a hidden
 computational budget.
 
+### Finite enumeration budgets
+
+Large finite enumeration is compatible with a bounded exact operation. Admit it
+using the mathematical quantities that actually control the computation rather
+than treating small inputs as a goal in themselves. Record independent bounds
+for:
+
+- the number of candidate objects inspected in the worst case;
+- the maximum intermediate height, degree, term count, or other value growth
+  within one candidate computation; and
+- the maximum number and canonical serialized size of returned values or
+  witnesses.
+
+Do not compress these into a convenient input product unless a documented
+derivation proves that the product conservatively bounds every relevant
+quantity. For example, a planar search over triples and quadruples has
+
+```text
+candidate_count = C(n, 3) + C(n, 4)
+```
+
+while coordinate height controls determinant intermediates and the result
+shape controls witness serialization. `n * coordinate_digits` does not by
+itself state any of those obligations.
+
+A decision or first-witness operation must admit the full negative-case work,
+but may have constant-size output. An all-witness operation or complete profile
+must additionally admit its worst-case witness count and serialized result.
+Prefer retaining the source value once and referring to indexed components over
+repeating labels, parents, or other source context in every output entry.
+
+Use measurements on representative and adversarial boundary fixtures to choose
+useful conservative ceilings, but do not present timing measurements as the
+boundedness proof. The proof is the finite candidate count and intermediate and
+output growth; measurements establish whether the admitted region is useful on
+the supported implementation.
+
+When the complete search exceeds a single-call ceiling, deterministic
+partitioning is acceptable only when the partition is a stable mathematical
+subdomain and the result identifies exactly what was searched. The caller may
+compose disjoint partitions, but no partition may claim global absence or
+completeness. A timeout, node limit, or truncated witness list is not such a
+claim. Keep the transport envelope separate from the mathematical output bound:
+the latter must imply that the canonical serialized result fits the former.
+
 When an operation has a genuine incomplete or unknown outcome, expose that
 state in its domain result with the evidence and bounds needed to interpret it.
 Do not turn an inability to finish or represent the exact answer into a
