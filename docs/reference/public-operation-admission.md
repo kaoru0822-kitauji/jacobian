@@ -22,6 +22,15 @@ itself evidence for a new public operation. See
 [Executable mathematical vocabulary](../explanation/executable-mathematical-vocabulary.md)
 for the semantic-atomicity test and gap-diagnosis methodology.
 
+Do not confuse a stable mathematical postcondition with one release's admitted
+execution envelope. If an existing operation has the right semantics but uses
+an unnecessarily coarse or narrow limit, classify the problem as a
+scale/backend gap and widen that contract when its work, intermediate growth,
+and result remain bounded. A new operation must not exist solely to bypass an
+arbitrary cap on a composable primitive. Follow the
+[boundedness proof](domain-operation-library.md#boundedness-proof) and prefer
+the quantities that actually control the kernel or exact output.
+
 ## Admission gates
 
 A public operation must satisfy every gate:
@@ -80,14 +89,17 @@ For a catalog-changing pull request:
 
 1. Compare the candidate against nearby IDs, native symbols, input and output
    types, and discovery wording.
-2. Record one decision and a concrete mathematical rationale in the owning
+2. Verify that each request limit follows from a named representation, work,
+   intermediate-growth, or result-size budget. Check whether a sharper bound
+   would safely admit materially larger source-backed cases.
+3. Record one decision and a concrete mathematical rationale in the owning
    domain's `_admission.py` module.
-3. For `NATIVE_ONLY`, name an importable callable whose containing public
+4. For `NATIVE_ONLY`, name an importable callable whose containing public
    module includes it in `__all__`.
-4. For bounded search, test both a complete result and the applicable
+5. For bounded search, test both a complete result and the applicable
    incomplete or truncated path. Missing witnesses and exhausted budgets are
    never negative mathematical conclusions.
-5. Regenerate the schema snapshot and run the catalog, native-API, and owning
+6. Regenerate the schema snapshot and run the catalog, native-API, and owning
    mathematical tests.
 
 The owner-local decision ledger is source review data for constructing the
