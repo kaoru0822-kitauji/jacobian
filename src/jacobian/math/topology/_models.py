@@ -23,6 +23,7 @@ from jacobian._digest import Sha256Digest
 from jacobian._exact import CanonicalInteger
 from jacobian._models import StrictModel
 from jacobian.canonical import canonicalize_json
+from jacobian.math.chain_complexes.values import ChainComplexValue
 from jacobian.math.matrices.certified_snf.values import (
     CertifiedIntegerMatrix,
     SmithNormalFormCertificate,
@@ -720,6 +721,34 @@ def require_linear_algebra_bounds(complex_: FiniteSimplicialComplex) -> None:
         )
 
 
+def _require_canonical_conversion_bounds(complex_: FiniteSimplicialComplex) -> None:
+    """Unreduced GF(p) chains must fit the canonical value's bounds.
+
+    ``ChainComplexValue`` caps the aggregate cells across every
+    differential, so admission must check the same sum rather than each
+    boundary product separately.
+    """
+    from jacobian.math.chain_complexes.values import (
+        MAX_BASIS_SIZE,
+        MAX_MATRIX_CELLS,
+    )
+
+    sizes = complex_.f_vector
+    if any(size > MAX_BASIS_SIZE for size in sizes):
+        raise ValueError(
+            "unreduced prime-field chain complexes require at most "
+            f"{MAX_BASIS_SIZE} faces per chain group"
+        )
+    padded = (0, *sizes)
+    total_cells = sum(rows * columns for rows, columns in pairwise(padded))
+    if total_cells > MAX_MATRIX_CELLS:
+        raise ValueError(
+            "unreduced prime-field chain complexes require "
+            f"{total_cells} aggregate boundary cells within the canonical "
+            f"{MAX_MATRIX_CELLS}-cell bound"
+        )
+
+
 class ChainComplexRequest(StrictModel):
     complex: FiniteSimplicialComplex
     coefficient_ring: ChainCoefficientRing = ChainCoefficientRing.INTEGER
@@ -734,6 +763,14 @@ class ChainComplexRequest(StrictModel):
         elif self.prime is None or not is_bounded_prime(self.prime):
             raise ValueError("prime-field chain complexes require a bounded prime")
         require_linear_algebra_bounds(self.complex)
+        # Every accepted unreduced prime-field producer result must carry
+        # its canonical chain-complex value, whose basis and cell bounds
+        # are tighter than the sparse internal ones.
+        if (
+            self.coefficient_ring is ChainCoefficientRing.PRIME_FIELD
+            and self.convention is HomologyConvention.UNREDUCED
+        ):
+            _require_canonical_conversion_bounds(self.complex)
         return self
 
 
@@ -824,6 +861,7 @@ class ChainComplexResult(TopologyExactResult):
         default=(),
         max_length=MAX_TOPOLOGY_DIMENSION,
     )
+    canonical_value: ChainComplexValue | None = None
 
     @model_validator(mode="after")
     def require_coherent_chain_contract(self) -> Self:
@@ -846,6 +884,26 @@ class ChainComplexResult(TopologyExactResult):
             expected_ledger
         ):
             raise ValueError("boundary-square ledger must cover every adjacent pair")
+        # The canonical value is part of the public result boundary: an
+        # unreduced GF(p) producer result must carry it exactly, and no
+        # other ring or convention admits one.
+        from jacobian.math.topology._operations import (
+            _canonical_value_from_parts,
+        )
+
+        expected_value = _canonical_value_from_parts(
+            self.coefficient_ring,
+            self.convention,
+            self.prime,
+            self.simplex_bases,
+            self.boundary_matrices,
+        )
+        if self.canonical_value != expected_value:
+            raise ValueError(
+                "canonical chain-complex value must be the exact "
+                "unreduced prime-field conversion of the retained "
+                "boundary data"
+            )
         return self
 
 
