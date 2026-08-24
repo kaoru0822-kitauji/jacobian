@@ -3,15 +3,19 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import Any
 
 import sympy
 
+from jacobian.canonical import CanonicalizationError, canonicalize_json
 from jacobian.math.commutative_algebra_ops._models import (
     EliminationIdealRequest,
     EliminationIdealResult,
     GroebnerBasisRequest,
     GroebnerBasisResult,
+    IdealMinimalPrimesRequest,
+    IdealMinimalPrimesResult,
     IdealNormalFormRequest,
     IdealNormalFormResult,
     IdealQuotientRequest,
@@ -22,10 +26,13 @@ from jacobian.math.commutative_algebra_ops._models import (
     IdealRadicalResult,
     IdealSaturationRequest,
     IdealSaturationResult,
+    computed_minimal_primes_result,
 )
 from jacobian.math.commutative_algebra_ops._singular import (
     run_bounded_stdin_python_kernel,
     run_singular_ideal_operation,
+    run_singular_minimal_primes,
+    run_singular_minimal_primes_verification,
 )
 from jacobian.math.polynomials._conversions import (
     rational_polynomial_to_sympy,
@@ -56,6 +63,19 @@ class _SympyKernelTimeoutError(TimeoutError):
 
 class _SympyKernelError(RuntimeError):
     """The bounded SymPy worker failed without producing an exact result."""
+
+
+def _require_transportable_minimal_primes_result(
+    result: IdealMinimalPrimesResult,
+) -> None:
+    """Reject a family whose complete public result exceeds JSON limits."""
+
+    try:
+        canonicalize_json(result.model_dump(mode="json"))
+    except CanonicalizationError as error:
+        raise _ResultLimitExceededError(
+            "the exact minimal-prime result exceeds the canonical transport bound"
+        ) from error
 
 
 _SYMPY_WORKER_SCRIPT = r"""
@@ -412,6 +432,145 @@ def compute_ideal_radical(request: IdealRadicalRequest) -> IdealRadicalResult:
     )
 
 
+def compute_ideal_minimal_primes(
+    request: IdealMinimalPrimesRequest,
+) -> IdealMinimalPrimesResult:
+    """Compute the complete minimal-prime family over ``QQ``.
+
+    The producing pass runs Singular's ``minAssGTZE`` kernel. A second
+    bounded pass then verifies the family's defining invariants by
+    independent evidence — radical-intersection equality, pairwise
+    non-containment, and agreement with the characteristic-set
+    decomposition — under ONE operation-level deadline: the verifier
+    subprocess receives only the wall allowance remaining after the
+    producing pass, so one request never exceeds its declared wall-time
+    budget.
+    """
+
+    started = time.monotonic()
+    backend = run_singular_minimal_primes(request.ideal, request.resource_budget)
+    components = backend.components
+    if backend.outcome != "COMPUTED" or components is None:
+        return IdealMinimalPrimesResult(
+            request=request,
+            outcome=backend.outcome,
+            components=None,
+            backend_version=None,
+            detail=backend.detail,
+        )
+
+    remaining = float(request.resource_budget.wall_seconds) - (
+        time.monotonic() - started
+    )
+    if remaining <= 0:
+        return IdealMinimalPrimesResult(
+            request=request,
+            outcome="TIMEOUT",
+            components=None,
+            backend_version=None,
+            detail=(
+                "The minimal-prime defining-invariant verification did not "
+                "complete within the declared backend budget."
+            ),
+        )
+
+    verdict = run_singular_minimal_primes_verification(
+        request.ideal,
+        components,
+        request.resource_budget,
+        wall_seconds=remaining,
+    )
+    if verdict == "VERIFIED":
+        # The producing pass and the independent verification pass above
+        # completed this request under one operation-level deadline. The
+        # trusted factory skips only a repeated backend verification while
+        # still enforcing shape, ring, exact-result envelopes, ordering, and
+        # uniqueness; externally supplied JSON always runs the model
+        # validator's own independent verification.
+        try:
+            result = computed_minimal_primes_result(
+                request=request,
+                components=components,
+                backend_version=backend.backend_version,
+            )
+            _require_transportable_minimal_primes_result(result)
+            return result
+        except _ResultLimitExceededError as error:
+            return IdealMinimalPrimesResult(
+                request=request,
+                outcome="LIMIT_EXCEEDED",
+                components=None,
+                backend_version=None,
+                detail=str(error),
+            )
+        except ValueError:
+            return IdealMinimalPrimesResult(
+                request=request,
+                outcome="ERROR",
+                components=None,
+                backend_version=None,
+                detail=(
+                    "The computed minimal-prime family violated its own shape, "
+                    "ring, exact-result-envelope, ordering, or uniqueness "
+                    "invariant."
+                ),
+            )
+    if verdict == "REFUTED":
+        return IdealMinimalPrimesResult(
+            request=request,
+            outcome="ERROR",
+            components=None,
+            backend_version=None,
+            detail=(
+                "The computed minimal-prime family failed its independent "
+                "primality, minimality, or radical-intersection verification."
+            ),
+        )
+    if verdict == "TIMEOUT":
+        return IdealMinimalPrimesResult(
+            request=request,
+            outcome="TIMEOUT",
+            components=None,
+            backend_version=None,
+            detail=(
+                "The minimal-prime defining-invariant verification did not "
+                "complete within the declared backend budget."
+            ),
+        )
+    if verdict == "UNAVAILABLE":
+        return IdealMinimalPrimesResult(
+            request=request,
+            outcome="UNAVAILABLE",
+            components=None,
+            backend_version=None,
+            detail=(
+                "The supported Singular backend became unavailable during "
+                "independent verification."
+            ),
+        )
+    if verdict == "CANCELLED":
+        return IdealMinimalPrimesResult(
+            request=request,
+            outcome="CANCELLED",
+            components=None,
+            backend_version=None,
+            detail=(
+                "The minimal-prime defining-invariant verification was "
+                "cancelled before producing a verdict."
+            ),
+        )
+    return IdealMinimalPrimesResult(
+        request=request,
+        outcome="ERROR",
+        components=None,
+        backend_version=None,
+        detail=(
+            "The independent minimal-prime verification failed without "
+            "producing a verdict."
+        ),
+    )
+
+
 def compute_ideal_radical_membership(
     request: IdealRadicalMembershipRequest,
 ) -> IdealRadicalMembershipResult:
@@ -473,6 +632,7 @@ def compute_ideal_saturation(request: IdealSaturationRequest) -> IdealSaturation
 
 
 __all__ = [
+    "compute_ideal_minimal_primes",
     "compute_ideal_quotient",
     "compute_ideal_radical",
     "compute_ideal_radical_membership",
