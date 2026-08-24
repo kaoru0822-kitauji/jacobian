@@ -5,6 +5,7 @@ from jacobian.math.number_theory._derived import DERIVED_NUMBER_THEORY_OPERATION
 from jacobian.math.number_theory._divisibility import DIVISIBILITY_OPERATIONS
 from jacobian.math.number_theory._finite_abelian_groups import (
     FINITE_ABELIAN_GROUP_FACTORIZATION_OPERATION,
+    FINITE_ABELIAN_SPECTRAL_PAIR_OPERATION,
 )
 from jacobian.math.number_theory._friable import FRIABLE_COUNT_OPERATION
 from jacobian.math.number_theory._modular import MODULAR_OPERATIONS
@@ -26,5 +27,6 @@ TOOLS: MathTools = (
     *DERIVED_NUMBER_THEORY_OPERATIONS,
     RAMANUJAN_SUM_OPERATION,
     FINITE_ABELIAN_GROUP_FACTORIZATION_OPERATION,
+    FINITE_ABELIAN_SPECTRAL_PAIR_OPERATION,
     FRIABLE_COUNT_OPERATION,
 )
