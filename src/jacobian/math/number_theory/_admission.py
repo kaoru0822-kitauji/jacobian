@@ -236,6 +236,11 @@ ADMISSIONS: tuple[OperationAdmission, ...] = (
         "distinct exact bounded mathematical value or invariant with material computational or reliability leverage",
     ),
     OperationAdmission(
+        "number_theory.ramanujan_sum.compute",
+        AdmissionDecision.KEEP,
+        "classical exact arithmetic function whose factorization-backed evaluation replaces a variable-length composition of divisor and Mobius calls",
+    ),
+    OperationAdmission(
         "number_theory.friable.count.compute",
         AdmissionDecision.KEEP,
         "complete exact friable count with result-sensitive materialized and generated regimes, avoiding caller-side factorization of every source integer",
