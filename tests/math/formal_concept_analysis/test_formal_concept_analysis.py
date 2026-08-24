@@ -59,6 +59,8 @@ def test_catalog_contains_only_audited_agent_outcomes() -> None:
         "formal_context.concept.from_attributes.compute",
         "formal_context.concepts.enumerate.compute",
         "formal_context.concept_lattice.compute",
+        "formal_context.duquenne_guigues_basis.compute",
+        "implication_system.closure.compute",
     }
 
 
@@ -152,16 +154,158 @@ class TestEnumeration:
         result = compute_enumerate_concepts(
             EnumerateConceptsRequest(context=_cross_context())
         )
-        # Cross context: (�{}, {a0,a1}), ({o0}, {a0}), ({o1}, {a1})
+        # Cross context: ({}, {a0,a1}), ({o0}, {a0}), ({o1}, {a1})
         assert result.count == 4
 
-    def test_diagonal_context_has_three_concepts(self) -> None:
+    def test_diagonal_context_has_two_concepts(self) -> None:
+        """cl(empty) = {a1} here, so the empty intent is not a concept."""
         result = compute_enumerate_concepts(
             EnumerateConceptsRequest(context=_diagonal_context())
         )
         # Diagonal: o0 has both a0 and a1; o1 has a1.
-        # Concepts: ({o0,o1}, {}), ({o0,o1}, {a1}), ({o0}, {a0,a1})
-        assert result.count == 3
+        # Concepts: ({o0,o1}, {a1}), ({o0}, {a0,a1})
+        assert result.count == 2
+
+    @staticmethod
+    def _contranominal(axis_size: int) -> FormalContext:
+        """The contranominal scale on n objects and n attributes: object i
+        has every attribute except i. It carries exactly 2^n concepts."""
+        n = axis_size
+        return FormalContext(
+            objects=tuple(f"o{index}" for index in range(n)),
+            attributes=tuple(f"a{index}" for index in range(n)),
+            incidence=tuple(
+                (object_index, attribute_index)
+                for object_index in range(n)
+                for attribute_index in range(n)
+                if attribute_index != object_index
+            ),
+        )
+
+    def test_contranominal_context_beyond_result_budget_is_rejected(self) -> None:
+        """A 21x21 contranominal context has exactly 2^21 concepts, beyond
+        the declared enumeration budget: admission must reject it with one
+        capped preflight instead of raising mid-enumeration."""
+        with pytest.raises(ValidationError, match="enumeration returns at most"):
+            EnumerateConceptsRequest(context=self._contranominal(21))
+
+    def test_empty_square_context_beyond_worst_case_stays_admissible(self) -> None:
+        """A 14x14 empty-incidence context has worst case 2^14 but only two
+        actual concepts, so the exact preflight must admit it and the
+        operation must return the complete family."""
+        context = FormalContext(
+            objects=tuple(f"o{index}" for index in range(14)),
+            attributes=tuple(f"a{index}" for index in range(14)),
+            incidence=(),
+        )
+        request = EnumerateConceptsRequest(context=context)
+        result = compute_enumerate_concepts(request)
+        assert result.count == 2
+
+    def test_contranominal_boundary_context_enumerates_complete_family(self) -> None:
+        """13 is the static boundary of the smaller axis (2^13 = 8192 fits
+        the budget; 2^14 does not), and the boundary context returns the
+        complete family as a typed result."""
+        result = compute_enumerate_concepts(
+            EnumerateConceptsRequest(context=self._contranominal(13))
+        )
+        assert result.count == 2**13 == 8192
+
+    def test_sparse_context_beyond_twenty_attributes_is_enumerated(self) -> None:
+        # One object with no incidences over 21 attributes carries exactly the
+        # two trivial concepts, so admission must not reject it by attribute
+        # count before considering actual enumeration work.
+        context = FormalContext(
+            objects=("o0",),
+            attributes=tuple(f"a{index}" for index in range(21)),
+            incidence=(),
+        )
+        result = compute_enumerate_concepts(EnumerateConceptsRequest(context=context))
+        assert result.count == 2
+
+    def test_attribute_fallback_boundary_is_admitted_and_rejected(self) -> None:
+        wide = FormalContext(
+            objects=("o0",),
+            attributes=tuple(f"a{index}" for index in range(64)),
+            incidence=(),
+        )
+        assert (
+            compute_enumerate_concepts(EnumerateConceptsRequest(context=wide)).count
+            == 2
+        )
+        with pytest.raises(ValidationError):
+            EnumerateConceptsRequest(
+                context=FormalContext(
+                    objects=("o0",),
+                    attributes=tuple(f"a{index}" for index in range(65)),
+                    incidence=(),
+                )
+            )
+
+
+# ---------------------------------------------------------------------------
+# Defining-equation replay (#2266)
+# ---------------------------------------------------------------------------
+
+
+def _assert_defining_equations(context: FormalContext) -> None:
+    from jacobian.math.formal_concept_analysis import (
+        attribute_derivation,
+        object_derivation,
+    )
+
+    for extent_tuple, intent_tuple in compute_enumerate_concepts(
+        EnumerateConceptsRequest(context=context)
+    ).concepts:
+        extent = frozenset(extent_tuple)
+        intent = frozenset(intent_tuple)
+        assert object_derivation(context, extent) == intent
+        assert attribute_derivation(context, intent) == extent
+
+
+@pytest.mark.parametrize(
+    "incidence",
+    (
+        ((0, 0), (0, 1), (1, 1)),
+        ((0, 0), (1, 1)),
+        ((0, 0), (0, 1), (1, 0), (1, 1)),
+        ((0, 1), (1, 0), (1, 1)),
+        ((0, 0),),
+        ((0, 0), (0, 1), (0, 2), (1, 1), (2, 2)),
+    ),
+)
+def test_every_emitted_concept_satisfies_defining_equations(
+    incidence: tuple[tuple[int, int], ...],
+) -> None:
+    object_count = max((o for o, _a in incidence), default=-1) + 1
+    attribute_count = max((a for _o, a in incidence), default=-1) + 1
+    context = FormalContext(
+        objects=tuple(f"o{i}" for i in range(object_count)),
+        attributes=tuple(f"a{j}" for j in range(attribute_count)),
+        incidence=incidence,
+    )
+    _assert_defining_equations(context)
+
+
+def test_lattice_embedded_concepts_replay_defining_equations() -> None:
+    from jacobian.math.formal_concept_analysis import (
+        attribute_derivation,
+        object_derivation,
+    )
+
+    context = _diagonal_context()
+    result = compute_concept_lattice(
+        EnumerateConceptsRequest(context=_diagonal_context())
+    )
+    assert len(result.concepts) == 2
+    for extent_tuple, intent_tuple in result.concepts:
+        extent = frozenset(extent_tuple)
+        intent = frozenset(intent_tuple)
+        assert object_derivation(context, extent) == intent
+        assert attribute_derivation(context, intent) == extent
+    # Extents are pairwise distinct, so no two concepts compare equal.
+    extents = [frozenset(extent_tuple) for extent_tuple, _intent in result.concepts]
+    assert len(set(extents)) == len(extents)
 
 
 # ---------------------------------------------------------------------------
@@ -177,6 +321,17 @@ class TestConceptLattice:
         assert result.top is not None
         assert result.bottom is not None
         assert len(result.concepts) == 4
+
+    def test_sparse_lattice_beyond_twenty_attributes_is_computed(self) -> None:
+        context = FormalContext(
+            objects=("o0",),
+            attributes=tuple(f"a{index}" for index in range(21)),
+            incidence=(),
+        )
+        result = compute_concept_lattice(EnumerateConceptsRequest(context=context))
+        assert len(result.concepts) == 2
+        assert result.top is not None
+        assert result.bottom is not None
 
 
 # ---------------------------------------------------------------------------

@@ -31,9 +31,19 @@ ADMISSIONS: tuple[OperationAdmission, ...] = (
         "distinct exact or explicitly bounded search outcome with material computational leverage",
     ),
     OperationAdmission(
+        "sat.refutation.check",
+        AdmissionDecision.KEEP,
+        "distinct source-bound certificate relation that cannot be established by SAT solving",
+    ),
+    OperationAdmission(
         "smt.solve",
         AdmissionDecision.KEEP,
         "distinct exact or explicitly bounded search outcome with material computational leverage",
+    ),
+    OperationAdmission(
+        "smt.unsat_core",
+        AdmissionDecision.KEEP,
+        "replayable source-bound contradiction certificate with distinct proof-extraction leverage",
     ),
 )
 

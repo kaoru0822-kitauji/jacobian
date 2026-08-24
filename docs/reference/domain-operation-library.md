@@ -105,6 +105,11 @@ or reasoning before designing an implementation (see
 Only a genuine operation gap proceeds to the
 [admission contract](public-operation-admission.md).
 
+Before trusting backend output for a new claim, consult the
+[known backend defects](backend-known-defects.md) registry; add an entry
+whenever the adapter compensates for backend behavior instead of narrowing
+the public domain.
+
 Every new or materially changed public operation must include the following
 completed review artifact in its issue or pull request. A field may say `Not
 applicable` with a reason; it must not be omitted.
@@ -222,6 +227,15 @@ morphism whose behavior is part of its contract. Never silently map unmatched
 variables to zero. Backend generator inference, ambient rings, and automatic
 coercion are private conveniences and do not define Jacobian's public
 semantics.
+
+### Canonical-value preflight
+
+Before adding a mathematical value, search the existing `values.py`,
+`_models.py`, and native exports by semantic meaning and fields, not only by
+class name. Reuse the existing owner across requests, results, producers, and
+consumers whenever possible. If a distinct type is necessary, record the
+different parent, representation, or postcondition, and define an explicit
+typed conversion rather than relying on caller-side reconstruction.
 
 Each mathematical value has one canonical type owned by its domain. A producer
 returns that type and downstream consumers accept it unchanged. An operation

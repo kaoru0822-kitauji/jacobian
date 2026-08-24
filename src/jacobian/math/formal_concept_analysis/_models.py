@@ -4,10 +4,22 @@ from __future__ import annotations
 
 from typing import Self
 
-from pydantic import Field, model_validator
+from pydantic import ConfigDict, Field, StrictInt, model_validator
 
 from jacobian._models import StrictModel
-from jacobian.math.formal_concept_analysis.values import FormalContext
+from jacobian.math.formal_concept_analysis.basis import (
+    MAX_DG_ATTRIBUTES,
+    MAX_DG_CANDIDATE_STATES,
+    MAX_DG_LOGICAL_WORK,
+    MAX_DG_RESULT_BYTES,
+    _duquenne_guigues_preflight,
+)
+from jacobian.math.formal_concept_analysis.values import (
+    MAX_IMPLICATION_MEMBERSHIPS,
+    MAX_IMPLICATIONS,
+    FiniteAttributeImplicationSystem,
+    FormalContext,
+)
 
 
 class _SubsetRequest(StrictModel):
@@ -38,6 +50,61 @@ class AttributeSubsetRequest(_SubsetRequest):
         return self
 
 
+class ImplicationClosureRequest(StrictModel):
+    """Close one canonical attribute subset under a finite implication system."""
+
+    system: FiniteAttributeImplicationSystem
+    seed: tuple[StrictInt, ...] = Field(
+        default=(),
+        description=(
+            "Attribute indices initially present. Order is immaterial, duplicate "
+            "indices are invalid, and every index refers to system.attributes."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def require_canonical_bounded_seed(self) -> Self:
+        if len(set(self.seed)) != len(self.seed):
+            raise ValueError("implication seed indices must be unique")
+        if any(
+            not 0 <= attribute < len(self.system.attributes) for attribute in self.seed
+        ):
+            raise ValueError(
+                "implication seed attribute is outside the declared carrier"
+            )
+        object.__setattr__(self, "seed", tuple(sorted(self.seed)))
+        return self
+
+
+class DuquenneGuiguesBasisRequest(StrictModel):
+    """Compute the complete canonical implication basis of one context."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "description": (
+                "Compute all pseudo-intents and the complete Duquenne-Guigues "
+                "basis for a FormalContext whose exhaustive candidate carrier "
+                f"is at most {MAX_DG_CANDIDATE_STATES} states "
+                f"({MAX_DG_ATTRIBUTES} attributes; documented conservative "
+                "fallback). Admission probes the exact closure matrix and "
+                "basis size, rejects bases beyond the "
+                f"{MAX_IMPLICATIONS}-implication canonical implication-system "
+                f"carrier ({MAX_IMPLICATION_MEMBERSHIPS:,} memberships), and "
+                "reserves producer and independent replay work bounded by "
+                f"{MAX_DG_LOGICAL_WORK:,} logical steps plus a worst-case "
+                f"{MAX_DG_RESULT_BYTES:,}-byte serialized result."
+            )
+        }
+    )
+
+    context: FormalContext
+
+    @model_validator(mode="after")
+    def require_complete_preflight(self) -> Self:
+        _duquenne_guigues_preflight(self.context)
+        return self
+
+
 class DerivationResult(StrictModel):
     """The derived set."""
 
@@ -60,11 +127,15 @@ class ConceptResult(StrictModel):
     intent: tuple[int, ...]
 
 
-# Bound the concept enumeration. NextClosure has cost proportional to the
-# number of concepts (not 2^|M|), but the number of concepts itself can be
-# exponential in the number of attributes.  We bound both the attribute count
-# and the number of concepts returned.
-MAX_CONCEPT_ATTRIBUTES = 64
+# Bound the concept enumeration by its declared output budget. NextClosure's
+# cost is proportional to the number of concepts, and that number is bounded
+# by 2^min(|objects|, |attributes|): intents biject with a closure system on
+# the attribute axis and extents with one on the object axis.  Admission is
+# therefore two-tier and result-sensitive.  When that tight worst case fits
+# MAX_CONCEPTS the request is admitted statically.  Otherwise one capped
+# NextClosure preflight — bounded by the same budget it guards — counts the
+# true family, so sparse wide or square contexts stay admissible and only
+# contexts whose actual family overflows are rejected before execution.
 MAX_CONCEPTS = 10000
 
 
@@ -74,11 +145,23 @@ class EnumerateConceptsRequest(StrictModel):
     context: FormalContext
 
     @model_validator(mode="after")
-    def require_bounded_attribute_count(self) -> Self:
-        if len(self.context.attributes) > MAX_CONCEPT_ATTRIBUTES:
-            raise ValueError(
-                f"concept enumeration supports at most {MAX_CONCEPT_ATTRIBUTES} attributes"
+    def require_bounded_concept_family(self) -> Self:
+        worst_case_concepts = 2 ** min(
+            len(self.context.objects), len(self.context.attributes)
+        )
+        if worst_case_concepts > MAX_CONCEPTS:
+            from jacobian.math.formal_concept_analysis.operations import (
+                concept_family_size_capped,
             )
+
+            family_size = concept_family_size_capped(self.context, MAX_CONCEPTS)
+            if family_size > MAX_CONCEPTS:
+                raise ValueError(
+                    f"the context carries more than {MAX_CONCEPTS} concepts "
+                    "and concept enumeration returns at most "
+                    f"{MAX_CONCEPTS}; narrow the context or split the "
+                    "enumeration"
+                )
         return self
 
 
@@ -101,13 +184,14 @@ class ConceptLatticeResult(StrictModel):
 
 __all__ = [
     "MAX_CONCEPTS",
-    "MAX_CONCEPT_ATTRIBUTES",
     "AttributeSubsetRequest",
     "ClosureResult",
     "ConceptLatticeResult",
     "ConceptResult",
     "DerivationResult",
+    "DuquenneGuiguesBasisRequest",
     "EnumerateConceptsRequest",
     "EnumerateConceptsResult",
+    "ImplicationClosureRequest",
     "ObjectSubsetRequest",
 ]
