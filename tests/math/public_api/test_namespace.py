@@ -25,6 +25,7 @@ ROOT_MATH_DOMAINS = (
     "combinatorial_matrices",
     "combinatorics",
     "crossed_products",
+    "delta_matroids",
     "diophantine_approximation",
     "dirichlet_characters",
     "finite_abelian_groups",
