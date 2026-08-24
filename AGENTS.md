@@ -196,11 +196,14 @@ partitioning must not introduce kernel-owned durable state.
   and encode that domain in the request model before invocation.
 - For every exact decomposition, certificate, or authoritative derived value,
   state its reconstruction or defining invariant and test that invariant.
-- Do not monkeypatch or use test fakes for mathematical values, validators,
-  serializers, or backend correctness. Test real typed boundaries and
-  maintained backends with deterministic fixtures, property tests, and
-  differential checks. Isolate unavailable-environment or transport-failure
-  tests separately; they must not stand in for mathematical correctness.
+- Center correctness tests on concrete regression evidence when fixing a
+  regression, defining identities, consistency checks, and property tests.
+  Exercise real typed boundaries and maintained backends through public paths
+  with deterministic or replayable inputs; keep fixtures sparse and name the
+  evidence each one contributes. Do not monkeypatch or use test fakes for
+  mathematical values, validators, serializers, or backend correctness.
+  Isolate unavailable-environment or transport-failure tests separately; they
+  must not stand in for mathematical correctness.
 - Keep mathematical results separate from transport failures. Timeout,
   incompleteness, unavailable execution, and missing witnesses do not establish
   mathematical conclusions. Follow the
