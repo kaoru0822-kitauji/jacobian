@@ -40,6 +40,12 @@ from jacobian.math.additive_combinatorics._subset_sum_residue import (
     SubsetSumResidueProfileResult,
     compute_subset_sum_residue_profile,
 )
+from jacobian.math.additive_combinatorics._subset_sum_target import (
+    MAX_SUBSET_SUM_TOTAL_TRANSITIONS,
+    SubsetSumTargetRequest,
+    SubsetSumTargetResult,
+    solve_subset_sum_target_request,
+)
 from jacobian.math.additive_combinatorics.operations import (
     MAX_SUBSET_SUM_DP_TRANSITIONS,
     MAX_SUBSET_SUM_PROFILE_RESULT_BYTES,
@@ -120,6 +126,37 @@ _DIRECT_SUM_NON_TILING_EXAMPLE: dict[str, Any] = {
 
 ADDITIVE_COMBINATORICS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     additive_combinatorics_operation(
+        "additive.subset_sum.target.solve",
+        "Solve one exact indexed subset-sum target",
+        (
+            "For a bounded indexed integer sequence and one integer target, "
+            "return the canonical attaining index subset or establish exact "
+            "non-attainment after exhausting the admitted reachable-sum state space. "
+            "The complete call charges admission, computation, and both "
+            "source-binding replays, performing at most "
+            f"{MAX_SUBSET_SUM_TOTAL_TRANSITIONS:,} state transitions."
+        ),
+        SubsetSumTargetRequest,
+        SubsetSumTargetResult,
+        solve_subset_sum_target_request,
+        "additive-combinatorics",
+        "subset-sum",
+        "decision",
+        "witness",
+        "exact",
+        examples=(
+            example(
+                "two_item_target",
+                "The distinct source indices 0 and 1 witness 2+3=5.",
+                {
+                    "source": {"items": ["2", "3"]},
+                    "target": "5",
+                    "allow_empty_subset": False,
+                },
+            ),
+        ),
+    ),
+    additive_combinatorics_operation(
         "additive.representation_profile.compute",
         "Compute the representation profile of a sumset",
         "Given two finite integer sets A and B, return r_{A+B}(x) = "
@@ -195,7 +232,7 @@ ADDITIVE_COMBINATORICS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
                 (
                     "Compute all subset sums of the two indexed values [1,1], "
                     "giving multiplicities 1,2,1 at sums 0,1,2; input items must "
-                    "be canonical integers inside the schema-visible "
+                    "be canonical integers inside the "
                     f"{MAX_SUBSET_SUM_ITEMS:,}-item, "
                     f"{MAX_SUBSET_SUM_ITEM_DIGITS:,}-digit, "
                     f"{MAX_SUBSET_SUM_PROFILE_ENTRIES:,}-row, "

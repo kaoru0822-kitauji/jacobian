@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Annotated, Self
 
 from pydantic import Field, StringConstraints, model_validator
+from pydantic.json_schema import WithJsonSchema
 
 from jacobian._exact import CanonicalInteger
 from jacobian._models import StrictModel
@@ -18,8 +19,10 @@ from jacobian.math.additive_combinatorics.operations import (
     _subset_sum_profile_envelope,
 )
 from jacobian.math.additive_combinatorics.values import (
+    MAX_SUBSET_SUM_ITEMS,
     MAX_SUBSET_SUM_PROFILE_ENTRIES,
     IndexedIntegerSequence,
+    indexed_sequence_item_ceiling,
 )
 
 # This conservative materialized-axis cap bounds source parsing and binomial
@@ -543,19 +546,53 @@ class SubsetSumProfileRequest(StrictModel):
     worst-case serialized profile before the dynamic program begins.
     """
 
-    source: IndexedIntegerSequence = Field(
+    source: Annotated[
+        IndexedIntegerSequence,
+        WithJsonSchema(indexed_sequence_item_ceiling(MAX_SUBSET_SUM_ITEMS)),
+    ] = Field(
         description=(
-            "The ordered indexed integer sequence. Each position is selectable "
-            "at most once; repeated values and zeros remain distinct positions. "
-            "Before execution, S=min(2^n, positive_sum-negative_sum+1, "
-            "product(m_v+1) over distinct nonzero values v) must fit "
-            f"{MAX_SUBSET_SUM_PROFILE_ENTRIES:,} "
+            "The ordered indexed integer sequence, at most 4,095 items. Each "
+            "position is selectable at most once; repeated values and zeros "
+            "remain distinct positions. Before execution, S=min(2^n, "
+            "positive_sum-negative_sum+1, product(m_v+1) over distinct "
+            f"nonzero values v) must fit {MAX_SUBSET_SUM_PROFILE_ENTRIES:,} "
             f"rows, 4*n*S must not exceed {MAX_SUBSET_SUM_DP_TRANSITIONS:,} "
             "dictionary transitions across construction and validation replay, "
             "and the conservative serialized-result estimate must not exceed "
             f"{MAX_SUBSET_SUM_PROFILE_RESULT_BYTES:,} bytes."
         ),
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def bound_raw_source(cls, value: object) -> object:
+        """Reject oversized raw sources before nested integer parsing.
+
+        Running a before validator moves field validation into Python
+        mode, where decoded JSON arrays no longer coerce to the declared
+        tuple shapes; normalize the source value list to a tuple on a
+        copied path so JSON invocation keeps working while the stored
+        sequence stays canonical.
+        """
+
+        if not isinstance(value, Mapping):
+            return value
+        prepared: dict[str, object] = dict(value)
+        raw_source = prepared.get("source")
+        if isinstance(raw_source, Mapping):
+            source = dict(raw_source)
+            items = source.get("items")
+            if isinstance(items, list):
+                source["items"] = tuple(items)
+                prepared["source"] = source
+                if len(items) > MAX_SUBSET_SUM_ITEMS:
+                    raise ValueError(
+                        "subset-sum profile source exceeds the "
+                        f"{MAX_SUBSET_SUM_ITEMS:,}-item profile bound"
+                    )
+            else:
+                prepared["source"] = source
+        return prepared
 
     @model_validator(mode="after")
     def require_admitted_profile_envelope(self) -> Self:

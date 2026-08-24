@@ -25,6 +25,7 @@ from jacobian.math.additive_combinatorics._operations import (
 )
 from jacobian.math.additive_combinatorics.operations import (
     MAX_SUBSET_SUM_PROFILE_RESULT_BYTES,
+    _subset_sum_profile_envelope,
 )
 from jacobian.math.additive_combinatorics.values import (
     MAX_SUBSET_SUM_ITEM_DIGITS,
@@ -212,9 +213,46 @@ def test_source_digit_bound_is_enforced_before_integer_conversion() -> None:
     assert error.value.errors()[0]["type"] == "string_too_long"
 
 
-def test_source_item_count_bound_is_enforced_by_schema() -> None:
-    with pytest.raises(ValidationError, match=f"at most {MAX_SUBSET_SUM_ITEMS} items"):
-        IndexedIntegerSequence(items=("0",) * (MAX_SUBSET_SUM_ITEMS + 1))
+def test_source_item_count_bound_is_enforced_by_admission() -> None:
+    widened = IndexedIntegerSequence(items=("0",) * (MAX_SUBSET_SUM_ITEMS + 1))
+    assert len(widened.items) == MAX_SUBSET_SUM_ITEMS + 1
+
+    with pytest.raises(
+        ValidationError, match=f"{MAX_SUBSET_SUM_ITEMS:,}-item profile bound"
+    ):
+        SubsetSumProfileRequest(source=widened)
+
+    with pytest.raises(ValidationError, match="at most 500000 items"):
+        IndexedIntegerSequence(items=("0",) * (500_000 + 1))
+
+
+def test_profile_envelope_rejects_oversized_sources_before_integer_conversion() -> None:
+    widened = IndexedIntegerSequence(items=("0",) * (MAX_SUBSET_SUM_ITEMS + 1))
+
+    with pytest.raises(
+        ValueError, match=f"{MAX_SUBSET_SUM_ITEMS:,}-item profile bound"
+    ):
+        _subset_sum_profile_envelope(widened)
+
+
+def test_raw_item_count_bound_is_enforced_before_nested_parsing() -> None:
+    payload = {"source": {"items": ["z"] * (MAX_SUBSET_SUM_ITEMS + 1)}}
+
+    with pytest.raises(
+        ValidationError, match=f"{MAX_SUBSET_SUM_ITEMS:,}-item profile bound"
+    ):
+        SubsetSumProfileRequest.model_validate(payload)
+
+
+def test_wide_canonical_items_are_rejected_by_the_raw_item_count_bound() -> None:
+    payload = {
+        "source": {"items": ["9" * 1_000] * (MAX_SUBSET_SUM_ITEMS + 1)},
+    }
+
+    with pytest.raises(
+        ValidationError, match=f"{MAX_SUBSET_SUM_ITEMS:,}-item profile bound"
+    ):
+        SubsetSumProfileRequest.model_validate(payload)
 
 
 @pytest.mark.parametrize(
@@ -237,8 +275,7 @@ def test_profile_entry_sum_digit_bound_applies_to_either_sign(
 
 def test_request_schema_exposes_source_shape_and_character_bounds() -> None:
     schema = SubsetSumProfileRequest.model_json_schema()
-    source_schema = schema["$defs"]["IndexedIntegerSequence"]
-    items_schema = source_schema["properties"]["items"]
+    items_schema = schema["properties"]["source"]["properties"]["items"]
     source_description = schema["properties"]["source"]["description"]
 
     assert items_schema["maxItems"] == MAX_SUBSET_SUM_ITEMS
@@ -246,3 +283,15 @@ def test_request_schema_exposes_source_shape_and_character_bounds() -> None:
     assert "4*n*S" in source_description
     assert "4,000,000" in source_description
     assert "4,194,304 bytes" in source_description
+
+
+def test_schema_item_ceiling_matches_validator_at_the_boundary() -> None:
+    at_ceiling = IndexedIntegerSequence(items=("0",) * MAX_SUBSET_SUM_ITEMS)
+    admitted = SubsetSumProfileRequest(source=at_ceiling)
+    assert len(admitted.source.items) == MAX_SUBSET_SUM_ITEMS
+
+    beyond = IndexedIntegerSequence(items=("0",) * (MAX_SUBSET_SUM_ITEMS + 1))
+    with pytest.raises(
+        ValidationError, match=f"{MAX_SUBSET_SUM_ITEMS:,}-item profile bound"
+    ):
+        SubsetSumProfileRequest(source=beyond)

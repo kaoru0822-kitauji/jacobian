@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 from itertools import pairwise
-from typing import Annotated, Self
+from typing import Annotated, Any, Self
 
 from pydantic import Field, StrictInt, StringConstraints, model_validator
+from pydantic.json_schema import WithJsonSchema
 
 from jacobian._models import StrictModel
 from jacobian.canonical import format_canonical_integer, parse_canonical_integer
 
 MAX_SUBSET_SUM_ITEMS = 4_095
+MAX_INDEXED_INTEGER_SEQUENCE_ITEMS = 500_000
 MAX_SUBSET_SUM_ITEM_DIGITS = 32_768
 MAX_SUBSET_SUM_SUM_DIGITS = MAX_SUBSET_SUM_ITEM_DIGITS + len(str(MAX_SUBSET_SUM_ITEMS))
 MAX_SUBSET_SUM_MULTIPLICITY_DIGITS = len(str(1 << MAX_SUBSET_SUM_ITEMS))
@@ -49,15 +51,18 @@ class IndexedIntegerSequence(StrictModel):
 
     Equal values and zeros are intentionally retained as separate positions.
     The listed order is the stable index axis used by subset witnesses and
-    other downstream indexed operations.
+    other downstream indexed operations. The item ceiling is the widest
+    consumer envelope; each consuming operation enforces its own tighter
+    item-count and work bounds in request-level admission.
     """
 
     items: tuple[IndexedInteger, ...] = Field(
-        max_length=MAX_SUBSET_SUM_ITEMS,
+        max_length=MAX_INDEXED_INTEGER_SEQUENCE_ITEMS,
         description=(
-            f"An ordered tuple of at most {MAX_SUBSET_SUM_ITEMS:,} canonical "
-            "integers. Repeated values and zeros remain distinct indexed items; "
-            f"each integer has at most {MAX_SUBSET_SUM_ITEM_DIGITS:,} decimal "
+            f"An ordered tuple of at most "
+            f"{MAX_INDEXED_INTEGER_SEQUENCE_ITEMS:,} canonical integers. "
+            "Repeated values and zeros remain distinct indexed items; each "
+            f"integer has at most {MAX_SUBSET_SUM_ITEM_DIGITS:,} decimal "
             "digits, excluding its optional sign."
         ),
         examples=[("1", "1", "3")],
@@ -77,6 +82,50 @@ class IndexedIntegerSequence(StrictModel):
         """Return the indexed values as exact Python integers."""
 
         return tuple(parse_canonical_integer(item) for item in self.items)
+
+
+def indexed_sequence_item_ceiling(
+    maximum_items: int,
+    *,
+    maximum_item_digits: int | None = None,
+) -> dict[str, Any]:
+    """Return the shared sequence definition tightened to ``maximum_items``.
+
+    The canonical sequence value advertises the widest consumer envelope, so a
+    verbatim shared definition would make every consumer publish
+    ``maxItems: 500000`` even when its validator admits fewer items. Consumers
+    attach the returned schema through ``WithJsonSchema`` so their own schema
+    documents advertise exactly the item ceiling their validators enforce;
+    validation itself stays with the canonical value.
+
+    ``maximum_item_digits`` additionally publishes a consumer-specific
+    per-item digit ceiling: the item ``pattern`` encodes the absolute digit
+    bound and ``maxLength`` keeps only its sign character, so schema-driven
+    clients never submit an item that request admission would reject.
+    """
+
+    schema: dict[str, Any] = IndexedIntegerSequence.model_json_schema()
+    schema.pop("$defs", None)
+    items_schema = schema["properties"]["items"]
+    items_schema["maxItems"] = maximum_items
+    item_digits = (
+        MAX_SUBSET_SUM_ITEM_DIGITS
+        if maximum_item_digits is None
+        else maximum_item_digits
+    )
+    items_schema["description"] = (
+        f"An ordered tuple of at most {maximum_items:,} canonical integers. "
+        "Repeated values and zeros remain distinct indexed items; each "
+        f"integer has at most {item_digits:,} decimal digits, "
+        "excluding its optional sign."
+    )
+    if maximum_item_digits is not None:
+        raw_item_schema = items_schema["items"]
+        raw_item_schema["maxLength"] = maximum_item_digits + 1
+        raw_item_schema["pattern"] = (
+            rf"^(?:0|-?[1-9][0-9]{{0,{maximum_item_digits - 1}}})$"
+        )
+    return schema
 
 
 class SubsetSumProfileEntry(StrictModel):
@@ -101,7 +150,10 @@ class SubsetSumProfile(StrictModel):
     bounded dynamic program, binding every row and multiplicity to ``source``.
     """
 
-    source: IndexedIntegerSequence
+    source: Annotated[
+        IndexedIntegerSequence,
+        WithJsonSchema(indexed_sequence_item_ceiling(MAX_SUBSET_SUM_ITEMS)),
+    ]
     entries: tuple[SubsetSumProfileEntry, ...] = Field(
         min_length=1,
         max_length=MAX_SUBSET_SUM_PROFILE_ENTRIES,
@@ -166,14 +218,6 @@ class SubsetSumProfile(StrictModel):
         )
 
 
-__all__ = [
-    "IndexSubset",
-    "IndexedIntegerSequence",
-    "SubsetSumProfile",
-    "SubsetSumProfileEntry",
-]
-
-
 class IndexSubset(StrictModel):
     """A finite subset of nonnegative indices in canonical increasing order."""
 
@@ -187,3 +231,11 @@ class IndexSubset(StrictModel):
         if any(left >= right for left, right in pairwise(self.indices)):
             raise ValueError("subset indices must be strictly increasing")
         return self
+
+
+__all__ = [
+    "IndexSubset",
+    "IndexedIntegerSequence",
+    "SubsetSumProfile",
+    "SubsetSumProfileEntry",
+]
