@@ -26,6 +26,7 @@ ROOT_MATH_DOMAINS = (
     "combinatorics",
     "crossed_products",
     "diophantine_approximation",
+    "dirichlet_characters",
     "finite_abelian_groups",
     "finite_fields",
     "finite_metric_spaces",
