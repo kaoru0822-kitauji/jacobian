@@ -38,9 +38,9 @@ ceiling: it measures the exact reduced `right - left` components, admits
 the pair when they stay within 513 digits and the dimension-scaled
 replayable-witness bound stays within the canonical rational limit, and
 identical or nearly equal operands whose reduced difference is tiny
-therefore admit trivially; because the result echoes both operands and
-their difference, admission also reserves the serialized transport budget,
-so every accepted call returns its typed result. A large Kronecker product
+therefore admit trivially; because both source-bound results echo their
+inputs, PSD order and partial trace also reserve the serialized transport
+budget, so every accepted call returns its typed result. A large Kronecker product
 therefore does not imply that every downstream decision fits in one bounded
 call. The kernels are exact rational computations; they do not use
 floating-point matrix predicates or a tensor registry. The catalog schemas

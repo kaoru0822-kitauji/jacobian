@@ -30,6 +30,7 @@ MAX_PARTIAL_TRACE_WORK_COMPONENT_DIGITS = 4 * MAX_PARTIAL_TRACE_RESULT_COMPONENT
 MAX_PSD_DIFFERENCE_COMPONENT_DIGITS = 513
 _PSD_RESULT_ENVELOPE_RESERVE_BYTES = 4_096
 _PSD_WITNESS_COMPONENT_RESERVE_BYTES = 2 * MAX_CANONICAL_RATIONAL_DIGITS + 32
+_TRACE_RESULT_ENVELOPE_RESERVE_BYTES = 4_096
 
 
 def _fraction_component_digits(value: Fraction) -> tuple[int, int]:
@@ -110,6 +111,50 @@ def _require_trace_result_envelope(
         raise ValueError(
             "partial-trace coefficient growth exceeds the "
             f"{MAX_PARTIAL_TRACE_RESULT_COMPONENT_DIGITS}-digit result bound"
+        )
+
+
+def _require_trace_transport_envelope(
+    matrix: FactorizedHermitianMatrix,
+    traced_factor_labels: tuple[str, ...],
+    expected_entries: tuple[tuple[Fraction, ...], ...],
+) -> None:
+    """Reserve the serialized result's share of the canonical output budget.
+
+    The result retains its source matrix and adds the reduced matrix, so a
+    source near the transport limit can fit every coefficient envelope and
+    still overflow canonical output encoding outside the request-validation
+    handler.  Measuring the exact encoded result -- plus one envelope
+    reserve -- keeps every accepted call returning its typed result.
+    """
+
+    output_limit = CanonicalLimits().max_output_bytes
+    try:
+        reduced = FactorizedHermitianMatrix(
+            matrix=RationalMatrix(
+                entries=tuple(
+                    tuple(CanonicalRational.from_fraction(entry) for entry in row)
+                    for row in expected_entries
+                )
+            ),
+            factors=tuple(
+                factor
+                for factor in matrix.factors
+                if factor.label not in traced_factor_labels
+            ),
+        )
+        result_bytes = (
+            len(encode_strict_json(matrix.model_dump(mode="json")))
+            + len(encode_strict_json(reduced.model_dump(mode="json")))
+            + _TRACE_RESULT_ENVELOPE_RESERVE_BYTES
+        )
+    except CanonicalizationError:
+        result_bytes = output_limit + 1
+    if result_bytes > output_limit:
+        raise ValueError(
+            "the partial-trace result retains its source matrix and would "
+            f"exceed the {output_limit}-byte canonical output limit; "
+            "use smaller or sparser operands"
         )
 
 
@@ -291,8 +336,9 @@ class SubsystemPartialTraceRequest(StrictModel):
             "Source operand; no fixed per-operand digit ceiling applies. "
             "Admission measures contraction intermediates, cancelling "
             "equal-denominator terms first, against the 16392-digit work "
-            "envelope, then admits reduced coefficients within the 4098-digit "
-            "result envelope."
+            "envelope, admits reduced coefficients within the 4098-digit "
+            "result envelope, and reserves the serialized result's canonical "
+            "output budget."
         ),
     )
     traced_factor_labels: tuple[str, ...] = Field(
@@ -316,8 +362,12 @@ class SubsystemPartialTraceRequest(StrictModel):
         )
         if self.traced_factor_labels != expected_order:
             raise ValueError("traced subsystem labels must follow source factor order")
-        _require_trace_result_envelope(
-            _require_trace_work_envelope(self.matrix, self.traced_factor_labels)
+        expected_entries = _require_trace_work_envelope(
+            self.matrix, self.traced_factor_labels
+        )
+        _require_trace_result_envelope(expected_entries)
+        _require_trace_transport_envelope(
+            self.matrix, self.traced_factor_labels, expected_entries
         )
         return self
 
@@ -348,6 +398,9 @@ class SubsystemPartialTraceResult(StrictModel):
             self.source_matrix, self.traced_factor_labels
         )
         _require_trace_result_envelope(expected_entries)
+        _require_trace_transport_envelope(
+            self.source_matrix, self.traced_factor_labels, expected_entries
+        )
         expected = tuple(
             factor
             for factor in self.source_matrix.factors
