@@ -1013,6 +1013,42 @@ def test_result_preflight_binding_defers_unparsed_structural_faults(
         PolytopeSupportResult.model_validate(payload)
 
 
+def test_result_preflights_forged_built_face_before_nested_parsing(
+    square_result: PolytopeSupportResult,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An already-built same-space face with forged membership binds
+    against the raw source before nested validation reconstructs (and
+    proves) it - the built-value shortcut must not skip the binding."""
+
+    _forbid_extremality_proof(monkeypatch)
+    payload = square_result.model_dump(mode="json")
+    payload["exposed_face"] = RationalExposedFace(
+        space=square_result.polytope.space,
+        vertices=(square_result.exposed_face.vertices[0],),
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match="exposed face must be exactly the complete maximizing vertex family",
+    ):
+        PolytopeSupportResult.model_validate(payload)
+
+
+def test_result_defers_malformed_coordinate_containers_to_nested_validation(
+    square_result: PolytopeSupportResult,
+) -> None:
+    """A retained vertex whose coordinates are not a sequence is reported
+    as the model's typed validation error, never as a host exception from
+    the preflight assembly."""
+
+    payload = square_result.model_dump(mode="json")
+    payload["polytope"]["vertices"][0]["coordinates"] = 3
+
+    with pytest.raises(ValidationError, match="coordinates"):
+        PolytopeSupportResult.model_validate(payload)
+
+
 def test_constructed_result_rejects_foreign_exposed_face_space_at_construction(
     square_result: PolytopeSupportResult,
     monkeypatch: pytest.MonkeyPatch,

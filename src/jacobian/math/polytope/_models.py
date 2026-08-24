@@ -584,8 +584,13 @@ def _require_raw_support_conclusions_admissible(canonical: Any) -> None:
         )
     if isinstance(exposed_face, RationalExposedFace):
         # Its ordering, distinctness, and serialization invariants already
-        # hold by construction; only the source-space agreement above can
-        # still fail before nested validation runs.
+        # hold by construction; membership forgery is still bound to the
+        # raw source here so a guaranteed-rejected result never pays the
+        # nested extremality replay.
+        _require_raw_support_conclusions_bound(
+            canonical,
+            [_raw_support_vertex_key(vertex) for vertex in exposed_face.vertices],
+        )
         return
     vertices = exposed_face["vertices"]
     if not isinstance(vertices, (list, tuple)):
@@ -657,6 +662,7 @@ def _assemble_raw_support_source(
             not isinstance(vertex, dict)
             or set(vertex) != {"vertex_id", "coordinates"}
             or not isinstance(vertex["vertex_id"], str)
+            or not isinstance(vertex["coordinates"], (list, tuple))
             or len(vertex["coordinates"]) != dimension
         ):
             return None
