@@ -44,6 +44,9 @@ result, producer, or consumer. -->
 - Controlling work, intermediate, memory, and output quantities:
 - Exact representation, algorithm regimes, and maintained backend:
 - Remaining fixed caps and their classification:
+- Motivating source request exercised through the public boundary:
+- Final-tree outcome for that request:
+- Effect of private normalization or presolve on admission:
 - Admission decision:
 
 ## Closure matrix
@@ -62,5 +65,6 @@ admitted operation with no residual surface. -->
 - [ ] Harbor task or verifier changes ran `make harbor-prepare-task` then `make harbor-validate-task` (if applicable)
 - [ ] Public operation changes include an owner-local admission decision (if applicable)
 - [ ] Result semantics distinguish exact, approximate, incomplete, unknown, and unavailable outcomes where applicable
+- [ ] Public operation changes include a behavioral regression copied from a motivating parent-gap request, or explain why no source request exists (if applicable)
 - [ ] New or changed bounds include boundary, algorithm-crossover, and realistic source-backed scale evidence (if applicable)
 - [ ] New shared abstractions replace duplication in at least two surviving production paths (if applicable)

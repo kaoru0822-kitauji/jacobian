@@ -38,6 +38,11 @@ another operation, serialize the producer result and pass its canonical value
 unchanged through the consumer's typed payload. The test should fail if a caller
 would have to reconstruct mathematical context or translate between parallel
 representations.
+When an operation is added or changed because of a source-backed gap, preserve
+at least one minimally reduced motivating request as a behavioral regression.
+Run it through the final public request model and operation, and assert both
+admission and the typed mathematical result. A smaller happy-path example does
+not replace the request that established the need.
 Include the degenerate producer case most likely to erase ambient information,
 such as an empty basis, zero-row matrix, empty trace, or zero count. For
 source-bound decisions, mutate the source and conclusion independently and
@@ -116,6 +121,12 @@ insufficient when correctness concerns a set, partition, or family of canonical
 representatives: compare the exact objects or their declared equivalence class.
 For example, two tree generators can return the same count while duplicating
 one representative and omitting another.
+
+Accepted and rejected boundary cases prove that a stated envelope is enforced;
+they do not prove that the envelope admits realistic work. Pair boundary tests
+with a source-backed accepted case even when its public dimensions are small.
+A compact request can still be the decisive scale fixture when private
+normalization, expansion, or backend representation makes it expensive.
 
 Use a source-backed reference fixture when a standard example helps fix
 terminology, normalization, or another convention-sensitive output. Cite the
