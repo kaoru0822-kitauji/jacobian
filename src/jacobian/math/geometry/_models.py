@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from fractions import Fraction
 from itertools import combinations
 from typing import Literal, Self
 
 from pydantic import ConfigDict, Field, StrictInt, model_validator
 
-from jacobian._exact import CanonicalRational, require_bounded_rational
+from jacobian._exact import (
+    MAX_CANONICAL_RATIONAL_DIGITS,
+    CanonicalRational,
+    require_bounded_rational,
+)
 from jacobian._models import StrictModel
-from jacobian.canonical import format_canonical_integer
+from jacobian.canonical import encode_strict_json, format_canonical_integer
 
 MAX_CONFIGURATION_POINTS = 32
 MAX_COORDINATE_DIGITS = 256
@@ -779,10 +784,197 @@ class WeightedPolygonDiagonal(StrictModel):
         return self
 
 
+def _triangulation_subproblem_costs(
+    count: int,
+    weight: Callable[[int, int], Fraction],
+) -> tuple[dict[tuple[int, int], Fraction], dict[tuple[int, int], int]]:
+    """Derive every convex-subpolygon minimum and split for one polygon size.
+
+    The recurrence charges ``weight(start, end)`` at state ``(start, end)``
+    itself: every non-hull diagonal is the boundary of exactly one non-root
+    subpolygon, so each selected diagonal is counted exactly once and the
+    root optimum equals the minimum non-hull-diagonal weight sum. Admission
+    replays this same derivation so it can never diverge from execution.
+    """
+
+    optimum: dict[tuple[int, int], Fraction] = {
+        (index, index + 1): Fraction() for index in range(count - 1)
+    }
+    split: dict[tuple[int, int], int] = {}
+    for span in range(2, count):
+        for start in range(count - span):
+            end = start + span
+            candidates = [
+                (
+                    optimum[start, pivot] + optimum[pivot, end] + weight(start, end),
+                    pivot,
+                )
+                for pivot in range(start + 1, end)
+            ]
+            value, pivot = min(candidates)
+            optimum[start, end] = value
+            split[start, end] = pivot
+    return optimum, split
+
+
+def _reconstruct_split_triangulation(
+    count: int,
+    split: dict[tuple[int, int], int],
+) -> tuple[tuple[tuple[int, int], ...], tuple[tuple[int, int, int], ...]]:
+    """Replay one stored split table into its deterministic triangulation.
+
+    Both execution and admission reconstruct the selected triangles and
+    non-hull diagonals through this single walk, so the echoed diagonal set
+    can never diverge between computing a result and bounding its payload.
+    """
+
+    triangles: list[tuple[int, int, int]] = []
+    diagonals: set[tuple[int, int]] = set()
+
+    def walk(start: int, end: int) -> None:
+        if end == start + 1:
+            return
+        pivot = split[start, end]
+        triangles.append((start, pivot, end))
+        for pair in ((start, pivot), (pivot, end)):
+            ordered = pair if pair[0] < pair[1] else (pair[1], pair[0])
+            if pair[1] != pair[0] + 1 and ordered != (0, count - 1):
+                diagonals.add(ordered)
+        walk(start, pivot)
+        walk(pivot, end)
+
+    walk(0, count - 1)
+    return tuple(sorted(diagonals)), tuple(sorted(triangles))
+
+
+# Serialized-output budget for the weighted triangulation result, kept below
+# the 10 MiB canonical transport envelope to leave room for request and
+# JSON envelope overhead.
+MAX_TRIANGULATION_OUTPUT_CHARS = 8_000_000
+_TRIANGULATION_ENTRY_OVERHEAD_CHARS = 96
+_TRIANGULATION_TRIANGLE_ENTRY_CHARS = 32
+_TRIANGULATION_RESULT_SLACK_CHARS = 512
+
+
+def _require_bounded_split_table_rationals(
+    count: int,
+    diagonal_weights: tuple[WeightedPolygonDiagonal, ...],
+) -> None:
+    """Preflight every derived split-table rational against the canonical cap.
+
+    Admission replays the bounded recurrence exactly and checks each retained
+    ledger optimum - the values the result model serializes - against the
+    shared canonical rational cap. Reduced sums of compatible weights need
+    not grow: shared denominator factors cancel, so multiplying component
+    heights would reject requests whose actual ledger values remain
+    representable. A request is rejected only when a state the result must
+    serialize genuinely exceeds the cap.
+
+    Per-entry caps alone cannot bound the aggregate payload: every retained
+    optimum may sit just under the cap while their combined serialization
+    outgrows the transport envelope. The same exact replay therefore also
+    sums each retained optimum's own serialized size - numerator plus
+    denominator digits beside fixed punctuation - and charges every echoed
+    weight at its own height: admission reconstructs the deterministic
+    selected-diagonal set from the shared split table, adds the duplicated
+    top-level optimum, then fixed triangle and header slack. Execution
+    replays the identical deterministic derivation and reconstruction, so
+    this estimate soundly bounds the complete serialized result without
+    charging unselected or small entries at the largest component height,
+    and a genuinely oversized aggregate is rejected at request validation
+    instead of failing canonical output validation after computation.
+    """
+
+    weights = {
+        (item.first, item.second): item.weight.as_fraction()
+        for item in diagonal_weights
+    }
+
+    def diagonal_cost(first: int, second: int) -> Fraction:
+        if second == first + 1 or (first, second) == (0, count - 1):
+            return Fraction()
+        return weights[first, second]
+
+    optimum, split = _triangulation_subproblem_costs(count, diagonal_cost)
+    ledger_chars = 0
+    for span in range(2, count):
+        for start in range(count - span):
+            end = start + span
+            value = optimum[start, end]
+            digits = max(
+                len(format_canonical_integer(value.numerator)),
+                len(format_canonical_integer(value.denominator)),
+            )
+            if digits > MAX_CANONICAL_RATIONAL_DIGITS:
+                raise ValueError(
+                    f"split-table state ({start}, {end}) carries {digits}-digit "
+                    f"rational components, exceeding the canonical "
+                    f"{MAX_CANONICAL_RATIONAL_DIGITS}-digit rational limit"
+                )
+            ledger_chars += 2 * digits + _TRIANGULATION_ENTRY_OVERHEAD_CHARS
+    selected_diagonals, _ = _reconstruct_split_triangulation(count, split)
+    selected_weight_chars = sum(
+        2
+        * max(
+            len(format_canonical_integer(weights[pair].numerator)),
+            len(format_canonical_integer(weights[pair].denominator)),
+        )
+        + _TRIANGULATION_ENTRY_OVERHEAD_CHARS
+        for pair in selected_diagonals
+    )
+    root = optimum[0, count - 1]
+    estimated_chars = (
+        ledger_chars
+        + selected_weight_chars
+        + 2
+        * max(
+            len(format_canonical_integer(root.numerator)),
+            len(format_canonical_integer(root.denominator)),
+        )
+        + _TRIANGULATION_ENTRY_OVERHEAD_CHARS
+        + (count - 2) * _TRIANGULATION_TRIANGLE_ENTRY_CHARS
+        + _TRIANGULATION_RESULT_SLACK_CHARS
+    )
+    if estimated_chars > MAX_TRIANGULATION_OUTPUT_CHARS:
+        raise ValueError(
+            f"weighted triangulation result can serialize up to "
+            f"{estimated_chars} characters, exceeding the "
+            f"{MAX_TRIANGULATION_OUTPUT_CHARS}-character output bound"
+        )
+
+
 class ConvexPolygonTriangulationRequest(StrictModel):
+    """One strict CCW convex rational polygon and its complete diagonal weights."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "description": (
+                "Minimum-weight triangulation of one strict CCW convex "
+                "rational polygon under a complete nonnegative exact rational "
+                "weight per non-hull diagonal. Each split-table state sums "
+                "one feasible subpolygon triangulation - at most vertex_count "
+                "- 3 pairwise noncrossing selected weights - so admission "
+                "replays the bounded recurrence exactly and rejects requests "
+                "whose derived split-table rationals exceed the canonical "
+                "32,768-digit rational limit or whose complete serialized "
+                "result exceeds the "
+                f"{MAX_TRIANGULATION_OUTPUT_CHARS}-character output bound."
+            ),
+        },
+    )
+
     polygon: PolygonRequest
     diagonal_weights: tuple[WeightedPolygonDiagonal, ...] = Field(
-        min_length=1, max_length=464
+        min_length=1,
+        max_length=464,
+        description=(
+            "Exactly one nonnegative exact rational weight per non-hull "
+            "diagonal in lexicographic pair order; the exact derived "
+            "split-table rationals must stay inside the canonical "
+            "32,768-digit limit and the aggregate serialized result must "
+            f"stay inside the {MAX_TRIANGULATION_OUTPUT_CHARS}-character "
+            "output bound."
+        ),
     )
     objective: Literal["NON_HULL_DIAGONAL_WEIGHT_SUM"] = "NON_HULL_DIAGONAL_WEIGHT_SUM"
 
@@ -812,6 +1004,7 @@ class ConvexPolygonTriangulationRequest(StrictModel):
         pairs = tuple((item.first, item.second) for item in self.diagonal_weights)
         if pairs != tuple(sorted(pairs)):
             raise ValueError("diagonal weights must use lexicographic pair order")
+        _require_bounded_split_table_rationals(len(points), self.diagonal_weights)
         return self
 
 
@@ -837,6 +1030,600 @@ class ConvexPolygonTriangulationResult(StrictModel):
     objective: Literal["NON_HULL_DIAGONAL_WEIGHT_SUM"] = "NON_HULL_DIAGONAL_WEIGHT_SUM"
     tie_break: Literal["LOWEST_SPLIT_INDEX"] = "LOWEST_SPLIT_INDEX"
     exactness: Literal["EXACT_RATIONAL"] = "EXACT_RATIONAL"
+
+
+# Euclidean convex-polygon triangulation (issue #945)
+# ---------------------------------------------------------------------------
+
+MAX_EUCLIDEAN_TRIANGULATION_OUTPUT_CHARS = 7_000_000
+_MIN_EUCLIDEAN_SPLIT_TERM_CHARS = 2 * (4 * 1 + 1) + 128
+_EUCLIDEAN_TRIANGLE_ENTRY_CHARS = 32
+_EUCLIDEAN_RESULT_ENVELOPE_SLACK_CHARS = 512
+
+
+def _span_term_occurrences(count: int) -> int:
+    """Total retained expression term occurrences charged by a ``count``-vertex source.
+
+    A non-root span-``s`` state carries at most ``s - 1`` terms - its
+    subpolygon triangulates with ``s - 2`` diagonals plus one charged
+    boundary - and spans ``1..count - 2`` each occur ``count - s`` times.
+    The root span ``count - 1`` carries exactly ``count - 3`` terms, since
+    its boundary is an uncharged hull edge, and it occurs once in the
+    retained table plus once more as the duplicated top-level optimum, so
+    the serialized envelope counts both copies rather than charging every
+    state the root's term count.
+    """
+
+    return sum((count - span) * (span - 1) for span in range(1, count - 1)) + 2 * (
+        count - 3
+    )
+
+
+def _echoed_result_envelope_chars(polygon: PolygonRequest) -> int:
+    """Canonical characters charged for the echoed source and fixed envelope.
+
+    Every certified or unresolved result repeats the complete source ring
+    beside literal header fields, so admission measures that echo directly;
+    the difference-based estimates below are translation-invariant and
+    cannot see absolute positions. The returned charge adds slack for the
+    status-specific fields the shared template cannot carry: an unresolved
+    comparison swaps a longer status string and carries its comparison
+    skeleton, while a certified result lists per-entry ledgers charged
+    separately by the caller.
+    """
+
+    return (
+        len(
+            encode_strict_json(
+                {
+                    "comparison_basis": "ARB_OUTWARD_ROUNDED_INTERVAL",
+                    "comparison_precision_bits": (
+                        EUCLIDEAN_TRIANGULATION_COMPARISON_PRECISION_BITS
+                    ),
+                    "objective": "NON_HULL_EUCLIDEAN_LENGTH_SUM",
+                    "polygon": polygon.model_dump(mode="json"),
+                    "status": "CERTIFIED_OPTIMUM",
+                    "vertex_count": 0,
+                }
+            )
+        )
+        + _EUCLIDEAN_RESULT_ENVELOPE_SLACK_CHARS
+    )
+
+
+def _euclidean_envelope_vertex_ceiling() -> int:
+    """Largest vertex count that admission could ever accept.
+
+    The split-table estimate multiplies ``_span_term_occurrences`` by
+    ``term_chars``, which grows with the pairwise-difference digit count
+    derived from the source and never drops below one digit, so that
+    product evaluated at the one-digit floor is a necessary condition for
+    every admitted source. The returned ceiling restates this closed-form
+    consequence of ``MAX_EUCLIDEAN_TRIANGULATION_OUTPUT_CHARS`` for schemas
+    that need static bounds; the echoed-source and metadata charges in the
+    full envelope are strictly positive, so it can never reject a source
+    whose estimate fits the budget and the derived envelope alone decides
+    admission.
+    """
+
+    count = 4
+    while True:
+        candidate = count + 1
+        if (
+            _span_term_occurrences(candidate) * _MIN_EUCLIDEAN_SPLIT_TERM_CHARS
+            > MAX_EUCLIDEAN_TRIANGULATION_OUTPUT_CHARS
+        ):
+            return count
+        count = candidate
+
+
+MAX_EUCLIDEAN_TRIANGULATION_VERTICES = _euclidean_envelope_vertex_ceiling()
+EUCLIDEAN_TRIANGULATION_COMPARISON_PRECISION_BITS = 128
+
+
+def _require_euclidean_triangulation_envelope(
+    polygon: PolygonRequest,
+) -> tuple[tuple[Fraction, Fraction], ...]:
+    """Validate the bounded exact source and return its rational coordinates.
+
+    Positive consecutive turns establish strict convexity only for a simple
+    ring, so global simplicity is checked before the recurrence runs.  Raw
+    positions control no kernel quantity: every turn, diagonal squared
+    length, and serialized expression depends only on pairwise coordinate
+    differences, so admission derives ``d``, the maximum decimal digits in
+    any pairwise-difference component, from the source itself.  A squared
+    length then has at most ``4d + 1`` digits in each component (each
+    product doubles its side and the final sum adds one digit), and each
+    split-table expression term is charged twice that plus fixed punctuation
+    slack.  A non-root span-``s`` table state carries at most ``s - 1``
+    terms, the root span carries ``count - 3``, and the top-level optimum
+    duplicates the root expression, so summing those span-specific term
+    counts over all retained expression serializations gives the conservative
+    serialized-expression estimate below, bounding every retained exact sum
+    before Arb is invoked; each raw input coordinate stays inside the shared
+    canonical rational cap.
+
+    The bound covers the complete deterministic result envelope, not just
+    the split table.  Every result echoes the full source polygon beside
+    fixed literal header fields, and a pure translation inflates that echo
+    without touching any difference, so admission measures the canonical
+    encoding of the echoed source directly.  Each certified diagonal's
+    squared length stays within one term-scale serialization plus its entry
+    skeleton, each triangle is charged a fixed skeleton cost, two further
+    root-scale terms cover the largest possible unresolved comparison pair,
+    and named slack absorbs the remaining status-specific fields.
+    Every candidate diagonal's exact squared length is also checked against
+    the canonical rational cap, because the aggregate serialized estimate
+    alone admits sources whose derived values cannot be represented at all.
+    The static ``MAX_EUCLIDEAN_TRIANGULATION_VERTICES`` bound is the
+    closed-form consequence of this estimate at its one-digit difference
+    floor, never an independent admission gate.
+    """
+
+    points = tuple(_point_key(point) for point in polygon.points)
+    count = len(points)
+    if not 4 <= count <= MAX_EUCLIDEAN_TRIANGULATION_VERTICES:
+        raise ValueError(
+            "Euclidean triangulation supports 4 to "
+            f"{MAX_EUCLIDEAN_TRIANGULATION_VERTICES} vertices"
+        )
+    difference_digits = 1
+    for first in range(count):
+        for second in range(first + 1, count):
+            for left, right in zip(points[first], points[second], strict=True):
+                delta = right - left
+                difference_digits = max(
+                    difference_digits,
+                    len(format_canonical_integer(abs(delta.numerator))),
+                    len(format_canonical_integer(delta.denominator)),
+                )
+    turns = tuple(
+        _cross(
+            _subtract(points[(index + 1) % count], points[index]),
+            _subtract(points[(index + 2) % count], points[index]),
+        )
+        for index in range(count)
+    )
+    if any(turn <= 0 for turn in turns):
+        raise ValueError("Euclidean triangulation requires strict CCW convexity")
+    if not _is_simple_ring(polygon.points):
+        raise ValueError("Euclidean triangulation requires a simple ring")
+    for first in range(count - 2):
+        for second in range(first + 2, count):
+            if (first, second) == (0, count - 1):
+                continue
+            squared = _euclidean_squared_length(points, first, second)
+            numerator = format_canonical_integer(squared.numerator)
+            denominator = format_canonical_integer(squared.denominator)
+            if (
+                len(numerator) > MAX_CANONICAL_RATIONAL_DIGITS
+                or len(denominator) > MAX_CANONICAL_RATIONAL_DIGITS
+            ):
+                digits = max(len(numerator), len(denominator))
+                raise ValueError(
+                    "Euclidean triangulation diagonal squared length carries "
+                    f"{digits} digits, exceeding the canonical "
+                    f"{MAX_CANONICAL_RATIONAL_DIGITS}-digit rational limit"
+                )
+    term_chars = 2 * (4 * difference_digits + 1) + 128
+    estimated_chars = (
+        _span_term_occurrences(count) * term_chars
+        + _echoed_result_envelope_chars(polygon)
+        + (count - 3) * term_chars
+        + (count - 2) * _EUCLIDEAN_TRIANGLE_ENTRY_CHARS
+        + 2 * term_chars
+    )
+    if estimated_chars > MAX_EUCLIDEAN_TRIANGULATION_OUTPUT_CHARS:
+        raise ValueError(
+            "Euclidean triangulation result can serialize up to "
+            f"{estimated_chars} characters, exceeding the "
+            f"{MAX_EUCLIDEAN_TRIANGULATION_OUTPUT_CHARS}-character output bound"
+        )
+    return points
+
+
+def _euclidean_squared_length(
+    points: tuple[tuple[Fraction, Fraction], ...], first: int, second: int
+) -> Fraction:
+    dx = points[second][0] - points[first][0]
+    dy = points[second][1] - points[first][1]
+    return dx * dx + dy * dy
+
+
+def _compare_euclidean_root_sums(
+    left: tuple[Fraction, ...], right: tuple[Fraction, ...]
+) -> int | None:
+    """Return a rigorous root-sum order, or ``None`` for an overlapping ball."""
+
+    if left == right:
+        return 0
+    from flint import arb, ctx, fmpq
+
+    with ctx.workprec(EUCLIDEAN_TRIANGULATION_COMPARISON_PRECISION_BITS):
+        difference = arb(0)
+        for value in left:
+            difference += arb(fmpq(value.numerator, value.denominator)).sqrt()
+        for value in right:
+            difference -= arb(fmpq(value.numerator, value.denominator)).sqrt()
+        if difference.contains(0):
+            return None
+        return 1 if difference > 0 else -1
+
+
+class EuclideanTriangulationPolygonRequest(PolygonRequest):
+    """Strict CCW convex simple rational ring admitted by Euclidean triangulation."""
+
+    points: tuple[RationalPoint2D, ...] = Field(
+        min_length=4,
+        max_length=MAX_EUCLIDEAN_TRIANGULATION_VERTICES,
+        description=(
+            "Ring vertices listed counterclockwise; the closed ring must be "
+            "simple and strictly convex. Admission bounds the complete "
+            "serialized result - the split table, the echoed source ring, "
+            "and fixed result metadata - from the exact source, so absolute "
+            "positions consume the published output budget even though the "
+            "mathematical work depends only on pairwise differences."
+        ),
+        json_schema_extra={
+            "maximum_serialized_result_characters": (
+                MAX_EUCLIDEAN_TRIANGULATION_OUTPUT_CHARS
+            ),
+        },
+    )
+
+
+class EuclideanConvexPolygonTriangulationRequest(StrictModel):
+    """One bounded strict convex rational polygon with Euclidean diagonal cost."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "description": (
+                "Minimum Euclidean triangulation of one strict CCW convex "
+                "simple rational polygon. Admitted requests contain 4 to "
+                f"{MAX_EUCLIDEAN_TRIANGULATION_VERTICES} vertices whose "
+                "complete serialized result, including the echoed source "
+                "ring, stays inside the published output bound; strict "
+                "counterclockwise convexity and ring simplicity are enforced "
+                "by the request validator after parsing."
+            ),
+        },
+    )
+
+    polygon: EuclideanTriangulationPolygonRequest
+    objective: Literal["NON_HULL_EUCLIDEAN_LENGTH_SUM"] = (
+        "NON_HULL_EUCLIDEAN_LENGTH_SUM"
+    )
+
+    @model_validator(mode="after")
+    def require_supported_source(self) -> Self:
+        _require_euclidean_triangulation_envelope(self.polygon)
+        return self
+
+
+class EuclideanDiagonal(StrictModel):
+    """One selected non-hull diagonal and its exact squared Euclidean length."""
+
+    first: StrictInt = Field(ge=0, le=MAX_EUCLIDEAN_TRIANGULATION_VERTICES - 1)
+    second: StrictInt = Field(ge=0, le=MAX_EUCLIDEAN_TRIANGULATION_VERTICES - 1)
+    squared_length: CanonicalRational
+
+    @model_validator(mode="after")
+    def require_positive_canonical_pair(self) -> Self:
+        if self.first >= self.second:
+            raise ValueError("Euclidean diagonal endpoints must be strictly increasing")
+        if self.squared_length.as_fraction() <= 0:
+            raise ValueError("Euclidean diagonal squared length must be positive")
+        return self
+
+
+class EuclideanLengthExpression(StrictModel):
+    """An exact ordered sum of positive square roots of rational squared lengths.
+
+    Its source-bound use in a triangulation result is exactly
+    ``sum(sqrt(term) for term in squared_lengths)``. The ordered presentation
+    retains the selected diagonal lengths without a decimal approximation or
+    an unbounded expanded number-field representation.
+    """
+
+    squared_lengths: tuple[CanonicalRational, ...] = Field(
+        default=(), max_length=MAX_EUCLIDEAN_TRIANGULATION_VERTICES - 3
+    )
+
+    @model_validator(mode="after")
+    def require_sorted_positive_terms(self) -> Self:
+        values = tuple(term.as_fraction() for term in self.squared_lengths)
+        if any(value <= 0 for value in values):
+            raise ValueError("Euclidean length terms must be positive")
+        if values != tuple(sorted(values)):
+            raise ValueError("Euclidean length terms must be ordered canonically")
+        return self
+
+
+class EuclideanTriangulationSplitEntry(StrictModel):
+    start: StrictInt = Field(ge=0, le=MAX_EUCLIDEAN_TRIANGULATION_VERTICES - 1)
+    end: StrictInt = Field(ge=0, le=MAX_EUCLIDEAN_TRIANGULATION_VERTICES - 1)
+    split: StrictInt = Field(ge=0, le=MAX_EUCLIDEAN_TRIANGULATION_VERTICES - 1)
+    optimum: EuclideanLengthExpression
+
+    @model_validator(mode="after")
+    def require_proper_subproblem(self) -> Self:
+        if not self.start < self.split < self.end:
+            raise ValueError("triangulation split must lie strictly inside its span")
+        return self
+
+
+class EuclideanComparisonUnresolved(StrictModel):
+    """The first finite DP comparison whose rigorous Arb enclosure overlaps zero."""
+
+    start: StrictInt = Field(ge=0, le=MAX_EUCLIDEAN_TRIANGULATION_VERTICES - 1)
+    end: StrictInt = Field(ge=0, le=MAX_EUCLIDEAN_TRIANGULATION_VERTICES - 1)
+    left_split: StrictInt = Field(ge=0, le=MAX_EUCLIDEAN_TRIANGULATION_VERTICES - 1)
+    right_split: StrictInt = Field(ge=0, le=MAX_EUCLIDEAN_TRIANGULATION_VERTICES - 1)
+    left: EuclideanLengthExpression
+    right: EuclideanLengthExpression
+    precision_bits: StrictInt = Field(
+        ge=EUCLIDEAN_TRIANGULATION_COMPARISON_PRECISION_BITS,
+        le=EUCLIDEAN_TRIANGULATION_COMPARISON_PRECISION_BITS,
+    )
+
+
+class EuclideanConvexPolygonTriangulationResult(StrictModel):
+    """A certified optimum, or an explicit unresolved exact comparison."""
+
+    status: Literal["CERTIFIED_OPTIMUM", "COMPARISON_UNRESOLVED"]
+    polygon: PolygonRequest
+    vertex_count: StrictInt = Field(ge=4, le=MAX_EUCLIDEAN_TRIANGULATION_VERTICES)
+    objective: Literal["NON_HULL_EUCLIDEAN_LENGTH_SUM"] = (
+        "NON_HULL_EUCLIDEAN_LENGTH_SUM"
+    )
+    comparison_basis: Literal["ARB_OUTWARD_ROUNDED_INTERVAL"] = (
+        "ARB_OUTWARD_ROUNDED_INTERVAL"
+    )
+    comparison_precision_bits: StrictInt = Field(
+        ge=EUCLIDEAN_TRIANGULATION_COMPARISON_PRECISION_BITS,
+        le=EUCLIDEAN_TRIANGULATION_COMPARISON_PRECISION_BITS,
+    )
+    diagonals: tuple[EuclideanDiagonal, ...] = Field(
+        default=(), max_length=MAX_EUCLIDEAN_TRIANGULATION_VERTICES - 3
+    )
+    triangles: tuple[PolygonTriangle, ...] = Field(
+        default=(), max_length=MAX_EUCLIDEAN_TRIANGULATION_VERTICES - 2
+    )
+    split_table: tuple[EuclideanTriangulationSplitEntry, ...] = Field(
+        default=(),
+        max_length=(MAX_EUCLIDEAN_TRIANGULATION_VERTICES - 1)
+        * (MAX_EUCLIDEAN_TRIANGULATION_VERTICES - 2)
+        // 2,
+    )
+    optimum: EuclideanLengthExpression | None = None
+    unresolved_comparison: EuclideanComparisonUnresolved | None = None
+
+    @model_validator(mode="after")
+    def bind_status_fields(self) -> Self:
+        points = _require_euclidean_triangulation_envelope(self.polygon)
+        if self.vertex_count != len(points):
+            raise ValueError("vertex_count must equal the source polygon vertex count")
+        certified = self.status == "CERTIFIED_OPTIMUM"
+        if certified != (self.optimum is not None):
+            raise ValueError(
+                "only a certified optimum carries an exact cost expression"
+            )
+        if certified != (self.unresolved_comparison is None):
+            raise ValueError(
+                "only an unresolved result carries an ambiguous comparison"
+            )
+        if not certified and (self.diagonals or self.triangles or self.split_table):
+            raise ValueError("an unresolved comparison must not claim a triangulation")
+        if certified:
+            assert self.optimum is not None
+            if len(self.diagonals) != self.vertex_count - 3:
+                raise ValueError(
+                    "a triangulation must contain vertex_count - 3 diagonals"
+                )
+            if len(self.triangles) != self.vertex_count - 2:
+                raise ValueError(
+                    "a triangulation must contain vertex_count - 2 triangles"
+                )
+            expected_states = (self.vertex_count - 1) * (self.vertex_count - 2) // 2
+            if len(self.split_table) != expected_states:
+                raise ValueError("split table must contain every nontrivial DP state")
+            if tuple(
+                sorted(edge.squared_length.as_fraction() for edge in self.diagonals)
+            ) != tuple(term.as_fraction() for term in self.optimum.squared_lengths):
+                raise ValueError(
+                    "optimum expression must list the selected diagonal lengths"
+                )
+            _replay_euclidean_triangulation(self, points)
+        else:
+            assert self.unresolved_comparison is not None
+            _replay_euclidean_unresolved_comparison(self.unresolved_comparison, points)
+        return self
+
+
+def _replay_euclidean_split_choice(
+    entry: EuclideanTriangulationSplitEntry,
+    optimum: dict[tuple[int, int], tuple[Fraction, ...]],
+    points: tuple[tuple[Fraction, Fraction], ...],
+    count: int,
+) -> None:
+    """Re-decide one DP state against its running incumbent in pivot order."""
+
+    start, end = entry.start, entry.end
+    boundary = (
+        ()
+        if end == start + 1 or (start, end) == (0, count - 1)
+        else (_euclidean_squared_length(points, start, end),)
+    )
+    candidates = tuple(
+        (
+            tuple(sorted(optimum[start, pivot] + optimum[pivot, end] + boundary)),
+            pivot,
+        )
+        for pivot in range(start + 1, end)
+    )
+    chosen = tuple(term.as_fraction() for term in entry.optimum.squared_lengths)
+    expected = next(
+        (candidate for candidate, pivot in candidates if pivot == entry.split),
+        None,
+    )
+    if expected != chosen:
+        raise ValueError("split-table optimum must equal its selected recurrence")
+    incumbent: tuple[Fraction, ...] | None = None
+    incumbent_split: int | None = None
+    for candidate, pivot in candidates:
+        if incumbent is None:
+            incumbent, incumbent_split = candidate, pivot
+            continue
+        order = _compare_euclidean_root_sums(candidate, incumbent)
+        if order is None:
+            raise ValueError("certified split table contains an unresolved comparison")
+        if order < 0:
+            incumbent, incumbent_split = candidate, pivot
+    assert incumbent is not None and incumbent_split is not None
+    if incumbent != chosen or incumbent_split != entry.split:
+        raise ValueError("split-table choice is not the deterministic minimum")
+
+
+def _replay_euclidean_triangulation(
+    result: EuclideanConvexPolygonTriangulationResult,
+    points: tuple[tuple[Fraction, Fraction], ...],
+) -> None:
+    """Replay the bounded recurrence that binds a certified result to its source.
+
+    Each DP choice is re-decided against the running incumbent in execution's
+    pivot order, so a certificate is rejected wherever execution would have
+    returned its first unresolved comparison instead of certifying.
+    """
+
+    count = len(points)
+    expected_entries = tuple(
+        (start, start + span)
+        for span in range(2, count)
+        for start in range(count - span)
+    )
+    actual_entries = tuple((entry.start, entry.end) for entry in result.split_table)
+    if actual_entries != expected_entries:
+        raise ValueError("split table must use deterministic span/start order")
+
+    optimum: dict[tuple[int, int], tuple[Fraction, ...]] = {
+        (index, index + 1): () for index in range(count - 1)
+    }
+    splits: dict[tuple[int, int], int] = {}
+    for entry in result.split_table:
+        _replay_euclidean_split_choice(entry, optimum, points, count)
+        optimum[entry.start, entry.end] = tuple(
+            term.as_fraction() for term in entry.optimum.squared_lengths
+        )
+        splits[entry.start, entry.end] = entry.split
+
+    if result.optimum is None or optimum[0, count - 1] != tuple(
+        term.as_fraction() for term in result.optimum.squared_lengths
+    ):
+        raise ValueError("result optimum must equal the root DP value")
+
+    triangles: list[tuple[int, int, int]] = []
+    diagonals: set[tuple[int, int]] = set()
+
+    def reconstruct(start: int, end: int) -> None:
+        if end == start + 1:
+            return
+        pivot = splits[start, end]
+        triangles.append((start, pivot, end))
+        if end != start + 1 and (start, end) != (0, count - 1):
+            diagonals.add((start, end))
+        reconstruct(start, pivot)
+        reconstruct(pivot, end)
+
+    reconstruct(0, count - 1)
+    if tuple(sorted(triangles)) != tuple(item.vertices for item in result.triangles):
+        raise ValueError("triangles must reconstruct from the certified split table")
+    actual_diagonals = tuple((item.first, item.second) for item in result.diagonals)
+    if actual_diagonals != tuple(sorted(diagonals)):
+        raise ValueError("diagonals must reconstruct from the certified split table")
+    for diagonal in result.diagonals:
+        if diagonal.squared_length.as_fraction() != _euclidean_squared_length(
+            points, diagonal.first, diagonal.second
+        ):
+            raise ValueError("diagonal squared length must match the source polygon")
+
+
+def _replay_euclidean_unresolved_comparison(
+    comparison: EuclideanComparisonUnresolved,
+    points: tuple[tuple[Fraction, Fraction], ...],
+) -> None:
+    """Replay the bounded recurrence that binds one unresolved comparison to its source.
+
+    The replay re-derives every DP choice at the declared precision, so the
+    claimed span and splits must name the recurrence's first comparison whose
+    rigorous Arb enclosure overlaps zero, and both expressions must equal the
+    exact candidates that comparison weighed.
+    """
+
+    count = len(points)
+    start, end = comparison.start, comparison.end
+    if end > count - 1 or end - start < 2:
+        raise ValueError(
+            "unresolved comparison must name a nontrivial DP subproblem span"
+        )
+    if not start < comparison.right_split < comparison.left_split < end:
+        raise ValueError(
+            "unresolved comparison splits must lie strictly inside its span "
+            "with the incumbent split first"
+        )
+
+    optimum: dict[tuple[int, int], tuple[Fraction, ...]] = {
+        (index, index + 1): () for index in range(count - 1)
+    }
+    for span in range(2, count):
+        for state_start in range(count - span):
+            state_end = state_start + span
+            boundary = (
+                ()
+                if state_end == state_start + 1
+                or (state_start, state_end) == (0, count - 1)
+                else (_euclidean_squared_length(points, state_start, state_end),)
+            )
+            chosen: tuple[Fraction, ...] | None = None
+            chosen_pivot: int | None = None
+            for pivot in range(state_start + 1, state_end):
+                candidate = tuple(
+                    sorted(
+                        optimum[state_start, pivot]
+                        + optimum[pivot, state_end]
+                        + boundary
+                    )
+                )
+                if chosen is None:
+                    chosen = candidate
+                    chosen_pivot = pivot
+                    continue
+                order = _compare_euclidean_root_sums(candidate, chosen)
+                if order is None:
+                    if (
+                        state_start,
+                        state_end,
+                        pivot,
+                        chosen_pivot,
+                    ) != (start, end, comparison.left_split, comparison.right_split):
+                        raise ValueError(
+                            "unresolved comparison must be the first "
+                            "unresolved DP comparison"
+                        )
+                    if candidate != tuple(
+                        term.as_fraction() for term in comparison.left.squared_lengths
+                    ) or chosen != tuple(
+                        term.as_fraction() for term in comparison.right.squared_lengths
+                    ):
+                        raise ValueError(
+                            "unresolved expressions must equal their DP candidates"
+                        )
+                    return
+                if order < 0:
+                    chosen = candidate
+                    chosen_pivot = pivot
+            assert chosen is not None and chosen_pivot is not None
+            optimum[state_start, state_end] = chosen
+    raise ValueError("unresolved comparison must occur during the replayed recurrence")
 
 
 # ---------------------------------------------------------------------------
