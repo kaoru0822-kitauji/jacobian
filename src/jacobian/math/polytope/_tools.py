@@ -9,11 +9,14 @@ from jacobian.catalog.models import MathTool, OperationExample
 from jacobian.math.polytope._models import (
     FacetIncidenceRequest,
     FacetIncidenceResult,
+    PolytopeSupportRequest,
+    PolytopeSupportResult,
     PolytopeVolumeRequest,
     PolytopeVolumeResult,
 )
 from jacobian.math.polytope._operations import (
     compute_facet_incidence,
+    compute_polytope_support,
     compute_polytope_volume,
 )
 
@@ -47,10 +50,79 @@ def _op[
 
 POLYTOPE_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     _op(
+        "polytope.rational.support.compute",
+        "Compute an exact rational polytope support value",
+        "For a full-dimensional rational polytope with one labelled coordinate "
+        "axis and a complete irredundant V-representation, compute the exact "
+        "support value h_P(u)=max_{x in P}<u,x> and return every maximizing "
+        "vertex as the complete exposed face. The exact support kernel is one "
+        "bounded vertex-by-covector pass; the V-value separately proves that "
+        "each supplied generator is an extreme vertex before evaluation.",
+        PolytopeSupportRequest,
+        PolytopeSupportResult,
+        compute_polytope_support,
+        "polytope",
+        "support-function",
+        "exposed-face",
+        "exact-rational",
+        examples=(
+            example(
+                "unit_square_top_edge",
+                "Unit square on axes [x, y]; the covector (0,1) exposes the "
+                "complete top edge. The covector's serialized space must be "
+                "identical to the polytope's: same axis labels, same order.",
+                {
+                    "polytope": {
+                        "space": {"axes": ["x", "y"]},
+                        "vertices": [
+                            {
+                                "vertex_id": "bottom_left",
+                                "coordinates": [
+                                    {"num": "0", "den": "1"},
+                                    {"num": "0", "den": "1"},
+                                ],
+                            },
+                            {
+                                "vertex_id": "bottom_right",
+                                "coordinates": [
+                                    {"num": "1", "den": "1"},
+                                    {"num": "0", "den": "1"},
+                                ],
+                            },
+                            {
+                                "vertex_id": "top_left",
+                                "coordinates": [
+                                    {"num": "0", "den": "1"},
+                                    {"num": "1", "den": "1"},
+                                ],
+                            },
+                            {
+                                "vertex_id": "top_right",
+                                "coordinates": [
+                                    {"num": "1", "den": "1"},
+                                    {"num": "1", "den": "1"},
+                                ],
+                            },
+                        ],
+                    },
+                    "covector": {
+                        "space": {"axes": ["x", "y"]},
+                        "components": [
+                            {"num": "0", "den": "1"},
+                            {"num": "1", "den": "1"},
+                        ],
+                    },
+                },
+            ),
+        ),
+    ),
+    _op(
         "polytope.facets.compute",
         "Compute the complete exact facet-incidence profile of a rational polytope",
         "Compute every maximal supporting facet of the convex hull of an ordered "
-        "rational V-representation (d <= 7); lower-dimensional hulls are "
+        "rational V-representation — bare vertices or an unchanged labelled "
+        "``RationalVPolytope`` value such as a support result's ``polytope`` "
+        "(d <= 7); lower-dimensional hulls are "
         "rejected. Each facet returns its canonical primitive supporting "
         "inequality as the shared half-space value plus the complete "
         "source-row incidence. For d <= 6 each row composes verbatim into "
@@ -107,8 +179,10 @@ POLYTOPE_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
         "polytope.volume.compute",
         "Compute the exact rational volume of a bounded polytope",
         "Compute the exact rational volume of a bounded rational polytope "
-        "from its V-representation (vertices) or H-representation (half-spaces) "
-        "for ambient dimension d <= 6, via triangulation and SymPy exact "
+        "from its V-representation — bare vertices or an unchanged "
+        "labelled ``RationalVPolytope`` value such as a support result's "
+        "``polytope`` — or H-representation (half-spaces) for ambient "
+        "dimension d <= 6, via triangulation and SymPy exact "
         "determinant-based simplex volume. Every half-space must carry a "
         "nonzero normal: rows whose coefficients are all zero are rejected.",
         PolytopeVolumeRequest,
