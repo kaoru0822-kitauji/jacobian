@@ -845,7 +845,15 @@ class HessianEntryEnclosure(StrictModel):
 class IntervalExpressionSecondJetEnclosureResult(
     IntervalExpressionSecondJetEnclosureRequest
 ):
-    """A source-bound rigorous value, gradient, and symmetric Hessian enclosure."""
+    """A source-bound rigorous value, gradient, and symmetric Hessian enclosure.
+
+    For ``ENCLOSED``, full validation recomputes the canonical jet claim from
+    its expression, axis, and source box.  ``DOMAIN_UNPROVEN`` replays its
+    deterministic first-obstruction evidence.  ``BACKEND_ERROR`` asserts no
+    enclosure conclusion at all, so it is validated structurally: rerunning
+    Arb would reject the operation's own serialized result whenever a
+    transient backend condition does not recur.
+    """
 
     status: IntervalExpressionSecondJetEnclosureStatus
     value: DyadicClosedInterval | None = None
@@ -914,6 +922,8 @@ class IntervalExpressionSecondJetEnclosureResult(
                 raise ValueError(
                     "domain-failure evidence must agree with DOMAIN_UNPROVEN status"
                 )
+            if self.status == "BACKEND_ERROR":
+                return self
 
         from jacobian.math.analysis._operations import _second_jet_enclosure
 
