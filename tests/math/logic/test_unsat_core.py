@@ -812,12 +812,12 @@ def test_request_bounds_formless_ite_sum_denominator_digits() -> None:
 
 
 def test_request_bounds_mixed_denominator_formless_ite_sum_scaling() -> None:
-    odd = "9" * 200
-    scalar = "9" * 100
-    ite_template = "(ite {p} (* (/ 9 2) x) (* (/ 1 {odd}) x))"
+    power = "3" * 170
+    scalar = "7" * 100
+    ite_template = "(ite {p} (* 4.5 x) (* (/ 1 {power}) x))"
     sum_term = (
-        f"(+ {ite_template.format(p='p', odd=odd)} "
-        f"{ite_template.format(p='q', odd=odd)})"
+        f"(+ {ite_template.format(p='p', power=power)} "
+        f"{ite_template.format(p='q', power=power)})"
     )
     scaled_source = (
         "(set-logic QF_LRA)\n"
@@ -841,6 +841,43 @@ def test_request_bounds_mixed_denominator_formless_ite_sum_scaling() -> None:
     )
 
     assert SmtUnsatCoreRequest(logic="QF_LRA", smtlib=unscaled_source)
+
+
+def test_request_bounds_opposite_sign_comparison_numerator_digits() -> None:
+    divisor = "8" + "0" * 254 + "9"
+    numerator = "9" * 256
+    source = (
+        "(set-logic QF_LRA)\n"
+        "(declare-const p Bool)\n"
+        "(declare-const q Bool)\n"
+        "(declare-const x Real)\n"
+        "(assert (= (ite p (* (- (/ "
+        f"{numerator} {divisor}))) x) "
+        "(ite q (* (/ "
+        f"{numerator} {divisor})) x)))\n"
+        "(check-sat)\n"
+    )
+
+    with pytest.raises(ValidationError, match="normalized SMT coefficient"):
+        SmtUnsatCoreRequest(logic="QF_LRA", smtlib=source)
+
+
+def test_bounded_reciprocal_cancelling_formless_ite_still_admitted() -> None:
+    digits = "9" * 256
+    source = (
+        "(set-logic QF_LRA)\n"
+        "(declare-const p Bool)\n"
+        "(declare-const x Real)\n"
+        f"(assert (= (* (/ 1 {digits}) (ite p (* {digits} x) x)) 1))\n"
+        "(check-sat)\n"
+    )
+
+    assert SmtUnsatCoreRequest(logic="QF_LRA", smtlib=source)
+
+    result = compute_smt_unsat_core(SmtUnsatCoreRequest(logic="QF_LRA", smtlib=source))
+
+    assert result.outcome == "SAT"
+    assert result.core_indices == ()
 
 
 def test_request_bounds_four_shared_denominator_formless_ite_terms() -> None:
@@ -921,6 +958,70 @@ def test_request_bounds_shared_denominator_comparison_numerator_digits() -> None
 
     with pytest.raises(ValidationError, match="normalized SMT coefficient"):
         SmtUnsatCoreRequest(logic="QF_LRA", smtlib=source)
+
+
+def test_request_bounds_scaled_formless_comparison_lifted_numerators() -> None:
+    scalar = "1" + "0" * 99
+    odd = "9" * 200
+    ite_template = "(ite {p} (/ (* 9 x) 2) (/ x {odd}))"
+    source = (
+        "(set-logic QF_LRA)\n"
+        "(declare-const p Bool)\n"
+        "(declare-const q Bool)\n"
+        "(declare-const x Real)\n"
+        f"(assert (= (* {scalar} {ite_template.format(p='p', odd=odd)}) "
+        f"(* {scalar} {ite_template.format(p='q', odd=odd)})))\n"
+        "(check-sat)\n"
+    )
+
+    with pytest.raises(ValidationError, match="normalized SMT coefficient"):
+        SmtUnsatCoreRequest(logic="QF_LRA", smtlib=source)
+
+
+def test_request_bounds_scaled_formless_sum_retains_unmatched_coefficients() -> None:
+    digits = "9" * 255
+    scalar = "7" * 10
+    left = f"(/ (+ (* (+ {digits} 1) {{variable}}) (+ {digits} 1)) (* 2 {digits}))"
+    right = f"(/ (+ (* (- {digits} 1) {{variable}}) (- {digits} 1)) (* 2 {digits}))"
+    source = (
+        "(set-logic QF_LRA)\n"
+        "(declare-const p Bool)\n"
+        "(declare-const q Bool)\n"
+        "(declare-const x Real)\n"
+        "(declare-const y Real)\n"
+        "(declare-const u Real)\n"
+        "(declare-const v Real)\n"
+        f"(assert (= (/ (- (ite p {left.format(variable='x')} "
+        f"{left.format(variable='y')}) (ite q {right.format(variable='u')} "
+        f"{right.format(variable='v')})) (/ 1 {scalar})) 0))\n"
+        "(check-sat)\n"
+    )
+
+    with pytest.raises(ValidationError, match="normalized SMT coefficient"):
+        SmtUnsatCoreRequest(logic="QF_LRA", smtlib=source)
+
+
+def test_bounded_scaled_formless_comparison_still_admitted() -> None:
+    scalar = "1" + "0" * 79
+    odd = "9" * 160
+    ite_template = "(ite {p} (/ (* 9 x) 2) (/ x {odd}))"
+    source = (
+        "(set-logic QF_LRA)\n"
+        "(declare-const p Bool)\n"
+        "(declare-const q Bool)\n"
+        "(declare-const x Real)\n"
+        f"(assert (= (* {scalar} {ite_template.format(p='p', odd=odd)}) "
+        f"(* {scalar} {ite_template.format(p='q', odd=odd)})))\n"
+        "(assert (>= x 0))\n"
+        "(check-sat)\n"
+    )
+
+    assert SmtUnsatCoreRequest(logic="QF_LRA", smtlib=source)
+
+    result = compute_smt_unsat_core(SmtUnsatCoreRequest(logic="QF_LRA", smtlib=source))
+
+    assert result.outcome == "SAT"
+    assert result.core_indices == ()
 
 
 def test_request_bounds_nested_division_of_formless_ite_denominator_digits() -> None:

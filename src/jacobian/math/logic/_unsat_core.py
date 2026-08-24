@@ -37,8 +37,9 @@ class _CoefficientEnvelope(NamedTuple):
     magnitude at most ``height``, numerator digit count at most
     ``numerator_digits``, and denominator digit count at most
     ``denominator_digits``. ``pairs`` is the exact closure of reachable
-    ``(numerator bound, denominator)`` pairs, or ``None`` when only the
-    marginal digit budgets are tracked; sums and comparisons use it to keep
+    ``(numerator bound, denominator)`` pairs, or a conservative closure that
+    also retains unmatched child coefficients, or ``None`` when only the
+    marginal digit budgets are tracked. Sums and comparisons use it to keep
     shared denominators from compounding while still bounding merged
     numerators soundly.
     """
@@ -82,6 +83,16 @@ def _pairs_common_denominator(
     return lcm(*(denominator for _numerator, denominator in pairs))
 
 
+def _negated_envelope(envelope: _CoefficientEnvelope) -> _CoefficientEnvelope:
+    if envelope.pairs is None:
+        return envelope
+    return envelope._replace(
+        pairs=tuple(
+            (-numerator, denominator) for numerator, denominator in envelope.pairs
+        )
+    )
+
+
 def _scaled_pairs(
     scalar: Fraction,
     pairs: tuple[tuple[int, int], ...] | None,
@@ -91,7 +102,7 @@ def _scaled_pairs(
     return _capped_pairs(
         {
             (
-                abs((Fraction(numerator, denominator) * scalar).numerator),
+                (Fraction(numerator, denominator) * scalar).numerator,
                 (Fraction(numerator, denominator) * scalar).denominator,
             )
             for numerator, denominator in pairs
@@ -646,7 +657,7 @@ def _coefficient_height(
             _merged_pairs(left.pairs, right.pairs),
         )
     if kind == z3.Z3_OP_UMINUS:
-        return child_envelopes[0]
+        return _negated_envelope(child_envelopes[0])
     if kind == z3.Z3_OP_MUL:
         return _multiplied_envelope(
             child_envelopes,
@@ -667,6 +678,9 @@ def _coefficient_height(
     if kind in (z3.Z3_OP_ADD, z3.Z3_OP_SUB):
         return _signed_sum_envelope(
             child_envelopes,
+            signs=(1,) * len(child_envelopes)
+            if kind == z3.Z3_OP_ADD
+            else (1,) + (-1,) * (len(child_envelopes) - 1),
             validate_budget=enforce_digit_budget,
         )
     if kind in (
@@ -736,7 +750,7 @@ def _product_pairs(
             for shared_numerator, shared_denominator in result:
                 right = Fraction(shared_numerator, shared_denominator)
                 product = left * right
-                combined.add((abs(product.numerator), product.denominator))
+                combined.add((product.numerator, product.denominator))
         result = combined
         if len(result) > _MAX_ENVELOPE_PAIRS:
             return None
@@ -774,9 +788,10 @@ def _divided_envelope(
 def _signed_sum_envelope(
     envelopes: tuple[_CoefficientEnvelope, ...],
     *,
+    signs: tuple[int, ...],
     validate_budget: bool,
 ) -> _CoefficientEnvelope:
-    """Merge child readings the way signed sums combine their coefficients."""
+    """Merge child readings the way the node's signed combination does."""
 
     height = Fraction(0)
     for envelope in envelopes:
@@ -795,10 +810,10 @@ def _signed_sum_envelope(
     shared = _shared_denominator_of_pairs(envelopes)
     if shared is not None:
         lifted: list[set[Fraction]] = []
-        for envelope in envelopes:
+        for sign, envelope in zip(signs, envelopes, strict=True):
             lifted.append(
                 {
-                    Fraction(numerator, denominator) * shared
+                    sign * Fraction(numerator, denominator) * shared
                     for numerator, denominator in envelope.pairs or ()
                 }
             )
@@ -808,13 +823,13 @@ def _signed_sum_envelope(
             if len(totals) > _MAX_ENVELOPE_PAIRS:
                 break
         else:
+            reachable: set[Fraction] = set(totals)
+            for values in lifted:
+                reachable.update(values)
             pairs = _capped_pairs(
                 {
-                    (
-                        abs((total / shared).numerator),
-                        (total / shared).denominator,
-                    )
-                    for total in totals
+                    ((value / shared).numerator, (value / shared).denominator)
+                    for value in reachable
                 }
             )
             common_denominator = _pairs_common_denominator(pairs)
@@ -822,7 +837,7 @@ def _signed_sum_envelope(
                 denominator_digits = min(
                     denominator_digits, len(str(common_denominator))
                 )
-            widest_merged = max(abs((total / shared).numerator) for total in totals)
+            widest_merged = max(abs((value / shared).numerator) for value in reachable)
             numerator_digits = min(numerator_digits, len(str(widest_merged)))
     else:
         pairs = None
@@ -863,7 +878,11 @@ def _compared_envelope(
         _require_bounded_normalized_coefficient(height)
     shared = _shared_denominator_of_pairs(envelopes)
     if shared is None:
-        fallback = _signed_sum_envelope(envelopes, validate_budget=validate_budget)
+        fallback = _signed_sum_envelope(
+            envelopes,
+            signs=(1,) * len(envelopes),
+            validate_budget=validate_budget,
+        )
         return _CoefficientEnvelope(
             height,
             fallback.numerator_digits,
@@ -918,7 +937,7 @@ def _closed_value_envelope(value: Fraction) -> _CoefficientEnvelope:
         abs(value),
         len(str(abs(value.numerator))),
         len(str(value.denominator)),
-        ((abs(value.numerator), value.denominator),),
+        ((value.numerator, value.denominator),),
     )
 
 
@@ -932,9 +951,7 @@ def _affine_form_envelope(
         height,
         max(len(str(abs(value.numerator))) for value in coefficients),
         max(len(str(value.denominator)) for value in coefficients),
-        _capped_pairs(
-            {(abs(value.numerator), value.denominator) for value in coefficients}
-        ),
+        _capped_pairs({(value.numerator, value.denominator) for value in coefficients}),
     )
 
 
@@ -950,6 +967,11 @@ def _scaled_coefficient_envelope(
     common_denominator = _pairs_common_denominator(pairs)
     if common_denominator is not None:
         denominator_digits = min(denominator_digits, len(str(common_denominator)))
+        widest_scaled_numerator = max(
+            abs(numerator) for numerator, _denominator in pairs or ()
+        )
+        if widest_scaled_numerator:
+            numerator_digits = min(numerator_digits, len(str(widest_scaled_numerator)))
     _require_bounded_coefficient_digit_budget(numerator_digits, denominator_digits)
     return _CoefficientEnvelope(
         coefficient * envelope.height,
