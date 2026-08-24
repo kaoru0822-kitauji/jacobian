@@ -200,10 +200,11 @@ partitioning must not introduce kernel-owned durable state.
   and encode that domain in the request model before invocation.
 - For every exact decomposition, certificate, or authoritative derived value,
   state its reconstruction or defining invariant and test that invariant.
-- Center correctness tests on concrete regression evidence when fixing a
-  regression, defining identities, consistency checks, and property tests.
-  Exercise real typed boundaries and maintained backends through public paths
-  with deterministic or replayable inputs; keep fixtures sparse and name the
+- Center correctness tests on regression evidence when fixing a concrete
+  regression, defining identities, consistency checks, and property-based
+  tests against actual symbolic or mathematical behavior. Use real
+  mathematical and numerical assertions at public typed interfaces with
+  deterministic or replayable inputs; keep fixtures sparse and name the
   evidence each one contributes. Do not monkeypatch or use test fakes for
   mathematical values, validators, serializers, or backend correctness.
   Isolate unavailable-environment or transport-failure tests separately; they

@@ -43,14 +43,15 @@ such as an empty basis, zero-row matrix, empty trace, or zero count. For
 source-bound decisions, mutate the source and conclusion independently and
 require result validation to reject both forgeries.
 
-Center correctness tests on concrete regression evidence when fixing a
-regression, defining identities, consistency checks, and property tests. Use
-maintained libraries in their owning domain tests rather than mocking their
-algorithms. Exercise real typed boundaries and maintained backends through
-public paths with deterministic or replayable inputs; keep fixtures sparse and
-name the evidence each one contributes. Do not monkeypatch or use test fakes
-for mathematical values, validators, serializers, or backend correctness.
-Keep unavailable-environment and transport-failure tests in separate boundary
+Center correctness tests on regression evidence when fixing a concrete
+regression, defining identities, consistency checks, and property-based tests
+against actual symbolic or mathematical behavior. Use maintained libraries in
+their owning domain tests rather than mocking their algorithms. Exercise real
+mathematical and numerical assertions at public typed interfaces with
+deterministic or replayable inputs; keep fixtures sparse and name the evidence
+each one contributes. Do not monkeypatch or use test fakes for mathematical
+values, validators, serializers, or backend correctness. Keep
+unavailable-environment and transport-failure tests in separate boundary
 cases; they must not stand in for mathematical correctness. A timeout,
 cancellation, unavailable external executable, or solver `UNKNOWN` is never a
 positive mathematical conclusion.
