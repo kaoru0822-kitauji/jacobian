@@ -5,6 +5,8 @@ from __future__ import annotations
 from typing import Literal
 
 from jacobian.math.term_rewriting._models import (
+    CriticalPairsRequest,
+    CriticalPairsResult,
     MatchingRequest,
     MatchingResult,
     NormalFormRequest,
@@ -17,15 +19,17 @@ from jacobian.math.term_rewriting._models import (
     UnificationResult,
 )
 from jacobian.math.term_rewriting.operations import (
+    _bounded_unify,
     apply_substitution,
+    critical_pairs,
     match,
     normal_form,
     rewrite_steps,
     selected_rewrite_step,
-    unify,
 )
 
 __all__ = [
+    "compute_critical_pairs",
     "compute_matching",
     "compute_normal_form",
     "compute_rewrite_step",
@@ -49,7 +53,7 @@ def compute_matching(request: MatchingRequest) -> MatchingResult:
 
 
 def compute_unification(request: UnificationRequest) -> UnificationResult:
-    result = unify(request.left, request.right)
+    result = _bounded_unify(request.left, request.right)
     if result is None:
         return UnificationResult(
             signature=request.signature,
@@ -105,4 +109,12 @@ def compute_normal_form(request: NormalFormRequest) -> NormalFormResult:
         status=status,
         steps=steps,
         next_step=next_step,
+    )
+
+
+def compute_critical_pairs(request: CriticalPairsRequest) -> CriticalPairsResult:
+    return CriticalPairsResult(
+        signature=request.signature,
+        rules=request.rules,
+        profile=critical_pairs(request.signature, request.rules),
     )

@@ -7,22 +7,51 @@ from typing import Literal, Self
 from pydantic import Field, model_validator
 
 from jacobian._models import StrictModel
+from jacobian.canonical import CanonicalizationError, CanonicalLimits, canonicalize_json
 from jacobian.math.term_rewriting.operations import (
+    _bounded_unify,
+    _validate_critical_pair_source,
     apply_substitution,
+    critical_pairs,
     normal_form,
     rewrite_steps,
     selected_rewrite_step,
     term_at_position,
-    unify,
 )
 from jacobian.math.term_rewriting.values import (
+    MAX_CRITICAL_PAIR_RESULT_BYTES,
+    MAX_CRITICAL_PAIR_RULES,
     MAX_RULES,
+    MAX_TERM_DEPTH,
+    MAX_VARIABLE_LABEL,
+    CriticalPairProfile,
     RankedSignature,
     RewriteApplication,
     RewriteRule,
     Substitution,
     Term,
 )
+
+
+def _require_transport_safe_depth(*terms: Term) -> None:
+    """Reject term paths deeper than strict JSON transport can carry.
+
+    The shared canonical profile caps JSON nesting at 64 levels and each
+    serialized term node costs one object level plus one ``children`` array
+    level inside a request, so any root-to-leaf path carries at most
+    ``MAX_TERM_DEPTH`` nodes. Wire contracts enforce this iteratively so
+    rejection stays typed instead of surfacing as a transport failure after
+    schema admission.
+    """
+    stack = [(term, 1) for term in terms]
+    while stack:
+        current, depth = stack.pop()
+        if depth > MAX_TERM_DEPTH:
+            raise ValueError(
+                "term depth exceeds the transport-safe bound; any "
+                f"root-to-leaf path carries at most {MAX_TERM_DEPTH} nodes"
+            )
+        stack.extend((child, depth + 1) for child in current.children)
 
 
 class SubstitutionRequest(StrictModel):
@@ -37,6 +66,11 @@ class SubstitutionRequest(StrictModel):
         self.signature.validate_term(self.term)
         for replacement in self.substitution.mapping.values():
             self.signature.validate_term(replacement)
+        _require_transport_safe_depth(
+            self.term,
+            *self.substitution.mapping.values(),
+            apply_substitution(self.term, self.substitution.mapping),
+        )
         return self
 
 
@@ -50,6 +84,7 @@ class SubstitutionResult(SubstitutionRequest):
         self.signature.validate_term(self.result)
         if self.result != apply_substitution(self.term, self.substitution.mapping):
             raise ValueError("substitution result is not bound to its source")
+        _require_transport_safe_depth(self.result)
         return self
 
 
@@ -64,6 +99,7 @@ class MatchingRequest(StrictModel):
     def require_signature(self) -> Self:
         self.signature.validate_term(self.pattern)
         self.signature.validate_term(self.subject)
+        _require_transport_safe_depth(self.pattern, self.subject)
         return self
 
 
@@ -96,6 +132,30 @@ class UnificationRequest(StrictModel):
     def require_signature(self) -> Self:
         self.signature.validate_term(self.left)
         self.signature.validate_term(self.right)
+        _require_transport_safe_depth(self.left, self.right)
+        expected = _bounded_unify(self.left, self.right)
+        if expected is not None:
+            _require_transport_safe_depth(*expected.values())
+            try:
+                canonicalize_json(
+                    {
+                        "signature": self.signature.model_dump(mode="json"),
+                        "left": self.left.model_dump(mode="json"),
+                        "right": self.right.model_dump(mode="json"),
+                        "unified": True,
+                        "substitution": {
+                            str(variable): term.model_dump(mode="json")
+                            for variable, term in expected.items()
+                        },
+                    },
+                    limits=CanonicalLimits(
+                        max_output_bytes=MAX_CRITICAL_PAIR_RESULT_BYTES
+                    ),
+                )
+            except CanonicalizationError as error:
+                raise ValueError(
+                    "unification result exceeds the supported transport bound"
+                ) from error
         return self
 
 
@@ -107,7 +167,7 @@ class UnificationResult(UnificationRequest):
 
     @model_validator(mode="after")
     def require_exact_unifier(self) -> Self:
-        expected = unify(self.left, self.right)
+        expected = _bounded_unify(self.left, self.right)
         if expected is None:
             if self.unified or self.substitution:
                 raise ValueError("failed unification must not claim a substitution")
@@ -143,11 +203,25 @@ class RewriteStepRequest(StrictModel):
         for rule in self.rules:
             self.signature.validate_term(rule.lhs)
             self.signature.validate_term(rule.rhs)
+        _require_transport_safe_depth(
+            self.term, *(side for rule in self.rules for side in (rule.lhs, rule.rhs))
+        )
         if self.selection is None:
-            return self
-        if self.selection.rule_index >= len(self.rules):
-            raise ValueError("selected rule_index is out of range")
-        term_at_position(self.term, self.selection.position)
+            applications = rewrite_steps(self.term, self.rules)
+        else:
+            if self.selection.rule_index >= len(self.rules):
+                raise ValueError("selected rule_index is out of range")
+            term_at_position(self.term, self.selection.position)
+            application = selected_rewrite_step(
+                self.term,
+                self.rules,
+                self.selection.position,
+                self.selection.rule_index,
+            )
+            applications = () if application is None else (application,)
+        _require_transport_safe_depth(
+            *(application.term for application in applications)
+        )
         return self
 
 
@@ -167,6 +241,13 @@ class RewriteStepResult(StrictModel):
         for rule in self.rules:
             self.signature.validate_term(rule.lhs)
             self.signature.validate_term(rule.rhs)
+        _require_transport_safe_depth(
+            self.source_term,
+            *(side for rule in self.rules for side in (rule.lhs, rule.rhs)),
+        )
+        _require_transport_safe_depth(
+            *(application.term for application in self.applications)
+        )
         if self.selection is None:
             expected = rewrite_steps(self.source_term, self.rules)
             expected_scope = "ALL_APPLICABLE_STEPS"
@@ -201,6 +282,14 @@ class NormalFormRequest(StrictModel):
         for rule in self.rules:
             self.signature.validate_term(rule.lhs)
             self.signature.validate_term(rule.rhs)
+        _require_transport_safe_depth(
+            self.term, *(side for rule in self.rules for side in (rule.lhs, rule.rhs))
+        )
+        normalized, _, _, next_step = normal_form(self.term, self.rules, self.max_steps)
+        observed = [normalized]
+        if next_step is not None:
+            observed.append(next_step.term)
+        _require_transport_safe_depth(*observed)
         return self
 
 
@@ -223,6 +312,14 @@ class NormalFormResult(StrictModel):
         for rule in self.rules:
             self.signature.validate_term(rule.lhs)
             self.signature.validate_term(rule.rhs)
+        _require_transport_safe_depth(
+            self.source_term,
+            *(side for rule in self.rules for side in (rule.lhs, rule.rhs)),
+        )
+        observed = [self.term]
+        if self.next_step is not None:
+            observed.append(self.next_step.term)
+        _require_transport_safe_depth(*observed)
         term, status, steps, next_step = normal_form(
             self.source_term, self.rules, self.max_steps
         )
@@ -236,7 +333,67 @@ class NormalFormResult(StrictModel):
         return self
 
 
+class CriticalPairsRequest(StrictModel):
+    """Enumerate every nontrivial source-indexed critical pair of a finite TRS."""
+
+    signature: RankedSignature = Field(
+        description=(
+            "Finite ranked signature for every rule; function symbols must use "
+            "these arities exactly."
+        )
+    )
+    rules: tuple[RewriteRule, ...] = Field(
+        max_length=MAX_CRITICAL_PAIR_RULES,
+        description=(
+            "Duplicate-free ordered rules, possibly empty. Variable labels "
+            "are non-negative integers up to the interoperable JSON integer "
+            "maximum published as the term symbol maximum; their serialized "
+            "width is charged against the byte bound. Terms carry at most "
+            "31 nodes on any root-to-leaf path, the deepest chain strict "
+            "JSON transport accepts. The complete ordered nonvariable "
+            "overlap ledger has at most 32 candidates. The materialized "
+            "replay work, the retained result, and its exact replay are "
+            "bounded by 42752 structural nodes and 4MiB. Composed reducts "
+            "and pair substitution bindings carry at most 30 nodes on any "
+            "root-to-leaf path; deeper compositions reject at admission."
+        ),
+        json_schema_extra={
+            "x-jacobian-bounds": {
+                "max_overlap_candidates": 32,
+                "max_result_nodes": 42752,
+                "max_result_bytes": 4194304,
+                "max_variable_label": MAX_VARIABLE_LABEL,
+                "max_term_depth": MAX_TERM_DEPTH,
+                "max_result_term_depth": MAX_TERM_DEPTH - 1,
+            }
+        },
+    )
+
+    @model_validator(mode="after")
+    def require_bounded_critical_pair_source(self) -> Self:
+        _validate_critical_pair_source(self.signature, self.rules)
+        _require_transport_safe_depth(
+            *(side for rule in self.rules for side in (rule.lhs, rule.rhs))
+        )
+        return self
+
+
+class CriticalPairsResult(CriticalPairsRequest):
+    """The complete exact critical-pair family for a bounded finite TRS."""
+
+    profile: CriticalPairProfile
+
+    @model_validator(mode="after")
+    def bind_critical_pairs(self) -> Self:
+        expected = critical_pairs(self.signature, self.rules)
+        if self.profile != expected:
+            raise ValueError("critical pairs do not replay from the source rules")
+        return self
+
+
 __all__ = [
+    "CriticalPairsRequest",
+    "CriticalPairsResult",
     "MatchingRequest",
     "MatchingResult",
     "NormalFormRequest",
