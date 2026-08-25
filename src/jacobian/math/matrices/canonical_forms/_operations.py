@@ -22,16 +22,9 @@ from jacobian.math.matrices.canonical_forms._models import (
     RationalCanonicalFormResult,
     SquareMatrixRequest,
 )
+from jacobian.math.matrices.canonical_forms._replay import _matrix_entries
 from jacobian.math.matrices.canonical_forms.operations import _evaluate_polynomial
-from jacobian.math.matrices.values import RationalMatrix
-
-
-def _matrix_entries(
-    request: SquareMatrixRequest | MatrixPolynomialEvaluationRequest,
-) -> tuple[tuple[Fraction, ...], ...]:
-    return tuple(
-        tuple(value.as_fraction() for value in row) for row in request.matrix.entries
-    )
+from jacobian.math.matrices.values import RationalMatrix, rational_matrix_from_fractions
 
 
 def _to_monic_polynomial(coefficients: Sequence[Fraction]) -> MonicPolynomial:
@@ -59,15 +52,10 @@ def evaluate_matrix_polynomial_value(
     request: MatrixPolynomialEvaluationRequest,
 ) -> RationalMatrix:
     evaluated = _evaluate_polynomial(
-        _matrix_entries(request),
+        _matrix_entries(request.matrix),
         _dense_polynomial_coefficients(request),
     )
-    return RationalMatrix(
-        entries=tuple(
-            tuple(CanonicalRational.from_fraction(value) for value in row)
-            for row in evaluated
-        )
-    )
+    return rational_matrix_from_fractions(evaluated)
 
 
 def compute_matrix_polynomial_evaluation(
@@ -92,7 +80,7 @@ def compute_matrix_polynomial_evaluation(
 def compute_minimal_polynomial(
     request: SquareMatrixRequest,
 ) -> MinimalPolynomialResult:
-    entries = _matrix_entries(request)
+    entries = _matrix_entries(request.matrix)
     minimal = minimal_polynomial(entries)
     characteristic = characteristic_polynomial(entries)
     return MinimalPolynomialResult(
@@ -106,7 +94,7 @@ def compute_minimal_polynomial(
 def compute_rational_canonical_form(
     request: SquareMatrixRequest,
 ) -> RationalCanonicalFormResult:
-    entries = _matrix_entries(request)
+    entries = _matrix_entries(request.matrix)
     factors = invariant_factors(entries)
     minimal = minimal_polynomial(entries)
     characteristic = characteristic_polynomial(entries)
@@ -131,7 +119,7 @@ def compute_rational_canonical_form(
 def compute_primary_decomposition(
     request: SquareMatrixRequest,
 ) -> PrimaryDecompositionResult:
-    entries = _matrix_entries(request)
+    entries = _matrix_entries(request.matrix)
     components = primary_decomposition(entries)
     minimal = minimal_polynomial(entries)
     return PrimaryDecompositionResult(

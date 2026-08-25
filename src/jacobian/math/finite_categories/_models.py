@@ -7,20 +7,16 @@ from typing import Self
 from pydantic import model_validator
 
 from jacobian._models import StrictModel
-from jacobian.math.finite_categories.operations import _product_plan
+from jacobian.math.finite_categories.operations import (
+    CategoryProductAdmissionError,
+    _product_error,
+    _product_plan,
+)
 from jacobian.math.finite_categories.values import (
     CategoryIdentifier,
     FiniteCategory,
-    FiniteCategoryProduct,
     MorphismSpec,
 )
-
-# The existing profile and opposite operations already accept a complete
-# category directly. Keep that wire shape while giving every producer and
-# consumer the same owner-defined category value.
-FiniteCategoryRequest = FiniteCategory
-OppositeCategoryResult = FiniteCategory
-CategoryProductResult = FiniteCategoryProduct
 
 
 class CategoryProfileResult(StrictModel):
@@ -42,15 +38,15 @@ class CategoryProductRequest(StrictModel):
 
     @model_validator(mode="after")
     def require_bounded_product(self) -> Self:
-        _product_plan(self.left, self.right)
+        try:
+            _product_plan(self.left, self.right)
+        except CategoryProductAdmissionError as exc:
+            raise _product_error(exc.reason, str(exc)) from None
         return self
 
 
 __all__ = [
     "CategoryProductRequest",
-    "CategoryProductResult",
     "CategoryProfileResult",
-    "FiniteCategoryRequest",
     "MorphismSpec",
-    "OppositeCategoryResult",
 ]

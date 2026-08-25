@@ -19,6 +19,7 @@ dependencies = [
     "mcp==2.0.0",
     "networkx==3.6.1",
     "pydantic>=2.12,<3",
+    "pydantic-core>=2.0,<3",
     "python-flint==0.9.0",
     "rfc8785==0.1.4",
     "scipy==1.16.1",
@@ -216,7 +217,7 @@ ignore_imports = [
     # Private exact-algebra adapters share one bounded Singular process owner.
     "jacobian.math._singular -> jacobian.process",
     # General ideal radical/quotient run in a bounded one-shot Singular process.
-    "jacobian.math.commutative_algebra_ops._singular -> jacobian.process",
+    "jacobian.math.polynomials.ideals._singular -> jacobian.process",
     # Exact multivariate factorization runs in a bounded killable worker.
     "jacobian.math.polynomials.multivariate._factor_backend -> jacobian.process",
     # Generic-fiber certificate replay runs in a bounded killable worker.

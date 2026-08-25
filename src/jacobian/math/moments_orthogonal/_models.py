@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Self
 
 from pydantic import Field, model_validator
+from pydantic_core import PydanticCustomError
 
 from jacobian._exact import (
     MAX_CANONICAL_RATIONAL_DIGITS,
@@ -18,6 +19,18 @@ from jacobian.math.moments_orthogonal.values import (
     MomentFunctionalPrefix,
     OrthogonalPolynomialFamily,
 )
+
+
+def _validation_error(reason: str, message: str) -> PydanticCustomError:
+    return PydanticCustomError(f"moments_orthogonal.{reason}", message)
+
+
+class MomentsOrthogonalAdmissionError(ValueError):
+    """Native admission failure for moments-orthogonal operations."""
+
+    def __init__(self, reason: str, message: str) -> None:
+        super().__init__(message)
+        self.reason = reason
 
 
 def _require_determinant_representable(
@@ -35,9 +48,10 @@ def _require_determinant_representable(
     # composition.
     for value in moments[: 2 * order + 1]:
         if RationalHeight.from_canonical(value).exceeds(max(per_entry - 2, 8)):
-            raise ValueError(
+            raise _validation_error(
+                "determinant_height",
                 f"moment heights exceed the conservative {max(per_entry - 2, 8)}-digit "
-                f"bound for an exact order-{order} determinant"
+                f"bound for an exact order-{order} determinant",
             )
 
 
@@ -64,10 +78,11 @@ def _require_gram_schmidt_heights_admissible(
     bound = max(per_entry, 8)
     for value in moments[: 2 * max_degree + 1]:
         if RationalHeight.from_canonical(value).exceeds(bound):
-            raise ValueError(
+            raise MomentsOrthogonalAdmissionError(
+                "gram_schmidt_height",
                 f"moment heights exceed the conservative {bound}-digit "
                 f"bound for exact degree-{max_degree} Gram-Schmidt; supply "
-                "a smaller or better-scaled moment prefix"
+                "a smaller or better-scaled moment prefix",
             )
 
 
@@ -81,8 +96,9 @@ class HankelRequest(StrictModel):
     def require_sufficient_moments(self) -> Self:
         needed = 2 * self.order + 1
         if len(self.prefix.moments) < needed:
-            raise ValueError(
-                f"need at least {needed} moments for order {self.order}, got {len(self.prefix.moments)}"
+            raise _validation_error(
+                "insufficient_moments",
+                f"need at least {needed} moments for order {self.order}, got {len(self.prefix.moments)}",
             )
         _require_determinant_representable(self.prefix.moments, self.order)
         return self
@@ -101,8 +117,9 @@ class ShiftedHankelRequest(StrictModel):
     def require_sufficient_moments(self) -> Self:
         needed = 2 * self.order + 2
         if len(self.prefix.moments) < needed:
-            raise ValueError(
-                f"need at least {needed} moments for shifted order {self.order}, got {len(self.prefix.moments)}"
+            raise _validation_error(
+                "insufficient_moments",
+                f"need at least {needed} moments for shifted order {self.order}, got {len(self.prefix.moments)}",
             )
         # The shifted determinant consumes mu_1..mu_(2r+1); bound exactly
         # that slice so det H_r^(1) stays canonical.
@@ -120,8 +137,9 @@ class OrthogonalPolynomialRequest(StrictModel):
     def require_sufficient_moments(self) -> Self:
         needed = 2 * self.max_degree + 1
         if len(self.prefix.moments) < needed:
-            raise ValueError(
-                f"need at least {needed} moments for degree {self.max_degree}, got {len(self.prefix.moments)}"
+            raise _validation_error(
+                "insufficient_moments",
+                f"need at least {needed} moments for degree {self.max_degree}, got {len(self.prefix.moments)}",
             )
         return self
 
@@ -137,7 +155,12 @@ class OrthogonalPolynomialRequest(StrictModel):
         gate, both this admission replay and the execution that follows it
         operate on provably bounded intermediates with typed height checks.
         """
-        _require_gram_schmidt_heights_admissible(self.prefix.moments, self.max_degree)
+        try:
+            _require_gram_schmidt_heights_admissible(
+                self.prefix.moments, self.max_degree
+            )
+        except MomentsOrthogonalAdmissionError as exc:
+            raise _validation_error(exc.reason, str(exc)) from None
         from jacobian.math.moments_orthogonal.operations import (
             orthogonal_polynomials_from_moments,
         )
@@ -168,9 +191,10 @@ class RecurrenceRequest(StrictModel):
         """
         interior = self.family.polynomials[:-1]
         if any(term.squared_norm.as_fraction() == 0 for term in interior):
-            raise ValueError(
+            raise _validation_error(
+                "nonzero_norm",
                 "recurrence coefficients require every non-terminal "
-                "squared norm to be nonzero"
+                "squared norm to be nonzero",
             )
         from jacobian.math.moments_orthogonal.operations import compute_recurrence
 
@@ -187,9 +211,10 @@ class ChristoffelDarbouxRequest(StrictModel):
     @model_validator(mode="after")
     def require_degree_within_family(self) -> Self:
         if self.degree >= len(self.family.polynomials):
-            raise ValueError(
+            raise _validation_error(
+                "degree_out_of_range",
                 f"kernel degree {self.degree} exceeds the supplied family "
-                f"of {len(self.family.polynomials)} polynomials"
+                f"of {len(self.family.polynomials)} polynomials",
             )
         return self
 
@@ -204,10 +229,11 @@ class ChristoffelDarbouxRequest(StrictModel):
         """
         for term in self.family.polynomials[: self.degree + 1]:
             if term.squared_norm.as_fraction() == 0:
-                raise ValueError(
+                raise _validation_error(
+                    "nonzero_norm",
                     f"Christoffel-Darboux kernel degree {self.degree} "
                     f"requires nonzero squared norms through degree "
-                    f"{self.degree}, but p_{term.degree} has a vanishing norm"
+                    f"{self.degree}, but p_{term.degree} has a vanishing norm",
                 )
         from jacobian.math.moments_orthogonal.operations import (
             compute_christoffel_darboux,
@@ -261,10 +287,11 @@ class JacobiMatrixRequest(StrictModel):
                 abs(alpha_k.numerator) >= digit_limit
                 or alpha_k.denominator >= digit_limit
             ):
-                raise ValueError(
+                raise _validation_error(
+                    "recurrence_height",
                     f"derived recurrence entry alpha_{k} exceeds the "
                     "canonical rational digit limit; supply a family whose "
-                    "coefficient differences stay representable"
+                    "coefficient differences stay representable",
                 )
         # The operation derives norm ratios h_k/h_{k-1} only for the
         # interior steps that actually appear in the (n-1)-dimensional
@@ -274,17 +301,19 @@ class JacobiMatrixRequest(StrictModel):
             h_k = polys[k].squared_norm.as_fraction()
             h_prev = polys[k - 1].squared_norm.as_fraction()
             if h_prev == 0 or h_k == 0:
-                raise ValueError(
+                raise _validation_error(
+                    "norm_ratio",
                     f"adjacent-norm ratio beta_{k} is undefined because "
                     f"squared norm h_{k - 1 if h_prev == 0 else k} vanishes; "
-                    "supply a family with nonzero norms for every emitted ratio"
+                    "supply a family with nonzero norms for every emitted ratio",
                 )
             ratio = h_k / h_prev
             if abs(ratio.numerator) >= digit_limit or ratio.denominator >= digit_limit:
-                raise ValueError(
+                raise _validation_error(
+                    "norm_ratio_height",
                     f"adjacent-norm ratio beta_{k} exceeds the canonical "
                     "rational digit limit; supply a family whose squared "
-                    "norm ratios stay representable"
+                    "norm ratios stay representable",
                 )
         return self
 
@@ -301,7 +330,10 @@ class GaussianQuadratureRequest(StrictModel):
         # projection: without it, a single schema-valid payload such as
         # mu_0 = 10^-32767 with mu_1 = 10^32767 forces enormous exact
         # backend work during parsing before the derived-node check fires.
-        _require_gram_schmidt_heights_admissible(self.prefix.moments, self.order)
+        try:
+            _require_gram_schmidt_heights_admissible(self.prefix.moments, self.order)
+        except MomentsOrthogonalAdmissionError as exc:
+            raise _validation_error(exc.reason, str(exc)) from None
         # Building p_order projects only onto earlier polynomials, so the
         # Gram-Schmidt kernel and the Vandermonde weight solve consume
         # moments through mu_(2n-1) exactly; execution verifies exactness
@@ -309,8 +341,9 @@ class GaussianQuadratureRequest(StrictModel):
         # required.
         needed = 2 * self.order
         if len(self.prefix.moments) < needed:
-            raise ValueError(
-                f"need at least {needed} moments for quadrature order {self.order}, got {len(self.prefix.moments)}"
+            raise _validation_error(
+                "insufficient_moments",
+                f"need at least {needed} moments for quadrature order {self.order}, got {len(self.prefix.moments)}",
             )
         return self
 
@@ -345,11 +378,12 @@ class GaussianQuadratureRequest(StrictModel):
             sympy.degree(factor, x) != 1 or multiplicity != 1
             for factor, multiplicity in factors
         ):
-            raise ValueError(
+            raise _validation_error(
+                "rational_nodes",
                 f"quadrature order {self.order} requires p_{self.order} to "
                 "split into distinct linear factors over QQ so every node "
                 "is an exact rational; this moment prefix yields algebraic "
-                "or repeated nodes"
+                "or repeated nodes",
             )
         # Positive weights are part of the declared contract; replay the
         # exact construction so a nonpositive weight is rejected here
@@ -361,15 +395,17 @@ class GaussianQuadratureRequest(StrictModel):
         if any(
             _fraction_exceeds_canonical_limit(value) for value in (*_nodes, *weights)
         ):
-            raise ValueError(
+            raise _validation_error(
+                "quadrature_height",
                 "derived quadrature nodes or weights exceed the canonical "
                 "rational digit limit; supply a moment prefix whose exact "
-                "rule stays representable"
+                "rule stays representable",
             )
         if any(weight <= 0 for weight in weights):
-            raise ValueError(
+            raise _validation_error(
+                "positive_weights",
                 "quadrature admission requires strictly positive weights; "
-                "this moment prefix yields a nonpositive weight"
+                "this moment prefix yields a nonpositive weight",
             )
         return self
 

@@ -299,8 +299,9 @@ async def inspect_surface(
         catalog_digest = _sha256_bytes(
             canonicalize_json(
                 {
-                    "catalog_version": catalog["catalog_version"],
-                    "operations": catalog["operations"],
+                    key: catalog[key]
+                    for key in ("catalog_version", "operations")
+                    if key in catalog
                 }
             )
         )
@@ -311,7 +312,11 @@ async def inspect_surface(
             "instructions": client.instructions,
             "tools": sorted(tool_records, key=lambda item: item["name"]),
             "catalog": {
-                "catalog_version": catalog["catalog_version"],
+                **(
+                    {"catalog_version": catalog["catalog_version"]}
+                    if "catalog_version" in catalog
+                    else {}
+                ),
                 "catalog_digest": catalog_digest,
                 "operation_count": len(catalog["operations"]),
                 "content_sha256": _sha256_bytes(catalog_content.text.encode("utf-8")),

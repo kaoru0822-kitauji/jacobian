@@ -37,11 +37,9 @@ def ct_operation[RequestT: StrictModel, ResultT: StrictModel](
     operation: Callable[[RequestT], ResultT],
     *tags: str,
     examples: tuple[OperationExample, ...] = (),
-    version: str = "1",
 ) -> MathTool[RequestT, ResultT]:
     return MathTool(
         operation_id=operation_id,
-        version=version,
         title=title,
         description=description,
         request_type=request_model,
@@ -63,7 +61,6 @@ CODE_THEORY_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
         "code",
         "minimum-distance",
         "exact",
-        version="2",
         examples=(
             example(
                 "binary_repetition_code",
@@ -82,7 +79,6 @@ CODE_THEORY_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
         "code",
         "weight-distribution",
         "exact",
-        version="2",
         examples=(
             example(
                 "binary_repetition_code",
@@ -101,7 +97,6 @@ CODE_THEORY_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
         "code",
         "covering-radius",
         "exact",
-        version="2",
         examples=(
             example(
                 "binary_repetition_code",
@@ -119,8 +114,9 @@ CODE_THEORY_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
         DualCodeRequest,
         DualCodeResult,
         compute_dual_code,
-        "coding-theory",
+        "code",
         "dual-code",
+        "exact",
         examples=(
             example(
                 "hamming_7_4_generator",
@@ -146,20 +142,21 @@ CODE_THEORY_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
         SyndromeRequest,
         SyndromeResult,
         compute_syndrome,
-        "coding-theory",
+        "code",
         "syndrome",
+        "exact",
         examples=(
             example(
-                "syndrome_of_correctable_error",
-                "Compute the syndrome of a received word; "
-                "field_order must be prime and word length must match columns.",
+                "single_error_syndrome",
+                "Syndrome of a single-bit error under a Hamming parity check.",
                 {
                     "field_order": 2,
                     "parity_check_matrix": [
-                        [1, 1, 0],
-                        [0, 1, 1],
+                        [1, 1, 0, 1, 1, 0, 0],
+                        [1, 0, 1, 1, 0, 1, 0],
+                        [0, 1, 1, 1, 0, 0, 1],
                     ],
-                    "received_word": [1, 0, 1],
+                    "received_word": [1, 0, 0, 0, 0, 0, 0],
                 },
             ),
         ),

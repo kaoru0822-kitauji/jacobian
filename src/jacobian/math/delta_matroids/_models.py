@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Literal, Self
 
 from pydantic import ConfigDict, Field, model_validator
+from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
 from jacobian.math.delta_matroids.values import (
@@ -13,6 +14,7 @@ from jacobian.math.delta_matroids.values import (
     MAX_DELTA_LABEL_BYTES,
     MAX_DELTA_MEMBERSHIPS,
     MAX_DELTA_RESULT_BYTES,
+    DeltaMatroidAdmissionError,
     DeltaMatroidObstruction,
     FiniteDeltaMatroid,
     canonical_feasible_rows,
@@ -20,6 +22,10 @@ from jacobian.math.delta_matroids.values import (
     require_delta_matroid_admission,
 )
 from jacobian.math.greedoids.values import FiniteFeasibleSetSystem
+
+
+def _validation_error(reason: str, message: str) -> PydanticCustomError:
+    return PydanticCustomError(f"delta_matroid.{reason}", message)
 
 
 class DeltaMatroidFromFeasibleSetsRequest(StrictModel):
@@ -65,7 +71,10 @@ class DeltaMatroidFromFeasibleSetsRequest(StrictModel):
 
     @model_validator(mode="after")
     def require_bounded_exchange_replay(self) -> Self:
-        require_delta_matroid_admission(self.system)
+        try:
+            require_delta_matroid_admission(self.system)
+        except DeltaMatroidAdmissionError as exc:
+            raise _validation_error(exc.reason, str(exc)) from None
         return self
 
 
@@ -79,13 +88,22 @@ class DeltaMatroidRecognitionResult(StrictModel):
 
     @model_validator(mode="after")
     def bind_result_to_complete_source_replay(self) -> Self:
-        require_delta_matroid_admission(self.source)
+        try:
+            require_delta_matroid_admission(self.source)
+        except DeltaMatroidAdmissionError as exc:
+            raise _validation_error(exc.reason, str(exc)) from None
         expected_obstruction = first_symmetric_exchange_obstruction(self.source)
         if expected_obstruction is None:
             if self.status != "DELTA_MATROID":
-                raise ValueError("a valid feasible family must return DELTA_MATROID")
+                raise _validation_error(
+                    "status_mismatch",
+                    "a valid feasible family must return DELTA_MATROID",
+                )
             if self.obstruction is not None:
-                raise ValueError("a valid delta-matroid result has no obstruction")
+                raise _validation_error(
+                    "unexpected_obstruction",
+                    "a valid delta-matroid result has no obstruction",
+                )
             # The declared delta_matroid already passed its own complete
             # defining-invariant replay during field validation; binding only
             # has to pin it to the retained source's canonical wire order.
@@ -94,18 +112,26 @@ class DeltaMatroidRecognitionResult(StrictModel):
                 or self.delta_matroid.ground != self.source.ground
                 or self.delta_matroid.feasible != canonical_feasible_rows(self.source)
             ):
-                raise ValueError(
-                    "delta_matroid must equal the canonical replay of the retained source"
+                raise _validation_error(
+                    "canonical_replay_mismatch",
+                    "delta_matroid must equal the canonical replay of the retained source",
                 )
             return self
         if self.status != "NOT_A_DELTA_MATROID":
-            raise ValueError("an exchange obstruction must return NOT_A_DELTA_MATROID")
+            raise _validation_error(
+                "status_mismatch",
+                "an exchange obstruction must return NOT_A_DELTA_MATROID",
+            )
         if self.delta_matroid is not None:
-            raise ValueError(
-                "an invalid feasible family must not carry a delta-matroid"
+            raise _validation_error(
+                "unexpected_delta_matroid",
+                "an invalid feasible family must not carry a delta-matroid",
             )
         if self.obstruction != expected_obstruction:
-            raise ValueError("obstruction must equal the first source exchange failure")
+            raise _validation_error(
+                "obstruction_mismatch",
+                "obstruction must equal the first source exchange failure",
+            )
         return self
 
 
