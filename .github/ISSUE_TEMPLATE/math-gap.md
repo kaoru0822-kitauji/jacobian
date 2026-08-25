@@ -1,7 +1,7 @@
 ---
 name: Mathematical vocabulary gap
 about: Report a missing mathematical result and diagnose what kind of gap it is
-labels: []
+labels: ["status: needs-triage"]
 assignees: []
 ---
 

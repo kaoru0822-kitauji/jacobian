@@ -2,7 +2,7 @@
 name: Admitted mathematical operation
 about: Propose one admitted, user-facing operation with a stable postcondition
 title: "[Operation]: "
-labels: ["request: math-operation"]
+labels: ["request: math-operation", "status: needs-triage"]
 assignees: []
 ---
 

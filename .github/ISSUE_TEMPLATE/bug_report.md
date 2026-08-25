@@ -2,7 +2,7 @@
 name: Bug report
 about: Report a defect in the Jacobian kernel, checker, or CLI
 title: "[Bug]: "
-labels: ["bug"]
+labels: ["bug", "status: needs-triage"]
 assignees: []
 ---
 
