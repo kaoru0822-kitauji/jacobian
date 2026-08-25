@@ -49,9 +49,9 @@ _PERIODIC_REQUEST_EXAMPLE = {
     "complement": False,
 }
 _PERIODIC_REQUEST_DESCRIPTION = (
-    "Normalize and merge at most 64 residue subsets with at most 4,096 raw "
-    "and 4,096 normalized residue rows. Each modulus and their lcm L have at "
-    "most 256 decimal digits. With W = sum(|R_i| * L/m_i), exact execution "
+    f"Normalize and merge at most {MAX_PERIODIC_FAMILY_SIZE} residue subsets with at most {MAX_PERIODIC_SOURCE_ROWS:,} raw "
+    f"and {MAX_PERIODIC_SOURCE_ROWS:,} normalized residue rows. Each modulus and their lcm L have at "
+    f"most {MAX_PERIODIC_INTEGER_DIGITS} decimal digits. With W = sum(|R_i| * L/m_i), exact execution "
     "uses a full-subset shortcut; a period lift when L <= 1,000,000 and "
     "L + W <= 2,000,000; a sparse lift when W <= 65,536; or generalized-CRT "
     "inclusion-exclusion with at most 65,535 retained states and 100,000 merges "
@@ -126,7 +126,9 @@ def _periodic_request_schema_extra(*, profile: bool) -> JsonSchemaValue:
 PeriodicSignedInteger = Annotated[
     str,
     StringConstraints(
-        pattern=r"^(?:0|-?[1-9][0-9]{0,255})$",
+        # The digit budget is derived from the owning constant; max_length only
+        # grants the one extra character for a leading minus sign.
+        pattern=f"^(?:0|-?[1-9][0-9]{{0,{MAX_PERIODIC_INTEGER_DIGITS - 1}}})$",
         max_length=MAX_PERIODIC_INTEGER_DIGITS + 1,
         strict=True,
     ),
@@ -134,7 +136,7 @@ PeriodicSignedInteger = Annotated[
 PeriodicNonnegativeInteger = Annotated[
     str,
     StringConstraints(
-        pattern=r"^(?:0|[1-9][0-9]{0,255})$",
+        pattern=f"^(?:0|[1-9][0-9]{{0,{MAX_PERIODIC_INTEGER_DIGITS - 1}}})$",
         max_length=MAX_PERIODIC_INTEGER_DIGITS,
         strict=True,
     ),
@@ -142,7 +144,7 @@ PeriodicNonnegativeInteger = Annotated[
 PeriodicPositiveInteger = Annotated[
     str,
     StringConstraints(
-        pattern=r"^[1-9][0-9]{0,255}$",
+        pattern=f"^[1-9][0-9]{{0,{MAX_PERIODIC_INTEGER_DIGITS - 1}}}$",
         max_length=MAX_PERIODIC_INTEGER_DIGITS,
         strict=True,
     ),

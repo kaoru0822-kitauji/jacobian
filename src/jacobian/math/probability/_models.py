@@ -495,9 +495,9 @@ class DirectedBondReliabilityArcProbability(StrictModel):
 
 
 class DirectedBondConnectionProbabilitySource(StrictModel):
-    """One finite directed bond-percolation source in canonical arc order.
+    __doc__ = f"""One finite directed bond-percolation source in canonical arc order.
 
-    Sources have at most 12 arcs; the derived producer-and-replay work budget
+    Sources have at most {MAX_DIRECTED_BOND_RELIABILITY_ARCS} arcs; the derived producer-and-replay work budget
     bounds the vertex count, so sparse sources may declare more vertices.  The
     probability map must contain every graph arc exactly once and is empty for
     an edgeless source, and source/target are distinct declared vertices.
@@ -507,7 +507,7 @@ class DirectedBondConnectionProbabilitySource(StrictModel):
 
     graph: DirectedGraph = Field(
         description=(
-            "A directed graph with at most 12 arcs for this "
+            f"A directed graph with at most {MAX_DIRECTED_BOND_RELIABILITY_ARCS} arcs for this "
             "complete-enumeration operation."
         )
     )
@@ -656,9 +656,9 @@ class DirectedBondConnectionProbabilitySource(StrictModel):
 
 
 class DirectedBondConnectionProbabilityRequest(StrictModel):
-    """Compute directed source-to-target bond connection probability.
+    __doc__ = f"""Compute directed source-to-target bond connection probability.
 
-    The request admits at most 12 arcs, requires one probability for every
+    The request admits at most {MAX_DIRECTED_BOND_RELIABILITY_ARCS} arcs, requires one probability for every
     arc exactly once (empty for an edgeless graph), and requires distinct
     declared source and target vertices.  The derived work budget bounds the
     vertex count, so sparse graphs may declare more vertices.  It normalizes
@@ -668,7 +668,7 @@ class DirectedBondConnectionProbabilityRequest(StrictModel):
 
     graph: DirectedGraph = Field(
         description=(
-            "A directed graph with at most 12 arcs for this "
+            f"A directed graph with at most {MAX_DIRECTED_BOND_RELIABILITY_ARCS} arcs for this "
             "complete-enumeration operation."
         )
     )

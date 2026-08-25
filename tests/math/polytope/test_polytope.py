@@ -13,6 +13,7 @@ from jacobian.canonical import format_canonical_integer
 from jacobian.math.polytope import _operations as polytope_operations
 from jacobian.math.polytope._models import (
     MAX_COMPUTED_FACETS,
+    MAX_DIMENSION,
     MAX_FACET_COORDINATE_DIGITS,
     MAX_FACET_INCIDENCES,
     MAX_FACET_SIGN_TESTS,
@@ -1295,12 +1296,16 @@ class TestHullWorkBoundPublished:
         """26 distinct six-dimensional points satisfy every visible field
         bound yet exceed C(26, 6) = 230230; the rejection must say why."""
         points = tuple(_v(*((1000 * j + i, 1) for i in range(6))) for j in range(26))
-        with pytest.raises(ValueError, match=r"combinatorial bound \(230230"):
+        with pytest.raises(
+            ValueError, match=rf"combinatorial bound \({math.comb(26, 6)}"
+        ):
             PolytopeVolumeRequest(vertices=points)
 
     def test_just_above_the_four_dimensional_maximum_rejected(self) -> None:
         points = tuple(_v(*((1000 * j + i, 1) for i in range(4))) for j in range(49))
-        with pytest.raises(ValueError, match=r"combinatorial bound \(211876"):
+        with pytest.raises(
+            ValueError, match=rf"combinatorial bound \({math.comb(49, 4)}"
+        ):
             PolytopeVolumeRequest(vertices=points)
 
 
@@ -1675,14 +1680,34 @@ class TestCanonicalVPolytopeComposition:
         with pytest.raises(ValueError, match="exceeds the dimension bound"):
             PolytopeVolumeRequest(vertices=cube, dimension_bound=2)
 
-    def test_seven_axis_canonical_value_rejects_before_the_hull_replay(
+    def test_over_dimension_canonical_value_rejects_before_the_hull_replay(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """The canonical space may carry seven axes for facet-profile
-        sources, but volume caps ambient dimension at six, so a serialized
-        seven-axis value fails the cheap dimension-bound preflight instead
+        """The canonical space may carry ``MAX_FACET_DIMENSION`` axes for
+        facet-profile sources, but volume caps ambient dimension at
+        ``MAX_DIMENSION``, so a full-dimensional canonical simplex one axis
+        beyond that bound fails the cheap dimension-bound preflight instead
         of paying the extremality replay."""
-        simplex = _labelled_seven_dimensional_simplex()
+        axes = tuple(f"x{axis}" for axis in range(MAX_DIMENSION + 1))
+        rows = [
+            RationalPolytopeVertex(
+                vertex_id="v00",
+                coordinates=tuple(_canonical_rational(0) for _ in axes),
+            )
+        ]
+        for axis in range(MAX_DIMENSION + 1):
+            coordinates = [_canonical_rational(0) for _ in axes]
+            coordinates[axis] = _canonical_rational(1)
+            rows.append(
+                RationalPolytopeVertex(
+                    vertex_id=f"v{axis + 1:02d}",
+                    coordinates=tuple(coordinates),
+                )
+            )
+        simplex = RationalVPolytope(
+            space=RationalCoordinateSpace(axes=axes),
+            vertices=tuple(rows),
+        )
 
         def unexpected_proof(polytope: object) -> None:
             raise AssertionError("extremality proof ran before the bound preflight")
@@ -1693,7 +1718,9 @@ class TestCanonicalVPolytopeComposition:
             unexpected_proof,
         )
 
-        with pytest.raises(ValueError, match="dimension 7 exceeds the dimension"):
+        with pytest.raises(
+            ValueError, match=rf"dimension {MAX_DIMENSION + 1} exceeds the dimension"
+        ):
             PolytopeVolumeRequest.model_validate(
                 {"vertices": simplex.model_dump(mode="json")}
             )

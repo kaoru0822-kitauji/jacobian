@@ -10,6 +10,9 @@ from pydantic_core import PydanticCustomError
 from jacobian._exact import CanonicalInteger
 from jacobian._models import StrictModel
 from jacobian.math.tree_automata.values import (
+    MAX_REACHABILITY_WITNESS_NODES,
+    MAX_TA_STATES,
+    MAX_TA_SYMBOLS,
     MAX_TA_TRANSITIONS,
     MAX_TREE_AUTOMATON_REACHABILITY_WORK,
     BottomUpTreeAutomaton,
@@ -112,12 +115,12 @@ class AcceptedTreeCountResult(AcceptedTreeCountRequest):
 
 
 class TreeAutomatonReachabilityRequest(StrictModel):
-    """Compute ground-tree reachable states through bottom-up hyperedges.
+    __doc__ = f"""Compute ground-tree reachable states through bottom-up hyperedges.
 
     A schema-valid automaton can still exceed two coupled work envelopes that
     validation enforces before execution:
 
-    - ``MAX_TREE_AUTOMATON_REACHABILITY_WORK`` (30,000,000 units) prices one
+    - ``MAX_TREE_AUTOMATON_REACHABILITY_WORK`` ({MAX_TREE_AUTOMATON_REACHABILITY_WORK:,} units) prices one
       profile's transition sorting, saturation scans measured to their exact
       convergence depth by a shared-code-path pass, and witness
       materialization and recount, charged across the four priced passes the
@@ -128,7 +131,7 @@ class TreeAutomatonReachabilityRequest(StrictModel):
       reuses its own pass's result, so no unpriced sort or probe executes.
       The pass always terminates within ``state_count + 1`` rounds for any
       schema-valid automaton.
-    - ``MAX_REACHABILITY_WITNESS_NODES`` (4096 nodes) bounds the total node
+    - ``MAX_REACHABILITY_WITNESS_NODES`` ({MAX_REACHABILITY_WITNESS_NODES} nodes) bounds the total node
       count summed over the minimum witnesses of all reachable states: it is
       an aggregate output limit across states, not a per-witness limit.
 
@@ -138,16 +141,17 @@ class TreeAutomatonReachabilityRequest(StrictModel):
 
     automaton: BottomUpTreeAutomaton = Field(
         description=(
-            f"nondeterministic bottom-up tree automaton with at most 64 "
-            f"states, 32 ranked symbols, and {MAX_TA_TRANSITIONS} unique transitions. "
+            f"nondeterministic bottom-up tree automaton with at most "
+            f"{MAX_TA_STATES} states, {MAX_TA_SYMBOLS} ranked symbols, and "
+            f"{MAX_TA_TRANSITIONS} unique transitions. "
             "Requests are additionally rejected when the coupled "
             "reachability work envelope (MAX_TREE_AUTOMATON_REACHABILITY_"
-            "WORK = 30,000,000 units, priced across the four passes behind "
+            f"WORK = {MAX_TREE_AUTOMATON_REACHABILITY_WORK:,} units, priced across the four passes behind "
             "request admission, execution, and source-bound result replay "
             "together with request admission's own saturation convergence "
             "pass) or the "
             "aggregate witness output envelope (MAX_REACHABILITY_WITNESS_"
-            "NODES = 4096 nodes summed across every reachable state's "
+            f"NODES = {MAX_REACHABILITY_WITNESS_NODES} nodes summed across every reachable state's "
             "minimum witness) is exceeded"
         ),
     )

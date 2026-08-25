@@ -285,7 +285,7 @@ class SubsystemKroneckerProductRequest(StrictModel):
             "First operand; no fixed per-operand digit ceiling applies. "
             "Admission evaluates the exact product coefficients and admits "
             "the pair when every numerator and denominator stays within the "
-            "256-digit product component envelope."
+            f"{MAX_KRONECKER_RESULT_COMPONENT_DIGITS}-digit product component envelope."
         ),
     )
     right: FactorizedHermitianMatrix = Field(
@@ -293,7 +293,7 @@ class SubsystemKroneckerProductRequest(StrictModel):
             "Second operand; no fixed per-operand digit ceiling applies. "
             "Admission evaluates the exact product coefficients and admits "
             "the pair when every numerator and denominator stays within the "
-            "256-digit product component envelope."
+            f"{MAX_KRONECKER_RESULT_COMPONENT_DIGITS}-digit product component envelope."
         ),
     )
 
@@ -351,8 +351,8 @@ class SubsystemPartialTraceRequest(StrictModel):
         description=(
             "Source operand; no fixed per-operand digit ceiling applies. "
             "Admission measures contraction intermediates, cancelling "
-            "equal-denominator terms first, against the 16392-digit work "
-            "envelope, admits reduced coefficients within the 4098-digit "
+            f"equal-denominator terms first, against the {MAX_PARTIAL_TRACE_WORK_COMPONENT_DIGITS}-digit work "
+            f"envelope, admits reduced coefficients within the {MAX_PARTIAL_TRACE_RESULT_COMPONENT_DIGITS}-digit "
             "result envelope, and reserves the serialized result's canonical "
             "output budget."
         ),
