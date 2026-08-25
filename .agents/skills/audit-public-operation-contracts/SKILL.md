@@ -32,17 +32,19 @@ Map each operation end to end:
 
 ```text
 public request model
-  -> canonical domain value and admission
+  -> canonical domain value
+  -> owner-local request admission and execution plan
   -> native kernel or private backend adapter
-  -> exact result conversion and invariant validation
-  -> canonical result and downstream consumers
+  -> canonical typed result construction
+  -> downstream consumers
+  -> optional explicit bounded result verification
 ```
 
 Inspect generated schema, declaration text, examples, and MCP-visible errors
 when the public projection is in scope. Do not infer the public contract from
 the implementation alone.
 
-## Complete the contract preflight
+## Complete the operation contract review
 
 Fill the review artifact from `domain-operation-library.md`. For every produced
 mathematical value, additionally answer:
@@ -54,7 +56,10 @@ mathematical value, additionally answer:
   normalization where meaningful?
 - What context survives empty, zero, identity, and other degenerate values?
 - Is a decision or certificate bound to the exact source value it concerns?
-- Can validation replay its defining relation within the admitted work bound?
+- If the public contract accepts independently supplied result data, can its
+  explicit bounded result-verification path replay the defining relation within
+  the admitted work bound? Otherwise, identify the owning tests for that
+  defining invariant.
 
 Classify each output as a canonical value, source-bound result, or display
 projection. A display projection must not masquerade as a composable value.
@@ -171,11 +176,14 @@ Prefer a root repair at the owning layer:
 - admission for unsupported or excessive requests;
 - canonical value ownership for composition failures;
 - adapter conversion for backend information loss;
-- result validation for source authenticity and reconstruction; or
+- an explicit bounded result verifier for source authenticity and
+  reconstruction, only when the public contract accepts independently supplied
+  result data; or
 - declaration/schema text for a public semantic mismatch.
 
-Do not use result validation to compensate for overbroad admission, and do not
-add source-text lint rules for mathematical properties.
+Do not use result construction or an optional verifier to compensate for
+overbroad request admission, and do not add source-text lint rules for
+mathematical properties.
 
 ## Require discriminating evidence
 

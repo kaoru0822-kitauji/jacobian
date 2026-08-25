@@ -77,7 +77,7 @@ remains imported or uncertain.
 
 ### 4. Audit current main
 
-On a clean current-main worktree, preflight installed providers, authorized
+On a clean current-main worktree, check installed providers, authorized
 checkers, input bounds, and estimated payload/runtime before materializing a
 large artifact. Stop early when the decisive operation is unavailable and the
 boundary is already documented.

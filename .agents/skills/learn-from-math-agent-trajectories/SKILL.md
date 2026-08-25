@@ -234,8 +234,8 @@ Lead with what the trajectory teaches, not a chronological replay. Include:
   actions; and
 - unresolved mathematical work that still requires proof or human judgment.
 
-For each operation-gap finding, state the gap verdict and the admission posture
-separately. Do not make a reader infer one from the other.
+For each operation-gap finding, state the gap verdict and the catalog
+disposition separately. Do not make a reader infer one from the other.
 
 Keep confirmed facts, plausible hypotheses, and open questions visibly
 separate. The retrospective succeeds when another agent or maintainer can
