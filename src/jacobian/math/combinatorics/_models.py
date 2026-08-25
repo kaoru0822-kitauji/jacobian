@@ -161,7 +161,7 @@ def _validate_result_inline_size(payload: dict[str, object]) -> None:
                 max_integer_digits=MAX_COMBINATORICS_RESULT_RATIONAL_DIGITS,
             ),
         )
-    except PydanticCustomError as exc:
+    except ValueError as exc:
         raise _combinatorics_validation_error(
             "the exact combinatorics result exceeds the bounded result limit"
         ) from exc

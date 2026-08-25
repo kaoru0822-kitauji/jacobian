@@ -5,10 +5,13 @@ from copy import deepcopy
 
 import pytest
 from pydantic import ValidationError
+from pydantic_core import PydanticCustomError
 
 from jacobian.math.combinatorics._models import (
+    MAX_COMBINATORICS_RESULT_ARTIFACT_BYTES,
     PolynomialCoefficientRecurrenceEvaluationRequest,
     PolynomialCoefficientRecurrenceEvaluationResult,
+    _validate_result_inline_size,
 )
 
 
@@ -116,6 +119,15 @@ def test_polynomial_recurrence_result_accepts_complete_bound_replay() -> None:
 
     assert tuple(item.index for item in result.values) == (0, 1, 2, 3)
     assert tuple(item.index for item in result.residuals) == (2, 3)
+
+
+def test_result_size_translation_preserves_owner_local_reason() -> None:
+    with pytest.raises(PydanticCustomError) as caught:
+        _validate_result_inline_size(
+            {"payload": "x" * (MAX_COMBINATORICS_RESULT_ARTIFACT_BYTES + 1)}
+        )
+
+    assert caught.value.type == "combinatorics.result_bound"
 
 
 def test_polynomial_recurrence_aborts_when_an_intermediate_exceeds_digit_bound() -> (
