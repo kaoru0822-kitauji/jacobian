@@ -42,15 +42,13 @@ local-first: ordinary mathematical tool work should stay focused on mathematics;
 preserve an explicit transport/security boundary only when the task actually
 changes one.
 
-The ordinary execution path is deliberately this small:
-
-```text
-math.run(operation ID, JSON)
-  -> select the immutable declaration
-  -> parse its Pydantic request once
-  -> call the domain-owned function
-  -> return its concrete typed mathematical result
-```
+The authoritative operation path and ownership vocabulary are defined in the
+[architecture](docs/explanation/architecture.md). In summary, `math.find`
+selects an immutable declaration and `math.run` parses one strict request,
+executes one owner-local bounded domain operation, and returns a canonical
+mathematical result through the delivery boundary. Any execution plan is
+request-scoped internal data, not caller-visible workflow state or a new MCP
+verb.
 
 The domain function may use a maintained library as a private computational
 engine; prefer an established backend over hand-rolling a kernel whenever it
@@ -86,15 +84,12 @@ semantics and types.
 
 > **Jacobian owns the contract; the backend owns the kernel.**
 
-```text
-public request
-  -> canonical Jacobian value
-  -> complete mathematical and work admission
-  -> private backend adapter
-  -> exact backend result
-  -> invariant validation
-  -> canonical Jacobian result
-```
+Catalog admission means publication in the immutable catalog. Request
+admission means per-call mathematical and resource bounds. Result construction
+means conversion to Jacobian's canonical typed result; defining-invariant
+evidence belongs primarily in tests. Replay verification is optional and only
+applies when independently supplied result data is accepted. Transport
+projection is the final MCP/JSON delivery step.
 
 - Public contracts use canonical mathematical values, not backend expressions
   or ambient contexts.
@@ -187,9 +182,11 @@ partitioning must not introduce kernel-owned durable state.
   under `jacobian.math`. Compose operations through typed mathematical values.
   Follow the [native Python API](docs/reference/python-api.md) when changing
   exported Python functions or values.
-- Validate the complete mathematical request before invoking a backend. Every
-  accepted request must return a typed result rather than expose a backend or
-  host exception. Follow the
+- Validate the complete request envelope before invoking a backend. Request
+  admission must account for mathematical work, intermediate growth, exact
+  output, and the final canonical transport representation. Every accepted
+  request must return a typed result rather than expose a backend, transport,
+  or host exception. Follow the
   [operation library](docs/reference/domain-operation-library.md) when changing
   an operation contract or implementation.
 - For every public string field that carries mathematical syntax, name its

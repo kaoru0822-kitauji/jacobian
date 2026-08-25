@@ -21,7 +21,8 @@ Preserve the exact evidence rather than only summarizing the failure. Write
 - Runtime and catalog revision:
 - Exact typed result, validation error, or transport error:
 - Timeout owner, configured deadline, and observed elapsed time (if applicable):
-- Replay outcome on current main:
+- Failure stage and contract owner (if applicable):
+- Replay/verification outcome (only if the public contract has one):
 
 ## Bespoke escape used
 <!-- What custom code, external library call, solver encoding, or manual work was needed? -->
@@ -49,8 +50,10 @@ a new operation. A timeout or UNKNOWN result is not evidence of mathematical
 nonexistence.
 -->
 
-## Admission posture (operation gaps only)
-<!-- State whether the evidence supports public-catalog consideration, suggests native-only support, or leaves disposition unresolved. Public admission is a later decision. -->
+## Catalog disposition (operation gaps only)
+<!-- State whether the evidence supports public-catalog consideration, suggests
+native-only support, or leaves disposition unresolved. This is catalog
+publication; request bounds for an existing operation belong to its domain. -->
 
 ## Existing math.find queries
 <!-- Queries already tried and what they returned. -->

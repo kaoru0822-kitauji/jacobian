@@ -32,11 +32,21 @@ must not become a negative mathematical conclusion.
 <!--
 Separate the semantic mathematical domain from this release's execution
 envelope. Name the quantities controlling work, intermediate growth, memory,
-and exact output, and explain the preflight formulas used to admit a request.
+and exact output, and explain the request-bounds formulas used to admit a request.
 Classify each remaining limit as mathematical, representation-specific,
 backend-specific, or currently uninvestigated. A fixed cap needs a documented
 reason that a sharper result- or algorithm-sensitive budget is not yet safe.
 -->
+
+## Execution ownership
+<!-- Keep the domain operation central. These fields describe runtime ownership,
+not catalog publication. -->
+- Request-bounds owner and execution-plan quantities:
+- Maintained backend or Jacobian kernel adapter:
+- Canonical result construction and malformed-backend handling:
+- Independent-result verifier (only if the public contract accepts independently supplied result data): <!-- none, or explicit replay bound and claim -->
+- Serialized-result bound and transport projection:
+- Native/MCP semantic parity and transport-only differences:
 
 ## Acceleration and exact representation
 <!--
@@ -63,9 +73,10 @@ separately; they are evidence, not runtime dependencies.
 
 ## Defining invariant
 <!--
-How can an independent validator tell that a returned object is mathematically
-valid? State the reconstruction equation, defining identity, or preservation
-law. Do not use "the backend returned it" as the invariant.
+How can the owning tests—or an explicit verifier, if the public contract
+accepts independently supplied result data—tell that a returned object is
+mathematically valid? State the reconstruction equation, defining identity, or
+preservation law. Do not use "the backend returned it" as the invariant.
 
 Examples: a factorization reconstructs the input from its unit and factors; an
 inverse satisfies both matrix products; a decomposition satisfies its local

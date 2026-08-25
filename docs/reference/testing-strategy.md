@@ -45,15 +45,18 @@ admission and the typed mathematical result. A smaller happy-path example does
 not replace the request that established the need.
 Include the degenerate producer case most likely to erase ambient information,
 such as an empty basis, zero-row matrix, empty trace, or zero count. For
-source-bound decisions, mutate the source and conclusion independently and
-require result validation to reject both forgeries.
+source-bound decisions whose public contract accepts independently supplied
+conclusions or certificates, mutate the source and conclusion independently
+and require the bounded result-verification path to reject both forgeries. For
+ordinary computed results, test the defining invariant of the returned value;
+do not introduce a replay path solely for that test.
 
 Center correctness tests on regression evidence when fixing a concrete
 regression, defining identities, consistency checks, and property-based tests
 against actual symbolic or mathematical behavior. Use maintained libraries in
 their owning domain tests rather than mocking their algorithms. Exercise real
 mathematical and numerical assertions at public typed interfaces with
-deterministic or replayable inputs; keep fixtures sparse and name the evidence
+deterministic inputs; keep fixtures sparse and name the evidence
 each one contributes. Do not monkeypatch or use test fakes for mathematical
 values, validators, serializers, or backend correctness. Keep
 unavailable-environment and transport-failure tests in separate boundary
@@ -105,7 +108,7 @@ Classify each fixture by the evidence it contributes:
 
 | Fixture role | What it establishes |
 | --- | --- |
-| Defining-invariant | Replays the reconstruction equation, preservation law, or certificate relation owned by the result. |
+| Defining-invariant | Tests the reconstruction equation, preservation law, or certificate relation owned by the result; use bounded replay only when the public contract accepts independently supplied result data. |
 | Convention/known-answer | Fixes terminology, normalization, indexing, signs, or another convention-sensitive value. |
 | Adversarial weaker-semantics | Rejects a tempting result that has the right shape or satisfies only a weaker claim. |
 | Metamorphic or equivalence | Checks invariance under a meaning-preserving transformation or compares noncanonical outputs by mathematical equivalence. |

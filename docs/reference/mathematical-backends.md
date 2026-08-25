@@ -25,15 +25,20 @@ result boundary.
 Automatic generator inference, ambient contexts, and implicit coercion are not
 public semantics. A result converter retains every unit, multiplicity, basis,
 axis, generator, quotient map, or witness needed by the declared result and
-checks its reconstruction or defining invariant where applicable.
+may reject malformed backend representation. Defining-invariant evidence
+belongs in the owning tests or in an explicit bounded verifier when the public
+contract accepts independently supplied result data; it is not a universal
+converter obligation.
 
 ## In-process adapters
 
 An in-process adapter has an explicit conversion in each direction, a supported
 version range when behavior is version-sensitive, and exhaustive exception
-translation for every accepted request. The concrete request model enforces the
-backend's coefficient domain, dimensional or degree limits, structural
-preconditions, degeneracies, and work bounds before calling it.
+translation for every accepted request. The shared domain admission path
+enforces the backend's coefficient domain, dimensional or degree limits,
+structural preconditions, degeneracies, and work bounds before calling it. A
+wire request model may invoke that path after parsing; native callers use the
+same domain function directly.
 
 ## Child-process adapters
 
@@ -71,9 +76,9 @@ The commutative-algebra and polynomial-map domains use Singular as a private
 child-process backend for exact ideal and generic-fiber operations. The
 adapters supply an explicit rational polynomial ring, collision-proof internal
 identifiers, a fixed ordering, and a strict result encoding. Generic-fiber
-degree evidence also carries a lift matrix back to the source ideal and is
-replayed independently. Singular does not define the public request or result
-types.
+degree evidence also carries a lift matrix back to the source ideal and has an
+explicit independent verification pass. Singular does not define the public
+request or result types.
 
 SageMath is the current development-time differential oracle for selected
 Singular-backed algorithms. It is not a Jacobian runtime dependency or a

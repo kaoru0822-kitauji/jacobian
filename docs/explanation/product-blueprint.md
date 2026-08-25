@@ -7,11 +7,11 @@ decomposition, sequencing, retention of values, and stopping.
 The server owns typed operation contracts, strict request validation, resource
 bounds, immutable discovery, and the final MCP projection.
 
-For an ordinary call, Jacobian selects one immutable declaration, parses its
-Pydantic request once, calls the domain-owned function, and returns that
-function's concrete typed result. The function may use a maintained library
+The operation path and ownership boundaries are defined in the
+[architecture](architecture.md). A domain kernel may use a maintained library
 such as SymPy, FLINT, NetworkX, or Z3 privately; Jacobian owns the public
-mathematical semantics and typed boundary around that computation.
+mathematical semantics, bounds, typed outcomes, and canonical boundary around
+that computation.
 
 Built-in operations are explicit immutable declarations. Ordinary results are
 small bounded mathematical values returned directly. Direct mathematical

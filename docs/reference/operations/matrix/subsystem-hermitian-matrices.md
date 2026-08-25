@@ -21,8 +21,8 @@ The bounded operations consume and produce this value directly:
   and a rational negative quadratic witness when the order fails.
 
 The admitted product dimension is at most 16, with at most four factors.
-Kronecker and partial-trace admission fix no per-operand ceilings: preflight
-derives the operation's exact result coefficients and admits them against
+Kronecker and partial-trace admission fix no per-operand ceilings: request
+admission derives the operation's exact result coefficients and admits them against
 the documented component envelopes — 256 decimal digits for one product
 component and 4,098 digits for one partial-trace component — and partial
 trace additionally charges its actual contracted intermediates, cancelling

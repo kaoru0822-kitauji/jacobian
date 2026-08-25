@@ -1,6 +1,12 @@
-# Public mathematical operation admission
+# Catalog admission for public mathematical operations
 
 [Documentation home](../index.md)
+
+This document uses **catalog admission** narrowly. It decides whether a
+candidate operation belongs in the immutable public catalog. It does not define
+the **request admission** or execution plan for an individual `math.run` call;
+those are owned by the mathematical domain and must account for work,
+intermediates, exact output, and transport representation.
 
 - Status: Current catalog-maintenance contract
 - Shared admission policy: `src/jacobian/catalog/admission.py`
@@ -62,7 +68,7 @@ applies. Before adopting a small fixed input cap, complete this review:
    examples for exact integer, polynomial, matrix, and rigorous ball
    computation; they are not mandatory when another maintained backend better
    fits the operation.
-6. Define preflight admission from the selected algorithm's work,
+6. Define request admission from the selected algorithm's work,
    intermediate, memory, and result bounds. Large scalar inputs should remain
    admissible when those derived quantities and the returned value are small.
 7. Document any remaining fixed ceiling as a conservative fallback. State
@@ -104,7 +110,7 @@ A public operation must satisfy every gate:
 9. It has a distinct discovery intent and does not create a near-duplicate
    result that degrades retrieval.
 10. Its admitted representation does not hide an unbounded expansion or a
-    materially different computational problem. The request and preflight name
+    materially different computational problem. The request bounds name
     and bound any expansion before execution.
 
 A named technique does not justify a second operation when it has the same
@@ -163,4 +169,6 @@ For a catalog-changing pull request:
    mathematical tests.
 
 The owner-local decision ledger is source review data for constructing the
-immutable public catalog; it is not a runtime recommendation or planning layer.
+immutable public catalog; it is not a runtime recommendation or execution
+planning layer. Do not place request-specific work admission in this catalog
+ledger, and do not call the two decisions by the same unqualified name.

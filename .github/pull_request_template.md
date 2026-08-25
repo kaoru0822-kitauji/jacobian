@@ -27,6 +27,18 @@ compatibility, packaging, and the ordinary Python surface. See
 <!-- Does this change alter an operation ID, request/result schema, native API,
 MCP contract, or mathematical semantics? State "none" when it does not. -->
 
+## Operation boundary ownership
+<!-- Complete for any operation, request/result model, backend adapter,
+native API, dispatch, or MCP change. Use "not applicable" when this PR does
+not touch an operation boundary. -->
+- Changed stage: <!-- request parsing / request bounds / kernel adapter / result construction / transport projection / other -->
+- Request-bounds owner and controlling quantities:
+- Backend or kernel path:
+- Result construction: <!-- canonical conversion; malformed-backend handling belongs to the adapter -->
+- Independent-result verifier (only if the public contract accepts independently supplied result data): <!-- none, or state its explicit replay bound -->
+- Native/MCP parity: <!-- same semantic admission/results, with transport-only differences stated -->
+- Serialized-result and round-trip evidence:
+
 ## Canonical value audit
 <!-- Complete when this change adds or changes a mathematical value, request,
 result, producer, or consumer. -->
@@ -34,8 +46,9 @@ result, producer, or consumer. -->
 - [ ] Owner or intentional distinction documented
 - [ ] Producer→consumer serialization tested
 
-## Public operation admission
-<!-- Complete only when adding or materially changing a public operation. -->
+## Catalog admission
+<!-- Complete only when adding, removing, or materially changing catalog
+membership. This is publication admission, not per-request runtime bounds. -->
 
 - Concrete gap:
 - Why existing operations or typed values are insufficient:
@@ -63,7 +76,8 @@ admitted operation with no residual surface. -->
 - [ ] `make check` passes
 - [ ] Explicitly relevant specialist validation is listed above (boundary, Lean, backend, Harbor/Oracle)
 - [ ] Harbor task or verifier changes ran `make harbor-prepare-task` then `make harbor-validate-task` (if applicable)
-- [ ] Public operation changes include an owner-local admission decision (if applicable)
+- [ ] Catalog changes include an owner-local catalog-admission decision (if applicable)
+- [ ] Runtime-bound changes name the request-bounds owner and execute the same semantic path for native and MCP callers (if applicable)
 - [ ] Result semantics distinguish exact, approximate, incomplete, unknown, and unavailable outcomes where applicable
 - [ ] Public operation changes include a behavioral regression copied from a motivating parent-gap request, or explain why no source request exists (if applicable)
 - [ ] New or changed bounds include boundary, algorithm-crossover, and realistic source-backed scale evidence (if applicable)

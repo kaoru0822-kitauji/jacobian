@@ -21,9 +21,19 @@ or a maintained backend type when it already carries the complete mathematical
 meaning. Private backend modules perform lazy conversions and calls to SymPy,
 NetworkX, FLINT, or Z3.
 
-Native values are mathematical values rather than wire envelopes. An operation
-parses one typed request, calls the same domain kernel, and serializes one typed
-result at the final MCP boundary.
+Native values are mathematical values rather than wire envelopes. Native and
+MCP calls use the same domain-owned request-admission function, execution plan,
+kernel path, canonical result construction, and typed outcome semantics. The
+MCP path adds only wire parsing and the final transport projection; native code
+must not
+inherit MCP byte/depth/echo limits unless those limits are part of the
+mathematical operation itself.
+
+An MCP operation parses one wire request before calling the shared domain
+admission function. Native callers call that domain function directly rather
+than constructing a wire Pydantic model. Native and wire parity tests should
+assert equal exact results and typed outcomes, and should document any
+difference as an explicit transport-only constraint.
 
 ## Canonical native values
 

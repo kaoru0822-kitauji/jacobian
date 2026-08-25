@@ -12,8 +12,9 @@ family. Feasible rows use sorted ground-index tuples and are serialized in
 lexicographic order. Omitted rows are infeasible; they are never unknown.
 
 The operation checks every ordered pair of feasible sets and every element of
-their symmetric difference. It preflights the complete family before replaying
-the axiom: 1,024 total row memberships, 2,048 UTF-8 bytes of ground labels
+their symmetric difference. It bounds the complete family before executing its
+axiom and explicit verification passes: 1,024 total row memberships, 2,048
+UTF-8 bytes of ground labels
 (each label must be UTF-8-representable), 250,000 symmetric-exchange candidate
 checks per complete axiom replay, and a 65,536-byte serialized result. There
 are deliberately no separate delta-matroid ground-size or row-count caps: the
@@ -23,11 +24,12 @@ short labels — or a dense short-row family such as every subset of size at mos
 two over 16 elements (137 rows, 220,832 candidate checks) — is admitted when
 these bounds hold.
 
-One recognized request performs at most four complete axiom replays: the
-operation's obstruction decision, the canonical value construction, the
-returned value's own defining-invariant validation, and the result-binding
-obstruction replay. The aggregate worst case is therefore 1,000,000 candidate
-checks per accepted call, which is part of the advertised envelope.
+One recognized request performs at most four complete axiom passes across its
+operation and explicit bounded verification obligations: the obstruction
+decision, canonical value construction, defining-invariant verification, and
+result-binding obstruction check. The aggregate worst case is therefore
+1,000,000 candidate checks per accepted call, which is part of this operation's
+advertised envelope rather than a universal result-construction rule.
 
 This initial operation deliberately does not construct twists, minors, binary
 matrix presentations, graph conversions, or interlace polynomials. Those are

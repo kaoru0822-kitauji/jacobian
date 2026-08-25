@@ -21,6 +21,19 @@ assignees: []
 **Expected behavior**
 <!-- What should have happened instead? -->
 
+**Failure stage and owner**
+<!-- Check the earliest stage that established the failure and name the
+responsible contract owner. -->
+- [ ] request parsing
+- [ ] request bounds/admission
+- [ ] backend or kernel execution
+- [ ] result construction
+- [ ] transport projection
+- Owner:
+
+**Typed outcome**
+<!-- What typed result or error should have been returned? -->
+
 **Steps to reproduce**
 1.
 2.

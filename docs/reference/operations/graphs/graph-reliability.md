@@ -13,14 +13,15 @@ Every edge has the same exact rational open probability. The source-bound
 result includes the connected-spanning-subgraph counts by open-edge cardinality,
 so its probability reconstructs as
 `sum(c[k] * p^k * (1-p)^(m-k))`. The operation accepts nonempty canonical
-simple graphs with at most 20 edges when the complete enumeration and
-validation replay each fit the `2^20`-state cap. Because the exact result retains
-its source, the graph plus fixed probability/profile headroom must also fit the
-canonical output limit.
+simple graphs with at most 20 edges when the complete enumeration and its
+explicit bounded verification replay each fit the `2^20`-state cap. Because
+the exact result retains its source, the graph plus fixed probability/profile
+headroom must also fit the canonical output limit.
 
 These are different events: two chosen vertices can remain connected while an
 isolated third vertex makes all-terminal reliability fail.
 
 Both operations are stateless. The all-terminal result retains its graph and
-uniform edge probability so validation can replay the defining coefficient
-profile directly; it does not create a separate verification record.
+uniform edge probability so its explicit bounded verifier can replay the
+defining coefficient profile directly; this verifier is part of this
+operation's contract, not a universal result-construction step.

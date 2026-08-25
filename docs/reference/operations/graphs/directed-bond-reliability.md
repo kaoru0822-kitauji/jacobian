@@ -9,18 +9,19 @@ its supplied rational probability; traversal follows arc orientation.
 
 The operation completely enumerates the bounded arc powerset and returns every
 state's open arcs, exact mass, and directed reachability value. Its result
-retains the canonical graph, terminal pair, and arc-probability map, then
-replays the complete enumeration during result validation. Reversing the
+retains the canonical graph, terminal pair, and arc-probability map, then uses
+an explicit bounded verifier to replay the complete enumeration. Reversing the
 terminals is therefore a different event.
 
 The current exact envelope admits at most 12 arcs; the derived
-producer-and-replay work budget bounds the vertex count, so sparse graphs can
+producer-and-verifier work budget bounds the vertex count, so sparse graphs can
 declare more vertices. The arc limit bounds all 4096 states, the full ledger,
-rational-product digit growth, and both the producer and replay passes.
+rational-product digit growth, and both the producer and explicit verifier
+passes.
 Edgeless directed graphs are admitted: with two distinct terminals the event
 has exact probability zero and the ledger holds the single empty state.
 Python-FLINT performs producer
-rational arithmetic; the standard-library `Fraction` replay checks those
+rational arithmetic; the standard-library `Fraction` verifier checks those
 values independently, while the existing directed-graph NetworkX operation
 defines each state’s forward reachability predicate.
 

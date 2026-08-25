@@ -8,13 +8,21 @@ The serving process compiles one immutable catalog directly from explicit
 `MathTool` entries and exposes `math.find` and `math.run` through the MCP Python
 SDK.
 
-Each operation validates one typed request, calls a domain-owned mathematical
-function or maintained private backend, and returns one typed bounded result.
+Each operation parses one typed request, performs owner-local request admission,
+executes one bounded Jacobian kernel path (which may use a maintained private
+backend), constructs one canonical typed result, and returns it through one
+transport projection.
 
 The ordinary call path is:
 
 ```text
-operation ID + JSON -> declaration -> Pydantic request -> domain function -> typed result
+operation ID + JSON
+  -> declaration
+  -> strict typed request
+  -> owner-local request admission and execution plan
+  -> bounded Jacobian kernel or private backend adapter
+  -> canonical typed result construction
+  -> MCP/JSON transport projection
 ```
 
 The domain function may compose a maintained backend such as SymPy, FLINT,
@@ -38,6 +46,18 @@ search, and immutable lookup; `jacobian.dispatch` owns strict invocation;
 `jacobian.mcp` and the CLI are delivery boundaries. The private root model and
 exact-scalar helpers contain only behavior genuinely shared by unrelated
 owners.
+
+Catalog admission decides publication and is not runtime planning. The
+mathematical owner decides request admission, builds the request-scoped
+execution plan, owns the backend adapter, and constructs the canonical result.
+Defining-invariant evidence belongs in the operation's tests; a full replay is
+not part of ordinary execution. An adapter may reject malformed backend data
+while converting it, but that is integration safety rather than a separate
+mathematical result stage.
+Dispatch and MCP project an already-admitted typed result into the final
+transport envelope; they must not discover a mathematical or work bound only
+after execution. Independently supplied result data uses an explicit, bounded
+replay verifier rather than ordinary result construction.
 
 ## Package organization and family folding
 

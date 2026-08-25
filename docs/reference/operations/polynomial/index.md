@@ -9,5 +9,7 @@ callers.
 
 Exact polynomial values retain their variable order, sparse terms, and
 canonical rational coefficients. Operation-specific bounds are checked by the
-owning request model before SymPy is called. A bounded result is returned
-inline; no polynomial is implicitly published or retained for replay.
+shared domain admission path before SymPy is called; a wire request model may
+invoke that path after parsing, while native callers use it directly. A bounded
+result is returned inline; no polynomial is implicitly published or retained
+for replay.

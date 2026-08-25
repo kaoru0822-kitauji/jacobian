@@ -5,10 +5,12 @@ domain owner. Declaration modules export immutable tuples of
 `MathTool` values. `math.find` reads those entries and `math.run`
 validates then executes exactly one of them.
 
-The ordinary path is: select declaration, parse its Pydantic request once,
-call the domain function, and return its concrete result. A domain function may
-use a maintained library privately for its algorithm; callers see Jacobian's
-typed mathematical values, not backend objects.
+The canonical operation path and ownership boundaries are defined in the
+[architecture](../explanation/architecture.md). A domain function may use a
+maintained library privately for its algorithm;
+callers see Jacobian's typed mathematical values, not backend objects. The
+execution plan is request-scoped and internal. It is not caller-owned workflow
+state and does not add another MCP operation.
 
 Keep values, codecs, invariants, and backend conversions with their domain.
 Shared contracts are limited to passive cross-domain primitives. A bounded
@@ -19,8 +21,12 @@ backend call. Express constraints that JSON Schema can represent in typed field
 metadata. When a domain invariant needs a Pydantic model validator—such as a
 cross-field relation or canonical term ordering—also provide an explicit field
 or model description and a minimal valid example in the exported schema. The
-validator remains authoritative; the metadata lets a caller form a valid first
-request rather than discover the rule only through a rejected call.
+Pydantic model is authoritative for the serialized request contract; the
+metadata lets a caller form a valid first request rather than discover the rule
+only through a rejected call. Mathematical and execution semantics belong to
+one domain-owned admission function. A wire model may invoke that shared
+function after parsing, but must not duplicate it or make the native API build a
+wire model just to inherit its checks.
 
 Every built-in `MathTool` declaration must publish at least one small valid
 invocation example. An example is part of the public contract: it must validate
@@ -28,9 +34,10 @@ against the declaration's request model, use canonical values where required,
 and be executable in Jacobian's supported local environment. Keep it close to
 the operation and adapt it when a request contract changes. The composition
 catalog test executes every published example: the payload must validate, the
-domain function must return a typed result, and that result must re-validate.
+domain function must return its declared typed result, and the final transport
+projection must accept its canonical representation.
 The operation's owning tests still own nontrivial example behavior and the
-adversarial and request-boundary cases in the preflight below. Those two cases
+adversarial and request-boundary cases in the contract review below. Those two cases
 are written with the operation; they are not a separate CI program.
 
 Write an invocation example's description in two parts: first state the
@@ -95,24 +102,27 @@ The issue or pull request must record why the selected implementation class is
 proportionate; backend convenience alone does not justify a broader public
 contract.
 
-## Operation preflight
+## Operation contract review
 
 First diagnose the gap: a missing operation is only one of several possible
 responses to an observed composition failure. Classify the failure as
 representation, interoperability, discovery, contract, scale/backend, operation,
 or reasoning before designing an implementation (see
 [Executable mathematical vocabulary](../explanation/executable-mathematical-vocabulary.md)).
-Only a genuine operation gap proceeds to the
-[admission contract](public-operation-admission.md).
+Only a genuine operation gap proceeds to the catalog-admission contract in
+[public-operation-admission](public-operation-admission.md). Existing
+operations with request, result, backend, or transport-bound changes still
+need the runtime ownership and boundedness review below.
 
 Before trusting backend output for a new claim, consult the
 [known backend defects](backend-known-defects.md) registry; add an entry
 whenever the adapter compensates for backend behavior instead of narrowing
 the public domain.
 
-Every new or materially changed public operation must include the following
-completed review artifact in its issue or pull request. A field may say `Not
-applicable` with a reason; it must not be omitted.
+Every new or materially changed operation contract—including an existing
+operation's request, result, backend, or transport behavior—must include the
+following completed review artifact in its issue or pull request. A field may
+say `Not applicable` with a reason; it must not be omitted.
 
 ### Public operation contract
 
@@ -122,7 +132,7 @@ applicable` with a reason; it must not be omitted.
 - Expansion performed by the kernel and its pre-execution bound:
 - Representation-sensitive complexity, including any compact representation
   that changes the algorithmic problem:
-- Admitted request envelope and its controlling quantities:
+- Request bounds and their controlling quantities:
 - Producer/consumer closure, or why not applicable:
 - Degenerate inputs:
 - Parent/ring/field identity:
@@ -137,11 +147,25 @@ applicable` with a reason; it must not be omitted.
 - Typed execution failures:
 - Property and boundary tests:
 
-These checks have distinct owners. Admission validation proves that a request
-belongs to the advertised domain. Backend conversion converts an already valid
-value; it does not widen or discover that domain. Backend result validation
-checks integration and reconstruction. Result validation must never compensate
-for an overbroad request contract.
+These checks have distinct owners. Catalog admission decides whether an
+operation is published; it does not admit a particular runtime request.
+Request admission proves that one parsed request belongs to the advertised
+mathematical and execution envelope and produces the owner-local execution
+plan. Backend conversion converts an already-admitted value; it does not widen
+or discover that domain. Result construction converts the output of that
+execution into the canonical typed result. The defining invariant is
+primarily established by the operation's known-answer, defining-identity, and
+adversarial tests; ordinary execution must not replay the entire mathematical
+computation just to construct its own result. Adapters may reject malformed
+backend data during conversion, but that is integration safety rather than a
+separate mathematical result stage.
+
+Do not use ordinary result construction to validate independently supplied
+results. When a request or consumer can provide result data for verification,
+use an explicit replay verifier with a declared replay-work ceiling and a
+soundness statement for the claim being checked. Transport limits are not a
+substitute for that replay bound, and a cheap identity must not authenticate a
+stronger claim such as canonicity, irreducibility, or non-existence.
 
 Public numeric values are canonical exact rationals. IEEE doubles may exist
 only inside a private kernel; any double crossing the boundary is carried as
@@ -228,7 +252,7 @@ variables to zero. Backend generator inference, ambient rings, and automatic
 coercion are private conveniences and do not define Jacobian's public
 semantics.
 
-### Canonical-value preflight
+### Canonical-value ownership check
 
 Before adding a mathematical value, search the existing `values.py`,
 `_models.py`, and native exports by semantic meaning and fields, not only by
@@ -271,12 +295,13 @@ in the producer/consumer closure field of the review artifact:
 - What mathematical context remains present for empty, zero, identity, or
   otherwise degenerate values?
 - Is each decision or certificate bound to the source value it concerns?
-- Can result validation replay the defining relation within the declared work
-  bound?
+- If independently supplied result data is accepted, can its explicit verifier
+  replay the defining relation within a declared work bound?
 
 Decision and profile results are relations, not detached booleans or numbers.
-Retain the source values needed to state the relation and replay its defining
-equation in result validation. A compact result may omit a large derivation
+Retain the source values needed to state the relation. When the public contract
+accepts an authored conclusion or certificate, replay its defining equation in
+an explicit bounded verifier. A compact result may omit a large derivation
 ledger when bounded replay from the retained source is deterministic, but it
 must not accept an authored conclusion merely because its scalar fields have
 the right shape.
@@ -301,8 +326,9 @@ those semantic claims as source-text or private-helper lint rules.
 
 Jacobian's operations are reusable mathematical instruments for agents doing
 high-level mathematics and investigating conjectures. Treat boundedness as
-part of the mathematical contract, not as a property of the transport or a
-final serializer. Separate four obligations:
+part of the mathematical contract, not as a property discovered only by the
+transport or a final serializer. Separate four obligations and assign them to
+their owners:
 
 1. **Semantic domain:** what stable mathematical map, predicate, invariant, or
    construction does the operation represent, independently of one release's
@@ -314,6 +340,15 @@ final serializer. Separate four obligations:
    before the backend expands, enumerates, or solves anything?
 4. **Output:** what bounds the exact returned value, witness, residual, or
    certificate, and how is that bound related to the admitted request?
+
+The operation's mathematical contract owns the semantic domain and result
+meaning. The domain owner owns request admission and the execution plan. The
+kernel or maintained backend performs only the work described by that plan.
+Result construction owns conversion; the operation's tests own defining-
+invariant evidence. Dispatch and MCP own only the final transport projection.
+A transport failure must therefore
+be rejected by request admission or returned as a typed operational outcome;
+it must not first appear as an uncaught post-execution serializer exception.
 
 The operation identifier and result semantics own the first obligation. The
 request contract enforces the second and the preconditions needed for the
@@ -427,8 +462,14 @@ partitioning is acceptable only when the partition is a stable mathematical
 subdomain and the result identifies exactly what was searched. The caller may
 compose disjoint partitions, but no partition may claim global absence or
 completeness. A timeout, node limit, or truncated witness list is not such a
-claim. Keep the transport envelope separate from the mathematical output bound:
-the latter must imply that the canonical serialized result fits the former.
+claim. Keep the transport envelope separate from the mathematical output bound,
+but make the relationship executable: the mathematical result bound must imply
+that the complete canonical serialized result—including envelope metadata,
+echoed fields, IPC framing, and JSON overhead—fits the transport limit. The
+operation's estimator or exact size calculation must be shared by request
+admission and the final projection, and boundary tests must exercise the
+serialize -> parse -> canonicalize round trip. An accepted request must not
+discover transport overflow only after the backend has run.
 
 When an operation has a genuine incomplete or unknown outcome, expose that
 state in its domain result with the evidence and bounds needed to interpret it.

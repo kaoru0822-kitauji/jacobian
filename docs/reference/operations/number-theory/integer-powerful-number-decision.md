@@ -37,9 +37,9 @@ The result records one of three exact conclusions:
   residual whose exact perfect-power classification is negative.
 
 Every result retains the source, derived cutoff, checked range, removed prime
-powers, and residual. Result validation replays the bounded decision, so
-changing the source, cutoff, checked range, exponent, residual, conclusion, or
-perfect-power witness invalidates the result.
+powers, and residual. The operation's explicit bounded verifier replays the
+decision, so changing the source, cutoff, checked range, exponent, residual,
+conclusion, or perfect-power witness invalidates the result.
 
 ## Execution envelope
 

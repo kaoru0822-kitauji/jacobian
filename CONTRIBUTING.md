@@ -15,7 +15,7 @@ Use the installed catalog and current references for present tool membership.
 Before proposing a public operation, follow the
 [public operation admission](docs/reference/public-operation-admission.md)
 contract and the
-[operation preflight](docs/reference/domain-operation-library.md#operation-preflight).
+[operation contract review](docs/reference/domain-operation-library.md#operation-contract-review).
 
 ## Contributor quick path
 
