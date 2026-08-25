@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from mcp.server.mcpserver import Context
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.shared.exceptions import MCPError
 from mcp.types import INVALID_PARAMS
 
@@ -89,6 +90,8 @@ def math_run(
     """Run one math tool. Role comes from the tool ID."""
     _authorize(ctx)
     catalog = _catalog(ctx)
+    if catalog.operation(operation_id) is None:
+        raise ToolError(f"unknown operation: {operation_id}")
     try:
         return invoke_operation(
             operation_id,

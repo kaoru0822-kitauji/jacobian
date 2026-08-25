@@ -15,7 +15,7 @@ from jacobian.mcp.tools import math_run
 
 
 def test_mcp_sdk_is_exactly_pinned_and_v2_bindings_are_used() -> None:
-    assert importlib.metadata.version("mcp") == "2.0.0"
+    assert importlib.metadata.version("mcp") == "2.1.0"
     assert not inspect.iscoroutinefunction(math_run)
 
 
