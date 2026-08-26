@@ -116,6 +116,8 @@ def math_run(
             message="operation payload failed validation",
             data=data.model_dump(mode="json"),
         ) from exc
+    except Exception as exc:
+        raise ToolError(str(exc) or "operation failed") from exc
 
 
 def _request_cancellation(ctx: Context[AppState, Any]) -> _CancellationSignal:
