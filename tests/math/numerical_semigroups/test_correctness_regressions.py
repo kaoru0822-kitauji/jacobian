@@ -27,6 +27,8 @@ from jacobian.math.numerical_semigroups._operations import (
     compute_delta_set,
     compute_elasticity,
     compute_element_catenary_degree,
+)
+from jacobian.math.numerical_semigroups._presentation_operations import (
     compute_minimal_presentation,
     compute_presentation_binomials,
 )
