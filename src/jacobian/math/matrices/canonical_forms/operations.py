@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from fractions import Fraction
 from typing import Any
 
@@ -15,6 +16,104 @@ __all__ = [
 
 RationalEntries = Sequence[Sequence[Fraction]]
 CoefficientList = tuple[Fraction, ...]
+
+
+def _integer_decimal_digits(value: int) -> int:
+    """Return the decimal width of ``value`` without decimal rendering.
+
+    The conformance probe below can observe large admitted exact components.
+    Avoiding ``str(int)`` keeps that private diagnostic independent of
+    CPython's configurable decimal-conversion guard.
+    """
+
+    magnitude = abs(value)
+    if magnitude == 0:
+        return 1
+    # 0.30103 is an upper rational approximation to log10(2), so this is an
+    # upper estimate from the binary width.  A single exact comparison removes
+    # the possible one-digit overestimate.
+    digits = magnitude.bit_length() * 30_103 // 100_000 + 1
+    if magnitude < 10 ** (digits - 1):
+        return digits - 1
+    return digits
+
+
+@dataclass
+class _HornerEvaluationMetrics:
+    """Private kernel measurements for the matrix-polynomial pilot only.
+
+    This is deliberately an optional observer on this owner-local kernel, not
+    a cross-operation instrumentation protocol.  It records the published
+    dense scalar-product proxy and the widest component of every materialized
+    Horner state -- each pre-addition matrix product together with each
+    reduced accumulator -- without changing evaluation semantics.  Inside a
+    measured matrix product the observer additionally records every scalar
+    multiplication term and every partial accumulation of the standard
+    row-times-column dot products, so canceling terms are observed at their
+    full product width before the following addition reduces them.
+    """
+
+    maximum_component_digits: int = 0
+    scalar_product_terms: int = 0
+    stored_states: int = 0
+
+    def record_state(self, state: Any) -> None:
+        """Record one materialized exact Horner state."""
+
+        state_digits = max(
+            (
+                max(
+                    _integer_decimal_digits(int(entry.p)),
+                    _integer_decimal_digits(int(entry.q)),
+                )
+                for entry in state
+            ),
+            default=1,
+        )
+        self.maximum_component_digits = max(self.maximum_component_digits, state_digits)
+        self.stored_states += 1
+
+
+def _measured_matrix_product(
+    result: Any,
+    matrix: Any,
+    dimension: int,
+    metrics: _HornerEvaluationMetrics,
+) -> Any:
+    """Return ``result * matrix`` while observing inside each dot product.
+
+    SymPy reduces every dot product fully before ``result * matrix``
+    returns, so a plain product observer never sees canceling scalar-product
+    terms: with ``A = H [[1, 1], [-1, -1]]`` the square ``A**2`` is zero even
+    though each entry forms ``H**2`` and ``-H**2`` terms mid-multiplication.
+    This helper walks the same standard row-times-column accumulation in one
+    deterministic order (entries row-major, each inner index ascending), and
+    SymPy still performs every entry multiplication and addition.  The
+    returned matrix equals ``result * matrix`` exactly because reduced
+    rational arithmetic is independent of the association order.
+    """
+
+    from sympy import Matrix, S
+
+    rows: list[list[Any]] = []
+    for row_index in range(dimension):
+        row_entries: list[Any] = []
+        for column_index in range(dimension):
+            accumulator = S.Zero
+            for inner_index in range(dimension):
+                term = (
+                    result[row_index, inner_index] * matrix[inner_index, column_index]
+                )
+                metrics.record_state((term,))
+                accumulator = accumulator + term
+                metrics.record_state((accumulator,))
+            row_entries.append(accumulator)
+        rows.append(row_entries)
+    product = Matrix(rows)
+    # The assembled product is materialized before the scalar term can
+    # cancel it, so the observed bound must cover this state too.
+    metrics.record_state(product)
+    return product
 
 
 def _square_dimension(entries: RationalEntries) -> int:
@@ -70,6 +169,8 @@ def characteristic_polynomial(entries: RationalEntries) -> CoefficientList:
 def _evaluate_polynomial(
     entries: RationalEntries,
     coefficients: Sequence[Fraction],
+    *,
+    metrics: _HornerEvaluationMetrics | None = None,
 ) -> tuple[tuple[Fraction, ...], ...]:
     """Return ``f(A)`` for increasing-degree coefficients by exact Horner evaluation."""
 
@@ -80,12 +181,29 @@ def _evaluate_polynomial(
     identity = eye(dimension)
     if not coefficients:
         result = zeros(dimension)
+        if metrics is not None:
+            metrics.record_state(result)
     else:
         leading = coefficients[-1]
         result = Rational(leading.numerator, leading.denominator) * identity
+        if metrics is not None:
+            metrics.record_state(result)
         for coefficient in reversed(coefficients[:-1]):
             scalar = Rational(coefficient.numerator, coefficient.denominator)
-            result = result * matrix + scalar * identity
+            if metrics is None:
+                product = result * matrix
+            else:
+                # Each dot product reduces before ``result * matrix`` would
+                # return, so measuring the plain product alone would miss
+                # canceling scalar-product terms.  The measured expansion
+                # records every term and partial accumulation of the same
+                # standard row-times-column order and returns the identical
+                # exact matrix.
+                metrics.scalar_product_terms += dimension**3
+                product = _measured_matrix_product(result, matrix, dimension, metrics)
+            result = product + scalar * identity
+            if metrics is not None:
+                metrics.record_state(result)
     return tuple(
         tuple(_to_fraction(result[row, column]) for column in range(dimension))
         for row in range(dimension)
