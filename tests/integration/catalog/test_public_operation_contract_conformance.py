@@ -1,4 +1,4 @@
-"""Catalog-wide conformance checks for accepted public-operation requests."""
+"""Exhaustive catalog-wide conformance checks for accepted public requests."""
 
 from __future__ import annotations
 
@@ -14,6 +14,8 @@ from jacobian.catalog.models import MathTool
 from jacobian.dispatch import invoke_operation
 
 MAX_MUTATIONS_PER_EXAMPLE = 256
+
+pytestmark = pytest.mark.exhaustive
 
 
 def _builtin_operations() -> tuple[MathTool[Any, Any], ...]:

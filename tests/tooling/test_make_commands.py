@@ -51,6 +51,7 @@ def test_lanes_use_their_declared_worker_and_fixture_affinity() -> None:
     assert "pytest -n 4 --dist worksteal" in math
     assert "pytest -n 2 --dist worksteal" in catalog
     assert "pytest -n 2 --dist worksteal" in integration
+    assert '-m "not exhaustive"' in integration
 
 
 def test_paths_file_stays_on_harbor_planning() -> None:

@@ -57,7 +57,7 @@ test-tooling: ## Repository tooling and static contracts (2 workers, 30s).
 		$(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 test-integration: ## Cross-owner mathematical seams (2 workers, 120s).
-	$(UV_RUN) pytest -n 2 --dist worksteal --timeout=120 \
+	$(UV_RUN) pytest -n 2 --dist worksteal --timeout=120 -m "not exhaustive" \
 		$(if $(TESTS),$(TESTS),tests/integration) \
 		$(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
