@@ -41,6 +41,14 @@ PUBLIC_COMMANDS: tuple[CommandContract, ...] = (
         cost_class="bounded",
     ),
     CommandContract(
+        name="handoff-scoped",
+        help="Focused handoff scoped to declared static PATHS and one owner test path.",
+        mutates_checkout=False,
+        scope="explicit Ruff and mypy paths + one explicit test path through its declared owner lane",
+        ci_relationship="additive local evidence; the broad check and CI static gate remain authoritative",
+        cost_class="fast",
+    ),
+    CommandContract(
         name="quick",
         help="Focused edit loop: lint and one declared owner path.",
         mutates_checkout=False,

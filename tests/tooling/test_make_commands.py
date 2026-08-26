@@ -44,6 +44,17 @@ def test_focused_math_lane_skips_validation_lock() -> None:
     assert "_harbor-oracle-all: _harbor-check-all" in harbor
 
 
+def test_scoped_handoff_requires_explicit_static_paths() -> None:
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    contracts = (ROOT / "tools" / "command_contract.py").read_text(encoding="utf-8")
+
+    assert "handoff-scoped: lint-scoped typecheck-scoped test-focused" in makefile
+    assert "ruff check $(PATHS)" in makefile
+    assert "ruff format --check $(PATHS)" in makefile
+    assert "mypy $(PATHS)" in makefile
+    assert 'name="handoff-scoped"' in contracts
+
+
 def test_lanes_use_their_declared_worker_and_fixture_affinity() -> None:
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
     math = makefile.split("test-math:", 1)[1].split("test-catalog:", 1)[0]

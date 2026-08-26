@@ -31,6 +31,20 @@ explicit lane preserves its configured timeout and worker count. Supported
 focused lanes are `math`, `catalog`, `dispatch`, `cli`, `tooling`,
 `integration`, `process`, and `mcp`; Singular retains its dedicated command.
 
+In a shared checkout with unrelated static drift, declare the source and test
+paths you own instead of waiting on unrelated files:
+
+```sh
+make handoff-scoped \
+  LANE=math \
+  TESTS=tests/math/graphs/test_graph_distance_matrix.py \
+  PATHS="src/jacobian/math/graphs tests/math/graphs/test_graph_distance_matrix.py"
+```
+
+`PATHS` is required and is passed directly to Ruff and mypy; use repository
+paths only, without pytest node IDs. This is additive local evidence, not a
+replacement for `make handoff`, `make check`, or CI's full static gate.
+
 `make check` is the explicit broad ordinary gate: it runs lint, types, and all
 non-integration owners once, excluding separately marked property, exhaustive,
 and scale evidence. `make check-all` adds the ordinary integration owner.

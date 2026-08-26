@@ -3,6 +3,7 @@
 UV_RUN := uv run --locked
 PYTEST_ARGS ?=
 TESTS ?=
+PATHS ?=
 EVAL_ARGS ?=
 STRESS_COUNT ?= 3
 ORDERING_DEFAULT_SEED := --randomly-seed=17
@@ -15,7 +16,7 @@ VALIDATION_LOCK := $(UV_RUN) python tools/with_validation_lock.py
 # them independently; `make check-all` reproduces them locally in this order.
 ORDINARY_TEST_LANES := math catalog dispatch cli tooling integration
 FOCUSED_TEST_LANES := $(ORDINARY_TEST_LANES) process mcp
-PUBLIC_COMMANDS := setup test-focused handoff quick check check-all fix
+PUBLIC_COMMANDS := setup test-focused handoff handoff-scoped quick check check-all fix
 
 include make/development.mk
 include make/harbor.mk
@@ -68,6 +69,15 @@ test-focused: ## Run TESTS through its explicit semantic LANE (for example, LANE
 	@case " $(FOCUSED_TEST_LANES) " in *" $(LANE) "*) ;; *) \
 		echo "LANE must be one of: $(FOCUSED_TEST_LANES)" >&2; exit 2;; esac
 	$(MAKE) test-$(LANE) TESTS="$(TESTS)" PYTEST_ARGS="$(PYTEST_ARGS)"
+
+lint-scoped: ## Check explicit Python PATHS with Ruff without touching unrelated files.
+	@test -n "$(PATHS)" || { echo "PATHS is required, e.g. PATHS='src/jacobian/... tests/math/...'" >&2; exit 2; }
+	$(UV_RUN) ruff check $(PATHS)
+	$(UV_RUN) ruff format --check $(PATHS)
+
+typecheck-scoped: ## Type-check explicit Python PATHS and their imported dependencies.
+	@test -n "$(PATHS)" || { echo "PATHS is required, e.g. PATHS='src/jacobian/... tests/math/...'" >&2; exit 2; }
+	$(UV_RUN) mypy $(PATHS)
 
 test-fast: ## Broad ordinary owner tests except cross-owner integration.
 	# Full catalog construction imports every maintained math backend; keep
@@ -181,6 +191,8 @@ build: ## Build Python source and wheel distributions.
 	$(UV_RUN) python tools/check_wheel_contents.py
 
 handoff: lint typecheck test-focused ## Focused contributor handoff: lint, types, and one declared owner path.
+
+handoff-scoped: lint-scoped typecheck-scoped test-focused ## Focused handoff scoped to declared static PATHS and one owner test path.
 
 quick: lint test-focused ## Focused edit loop: lint and one declared owner path.
 

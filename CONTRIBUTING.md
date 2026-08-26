@@ -110,6 +110,11 @@ make handoff LANE=math TESTS=tests/math/graphs/test_graph_distance_matrix.py
 `LANE` is one of `math`, `catalog`, `dispatch`, `cli`, `tooling`,
 `integration`, `process`, or `mcp`. The command keeps each lane's established
 timeout and worker count; it does not select a lane from a path implicitly.
+When a shared checkout has unrelated static drift, use
+`make handoff-scoped LANE=... TESTS=... PATHS="src/... tests/..."`. `PATHS`
+must name the Python files or directories you own (not pytest node IDs); Ruff
+and mypy receive those paths directly. It is additive local evidence and does
+not replace the broad `make handoff`, `make check`, or CI static gate.
 `make quick LANE=... TESTS=...` omits mypy for a shorter focused loop.
 `make check` is the broad ordinary gate, `make check-all` explicitly reproduces
 every ordinary Python CI lane, and `make test-full` is the exceptional complete
