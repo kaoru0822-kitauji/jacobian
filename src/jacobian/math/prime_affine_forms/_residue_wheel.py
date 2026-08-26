@@ -16,16 +16,19 @@ from jacobian.math.affine_forms.values import (
     AffineComponentInteger,
     AffineFormId,
 )
+from jacobian.math.prime_affine_forms._interval import (
+    MAX_INTERVAL_REPLAY_EVALUATIONS,
+    IntervalEndpointInteger,
+    _parse_interval,
+    require_bounded_affine_endpoints,
+)
 from jacobian.math.prime_affine_forms._kernel import wheel_modulus
 from jacobian.math.prime_affine_forms._models import (
     MAX_BATCH_PRIME,
-    MAX_INTERVAL_REPLAY_EVALUATIONS,
     MAX_RESULT_CHARACTER_BUDGET,
     CompactPrime,
-    IntervalEndpointInteger,
     PrimeTupleLocalSummary,
     _digits,
-    _parse_interval,
     _require_prime_set,
     _require_summary,
     _source_character_upper_bound,
@@ -320,6 +323,9 @@ class PrimeTupleIntervalResidueProfileRequest(StrictModel):
 
     @model_validator(mode="after")
     def require_bounded_survivor_profile(self) -> Self:
+        require_bounded_affine_endpoints(
+            self.wheel.source, self.lower, self.upper, label="interval"
+        )
         _, _, interval_size = _parse_interval(self.lower, self.upper)
         if interval_size > MAX_WHEEL_INTERVAL_LENGTH:
             raise _validation_error(

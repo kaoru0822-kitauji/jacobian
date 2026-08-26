@@ -6,16 +6,22 @@ Tests prove one observable mathematical or transport contract at a time.
 
 ## Routine validation
 
-Run the focused local handoff before sharing a code change:
+Run planner-selected affected validation before sharing a code change:
 
 ```sh
 make setup
-make handoff LANE=math TESTS=tests/math/graphs/test_graph_distance_matrix.py
+make affected AFFECTED_BASE=origin/main
 ```
 
-`make handoff` runs Ruff, mypy, and one changed test path through its declared
-semantic owner. Add the narrowest named boundary lane when a change crosses its
-real boundary:
+`make affected` resolves `AFFECTED_BASE...HEAD` together with staged, unstaged, and
+untracked paths, then uses the checked-in pull-request planner to run only the
+selected owner, catalog, and boundary lanes. Ruff and mypy run only on changed
+Python files in their normal repository scopes. It
+prints the immutable plan and its reasons before execution; `make affected-plan`
+prints that selection without running it. Installed-wheel evidence remains
+CI-owned. For a deliberately narrower one-owner loop, use `make handoff-scoped`
+with explicit `PATHS`. Add the narrowest named boundary lane when a change
+crosses its real boundary:
 
 | Change | Additional check |
 | --- | --- |
@@ -47,11 +53,33 @@ make handoff-scoped \
 paths only, without pytest node IDs. This is additive local evidence, not a
 replacement for `make handoff`, `make check`, or CI's full static gate.
 
-`make check` is the explicit broad ordinary gate: it runs lint, types, and all
+`make check` is the final broad ordinary gate: it runs lint, types, and all
 non-integration owners once, excluding separately marked property, exhaustive,
 and scale evidence. `make check-all` adds the ordinary integration owner.
 `make test-full` is the exceptional complete local reproduction. Do not use a
 broad or full suite as a substitute for a focused regression test.
+
+### Command hierarchy and timing evidence
+
+Use `make affected` for normal branch-local validation and
+`make handoff-scoped LANE=... TESTS=... PATHS="..."` for a one-owner edit loop.
+Run `make check` once on a frozen tree. `make check-all` reproduces ordinary CI
+lanes and `make test-full` is the complete local escalation path; neither is an
+iteration command.
+
+`make check` and `make check-all` take a worktree-local non-blocking validation
+lease. `make validation-status` identifies a competing broad run immediately;
+focused and affected commands remain unblocked. Use
+`ALLOW_PARALLEL_VALIDATION=1` only for an intentional parallel broad run on a
+host with known capacity.
+
+Every CI lane emits a JUnit artifact and a worker-timing sidecar retained for
+90 days. Download both to identify slow testcases, xdist call-time skew, and
+the non-call wall remainder before changing worker counts, fixtures, or shards:
+
+```sh
+make test-timings JUNIT=pytest.xml TIMING=timing.json
+```
 
 ## CI lifecycle
 

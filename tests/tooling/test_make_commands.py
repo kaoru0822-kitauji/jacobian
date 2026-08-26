@@ -55,6 +55,38 @@ def test_scoped_handoff_requires_explicit_static_paths() -> None:
     assert 'name="handoff-scoped"' in contracts
 
 
+def test_affected_validation_is_a_public_planner_backed_default() -> None:
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    contracts = (ROOT / "tools" / "command_contract.py").read_text(encoding="utf-8")
+
+    assert "affected: ## Default local validation:" in makefile
+    assert "affected-plan: ## Show the CI-planned" in makefile
+    assert 'python tools/affected_validation.py --base "$(AFFECTED_BASE)"' in makefile
+    assert 'name="affected"' in contracts
+    assert 'name="affected-plan"' in contracts
+
+
+def test_timing_report_is_a_public_read_only_diagnostic() -> None:
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    contracts = (ROOT / "tools" / "command_contract.py").read_text(encoding="utf-8")
+
+    assert "test-timings: ## Summarize pytest JUnit timing evidence" in makefile
+    assert "tools/test_timing_report.py" in makefile
+    assert 'name="test-timings"' in contracts
+
+
+def test_broad_commands_share_the_nonblocking_validation_lease() -> None:
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+
+    assert "ALLOW_PARALLEL_VALIDATION ?= 0" in makefile
+    assert (
+        "validation-status: ## Show whether this worktree holds a broad-validation lock."
+        in makefile
+    )
+    assert "$(VALIDATION_LOCK) run --target check -- $(MAKE) _check" in makefile
+    assert "$(VALIDATION_LOCK) run --target check-all -- $(MAKE) _check-all" in makefile
+
+
 def test_lanes_use_their_declared_worker_and_fixture_affinity() -> None:
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
     math = makefile.split("test-math:", 1)[1].split("test-catalog:", 1)[0]

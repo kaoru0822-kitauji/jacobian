@@ -30,7 +30,7 @@ runs:
         COLLECT_COVERAGE: ${{ inputs.collect-coverage }}
         TESTS: ${{ inputs.tests }}
       run: |
-        pytest_args=(--junitxml=pytest.xml)
+        pytest_args=(--junitxml=pytest.xml -p tools.pytest_timing --jacobian-timing-json=timing.json)
         if [ "$COLLECT_COVERAGE" = true ]; then
           pytest_args+=(--cov --cov-report= --cov-fail-under=0)
         fi
@@ -39,6 +39,11 @@ runs:
     - if: ${{ !cancelled() }}
       shell: bash
       run: uv cache prune --ci
+    - if: ${{ !cancelled() }}
+      shell: bash
+      run: |
+        uv run --locked python tools/test_timing_report.py \
+          --junit pytest.xml --timing timing.json >> "$GITHUB_STEP_SUMMARY"
     - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       if: ${{ !cancelled() }}
       with:
@@ -47,6 +52,13 @@ runs:
         if-no-files-found: ignore
         # JUnit testcase times provide the durable unsharded baseline for
         # measured future balancing work.
+        retention-days: 90
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      if: ${{ !cancelled() }}
+      with:
+        name: ${{ inputs.junit-artifact }}-timing
+        path: timing.json
+        if-no-files-found: error
         retention-days: 90
     - if: ${{ !cancelled() && inputs.collect-coverage == 'true' }}
       shell: bash

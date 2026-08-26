@@ -19,17 +19,22 @@ contract and the
 
 ## Contributor quick path
 
-Most changes need only the locked environment and a focused local handoff:
+Most changes should begin with the CI-planned affected local validation:
 
 ```sh
 make setup
-make handoff LANE=math TESTS=tests/math/graphs/test_graph_distance_matrix.py
+make affected AFFECTED_BASE=origin/main
 ```
 
 Then open a pull request. `make setup` installs the locked development
-environment with the complete maintained Python backend stack. `make handoff`
-runs Ruff, mypy, and the named changed test path through its owner lane. Add a
-named `make test-*` lane only for another behavior or boundary changed.
+environment with the complete maintained Python backend stack. `make affected`
+uses the same checked-in planner as pull-request CI to select committed, staged,
+unstaged, and untracked changed owners,
+catalog examples, and public boundaries, while scoping Ruff and mypy to changed
+Python files. Use `make affected-plan` to inspect the selection without running
+it. For a deliberately narrower one-owner loop, use `make handoff-scoped` with
+explicit `PATHS`; add a named `make test-*` lane only for another behavior or
+boundary changed.
 Pull-request CI runs static checks plus changed owners and boundaries. Public
 operation, model, admission, and canonical-contract changes also run catalog
 conformance and every advertised invocation example; merge-group candidates
@@ -55,11 +60,33 @@ prerequisite for every developer loop.
 `make quick LANE=... TESTS=...` is the cheaper loop: it omits mypy but still
 runs repository-wide Ruff. In a shared checkout, use `make quick-scoped
 LANE=... TESTS=... PATHS="src/... tests/..."` to scope both Ruff and the test.
-`make check` is a broad ordinary gate, not a routine edit command; it runs lint,
+`make check` is the final broad ordinary gate, not a routine edit command; it runs lint,
 types, and the non-integration owner suite once. The
 pre-push hook stays `make lint typecheck`. Focused debugging uses
 `uv run pytest path/to/test.py`. Default `uv run pytest` collects the ordinary
 testpaths`; it does not run process or MCP trees.
+
+### Command hierarchy
+
+Use the narrowest command that establishes the needed evidence:
+
+- `make affected` is the normal local path for a working branch.
+- `make handoff-scoped LANE=... TESTS=... PATHS="..."` is the fastest loop for one owner.
+- `make check` is one final broad ordinary gate on a frozen tree.
+- `make check-all` and `make test-full` are escalation commands for reproducing CI or the complete local suite.
+
+`make check` and `make check-all` acquire the same worktree-local validation
+lease used by the exhaustive commands. If another broad run holds it, use
+`make validation-status` rather than waiting behind an invisible competing
+suite. Set `ALLOW_PARALLEL_VALIDATION=1` only when parallel broad validation is
+intentional and the host has capacity.
+
+Every CI test lane publishes JUnit and worker timing artifacts for 90 days. Download
+both, then inspect them without rerunning tests:
+
+```sh
+make test-timings JUNIT=pytest.xml TIMING=timing.json
+```
 
 CI runs static checks plus the selected ordinary Python surface and boundaries.
 Merge-group candidates add optional scale evidence; `main` runs the landed-tree

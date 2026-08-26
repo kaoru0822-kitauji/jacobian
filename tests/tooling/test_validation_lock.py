@@ -26,7 +26,7 @@ def test_status_reports_free_worktree(
     assert main(["status"]) == 0
 
 
-def test_second_exhaustive_run_is_rejected_while_lock_is_held(
+def test_second_broad_run_is_rejected_while_lock_is_held(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(_worktree(tmp_path))
@@ -52,7 +52,7 @@ def test_second_exhaustive_run_is_rejected_while_lock_is_held(
             time.sleep(0.05)
         else:
             raise AssertionError("holder did not take the validation lock")
-        with pytest.raises(SystemExit, match="already running exhaustive validation"):
+        with pytest.raises(SystemExit, match="already running broad validation"):
             main(["run", "--target", "test-exhaustive", "--", "true"])
     finally:
         holder.wait(timeout=15)
