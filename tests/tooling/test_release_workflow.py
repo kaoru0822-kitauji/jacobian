@@ -123,6 +123,16 @@ def test_mcp_publisher_is_verified_before_oidc_or_publication() -> None:
     )
 
 
+def test_npm_publish_sets_the_release_tag_without_a_second_registry_write() -> None:
+    npm = _job(_workflow(), "publish-npm")
+    publication = _named_step(npm, "Publish npm distribution")
+    script = publication["run"]
+
+    assert isinstance(script, str)
+    assert 'npm publish artifacts/npm/*.tgz --access public --tag "$dist_tag"' in script
+    assert "npm dist-tag add" not in script
+
+
 def test_release_please_updates_all_mcp_server_versions() -> None:
     configuration = json.loads(RELEASE_PLEASE_CONFIG.read_text(encoding="utf-8"))
     extra_files = configuration["packages"]["."]["extra-files"]
