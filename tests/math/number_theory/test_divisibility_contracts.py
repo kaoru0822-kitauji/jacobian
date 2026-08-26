@@ -6,6 +6,7 @@ import pytest
 from tests.math.number_theory._validation import expect_validation
 
 from jacobian.catalog.models import MathTool
+from jacobian.math.arithmetic.operations import absolute_value
 from jacobian.math.arithmetic.values import IntegerValue
 from jacobian.math.number_theory._divisibility import DIVISIBILITY_OPERATIONS
 from jacobian.math.number_theory._divisibility_models import (
@@ -14,6 +15,7 @@ from jacobian.math.number_theory._divisibility_models import (
     IntegerPairRequest,
     ValuationRequest,
 )
+from jacobian.math.number_theory._divisibility_operations import compute_gcd
 
 
 def _operation(operation_id: str) -> MathTool[Any, Any]:
@@ -75,3 +77,10 @@ def test_divisibility_contracts_retain_their_typed_admission_errors() -> None:
         ValuationRequest(value="0", prime="2")
     with expect_validation("number_theory.valuation_requires_a_prime_absolute_base_2"):
         ValuationRequest(value="1", prime="4")
+
+
+def test_gcd_result_composes_with_arithmetic_integer_consumers() -> None:
+    gcd = compute_gcd(IntegerPairRequest(left="-84", right="30"))
+
+    assert type(gcd) is IntegerValue
+    assert absolute_value(gcd) == IntegerValue(value="6")

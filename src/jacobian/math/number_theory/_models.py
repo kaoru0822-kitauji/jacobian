@@ -289,12 +289,6 @@ class DiscreteLogarithmRequest(StrictModel):
 # ---------------------------------------------------------------------------
 
 
-class IntegerValueResult(StrictModel):
-    """One exact integer value produced by a number-theory operation."""
-
-    value: BoundedInteger
-
-
 class PrimePower(StrictModel):
     """One prime base and its exponent in a prime factorization."""
 
