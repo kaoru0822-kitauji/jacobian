@@ -1,4 +1,4 @@
-.PHONY: uv-version-check setup container-image eval-image eval-image-pull hooks fix lint lint-full security-audit typecheck architecture docs-command-check docs-linkcheck
+.PHONY: uv-version-check setup container-image eval-image eval-image-pull hooks fix lint lint-full security-audit typecheck architecture repository-hygiene docs-command-check docs-linkcheck
 
 uv-version-check: ## Require the repository-pinned uv release.
 	@test "$$(uv --version | awk '{print $$2}')" = "$$(tr -d '[:space:]' < .uv-version)" || { echo "install uv $$(tr -d '[:space:]' < .uv-version) before using this checkout" >&2; exit 2; }
@@ -44,6 +44,9 @@ import-contracts: ## Enforce declared package dependency direction.
 
 architecture: ## Enforce product source boundary invariants (subprocess, shutil.which, environ, contracts, surfaces).
 	$(UV_RUN) python tools/check_architecture.py
+
+repository-hygiene: ## Reject tracked local artifacts and unresolved conflict markers.
+	$(UV_RUN) python tools/check_repository_hygiene.py
 
 docs-command-check: ## Validate Make targets and TESTS paths in command examples.
 	$(UV_RUN) python tools/check_doc_commands.py
