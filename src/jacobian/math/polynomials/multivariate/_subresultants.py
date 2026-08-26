@@ -65,7 +65,15 @@ def _subresultant_coefficient_height_bits(
     sylvester_order: int,
     input_coefficient_support: int,
 ) -> int:
-    """Bound determinant coefficient numerators and denominators in bits."""
+    """Bound determinant coefficient numerators and denominators in bits.
+
+    Put every input coefficient over their exact common denominator ``L``. A
+    Sylvester minor has order at most ``sylvester_order``; Leibniz expansion
+    then bounds a coefficient numerator by
+    ``s! * (input_coefficient_support * scaled_height)^s`` and its denominator
+    by ``L^s``. Subresultant minors are no larger than the full Sylvester
+    matrix, so the same bound covers every returned member.
+    """
 
     coefficients = tuple(
         term.coefficient
@@ -100,7 +108,22 @@ def _brown_intermediate_coefficient_height_bits(
     sylvester_order: int,
     maximum_coefficient_support: int,
 ) -> int:
-    """Bound coefficients materialized inside Brown pseudo-remainders."""
+    """Bound coefficients materialized inside Brown pseudo-remainders.
+
+    Every returned PRS coefficient and scalar subresultant is a Sylvester
+    minor covered by ``returned_coefficient_bits``. In SymPy's Brown kernel,
+    one pseudo-remainder, scaling factor, exact-division partial product, or
+    fraction-field GCD/replay intermediate is a sum of coefficient-ring
+    products containing at most ``sylvester_order + 2`` such minor factors.
+
+    All source coefficients share the exact common denominator used by the
+    determinant bound. Products therefore share a power of that denominator;
+    summing convolution paths adds their logarithm rather than multiplying
+    unrelated denominators. ``maximum_coefficient_support`` bounds the paths
+    contributed by each factor and the partial quotient ledger. This is
+    deliberately conservative, but it covers the pre-division pseudo-
+    remainder that can be larger than every returned subresultant.
+    """
 
     factor_count = sylvester_order + 2
     support_path_bits = (factor_count + 1) * max(
@@ -149,6 +172,23 @@ def _subresultant_envelope(
         maximum_support = max(maximum_support, coefficient_support)
         aggregate_terms += (index + 1) * coefficient_support
 
+    # The Brown kernel also materializes coefficient-ring scaling powers:
+    # every pseudo-remainder ends by multiplying with its divisor's leading
+    # coefficient raised to the degree gap plus one, and the abnormal branch
+    # raises scalar subresultants and member leading coefficients to the gap.
+    # A power's support follows from its base's remaining-variable degree
+    # times the exponent, so the formal returned supports above do not bound
+    # it. The first gap is higher_degree - lower_degree and every later gap
+    # is at most lower_degree; every power base (a source or member leading
+    # coefficient, or a scalar subresultant) has remaining degree at most the
+    # index-zero formal coefficient degree. Pseudo-remainder running
+    # coefficients additionally retain exactly one source coefficient while
+    # appending one divisor-side factor per elimination step -- at most
+    # ``power_exponent`` of them -- so the power allowance carries one extra
+    # highest source remaining degree. Folding this derived power support
+    # into ``maximum_support`` keeps the product invariant below true for the
+    # scaling factors as well, and rejects the abnormal-gap nonscalar regime
+    # whose powers would otherwise expand unboundedly.
     power_base_remaining_degree = (
         lower_degree * higher_remaining_degree + higher_degree * lower_remaining_degree
     )
@@ -162,6 +202,11 @@ def _subresultant_envelope(
     maximum_support = max(maximum_support, scaling_power_support)
 
     sylvester_order = higher_degree + lower_degree
+    # At most ``sylvester_order`` PRS steps each perform at most a quadratic
+    # number of coefficient-ring operations. Every materialized quantity --
+    # sources, members, scalar subresultants, and their scaling-power
+    # products -- has support at most ``maximum_support``, so every
+    # coefficient product expands at most ``maximum_support**2`` term pairs.
     arithmetic_term_pairs = (
         _SUBRESULTANT_BACKEND_PASS_COUNT * sylvester_order**3 * maximum_support**2
     )
@@ -182,6 +227,9 @@ def _subresultant_envelope(
         arithmetic_term_pairs=arithmetic_term_pairs,
         coefficient_bits=coefficient_bits,
         intermediate_coefficient_bits=intermediate_coefficient_bits,
+        # The result repeats the sources, returns the PRS and complete scalar-
+        # subresultant ledger, and also carries the resultant and final-member
+        # leading coefficient. Four sequence-sized budgets cover them.
         serialized_coefficient_bits=(
             _SUBRESULTANT_RESULT_TERM_MULTIPLIER * aggregate_terms * coefficient_bits
         ),
