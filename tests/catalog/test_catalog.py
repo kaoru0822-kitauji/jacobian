@@ -1,12 +1,32 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import cast
+
 import pytest
 
+from jacobian._models import StrictModel
 from jacobian.catalog import catalog as catalog_module
 from jacobian.catalog.catalog import Catalog
-from jacobian.catalog.models import OperationDiscoveryRequest
+from jacobian.catalog.models import MathTool, OperationDiscoveryRequest
 from jacobian.catalog.search import browse_operations, discover_operations
 from jacobian.dispatch import invoke_operation
+
+
+class _BindingRequest(StrictModel):
+    value: int
+
+
+class _BindingResult(StrictModel):
+    doubled: int
+
+
+class _WrongBindingResult(StrictModel):
+    value: int
+
+
+class _ExtraBindingResult(_BindingResult):
+    leaked: str
 
 
 def test_catalog_inspects_determinant_without_sqlite() -> None:
@@ -70,6 +90,59 @@ def test_invoke_operation_reports_unknown_removed_family_id(operation_id: str) -
             {"vertices": ["a"], "edges": []},
             catalog,
         )
+
+
+def test_checked_catalog_binding_rejects_an_incorrect_declared_result() -> None:
+    def wrong_result(_request: _BindingRequest) -> _WrongBindingResult:
+        return _WrongBindingResult(value=1)
+
+    operation = MathTool(
+        operation_id="test.binding.result",
+        title="Test checked result binding",
+        description="Exercise the private heterogeneous catalog boundary.",
+        request_type=_BindingRequest,
+        result_type=_BindingResult,
+        run=cast(Callable[[_BindingRequest], _BindingResult], wrong_result),
+    )
+
+    with pytest.raises(TypeError, match="returned a result outside its declared type"):
+        invoke_operation("test.binding.result", {"value": 1}, Catalog((operation,)))
+
+
+def test_checked_catalog_binding_passes_exact_declared_result_unchanged() -> None:
+    def double(_request: _BindingRequest) -> _BindingResult:
+        return _BindingResult(doubled=2)
+
+    operation = MathTool(
+        operation_id="test.binding.exact",
+        title="Test exact result binding",
+        description="Exercise the private heterogeneous catalog boundary.",
+        request_type=_BindingRequest,
+        result_type=_BindingResult,
+        run=double,
+    )
+
+    result = invoke_operation("test.binding.exact", {"value": 1}, Catalog((operation,)))
+
+    assert set(result.output) == {"doubled"}
+    assert result.output["doubled"] == 2
+
+
+def test_checked_catalog_binding_rejects_result_subclass_extra_fields() -> None:
+    def leak_extra_field(_request: _BindingRequest) -> _ExtraBindingResult:
+        return _ExtraBindingResult(doubled=2, leaked="private")
+
+    operation = MathTool(
+        operation_id="test.binding.subclass",
+        title="Test subclass result binding",
+        description="Exercise the private heterogeneous catalog boundary.",
+        request_type=_BindingRequest,
+        result_type=_BindingResult,
+        run=cast(Callable[[_BindingRequest], _BindingResult], leak_extra_field),
+    )
+
+    with pytest.raises(TypeError, match="returned a result outside its declared type"):
+        invoke_operation("test.binding.subclass", {"value": 1}, Catalog((operation,)))
 
 
 def test_explicit_binary_profile_remains_the_published_code_profile() -> None:
