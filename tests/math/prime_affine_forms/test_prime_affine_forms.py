@@ -8,6 +8,8 @@ import pytest
 from pydantic import ValidationError
 from sympy import primerange
 
+import jacobian.math.prime_affine_forms._interval as interval_contracts
+import jacobian.math.prime_affine_forms._translation as translation_contracts
 from jacobian.math.affine_forms import IntegerAffineForm
 from jacobian.math.prime_affine_forms import (
     PrimeAffineTuple,
@@ -17,6 +19,14 @@ from jacobian.math.prime_affine_forms._admissibility import (
     PrimeTupleAdmissibilityRequest,
     compute_local_admissibility,
 )
+from jacobian.math.prime_affine_forms._interval import (
+    PrimeAffineIntervalCountRequest,
+    PrimeAffineIntervalEnumerateRequest,
+    PrimePatternIntervalCountResult,
+    PrimePatternIntervalEnumerateResult,
+    compute_interval_count,
+    compute_interval_enumerate,
+)
 from jacobian.math.prime_affine_forms._local_factors import (
     FinitePrimeTupleFactorProduct,
     PrimeTupleLocalFactorRequest,
@@ -25,16 +35,8 @@ from jacobian.math.prime_affine_forms._local_factors import (
     compute_local_factor,
     compute_local_factors,
 )
-from jacobian.math.prime_affine_forms._models import (
-    PrimeAffineIntervalCountRequest,
-    PrimeAffineIntervalEnumerateRequest,
-    PrimePatternIntervalCountResult,
-    PrimePatternIntervalEnumerateResult,
-    PrimeTupleLocalSummary,
-)
+from jacobian.math.prime_affine_forms._models import PrimeTupleLocalSummary
 from jacobian.math.prime_affine_forms._operations import (
-    compute_interval_count,
-    compute_interval_enumerate,
     compute_interval_residue_profile,
     compute_residue_wheel,
     compute_residue_wheel_enumeration,
@@ -339,6 +341,67 @@ def test_translation_admits_translated_tuple_at_the_aggregate_digit_bound() -> N
     assert all(len(form.constant) == 128 for form in result.translated.forms)
 
 
+def test_translation_admits_a_65_digit_cancelling_shift() -> None:
+    """Translation is bounded by its canonical result, not shift syntax length."""
+
+    shift = 10**64
+    source = _tuple(_form("cancelled", 1, -shift))
+
+    result = compute_translation(
+        PrimeAffineTranslationRequest(source=source, shift=str(shift))
+    )
+
+    assert result.translated.forms == (_form("cancelled", 1, 0),)
+
+
+def test_interval_preflights_oversized_endpoints_before_integer_parsing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_parse(_: str) -> int:
+        raise AssertionError("endpoint reached integer parsing")
+
+    monkeypatch.setattr(interval_contracts, "parse_canonical_integer", fail_parse)
+
+    with pytest.raises(ValidationError, match="source-sensitive pre-parse"):
+        PrimeAffineIntervalCountRequest(
+            source=TWIN_PRIMES,
+            lower="9" * 258,
+            upper="9" * 258,
+        )
+
+
+def test_residue_profile_preflights_oversized_endpoints_before_integer_parsing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    wheel = compute_residue_wheel(
+        PrimeTupleResidueWheelRequest(source=TWIN_PRIMES, primes=(2, 3))
+    )
+
+    def fail_parse(_: str) -> int:
+        raise AssertionError("endpoint reached integer parsing")
+
+    monkeypatch.setattr(interval_contracts, "parse_canonical_integer", fail_parse)
+
+    with pytest.raises(ValidationError, match="source-sensitive pre-parse"):
+        PrimeTupleIntervalResidueProfileRequest(
+            wheel=wheel,
+            lower="9" * 258,
+            upper="9" * 258,
+        )
+
+
+def test_translation_preflights_oversized_shift_before_integer_parsing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_parse(_: str) -> int:
+        raise AssertionError("shift reached integer parsing")
+
+    monkeypatch.setattr(translation_contracts, "parse_canonical_integer", fail_parse)
+
+    with pytest.raises(ValidationError, match="source-sensitive pre-parse"):
+        PrimeAffineTranslationRequest(source=TWIN_PRIMES, shift="9" * 258)
+
+
 def test_residue_wheel_and_membership_compose_without_reconstruction() -> None:
     wheel = compute_residue_wheel(
         PrimeTupleResidueWheelRequest(source=TWIN_PRIMES, primes=(2, 3))
@@ -523,6 +586,29 @@ def test_request_boundaries_reject_before_expansion() -> None:
     PrimeAffineIntervalCountRequest(source=identity_form, lower="0", upper="99999")
     with pytest.raises(ValidationError):
         PrimeAffineIntervalCountRequest(source=identity_form, lower="0", upper="100000")
+
+    # A 65-digit endpoint is harmless when its affine values cancel to the
+    # admitted deterministic primality range.  The two existing interval scans
+    # are still charged by the 2 * interval_size * form_count envelope.
+    shifted_identity = _tuple(_form("shifted_n", 1, -(10**64)))
+    accepted_cancellation = PrimeAffineIntervalCountRequest(
+        source=shifted_identity,
+        lower=str(10**64),
+        upper=str(10**64),
+    )
+    cancelled_count = compute_interval_count(accepted_cancellation)
+    assert (cancelled_count.match_count, cancelled_count.affine_values_examined) == (
+        0,
+        1,
+    )
+    cancelled_enumeration = compute_interval_enumerate(
+        PrimeAffineIntervalEnumerateRequest(
+            source=shifted_identity,
+            lower=str(10**64),
+            upper=str(10**64),
+        )
+    )
+    assert cancelled_enumeration.matches == ()
 
     PrimeAffineIntervalEnumerateRequest(source=identity_form, lower="0", upper="32767")
     with pytest.raises(ValidationError):
