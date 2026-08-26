@@ -155,7 +155,8 @@ invariants its canonical type actually validates. An operation whose result
 depends on a stronger property—such as the greedoid axioms, antimatroid union
 closure, irreducibility, or stochasticity—must either:
 
-- consume a canonical subtype that has already established that property; or
+- consume a canonical subtype whose public construction establishes that
+  property within the admitted bound; or
 - perform recognition as part of its own postcondition and return a typed
   negative or non-applicable outcome when recognition fails.
 
@@ -167,15 +168,28 @@ a property of arbitrary candidates, name the result in set-system-, matrix-,
 graph-, or polynomial-neutral terms rather than attaching theorem-only
 semantics.
 
+Serialization does not preserve trusted provenance. Every value reconstructed
+from a public payload is caller-authored, even when its bytes are identical to
+the output of a recognizer. A theorem-dependent consumer must therefore rely on
+one of three enforceable boundaries: ordinary construction of the canonical
+subtype validates the theorem property, the value carries source-bound evidence
+checked by an explicit bounded verifier, or the consumer performs recognition
+itself. A subtype name, `validated` boolean, digest, or claim that a producer ran
+earlier is not evidence. Test native composition and serialized public
+composition separately when they cross different trust boundaries.
+
 Likewise, an exact-success result must make failure of its defining invariant
-unrepresentable. Prefer a discriminated result such as `CONSTRUCTED`,
-`NOT_APPLICABLE`, or `UNKNOWN`, with the exact witness present only in the
-success branch. If one model retains status and diagnostic fields, its cheap
-structural validation must enforce every implication between them. A result
-must not report exact success while also reporting that reconstruction, target
-matching, optimality, or certificate validation failed. Diagnostic fields may
-explain a non-success branch; they cannot weaken the operation's advertised
-postcondition.
+unrepresentable. When result branches change the presence or mathematical
+meaning of a witness, certificate, diagnostic, or derived value, use a
+discriminated result such as `CONSTRUCTED`, `NOT_APPLICABLE`, or `UNKNOWN`.
+The generated public schema must expose those branches and exclude their
+contradictory field combinations; do not replace that contract with one model
+containing optional fields and corrective booleans. If all branches genuinely
+share one field shape, cheap structural validation must still enforce every
+status implication. A result must not report exact success while also reporting
+that reconstruction, target matching, optimality, or certificate validation
+failed. Diagnostic fields may explain a non-success branch; they cannot weaken
+the operation's advertised postcondition.
 
 This rule does not require ordinary result construction to replay an expensive
 proof. The trusted kernel must establish the defining invariant before calling

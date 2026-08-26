@@ -86,6 +86,10 @@ an execution outcome, never a negative mathematical conclusion. If the public
 result has no typed incomplete or unknown state, admission must reject the
 request before execution whenever completion cannot be bounded. Wall time
 remains a safety net rather than the definition of the mathematical domain.
+For every new or changed execution envelope, record the operation-owned wall
+deadline, the realistic admitted workload used to calibrate it, the safety
+margin, and any caller-selectable range. This evidence is required for changes
+to existing operations as well as catalog-membership changes.
 
 ## Admission gates
 

@@ -129,6 +129,13 @@ recognizer → serialization → consumer test using the canonical validated
 subtype unchanged. Shape validation and a separate recognizer test do not by
 themselves establish safe composition.
 
+Also submit a forged serialized subtype directly to the public consumer without
+calling its recognizer first. The test must prove that public reconstruction
+revalidates the theorem property, checks source-bound evidence through the
+declared bounded verifier, or routes through consumer-owned recognition. A
+nominal subtype tag, `validated` field, or producer-shaped payload must not
+cross the stateless boundary as proof.
+
 When an operation is added or changed because of a source-backed gap, preserve
 at least one minimally reduced motivating request as a behavioral regression.
 Run it through the final public request model and operation, and assert both
@@ -148,6 +155,11 @@ claim success while admitting that the invariant failed. Checking only that a
 step list, factor list, witness, or certificate-shaped object is nonempty is
 not correctness evidence. For non-success branches, assert that exact witness
 fields are absent unless the contract explicitly assigns them another meaning.
+When branches have different fields or field meanings, inspect the generated
+schema for a discriminated union and validate every branch through both the
+declared result type and final transport projection. Construct contradictory
+payloads directly; proving only that the producer does not emit them is
+insufficient.
 
 Center correctness tests on regression evidence when fixing a concrete
 regression, defining identities, consistency checks, and property-based tests
@@ -187,8 +199,8 @@ algebraic claim. Select evidence by the claim being made:
 | Backend domain | Supported edge and an immediately unsupported case |
 | Exact decomposition | Reconstruction property |
 | Canonical value | Normalization and round-trip property |
-| Theorem-bearing subtype | Invalid structural candidate rejected, then recognizer → serialization → consumer success |
-| Exact-success state | Defining invariant holds and contradictory status/diagnostic combinations are rejected |
+| Theorem-bearing subtype | Invalid structural candidate and forged validated payload rejected, then recognizer → serialization → consumer success |
+| Exact-success state | Defining invariant holds, schema exposes discriminated branches, and contradictory combinations are rejected |
 | Parent identity | Incompatible-parent rejection and explicit-map success |
 | Algebraic operation | Defining identities or an independent oracle |
 | Public operation | Catalog mutation conformance |

@@ -33,6 +33,8 @@ native API, dispatch, or MCP change. Use "not applicable" when this PR does
 not touch an operation boundary. -->
 - Changed stage: <!-- request parsing / request bounds / kernel adapter / result construction / transport projection / other -->
 - Request-bounds owner and controlling quantities:
+- Work, intermediate, memory, and exact-output bounds:
+- Wall deadline, calibration workload, safety margin, and caller-selectable range: <!-- applies to new or changed execution envelopes; wall time is a safety backstop -->
 - Backend or kernel path:
 - Result construction: <!-- canonical conversion; malformed-backend handling belongs to the adapter -->
 - Independent-result verifier (only if the public contract accepts independently supplied result data): <!-- none, or state its explicit replay bound -->
@@ -47,8 +49,9 @@ result, producer, or consumer. -->
 - [ ] Producer→consumer serialization tested
 - Theorem-dependent preconditions and validated input subtype: <!-- or not applicable with a reason -->
 - Structurally valid but mathematically invalid fixture and outcome: <!-- rejection or typed non-applicability -->
+- Serialized-subtype trust boundary: <!-- constructor validation / source-bound bounded verifier / consumer recognition, plus forged-payload evidence -->
 - Exact-success defining invariant: <!-- reconstruction equation, preservation law, optimum/certificate relation, or not applicable -->
-- Impossible result combinations: <!-- contradictory status/diagnostic/witness states rejected by the contract -->
+- Discriminated result schema and impossible combinations: <!-- public branch schema plus contradictory status/diagnostic/witness rejection -->
 
 ## Catalog admission
 <!-- Complete only when adding, removing, or materially changing catalog
@@ -61,7 +64,6 @@ membership. This is publication admission, not per-request runtime bounds. -->
 - Controlling work, intermediate, memory, and output quantities:
 - Exact representation, algorithm regimes, and maintained backend:
 - Remaining fixed caps and their classification:
-- Wall deadline, calibration workload, and caller-selectable range: <!-- wall time is a generous safety backstop, not mathematical admission -->
 - Motivating source request exercised through the public boundary:
 - Final-tree outcome for that request:
 - Effect of private normalization or presolve on admission:
