@@ -120,6 +120,15 @@ another operation, serialize the producer result and pass its canonical value
 unchanged through the consumer's typed payload. The test should fail if a caller
 would have to reconstruct mathematical context or translate between parallel
 representations.
+
+When a consumer relies on a theorem-bearing subtype, add an adversarial type-
+boundary fixture: construct a value that is structurally valid but violates the
+required theorem property, and prove that the consumer rejects it or returns
+the declared typed non-applicability outcome. Pair that fixture with a positive
+recognizer → serialization → consumer test using the canonical validated
+subtype unchanged. Shape validation and a separate recognizer test do not by
+themselves establish safe composition.
+
 When an operation is added or changed because of a source-backed gap, preserve
 at least one minimally reduced motivating request as a behavioral regression.
 Run it through the final public request model and operation, and assert both
@@ -132,6 +141,13 @@ conclusions or certificates, mutate the source and conclusion independently
 and require the bounded result-verification path to reject both forgeries. For
 ordinary computed results, test the defining invariant of the returned value;
 do not introduce a replay path solely for that test.
+
+For every exact-success branch, assert the defining equation or preservation
+law and reject every representable status/diagnostic combination that would
+claim success while admitting that the invariant failed. Checking only that a
+step list, factor list, witness, or certificate-shaped object is nonempty is
+not correctness evidence. For non-success branches, assert that exact witness
+fields are absent unless the contract explicitly assigns them another meaning.
 
 Center correctness tests on regression evidence when fixing a concrete
 regression, defining identities, consistency checks, and property-based tests
@@ -171,6 +187,8 @@ algebraic claim. Select evidence by the claim being made:
 | Backend domain | Supported edge and an immediately unsupported case |
 | Exact decomposition | Reconstruction property |
 | Canonical value | Normalization and round-trip property |
+| Theorem-bearing subtype | Invalid structural candidate rejected, then recognizer → serialization → consumer success |
+| Exact-success state | Defining invariant holds and contradictory status/diagnostic combinations are rejected |
 | Parent identity | Incompatible-parent rejection and explicit-map success |
 | Algebraic operation | Defining identities or an independent oracle |
 | Public operation | Catalog mutation conformance |

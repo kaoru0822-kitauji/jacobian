@@ -141,9 +141,47 @@ say `Not applicable` with a reason; it must not be omitted.
 - Backend input domain:
 - Conversion/coercion behavior:
 - Result type:
+- Theorem-dependent preconditions and validated input type, or why not applicable:
 - Reconstruction or defining invariant:
+- Exact-success state and impossible field/status combinations:
 - Typed execution failures:
 - Property and boundary tests:
+
+### Validated mathematical subtypes and exact-success states
+
+A structurally valid candidate is not a theorem-bearing value. A raw set
+system, matrix, graph, polynomial, or similar carrier establishes only the
+invariants its canonical type actually validates. An operation whose result
+depends on a stronger property—such as the greedoid axioms, antimatroid union
+closure, irreducibility, or stochasticity—must either:
+
+- consume a canonical subtype that has already established that property; or
+- perform recognition as part of its own postcondition and return a typed
+  negative or non-applicable outcome when recognition fails.
+
+Do not let a structurally valid candidate flow into a theorem-dependent
+consumer merely because its fields have the expected shape. A positive
+recognizer should return a source-bound canonical validated value that
+downstream consumers accept unchanged. If an operation intentionally computes
+a property of arbitrary candidates, name the result in set-system-, matrix-,
+graph-, or polynomial-neutral terms rather than attaching theorem-only
+semantics.
+
+Likewise, an exact-success result must make failure of its defining invariant
+unrepresentable. Prefer a discriminated result such as `CONSTRUCTED`,
+`NOT_APPLICABLE`, or `UNKNOWN`, with the exact witness present only in the
+success branch. If one model retains status and diagnostic fields, its cheap
+structural validation must enforce every implication between them. A result
+must not report exact success while also reporting that reconstruction, target
+matching, optimality, or certificate validation failed. Diagnostic fields may
+explain a non-success branch; they cannot weaken the operation's advertised
+postcondition.
+
+This rule does not require ordinary result construction to replay an expensive
+proof. The trusted kernel must establish the defining invariant before calling
+its private construction path, while owning tests replay the invariant on
+known-answer, adversarial, and property-based fixtures. Independently supplied
+claims still use the explicit bounded verifier described below.
 
 These checks have distinct owners. Catalog admission decides whether an
 operation is published; it does not admit a particular runtime request.
@@ -376,6 +414,15 @@ limit for every operation. Derive the admitted work from mathematical and
 representation-specific quantities, then choose a killable wall limit that is
 large enough for useful admitted requests. Wall time is a safety backstop, not
 the proof that the computation is bounded.
+
+Do not shrink an exact mathematical domain merely because a realistic admitted
+computation is slow. First derive its work, intermediate, memory, and output
+bounds; then improve the algorithm or backend and provide a generous killable
+deadline. When no latency service level applies, calibrate that deadline from
+realistic admitted workloads with explicit margin rather than inheriting a
+universal short default. If callers may select wall time, expose only an
+operation-owned range whose upper bound remains compatible with the admitted
+work, memory, and cleanup envelope.
 
 One accepted request has one execution envelope. Parsing, normalization,
 presolve, backend calls, exact replay, result validation, serialization, and

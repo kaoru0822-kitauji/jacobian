@@ -45,6 +45,10 @@ result, producer, or consumer. -->
 - [ ] Existing canonical values searched
 - [ ] Owner or intentional distinction documented
 - [ ] Producer→consumer serialization tested
+- Theorem-dependent preconditions and validated input subtype: <!-- or not applicable with a reason -->
+- Structurally valid but mathematically invalid fixture and outcome: <!-- rejection or typed non-applicability -->
+- Exact-success defining invariant: <!-- reconstruction equation, preservation law, optimum/certificate relation, or not applicable -->
+- Impossible result combinations: <!-- contradictory status/diagnostic/witness states rejected by the contract -->
 
 ## Catalog admission
 <!-- Complete only when adding, removing, or materially changing catalog
@@ -57,6 +61,7 @@ membership. This is publication admission, not per-request runtime bounds. -->
 - Controlling work, intermediate, memory, and output quantities:
 - Exact representation, algorithm regimes, and maintained backend:
 - Remaining fixed caps and their classification:
+- Wall deadline, calibration workload, and caller-selectable range: <!-- wall time is a generous safety backstop, not mathematical admission -->
 - Motivating source request exercised through the public boundary:
 - Final-tree outcome for that request:
 - Effect of private normalization or presolve on admission:
