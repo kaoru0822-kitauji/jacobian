@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+from jacobian.canonical import format_canonical_integer
 from jacobian.math.finite_geometry._models import (
     GrassmannianCountRequest,
     GrassmannianCountResult,
     LinearSubspace,
-    ProjectivePoint,
     ProjectivePointCanonicalizeRequest,
     ProjectivePointCanonicalizeResult,
     ProjectivePointEqualRequest,
@@ -21,6 +21,10 @@ from jacobian.math.finite_geometry._models import (
     SubspaceMembershipResult,
     SubspaceSpanRequest,
     SubspaceSpanResult,
+)
+from jacobian.math.finite_geometry.values import (
+    ProjectivePoint,
+    ProjectivePointSequence,
 )
 from jacobian.math.prime_field_linear_algebra import (
     PrimeFieldMatrix,
@@ -211,7 +215,7 @@ def compute_grassmannian_count(
         field_order=q,
         ambient_dimension=n,
         subspace_dimension=k,
-        count=count,
+        count=format_canonical_integer(count),
     )
 
 
@@ -240,9 +244,7 @@ def compute_projective_space_enumerate(
                 break
 
     return ProjectiveSpaceEnumerateResult(
-        space=request.space,
-        points=tuple(
-            ProjectivePoint(space=request.space, coordinates=point) for point in points
+        sequence=ProjectivePointSequence(
+            space=request.space, coordinates=tuple(points)
         ),
-        count=len(points),
     )

@@ -2,80 +2,38 @@
 
 from __future__ import annotations
 
+import unicodedata
 from typing import Self
 
-from pydantic import Field, model_validator
-from pydantic_core import PydanticCustomError
+from pydantic import ConfigDict, Field, model_validator
 from sympy import isprime
 
+from jacobian._exact import CanonicalInteger
 from jacobian._models import StrictModel
+from jacobian.canonical import encode_strict_json, format_canonical_integer
+from jacobian.math.finite_geometry.values import (
+    MAX_DIM,
+    MAX_FIELD_ORDER,
+    PrimeFieldVectorSpace,
+    ProjectivePoint,
+    ProjectivePointSequence,
+    _validate_vector,
+    _validation_error,
+)
 
-MAX_DIM = 32
-MAX_FIELD_ORDER = 10000
-
-
-def _validation_error(reason: str, message: str) -> PydanticCustomError:
-    """Build a stable validation error owned by finite-geometry contracts."""
-
-    return PydanticCustomError(f"finite_geometry.{reason}", message)
-
-
-class PrimeFieldVectorSpace(StrictModel):
-    """An ordered coordinate space over a named prime field."""
-
-    field_order: int = Field(ge=2, le=MAX_FIELD_ORDER)
-    axis: tuple[str, ...] = Field(min_length=1, max_length=MAX_DIM)
-
-    @model_validator(mode="after")
-    def require_valid(self) -> Self:
-        if not isprime(self.field_order):
-            raise _validation_error(
-                "field_order_not_prime", "field_order must be prime"
-            )
-        if any(not label or not label.isidentifier() for label in self.axis):
-            raise _validation_error(
-                "axis_labels_invalid", "axis labels must be nonempty identifiers"
-            )
-        if len(set(self.axis)) != len(self.axis):
-            raise _validation_error(
-                "axis_labels_not_unique", "axis labels must be unique"
-            )
-        return self
-
-
-def _validate_vector(vector: tuple[int, ...], space: PrimeFieldVectorSpace) -> None:
-    if len(vector) != len(space.axis):
-        raise _validation_error(
-            "vector_length_mismatch", "vector length must match the ambient axis"
-        )
-    if any(not 0 <= value < space.field_order for value in vector):
-        raise _validation_error(
-            "vector_entry_not_canonical",
-            "vector entries must be canonical field residues",
-        )
-
-
-class ProjectivePoint(StrictModel):
-    """A canonical point in a specific prime-field projective space."""
-
-    space: PrimeFieldVectorSpace
-    coordinates: tuple[int, ...]
-
-    @model_validator(mode="after")
-    def require_canonical(self) -> Self:
-        _validate_vector(self.coordinates, self.space)
-        try:
-            first = next(value for value in self.coordinates if value != 0)
-        except StopIteration as exc:
-            raise _validation_error(
-                "projective_coordinates_zero", "projective coordinates must be nonzero"
-            ) from exc
-        if first != 1:
-            raise _validation_error(
-                "projective_coordinates_not_normalized",
-                "projective coordinates must have first nonzero entry one",
-            )
-        return self
+MAX_PROJECTIVE_SPACE_ENUMERATION_VECTORS = 65_536
+# Owner-local serialized-result budget for the complete enumeration reply,
+# kept below Jacobian's 10 MiB canonical transport limit. Admission predicts
+# the worst-case canonical bytes from mathematics alone: at most
+# (q**n - 1)/(q - 1) points, each encoded as a bare coordinate array whose
+# entries carry at most len(str(q - 1)) digits (canonical residues are < q),
+# plus the declared parent space echoed once and a fixed key/method header.
+# Every admitted request therefore returns its complete declared result
+# instead of failing transport validation only after enumeration.
+MAX_PROJECTIVE_ENUMERATION_RESULT_BYTES = 8 * 1024 * 1024
+# Conservative fixed overhead for result keys, the method string, the count
+# digits, enclosing braces, and array punctuation outside per-point entries.
+_PROJECTIVE_ENUMERATION_ENVELOPE_BYTES = 256
 
 
 class LinearSubspace(StrictModel):
@@ -224,15 +182,90 @@ class GrassmannianCountRequest(StrictModel):
 
 
 class ProjectiveSpaceEnumerateRequest(StrictModel):
-    space: PrimeFieldVectorSpace
+    """One finite projective space whose complete point list fits the envelope.
+
+    ``q`` is the prime field order and ``n`` is the length of its ordered
+    coordinate axis.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "description": (
+                "One finite projective space whose complete canonical point "
+                "list fits the transport envelope. It admits exactly q**n <= "
+                f"{MAX_PROJECTIVE_SPACE_ENUMERATION_VECTORS}, where q is the "
+                "prime field order and n is the length of its ordered coordinate "
+                "axis; this leaves at most "
+                f"{MAX_PROJECTIVE_SPACE_ENUMERATION_VECTORS - 1} canonical "
+                "projective points, returned as a typed point sequence holding "
+                "the parent space once plus bare coordinate tuples. Admission "
+                "also predicts the complete serialized result before execution "
+                "and rejects any request whose canonical output would exceed "
+                f"the {MAX_PROJECTIVE_ENUMERATION_RESULT_BYTES}-byte result "
+                "budget, so every accepted request returns its declared "
+                "result inside the canonical transport limit."
+            )
+        }
+    )
+
+    space: PrimeFieldVectorSpace = Field(
+        description=(
+            "An ordered coordinate space over the prime field F_q. Complete "
+            "enumeration requires q**len(axis) <= "
+            f"{MAX_PROJECTIVE_SPACE_ENUMERATION_VECTORS} plus a predicted "
+            f"serialized result within the "
+            f"{MAX_PROJECTIVE_ENUMERATION_RESULT_BYTES}-byte budget; the "
+            "canonical sequence holds at most "
+            f"{MAX_PROJECTIVE_SPACE_ENUMERATION_VECTORS - 1} bare coordinate "
+            "tuples in this axis order."
+        )
+    )
 
     @model_validator(mode="after")
     def require_valid(self) -> Self:
-        if self.space.field_order ** len(self.space.axis) > 65536:
+        q = self.space.field_order
+        n = len(self.space.axis)
+        if q**n > MAX_PROJECTIVE_SPACE_ENUMERATION_VECTORS:
             raise _validation_error(
-                "projective_space_too_large", "projective space too large to enumerate"
+                "projective_space_too_large",
+                "projective space exceeds the "
+                f"{MAX_PROJECTIVE_SPACE_ENUMERATION_VECTORS}-vector "
+                "enumeration envelope",
             )
+        self.require_transportable_result()
         return self
+
+    def require_transportable_result(self) -> None:
+        """Reject requests whose complete canonical reply cannot fit transport.
+
+        Runs before execution on admitted mathematics alone. Each returned
+        point is a bare coordinate array with at most ``n`` entries carrying
+        at most ``len(str(q - 1))`` digits, so the exact worst-case point
+        array size follows from q and n; the parent space echoes once with
+        NFC-normalized labels, matching how canonical JSON serialization
+        normalizes string values before transport; and a fixed constant
+        covers keys, method string, count digits, and punctuation.
+        """
+
+        q = self.space.field_order
+        n = len(self.space.axis)
+        digit_width = len(str(q - 1))
+        point_count = (q**n - 1) // (q - 1)
+        per_point_bytes = 2 + n * digit_width + (n - 1) + 1
+        predicted = (
+            _PROJECTIVE_ENUMERATION_ENVELOPE_BYTES
+            + sum(
+                len(encode_strict_json(unicodedata.normalize("NFC", label)))
+                for label in self.space.axis
+            )
+            + point_count * per_point_bytes
+        )
+        if predicted > MAX_PROJECTIVE_ENUMERATION_RESULT_BYTES:
+            raise _validation_error(
+                "projective_enumeration_result_too_large",
+                "the complete serialized point list would exceed the "
+                f"{MAX_PROJECTIVE_ENUMERATION_RESULT_BYTES}-byte result budget",
+            )
 
 
 class ProjectivePointCanonicalizeResult(ProjectivePointCanonicalizeRequest):
@@ -371,7 +404,9 @@ class GrassmannianCountResult(StrictModel):
     field_order: int
     ambient_dimension: int
     subspace_dimension: int
-    count: int = Field(ge=1)
+    count: CanonicalInteger = Field(
+        description="Exact Gaussian-binomial count encoded as a canonical decimal integer."
+    )
     method: str = "GAUSSIAN_BINOMIAL"
 
     @model_validator(mode="after")
@@ -388,7 +423,7 @@ class GrassmannianCountResult(StrictModel):
         for index in range(self.subspace_dimension):
             numerator *= self.field_order ** (self.ambient_dimension - index) - 1
             denominator *= self.field_order ** (self.subspace_dimension - index) - 1
-        if self.count != numerator // denominator:
+        if self.count != format_canonical_integer(numerator // denominator):
             raise _validation_error(
                 "grassmannian_count_mismatch",
                 "count does not match its Gaussian-binomial parameters",
@@ -397,28 +432,13 @@ class GrassmannianCountResult(StrictModel):
 
 
 class ProjectiveSpaceEnumerateResult(StrictModel):
-    space: PrimeFieldVectorSpace
-    points: tuple[ProjectivePoint, ...]
-    count: int = Field(ge=1)
-    method: str = "CANONICAL_REPRESENTATIVES"
+    """The complete canonical point sequence of one finite projective space.
 
-    @model_validator(mode="after")
-    def replay(self) -> Self:
-        expected = (self.space.field_order ** len(self.space.axis) - 1) // (
-            self.space.field_order - 1
-        )
-        if self.count != len(self.points) or self.count != expected:
-            raise _validation_error(
-                "enumeration_count_mismatch",
-                "projective point enumeration does not match its parent",
-            )
-        if any(point.space != self.space for point in self.points):
-            raise _validation_error(
-                "enumeration_parent_mismatch",
-                "every projective point must belong to the result space",
-            )
-        if len({point.coordinates for point in self.points}) != len(self.points):
-            raise _validation_error(
-                "enumeration_points_not_unique", "projective points must be unique"
-            )
-        return self
+    The sequence value owns its declared parent space and self-certifies
+    completeness, normalization, and uniqueness; natively it iterates typed
+    :class:`ProjectivePoint` items while serializing as the parent space once
+    plus one bare coordinate tuple per point.
+    """
+
+    sequence: ProjectivePointSequence
+    method: str = "CANONICAL_REPRESENTATIVES"
