@@ -59,6 +59,22 @@ and scale evidence. `make check-all` adds the ordinary integration owner.
 `make test-full` is the exceptional complete local reproduction. Do not use a
 broad or full suite as a substitute for a focused regression test.
 
+### Command hierarchy and timing evidence
+
+Use `make affected` for normal branch-local validation and
+`make handoff-scoped LANE=... TESTS=... PATHS="..."` for a one-owner edit loop.
+Run `make check` once on a frozen tree. `make check-all` reproduces ordinary CI
+lanes and `make test-full` is the complete local escalation path; neither is an
+iteration command.
+
+Every CI lane emits a JUnit artifact and a worker-timing sidecar retained for
+90 days. Download both to identify slow testcases, xdist call-time skew, and
+the non-call wall remainder before changing worker counts, fixtures, or shards:
+
+```sh
+make test-timings JUNIT=pytest.xml TIMING=timing.json
+```
+
 ## CI lifecycle
 
 Pull requests always run static validation. The checked-in CI planner selects

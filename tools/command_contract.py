@@ -41,6 +41,14 @@ PUBLIC_COMMANDS: tuple[CommandContract, ...] = (
         cost_class="fast",
     ),
     CommandContract(
+        name="test-timings",
+        help="Summarize retained pytest timing evidence.",
+        mutates_checkout=False,
+        scope="one JUnit artifact plus optional xdist worker timing evidence",
+        ci_relationship="reads the JUnit and timing artifacts retained by each CI lane",
+        cost_class="fast",
+    ),
+    CommandContract(
         name="test-focused",
         help="Run TESTS through its explicit semantic LANE (for example, LANE=math).",
         mutates_checkout=False,
@@ -90,7 +98,7 @@ PUBLIC_COMMANDS: tuple[CommandContract, ...] = (
     ),
     CommandContract(
         name="check-all",
-        help="Reproduce the ordinary Python CI lanes locally.",
+        help="Escalation: reproduce all ordinary Python CI lanes locally.",
         mutates_checkout=False,
         scope="lint + typecheck + all ordinary semantic owners",
         ci_relationship="local equivalent of the python matrix, not all CI jobs",

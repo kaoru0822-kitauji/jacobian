@@ -66,6 +66,15 @@ def test_affected_validation_is_a_public_planner_backed_default() -> None:
     assert 'name="affected-plan"' in contracts
 
 
+def test_timing_report_is_a_public_read_only_diagnostic() -> None:
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    contracts = (ROOT / "tools" / "command_contract.py").read_text(encoding="utf-8")
+
+    assert "test-timings: ## Summarize pytest JUnit timing evidence" in makefile
+    assert "tools/test_timing_report.py" in makefile
+    assert 'name="test-timings"' in contracts
+
+
 def test_lanes_use_their_declared_worker_and_fixture_affinity() -> None:
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
     math = makefile.split("test-math:", 1)[1].split("test-catalog:", 1)[0]

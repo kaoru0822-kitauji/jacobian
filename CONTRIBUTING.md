@@ -66,6 +66,22 @@ pre-push hook stays `make lint typecheck`. Focused debugging uses
 `uv run pytest path/to/test.py`. Default `uv run pytest` collects the ordinary
 testpaths`; it does not run process or MCP trees.
 
+### Command hierarchy
+
+Use the narrowest command that establishes the needed evidence:
+
+- `make affected` is the normal local path for a working branch.
+- `make handoff-scoped LANE=... TESTS=... PATHS="..."` is the fastest loop for one owner.
+- `make check` is one final broad ordinary gate on a frozen tree.
+- `make check-all` and `make test-full` are escalation commands for reproducing CI or the complete local suite.
+
+Every CI test lane publishes JUnit and worker timing artifacts for 90 days. Download
+both, then inspect them without rerunning tests:
+
+```sh
+make test-timings JUNIT=pytest.xml TIMING=timing.json
+```
+
 CI runs static checks plus the selected ordinary Python surface and boundaries.
 Merge-group candidates add optional scale evidence; `main` runs the landed-tree
 ordinary suite and coverage. Scheduled validation owns exhaustive, repeated

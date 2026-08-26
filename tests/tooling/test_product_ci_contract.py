@@ -74,9 +74,13 @@ def test_python_and_boundary_lanes_share_evidence_collection() -> None:
 
     assert workflow.count("uses: ./.github/actions/run-test-lane") == 6
     assert "--junitxml=pytest.xml" in action
+    assert "-p tools.pytest_timing" in action
+    assert "--jacobian-timing-json=timing.json" in action
     assert "pytest_args+=(--cov --cov-report= --cov-fail-under=0)" in action
     assert "inputs.collect-coverage == 'true'" in action
-    assert action.count("actions/upload-artifact@") == 2
+    assert action.count("actions/upload-artifact@") == 3
+    assert "${{ inputs.junit-artifact }}-timing" in action
+    assert "tools/test_timing_report.py" in action
     assert "uv cache prune --ci" in action
 
 
