@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import subprocess
 import sys
 from collections.abc import Iterable, Sequence
 from pathlib import Path
@@ -14,16 +13,49 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from tools.ci_test_plan import TestPlan, build_plan  # noqa: E402
+from tools.command_runner import (  # noqa: E402
+    ToolCommandStatus,
+    operator_environment,
+    run_operator_command,
+)
 
 _STATIC_PREFIXES = ("src/", "tests/", "benchmarks/")
+_VALIDATION_ENVIRONMENT = (
+    "PATH",
+    "AFFECTED_BASE",
+    "PYTEST_ARGS",
+    "PYTEST_DIAGNOSTIC_ARGS",
+    "ALLOW_PARALLEL_VALIDATION",
+    "UV_CACHE_DIR",
+    "UV_PYTHON_INSTALL_DIR",
+    "VIRTUAL_ENV",
+)
+_BOUNDARY_LANE_TIMEOUT_SECONDS = 4_800
+_VALIDATION_OUTPUT_LIMIT_BYTES = 64 * 1024 * 1024
+
+
+def _validation_environment() -> dict[str, str]:
+    """Forward documented validation controls without ambient environment leakage."""
+
+    return dict(operator_environment(include=_VALIDATION_ENVIRONMENT))
 
 
 def _git(*arguments: str, repository: Path) -> str:
-    """Return one Git query's decoded standard output."""
+    """Return one bounded Git metadata query's decoded standard output."""
 
-    return subprocess.check_output(
-        ("git", *arguments), cwd=repository, text=True
-    ).strip()
+    result = run_operator_command(
+        "git",
+        arguments,
+        cwd=repository,
+        timeout_seconds=30.0,
+        stdout_limit_bytes=4 * 1024 * 1024,
+        stderr_limit_bytes=1024 * 1024,
+        environment=_validation_environment(),
+    )
+    if result.status is not ToolCommandStatus.EXITED or result.exit_code != 0:
+        diagnostic = result.diagnostic or result.stderr.decode("utf-8", "replace")
+        raise RuntimeError(f"git {' '.join(arguments)} failed: {diagnostic.strip()}")
+    return result.stdout.decode("utf-8", "strict").strip()
 
 
 def changed_paths(*, base: str, repository: Path) -> tuple[str, str, tuple[str, ...]]:
@@ -121,7 +153,27 @@ def commands_for_plan(
 def _run(commands: Sequence[Sequence[str]], *, repository: Path) -> None:
     for command in commands:
         print("+", " ".join(command), flush=True)
-        subprocess.run(command, cwd=repository, check=True)
+        result = run_operator_command(
+            command[0],
+            command[1:],
+            cwd=repository,
+            timeout_seconds=(
+                _BOUNDARY_LANE_TIMEOUT_SECONDS
+                if len(command) > 1 and command[1] in {"test-process", "test-mcp"}
+                else 30 * 60
+            ),
+            stdout_limit_bytes=_VALIDATION_OUTPUT_LIMIT_BYTES,
+            stderr_limit_bytes=_VALIDATION_OUTPUT_LIMIT_BYTES,
+            environment=_validation_environment(),
+        )
+        if result.stdout:
+            sys.stdout.write(result.stdout.decode("utf-8", "replace"))
+        if result.stderr:
+            sys.stderr.write(result.stderr.decode("utf-8", "replace"))
+        if result.status is not ToolCommandStatus.EXITED or result.exit_code != 0:
+            raise SystemExit(
+                result.diagnostic or f"{' '.join(command)} failed with {result.status}"
+            )
 
 
 def main(argv: Sequence[str] | None = None) -> int:

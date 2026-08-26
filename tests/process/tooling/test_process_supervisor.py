@@ -3,8 +3,10 @@ from __future__ import annotations
 import os
 import sys
 import time
+from io import StringIO
 from pathlib import Path
 
+import pytest
 from tools.process_supervisor import run_process_tree
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -74,3 +76,36 @@ def test_timeout_kills_a_descendant_that_ignores_sigterm(tmp_path: Path) -> None
     assert still_alive is False, (
         f"descendant (pid={child_pid}) survived timeout — SIGKILL not sent?"
     )
+
+
+def test_omitted_environment_preserves_the_parent_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("JACOBIAN_SUPERVISOR_ENV_PROBE", "available")
+
+    result = run_process_tree(
+        (
+            sys.executable,
+            "-c",
+            "import os; raise SystemExit(os.environ['JACOBIAN_SUPERVISOR_ENV_PROBE'] != 'available')",
+        ),
+        timeout=5.0,
+        cwd=tmp_path,
+    )
+
+    assert result.exit_code == 0
+    assert not result.timed_out
+
+
+def test_text_only_output_stream_receives_decoded_child_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = StringIO()
+    monkeypatch.setattr("tools.process_supervisor.sys.stdout", output)
+
+    result = run_process_tree(
+        (sys.executable, "-c", "print('hello')"), timeout=5.0, cwd=tmp_path
+    )
+
+    assert result.exit_code == 0
+    assert output.getvalue() == "hello\n"

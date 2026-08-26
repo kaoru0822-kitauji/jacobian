@@ -10,8 +10,13 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 from pathlib import Path
+
+from tools.command_runner import (
+    ToolCommandStatus,
+    operator_environment,
+    run_operator_command,
+)
 
 HISTORICAL_PREFIXES = ("agent-port-", "agent-rebase-")
 WORKFLOW_LIST_LIMIT = 1000
@@ -80,15 +85,33 @@ def _stems_from_workflow_rows(rows: object) -> set[str]:
 
 
 def _registered_from_gh() -> set[str]:
-    completed = subprocess.run(
-        _workflow_list_command(),
-        check=False,
-        capture_output=True,
-        text=True,
+    command = _workflow_list_command()
+    completed = run_operator_command(
+        command[0],
+        command[1:],
+        cwd=Path.cwd().resolve(),
+        timeout_seconds=30.0,
+        stdout_limit_bytes=4 * 1024 * 1024,
+        stderr_limit_bytes=1024 * 1024,
+        environment=operator_environment(
+            include=(
+                "PATH",
+                "GH_TOKEN",
+                "GITHUB_TOKEN",
+                "GH_CONFIG_DIR",
+                "XDG_CONFIG_HOME",
+                "HOME",
+            )
+        ),
     )
-    if completed.returncode != 0:
-        raise SystemExit(completed.stderr.strip() or "gh workflow list failed")
-    return _stems_from_workflow_rows(json.loads(completed.stdout))
+    if completed.status is not ToolCommandStatus.EXITED or completed.exit_code != 0:
+        diagnostic = completed.stderr.decode("utf-8", "replace").strip()
+        raise SystemExit(
+            diagnostic or completed.diagnostic or "gh workflow list failed"
+        )
+    return _stems_from_workflow_rows(
+        json.loads(completed.stdout.decode("utf-8", "strict"))
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
