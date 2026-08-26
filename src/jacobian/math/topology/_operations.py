@@ -8,12 +8,7 @@ from itertools import combinations
 from jacobian.catalog._examples import example
 from jacobian.catalog.models import MathTool
 from jacobian.math import prime_field_linear_algebra as prime_field
-from jacobian.math.chain_complexes.values import (
-    MAX_BASIS_SIZE,
-    MAX_MATRIX_CELLS,
-    ChainComplexValue,
-    CoefficientField,
-)
+from jacobian.math.chain_complexes.values import ChainComplexValue
 from jacobian.math.matrices.certified_snf.operations import (
     certificate_from_reduction,
     inverse_unimodular,
@@ -23,6 +18,22 @@ from jacobian.math.matrices.certified_snf.operations import (
     smith_reduce,
 )
 from jacobian.math.matrices.certified_snf.values import CertifiedIntegerMatrix
+from jacobian.math.topology._barycentric import barycentric_subdivision
+from jacobian.math.topology._chain_conversion import (
+    canonical_chain_complex_value_from_parts,
+)
+from jacobian.math.topology._homology import (
+    HomologyGroupResult,
+    IntegralFreeGenerator,
+    IntegralHomologyGroupResult,
+    IntegralSimplicialHomologyRequest,
+    IntegralSimplicialHomologyResult,
+    IntegralTorsionGenerator,
+    IntegralVector,
+    ModularVector,
+    SimplicialHomologyRequest,
+    SimplicialHomologyResult,
+)
 from jacobian.math.topology._models import (
     BarycentricSubdivisionRequest,
     BarycentricSubdivisionResult,
@@ -37,18 +48,10 @@ from jacobian.math.topology._models import (
     FVectorRequest,
     FVectorResult,
     HomologyConvention,
-    HomologyGroupResult,
-    IntegralFreeGenerator,
-    IntegralHomologyGroupResult,
-    IntegralSimplicialHomologyRequest,
-    IntegralSimplicialHomologyResult,
-    IntegralTorsionGenerator,
-    IntegralVector,
     JoinRequest,
     JoinResult,
     LinkRequest,
     LinkResult,
-    ModularVector,
     PseudomanifoldRequest,
     PseudomanifoldResult,
     ShellingCheckRequest,
@@ -56,8 +59,6 @@ from jacobian.math.topology._models import (
     SimplexBasis,
     SimplicialComplexCanonicalizationResult,
     SimplicialComplexRequest,
-    SimplicialHomologyRequest,
-    SimplicialHomologyResult,
     SkeletonRequest,
     SkeletonResult,
     SparseBoundaryMatrix,
@@ -67,13 +68,10 @@ from jacobian.math.topology._models import (
     VertexDeletionRequest,
     VertexDeletionResult,
     _all_faces,
-    _cover_relations,
-    _evaluate_shelling,
-    _maximal_chains_from_covers,
-    _minimal_face_indices,
     face_closure,
     simplicial_complex_digest,
 )
+from jacobian.math.topology._shelling import evaluate_shelling
 
 
 def _canonical_complex(
@@ -265,7 +263,7 @@ def _chain_result(request: ChainComplexRequest) -> ChainComplexResult:
         boundary_matrices=boundaries,
         augmentation=augmentation,
         boundary_squared_zero=tuple(ledger),
-        canonical_value=_canonical_value_from_parts(
+        canonical_value=canonical_chain_complex_value_from_parts(
             request.coefficient_ring,
             request.convention,
             request.prime,
@@ -281,62 +279,9 @@ def _chain(
     return _chain_result(request)
 
 
-def _canonical_value_from_parts(
-    coefficient_ring: ChainCoefficientRing,
-    convention: HomologyConvention,
-    prime: int | None,
-    simplex_bases: tuple[SimplexBasis, ...],
-    boundary_matrices: tuple[SparseBoundaryMatrix, ...],
-) -> ChainComplexValue | None:
-    """The canonical chain-complex value of one simplicial chain complex.
-
-    Only unreduced prime-field results convert: integral boundaries live
-    over ZZ rather than QQ or GF(p), and reduced chains carry an
-    augmentation map outside the canonical value's representation. The
-    ordered lexicographic face bases remain the implicit column/row
-    ordering of each dense differential; simplex labels do not survive
-    because the canonical value is based but unlabeled.
-    """
-    if coefficient_ring is not ChainCoefficientRing.PRIME_FIELD:
-        return None
-    if convention is HomologyConvention.REDUCED:
-        return None
-    if prime is None:
-        raise ValueError("prime-field chains must declare their modulus")
-    basis_sizes = tuple(len(basis.simplices) for basis in simplex_bases)
-    total_cells = sum(matrix.rows * matrix.columns for matrix in boundary_matrices)
-    if any(size > MAX_BASIS_SIZE for size in basis_sizes):
-        raise ValueError(
-            f"simplicial chain group exceeds the canonical basis bound {MAX_BASIS_SIZE}"
-        )
-    if total_cells > MAX_MATRIX_CELLS:
-        raise ValueError(
-            f"simplicial boundary data exceeds the canonical cell bound "
-            f"{MAX_MATRIX_CELLS}"
-        )
-    # Boundary matrix k maps C_k -> C_{k-1}; the canonical value stores
-    # differentials[i] as C_{i+1} -> C_i, i.e. boundary_matrices[i + 1].
-    differential_matrices = []
-    for matrix in boundary_matrices[1:]:
-        dense = [[0] * matrix.columns for _ in range(matrix.rows)]
-        for entry in matrix.entries:
-            dense[entry.row][entry.column] = entry.value % prime
-        differential_matrices.append(
-            tuple(tuple(str(value) for value in row) for row in dense)
-        )
-    return ChainComplexValue(
-        coefficient_field=CoefficientField.PRIME_FIELD,
-        prime=prime,
-        degree_min=0,
-        degree_max=len(basis_sizes) - 1,
-        basis_sizes=basis_sizes,
-        differential_matrices=tuple(differential_matrices),
-    )
-
-
 def _canonical_chain_complex_value(result: ChainComplexResult) -> ChainComplexValue:
     """The canonical chain-complex value carried by one chain result."""
-    value = _canonical_value_from_parts(
+    value = canonical_chain_complex_value_from_parts(
         result.coefficient_ring,
         result.convention,
         result.prime,
@@ -982,44 +927,23 @@ def compute_barycentric_subdivision(
     """Compute the barycentric subdivision of a simplicial complex."""
     all_faces_set = _all_faces(request.complex.facets)
     sorted_faces = sorted(all_faces_set, key=lambda f: (len(f), f))
-    # Bounded injective encoding: use short valid labels "bv{i}" instead of
-    # comma-joined face content which violates VertexLabel.
-    new_vertices = [f"bv{i}" for i in range(len(sorted_faces))]
-    vertex_map = {face: new_vertices[idx] for idx, face in enumerate(sorted_faces)}
-    # Enumerate maximal chains via cover relation (efficient, not power set).
-    face_frozens = [frozenset(f) for f in sorted_faces]
-    n = len(sorted_faces)
-    covers = _cover_relations(face_frozens)
-    minimal_indices = _minimal_face_indices(face_frozens)
-    maximal_chains = _maximal_chains_from_covers(
-        covers, minimal_indices, n, sorted_faces, face_frozens
-    )
-    subdivision_facets = [
-        tuple(sorted(vertex_map[sorted_faces[idx]] for idx in chain))
-        for chain in maximal_chains
-    ]
-    # Ensure maximality (covers already guarantees, but keep dedup)
-    # Remove duplicates and sort deterministically
-    unique_facets = sorted(set(subdivision_facets), key=lambda f: (-len(f), f))
-    # No further filtering needed; they are maximal chains.
-    maximal = unique_facets
-    subdivision_vertex_faces = tuple(sorted_faces)
+    subdivision = barycentric_subdivision(sorted_faces)
     # Build canonical complex for subdivision
     subdivision_complex = None
-    if maximal:
-        sub_vertices = tuple(sorted(new_vertices))
+    if subdivision.facets:
+        sub_vertices = tuple(sorted(subdivision.vertices))
         # maximal facets for complex must be sorted tuple of sorted vertices
-        canon_facets = tuple(sorted(tuple(sorted(f)) for f in maximal))
+        canon_facets = tuple(sorted(tuple(sorted(f)) for f in subdivision.facets))
         subdivision_complex = _canonical_complex(sub_vertices, canon_facets)
     return BarycentricSubdivisionResult(
         original_vertices=request.complex.vertices,
         original_dimension=max(len(f) - 1 for f in request.complex.facets),
-        subdivision_vertices=tuple(new_vertices),
-        subdivision_facets=tuple(maximal),
-        num_new_vertices=len(new_vertices),
+        subdivision_vertices=subdivision.vertices,
+        subdivision_facets=subdivision.facets,
+        num_new_vertices=len(subdivision.vertices),
         complex=request.complex,
         subdivision_complex=subdivision_complex,
-        subdivision_vertex_faces=subdivision_vertex_faces,
+        subdivision_vertex_faces=subdivision.vertex_faces,
     )
 
 
@@ -1075,7 +999,7 @@ def compute_pseudomanifold_decision(
 def compute_shelling_check(request: ShellingCheckRequest) -> ShellingCheckResult:
     """Check whether a submitted facet order is a valid shelling order."""
 
-    is_shelling, failed_at, failure_reason = _evaluate_shelling(
+    is_shelling, failed_at, failure_reason = evaluate_shelling(
         request.complex.facets, request.facet_order
     )
     return ShellingCheckResult(

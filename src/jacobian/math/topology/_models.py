@@ -21,36 +21,18 @@ from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticCustomError
 
 from jacobian._digest import Sha256Digest
-from jacobian._exact import CanonicalInteger
 from jacobian._models import StrictModel
 from jacobian.canonical import canonicalize_json
 from jacobian.math.chain_complexes.values import ChainComplexValue
-from jacobian.math.matrices.certified_snf.values import (
-    MAX_CERTIFIED_SNF_DIMENSION,
-    CertifiedIntegerMatrix,
-    SmithNormalFormCertificate,
-)
+from jacobian.math.topology._barycentric import barycentric_subdivision
 
 MAX_TOPOLOGY_VERTICES = 64
 MAX_TOPOLOGY_FACETS = 128
 MAX_TOPOLOGY_DIMENSION = 7
 MAX_TOPOLOGY_FACES = 2048
 MAX_TOPOLOGY_CHAIN_GROUP = 512
-MAX_INLINE_HOMOLOGY_CHAIN_GROUP = 64
 MAX_TOPOLOGY_MATRIX_CELLS = 131_072
 MAX_TOPOLOGY_PRIME = 251
-# Integral homology embeds every boundary/augmentation matrix, Smith
-# transformation, and derived coordinate matrix in ``CertifiedIntegerMatrix``,
-# whose dimension contract caps at ``MAX_CERTIFIED_SNF_DIMENSION``.  The
-# admitted chain groups therefore derive from that certificate bound; raising
-# them requires expanding the certificate contract first, not this constant
-# alone.  The total-rank and cell bounds are independent work nets over the
-# whole request (SNF cost scales with total chain size), not output-shape
-# bounds.
-MAX_INTEGRAL_HOMOLOGY_CHAIN_GROUP = MAX_CERTIFIED_SNF_DIMENSION
-MAX_INTEGRAL_HOMOLOGY_TOTAL_CHAIN_RANK = 100
-MAX_INTEGRAL_HOMOLOGY_MATRIX_CELLS = 2500
-MAX_INTEGRAL_HOMOLOGY_OUTPUT_DIGITS = 256
 
 
 def _validation_error(reason: str, message: str) -> PydanticCustomError:
@@ -181,68 +163,6 @@ def _collapse_remaining_facets(
     return _maximal_faces(remaining)
 
 
-def _shelling_restriction_failure(
-    facet_i: set[str],
-    prev_facets: list[set[str]],
-) -> str | None:
-    """Check the standard shelling restriction for one new facet.
-
-    ``R(F_i)`` — the faces of ``F_i`` contained in no earlier facet — must be
-    a nonempty interval of the face lattice, i.e. have exactly one minimal
-    face. Returns the failure description or ``None`` when the restriction is
-    admissible.
-    """
-
-    faces_not_in_prev: set[tuple[str, ...]] = set()
-    n = len(facet_i)
-    for r in range(1, n + 1):
-        for subset in combinations(sorted(facet_i), r):
-            face_set = set(subset)
-            if not any(face_set.issubset(pf) for pf in prev_facets):
-                faces_not_in_prev.add(subset)
-    if not faces_not_in_prev:
-        return "has no new faces"
-    face_sets = {frozenset(face) for face in faces_not_in_prev}
-    min_faces = [
-        face
-        for face in face_sets
-        if not any(other < face for other in face_sets if other != face)
-    ]
-    if len(min_faces) != 1:
-        return "restriction is not an interval"
-    return None
-
-
-def _evaluate_shelling(
-    facets: tuple[Simplex, ...],
-    facet_order: tuple[int, ...],
-) -> tuple[bool, int | None, str | None]:
-    """Recompute the shelling decision for a submitted facet order."""
-
-    dim = len(facets[0])
-    if not all(len(facet) == dim for facet in facets):
-        return False, 0, "complex is not pure"
-
-    for i, idx in enumerate(order := facet_order):
-        facet_i = set(facets[idx])
-        if i == 0:
-            continue
-        prev_facets = [set(facets[order[j]]) for j in range(i)]
-        for j in range(i):
-            intersection = facet_i & set(facets[order[j]])
-            if intersection == facet_i:
-                return (
-                    False,
-                    i,
-                    f"facet {idx} is contained in earlier facet",
-                )
-        failure = _shelling_restriction_failure(facet_i, prev_facets)
-        if failure is not None:
-            return False, i, f"facet {idx} {failure}"
-
-    return True, None, None
-
-
 class _PseudomanifoldExpectation(NamedTuple):
     """Recomputed pseudomanifold decision for one facet family."""
 
@@ -260,86 +180,6 @@ def _all_faces(facets: tuple[Simplex, ...]) -> set[tuple[str, ...]]:
             for subset in combinations(facet, r):
                 faces.add(tuple(sorted(subset)))
     return faces
-
-
-def _cover_relations(face_frozens: list[frozenset[str]]) -> list[list[int]]:
-    """Compute the cover relation of the face lattice: i covers j when
-    ``face_frozens[i] < face_frozens[j]`` with no strict intermediate."""
-
-    n = len(face_frozens)
-    covers: list[list[int]] = [[] for _ in range(n)]
-    for i in range(n):
-        for j in range(n):
-            if face_frozens[i] < face_frozens[j]:
-                has_intermediate = any(
-                    face_frozens[i] < face_frozens[k] < face_frozens[j]
-                    for k in range(n)
-                )
-                if not has_intermediate:
-                    covers[i].append(j)
-    return covers
-
-
-def _minimal_face_indices(face_frozens: list[frozenset[str]]) -> list[int]:
-    is_minimal = [True] * len(face_frozens)
-    for i in range(len(face_frozens)):
-        for j in range(len(face_frozens)):
-            if face_frozens[j] < face_frozens[i]:
-                is_minimal[i] = False
-                break
-    return [i for i, minimal in enumerate(is_minimal) if minimal]
-
-
-def _maximal_chains_from_covers(
-    covers: list[list[int]],
-    minimal_indices: list[int],
-    n: int,
-    sorted_faces: list[tuple[str, ...]],
-    face_frozens: list[frozenset[str]],
-) -> list[list[int]]:
-    maximal_chains: list[list[int]] = []
-
-    def dfs(chain: list[int]) -> None:
-        last = chain[-1]
-        if not covers[last]:
-            maximal_chains.append(list(chain))
-            return
-        for nxt in covers[last]:
-            chain.append(nxt)
-            dfs(chain)
-            chain.pop()
-
-    for start in minimal_indices:
-        dfs([start])
-    # If no minimal (should not happen) fallback to each face as chain
-    if not maximal_chains and sorted_faces:
-        # Single-face complex
-        for i in range(n):
-            if not any(face_frozens[i] < face_frozens[j] for j in range(n)):
-                # maximal element
-                maximal_chains.append([i])
-    return maximal_chains
-
-
-def _replayed_barycentric_subdivision(
-    facets: tuple[Simplex, ...],
-    faces: list[tuple[str, ...]],
-) -> tuple[tuple[str, ...], ...]:
-    """Recompute the barycentric-subdivision facets for ``bv{i}`` labels
-    assigned to ``faces`` in the given canonical order."""
-
-    face_frozens = [frozenset(face) for face in faces]
-    covers = _cover_relations(face_frozens)
-    minimal_indices = _minimal_face_indices(face_frozens)
-    maximal_chains = _maximal_chains_from_covers(
-        covers, minimal_indices, len(faces), faces, face_frozens
-    )
-    vertex_map = {face: f"bv{idx}" for idx, face in enumerate(faces)}
-    subdivision_facets = [
-        tuple(sorted(vertex_map[faces[idx]] for idx in chain))
-        for chain in maximal_chains
-    ]
-    return tuple(sorted(set(subdivision_facets), key=lambda f: (-len(f), f)))
 
 
 def _require_subdivision_replay(
@@ -370,7 +210,7 @@ def _require_subdivision_replay(
             "the canonical indexed bijection onto the source complex's "
             "non-empty faces",
         )
-    expected = _replayed_barycentric_subdivision(source_complex.facets, faces)
+    expected = barycentric_subdivision(faces).facets
     if (
         tuple(subdivision_facets) != expected
         or original_vertices != source_complex.vertices
@@ -993,11 +833,11 @@ class ChainComplexResult(TopologyExactResult):
         # The canonical value is part of the public result boundary: an
         # unreduced GF(p) producer result must carry it exactly, and no
         # other ring or convention admits one.
-        from jacobian.math.topology._operations import (
-            _canonical_value_from_parts,
+        from jacobian.math.topology._chain_conversion import (
+            canonical_chain_complex_value_from_parts,
         )
 
-        expected_value = _canonical_value_from_parts(
+        expected_value = canonical_chain_complex_value_from_parts(
             self.coefficient_ring,
             self.convention,
             self.prime,
@@ -1014,360 +854,7 @@ class ChainComplexResult(TopologyExactResult):
         return self
 
 
-class SimplicialHomologyRequest(StrictModel):
-    complex: FiniteSimplicialComplex
-    prime: StrictInt = Field(ge=2, le=MAX_TOPOLOGY_PRIME)
-    convention: HomologyConvention = HomologyConvention.UNREDUCED
-
-    @model_validator(mode="after")
-    def require_prime_and_bounds(self) -> Self:
-        if not is_bounded_prime(self.prime):
-            raise _validation_error(
-                "topology.require_prime_and_bounds_1",
-                "homology coefficients require a bounded prime",
-            )
-        require_linear_algebra_bounds(self.complex)
-        if any(
-            size > MAX_INLINE_HOMOLOGY_CHAIN_GROUP for size in self.complex.f_vector
-        ):
-            raise _validation_error(
-                "topology.require_prime_and_bounds_2",
-                "inline homology bases require at most "
-                f"{MAX_INLINE_HOMOLOGY_CHAIN_GROUP} simplices in each chain group",
-            )
-        return self
-
-
-class ModularVector(StrictModel):
-    coefficients: tuple[StrictInt, ...] = Field(
-        min_length=1,
-        max_length=MAX_TOPOLOGY_CHAIN_GROUP,
-    )
-
-
-class HomologyGroupResult(StrictModel):
-    dimension: StrictInt = Field(ge=0, le=MAX_TOPOLOGY_DIMENSION)
-    chain_dimension: StrictInt = Field(ge=1, le=MAX_TOPOLOGY_CHAIN_GROUP)
-    outgoing_boundary_rank: StrictInt = Field(ge=0, le=MAX_TOPOLOGY_CHAIN_GROUP)
-    cycle_dimension: StrictInt = Field(ge=0, le=MAX_TOPOLOGY_CHAIN_GROUP)
-    incoming_boundary_rank: StrictInt = Field(ge=0, le=MAX_TOPOLOGY_CHAIN_GROUP)
-    betti_number: StrictInt = Field(ge=0, le=MAX_TOPOLOGY_CHAIN_GROUP)
-    cycle_basis: tuple[ModularVector, ...] = Field(
-        default=(),
-        max_length=MAX_TOPOLOGY_CHAIN_GROUP,
-    )
-    boundary_basis: tuple[ModularVector, ...] = Field(
-        default=(),
-        max_length=MAX_TOPOLOGY_CHAIN_GROUP,
-    )
-    homology_basis: tuple[ModularVector, ...] = Field(
-        default=(),
-        max_length=MAX_TOPOLOGY_CHAIN_GROUP,
-    )
-    quotient_span_rank: StrictInt = Field(ge=0, le=MAX_TOPOLOGY_CHAIN_GROUP)
-
-    @model_validator(mode="after")
-    def require_dimension_ledger(self) -> Self:
-        if self.cycle_dimension != (self.chain_dimension - self.outgoing_boundary_rank):
-            raise _validation_error(
-                "topology.require_dimension_ledger_1",
-                "cycle dimension does not equal nullity",
-            )
-        if self.betti_number != (self.cycle_dimension - self.incoming_boundary_rank):
-            raise _validation_error(
-                "topology.require_dimension_ledger_2",
-                "Betti number does not equal dim cycles minus boundaries",
-            )
-        if (
-            len(self.cycle_basis) != self.cycle_dimension
-            or len(self.boundary_basis) != self.incoming_boundary_rank
-            or len(self.homology_basis) != self.betti_number
-            or self.quotient_span_rank != self.cycle_dimension
-        ):
-            raise _validation_error(
-                "topology.require_dimension_ledger_3",
-                "homology bases do not match the dimension ledger",
-            )
-        vectors = (
-            *self.cycle_basis,
-            *self.boundary_basis,
-            *self.homology_basis,
-        )
-        if any(len(vector.coefficients) != self.chain_dimension for vector in vectors):
-            raise _validation_error(
-                "topology.require_dimension_ledger_4",
-                "homology vector does not use the declared chain basis",
-            )
-        return self
-
-
-class SimplicialHomologyResult(TopologyExactResult):
-    complex_digest: Sha256Digest
-    coefficient_field: Literal["PRIME_FIELD"] = "PRIME_FIELD"
-    prime: StrictInt = Field(ge=2, le=MAX_TOPOLOGY_PRIME)
-    convention: HomologyConvention
-    orientation_convention: Literal["LEXICOGRAPHIC_VERTEX_ORDER"] = (
-        "LEXICOGRAPHIC_VERTEX_ORDER"
-    )
-    dimension_range: tuple[StrictInt, StrictInt]
-    groups: tuple[HomologyGroupResult, ...] = Field(
-        min_length=1,
-        max_length=MAX_TOPOLOGY_DIMENSION + 1,
-    )
-
-    @model_validator(mode="after")
-    def require_complete_dimension_range(self) -> Self:
-        if not is_bounded_prime(self.prime):
-            raise _validation_error(
-                "topology.require_complete_dimension_range_1",
-                "homology result requires a bounded prime",
-            )
-        dimensions = tuple(group.dimension for group in self.groups)
-        if dimensions != tuple(range(len(self.groups))):
-            raise _validation_error(
-                "topology.require_complete_dimension_range_2",
-                "homology groups must cover contiguous dimensions",
-            )
-        if self.dimension_range != (0, len(self.groups) - 1):
-            raise _validation_error(
-                "topology.require_complete_dimension_range_3",
-                "dimension_range does not cover every returned group",
-            )
-        if any(
-            coefficient < 0 or coefficient >= self.prime
-            for group in self.groups
-            for vector in (
-                *group.cycle_basis,
-                *group.boundary_basis,
-                *group.homology_basis,
-            )
-            for coefficient in vector.coefficients
-        ):
-            raise _validation_error(
-                "topology.require_complete_dimension_range_4",
-                "homology vector coefficient is outside the prime field",
-            )
-        return self
-
-
-class IntegralSimplicialHomologyRequest(StrictModel):
-    complex: FiniteSimplicialComplex
-    convention: HomologyConvention = HomologyConvention.UNREDUCED
-
-    @model_validator(mode="after")
-    def require_integral_certificate_bounds(self) -> Self:
-        require_linear_algebra_bounds(self.complex)
-        if any(
-            size > MAX_INTEGRAL_HOMOLOGY_CHAIN_GROUP for size in self.complex.f_vector
-        ):
-            raise _validation_error(
-                "topology.require_integral_certificate_bounds_1",
-                "integral homology requires at most "
-                f"{MAX_INTEGRAL_HOMOLOGY_CHAIN_GROUP} simplices in each chain group",
-            )
-        if sum(self.complex.f_vector) > MAX_INTEGRAL_HOMOLOGY_TOTAL_CHAIN_RANK:
-            raise _validation_error(
-                "topology.require_integral_certificate_bounds_2",
-                "integral homology requires total chain rank at most "
-                f"{MAX_INTEGRAL_HOMOLOGY_TOTAL_CHAIN_RANK}",
-            )
-        padded = (0, *self.complex.f_vector)
-        if any(
-            rows * columns > MAX_INTEGRAL_HOMOLOGY_MATRIX_CELLS
-            for rows, columns in pairwise(padded)
-        ):
-            raise _validation_error(
-                "topology.require_integral_certificate_bounds_3",
-                "integral homology boundary exceeds the "
-                f"{MAX_INTEGRAL_HOMOLOGY_MATRIX_CELLS}-cell bound",
-            )
-        return self
-
-
-class IntegralVector(StrictModel):
-    coefficients: tuple[CanonicalInteger, ...] = Field(
-        max_length=MAX_INTEGRAL_HOMOLOGY_CHAIN_GROUP
-    )
-
-    @model_validator(mode="after")
-    def require_output_digit_budget(self) -> Self:
-        if any(
-            len(value.lstrip("-")) > MAX_INTEGRAL_HOMOLOGY_OUTPUT_DIGITS
-            for value in self.coefficients
-        ):
-            raise _validation_error(
-                "topology.require_output_digit_budget_1",
-                "integral homology vector exceeds the output digit bound",
-            )
-        return self
-
-
-class IntegralFreeGenerator(StrictModel):
-    cycle: IntegralVector
-    cycle_coordinates: IntegralVector
-
-
-class IntegralTorsionGenerator(StrictModel):
-    order: CanonicalInteger
-    cycle: IntegralVector
-    cycle_coordinates: IntegralVector
-    bounding_chain: IntegralVector
-
-    @model_validator(mode="after")
-    def require_nontrivial_bounded_order(self) -> Self:
-        if (
-            int(self.order) <= 1
-            or len(self.order.lstrip("-")) > MAX_INTEGRAL_HOMOLOGY_OUTPUT_DIGITS
-        ):
-            raise _validation_error(
-                "topology.require_nontrivial_bounded_order_1",
-                "torsion generator order must be a bounded integer > 1",
-            )
-        return self
-
-
-class IntegralHomologyGroupResult(StrictModel):
-    dimension: StrictInt = Field(ge=0, le=MAX_TOPOLOGY_DIMENSION)
-    chain_dimension: StrictInt = Field(ge=1, le=MAX_INTEGRAL_HOMOLOGY_CHAIN_GROUP)
-    incoming_chain_dimension: StrictInt = Field(
-        ge=0, le=MAX_INTEGRAL_HOMOLOGY_CHAIN_GROUP
-    )
-    outgoing_boundary_rank: StrictInt = Field(
-        ge=0, le=MAX_INTEGRAL_HOMOLOGY_CHAIN_GROUP
-    )
-    cycle_rank: StrictInt = Field(ge=0, le=MAX_INTEGRAL_HOMOLOGY_CHAIN_GROUP)
-    incoming_boundary_rank: StrictInt = Field(
-        ge=0, le=MAX_INTEGRAL_HOMOLOGY_CHAIN_GROUP
-    )
-    betti_number: StrictInt = Field(ge=0, le=MAX_INTEGRAL_HOMOLOGY_CHAIN_GROUP)
-    torsion_coefficients: tuple[CanonicalInteger, ...] = Field(
-        max_length=MAX_INTEGRAL_HOMOLOGY_CHAIN_GROUP
-    )
-    free_generators: tuple[IntegralFreeGenerator, ...] = Field(
-        max_length=MAX_INTEGRAL_HOMOLOGY_CHAIN_GROUP
-    )
-    torsion_generators: tuple[IntegralTorsionGenerator, ...] = Field(
-        max_length=MAX_INTEGRAL_HOMOLOGY_CHAIN_GROUP
-    )
-    outgoing_smith_certificate: SmithNormalFormCertificate
-    boundary_in_cycle_coordinates: CertifiedIntegerMatrix
-    incoming_smith_certificate: SmithNormalFormCertificate
-    generator_basis: Literal[
-        "CANONICAL_SIMPLEX_BASIS_VIA_CERTIFIED_SMITH_TRANSFORMATIONS"
-    ] = "CANONICAL_SIMPLEX_BASIS_VIA_CERTIFIED_SMITH_TRANSFORMATIONS"
-
-    @model_validator(mode="after")
-    def require_complete_integral_group_ledger(self) -> Self:
-        outgoing = self.outgoing_smith_certificate
-        incoming = self.incoming_smith_certificate
-        if (
-            outgoing.source.column_count != self.chain_dimension
-            or outgoing.rank != self.outgoing_boundary_rank
-            or self.cycle_rank != self.chain_dimension - self.outgoing_boundary_rank
-            or (
-                self.boundary_in_cycle_coordinates.row_count,
-                self.boundary_in_cycle_coordinates.column_count,
-            )
-            != (self.cycle_rank, self.incoming_chain_dimension)
-            or incoming.source != self.boundary_in_cycle_coordinates
-            or incoming.rank != self.incoming_boundary_rank
-            or self.betti_number != self.cycle_rank - self.incoming_boundary_rank
-            or len(self.free_generators) != self.betti_number
-        ):
-            raise _validation_error(
-                "topology.require_complete_integral_group_ledger_1",
-                "integral homology rank and certificate ledger is invalid",
-            )
-        torsion = tuple(
-            factor for factor in incoming.invariant_factors if int(factor) > 1
-        )
-        if (
-            self.torsion_coefficients != torsion
-            or tuple(item.order for item in self.torsion_generators) != torsion
-        ):
-            raise _validation_error(
-                "topology.require_complete_integral_group_ledger_2",
-                "integral homology torsion generators must match Smith factors",
-            )
-        if any(
-            len(item.cycle.coefficients) != self.chain_dimension
-            or len(item.cycle_coordinates.coefficients) != self.cycle_rank
-            for item in self.free_generators
-        ) or any(
-            len(item.cycle.coefficients) != self.chain_dimension
-            or len(item.cycle_coordinates.coefficients) != self.cycle_rank
-            or len(item.bounding_chain.coefficients) != self.incoming_chain_dimension
-            for item in self.torsion_generators
-        ):
-            raise _validation_error(
-                "topology.require_complete_integral_group_ledger_3",
-                "integral homology generators must use the declared simplex bases",
-            )
-        matrices = (
-            outgoing.source,
-            outgoing.diagonal,
-            outgoing.left_transformation,
-            outgoing.right_transformation,
-            self.boundary_in_cycle_coordinates,
-            incoming.source,
-            incoming.diagonal,
-            incoming.left_transformation,
-            incoming.right_transformation,
-        )
-        scalar_values = (
-            value for matrix in matrices for row in matrix.entries for value in row
-        )
-        if any(
-            len(value.lstrip("-")) > MAX_INTEGRAL_HOMOLOGY_OUTPUT_DIGITS
-            for value in scalar_values
-        ):
-            raise _validation_error(
-                "topology.require_complete_integral_group_ledger_4",
-                "integral homology certificate exceeds the output digit bound",
-            )
-        return self
-
-
-class IntegralSimplicialHomologyResult(TopologyExactResult):
-    complex_digest: Sha256Digest
-    coefficient_ring: Literal["ZZ"] = "ZZ"
-    convention: HomologyConvention
-    orientation_convention: Literal["LEXICOGRAPHIC_VERTEX_ORDER"] = (
-        "LEXICOGRAPHIC_VERTEX_ORDER"
-    )
-    dimension_range: tuple[StrictInt, StrictInt]
-    groups: tuple[IntegralHomologyGroupResult, ...] = Field(
-        min_length=1,
-        max_length=MAX_TOPOLOGY_DIMENSION + 1,
-    )
-    completeness: Literal["FREE_TORSION_AND_BOUND_GENERATORS"] = (
-        "FREE_TORSION_AND_BOUND_GENERATORS"
-    )
-    decomposition: Literal["DIRECT_SUM_Z_AND_FINITE_CYCLIC_FACTORS"] = (
-        "DIRECT_SUM_Z_AND_FINITE_CYCLIC_FACTORS"
-    )
-
-    @model_validator(mode="after")
-    def require_complete_integral_dimension_range(self) -> Self:
-        dimensions = tuple(group.dimension for group in self.groups)
-        if dimensions != tuple(range(len(self.groups))):
-            raise _validation_error(
-                "topology.require_complete_integral_dimension_range_1",
-                "integral homology groups must cover contiguous dimensions",
-            )
-        if self.dimension_range != (0, len(self.groups) - 1):
-            raise _validation_error(
-                "topology.require_complete_integral_dimension_range_2",
-                "integral homology dimension_range must cover every group",
-            )
-        return self
-
-
 __all__ = [
-    "MAX_INTEGRAL_HOMOLOGY_CHAIN_GROUP",
-    "MAX_INTEGRAL_HOMOLOGY_MATRIX_CELLS",
-    "MAX_INTEGRAL_HOMOLOGY_OUTPUT_DIGITS",
-    "MAX_INTEGRAL_HOMOLOGY_TOTAL_CHAIN_RANK",
     "MAX_TOPOLOGY_CHAIN_GROUP",
     "MAX_TOPOLOGY_DIMENSION",
     "MAX_TOPOLOGY_FACES",
@@ -1382,20 +869,10 @@ __all__ = [
     "FacesInDimension",
     "FiniteSimplicialComplex",
     "HomologyConvention",
-    "HomologyGroupResult",
-    "IntegralFreeGenerator",
-    "IntegralHomologyGroupResult",
-    "IntegralSimplicialHomologyRequest",
-    "IntegralSimplicialHomologyResult",
-    "IntegralTorsionGenerator",
-    "IntegralVector",
-    "ModularVector",
     "Simplex",
     "SimplexBasis",
     "SimplicialComplexCanonicalizationResult",
     "SimplicialComplexRequest",
-    "SimplicialHomologyRequest",
-    "SimplicialHomologyResult",
     "SparseBoundaryMatrix",
     "SparseMatrixEntry",
     "VertexLabel",
@@ -2108,7 +1585,9 @@ class ShellingCheckResult(TopologyExactResult):
             )
         # Replay the shelling condition over the retained complex and order so
         # an authored decision cannot validate independently of its source.
-        expected_is_shelling, expected_failed_at, expected_reason = _evaluate_shelling(
+        from jacobian.math.topology._shelling import evaluate_shelling
+
+        expected_is_shelling, expected_failed_at, expected_reason = evaluate_shelling(
             self.complex.facets, self.facet_order
         )
         if self.is_shelling != expected_is_shelling:
