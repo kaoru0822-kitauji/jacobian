@@ -72,8 +72,10 @@ def compute_pratt_certificate(
 
     value = parse_canonical_integer(request.value)
     if not isprime(value):
-        return PrimalityCertificateResult(status="COMPOSITE", value=request.value)
-    return PrimalityCertificateResult(
+        return PrimalityCertificateResult._from_kernel(
+            status="COMPOSITE", value=request.value
+        )
+    return PrimalityCertificateResult._from_kernel(
         status="CERTIFIED",
         value=request.value,
         certificate=_build_pratt_certificate(value),
@@ -106,8 +108,7 @@ def factorize_certified(
         )
         for prime, exponent in decomposition
     )
-    return CertifiedFactorizationResult(
-        status="COMPLETE",
+    return CertifiedFactorizationResult._from_kernel(
         value=request.value,
         factors=factors,
     )

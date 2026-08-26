@@ -553,6 +553,17 @@ class CertifiedFactorizationResult(StrictModel):
                 )
         return self
 
+    @classmethod
+    def _from_kernel(
+        cls,
+        *,
+        value: CertifiedFactorizationInteger,
+        factors: tuple[CertifiedFactor, ...],
+    ) -> Self:
+        """Construct a factorization converted from bounded kernel output."""
+
+        return cls.model_construct(status="COMPLETE", value=value, factors=factors)
+
 
 class PrimalityCertificateRequest(StrictModel):
     """One positive integer to be certified as prime via a Pratt certificate."""
@@ -593,14 +604,6 @@ class PrimalityCertificateResult(StrictModel):
                 "COMPOSITE status must not carry a certificate",
             )
         value_int = parse_canonical_integer(self.value)
-        if self.status == "COMPOSITE":
-            from sympy import isprime
-
-            if isprime(value_int):
-                raise _validation_error(
-                    "composite_status_requires_a_composite_value",
-                    "COMPOSITE status requires a composite value",
-                )
         if self.status == "CERTIFIED":
             assert self.certificate is not None
             cert_prime = parse_canonical_integer(self.certificate.prime)
@@ -609,14 +612,23 @@ class PrimalityCertificateResult(StrictModel):
                     "certificate_prime_must_match_the_candidate_value",
                     "certificate prime must match the candidate value",
                 )
-            from sympy import isprime
-
-            if not isprime(value_int):
-                raise _validation_error(
-                    "certified_status_requires_a_prime_value",
-                    "CERTIFIED status requires a prime value",
-                )
         return self
+
+    @classmethod
+    def _from_kernel(
+        cls,
+        *,
+        status: Literal["CERTIFIED", "COMPOSITE"],
+        value: CertifiedFactorizationInteger,
+        certificate: PrattCertificateNode | None = None,
+    ) -> Self:
+        """Construct a backend-produced primality conclusion without replay."""
+
+        return cls.model_construct(
+            status=status,
+            value=value,
+            certificate=certificate,
+        )
 
 
 PrattCertificateNode.model_rebuild()

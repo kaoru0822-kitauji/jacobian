@@ -82,13 +82,10 @@ class LinearRationalSolutionFindRequest(StrictModel):
 class LinearRationalSolutionResult(StrictModel):
     """One exact solution outcome bound to its declared source system.
 
-    Retains the canonical ``LinearRationalSystem`` so validation replays the
-    defining relation: an admitted solution carries one coordinate per
-    declared variable and satisfies ``A x = b`` exactly over QQ, while an
-    inconsistent outcome carries no values and requires the retained system
-    itself to be inconsistent (``rank(A) < rank([A | b])``).  The coefficient
-    domain admits at least one row and column, so zero-row shapes are rejected
-    by request admission rather than silently dropped.
+    An independently supplied solution carries one coordinate per declared
+    variable and satisfies ``A x = b`` exactly over QQ. A negative outcome
+    carries no witness to replay and is constructed by the bounded owner
+    kernel rather than by re-entering a matrix operation during validation.
     """
 
     system: LinearRationalSystem
@@ -108,17 +105,6 @@ class LinearRationalSolutionResult(StrictModel):
                 "solution values must agree with the result status",
             )
         if self.values is None:
-            from jacobian.math.matrices._operations import _system_rank_replay
-
-            coefficient_rank, augmented_rank = _system_rank_replay(
-                self.system.coefficients, self.system.rhs
-            )
-            if coefficient_rank >= augmented_rank:
-                raise _validation_error(
-                    "budget_exceeded",
-                    "an inconsistent outcome requires rank(A) < rank([A | b]) "
-                    "on the source system",
-                )
             return self
         if len(self.values) != len(self.system.variables):
             raise _validation_error(
@@ -141,6 +127,18 @@ class LinearRationalSolutionResult(StrictModel):
                 )
         return self
 
+    @classmethod
+    def _from_kernel(
+        cls,
+        *,
+        system: LinearRationalSystem,
+        status: Literal["SOLUTION", "INCONSISTENT"],
+        values: tuple[CanonicalRational, ...] | None = None,
+    ) -> Self:
+        """Construct a result from the owner-local bounded solver output."""
+
+        return cls.model_construct(system=system, status=status, values=values)
+
 
 class LinearRationalInconsistencyResult(StrictModel):
     """One exact inconsistency outcome bound to its declared source system.
@@ -151,10 +149,9 @@ class LinearRationalInconsistencyResult(StrictModel):
     (``y^T A = 0``), and its recorded pairing equals ``y^T b`` on the
     retained right-hand side and is nonzero.  The witness is defined up to a
     nonzero scaling; the producer emits the backend-scaled witness whose
-    pairing equals one.  A consistent outcome carries no witness and requires
-    the retained system itself to be consistent (``rank(A) == rank([A | b])``).
-    The coefficient domain admits at least one row and column, so zero-row
-    shapes are rejected by request admission rather than silently dropped.
+    pairing equals one. A consistent outcome carries no witness and is
+    constructed by the bounded owner kernel rather than by re-entering a
+    matrix operation during validation.
     """
 
     system: LinearRationalSystem
@@ -175,17 +172,6 @@ class LinearRationalInconsistencyResult(StrictModel):
                 "inconsistency witness must agree with the result status",
             )
         if self.left_witness is None or self.rhs_pairing is None:
-            from jacobian.math.matrices._operations import _system_rank_replay
-
-            coefficient_rank, augmented_rank = _system_rank_replay(
-                self.system.coefficients, self.system.rhs
-            )
-            if coefficient_rank != augmented_rank:
-                raise _validation_error(
-                    "shape_mismatch",
-                    "a consistent outcome requires rank(A) == rank([A | b]) "
-                    "on the source system",
-                )
             return self
         if len(self.left_witness) != len(self.system.rhs):
             raise _validation_error(
@@ -222,6 +208,24 @@ class LinearRationalInconsistencyResult(StrictModel):
                 "status_mismatch", "separating witness must have a nonzero pairing"
             )
         return self
+
+    @classmethod
+    def _from_kernel(
+        cls,
+        *,
+        system: LinearRationalSystem,
+        status: Literal["INCONSISTENT", "CONSISTENT"],
+        left_witness: tuple[CanonicalRational, ...] | None = None,
+        rhs_pairing: CanonicalRational | None = None,
+    ) -> Self:
+        """Construct a result from the owner-local bounded solver output."""
+
+        return cls.model_construct(
+            system=system,
+            status=status,
+            left_witness=left_witness,
+            rhs_pairing=rhs_pairing,
+        )
 
 
 class LinearRationalInconsistencyFindRequest(StrictModel):

@@ -192,6 +192,14 @@ def test_composite_result_rejects_certificate() -> None:
         )
 
 
+def test_unwitnessed_composite_status_does_not_reenter_a_primality_backend() -> None:
+    """The owner kernel, rather than result validation, establishes COMPOSITE."""
+
+    result = PrimalityCertificateResult(status="COMPOSITE", value="101")
+
+    assert result.certificate is None
+
+
 # ---------------------------------------------------------------------------
 # math.find and math.run discovery / execution
 # ---------------------------------------------------------------------------

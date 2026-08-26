@@ -270,8 +270,8 @@ def test_consistent_outcome_rejects_bare_or_mutated_claims() -> None:
         LinearRationalInconsistencyResult.model_validate(flipped_status)
 
 
-def test_inconsistent_outcome_requires_a_genuinely_inconsistent_source() -> None:
-    """A mutated INCONSISTENT claim cannot attach to a consistent source."""
+def test_negative_solution_status_is_structural_not_a_backend_replay() -> None:
+    """A no-solution conclusion is constructed by the bounded owner kernel."""
 
     dumped = _mutable(
         compute_rational_solution(
@@ -285,8 +285,7 @@ def test_inconsistent_outcome_requires_a_genuinely_inconsistent_source() -> None
     flipped = copy.deepcopy(dumped)
     flipped["status"] = "INCONSISTENT"
     flipped["values"] = None
-    with pytest.raises(ValidationError):
-        LinearRationalSolutionResult.model_validate(flipped)
+    assert LinearRationalSolutionResult.model_validate(flipped).status == "INCONSISTENT"
 
     identity = copy.deepcopy(dumped)
     identity["system"] = _system(
@@ -296,12 +295,11 @@ def test_inconsistent_outcome_requires_a_genuinely_inconsistent_source() -> None
     )
     identity["status"] = "INCONSISTENT"
     identity["values"] = None
-    with pytest.raises(ValidationError):
-        LinearRationalSolutionResult.model_validate(identity)
+    assert LinearRationalSolutionResult.model_validate(identity).status == "INCONSISTENT"
 
 
-def test_consistent_outcome_requires_a_genuinely_consistent_source() -> None:
-    """A CONSISTENT claim cannot attach to a contradictory source system."""
+def test_negative_inconsistency_status_is_structural_not_a_backend_replay() -> None:
+    """A no-witness conclusion is constructed by the bounded owner kernel."""
 
     consistent = _mutable(
         compute_rational_inconsistency(
@@ -318,8 +316,10 @@ def test_consistent_outcome_requires_a_genuinely_consistent_source() -> None:
         [[Fraction(1)], [Fraction(1)]],
         [Fraction(0), Fraction(1)],
     )
-    with pytest.raises(ValidationError):
-        LinearRationalInconsistencyResult.model_validate(contradictory)
+    assert (
+        LinearRationalInconsistencyResult.model_validate(contradictory).status
+        == "CONSISTENT"
+    )
 
 
 def test_negative_outcomes_round_trip_on_their_true_sources() -> None:

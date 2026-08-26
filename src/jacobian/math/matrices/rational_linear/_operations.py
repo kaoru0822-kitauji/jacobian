@@ -76,9 +76,12 @@ def compute_rational_solution(
 
     values = _solve(coefficients, bounds, flint)
     if values is None:
-        return LinearRationalSolutionResult(system=system, status="INCONSISTENT")
-    return LinearRationalSolutionResult(
+        return LinearRationalSolutionResult._from_kernel(
+            system=system, status="INCONSISTENT"
+        )
+    return LinearRationalSolutionResult._from_kernel(
         system=system,
+        status="SOLUTION",
         values=tuple(_canonical_rational(value) for value in values),
     )
 
@@ -102,7 +105,9 @@ def compute_rational_inconsistency(
     dual.append(bounds)
     values = _solve(dual, [Fraction(0)] * column_count + [Fraction(1)], flint)
     if values is None:
-        return LinearRationalInconsistencyResult(system=system, status="CONSISTENT")
+        return LinearRationalInconsistencyResult._from_kernel(
+            system=system, status="CONSISTENT"
+        )
     witness = tuple(_canonical_rational(value) for value in values)
     pairing: Fraction = sum(
         (
@@ -111,8 +116,9 @@ def compute_rational_inconsistency(
         ),
         Fraction(0),
     )
-    return LinearRationalInconsistencyResult(
+    return LinearRationalInconsistencyResult._from_kernel(
         system=system,
+        status="INCONSISTENT",
         left_witness=witness,
         rhs_pairing=_canonical_fraction(pairing),
     )
