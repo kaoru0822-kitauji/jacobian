@@ -492,6 +492,13 @@ admission and the final projection, and boundary tests must exercise the
 serialize -> parse -> canonicalize round trip. An accepted request must not
 discover transport overflow only after the backend has run.
 
+A transport limit is a concrete ingress, egress, IPC, persistence, or host
+limit—not a speculative JSON-size policy. Do not truncate exact mathematical
+values or add synthetic aggregate response budgets. Diagnostics must redact raw
+caller values and bound their structural fields. Discovery remains exact cursor
+pagination; when needed, bound immutable catalog metadata at declaration time
+rather than trimming a page after projection.
+
 When an operation has a genuine incomplete or unknown outcome, expose that
 state in its domain result with the evidence and bounds needed to interpret it.
 Do not turn an inability to finish or represent the exact answer into a
