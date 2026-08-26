@@ -16,10 +16,25 @@ from collections import Counter
 from itertools import product
 from typing import Annotated, Literal, Self
 
-from pydantic import Field, StrictBool, StrictInt, StringConstraints, model_validator
+from pydantic import (
+    Field,
+    StrictBool,
+    StrictInt,
+    StringConstraints,
+    WithJsonSchema,
+    model_validator,
+)
+from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
+from jacobian.math.modular_polynomials import _INTEGER as _TERM_INTEGER
+from jacobian.math.modular_polynomials import (
+    ModularPolynomialTerm as _ModularPolynomialTerm,
+)
+from jacobian.math.modular_polynomials import (
+    NormalizedModularPolynomialTerm as _NormalizedModularPolynomialTerm,
+)
 
 
 def _validation_error(reason: str, message: str) -> PydanticCustomError:
@@ -520,26 +535,37 @@ class ModularPolynomialVariable(StrictModel):
         return self
 
 
-class ModularPolynomialTerm(StrictModel):
-    """One nonzero sparse integer-polynomial term in canonical exponent order."""
+def _residue_image_term_schema() -> JsonSchemaValue:
+    """Project the shared term schema onto residue-image admission.
 
-    coefficient: BoundedInteger
-    exponents: tuple[StrictInt, ...] = Field(
-        min_length=1,
-        max_length=_MAX_RESIDUE_VARIABLES,
-    )
+    ``ModularPolynomialTerm`` publishes the widest consumer envelope: any
+    canonical-integer string of a sign plus 256 digits and up to 20 exponents
+    of magnitude 256. Residue-image admission rejects any coefficient string
+    longer than ``_MAX_INTEGER_LENGTH`` characters, exponent magnitudes
+    above ``_MAX_RESIDUE_EXPONENT``, and — because every exponent vector
+    must match at most ``_MAX_RESIDUE_VARIABLES`` variables — vectors longer
+    than six entries. Discovery publishes exactly that narrower envelope so
+    schema-driven callers never submit a term the request validator rejects.
+    The coefficient pattern is the shared type's own canonical-integer
+    grammar — the same compiled pattern its ``field_validator`` enforces —
+    so the published grammar cannot drift from runtime parsing. Validation
+    itself stays with the shared runtime type.
+    """
 
-    @model_validator(mode="after")
-    def require_nonnegative_exponents(self) -> Self:
-        if any(
-            exponent < 0 or exponent > _MAX_RESIDUE_EXPONENT
-            for exponent in self.exponents
-        ):
-            raise _validation_error(
-                "f_term_exponents_must_be_between_0_and",
-                f"term exponents must be between 0 and {_MAX_RESIDUE_EXPONENT}",
-            )
-        return self
+    schema = _ModularPolynomialTerm.model_json_schema()
+    coefficient = schema["properties"]["coefficient"]
+    coefficient["maxLength"] = _MAX_INTEGER_LENGTH
+    coefficient["pattern"] = _TERM_INTEGER.pattern
+    exponents = schema["properties"]["exponents"]
+    exponents["maxItems"] = _MAX_RESIDUE_VARIABLES
+    exponents["items"]["maximum"] = _MAX_RESIDUE_EXPONENT
+    return schema
+
+
+ResidueImagePolynomialTerm = Annotated[
+    _ModularPolynomialTerm,
+    WithJsonSchema(_residue_image_term_schema()),
+]
 
 
 class ModularPolynomialResidueImageRequest(StrictModel):
@@ -550,7 +576,7 @@ class ModularPolynomialResidueImageRequest(StrictModel):
         min_length=1,
         max_length=_MAX_RESIDUE_VARIABLES,
     )
-    terms: tuple[ModularPolynomialTerm, ...] = Field(
+    terms: tuple[ResidueImagePolynomialTerm, ...] = Field(
         min_length=0,
         max_length=_MAX_RESIDUE_TERMS,
     )
@@ -584,6 +610,18 @@ class ModularPolynomialResidueImageRequest(StrictModel):
             raise _validation_error(
                 "every_term_exponent_vector_must_match_the_variable_count",
                 "every term exponent vector must match the variable count",
+            )
+        if any(
+            len(term.coefficient) > _MAX_INTEGER_LENGTH
+            or any(
+                exponent < 0 or exponent > _MAX_RESIDUE_EXPONENT
+                for exponent in term.exponents
+            )
+            for term in self.terms
+        ):
+            raise _validation_error(
+                "term_outside_residue_image_admission",
+                "term coefficient or exponents exceed the residue-image admission",
             )
         exponent_vectors = [term.exponents for term in self.terms]
         if exponent_vectors != sorted(set(exponent_vectors)):
@@ -931,14 +969,32 @@ class QuadraticResiduesResult(StrictModel):
     residues: tuple[BoundedInteger, ...]
 
 
-class NormalizedModularPolynomialTerm(StrictModel):
-    """One sparse term with its coefficient reduced to the canonical residue."""
+def _residue_image_normalized_term_schema() -> JsonSchemaValue:
+    """Project the shared normalized term schema onto residue-image results.
 
-    coefficient: StrictInt = Field(ge=1, lt=_MAX_POLYNOMIAL_RESIDUE_MODULUS)
-    exponents: tuple[StrictInt, ...] = Field(
-        min_length=1,
-        max_length=_MAX_RESIDUE_VARIABLES,
-    )
+    ``NormalizedModularPolynomialTerm`` publishes the widest consumer
+    envelope: up to 20 exponent entries of arbitrary magnitude.
+    ``_validate_residue_image_shape`` rejects every normalized term whose
+    exponent vector differs from ``variable_order`` — itself capped at
+    ``_MAX_RESIDUE_VARIABLES`` entries — or carries an exponent outside
+    0..``_MAX_RESIDUE_EXPONENT``. Discovery publishes exactly that shape so
+    both residue-image operations advertise only results their declared
+    model can produce or parse. Validation itself stays with the shared
+    runtime type.
+    """
+
+    schema = _NormalizedModularPolynomialTerm.model_json_schema()
+    exponents = schema["properties"]["exponents"]
+    exponents["maxItems"] = _MAX_RESIDUE_VARIABLES
+    exponents["items"]["minimum"] = 0
+    exponents["items"]["maximum"] = _MAX_RESIDUE_EXPONENT
+    return schema
+
+
+ResidueImageNormalizedPolynomialTerm = Annotated[
+    _NormalizedModularPolynomialTerm,
+    WithJsonSchema(_residue_image_normalized_term_schema()),
+]
 
 
 class ModularPolynomialResidueCount(StrictModel):
@@ -974,7 +1030,7 @@ class ModularPolynomialResidueImageResult(StrictModel):
         min_length=1,
         max_length=_MAX_RESIDUE_VARIABLES,
     )
-    normalized_terms: tuple[NormalizedModularPolynomialTerm, ...] = Field(
+    normalized_terms: tuple[ResidueImageNormalizedPolynomialTerm, ...] = Field(
         min_length=0,
         max_length=_MAX_RESIDUE_TERMS,
     )
@@ -1007,7 +1063,7 @@ class ModularPolynomialResidueImageResult(StrictModel):
 
 
 def _evaluate_normalized_modular_polynomial(
-    terms: tuple[NormalizedModularPolynomialTerm, ...],
+    terms: tuple[_NormalizedModularPolynomialTerm, ...],
     assignment: tuple[int, ...],
     modulus: int,
 ) -> int:
