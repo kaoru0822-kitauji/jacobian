@@ -97,13 +97,23 @@ class GraphIsomorphismResult(StrictModel):
 
     When ``status`` is ``ISOMORPHIC`` the ``vertex_mapping`` field carries an
     explicit bijection as a list of ``(from_vertex, to_vertex)`` pairs that
-    the caller can independently verify.  When ``status`` is
-    ``NOT_ISOMORPHIC`` the ``vertex_mapping`` field is empty.
+    the caller can independently verify.  ``NOT_ISOMORPHIC`` and ``UNKNOWN``
+    carry no mapping.  ``UNKNOWN`` means the bounded VF2 worker did not
+    complete, so it establishes neither conclusion.
     """
 
-    status: Literal["ISOMORPHIC", "NOT_ISOMORPHIC"]
+    status: Literal["ISOMORPHIC", "NOT_ISOMORPHIC", "UNKNOWN"]
     vertex_mapping: tuple[VertexMappingPair, ...] = Field(default=())
     convention: Literal["NETWORKX_IS_ISOMORPHIC"] = "NETWORKX_IS_ISOMORPHIC"
+
+    @model_validator(mode="after")
+    def bind_mapping_to_status(self) -> Self:
+        if self.status != "ISOMORPHIC" and self.vertex_mapping:
+            raise PydanticCustomError(
+                "graph.nonisomorphic_result_has_mapping",
+                "only an ISOMORPHIC result may carry a vertex mapping",
+            )
+        return self
 
 
 class ColoredGraphCanonicalizationRequest(StrictModel):
