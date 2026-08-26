@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -21,6 +22,8 @@ from jacobian.canonical import canonicalize_json
 from jacobian.math.logic._cnf import (
     _MAX_VARIABLES,
     CanonicalCnf,
+    SatAssignmentCheckRequest,
+    check_sat_assignment,
 )
 from jacobian.math.logic._smt import (
     _EXHAUSTION_DETAILS,
@@ -47,11 +50,10 @@ _LPR_ADDRESS_SPACE_BYTES = 128 * 1024 * 1024
 _LPR_PROCESS_OUTPUT_BYTES = 16_384
 _MAX_LPR_RESULT_BYTES = 9 * 1024 * 1024
 _CAKE_LPR_MANIFEST = Path("/usr/local/share/jacobian/cake-lpr.manifest")
-_CAKE_LPR_MANIFEST_CONTENT = (
-    "format=jacobian.cake-lpr/v1\n"
-    "upstream_commit=a36874a8b750b43fe4b385b8ddbf5b033e46a3fa\n"
-    "basis_ffi.c=8e30d84fdcb2177aa5571d7fa6661a2fae5ecfd56baa0ce49c65f9233a9f87cb\n"
-    "cake_lpr.S=2f3af32d55083839b3fa0e693afd817679c0b8944bef41def05a8b0ec72b7d4a\n"
+_CAKE_LPR_MANIFEST_FORMAT = "jacobian.cake-lpr/v1"
+_CAKE_LPR_MANIFEST_HASH_KEYS = frozenset({"basis_ffi.c", "cake_lpr.S"})
+_CAKE_LPR_MANIFEST_KEYS = frozenset(
+    {"format", "upstream_commit", *_CAKE_LPR_MANIFEST_HASH_KEYS}
 )
 
 
@@ -422,6 +424,14 @@ def solve_sat(request: SatSolveRequest) -> SatSolveResult:
                 z3.is_true(model.eval(variable, model_completion=True))
                 for variable in variables
             )
+            checked_assignment = check_sat_assignment(
+                SatAssignmentCheckRequest(cnf=request.cnf, assignment=assignment)
+            )
+            if not checked_assignment.satisfies:
+                return SatSolveResult(
+                    outcome="UNKNOWN",
+                    detail="the Z3 backend returned a model that does not satisfy the canonical CNF",
+                )
             return SatSolveResult(outcome="SAT", assignment=assignment)
         if outcome == z3.unsat:
             return SatSolveResult(outcome="UNSAT")
@@ -481,11 +491,38 @@ def _cake_lpr_is_supported(executable: str) -> bool:
     try:
         return (
             Path(executable).resolve() == Path("/usr/local/bin/cake_lpr")
-            and _CAKE_LPR_MANIFEST.read_text(encoding="ascii")
-            == _CAKE_LPR_MANIFEST_CONTENT
+            and _is_cake_lpr_manifest(_CAKE_LPR_MANIFEST.read_text(encoding="ascii"))
         )
     except OSError:
         return False
+
+
+def _is_cake_lpr_manifest(content: str) -> bool:
+    """Validate the stable manifest shape emitted by the service image.
+
+    The Dockerfile owns the concrete revision and source hashes. The runtime
+    only requires the fixed proof-format declaration and a well-formed identity
+    record beside the image's fixed executable.
+    """
+
+    lines = content.splitlines()
+    if len(lines) != len(_CAKE_LPR_MANIFEST_KEYS):
+        return False
+    fields: dict[str, str] = {}
+    for line in lines:
+        key, separator, value = line.partition("=")
+        if not separator or not key or not value or key in fields:
+            return False
+        fields[key] = value
+    return (
+        frozenset(fields) == _CAKE_LPR_MANIFEST_KEYS
+        and fields["format"] == _CAKE_LPR_MANIFEST_FORMAT
+        and re.fullmatch(r"[0-9a-f]{40}", fields["upstream_commit"]) is not None
+        and all(
+            re.fullmatch(r"[0-9a-f]{64}", fields[key]) is not None
+            for key in _CAKE_LPR_MANIFEST_HASH_KEYS
+        )
+    )
 
 
 def check_sat_refutation(

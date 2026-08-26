@@ -448,13 +448,25 @@ def solve_smt(request: SmtSolveRequest) -> SmtSolveResult:
         solver.add(assertions)
         outcome = solver.check()
         if outcome == z3.sat:
-            model = solver.model().sexpr()
-            if len(model.encode("utf-8")) > _MAX_MODEL_BYTES:
+            model = solver.model()
+            if not all(
+                z3.is_true(model.eval(assertion, model_completion=True))
+                for assertion in assertions
+            ):
+                return SmtSolveResult(
+                    outcome="UNKNOWN",
+                    detail=(
+                        "the Z3 backend returned a model that does not satisfy the "
+                        "admitted SMT-LIB assertions"
+                    ),
+                )
+            model_smtlib = model.sexpr()
+            if len(model_smtlib.encode("utf-8")) > _MAX_MODEL_BYTES:
                 return SmtSolveResult(
                     outcome="UNKNOWN",
                     detail="the satisfying model exceeds the bounded result limit",
                 )
-            return SmtSolveResult(outcome="SAT", model_smtlib=model)
+            return SmtSolveResult(outcome="SAT", model_smtlib=model_smtlib)
         if outcome == z3.unsat:
             return SmtSolveResult(outcome="UNSAT")
     except (OSError, z3.Z3Exception) as exc:

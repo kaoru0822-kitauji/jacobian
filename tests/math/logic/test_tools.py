@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import re
 import sys
 from contextlib import contextmanager
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -109,6 +111,86 @@ def test_sat_solver_returns_unsat_without_a_model() -> None:
 
     assert result.outcome == "UNSAT"
     assert result.assignment is None
+
+
+def test_sat_solver_does_not_promote_a_malformed_backend_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import z3
+
+    class MisreportingSolver:
+        def set(self, **_settings: object) -> None:
+            pass
+
+        def add(self, *_clauses: object) -> None:
+            pass
+
+        def check(self) -> z3.CheckSatResult:
+            return z3.sat
+
+        def model(self) -> object:
+            return SimpleNamespace(
+                eval=lambda _variable, **_kwargs: z3.BoolVal(False)
+            )
+
+    monkeypatch.setattr(z3, "Solver", MisreportingSolver)
+
+    result = solve_sat(
+        SatSolveRequest(cnf=CanonicalCnf(variables=("x",), clauses=((1,),)))
+    )
+
+    assert result.outcome == "UNKNOWN"
+    assert result.assignment is None
+    assert result.detail == (
+        "the Z3 backend returned a model that does not satisfy the canonical CNF"
+    )
+
+
+def test_smt_solver_does_not_promote_a_malformed_backend_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import z3
+
+    class MisreportingModel:
+        def eval(self, _assertion: object, **_kwargs: object) -> z3.BoolRef:
+            return z3.BoolVal(False)
+
+        def sexpr(self) -> str:
+            return "(model)"
+
+    class MisreportingSolver:
+        def set(self, **_settings: object) -> None:
+            pass
+
+        def add(self, _assertions: object) -> None:
+            pass
+
+        def check(self) -> z3.CheckSatResult:
+            return z3.sat
+
+        def model(self) -> MisreportingModel:
+            return MisreportingModel()
+
+    monkeypatch.setattr(z3, "SolverFor", lambda _logic: MisreportingSolver())
+
+    result = solve_smt(
+        SmtSolveRequest(
+            logic=SmtLogic.QF_LIA,
+            smtlib=(
+                "(set-logic QF_LIA)\n"
+                "(declare-const x Int)\n"
+                "(assert (> x 0))\n"
+                "(check-sat)"
+            ),
+        )
+    )
+
+    assert result.outcome == "UNKNOWN"
+    assert result.model_smtlib is None
+    assert result.detail == (
+        "the Z3 backend returned a model that does not satisfy the admitted "
+        "SMT-LIB assertions"
+    )
 
 
 def _unit_refutation_request() -> SatRefutationCheckRequest:
@@ -280,6 +362,47 @@ def test_lpr_refutation_returns_unavailable_without_the_pinned_provider(
     assert result.outcome == "UNAVAILABLE"
     assert result.cnf == _unit_refutation_request().cnf
     assert result.refutation == _unit_refutation_request().refutation
+
+
+def test_cake_lpr_manifest_is_structural_while_dockerfile_owns_its_pin() -> None:
+    manifest = (
+        "format=jacobian.cake-lpr/v1\n"
+        "upstream_commit=" + "a" * 40 + "\n"
+        "basis_ffi.c=" + "b" * 64 + "\n"
+        "cake_lpr.S=" + "c" * 64 + "\n"
+    )
+
+    assert sat._is_cake_lpr_manifest(manifest)
+    assert not sat._is_cake_lpr_manifest(manifest.replace("format=", "version="))
+    assert not sat._is_cake_lpr_manifest(manifest.replace("b" * 64, "not-a-hash"))
+
+    dockerfile = Path("Dockerfile").read_text(encoding="utf-8")
+    emitted_fields = dict(
+        re.findall(
+            r"'((?:format|upstream_commit|basis_ffi\.c|cake_lpr\.S))=([^']+)'",
+            dockerfile,
+        )
+    )
+    assert set(emitted_fields) == {
+        "format",
+        "upstream_commit",
+        "basis_ffi.c",
+        "cake_lpr.S",
+    }
+    assert sat._is_cake_lpr_manifest(
+        "".join(f"{key}={value}\n" for key, value in emitted_fields.items())
+    )
+    downloaded_sources = {
+        filename: digest
+        for digest, filename in re.findall(
+            r"ADD --checksum=sha256:([0-9a-f]{64}) \\\n"
+            r"\s+https://raw\.githubusercontent\.com/tanyongkiam/cake_lpr/"
+            r"[0-9a-f]{40}/([^\s]+)",
+            dockerfile,
+        )
+    }
+    assert downloaded_sources["basis_ffi.c"] == emitted_fields["basis_ffi.c"]
+    assert downloaded_sources["cake_lpr.S"] == emitted_fields["cake_lpr.S"]
 
 
 def test_lpr_refutation_accepts_only_the_exact_cake_verdict(
@@ -960,6 +1083,9 @@ def test_smt_solver_projects_exhaustion_from_model_serialization(monkeypatch) ->
     import z3
 
     class ExhaustingModel:
+        def eval(self, _assertion: object, **_kwargs: object) -> z3.BoolRef:
+            return z3.BoolVal(True)
+
         def sexpr(self) -> str:
             raise z3.Z3Exception("out of memory")
 
