@@ -154,6 +154,14 @@ work ledger rather than receiving independent wall budgets. Test caller-side
 timeouts separately in the MCP lane; their only conclusion is that transport
 aborted the request.
 
+For an operation that uses a nontrivial backend, enumeration, solver, or
+certificate check, add the smallest owner-local regression that proves a
+successful producer performs that work once. If independently supplied claims
+are supported, separately prove a forged claim fails through the explicit
+verifier. Timing tests must state whether serialization is included in the
+reported duration or exposed as a distinct named phase; no mandatory phase may
+be absent from all timing evidence.
+
 Examples prove that a documented path works; they do not establish an
 algebraic claim. Select evidence by the claim being made:
 

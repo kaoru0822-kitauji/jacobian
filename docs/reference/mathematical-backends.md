@@ -22,6 +22,11 @@ identity, and translates expected backend failures into the operation's typed
 outcomes. Backend objects and exceptions must not cross the public request or
 result boundary.
 
+An unexpected backend or host failure never establishes a mathematical
+predicate. An adapter may return ``False``, ``UNBOUNDED``, ``UNSAT``, or another
+mathematical outcome only from the defining computation; unexpected failures
+propagate to the owner for typed operational-failure translation.
+
 Automatic generator inference, ambient contexts, and implicit coercion are not
 public semantics. A result converter retains every unit, multiplicity, basis,
 axis, generator, quotient map, or witness needed by the declared result and
@@ -54,6 +59,12 @@ A child-process adapter has the same obligations plus:
 Child processes use the shared bounded-process supervisor. Backend adapters test
 their codec and outcome projection; the supervisor's owning tests prove
 process-group termination and descendant cleanup.
+
+The supervisor's wall deadline starts at adapter entry and is shared by input
+spooling, launch, resource setup, capture, execution, conversion, and result
+delivery. Cleanup may use a separately named finite reaping grace, but it must
+be included in the documented maximum return envelope rather than resetting
+the operation deadline.
 
 ## External reference oracles
 

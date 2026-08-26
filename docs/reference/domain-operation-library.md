@@ -158,6 +158,14 @@ computation just to construct its own result. Adapters may reject malformed
 backend data during conversion, but that is integration safety rather than a
 separate mathematical result stage.
 
+When result construction needs to bypass semantic replay, expose one private
+owner-local factory such as ``_from_kernel``. It may use trusted construction
+only after the kernel has established every invariant it skips. Pydantic result
+validators remain limited to structural, linearly bounded checks; they do not
+call a backend, enumerate a search space, invoke a solver, or recompute the
+operation's defining relation. An independently supplied claim instead uses
+the explicit verifier below.
+
 Do not use ordinary result construction to validate independently supplied
 results. When a request or consumer can provide result data for verification,
 use an explicit replay verifier with a declared replay-work ceiling and a
@@ -376,6 +384,12 @@ No phase receives a fresh hidden budget. A caller or MCP read timeout must
 cover the declared operation envelope plus bounded transport overhead; a
 shorter outer timeout may abort the call, but it cannot establish an operation
 result.
+
+Preflight raw shape, nesting depth, digit length, and every derivable source
+limit before copying or canonicalizing containers, constructing nested models,
+parsing unbounded integers, or reaching a backend. A semantic bound may retain
+useful cancellation cases, but its cheap source-side consequence must be
+checked before expensive conversion.
 
 When execution does not complete, retain the operation ID and version, exact
 request or canonical digest, declared budgets, elapsed time, typed result or
