@@ -11,19 +11,14 @@ from sympy import isprime
 from jacobian._exact import CanonicalInteger
 from jacobian._models import StrictModel
 from jacobian.canonical import parse_canonical_integer
-from jacobian.math.affine_forms.values import (
-    MAX_AFFINE_COMPONENT_DIGITS,
-    AffineFormId,
-)
+from jacobian.math.affine_forms.values import AffineFormId
 from jacobian.math.prime_affine_forms._kernel import (
     MAX_DETERMINISTIC_PRIME_INPUT,
     interval_match_summary,
     interval_matches,
     local_bad_residues,
-    translated_tuple,
 )
 from jacobian.math.prime_affine_forms.values import (
-    MAX_AFFINE_AGGREGATE_DIGITS,
     MAX_AFFINE_FORMS,
     PrimeAffineTuple,
 )
@@ -384,51 +379,6 @@ class PrimePatternIntervalEnumerateResult(StrictModel):
         return self
 
 
-class PrimeAffineTranslationRequest(StrictModel):
-    """Translate every source form by the variable substitution n -> n+shift."""
-
-    source: PrimeAffineTuple
-    shift: IntervalEndpointInteger
-
-    @model_validator(mode="after")
-    def require_bounded_translated_tuple(self) -> Self:
-        if _digits(self.shift) > MAX_INTERVAL_ENDPOINT_DIGITS:
-            raise _validation_error(
-                f"translation shift must have at most {MAX_INTERVAL_ENDPOINT_DIGITS} digits"
-            )
-        shift = parse_canonical_integer(self.shift)
-        aggregate_digits = 0
-        for form in self.source.forms:
-            translated_constant = form.evaluate(shift)
-            if _digits(translated_constant) > MAX_AFFINE_COMPONENT_DIGITS:
-                raise _validation_error(
-                    "translated constant exceeds the canonical affine component bound"
-                )
-            aggregate_digits += _digits(form.coefficient) + _digits(translated_constant)
-        if aggregate_digits > MAX_AFFINE_AGGREGATE_DIGITS:
-            raise _validation_error(
-                "translated affine tuple exceeds the aggregate coefficient-digit "
-                f"bound {MAX_AFFINE_AGGREGATE_DIGITS}"
-            )
-        return self
-
-
-class PrimeAffineTranslationResult(StrictModel):
-    source: PrimeAffineTuple
-    shift: IntervalEndpointInteger
-    translated: PrimeAffineTuple
-
-    @model_validator(mode="after")
-    def bind_exact_translation(self) -> Self:
-        PrimeAffineTranslationRequest(source=self.source, shift=self.shift)
-        expected = translated_tuple(self.source, parse_canonical_integer(self.shift))
-        if self.translated != expected:
-            raise _validation_error(
-                "translated tuple must equal L_i(n+shift) for every form"
-            )
-        return self
-
-
 __all__ = [
     "MAX_BATCH_PRIME",
     "MAX_INTERVAL_ENUMERATION_CELLS",
@@ -437,8 +387,6 @@ __all__ = [
     "MAX_PRIME_BATCH",
     "PrimeAffineIntervalCountRequest",
     "PrimeAffineIntervalEnumerateRequest",
-    "PrimeAffineTranslationRequest",
-    "PrimeAffineTranslationResult",
     "PrimePatternIntervalCountResult",
     "PrimePatternIntervalEnumerateResult",
     "PrimePatternMatch",

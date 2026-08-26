@@ -22,8 +22,6 @@ from jacobian.math.prime_affine_forms._local_factors import (
 from jacobian.math.prime_affine_forms._models import (
     PrimeAffineIntervalCountRequest,
     PrimeAffineIntervalEnumerateRequest,
-    PrimeAffineTranslationRequest,
-    PrimeAffineTranslationResult,
     PrimePatternIntervalCountResult,
     PrimePatternIntervalEnumerateResult,
 )
@@ -33,7 +31,6 @@ from jacobian.math.prime_affine_forms._operations import (
     compute_interval_residue_profile,
     compute_residue_wheel,
     compute_residue_wheel_enumeration,
-    compute_translation,
     compute_wheel_membership,
 )
 from jacobian.math.prime_affine_forms._residue_wheel import (
@@ -45,6 +42,11 @@ from jacobian.math.prime_affine_forms._residue_wheel import (
     PrimeTupleResidueWheelRequest,
     PrimeTupleWheelMembershipRequest,
     PrimeTupleWheelMembershipResult,
+)
+from jacobian.math.prime_affine_forms._translation import (
+    PrimeAffineTranslationRequest,
+    PrimeAffineTranslationResult,
+    compute_translation,
 )
 
 

@@ -8,7 +8,6 @@ from jacobian.canonical import format_canonical_integer, parse_canonical_integer
 from jacobian.math.prime_affine_forms._kernel import (
     interval_match_summary,
     interval_matches,
-    translated_tuple,
     wheel_modulus,
     wheel_rows,
 )
@@ -16,8 +15,6 @@ from jacobian.math.prime_affine_forms._local_factors import local_summary
 from jacobian.math.prime_affine_forms._models import (
     PrimeAffineIntervalCountRequest,
     PrimeAffineIntervalEnumerateRequest,
-    PrimeAffineTranslationRequest,
-    PrimeAffineTranslationResult,
     PrimePatternIntervalCountResult,
     PrimePatternIntervalEnumerateResult,
     PrimePatternMatch,
@@ -160,24 +157,11 @@ def compute_interval_residue_profile(
     )
 
 
-def compute_translation(
-    request: PrimeAffineTranslationRequest,
-) -> PrimeAffineTranslationResult:
-    return PrimeAffineTranslationResult(
-        source=request.source,
-        shift=request.shift,
-        translated=translated_tuple(
-            request.source, parse_canonical_integer(request.shift)
-        ),
-    )
-
-
 __all__ = [
     "compute_interval_count",
     "compute_interval_enumerate",
     "compute_interval_residue_profile",
     "compute_residue_wheel",
     "compute_residue_wheel_enumeration",
-    "compute_translation",
     "compute_wheel_membership",
 ]
