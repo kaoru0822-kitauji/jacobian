@@ -45,7 +45,7 @@ def test_non_independent_candidate_returns_canonical_blocking_edge() -> None:
     result = compute_maximal_independent_set_decision(
         _request(
             vertex_count=3,
-            edges=[[1, 0], [1, 2]],
+            edges=[[0, 1], [1, 2]],
             candidate_set=[0, 1],
         )
     )
@@ -93,6 +93,17 @@ def test_singleton_in_complete_graph_is_maximal() -> None:
 def test_all_vertices_of_empty_graph_form_a_maximal_set() -> None:
     result = compute_maximal_independent_set_decision(
         _request(vertex_count=3, edges=[], candidate_set=[0, 1, 2])
+    )
+
+    assert result.decision == "MAXIMAL"
+
+
+def test_null_graph_makes_the_empty_candidate_maximal() -> None:
+    """The canonical value carries the null graph; the empty candidate set
+    is its unique maximal independent set."""
+
+    result = compute_maximal_independent_set_decision(
+        _request(vertex_count=0, edges=[], candidate_set=[])
     )
 
     assert result.decision == "MAXIMAL"
@@ -630,12 +641,34 @@ class TestSolverConflictBudget:
 
 class TestVertexKColorability:
     def _k4(self):
-        from jacobian.math.graphs.coloring._models import GraphEdgeList
+        from jacobian.math.graphs.values import IndexedSimpleUndirectedGraph
 
-        return GraphEdgeList(
+        return IndexedSimpleUndirectedGraph(
             vertex_count=4,
             edges=((0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)),
         )
+
+    def test_null_graph_is_decided_colorable_with_an_empty_witness(self):
+        """The null graph is k-colorable for every palette; the produced
+        result must round-trip through full validation."""
+        from jacobian.math.graphs.coloring._models import (
+            KColorabilityRequest,
+            KColorabilityResult,
+        )
+        from jacobian.math.graphs.coloring._operations import compute_k_colorability
+        from jacobian.math.graphs.values import IndexedSimpleUndirectedGraph
+
+        result = compute_k_colorability(
+            KColorabilityRequest(
+                graph=IndexedSimpleUndirectedGraph(vertex_count=0, edges=()),
+                colors=3,
+            )
+        )
+        assert result.status == "DECIDED"
+        assert result.colorable is True
+        assert result.coloring == ()
+        assert result.vertex_count == 0
+        assert KColorabilityResult.model_validate(result.model_dump()) == result
 
     def test_triangle_decision_carries_a_proper_witness(self):
         from jacobian.math.graphs.coloring._models import KColorabilityRequest
@@ -643,7 +676,7 @@ class TestVertexKColorability:
 
         result = compute_k_colorability(
             KColorabilityRequest(
-                graph={"vertex_count": 3, "edges": [[0, 1], [1, 2], [2, 0]]},
+                graph={"vertex_count": 3, "edges": [[0, 1], [1, 2], [0, 2]]},
                 colors=3,
             )
         )
@@ -673,13 +706,13 @@ class TestVertexKColorability:
         """An authored budget-exceeded label on a trivially decidable graph
         must not validate."""
         from jacobian.math.graphs.coloring._models import (
-            GraphEdgeList,
             KColorabilityResult,
         )
+        from jacobian.math.graphs.values import IndexedSimpleUndirectedGraph
 
         with pytest.raises(ValidationError):
             KColorabilityResult(
-                graph=GraphEdgeList(vertex_count=2, edges=((0, 1),)),
+                graph=IndexedSimpleUndirectedGraph(vertex_count=2, edges=((0, 1),)),
                 colors=2,
                 solver_conflicts=1000,
                 status="SOLVER_BUDGET_EXCEEDED",
@@ -758,11 +791,11 @@ class TestVertexKColorability:
         """A colorable claim must carry one in-range color per vertex and the
         witness must be proper for the result's own graph."""
         from jacobian.math.graphs.coloring._models import (
-            GraphEdgeList,
             KColorabilityResult,
         )
+        from jacobian.math.graphs.values import IndexedSimpleUndirectedGraph
 
-        path = GraphEdgeList(vertex_count=3, edges=((0, 1), (1, 2)))
+        path = IndexedSimpleUndirectedGraph(vertex_count=3, edges=((0, 1), (1, 2)))
         base = {
             "graph": path,
             "colors": 2,
