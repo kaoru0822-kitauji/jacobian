@@ -4,29 +4,24 @@ from __future__ import annotations
 
 import math
 
+from jacobian.math.arithmetic.values import IntegerValue
 from jacobian.math.number_theory._models import (
     BooleanResult,
     DivisibilityRequest,
     ExtendedGcdResult,
     IntegerPairRequest,
-    IntegerValueRequest,
-    IntegerValueResult,
     NonnegativeIntegerRequest,
     PositiveIntegerRequest,
     ValuationRequest,
 )
 
 
-def compute_gcd(request: IntegerPairRequest) -> IntegerValueResult:
-    return IntegerValueResult(
-        value=str(math.gcd(int(request.left), int(request.right)))
-    )
+def compute_gcd(request: IntegerPairRequest) -> IntegerValue:
+    return IntegerValue(value=str(math.gcd(int(request.left), int(request.right))))
 
 
-def compute_lcm(request: IntegerPairRequest) -> IntegerValueResult:
-    return IntegerValueResult(
-        value=str(math.lcm(int(request.left), int(request.right)))
-    )
+def compute_lcm(request: IntegerPairRequest) -> IntegerValue:
+    return IntegerValue(value=str(math.lcm(int(request.left), int(request.right))))
 
 
 def compute_extended_gcd(request: IntegerPairRequest) -> ExtendedGcdResult:
@@ -41,29 +36,29 @@ def compute_extended_gcd(request: IntegerPairRequest) -> ExtendedGcdResult:
     )
 
 
-def compute_valuation(request: ValuationRequest) -> IntegerValueResult:
+def compute_valuation(request: ValuationRequest) -> IntegerValue:
     from sympy import multiplicity
 
     value, prime = int(request.value), int(request.prime)
-    return IntegerValueResult(value=str(multiplicity(abs(prime), abs(value))))
+    return IntegerValue(value=str(multiplicity(abs(prime), abs(value))))
 
 
-def compute_divisor_count(request: PositiveIntegerRequest) -> IntegerValueResult:
+def compute_divisor_count(request: PositiveIntegerRequest) -> IntegerValue:
     from sympy import divisor_count
 
-    return IntegerValueResult(value=str(int(divisor_count(request.n))))
+    return IntegerValue(value=str(int(divisor_count(request.n))))
 
 
-def compute_divisor_sum(request: PositiveIntegerRequest) -> IntegerValueResult:
+def compute_divisor_sum(request: PositiveIntegerRequest) -> IntegerValue:
     from sympy import divisor_sigma
 
-    return IntegerValueResult(value=str(int(divisor_sigma(request.n))))
+    return IntegerValue(value=str(int(divisor_sigma(request.n))))
 
 
-def compute_aliquot_sum(request: PositiveIntegerRequest) -> IntegerValueResult:
+def compute_aliquot_sum(request: PositiveIntegerRequest) -> IntegerValue:
     from sympy import divisor_sigma
 
-    return IntegerValueResult(value=str(int(divisor_sigma(request.n)) - request.n))
+    return IntegerValue(value=str(int(divisor_sigma(request.n)) - request.n))
 
 
 def decide_coprime(request: IntegerPairRequest) -> BooleanResult:
@@ -75,12 +70,12 @@ def decide_divides(request: DivisibilityRequest) -> BooleanResult:
     return BooleanResult(holds=dividend % divisor == 0)
 
 
-def decide_even(request: IntegerValueRequest) -> BooleanResult:
-    return BooleanResult(holds=int(request.value) % 2 == 0)
+def decide_even(request: IntegerValue) -> BooleanResult:
+    return BooleanResult(holds=int(request.value[-1]) % 2 == 0)
 
 
-def decide_odd(request: IntegerValueRequest) -> BooleanResult:
-    return BooleanResult(holds=int(request.value) % 2 != 0)
+def decide_odd(request: IntegerValue) -> BooleanResult:
+    return BooleanResult(holds=int(request.value[-1]) % 2 != 0)
 
 
 def decide_square(request: NonnegativeIntegerRequest) -> BooleanResult:

@@ -5,6 +5,9 @@ from fractions import Fraction
 from math import gcd, lcm
 from typing import SupportsIndex
 
+from jacobian.canonical import format_canonical_integer, parse_canonical_integer
+from jacobian.math.arithmetic.values import IntegerValue
+
 __all__ = [
     "absolute_value",
     "integerize_rational_vector",
@@ -16,38 +19,58 @@ __all__ = [
 ]
 
 
-def absolute_value(value: SupportsIndex) -> int:
-    """Return the exact absolute value of an integer-like value."""
+def _as_python_integer(value: SupportsIndex | IntegerValue) -> int:
+    """Return one admitted integer input as its Python integer value."""
 
-    return abs(value.__index__())
+    if isinstance(value, IntegerValue):
+        return parse_canonical_integer(value.value)
+    return value.__index__()
 
 
-def sign(value: SupportsIndex) -> int:
+def absolute_value(value: SupportsIndex | IntegerValue) -> IntegerValue:
+    """Return the canonical shared integer value of the exact absolute value."""
+
+    return IntegerValue(value=format_canonical_integer(abs(_as_python_integer(value))))
+
+
+def sign(value: SupportsIndex | IntegerValue) -> int:
     """Return -1, 0, or 1 according to the sign of an integer."""
 
-    integer = value.__index__()
+    integer = _as_python_integer(value)
     return (integer > 0) - (integer < 0)
 
 
-def reciprocal(value: Fraction | int) -> Fraction:
+def _as_rational(value: Fraction | int | IntegerValue) -> Fraction:
+    """Return one admitted rational input as its exact Python fraction."""
+
+    if isinstance(value, IntegerValue):
+        return Fraction(parse_canonical_integer(value.value))
+    return Fraction(value)
+
+
+def reciprocal(value: Fraction | int | IntegerValue) -> Fraction:
     """Return the exact reciprocal, rejecting zero."""
 
-    rational = Fraction(value)
+    rational = _as_rational(value)
     if not rational:
         raise ZeroDivisionError("zero has no reciprocal")
     return 1 / rational
 
 
-def sum_rationals(left: Fraction | int, right: Fraction | int) -> Fraction:
+def sum_rationals(
+    left: Fraction | int | IntegerValue, right: Fraction | int | IntegerValue
+) -> Fraction:
     """Add two exact rational values."""
 
-    return Fraction(left) + Fraction(right)
+    return _as_rational(left) + _as_rational(right)
 
 
-def integerize_rational_vector(values: Iterable[Fraction | int]) -> tuple[int, ...]:
+def integerize_rational_vector(
+    values: Iterable[Fraction | int | IntegerValue],
+) -> tuple[int, ...]:
     """Scale exact rationals to integer coordinates with a shared denominator."""
 
-    rationals = tuple(Fraction(value) for value in values)
+    rationals = tuple(_as_rational(value) for value in values)
     common_denominator = lcm(*(value.denominator for value in rationals))
     return tuple(
         value.numerator * (common_denominator // value.denominator)
@@ -55,7 +78,9 @@ def integerize_rational_vector(values: Iterable[Fraction | int]) -> tuple[int, .
     )
 
 
-def primitive_integer_vector(values: Iterable[Fraction | int]) -> tuple[int, ...]:
+def primitive_integer_vector(
+    values: Iterable[Fraction | int | IntegerValue],
+) -> tuple[int, ...]:
     """Normalize a nonzero rational vector to primitive, positive-leading integers."""
 
     integers = integerize_rational_vector(values)
@@ -70,10 +95,12 @@ def primitive_integer_vector(values: Iterable[Fraction | int]) -> tuple[int, ...
     return primitive
 
 
-def quotient(left: Fraction | int, right: Fraction | int) -> Fraction:
+def quotient(
+    left: Fraction | int | IntegerValue, right: Fraction | int | IntegerValue
+) -> Fraction:
     """Divide two exact rational values."""
 
-    divisor = Fraction(right)
+    divisor = _as_rational(right)
     if not divisor:
         raise ZeroDivisionError("division by zero")
-    return Fraction(left) / divisor
+    return _as_rational(left) / divisor
