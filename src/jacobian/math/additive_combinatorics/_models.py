@@ -11,7 +11,7 @@ from pydantic.json_schema import WithJsonSchema
 from pydantic_core import PydanticCustomError
 
 from jacobian._exact import CanonicalInteger
-from jacobian._models import StrictModel
+from jacobian._models import StrictModel, canonicalize_json_containers
 from jacobian.canonical import format_canonical_integer, parse_canonical_integer
 from jacobian.math.additive_combinatorics import _multiset_sum
 from jacobian.math.additive_combinatorics.operations import (
@@ -632,8 +632,12 @@ class SubsetSumProfileRequest(StrictModel):
         mode, where decoded JSON arrays no longer coerce to the declared
         tuple shapes; normalize the source value list to a tuple on a
         copied path so JSON invocation keeps working while the stored
-        sequence stays canonical.
+        sequence stays canonical. Container canonicalization preserves
+        element count and order, so the raw item-count bound is enforced
+        after it against either accepted container shape.
         """
+
+        value = canonicalize_json_containers(value)
 
         if not isinstance(value, Mapping):
             return value
@@ -642,7 +646,7 @@ class SubsetSumProfileRequest(StrictModel):
         if isinstance(raw_source, Mapping):
             source = dict(raw_source)
             items = source.get("items")
-            if isinstance(items, list):
+            if isinstance(items, (list, tuple)):
                 source["items"] = tuple(items)
                 prepared["source"] = source
                 if len(items) > MAX_SUBSET_SUM_ITEMS:
