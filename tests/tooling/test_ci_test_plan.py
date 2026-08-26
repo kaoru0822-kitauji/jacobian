@@ -40,6 +40,9 @@ def test_model_change_selects_its_math_owner_and_public_contract_evidence() -> N
     assert plan.math_tests == ("tests/math/code_theory",)
     assert plan.run_catalog is True
     assert plan.run_catalog_examples is True
+    assert plan.run_scale is False
+    assert plan.python_lanes == ()
+    assert plan.boundary_lanes == ()
 
 
 def test_canonical_cnf_contract_change_selects_public_contract_evidence() -> None:
@@ -135,6 +138,56 @@ def test_documentation_change_skips_product_evidence() -> None:
     assert plan.run_math is False
     assert plan.run_catalog is False
     assert plan.run_catalog_examples is False
+    assert plan.run_scale is False
+    assert plan.python_lanes == ()
+    assert plan.boundary_lanes == ()
+    assert plan.run_singular is False
+    assert plan.run_wheel is False
+
+
+@pytest.mark.parametrize(
+    ("path", "lanes"),
+    [
+        ("tests/dispatch/test_dispatch.py", ("dispatch",)),
+        ("tests/cli/test_cli.py", ("cli",)),
+        ("tests/tooling/test_make_commands.py", ("tooling",)),
+        ("tests/integration/algebra/test_linear.py", ("integration",)),
+    ],
+)
+def test_boundary_owner_test_change_selects_only_its_python_lane(
+    path: str, lanes: tuple[str, ...]
+) -> None:
+    plan = _plan([path])
+
+    assert plan.run_math is False
+    assert plan.python_lanes == lanes
+    assert plan.boundary_lanes == ()
+
+
+def test_mcp_runtime_change_fails_closed_to_shared_runtime_evidence() -> None:
+    plan = _plan(["src/jacobian/mcp/tools.py"])
+
+    assert plan.boundary_lanes == ("mcp", "process")
+    assert plan.run_wheel is True
+    assert plan.run_math is True
+
+
+def test_process_polynomial_test_selects_process_and_singular() -> None:
+    plan = _plan(["tests/process/polynomials/test_ideals.py"])
+
+    assert plan.boundary_lanes == ("process",)
+    assert plan.run_singular is True
+
+
+def test_shared_test_support_fails_closed_to_every_ordinary_boundary() -> None:
+    plan = _plan(["tests/support/math_values.py"])
+
+    assert plan.run_math is True
+    assert plan.math_tests == ()
+    assert plan.python_lanes == ("cli", "dispatch", "integration", "tooling")
+    assert plan.boundary_lanes == ("mcp", "process")
+    assert plan.run_singular is True
+    assert plan.run_wheel is True
 
 
 def test_merge_group_always_owns_full_math_and_public_contracts() -> None:
@@ -144,6 +197,37 @@ def test_merge_group_always_owns_full_math_and_public_contracts() -> None:
     assert plan.math_tests == ()
     assert plan.run_catalog is True
     assert plan.run_catalog_examples is True
+    assert plan.run_scale is False
+    assert plan.python_lanes == ("dispatch", "cli", "tooling", "integration")
+    assert plan.boundary_lanes == ("process", "mcp")
+    assert plan.run_singular is True
+    assert plan.run_wheel is True
+
+
+def test_merge_group_selects_scale_evidence_for_its_owning_math_domain() -> None:
+    plan = _plan(
+        ["src/jacobian/math/lattice_polytopes/_operations.py"], event="merge_group"
+    )
+
+    assert plan.run_math is True
+    assert plan.math_tests == ()
+    assert plan.run_scale is True
+
+
+def test_main_owns_full_ordinary_suite_and_coverage_without_scale() -> None:
+    plan = _plan(["docs/reference/testing-strategy.md"], event="push")
+
+    assert plan.run_math is True
+    assert plan.run_scale is False
+    assert plan.python_lanes == ("dispatch", "cli", "tooling", "integration")
+    assert plan.boundary_lanes == ("process", "mcp")
+
+
+@pytest.mark.parametrize("event", ["schedule", "workflow_dispatch"])
+def test_schedule_and_manual_runs_include_scale_evidence(event: str) -> None:
+    plan = _plan([], event=event)
+
+    assert plan.run_scale is True
 
 
 def test_rejects_non_normalized_paths() -> None:

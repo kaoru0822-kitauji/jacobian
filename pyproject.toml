@@ -89,6 +89,7 @@ markers = [
     "requires_backend(name): test requires a maintained mathematical backend",
     "property: property-based invariant tests",
     "exhaustive: broad finite reference sweeps run by scheduled validation",
+    "scale: optional near-envelope execution evidence",
 ]
 
 [tool.ruff]

@@ -6,50 +6,63 @@ Tests prove one observable mathematical or transport contract at a time.
 
 ## Routine validation
 
-Run the bounded local handoff before sharing a code change:
+Run the focused local handoff before sharing a code change:
 
 ```sh
 make setup
-make check
+make handoff LANE=math TESTS=tests/math/graphs/test_graph_distance_matrix.py
 ```
 
-`make check` runs Ruff, mypy, and the math, catalog, dispatch, CLI,
-and tooling owners. Add the narrowest named lane when a change crosses its
+`make handoff` runs Ruff, mypy, and one changed test path through its declared
+semantic owner. Add the narrowest named boundary lane when a change crosses its
 real boundary:
 
 | Change | Additional check |
 | --- | --- |
 | MCP tool schema or transport | `make test-mcp` |
-| One mathematical domain | `make test-math TESTS=tests/math/logic/test_tools.py` |
+| One mathematical domain | `make handoff LANE=math TESTS=tests/math/logic/test_tools.py` |
 | Cross-owner behavior | `make test-integration` |
 | Child-process behavior | `make test-process` |
 | Singular ideal backend | `make test-singular` |
 | Documentation | `make docs-linkcheck` |
 
-For the normal edit loop, run one changed test path through its semantic owner
-instead of the broad confidence gate:
-
-```sh
-make test-focused LANE=math TESTS=tests/math/graphs/test_graph_distance_matrix.py
-```
-
-The explicit lane preserves its configured timeout and worker count. Supported
+`make quick LANE=... TESTS=...` is the same focused path without mypy. The
+explicit lane preserves its configured timeout and worker count. Supported
 focused lanes are `math`, `catalog`, `dispatch`, `cli`, `tooling`,
 `integration`, `process`, and `mcp`; Singular retains its dedicated command.
 
-`make check-all` is an intentional broad reproduction. Do not use a full suite
-as a substitute for a focused regression test.
+`make check` is the explicit broad ordinary gate: it runs lint, types, and all
+non-integration owners once, excluding separately marked property, exhaustive,
+and scale evidence. `make check-all` adds the ordinary integration owner.
+`make test-full` is the exceptional complete local reproduction. Do not use a
+broad or full suite as a substitute for a focused regression test.
 
 ## CI lifecycle
 
 Pull requests always run static validation. The checked-in CI planner selects
-the changed `tests/math` owner and, when a public operation, model, admission,
-or canonical contract changes, catalog conformance plus the advertised-example
-integration test. Shared runtime, CI, dependency, and unmapped mathematical
-paths fail closed to the full math suite. Merge-group candidates and `main`
-always run the full non-exhaustive `tests/math` suite. Scheduled validation owns
-exhaustive and repeated property checks. Collection inspection remains a manual
-diagnostic, not a prerequisite for every test lane.
+changed mathematical owners and changed dispatch, CLI, tooling, integration,
+process, MCP, Singular, and installed-wheel boundaries. A public operation,
+model, admission, or canonical contract change also selects catalog conformance
+and the advertised-example integration test. Shared runtime, CI, dependency,
+and unmapped paths fail closed to the complete ordinary suite.
+
+Merge-group candidates run the complete ordinary suite plus optional
+near-envelope scale evidence. `main` runs the landed-tree ordinary suite and
+coverage. Scheduled validation owns exhaustive evidence, repeated property
+checks, optional scale evidence, and randomized order/provider variation.
+Collection inspection remains a manual diagnostic, not a prerequisite for every
+test lane.
+
+Markers are execution tiers, not synonyms for slow tests:
+
+| Marker | Evidence | Owner |
+| --- | --- | --- |
+| `property` | Repeated or generalized invariant checks | Scheduled validation; one run in `make test-full` |
+| `exhaustive` | Broad finite reference sweeps | Scheduled validation; one run in `make test-full` |
+| `scale` | Optional exact near-envelope execution proof | Merge-group and scheduled validation; one run in `make test-full` |
+
+Keep a small ordinary regression for the same public behavior when moving a
+near-envelope case to `scale`.
 
 ## What to test
 

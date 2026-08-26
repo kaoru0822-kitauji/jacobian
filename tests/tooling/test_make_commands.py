@@ -20,7 +20,9 @@ def test_exhaustive_local_reproduction_includes_exhaustive_marker_lane() -> None
     )[1].split("test-stress:", 1)[0]
 
     assert "$(MAKE) test-math" in all_ci
+    assert "$(MAKE) test-property" in all_ci
     assert "$(MAKE) _test-exhaustive" in all_ci
+    assert "$(MAKE) _test-scale" in all_ci
     assert "$(VALIDATION_LOCK) run --target test-full" in all_ci
     assert all_ci.index("$(MAKE) test-math") < all_ci.index("$(MAKE) _test-exhaustive")
 
@@ -51,7 +53,21 @@ def test_lanes_use_their_declared_worker_and_fixture_affinity() -> None:
     assert "pytest -n 4 --dist worksteal" in math
     assert "pytest -n 2 --dist worksteal" in catalog
     assert "pytest -n 2 --dist worksteal" in integration
-    assert '-m "not exhaustive"' in integration
+    assert '-m "$(ORDINARY_MARKER_EXPRESSION)"' in integration
+
+
+def test_semantic_marker_lanes_are_excluded_from_ordinary_math() -> None:
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    math = makefile.split("test-math:", 1)[1].split("test-catalog:", 1)[0]
+    scale = makefile.split("test-scale:", 1)[1].split("test-ordering:", 1)[0]
+
+    assert (
+        "ORDINARY_MARKER_EXPRESSION := not property and not exhaustive and not scale"
+        in makefile
+    )
+    assert '-m "$(ORDINARY_MARKER_EXPRESSION)"' in math
+    assert "-m scale" in scale
+    assert "$(VALIDATION_LOCK) run --target test-scale" in scale
 
 
 def test_paths_file_stays_on_harbor_planning() -> None:

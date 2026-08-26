@@ -16,8 +16,11 @@ if str(ROOT) not in sys.path:
 from tools.makefile_catalog import MakefileCatalogError, discover_makefiles
 
 DEFAULT_DOCUMENTS = (
+    Path("README.md"),
+    Path("README.zh-CN.md"),
     Path("CONTRIBUTING.md"),
     Path("docs/reference/testing-strategy.md"),
+    Path(".github/pull_request_template.md"),
     Path("benchmarks/docs/benchmark-contracts.md"),
     Path("benchmarks/docs/author-harbor-benchmark-task.md"),
     Path("benchmarks/docs/run-agent-evaluations.md"),

@@ -282,6 +282,7 @@ class TestBudgets:
                 )
             )
 
+    @pytest.mark.scale
     def test_lattice_point_cap_enforced(self) -> None:
         # A 2D box just within the per-axis span bound but with more than
         # MAX_LATTICE_POINTS interior points. Use a near-square box.

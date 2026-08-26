@@ -67,6 +67,13 @@ jobs:
       math_tests: ${{ steps.plan.outputs.math_tests }}
       run_catalog: ${{ steps.plan.outputs.run_catalog }}
       run_catalog_examples: ${{ steps.plan.outputs.run_catalog_examples }}
+      run_scale: ${{ steps.plan.outputs.run_scale }}
+      run_python: ${{ steps.plan.outputs.run_python }}
+      python_lanes: ${{ steps.plan.outputs.python_lanes }}
+      run_boundaries: ${{ steps.plan.outputs.run_boundaries }}
+      boundary_lanes: ${{ steps.plan.outputs.boundary_lanes }}
+      run_singular: ${{ steps.plan.outputs.run_singular }}
+      run_wheel: ${{ steps.plan.outputs.run_wheel }}
       plan: ${{ steps.plan.outputs.plan }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -89,7 +96,7 @@ jobs:
             # Preserve evidence by using the planner's full-suite event policy.
             event=workflow_dispatch
           fi
-          if [ "$event" = pull_request ]; then
+          if [ "$event" = pull_request ] || [ "$event" = merge_group ]; then
             git diff --no-ext-diff --no-textconv --name-only "$BASE_SHA...$HEAD_SHA" > changed-paths.txt
           else
             : > changed-paths.txt
@@ -123,6 +130,27 @@ jobs:
           coverage-file: .coverage.python-math
           tests: ${{ needs.plan.outputs.math_tests }}
           collect-coverage: ${{ needs.plan.outputs.pr_lanes != 'true' }}
+
+  scale:
+    name: python (scale)
+    needs: plan
+    if: ${{ needs.plan.outputs.run_scale == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-python-tests
+        with:
+          python-version: "3.12"
+      - uses: ./.github/actions/run-test-lane
+        with:
+          lane: scale
+          junit-artifact: junit-python-scale-3.12
+          coverage-artifact: coverage-data-python-scale
+          coverage-file: .coverage.python-scale
+          collect-coverage: "false"
 
   catalog:
     name: python (catalog)
@@ -170,18 +198,13 @@ jobs:
   python:
     name: python (${{ matrix.lane }})
     needs: plan
+    if: ${{ needs.plan.outputs.run_python == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ matrix.timeout-minutes }}
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - lane: dispatch
-            timeout-minutes: 10
-          - lane: cli
-            timeout-minutes: 10
-          - lane: tooling
-            timeout-minutes: 15
+        lane: ${{ fromJSON(needs.plan.outputs.python_lanes) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -200,12 +223,13 @@ jobs:
   boundaries:
     name: boundaries (${{ matrix.lane }})
     needs: plan
+    if: ${{ needs.plan.outputs.run_boundaries == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        lane: [process, mcp]
+        lane: ${{ fromJSON(needs.plan.outputs.boundary_lanes) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -223,6 +247,8 @@ jobs:
 
   singular:
     name: Singular Runtime
+    needs: plan
+    if: ${{ needs.plan.outputs.run_singular == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     container:
@@ -247,7 +273,8 @@ jobs:
 
   wheel:
     name: wheel (Python ${{ matrix.python-version }})
-    needs: [static]
+    needs: [plan, static]
+    if: ${{ needs.plan.outputs.run_wheel == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
@@ -344,7 +371,7 @@ jobs:
   required:
     name: required
     if: ${{ always() }}
-    needs: [plan, static, math, catalog, catalog_examples, python, boundaries, singular, wheel, coverage]
+    needs: [plan, static, math, scale, catalog, catalog_examples, python, boundaries, singular, wheel, coverage]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -355,8 +382,14 @@ jobs:
           RUN_MATH: ${{ needs.plan.outputs.run_math }}
           RUN_CATALOG: ${{ needs.plan.outputs.run_catalog }}
           RUN_CATALOG_EXAMPLES: ${{ needs.plan.outputs.run_catalog_examples }}
+          RUN_SCALE: ${{ needs.plan.outputs.run_scale }}
+          RUN_PYTHON: ${{ needs.plan.outputs.run_python }}
+          RUN_BOUNDARIES: ${{ needs.plan.outputs.run_boundaries }}
+          RUN_SINGULAR: ${{ needs.plan.outputs.run_singular }}
+          RUN_WHEEL: ${{ needs.plan.outputs.run_wheel }}
           STATIC_RESULT: ${{ needs.static.result }}
           MATH_RESULT: ${{ needs.math.result }}
+          SCALE_RESULT: ${{ needs.scale.result }}
           CATALOG_RESULT: ${{ needs.catalog.result }}
           CATALOG_EXAMPLES_RESULT: ${{ needs.catalog_examples.result }}
           PYTHON_RESULT: ${{ needs.python.result }}
@@ -374,12 +407,13 @@ jobs:
           test "$PLAN_RESULT" = success
           test "$STATIC_RESULT" = success
           selected_result "$RUN_MATH" "$MATH_RESULT"
+          selected_result "$RUN_SCALE" "$SCALE_RESULT"
           selected_result "$RUN_CATALOG" "$CATALOG_RESULT"
           selected_result "$RUN_CATALOG_EXAMPLES" "$CATALOG_EXAMPLES_RESULT"
-          test "$PYTHON_RESULT" = success
-          test "$BOUNDARIES_RESULT" = success
-          test "$SINGULAR_RESULT" = success
-          test "$WHEEL_RESULT" = success
+          selected_result "$RUN_PYTHON" "$PYTHON_RESULT"
+          selected_result "$RUN_BOUNDARIES" "$BOUNDARIES_RESULT"
+          selected_result "$RUN_SINGULAR" "$SINGULAR_RESULT"
+          selected_result "$RUN_WHEEL" "$WHEEL_RESULT"
           if [ "$PR_LANE_SELECTION" = true ]; then
             test "$COVERAGE_RESULT" = skipped
           else

@@ -11,7 +11,7 @@ from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
 
-PLAN_VERSION = 1
+PLAN_VERSION = 2
 SUPPORTED_EVENTS = frozenset(
     {"pull_request", "merge_group", "push", "schedule", "workflow_dispatch"}
 )
@@ -46,6 +46,9 @@ _PUBLIC_MATH_FILES = frozenset(
         "values.py",
     }
 )
+_PYTHON_LANES = ("dispatch", "cli", "tooling", "integration")
+_BOUNDARY_LANES = ("process", "mcp")
+_SCALE_MATH_OWNERS = frozenset({"lattice_polytopes"})
 
 
 @dataclass(frozen=True)
@@ -59,6 +62,11 @@ class TestPlan:
     math_tests: tuple[str, ...]
     run_catalog: bool
     run_catalog_examples: bool
+    run_scale: bool
+    python_lanes: tuple[str, ...]
+    boundary_lanes: tuple[str, ...]
+    run_singular: bool
+    run_wheel: bool
     reasons: tuple[str, ...]
 
     def as_json(self) -> str:
@@ -70,6 +78,11 @@ class PathDecision:
     math_tests: tuple[str, ...] = ()
     run_catalog: bool = False
     run_catalog_examples: bool = False
+    run_scale: bool = False
+    python_lanes: tuple[str, ...] = ()
+    boundary_lanes: tuple[str, ...] = ()
+    run_singular: bool = False
+    run_wheel: bool = False
     full_math_reason: str | None = None
 
 
@@ -121,46 +134,102 @@ def _is_public_math_path(path: str) -> bool:
     return filename in _PUBLIC_MATH_FILES or filename.endswith("_operations.py")
 
 
-def _classify_path(path: str, repository: Path) -> PathDecision:
-    if _is_shared(path):
-        return PathDecision(
-            run_catalog=True,
-            run_catalog_examples=True,
-            full_math_reason=f"shared CI or runtime path changed: {path}",
-        )
+def _complete_decision(reason: str) -> PathDecision:
+    return PathDecision(
+        run_catalog=True,
+        run_catalog_examples=True,
+        run_scale=True,
+        python_lanes=_PYTHON_LANES,
+        boundary_lanes=_BOUNDARY_LANES,
+        run_singular=True,
+        run_wheel=True,
+        full_math_reason=reason,
+    )
+
+
+def _classify_math_path(path: str, repository: Path) -> PathDecision:
     if path.startswith("src/jacobian/math/"):
         parts = PurePosixPath(path).parts
         owner = parts[3] if len(parts) > 3 else ""
         selected = _math_owner_tests(owner, repository) if owner else None
         if selected is None:
-            return PathDecision(
-                run_catalog=True,
-                run_catalog_examples=True,
-                full_math_reason=f"math owner has no explicit test root: {path}",
-            )
+            return _complete_decision(f"math owner has no explicit test root: {path}")
         public_contract = _is_public_math_path(path)
         return PathDecision(
             math_tests=selected,
             run_catalog=public_contract,
             run_catalog_examples=public_contract,
+            run_scale=owner in _SCALE_MATH_OWNERS,
         )
+    return PathDecision()
+
+
+def _classify_test_path(path: str) -> PathDecision | None:
     if path.startswith("tests/math/"):
         selected = _math_test_change(path)
         if selected is None:
             return PathDecision(
                 full_math_reason=f"shared mathematical test support changed: {path}"
             )
-        return PathDecision(math_tests=selected)
+        return PathDecision(
+            math_tests=selected,
+            run_scale="tests/math/lattice_polytopes/" in path,
+        )
     if path.startswith("tests/catalog/"):
         return PathDecision(run_catalog=True)
     if path.startswith("tests/integration/catalog/"):
         return PathDecision(run_catalog_examples=True)
-    if path.startswith("src/jacobian/"):
+    if path.startswith("tests/integration/"):
+        return PathDecision(python_lanes=("integration",))
+    if path.startswith("tests/dispatch/"):
+        return PathDecision(python_lanes=("dispatch",))
+    if path.startswith("tests/cli/"):
+        return PathDecision(python_lanes=("cli",))
+    if path.startswith("tests/tooling/"):
+        return PathDecision(python_lanes=("tooling",))
+    if path.startswith("tests/process/"):
+        return PathDecision(
+            boundary_lanes=("process",),
+            run_singular="/polynomials/" in path,
+        )
+    if path.startswith("tests/mcp/"):
+        return PathDecision(boundary_lanes=("mcp",))
+    if path.startswith(("tests/support/", "tests/fixtures/")):
+        return _complete_decision(f"shared test support changed: {path}")
+    return None
+
+
+def _classify_runtime_path(path: str) -> PathDecision | None:
+    if path == "src/jacobian/dispatch.py":
         return PathDecision(
             run_catalog=True,
             run_catalog_examples=True,
-            full_math_reason=f"unmapped Jacobian runtime path changed: {path}",
+            python_lanes=("dispatch",),
+            boundary_lanes=("mcp",),
         )
+    if path == "src/jacobian/cli.py":
+        return PathDecision(python_lanes=("cli",), run_wheel=True)
+    if path == "src/jacobian/process.py":
+        return PathDecision(boundary_lanes=("process",), run_singular=True)
+    if path.startswith("src/jacobian/mcp/"):
+        return PathDecision(boundary_lanes=("mcp",), run_wheel=True)
+    if path.startswith("src/jacobian/"):
+        return _complete_decision(f"unmapped Jacobian runtime path changed: {path}")
+    return None
+
+
+def _classify_path(path: str, repository: Path) -> PathDecision:
+    if _is_shared(path):
+        return _complete_decision(f"shared CI or runtime path changed: {path}")
+    math_decision = _classify_math_path(path, repository)
+    if math_decision != PathDecision():
+        return math_decision
+    test_decision = _classify_test_path(path)
+    if test_decision is not None:
+        return test_decision
+    runtime_decision = _classify_runtime_path(path)
+    if runtime_decision is not None:
+        return runtime_decision
     return PathDecision()
 
 
@@ -174,6 +243,10 @@ def _pull_request_plan(
     math_tests: set[str] = set()
     run_catalog = False
     run_catalog_examples = False
+    python_lanes: set[str] = set()
+    boundary_lanes: set[str] = set()
+    run_singular = False
+    run_wheel = False
     full_math_reason: str | None = None
     reasons: list[str] = []
 
@@ -182,6 +255,10 @@ def _pull_request_plan(
         math_tests.update(decision.math_tests)
         run_catalog = run_catalog or decision.run_catalog
         run_catalog_examples = run_catalog_examples or decision.run_catalog_examples
+        python_lanes.update(decision.python_lanes)
+        boundary_lanes.update(decision.boundary_lanes)
+        run_singular = run_singular or decision.run_singular
+        run_wheel = run_wheel or decision.run_wheel
         if decision.full_math_reason:
             full_math_reason = decision.full_math_reason
             break
@@ -202,6 +279,16 @@ def _pull_request_plan(
             reasons.append(
                 "catalog invocation examples cover the changed public contract"
             )
+        if python_lanes:
+            reasons.append("selected owner lanes: " + ", ".join(sorted(python_lanes)))
+        if boundary_lanes:
+            reasons.append(
+                "selected boundary lanes: " + ", ".join(sorted(boundary_lanes))
+            )
+        if run_singular:
+            reasons.append("pinned Singular boundary changed")
+        if run_wheel:
+            reasons.append("installed-wheel boundary changed")
         if not reasons:
             reasons.append("no mathematical or public-contract path changed")
     return TestPlan(
@@ -214,8 +301,17 @@ def _pull_request_plan(
         math_tests=tuple(sorted(math_tests)),
         run_catalog=run_catalog,
         run_catalog_examples=run_catalog_examples,
+        run_scale=False,
+        python_lanes=tuple(sorted(python_lanes)),
+        boundary_lanes=tuple(sorted(boundary_lanes)),
+        run_singular=run_singular,
+        run_wheel=run_wheel,
         reasons=tuple(reasons),
     )
+
+
+def _select_scale_evidence(paths: tuple[str, ...], repository: Path) -> bool:
+    return any(_classify_path(path, repository).run_scale for path in paths)
 
 
 def build_plan(
@@ -233,6 +329,9 @@ def build_plan(
 
     paths = _normalize_paths(changed_paths)
     if event != "pull_request":
+        run_scale = event in {"schedule", "workflow_dispatch"} or (
+            event == "merge_group" and _select_scale_evidence(paths, repository)
+        )
         return TestPlan(
             version=PLAN_VERSION,
             event=event,
@@ -243,8 +342,14 @@ def build_plan(
             math_tests=(),
             run_catalog=True,
             run_catalog_examples=True,
+            run_scale=run_scale,
+            python_lanes=_PYTHON_LANES,
+            boundary_lanes=_BOUNDARY_LANES,
+            run_singular=True,
+            run_wheel=True,
             reasons=(
-                f"{event} owns the complete mathematical and public-contract suite",
+                f"{event} owns the complete ordinary suite"
+                + (" and optional scale evidence" if run_scale else ""),
             ),
         )
 
@@ -263,6 +368,13 @@ def _write_github_output(plan: TestPlan, output: Path) -> None:
         "math_tests": " ".join(plan.math_tests),
         "run_catalog": str(plan.run_catalog).lower(),
         "run_catalog_examples": str(plan.run_catalog_examples).lower(),
+        "run_scale": str(plan.run_scale).lower(),
+        "run_python": str(bool(plan.python_lanes)).lower(),
+        "python_lanes": json.dumps(plan.python_lanes),
+        "run_boundaries": str(bool(plan.boundary_lanes)).lower(),
+        "boundary_lanes": json.dumps(plan.boundary_lanes),
+        "run_singular": str(plan.run_singular).lower(),
+        "run_wheel": str(plan.run_wheel).lower(),
     }
     with output.open("a", encoding="utf-8") as stream:
         for name, value in values.items():

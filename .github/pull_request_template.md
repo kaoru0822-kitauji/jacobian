@@ -11,7 +11,7 @@ Contributor quick path:
 
 ```sh
 make setup
-make check
+make handoff LANE=math TESTS=tests/math/graphs/test_graph_distance_matrix.py
 ```
 
 If this change crosses a named boundary, add the explicitly relevant specialist
@@ -73,7 +73,7 @@ admitted operation with no residual surface. -->
 | <!-- e.g. graphicality with obstruction --> | <!-- delivered / deferred / rejected --> | <!-- operation ID or child issue --> |
 
 ## Checklist
-- [ ] `make check` passes
+- [ ] `make handoff LANE=... TESTS=...` passes
 - [ ] Explicitly relevant specialist validation is listed above (boundary, backend, Harbor/Oracle)
 - [ ] Harbor task or verifier changes ran `make harbor-prepare-task` then `make harbor-validate-task` (if applicable)
 - [ ] Catalog changes include an owner-local catalog-admission decision (if applicable)

@@ -433,6 +433,7 @@ def test_value_models_reject_ambiguous_and_invalid_carriers() -> None:
     )
 
 
+@pytest.mark.property
 def test_random_block_languages_match_bounded_extension_oracle() -> None:
     random_source = random.Random(1968)
     alphabet = ("0", "1")

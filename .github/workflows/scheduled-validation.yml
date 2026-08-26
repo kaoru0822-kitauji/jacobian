@@ -30,6 +30,9 @@ jobs:
       - run: make test-exhaustive
         env:
           PYTEST_ARGS: --durations=20
+      - run: make test-scale
+        env:
+          PYTEST_ARGS: --durations=20
 
   ordering:
     name: Ordering ${{ matrix.lane }} seed ${{ matrix.seed }}

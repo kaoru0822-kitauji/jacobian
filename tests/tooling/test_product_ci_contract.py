@@ -44,7 +44,8 @@ def test_process_lane_is_invoked_by_ci() -> None:
         encoding="utf-8"
     )
 
-    assert "lane: [process, mcp]" in workflow
+    assert "fromJSON(needs.plan.outputs.boundary_lanes)" in workflow
+    assert "needs.plan.outputs.run_boundaries == 'true'" in workflow
     assert "uses: ./.github/actions/run-test-lane" in workflow
     assert 'make test-${{ inputs.lane }} TESTS="$TESTS"' in action
 
@@ -59,10 +60,10 @@ def test_singular_backend_has_a_pinned_required_ci_lane() -> None:
     assert 'system("version")' in singular
     assert "make test-singular" in singular
     assert (
-        "needs: [plan, static, math, catalog, catalog_examples, python, boundaries, singular, wheel, coverage]"
+        "needs: [plan, static, math, scale, catalog, catalog_examples, python, boundaries, singular, wheel, coverage]"
         in required
     )
-    assert 'test "$SINGULAR_RESULT" = success' in required
+    assert 'selected_result "$RUN_SINGULAR" "$SINGULAR_RESULT"' in required
 
 
 def test_python_and_boundary_lanes_share_evidence_collection() -> None:
@@ -71,7 +72,7 @@ def test_python_and_boundary_lanes_share_evidence_collection() -> None:
         encoding="utf-8"
     )
 
-    assert workflow.count("uses: ./.github/actions/run-test-lane") == 5
+    assert workflow.count("uses: ./.github/actions/run-test-lane") == 6
     assert "--junitxml=pytest.xml" in action
     assert "pytest_args+=(--cov --cov-report= --cov-fail-under=0)" in action
     assert "inputs.collect-coverage == 'true'" in action
@@ -95,10 +96,11 @@ def test_python_jobs_select_math_and_public_contract_evidence_from_the_plan() ->
     assert "name: python (math)" in workflow
     assert "name: python (catalog)" in workflow
     assert "name: python (catalog examples)" in workflow
+    assert "name: python (scale)" in workflow
     assert "tests: ${{ needs.plan.outputs.math_tests }}" in workflow
     assert "tests: tests/integration/catalog/" in workflow
-    for lane in ("dispatch", "cli", "tooling"):
-        assert f"lane: {lane}" in workflow
+    assert "fromJSON(needs.plan.outputs.python_lanes)" in workflow
+    assert "needs.plan.outputs.run_python == 'true'" in workflow
     assert "lane: e2e" not in workflow
     assert "lane: provider" not in workflow
     assert "uses: ./.github/actions/run-test-lane" in workflow
@@ -106,7 +108,8 @@ def test_python_jobs_select_math_and_public_contract_evidence_from_the_plan() ->
         "ORDINARY_TEST_LANES := math catalog dispatch cli tooling integration"
         in makefile
     )
-    assert "quick: lint test-fast" in makefile
+    assert "handoff: lint typecheck test-focused" in makefile
+    assert "quick: lint test-focused" in makefile
     assert "check: lint typecheck test-fast" in makefile
     assert "check-all: lint typecheck test-ordinary" in makefile
 
@@ -119,6 +122,8 @@ def test_product_ci_uses_a_versioned_checked_in_test_plan() -> None:
     assert '--base "$BASE_SHA"' in workflow
     assert '--head "$HEAD_SHA"' in workflow
     assert "event=workflow_dispatch" in workflow
+    assert "run_scale: ${{ steps.plan.outputs.run_scale }}" in workflow
+    assert "python_lanes: ${{ steps.plan.outputs.python_lanes }}" in workflow
     assert (ROOT / "tools" / "ci_test_plan.py").exists()
 
 
@@ -181,5 +186,7 @@ def test_required_accepts_only_explicitly_skipped_pr_evidence() -> None:
 
     assert "selected_result" in required
     assert "true:success|false:skipped" in required
+    assert 'selected_result "$RUN_SCALE" "$SCALE_RESULT"' in required
+    assert 'selected_result "$RUN_WHEEL" "$WHEEL_RESULT"' in required
     assert 'test "$COVERAGE_RESULT" = skipped' in required
     assert 'test "$COVERAGE_RESULT" = success' in required

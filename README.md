@@ -95,6 +95,19 @@ An ordinary operation returns mathematics first. For example,
 determinant directly. Callers compose results by passing their typed values to a
 subsequent operation.
 
+For a local terminal workflow, inspect the exact installed contract and run one
+of its examples with the CLI:
+
+```sh
+jacobian inspect integer.compute.extended_gcd
+jacobian run integer.compute.extended_gcd --json '{"left":"84","right":"30"}'
+```
+
+The second command returns the gcd and Bézout coefficients as JSON. In an MCP
+host, use `math.find` to inspect the same contract and `math.run` with the same
+payload shape. See [Discover and invoke operations](docs/how-to/invoke-domain-operations.md)
+for that agent workflow.
+
 ## Available mathematics
 
 The built-in portfolio covers work in:
@@ -140,8 +153,7 @@ Jacobian uses Python 3.12, `uv`, and a small `Makefile`:
 
 ```sh
 make setup
-make test-math
-make check
+make handoff LANE=math TESTS=tests/math/graphs/test_graph_distance_matrix.py
 ```
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before changing code. It documents

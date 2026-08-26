@@ -7,6 +7,7 @@ EVAL_ARGS ?=
 STRESS_COUNT ?= 3
 ORDERING_DEFAULT_SEED := --randomly-seed=17
 PYTEST_DIAGNOSTIC_ARGS ?= --durations=10
+ORDINARY_MARKER_EXPRESSION := not property and not exhaustive and not scale
 RUFF_PATHS := src tests benchmarks
 PYTEST_RUNNER := $(UV_RUN) python tools/pytest_lifecycle.py
 VALIDATION_LOCK := $(UV_RUN) python tools/with_validation_lock.py
@@ -14,7 +15,7 @@ VALIDATION_LOCK := $(UV_RUN) python tools/with_validation_lock.py
 # them independently; `make check-all` reproduces them locally in this order.
 ORDINARY_TEST_LANES := math catalog dispatch cli tooling integration
 FOCUSED_TEST_LANES := $(ORDINARY_TEST_LANES) process mcp
-PUBLIC_COMMANDS := setup test-focused quick check check-all fix
+PUBLIC_COMMANDS := setup test-focused handoff quick check check-all fix
 
 include make/development.mk
 include make/harbor.mk
@@ -31,9 +32,9 @@ help: ## Show the primary developer workflow.
 help-all: ## Show every low-level and lifecycle developer command.
 	@awk 'BEGIN {FS = ":.*## "; printf "All Jacobian developer commands:\n\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-26s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-test-math: ## Domain-owned mathematical behavior (4 workers, 120s).
+test-math: ## Ordinary domain-owned mathematical behavior (4 workers, 120s).
 	$(UV_RUN) pytest -n 4 --dist worksteal --timeout=120 \
-		-m "not exhaustive" $(if $(TESTS),$(TESTS),tests/math) \
+		-m "$(ORDINARY_MARKER_EXPRESSION)" $(if $(TESTS),$(TESTS),tests/math) \
 		$(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 test-catalog: ## Immutable catalog and discovery behavior (2 workers, 30s).
@@ -56,8 +57,8 @@ test-tooling: ## Repository tooling and static contracts (2 workers, 30s).
 		$(if $(TESTS),$(TESTS),tests/tooling) \
 		$(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
-test-integration: ## Cross-owner mathematical seams (2 workers, 120s).
-	$(UV_RUN) pytest -n 2 --dist worksteal --timeout=120 -m "not exhaustive" \
+test-integration: ## Ordinary cross-owner mathematical seams (2 workers, 120s).
+	$(UV_RUN) pytest -n 2 --dist worksteal --timeout=120 -m "$(ORDINARY_MARKER_EXPRESSION)" \
 		$(if $(TESTS),$(TESTS),tests/integration) \
 		$(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
@@ -68,10 +69,10 @@ test-focused: ## Run TESTS through its explicit semantic LANE (for example, LANE
 		echo "LANE must be one of: $(FOCUSED_TEST_LANES)" >&2; exit 2;; esac
 	$(MAKE) test-$(LANE) TESTS="$(TESTS)" PYTEST_ARGS="$(PYTEST_ARGS)"
 
-test-fast: ## Owner tests except cross-owner integration.
+test-fast: ## Broad ordinary owner tests except cross-owner integration.
 	# Full catalog construction imports every maintained math backend; keep
 	# the fast lane within hosted-runner memory instead of crashing workers.
-	$(UV_RUN) pytest -n 2 --dist worksteal --timeout=120 -m "not exhaustive" \
+	$(UV_RUN) pytest -n 2 --dist worksteal --timeout=120 -m "$(ORDINARY_MARKER_EXPRESSION)" \
 		$(if $(TESTS),$(TESTS),tests/math tests/catalog tests/dispatch tests/cli tests/tooling) \
 		$(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
@@ -114,7 +115,9 @@ test-full: ## Every local semantic pytest lane; not hosted CI, coverage, or docs
 
 _test-full:
 	$(MAKE) test-math
+	$(MAKE) test-property
 	$(MAKE) _test-exhaustive
+	$(MAKE) _test-scale
 	$(MAKE) test-catalog
 	$(MAKE) test-dispatch
 	$(MAKE) test-cli
@@ -124,9 +127,20 @@ _test-full:
 	$(MAKE) test-mcp
 	$(MAKE) test-singular
 
-test-stress: ## Repeat explicitly marked property tests on the scheduled lane.
+test-property: ## Run explicitly marked invariant checks once.
 	$(UV_RUN) pytest -n 0 --timeout=120 --timeout-method=thread -m property \
-		--count=$(STRESS_COUNT) $(if $(TESTS),$(TESTS),tests) \
+		$(if $(TESTS),$(TESTS),tests) \
+		$(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
+
+test-stress: ## Repeat explicitly marked property tests on the scheduled lane.
+	$(MAKE) test-property PYTEST_ARGS="--count=$(STRESS_COUNT) $(PYTEST_ARGS)"
+
+test-scale: ## Run optional near-envelope mathematical execution evidence.
+	$(VALIDATION_LOCK) run --target test-scale -- $(MAKE) _test-scale
+
+_test-scale:
+	$(UV_RUN) pytest -n 0 --timeout=180 --timeout-method=thread -m scale \
+		$(if $(TESTS),$(TESTS),tests) \
 		$(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 test-exhaustive: ## Broad finite reference sweeps reserved for scheduled validation.
@@ -166,13 +180,15 @@ build: ## Build Python source and wheel distributions.
 	uv build
 	$(UV_RUN) python tools/check_wheel_contents.py
 
-quick: lint test-fast ## Cheap iteration: lint and owner tests.
+handoff: lint typecheck test-focused ## Focused contributor handoff: lint, types, and one declared owner path.
 
-check: lint typecheck test-fast ## Routine local handoff: lint, types, and owner tests.
+quick: lint test-focused ## Focused edit loop: lint and one declared owner path.
+
+check: lint typecheck test-fast ## Broad ordinary gate: lint, types, and all non-integration owner tests.
 
 check-all: lint typecheck test-ordinary ## Reproduce the ordinary Python CI lanes locally.
 
-precommit: ## Apply safe fixes, then run lint, types, and unit tests (mutates the tree).
+precommit: ## Apply safe fixes, then run the broad ordinary gate (mutates the tree).
 	$(MAKE) fix
 	$(MAKE) check
 

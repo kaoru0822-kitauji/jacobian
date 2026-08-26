@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from tools.check_doc_commands import validate_documents
+from tools.check_doc_commands import DEFAULT_DOCUMENTS, validate_documents
 from tools.makefile_catalog import MakefileCatalogError, discover_makefiles
 
 
@@ -34,6 +34,13 @@ make unit TESTS=tests/math/test_example.py
     )
 
     assert validate_documents(root, (document,)) == []
+
+
+def test_repository_document_command_examples_stay_valid() -> None:
+    assert Path("README.md") in DEFAULT_DOCUMENTS
+    assert Path("README.zh-CN.md") in DEFAULT_DOCUMENTS
+    assert Path(".github/pull_request_template.md") in DEFAULT_DOCUMENTS
+    assert validate_documents() == []
 
 
 def test_validates_targets_and_required_variables_from_literal_includes(

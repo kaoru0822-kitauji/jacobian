@@ -63,6 +63,17 @@ Python 发行包里包含了数学内核、CLI 和 MCP 服务器。npm 包本身
 
 普通操作直接返回数学结果。例如，`matrix.determinant.compute` 接收一个精确的有理数矩阵，直接返回它的行列式。你可以把类型化的结果传给下一个操作，串起来完成更复杂的计算。
 
+在本地终端中，先查看已安装操作的精确契约，再运行其中一个示例：
+
+```sh
+jacobian inspect integer.compute.extended_gcd
+jacobian run integer.compute.extended_gcd --json '{"left":"84","right":"30"}'
+```
+
+第二条命令会以 JSON 返回最大公约数和 Bézout 系数。在 MCP 主机中，用
+`math.find` 查看同一份契约，再用相同形状的 payload 调用 `math.run`。具体的
+智能体调用流程见[发现和调用操作](docs/how-to/invoke-domain-operations.md)。
+
 ## 可用的数学能力
 
 内置能力覆盖：
@@ -96,8 +107,7 @@ Jacobian 使用 Python 3.12、`uv` 和精简的 `Makefile`：
 
 ```sh
 make setup
-make test-math
-make check
+make handoff LANE=math TESTS=tests/math/graphs/test_graph_distance_matrix.py
 ```
 
 改代码前请先读 [CONTRIBUTING.md](CONTRIBUTING.md)，里面有聚焦的测试命令、校验规则、文档组织和 PR 要求。
