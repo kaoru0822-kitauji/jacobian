@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from contextlib import contextmanager
 from types import SimpleNamespace
 
@@ -30,6 +31,7 @@ from jacobian.math.logic._operations import (
     solve_smt,
 )
 from jacobian.math.logic._tools import TOOLS
+from jacobian.math.logic._unsat_core import SmtUnsatCoreRequest
 
 
 @contextmanager
@@ -669,18 +671,21 @@ def test_smt_request_rejects_an_indexed_bit_vector_value_beyond_the_digit_budget
         )
 
 
-def test_smt_request_admits_an_indexed_bit_vector_at_the_digit_boundary() -> None:
-    request = SmtSolveRequest(
-        logic=SmtLogic.QF_LIA,
-        smtlib=(
-            "(set-logic QF_LIA)\n"
-            "(declare-const x Int)\n"
-            f"(assert (= x (_ bv{'9' * 4_096} 8)))\n"
-            "(check-sat)\n"
-        ),
-    )
+def test_smt_request_rejects_an_ill_sorted_indexed_bit_vector_equality() -> None:
+    """Lexical digit admission cannot override backend well-sortedness."""
 
-    assert operations._smtlib_structure(request.smtlib).numeral_digits == 4_096
+    with pytest.raises(ValidationError) as error:
+        SmtSolveRequest(
+            logic=SmtLogic.QF_LIA,
+            smtlib=(
+                "(set-logic QF_LIA)\n"
+                "(declare-const x Int)\n"
+                f"(assert (= x (_ bv{'9' * 4_096} 8)))\n"
+                "(check-sat)\n"
+            ),
+        )
+
+    assert error.value.errors(include_url=False)[0]["type"] == "logic.smtlib_grammar"
 
 
 def test_smt_request_admits_a_bv_named_symbol_outside_index_context_and_solves() -> (
@@ -1021,6 +1026,235 @@ def test_solver_wraps_unrecognized_z3_exceptions_without_typed_exhaustion(
         assert (
             "the Z3 backend failed during the bounded solve: backend exploded"
             in result.detail
+        )
+
+
+@pytest.mark.parametrize(
+    ("operation", "accepted_request"),
+    (
+        (
+            solve_sat,
+            SatSolveRequest(
+                cnf=CanonicalCnf(variables=("x",), clauses=((1,),)),
+            ),
+        ),
+        (
+            solve_smt,
+            SmtSolveRequest(
+                logic=SmtLogic.QF_LIA,
+                smtlib=(
+                    "(set-logic QF_LIA)\n"
+                    "(declare-const x Int)\n"
+                    "(assert (> x 0))\n"
+                    "(check-sat)"
+                ),
+            ),
+        ),
+    ),
+)
+def test_z3_initialization_failure_is_a_typed_unknown(
+    operation,
+    accepted_request,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A failed Z3 module initialization cannot escape an accepted request."""
+
+    monkeypatch.setitem(sys.modules, "z3", None)
+
+    result = operation(accepted_request)
+
+    assert result.outcome == "UNKNOWN"
+    assert result.exhausted is None
+    assert result.detail is not None
+    assert "could not initialize" in result.detail
+    assert type(result).model_validate(result.model_dump()) == result
+
+
+def test_smt_request_admission_skips_grammar_rejection_without_the_backend(
+    monkeypatch,
+) -> None:
+    """Backend absence at admission stays the typed execution init outcome."""
+
+    monkeypatch.setitem(sys.modules, "z3", None)
+    admitted = SmtSolveRequest(
+        logic=SmtLogic.QF_LIA,
+        smtlib="(set-logic QF_LIA)\n(declare-const x Int)\n(assert (> x 0))\n(check-sat)",
+    )
+
+    result = solve_smt(admitted)
+
+    assert result.outcome == "UNKNOWN"
+    assert result.exhausted is None
+    assert result.detail is not None
+    assert "could not initialize" in result.detail
+
+
+def test_smt_request_rejects_malformed_source_as_a_request_error(monkeypatch) -> None:
+    """Malformed SMT-LIB stays caller-correctable instead of solver indeterminacy."""
+
+    import z3
+
+    def refuse_solver(_logic: object) -> object:
+        raise AssertionError("a malformed request reached solver construction")
+
+    monkeypatch.setattr(z3, "SolverFor", refuse_solver)
+    with pytest.raises(ValidationError) as error:
+        SmtSolveRequest(
+            logic=SmtLogic.QF_LIA,
+            smtlib=(
+                "(set-logic QF_LIA)\n"
+                "(declare-const x Int)\n"
+                "(assert (> y 0))\n"
+                "(check-sat)"
+            ),
+        )
+
+    assert error.value.errors(include_url=False)[0]["type"] == "logic.smtlib_grammar"
+
+
+@pytest.mark.parametrize(
+    "identifier",
+    ("memory", "timeout", "canceled", "|resource limit|"),
+)
+def test_smt_request_rejects_undeclared_identifiers_named_after_resource_keywords(
+    identifier: str,
+) -> None:
+    """A located diagnostic quoting a caller symbol is never budget exhaustion.
+
+    Z3 reports an undeclared identifier as
+    ``(error "line L column C: unknown constant <identifier>")``; when the
+    caller-controlled spelling contains a resource keyword, that text must
+    still be a caller-correctable grammar rejection rather than an admitted
+    request whose execution reports an exhausted budget.
+    """
+
+    with pytest.raises(ValidationError) as error:
+        SmtSolveRequest(
+            logic=SmtLogic.QF_LIA,
+            smtlib=(
+                "(set-logic QF_LIA)\n"
+                "(declare-const x Int)\n"
+                f"(assert (> {identifier} 0))\n"
+                "(check-sat)"
+            ),
+        )
+
+    assert error.value.errors(include_url=False)[0]["type"] == "logic.smtlib_grammar"
+
+
+def test_smt_solver_types_parse_stage_backend_failures_as_unknown(monkeypatch) -> None:
+    """A backend parser failure on an admitted source is execution UNKNOWN."""
+
+    import z3
+
+    def exhausting_parser(_source: str) -> object:
+        raise z3.Z3Exception("parser ran out of memory")
+
+    admitted = SmtSolveRequest(
+        logic=SmtLogic.QF_LIA,
+        smtlib="(set-logic QF_LIA)\n(declare-const x Int)\n(assert (> x 0))\n(check-sat)",
+    )
+    monkeypatch.setattr(z3, "parse_smt2_string", exhausting_parser)
+    result = solve_smt(admitted)
+
+    assert result.outcome == "UNKNOWN"
+    assert result.exhausted == "memory"
+    assert result.detail == operations._EXHAUSTION_DETAILS["memory"]
+
+
+def test_smt_solver_never_classifies_located_source_text_as_exhaustion(
+    monkeypatch,
+) -> None:
+    """Located diagnostic text quotes the caller's source, not a budget.
+
+    A located ``(error "line ... column ...: ...")`` diagnostic embeds
+    caller-controlled spellings, so its resource keywords cannot establish an
+    exhausted budget; execution reports it as a generic backend failure.
+    """
+
+    import z3
+
+    def diagnosing_parser(_source: str) -> object:
+        raise z3.Z3Exception(b'(error "line 1 column 0: out of memory")')
+
+    admitted = SmtSolveRequest(
+        logic=SmtLogic.QF_LIA,
+        smtlib="(set-logic QF_LIA)\n(declare-const x Int)\n(assert (> x 0))\n(check-sat)",
+    )
+    monkeypatch.setattr(z3, "parse_smt2_string", diagnosing_parser)
+
+    result = solve_smt(admitted)
+
+    assert result.outcome == "UNKNOWN"
+    assert result.exhausted is None
+    assert result.detail is not None and "bounded solve" in result.detail
+
+
+def test_smt_request_admission_rejects_located_parser_diagnostics(monkeypatch) -> None:
+    """A located Z3 parser diagnostic stays a caller-correctable rejection."""
+
+    import z3
+
+    def diagnosing_parser(_source: str) -> object:
+        raise z3.Z3Exception(b'(error "line 2 column 11: unknown constant y")\n')
+
+    monkeypatch.setattr(z3, "parse_smt2_string", diagnosing_parser)
+    with pytest.raises(ValidationError) as error:
+        SmtSolveRequest(
+            logic=SmtLogic.QF_LIA,
+            smtlib=(
+                "(set-logic QF_LIA)\n"
+                "(declare-const x Int)\n"
+                "(assert (> y 0))\n"
+                "(check-sat)"
+            ),
+        )
+
+    assert error.value.errors(include_url=False)[0]["type"] == "logic.smtlib_grammar"
+
+
+def test_smt_request_admission_defers_parse_stage_os_errors(monkeypatch) -> None:
+    """A parse-stage native backend failure stays off the caller's hands.
+
+    ``math.run`` validates the request before calling the solver, so admission
+    must not let a native ``OSError`` from ``parse_smt2_string`` escape as a
+    host exception; it carries no evidence about the source and defers to
+    execution, which reports it through the typed UNKNOWN translation.
+    """
+
+    import z3
+
+    def failing_parser(_source: str) -> object:
+        raise OSError("native parser backend unavailable")
+
+    source = "(set-logic QF_LIA)\n(declare-const x Int)\n(assert (> x 0))\n(check-sat)"
+    monkeypatch.setattr(z3, "parse_smt2_string", failing_parser)
+    admitted = SmtSolveRequest(logic=SmtLogic.QF_LIA, smtlib=source)
+    result = solve_smt(admitted)
+
+    assert result.outcome == "UNKNOWN"
+
+
+@pytest.mark.parametrize(
+    "request_type",
+    sorted(
+        {SmtSolveRequest, SmtUnsatCoreRequest, *SmtSolveRequest.__subclasses__()},
+        key=lambda request_type: request_type.__name__,
+    ),
+    ids=lambda request_type: request_type.__name__,
+)
+def test_every_concrete_smt_request_rejects_malformed_grammar(request_type) -> None:
+    """No SMT request subclass may leave malformed grammar to execution."""
+
+    with pytest.raises(ValidationError):
+        request_type(
+            logic=SmtLogic.QF_LIA,
+            smtlib=(
+                "(set-logic QF_LIA)\n"
+                "(declare-const x Int)\n"
+                "(assert (> y 0))\n"
+                "(check-sat)"
+            ),
         )
 
 
