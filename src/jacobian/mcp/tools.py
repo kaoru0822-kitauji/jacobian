@@ -11,7 +11,12 @@ from mcp.shared.exceptions import MCPError
 from mcp.types import INVALID_PARAMS
 
 from jacobian.catalog.models import OperationId, OperationResult
-from jacobian.dispatch import OperationRequestValidationError, invoke_operation
+from jacobian.dispatch import (
+    OperationRequestValidationError,
+    _invoke_prepared_operation,
+    _prepare_operation,
+    _PreparedOperation,
+)
 from jacobian.mcp.models import (
     OperationBrowseRequest,
     OperationFindRequest,
@@ -37,6 +42,7 @@ _MAX_VALIDATION_ERRORS = 64
 _MAX_VALIDATION_LOCATION_COMPONENTS = 32
 _MAX_VALIDATION_LOCATION_LENGTH = 128
 _MAX_VALIDATION_ISSUES_BYTES = 48 * 1_024
+_EXECUTION_LOCK_POLL_SECONDS = 0.05
 
 
 class _CancellationSignal(Protocol):
@@ -101,16 +107,13 @@ def math_run(
     if catalog.operation(operation_id) is None:
         raise ToolError(f"unknown operation: {operation_id}")
     try:
+        prepared = _prepare_operation(operation_id, payload, catalog)
         # MCP runs synchronous tools in a worker thread.  Its request event
         # is polled by the shared external-process runner, which kills and
         # reaps only an operation's owned child tree.
         # Maintained mathematical backends may retain process-global state
         # that cannot safely execute on concurrent MCP worker threads.
-        with (
-            bounded_process_cancellation(_request_cancellation(ctx)),
-            _state(ctx).execution_lock,
-        ):
-            return invoke_operation(operation_id, payload, catalog)
+        return _run_prepared_operation(prepared, ctx)
     except OperationRequestValidationError as exc:
         errors = _bounded_validation_issues(exc.errors())
         data = OperationInvalidRequestData(
@@ -130,6 +133,27 @@ def _request_cancellation(ctx: Context[AppState, Any]) -> _CancellationSignal:
     """Return MCP 2.1's request signal through its only available SDK seam."""
 
     return ctx.request_context.session._request_outbound.cancel_requested
+
+
+def _run_prepared_operation(
+    prepared: _PreparedOperation,
+    ctx: Context[AppState, Any],
+) -> OperationResult:
+    """Wait cooperatively, then run one admitted operation under the server gate."""
+
+    cancellation = _request_cancellation(ctx)
+    execution_lock = _state(ctx).execution_lock
+    while not cancellation.is_set():
+        if not execution_lock.acquire(timeout=_EXECUTION_LOCK_POLL_SECONDS):
+            continue
+        try:
+            if cancellation.is_set():
+                break
+            with bounded_process_cancellation(cancellation):
+                return _invoke_prepared_operation(prepared)
+        finally:
+            execution_lock.release()
+    raise ToolError("operation cancelled before execution")
 
 
 def _bounded_validation_issues(

@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
+from jacobian._models import StrictModel
 from jacobian.canonical import CanonicalizationError, encode_strict_json
 from jacobian.catalog.catalog import Catalog
 from jacobian.catalog.models import OperationId, OperationResult
@@ -40,6 +42,15 @@ class OperationRequestValidationError(ValueError):
         ]
 
 
+@dataclass(frozen=True, slots=True)
+class _PreparedOperation:
+    """One request parsed against its selected immutable operation binding."""
+
+    operation_id: OperationId
+    run: Callable[[StrictModel], StrictModel]
+    request: StrictModel
+
+
 def parse_operation_input[ModelT: BaseModel](
     model: type[ModelT], payload: dict[str, Any]
 ) -> ModelT:
@@ -57,6 +68,19 @@ def invoke_operation(
     """Select, parse, call, and project one typed mathematical operation."""
 
     started = time.monotonic()
+    return _invoke_prepared_operation(
+        _prepare_operation(operation_id, payload, catalog),
+        started=started,
+    )
+
+
+def _prepare_operation(
+    operation_id: OperationId,
+    payload: dict[str, Any],
+    catalog: Catalog,
+) -> _PreparedOperation:
+    """Select and parse one request before its kernel execution is scheduled."""
+
     binding = catalog._binding(operation_id)
     if binding is None:
         raise ValueError(f"unknown operation: {operation_id}")
@@ -64,10 +88,26 @@ def invoke_operation(
         parsed = parse_operation_input(binding.request_type, payload)
     except (CanonicalizationError, ValidationError) as exc:
         raise OperationRequestValidationError(exc) from exc
-    result = binding.run(parsed)
+    return _PreparedOperation(
+        operation_id=operation_id,
+        run=binding.run,
+        request=parsed,
+    )
+
+
+def _invoke_prepared_operation(
+    prepared: _PreparedOperation,
+    *,
+    started: float | None = None,
+) -> OperationResult:
+    """Run one already-admitted request and project its typed result."""
+
+    if started is None:
+        started = time.monotonic()
+    result = prepared.run(prepared.request)
 
     return OperationResult(
-        operation_id=operation_id,
+        operation_id=prepared.operation_id,
         runtime_ms=max(0, round((time.monotonic() - started) * 1000)),
         output=result.model_dump(mode="json"),
     )
