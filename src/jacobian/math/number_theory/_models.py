@@ -2,7 +2,7 @@
 
 These contracts cover gcd/lcm, Bezout coefficients, divisors, prime
 factorization, p-adic valuation, multiplicative arithmetic functions,
-primality, friable counting, modular arithmetic, and integer predicates (coprimality,
+friable counting, modular arithmetic, and integer predicates (coprimality,
 divisibility, perfect/abundant/deficient, square, squarefree).  They are
 owned by the number-theory domain and intentionally exclude arithmetic-owned
 operations (absolute value, sign, decimal digit sum/count, base expansion,
@@ -11,10 +11,9 @@ integer nth root).
 
 from __future__ import annotations
 
-import math
 from typing import Annotated, Literal, Self
 
-from pydantic import Field, StrictBool, StrictInt, StringConstraints, model_validator
+from pydantic import Field, StrictInt, StringConstraints, model_validator
 from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
@@ -31,10 +30,6 @@ def _validation_error(reason: str, message: str) -> PydanticCustomError:
 # ---------------------------------------------------------------------------
 
 _MAX_INTEGER_LENGTH = 256
-MAX_POWERFUL_INTEGER_DIGITS = 25
-MAX_POWERFUL_CUTOFF = 100_000
-MAX_POWERFUL_FACTOR_ENTRIES = 42
-MAX_POWERFUL_EXPONENT = 83
 # Certified factoring uses SymPy's ``factorint`` (Pollard rho, Pollard p-1,
 # ECM) on the input and recursively on ``p - 1`` for Pratt certificates.
 # The 30-digit bound (~100 bits) is a real work bound: it keeps worst-case
@@ -49,15 +44,8 @@ _MAX_CERTIFIED_FACTORIZATION_LENGTH = 30
 # (totient, Möbius, divisor sigma, square-free predicates, and
 # multiplicative order).  The 10_000 bound keeps SymPy factoring safe for
 # in-process execution while admitting materially larger useful cases than
-# the prior 1_000 cap.  Primorial has its own request bound derived from
-# the declared result digit budget (see ``_MAX_PRIMORIAL_N``).
+# the prior 1_000 cap.
 _MAX_N_SMALL = 10_000
-# primorial(n) carries n(ln n + ln ln n)/ln 10 digits.  The declared
-# result budget is ``_MAX_PRIMORIAL_DIGITS`` (3_400), and primorial(1001)
-# already has 3397 digits while primorial(1002) has 3401, so the exact
-# admitted boundary is n <= 1001.  Defined here so ``PrimorialRequest``
-# can derive its own request-side guard from the output contract.
-_MAX_PRIMORIAL_N = 1001
 # ``_MAX_MODULUS`` is shared across modular inverse, multiplicative order,
 # quadratic residues, CRT, Jacobi symbol, and brute-force discrete log.
 # Raised to 1_000_000 for non-enumeration ops (inverse, order, CRT, Jacobi
@@ -75,42 +63,11 @@ _MAX_CRT_SIZE = 64
 # is the smallest excluded combined modulus (positive values only).
 _MAX_CRT_COMBINED_MODULUS = 10**_MAX_INTEGER_LENGTH
 
-# Friable counting has two exact, result-sensitive execution regimes. The
-# materialized regime uses one bytearray for primality and one for friability;
-# its work bound covers both the operation and result-validation replay. The
-# generated regime enumerates prime-exponent prefixes only when a conservative
-# prefix-box bound covers both passes.
-MAX_FRIABLE_MATERIALIZED_X = 1_000_000
-MAX_FRIABLE_GENERATED_CUTOFF = 10_000
-_MAX_FRIABLE_MATERIALIZED_TOTAL_STEPS = 82_000_000
-_MAX_FRIABLE_MATERIALIZED_BYTES = 3_000_000
-_MAX_FRIABLE_GENERATED_TOTAL_NODES = 1_000_000
-# Sources are nonnegative and rejected at ``10**_MAX_FRIABLE_SOURCE_DIGITS`` or
-# above, so every admitted value carries at most this many decimal digits.
-_MAX_FRIABLE_SOURCE_DIGITS = 256
-_MAX_FRIABLE_SOURCE_ABS = 10**_MAX_FRIABLE_SOURCE_DIGITS
-
 BoundedInteger = Annotated[
     str,
     StringConstraints(
         pattern=r"^-?(?:0|[1-9][0-9]*)$",
         max_length=_MAX_INTEGER_LENGTH,
-        strict=True,
-    ),
-]
-
-
-class PrimalityRequest(StrictModel):
-    """One bounded canonical integer for the maintained primality backend."""
-
-    value: BoundedInteger
-
-
-PowerfulInteger = Annotated[
-    str,
-    StringConstraints(
-        pattern=r"^[1-9][0-9]*$",
-        max_length=MAX_POWERFUL_INTEGER_DIGITS,
         strict=True,
     ),
 ]
@@ -123,93 +80,15 @@ CertifiedFactorizationInteger = Annotated[
     ),
 ]
 
-type _FriableRegime = Literal["DIRECT", "MATERIALIZED", "GENERATED"]
+# ---------------------------------------------------------------------------
+# Request models — canonical integers (arbitrary precision, bounded string)
+# ---------------------------------------------------------------------------
 
 
-def _primes_through(limit: int) -> tuple[int, ...]:
-    """Return the primes at most a small admitted cutoff."""
+class IntegerValueRequest(StrictModel):
+    """One canonical integer supplied to a unary number-theory operation."""
 
-    if limit < 2:
-        return ()
-    sieve = bytearray(b"\x01") * (limit + 1)
-    sieve[0:2] = b"\x00\x00"
-    for candidate in range(2, math.isqrt(limit) + 1):
-        if not sieve[candidate]:
-            continue
-        first_composite = candidate * candidate
-        composite_count = (limit - first_composite) // candidate + 1
-        sieve[first_composite : limit + 1 : candidate] = b"\x00" * composite_count
-    return tuple(index for index, is_prime in enumerate(sieve) if is_prime)
-
-
-def _maximum_exponent(x: int, prime: int) -> int:
-    """Return the largest ``exponent`` with ``prime**exponent <= x``."""
-
-    exponent = 0
-    remaining = x
-    while remaining >= prime:
-        remaining //= prime
-        exponent += 1
-    return exponent
-
-
-def _plan_friable_count(x: int, y: int) -> tuple[_FriableRegime, tuple[int, ...]]:
-    """Validate and select one exact friable-count execution regime."""
-
-    if x < 0 or y < 0:
-        raise _validation_error(
-            "friable_count_sources_must_be_nonnegative",
-            "friable-count sources must be nonnegative",
-        )
-    if x >= _MAX_FRIABLE_SOURCE_ABS or y >= _MAX_FRIABLE_SOURCE_ABS:
-        raise _validation_error(
-            f"friable_count_sources_must_have_at_most_{_MAX_FRIABLE_SOURCE_DIGITS}_decimal_digits",
-            f"friable-count sources must have at most {_MAX_FRIABLE_SOURCE_DIGITS} decimal digits",
-        )
-    if x == 0 or y <= 1 or y >= x:
-        return "DIRECT", ()
-
-    # Each materialized pass marks at most two harmonic series of multiples,
-    # plus one scan. Result validation replays the full exact computation.
-    per_pass_steps = x * (2 * x.bit_length() + 1)
-    materialized_bytes = 2 * (x + 1) + x // 2
-    if (
-        x <= MAX_FRIABLE_MATERIALIZED_X
-        and 2 * per_pass_steps <= _MAX_FRIABLE_MATERIALIZED_TOTAL_STEPS
-        and materialized_bytes <= _MAX_FRIABLE_MATERIALIZED_BYTES
-    ):
-        return "MATERIALIZED", ()
-
-    if y > MAX_FRIABLE_GENERATED_CUTOFF:
-        raise _validation_error(
-            "generated_friable_counting_exceeds_the_admitted_prime_cutoff",
-            "generated friable counting exceeds the admitted prime cutoff",
-        )
-
-    primes = _primes_through(y)
-    nodes_per_pass = 1
-    prefix_box = 1
-    for prime in primes:
-        prefix_box *= _maximum_exponent(x, prime) + 1
-        nodes_per_pass += prefix_box
-        if 2 * nodes_per_pass > _MAX_FRIABLE_GENERATED_TOTAL_NODES:
-            raise _validation_error(
-                "generated_friable_counting_exceeds_the_search_node_budget",
-                "generated friable counting exceeds the search-node budget",
-            )
-    return "GENERATED", primes
-
-
-class PowerfulNumberRequest(StrictModel):
-    """One positive canonical integer of at most 25 digits."""
-
-    value: PowerfulInteger = Field(
-        description=(
-            "Positive canonical decimal integer with at most 25 digits. The "
-            "kernel derives B=ceil(value^(1/5)), so B <= 100000."
-        ),
-        examples=["12168"],
-    )
+    value: BoundedInteger
 
 
 class ArithmeticFunctionRequest(StrictModel):
@@ -233,25 +112,6 @@ class PositiveIntegerRequest(StrictModel):
     """One bounded positive integer (1 <= n <= 10 000)."""
 
     n: StrictInt = Field(ge=1, le=_MAX_N_SMALL)
-
-
-class PrimorialRequest(StrictModel):
-    """One bounded positive integer whose primorial fits the result contract.
-
-    ``primorial(n)`` grows like ``exp(n log n)``: the product of the first
-    ``n`` primes carries ``n(log n + log log n) / ln 10`` digits.  The
-    shared arithmetic-function bound admits values whose primorial would
-    exceed the declared ``_MAX_PRIMORIAL_DIGITS``-digit result, so this
-    request derives its own conservative ceiling from the digit bound.
-    """
-
-    n: StrictInt = Field(ge=1, le=_MAX_PRIMORIAL_N)
-
-
-class PreviousPrimeRequest(StrictModel):
-    """One bounded integer n >= 3 for previous-prime queries."""
-
-    n: StrictInt = Field(ge=3, le=_MAX_N_SMALL)
 
 
 class FloorSquareRootRequest(StrictModel):
@@ -299,63 +159,6 @@ class FactorialValuationResult(StrictModel):
     n: StrictInt = Field(ge=0, le=100_000)
     base: StrictInt = Field(ge=2, le=1_000_000)
     valuation: StrictInt = Field(ge=0)
-
-
-class FriableCountRequest(StrictModel):
-    """One exact bounded count of positive ``y``-friable integers through ``x``."""
-
-    x: BoundedInteger = Field(
-        description=(
-            "Canonical nonnegative inclusive source bound. Easy boundary cases may "
-            "use up to 256 decimal digits; other cases must fit an exact counting "
-            "regime selected from the source-sensitive work bounds."
-        ),
-        examples=["100"],
-    )
-    y: BoundedInteger = Field(
-        description=(
-            "Canonical nonnegative inclusive prime-factor cutoff. Values zero and "
-            "one use the convention that only 1 is friable when x is positive."
-        ),
-        examples=["5"],
-    )
-
-    @model_validator(mode="after")
-    def require_admitted_exact_count(self) -> Self:
-        from jacobian.canonical import parse_canonical_integer
-
-        _plan_friable_count(
-            parse_canonical_integer(self.x),
-            parse_canonical_integer(self.y),
-        )
-        return self
-
-
-class FriableCountResult(StrictModel):
-    """An exact friable count bound to its complete source pair."""
-
-    x: BoundedInteger
-    y: BoundedInteger
-    count: BoundedInteger
-
-    @model_validator(mode="after")
-    def bind_exact_count_to_sources(self) -> Self:
-        from jacobian.canonical import parse_canonical_integer
-        from jacobian.math.number_theory._friable_operations import count_friable
-
-        x = parse_canonical_integer(self.x)
-        y = parse_canonical_integer(self.y)
-        count = parse_canonical_integer(self.count)
-        if count < 0:
-            raise _validation_error(
-                "friable_count_must_be_nonnegative", "friable count must be nonnegative"
-            )
-        if count != count_friable(x, y):
-            raise _validation_error(
-                "friable_count_does_not_match_the_retained_sources",
-                "friable count does not match the retained sources",
-            )
-        return self
 
 
 # ---------------------------------------------------------------------------
@@ -481,21 +284,15 @@ class DiscreteLogarithmRequest(StrictModel):
         return self
 
 
-_MAX_PRIMORIAL_DIGITS = 3_400
-PrimorialInteger = Annotated[
-    str,
-    StringConstraints(
-        pattern=r"^(?:0|[1-9][0-9]*)$",
-        max_length=_MAX_PRIMORIAL_DIGITS,
-        strict=True,
-    ),
-]
+# ---------------------------------------------------------------------------
+# Result models
+# ---------------------------------------------------------------------------
 
 
-class PrimorialResult(StrictModel):
-    """The primorial (product of the first n primes)."""
+class IntegerValueResult(StrictModel):
+    """One exact integer value produced by a number-theory operation."""
 
-    value: PrimorialInteger
+    value: BoundedInteger
 
 
 class PrimePower(StrictModel):
@@ -503,83 +300,6 @@ class PrimePower(StrictModel):
 
     prime: BoundedInteger
     power: int = Field(ge=1, le=_MAX_N_SMALL)
-
-
-class ResidualPerfectPower(StrictModel):
-    """An exact decomposition of the stripped residual as base**exponent."""
-
-    base: PowerfulInteger
-    exponent: StrictInt = Field(ge=2, le=MAX_POWERFUL_EXPONENT)
-
-
-class PowerfulNumberResult(StrictModel):
-    """A source-bound, replayable exact powerful-number decision."""
-
-    value: PowerfulInteger
-    conclusion: Literal[
-        "POWERFUL",
-        "EXPONENT_ONE",
-        "ROUGH_NOT_PERFECT_POWER",
-    ]
-    is_powerful: StrictBool
-    cutoff: StrictInt = Field(
-        ge=1,
-        le=MAX_POWERFUL_CUTOFF,
-        description="The canonical cutoff B=ceil(value^(1/5)); B^5 >= value.",
-    )
-    checked_through: StrictInt = Field(
-        ge=1,
-        le=MAX_POWERFUL_CUTOFF,
-        description=(
-            "All primes at most this bound were tested. It equals cutoff unless "
-            "an exponent-one prime ended the decision early."
-        ),
-    )
-    stripped_factors: tuple[PrimePower, ...] = Field(
-        min_length=0,
-        max_length=MAX_POWERFUL_FACTOR_ENTRIES,
-    )
-    residual: PowerfulInteger = Field(
-        description=(
-            "The positive cofactor after the reported prime powers are removed."
-        )
-    )
-    residual_perfect_power: ResidualPerfectPower | None = None
-
-    @model_validator(mode="after")
-    def bind_decision_to_source_by_exact_replay(self) -> Self:
-        from jacobian.canonical import parse_canonical_integer
-        from jacobian.math.number_theory._powerful_kernels import (
-            decide_powerful_data,
-        )
-
-        expected = decide_powerful_data(parse_canonical_integer(self.value))
-        factors = tuple(
-            (parse_canonical_integer(factor.prime), factor.power)
-            for factor in self.stripped_factors
-        )
-        perfect_power = (
-            None
-            if self.residual_perfect_power is None
-            else (
-                parse_canonical_integer(self.residual_perfect_power.base),
-                self.residual_perfect_power.exponent,
-            )
-        )
-        if (
-            self.conclusion != expected.conclusion
-            or self.is_powerful != (expected.conclusion == "POWERFUL")
-            or self.cutoff != expected.cutoff
-            or self.checked_through != expected.checked_through
-            or factors != expected.stripped_factors
-            or parse_canonical_integer(self.residual) != expected.residual
-            or perfect_power != expected.perfect_power
-        ):
-            raise _validation_error(
-                "powerful_number_conclusion_or_certificate_does_not_match_exact_replay",
-                "powerful-number conclusion or certificate does not match exact replay",
-            )
-        return self
 
 
 class BooleanResult(StrictModel):
