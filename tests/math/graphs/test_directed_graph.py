@@ -2,15 +2,21 @@
 
 from __future__ import annotations
 
+from itertools import combinations, islice
+
 import networkx as nx
 import pytest
 from pydantic import ValidationError
 
 from jacobian.math.graphs.directed._models import (
+    MAX_DIRECTED_GRAPH_PARSE_EDGES,
+    MAX_DIRECTED_OPERATION_EDGES,
+    MAX_DIRECTED_OPERATION_VERTICES,
     AcyclicOrderRequest,
     AcyclicOrderResult,
     CondensationRequest,
     CondensationResult,
+    DirectedGraph,
     ReachabilityRequest,
     ReachabilityResult,
     StronglyConnectedComponentsRequest,
@@ -46,6 +52,12 @@ def _condensation(graph: dict) -> CondensationResult:
 
 def _acyclic_order(graph: dict) -> AcyclicOrderResult:
     return compute_acyclic_order(AcyclicOrderRequest.model_validate({"graph": graph}))
+
+
+def _directed_pairs(edge_count: int) -> list[list[int]]:
+    """Distinct loop-free directed pairs over 33 vertices: C(33, 2) = 528."""
+
+    return [list(pair) for pair in islice(combinations(range(33), 2), edge_count)]
 
 
 # ---------------------------------------------------------------------------
@@ -142,10 +154,17 @@ class TestReachabilityContract:
             )
 
     def test_rejects_vertex_count_above_the_conservative_fallback(self) -> None:
+        graph = DirectedGraph(vertex_count=257, edges=())
+        assert graph.vertex_count == 257
+
         with pytest.raises(ValidationError):
-            ReachabilityRequest.model_validate(
-                {"graph": {"vertex_count": 257, "edges": []}, "source": 0}
-            )
+            ReachabilityRequest(graph=graph, source=0)
+        with pytest.raises(ValidationError):
+            StronglyConnectedComponentsRequest(graph=graph)
+        with pytest.raises(ValidationError):
+            CondensationRequest(graph=graph)
+        with pytest.raises(ValidationError):
+            AcyclicOrderRequest(graph=graph)
 
 
 # ---------------------------------------------------------------------------
@@ -289,6 +308,198 @@ class TestAcyclicOrder:
         result = _acyclic_order({"vertex_count": 2, "edges": [[0, 1]]})
         assert result.acyclic
         assert result.order == (0, 1)
+
+
+# ---------------------------------------------------------------------------
+# Published direct-operation envelope
+# ---------------------------------------------------------------------------
+
+
+DIRECT_OPERATION_REQUESTS = (
+    ReachabilityRequest,
+    StronglyConnectedComponentsRequest,
+    CondensationRequest,
+    AcyclicOrderRequest,
+)
+
+
+class TestDirectOperationEnvelope:
+    """Published schemas advertise exactly the direct-operation admission."""
+
+    def test_published_schemas_advertise_the_operation_envelope(self) -> None:
+        for request_type in DIRECT_OPERATION_REQUESTS:
+            graph_schema = request_type.model_json_schema()["properties"]["graph"]
+            assert (
+                graph_schema["properties"]["vertex_count"]["maximum"]
+                == MAX_DIRECTED_OPERATION_VERTICES
+            )
+            assert (
+                graph_schema["properties"]["edges"]["maxItems"]
+                == MAX_DIRECTED_OPERATION_EDGES
+            )
+            assert str(MAX_DIRECTED_OPERATION_VERTICES) in graph_schema["description"]
+            assert str(MAX_DIRECTED_OPERATION_EDGES) in graph_schema["description"]
+
+    def test_shared_carrier_schema_stays_free_of_the_operation_caps(self) -> None:
+        """The reusable carrier keeps its structural schema without this cap."""
+
+        carrier_properties = DirectedGraph.model_json_schema()["properties"]
+        assert "maximum" not in carrier_properties["vertex_count"]
+        assert "maxItems" not in carrier_properties["edges"]
+
+    def test_envelope_boundary_is_admitted_by_every_direct_request(self) -> None:
+        edgeless = {
+            "graph": {"vertex_count": MAX_DIRECTED_OPERATION_VERTICES, "edges": []}
+        }
+        ReachabilityRequest.model_validate({**edgeless, "source": 0})
+        StronglyConnectedComponentsRequest.model_validate(edgeless)
+        CondensationRequest.model_validate(edgeless)
+        AcyclicOrderRequest.model_validate(edgeless)
+
+        full_envelope = {
+            "graph": {
+                "vertex_count": MAX_DIRECTED_OPERATION_VERTICES,
+                "edges": _directed_pairs(MAX_DIRECTED_OPERATION_EDGES),
+            }
+        }
+        assert len(full_envelope["graph"]["edges"]) == MAX_DIRECTED_OPERATION_EDGES
+        ReachabilityRequest.model_validate({**full_envelope, "source": 0})
+        StronglyConnectedComponentsRequest.model_validate(full_envelope)
+        CondensationRequest.model_validate(full_envelope)
+        AcyclicOrderRequest.model_validate(full_envelope)
+
+    def test_requests_beyond_the_envelope_are_rejected_at_runtime(self) -> None:
+        beyond_envelope = [
+            {
+                "graph": {
+                    "vertex_count": MAX_DIRECTED_OPERATION_VERTICES + 1,
+                    "edges": [],
+                }
+            },
+            {
+                "graph": {
+                    "vertex_count": MAX_DIRECTED_OPERATION_VERTICES,
+                    "edges": _directed_pairs(MAX_DIRECTED_OPERATION_EDGES + 1),
+                }
+            },
+        ]
+        for request in beyond_envelope:
+            with pytest.raises(ValidationError):
+                ReachabilityRequest.model_validate({**request, "source": 0})
+            with pytest.raises(ValidationError):
+                StronglyConnectedComponentsRequest.model_validate(request)
+            with pytest.raises(ValidationError):
+                CondensationRequest.model_validate(request)
+            with pytest.raises(ValidationError):
+                AcyclicOrderRequest.model_validate(request)
+
+    def test_reachability_source_schema_matches_the_vertex_envelope(self) -> None:
+        """The published source field keeps the operation-wide vertex maximum."""
+
+        source_schema = ReachabilityRequest.model_json_schema()["properties"]["source"]
+        assert source_schema["maximum"] == MAX_DIRECTED_OPERATION_VERTICES - 1
+        assert "exclusiveMaximum" not in source_schema
+
+        full_graph = {
+            "graph": {
+                "vertex_count": MAX_DIRECTED_OPERATION_VERTICES,
+                "edges": [],
+            }
+        }
+        request = {**full_graph, "source": MAX_DIRECTED_OPERATION_VERTICES - 1}
+        accepted = ReachabilityRequest.model_validate(request)
+        assert accepted.source == MAX_DIRECTED_OPERATION_VERTICES - 1
+
+        beyond = {**full_graph, "source": MAX_DIRECTED_OPERATION_VERTICES}
+        with pytest.raises(ValidationError):
+            ReachabilityRequest.model_validate(beyond)
+
+    def test_cross_field_source_check_still_binds_below_the_field_maximum(self) -> None:
+        """source < vertex_count stays enforced inside the advertised range."""
+
+        small_graph = {"graph": {"vertex_count": 4, "edges": []}}
+        with pytest.raises(ValidationError):
+            ReachabilityRequest.model_validate({**small_graph, "source": 4})
+        with pytest.raises(ValidationError):
+            ReachabilityRequest.model_validate({**small_graph, "source": 255})
+
+
+class TestCarrierParseEnvelope:
+    """The carrier rejects oversized edge lists before structural scanning.
+
+    A near-10 MiB payload of distinct valid arcs must fail on the carrier's
+    parse-safety envelope instead of paying the full duplicate-detecting
+    scan, and the envelope must stay far above every consumer's admission.
+    """
+
+    def test_oversized_valid_arcs_reject_before_deep_validation(self) -> None:
+        arc_count = 250_000
+        edges = [[index, index + 1] for index in range(arc_count)]
+        edges.append([0, 1])
+        edges.append([1, 1])
+
+        with pytest.raises(ValidationError) as excinfo:
+            DirectedGraph.model_validate(
+                {"vertex_count": arc_count + 2, "edges": edges}
+            )
+
+        message = str(excinfo.value)
+        assert "parse-safety envelope" in message
+        assert "unique" not in message
+        assert "self-loops" not in message
+
+    def test_oversized_rejection_precedes_nested_row_materialization(self) -> None:
+        """The envelope fires on the raw sequence before any row is coerced.
+
+        Every oversized row is deliberately not even an edge tuple, so an
+        after-validator placement would fail with coercion errors instead of
+        the parse-safety envelope.
+        """
+        edges = ["not-an-edge"] * (MAX_DIRECTED_GRAPH_PARSE_EDGES + 1)
+
+        with pytest.raises(ValidationError) as excinfo:
+            DirectedGraph.model_validate({"vertex_count": 2, "edges": edges})
+
+        message = str(excinfo.value)
+        assert "parse-safety envelope" in message
+        assert excinfo.value.errors(include_url=False)[0]["type"] == (
+            "graph.edge_list_parse_envelope_exceeded"
+        )
+        assert len(excinfo.value.errors(include_url=False)) == 1
+
+    def test_oversized_rejection_covers_every_request_consumer(self) -> None:
+        edges = [
+            [index % 97, (index + 1) % 97]
+            for index in range(MAX_DIRECTED_GRAPH_PARSE_EDGES + 1)
+        ]
+        for request_type in DIRECT_OPERATION_REQUESTS:
+            payload: dict = {"graph": {"vertex_count": 97, "edges": edges}}
+            if request_type is ReachabilityRequest:
+                payload["source"] = 0
+            with pytest.raises(ValidationError) as excinfo:
+                request_type.model_validate(payload)
+            assert "parse-safety envelope" in str(excinfo.value)
+
+    def test_envelope_boundary_remains_structurally_valid(self) -> None:
+        vertex_count = MAX_DIRECTED_GRAPH_PARSE_EDGES + 1
+        edges = [[index, index + 1] for index in range(MAX_DIRECTED_GRAPH_PARSE_EDGES)]
+        accepted = DirectedGraph.model_validate(
+            {"vertex_count": vertex_count, "edges": edges}
+        )
+        assert len(accepted.edges) == MAX_DIRECTED_GRAPH_PARSE_EDGES
+
+    def test_operation_admission_still_rejects_below_the_parse_envelope(self) -> None:
+        edges = _directed_pairs(MAX_DIRECTED_OPERATION_EDGES + 1)
+        with pytest.raises(ValidationError) as excinfo:
+            StronglyConnectedComponentsRequest.model_validate(
+                {"graph": {"vertex_count": 33, "edges": edges}}
+            )
+        message = str(excinfo.value)
+        assert "directed_edge_budget_exceeded" in message
+        assert "parse-safety envelope" not in message
+
+    def test_envelope_dwarfs_the_direct_operation_admission(self) -> None:
+        assert MAX_DIRECTED_GRAPH_PARSE_EDGES > 64 * MAX_DIRECTED_OPERATION_EDGES
 
 
 # ---------------------------------------------------------------------------

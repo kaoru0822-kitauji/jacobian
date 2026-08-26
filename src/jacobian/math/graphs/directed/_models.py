@@ -2,24 +2,71 @@
 
 from __future__ import annotations
 
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 
-from pydantic import Field, model_validator
+from pydantic import Field, WithJsonSchema, field_validator, model_validator
+from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
+from jacobian.canonical import CanonicalLimits
+
+# These are the execution envelope for the four direct NetworkX operations
+# below.  ``DirectedGraph`` itself remains reusable by consumers whose work is
+# bounded more sharply from their own request data.
+MAX_DIRECTED_OPERATION_VERTICES = 256
+MAX_DIRECTED_OPERATION_EDGES = 512
+
+# Parse-safety envelope for the shared carrier's edge list: a transport guard,
+# not admission.  The minimal canonical JSON encoding of one arc inside
+# ``edges`` is ``[0,0],`` -- five content bytes plus one separator byte --
+# so a maximal 10 MiB request document could still minimally encode roughly
+# 1.75 million arcs.  This envelope deliberately sits far below that: it is
+# one sixty-fourth of ``CanonicalLimits().max_input_bytes`` (163,840 arcs),
+# so even a worst-case admitted list consumes under a tenth of the transport
+# input envelope while remaining 320x the loosest current admission (the
+# direct operations' 512 arcs above; directed bond reliability admits 12).  No schema-admitted request can reach it, and
+# payloads beyond it reject here in O(1) instead of paying the full
+# duplicate-detecting scan first.
+MAX_DIRECTED_GRAPH_PARSE_EDGES = CanonicalLimits().max_input_bytes // 64
 
 
 class DirectedGraph(StrictModel):
-    """A simple directed graph for reachability, SCC, and related analyses.
+    """A structurally valid finite simple directed graph."""
 
-    ``vertex_count`` carries a conservative admission fallback bounding
-    linear-time traversal work and vertex-sized results; consumers with
-    sharper derived budgets refine admission further.
-    """
+    vertex_count: int = Field(ge=2)
+    edges: tuple[tuple[int, int], ...] = Field()
 
-    vertex_count: int = Field(ge=2, le=256)
-    edges: tuple[tuple[int, int], ...] = Field(max_length=512)
+    @field_validator("edges", mode="before")
+    @classmethod
+    def require_edge_parse_envelope(cls, edges: object) -> object:
+        """Bound the raw edge sequence before any nested row is materialized.
+
+        Pydantic coerces and validates each nested tuple only after this
+        before-validator returns, so a payload beyond the parse-safety
+        envelope rejects on its raw sequence length without building the
+        edge tuples or entering structural validation at all. Admitted
+        lists are canonicalized to tuples here because strict JSON parsing
+        treats values returned by a before-validator as runtime data, which
+        no longer coerces lists to tuples (the container-canonicalization
+        rule shared with strict-JSON preflight models).
+        """
+
+        if isinstance(edges, list):
+            if len(edges) > MAX_DIRECTED_GRAPH_PARSE_EDGES:
+                raise PydanticCustomError(
+                    "graph.edge_list_parse_envelope_exceeded",
+                    "directed graph edge list exceeds the "
+                    f"{MAX_DIRECTED_GRAPH_PARSE_EDGES}-edge parse-safety envelope",
+                )
+            return tuple(tuple(row) if isinstance(row, list) else row for row in edges)
+        if isinstance(edges, tuple) and len(edges) > MAX_DIRECTED_GRAPH_PARSE_EDGES:
+            raise PydanticCustomError(
+                "graph.edge_list_parse_envelope_exceeded",
+                "directed graph edge list exceeds the "
+                f"{MAX_DIRECTED_GRAPH_PARSE_EDGES}-edge parse-safety envelope",
+            )
+        return edges
 
     @model_validator(mode="after")
     def require_valid_edges(self) -> Self:
@@ -46,12 +93,53 @@ class DirectedGraph(StrictModel):
         return self
 
 
+def _require_directed_operation_admission(graph: DirectedGraph) -> None:
+    """Bound one direct traversal operation before constructing NetworkX state."""
+
+    if graph.vertex_count > MAX_DIRECTED_OPERATION_VERTICES:
+        raise PydanticCustomError(
+            "graph.directed_vertex_budget_exceeded",
+            "directed graph operation supports at most "
+            f"{MAX_DIRECTED_OPERATION_VERTICES} vertices",
+        )
+    if len(graph.edges) > MAX_DIRECTED_OPERATION_EDGES:
+        raise PydanticCustomError(
+            "graph.directed_edge_budget_exceeded",
+            "directed graph operation supports at most "
+            f"{MAX_DIRECTED_OPERATION_EDGES} edges",
+        )
+
+
+def _directed_operation_graph_schema() -> JsonSchemaValue:
+    """Project the direct-operation envelope onto the shared carrier schema."""
+
+    schema = DirectedGraph.model_json_schema()
+    schema["description"] = (
+        "A structurally valid finite simple directed graph accepted by the "
+        "direct traversal operations: at most "
+        f"{MAX_DIRECTED_OPERATION_VERTICES} vertices and at most "
+        f"{MAX_DIRECTED_OPERATION_EDGES} edges."
+    )
+    schema["properties"]["vertex_count"].update(
+        maximum=MAX_DIRECTED_OPERATION_VERTICES,
+    )
+    schema["properties"]["edges"].update(maxItems=MAX_DIRECTED_OPERATION_EDGES)
+    return schema
+
+
+DirectedOperationGraph = Annotated[
+    DirectedGraph,
+    WithJsonSchema(_directed_operation_graph_schema()),
+]
+
+
 class ReachabilityRequest(StrictModel):
-    graph: DirectedGraph
-    source: int = Field(ge=0, le=255)
+    graph: DirectedOperationGraph
+    source: int = Field(ge=0, le=MAX_DIRECTED_OPERATION_VERTICES - 1)
 
     @model_validator(mode="after")
     def require_valid_source(self) -> Self:
+        _require_directed_operation_admission(self.graph)
         if not (0 <= self.source < self.graph.vertex_count):
             raise PydanticCustomError(
                 "graph.source_must_be_in_0_graph_vertex_count_1",
@@ -68,7 +156,12 @@ class ReachabilityResult(StrictModel):
 
 
 class StronglyConnectedComponentsRequest(StrictModel):
-    graph: DirectedGraph
+    graph: DirectedOperationGraph
+
+    @model_validator(mode="after")
+    def require_operation_admission(self) -> Self:
+        _require_directed_operation_admission(self.graph)
+        return self
 
 
 class StronglyConnectedComponentsResult(StrictModel):
@@ -80,7 +173,12 @@ class StronglyConnectedComponentsResult(StrictModel):
 
 
 class CondensationRequest(StrictModel):
-    graph: DirectedGraph
+    graph: DirectedOperationGraph
+
+    @model_validator(mode="after")
+    def require_operation_admission(self) -> Self:
+        _require_directed_operation_admission(self.graph)
+        return self
 
 
 class CondensationEdge(StrictModel):
@@ -96,7 +194,12 @@ class CondensationResult(StrictModel):
 
 
 class AcyclicOrderRequest(StrictModel):
-    graph: DirectedGraph
+    graph: DirectedOperationGraph
+
+    @model_validator(mode="after")
+    def require_operation_admission(self) -> Self:
+        _require_directed_operation_admission(self.graph)
+        return self
 
 
 class AcyclicOrderResult(StrictModel):
