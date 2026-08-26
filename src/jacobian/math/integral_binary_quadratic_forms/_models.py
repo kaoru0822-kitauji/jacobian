@@ -176,10 +176,25 @@ def _representation_y_bound(
     return isqrt((4 * form.a * target) // (-form.discriminant))
 
 
+def _has_sum_of_two_squares_mod_four_obstruction(
+    form: PrimitivePositiveDefiniteBinaryQuadraticForm, target: int
+) -> bool:
+    """Whether a request has the immediate ``x² + y² ≡ 3 (mod 4)`` obstruction.
+
+    Squares modulo four are zero or one, so the sum-of-two-squares form cannot
+    represent a target congruent to three.  This is a complete empty-result
+    certificate, not a heuristic used to narrow the general y-coordinate scan.
+    """
+
+    return (form.a, form.b, form.c) == (1, 0, 1) and target % 4 == 3
+
+
 def _require_representation_budget(
     form: PrimitivePositiveDefiniteBinaryQuadraticForm, target: int
-) -> int:
-    """Return the complete y-bound after checking the exact scan envelope."""
+) -> int | None:
+    """Return the complete scan bound, or ``None`` for a proved empty result."""
+    if _has_sum_of_two_squares_mod_four_obstruction(form, target):
+        return None
     y_bound = _representation_y_bound(form, target)
     if 2 * y_bound + 1 > MAX_REPRESENTATION_Y_CANDIDATES:
         raise _validation_error(
@@ -215,7 +230,9 @@ class BinaryQuadraticFormRepresentationsRequest(StrictModel):
         le=MAX_REPRESENTATION_TARGET,
         description=(
             "Nonnegative target n. With D=b^2-4ac for form, this request is "
-            "admitted exactly when 2*floor_sqrt(4*a*n/(-D))+1 is at most "
+            "admitted exactly when either (a,b,c)=(1,0,1) and n mod 4 is 3, "
+            "where squares are 0 or 1 modulo 4 so x^2+y^2=n is proved empty "
+            "without any scan, or 2*floor_sqrt(4*a*n/(-D))+1 is at most "
             f"{MAX_REPRESENTATION_Y_CANDIDATES}; that is the complete "
             "y-coordinate scan size."
         ),
