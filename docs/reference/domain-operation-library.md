@@ -360,6 +360,29 @@ it is safe for the algorithm, and test both the rejected adversarial case and a
 useful case near the boundary. Do not use a post-hoc output-term cap,
 truncation, sentinel, or host exception as a hidden computational budget.
 
+### Execution time and deadline composition
+
+Exact mathematical work may legitimately take minutes or longer. Unless an
+explicit service contract requires otherwise, do not use one short wall-clock
+limit for every operation. Derive the admitted work from mathematical and
+representation-specific quantities, then choose a killable wall limit that is
+large enough for useful admitted requests. Wall time is a safety backstop, not
+the proof that the computation is bounded.
+
+One accepted request has one execution envelope. Parsing, normalization,
+presolve, backend calls, exact replay, result validation, serialization, and
+cancellation cleanup consume the same request-scoped deadline and work ledger.
+No phase receives a fresh hidden budget. A caller or MCP read timeout must
+cover the declared operation envelope plus bounded transport overhead; a
+shorter outer timeout may abort the call, but it cannot establish an operation
+result.
+
+When execution does not complete, retain the operation ID and version, exact
+request or canonical digest, declared budgets, elapsed time, typed result or
+outer error, timeout layer, backend status, and repository revision. Retry only
+with an explicitly changed budget, backend, representation, or deterministic
+partition, and retain both attempts.
+
 ### Representation-sensitive expansion
 
 Representation is part of the execution envelope, even when two encodings

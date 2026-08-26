@@ -118,6 +118,14 @@ cases; they must not stand in for mathematical correctness. A timeout,
 cancellation, unavailable external executable, or solver `UNKNOWN` is never a
 positive mathematical conclusion.
 
+Boundary rejection tests do not replace a realistic admitted workload. For a
+new or repaired operation, run at least one motivating interior request through
+the final public boundary and assert its typed mathematical result. When the
+operation has multiple mandatory phases, test that they share one deadline and
+work ledger rather than receiving independent wall budgets. Test caller-side
+timeouts separately in the MCP lane; their only conclusion is that transport
+aborted the request.
+
 Examples prove that a documented path works; they do not establish an
 algebraic claim. Select evidence by the claim being made:
 

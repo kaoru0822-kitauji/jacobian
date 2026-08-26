@@ -141,14 +141,18 @@ domains when necessary, and narrow the domain or change the typed result when
 the claim cannot be established. Add known-answer, boundary, adversarial, and
 defining-invariant tests.
 
-Bounded does not mean small or constant-time. Exact exhaustive enumeration is
-appropriate when admission can determine the finite candidate space, bound
-per-candidate intermediate growth, and bound the worst-case exact result before
-execution. Prefer operation-specific mathematical quantities such as candidate
-tuples, search nodes, terms, degree, coefficient height, and witness count over
-coarse aggregate input-size proxies. Limits may be generous when their safety
-and usefulness are established; wall time remains an execution safety net, not
-the mathematical work bound.
+Bounded does not mean small or constant-time. Exact higher mathematics may
+legitimately take minutes or longer. Without an explicit latency requirement,
+do not impose a universal short timeout. Admit work from mathematical bounds on
+search, intermediate growth, and output size; use wall time only as a generous,
+killable safety limit.
+
+All mandatory phases—including normalization, presolve, backend work,
+validation, and serialization—must share one request-scoped deadline and work
+ledger. An outer client timeout must cover that complete envelope. A timeout is
+not mathematical evidence: preserve the exact request or digest, budget,
+elapsed time, error, timeout layer, operation version, and repository revision
+before retrying or reporting a gap.
 
 Keep the mathematical postcondition separate from one call's admitted
 execution envelope. Do not impose a convenient ceiling on a coarse input such

@@ -21,6 +21,20 @@ Larger workflows are caller-owned: retain the returned value, choose the next
 operation, and construct its payload from the relevant fields. Incomplete or
 unknown outcomes belong to the operation's own result model.
 
+## Execution deadlines
+
+Exact mathematical operations may legitimately run for minutes or longer.
+Absent an explicit latency requirement, callers should not impose one short
+timeout on every `math.run` call. An operation's admitted work and declared
+resource budget determine its execution envelope; any MCP or client read
+timeout must cover that envelope plus bounded transport overhead.
+
+An outer timeout aborts transport and is not a mathematical result. Preserve
+the operation ID and version, exact payload or digest, resource budget, elapsed
+time, error, timeout layer, and repository revision before retrying or
+reporting a gap. A retry should state what changed: budget, backend,
+representation, or deterministic partition.
+
 ```json
 {"operation_id":"integer.compute.extended_gcd","payload":{"left":"84","right":"30"}}
 ```
