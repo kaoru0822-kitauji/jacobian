@@ -110,6 +110,7 @@ LEGACY_THREE_VARIABLE_CERTIFICATE_PAYLOAD = {
 }
 
 
+@pytest.mark.scale
 def test_four_variable_rank_fixture_has_the_published_first_kernel() -> None:
     result = compute_graded_jacobian_syzygy(
         GradedJacobianSyzygyRequest(

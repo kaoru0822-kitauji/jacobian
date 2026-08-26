@@ -932,6 +932,7 @@ def test_tall_operator_coefficients_are_admitted_by_derived_growth() -> None:
         )
 
 
+@pytest.mark.scale
 def test_degenerate_shortcuts_still_honor_the_retained_byte_budget() -> None:
     coefficient = CanonicalRational(num="1" + "0" * 32_767, den="1")
 

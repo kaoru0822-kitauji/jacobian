@@ -52,7 +52,9 @@ Singular is intentionally not part of `make check`: its pinned hosted-CI lane
 provides the required runtime evidence without making the executable a
 prerequisite for every developer loop.
 
-`make quick LANE=... TESTS=...` is the cheaper focused loop: it omits mypy.
+`make quick LANE=... TESTS=...` is the cheaper loop: it omits mypy but still
+runs repository-wide Ruff. In a shared checkout, use `make quick-scoped
+LANE=... TESTS=... PATHS="src/... tests/..."` to scope both Ruff and the test.
 `make check` is a broad ordinary gate, not a routine edit command; it runs lint,
 types, and the non-integration owner suite once. The
 pre-push hook stays `make lint typecheck`. Focused debugging uses

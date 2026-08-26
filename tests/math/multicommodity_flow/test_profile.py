@@ -796,6 +796,7 @@ def test_cell_budgets_admit_commodities_without_a_fixed_ceiling() -> None:
         dense_commodities(257)
 
 
+@pytest.mark.scale
 def test_result_envelope_prices_rows_at_their_actual_sides() -> None:
     from itertools import combinations
 

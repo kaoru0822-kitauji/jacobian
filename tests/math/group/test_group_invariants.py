@@ -204,6 +204,7 @@ class TestLatticeWorkBound:
             generators.append(tuple(form))
         return GroupSubgroupLatticeRequest(degree=12, generators=tuple(generators))
 
+    @pytest.mark.scale
     def test_extremal_abelian_lattice_completes(self):
         """C2^6 has exactly 2825 subgroups (subspaces of F_2^6)."""
         result = compute_subgroup_lattice(self._c2_power_six())

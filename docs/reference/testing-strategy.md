@@ -26,8 +26,10 @@ real boundary:
 | Singular ideal backend | `make test-singular` |
 | Documentation | `make docs-linkcheck` |
 
-`make quick LANE=... TESTS=...` is the same focused path without mypy. The
-explicit lane preserves its configured timeout and worker count. Supported
+`make quick LANE=... TESTS=...` omits mypy but retains the repository-wide Ruff
+check. In a shared checkout, use `make quick-scoped LANE=... TESTS=...
+PATHS="src/... tests/..."` to scope both Ruff and the test path. The explicit
+lane preserves its configured timeout and worker count. Supported
 focused lanes are `math`, `catalog`, `dispatch`, `cli`, `tooling`,
 `integration`, `process`, and `mcp`; Singular retains its dedicated command.
 
@@ -64,8 +66,11 @@ Merge-group candidates run the complete ordinary suite plus optional
 near-envelope scale evidence. `main` runs the landed-tree ordinary suite and
 coverage. Scheduled validation owns exhaustive evidence, repeated property
 checks, optional scale evidence, and randomized order/provider variation.
-Collection inspection remains a manual diagnostic, not a prerequisite for every
-test lane.
+Each ordinary CI lane retains JUnit timing evidence for 90 days. Use those node
+durations to tier near-envelope regressions before proposing more workers or
+timing-based sharding; ordinary product lanes remain unsharded until the
+evidence demonstrates a safe, useful split. Collection inspection remains a
+manual diagnostic, not a prerequisite for every test lane.
 
 Markers are execution tiers, not synonyms for slow tests:
 

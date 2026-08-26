@@ -326,6 +326,7 @@ class TestFacetIncidence:
         with pytest.raises(ValidationError):
             FacetIncidenceRequest(vertices=vertices)
 
+    @pytest.mark.scale
     def test_interior_source_rows_are_admitted_and_bind_no_facet(self) -> None:
         """Reviewer counterexample: a 7-simplex plus eight distinct strict
         interior points (1/k, ..., 1/k) for k = 9..16 needs only
@@ -1194,6 +1195,7 @@ class TestNativeApiAdmission:
 
 
 class TestNonsimpleFaceExtremality:
+    @pytest.mark.scale
     def test_edge_midpoint_of_4d_prism_is_not_a_vertex(self) -> None:
         """Reviewer counterexample: the midpoint (e1, 1/2) of a vertical
         edge of conv(+/-e1, +/-e2, +/-e3) x [0,1] lies on four maximal

@@ -45,7 +45,9 @@ runs:
         name: ${{ inputs.junit-artifact }}
         path: pytest.xml
         if-no-files-found: ignore
-        retention-days: 7
+        # JUnit testcase times provide the durable unsharded baseline for
+        # measured future balancing work.
+        retention-days: 90
     - if: ${{ !cancelled() && inputs.collect-coverage == 'true' }}
       shell: bash
       run: mv .coverage ${{ inputs.coverage-file }}

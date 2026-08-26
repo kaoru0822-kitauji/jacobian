@@ -110,6 +110,7 @@ def test_python_jobs_select_math_and_public_contract_evidence_from_the_plan() ->
     )
     assert "handoff: lint typecheck test-focused" in makefile
     assert "quick: lint test-focused" in makefile
+    assert "quick-scoped: lint-scoped test-focused" in makefile
     assert "check: lint typecheck test-fast" in makefile
     assert "check-all: lint typecheck test-ordinary" in makefile
 

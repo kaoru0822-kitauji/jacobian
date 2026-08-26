@@ -1141,6 +1141,7 @@ def test_square_free_operation_admits_transiently_dense_prefixes() -> None:
     )
 
 
+@pytest.mark.scale
 def test_square_free_operation_admits_telescoping_geometric_decomposition() -> None:
     """The reported admitted source returns its typed decomposition.
 

@@ -868,6 +868,7 @@ class TestValidation:
             TreeAutomatonReachabilityRequest(automaton=rejected)
         _assert_validation_code(exc, "tree_automata.reachability_work_bound")
 
+    @pytest.mark.scale
     def test_deepest_native_profile_fits_envelope_while_public_rejects(self):
         automaton = _seeded_chain_with_padded_rows(64)
 

@@ -16,7 +16,7 @@ VALIDATION_LOCK := $(UV_RUN) python tools/with_validation_lock.py
 # them independently; `make check-all` reproduces them locally in this order.
 ORDINARY_TEST_LANES := math catalog dispatch cli tooling integration
 FOCUSED_TEST_LANES := $(ORDINARY_TEST_LANES) process mcp
-PUBLIC_COMMANDS := setup test-focused handoff handoff-scoped quick check check-all fix
+PUBLIC_COMMANDS := setup test-focused handoff handoff-scoped quick quick-scoped check check-all fix
 
 include make/development.mk
 include make/harbor.mk
@@ -194,7 +194,9 @@ handoff: lint typecheck test-focused ## Focused contributor handoff: lint, types
 
 handoff-scoped: lint-scoped typecheck-scoped test-focused ## Focused handoff scoped to declared static PATHS and one owner test path.
 
-quick: lint test-focused ## Focused edit loop: lint and one declared owner path.
+quick: lint test-focused ## Broad Ruff checks plus one declared owner test path.
+
+quick-scoped: lint-scoped test-focused ## Focused edit loop scoped to declared static PATHS and one owner test path.
 
 check: lint typecheck test-fast ## Broad ordinary gate: lint, types, and all non-integration owner tests.
 
