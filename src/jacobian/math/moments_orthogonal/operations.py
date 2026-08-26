@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from fractions import Fraction
 
-from jacobian._exact import CanonicalRational
+from jacobian._exact import MAX_CANONICAL_RATIONAL_DIGITS, CanonicalRational
+from jacobian.math._rational_height import RationalHeight
+from jacobian.math.moments_orthogonal._jacobi import jacobi_matrix_from_family
 from jacobian.math.moments_orthogonal._models import (
     ChristoffelDarbouxRequest,
     GaussianQuadratureRequest,
@@ -25,6 +27,26 @@ from jacobian.math.moments_orthogonal.values import (
     QuadratureNode,
     ThreeTermRecurrence,
 )
+
+
+class HankelMatrixAdmissionError(ValueError):
+    """A value-based Hankel admission failure with an owner-local code."""
+
+    def __init__(self, reason: str, message: str) -> None:
+        super().__init__(message)
+        self.reason = reason
+
+
+class MomentsOrthogonalAdmissionError(ValueError):
+    """A shared value-based admission failure for moment operations."""
+
+    def __init__(self, reason: str, message: str) -> None:
+        super().__init__(message)
+        self.reason = reason
+
+
+class GaussianQuadratureAdmissionError(MomentsOrthogonalAdmissionError):
+    """A value-based Gaussian-quadrature admission failure."""
 
 
 def _to_fraction(r: CanonicalRational) -> Fraction:
@@ -49,6 +71,25 @@ def _fraction_exceeds_canonical_limit(value: Fraction) -> bool:
         abs(value.numerator) >= _CANONICAL_DIGIT_LIMIT
         or value.denominator >= _CANONICAL_DIGIT_LIMIT
     )
+
+
+def _require_gram_schmidt_heights_admissible(
+    moments: tuple[CanonicalRational, ...], max_degree: int
+) -> None:
+    """Bound moment heights before exact Gram-Schmidt projection begins."""
+    if max_degree == 0:
+        return
+    side = max_degree + 1
+    per_entry = (MAX_CANONICAL_RATIONAL_DIGITS - 2 * side) // (2 * side * (side + 1))
+    bound = max(per_entry, 8)
+    for value in moments[: 2 * max_degree + 1]:
+        if RationalHeight.from_canonical(value).exceeds(bound):
+            raise MomentsOrthogonalAdmissionError(
+                "gram_schmidt_height",
+                f"moment heights exceed the conservative {bound}-digit "
+                f"bound for exact degree-{max_degree} Gram-Schmidt; supply "
+                "a smaller or better-scaled moment prefix",
+            )
 
 
 def _rational_det(matrix: list[list[Fraction]]) -> Fraction:
@@ -108,44 +149,75 @@ def _eliminate_below(mat: list[list[Fraction]], rank: int, col: int) -> None:
             mat[row][j] -= factor * mat[rank][j]
 
 
-def compute_hankel_matrix(request: HankelRequest) -> HankelMomentMatrix:
-    """Compute the Hankel matrix H_r[i,j] = mu_(i+j)."""
-    moments = [_to_fraction(m) for m in request.prefix.moments]
-    order = request.order
-    matrix = [[moments[i + j] for j in range(order + 1)] for i in range(order + 1)]
-    det = _rational_det(matrix)
+def require_hankel_matrix_admission(
+    prefix: MomentFunctionalPrefix, order: int, *, shifted: bool
+) -> None:
+    """Validate one canonical prefix for a bounded Hankel construction."""
+    from jacobian.math.moments_orthogonal.values import MAX_HANKEL_ORDER
+
+    maximum = MAX_HANKEL_ORDER - int(shifted)
+    if (
+        isinstance(order, bool)
+        or not isinstance(order, int)
+        or not 0 <= order <= maximum
+    ):
+        raise HankelMatrixAdmissionError(
+            "order_out_of_range",
+            f"Hankel order must be an integer between 0 and {maximum}",
+        )
+    needed = 2 * order + 1 + int(shifted)
+    if len(prefix.moments) < needed:
+        kind = "shifted " if shifted else ""
+        raise HankelMatrixAdmissionError(
+            "insufficient_moments",
+            f"need at least {needed} moments for {kind}order {order}, got "
+            f"{len(prefix.moments)}",
+        )
+    consumed = prefix.moments[1:] if shifted else prefix.moments
+    per_entry = MAX_CANONICAL_RATIONAL_DIGITS // ((order + 1) ** 2)
+    bound = max(per_entry - 2, 8)
+    if any(
+        RationalHeight.from_canonical(value).exceeds(bound)
+        for value in consumed[: 2 * order + 1]
+    ):
+        raise HankelMatrixAdmissionError(
+            "determinant_height",
+            f"moment heights exceed the conservative {bound}-digit bound for "
+            f"an exact order-{order} determinant",
+        )
+
+
+def hankel_matrix_from_prefix(
+    prefix: MomentFunctionalPrefix, order: int, *, shifted: bool
+) -> HankelMomentMatrix:
+    """Compute one admitted ordinary or shifted exact Hankel matrix."""
+    moments = [_to_fraction(moment) for moment in prefix.moments]
+    offset = int(shifted)
+    matrix = [
+        [moments[i + j + offset] for j in range(order + 1)] for i in range(order + 1)
+    ]
+    determinant = _rational_det(matrix)
     rank = _rational_rank(matrix)
-    entries = tuple(
-        tuple(_from_fraction(matrix[i][j]) for j in range(order + 1))
-        for i in range(order + 1)
-    )
     return HankelMomentMatrix(
         order=order,
-        entries=entries,
-        determinant=_from_fraction(det),
+        entries=tuple(
+            tuple(_from_fraction(matrix[i][j]) for j in range(order + 1))
+            for i in range(order + 1)
+        ),
+        determinant=_from_fraction(determinant),
         rank=rank,
-        variable=request.prefix.variable,
+        variable=prefix.variable,
     )
+
+
+def compute_hankel_matrix(request: HankelRequest) -> HankelMomentMatrix:
+    """MCP adapter: parse one request, call the canonical-prefix kernel."""
+    return hankel_matrix_from_prefix(request.prefix, request.order, shifted=False)
 
 
 def compute_shifted_hankel(request: ShiftedHankelRequest) -> HankelMomentMatrix:
-    """Compute the shifted Hankel matrix H_r^(1)[i,j] = mu_(i+j+1)."""
-    moments = [_to_fraction(m) for m in request.prefix.moments]
-    order = request.order
-    matrix = [[moments[i + j + 1] for j in range(order + 1)] for i in range(order + 1)]
-    det = _rational_det(matrix)
-    rank = _rational_rank(matrix)
-    entries = tuple(
-        tuple(_from_fraction(matrix[i][j]) for j in range(order + 1))
-        for i in range(order + 1)
-    )
-    return HankelMomentMatrix(
-        order=order,
-        entries=entries,
-        determinant=_from_fraction(det),
-        rank=rank,
-        variable=request.prefix.variable,
-    )
+    """MCP adapter: parse one request, call the canonical-prefix kernel."""
+    return hankel_matrix_from_prefix(request.prefix, request.order, shifted=True)
 
 
 def _poly_eval(coeffs: list[Fraction], x: Fraction) -> Fraction:
@@ -331,9 +403,6 @@ def _require_gram_schmidt_admission(
     prefix silently reads missing moments as zero) or accepting
     unsupported degrees.
     """
-    from jacobian.math.moments_orthogonal._models import (
-        _require_gram_schmidt_heights_admissible,
-    )
     from jacobian.math.moments_orthogonal.values import MAX_POLYNOMIAL_DEGREE
 
     if not 0 <= max_degree <= MAX_POLYNOMIAL_DEGREE:
@@ -514,68 +583,8 @@ def compute_christoffel_darboux(
 
 
 def compute_jacobi_matrix(request: JacobiMatrixRequest) -> JacobiMatrix:
-    """Compute the finite Jacobi matrix from the orthogonal polynomial family."""
-    family = request.family
-    polys = family.polynomials
-    n = len(polys)
-
-    if n < 2:
-        return JacobiMatrix(
-            alphas=(),
-            betas=(),
-            matrix=(),
-            variable=family.variable,
-        )
-
-    alphas: list[Fraction] = []
-    betas: list[Fraction] = []
-
-    for k in range(n - 1):
-        p_k = [_to_fraction(c) for c in polys[k].coefficients]
-        p_next = [_to_fraction(c) for c in polys[k + 1].coefficients]
-        squared_norm_k = _to_fraction(polys[k].squared_norm)
-
-        if k == 0:
-            alphas.append(-p_next[0])
-            betas.append(Fraction(0))
-        else:
-            squared_norm_prev = _to_fraction(polys[k - 1].squared_norm)
-
-            x_pk = [Fraction(0)] * (len(p_k) + 1)
-            for i in range(len(p_k)):
-                x_pk[i + 1] = p_k[i]
-
-            residual = [
-                x_pk[i] - p_next[i] if i < len(p_next) else x_pk[i]
-                for i in range(len(x_pk))
-            ]
-            alpha_k = residual[k] if k < len(residual) else Fraction(0)
-            alphas.append(alpha_k)
-
-            # Admission guarantees every norm feeding an emitted ratio is
-            # nonzero.
-            betas.append(squared_norm_k / squared_norm_prev)
-
-    matrix_size = n - 1
-    matrix = [[Fraction(0)] * matrix_size for _ in range(matrix_size)]
-    for i in range(matrix_size):
-        matrix[i][i] = alphas[i]
-        if i < matrix_size - 1:
-            # Monic-basis multiplication by x: x p_k = p_{k+1} + alpha_k p_k
-            # + beta_k p_{k-1}, so the subdiagonal carries the monic
-            # normalization 1 and the superdiagonal carries beta_{i+1}.
-            matrix[i + 1][i] = Fraction(1)
-            matrix[i][i + 1] = betas[i + 1]
-
-    return JacobiMatrix(
-        alphas=tuple(_from_fraction(a) for a in alphas),
-        betas=tuple(_from_fraction(b) for b in betas),
-        matrix=tuple(
-            tuple(_from_fraction(matrix[i][j]) for j in range(matrix_size))
-            for i in range(matrix_size)
-        ),
-        variable=family.variable,
-    )
+    """MCP adapter: parse one request, call the canonical-family kernel."""
+    return jacobi_matrix_from_family(request.family)
 
 
 def _construct_quadrature_rule(
@@ -623,66 +632,96 @@ def _build_quadrature_rule(
     return nodes, weights
 
 
+def require_gaussian_quadrature_admission(
+    prefix: MomentFunctionalPrefix, order: int
+) -> None:
+    """Admit a canonical prefix for one exact rational Gaussian rule."""
+    from jacobian.math.moments_orthogonal.values import MAX_QUADRATURE_ORDER
+
+    if (
+        isinstance(order, bool)
+        or not isinstance(order, int)
+        or not 1 <= order <= MAX_QUADRATURE_ORDER
+    ):
+        raise GaussianQuadratureAdmissionError(
+            "order_out_of_range",
+            f"quadrature order must be an integer between 1 and {MAX_QUADRATURE_ORDER}",
+        )
+    try:
+        _require_gram_schmidt_heights_admissible(prefix.moments, order)
+    except MomentsOrthogonalAdmissionError as exc:
+        raise GaussianQuadratureAdmissionError(exc.reason, str(exc)) from None
+    needed = 2 * order
+    if len(prefix.moments) < needed:
+        raise GaussianQuadratureAdmissionError(
+            "insufficient_moments",
+            f"need at least {needed} moments for quadrature order {order}, got "
+            f"{len(prefix.moments)}",
+        )
+
+    import sympy
+
+    moments = [_to_fraction(value) for value in prefix.moments]
+    coefficients = _construct_monic_orthogonal_polynomial(moments, order)
+    variable = sympy.Symbol(prefix.variable)
+    polynomial = sum(
+        coefficient * variable**index for index, coefficient in enumerate(coefficients)
+    )
+    _, factors = sympy.factor_list(polynomial)
+    if any(
+        sympy.degree(factor, variable) != 1 or multiplicity != 1
+        for factor, multiplicity in factors
+    ):
+        raise GaussianQuadratureAdmissionError(
+            "rational_nodes",
+            f"quadrature order {order} requires p_{order} to split into "
+            "distinct linear factors over QQ so every node is an exact rational; "
+            "this moment prefix yields algebraic or repeated nodes",
+        )
+    nodes, weights = _build_quadrature_rule(prefix, order)
+    if any(_fraction_exceeds_canonical_limit(value) for value in (*nodes, *weights)):
+        raise GaussianQuadratureAdmissionError(
+            "quadrature_height",
+            "derived quadrature nodes or weights exceed the canonical rational "
+            "digit limit; supply a moment prefix whose exact rule stays "
+            "representable",
+        )
+    if any(weight <= 0 for weight in weights):
+        raise GaussianQuadratureAdmissionError(
+            "positive_weights",
+            "quadrature admission requires strictly positive weights; this "
+            "moment prefix yields a nonpositive weight",
+        )
+
+
+def gaussian_quadrature_rule_from_prefix(
+    prefix: MomentFunctionalPrefix, order: int
+) -> GaussianQuadratureRule:
+    """Construct one admitted exact Gaussian quadrature rule."""
+    nodes_frac, weights = _build_quadrature_rule(prefix, order)
+    for k in range(2 * order):
+        approximation = sum(
+            weights[index] * nodes_frac[index] ** k for index in range(order)
+        )
+        if approximation != _to_fraction(prefix.moments[k]):
+            raise ValueError(f"quadrature is not exact at degree {k}")
+    return GaussianQuadratureRule(
+        order=order,
+        nodes=tuple(
+            QuadratureNode(node=_from_fraction(node), weight=_from_fraction(weight))
+            for node, weight in zip(nodes_frac, weights, strict=True)
+        ),
+        variable=prefix.variable,
+        exactness_degree=2 * order - 1,
+        prefix=prefix,
+    )
+
+
 def compute_gaussian_quadrature(
     request: GaussianQuadratureRequest,
 ) -> GaussianQuadratureRule:
-    """Compute an exact Gaussian quadrature rule from moments.
-
-    For small orders, we use the fact that the nodes are roots of the
-    degree-n orthogonal polynomial. We compute weights from the Vandermonde
-    moment system.
-    """
-    n = request.order
-    var = request.prefix.variable
-
-    nodes_frac, weights = _build_quadrature_rule(request.prefix, n)
-
-    # Find rational roots using the rational root theorem
-    # For a monic polynomial with rational coefficients, rational roots
-    # are of the form p/q where p | constant term, q | leading coefficient
-    # Since the polynomial is monic, q = 1, so rational roots are integers
-    # dividing the constant term
-
-    # Actually, for general rational moments, we need to clear denominators
-    # and use the rational root theorem on the resulting integer polynomial
-
-    # For now, let's use numpy or sympy for root finding
-    # But we should use exact methods. Let's try a simple approach:
-    # For small n, we can try all rational candidates
-
-    # Actually, let's use sympy for exact root finding
-    import sympy  # noqa: F401 - availability guard for the exact backend
-
-    if weights is None:
-        raise ValueError("Vandermonde system is singular")
-
-    # Check that all weights are positive
-    for w in weights:
-        if w <= 0:
-            raise ValueError(f"Non-positive weight {w} in Gaussian quadrature")
-
-    # Verify exactness through degree 2n-1 against the retained prefix.
-    prefix_moments = [_to_fraction(m) for m in request.prefix.moments]
-    for k in range(2 * n):
-        approx = sum(weights[i] * nodes_frac[i] ** k for i in range(n))
-        if k < len(prefix_moments) and approx != prefix_moments[k]:
-            raise ValueError(f"Quadrature not exact at degree {k}")
-
-    nodes = [
-        QuadratureNode(
-            node=_from_fraction(nodes_frac[i]),
-            weight=_from_fraction(weights[i]),
-        )
-        for i in range(n)
-    ]
-
-    return GaussianQuadratureRule(
-        order=n,
-        nodes=tuple(nodes),
-        variable=var,
-        exactness_degree=2 * n - 1,
-        prefix=request.prefix,
-    )
+    """MCP adapter: parse one request, call the canonical-prefix kernel."""
+    return gaussian_quadrature_rule_from_prefix(request.prefix, request.order)
 
 
 def _solve_linear_system(
