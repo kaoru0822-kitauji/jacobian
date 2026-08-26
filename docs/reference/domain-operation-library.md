@@ -224,6 +224,11 @@ use an explicit replay verifier with a declared replay-work ceiling and a
 soundness statement for the claim being checked. Transport limits are not a
 substitute for that replay bound, and a cheap identity must not authenticate a
 stronger claim such as canonicity, irreducibility, or non-existence.
+When that verifier is a public ``-> bool`` predicate, structurally valid but
+out-of-envelope or admission-rejected claims return ``False`` rather than
+leaking a validation exception. This fail-closed result is about the supplied
+claim; unexpected owner or backend faults remain operational failures and must
+not be converted into a mathematical negative.
 
 Public numeric values are canonical exact rationals. IEEE doubles may exist
 only inside a private kernel; any double crossing the boundary is carried as
@@ -445,6 +450,12 @@ No phase receives a fresh hidden budget. A caller or MCP read timeout must
 cover the declared operation envelope plus bounded transport overhead; a
 shorter outer timeout may abort the call, but it cannot establish an operation
 result.
+
+For a killable subprocess or interactive backend, that envelope begins before
+input spooling, launch, resource setup, and reader/writer startup. It also
+covers termination, pipe draining, and reaping: reserve a named finite cleanup
+allowance from the admitted deadline rather than granting a fresh post-timeout
+clock to shutdown.
 
 Preflight raw shape, nesting depth, digit length, and every derivable source
 limit before copying or canonicalizing containers, constructing nested models,
