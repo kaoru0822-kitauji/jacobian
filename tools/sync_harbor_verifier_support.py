@@ -1,9 +1,9 @@
 """Update verifier checksum labels for explicitly selected Harbor tasks.
 
-Task support modules are intentionally owned by their task bundles.  This
-command only updates the checksum label for each selected task's verifier bundle and
-never copies support code, formats benchmark files, or touches unselected
-tasks.
+Task support modules are intentionally owned by their task bundles. This
+command updates checksum labels only for selected tasks. ``--write-support``
+is an explicit migration action: it copies the task template into those same
+selected tasks before refreshing their labels; it never rewrites a dataset.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+SUPPORT_TEMPLATE = ROOT / "benchmarks/templates/task/tests/verifier_support.py"
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -27,9 +28,16 @@ from benchmarks.tooling.harbor_suite import (  # noqa: E402
 _CHECKSUM = re.compile(r'jacobian\.checksum="[^"]*"')
 
 
-def update(dataset: str, tasks: tuple[str, ...]) -> int:
+def update(
+    dataset: str, tasks: tuple[str, ...], *, write_support: bool = False
+) -> int:
     suite = get_suite(dataset)
     refs = select_task_refs(suite, tasks)
+    template = (
+        SUPPORT_TEMPLATE.read_bytes()
+        if write_support
+        else None
+    )
     for ref in refs:
         tests = ref.path / "tests"
         verifier = tests / "verifier.py"
@@ -47,6 +55,8 @@ def update(dataset: str, tasks: tuple[str, ...]) -> int:
             raise HarborSuiteError(
                 f"{support.relative_to(ROOT)}: verifier_support.py must be a regular file"
             )
+        if template is not None:
+            support.write_bytes(template)
         digest = verifier_bundle_checksum(tests)
         text = dockerfile.read_text(encoding="utf-8")
         updated, count = _CHECKSUM.subn(f'jacobian.checksum="{digest}"', text, count=1)
@@ -64,7 +74,8 @@ def update(dataset: str, tasks: tuple[str, ...]) -> int:
             )
         if updated != text:
             dockerfile.write_text(updated, encoding="utf-8")
-        print(f"Updated verifier checksum: {ref.path.relative_to(ROOT)}")
+        action = "Synced support and updated" if template is not None else "Updated"
+        print(f"{action} verifier checksum: {ref.path.relative_to(ROOT)}")
     return 0
 
 
@@ -72,9 +83,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", required=True)
     parser.add_argument("--tasks", nargs="+", required=True)
+    parser.add_argument(
+        "--write-support",
+        action="store_true",
+        help="copy the task verifier-support template into only the selected tasks",
+    )
     args = parser.parse_args()
     try:
-        return update(args.dataset, tuple(args.tasks))
+        return update(
+            args.dataset,
+            tuple(args.tasks),
+            write_support=args.write_support,
+        )
     except HarborSuiteError as exc:
         print(f"harbor verifier checksum error: {exc}", file=sys.stderr)
         return 2
