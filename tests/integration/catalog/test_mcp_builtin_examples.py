@@ -81,8 +81,8 @@ def test_mcp_advertised_examples_execute_as_typed_results() -> None:
     asyncio.run(scenario())
 
 
-def test_mcp_host_failures_are_not_exception_groups() -> None:
-    """A broken operation must return ToolError, not a host ExceptionGroup."""
+def test_mcp_unexpected_operation_fault_uses_the_sdk_failure_path() -> None:
+    """Unexpected operation faults are not recast as mathematical tool errors."""
 
     from pydantic import Field
 
@@ -121,11 +121,13 @@ def test_mcp_host_failures_are_not_exception_groups() -> None:
                 "math.run",
                 {"operation_id": "test.synthetic.boom", "payload": {"x": 1}},
             )
-            # Must be a bounded tool error, not an unhandled ExceptionGroup / crash.
+            # Expected mathematical failures are returned by their owning operation.
+            # A programming fault reaches the MCP SDK's installed failure path rather
+            # than being mislabeled as a generic Jacobian ToolError.
             assert result.is_error is True
             assert result.structured_content is None
             text = result.content[0].text if result.content else ""
-            assert "synthetic boom" in text
+            assert text == "Error executing tool math.run"
             assert len(text) < 5000
 
     asyncio.run(scenario())
