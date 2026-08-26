@@ -19,17 +19,22 @@ contract and the
 
 ## Contributor quick path
 
-Most changes need only the locked environment and a focused local handoff:
+Most changes should begin with the CI-planned affected local validation:
 
 ```sh
 make setup
-make handoff LANE=math TESTS=tests/math/graphs/test_graph_distance_matrix.py
+make affected AFFECTED_BASE=origin/main
 ```
 
 Then open a pull request. `make setup` installs the locked development
-environment with the complete maintained Python backend stack. `make handoff`
-runs Ruff, mypy, and the named changed test path through its owner lane. Add a
-named `make test-*` lane only for another behavior or boundary changed.
+environment with the complete maintained Python backend stack. `make affected`
+uses the same checked-in planner as pull-request CI to select committed, staged,
+unstaged, and untracked changed owners,
+catalog examples, and public boundaries, while scoping Ruff and mypy to changed
+Python files. Use `make affected-plan` to inspect the selection without running
+it. For a deliberately narrower one-owner loop, use `make handoff-scoped` with
+explicit `PATHS`; add a named `make test-*` lane only for another behavior or
+boundary changed.
 Pull-request CI runs static checks plus changed owners and boundaries. Public
 operation, model, admission, and canonical-contract changes also run catalog
 conformance and every advertised invocation example; merge-group candidates
@@ -55,7 +60,7 @@ prerequisite for every developer loop.
 `make quick LANE=... TESTS=...` is the cheaper loop: it omits mypy but still
 runs repository-wide Ruff. In a shared checkout, use `make quick-scoped
 LANE=... TESTS=... PATHS="src/... tests/..."` to scope both Ruff and the test.
-`make check` is a broad ordinary gate, not a routine edit command; it runs lint,
+`make check` is the final broad ordinary gate, not a routine edit command; it runs lint,
 types, and the non-integration owner suite once. The
 pre-push hook stays `make lint typecheck`. Focused debugging uses
 `uv run pytest path/to/test.py`. Default `uv run pytest` collects the ordinary

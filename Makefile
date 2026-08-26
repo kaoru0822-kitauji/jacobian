@@ -4,6 +4,7 @@ UV_RUN := uv run --locked
 PYTEST_ARGS ?=
 TESTS ?=
 PATHS ?=
+AFFECTED_BASE ?= origin/main
 EVAL_ARGS ?=
 STRESS_COUNT ?= 3
 ORDERING_DEFAULT_SEED := --randomly-seed=17
@@ -16,7 +17,7 @@ VALIDATION_LOCK := $(UV_RUN) python tools/with_validation_lock.py
 # them independently; `make check-all` reproduces them locally in this order.
 ORDINARY_TEST_LANES := math catalog dispatch cli tooling integration
 FOCUSED_TEST_LANES := $(ORDINARY_TEST_LANES) process mcp
-PUBLIC_COMMANDS := setup test-focused handoff handoff-scoped quick quick-scoped check check-all fix
+PUBLIC_COMMANDS := setup affected affected-plan test-focused handoff-scoped handoff quick-scoped quick check check-all fix
 
 include make/development.mk
 include make/harbor.mk
@@ -69,6 +70,12 @@ test-focused: ## Run TESTS through its explicit semantic LANE (for example, LANE
 	@case " $(FOCUSED_TEST_LANES) " in *" $(LANE) "*) ;; *) \
 		echo "LANE must be one of: $(FOCUSED_TEST_LANES)" >&2; exit 2;; esac
 	$(MAKE) test-$(LANE) TESTS="$(TESTS)" PYTEST_ARGS="$(PYTEST_ARGS)"
+
+affected: ## Default local validation: CI-planned affected owners and scoped static checks.
+	$(UV_RUN) python tools/affected_validation.py --base "$(AFFECTED_BASE)"
+
+affected-plan: ## Show the CI-planned local validation selected from AFFECTED_BASE...HEAD.
+	$(UV_RUN) python tools/affected_validation.py --base "$(AFFECTED_BASE)" --dry-run
 
 lint-scoped: ## Check explicit Python PATHS with Ruff without touching unrelated files.
 	@test -n "$(PATHS)" || { echo "PATHS is required, e.g. PATHS='src/jacobian/... tests/math/...'" >&2; exit 2; }
@@ -198,7 +205,7 @@ quick: lint test-focused ## Broad Ruff checks plus one declared owner test path.
 
 quick-scoped: lint-scoped test-focused ## Focused edit loop scoped to declared static PATHS and one owner test path.
 
-check: lint typecheck test-fast ## Broad ordinary gate: lint, types, and all non-integration owner tests.
+check: lint typecheck test-fast ## Final broad gate: lint, types, and all non-integration owner tests.
 
 check-all: lint typecheck test-ordinary ## Reproduce the ordinary Python CI lanes locally.
 

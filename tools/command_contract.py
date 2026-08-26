@@ -25,6 +25,22 @@ PUBLIC_COMMANDS: tuple[CommandContract, ...] = (
         cost_class="once",
     ),
     CommandContract(
+        name="affected",
+        help="Default local validation selected from the CI planner.",
+        mutates_checkout=False,
+        scope="changed Python static paths plus CI-planned owner and boundary lanes from AFFECTED_BASE...HEAD",
+        ci_relationship="uses the checked-in CI planner; installed-wheel evidence remains CI-owned",
+        cost_class="bounded",
+    ),
+    CommandContract(
+        name="affected-plan",
+        help="Show the CI-planned local validation selected from AFFECTED_BASE...HEAD.",
+        mutates_checkout=False,
+        scope="prints changed owners, boundary lanes, and scoped static paths without running them",
+        ci_relationship="same checked-in CI planner as affected and pull-request CI",
+        cost_class="fast",
+    ),
+    CommandContract(
         name="test-focused",
         help="Run TESTS through its explicit semantic LANE (for example, LANE=math).",
         mutates_checkout=False,
@@ -66,7 +82,7 @@ PUBLIC_COMMANDS: tuple[CommandContract, ...] = (
     ),
     CommandContract(
         name="check",
-        help="Broad ordinary gate: lint, types, and all non-integration owner tests.",
+        help="Final broad gate: lint, types, and all non-integration owner tests.",
         mutates_checkout=False,
         scope="lint + typecheck + math/catalog/dispatch/CLI/tooling tests",
         ci_relationship="subset of required PR jobs, not PR-equivalent",

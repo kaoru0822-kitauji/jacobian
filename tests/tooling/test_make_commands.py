@@ -55,6 +55,17 @@ def test_scoped_handoff_requires_explicit_static_paths() -> None:
     assert 'name="handoff-scoped"' in contracts
 
 
+def test_affected_validation_is_a_public_planner_backed_default() -> None:
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    contracts = (ROOT / "tools" / "command_contract.py").read_text(encoding="utf-8")
+
+    assert "affected: ## Default local validation:" in makefile
+    assert "affected-plan: ## Show the CI-planned" in makefile
+    assert 'python tools/affected_validation.py --base "$(AFFECTED_BASE)"' in makefile
+    assert 'name="affected"' in contracts
+    assert 'name="affected-plan"' in contracts
+
+
 def test_lanes_use_their_declared_worker_and_fixture_affinity() -> None:
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
     math = makefile.split("test-math:", 1)[1].split("test-catalog:", 1)[0]
