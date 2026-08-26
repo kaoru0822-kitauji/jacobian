@@ -295,7 +295,9 @@ def test_negative_solution_status_is_structural_not_a_backend_replay() -> None:
     )
     identity["status"] = "INCONSISTENT"
     identity["values"] = None
-    assert LinearRationalSolutionResult.model_validate(identity).status == "INCONSISTENT"
+    assert (
+        LinearRationalSolutionResult.model_validate(identity).status == "INCONSISTENT"
+    )
 
 
 def test_negative_inconsistency_status_is_structural_not_a_backend_replay() -> None:

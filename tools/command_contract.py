@@ -50,10 +50,18 @@ PUBLIC_COMMANDS: tuple[CommandContract, ...] = (
     ),
     CommandContract(
         name="quick",
-        help="Focused edit loop: lint and one declared owner path.",
+        help="Broad Ruff checks plus one declared owner test path.",
         mutates_checkout=False,
-        scope="lint + one explicit test path through its declared owner lane",
+        scope="repository-wide Ruff + one explicit test path through its declared owner lane",
         ci_relationship="uses the same focused owner-lane command and limits as CI",
+        cost_class="fast",
+    ),
+    CommandContract(
+        name="quick-scoped",
+        help="Focused edit loop scoped to declared static PATHS and one owner test path.",
+        mutates_checkout=False,
+        scope="explicit Ruff paths + one explicit test path through its declared owner lane",
+        ci_relationship="additive local evidence; the broad check and CI static gate remain authoritative",
         cost_class="fast",
     ),
     CommandContract(

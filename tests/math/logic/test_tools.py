@@ -129,9 +129,7 @@ def test_sat_solver_does_not_promote_a_malformed_backend_model(
             return z3.sat
 
         def model(self) -> object:
-            return SimpleNamespace(
-                eval=lambda _variable, **_kwargs: z3.BoolVal(False)
-            )
+            return SimpleNamespace(eval=lambda _variable, **_kwargs: z3.BoolVal(False))
 
     monkeypatch.setattr(z3, "Solver", MisreportingSolver)
 

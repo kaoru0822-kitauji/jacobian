@@ -75,5 +75,7 @@ def test_support_sync_is_explicit_and_limited_to_selected_tasks(
 
     checksum_tool.update("test-v1", ("test-v1-a",), write_support=True)
 
-    assert (first / "tests" / "verifier_support.py").read_text() == "# current support\n"
+    assert (
+        first / "tests" / "verifier_support.py"
+    ).read_text() == "# current support\n"
     assert second_support.read_bytes() == second_before

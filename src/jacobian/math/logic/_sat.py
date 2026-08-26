@@ -489,10 +489,9 @@ def _cake_lpr_is_supported(executable: str) -> bool:
     """Require the source-pinned Cake LPR provider installed by our OCI image."""
 
     try:
-        return (
-            Path(executable).resolve() == Path("/usr/local/bin/cake_lpr")
-            and _is_cake_lpr_manifest(_CAKE_LPR_MANIFEST.read_text(encoding="ascii"))
-        )
+        return Path(executable).resolve() == Path(
+            "/usr/local/bin/cake_lpr"
+        ) and _is_cake_lpr_manifest(_CAKE_LPR_MANIFEST.read_text(encoding="ascii"))
     except OSError:
         return False
 
