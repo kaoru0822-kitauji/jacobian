@@ -75,6 +75,18 @@ def test_timing_report_is_a_public_read_only_diagnostic() -> None:
     assert 'name="test-timings"' in contracts
 
 
+def test_broad_commands_share_the_nonblocking_validation_lease() -> None:
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+
+    assert "ALLOW_PARALLEL_VALIDATION ?= 0" in makefile
+    assert (
+        "validation-status: ## Show whether this worktree holds a broad-validation lock."
+        in makefile
+    )
+    assert "$(VALIDATION_LOCK) run --target check -- $(MAKE) _check" in makefile
+    assert "$(VALIDATION_LOCK) run --target check-all -- $(MAKE) _check-all" in makefile
+
+
 def test_lanes_use_their_declared_worker_and_fixture_affinity() -> None:
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
     math = makefile.split("test-math:", 1)[1].split("test-catalog:", 1)[0]

@@ -51,7 +51,7 @@ def _run(target: str, command: list[str]) -> int:
             holder = payload.get("target", "unknown")
             pid = payload.get("pid", "unknown")
             raise SystemExit(
-                f"worktree already running exhaustive validation {holder!r} (pid {pid})"
+                f"worktree already running broad validation {holder!r} (pid {pid})"
             ) from exc
         encoded = json.dumps(
             {"target": target, "pid": os.getpid(), "started": time.time()},

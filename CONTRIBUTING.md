@@ -75,6 +75,12 @@ Use the narrowest command that establishes the needed evidence:
 - `make check` is one final broad ordinary gate on a frozen tree.
 - `make check-all` and `make test-full` are escalation commands for reproducing CI or the complete local suite.
 
+`make check` and `make check-all` acquire the same worktree-local validation
+lease used by the exhaustive commands. If another broad run holds it, use
+`make validation-status` rather than waiting behind an invisible competing
+suite. Set `ALLOW_PARALLEL_VALIDATION=1` only when parallel broad validation is
+intentional and the host has capacity.
+
 Every CI test lane publishes JUnit and worker timing artifacts for 90 days. Download
 both, then inspect them without rerunning tests:
 

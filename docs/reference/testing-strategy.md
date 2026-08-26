@@ -67,6 +67,12 @@ Run `make check` once on a frozen tree. `make check-all` reproduces ordinary CI
 lanes and `make test-full` is the complete local escalation path; neither is an
 iteration command.
 
+`make check` and `make check-all` take a worktree-local non-blocking validation
+lease. `make validation-status` identifies a competing broad run immediately;
+focused and affected commands remain unblocked. Use
+`ALLOW_PARALLEL_VALIDATION=1` only for an intentional parallel broad run on a
+host with known capacity.
+
 Every CI lane emits a JUnit artifact and a worker-timing sidecar retained for
 90 days. Download both to identify slow testcases, xdist call-time skew, and
 the non-call wall remainder before changing worker counts, fixtures, or shards:

@@ -115,8 +115,12 @@ def test_python_jobs_select_math_and_public_contract_evidence_from_the_plan() ->
     assert "handoff: lint typecheck test-focused" in makefile
     assert "quick: lint test-focused" in makefile
     assert "quick-scoped: lint-scoped test-focused" in makefile
-    assert "check: lint typecheck test-fast" in makefile
-    assert "check-all: lint typecheck test-ordinary" in makefile
+    assert "check: ## Final broad gate:" in makefile
+    assert "check-all: ## Escalation:" in makefile
+    assert "$(VALIDATION_LOCK) run --target check -- $(MAKE) _check" in makefile
+    assert "$(VALIDATION_LOCK) run --target check-all -- $(MAKE) _check-all" in makefile
+    assert "_check: lint typecheck test-fast" in makefile
+    assert "_check-all: lint typecheck test-ordinary" in makefile
 
 
 def test_product_ci_uses_a_versioned_checked_in_test_plan() -> None:

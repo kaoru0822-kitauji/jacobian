@@ -8,6 +8,7 @@ AFFECTED_BASE ?= origin/main
 JUNIT ?= pytest.xml
 TIMING ?=
 TIMING_LIMIT ?= 20
+ALLOW_PARALLEL_VALIDATION ?= 0
 EVAL_ARGS ?=
 STRESS_COUNT ?= 3
 ORDERING_DEFAULT_SEED := --randomly-seed=17
@@ -212,15 +213,29 @@ quick: lint test-focused ## Broad Ruff checks plus one declared owner test path.
 
 quick-scoped: lint-scoped test-focused ## Focused edit loop scoped to declared static PATHS and one owner test path.
 
-check: lint typecheck test-fast ## Final broad gate: lint, types, and all non-integration owner tests.
+check: ## Final broad gate: lint, types, and all non-integration owner tests.
+ifeq ($(ALLOW_PARALLEL_VALIDATION),1)
+	$(MAKE) _check
+else
+	$(VALIDATION_LOCK) run --target check -- $(MAKE) _check
+endif
 
-check-all: lint typecheck test-ordinary ## Escalation: reproduce all ordinary Python CI lanes locally.
+_check: lint typecheck test-fast
+
+check-all: ## Escalation: reproduce all ordinary Python CI lanes locally.
+ifeq ($(ALLOW_PARALLEL_VALIDATION),1)
+	$(MAKE) _check-all
+else
+	$(VALIDATION_LOCK) run --target check-all -- $(MAKE) _check-all
+endif
+
+_check-all: lint typecheck test-ordinary
 
 precommit: ## Apply safe fixes, then run the broad ordinary gate (mutates the tree).
 	$(MAKE) fix
 	$(MAKE) check
 
-validation-status: ## Show whether this worktree holds an exhaustive validation lock.
+validation-status: ## Show whether this worktree holds a broad-validation lock.
 	$(VALIDATION_LOCK) status
 
 check-static: lint-full typecheck import-contracts architecture todo-check build ## CI-owned static checks plus a local package build.
