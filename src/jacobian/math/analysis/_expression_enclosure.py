@@ -7,15 +7,13 @@ from typing import Literal, Self
 
 from pydantic import Field, StrictInt, model_validator
 
-from jacobian._exact import CanonicalRational, require_bounded_rational
+from jacobian._exact import CanonicalRational
 from jacobian._models import StrictModel, canonicalize_json_containers
 from jacobian.math.analysis._models import (
-    MAX_RATIONAL_DIGITS,
     ExactDyadic,
     IntervalExpressionNode,
     _bound_raw_expression,
     _bound_raw_rational,
-    _bounded_expression_nodes,
     _validation_error,
 )
 
@@ -35,21 +33,6 @@ class IntervalExpressionEnclosureRequest(StrictModel):
             _bound_raw_expression(value.get("expression"))
             _bound_raw_rational(value.get("argument"), "interval-enclosure argument")
         return value
-
-    @model_validator(mode="after")
-    def require_bounded_tree(self) -> Self:
-        require_bounded_rational(
-            self.argument,
-            max_digits=MAX_RATIONAL_DIGITS,
-            label="interval-enclosure argument",
-        )
-        nodes = _bounded_expression_nodes(self.expression)
-        if any(node.op == "var" and node.variable is not None for node in nodes):
-            raise _validation_error(
-                "point-enclosure variable nodes must remain anonymous"
-            )
-        return self
-
 
 class IntervalExpressionEnclosureResult(StrictModel):
     status: Literal[

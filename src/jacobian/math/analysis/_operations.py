@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
+from jacobian._exact import require_bounded_rational
 from jacobian.catalog._examples import example
 from jacobian.catalog.models import MathTool, OperationDomainValidationError
 from jacobian.math.analysis._arb import arb_source_interval, dyadic_endpoints
@@ -14,6 +15,7 @@ from jacobian.math.analysis._expression_enclosure import (
     IntervalExpressionEnclosureResult,
 )
 from jacobian.math.analysis._models import (
+    MAX_RATIONAL_DIGITS,
     DyadicClosedInterval,
     IntervalExpressionDomainFailure,
     IntervalExpressionNode,
@@ -118,6 +120,27 @@ def _evaluate_expression(node: IntervalExpressionNode, variable: Any) -> Any:
 def _expression_enclosure(
     request: IntervalExpressionEnclosureRequest,
 ) -> IntervalExpressionEnclosureResult:
+    try:
+        require_bounded_rational(
+            request.argument,
+            max_digits=MAX_RATIONAL_DIGITS,
+            label="interval-enclosure argument",
+        )
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=("argument",),
+            code="analysis.expression.argument_bound",
+            message=str(exc),
+        ) from exc
+    if any(
+        node.op == "var" and node.variable is not None
+        for node in _bounded_expression_nodes(request.expression)
+    ):
+        raise OperationDomainValidationError(
+            location=("expression",),
+            code="analysis.expression.named_variable",
+            message="point-enclosure variable nodes must remain anonymous",
+        )
     from flint import arb, ctx, fmpq
 
     numerator, denominator = request.argument.as_integer_ratio()
