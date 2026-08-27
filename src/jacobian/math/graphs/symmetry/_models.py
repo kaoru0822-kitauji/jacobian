@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import unicodedata
 from typing import Annotated, Literal, Self
 
 from pydantic import ConfigDict, Field, StrictInt, model_validator
@@ -264,66 +263,6 @@ class GraphSymmetryOrbitRequest(StrictModel):
     action: Literal["DECLARED_AUTOMORPHISM_GENERATORS"] = (
         "DECLARED_AUTOMORPHISM_GENERATORS"
     )
-
-    @model_validator(mode="after")
-    def require_bounded_color_preserving_automorphisms(self) -> Self:
-        vertices = self.graph.graph.vertices
-        edges = self.graph.graph.edges
-        if len(vertices) > MAX_GRAPH_SYMMETRY_VERTICES:
-            raise PydanticCustomError(
-                "graph.symmetry_exceeds_max_symmetry_vertices_vertex_bound",
-                f"graph symmetry exceeds the {MAX_GRAPH_SYMMETRY_VERTICES}-vertex bound",
-            )
-        if len(edges) > MAX_GRAPH_SYMMETRY_EDGES:
-            raise PydanticCustomError(
-                "graph.symmetry_exceeds_max_symmetry_edges_edge_bound",
-                f"graph symmetry exceeds the {MAX_GRAPH_SYMMETRY_EDGES}-edge bound",
-            )
-
-        generator_ids = tuple(generator.generator_id for generator in self.generators)
-        if len(set(generator_ids)) != len(generator_ids):
-            raise PydanticCustomError(
-                "graph.graph_symmetry_generator_identifiers_must_be_uni",
-                "graph symmetry generator identifiers must be unique",
-            )
-        if any(
-            not unicodedata.is_normalized("NFC", generator_id)
-            for generator_id in generator_ids
-        ):
-            raise PydanticCustomError(
-                "graph.symmetry_generator_identifiers_use_unicode_nfc",
-                "graph symmetry generator identifiers must use Unicode NFC",
-            )
-
-        vertex_set = set(vertices)
-        edge_set = set(edges)
-        vertex_colors = (
-            dict(zip(vertices, self.graph.vertex_colors, strict=True))
-            if self.graph.vertex_colors
-            else dict.fromkeys(vertices, _UNCOLORED)
-        )
-        edge_colors = (
-            dict(zip(edges, self.graph.edge_colors, strict=True))
-            if self.graph.edge_colors
-            else dict.fromkeys(edges, _UNCOLORED)
-        )
-        for generator in self.generators:
-            _validate_automorphism_generator(
-                generator,
-                vertices,
-                edges,
-                vertex_set,
-                edge_set,
-                vertex_colors,
-                edge_colors,
-            )
-        return self
-
-    @model_validator(mode="after")
-    def require_result_within_canonical_output_limit(self) -> Self:
-        _require_result_output_headroom(self)
-        return self
-
 
 class GraphVertexOrbit(StrictModel):
     orbit_index: StrictInt = Field(ge=0, le=MAX_GRAPH_SYMMETRY_VERTICES - 1)

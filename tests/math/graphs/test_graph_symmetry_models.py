@@ -10,6 +10,7 @@ from jacobian.canonical import (
     canonicalize_json,
     encode_strict_json,
 )
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.isomorphism import (
     ColoredUndirectedGraph,
     canonicalize_colored_graph,
@@ -72,24 +73,27 @@ def test_graph_symmetry_request_rejects_incomplete_permutation() -> None:
     payload = _path_request()
     del payload["generators"][0]["mapping"][2]
 
-    with pytest.raises(ValidationError):
-        GraphSymmetryOrbitRequest.model_validate(payload)
+    request = GraphSymmetryOrbitRequest.model_validate(payload)
+    with pytest.raises(OperationDomainValidationError):
+        _generator_orbits(request)
 
 
 def test_graph_symmetry_request_requires_declared_vertex_order_mapping() -> None:
     payload = _path_request()
     payload["generators"][0]["mapping"] = [["b", "b"], ["a", "c"], ["c", "a"]]
 
-    with pytest.raises(ValidationError):
-        GraphSymmetryOrbitRequest.model_validate(payload)
+    request = GraphSymmetryOrbitRequest.model_validate(payload)
+    with pytest.raises(OperationDomainValidationError):
+        _generator_orbits(request)
 
 
 def test_graph_symmetry_request_rejects_color_breaking_generator() -> None:
     payload = _path_request()
     payload["graph"]["vertex_colors"][2] = "distinguished"
 
-    with pytest.raises(ValidationError):
-        GraphSymmetryOrbitRequest.model_validate(payload)
+    request = GraphSymmetryOrbitRequest.model_validate(payload)
+    with pytest.raises(OperationDomainValidationError):
+        _generator_orbits(request)
 
 
 def test_graph_symmetry_request_rejects_labels_outside_artifact_budget() -> None:
@@ -343,8 +347,9 @@ def test_graph_symmetry_request_requires_nfc_generator_identifiers() -> None:
     payload = _path_request()
     payload["generators"][0]["generator_id"] = "refle\u0301ction"
 
-    with pytest.raises(ValidationError):
-        GraphSymmetryOrbitRequest.model_validate(payload)
+    request = GraphSymmetryOrbitRequest.model_validate(payload)
+    with pytest.raises(OperationDomainValidationError):
+        _generator_orbits(request)
 
 
 def test_graph_symmetry_request_requires_nfc_vertex_colors() -> None:
@@ -804,8 +809,8 @@ def test_graph_symmetry_admission_flips_exactly_at_the_output_limit(
         "CanonicalLimits",
         lambda **kwargs: CanonicalLimits(max_output_bytes=actual - 1),
     )
-    with pytest.raises(ValidationError):
-        GraphSymmetryOrbitRequest.model_validate(_wide_orbit_payload(14))
+    with pytest.raises(OperationDomainValidationError):
+        _generator_orbits(GraphSymmetryOrbitRequest.model_validate(_wide_orbit_payload(14)))
 
 
 def test_graph_symmetry_operation_declares_version_seven() -> None:
