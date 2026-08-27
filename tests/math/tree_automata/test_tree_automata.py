@@ -986,9 +986,9 @@ class TestValidation:
     def test_nested_tree_arity_is_validated_before_execution(self) -> None:
         invalid_tree = _node(RankedTree(symbol=1), _leaf())
 
-        with pytest.raises(ValidationError) as exc:
-            TreeRunRequest(automaton=_simple_automaton(), tree=invalid_tree)
-        _assert_validation_code(exc, "tree_automata.invalid_tree")
+        request = TreeRunRequest(automaton=_simple_automaton(), tree=invalid_tree)
+        with pytest.raises(ValueError, match="arity"):
+            compute_tree_run(request)
 
     def test_duplicate_transitions_are_rejected(self) -> None:
         transition = TreeAutomatonTransition(symbol=0, child_states=(), target_state=0)

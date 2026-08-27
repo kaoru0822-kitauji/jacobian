@@ -16,6 +16,7 @@ from jacobian.math.finite_fields import (
     PermutationResult,
     ProjectiveLine,
     RankResult,
+    direction_rank_ledger,
     element,
     finite_field,
     finite_map_table,
@@ -72,14 +73,15 @@ def test_bundle_declares_atomic_inline_typed_operations() -> None:
 
 
 def test_projective_enumeration_refuses_large_output_before_allocation() -> None:
-    with pytest.raises(ValidationError) as error:
-        ProjectiveLineRequest(
-            presentation=FiniteFieldPresentation(
-                characteristic=2,
-                modulus_coefficients=(1, 1, 1),
-            ),
-            axis=Axis(name="large", labels=tuple(f"x{index}" for index in range(7))),
-        )
+    request = ProjectiveLineRequest(
+        presentation=FiniteFieldPresentation(
+            characteristic=2,
+            modulus_coefficients=(1, 1, 1),
+        ),
+        axis=Axis(name="large", labels=tuple(f"x{index}" for index in range(7))),
+    )
+    with pytest.raises(OperationDomainValidationError) as error:
+        projective_line(request.presentation, request.axis)
     assert (
         error.value.errors()[0]["type"]
         == "finite_field.projective_line_two_coordinate_axis"
@@ -130,15 +132,16 @@ def test_direction_rank_ledger_refuses_excessive_aggregate_work() -> None:
         )
         for index in range(64)
     )
-    with pytest.raises(ValidationError) as error:
-        DirectionRankLedgerRequest(
-            subspace=FiniteDimensionalSubspace(
-                presentation=presentation,
-                basis_axis=basis_axis,
-                basis=basis,
-            ),
-            directions=projective_line(presentation, row_axis),
-        )
+    request = DirectionRankLedgerRequest(
+        subspace=FiniteDimensionalSubspace(
+            presentation=presentation,
+            basis_axis=basis_axis,
+            basis=basis,
+        ),
+        directions=projective_line(presentation, row_axis),
+    )
+    with pytest.raises(OperationDomainValidationError) as error:
+        direction_rank_ledger(request.subspace, request.directions)
     assert (
         error.value.errors()[0]["type"]
         == "finite_field.direction_rank_ledger_exceeds_operation_work_budget"

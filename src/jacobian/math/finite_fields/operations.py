@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 from jacobian.catalog.models import OperationDomainValidationError
+from jacobian.math.finite_fields._models import (
+    _MAX_DIRECTION_RANK_WORK,
+    _MAX_PROJECTIVE_POINTS,
+)
 from jacobian.math.finite_fields.values import (
     Axis,
     CollisionResult,
@@ -20,6 +24,7 @@ from jacobian.math.finite_fields.values import (
     ProjectiveLine,
     ProjectivePoint,
     RankResult,
+    _direction_rank_work,
 )
 from jacobian.math.prime_field_linear_algebra import PrimeFieldMatrix
 
@@ -84,7 +89,17 @@ def projective_line(
     """Enumerate a projective line in deterministic power-basis encoding order."""
 
     if len(axis.labels) != 2:
-        raise ValueError("projective-line enumeration requires a two-coordinate axis")
+        raise OperationDomainValidationError(
+            location=("axis",),
+            code="finite_field.projective_line_two_coordinate_axis",
+            message="projective-line enumeration requires a two-coordinate axis",
+        )
+    if presentation.order + 1 > _MAX_PROJECTIVE_POINTS:
+        raise OperationDomainValidationError(
+            location=("presentation",),
+            code="finite_field.projective_line_exceeds_output_size_budget",
+            message="projective line exceeds the output-size budget",
+        )
     zero = element(presentation, (0,) * presentation.degree)
     one = element(presentation, (1,) + (0,) * (presentation.degree - 1))
     affine_elements = _field_elements(presentation)
@@ -127,6 +142,12 @@ def restrict_scalars(
         raise ValueError("direction and subspace must share their field presentation")
     if direction.axis != subspace.row_axis:
         raise ValueError("direction axis must match the subspace matrix row axis")
+    if _direction_rank_work(subspace, 1) > _MAX_DIRECTION_RANK_WORK:
+        raise OperationDomainValidationError(
+            location=("subspace",),
+            code="finite_field.restriction_exceeds_operation_work_budget",
+            message="restriction exceeds the operation work budget",
+        )
     from jacobian.math.finite_fields import _flint
 
     active_context = _flint.context(subspace.presentation)
@@ -187,6 +208,12 @@ def linear_map_rank(
 ) -> RankResult:
     """Derive and rank the direction-bound prime-field map."""
 
+    if _direction_rank_work(subspace, 1) > _MAX_DIRECTION_RANK_WORK:
+        raise OperationDomainValidationError(
+            location=("subspace",),
+            code="finite_field.rank_derivation_exceeds_operation_work_budget",
+            message="rank derivation exceeds the operation work budget",
+        )
     from jacobian.math.finite_fields import _flint
 
     linear_map = restrict_scalars(subspace, direction)
@@ -204,6 +231,12 @@ def direction_rank_ledger(
 ) -> DirectionRankLedger:
     """Restrict scalars and rank every supplied direction without losing order."""
 
+    if _direction_rank_work(subspace, len(directions.points)) > _MAX_DIRECTION_RANK_WORK:
+        raise OperationDomainValidationError(
+            location=("directions",),
+            code="finite_field.direction_rank_ledger_exceeds_operation_work_budget",
+            message="direction-rank ledger exceeds the operation work budget",
+        )
     return DirectionRankLedger(
         subspace=subspace,
         entries=tuple(

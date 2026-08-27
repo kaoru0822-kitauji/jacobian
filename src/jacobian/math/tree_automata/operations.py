@@ -73,6 +73,15 @@ def tree_state_chart(
     """Return the canonical postorder position/state chart for a ranked tree."""
 
     validate_ranked_tree(automaton, tree)
+    return _tree_state_chart_unchecked(automaton, tree)
+
+
+def _tree_state_chart_unchecked(
+    automaton: BottomUpTreeAutomaton,
+    tree: RankedTree,
+) -> tuple[tuple[tuple[int, ...], tuple[int, ...]], ...]:
+    """Build a chart after the owner operation has validated the tree."""
+
     chart: list[tuple[tuple[int, ...], tuple[int, ...]]] = []
 
     def visit(node: RankedTree, position: tuple[int, ...]) -> set[int]:

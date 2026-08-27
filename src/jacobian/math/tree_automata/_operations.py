@@ -12,10 +12,9 @@ from jacobian.math.tree_automata._models import (
 )
 from jacobian.math.tree_automata.operations import (
     ReachableStateProfile,
+    _tree_state_chart_unchecked,
     accepted_tree_count,
     reachable_state_profile,
-    run_tree_automaton,
-    tree_state_chart,
 )
 from jacobian.math.tree_automata.values import (
     accepted_tree_count_work_bound,
@@ -30,14 +29,16 @@ __all__ = [
 
 
 def compute_tree_run(request: TreeRunRequest) -> TreeRunResult:
-    states = run_tree_automaton(request.automaton, request.tree)
+    node_count = validate_ranked_tree(request.automaton, request.tree)
+    chart = _tree_state_chart_unchecked(request.automaton, request.tree)
+    states = set(chart[-1][1])
     accepting = set(states) & set(request.automaton.final_states)
     return TreeRunResult._from_kernel(
         request,
         accepted=bool(accepting),
         root_states=tuple(sorted(states)),
-        state_chart=tree_state_chart(request.automaton, request.tree),
-        node_count=validate_ranked_tree(request.automaton, request.tree),
+        state_chart=chart,
+        node_count=node_count,
     )
 
 

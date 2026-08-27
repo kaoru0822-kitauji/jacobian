@@ -17,7 +17,6 @@ from jacobian.math.tree_automata.values import (
     MAX_TREE_AUTOMATON_REACHABILITY_WORK,
     BottomUpTreeAutomaton,
     RankedTree,
-    validate_ranked_tree,
 )
 
 
@@ -33,15 +32,6 @@ class TreeRunRequest(StrictModel):
 
     automaton: BottomUpTreeAutomaton
     tree: RankedTree
-
-    @model_validator(mode="after")
-    def require_valid_tree_arity(self) -> Self:
-        try:
-            validate_ranked_tree(self.automaton, self.tree)
-        except ValueError as exc:
-            raise _validation_error("invalid_tree", str(exc)) from exc
-        return self
-
 
 class TreeRunResult(TreeRunRequest):
     """Result of a tree automaton run."""
