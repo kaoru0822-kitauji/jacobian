@@ -18,6 +18,7 @@ from jacobian.math.prime_affine_forms._kernel import (
 from jacobian.math.prime_affine_forms._models import (
     MAX_RESULT_CHARACTER_BUDGET,
     _digits,
+    _run_admission,
     _source_character_upper_bound,
     _validation_error,
 )
@@ -98,47 +99,50 @@ class PrimeAffineIntervalCountRequest(StrictModel):
         description="Canonical upper endpoint, required to be at least lower."
     )
 
-    @model_validator(mode="after")
-    def require_bounded_complete_count(self) -> Self:
-        require_bounded_affine_endpoints(
-            self.source, self.lower, self.upper, label="interval"
+
+def _admit_interval_count(
+    request: PrimeAffineIntervalCountRequest,
+) -> tuple[int, int, int, int]:
+    require_bounded_affine_endpoints(
+        request.source, request.lower, request.upper, label="interval"
+    )
+    lower, upper, interval_size = _parse_interval(request.lower, request.upper)
+    value_digits = _interval_value_digit_bound(request.source, lower, upper)
+    evaluations = interval_size * request.source.form_count
+    if evaluations > MAX_INTERVAL_EVALUATIONS:
+        raise _validation_error(
+            f"interval needs {evaluations} affine evaluations, exceeding "
+            f"{MAX_INTERVAL_EVALUATIONS}"
         )
-        lower, upper, interval_size = _parse_interval(self.lower, self.upper)
-        _interval_value_digit_bound(self.source, lower, upper)
-        evaluations = interval_size * self.source.form_count
-        if evaluations > MAX_INTERVAL_EVALUATIONS:
-            raise _validation_error(
-                f"interval needs {evaluations} affine evaluations, exceeding "
-                f"{MAX_INTERVAL_EVALUATIONS}"
-            )
-        return self
+    return lower, upper, interval_size, value_digits
+
+
+def _admit_interval_enumerate(
+    request: PrimeAffineIntervalEnumerateRequest,
+) -> tuple[int, int, int]:
+    lower, upper, interval_size, value_digits = _admit_interval_count(request)
+    result_cells = interval_size * (request.source.form_count + 1)
+    if result_cells > MAX_INTERVAL_ENUMERATION_CELLS:
+        raise _validation_error(
+            f"interval enumeration may need {result_cells} result cells, "
+            f"exceeding {MAX_INTERVAL_ENUMERATION_CELLS}"
+        )
+    parameter_digits = max(_digits(lower), _digits(upper))
+    serialized_characters = (
+        _source_character_upper_bound(request.source)
+        + interval_size
+        * (40 + parameter_digits + request.source.form_count * (value_digits + 4))
+        + 256
+    )
+    if serialized_characters > MAX_RESULT_CHARACTER_BUDGET:
+        raise _validation_error(
+            "interval enumeration exceeds the conservative serialized bound"
+        )
+    return lower, upper, interval_size
 
 
 class PrimeAffineIntervalEnumerateRequest(PrimeAffineIntervalCountRequest):
     """Enumerate all positive-prime affine tuples on a stricter output envelope."""
-
-    @model_validator(mode="after")
-    def require_bounded_complete_enumeration(self) -> Self:
-        lower, upper, interval_size = _parse_interval(self.lower, self.upper)
-        value_digits = _interval_value_digit_bound(self.source, lower, upper)
-        result_cells = interval_size * (self.source.form_count + 1)
-        if result_cells > MAX_INTERVAL_ENUMERATION_CELLS:
-            raise _validation_error(
-                f"interval enumeration may need {result_cells} result cells, "
-                f"exceeding {MAX_INTERVAL_ENUMERATION_CELLS}"
-            )
-        parameter_digits = max(_digits(lower), _digits(upper))
-        serialized_characters = (
-            _source_character_upper_bound(self.source)
-            + interval_size
-            * (40 + parameter_digits + self.source.form_count * (value_digits + 4))
-            + 256
-        )
-        if serialized_characters > MAX_RESULT_CHARACTER_BUDGET:
-            raise _validation_error(
-                "interval enumeration exceeds the conservative serialized bound"
-            )
-        return self
 
 
 class PrimePatternMatch(StrictModel):
@@ -288,8 +292,7 @@ def compute_interval_count(
 ) -> PrimePatternIntervalCountResult:
     """Count every admitted positive-prime affine tuple in the interval."""
 
-    lower = parse_canonical_integer(request.lower)
-    upper = parse_canonical_integer(request.upper)
+    lower, upper, _, _ = _run_admission(lambda: _admit_interval_count(request))
     count, first, last = interval_match_summary(request.source, lower, upper)
     return PrimePatternIntervalCountResult._from_kernel(
         request, count=count, first=first, last=last
@@ -301,32 +304,9 @@ def compute_interval_enumerate(
 ) -> PrimePatternIntervalEnumerateResult:
     """Materialize every admitted positive-prime affine tuple in the interval."""
 
-    lower = parse_canonical_integer(request.lower)
-    upper = parse_canonical_integer(request.upper)
+    lower, upper, _ = _run_admission(lambda: _admit_interval_enumerate(request))
     matches = interval_matches(request.source, lower, upper)
     return PrimePatternIntervalEnumerateResult._from_kernel(request, matches=matches)
-
-
-def verify_interval_count_result(result: PrimePatternIntervalCountResult) -> bool:
-    """Verify an independently supplied exact interval-count claim."""
-
-    request = PrimeAffineIntervalCountRequest(
-        source=result.source, lower=result.lower, upper=result.upper
-    )
-    expected = compute_interval_count(request)
-    return result == expected
-
-
-def verify_interval_enumerate_result(
-    result: PrimePatternIntervalEnumerateResult,
-) -> bool:
-    """Verify an independently supplied complete interval-enumeration claim."""
-
-    request = PrimeAffineIntervalEnumerateRequest(
-        source=result.source, lower=result.lower, upper=result.upper
-    )
-    expected = compute_interval_enumerate(request)
-    return result == expected
 
 
 __all__ = [

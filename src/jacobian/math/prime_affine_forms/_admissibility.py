@@ -13,7 +13,7 @@ from jacobian.math.prime_affine_forms._local_factors import local_summary
 from jacobian.math.prime_affine_forms._models import (
     MAX_RESULT_CHARACTER_BUDGET,
     PrimeTupleLocalSummary,
-    _require_summary,
+    _run_admission,
     _source_character_upper_bound,
     _summary_character_upper_bound,
     _validation_error,
@@ -30,37 +30,34 @@ class PrimeTupleAdmissibilityRequest(StrictModel):
 
     source: PrimeAffineTuple
 
-    @model_validator(mode="after")
-    def require_bounded_cutoff_profile(self) -> Self:
-        cutoff = self.source.form_count
-        prime_rows = int(primepi(cutoff))
-        if prime_rows > MAX_ADMISSIBILITY_PRIME_ROWS:
-            raise _validation_error(
-                f"admissibility needs {prime_rows} prime rows, exceeding "
-                f"{MAX_ADMISSIBILITY_PRIME_ROWS}"
-            )
-        root_cells = self.source.form_count * prime_rows
-        total_root_cells = 4 * root_cells
-        if total_root_cells > MAX_ADMISSIBILITY_ROOT_CELLS:
-            raise _validation_error(
-                "admissibility computation and validation may require "
-                f"{total_root_cells} root cells, "
-                f"exceeding {MAX_ADMISSIBILITY_ROOT_CELLS}"
-            )
-        estimated_characters = (
-            _source_character_upper_bound(self.source)
-            + sum(
-                _summary_character_upper_bound(self.source, prime)
-                for prime in primes_through(cutoff)
-            )
-            + 16 * prime_rows
-            + 256
+def _admit_local_admissibility(source: PrimeAffineTuple) -> None:
+    cutoff = source.form_count
+    prime_rows = int(primepi(cutoff))
+    if prime_rows > MAX_ADMISSIBILITY_PRIME_ROWS:
+        raise _validation_error(
+            f"admissibility needs {prime_rows} prime rows, exceeding "
+            f"{MAX_ADMISSIBILITY_PRIME_ROWS}"
         )
-        if estimated_characters > MAX_RESULT_CHARACTER_BUDGET:
-            raise _validation_error(
-                "admissibility profile exceeds the conservative serialized bound"
-            )
-        return self
+    root_cells = source.form_count * prime_rows
+    total_root_cells = 4 * root_cells
+    if total_root_cells > MAX_ADMISSIBILITY_ROOT_CELLS:
+        raise _validation_error(
+            "admissibility computation may require "
+            f"{total_root_cells} root cells, exceeding {MAX_ADMISSIBILITY_ROOT_CELLS}"
+        )
+    estimated_characters = (
+        _source_character_upper_bound(source)
+        + sum(
+            _summary_character_upper_bound(source, prime)
+            for prime in primes_through(cutoff)
+        )
+        + 16 * prime_rows
+        + 256
+    )
+    if estimated_characters > MAX_RESULT_CHARACTER_BUDGET:
+        raise _validation_error(
+            "admissibility profile exceeds the conservative serialized bound"
+        )
 
 
 class PrimeTupleAdmissibilityResult(StrictModel):
@@ -81,25 +78,19 @@ class PrimeTupleAdmissibilityResult(StrictModel):
 
     @model_validator(mode="after")
     def bind_cutoff_decision(self) -> Self:
-        PrimeTupleAdmissibilityRequest(source=self.source)
         expected_cutoff = self.source.form_count
-        expected_primes = primes_through(expected_cutoff)
-        if self.cutoff != expected_cutoff or self.checked_primes != expected_primes:
-            raise _validation_error(
-                "checked primes must be exactly every prime through the cutoff"
-            )
-        if tuple(row.prime for row in self.local_rows) != expected_primes:
-            raise _validation_error("local rows must align with every checked prime")
-        for row in self.local_rows:
-            _require_summary(self.source, row)
+        if self.cutoff != expected_cutoff:
+            raise _validation_error("cutoff must equal the source form count")
+        if self.checked_primes != tuple(sorted(set(self.checked_primes))):
+            raise _validation_error("checked primes must be distinct and increasing")
+        if tuple(row.prime for row in self.local_rows) != self.checked_primes:
+            raise _validation_error("local rows must align with checked primes")
         obstructing = tuple(
             row.prime for row in self.local_rows if row.valid_count == 0
         )
         expected_status = "LOCALLY_OBSTRUCTED" if obstructing else "LOCALLY_ADMISSIBLE"
         if self.status != expected_status:
-            raise _validation_error(
-                "admissibility status does not match the local rows"
-            )
+            raise _validation_error("admissibility status does not match the local rows")
         expected_first = obstructing[0] if obstructing else None
         if self.least_obstructing_prime != expected_first:
             raise _validation_error(
@@ -120,6 +111,7 @@ def compute_local_admissibility(
 ) -> PrimeTupleAdmissibilityResult:
     """Decide whether every prime-affine local factor has a valid residue."""
 
+    _run_admission(lambda: _admit_local_admissibility(request.source))
     cutoff = request.source.form_count
     checked_primes = primes_through(cutoff)
     rows = tuple(local_summary(request.source, prime) for prime in checked_primes)

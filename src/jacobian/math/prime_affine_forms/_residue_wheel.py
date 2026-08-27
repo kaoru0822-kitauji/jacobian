@@ -9,27 +9,14 @@ from pydantic import Field, StrictBool, StrictInt, StringConstraints, model_vali
 from jacobian._exact import CanonicalInteger
 from jacobian._models import StrictModel
 from jacobian.canonical import parse_canonical_integer
-from jacobian.math.affine_forms.values import (
-    MAX_AFFINE_COMPONENT_DIGITS,
-    MAX_FORM_ID_LENGTH,
-    AffineComponentInteger,
-    AffineFormId,
-)
+from jacobian.math.affine_forms.values import AffineComponentInteger, AffineFormId
 from jacobian.math.prime_affine_forms._interval import (
-    MAX_INTERVAL_EVALUATIONS,
     IntervalEndpointInteger,
     _parse_interval,
-    require_bounded_affine_endpoints,
 )
 from jacobian.math.prime_affine_forms._models import (
-    MAX_BATCH_PRIME,
-    MAX_RESULT_CHARACTER_BUDGET,
     CompactPrime,
     PrimeTupleLocalSummary,
-    _digits,
-    _require_prime_set,
-    _source_character_upper_bound,
-    _summary_character_upper_bound,
     _validation_error,
 )
 from jacobian.math.prime_affine_forms.values import (
@@ -64,38 +51,6 @@ class PrimeTupleResidueWheelRequest(StrictModel):
             "operation does not enumerate all combined residues."
         ),
     )
-
-    @model_validator(mode="after")
-    def require_bounded_compact_wheel(self) -> Self:
-        _require_prime_set(self.primes, maximum=MAX_BATCH_PRIME)
-        root_cells = self.source.form_count * len(self.primes)
-        root_work = 6 * root_cells
-        if root_work > MAX_COMPACT_WHEEL_ROOT_WORK:
-            raise _validation_error(
-                f"compact wheel computation needs {root_work} root "
-                f"steps, exceeding {MAX_COMPACT_WHEEL_ROOT_WORK}"
-            )
-        modulus_digits = sum(_digits(prime) for prime in self.primes) or 1
-        if modulus_digits > MAX_COMPACT_WHEEL_SCALAR_DIGITS:
-            raise _validation_error(
-                "compact wheel modulus exceeds the conservative exact scalar "
-                f"digit bound {MAX_COMPACT_WHEEL_SCALAR_DIGITS}"
-            )
-        estimated_characters = (
-            _source_character_upper_bound(self.source)
-            + sum(
-                _summary_character_upper_bound(self.source, prime)
-                for prime in self.primes
-            )
-            + 2 * modulus_digits
-            + 128
-        )
-        if estimated_characters > MAX_RESULT_CHARACTER_BUDGET:
-            raise _validation_error(
-                "compact wheel exceeds the conservative serialized bound"
-            )
-        return self
-
 
 class PrimeTupleWheelResidueRow(StrictModel):
     residue: CompactWheelScalar
@@ -141,51 +96,6 @@ class PrimeTupleResidueWheelEnumerationRequest(StrictModel):
     """Materialize every residue of a supplied compact wheel under strict bounds."""
 
     wheel: PrimeTupleResidueWheel
-
-    @model_validator(mode="after")
-    def require_bounded_wheel_enumeration(self) -> Self:
-        _require_verified_residue_wheel(self.wheel)
-        local_residue_rows = sum(self.wheel.primes)
-        if local_residue_rows > MAX_WHEEL_LOCAL_RESIDUES:
-            raise _validation_error(
-                f"wheel local residue enumeration {local_residue_rows} exceeds "
-                f"{MAX_WHEEL_LOCAL_RESIDUES}"
-            )
-        result_count = parse_canonical_integer(self.wheel.valid_count)
-        if result_count > MAX_WHEEL_RESIDUES:
-            raise _validation_error(
-                f"wheel has {result_count} valid residues, exceeding "
-                f"{MAX_WHEEL_RESIDUES}"
-            )
-        result_cells = result_count * (len(self.wheel.primes) + 1)
-        if result_cells > MAX_WHEEL_RESULT_CELLS:
-            raise _validation_error(
-                f"wheel result needs {result_cells} cells, exceeding "
-                f"{MAX_WHEEL_RESULT_CELLS}"
-            )
-        root_cells = self.wheel.source.form_count * len(self.wheel.primes)
-        enumeration_work = (
-            result_count * len(self.wheel.primes) + local_residue_rows + root_cells
-        )
-        if enumeration_work > MAX_WHEEL_ENUMERATION_WORK:
-            raise _validation_error(
-                f"wheel enumeration needs {enumeration_work} bounded "
-                f"steps, exceeding {MAX_WHEEL_ENUMERATION_WORK}"
-            )
-        modulus_digits = _digits(self.wheel.modulus)
-        component_digits = sum(_digits(prime) for prime in self.wheel.primes)
-        serialized_characters = (
-            len(self.wheel.model_dump_json())
-            + result_count
-            * (modulus_digits + component_digits + 4 * len(self.wheel.primes) + 64)
-            + 128
-        )
-        if serialized_characters > MAX_RESULT_CHARACTER_BUDGET:
-            raise _validation_error(
-                "wheel enumeration exceeds the conservative serialized bound"
-            )
-        return self
-
 
 class PrimeTupleResidueWheelEnumeration(StrictModel):
     """Complete explicit residue realization of one compact CRT wheel."""
@@ -243,28 +153,6 @@ class PrimeTupleWheelMembershipRequest(StrictModel):
     wheel: PrimeTupleResidueWheel
     value: AffineComponentInteger
 
-    @model_validator(mode="after")
-    def require_bounded_value(self) -> Self:
-        _require_verified_residue_wheel(self.wheel)
-        if _digits(self.value) > MAX_AFFINE_COMPONENT_DIGITS:
-            raise _validation_error(
-                f"membership value must have at most {MAX_AFFINE_COMPONENT_DIGITS} digits"
-            )
-        result_characters = (
-            len(self.wheel.model_dump_json())
-            + len(self.value)
-            + _digits(self.wheel.modulus)
-            + sum(_digits(prime) for prime in self.wheel.primes)
-            + MAX_FORM_ID_LENGTH * self.wheel.source.form_count
-            + 256
-        )
-        if result_characters > MAX_RESULT_CHARACTER_BUDGET:
-            raise _validation_error(
-                "wheel membership result exceeds the conservative serialized bound"
-            )
-        return self
-
-
 class PrimeTupleWheelMembershipResult(StrictModel):
     wheel: PrimeTupleResidueWheel
     value: AffineComponentInteger
@@ -317,37 +205,6 @@ class PrimeTupleIntervalResidueProfileRequest(StrictModel):
     lower: IntervalEndpointInteger
     upper: IntervalEndpointInteger
 
-    @model_validator(mode="after")
-    def require_bounded_survivor_profile(self) -> Self:
-        _require_verified_residue_wheel(self.wheel)
-        require_bounded_affine_endpoints(
-            self.wheel.source, self.lower, self.upper, label="interval"
-        )
-        _, _, interval_size = _parse_interval(self.lower, self.upper)
-        if interval_size > MAX_WHEEL_INTERVAL_LENGTH:
-            raise _validation_error(
-                f"wheel interval length {interval_size} exceeds "
-                f"{MAX_WHEEL_INTERVAL_LENGTH}"
-            )
-        membership_checks = interval_size * max(1, len(self.wheel.primes))
-        if membership_checks > MAX_INTERVAL_EVALUATIONS:
-            raise _validation_error(
-                f"wheel interval profile needs {membership_checks} modular checks, "
-                f"exceeding {MAX_INTERVAL_EVALUATIONS}"
-            )
-        endpoint_digits = max(_digits(self.lower), _digits(self.upper))
-        result_characters = (
-            len(self.wheel.model_dump_json())
-            + interval_size * (endpoint_digits + 4)
-            + 192
-        )
-        if result_characters > MAX_RESULT_CHARACTER_BUDGET:
-            raise _validation_error(
-                "wheel interval profile exceeds the conservative serialized bound"
-            )
-        return self
-
-
 class PrimeTupleIntervalResidueProfileResult(StrictModel):
     """Exact local survivors; this value does not assert actual primality."""
 
@@ -389,64 +246,6 @@ class PrimeTupleIntervalResidueProfileResult(StrictModel):
             interval_size=upper - lower + 1,
             survivors=survivors,
         )
-
-
-def verify_residue_wheel(result: PrimeTupleResidueWheel) -> bool:
-    """Verify an independently supplied compact residue-wheel claim."""
-
-    from jacobian.math.prime_affine_forms._operations import compute_residue_wheel
-
-    request = PrimeTupleResidueWheelRequest(source=result.source, primes=result.primes)
-    return result == compute_residue_wheel(request)
-
-
-def _require_verified_residue_wheel(wheel: PrimeTupleResidueWheel) -> None:
-    """Admit an independently supplied wheel before a consumer trusts it."""
-
-    if not verify_residue_wheel(wheel):
-        raise _validation_error(
-            "wheel must equal the compact residue wheel for its source and primes"
-        )
-
-
-def verify_residue_wheel_enumeration(
-    result: PrimeTupleResidueWheelEnumeration,
-) -> bool:
-    """Verify an independently supplied explicit residue-wheel enumeration."""
-
-    from jacobian.math.prime_affine_forms._operations import (
-        compute_residue_wheel_enumeration,
-    )
-
-    return result == compute_residue_wheel_enumeration(
-        PrimeTupleResidueWheelEnumerationRequest(wheel=result.wheel)
-    )
-
-
-def verify_wheel_membership_result(result: PrimeTupleWheelMembershipResult) -> bool:
-    """Verify an independently supplied wheel-membership claim."""
-
-    from jacobian.math.prime_affine_forms._operations import compute_wheel_membership
-
-    return result == compute_wheel_membership(
-        PrimeTupleWheelMembershipRequest(wheel=result.wheel, value=result.value)
-    )
-
-
-def verify_interval_residue_profile_result(
-    result: PrimeTupleIntervalResidueProfileResult,
-) -> bool:
-    """Verify an independently supplied complete local survivor profile."""
-
-    from jacobian.math.prime_affine_forms._operations import (
-        compute_interval_residue_profile,
-    )
-
-    return result == compute_interval_residue_profile(
-        PrimeTupleIntervalResidueProfileRequest(
-            wheel=result.wheel, lower=result.lower, upper=result.upper
-        )
-    )
 
 
 __all__ = [

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pydantic import model_validator
-
 from jacobian._models import StrictModel
 from jacobian.canonical import parse_canonical_integer
 from jacobian.math.affine_forms.values import MAX_AFFINE_COMPONENT_DIGITS
@@ -14,6 +12,7 @@ from jacobian.math.prime_affine_forms._interval import (
 from jacobian.math.prime_affine_forms._kernel import translated_tuple
 from jacobian.math.prime_affine_forms._models import (
     _digits,
+    _run_admission,
     _validation_error,
 )
 from jacobian.math.prime_affine_forms.values import (
@@ -28,24 +27,23 @@ class PrimeAffineTranslationRequest(StrictModel):
     source: PrimeAffineTuple
     shift: IntervalEndpointInteger
 
-    @model_validator(mode="after")
-    def require_bounded_translated_tuple(self) -> PrimeAffineTranslationRequest:
-        require_bounded_affine_endpoints(self.source, self.shift, label="translation")
-        shift = parse_canonical_integer(self.shift)
-        aggregate_digits = 0
-        for form in self.source.forms:
-            translated_constant = form.evaluate(shift)
-            if _digits(translated_constant) > MAX_AFFINE_COMPONENT_DIGITS:
-                raise _validation_error(
-                    "translated constant exceeds the canonical affine component bound"
-                )
-            aggregate_digits += _digits(form.coefficient) + _digits(translated_constant)
-        if aggregate_digits > MAX_AFFINE_AGGREGATE_DIGITS:
+def _admit_translation(request: PrimeAffineTranslationRequest) -> int:
+    require_bounded_affine_endpoints(request.source, request.shift, label="translation")
+    shift = parse_canonical_integer(request.shift)
+    aggregate_digits = 0
+    for form in request.source.forms:
+        translated_constant = form.evaluate(shift)
+        if _digits(translated_constant) > MAX_AFFINE_COMPONENT_DIGITS:
             raise _validation_error(
-                "translated affine tuple exceeds the aggregate coefficient-digit "
-                f"bound {MAX_AFFINE_AGGREGATE_DIGITS}"
+                "translated constant exceeds the canonical affine component bound"
             )
-        return self
+        aggregate_digits += _digits(form.coefficient) + _digits(translated_constant)
+    if aggregate_digits > MAX_AFFINE_AGGREGATE_DIGITS:
+        raise _validation_error(
+            "translated affine tuple exceeds the aggregate coefficient-digit "
+            f"bound {MAX_AFFINE_AGGREGATE_DIGITS}"
+        )
+    return shift
 
 
 class PrimeAffineTranslationResult(StrictModel):
@@ -67,19 +65,11 @@ def compute_translation(
 ) -> PrimeAffineTranslationResult:
     """Apply one admitted translation and retain its exact canonical tuple."""
 
+    shift = _run_admission(lambda: _admit_translation(request))
     return PrimeAffineTranslationResult._from_kernel(
         request,
-        translated=translated_tuple(
-            request.source, parse_canonical_integer(request.shift)
-        ),
+        translated=translated_tuple(request.source, shift),
     )
-
-
-def verify_translation_result(result: PrimeAffineTranslationResult) -> bool:
-    """Verify an independently supplied affine-translation claim."""
-
-    request = PrimeAffineTranslationRequest(source=result.source, shift=result.shift)
-    return result == compute_translation(request)
 
 
 __all__ = [

@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.prime_affine_forms import (
     PrimeAffineTuple,
     PrimitiveIntegerAffineForm,
@@ -151,23 +151,23 @@ def test_native_results_equal_the_wire_request_path() -> None:
 
 
 def test_native_calls_reject_out_of_envelope_requests() -> None:
-    with pytest.raises(ValidationError):
+    with pytest.raises(OperationDomainValidationError):
         local_factor(TWIN_PRIMES, 8_209)
-    with pytest.raises(ValidationError):
+    with pytest.raises(OperationDomainValidationError):
         local_factor(TWIN_PRIMES, 15)
-    with pytest.raises(ValidationError):
+    with pytest.raises(OperationDomainValidationError):
         local_factors(TWIN_PRIMES, (3, 2))
-    with pytest.raises(ValidationError):
+    with pytest.raises(OperationDomainValidationError):
         residue_wheel(TWIN_PRIMES, (2, 2))
-    with pytest.raises(ValidationError):
+    with pytest.raises(OperationDomainValidationError):
         interval_count(PrimeAffineTuple(forms=(_form("n", 1, 0),)), 0, 100_000)
-    with pytest.raises(ValidationError):
+    with pytest.raises(OperationDomainValidationError):
         interval_enumerate(PrimeAffineTuple(forms=(_form("n", 1, 0),)), 2**64, 2**64)
-    with pytest.raises(ValidationError):
+    with pytest.raises(OperationDomainValidationError):
         translate_tuple(
             PrimeAffineTuple(forms=(_form("large", 1, int("9" * 256)),)),
             10**65 + 1,
         )
     large_wheel = residue_wheel(PrimeAffineTuple(forms=(_form("n", 1, 0),)), (8_209,))
-    with pytest.raises(ValidationError):
+    with pytest.raises(OperationDomainValidationError):
         enumerate_residue_wheel(large_wheel)

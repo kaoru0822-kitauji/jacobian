@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Annotated, Self
 
 from pydantic import Field, StrictInt, StringConstraints, model_validator
@@ -10,6 +11,7 @@ from sympy import isprime
 
 from jacobian._exact import CanonicalInteger
 from jacobian._models import StrictModel
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.affine_forms.values import AffineFormId
 from jacobian.math.prime_affine_forms._kernel import (
     local_bad_residues,
@@ -27,6 +29,17 @@ MAX_BATCH_ROOT_WORK = 250_000
 MAX_FACTOR_COMPONENT_DIGITS = 4_096
 MAX_FACTOR_PRODUCT_DIGITS = 8_192
 MAX_RESULT_CHARACTER_BUDGET = 2_000_000
+
+
+def _run_admission[ResultT](admission: Callable[[], ResultT]) -> ResultT:
+    """Run owner admission and expose its diagnostic through the domain API."""
+
+    try:
+        return admission()
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=(), code=exc.type, message=exc.message()
+        ) from exc
 
 CompactPrime = Annotated[
     StrictInt,
@@ -114,22 +127,6 @@ def _require_prime_set(primes: tuple[int, ...], *, maximum: int) -> None:
         raise _validation_error("primes must be distinct and strictly increasing")
     for prime in primes:
         _require_prime(prime, maximum=maximum)
-
-
-def _expected_summary(
-    source: PrimeAffineTuple, prime: int
-) -> tuple[tuple[tuple[int, tuple[str, ...]], ...], int, int]:
-    bad = local_bad_residues(source, prime)
-    return bad, len(bad), prime - len(bad)
-
-
-def _require_summary(source: PrimeAffineTuple, summary: PrimeTupleLocalSummary) -> None:
-    bad, bad_count, valid_count = _expected_summary(source, summary.prime)
-    actual = tuple((row.residue, row.form_ids) for row in summary.bad_residues)
-    if actual != bad:
-        raise _validation_error("bad-residue rows do not match the source affine tuple")
-    if summary.bad_count != bad_count or summary.valid_count != valid_count:
-        raise _validation_error("local residue counts do not match the source tuple")
 
 
 class PrimeTupleBadResidueRow(StrictModel):

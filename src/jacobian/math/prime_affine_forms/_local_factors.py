@@ -29,6 +29,7 @@ from jacobian.math.prime_affine_forms._models import (
     PrimeTupleResidueRow,
     _require_prime,
     _require_prime_set,
+    _run_admission,
     _source_character_upper_bound,
     _summary_character_upper_bound,
     _validation_error,
@@ -77,20 +78,18 @@ class PrimeTupleLocalFactorRequest(StrictModel):
     """Compute one complete local residue profile and exact local factor."""
 
     source: PrimeAffineTuple
-    prime: StrictInt = Field(ge=2, le=MAX_LOCAL_PROFILE_PRIME)
+    prime: StrictInt = Field(ge=2)
 
-    @model_validator(mode="after")
-    def require_bounded_complete_profile(self) -> Self:
-        _require_prime(self.prime, maximum=MAX_LOCAL_PROFILE_PRIME)
-        _require_factor_output(self.source, self.prime)
-        work = 6 * self.source.form_count + 2 * self.prime
-        if work > MAX_LOCAL_PROFILE_WORK:
-            raise _validation_error(
-                f"local profile needs {work} bounded steps, "
-                f"exceeding {MAX_LOCAL_PROFILE_WORK}"
-            )
-        return self
 
+def _admit_local_factor(request: PrimeTupleLocalFactorRequest) -> None:
+    _require_prime(request.prime, maximum=MAX_LOCAL_PROFILE_PRIME)
+    _require_factor_output(request.source, request.prime)
+    work = 6 * request.source.form_count + 2 * request.prime
+    if work > MAX_LOCAL_PROFILE_WORK:
+        raise _validation_error(
+            f"local profile needs {work} bounded steps, "
+            f"exceeding {MAX_LOCAL_PROFILE_WORK}"
+        )
 
 class PrimeTupleLocalFactorResult(StrictModel):
     """Source-bound complete partition modulo one prime and its local factor."""
@@ -165,47 +164,45 @@ class PrimeTupleLocalFactorsRequest(StrictModel):
         max_length=MAX_PRIME_BATCH,
         description=(
             "Distinct primes in strictly increasing order. The aggregate form/root "
-            "and exact rational-output bounds are validated before computation."
+            "and exact rational-output bounds are admitted at execution time."
         ),
     )
 
-    @model_validator(mode="after")
-    def require_bounded_factor_batch(self) -> Self:
-        _require_prime_set(self.primes, maximum=MAX_BATCH_PRIME)
-        root_cells = self.source.form_count * len(self.primes)
-        root_work = 6 * root_cells
-        if root_work > MAX_BATCH_ROOT_WORK:
-            raise _validation_error(
-                f"local-factor computation needs {root_work} root "
-                f"steps, exceeding {MAX_BATCH_ROOT_WORK}"
-            )
-        digit_bounds = tuple(
-            _factor_digit_upper_bound(self.source, prime) for prime in self.primes
+def _admit_local_factors(request: PrimeTupleLocalFactorsRequest) -> None:
+    _require_prime_set(request.primes, maximum=MAX_BATCH_PRIME)
+    root_cells = request.source.form_count * len(request.primes)
+    root_work = 6 * root_cells
+    if root_work > MAX_BATCH_ROOT_WORK:
+        raise _validation_error(
+            f"local-factor computation needs {root_work} root "
+            f"steps, exceeding {MAX_BATCH_ROOT_WORK}"
         )
-        if any(bound > MAX_FACTOR_COMPONENT_DIGITS for bound in digit_bounds):
-            raise _validation_error(
-                "one local factor exceeds the exact rational component-digit bound"
-            )
-        if sum(digit_bounds) > MAX_FACTOR_PRODUCT_DIGITS:
-            raise _validation_error(
-                "finite factor product exceeds the conservative exact rational "
-                f"digit bound {MAX_FACTOR_PRODUCT_DIGITS}"
-            )
-        estimated_characters = (
-            _source_character_upper_bound(self.source)
-            + sum(
-                _summary_character_upper_bound(self.source, prime)
-                for prime in self.primes
-            )
-            + 128 * len(self.primes)
-            + 4 * sum(digit_bounds)
-            + 256
+    digit_bounds = tuple(
+        _factor_digit_upper_bound(request.source, prime) for prime in request.primes
+    )
+    if any(bound > MAX_FACTOR_COMPONENT_DIGITS for bound in digit_bounds):
+        raise _validation_error(
+            "one local factor exceeds the exact rational component-digit bound"
         )
-        if estimated_characters > MAX_RESULT_CHARACTER_BUDGET:
-            raise _validation_error(
-                "finite factor result exceeds the conservative serialized bound"
-            )
-        return self
+    if sum(digit_bounds) > MAX_FACTOR_PRODUCT_DIGITS:
+        raise _validation_error(
+            "finite factor product exceeds the conservative exact rational "
+            f"digit bound {MAX_FACTOR_PRODUCT_DIGITS}"
+        )
+    estimated_characters = (
+        _source_character_upper_bound(request.source)
+        + sum(
+            _summary_character_upper_bound(request.source, prime)
+            for prime in request.primes
+        )
+        + 128 * len(request.primes)
+        + 4 * sum(digit_bounds)
+        + 256
+    )
+    if estimated_characters > MAX_RESULT_CHARACTER_BUDGET:
+        raise _validation_error(
+            "finite factor result exceeds the conservative serialized bound"
+        )
 
 
 class PrimeTupleLocalFactorRow(StrictModel):
@@ -265,6 +262,7 @@ def compute_local_factor(
 ) -> PrimeTupleLocalFactorResult:
     """Return one complete local residue partition and exact factor."""
 
+    _run_admission(lambda: _admit_local_factor(request))
     return PrimeTupleLocalFactorResult._from_kernel(
         request, bad=local_bad_residues(request.source, request.prime)
     )
@@ -275,6 +273,7 @@ def compute_local_factors(
 ) -> FinitePrimeTupleFactorProduct:
     """Return compact exact local factors over one finite prime set."""
 
+    _run_admission(lambda: _admit_local_factors(request))
     product = Fraction(1, 1)
     rows: list[PrimeTupleLocalFactorRow] = []
     first_obstruction: int | None = None
@@ -298,20 +297,6 @@ def compute_local_factors(
         product=product,
         first_obstruction=first_obstruction,
     )
-
-
-def verify_local_factor_result(result: PrimeTupleLocalFactorResult) -> bool:
-    """Verify an independently supplied complete local-factor claim."""
-
-    request = PrimeTupleLocalFactorRequest(source=result.source, prime=result.prime)
-    return result == compute_local_factor(request)
-
-
-def verify_local_factors_result(result: FinitePrimeTupleFactorProduct) -> bool:
-    """Verify an independently supplied finite local-factor product claim."""
-
-    request = PrimeTupleLocalFactorsRequest(source=result.source, primes=result.primes)
-    return result == compute_local_factors(request)
 
 
 __all__ = [

@@ -10,6 +10,7 @@ from sympy import primerange
 
 import jacobian.math.prime_affine_forms._interval as interval_contracts
 import jacobian.math.prime_affine_forms._translation as translation_contracts
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.affine_forms import IntegerAffineForm
 from jacobian.math.prime_affine_forms import (
     PrimeAffineTuple,
@@ -26,7 +27,6 @@ from jacobian.math.prime_affine_forms._interval import (
     PrimePatternIntervalEnumerateResult,
     compute_interval_count,
     compute_interval_enumerate,
-    verify_interval_enumerate_result,
 )
 from jacobian.math.prime_affine_forms._local_factors import (
     FinitePrimeTupleFactorProduct,
@@ -35,8 +35,6 @@ from jacobian.math.prime_affine_forms._local_factors import (
     PrimeTupleLocalFactorsRequest,
     compute_local_factor,
     compute_local_factors,
-    verify_local_factor_result,
-    verify_local_factors_result,
 )
 from jacobian.math.prime_affine_forms._models import PrimeTupleLocalSummary
 from jacobian.math.prime_affine_forms._operations import (
@@ -52,15 +50,12 @@ from jacobian.math.prime_affine_forms._residue_wheel import (
     PrimeTupleResidueWheelEnumerationRequest,
     PrimeTupleResidueWheelRequest,
     PrimeTupleWheelMembershipRequest,
-    verify_residue_wheel,
-    verify_residue_wheel_enumeration,
 )
 from jacobian.math.prime_affine_forms._tools import TOOLS
 from jacobian.math.prime_affine_forms._translation import (
     PrimeAffineTranslationRequest,
     PrimeAffineTranslationResult,
     compute_translation,
-    verify_translation_result,
 )
 from jacobian.math.prime_affine_forms.values import MAX_AFFINE_AGGREGATE_DIGITS
 
@@ -191,7 +186,7 @@ def test_local_factor_agrees_with_direct_residue_oracle(prime: int) -> None:
     assert result.factor.as_fraction() == expected_factor
 
 
-def test_local_factor_result_round_trips_structurally_and_verifier_rejects_forgery() -> (
+def test_local_factor_result_round_trips_structurally() -> (
     None
 ):
     result = compute_local_factor(
@@ -202,21 +197,14 @@ def test_local_factor_result_round_trips_structurally_and_verifier_rejects_forge
     wrong_factor = deepcopy(payload)
     wrong_factor["factor"] = {"num": "1", "den": "1"}
     assert PrimeTupleLocalFactorResult.model_validate(wrong_factor) != result
-    assert not verify_local_factor_result(
-        PrimeTupleLocalFactorResult.model_validate(wrong_factor)
-    )
 
     wrong_source = deepcopy(payload)
     wrong_source["source"]["forms"][1]["constant"] = "4"
-    assert not verify_local_factor_result(
-        PrimeTupleLocalFactorResult.model_validate(wrong_source)
-    )
+    assert PrimeTupleLocalFactorResult.model_validate(wrong_source) != result
 
     wrong_row = deepcopy(payload)
     wrong_row["residue_rows"][1]["vanishing_form_ids"] = []
-    assert not verify_local_factor_result(
-        PrimeTupleLocalFactorResult.model_validate(wrong_row)
-    )
+    assert PrimeTupleLocalFactorResult.model_validate(wrong_row) != result
     assert PrimeTupleLocalFactorResult.model_validate(payload) == result
 
 
@@ -241,7 +229,7 @@ def test_finite_local_factor_product_and_obstruction() -> None:
     payload = zero.model_dump(mode="json")
     payload["first_obstructing_prime"] = 2
     forged = FinitePrimeTupleFactorProduct.model_validate(payload)
-    assert not verify_local_factors_result(forged)
+    assert forged != zero
 
 
 def test_local_admissibility_uses_complete_finite_cutoff() -> None:
@@ -331,15 +319,15 @@ def test_translation_preserves_local_factors_and_form_ids() -> None:
     payload = translated.model_dump(mode="json")
     payload["translated"]["forms"][0]["constant"] = "2"
     forged = PrimeAffineTranslationResult.model_validate(payload)
-    assert not verify_translation_result(forged)
+    assert forged != translated
 
 
 def test_translation_rejects_translated_tuple_exceeding_aggregate_digit_bound() -> None:
     source = _tuple(
         *(_form(f"f{index:03d}", 10**127 + index, 1) for index in range(512))
     )
-    with pytest.raises(ValidationError):
-        PrimeAffineTranslationRequest(source=source, shift=str(10**63))
+    with pytest.raises(OperationDomainValidationError):
+        compute_translation(PrimeAffineTranslationRequest(source=source, shift=str(10**63)))
 
 
 def test_translation_admits_translated_tuple_at_the_aggregate_digit_bound() -> None:
@@ -375,11 +363,13 @@ def test_interval_preflights_oversized_endpoints_before_integer_parsing(
 
     monkeypatch.setattr(interval_contracts, "parse_canonical_integer", fail_parse)
 
-    with pytest.raises(ValidationError, match="source-sensitive pre-parse"):
-        PrimeAffineIntervalCountRequest(
-            source=TWIN_PRIMES,
-            lower="9" * 258,
-            upper="9" * 258,
+    with pytest.raises(OperationDomainValidationError, match="source-sensitive pre-parse"):
+        compute_interval_count(
+            PrimeAffineIntervalCountRequest(
+                source=TWIN_PRIMES,
+                lower="9" * 258,
+                upper="9" * 258,
+            )
         )
 
 
@@ -395,11 +385,13 @@ def test_residue_profile_preflights_oversized_endpoints_before_integer_parsing(
 
     monkeypatch.setattr(interval_contracts, "parse_canonical_integer", fail_parse)
 
-    with pytest.raises(ValidationError, match="source-sensitive pre-parse"):
-        PrimeTupleIntervalResidueProfileRequest(
-            wheel=wheel,
-            lower="9" * 258,
-            upper="9" * 258,
+    with pytest.raises(OperationDomainValidationError, match="source-sensitive pre-parse"):
+        compute_interval_residue_profile(
+            PrimeTupleIntervalResidueProfileRequest(
+                wheel=wheel,
+                lower="9" * 258,
+                upper="9" * 258,
+            )
         )
 
 
@@ -411,8 +403,10 @@ def test_translation_preflights_oversized_shift_before_integer_parsing(
 
     monkeypatch.setattr(translation_contracts, "parse_canonical_integer", fail_parse)
 
-    with pytest.raises(ValidationError, match="source-sensitive pre-parse"):
-        PrimeAffineTranslationRequest(source=TWIN_PRIMES, shift="9" * 258)
+    with pytest.raises(OperationDomainValidationError, match="source-sensitive pre-parse"):
+        compute_translation(
+            PrimeAffineTranslationRequest(source=TWIN_PRIMES, shift="9" * 258)
+        )
 
 
 def test_residue_wheel_and_membership_compose_without_reconstruction() -> None:
@@ -488,17 +482,15 @@ def test_wheel_result_rejects_component_and_source_mutations() -> None:
     wrong_source = deepcopy(payload)
     wrong_source["source"]["forms"][1]["constant"] = "4"
     forged_wheel = PrimeTupleResidueWheel.model_validate(wrong_source)
-    assert not verify_residue_wheel(forged_wheel)
+    assert forged_wheel != wheel
 
     enumeration = compute_residue_wheel_enumeration(
         PrimeTupleResidueWheelEnumerationRequest(wheel=wheel)
     )
     wrong_component = enumeration.model_dump(mode="json")
     wrong_component["residues"][0]["components"] = [0, 2]
-    forged_enumeration = PrimeTupleResidueWheelEnumeration.model_validate(
-        wrong_component
-    )
-    assert not verify_residue_wheel_enumeration(forged_enumeration)
+    forged_enumeration = PrimeTupleResidueWheelEnumeration.model_validate(wrong_component)
+    assert forged_enumeration != enumeration
 
     oversized_scalar = deepcopy(payload)
     oversized_scalar["modulus"] = "9" * 4_097
@@ -515,13 +507,21 @@ def test_wheel_consumers_reject_a_structurally_valid_forged_wheel() -> None:
     forged = wheel.model_dump(mode="json")
     forged["modulus"] = "0"
 
-    with pytest.raises(ValidationError, match="must equal the compact residue wheel"):
-        PrimeTupleResidueWheelEnumerationRequest.model_validate({"wheel": forged})
-    with pytest.raises(ValidationError, match="must equal the compact residue wheel"):
-        PrimeTupleWheelMembershipRequest.model_validate({"wheel": forged, "value": "5"})
-    with pytest.raises(ValidationError, match="must equal the compact residue wheel"):
-        PrimeTupleIntervalResidueProfileRequest.model_validate(
-            {"wheel": forged, "lower": "0", "upper": "12"}
+    with pytest.raises(OperationDomainValidationError, match="wheel modulus"):
+        compute_residue_wheel_enumeration(
+            PrimeTupleResidueWheelEnumerationRequest.model_validate({"wheel": forged})
+        )
+    with pytest.raises(OperationDomainValidationError, match="wheel modulus"):
+        compute_wheel_membership(
+            PrimeTupleWheelMembershipRequest.model_validate(
+                {"wheel": forged, "value": "5"}
+            )
+        )
+    with pytest.raises(OperationDomainValidationError, match="wheel modulus"):
+        compute_interval_residue_profile(
+            PrimeTupleIntervalResidueProfileRequest.model_validate(
+                {"wheel": forged, "lower": "0", "upper": "12"}
+            )
         )
 
 
@@ -568,7 +568,7 @@ def test_interval_count_and_enumeration_are_exact_and_aligned() -> None:
     payload = enumeration.model_dump(mode="json")
     payload["matches"][0]["prime_values"][1] = "7"
     forged = PrimePatternIntervalEnumerateResult.model_validate(payload)
-    assert not verify_interval_enumerate_result(forged)
+    assert forged != enumeration
 
     payload = enumeration.model_dump(mode="json")
     payload["matches"][0]["parameter"] = "-1"
@@ -620,11 +620,11 @@ def test_wheel_survival_is_not_mislabelled_as_primality() -> None:
 def test_request_boundaries_reject_before_expansion() -> None:
     identity_form = _tuple(_form("n", 1, 0))
 
-    PrimeTupleLocalFactorRequest(source=identity_form, prime=8_191)
-    with pytest.raises(ValidationError):
-        PrimeTupleLocalFactorRequest(source=identity_form, prime=8_209)
-    with pytest.raises(ValidationError):
-        PrimeTupleLocalFactorRequest(source=identity_form, prime=15)
+    compute_local_factor(PrimeTupleLocalFactorRequest(source=identity_form, prime=8_191))
+    with pytest.raises(OperationDomainValidationError):
+        compute_local_factor(PrimeTupleLocalFactorRequest(source=identity_form, prime=8_209))
+    with pytest.raises(OperationDomainValidationError):
+        compute_local_factor(PrimeTupleLocalFactorRequest(source=identity_form, prime=15))
     with pytest.raises(ValidationError):
         PrimeTupleLocalSummary(
             prime=15,
@@ -632,14 +632,22 @@ def test_request_boundaries_reject_before_expansion() -> None:
             bad_count=0,
             valid_count=15,
         )
-    with pytest.raises(ValidationError):
-        PrimeTupleLocalFactorsRequest(source=identity_form, primes=(3, 2))
-    with pytest.raises(ValidationError):
-        PrimeTupleLocalFactorsRequest(source=identity_form, primes=(2, 2))
+    with pytest.raises(OperationDomainValidationError):
+        compute_local_factors(
+            PrimeTupleLocalFactorsRequest(source=identity_form, primes=(3, 2))
+        )
+    with pytest.raises(OperationDomainValidationError):
+        compute_local_factors(
+            PrimeTupleLocalFactorsRequest(source=identity_form, primes=(2, 2))
+        )
 
-    PrimeAffineIntervalCountRequest(source=identity_form, lower="0", upper="99999")
-    with pytest.raises(ValidationError):
-        PrimeAffineIntervalCountRequest(source=identity_form, lower="0", upper="100000")
+    compute_interval_count(
+        PrimeAffineIntervalCountRequest(source=identity_form, lower="0", upper="99999")
+    )
+    with pytest.raises(OperationDomainValidationError):
+        compute_interval_count(
+            PrimeAffineIntervalCountRequest(source=identity_form, lower="0", upper="100000")
+        )
 
     # A 65-digit endpoint is harmless when its affine values cancel to the
     # admitted deterministic primality range.  The two existing interval scans
@@ -664,36 +672,41 @@ def test_request_boundaries_reject_before_expansion() -> None:
     )
     assert cancelled_enumeration.matches == ()
 
-    PrimeAffineIntervalEnumerateRequest(source=identity_form, lower="0", upper="32767")
-    with pytest.raises(ValidationError):
-        PrimeAffineIntervalEnumerateRequest(
-            source=identity_form, lower="0", upper="32768"
+    compute_interval_enumerate(
+        PrimeAffineIntervalEnumerateRequest(source=identity_form, lower="0", upper="32767")
+    )
+    with pytest.raises(OperationDomainValidationError):
+        compute_interval_enumerate(
+            PrimeAffineIntervalEnumerateRequest(
+                source=identity_form, lower="0", upper="32768"
+            )
         )
 
     cancellation_source = _tuple(_form("shifted_n", 1, -(10**63)))
-    with pytest.raises(ValidationError):
-        PrimeAffineIntervalEnumerateRequest(
-            source=cancellation_source,
-            lower=str(10**63),
-            upper=str(10**63 + 20_000),
+    with pytest.raises(OperationDomainValidationError):
+        compute_interval_enumerate(
+            PrimeAffineIntervalEnumerateRequest(
+                source=cancellation_source,
+                lower=str(10**63),
+                upper=str(10**63 + 20_000),
+            )
         )
 
-    PrimeAffineIntervalCountRequest(
-        source=identity_form,
-        lower=str(2**64 - 1),
-        upper=str(2**64 - 1),
-    )
-    with pytest.raises(ValidationError):
+    compute_interval_count(
         PrimeAffineIntervalCountRequest(
-            source=identity_form,
-            lower=str(2**64),
-            upper=str(2**64),
+            source=identity_form, lower=str(2**64 - 1), upper=str(2**64 - 1)
+        )
+    )
+    with pytest.raises(OperationDomainValidationError):
+        compute_interval_count(
+            PrimeAffineIntervalCountRequest(
+                source=identity_form, lower=str(2**64), upper=str(2**64)
+            )
         )
 
     large_machine_prime = 4_294_967_291
-    PrimeTupleLocalFactorsRequest(
-        source=identity_form,
-        primes=(large_machine_prime,),
+    compute_local_factors(
+        PrimeTupleLocalFactorsRequest(source=identity_form, primes=(large_machine_prime,))
     )
     machine_prime_wheel = compute_residue_wheel(
         PrimeTupleResidueWheelRequest(
@@ -704,41 +717,21 @@ def test_request_boundaries_reject_before_expansion() -> None:
     assert machine_prime_wheel.modulus == str(large_machine_prime)
     assert machine_prime_wheel.valid_count == str(large_machine_prime - 1)
 
-    PrimeTupleResidueWheelRequest(source=identity_form, primes=(8_209,))
     large_compact_wheel = compute_residue_wheel(
         PrimeTupleResidueWheelRequest(source=identity_form, primes=(8_209,))
     )
     assert large_compact_wheel.valid_count == "8208"
-    with pytest.raises(ValidationError):
-        PrimeTupleResidueWheelEnumerationRequest(wheel=large_compact_wheel)
-
-    with pytest.raises(ValidationError):
-        PrimeAffineTranslationRequest(
-            source=_tuple(_form("large", 1, int("9" * 256))),
-            shift="1",
+    with pytest.raises(OperationDomainValidationError):
+        compute_residue_wheel_enumeration(
+            PrimeTupleResidueWheelEnumerationRequest(wheel=large_compact_wheel)
         )
 
-
-def test_private_verification_reapplies_request_bounds() -> None:
-    count = compute_interval_count(
-        PrimeAffineIntervalCountRequest(
-            source=_tuple(_form("n", 1, 0)), lower="0", upper="10"
+    with pytest.raises(OperationDomainValidationError):
+        compute_translation(
+            PrimeAffineTranslationRequest(
+                source=_tuple(_form("large", 1, int("9" * 256))), shift="1"
+            )
         )
-    )
-    overbound_count = count.model_dump(mode="json")
-    overbound_count["upper"] = "100000"
-    with pytest.raises(ValidationError):
-        interval_contracts.verify_interval_count_result(
-            PrimePatternIntervalCountResult.model_validate(overbound_count)
-        )
-
-    wheel = compute_residue_wheel(
-        PrimeTupleResidueWheelRequest(source=TWIN_PRIMES, primes=(2, 3))
-    )
-    overbound_wheel = wheel.model_dump(mode="json")
-    overbound_wheel["primes"] = [9_007_199_254_740_993]
-    with pytest.raises(ValidationError):
-        verify_residue_wheel(PrimeTupleResidueWheel.model_validate(overbound_wheel))
 
 
 def test_prime_sets_and_interval_relations_are_schema_visible() -> None:
