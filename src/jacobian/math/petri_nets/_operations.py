@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.petri_nets._models import (
+    MAX_SIPHON_TRAP_PLACES,
+    MAX_SIPHON_TRAP_WORK,
     EnabledTransitionsRequest,
     EnabledTransitionsResult,
     FireTransitionRequest,
@@ -22,7 +25,11 @@ from jacobian.math.petri_nets.operations import (
     fire_transition,
     reachability_graph,
 )
-from jacobian.math.petri_nets.values import MAX_PETRI_MARKING, Marking
+from jacobian.math.petri_nets.values import (
+    MAX_PETRI_MARKING,
+    Marking,
+    require_reachability_bounds,
+)
 
 __all__ = [
     "compute_enabled_transitions",
@@ -61,6 +68,14 @@ def compute_incidence(request: IncidenceMatrixRequest) -> IncidenceMatrixResult:
 
 
 def compute_reachability(request: ReachabilityRequest) -> ReachabilityResult:
+    try:
+        require_reachability_bounds(request.net, request.max_states)
+    except ValueError as error:
+        raise OperationDomainValidationError(
+            location=("net", "max_states"),
+            code="petri_net.reachability_bound",
+            message=str(error),
+        ) from error
     states, edges, truncated = reachability_graph(
         request.net, request.initial_marking, request.max_states
     )
@@ -72,6 +87,27 @@ def compute_reachability(request: ReachabilityRequest) -> ReachabilityResult:
 
 
 def compute_siphon_trap(request: SiphonTrapRequest) -> SiphonTrapResult:
+    if request.net.place_count > MAX_SIPHON_TRAP_PLACES:
+        raise OperationDomainValidationError(
+            location=("net",),
+            code="petri_net.siphon_trap_place_bound",
+            message=(
+                "siphon/trap check supports at most "
+                f"{MAX_SIPHON_TRAP_PLACES} places for exact enumeration"
+            ),
+        )
+    candidates = (1 << request.net.place_count) - 1
+    work = 2 * candidates * (
+        request.net.transition_count + request.net.place_count
+    )
+    if work > MAX_SIPHON_TRAP_WORK:
+        raise OperationDomainValidationError(
+            location=("net",),
+            code="petri_net.siphon_trap_work_bound",
+            message=(
+                "siphon/trap candidate and transition-scan work exceeds the admitted bound"
+            ),
+        )
     siphons = find_minimal_siphons(request.net)
     traps = find_minimal_traps(request.net)
     return SiphonTrapResult(

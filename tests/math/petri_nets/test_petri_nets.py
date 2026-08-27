@@ -7,7 +7,9 @@
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.petri_nets._models import (
+    MAX_SIPHON_TRAP_PLACES,
     EnabledTransitionsRequest,
     FireTransitionRequest,
     IncidenceMatrixRequest,
@@ -344,10 +346,13 @@ def test_petri_values_enforce_advertised_arc_and_marking_bounds() -> None:
 
 def test_siphon_trap_admission_charges_transition_scan_work() -> None:
     net = PetriNet(
-        place_count=20,
+        place_count=MAX_SIPHON_TRAP_PLACES,
         transition_count=64,
-        pre=tuple((0,) * 64 for _ in range(20)),
-        post=tuple((0,) * 64 for _ in range(20)),
+        pre=tuple((0,) * 64 for _ in range(MAX_SIPHON_TRAP_PLACES)),
+        post=tuple((0,) * 64 for _ in range(MAX_SIPHON_TRAP_PLACES)),
     )
-    with pytest.raises(ValidationError, match="candidate and transition-scan work"):
-        SiphonTrapRequest(net=net)
+    request = SiphonTrapRequest(net=net)
+    with pytest.raises(
+        OperationDomainValidationError, match="candidate and transition-scan work"
+    ):
+        compute_siphon_trap(request)
