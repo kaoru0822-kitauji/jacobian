@@ -30,17 +30,6 @@ class BooleanTruthTableRequest(StrictModel):
         max_length=MAX_TRUTH_TABLE_LENGTH,
     )
 
-    @model_validator(mode="after")
-    def require_power_of_two_length(self) -> Self:
-        n = len(self.truth_table)
-        if n & (n - 1) != 0:
-            raise _validation_error(
-                "truth_table_length_invalid",
-                "truth table length must be a power of two",
-            )
-        return self
-
-
 class BooleanWalshTransformResult(StrictModel):
     """The exact Boolean Walsh spectrum of a Boolean truth table.
 

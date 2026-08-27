@@ -132,8 +132,9 @@ def test_walsh_transform_agrees_with_direct_character_sum(
 
 
 def test_walsh_transform_rejects_non_power_of_two_length() -> None:
+    request = BooleanTruthTableRequest(truth_table=(0, 1, 1))
     with pytest.raises(ValueError, match="power of two"):
-        BooleanTruthTableRequest(truth_table=(0, 1, 1))
+        compute_walsh_hadamard_transform(request)
 
 
 def test_walsh_transform_rejects_empty_truth_table() -> None:
