@@ -11,7 +11,6 @@ from jacobian.math.coherent_configurations._models import (
 )
 from jacobian.math.coherent_configurations._operations import (
     compute_analyze,
-    verify_analyze_result,
     verify_finite_coherent_configuration,
 )
 from jacobian.math.coherent_configurations._tools import TOOLS
@@ -316,7 +315,7 @@ def test_maximum_point_count_translation_configuration_is_admitted() -> None:
     assert len(result.intersection_numbers) == 12**3
 
 
-def test_produced_results_round_trip_and_pass_explicit_replay() -> None:
+def test_produced_results_round_trip() -> None:
     """Both trusted outcome shapes remain valid canonical wire values."""
 
     coherent = compute_analyze(_request(_complete_graph_k3()))
@@ -330,8 +329,6 @@ def test_produced_results_round_trip_and_pass_explicit_replay() -> None:
     )
     assert restored_coherent == coherent
     assert restored_noncoherent == noncoherent
-    assert verify_analyze_result(restored_coherent)
-    assert verify_analyze_result(restored_noncoherent)
 
 
 def test_over_relation_bound_is_rejected_before_analysis() -> None:
@@ -340,19 +337,3 @@ def test_over_relation_bound_is_rejected_before_analysis() -> None:
 
     with pytest.raises(ValidationError):
         _request(payload)
-
-
-def test_explicit_result_replay_rejects_intersection_and_source_mutations() -> None:
-    result = compute_analyze(_request(_complete_graph_k3()))
-    payload = result.model_dump(mode="json")
-    payload["intersection_numbers"][0]["value"] = 99
-    assert not verify_analyze_result(
-        CoherentConfigurationAnalyzeResult.model_validate(payload)
-    )
-
-    payload = result.model_dump(mode="json")
-    payload["configuration"]["relation_matrix"][0][1] = "diagonal"
-    payload["coherent_configuration"]["relation_matrix"][0][1] = "diagonal"
-    assert not verify_analyze_result(
-        CoherentConfigurationAnalyzeResult.model_validate(payload)
-    )
