@@ -824,16 +824,6 @@ class DirectSumPredicateRequest(StrictModel):
     left: FiniteIntegerSet
     right: FiniteIntegerSet
 
-    @model_validator(mode="after")
-    def require_bounded_cartesian_product(self) -> Self:
-        _require_bounded_cartesian_product(self.left, self.right)
-        _require_direct_sum_result_transport_bound(
-            self.modulus,
-            self.left,
-            self.right,
-        )
-        return self
-
 
 class DirectSumPredicateResult(StrictModel):
     """Whether the direct sum tiles ``Z_n`` and witnesses/counterexamples."""

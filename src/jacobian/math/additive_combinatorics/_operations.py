@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Mapping
 
+from pydantic_core import PydanticCustomError
+
 from jacobian.canonical import format_canonical_integer, parse_canonical_integer
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.additive_combinatorics import _multiset_sum
@@ -30,6 +32,7 @@ from jacobian.math.additive_combinatorics._models import (
     SumsetCardinalityResult,
     _multiset_sum_source_values,
     _require_bounded_cartesian_product,
+    _require_direct_sum_result_transport_bound,
     _vector_from_ints,
 )
 from jacobian.math.additive_combinatorics._multiset_sum import count_sums
@@ -63,6 +66,22 @@ def _representation_function(
 
 def _sorted_sums(counts: Mapping[int, int]) -> list[int]:
     return sorted(counts.keys())
+
+
+def _admit_direct_sum(request: DirectSumPredicateRequest) -> None:
+    try:
+        _require_bounded_cartesian_product(request.left, request.right)
+        _require_direct_sum_result_transport_bound(
+            request.modulus,
+            request.left,
+            request.right,
+        )
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=("left", "right"),
+            code=exc.type,
+            message=exc.message(),
+        ) from None
 
 
 def compute_representation_profile(
@@ -243,6 +262,7 @@ def decide_direct_sum_predicate(
     representatives of every residue, residues with multiple representations
     (collisions), and residues with no representation (missing).
     """
+    _admit_direct_sum(request)
     modulus = request.modulus
     if modulus < 2:
         raise ValueError("cyclic group modulus must be at least 2")

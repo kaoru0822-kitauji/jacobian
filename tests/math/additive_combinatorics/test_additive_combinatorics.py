@@ -1,13 +1,13 @@
 """Tests for additive combinatorics operations."""
 
 import pytest
-from pydantic import ValidationError
 
 from jacobian.canonical import (
     CanonicalLimits,
     encode_strict_json,
     parse_canonical_integer,
 )
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.additive_combinatorics._models import (
     AdditiveEnergyRequest,
     DirectSumPredicateRequest,
@@ -222,12 +222,14 @@ class TestDirectSumPredicate:
         assert request.modulus == modulus
 
     def test_rejects_oversized_missing_diagnostic_before_kernel_execution(self) -> None:
-        with pytest.raises(ValidationError) as exc_info:
-            DirectSumPredicateRequest(
-                modulus=1_200_000,
-                left=FiniteIntegerSet(elements=()),
-                right=FiniteIntegerSet(elements=()),
-            )
+        request = DirectSumPredicateRequest(
+            modulus=1_200_000,
+            left=FiniteIntegerSet(elements=()),
+            right=FiniteIntegerSet(elements=()),
+        )
+
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            decide_direct_sum_predicate(request)
 
         assert exc_info.value.errors()[0]["type"] == (
             "additive_combinatorics.direct_sum_result_transport_exceeded"
