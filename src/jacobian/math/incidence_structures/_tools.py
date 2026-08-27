@@ -116,22 +116,30 @@ TOOLS: tuple[MathTool[Any, Any], ...] = (
     ),
     _op(
         "incidence.containment_profiles.compute",
-        "Compute t-subset containment multiplicity profiles",
-        "For a bounded order t, return the finite map from every t-subset "
-        "of points to the number of blocks containing it, plus the "
-        "multiplicity histogram and whether the profile is constant.",
+        "Compute all t-codegrees in an incidence containment profile",
+        "For a finite incidence structure and bounded order t, compute all "
+        "t-codegrees: the containment counts from every t-subset of points to "
+        "the number of blocks containing it. This is the complete codegree "
+        "profile of the associated block hypergraph. The result includes a "
+        "multiplicity histogram and records whether it is a uniform codegree "
+        "profile.",
         ContainmentProfileRequest,
         ContainmentProfileResult,
         compute_containment_profile,
         "combinatorics",
         "incidence",
+        "t-codegree",
+        "t-codegrees",
+        "codegree",
+        "codegree-profile",
         "exact",
         examples=(
             example(
-                "triangle_t1",
-                "Compute containment profiles at t=1 for a 3-point, 2-block "
-                "structure; returns per-point multiplicities.",
-                {"incidence": _STRUCTURE, "t": 1},
+                "triangle_pair_codegrees",
+                "Compute the exact t=2 codegrees of all pairs in a 3-point, "
+                "2-block incidence structure, including the zero codegree of "
+                "the pair {p1, p3}.",
+                {"incidence": _STRUCTURE, "t": 2},
             ),
         ),
     ),
