@@ -4,11 +4,9 @@ from __future__ import annotations
 
 from typing import Self
 
-from pydantic import Field, model_validator
-from pydantic_core import PydanticCustomError
+from pydantic import Field
 
 from jacobian._models import StrictModel
-from jacobian.math.graphical_models._validation import validate_d_separation_input
 from jacobian.math.graphical_models.values import (
     MAX_MODEL_VARS,
     Factor,
@@ -19,15 +17,6 @@ from jacobian.math.graphical_models.values import (
 class FactorMultiplyRequest(StrictModel):
     left: Factor
     right: Factor
-
-    @model_validator(mode="after")
-    def require_compatible_domains(self) -> Self:
-        if self.left.domain_sizes != self.right.domain_sizes:
-            raise PydanticCustomError(
-                "graphical_model.factor_domains_mismatch",
-                "factors must share the exact model domain_sizes",
-            )
-        return self
 
 
 class FactorMultiplyResult(FactorMultiplyRequest):
@@ -43,15 +32,6 @@ class FactorMultiplyResult(FactorMultiplyRequest):
 class FactorMarginalizeRequest(StrictModel):
     factor: Factor
     variable: Variable
-
-    @model_validator(mode="after")
-    def require_valid_variable(self) -> Self:
-        if self.variable not in self.factor.variables:
-            raise PydanticCustomError(
-                "graphical_model.factor_variable_missing",
-                "variable is not in factor",
-            )
-        return self
 
 
 class FactorMarginalizeResult(StrictModel):
@@ -78,23 +58,6 @@ class DSeparationRequest(StrictModel):
     set_a: tuple[Variable, ...] = Field(min_length=1, max_length=MAX_MODEL_VARS)
     set_b: tuple[Variable, ...] = Field(min_length=1, max_length=MAX_MODEL_VARS)
     set_c: tuple[Variable, ...] = Field(default=(), max_length=MAX_MODEL_VARS)
-
-    @model_validator(mode="after")
-    def require_dag_and_disjoint_sets(self) -> Self:
-        try:
-            validate_d_separation_input(
-                self.variable_count,
-                self.edges,
-                self.set_a,
-                self.set_b,
-                self.set_c,
-            )
-        except ValueError as error:
-            raise PydanticCustomError(
-                "graphical_model.d_separation_invalid",
-                str(error),
-            ) from error
-        return self
 
 
 class DSeparationResult(DSeparationRequest):
