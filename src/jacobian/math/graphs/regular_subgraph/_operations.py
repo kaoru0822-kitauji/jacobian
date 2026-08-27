@@ -67,12 +67,9 @@ def compute_k_regular_subgraph(
 
             if all(d == k for d in degree.values()):
                 # Found a k-regular subgraph.
-                used_vertex_labels = tuple(
-                    sorted(vertices[i] for i in used_vertices)
-                )
+                used_vertex_labels = tuple(sorted(vertices[i] for i in used_vertices))
                 used_edge_list = tuple(
-                    tuple(sorted((vertices[u], vertices[v])))
-                    for u, v in selected_edges
+                    tuple(sorted((vertices[u], vertices[v]))) for u, v in selected_edges
                 )
                 return RegularSubgraphResult(
                     graph=graph,

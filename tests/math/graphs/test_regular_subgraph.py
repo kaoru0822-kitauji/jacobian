@@ -7,9 +7,7 @@ from jacobian.math.graphs.regular_subgraph._operations import (
 from jacobian.math.graphs.values import SimpleUndirectedGraph
 
 
-def _graph(
-    vertices: list[str], edges: list[tuple[str, str]]
-) -> SimpleUndirectedGraph:
+def _graph(vertices: list[str], edges: list[tuple[str, str]]) -> SimpleUndirectedGraph:
     return SimpleUndirectedGraph(
         vertices=tuple(vertices),
         edges=tuple(tuple(sorted(e)) for e in edges),
