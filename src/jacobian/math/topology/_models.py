@@ -266,19 +266,6 @@ class SimplicialComplexRequest(StrictModel):
             "facets": tuple(tuple(facet) for facet in canonical.maximal_simplices),
         }
 
-    @model_validator(mode="after")
-    def require_bounded_maximal_facets(self) -> Self:
-        if any(
-            not 1 <= len(facet) <= MAX_TOPOLOGY_DIMENSION + 1 for facet in self.facets
-        ):
-            raise _validation_error(
-                "topology.require_bounded_maximal_facets_1",
-                "each facet must contain between 1 and "
-                f"{MAX_TOPOLOGY_DIMENSION + 1} vertices",
-            )
-        _require_request_complex(self.vertices, self.facets)
-        return self
-
     @classmethod
     def __get_pydantic_json_schema__(
         cls,
@@ -532,30 +519,6 @@ class ChainComplexRequest(StrictModel):
     prime: StrictInt | None = Field(default=None, ge=2, le=MAX_TOPOLOGY_PRIME)
     convention: HomologyConvention = HomologyConvention.UNREDUCED
 
-    @model_validator(mode="after")
-    def require_coefficient_semantics_and_bounds(self) -> Self:
-        if self.coefficient_ring is ChainCoefficientRing.INTEGER:
-            if self.prime is not None:
-                raise _validation_error(
-                    "topology.require_coefficient_semantics_and_bounds_1",
-                    "integer chain complexes must not declare a prime",
-                )
-        elif self.prime is None or not is_bounded_prime(self.prime):
-            raise _validation_error(
-                "topology.require_coefficient_semantics_and_bounds_2",
-                "prime-field chain complexes require a bounded prime",
-            )
-        require_linear_algebra_bounds(self.complex)
-        # Every accepted unreduced prime-field producer result must carry
-        # its canonical chain-complex value, whose basis and cell bounds
-        # are tighter than the sparse internal ones.
-        if (
-            self.coefficient_ring is ChainCoefficientRing.PRIME_FIELD
-            and self.convention is HomologyConvention.UNREDUCED
-        ):
-            _require_canonical_conversion_bounds(self.complex)
-        return self
-
 
 class SimplexBasis(StrictModel):
     dimension: StrictInt = Field(ge=0, le=MAX_TOPOLOGY_DIMENSION)
@@ -706,30 +669,13 @@ class ChainComplexResult(TopologyExactResult):
                 "canonical chain-complex value is only defined for unreduced "
                 "prime-field chains",
             )
-        if self.canonical_value is not None:
-            from jacobian.math.topology._chain_conversion import (
-                canonical_chain_complex_value_from_parts,
-            )
-
-            expected = canonical_chain_complex_value_from_parts(
-                self.coefficient_ring,
-                self.convention,
-                self.prime,
-                self.simplex_bases,
-                self.boundary_matrices,
-            )
-            if self.canonical_value != expected:
-                raise _validation_error(
-                    "topology.require_coherent_chain_contract_6",
-                    "canonical chain-complex value must match retained chain data",
-                )
         return self
 
     @classmethod
     def _from_kernel(cls, **values: Any) -> Self:
         """Build after the chain kernel established all derived fields."""
 
-        return cls(**values)
+        return cls.model_construct(**values)
 
 
 __all__ = [
@@ -828,7 +774,7 @@ class BarycentricSubdivisionResult(TopologyExactResult):
     def _from_kernel(cls, **values: Any) -> Self:
         """Build after the admitted subdivision kernel established the result."""
 
-        return cls(**values)
+        return cls.model_construct(**values)
 
 
 class ShellingCheckRequest(StrictModel):
@@ -839,15 +785,6 @@ class ShellingCheckRequest(StrictModel):
         min_length=1,
         max_length=MAX_TOPOLOGY_FACETS,
     )
-
-    @model_validator(mode="after")
-    def require_valid_order(self) -> Self:
-        if sorted(self.facet_order) != list(range(len(self.complex.facets))):
-            raise _validation_error(
-                "topology.require_valid_order_1",
-                "facet_order must be a permutation of facet indices",
-            )
-        return self
 
 
 class ShellingCheckResult(TopologyExactResult):
@@ -885,7 +822,7 @@ class ShellingCheckResult(TopologyExactResult):
     def _from_kernel(cls, **values: Any) -> Self:
         """Build after the admitted shelling kernel established the decision."""
 
-        return cls(**values)
+        return cls.model_construct(**values)
 
 
 __all__.extend(

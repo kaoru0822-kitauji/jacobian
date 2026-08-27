@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from itertools import pairwise
 from typing import Literal, Self
 
 from pydantic import Field, StrictInt, model_validator
@@ -24,7 +23,6 @@ from jacobian.math.topology._models import (
     TopologyExactResult,
     _validation_error,
     is_bounded_prime,
-    require_linear_algebra_bounds,
 )
 
 # Integral homology embeds every boundary/augmentation matrix, Smith
@@ -46,25 +44,6 @@ class SimplicialHomologyRequest(StrictModel):
     complex: FiniteSimplicialComplex
     prime: StrictInt = Field(ge=2, le=MAX_TOPOLOGY_PRIME)
     convention: HomologyConvention = HomologyConvention.UNREDUCED
-
-    @model_validator(mode="after")
-    def require_prime_and_bounds(self) -> Self:
-        if not is_bounded_prime(self.prime):
-            raise _validation_error(
-                "topology.require_prime_and_bounds_1",
-                "homology coefficients require a bounded prime",
-            )
-        require_linear_algebra_bounds(self.complex)
-        if any(
-            size > MAX_INLINE_HOMOLOGY_CHAIN_GROUP for size in self.complex.f_vector
-        ):
-            raise _validation_error(
-                "topology.require_prime_and_bounds_2",
-                "inline homology bases require at most "
-                f"{MAX_INLINE_HOMOLOGY_CHAIN_GROUP} simplices in each chain group",
-            )
-        return self
-
 
 class ModularVector(StrictModel):
     coefficients: tuple[StrictInt, ...] = Field(
@@ -181,36 +160,6 @@ class SimplicialHomologyResult(TopologyExactResult):
 class IntegralSimplicialHomologyRequest(StrictModel):
     complex: FiniteSimplicialComplex
     convention: HomologyConvention = HomologyConvention.UNREDUCED
-
-    @model_validator(mode="after")
-    def require_integral_certificate_bounds(self) -> Self:
-        require_linear_algebra_bounds(self.complex)
-        if any(
-            size > MAX_INTEGRAL_HOMOLOGY_CHAIN_GROUP for size in self.complex.f_vector
-        ):
-            raise _validation_error(
-                "topology.require_integral_certificate_bounds_1",
-                "integral homology requires at most "
-                f"{MAX_INTEGRAL_HOMOLOGY_CHAIN_GROUP} simplices in each chain group",
-            )
-        if sum(self.complex.f_vector) > MAX_INTEGRAL_HOMOLOGY_TOTAL_CHAIN_RANK:
-            raise _validation_error(
-                "topology.require_integral_certificate_bounds_2",
-                "integral homology requires total chain rank at most "
-                f"{MAX_INTEGRAL_HOMOLOGY_TOTAL_CHAIN_RANK}",
-            )
-        padded = (0, *self.complex.f_vector)
-        if any(
-            rows * columns > MAX_INTEGRAL_HOMOLOGY_MATRIX_CELLS
-            for rows, columns in pairwise(padded)
-        ):
-            raise _validation_error(
-                "topology.require_integral_certificate_bounds_3",
-                "integral homology boundary exceeds the "
-                f"{MAX_INTEGRAL_HOMOLOGY_MATRIX_CELLS}-cell bound",
-            )
-        return self
-
 
 class IntegralVector(StrictModel):
     coefficients: tuple[CanonicalInteger, ...] = Field(

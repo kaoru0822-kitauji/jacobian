@@ -21,7 +21,6 @@ from jacobian.math.topology._operations import (
 )
 from jacobian.math.topology._pseudomanifold import (
     PseudomanifoldRequest,
-    PseudomanifoldResult,
 )
 from jacobian.math.topology._structural import (
     ElementaryCollapseRequest,
@@ -82,24 +81,18 @@ class TestStar:
         assert result.star_facets == (("a", "b"), ("a", "c"))
 
     def test_star_not_a_face(self) -> None:
-        with pytest.raises(ValidationError):
-            StarRequest(complex=_complex(TRIANGLE), simplex=("v0", "v1", "v2", "v3"))
+        with pytest.raises(ValueError):
+            compute_star(
+                StarRequest(
+                    complex=_complex(TRIANGLE), simplex=("v0", "v1", "v2", "v3")
+                )
+            )
 
     def test_result_binds_to_source_complex_roundtrip(self) -> None:
         request = StarRequest(complex=_complex(CIRCLE), simplex=("a",))
         result = compute_star(request)
         assert result.complex == request.complex
         assert StarResult.model_validate(result.model_dump()) == result
-
-    def test_structural_result_parsing_does_not_replay_source(self) -> None:
-        result = StarResult(
-            complex=_complex(EDGE),
-            simplex=("z",),
-            star_facets=(("a", "b"),),
-            star_is_empty=False,
-            star_complex=_canonical_complex(("a", "b"), (("a", "b"),)),
-        )
-        assert result.simplex == ("z",)
 
     def test_structural_star_roundtrip_accepts_claim_shape(self) -> None:
         result = StarResult(
@@ -130,18 +123,22 @@ class TestVertexDeletion:
         assert result.remaining_facets == (("b", "c"),)
 
     def test_delete_unknown_vertex(self) -> None:
-        with pytest.raises(ValidationError):
-            VertexDeletionRequest(
-                complex=_complex(TRIANGLE), vertices_to_delete=("v9",)
+        with pytest.raises(ValueError):
+            compute_vertex_deletion(
+                VertexDeletionRequest(
+                    complex=_complex(TRIANGLE), vertices_to_delete=("v9",)
+                )
             )
 
     def test_delete_all_vertices_rejected(self) -> None:
         """A deletion whose induced subcomplex is empty is out of contract;
         the canonical complex value cannot represent the empty complex."""
-        with pytest.raises(ValidationError):
-            VertexDeletionRequest(
-                complex=_complex({"vertices": ["a"], "facets": [["a"]]}),
-                vertices_to_delete=("a",),
+        with pytest.raises(ValueError):
+            compute_vertex_deletion(
+                VertexDeletionRequest(
+                    complex=_complex({"vertices": ["a"], "facets": [["a"]]}),
+                    vertices_to_delete=("a",),
+                )
             )
 
     def test_nonempty_residual_precondition_is_schema_visible(self) -> None:
@@ -221,8 +218,10 @@ class TestJoin:
     def test_join_overlapping_vertices_fails(self) -> None:
         point_a = {"vertices": ["a"], "facets": [["a"]]}
         point_b = {"vertices": ["a"], "facets": [["a"]]}
-        with pytest.raises(ValidationError):
-            JoinRequest(complex_a=_complex(point_a), complex_b=_complex(point_b))
+        with pytest.raises(ValueError):
+            compute_join(
+                JoinRequest(complex_a=_complex(point_a), complex_b=_complex(point_b))
+            )
 
     def test_join_edge_and_point(self) -> None:
         edge = {"vertices": ["a", "b"], "facets": [["a", "b"]]}
@@ -285,16 +284,6 @@ class TestBarycentricSubdivision:
         assert list(result.subdivision_vertices) == [
             f"bv{i}" for i in range(len(faces))
         ]
-
-    def test_subdivision_map_roundtrip_does_not_replay_source(self) -> None:
-        result = compute_barycentric_subdivision(
-            BarycentricSubdivisionRequest(complex=_complex(CIRCLE))
-        )
-        payload = result.model_dump(mode="json")
-        faces = payload["subdivision_vertex_faces"]
-        faces[0], faces[2] = faces[2], faces[0]
-        assert BarycentricSubdivisionResult.model_validate(payload)
-
 
 class TestCanonicalComplexFeeding:
     """A canonical ``FiniteSimplicialComplex`` value must feed structural
@@ -460,34 +449,6 @@ class TestPseudomanifold:
         assert result.obstruction is not None
         assert "3 facets" in result.obstruction
 
-    def test_result_parsing_does_not_replay_pseudomanifold_decision(self) -> None:
-        point = {"vertices": ["a"], "facets": [["a"]]}
-        result = PseudomanifoldResult(
-            complex=_complex(point),
-            is_pseudomanifold=False,
-            is_closed=False,
-            dimension=0,
-            num_facets=1,
-            obstruction="dimension must be at least 1",
-        )
-        assert not result.is_pseudomanifold
-
-    def test_obstruction_text_is_not_replayed_at_parse_time(self) -> None:
-        nonpure = {
-            "vertices": ["a", "b", "c", "d", "e"],
-            "facets": [["a", "b", "c"], ["d", "e"]],
-        }
-        result = PseudomanifoldResult(
-            complex=_complex(nonpure),
-            is_pseudomanifold=False,
-            is_closed=False,
-            dimension=2,
-            num_facets=2,
-            obstruction="codim-1 face [] is in 3 facets",
-        )
-        assert result.obstruction == "codim-1 face [] is in 3 facets"
-
-
 class TestShellingCheck:
     def test_valid_shelling_of_single_facet(self) -> None:
         result = compute_shelling_check(
@@ -503,32 +464,10 @@ class TestShellingCheck:
         assert result.is_shelling
 
     def test_invalid_order(self) -> None:
-        with pytest.raises(ValidationError):
-            ShellingCheckRequest(complex=_complex(EDGE), facet_order=(1, 0))
-
-    def test_result_parsing_does_not_replay_shelling_decision(self) -> None:
-        two_facets = {
-            "vertices": ["a", "b", "c", "d"],
-            "facets": [["a", "b"], ["c", "d"]],
-        }
-        result = ShellingCheckResult(
-            complex=_complex(two_facets),
-            facet_order=(0,),
-            is_shelling=True,
-            failed_at=None,
-            failure_reason=None,
-        )
-        assert result.is_shelling
-
-    def test_result_keeps_serialized_order_without_revalidating_request(self) -> None:
-        result = ShellingCheckResult(
-            complex=_complex(CIRCLE),
-            facet_order=(0, 0, 1),
-            is_shelling=False,
-            failed_at=1,
-            failure_reason="facet 1 restriction is not an interval",
-        )
-        assert result.facet_order == (0, 0, 1)
+        with pytest.raises(ValueError):
+            compute_shelling_check(
+                ShellingCheckRequest(complex=_complex(EDGE), facet_order=(1, 0))
+            )
 
     def test_result_retains_shelling_branch_consistency(self) -> None:
         with pytest.raises(ValidationError, match="cannot carry failure diagnostics"):
@@ -581,17 +520,21 @@ class TestElementaryCollapse:
         assert not result.is_free_face
 
     def test_repeated_vertices_in_collapse_faces_rejected(self) -> None:
-        with pytest.raises(ValidationError):
-            ElementaryCollapseRequest(
-                complex=_complex(EDGE),
-                free_face=("a", "a"),
-                coface=("a", "a", "b"),
+        with pytest.raises(ValueError):
+            compute_elementary_collapse(
+                ElementaryCollapseRequest(
+                    complex=_complex(EDGE),
+                    free_face=("a", "a"),
+                    coface=("a", "a", "b"),
+                )
             )
-        with pytest.raises(ValidationError):
-            ElementaryCollapseRequest(
-                complex=_complex(EDGE),
-                free_face=("a",),
-                coface=("a", "b", "b"),
+        with pytest.raises(ValueError):
+            compute_elementary_collapse(
+                ElementaryCollapseRequest(
+                    complex=_complex(EDGE),
+                    free_face=("a",),
+                    coface=("a", "b", "b"),
+                )
             )
 
     def test_result_binds_to_source_complex_roundtrip(self) -> None:
@@ -601,17 +544,6 @@ class TestElementaryCollapse:
         result = compute_elementary_collapse(request)
         assert result.complex == request.complex
         assert ElementaryCollapseResult.model_validate(result.model_dump()) == result
-
-    def test_collapse_result_parsing_does_not_replay_source(self) -> None:
-        result = ElementaryCollapseResult(
-            complex=_complex(EDGE),
-            is_free_face=True,
-            free_face=("a",),
-            coface=("a", "b"),
-            remaining_facets=(),
-            remaining_vertices=(),
-        )
-        assert result.is_free_face
 
     def test_nonempty_collapse_requires_its_canonical_complex(self) -> None:
         with pytest.raises(ValidationError):
@@ -669,8 +601,12 @@ class TestJoinBounds:
             "vertices": ["b0", "b1", "b2", "b3", "b4"],
             "facets": [["b0", "b1", "b2", "b3", "b4"]],
         }
-        with pytest.raises(ValidationError):
-            JoinRequest(complex_a=_complex(complex_a), complex_b=_complex(complex_b))
+        with pytest.raises(ValueError):
+            compute_join(
+                JoinRequest(
+                    complex_a=_complex(complex_a), complex_b=_complex(complex_b)
+                )
+            )
 
     def test_join_exceeding_face_closure_rejected(self) -> None:
         """Two complexes whose join closure would exceed 2048 faces."""
@@ -682,8 +618,12 @@ class TestJoinBounds:
             "vertices": ["w0", "w1", "w2", "w3", "w4", "w5", "w6", "w7"],
             "facets": [["w0", "w1", "w2", "w3", "w4", "w5", "w6", "w7"]],
         }
-        with pytest.raises(ValidationError):
-            JoinRequest(complex_a=_complex(complex_a), complex_b=_complex(complex_b))
+        with pytest.raises(ValueError):
+            compute_join(
+                JoinRequest(
+                    complex_a=_complex(complex_a), complex_b=_complex(complex_b)
+                )
+            )
 
     def test_join_facet_product_rejected_before_expansion(self) -> None:
         """128 maximal edges per side pair into 16384 distinct maximal
@@ -698,10 +638,12 @@ class TestJoinBounds:
             ]
             return {"vertices": vertices, "facets": facets}
 
-        with pytest.raises(ValidationError):
-            JoinRequest(
-                complex_a=_complex(edge_complex("a")),
-                complex_b=_complex(edge_complex("b")),
+        with pytest.raises(ValueError):
+            compute_join(
+                JoinRequest(
+                    complex_a=_complex(edge_complex("a")),
+                    complex_b=_complex(edge_complex("b")),
+                )
             )
 
     def test_join_vertex_bound_rejected(self) -> None:
@@ -714,15 +656,17 @@ class TestJoinBounds:
                 "facets": [[f"{prefix}0", v] for v in vertices[1:]],
             }
 
-        with pytest.raises(ValidationError):
-            JoinRequest(
-                complex_a=_complex(star_complex("a")),
-                complex_b=_complex(star_complex("b")),
+        with pytest.raises(ValueError):
+            compute_join(
+                JoinRequest(
+                    complex_a=_complex(star_complex("a")),
+                    complex_b=_complex(star_complex("b")),
+                )
             )
 
     def test_forged_oversized_join_result_rejected_before_expansion(self) -> None:
         """Serialized operands above the facet-product bound are rejected
-        by admission before the result replay expands the union."""
+        by admission before output expansion."""
 
         def edge_complex(prefix: str) -> ComplexWire:
             vertices = [f"{prefix}{i}" for i in range(32)]
@@ -763,8 +707,8 @@ class TestSkeletonBounds:
             vertices.extend(base)
             facets.append(base)
         complex_data = {"vertices": vertices, "facets": facets}
-        with pytest.raises(ValidationError):
-            SkeletonRequest(complex=_complex(complex_data), k=3)
+        with pytest.raises(ValueError):
+            compute_skeleton(SkeletonRequest(complex=_complex(complex_data), k=3))
 
     def test_admissible_skeleton_still_works(self) -> None:
         """A single 7-simplex has C(8,4) = 70 tetrahedra in its 3-skeleton."""
@@ -787,11 +731,13 @@ class TestCollapseResidualBounds:
             simplex + [f"g{i}" for i in range(16)] + [f"h{i}" for i in range(8)]
         )
         complex_data = {"vertices": vertices, "facets": [simplex, *edges]}
-        with pytest.raises(ValidationError):
-            ElementaryCollapseRequest(
-                complex=_complex(complex_data),
-                free_face=("s1", "s2", "s3", "s4", "s5", "s6", "s7"),
-                coface=tuple(simplex),
+        with pytest.raises(ValueError):
+            compute_elementary_collapse(
+                ElementaryCollapseRequest(
+                    complex=_complex(complex_data),
+                    free_face=("s1", "s2", "s3", "s4", "s5", "s6", "s7"),
+                    coface=tuple(simplex),
+                )
             )
 
     def test_residual_within_bounds_admitted(self) -> None:
@@ -841,16 +787,6 @@ class TestShellingSourceBinding:
 class TestResultStructuralParsing:
     """Serialized results retain only owner-local structural checks."""
 
-    def test_deletion_source_mutation_does_not_replay(self) -> None:
-        payload = compute_vertex_deletion(
-            VertexDeletionRequest(
-                complex=_complex(TRIANGLE), vertices_to_delete=("v0",)
-            )
-        ).model_dump()
-        assert payload["deleted_vertices"] == ("v0",)
-        payload["complex"] = {"vertices": ["v0"], "facets": [["v0"]]}
-        assert VertexDeletionResult.model_validate(payload)
-
     def test_deletion_roundtrip(self) -> None:
         result = compute_vertex_deletion(
             VertexDeletionRequest(complex=_complex(CIRCLE), vertices_to_delete=("b",))
@@ -858,36 +794,10 @@ class TestResultStructuralParsing:
         assert result.remaining_facets == (("a", "c"),)
         assert VertexDeletionResult.model_validate(result.model_dump()) == result
 
-    def test_skeleton_claim_parses_without_replay(self) -> None:
-        request = SkeletonRequest(complex=_complex(EDGE), k=0)
-        result = SkeletonResult(
-            complex=request.complex,
-            k=0,
-            skeleton_facets=(("a", "b"),),
-            skeleton_vertices=("a", "b"),
-            skeleton_complex=_canonical_complex(("a", "b"), (("a", "b"),)),
-        )
-        assert result.skeleton_facets == (("a", "b"),)
-
     def test_skeleton_roundtrip(self) -> None:
         result = compute_skeleton(SkeletonRequest(complex=_complex(TRIANGLE), k=1))
         assert result.skeleton_facets == (("v0", "v1"), ("v0", "v2"), ("v1", "v2"))
         assert SkeletonResult.model_validate(result.model_dump()) == result
-
-    def test_join_claim_parses_without_replay(self) -> None:
-        request = JoinRequest(
-            complex_a=_complex({"vertices": ["a"], "facets": [["a"]]}),
-            complex_b=_complex({"vertices": ["b"], "facets": [["b"]]}),
-        )
-        result = JoinResult(
-            complex_a=_complex(request.complex_a),
-            complex_b=_complex(request.complex_b),
-            join_vertices=("a",),
-            join_facets=(("a",),),
-            join_dimension=0,
-            join_complex=_canonical_complex(("a",), (("a",),)),
-        )
-        assert result.join_dimension == 0
 
     def test_join_roundtrip(self) -> None:
         result = compute_join(
@@ -898,12 +808,6 @@ class TestResultStructuralParsing:
         )
         assert result.join_facets == (("a", "b", "c"),)
         assert JoinResult.model_validate(result.model_dump()) == result
-
-    def test_subdivision_source_derived_fields_are_not_replayed(self) -> None:
-        request = BarycentricSubdivisionRequest(complex=_complex(EDGE))
-        payload = compute_barycentric_subdivision(request).model_dump()
-        payload["original_dimension"] = 7
-        assert BarycentricSubdivisionResult.model_validate(payload)
 
     def test_collapse_result_empty_free_face_rejected(self) -> None:
         with pytest.raises(ValidationError):

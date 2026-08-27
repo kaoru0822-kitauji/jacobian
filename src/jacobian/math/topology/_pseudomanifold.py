@@ -1,4 +1,4 @@
-"""Pseudomanifold decision contracts and replay kernel."""
+"""Pseudomanifold decision contracts and decision kernel."""
 
 from __future__ import annotations
 
@@ -96,7 +96,7 @@ class PseudomanifoldResult(TopologyExactResult):
     def _from_kernel(
         cls, request: PseudomanifoldRequest, *, decision: _PseudomanifoldDecision
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             complex=request.complex,
             is_pseudomanifold=decision.is_pseudomanifold,
             is_closed=decision.is_closed,

@@ -6,7 +6,6 @@ from __future__ import annotations
 from typing import Any, Literal, overload
 
 import pytest
-from pydantic import ValidationError
 
 from jacobian.catalog.models import MathTool
 from jacobian.math.chain_complexes._models import (
@@ -101,11 +100,6 @@ def test_producer_result_carries_its_canonical_value() -> None:
     assert result.canonical_value == simplicial_chain_complex_value(result)
     homology = compute_homology(ComputeHomologyRequest(complex=result.canonical_value))
     assert [group.betti_number for group in homology.homology_groups] == [1, 1]
-
-    payload = result.model_dump()
-    payload["canonical_value"]["prime"] = 3
-    with pytest.raises(ValidationError, match="must match retained chain data"):
-        type(result).model_validate(payload)
 
 
 def test_integral_producer_result_admits_no_canonical_value() -> None:
@@ -202,11 +196,13 @@ def test_oversized_simplicial_groups_stay_outside_the_canonical_domain() -> None
         SimplicialComplexRequest(vertices=labels, facets=facets)
     )
     with pytest.raises(ValueError):
-        ChainComplexRequest(
-            complex=big.complex,
-            coefficient_ring=ChainCoefficientRing.PRIME_FIELD,
-            prime=2,
-            convention=HomologyConvention.UNREDUCED,
+        _operation("topology.simplicial_complex.chain_complex.compute").run(
+            ChainComplexRequest(
+                complex=big.complex,
+                coefficient_ring=ChainCoefficientRing.PRIME_FIELD,
+                prime=2,
+                convention=HomologyConvention.UNREDUCED,
+            )
         )
 
 
@@ -223,9 +219,11 @@ def test_aggregate_canonical_cell_bound_is_enforced() -> None:
     )
     assert complex_.f_vector == (40, 60, 40, 10)
     with pytest.raises(ValueError):
-        ChainComplexRequest(
-            complex=complex_,
-            coefficient_ring=ChainCoefficientRing.PRIME_FIELD,
-            prime=2,
-            convention=HomologyConvention.UNREDUCED,
+        _operation("topology.simplicial_complex.chain_complex.compute").run(
+            ChainComplexRequest(
+                complex=complex_,
+                coefficient_ring=ChainCoefficientRing.PRIME_FIELD,
+                prime=2,
+                convention=HomologyConvention.UNREDUCED,
+            )
         )

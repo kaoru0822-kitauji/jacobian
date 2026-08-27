@@ -27,6 +27,7 @@ from jacobian.math.topology._models import (
     _validation_error,
     canonical_complex,
 )
+from jacobian.math.topology._request_admission import require_complex_admission
 
 
 def _all_nonempty_faces(facets: tuple[Simplex, ...]) -> set[Simplex]:
@@ -122,6 +123,44 @@ def _require_complex_matches_facets(
         )
 
 
+def _require_simplex_in_complex(
+    complex_: SimplicialComplexRequest, simplex: tuple[str, ...]
+) -> None:
+    simplex_set = set(simplex)
+    if len(simplex_set) != len(simplex):
+        raise ValueError("simplex vertices must be distinct")
+    if not simplex_set.issubset(complex_.vertices):
+        raise ValueError("simplex vertices must be in the complex")
+    if not any(simplex_set.issubset(facet) for facet in complex_.facets):
+        raise ValueError("simplex must be a face of the complex")
+
+
+def _require_deletion(
+    complex_: SimplicialComplexRequest, vertices_to_delete: tuple[str, ...]
+) -> None:
+    deleted = set(vertices_to_delete)
+    if len(deleted) != len(vertices_to_delete):
+        raise ValueError("vertices_to_delete must be distinct")
+    if not deleted.issubset(complex_.vertices):
+        raise ValueError("vertices_to_delete must be in the complex")
+    if all(frozenset(facet).issubset(deleted) for facet in complex_.facets):
+        raise ValueError("deletion must leave at least one simplex")
+
+
+def _require_collapse(
+    complex_: SimplicialComplexRequest,
+    free_face: tuple[str, ...],
+    coface: tuple[str, ...],
+) -> None:
+    free_set, coface_set = set(free_face), set(coface)
+    if len(free_set) != len(free_face) or len(coface_set) != len(coface):
+        raise ValueError("collapse faces must have distinct vertices")
+    if not free_set < coface_set:
+        raise ValueError("free_face must be a proper subset of coface")
+    if len(coface_set) != len(free_set) + 1:
+        raise ValueError("elementary collapse requires codimension-one faces")
+
+
 class FVectorRequest(StrictModel):
     """Request the f-vector and h-vector of a simplicial complex."""
 
@@ -145,26 +184,6 @@ class LinkRequest(StrictModel):
         min_length=1, max_length=MAX_TOPOLOGY_DIMENSION + 1
     )
 
-    @model_validator(mode="after")
-    def require_valid_simplex(self) -> Self:
-        simplex = set(self.simplex)
-        if len(simplex) != len(self.simplex):
-            raise _validation_error(
-                "topology.require_valid_simplex_1", "simplex vertices must be distinct"
-            )
-        if not simplex.issubset(self.complex.vertices):
-            raise _validation_error(
-                "topology.require_valid_simplex_2",
-                "simplex vertices must be in the complex",
-            )
-        if not any(simplex.issubset(facet) for facet in self.complex.facets):
-            raise _validation_error(
-                "topology.require_valid_simplex_3",
-                "simplex must be a face of the complex",
-            )
-        return self
-
-
 class LinkResult(TopologyExactResult):
     """The maximal facets of the link of a simplex."""
 
@@ -180,27 +199,6 @@ class StarRequest(StrictModel):
     simplex: tuple[VertexLabel, ...] = Field(
         min_length=1, max_length=MAX_TOPOLOGY_DIMENSION + 1
     )
-
-    @model_validator(mode="after")
-    def require_valid_star_simplex(self) -> Self:
-        simplex = set(self.simplex)
-        if len(simplex) != len(self.simplex):
-            raise _validation_error(
-                "topology.require_valid_star_simplex_1",
-                "simplex vertices must be distinct",
-            )
-        if not simplex.issubset(self.complex.vertices):
-            raise _validation_error(
-                "topology.require_valid_star_simplex_2",
-                "simplex vertices must be in the complex",
-            )
-        if not any(simplex.issubset(facet) for facet in self.complex.facets):
-            raise _validation_error(
-                "topology.require_valid_star_simplex_3",
-                "simplex must be a face of the complex",
-            )
-        return self
-
 
 class StarResult(TopologyExactResult):
     """The closed star produced for a simplex."""
@@ -254,7 +252,7 @@ class StarResult(TopologyExactResult):
 
     @classmethod
     def _from_kernel(cls, **values: Any) -> Self:
-        return cls(**values)
+        return cls.model_construct(**values)
 
 
 class VertexDeletionRequest(StrictModel):
@@ -271,27 +269,6 @@ class VertexDeletionRequest(StrictModel):
         max_length=MAX_TOPOLOGY_VERTICES,
         description="Vertex subset to remove. The deletion must leave at least one simplex on the remaining vertices: deleting every vertex is rejected because the empty complex has no canonical value.",
     )
-
-    @model_validator(mode="after")
-    def require_valid_deletion(self) -> Self:
-        deleted = set(self.vertices_to_delete)
-        if len(deleted) != len(self.vertices_to_delete):
-            raise _validation_error(
-                "topology.require_valid_deletion_1",
-                "vertices_to_delete must be distinct",
-            )
-        if not deleted.issubset(self.complex.vertices):
-            raise _validation_error(
-                "topology.require_valid_deletion_2",
-                "vertices_to_delete must be in the complex",
-            )
-        if all(frozenset(facet).issubset(deleted) for facet in self.complex.facets):
-            raise _validation_error(
-                "topology.require_valid_deletion_3",
-                "deletion must leave at least one simplex on the remaining vertices",
-            )
-        return self
-
 
 class VertexDeletionResult(TopologyExactResult):
     """The induced subcomplex produced after deleting a vertex subset."""
@@ -335,7 +312,7 @@ class VertexDeletionResult(TopologyExactResult):
 
     @classmethod
     def _from_kernel(cls, **values: Any) -> Self:
-        return cls(**values)
+        return cls.model_construct(**values)
 
 
 class SkeletonRequest(StrictModel):
@@ -343,16 +320,6 @@ class SkeletonRequest(StrictModel):
 
     complex: SimplicialComplexRequest
     k: StrictInt = Field(ge=0, le=MAX_TOPOLOGY_DIMENSION)
-
-    @model_validator(mode="after")
-    def require_admissible_skeleton(self) -> Self:
-        facets = skeleton_maximal_facets(self.complex.facets, self.k)
-        SimplicialComplexRequest(
-            vertices=tuple(sorted({v for facet in facets for v in facet})),
-            facets=facets,
-        )
-        return self
-
 
 class SkeletonResult(TopologyExactResult):
     """The k-skeleton as a facet list."""
@@ -395,7 +362,7 @@ class SkeletonResult(TopologyExactResult):
 
     @classmethod
     def _from_kernel(cls, **values: Any) -> Self:
-        return cls(**values)
+        return cls.model_construct(**values)
 
 
 def _require_join_admission(
@@ -432,19 +399,6 @@ class JoinRequest(StrictModel):
     complex_a: SimplicialComplexRequest
     complex_b: SimplicialComplexRequest
 
-    @model_validator(mode="after")
-    def require_admissible_join(self) -> Self:
-        _require_join_admission(self.complex_a, self.complex_b)
-        facets = join_maximal_facets(self.complex_a.facets, self.complex_b.facets)
-        SimplicialComplexRequest(
-            vertices=tuple(
-                sorted(set(self.complex_a.vertices) | set(self.complex_b.vertices))
-            ),
-            facets=facets,
-        )
-        return self
-
-
 class JoinResult(TopologyExactResult):
     """The join of two complexes."""
 
@@ -478,7 +432,7 @@ class JoinResult(TopologyExactResult):
 
     @classmethod
     def _from_kernel(cls, **values: Any) -> Self:
-        return cls(**values)
+        return cls.model_construct(**values)
 
 
 class ElementaryCollapseRequest(StrictModel):
@@ -491,45 +445,6 @@ class ElementaryCollapseRequest(StrictModel):
     coface: tuple[VertexLabel, ...] = Field(
         min_length=2, max_length=MAX_TOPOLOGY_DIMENSION + 1
     )
-
-    @model_validator(mode="after")
-    def require_valid_collapse(self) -> Self:
-        free_set, coface_set = set(self.free_face), set(self.coface)
-        if len(free_set) != len(self.free_face):
-            raise _validation_error(
-                "topology.require_valid_collapse_1",
-                "free_face vertices must be unique; repeated labels do not represent a simplex",
-            )
-        if len(coface_set) != len(self.coface):
-            raise _validation_error(
-                "topology.require_valid_collapse_2",
-                "coface vertices must be unique; repeated labels do not represent a simplex",
-            )
-        if free_set == coface_set:
-            raise _validation_error(
-                "topology.require_valid_collapse_3",
-                "free_face must be a proper subset of coface",
-            )
-        if not free_set.issubset(coface_set):
-            raise _validation_error(
-                "topology.require_valid_collapse_4",
-                "free_face must be contained in coface",
-            )
-        if len(coface_set) != len(free_set) + 1:
-            raise _validation_error(
-                "topology.require_valid_collapse_5",
-                f"elementary collapse requires free_face to be codimension-one in coface (got |free|={len(free_set)}, |coface|={len(coface_set)})",
-            )
-        facets = collapse_remaining_facets(
-            self.complex.facets, tuple(sorted(free_set)), tuple(sorted(coface_set))
-        )
-        if facets:
-            SimplicialComplexRequest(
-                vertices=tuple(sorted({v for facet in facets for v in facet})),
-                facets=facets,
-            )
-        return self
-
 
 class ElementaryCollapseResult(TopologyExactResult):
     """Result of one elementary collapse step."""
@@ -577,11 +492,12 @@ class ElementaryCollapseResult(TopologyExactResult):
 
     @classmethod
     def _from_kernel(cls, **values: Any) -> Self:
-        return cls(**values)
+        return cls.model_construct(**values)
 
 
 def compute_f_vector(request: FVectorRequest) -> FVectorResult:
     """Compute the exact f-, h-, and Euler vectors of one complex."""
+    require_complex_admission(request.complex)
 
     all_simplices = _all_nonempty_faces(request.complex.facets)
     dimension = max(len(simplex) - 1 for simplex in all_simplices)
@@ -612,6 +528,8 @@ def compute_f_vector(request: FVectorRequest) -> FVectorResult:
 
 
 def compute_link(request: LinkRequest) -> LinkResult:
+    require_complex_admission(request.complex)
+    _require_simplex_in_complex(request.complex, request.simplex)
     target = frozenset(request.simplex)
     facets = _maximal_faces(
         tuple(sorted(frozenset(facet) - target))
@@ -624,6 +542,8 @@ def compute_link(request: LinkRequest) -> LinkResult:
 
 
 def compute_star(request: StarRequest) -> StarResult:
+    require_complex_admission(request.complex)
+    _require_simplex_in_complex(request.complex, request.simplex)
     target = frozenset(request.simplex)
     facets = tuple(
         tuple(sorted(facet))
@@ -647,6 +567,8 @@ def compute_star(request: StarRequest) -> StarResult:
 
 
 def compute_vertex_deletion(request: VertexDeletionRequest) -> VertexDeletionResult:
+    require_complex_admission(request.complex)
+    _require_deletion(request.complex, request.vertices_to_delete)
     deleted = set(request.vertices_to_delete)
     facets = _maximal_faces(
         face
@@ -664,8 +586,13 @@ def compute_vertex_deletion(request: VertexDeletionRequest) -> VertexDeletionRes
 
 
 def compute_skeleton(request: SkeletonRequest) -> SkeletonResult:
+    require_complex_admission(request.complex)
     facets = skeleton_maximal_facets(request.complex.facets, request.k)
     vertices = tuple(sorted({vertex for facet in facets for vertex in facet}))
+    if facets:
+        require_complex_admission(
+            SimplicialComplexRequest(vertices=vertices, facets=facets)
+        )
     return SkeletonResult._from_kernel(
         complex=request.complex,
         k=request.k,
@@ -676,6 +603,9 @@ def compute_skeleton(request: SkeletonRequest) -> SkeletonResult:
 
 
 def compute_join(request: JoinRequest) -> JoinResult:
+    require_complex_admission(request.complex_a)
+    require_complex_admission(request.complex_b)
+    _require_join_admission(request.complex_a, request.complex_b)
     facets = join_maximal_facets(request.complex_a.facets, request.complex_b.facets)
     vertices = tuple(
         sorted(set(request.complex_a.vertices) | set(request.complex_b.vertices))
@@ -694,6 +624,8 @@ def compute_join(request: JoinRequest) -> JoinResult:
 def compute_elementary_collapse(
     request: ElementaryCollapseRequest,
 ) -> ElementaryCollapseResult:
+    require_complex_admission(request.complex)
+    _require_collapse(request.complex, request.free_face, request.coface)
     free_face, coface = tuple(sorted(request.free_face)), tuple(sorted(request.coface))
     facets = collapse_remaining_facets(request.complex.facets, free_face, coface)
     is_free = facets is not None

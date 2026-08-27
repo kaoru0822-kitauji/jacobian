@@ -1,7 +1,6 @@
 """Tests for algebraic topology operations."""
 
 import pytest
-from pydantic import ValidationError
 
 from jacobian.math.topology.edge_paths._models import (
     EdgePathConcatenateRequest,
@@ -60,15 +59,17 @@ def test_edge_path_concatenate() -> None:
 
 
 def test_edge_path_word_rejects_non_edge_path() -> None:
-    """Path with a step that is not an edge must be rejected at request level."""
-    with pytest.raises(ValidationError):
-        EdgePathWordRequest.model_validate(
-            {
-                "vertex_count": 4,
-                "edges": ((0, 1), (2, 3)),
-                "start_vertex": 0,
-                "path": ({"edge_index": 1, "orientation": 1},),
-            }
+    """Path with a step that is not an edge is rejected by the operation."""
+    with pytest.raises(ValueError):
+        compute_edge_path_word(
+            EdgePathWordRequest.model_validate(
+                {
+                    "vertex_count": 4,
+                    "edges": ((0, 1), (2, 3)),
+                    "start_vertex": 0,
+                    "path": ({"edge_index": 1, "orientation": 1},),
+                }
+            )
         )
 
 
@@ -108,9 +109,11 @@ def test_parallel_edges_and_loops_have_explicit_identity_and_orientation() -> No
 
 def test_edge_path_concatenate_rejects_discontinuous() -> None:
     """Concatenation must require matching endpoints."""
-    with pytest.raises(ValidationError):
-        EdgePathConcatenateRequest(
-            vertex_count=3,
-            path_a=(0, 1),
-            path_b=(2, 0),
+    with pytest.raises(ValueError):
+        compute_edge_path_concatenate(
+            EdgePathConcatenateRequest(
+                vertex_count=3,
+                path_a=(0, 1),
+                path_b=(2, 0),
+            )
         )

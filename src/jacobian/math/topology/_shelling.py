@@ -1,4 +1,4 @@
-"""Pure replay kernel for simplicial-complex shelling checks."""
+"""Pure decision kernel for simplicial-complex shelling checks."""
 
 from __future__ import annotations
 

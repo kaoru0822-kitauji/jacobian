@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from itertools import pairwise
 
 from jacobian.catalog._examples import example
 from jacobian.catalog.models import MathTool, OperationDomainValidationError
@@ -22,6 +23,10 @@ from jacobian.math.topology._chain_conversion import (
     canonical_chain_complex_value_from_parts,
 )
 from jacobian.math.topology._homology import (
+    MAX_INLINE_HOMOLOGY_CHAIN_GROUP,
+    MAX_INTEGRAL_HOMOLOGY_CHAIN_GROUP,
+    MAX_INTEGRAL_HOMOLOGY_MATRIX_CELLS,
+    MAX_INTEGRAL_HOMOLOGY_TOTAL_CHAIN_RANK,
     HomologyGroupResult,
     IntegralFreeGenerator,
     IntegralHomologyGroupResult,
@@ -50,13 +55,17 @@ from jacobian.math.topology._models import (
     SparseBoundaryMatrix,
     SparseMatrixEntry,
     _all_faces,
+    _require_canonical_conversion_bounds,
     canonical_complex,
+    is_bounded_prime,
+    require_linear_algebra_bounds,
 )
 from jacobian.math.topology._pseudomanifold import (
     PseudomanifoldRequest,
     PseudomanifoldResult,
     pseudomanifold_decision,
 )
+from jacobian.math.topology._request_admission import require_complex_admission
 from jacobian.math.topology._shelling import evaluate_shelling
 
 
@@ -69,9 +78,82 @@ def _canonical_complex(
     return canonical_complex(vertices, facets)
 
 
+def _admit_chain_request(request: ChainComplexRequest) -> None:
+    require_complex_admission(
+        SimplicialComplexRequest(
+            vertices=request.complex.vertices,
+            facets=request.complex.maximal_simplices,
+        )
+    )
+    if request.coefficient_ring is ChainCoefficientRing.INTEGER:
+        if request.prime is not None:
+            raise ValueError("integer chain complexes must not declare a prime")
+    elif request.prime is None or not is_bounded_prime(request.prime):
+        raise ValueError("prime-field chain complexes require a bounded prime")
+    require_linear_algebra_bounds(request.complex)
+    if (
+        request.coefficient_ring is ChainCoefficientRing.PRIME_FIELD
+        and request.convention is HomologyConvention.UNREDUCED
+    ):
+        _require_canonical_conversion_bounds(request.complex)
+
+
+def _admit_homology_request(request: SimplicialHomologyRequest) -> None:
+    if not is_bounded_prime(request.prime):
+        raise ValueError("homology coefficients require a bounded prime")
+    if any(size > MAX_INLINE_HOMOLOGY_CHAIN_GROUP for size in request.complex.f_vector):
+        raise ValueError(
+            "inline homology bases require at most "
+            f"{MAX_INLINE_HOMOLOGY_CHAIN_GROUP} simplices in each chain group"
+        )
+    _admit_chain_request(
+        ChainComplexRequest(
+            complex=request.complex,
+            coefficient_ring=ChainCoefficientRing.PRIME_FIELD,
+            prime=request.prime,
+            convention=request.convention,
+        )
+    )
+
+
+def _admit_integral_homology_request(
+    request: IntegralSimplicialHomologyRequest,
+) -> None:
+    if any(
+        size > MAX_INTEGRAL_HOMOLOGY_CHAIN_GROUP
+        for size in request.complex.f_vector
+    ):
+        raise ValueError(
+            "integral homology requires at most "
+            f"{MAX_INTEGRAL_HOMOLOGY_CHAIN_GROUP} simplices in each chain group"
+        )
+    if sum(request.complex.f_vector) > MAX_INTEGRAL_HOMOLOGY_TOTAL_CHAIN_RANK:
+        raise ValueError(
+            "integral homology requires total chain rank at most "
+            f"{MAX_INTEGRAL_HOMOLOGY_TOTAL_CHAIN_RANK}"
+        )
+    padded = (0, *request.complex.f_vector)
+    if any(
+        rows * columns > MAX_INTEGRAL_HOMOLOGY_MATRIX_CELLS
+        for rows, columns in pairwise(padded)
+    ):
+        raise ValueError(
+            "integral homology boundary exceeds the "
+            f"{MAX_INTEGRAL_HOMOLOGY_MATRIX_CELLS}-cell bound"
+        )
+    _admit_chain_request(
+        ChainComplexRequest(
+            complex=request.complex,
+            coefficient_ring=ChainCoefficientRing.INTEGER,
+            convention=request.convention,
+        )
+    )
+
+
 def _canonicalize(
     request: SimplicialComplexRequest,
 ) -> SimplicialComplexCanonicalizationResult:
+    require_complex_admission(request)
     return SimplicialComplexCanonicalizationResult(
         complex=_canonical_complex(request.vertices, request.facets)
     )
@@ -172,7 +254,11 @@ def _product_is_zero(
     return True
 
 
-def _chain_result(request: ChainComplexRequest) -> ChainComplexResult:
+def _chain_result(
+    request: ChainComplexRequest, *, admitted: bool = False
+) -> ChainComplexResult:
+    if not admitted:
+        _admit_chain_request(request)
     complex_ = request.complex
     bases = tuple(
         SimplexBasis(dimension=item.dimension, simplices=item.faces)
@@ -274,13 +360,15 @@ def _vector_rank(vectors: Sequence[Sequence[int]], *, prime: int) -> int:
 def _homology(
     request: SimplicialHomologyRequest,
 ) -> SimplicialHomologyResult:
+    _admit_homology_request(request)
     chain = _chain_result(
         ChainComplexRequest(
             complex=request.complex,
             coefficient_ring=ChainCoefficientRing.PRIME_FIELD,
             prime=request.prime,
             convention=request.convention,
-        )
+        ),
+        admitted=True,
     )
     boundaries = tuple(
         _dense(matrix, modulus=request.prime) for matrix in chain.boundary_matrices
@@ -347,7 +435,7 @@ def _homology(
                 quotient_span_rank=quotient_span_rank,
             )
         )
-    return SimplicialHomologyResult(
+    return SimplicialHomologyResult.model_construct(
         complex_digest=request.complex.complex_digest,
         prime=request.prime,
         convention=request.convention,
@@ -376,12 +464,14 @@ def _integral_vector(values: list[int]) -> IntegralVector:
 def _integral_homology(
     request: IntegralSimplicialHomologyRequest,
 ) -> IntegralSimplicialHomologyResult:
+    _admit_integral_homology_request(request)
     chain = _chain_result(
         ChainComplexRequest(
             complex=request.complex,
             coefficient_ring=ChainCoefficientRing.INTEGER,
             convention=request.convention,
-        )
+        ),
+        admitted=True,
     )
     boundaries = tuple(
         _dense(matrix, modulus=None) for matrix in chain.boundary_matrices
@@ -500,7 +590,7 @@ def _integral_homology(
                 ),
             )
         )
-    return IntegralSimplicialHomologyResult(
+    return IntegralSimplicialHomologyResult.model_construct(
         complex_digest=request.complex.complex_digest,
         convention=request.convention,
         dimension_range=(0, request.complex.dimension),
@@ -692,6 +782,7 @@ def compute_barycentric_subdivision(
     request: BarycentricSubdivisionRequest,
 ) -> BarycentricSubdivisionResult:
     """Compute the barycentric subdivision of a simplicial complex."""
+    require_complex_admission(request.complex)
 
     sorted_faces = sorted(
         _all_faces(request.complex.facets), key=lambda face: (len(face), face)
@@ -727,6 +818,7 @@ def compute_pseudomanifold_decision(
     request: PseudomanifoldRequest,
 ) -> PseudomanifoldResult:
     """Decide whether a complex is a pseudomanifold."""
+    require_complex_admission(request.complex)
 
     decision = pseudomanifold_decision(request.complex.facets)
     return PseudomanifoldResult._from_kernel(request, decision=decision)
@@ -734,6 +826,9 @@ def compute_pseudomanifold_decision(
 
 def compute_shelling_check(request: ShellingCheckRequest) -> ShellingCheckResult:
     """Check whether a submitted facet order is a valid shelling order."""
+    require_complex_admission(request.complex)
+    if sorted(request.facet_order) != list(range(len(request.complex.facets))):
+        raise ValueError("facet_order must be a permutation of facet indices")
 
     is_shelling, failed_at, failure_reason = evaluate_shelling(
         request.complex.facets, request.facet_order

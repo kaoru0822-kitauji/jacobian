@@ -115,8 +115,6 @@ def test_f_vector_h_vector_invariant() -> None:
 
 def test_link_rejects_non_face() -> None:
     """Non-face simplex should be rejected, not silently returned as empty link."""
-    from pydantic import ValidationError
-
     try:
         compute_link(
             LinkRequest(
@@ -129,6 +127,6 @@ def test_link_rejects_non_face() -> None:
                 simplex=("v0", "v2"),
             )
         )
-        raise AssertionError("Should have raised ValidationError")
-    except ValidationError:
+        raise AssertionError("Should have raised ValueError")
+    except ValueError:
         pass
