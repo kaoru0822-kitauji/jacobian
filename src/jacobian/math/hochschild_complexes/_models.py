@@ -35,8 +35,8 @@ MAX_HOCHSCHILD_MATRIX_ENTRIES = 131_072
 #   backend gap -- admitting them requires an accelerated associativity
 #   kernel, not a change of mathematical domain.
 # - Tensor elements, boundary-matrix entries, matrix dimensions, and result
-#   sizes stay bounded per request by require_hochschild_budget and the
-#   request/result validators below, which bound each
+#   sizes stay bounded per request by the owner admission operation and the
+#   request/result structural validators below, which bound each
 #   (dimension, max_degree) combination separately.
 MAX_STRUCTURE_CONSTANT_ENTRIES = MAX_HOCHSCHILD_MATRIX_ENTRIES
 MAX_ASSOCIATIVITY_DOT_STEPS = 20_000_000
@@ -200,8 +200,8 @@ class HochschildChainComplexResult(StrictModel):
 
     Kernel-produced boundaries use :meth:`_from_kernel`. Deserializing a
     separately supplied result validates only source binding, field,
-    dimensions, and the admitted envelope; the explicit owner verifier checks
-    that matrices are the bar differentials of ``algebra``.
+    dimensions, and the admitted envelope; the bar differentials are produced
+    by the owner operation.
     """
 
     algebra: AlgebraStructure
@@ -275,7 +275,7 @@ class HochschildChainComplexResult(StrictModel):
     ) -> Self:
         """Construct a result emitted by the owner-local kernel."""
 
-        return cls(
+        return cls.model_construct(
             algebra=algebra,
             algebra_dimension=algebra.dimension,
             group_dimensions=group_dimensions,
@@ -288,51 +288,13 @@ class HochschildHomologyRequest(StrictModel):
     """Compute exact Hochschild homology HH_n(A, K) with trivial coefficients.
 
     K = GF(p) carries the trivial A-bimodule structure defined by the retained
-    augmentation epsilon; the computation replays the full Hochschild boundary
+    augmentation epsilon; the operation computes the full Hochschild boundary
     (interior multiplications plus both augmentation endpoint faces) and
     returns the exact Betti numbers of the retained augmented algebra.
     """
 
     algebra: AlgebraStructure
     max_degree: int = Field(ge=1, le=MAX_HOCHSCHILD_DEGREE)
-
-def require_hochschild_budget(dimension: int, max_degree: int) -> None:
-    """Reject degrees whose tensor or boundary-matrix budget is exceeded."""
-
-    if dimension ** (max_degree + 1) > MAX_HOCHSCHILD_TENSOR_ELEMENTS:
-        raise _validation_error(
-            "hochschild_complex.tensor_budget",
-            "requested max_degree exceeds the supported tensor-element budget "
-            f"(dimension^{max_degree + 1} > {MAX_HOCHSCHILD_TENSOR_ELEMENTS})",
-        )
-    densest_entries = dimension ** (2 * max_degree + 1)
-    if densest_entries > MAX_HOCHSCHILD_MATRIX_ENTRIES:
-        raise _validation_error(
-            "hochschild_complex.matrix_budget",
-            "requested max_degree exceeds the supported boundary-matrix "
-            f"entry budget (dimension^(2*max_degree+1) = {densest_entries} "
-            f"> {MAX_HOCHSCHILD_MATRIX_ENTRIES})",
-        )
-
-
-def require_algebra_admission(algebra: AlgebraStructure) -> None:
-    """Check expensive algebra invariants at operation execution time."""
-
-    structure_entries = algebra.dimension**3 + algebra.dimension
-    if structure_entries > MAX_STRUCTURE_CONSTANT_ENTRIES:
-        raise _validation_error(
-            "hochschild_complex.input_budget",
-            "structure constants exceed the supported input-entry budget",
-        )
-    associativity_steps = 2 * algebra.dimension**5
-    if associativity_steps > MAX_ASSOCIATIVITY_DOT_STEPS:
-        raise _validation_error(
-            "hochschild_complex.associativity_budget",
-            "algebra dimension exceeds the associativity-admission work budget",
-        )
-    algebra._require_associative()
-    algebra._require_multiplicative_augmentation()
-
 
 class HochschildHomologyGroup(StrictModel):
     """One Hochschild homology group."""
@@ -344,8 +306,8 @@ class HochschildHomologyGroup(StrictModel):
 class HochschildHomologyResult(StrictModel):
     """Structurally bounded Hochschild homology groups with trivial coefficients.
 
-    The exact rank computation is an explicit owner verifier, never a result
-    validation side effect.
+    The exact rank computation is performed by the owner operation, never as a
+    result validation side effect.
     """
 
     algebra: AlgebraStructure
@@ -384,7 +346,7 @@ class HochschildHomologyResult(StrictModel):
     ) -> Self:
         """Construct a result emitted by the owner-local kernel."""
 
-        return cls(
+        return cls.model_construct(
             algebra=algebra,
             max_degree=max_degree,
             groups=groups,

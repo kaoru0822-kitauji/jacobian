@@ -12,8 +12,6 @@ from jacobian.math.hochschild_complexes._models import (
     HochschildHomologyGroup,
     HochschildHomologyRequest,
     HochschildHomologyResult,
-    require_algebra_admission,
-    require_hochschild_budget,
 )
 from jacobian.math.prime_field_linear_algebra import (
     PrimeFieldMatrix,
@@ -92,6 +90,11 @@ def compute_hochschild_chain_complex(
     augmentation-dependent endpoint faces. It squares to zero because epsilon
     is an algebra homomorphism and the multiplication is associative.
     """
+    from jacobian.math.hochschild_complexes._admission import (
+        require_algebra_admission,
+        require_hochschild_budget,
+    )
+
     require_algebra_admission(request.algebra)
     require_hochschild_budget(request.algebra.dimension, request.max_degree)
     alg = request.algebra
@@ -166,6 +169,11 @@ def compute_hochschild_homology(
     request: HochschildHomologyRequest,
 ) -> HochschildHomologyResult:
     """Compute exact Hochschild homology HH_n(A, K) for trivial coefficients."""
+    from jacobian.math.hochschild_complexes._admission import (
+        require_algebra_admission,
+        require_hochschild_budget,
+    )
+
     require_algebra_admission(request.algebra)
     require_hochschild_budget(request.algebra.dimension, request.max_degree)
     alg = request.algebra

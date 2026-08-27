@@ -4,13 +4,53 @@ from __future__ import annotations
 
 from itertools import product as iproduct
 
+from sympy.combinatorics import Permutation, PermutationGroup
+
 from jacobian.math.group._models import PermutationGroupRequest
 from jacobian.math.group_cohomology._models import (
+    MAX_BAR_MATRIX_CELLS,
+    MAX_COCHAIN_DEGREE,
+    MAX_COCHAIN_TENSOR_ELEMENTS,
+    MAX_GROUP_ORDER,
     CohomologyGroup,
     GroupCohomologyRequest,
     GroupCohomologyResult,
-    _require_admitted_request,
 )
+
+
+def _enumerated_group_order(group: PermutationGroupRequest) -> int:
+    return int(PermutationGroup(*(Permutation(list(g)) for g in group.generators)).order())
+
+
+def _admitted_max_degree(order: int) -> int:
+    if order == 1:
+        return MAX_COCHAIN_DEGREE
+    degree = 0
+    while (
+        order ** (degree + 1) <= MAX_COCHAIN_TENSOR_ELEMENTS
+        and order ** (2 * degree + 1) <= MAX_BAR_MATRIX_CELLS
+    ):
+        degree += 1
+    return degree - 1
+
+
+def _require_admitted_request(request: GroupCohomologyRequest) -> int:
+    from sympy import isprime
+
+    if not isprime(request.prime):
+        raise ValueError("prime must be a prime integer")
+    order = _enumerated_group_order(request.group)
+    if order > MAX_GROUP_ORDER:
+        raise ValueError(
+            f"enumerated group order {order} exceeds the bounded maximum {MAX_GROUP_ORDER}"
+        )
+    admitted_degree = _admitted_max_degree(order)
+    if request.max_degree > admitted_degree:
+        raise ValueError(
+            f"max_degree {request.max_degree} exceeds the work-derived degree budget "
+            f"{admitted_degree} for enumerated group order {order}"
+        )
+    return order
 
 
 def _enumerate_group_elements(group: PermutationGroupRequest) -> list[tuple[int, ...]]:

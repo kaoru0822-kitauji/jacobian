@@ -55,62 +55,6 @@ def _validation_error(reason: str, message: str) -> PydanticCustomError:
     return PydanticCustomError(f"group_cohomology.{reason}", message)
 
 
-def _enumerated_group_order(group: PermutationGroupRequest) -> int:
-    from sympy.combinatorics import Permutation, PermutationGroup
-
-    pg = PermutationGroup(*(Permutation(list(g)) for g in group.generators))
-    return int(pg.order())
-
-
-def _admitted_max_degree(order: int) -> int:
-    """Largest degree whose predicted work stays inside the coupled budgets.
-
-    Derived from the actual work the kernel performs, not a fixed cap: at
-    degree n it allocates an ``order**(n+1)``-element cochain space and an
-    ``order**(2n+1)``-cell dense coboundary matrix, so a top degree d is
-    admissible exactly when both quantities stay within their budgets for
-    every n <= d. The exact integer search terminates in O(log order) steps
-    because both quantities grow geometrically. For ``order == 1`` every
-    quantity is identically one at any degree, so the budgets can never bind
-    and only the conservative fallback ``MAX_COCHAIN_DEGREE`` applies.
-    """
-    if order == 1:
-        return MAX_COCHAIN_DEGREE
-    degree = 0
-    while (
-        order ** (degree + 1) <= MAX_COCHAIN_TENSOR_ELEMENTS
-        and order ** (2 * degree + 1) <= MAX_BAR_MATRIX_CELLS
-    ):
-        degree += 1
-    return degree - 1
-
-
-def _require_admitted_request(request: GroupCohomologyRequest) -> int:
-    """Admit one cohomology computation and return its enumerated group order."""
-
-    from sympy import isprime
-
-    if not isprime(request.prime):
-        raise _validation_error("prime_not_prime", "prime must be a prime integer")
-    order = _enumerated_group_order(request.group)
-    if order > MAX_GROUP_ORDER:
-        raise _validation_error(
-            "group_order_exceeds_bound",
-            f"enumerated group order {order} exceeds the bounded maximum {MAX_GROUP_ORDER}",
-        )
-    admitted_degree = _admitted_max_degree(order)
-    if request.max_degree > admitted_degree:
-        raise _validation_error(
-            "degree_exceeds_work_budget",
-            f"max_degree {request.max_degree} exceeds the work-derived degree budget "
-            f"{admitted_degree} for enumerated group order {order}: cochain spaces "
-            f"|G|^(n+1) must stay within the {MAX_COCHAIN_TENSOR_ELEMENTS}-element "
-            f"budget and dense bar coboundaries |G|^(2n+1) within the "
-            f"{MAX_BAR_MATRIX_CELLS}-cell budget",
-        )
-    return order
-
-
 class GroupCohomologyRequest(StrictModel):
     """Compute group cohomology with trivial coefficients over GF(p).
 
@@ -146,10 +90,9 @@ class CohomologyGroup(StrictModel):
 class GroupCohomologyResult(StrictModel):
     """Group cohomology groups with trivial coefficients.
 
-    The source request and exact table stay structurally aligned here. The
-    bar-complex replay is intentionally an explicit owner verifier rather
-    than a result-validator side effect: deserializing a result must not
-    allocate a cochain matrix or invoke a mathematical backend.
+    The source request and exact table stay structurally aligned here.
+    Deserializing a result checks only this structural binding; the bar
+    computation runs in the owner operation.
     """
 
     request: GroupCohomologyRequest
@@ -194,7 +137,9 @@ class GroupCohomologyResult(StrictModel):
     ) -> Self:
         """Construct a trusted result emitted by the owner-local kernel."""
 
-        return cls(request=request, groups=groups, group_order=group_order)
+        return cls.model_construct(
+            request=request, groups=groups, group_order=group_order
+        )
 
 
 __all__ = [

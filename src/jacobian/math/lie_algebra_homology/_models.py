@@ -265,7 +265,7 @@ class ChevalleyEilenbergComplexResult(StrictModel):
     ) -> Self:
         """Construct a result emitted by the owner-local CE kernel."""
 
-        return cls(
+        return cls.model_construct(
             lie_algebra=lie_algebra,
             dimension=lie_algebra.dimension,
             group_dimensions=group_dimensions,
@@ -349,7 +349,7 @@ class LieHomologyResult(StrictModel):
     ) -> Self:
         """Construct a result emitted by the owner-local homology kernel."""
 
-        return cls(
+        return cls.model_construct(
             lie_algebra=lie_algebra,
             groups=groups,
             dimension=lie_algebra.dimension,
