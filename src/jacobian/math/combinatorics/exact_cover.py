@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import unicodedata
-from builtins import ValueError as BuiltinValueError
 from typing import Literal, Self
 
 from pydantic import ConfigDict, Field, StrictInt, model_validator
@@ -361,46 +360,6 @@ class GeneralizedExactCoverResult(StrictModel):
             selected_row_ids=selected_row_ids,
             item_multiplicities=item_multiplicities,
         )
-
-
-def _verify_generalized_exact_cover_result(result: GeneralizedExactCoverResult) -> bool:
-    """Replay an independently supplied exact-cover claim in its envelope."""
-
-    try:
-        request = GeneralizedExactCoverRequest(
-            instance=result.instance, search_node_limit=result.search_node_limit
-        )
-        if result.status == "FOUND":
-            if result.selected_row_ids is None or result.item_multiplicities is None:
-                return False
-            if result.item_multiplicities != _expected_coverage(
-                request.instance, result.selected_row_ids
-            ):
-                return False
-        elif (
-            result.selected_row_ids is not None
-            or result.item_multiplicities is not None
-        ):
-            return False
-
-        from jacobian.math.combinatorics._exact_cover_kernel import (
-            search_generalized_exact_cover,
-        )
-
-        replay = search_generalized_exact_cover(
-            request.instance, request.search_node_limit
-        )
-    except (BuiltinValueError, TypeError):
-        return False
-
-    if replay.status != result.status:
-        return False
-    if result.status != "FOUND":
-        return True
-    assert result.selected_row_ids is not None
-    return result.selected_row_ids == tuple(
-        sorted(request.instance.rows[index].row_id for index in replay.selected_rows)
-    )
 
 
 def _solve_generalized_exact_cover(

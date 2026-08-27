@@ -19,7 +19,6 @@ from jacobian.math.combinatorics.exact_cover import (
     GeneralizedExactCoverInstance,
     GeneralizedExactCoverRequest,
     GeneralizedExactCoverResult,
-    _verify_generalized_exact_cover_result,
     find_generalized_exact_cover,
 )
 
@@ -283,33 +282,7 @@ def test_erdos_743_k3_packing_fixture_and_planted_overfull_mutation() -> None:
     assert _solve(overfull).status == "NO_COVER"
 
 
-def test_result_parsing_is_structural_and_private_verifier_checks_claims() -> None:
-    cover = _instance(
-        primary=("p", "q"),
-        secondary=("s",),
-        rows=(
-            ("r1", ("p", "s")),
-            ("r2", ("q",)),
-        ),
-    )
-    found = _solve(cover)
-    payload = found.model_dump(mode="json")
-    payload["item_multiplicities"][-1]["multiplicity"] = 0
-    forged_witness = GeneralizedExactCoverResult.model_validate(payload)
-    assert not _verify_generalized_exact_cover_result(forged_witness)
-
-    mutated_source = found.model_dump(mode="json")
-    mutated_source["instance"]["rows"][0]["items"] = ["p"]
-    forged_source = GeneralizedExactCoverResult.model_validate(mutated_source)
-    assert not _verify_generalized_exact_cover_result(forged_source)
-
-    forged_negative = GeneralizedExactCoverResult(
-        instance=cover,
-        search_node_limit=100,
-        status="NO_COVER",
-    )
-    assert not _verify_generalized_exact_cover_result(forged_negative)
-
+def test_unknown_result_round_trips_as_a_non_conclusion() -> None:
     no_cover = _instance(
         primary=("p", "q"),
         secondary=("s",),
@@ -318,15 +291,12 @@ def test_result_parsing_is_structural_and_private_verifier_checks_claims() -> No
             ("r2", ("q", "s")),
         ),
     )
-    # UNKNOWN is a durable non-conclusion, not a claim that validation must
-    # reproduce with one private branching implementation.
     unknown = GeneralizedExactCoverResult(
         instance=no_cover,
         search_node_limit=1,
         status="UNKNOWN",
     )
     assert type(unknown).model_validate(unknown.model_dump()) == unknown
-    assert _verify_generalized_exact_cover_result(_solve(no_cover))
 
 
 def test_contract_rejects_duplicate_undeclared_and_noncanonical_incidences() -> None:
