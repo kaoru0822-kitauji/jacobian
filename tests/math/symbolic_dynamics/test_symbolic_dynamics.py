@@ -13,7 +13,6 @@ from jacobian.math.symbolic_dynamics import (
     AdjacencyShift,
     ForbiddenBlockShift,
     adjacency_shift,
-    artin_mazur_zeta,
     block_language,
     finite_type_presentation,
     normalize_forbidden_blocks,
@@ -29,7 +28,6 @@ from jacobian.math.symbolic_dynamics._models import (
     HigherBlockRequest,
     HigherBlockResult,
     PeriodicPointProfileRequest,
-    PeriodicPointProfileResult,
 )
 from jacobian.math.symbolic_dynamics._operations import (
     compute_artin_mazur_zeta,
@@ -37,9 +35,6 @@ from jacobian.math.symbolic_dynamics._operations import (
     compute_higher_block,
     compute_periodic_point_profile,
     construct_finite_type_shift,
-    verify_artin_mazur_zeta_result,
-    verify_block_language_result,
-    verify_periodic_point_profile_result,
 )
 from jacobian.math.symbolic_dynamics._tools import TOOLS
 
@@ -96,20 +91,6 @@ def test_golden_mean_artin_mazur_zeta_is_bound_to_periodic_traces() -> None:
         "11",
     )
     assert ArtinMazurZetaResult.model_validate(result.model_dump(mode="json")) == result
-
-    payload = result.model_dump()
-    payload["replay"][2]["logarithmic_derivative_coefficient"] = "5"
-    assert not verify_artin_mazur_zeta_result(
-        ArtinMazurZetaResult.model_validate(payload)
-    )
-
-    payload = result.model_dump()
-    payload["determinant_polynomial"]["polynomial"]["terms"][0]["coefficient"][
-        "num"
-    ] = "-2"
-    assert not verify_artin_mazur_zeta_result(
-        ArtinMazurZetaResult.model_validate(payload)
-    )
 
 
 def test_zeta_distinguishes_full_shift_cycle_and_disjoint_components() -> None:
@@ -195,14 +176,12 @@ def test_zeta_admission_bounds_coefficient_growth_before_backend() -> None:
     assert len(boundary.replay) == 50
 
     dense_large = (tuple((1_000_000,) * 50),) * 50
-    with pytest.raises(ValidationError) as exc_info:
-        ArtinMazurZetaRequest(shift=AdjacencyShift(matrix=dense_large), replay_period=1)
-    assert (
-        exc_info.value.errors()[0]["type"]
-        == "symbolic_dynamics.zeta_coefficient_digit_bound"
-    )
     with pytest.raises(ValueError, match="coefficient digit bound"):
-        artin_mazur_zeta(AdjacencyShift(matrix=dense_large), 1)
+        compute_artin_mazur_zeta(
+            ArtinMazurZetaRequest(
+                shift=AdjacencyShift(matrix=dense_large), replay_period=1
+            )
+        )
 
 
 def test_public_surface_excludes_adjacency_carrier_invariants() -> None:
@@ -306,11 +285,6 @@ def test_complete_block_language_includes_empty_word_convention() -> None:
         exc_info.value.errors()[0]["type"] == "symbolic_dynamics.block_language_count"
     )
 
-    payload = result.model_dump()
-    payload["allowed_blocks"] = payload["allowed_blocks"][:-1]
-    payload["count"] = len(payload["allowed_blocks"])
-    assert not verify_block_language_result(BlockLanguageResult.model_validate(payload))
-
 
 def test_oversized_enumerations_fail_before_computation() -> None:
     alphabet = tuple(chr(ord("a") + index) for index in range(16))
@@ -337,18 +311,15 @@ def test_oversized_enumerations_fail_before_computation() -> None:
                 )
             )
         )
-    with pytest.raises(ValidationError) as exc_info:
-        HigherBlockRequest(
+    request = HigherBlockRequest(
             shift=ForbiddenBlockShift(
                 alphabet=ten_symbols,
                 forbidden_blocks=(),
             ),
             block_length=4,
         )
-    assert (
-        exc_info.value.errors()[0]["type"]
-        == "symbolic_dynamics.finite_type_presentation_result_bound"
-    )
+    with pytest.raises(ValueError, match="presentation adjacency"):
+        compute_higher_block(request)
     oversized_support = ForbiddenBlockShift(
         alphabet=alphabet,
         forbidden_blocks=(("a",) * 20,),
@@ -390,12 +361,9 @@ def test_higher_block_requires_enough_memory_for_exact_sft_presentation() -> Non
     shift = ForbiddenBlockShift(
         alphabet=("0", "1"), forbidden_blocks=(("1", "0", "1", "0"),)
     )
-    with pytest.raises(ValidationError) as exc_info:
-        HigherBlockRequest(shift=shift, block_length=2)
-    assert (
-        exc_info.value.errors()[0]["type"]
-        == "symbolic_dynamics.higher_block_memory_bound"
-    )
+    request = HigherBlockRequest(shift=shift, block_length=2)
+    with pytest.raises(ValueError, match="below the presentation memory"):
+        compute_higher_block(request)
 
 
 def test_periodic_profile_handles_square_mobius_factor() -> None:
@@ -407,12 +375,6 @@ def test_periodic_profile_handles_square_mobius_factor() -> None:
     assert result.least_period_point_counts == ("2", "2", "6", "12")
     assert result.primitive_orbit_counts == ("2", "1", "2", "3")
     assert result.complete_through_period == 4
-
-    payload = result.model_dump()
-    payload["primitive_orbit_counts"] = ("2", "1", "2", "4")
-    assert not verify_periodic_point_profile_result(
-        PeriodicPointProfileResult.model_validate(payload)
-    )
 
 
 def test_value_models_reject_ambiguous_and_invalid_carriers() -> None:

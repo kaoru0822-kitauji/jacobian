@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from jacobian._exact import CanonicalRational
+from math import factorial
+
+from jacobian._exact import MAX_CANONICAL_RATIONAL_DIGITS, CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.markov_chain import (
     ergodic_properties,
     mixing_time,
@@ -18,6 +21,66 @@ from jacobian.math.markov_chain._models import (
     TransitionMatrixRequest,
 )
 from jacobian.math.markov_chain.operations import _stationary_distribution_extremes
+
+
+def _reject(location: tuple[str | int, ...], code: str, message: str) -> None:
+    raise OperationDomainValidationError(
+        location=location, code=f"markov_chain.{code}", message=message
+    )
+
+
+def _admit_stationary(request: StationaryDistributionRequest) -> None:
+    dimension = len(request.matrix)
+    row_bounds: list[int] = []
+    for column in range(dimension - 1):
+        entries = tuple(request.matrix[row][column] for row in range(dimension))
+        denominator_digits = sum(len(value.den) for value in entries)
+        row_bounds.append(
+            max(
+                max(len(value.num.lstrip("-")), len(value.den))
+                + 1
+                + denominator_digits
+                - len(value.den)
+                for value in entries
+            )
+        )
+    determinant_digits = sum(row_bounds) + 1 + len(str(factorial(dimension)))
+    if determinant_digits > MAX_CANONICAL_RATIONAL_DIGITS:
+        _reject(
+            ("matrix",),
+            "stationary_height_exceeds_bound",
+            "stationary distribution rational height exceeds the "
+            f"{MAX_CANONICAL_RATIONAL_DIGITS}-digit result bound",
+        )
+
+
+def _admit_mixing(request: MixingTimeRequest) -> None:
+    if not 0 < request.epsilon.as_fraction() <= 1:
+        _reject(
+            ("epsilon",),
+            "mixing_epsilon_out_of_range",
+            "epsilon must lie in (0, 1]",
+        )
+    values = (request.epsilon, *(item for row in request.matrix for item in row))
+    if any(max(len(value.num.lstrip("-")), len(value.den)) > 32 for value in values):
+        _reject(
+            ("matrix",),
+            "mixing_component_digits_exceed_limit",
+            "mixing-time rational components support at most 32 digits",
+        )
+    matrix_digits = max(
+        max(len(value.num.lstrip("-")), len(value.den))
+        for row in request.matrix
+        for value in row
+    )
+    state_count = len(request.matrix)
+    height = matrix_digits * (state_count**3 + request.max_steps * state_count**2)
+    if height > MAX_CANONICAL_RATIONAL_DIGITS - 1_024:
+        _reject(
+            ("matrix",),
+            "mixing_result_height_exceeds_bound",
+            "mixing-time matrix height and max_steps can exceed the exact rational result bound",
+        )
 
 
 def _derive_communicating_classes(
@@ -55,6 +118,7 @@ def _derive_communicating_classes(
 
 
 def compute_mixing_time(request: MixingTimeRequest) -> MixingTimeResult:
+    _admit_mixing(request)
     matrix = tuple(
         tuple(value.as_fraction() for value in row) for row in request.matrix
     )
@@ -88,6 +152,7 @@ def compute_mixing_time(request: MixingTimeRequest) -> MixingTimeResult:
 def compute_stationary_distribution(
     request: StationaryDistributionRequest,
 ) -> StationaryDistributionResult:
+    _admit_stationary(request)
     matrix = tuple(
         tuple(value.as_fraction() for value in row) for row in request.matrix
     )

@@ -1,11 +1,12 @@
 import pytest
-from pydantic import ValidationError
 
 from jacobian.canonical import format_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.markov_chain._models import (
     StationaryDistributionRequest,
     TransitionMatrixRequest,
 )
+from jacobian.math.markov_chain._operations import compute_stationary_distribution
 
 
 def _two_state_counterexample(exponent: int) -> dict[str, object]:
@@ -36,8 +37,12 @@ def _two_state_counterexample(exponent: int) -> dict[str, object]:
 
 
 def test_stationary_request_rejects_exact_two_state_height_counterexample() -> None:
-    with pytest.raises(ValidationError) as error:
-        StationaryDistributionRequest.model_validate(_two_state_counterexample(45_000))
+    request = StationaryDistributionRequest.model_validate(
+        _two_state_counterexample(45_000)
+    )
+
+    with pytest.raises(OperationDomainValidationError) as error:
+        compute_stationary_distribution(request)
     assert (
         error.value.errors()[0]["type"]
         == "markov_chain.stationary_height_exceeds_bound"

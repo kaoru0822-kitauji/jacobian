@@ -241,6 +241,14 @@ def periodic_point_profile(
     if not 1 <= max_period <= 50:
         raise ValueError("max period is outside the supported bounds")
     matrix = shift.matrix
+    states = len(matrix)
+    if states**3 * max_period > 10_000_000:
+        raise ValueError("periodic-point matrix powering exceeds the work bound")
+    maximum_row_sum = max(sum(row) for row in matrix)
+    count_bound = states * max(1, maximum_row_sum) ** max_period
+    aggregate_digits = 3 * max_period * len(str(count_bound))
+    if aggregate_digits > 100_000:
+        raise ValueError("periodic-point profile exceeds the output digit bound")
     power = matrix
     fixed: list[int] = []
     for period in range(1, max_period + 1):

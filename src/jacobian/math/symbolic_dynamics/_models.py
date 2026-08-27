@@ -11,12 +11,7 @@ from jacobian._exact import CanonicalInteger
 from jacobian._models import StrictModel
 from jacobian.canonical import format_canonical_integer
 from jacobian.math.polynomials.values import RationalFunction, RationalPolynomial
-from jacobian.math.symbolic_dynamics._bounds import (
-    MAX_ZETA_REPLAY_PERIOD,
-    presentation_memory,
-    require_bounded_presentation,
-    require_zeta_budget,
-)
+from jacobian.math.symbolic_dynamics._bounds import MAX_ZETA_REPLAY_PERIOD
 from jacobian.math.symbolic_dynamics.values import (
     MAX_FORBIDDEN_BLOCK_LENGTH,
     MAX_PERIOD,
@@ -25,22 +20,9 @@ from jacobian.math.symbolic_dynamics.values import (
     ForbiddenBlockShift,
 )
 
-MAX_PERIODIC_PROFILE_DIGITS = 100_000
-
 
 def _validation_error(reason: str, message: str) -> PydanticCustomError:
     return PydanticCustomError(f"symbolic_dynamics.{reason}", message)
-
-
-def _validation_error_from_message(error: ValueError) -> PydanticCustomError:
-    reasons = {
-        "presentation adjacency exceeds the result bound": "finite_type_presentation_result_bound",
-        "requested block enumeration exceeds the work bound": "block_language_work_bound",
-        "zeta polynomial exceeds the coefficient digit bound": "zeta_coefficient_digit_bound",
-        "zeta determinant and replay exceed the work bound": "zeta_work_bound",
-        "zeta result exceeds the aggregate digit bound": "zeta_result_digit_bound",
-    }
-    return _validation_error(reasons.get(str(error), "request_bound"), str(error))
 
 
 class FiniteTypeShiftRequest(StrictModel):
@@ -83,24 +65,6 @@ class PeriodicPointProfileRequest(StrictModel):
     shift: AdjacencyShift
     max_period: int = Field(ge=1, le=MAX_PERIOD)
 
-    @model_validator(mode="after")
-    def require_bounded_matrix_powering(self) -> Self:
-        states = len(self.shift.matrix)
-        if states**3 * self.max_period > 10_000_000:
-            raise _validation_error(
-                "periodic_point_work_bound",
-                "periodic-point matrix powering exceeds the work bound",
-            )
-        max_row_sum = max(sum(row) for row in self.shift.matrix)
-        count_bound = states * max(1, max_row_sum) ** self.max_period
-        aggregate_digits = 3 * self.max_period * len(str(count_bound))
-        if aggregate_digits > MAX_PERIODIC_PROFILE_DIGITS:
-            raise _validation_error(
-                "periodic_point_result_bound",
-                "periodic-point profile exceeds the output digit bound",
-            )
-        return self
-
 
 class PeriodicPointProfileResult(PeriodicPointProfileRequest):
     periods: tuple[int, ...]
@@ -132,20 +96,6 @@ class HigherBlockRequest(StrictModel):
     shift: ForbiddenBlockShift
     block_length: int = Field(ge=1, le=MAX_FORBIDDEN_BLOCK_LENGTH)
 
-    @model_validator(mode="after")
-    def require_exact_bounded_presentation(self) -> Self:
-        required_memory = presentation_memory(self.shift)
-        if self.block_length < required_memory:
-            raise _validation_error(
-                "higher_block_memory_bound",
-                "block_length must be at least the SFT presentation memory",
-            )
-        try:
-            require_bounded_presentation(self.shift, self.block_length)
-        except ValueError as error:
-            raise _validation_error_from_message(error) from error
-        return self
-
 
 class HigherBlockResult(HigherBlockRequest):
     presentation: BlockPresentation
@@ -160,14 +110,6 @@ class ArtinMazurZetaRequest(StrictModel):
 
     shift: AdjacencyShift
     replay_period: int = Field(ge=1, le=MAX_ZETA_REPLAY_PERIOD)
-
-    @model_validator(mode="after")
-    def require_bounded_exact_zeta(self) -> Self:
-        try:
-            require_zeta_budget(self.shift, self.replay_period)
-        except ValueError as error:
-            raise _validation_error_from_message(error) from error
-        return self
 
 
 class ArtinMazurZetaReplayRow(StrictModel):

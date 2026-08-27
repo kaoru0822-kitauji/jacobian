@@ -5,6 +5,7 @@ from fractions import Fraction
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.markov_chain._models import MixingTimeRequest
 from jacobian.math.markov_chain._operations import compute_mixing_time
 
@@ -87,8 +88,9 @@ def test_search_bounds_reject_before_exact_matrix_powers() -> None:
             }
         )
     assert error.value.errors()[0]["type"] == "too_long"
-    with pytest.raises(ValidationError) as error:
-        _request(epsilon=(0, 1))
+    request = _request(epsilon=(0, 1))
+    with pytest.raises(OperationDomainValidationError) as error:
+        compute_mixing_time(request)
     assert error.value.errors()[0]["type"] == "markov_chain.mixing_epsilon_out_of_range"
 
 
@@ -105,10 +107,11 @@ def test_search_rejects_a_rational_height_that_cannot_fit_the_result() -> None:
         ]
         for row in range(8)
     ]
-    with pytest.raises(ValidationError) as error:
-        MixingTimeRequest.model_validate(
-            {"matrix": matrix, "epsilon": _r(1, 10), "max_steps": 256}
-        )
+    request = MixingTimeRequest.model_validate(
+        {"matrix": matrix, "epsilon": _r(1, 10), "max_steps": 256}
+    )
+    with pytest.raises(OperationDomainValidationError) as error:
+        compute_mixing_time(request)
     assert (
         error.value.errors()[0]["type"]
         == "markov_chain.mixing_result_height_exceeds_bound"
