@@ -7,7 +7,7 @@ from enum import StrEnum
 from typing import Any
 
 from jacobian.catalog._examples import example
-from jacobian.catalog.models import MathTool
+from jacobian.catalog.models import MathTool, OperationDomainValidationError
 from jacobian.math.analysis._arb import arb_source_interval, dyadic_endpoints
 from jacobian.math.analysis._expression_enclosure import (
     IntervalExpressionEnclosureRequest,
@@ -17,6 +17,7 @@ from jacobian.math.analysis._models import (
     DyadicClosedInterval,
     IntervalExpressionDomainFailure,
     IntervalExpressionNode,
+    _bounded_expression_nodes,
     _rational_box_bounds,
 )
 from jacobian.math.analysis._point_enclosure import (
@@ -28,11 +29,14 @@ from jacobian.math.analysis._point_enclosure import (
     _point_enclosure,
 )
 from jacobian.math.analysis._second_jet import (
+    MAX_SECOND_JET_RESULT_INTERVALS,
+    MAX_SECOND_JET_WORK_UNITS,
     FirstPartialEnclosure,
     HessianEntryEnclosure,
     IntervalExpressionSecondJetEnclosureRequest,
     IntervalExpressionSecondJetEnclosureResult,
     _preflight_second_jet_expression,
+    _second_jet_node_arithmetic_units,
 )
 
 
@@ -382,9 +386,32 @@ def _dyadic_closed_interval(value: Any) -> DyadicClosedInterval | None:
 def _second_jet_enclosure(
     request: IntervalExpressionSecondJetEnclosureRequest,
 ) -> IntervalExpressionSecondJetEnclosureResult:
-    preflight = _preflight_second_jet_expression(
-        request.expression, _rational_box_bounds(request.box)
+    dimension = len(request.box.variables)
+    result_intervals = 1 + dimension + dimension * (dimension + 1) // 2
+    if result_intervals > MAX_SECOND_JET_RESULT_INTERVALS:
+        raise AssertionError("second-jet result interval accounting is inconsistent")
+    work_units = len(_bounded_expression_nodes(request.expression)) * (
+        _second_jet_node_arithmetic_units(dimension)
     )
+    if work_units > MAX_SECOND_JET_WORK_UNITS:
+        raise OperationDomainValidationError(
+            location=("expression",),
+            code="analysis.second_jet.work_bound",
+            message=(
+                f"second-jet forward arithmetic work of {work_units} scalar units "
+                f"exceeds its {MAX_SECOND_JET_WORK_UNITS}-unit bound at this dimension"
+            ),
+        )
+    try:
+        preflight = _preflight_second_jet_expression(
+            request.expression, _rational_box_bounds(request.box)
+        )
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=("expression",),
+            code="analysis.second_jet.intermediate_bound",
+            message=str(exc),
+        ) from exc
     if isinstance(preflight, IntervalExpressionDomainFailure):
         return IntervalExpressionSecondJetEnclosureResult._from_kernel(
             request,

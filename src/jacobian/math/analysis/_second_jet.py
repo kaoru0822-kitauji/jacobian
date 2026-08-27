@@ -13,13 +13,11 @@ from jacobian.math.analysis._models import (
     IntervalExpressionDomainFailure,
     IntervalExpressionNode,
     IntervalVariable,
-    _bounded_expression_nodes,
     _bounded_rational_bounds,
     _BoxPreflight,
     _IntervalExpressionBoxRequest,
     _preflight_box_binary,
     _preflight_box_unary,
-    _rational_box_bounds,
     _RationalBounds,
     _validation_error,
 )
@@ -95,28 +93,6 @@ def _preflight_second_jet_expression(
 
 class IntervalExpressionSecondJetEnclosureRequest(_IntervalExpressionBoxRequest):
     """Enclose an elementary expression and all derivatives through order two."""
-
-    @model_validator(mode="after")
-    def require_small_twice_differentiable_source(self) -> Self:
-        dimension = len(self.box.variables)
-        result_intervals = 1 + dimension + dimension * (dimension + 1) // 2
-        if result_intervals > MAX_SECOND_JET_RESULT_INTERVALS:
-            raise AssertionError(
-                "second-jet result interval accounting is inconsistent"
-            )
-        work_units = len(
-            _bounded_expression_nodes(self.expression)
-        ) * _second_jet_node_arithmetic_units(dimension)
-        if work_units > MAX_SECOND_JET_WORK_UNITS:
-            raise _validation_error(
-                f"second-jet forward arithmetic work of {work_units} scalar "
-                f"units exceeds its {MAX_SECOND_JET_WORK_UNITS}-unit bound at "
-                "this dimension"
-            )
-        _preflight_second_jet_expression(
-            self.expression, _rational_box_bounds(self.box)
-        )
-        return self
 
 
 class FirstPartialEnclosure(StrictModel):

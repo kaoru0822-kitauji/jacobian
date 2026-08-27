@@ -6,8 +6,8 @@ from typing import Any
 
 import pytest
 from pydantic import ValidationError
-from tests.math._analysis_support import analysis_validation_error
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.analysis._models import DyadicClosedInterval
 from jacobian.math.analysis._operations import _second_jet_enclosure
 from jacobian.math.analysis._second_jet import (
@@ -337,8 +337,8 @@ def test_full_box_affine_jet_encloses_all_eight_variables() -> None:
 def test_work_budget_scales_with_the_jet_dimension() -> None:
     box = tuple((variable, Fraction(2), Fraction(3)) for variable in "abcdefgh")
     wide_tree = _balanced_binary_tree("div", tuple("abcdefgh"))
-    with analysis_validation_error():
-        _request(wide_tree, box)
+    with pytest.raises(OperationDomainValidationError, match="work"):
+        _run(wide_tree, box)
 
     narrow_box = (
         ("a", Fraction(2), Fraction(3)),
