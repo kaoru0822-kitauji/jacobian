@@ -1,8 +1,8 @@
 """Exact frame and vector-family contract tests."""
 
 import pytest
-from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.frames._models import (
     CoherenceRequest,
     FiniteFrameRequest,
@@ -25,14 +25,18 @@ def test_gram_accepts_nonspanning_vector_family() -> None:
 
 
 def test_frame_requires_full_ambient_span() -> None:
-    with pytest.raises(ValidationError) as error:
-        FiniteFrameRequest.model_validate({"vectors": [[1, 0], [2, 0]]})
+    request = FiniteFrameRequest.model_validate({"vectors": [[1, 0], [2, 0]]})
+    with pytest.raises(OperationDomainValidationError) as error:
+        compute_frame_potential(request)
     assert error.value.errors()[0]["type"] == "frames.frame_does_not_span"
 
 
 def test_coherence_rejects_zero_vector() -> None:
-    with pytest.raises(ValidationError) as error:
-        CoherenceRequest.model_validate({"vectors": [[0, 0], [1, 0], [0, 1]]})
+    request = CoherenceRequest.model_validate(
+        {"vectors": [[0, 0], [1, 0], [0, 1]]}
+    )
+    with pytest.raises(OperationDomainValidationError) as error:
+        compute_coherence(request)
     assert error.value.errors()[0]["type"] == "frames.zero_vector"
 
 
