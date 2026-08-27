@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from pydantic import Field, model_validator
 from typing import Self
+
+from pydantic import Field, model_validator
 
 from jacobian._models import StrictModel
 
@@ -42,9 +43,9 @@ class PrimeCoverageProfileResult(StrictModel):
 
 
 __all__ = [
+    "MAX_COVERAGE_UPPER",
+    "MAX_COVERAGE_WIDTH",
     "PrimeCoverageProfileRequest",
     "PrimeCoverageProfileResult",
     "PrimeCoverageProfileRow",
-    "MAX_COVERAGE_UPPER",
-    "MAX_COVERAGE_WIDTH",
 ]

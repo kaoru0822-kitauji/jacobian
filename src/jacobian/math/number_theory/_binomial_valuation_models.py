@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pydantic import Field
-from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
 
@@ -17,6 +16,7 @@ class BinomialValuationProfileRequest(StrictModel):
     def model_post_validate(self) -> None:
         """Validate that prime is actually prime."""
         from sympy import isprime
+
         if not isprime(self.prime):
             raise ValueError("prime must be a prime number")
 

@@ -16,7 +16,7 @@ def _simple_sieve(limit: int) -> list[int]:
         return []
     is_prime = bytearray(b"\x01") * (limit + 1)
     is_prime[0] = is_prime[1] = 0
-    for i in range(2, int(math.isqrt(limit)) + 1):
+    for i in range(2, math.isqrt(limit) + 1):
         if is_prime[i]:
             for j in range(i * i, limit + 1, i):
                 is_prime[j] = 0

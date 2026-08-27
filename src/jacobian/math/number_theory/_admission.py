@@ -258,7 +258,7 @@ ADMISSIONS: tuple[OperationAdmission, ...] = (
         AdmissionDecision.KEEP,
         "complete exact friable count with result-sensitive materialized and generated regimes, avoiding caller-side factorization of every source integer",
     ),
-   OperationAdmission(
+    OperationAdmission(
         "number_theory.integer_interval.prime_coverage_profile.compute",
         AdmissionDecision.KEEP,
         "distinct complete interval profile that a loop of scalar omega calls cannot establish as one source-bound value",
