@@ -255,8 +255,7 @@ class PrimeFieldRecurrenceFindResult(StrictModel):
         """Construct a result from the trusted Berlekamp-Massey kernel.
 
         Normal model parsing deliberately checks only the bounded wire
-        structure.  Use the explicit owner verifier for a result supplied by
-        an independent producer.
+        structure.
         """
 
         return cls.model_construct(

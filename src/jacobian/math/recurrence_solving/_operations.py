@@ -47,22 +47,3 @@ def compute_prime_field_find_recurrence(
         sequence=request.sequence,
         recurrence=rec,
     )
-
-
-def verify_prime_field_recurrence_find_result(
-    result: PrimeFieldRecurrenceFindResult,
-) -> bool:
-    """Verify an independently supplied Berlekamp-Massey result.
-
-    The result's request bounds cap the replay at 256 terms and a prime below
-    10,000.  This deliberately lives outside Pydantic validation: parsing an
-    untrusted wire result must not execute the operation or import the native
-    API.
-    """
-
-    recurrence = result.recurrence
-    try:
-        expected = berlekamp_massey(list(result.sequence), recurrence.prime)
-    except ValueError:
-        return False
-    return recurrence == expected

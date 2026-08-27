@@ -15,7 +15,6 @@ from jacobian.math.recurrence_solving._models import (
 )
 from jacobian.math.recurrence_solving._operations import (
     compute_prime_field_find_recurrence,
-    verify_prime_field_recurrence_find_result,
 )
 from jacobian.math.recurrence_solving.operations import berlekamp_massey
 
@@ -130,16 +129,6 @@ class TestPrimeFieldRecurrenceFind:
         assert result.recurrence.status == "FOUND"
         assert result.recurrence.order == 2
         assert result.recurrence.coefficients == (1, 1)
-        assert verify_prime_field_recurrence_find_result(result)
-
-    def test_explicit_verifier_rejects_nonminimal_fibonacci_recurrence(self) -> None:
-        result = PrimeFieldRecurrenceFindResult(
-            sequence=FIBONACCI_MOD_7,
-            recurrence=PrimeFieldRecurrence(
-                prime=7, coefficients=(1, 1, 0), order=3, status="FOUND"
-            ),
-        )
-        assert not verify_prime_field_recurrence_find_result(result)
 
     def test_no_fitting_status_is_not_part_of_the_prime_field_contract(self) -> None:
         with pytest.raises(ValidationError):
@@ -157,17 +146,6 @@ class TestPrimeFieldRecurrenceFind:
             PrimeFieldRecurrenceFindResult.model_json_schema()
         )
 
-    def test_explicit_verifier_rejects_wrong_coefficients_at_minimal_order(
-        self,
-    ) -> None:
-        result = PrimeFieldRecurrenceFindResult(
-            sequence=FIBONACCI_MOD_7,
-            recurrence=PrimeFieldRecurrence(
-                prime=7, coefficients=(1, 2), order=2, status="FOUND"
-            ),
-        )
-        assert not verify_prime_field_recurrence_find_result(result)
-
     def test_impulse_sequence_is_the_minimal_order_n_recurrence(self) -> None:
         sequence = (0, 0, 0, 1)
         result = compute_prime_field_find_recurrence(
@@ -176,10 +154,3 @@ class TestPrimeFieldRecurrenceFind:
         assert result.recurrence.status == "FOUND"
         assert result.recurrence.order == len(sequence)
         PrimeFieldRecurrenceFindResult.model_validate(result.model_dump())
-        incorrect = PrimeFieldRecurrenceFindResult(
-            sequence=sequence,
-            recurrence=PrimeFieldRecurrence(
-                prime=2, coefficients=(1,), order=1, status="FOUND"
-            ),
-        )
-        assert not verify_prime_field_recurrence_find_result(incorrect)
