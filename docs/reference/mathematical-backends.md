@@ -45,6 +45,69 @@ structural preconditions, degeneracies, and work bounds before calling it. A
 wire request model may invoke that path after parsing; native callers use the
 same domain function directly.
 
+### Owner-local adapter placement
+
+Keep an in-process backend private to the mathematical owner whose operation
+uses it:
+
+```text
+owner-local request admission
+  -> owner-local private backend adapter
+  -> maintained backend kernel
+  -> canonical owner-defined result
+```
+
+The owner decides the backend's admitted domain, converts canonical values in
+both directions, normalizes backend output, and translates expected failures.
+Do not introduce a repository-wide backend facade that mirrors a maintained
+library's API or pass backend objects between mathematical owners. Shared
+helpers may own genuinely canonical scalar or value construction, but not an
+operation's mathematical policy.
+
+Load a native backend lazily when importing the public Jacobian namespace does
+not require it. For a single call with no substantial conversion or failure
+policy, keep the import and call together in the owner's private operation
+path:
+
+```python
+def _integer_rank(rows: tuple[tuple[int, ...], ...]) -> int:
+    from flint import fmpz_mat
+
+    return int(fmpz_mat(rows).rank())
+```
+
+A separate private adapter module is warranted when it owns meaningful
+conversion, normalization, backend context, exception translation, or reuse.
+For example, an owner may place this boundary in ``_flint.py``:
+
+```python
+from fractions import Fraction
+
+
+def determinant_and_rank(
+    rows: tuple[tuple[Fraction, ...], ...],
+) -> tuple[Fraction, int]:
+    from flint import fmpq, fmpq_mat
+
+    backend = fmpq_mat(
+        [
+            [fmpq(value.numerator, value.denominator) for value in row]
+            for row in rows
+        ]
+    )
+    determinant = backend.det()
+    return (
+        Fraction(int(determinant.numerator), int(determinant.denominator)),
+        int(backend.rank()),
+    )
+```
+
+The operation computes admission before calling this adapter and constructs its
+canonical result after the adapter returns. The adapter is a boundary around
+backend-specific mechanics, not an interchangeable-backend framework. Mutable
+backend context, including global precision, requires explicit request-lifetime
+and concurrency ownership rather than an unguarded set-and-restore sequence.
+
 ## Child-process adapters
 
 A child-process adapter has the same obligations plus:
