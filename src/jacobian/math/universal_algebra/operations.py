@@ -78,8 +78,6 @@ def equation_profile(
     Return ``HOLDS`` with the satisfying assignment count, or ``FAILS`` with
     the first counterassignment and exact left/right values.
     """
-    from itertools import product as iproduct
-
     require_term_for_algebra(left, algebra)
     require_term_for_algebra(right, algebra)
     return _equation_profile_unchecked(algebra, left, right, variable_count)
