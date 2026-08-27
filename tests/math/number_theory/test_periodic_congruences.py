@@ -374,11 +374,7 @@ def test_small_profiles_match_exhaustive_membership_replay() -> None:
                 assert result.density.as_fraction() == Fraction(len(expected), 6)
 
 
-def test_measure_result_is_structural_and_private_verifier_rejects_mutations() -> None:
-    from jacobian.math.number_theory._periodic_operations import (
-        _verify_periodic_congruence_union_measure_result,
-    )
-
+def test_measure_result_is_structural() -> None:
     result = _measure(
         {
             "subsets": [{"modulus": "5", "residues": ["0", "2"]}],
@@ -397,18 +393,7 @@ def test_measure_result_is_structural_and_private_verifier_rejects_mutations() -
     with expect_validation("number_theory."):
         PeriodicCongruenceUnionMeasureResult.model_validate(bad_density)
 
-    bad_source = copy.deepcopy(serialized)
-    bad_source["source"]["complement"] = True
-    assert not _verify_periodic_congruence_union_measure_result(
-        PeriodicCongruenceUnionMeasureResult.model_validate(bad_source)
-    )
-
-
-def test_profile_private_verifier_rejects_omitted_or_forged_residues() -> None:
-    from jacobian.math.number_theory._periodic_operations import (
-        _verify_periodic_congruence_union_profile_result,
-    )
-
+def test_profile_result_is_structural() -> None:
     result = _profile(
         {
             "subsets": [{"modulus": "5", "residues": ["0", "2"]}],
@@ -416,35 +401,6 @@ def test_profile_private_verifier_rejects_omitted_or_forged_residues() -> None:
         }
     )
     serialized = result.model_dump(mode="json")
-
-    for residues in (["0", "1"], ["1", "2"]):
-        forged = copy.deepcopy(serialized)
-        forged["occupied_residues"] = residues
-        assert not _verify_periodic_congruence_union_profile_result(
-            PeriodicCongruenceUnionProfileResult.model_validate(forged)
-        )
-
-
-def test_profile_result_is_structural_and_private_verifier_rejects_source_mutation() -> (
-    None
-):
-    from jacobian.math.number_theory._periodic_operations import (
-        _verify_periodic_congruence_union_profile_result,
-    )
-
-    result = _profile(
-        {
-            "subsets": [{"modulus": "5", "residues": ["0", "2"]}],
-            "complement": False,
-        }
-    )
-    serialized = result.model_dump(mode="json")
-
-    bad_source = copy.deepcopy(serialized)
-    bad_source["source"]["subsets"][0]["residues"] = ["1", "3"]
-    assert not _verify_periodic_congruence_union_profile_result(
-        PeriodicCongruenceUnionProfileResult.model_validate(bad_source)
-    )
 
     bad_period = copy.deepcopy(serialized)
     bad_period["common_period"] = "6"

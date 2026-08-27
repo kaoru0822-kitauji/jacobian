@@ -20,12 +20,6 @@ from jacobian.math.number_theory._periodic_models import (
 )
 
 
-def _measure_request_from_source(
-    source: PeriodicCongruenceUnionSource,
-) -> PeriodicCongruenceUnionRequest:
-    return PeriodicCongruenceUnionRequest.model_validate(source.model_dump(mode="json"))
-
-
 def _measure_values(
     source: PeriodicCongruenceUnionSource,
     occupied_count: int,
@@ -72,36 +66,6 @@ def compute_periodic_congruence_union_profile(
             format_canonical_integer(residue) for residue in residues
         ),
     )
-
-
-def _verify_periodic_congruence_union_measure_result(
-    result: PeriodicCongruenceUnionMeasureResult,
-) -> bool:
-    """Verify a deliberately supplied measure claim inside its admission envelope."""
-
-    try:
-        return (
-            compute_periodic_congruence_union_measure(
-                _measure_request_from_source(result.source)
-            )
-            == result
-        )
-    except ValueError:
-        return False
-
-
-def _verify_periodic_congruence_union_profile_result(
-    result: PeriodicCongruenceUnionProfileResult,
-) -> bool:
-    """Verify a deliberately supplied materialized profile claim."""
-
-    try:
-        request = PeriodicCongruenceUnionProfileRequest.model_validate(
-            result.source.model_dump(mode="json")
-        )
-        return compute_periodic_congruence_union_profile(request) == result
-    except ValueError:
-        return False
 
 
 __all__ = [
