@@ -9,6 +9,7 @@ from pydantic import ConfigDict, Field, StrictInt, model_validator
 
 from jacobian._exact import CanonicalRational, require_bounded_rational
 from jacobian._models import StrictModel, canonicalize_json_containers
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.analysis._arb import dyadic_endpoints
 from jacobian.math.analysis._models import (
     MAX_DYADIC_MANTISSA_DIGITS,
@@ -35,16 +36,6 @@ class ArbPointEnclosureRequest(StrictModel):
     function: RealUnaryFunction
     argument: CanonicalRational
     precision_bits: StrictInt = Field(default=128, ge=32, le=4096)
-
-    @model_validator(mode="after")
-    def bound_argument_size(self) -> Self:
-        require_bounded_rational(
-            self.argument,
-            max_digits=MAX_RATIONAL_DIGITS,
-            label="validated-analysis rational",
-        )
-        return self
-
 
 type PointEnclosureCheckOutcome = Literal["ACCEPTED", "REJECTED", "NON_RESULT"]
 
@@ -298,6 +289,19 @@ class ArbPointEnclosureResult(ArbPointEnclosureRequest):
 
 def _point_enclosure(request: ArbPointEnclosureRequest) -> ArbPointEnclosureResult:
     """Compute one bounded Arb point enclosure in its owning family."""
+
+    try:
+        require_bounded_rational(
+            request.argument,
+            max_digits=MAX_RATIONAL_DIGITS,
+            label="validated-analysis rational",
+        )
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=("argument",),
+            code="analysis.point.argument_bound",
+            message=str(exc),
+        ) from exc
 
     from flint import arb, ctx, fmpq
 
