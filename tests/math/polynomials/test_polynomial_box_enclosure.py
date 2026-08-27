@@ -11,6 +11,7 @@ from tests.math.polynomials._support import polynomial_validation_error
 
 from jacobian._exact import MAX_CANONICAL_RATIONAL_DIGITS, CanonicalRational
 from jacobian.canonical import encode_strict_json
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.intervals import ClosedRationalInterval, RationalBox
 from jacobian.math.polynomials.intervals._models import (
     MAX_BOX_ENCLOSURE_COEFFICIENT_DIGITS,
@@ -243,11 +244,12 @@ def test_transported_variable_and_axis_permutation_preserves_enclosure() -> None
 
 def test_box_must_use_the_polynomial_complete_ordered_axis() -> None:
     polynomial = _polynomial(("x", "y"), {(1, 0): 1})
-    with polynomial_validation_error():
-        PolynomialBoxEnclosureRequest(
+    request = PolynomialBoxEnclosureRequest(
             polynomial=polynomial,
             box=_box(("y", "x"), ((0, 1), (0, 1))),
         )
+    with pytest.raises(OperationDomainValidationError):
+        compute_polynomial_box_enclosure(request)
 
 
 def test_reversed_coordinate_interval_is_rejected_before_execution() -> None:
@@ -577,13 +579,14 @@ def test_exact_result_digit_growth_boundary() -> None:
     assert MAX_BOX_ENCLOSURE_RESULT_DIGITS == 32_768
     assert compute_polynomial_box_enclosure(at_limit).box == at_limit.box
 
-    with polynomial_validation_error():
-        _growth_boundary_request(
+    above_limit = _growth_boundary_request(
             second_endpoint_numerator_digits=128,
             second_endpoint_denominator_digits=127,
             coefficient_numerator="1",
             coefficient_denominator_digits=64,
         )
+    with pytest.raises(OperationDomainValidationError):
+        compute_polynomial_box_enclosure(above_limit)
 
 
 def test_intermediate_digit_growth_boundary() -> None:

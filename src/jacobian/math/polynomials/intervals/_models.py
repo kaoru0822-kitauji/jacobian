@@ -319,10 +319,6 @@ class PolynomialBoxEnclosureRequest(StrictModel):
     polynomial: RationalPolynomial
     box: RationalBox
 
-    @model_validator(mode="after")
-    def require_complete_bounded_source(self) -> Self:
-        _require_enclosure_preflight(self.polynomial, self.box)
-        return self
 
 
 class PolynomialBoxEnclosureResult(StrictModel):
