@@ -21,6 +21,30 @@ inputs:
     description: Whether this lane contributes a coverage database.
     required: false
     default: "true"
+  split-count:
+    description: Optional total number of pytest-split groups.
+    required: false
+    default: ""
+  split-group:
+    description: Optional one-based pytest-split group number.
+    required: false
+    default: ""
+  durations-path:
+    description: Optional pytest-split duration history input path.
+    required: false
+    default: ""
+  store-durations:
+    description: Whether to store durations for a future timing baseline.
+    required: false
+    default: "false"
+  duration-output:
+    description: Path for the stored pytest-split duration file.
+    required: false
+    default: ""
+  duration-artifact:
+    description: Artifact name for the stored pytest-split durations.
+    required: false
+    default: ""
 runs:
   using: composite
   steps:
@@ -29,10 +53,39 @@ runs:
       env:
         COLLECT_COVERAGE: ${{ inputs.collect-coverage }}
         TESTS: ${{ inputs.tests }}
+        SPLIT_COUNT: ${{ inputs.split-count }}
+        SPLIT_GROUP: ${{ inputs.split-group }}
+        DURATIONS_PATH: ${{ inputs.durations-path }}
+        STORE_DURATIONS: ${{ inputs.store-durations }}
+        DURATION_OUTPUT: ${{ inputs.duration-output }}
       run: |
         pytest_args=(--junitxml=pytest.xml -p tools.pytest_timing --jacobian-timing-json=timing.json)
         if [ "$COLLECT_COVERAGE" = true ]; then
           pytest_args+=(--cov --cov-report= --cov-fail-under=0)
+        fi
+        if [ -n "$SPLIT_COUNT" ]; then
+          test -n "$SPLIT_GROUP"
+          test -n "$DURATIONS_PATH"
+          pytest_args+=(
+            --splits "$SPLIT_COUNT"
+            --group "$SPLIT_GROUP"
+            --splitting-algorithm least_duration
+          )
+        fi
+        durations_file="$DURATIONS_PATH"
+        if [ "$STORE_DURATIONS" = true ]; then
+          test -n "$DURATION_OUTPUT"
+          mkdir -p "$(dirname "$DURATION_OUTPUT")"
+          if [ -n "$DURATIONS_PATH" ] && [ -f "$DURATIONS_PATH" ]; then
+            cp "$DURATIONS_PATH" "$DURATION_OUTPUT"
+          else
+            printf '{}\n' > "$DURATION_OUTPUT"
+          fi
+          durations_file="$DURATION_OUTPUT"
+          pytest_args+=(--store-durations)
+        fi
+        if [ -n "$durations_file" ]; then
+          pytest_args+=(--durations-path "$durations_file")
         fi
         env PYTEST_ARGS="${pytest_args[*]}" \
           make test-${{ inputs.lane }} TESTS="$TESTS"
@@ -69,3 +122,10 @@ runs:
         name: ${{ inputs.coverage-artifact }}
         path: ${{ inputs.coverage-file }}
         include-hidden-files: true
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      if: ${{ !cancelled() && inputs.store-durations == 'true' }}
+      with:
+        name: ${{ inputs.duration-artifact }}
+        path: ${{ inputs.duration-output }}
+        if-no-files-found: error
+        retention-days: 1

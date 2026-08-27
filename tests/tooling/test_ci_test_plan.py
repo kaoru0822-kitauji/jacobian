@@ -138,6 +138,7 @@ def test_math_test_change_runs_only_the_changed_test() -> None:
 
     assert plan.run_math is True
     assert plan.math_tests == (path,)
+    assert [(shard.group, shard.splits) for shard in plan.math_shards] == [(1, 1)]
     assert plan.run_catalog is False
 
 
@@ -146,6 +147,12 @@ def test_shared_runtime_path_falls_back_to_full_math_and_public_contracts() -> N
 
     assert plan.run_math is True
     assert plan.math_tests == ()
+    assert [(shard.group, shard.splits) for shard in plan.math_shards] == [
+        (1, 4),
+        (2, 4),
+        (3, 4),
+        (4, 4),
+    ]
     assert plan.run_catalog is True
     assert plan.run_catalog_examples is True
     assert "shared CI or runtime path changed" in plan.reasons[0]
@@ -171,6 +178,7 @@ def test_documentation_change_skips_product_evidence() -> None:
     plan = _plan(["docs/reference/testing-strategy.md"])
 
     assert plan.run_math is False
+    assert plan.math_shards == ()
     assert plan.run_catalog is False
     assert plan.run_catalog_examples is False
     assert plan.run_scale is False
@@ -230,6 +238,12 @@ def test_merge_group_always_owns_full_math_and_public_contracts() -> None:
 
     assert plan.run_math is True
     assert plan.math_tests == ()
+    assert [(shard.group, shard.splits) for shard in plan.math_shards] == [
+        (1, 4),
+        (2, 4),
+        (3, 4),
+        (4, 4),
+    ]
     assert plan.run_catalog is True
     assert plan.run_catalog_examples is True
     assert plan.run_scale is False
@@ -253,6 +267,12 @@ def test_main_owns_full_ordinary_suite_and_coverage_without_scale() -> None:
     plan = _plan(["docs/reference/testing-strategy.md"], event="push")
 
     assert plan.run_math is True
+    assert [(shard.group, shard.splits) for shard in plan.math_shards] == [
+        (1, 4),
+        (2, 4),
+        (3, 4),
+        (4, 4),
+    ]
     assert plan.run_scale is False
     assert plan.python_lanes == ("dispatch", "cli", "tooling", "integration")
     assert plan.boundary_lanes == ("process", "mcp")

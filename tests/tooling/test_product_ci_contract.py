@@ -78,7 +78,7 @@ def test_python_and_boundary_lanes_share_evidence_collection() -> None:
     assert "--jacobian-timing-json=timing.json" in action
     assert "pytest_args+=(--cov --cov-report= --cov-fail-under=0)" in action
     assert "inputs.collect-coverage == 'true'" in action
-    assert action.count("actions/upload-artifact@") == 3
+    assert action.count("actions/upload-artifact@") == 4
     assert "${{ inputs.junit-artifact }}-timing" in action
     assert "tools/test_timing_report.py" in action
     assert "uv cache prune --ci" in action
@@ -97,7 +97,7 @@ def test_python_jobs_select_math_and_public_contract_evidence_from_the_plan() ->
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
 
     assert "name: python (${{ matrix.lane }})" in workflow
-    assert "name: python (math)" in workflow
+    assert "name: python (math ${{ matrix.group }}/${{ matrix.splits }})" in workflow
     assert "name: python (catalog)" in workflow
     assert "name: python (catalog examples)" in workflow
     assert "name: python (scale)" in workflow
@@ -133,6 +133,7 @@ def test_product_ci_uses_a_versioned_checked_in_test_plan() -> None:
     assert "event=workflow_dispatch" in workflow
     assert "run_scale: ${{ steps.plan.outputs.run_scale }}" in workflow
     assert "python_lanes: ${{ steps.plan.outputs.python_lanes }}" in workflow
+    assert "math_shards: ${{ steps.plan.outputs.math_shards }}" in workflow
     assert (ROOT / "tools" / "ci_test_plan.py").exists()
 
 
@@ -171,12 +172,20 @@ def test_required_pr_workflows_cancel_stale_evidence() -> None:
     )
 
 
-def test_product_ci_does_not_use_timing_shards() -> None:
+def test_product_ci_uses_bounded_timing_balanced_math_shards() -> None:
     workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    action = (ROOT / ".github/actions/run-test-lane/action.yml").read_text(
+        encoding="utf-8"
+    )
 
-    assert "composition-shard-count:" not in workflow
-    assert "--splits" not in workflow
-    assert "pytest-split" not in workflow
+    assert "fromJSON(needs.plan.outputs.math_shards)" in workflow
+    assert "max-parallel: 4" in workflow
+    assert "--splits" in action
+    assert "--group" in action
+    assert "--splitting-algorithm least_duration" in action
+    assert "--store-durations" in action
+    assert "name: math-test-durations" in workflow
+    assert "needs.math.result == 'success'" in workflow
 
 
 def test_coverage_report_lives_in_the_job_summary_not_a_pr_comment() -> None:

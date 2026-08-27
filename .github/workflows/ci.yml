@@ -26,6 +26,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   static:
@@ -65,6 +66,8 @@ jobs:
       pr_lanes: ${{ steps.plan.outputs.pr_lanes }}
       run_math: ${{ steps.plan.outputs.run_math }}
       math_tests: ${{ steps.plan.outputs.math_tests }}
+      math_shards: ${{ steps.plan.outputs.math_shards }}
+      math_shard_count: ${{ steps.plan.outputs.math_shard_count }}
       run_catalog: ${{ steps.plan.outputs.run_catalog }}
       run_catalog_examples: ${{ steps.plan.outputs.run_catalog_examples }}
       run_scale: ${{ steps.plan.outputs.run_scale }}
@@ -108,13 +111,33 @@ jobs:
             --changed-paths changed-paths.txt \
             --github-output "$GITHUB_OUTPUT"
           echo "pr_lanes=$PR_LANES" >> "$GITHUB_OUTPUT"
+      - name: Prepare math timing history
+        if: steps.plan.outputs.math_shard_count == '4'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          .github/scripts/manage-test-timings prepare \
+            --suite math \
+            --output .ci/math-test-durations.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: steps.plan.outputs.math_shard_count == '4'
+        with:
+          name: math-test-durations-input
+          path: .ci/math-test-durations.json
+          include-hidden-files: true
+          retention-days: 1
 
   math:
-    name: python (math)
+    name: python (math ${{ matrix.group }}/${{ matrix.splits }})
     needs: plan
     if: ${{ needs.plan.outputs.run_math == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.math_shards) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -122,14 +145,61 @@ jobs:
       - uses: ./.github/actions/setup-python-tests
         with:
           python-version: "3.12"
+      - name: Download math timing history
+        if: matrix.splits == 4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: math-test-durations-input
+          path: .ci
       - uses: ./.github/actions/run-test-lane
         with:
           lane: math
-          junit-artifact: junit-python-math-3.12
-          coverage-artifact: coverage-data-python-math
-          coverage-file: .coverage.python-math
+          junit-artifact: junit-python-math-3.12-${{ matrix.group }}
+          coverage-artifact: coverage-data-python-math-${{ matrix.group }}
+          coverage-file: .coverage.python-math-${{ matrix.group }}
           tests: ${{ needs.plan.outputs.math_tests }}
           collect-coverage: ${{ needs.plan.outputs.pr_lanes != 'true' }}
+          split-count: ${{ matrix.splits }}
+          split-group: ${{ matrix.group }}
+          durations-path: .ci/math-test-durations.json
+          store-durations: ${{ matrix.splits == 4 }}
+          duration-output: math-test-durations.json
+          duration-artifact: math-duration-shard-${{ matrix.group }}
+
+  math_timings:
+    name: Publish math timing history
+    needs: [plan, math]
+    if: >-
+      ${{ always() && github.ref == 'refs/heads/main' &&
+      needs.plan.outputs.pr_lanes != 'true' &&
+      needs.plan.outputs.math_shard_count == '4' && needs.math.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: math-duration-shard-*
+          path: .ci/math-shards
+      - name: Merge math timing history
+        run: |
+          .github/scripts/manage-test-timings merge \
+            --suite math \
+            --input .ci/math-shards/math-duration-shard-1/math-test-durations.json \
+            --input .ci/math-shards/math-duration-shard-2/math-test-durations.json \
+            --input .ci/math-shards/math-duration-shard-3/math-test-durations.json \
+            --input .ci/math-shards/math-duration-shard-4/math-test-durations.json \
+            --output .ci/math-test-durations.json \
+            --source-sha "${{ github.sha }}" \
+            --python-version 3.12
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: math-test-durations
+          path: .ci/math-test-durations.json
+          include-hidden-files: true
+          retention-days: 90
 
   scale:
     name: python (scale)

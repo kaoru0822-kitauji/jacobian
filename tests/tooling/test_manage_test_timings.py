@@ -180,3 +180,58 @@ def test_timing_artifact_source_must_match_its_successful_workflow_run(
             suite="benchmark",
             now=now,
         )
+
+
+def test_math_timing_history_uses_four_shards_and_math_node_ids() -> None:
+    module = _script()
+
+    assert module.shard_count("math") == 4
+    assert module.validate_durations(
+        {"tests/math/logic/test_cnf.py::test_case": 1.25},
+        "math-test-durations.json",
+        "math",
+    ) == {"tests/math/logic/test_cnf.py::test_case": 1.25}
+
+
+def test_math_timing_history_merges_four_shards(tmp_path: Path) -> None:
+    module = _script()
+    first = tmp_path / "first.json"
+    second = tmp_path / "second.json"
+    third = tmp_path / "third.json"
+    fourth = tmp_path / "fourth.json"
+    output = tmp_path / "math-test-durations.json"
+    first.write_text(
+        json.dumps({"tests/math/logic/test_cnf.py::test_case": 1.25}),
+        encoding="utf-8",
+    )
+    second.write_text(
+        json.dumps({"tests/math/topology/test_graph.py::test_case": 2.5}),
+        encoding="utf-8",
+    )
+    third.write_text(
+        json.dumps({"tests/math/logic/test_sat.py::test_case": 3.75}),
+        encoding="utf-8",
+    )
+    fourth.write_text(
+        json.dumps({"tests/math/topology/test_hypergraph.py::test_case": 5.0}),
+        encoding="utf-8",
+    )
+
+    module.merge(
+        [first, second, third, fourth],
+        output,
+        "a" * 40,
+        "3.12",
+        "0.11.0",
+        "math",
+    )
+
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["suite"] == "math"
+    assert payload["shard_count"] == 4
+    assert payload["durations"] == {
+        "tests/math/logic/test_cnf.py::test_case": 1.25,
+        "tests/math/logic/test_sat.py::test_case": 3.75,
+        "tests/math/topology/test_graph.py::test_case": 2.5,
+        "tests/math/topology/test_hypergraph.py::test_case": 5.0,
+    }

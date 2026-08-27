@@ -11,7 +11,7 @@ from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
 
-PLAN_VERSION = 2
+PLAN_VERSION = 3
 SUPPORTED_EVENTS = frozenset(
     {"pull_request", "merge_group", "push", "schedule", "workflow_dispatch"}
 )
@@ -52,6 +52,13 @@ _PUBLIC_MATH_FILES = frozenset(
 _PYTHON_LANES = ("dispatch", "cli", "tooling", "integration")
 _BOUNDARY_LANES = ("process", "mcp")
 _SCALE_MATH_OWNERS = frozenset({"lattice_polytopes"})
+_FULL_MATH_SHARD_COUNT = 4
+
+
+@dataclass(frozen=True)
+class MathShard:
+    group: int
+    splits: int
 
 
 @dataclass(frozen=True)
@@ -63,6 +70,7 @@ class TestPlan:
     topology_digest: str
     run_math: bool
     math_tests: tuple[str, ...]
+    math_shards: tuple[MathShard, ...]
     run_catalog: bool
     run_catalog_examples: bool
     run_scale: bool
@@ -148,6 +156,13 @@ def _complete_decision(reason: str) -> PathDecision:
         run_wheel=True,
         full_math_reason=reason,
     )
+
+
+def _math_shards(*, run_math: bool, full_suite: bool) -> tuple[MathShard, ...]:
+    if not run_math:
+        return ()
+    count = _FULL_MATH_SHARD_COUNT if full_suite else 1
+    return tuple(MathShard(group=group, splits=count) for group in range(1, count + 1))
 
 
 def _classify_math_path(path: str, repository: Path) -> PathDecision:
@@ -302,6 +317,10 @@ def _pull_request_plan(
         topology_digest=_topology_digest(),
         run_math=bool(math_tests) or full_math_reason is not None,
         math_tests=tuple(sorted(math_tests)),
+        math_shards=_math_shards(
+            run_math=bool(math_tests) or full_math_reason is not None,
+            full_suite=full_math_reason is not None,
+        ),
         run_catalog=run_catalog,
         run_catalog_examples=run_catalog_examples,
         run_scale=False,
@@ -343,6 +362,7 @@ def build_plan(
             topology_digest=_topology_digest(),
             run_math=True,
             math_tests=(),
+            math_shards=_math_shards(run_math=True, full_suite=True),
             run_catalog=True,
             run_catalog_examples=True,
             run_scale=run_scale,
@@ -369,6 +389,8 @@ def _write_github_output(plan: TestPlan, output: Path) -> None:
         "plan": plan.as_json(),
         "run_math": str(plan.run_math).lower(),
         "math_tests": " ".join(plan.math_tests),
+        "math_shards": json.dumps([asdict(shard) for shard in plan.math_shards]),
+        "math_shard_count": str(len(plan.math_shards)),
         "run_catalog": str(plan.run_catalog).lower(),
         "run_catalog_examples": str(plan.run_catalog_examples).lower(),
         "run_scale": str(plan.run_scale).lower(),
