@@ -2,13 +2,22 @@
 
 from __future__ import annotations
 
-from jacobian.canonical import format_canonical_integer
+import unicodedata
+from itertools import product
+
+from sympy import isprime
+
+from jacobian.canonical import encode_strict_json, format_canonical_integer
 from jacobian.math.finite_geometry._linear import (
     canonical_basis,
     intersection_basis,
     rref_rank,
 )
 from jacobian.math.finite_geometry._models import (
+    _PROJECTIVE_ENUMERATION_ENVELOPE_BYTES,
+    MAX_AFFINE_PLANE_FIELD_ORDER,
+    MAX_PROJECTIVE_ENUMERATION_RESULT_BYTES,
+    MAX_PROJECTIVE_SPACE_ENUMERATION_VECTORS,
     GrassmannianCountRequest,
     GrassmannianCountResult,
     LinearSubspace,
@@ -31,15 +40,54 @@ from jacobian.math.finite_geometry._models import (
     SubspaceSpanResult,
 )
 from jacobian.math.finite_geometry.values import (
+    MAX_DIM,
     ProjectivePoint,
     ProjectivePointSequence,
 )
 from jacobian.math.incidence_structures._models import IncidenceStructure
 
 
+def _admit_span(request: SubspaceSpanRequest) -> None:
+    if not request.vectors and not request.subspaces:
+        raise ValueError("span requires at least one vector or subspace")
+    if len(request.vectors) + sum(len(item.basis) for item in request.subspaces) > MAX_DIM:
+        raise ValueError("span generator count exceeds bound")
+
+
+def _admit_grassmannian(request: GrassmannianCountRequest) -> None:
+    if not isprime(request.field_order):
+        raise ValueError("field_order must be prime")
+    if request.subspace_dimension > request.ambient_dimension:
+        raise ValueError("subspace dimension cannot exceed ambient dimension")
+
+
+def _admit_projective_enumeration(request: ProjectiveSpaceEnumerateRequest) -> None:
+    q = request.space.field_order
+    n = len(request.space.axis)
+    if q**n > MAX_PROJECTIVE_SPACE_ENUMERATION_VECTORS:
+        raise ValueError(
+            "projective space exceeds the "
+            f"{MAX_PROJECTIVE_SPACE_ENUMERATION_VECTORS}-vector enumeration envelope"
+        )
+    digit_width = len(str(q - 1))
+    point_count = (q**n - 1) // (q - 1)
+    per_point_bytes = 2 + n * digit_width + (n - 1) + 1
+    predicted = _PROJECTIVE_ENUMERATION_ENVELOPE_BYTES + sum(
+        len(encode_strict_json(unicodedata.normalize("NFC", label)))
+        for label in request.space.axis
+    ) + point_count * per_point_bytes
+    if predicted > MAX_PROJECTIVE_ENUMERATION_RESULT_BYTES:
+        raise ValueError(
+            "the complete serialized point list would exceed the "
+            f"{MAX_PROJECTIVE_ENUMERATION_RESULT_BYTES}-byte result budget"
+        )
+
+
 def compute_projective_point_canonicalize(
     request: ProjectivePointCanonicalizeRequest,
 ) -> ProjectivePointCanonicalizeResult:
+    if all(value == 0 for value in request.vector):
+        raise ValueError("zero vector has no projective point")
     vector = list(request.vector)
     q = request.space.field_order
     for _i, v in enumerate(vector):
@@ -100,6 +148,7 @@ def compute_subspace_membership(
 def compute_subspace_span(
     request: SubspaceSpanRequest,
 ) -> SubspaceSpanResult:
+    _admit_span(request)
     matrix = [list(row) for row in request.vectors]
     matrix.extend(list(row) for subspace in request.subspaces for row in subspace.basis)
     basis = canonical_basis(matrix, request.space.field_order)
@@ -125,6 +174,7 @@ def compute_subspace_intersection(
 def compute_grassmannian_count(
     request: GrassmannianCountRequest,
 ) -> GrassmannianCountResult:
+    _admit_grassmannian(request)
     q = request.field_order
     n = request.ambient_dimension
     k = request.subspace_dimension
@@ -146,7 +196,7 @@ def compute_grassmannian_count(
 def compute_projective_space_enumerate(
     request: ProjectiveSpaceEnumerateRequest,
 ) -> ProjectiveSpaceEnumerateResult:
-    from itertools import product
+    _admit_projective_enumeration(request)
 
     q = request.space.field_order
     n = len(request.space.axis)
@@ -187,6 +237,12 @@ def compute_prime_field_affine_plane(
     class.
     """
     q = request.prime_order
+    if not isprime(q):
+        raise ValueError("prime_order must be prime")
+    if q > MAX_AFFINE_PLANE_FIELD_ORDER:
+        raise ValueError(
+            "prime_order exceeds the affine-plane operation envelope"
+        )
 
     # Points: (x, y) in lexicographic order, index = x * q + y
     points = tuple(f"{x},{y}" for x in range(q) for y in range(q))
@@ -239,7 +295,7 @@ def compute_prime_field_affine_plane(
 
     total_incidences = q * q * (q + 1)
 
-    return PrimeFieldAffinePlaneResult(
+    return PrimeFieldAffinePlaneResult.model_construct(
         prime_order=q,
         incidence=incidence,
         parallel_classes=tuple(parallel_classes),

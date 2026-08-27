@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import unicodedata
 from typing import Self
 
 from pydantic import ConfigDict, Field, model_validator
-from sympy import isprime
 
 from jacobian._exact import CanonicalInteger
 from jacobian._models import StrictModel
-from jacobian.canonical import encode_strict_json
 from jacobian.math.finite_geometry.values import (
     MAX_DIM,
     MAX_FIELD_ORDER,
@@ -41,7 +38,7 @@ class LinearSubspace(StrictModel):
     """A subspace represented by its unique RREF basis in an ordered parent."""
 
     space: PrimeFieldVectorSpace
-    basis: tuple[tuple[int, ...], ...] = Field(max_length=32)
+    basis: tuple[tuple[int, ...], ...] = Field(max_length=MAX_DIM)
 
     @model_validator(mode="after")
     def require_canonical(self) -> Self:
@@ -82,10 +79,6 @@ class ProjectivePointCanonicalizeRequest(StrictModel):
     @model_validator(mode="after")
     def require_valid(self) -> Self:
         _validate_vector(self.vector, self.space)
-        if all(value == 0 for value in self.vector):
-            raise _validation_error(
-                "projective_vector_zero", "projective point vector must be nonzero"
-            )
         return self
 
 
@@ -105,7 +98,7 @@ class ProjectivePointEqualRequest(StrictModel):
 
 class SubspaceComputeRequest(StrictModel):
     space: PrimeFieldVectorSpace
-    vectors: tuple[tuple[int, ...], ...] = Field(min_length=1, max_length=32)
+    vectors: tuple[tuple[int, ...], ...] = Field(min_length=1, max_length=MAX_DIM)
 
     @model_validator(mode="after")
     def require_valid(self) -> Self:
@@ -126,25 +119,17 @@ class SubspaceMembershipRequest(StrictModel):
 
 class SubspaceSpanRequest(StrictModel):
     space: PrimeFieldVectorSpace
-    vectors: tuple[tuple[int, ...], ...] = Field(max_length=32)
-    subspaces: tuple[LinearSubspace, ...] = Field(max_length=32)
+    vectors: tuple[tuple[int, ...], ...] = Field(max_length=MAX_DIM)
+    subspaces: tuple[LinearSubspace, ...] = Field(max_length=MAX_DIM)
 
     @model_validator(mode="after")
     def require_valid(self) -> Self:
-        if not self.vectors and not self.subspaces:
-            raise _validation_error(
-                "span_empty_generators", "span requires at least one vector or subspace"
-            )
         for vector in self.vectors:
             _validate_vector(vector, self.space)
         if any(subspace.space != self.space for subspace in self.subspaces):
             raise _validation_error(
                 "span_parent_mismatch",
                 "all subspaces must have the declared field and axis",
-            )
-        if len(self.vectors) + sum(len(item.basis) for item in self.subspaces) > 32:
-            raise _validation_error(
-                "span_generator_count_exceeded", "span generator count exceeds bound"
             )
         return self
 
@@ -167,20 +152,6 @@ class GrassmannianCountRequest(StrictModel):
     field_order: int = Field(ge=2, le=MAX_FIELD_ORDER)
     ambient_dimension: int = Field(ge=1, le=MAX_DIM)
     subspace_dimension: int = Field(ge=0, le=MAX_DIM)
-
-    @model_validator(mode="after")
-    def require_valid(self) -> Self:
-        if not isprime(self.field_order):
-            raise _validation_error(
-                "field_order_not_prime", "field_order must be prime"
-            )
-        if self.subspace_dimension > self.ambient_dimension:
-            raise _validation_error(
-                "subspace_dimension_exceeds_ambient",
-                "subspace dimension cannot exceed ambient dimension",
-            )
-        return self
-
 
 class ProjectiveSpaceEnumerateRequest(StrictModel):
     """One finite projective space whose complete point list fits the envelope.
@@ -222,53 +193,6 @@ class ProjectiveSpaceEnumerateRequest(StrictModel):
         )
     )
 
-    @model_validator(mode="after")
-    def require_valid(self) -> Self:
-        q = self.space.field_order
-        n = len(self.space.axis)
-        if q**n > MAX_PROJECTIVE_SPACE_ENUMERATION_VECTORS:
-            raise _validation_error(
-                "projective_space_too_large",
-                "projective space exceeds the "
-                f"{MAX_PROJECTIVE_SPACE_ENUMERATION_VECTORS}-vector "
-                "enumeration envelope",
-            )
-        self.require_transportable_result()
-        return self
-
-    def require_transportable_result(self) -> None:
-        """Reject requests whose complete canonical reply cannot fit transport.
-
-        Runs before execution on admitted mathematics alone. Each returned
-        point is a bare coordinate array with at most ``n`` entries carrying
-        at most ``len(str(q - 1))`` digits, so the exact worst-case point
-        array size follows from q and n; the parent space echoes once with
-        NFC-normalized labels, matching how canonical JSON serialization
-        normalizes string values before transport; and a fixed constant
-        covers keys, method string, count digits, and punctuation.
-        """
-
-        q = self.space.field_order
-        n = len(self.space.axis)
-        digit_width = len(str(q - 1))
-        point_count = (q**n - 1) // (q - 1)
-        per_point_bytes = 2 + n * digit_width + (n - 1) + 1
-        predicted = (
-            _PROJECTIVE_ENUMERATION_ENVELOPE_BYTES
-            + sum(
-                len(encode_strict_json(unicodedata.normalize("NFC", label)))
-                for label in self.space.axis
-            )
-            + point_count * per_point_bytes
-        )
-        if predicted > MAX_PROJECTIVE_ENUMERATION_RESULT_BYTES:
-            raise _validation_error(
-                "projective_enumeration_result_too_large",
-                "the complete serialized point list would exceed the "
-                f"{MAX_PROJECTIVE_ENUMERATION_RESULT_BYTES}-byte result budget",
-            )
-
-
 class ProjectivePointCanonicalizeResult(ProjectivePointCanonicalizeRequest):
     point: ProjectivePoint
     scale: int = Field(ge=1)
@@ -290,7 +214,12 @@ class ProjectivePointCanonicalizeResult(ProjectivePointCanonicalizeRequest):
         point: ProjectivePoint,
         scale: int,
     ) -> Self:
-        return cls(**request.model_dump(), point=point, scale=scale)
+        return cls.model_construct(
+            space=request.space,
+            vector=request.vector,
+            point=point,
+            scale=scale,
+        )
 
 
 class ProjectivePointEqualResult(StrictModel):
@@ -310,7 +239,9 @@ class ProjectivePointEqualResult(StrictModel):
 
     @classmethod
     def _from_kernel(cls, request: ProjectivePointEqualRequest, equal: bool) -> Self:
-        return cls(point_a=request.point_a, point_b=request.point_b, equal=equal)
+        return cls.model_construct(
+            point_a=request.point_a, point_b=request.point_b, equal=equal
+        )
 
 
 class SubspaceComputeResult(SubspaceComputeRequest):
@@ -330,7 +261,9 @@ class SubspaceComputeResult(SubspaceComputeRequest):
     def _from_kernel(
         cls, request: SubspaceComputeRequest, subspace: LinearSubspace
     ) -> Self:
-        return cls(**request.model_dump(), subspace=subspace)
+        return cls.model_construct(
+            space=request.space, vectors=request.vectors, subspace=subspace
+        )
 
 
 class SubspaceMembershipResult(StrictModel):
@@ -346,7 +279,7 @@ class SubspaceMembershipResult(StrictModel):
 
     @classmethod
     def _from_kernel(cls, request: SubspaceMembershipRequest, is_member: bool) -> Self:
-        return cls(
+        return cls.model_construct(
             subspace=request.subspace, vector=request.vector, is_member=is_member
         )
 
@@ -367,7 +300,12 @@ class SubspaceSpanResult(SubspaceSpanRequest):
     def _from_kernel(
         cls, request: SubspaceSpanRequest, subspace: LinearSubspace
     ) -> Self:
-        return cls(**request.model_dump(), subspace=subspace)
+        return cls.model_construct(
+            space=request.space,
+            vectors=request.vectors,
+            subspaces=request.subspaces,
+            subspace=subspace,
+        )
 
 
 class SubspaceIntersectionResult(SubspaceIntersectionRequest):
@@ -387,7 +325,11 @@ class SubspaceIntersectionResult(SubspaceIntersectionRequest):
     def _from_kernel(
         cls, request: SubspaceIntersectionRequest, subspace: LinearSubspace
     ) -> Self:
-        return cls(**request.model_dump(), subspace=subspace)
+        return cls.model_construct(
+            subspace_a=request.subspace_a,
+            subspace_b=request.subspace_b,
+            subspace=subspace,
+        )
 
 
 class GrassmannianCountResult(StrictModel):
@@ -399,22 +341,11 @@ class GrassmannianCountResult(StrictModel):
     )
     method: str = "GAUSSIAN_BINOMIAL"
 
-    @model_validator(mode="after")
-    def require_parameter_domain(self) -> Self:
-        if not isprime(self.field_order) or not (
-            0 <= self.subspace_dimension <= self.ambient_dimension <= MAX_DIM
-        ):
-            raise _validation_error(
-                "grassmannian_parameters_invalid",
-                "Grassmannian parameters are outside the public domain",
-            )
-        return self
-
     @classmethod
     def _from_kernel(
         cls, request: GrassmannianCountRequest, count: CanonicalInteger
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             field_order=request.field_order,
             ambient_dimension=request.ambient_dimension,
             subspace_dimension=request.subspace_dimension,
@@ -473,15 +404,6 @@ class PrimeFieldAffinePlaneRequest(StrictModel):
 
     prime_order: int = Field(ge=2, le=MAX_AFFINE_PLANE_FIELD_ORDER)
 
-    @model_validator(mode="after")
-    def require_prime(self) -> Self:
-        if not isprime(self.prime_order):
-            raise _validation_error(
-                "affine_plane_order_not_prime", "prime_order must be prime"
-            )
-        return self
-
-
 class PrimeFieldAffinePlaneResult(StrictModel):
     """The complete prime-field affine plane AG(2, q).
 
@@ -498,43 +420,3 @@ class PrimeFieldAffinePlaneResult(StrictModel):
     parallel_classes: tuple[ParallelClass, ...] = Field(min_length=2)
     total_incidences: int = Field(ge=0)
     method: str = "MODULAR_ARITHMETIC"
-
-    @model_validator(mode="after")
-    def require_consistency(self) -> Self:
-        q = self.prime_order
-        if not isprime(q):
-            raise _validation_error(
-                "affine_plane_result_not_prime", "prime_order must be prime"
-            )
-        expected_points = q * q
-        if len(self.incidence.points) != expected_points:
-            raise _validation_error(
-                "affine_plane_point_count_mismatch",
-                "affine plane must have exactly q^2 points",
-            )
-        expected_blocks = q * (q + 1)
-        if len(self.incidence.block_ids) != expected_blocks:
-            raise _validation_error(
-                "affine_plane_block_count_mismatch",
-                "affine plane must have exactly q(q+1) lines",
-            )
-        if len(self.parallel_classes) != q + 1:
-            raise _validation_error(
-                "affine_plane_class_count_mismatch",
-                "affine plane must have exactly q+1 parallel classes",
-            )
-        flat_line_ids: list[int] = []
-        for cls_ in self.parallel_classes:
-            flat_line_ids.extend(cls_.line_ids)
-        if flat_line_ids != list(range(expected_blocks)):
-            raise _validation_error(
-                "affine_plane_partition_mismatch",
-                "parallel classes must partition line IDs in order",
-            )
-        expected_incidences = expected_points * (q + 1)
-        if self.total_incidences != expected_incidences:
-            raise _validation_error(
-                "affine_plane_incidence_count_mismatch",
-                "total_incidences must equal q^2 * (q+1)",
-            )
-        return self

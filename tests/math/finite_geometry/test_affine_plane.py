@@ -190,17 +190,17 @@ def test_parallel_classes_labels() -> None:
 
 @pytest.mark.parametrize("bad_q", [1, 4, 6, 9, 10, 15, 21, 100])
 def test_rejects_composite_and_one(bad_q: int) -> None:
-    with pytest.raises(ValidationError) as exc:
-        PrimeFieldAffinePlaneRequest(prime_order=bad_q)
-    errors = exc.value.errors()
-    assert len(errors) > 0
+    with pytest.raises((ValidationError, ValueError)):
+        compute_prime_field_affine_plane(
+            PrimeFieldAffinePlaneRequest(prime_order=bad_q)
+        )
 
 
 def test_rejects_q_too_large() -> None:
     """q > MAX_AFFINE_PLANE_FIELD_ORDER is rejected."""
     # 11 is prime but exceeds the transport budget
     with pytest.raises(ValidationError):
-        PrimeFieldAffinePlaneRequest(prime_order=11)
+        compute_prime_field_affine_plane(PrimeFieldAffinePlaneRequest(prime_order=11))
 
 
 # ---------------------------------------------------------------------------

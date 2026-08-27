@@ -2,15 +2,10 @@
 
 import pytest
 from jsonschema.validators import Draft202012Validator
-from pydantic import ValidationError
 
 from jacobian.canonical import CanonicalLimits, canonicalize_json
 from jacobian.catalog.catalog import Catalog
-from jacobian.dispatch import (
-    OperationRequestValidationError,
-    invoke_operation,
-    parse_operation_input,
-)
+from jacobian.dispatch import invoke_operation, parse_operation_input
 from jacobian.math.finite_geometry._models import (
     MAX_PROJECTIVE_ENUMERATION_RESULT_BYTES,
     MAX_PROJECTIVE_SPACE_ENUMERATION_VECTORS,
@@ -82,12 +77,8 @@ def test_projective_space_schema_publishes_coupled_enumeration_bound() -> None:
         "space": {"field_order": 257, "axis": ["x", "y"]}
     }
     assert not list(validator.iter_errors(structurally_valid_but_too_large))
-    with pytest.raises(ValidationError) as exc_info:
-        operation.request_type.model_validate(structurally_valid_but_too_large)
-    assert (
-        exc_info.value.errors()[0]["type"]
-        == "finite_geometry.projective_space_too_large"
-    )
+    with pytest.raises(ValueError, match="vector enumeration envelope"):
+        invoke_operation(operation.operation_id, structurally_valid_but_too_large, Catalog.open())
 
 
 def test_dispatch_returns_maximal_enumeration_within_transport_limit() -> None:
@@ -118,13 +109,9 @@ def test_dispatch_rejects_untransportable_enumeration_as_invalid_request() -> No
         "space": {"field_order": 2, "axis": ["x", "y" * (9 * 1024 * 1024)]},
     }
 
-    with pytest.raises(OperationRequestValidationError) as exc_info:
+    with pytest.raises(ValueError, match="serialized point list"):
         invoke_operation(
             "finite_geometry.projective_space.enumerate_points",
             payload,
             Catalog.open(),
         )
-    assert (
-        exc_info.value.errors()[0]["type"]
-        == "finite_geometry.projective_enumeration_result_too_large"
-    )

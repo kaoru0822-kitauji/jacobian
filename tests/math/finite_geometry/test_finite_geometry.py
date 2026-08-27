@@ -69,9 +69,12 @@ def test_projective_point_canonicalize_scales_to_one() -> None:
 
 
 def test_projective_point_canonicalize_rejects_zero() -> None:
-    with pytest.raises(ValidationError) as error:
-        ProjectivePointCanonicalizeRequest(space=_space(5, ("x", "y")), vector=(0, 0))
-    assert error.value.errors()[0]["type"] == "finite_geometry.projective_vector_zero"
+    with pytest.raises(ValueError, match="zero vector"):
+        compute_projective_point_canonicalize(
+            ProjectivePointCanonicalizeRequest(
+                space=_space(5, ("x", "y")), vector=(0, 0)
+            )
+        )
 
 
 def test_projective_point_equal_same_point() -> None:
@@ -352,12 +355,12 @@ def test_enumerate_admission_rejects_results_beyond_the_transport_budget() -> No
     """A pathological axis label cannot smuggle an untransportable complete
     result past admission: the serialized-result bound fires before any
     enumeration runs."""
-    with pytest.raises(ValidationError) as error:
-        ProjectiveSpaceEnumerateRequest(space=_space(2, ("x", "y" * (9 * 1024 * 1024))))
-    assert (
-        error.value.errors()[0]["type"]
-        == "finite_geometry.projective_enumeration_result_too_large"
-    )
+    with pytest.raises(ValueError, match="serialized point list"):
+        compute_projective_space_enumerate(
+            ProjectiveSpaceEnumerateRequest(
+                space=_space(2, ("x", "y" * (9 * 1024 * 1024)))
+            )
+        )
 
 
 def test_enumerate_admission_estimates_normalized_label_encoding() -> None:
@@ -369,12 +372,10 @@ def test_enumerate_admission_estimates_normalized_label_encoding() -> None:
     before any enumeration runs.
     """
     label = "x" + "\u0344" * (2_600_000)
-    with pytest.raises(ValidationError) as error:
-        ProjectiveSpaceEnumerateRequest(space=_space(2, ("x", label)))
-    assert (
-        error.value.errors()[0]["type"]
-        == "finite_geometry.projective_enumeration_result_too_large"
-    )
+    with pytest.raises(ValueError, match="serialized point list"):
+        compute_projective_space_enumerate(
+            ProjectiveSpaceEnumerateRequest(space=_space(2, ("x", label)))
+        )
 
 
 def test_enumeration_replay_rejects_unnormalized_representatives() -> None:
