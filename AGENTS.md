@@ -96,6 +96,12 @@ evidence belongs primarily in tests. Replay verification is optional and only
 applies when independently supplied result data is accepted. Transport
 projection is the final MCP/JSON delivery step.
 
+- Raw preflight may enforce cheap representation limits before canonicalization.
+  After canonicalization, semantic admission is computed once per invocation
+  and reused by the kernel and trusted result construction; do not repeat
+  non-trivial admission in request validators, operation wrappers, or result
+  validators.
+
 - Public contracts use canonical mathematical values, not backend expressions
   or ambient contexts.
 - Each mathematical value has one domain-owned canonical type. Producers return
