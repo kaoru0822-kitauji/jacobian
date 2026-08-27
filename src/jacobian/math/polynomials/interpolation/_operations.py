@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from fractions import Fraction
 
+from pydantic_core import PydanticCustomError
+
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.polynomials.interpolation._kernel import (
     divided_difference_coefficients,
     evaluate_newton_form,
@@ -12,6 +16,8 @@ from jacobian.math.polynomials.interpolation._kernel import (
     ordinary_derivative_value,
 )
 from jacobian.math.polynomials.interpolation._models import (
+    _MAX_RATIONAL_DIGITS,
+    MAX_CANONICAL_RATIONAL_DIGITS,
     DividedDifferencesRequest,
     DividedDifferencesResult,
     HermiteConstraintReplay,
@@ -22,6 +28,9 @@ from jacobian.math.polynomials.interpolation._models import (
     NewtonForm,
     NewtonFormRequest,
     OrdinaryDerivativeJetTable,
+    _require_distinct,
+    _require_hermite_preflight,
+    _validation_error,
 )
 from jacobian.math.polynomials.values import (
     RationalPolynomial,
@@ -34,28 +43,70 @@ def _canonical(values: tuple[Fraction, ...]) -> tuple[CanonicalRational, ...]:
     return tuple(CanonicalRational.from_fraction(value) for value in values)
 
 
+def _run_admission[ResultT](admission: Callable[[], ResultT]) -> ResultT:
+    try:
+        return admission()
+    except OperationDomainValidationError:
+        raise
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=(), code=exc.type, message=exc.message()
+        ) from exc
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=(), code="polynomial.interpolation_admission", message=str(exc)
+        ) from exc
+
+
+def _admit_samples(
+    request: DividedDifferencesRequest | NewtonFormRequest,
+) -> tuple[CanonicalRational, ...]:
+    samples = request.samples
+    _require_distinct(samples.nodes)
+    coefficients = _canonical(
+        divided_difference_coefficients(samples.nodes, samples.values)
+    )
+    for coefficient in coefficients:
+        if (
+            len(coefficient.num.lstrip("-")) > MAX_CANONICAL_RATIONAL_DIGITS
+            or len(coefficient.den) > MAX_CANONICAL_RATIONAL_DIGITS
+        ):
+            raise _validation_error(
+                "derived Newton coefficient exceeds the canonical digit bound"
+            )
+    return coefficients
+
+
+def _admit_hermite(request: HermiteInterpolationRequest) -> None:
+    _require_hermite_preflight(request.table)
+
+
+def _admit_newton_evaluate(request: NewtonEvaluateRequest) -> None:
+    if (
+        len(request.evaluation_point.num.lstrip("-")) > _MAX_RATIONAL_DIGITS
+        or len(request.evaluation_point.den) > _MAX_RATIONAL_DIGITS
+    ):
+        raise _validation_error(
+            f"evaluation point exceeds the {_MAX_RATIONAL_DIGITS}-digit bound"
+        )
+
+
 def compute_divided_differences(
     request: DividedDifferencesRequest,
 ) -> DividedDifferencesResult:
-    coefficients = divided_difference_coefficients(
-        request.samples.nodes,
-        request.samples.values,
-    )
-    return DividedDifferencesResult(coefficients=_canonical(coefficients))
+    return DividedDifferencesResult(coefficients=_admit_samples(request))
 
 
 def compute_newton_form(request: NewtonFormRequest) -> NewtonForm:
-    coefficients = divided_difference_coefficients(
-        request.samples.nodes,
-        request.samples.values,
-    )
+    coefficients = _admit_samples(request)
     return NewtonForm(
-        coefficients=_canonical(coefficients),
+        coefficients=coefficients,
         nodes=request.samples.nodes,
     )
 
 
 def compute_newton_evaluate(request: NewtonEvaluateRequest) -> NewtonEvaluateResult:
+    _run_admission(lambda: _admit_newton_evaluate(request))
     return NewtonEvaluateResult(
         result=CanonicalRational.from_fraction(
             evaluate_newton_form(
@@ -71,6 +122,8 @@ def hermite_interpolation(
     table: OrdinaryDerivativeJetTable,
 ) -> HermiteInterpolationResult:
     """Return the unique degree-``< M`` polynomial matching one jet table."""
+
+    _run_admission(lambda: _admit_hermite(HermiteInterpolationRequest(table=table)))
 
     coefficients = hermite_interpolation_coefficients(table)
     nonzero_degrees = tuple(

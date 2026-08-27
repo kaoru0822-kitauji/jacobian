@@ -10,6 +10,7 @@ from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
 from jacobian.canonical import encode_strict_json
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.polynomials import interpolation
 from jacobian.math.polynomials._elementary_operations import (
     rational_polynomial_evaluate,
@@ -361,8 +362,11 @@ def test_intermediate_growth_boundary_rejects_before_matrix_construction() -> No
     # fraction-free-minor envelope while every raw rational remains admissible.
     accepted = OrdinaryDerivativeJetTable.model_validate(_full_multiplicity_payload(64))
     assert hermite_interpolation(accepted).polynomial.polynomial.terms == ()
-    with pytest.raises(ValidationError):
-        OrdinaryDerivativeJetTable.model_validate(_full_multiplicity_payload(65))
+    rejected = OrdinaryDerivativeJetTable.model_validate(
+        _full_multiplicity_payload(65)
+    )
+    with pytest.raises(OperationDomainValidationError):
+        hermite_interpolation(rejected)
 
 
 def test_aggregate_result_boundary_is_checked_during_request_preflight() -> None:
@@ -376,10 +380,11 @@ def test_aggregate_result_boundary_is_checked_during_request_preflight() -> None
         len(encode_strict_json(result.model_dump(mode="json")))
         < MAX_HERMITE_RESULT_BYTES
     )
-    with pytest.raises(ValidationError):
-        OrdinaryDerivativeJetTable.model_validate(
-            _full_multiplicity_payload(62, last_value_digits=256)
-        )
+    rejected = OrdinaryDerivativeJetTable.model_validate(
+        _full_multiplicity_payload(62, last_value_digits=256)
+    )
+    with pytest.raises(OperationDomainValidationError):
+        hermite_interpolation(rejected)
 
 
 def test_result_size_is_bounded_and_round_trips() -> None:

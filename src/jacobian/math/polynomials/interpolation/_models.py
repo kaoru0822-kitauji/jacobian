@@ -16,10 +16,6 @@ from jacobian._exact import (
 )
 from jacobian._models import StrictModel, canonicalize_json_containers
 from jacobian.canonical import encode_strict_json
-from jacobian.math.polynomials.interpolation._kernel import (
-    divided_difference_coefficients,
-    evaluate_newton_form,
-)
 from jacobian.math.polynomials.values import (
     PolynomialVariable,
     RationalPolynomial,
@@ -194,7 +190,6 @@ class OrdinaryDerivativeJetTable(StrictModel):
                 "total ordinary derivative multiplicity exceeds the "
                 f"{MAX_POINTS}-constraint bound"
             )
-        _require_hermite_preflight(self)
         return self
 
 
@@ -440,11 +435,10 @@ class HermiteInterpolationResult(StrictModel):
             raise _validation_error(
                 "Hermite polynomial must use exactly the source table variable"
             )
-        coefficient_bound, _ = _require_hermite_preflight(self.source)
         for term in self.polynomial.polynomial.terms:
             require_bounded_rational(
                 term.coefficient,
-                max_digits=coefficient_bound,
+                max_digits=MAX_CANONICAL_RATIONAL_DIGITS,
                 label="Hermite polynomial coefficient",
             )
         coefficients = _polynomial_coefficients(self.polynomial, multiplicity)
@@ -537,12 +531,6 @@ class InterpolationSamples(StrictModel):
         _require_distinct(self.nodes)
         _require_bounded(self.nodes, "interpolation node")
         _require_bounded(self.values, "interpolation value")
-        for coefficient in divided_difference_coefficients(self.nodes, self.values):
-            require_bounded_rational(
-                CanonicalRational.from_fraction(coefficient),
-                max_digits=MAX_CANONICAL_RATIONAL_DIGITS,
-                label="derived Newton coefficient",
-            )
         return self
 
 
@@ -587,17 +575,6 @@ class NewtonEvaluateRequest(StrictModel):
             self.evaluation_point,
             max_digits=_MAX_RATIONAL_DIGITS,
             label="evaluation point",
-        )
-        require_bounded_rational(
-            CanonicalRational.from_fraction(
-                evaluate_newton_form(
-                    self.newton_form.nodes,
-                    self.newton_form.coefficients,
-                    self.evaluation_point,
-                )
-            ),
-            max_digits=MAX_CANONICAL_RATIONAL_DIGITS,
-            label="derived Newton evaluation",
         )
         return self
 
