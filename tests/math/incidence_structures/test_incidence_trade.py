@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.incidence_structures import (
     ContainmentProfileResult,
     IncidenceMomentComparison,
@@ -256,10 +257,13 @@ def test_trade_requires_identical_ordered_point_parents() -> None:
     left = _family((("a",),), "l", points=("a", "b"))
     right = _family((("a",),), "r", points=("b", "a"))
 
-    with pytest.raises(ValueError):
+    with pytest.raises(OperationDomainValidationError) as caught:
         compute_incidence_trade(
             IncidenceTradeRequest(left=left, right=right, max_order=1)
         )
+    assert caught.value.errors()[0]["type"] == (
+        "incidence_structure.trade_point_axis_mismatch"
+    )
 
 
 def _long_id_family(prefix: str, filler: str, id_length: int) -> IncidenceStructure:

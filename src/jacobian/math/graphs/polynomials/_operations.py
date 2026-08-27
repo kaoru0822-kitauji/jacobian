@@ -8,6 +8,7 @@ import networkx as nx
 import sympy
 from sympy import Poly, Symbol, expand
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.polynomials._models import (
     GraphPolynomialRequest,
     GraphPolynomialResult,
@@ -15,6 +16,7 @@ from jacobian.math.graphs.polynomials._models import (
     MultivariatePolynomialTerm,
     PolynomialTerm,
     SparseMultivariatePolynomial,
+    TreeIndependencePolynomialAdmissionError,
     TreeIndependencePolynomialRequest,
     TreeIndependencePolynomialResult,
 )
@@ -145,7 +147,14 @@ def compute_independence_polynomial(
 ) -> TreeIndependencePolynomialResult:
     """Compute the exact independence polynomial of an admitted finite tree."""
 
-    coefficients = independence_polynomial_coefficients(request.graph)
+    try:
+        coefficients = independence_polynomial_coefficients(request.graph)
+    except TreeIndependencePolynomialAdmissionError as exc:
+        raise OperationDomainValidationError(
+            location=("graph",),
+            code="graph.polynomial.independence.admission",
+            message=str(exc),
+        ) from exc
     return TreeIndependencePolynomialResult._from_kernel(
         graph=request.graph,
         coefficients=coefficients,

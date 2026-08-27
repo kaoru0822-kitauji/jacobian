@@ -18,6 +18,10 @@ MAX_PROBABILITIES = 255
 MAX_INTERMEDIATE_RATIONAL_DIGITS = MAX_RESULT_RATIONAL_DIGITS
 
 
+class PoissonBinomialAdmissionError(ValueError):
+    """Native admission failure for an exact Poisson-binomial computation."""
+
+
 class PoissonBinomialRequest(StrictModel):
     """A list of canonical rational Bernoulli success probabilities."""
 
@@ -73,7 +77,7 @@ def _admit_probabilities(
     """Validate the exact native computation envelope."""
 
     if not 1 <= len(probabilities) <= MAX_PROBABILITIES:
-        raise ValueError(
+        raise PoissonBinomialAdmissionError(
             "Poisson-binomial probability count must be between 1 and "
             f"{MAX_PROBABILITIES}"
         )
@@ -81,14 +85,16 @@ def _admit_probabilities(
         raise TypeError("Poisson-binomial probabilities must use Fractions")
     for value in probabilities:
         if value < 0 or value > 1:
-            raise ValueError("probabilities must lie in the closed unit interval")
+            raise PoissonBinomialAdmissionError(
+                "probabilities must lie in the closed unit interval"
+            )
         if (
             len(format_canonical_integer(abs(value.numerator)))
             > MAX_INPUT_RATIONAL_DIGITS
             or len(format_canonical_integer(value.denominator))
             > MAX_INPUT_RATIONAL_DIGITS
         ):
-            raise ValueError(
+            raise PoissonBinomialAdmissionError(
                 "Poisson-binomial input probabilities exceed the "
                 f"{MAX_INPUT_RATIONAL_DIGITS}-digit bound"
             )
@@ -96,7 +102,7 @@ def _admit_probabilities(
         len(format_canonical_integer(value.denominator)) for value in probabilities
     )
     if denominator_digits > MAX_INTERMEDIATE_RATIONAL_DIGITS:
-        raise ValueError(
+        raise PoissonBinomialAdmissionError(
             "probability denominators exceed the exact result digit budget of "
             f"{MAX_INTERMEDIATE_RATIONAL_DIGITS} digits"
         )

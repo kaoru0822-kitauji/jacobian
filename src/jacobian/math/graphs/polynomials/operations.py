@@ -5,6 +5,7 @@ from __future__ import annotations
 from jacobian._exact import CanonicalRational
 from jacobian.canonical import CanonicalLimits, format_canonical_integer
 from jacobian.math.graphs.polynomials._models import (
+    TreeIndependencePolynomialAdmissionError,
     _admitted_tree_profile,
     _maximum_independence_result_bytes,
 )
@@ -50,7 +51,7 @@ def independence_polynomial_coefficients(
         _maximum_independence_result_bytes(graph, profile.independence_degree)
         > output_limit
     ):
-        raise ValueError(
+        raise TreeIndependencePolynomialAdmissionError(
             "tree independence polynomial would exceed the canonical output "
             "limit after retaining its source; shorten vertex labels"
         )

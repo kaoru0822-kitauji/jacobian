@@ -5,6 +5,7 @@ from fractions import Fraction
 import pytest
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.finite_stochastic_processes import poisson_binomial
 from jacobian.math.finite_stochastic_processes._poisson_binomial_models import (
     PoissonBinomialRequest,
@@ -82,6 +83,17 @@ def test_native_admission_rejects_probabilities_outside_the_unit_interval() -> N
         poisson_binomial((CanonicalRational.from_integer_ratio(-1, 2),))
     with pytest.raises(ValueError, match="closed unit interval"):
         poisson_binomial((CanonicalRational.from_integer_ratio(2, 1),))
+
+
+def test_operation_admission_uses_the_typed_domain_error() -> None:
+    request = PoissonBinomialRequest(
+        probabilities=(CanonicalRational.from_integer_ratio(-1, 2),)
+    )
+
+    with pytest.raises(OperationDomainValidationError) as caught:
+        compute_poisson_binomial(request)
+
+    assert caught.value.errors()[0]["loc"] == ("probabilities",)
 
 
 def test_native_admission_rejects_result_digit_growth_before_execution() -> None:

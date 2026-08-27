@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.finite_stochastic_processes._poisson_binomial_models import (
+    PoissonBinomialAdmissionError,
     PoissonBinomialRequest,
     PoissonBinomialResult,
 )
@@ -23,10 +25,15 @@ def compute_poisson_binomial(
     Uses the direct recurrence with exact rational arithmetic:
     P(k, n) = P(k, n-1) * (1-p_n) + P(k-1, n-1) * p_n
     """
-    return PoissonBinomialResult._from_kernel(
-        request,
-        count_distribution=poisson_binomial(request.probabilities),
-    )
+    try:
+        count_distribution = poisson_binomial(request.probabilities)
+    except PoissonBinomialAdmissionError as exc:
+        raise OperationDomainValidationError(
+            location=("probabilities",),
+            code="probability.poisson_binomial.admission",
+            message=str(exc),
+        ) from exc
+    return PoissonBinomialResult._from_kernel(request, count_distribution)
 
 
 __all__ = ["compute_poisson_binomial"]

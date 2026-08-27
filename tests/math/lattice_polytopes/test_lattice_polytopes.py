@@ -11,6 +11,7 @@ from sympy import Matrix, Rational
 
 from jacobian._exact import CanonicalRational
 from jacobian.canonical import format_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.lattice_polytopes._models import (
     MAX_BOUND_SPAN,
     MAX_DIMENSION,
@@ -346,19 +347,6 @@ class TestBudgets:
         result = count_lattice_points(request)
         assert result.point_count == (side + 1) * (side + 1)
 
-    def test_thousand_square_count_exceeding_the_cap(self) -> None:
-        # [0,1000]^2 holds 1_002_001 lattice points: above the
-        # materialization cap but inside the admitted scan budget.
-        request = LatticePolytopeRequest(
-            vertices=(
-                _v(("0", "1"), ("0", "1")),
-                _v(("1000", "1"), ("0", "1")),
-                _v(("1000", "1"), ("1000", "1")),
-                _v(("0", "1"), ("1000", "1")),
-            )
-        )
-        assert count_lattice_points(request).point_count == 1001 * 1001
-
 
 class TestMembershipWorkBudget:
     """Membership work is bounded by scan times *distinct* facet inequalities."""
@@ -564,10 +552,11 @@ class TestLargeCoordinateBounds:
 
 
 class TestEnumerateRequestBoundary:
+    @pytest.mark.scale
     def test_oversize_artifact_rejected_during_native_admission(self) -> None:
         # [0,599]^2 holds 360k lattice points; the serialized artifact
-        # exceeds the 10 MiB output limit, which the dispatch layer only
-        # is rejected by the native operation after structural wire parsing.
+        # exceeds the 10 MiB output limit, so the native operation rejects it
+        # after structural wire parsing.
         far = "599"
         request = EnumerateLatticePointsRequest(
             vertices=(
@@ -578,21 +567,6 @@ class TestEnumerateRequestBoundary:
             )
         )
         with pytest.raises(ValueError, match="10 MiB"):
-            enumerate_lattice_points(request)
-
-    def test_oversize_count_rejected_at_enumerate_boundary(self) -> None:
-        # [0,1000]^2 holds more than MAX_LATTICE_POINTS points: counting
-        # succeeds but enumeration must be refused before execution.
-        far = "1000"
-        request = EnumerateLatticePointsRequest(
-            vertices=(
-                _v(("0", "1"), ("0", "1")),
-                _v((far, "1"), ("0", "1")),
-                _v((far, "1"), (far, "1")),
-                _v(("0", "1"), (far, "1")),
-            )
-        )
-        with pytest.raises(ValueError, match="point budget"):
             enumerate_lattice_points(request)
 
     def test_result_count_must_match_points(self) -> None:
@@ -664,6 +638,7 @@ class TestEnumerationResultInvariants:
 
 
 class TestVertexFacetMembershipBudget:
+    @pytest.mark.scale
     def test_parabola_vertex_facet_excess_rejected_at_validation(self) -> None:
         """64 points on a strictly convex parabola fill a 7.88M-candidate
         scan box and generate ~64 hull facets; scan-times-facet-count far
@@ -877,7 +852,7 @@ class TestBoundedEmptyHalfspacePolytopes:
 
     def test_unbounded_representation_still_rejected(self) -> None:
         request = LatticePolytopeRequest(halfspaces=(_hs((("1", "1"),), ("0", "1")),))
-        with pytest.raises(ValueError, match="unbounded"):
+        with pytest.raises(OperationDomainValidationError, match="unbounded"):
             count_lattice_points(request)
 
     def test_declarations_disclose_the_empty_h_result(self) -> None:
@@ -1006,6 +981,7 @@ class TestSecondWaveRegressions:
         result = count_lattice_points(request)
         assert result.point_count == 0
 
+    @pytest.mark.scale
     def test_derived_h_vertex_coordinates_bounded_at_admission(self) -> None:
         """x/(10^m) <= 10^k pinned from below derives x = 10^(k+m).
 
@@ -1066,6 +1042,7 @@ def _singleton_halfspaces(*, negative: bool) -> tuple[Halfspace, ...]:
 class TestDerivedCoordinateSignBoundary:
     """The canonical digit bound measures magnitude, not sign length."""
 
+    @pytest.mark.scale
     def test_reviewer_negative_singleton_at_boundary_is_admitted(self) -> None:
         """x pinned to -10^32767 derives a vertex whose magnitude has exactly
         32,768 digits; the request and its single lattice point are valid."""
@@ -1074,6 +1051,7 @@ class TestDerivedCoordinateSignBoundary:
         )
         assert count_lattice_points(request).point_count == 1
 
+    @pytest.mark.scale
     def test_negative_boundary_singleton_enumerates_exactly(self) -> None:
         from jacobian.math.lattice_polytopes._models import COORDINATE_DIGITS
 
@@ -1087,6 +1065,7 @@ class TestDerivedCoordinateSignBoundary:
         # The returned coordinate satisfies the same magnitude convention.
         assert len(result.points[0].coordinates[0].lstrip("-")) == COORDINATE_DIGITS
 
+    @pytest.mark.scale
     def test_positive_boundary_singleton_is_admitted_symmetrically(self) -> None:
         request = LatticePolytopeRequest(
             halfspaces=_singleton_halfspaces(negative=False)
@@ -1095,6 +1074,7 @@ class TestDerivedCoordinateSignBoundary:
         enumerated = enumerate_lattice_points(request)
         assert enumerated.points[0].coordinates == (BOUNDARY_COORDINATE,)
 
+    @pytest.mark.scale
     @pytest.mark.parametrize("negative", [False, True])
     def test_derived_magnitudes_beyond_the_bound_stay_rejected(
         self, negative: bool

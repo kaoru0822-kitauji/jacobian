@@ -40,6 +40,7 @@ from typing import Literal
 from sympy import Matrix, Rational
 
 from jacobian.canonical import format_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.lattice_polytopes._models import (
     MAX_BOUND_SPAN,
     MAX_FACET_TESTS,
@@ -67,7 +68,11 @@ AdmittedGeometry = tuple[
 """The integer facet inequalities, bounding box, and ambient dimension."""
 
 
-class LatticePointBudgetError(ValueError):
+class LatticePolytopeAdmissionError(ValueError):
+    """Native admission failure for lattice-polytope operations."""
+
+
+class LatticePointBudgetError(LatticePolytopeAdmissionError):
     """Raised when the enumeration would exceed a fail-closed budget bound."""
 
 
@@ -281,7 +286,7 @@ def _facets_and_box(  # noqa: C901
                     or len(_fmt(value.denominator).lstrip("-"))
                     > MAX_CANONICAL_RATIONAL_DIGITS
                 ):
-                    raise ValueError(
+                    raise LatticePolytopeAdmissionError(
                         "the H-system derives vertex coordinates beyond the "
                         f"canonical {MAX_CANONICAL_RATIONAL_DIGITS}-digit "
                         "representable bound; tighten the half-space heights"
@@ -291,7 +296,7 @@ def _facets_and_box(  # noqa: C901
         # infeasible system defines the empty - therefore bounded - polytope
         # even when its normals do not positively span the ambient space.
         if not bounded and (verts or _h_system_feasible(deduped)):
-            raise ValueError(
+            raise LatticePolytopeAdmissionError(
                 "the H-representation is unbounded whenever non-empty "
                 "(its recession cone is nontrivial); lattice-point "
                 "enumeration requires a bounded polytope"
@@ -489,7 +494,14 @@ def count_lattice_points(
     representation: Literal["vertices", "halfspaces"] = (
         "vertices" if request.vertices is not None else "halfspaces"
     )
-    facets, lo, hi, d = _facets_and_box(request)
+    try:
+        facets, lo, hi, d = _facets_and_box(request)
+    except LatticePolytopeAdmissionError as exc:
+        raise OperationDomainValidationError(
+            location=("vertices", "halfspaces"),
+            code="polytope.lattice_points.admission",
+            message=str(exc),
+        ) from exc
     _points, count = _scan_box(facets, lo, hi, d, collect=False)
     return CountLatticePointsResult._from_kernel(
         dimension=d,
