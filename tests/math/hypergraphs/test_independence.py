@@ -9,13 +9,16 @@ from pydantic import ValidationError
 
 from jacobian.math.hypergraphs._models import (
     MAX_HYPERGRAPH_INDEPENDENCE_SOLVER_CALLS,
+    DualRequest,
     FiniteHypergraph,
     HypergraphIndependenceBudget,
     HypergraphIndependenceRequest,
     HypergraphIndependenceResult,
+    ParametersRequest,
 )
 from jacobian.math.hypergraphs._operations import (
     compute_independence_number,
+    compute_parameters,
     verify_independence_result,
 )
 from jacobian.process import BoundedProcessResult, ProcessResourceLimits
@@ -158,16 +161,49 @@ def test_full_structural_encoding_boundary_is_admitted() -> None:
     assert sum(len(edge) for _, edge in request.hypergraph.edges) == 10_000
 
 
-def test_vertex_boundary_rejects_immediately_unsupported_input() -> None:
+def test_carrier_rejects_vertices_above_its_representation_bound() -> None:
     with pytest.raises(ValidationError):
-        HypergraphIndependenceRequest.model_validate(
+        FiniteHypergraph.model_validate(
             {
-                "hypergraph": {
-                    "vertices": [f"v{index}" for index in range(101)],
-                    "edges": [],
-                }
+                "vertices": [f"v{index}" for index in range(257)],
+                "edges": [],
             }
         )
+
+
+def test_large_ap_carrier_reaches_linear_consumers_not_independence_search() -> None:
+    vertices = [str(index) for index in range(1, 213)]
+    edges = [
+        [
+            f"ap-{index}",
+            [str(start), str(start + difference), str(start + 2 * difference)],
+        ]
+        for difference in range(1, 106)
+        for start in range(1, 213 - 2 * difference)
+        for index in [
+            sum(212 - 2 * prior for prior in range(1, difference)) + start - 1
+        ]
+    ]
+    source = FiniteHypergraph.model_validate({"vertices": vertices, "edges": edges})
+
+    assert len(source.vertices) == 212
+    assert len(source.edges) == 11_130
+    assert sum(len(members) for _, members in source.edges) == 33_390
+    assert FiniteHypergraph.model_validate(source.model_dump(mode="json")) == source
+    parameters = compute_parameters(ParametersRequest(hypergraph=source))
+    assert (
+        parameters.vertex_count,
+        parameters.edge_count,
+        parameters.total_incidences,
+    ) == (
+        212,
+        11_130,
+        33_390,
+    )
+    with pytest.raises(ValidationError, match="100-vertex solver bound"):
+        HypergraphIndependenceRequest(hypergraph=source)
+    with pytest.raises(ValidationError, match="256-vertex representation bound"):
+        DualRequest(hypergraph=source)
 
 
 def test_edge_free_hypergraph_returns_all_vertices() -> None:

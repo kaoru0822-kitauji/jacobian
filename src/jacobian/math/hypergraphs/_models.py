@@ -18,10 +18,12 @@ from jacobian._models import StrictModel, canonicalize_json_containers
 from jacobian.canonical import CanonicalLimits, encode_strict_json, sha256_digest
 from jacobian.math.graphs.values import SimpleUndirectedGraph
 
-MAX_VERTICES = 100
-MAX_EDGES = 100
+MAX_VERTICES = 256
+MAX_EDGES = 12_000
 MAX_LABEL_LENGTH = 64
 MAX_HYPERGRAPH_INDEPENDENCE_SOLVER_CALLS = 16
+MAX_HYPERGRAPH_INDEPENDENCE_VERTICES = 100
+MAX_HYPERGRAPH_INDEPENDENCE_INCIDENCES = 10_000
 
 HypergraphIndependenceStatus = Literal["EXACT", "UNKNOWN"]
 HypergraphIndependenceTermination = Literal[
@@ -33,8 +35,8 @@ HypergraphIndependenceTermination = Literal[
     "SPECIAL_CASE",
 ]
 
-MAX_TOTAL_INCIDENCES = MAX_VERTICES * MAX_EDGES
-MAX_EDGE_PAIR_COUNT = MAX_EDGES * (MAX_EDGES - 1) // 2
+MAX_TOTAL_INCIDENCES = 36_000
+MAX_EDGE_PAIR_COUNT = 65_536
 MAX_EDGE_INTERSECTION_CELLS = 65_536
 # UTF-8 uses at most four bytes per Unicode scalar.  Together with the existing
 # per-label and vertex/edge-count limits, this is the complete aggregate label
@@ -92,6 +94,9 @@ def _validation_error(message: str) -> PydanticCustomError:
         ("incidence bound", "preflight_incidences"),
         ("intersection-cell bound", "preflight_cells"),
         ("canonical output limit", "preflight_output"),
+        ("source exceeds", "source_representation"),
+        ("solver bound", "solver_envelope"),
+        ("dual exceeds", "dual_envelope"),
         ("distinct edge IDs", "entry_identity"),
         ("intersection_size", "entry_size"),
         ("intersection vertices", "entry_order"),
@@ -152,7 +157,8 @@ class FiniteHypergraph(StrictModel):
         max_length=MAX_VERTICES,
         description=(
             "Unique UTF-8-encodable vertex labels of at most "
-            f"{MAX_LABEL_LENGTH} characters each."
+            f"{MAX_LABEL_LENGTH} characters each; a carrier has at most "
+            f"{MAX_VERTICES} vertices."
         ),
     )
     edges: tuple[tuple[str, tuple[str, ...]], ...] = Field(
@@ -160,7 +166,8 @@ class FiniteHypergraph(StrictModel):
         description=(
             "Unique UTF-8-encodable edge IDs (at most "
             f"{MAX_LABEL_LENGTH} characters each) paired with tuples of "
-            "declared vertex labels."
+            "declared vertex labels. A carrier has at most "
+            f"{MAX_EDGES} edges and {MAX_TOTAL_INCIDENCES} total incidences."
         ),
     )
 
@@ -192,6 +199,25 @@ class FiniteHypergraph(StrictModel):
                 raise _validation_error("every edge member must be a declared vertex")
             canonical_edges.append((edge_id, tuple(sorted(members))))
         object.__setattr__(self, "edges", tuple(canonical_edges))
+        total_incidences = sum(len(members) for _, members in self.edges)
+        if total_incidences > MAX_TOTAL_INCIDENCES:
+            raise _validation_error(
+                "hypergraph source exceeds the "
+                f"{MAX_TOTAL_INCIDENCES}-incidence representation bound"
+            )
+        try:
+            encode_strict_json(
+                {
+                    "vertices": list(self.vertices),
+                    "edges": [
+                        [edge_id, list(members)] for edge_id, members in self.edges
+                    ],
+                }
+            )
+        except ValueError as exc:
+            raise _validation_error(
+                "hypergraph source exceeds the canonical JSON representation bound"
+            ) from exc
         return self
 
 
@@ -244,13 +270,18 @@ class HypergraphIndependenceBudget(StrictModel):
 class HypergraphIndependenceRequest(StrictModel):
     """One finite hypergraph and its operation-owned exact-search budget.
 
-    Hyperedges must be nonempty. The inherited finite-hypergraph contract admits
-    at most 100 vertices, 100 indexed edges, width 100, and 10,000 total
-    incidences, which bounds the Boolean encoding before the private backend is
-    invoked.
+    Hyperedges must be nonempty. The source carrier has its own representation
+    envelope; this operation independently admits only Boolean encodings of at
+    most 100 vertices and 10,000 incidences before invoking the private backend.
     """
 
-    hypergraph: FiniteHypergraph
+    hypergraph: FiniteHypergraph = Field(
+        description=(
+            "Canonical finite hypergraph. The Z3 threshold search separately "
+            f"admits at most {MAX_HYPERGRAPH_INDEPENDENCE_VERTICES} vertices "
+            f"and {MAX_HYPERGRAPH_INDEPENDENCE_INCIDENCES} incidences."
+        )
+    )
     resource_budget: HypergraphIndependenceBudget = Field(
         default_factory=HypergraphIndependenceBudget
     )
@@ -260,6 +291,17 @@ class HypergraphIndependenceRequest(StrictModel):
         if any(not members for _, members in self.hypergraph.edges):
             raise _validation_error(
                 "independence-number search does not admit empty edges"
+            )
+        total_incidences = sum(len(members) for _, members in self.hypergraph.edges)
+        if len(self.hypergraph.vertices) > MAX_HYPERGRAPH_INDEPENDENCE_VERTICES:
+            raise _validation_error(
+                "independence-number search exceeds the "
+                f"{MAX_HYPERGRAPH_INDEPENDENCE_VERTICES}-vertex solver bound"
+            )
+        if total_incidences > MAX_HYPERGRAPH_INDEPENDENCE_INCIDENCES:
+            raise _validation_error(
+                "independence-number search exceeds the "
+                f"{MAX_HYPERGRAPH_INDEPENDENCE_INCIDENCES}-incidence solver bound"
             )
         return self
 
@@ -556,8 +598,7 @@ class EdgeIntersectionsRequest(StrictModel):
 
     hypergraph: FiniteHypergraph = Field(
         description=(
-            "Canonical finite hypergraph with at most 100 vertices and 100 "
-            "indexed edges. The complete profile is admitted only when its "
+            "Canonical finite hypergraph. The complete profile is admitted only when its "
             "pair intersections contain at most 65,536 memberships "
             "and its retained-source result fits the canonical output limit."
         ),
@@ -776,6 +817,15 @@ class DualRequest(StrictModel):
     """Request the dual of a finite hypergraph."""
 
     hypergraph: FiniteHypergraph
+
+    @model_validator(mode="after")
+    def require_representable_dual(self) -> Self:
+        if len(self.hypergraph.edges) > MAX_VERTICES:
+            raise _validation_error(
+                "hypergraph dual exceeds the "
+                f"{MAX_VERTICES}-vertex representation bound"
+            )
+        return self
 
 
 class DualResult(StrictModel):
