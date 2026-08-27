@@ -135,10 +135,8 @@ class MatroidClosureResult(MatroidClosureRequest):
     """The claimed closure (flat) of a subset in a linear matroid.
 
     Deserialization establishes only the retained request and bounded canonical
-    result shape.  The exact span claim is checked by
-    :func:`verify_matroid_closure_result` when an independently supplied
-    result needs verification.  Kernel output uses ``_from_kernel`` after its
-    trusted bounded computation.
+    result shape. Kernel output uses ``_from_kernel`` after its trusted bounded
+    computation.
     """
 
     closure: tuple[StrictInt, ...] = Field(
