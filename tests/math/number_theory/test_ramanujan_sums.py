@@ -8,6 +8,7 @@ from sympy import divisors, mobius
 from tests.math.number_theory._validation import expect_validation
 
 from jacobian._exact import CanonicalInteger
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.arithmetic import absolute_value
 from jacobian.math.arithmetic.values import IntegerValue
 from jacobian.math.number_theory import ramanujan_sum
@@ -209,8 +210,10 @@ def test_owner_grammar_admits_negative_moduli_the_operation_rejects(
     negative: str,
 ) -> None:
     assert TypeAdapter(CanonicalInteger).validate_python(negative) == negative
-    with expect_validation("number_theory."):
-        RamanujanSumRequest(modulus=negative, frequency="0")
+    with pytest.raises(OperationDomainValidationError, match="nonnegative"):
+        RAMANUJAN_SUM_OPERATION.run(
+            RamanujanSumRequest(modulus=negative, frequency="0")
+        )
     with expect_validation("number_theory."):
         RamanujanSumResult.model_validate(
             {"modulus": negative, "frequency": "2", "value": "-2"}
@@ -269,8 +272,10 @@ def test_ramanujan_sum_request_bounds_factorization_and_frequency_work() -> None
         RamanujanSumRequest(modulus=str(10**_MAX_MODULUS_DIGITS), frequency="0")
     with expect_validation("number_theory."):
         RamanujanSumRequest(modulus="1", frequency="9" * (_MAX_INTEGER_LENGTH + 1))
-    with pytest.raises(ValidationError):
-        RamanujanSumRequest(modulus="-1", frequency="0")
+    with pytest.raises(OperationDomainValidationError, match="nonnegative"):
+        RAMANUJAN_SUM_OPERATION.run(
+            RamanujanSumRequest(modulus="-1", frequency="0")
+        )
 
 
 def test_ramanujan_sum_rejects_negative_native_modulus() -> None:

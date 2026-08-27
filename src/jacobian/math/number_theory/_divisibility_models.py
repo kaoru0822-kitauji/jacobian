@@ -2,12 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Self
-
-from pydantic import model_validator
-
 from jacobian._models import StrictModel
-from jacobian.math.number_theory._models import BoundedInteger, _validation_error
+from jacobian.math.number_theory._models import BoundedInteger
 
 
 class IntegerPairRequest(StrictModel):
@@ -23,35 +19,12 @@ class DivisibilityRequest(StrictModel):
     divisor: BoundedInteger
     dividend: BoundedInteger
 
-    @model_validator(mode="after")
-    def require_nonzero_divisor(self) -> Self:
-        if int(self.divisor) == 0:
-            raise _validation_error(
-                "divisor_must_be_nonzero", "divisor must be nonzero"
-            )
-        return self
-
 
 class ValuationRequest(StrictModel):
     """One integer and a prime base supplied to a p-adic valuation."""
 
     value: BoundedInteger
     prime: BoundedInteger
-
-    @model_validator(mode="after")
-    def require_valid_valuation_domain(self) -> Self:
-        from sympy import isprime
-
-        if int(self.value) == 0:
-            raise _validation_error(
-                "valuation_requires_nonzero_value", "valuation requires nonzero value"
-            )
-        if int(self.prime) < 2 or not isprime(int(self.prime)):
-            raise _validation_error(
-                "valuation_requires_a_prime_absolute_base_2",
-                "valuation requires a prime absolute base >= 2",
-            )
-        return self
 
 
 class ExtendedGcdResult(StrictModel):

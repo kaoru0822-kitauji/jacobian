@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 from tests.math.number_theory._validation import expect_validation
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.number_theory._derived_models import (
     FactorialValuationRequest,
     LegendreSymbolRequest,
@@ -30,13 +31,15 @@ from jacobian.math.number_theory._modular_basic_models import (
 from jacobian.math.number_theory._modular_models import (
     ModularPolynomialResidueImageRequest,
 )
+from jacobian.math.number_theory._modular_operations import solve_chinese_remainder
 from jacobian.math.number_theory._prime_models import PrimalityRequest
 
 
 @pytest.mark.parametrize("residue", [-1, 3])
 def test_chinese_remainder_rejects_noncanonical_residues(residue: int) -> None:
-    with expect_validation("number_theory."):
-        ChineseRemainderRequest(residues=(residue,), moduli=(3,))
+    request = ChineseRemainderRequest(residues=(residue,), moduli=(3,))
+    with pytest.raises(OperationDomainValidationError, match="canonical"):
+        solve_chinese_remainder(request)
 
 
 @pytest.mark.parametrize(
@@ -51,8 +54,9 @@ def test_chinese_remainder_rejects_invalid_system_bounds(
     payload: dict[str, list[int]],
     message: str,
 ) -> None:
-    with expect_validation("number_theory."):
-        ChineseRemainderRequest.model_validate(payload)
+    request = ChineseRemainderRequest.model_validate(payload)
+    with pytest.raises(OperationDomainValidationError, match=message):
+        solve_chinese_remainder(request)
 
 
 @pytest.mark.parametrize("prime", (3, 97, 9_999_991))
@@ -81,8 +85,9 @@ def test_chinese_remainder_rejects_combined_modulus_beyond_result_budget() -> No
         candidate = int(prevprime(candidate))
         moduli.append(candidate)
 
-    with expect_validation("number_theory."):
-        ChineseRemainderRequest(residues=(1,) * len(moduli), moduli=tuple(moduli))
+    request = ChineseRemainderRequest(residues=(1,) * len(moduli), moduli=tuple(moduli))
+    with pytest.raises(OperationDomainValidationError, match="combined modulus"):
+        solve_chinese_remainder(request)
 
 
 def test_chinese_remainder_admits_boundary_system_and_solves_exactly() -> None:

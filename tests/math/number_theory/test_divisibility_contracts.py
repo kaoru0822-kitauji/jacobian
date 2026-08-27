@@ -3,9 +3,8 @@
 from typing import Any
 
 import pytest
-from tests.math.number_theory._validation import expect_validation
 
-from jacobian.catalog.models import MathTool
+from jacobian.catalog.models import MathTool, OperationDomainValidationError
 from jacobian.math.arithmetic.operations import absolute_value
 from jacobian.math.arithmetic.values import IntegerValue
 from jacobian.math.number_theory._divisibility import DIVISIBILITY_OPERATIONS
@@ -15,7 +14,11 @@ from jacobian.math.number_theory._divisibility_models import (
     IntegerPairRequest,
     ValuationRequest,
 )
-from jacobian.math.number_theory._divisibility_operations import compute_gcd
+from jacobian.math.number_theory._divisibility_operations import (
+    compute_gcd,
+    compute_valuation,
+    decide_divides,
+)
 
 
 def _operation(operation_id: str) -> MathTool[Any, Any]:
@@ -71,12 +74,12 @@ def test_divisibility_declarations_keep_their_owner_local_contracts(
 
 
 def test_divisibility_contracts_retain_their_typed_admission_errors() -> None:
-    with expect_validation("number_theory.divisor_must_be_nonzero"):
-        DivisibilityRequest(divisor="0", dividend="1")
-    with expect_validation("number_theory.valuation_requires_nonzero_value"):
-        ValuationRequest(value="0", prime="2")
-    with expect_validation("number_theory.valuation_requires_a_prime_absolute_base_2"):
-        ValuationRequest(value="1", prime="4")
+    with pytest.raises(OperationDomainValidationError, match="divisor"):
+        decide_divides(DivisibilityRequest(divisor="0", dividend="1"))
+    with pytest.raises(OperationDomainValidationError, match="nonzero"):
+        compute_valuation(ValuationRequest(value="0", prime="2"))
+    with pytest.raises(OperationDomainValidationError, match="prime"):
+        compute_valuation(ValuationRequest(value="1", prime="4"))
 
 
 def test_gcd_result_composes_with_arithmetic_integer_consumers() -> None:

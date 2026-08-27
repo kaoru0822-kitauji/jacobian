@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.arithmetic.values import IntegerValue
 from jacobian.math.number_theory._divisibility_models import (
     DivisibilityRequest,
@@ -16,6 +17,34 @@ from jacobian.math.number_theory._integer_models import (
     NonnegativeIntegerRequest,
     PositiveIntegerRequest,
 )
+
+
+def _domain_error(location: tuple[str | int, ...], code: str, message: str) -> None:
+    raise OperationDomainValidationError(
+        location=location, code=f"number_theory.{code}", message=message
+    )
+
+
+def _admit_divisor(request: DivisibilityRequest) -> None:
+    if int(request.divisor) == 0:
+        _domain_error(("divisor",), "divisor_must_be_nonzero", "divisor must be nonzero")
+
+
+def _admit_valuation(request: ValuationRequest) -> None:
+    if int(request.value) == 0:
+        _domain_error(
+            ("value",),
+            "valuation_requires_nonzero_value",
+            "valuation requires nonzero value",
+        )
+    from sympy import isprime
+
+    if int(request.prime) < 2 or not isprime(int(request.prime)):
+        _domain_error(
+            ("prime",),
+            "valuation_requires_a_prime_absolute_base_2",
+            "valuation requires a prime absolute base >= 2",
+        )
 
 
 def compute_gcd(request: IntegerPairRequest) -> IntegerValue:
@@ -41,6 +70,7 @@ def compute_extended_gcd(request: IntegerPairRequest) -> ExtendedGcdResult:
 def compute_valuation(request: ValuationRequest) -> IntegerValue:
     from sympy import multiplicity
 
+    _admit_valuation(request)
     value, prime = int(request.value), int(request.prime)
     return IntegerValue(value=str(multiplicity(abs(prime), abs(value))))
 
@@ -68,6 +98,7 @@ def decide_coprime(request: IntegerPairRequest) -> BooleanResult:
 
 
 def decide_divides(request: DivisibilityRequest) -> BooleanResult:
+    _admit_divisor(request)
     divisor, dividend = int(request.divisor), int(request.dividend)
     return BooleanResult(holds=dividend % divisor == 0)
 

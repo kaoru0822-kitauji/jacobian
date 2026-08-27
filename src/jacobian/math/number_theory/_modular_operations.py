@@ -6,9 +6,12 @@ import math
 from itertools import product
 from typing import Literal, cast
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.arithmetic.values import IntegerValue
 from jacobian.math.modular_polynomials import NormalizedModularPolynomialTerm
 from jacobian.math.number_theory._modular_basic_models import (
+    MAX_CRT_COMBINED_MODULUS,
+    MAX_MODULUS,
     ChineseRemainderRequest,
     ChineseRemainderResult,
     JacobiSymbolRequest,
@@ -26,9 +29,72 @@ from jacobian.math.number_theory._modular_models import (
 )
 
 
+def _domain_error(location: tuple[str | int, ...], code: str, message: str) -> None:
+    raise OperationDomainValidationError(
+        location=location, code=f"number_theory.{code}", message=message
+    )
+
+
+def _admit_unit(request: ModularUnitRequest) -> None:
+    if math.gcd(int(request.value), request.modulus) != 1:
+        _domain_error(
+            ("value",),
+            "value_must_be_coprime_to_the_modulus",
+            "value must be coprime to the modulus",
+        )
+
+
+def _admit_crt(request: ChineseRemainderRequest) -> None:
+    if len(request.residues) != len(request.moduli):
+        _domain_error(
+            ("residues",),
+            "residues_and_moduli_must_have_equal_length",
+            "residues and moduli must have equal length",
+        )
+    combined = 1
+    for index, modulus in enumerate(request.moduli):
+        if not 2 <= modulus <= MAX_MODULUS:
+            _domain_error(
+                ("moduli", index),
+                "every_modulus_must_be_between_2_and_1_000_000",
+                "every modulus must be between 2 and 1,000,000",
+            )
+        combined = combined // math.gcd(combined, modulus) * modulus
+        if combined > MAX_CRT_COMBINED_MODULUS:
+            _domain_error(
+                ("moduli", index),
+                "the_system_s_combined_modulus_must_have_at",
+                "the system's combined modulus must have at most 256 digits; split the congruence system into narrower subsystems",
+            )
+    for index, (residue, modulus) in enumerate(
+        zip(request.residues, request.moduli, strict=True)
+    ):
+        if not 0 <= residue < modulus:
+            _domain_error(
+                ("residues", index),
+                "every_residue_must_be_canonical_for_its_modulus",
+                "every residue must be canonical for its modulus",
+            )
+        for other_index in range(index):
+            if (residue - request.residues[other_index]) % math.gcd(
+                modulus, request.moduli[other_index]
+            ):
+                _domain_error(
+                    ("residues", index),
+                    "congruence_system_is_inconsistent",
+                    "congruence system is inconsistent",
+                )
+
+
 def compute_jacobi_symbol(request: JacobiSymbolRequest) -> JacobiSymbolResult:
     from sympy import jacobi_symbol
 
+    if request.n % 2 == 0:
+        _domain_error(
+            ("n",),
+            "jacobi_symbol_denominator_must_be_odd",
+            "Jacobi symbol denominator must be odd",
+        )
     return JacobiSymbolResult(
         a=request.a,
         n=request.n,
@@ -37,15 +103,15 @@ def compute_jacobi_symbol(request: JacobiSymbolRequest) -> JacobiSymbolResult:
 
 
 def compute_modular_inverse(request: ModularUnitRequest) -> IntegerValue:
+    _admit_unit(request)
     return IntegerValue(value=str(pow(int(request.value), -1, request.modulus)))
 
 
 def compute_multiplicative_order(request: ModularUnitRequest) -> IntegerValue:
     from sympy import n_order
 
+    _admit_unit(request)
     value, modulus = int(request.value), request.modulus
-    if math.gcd(value, modulus) != 1:
-        raise ValueError("multiplicative order requires coprime value and modulus")
     return IntegerValue(value=str(int(n_order(value, modulus))))
 
 
@@ -135,6 +201,7 @@ def _evaluate_modular_polynomial(
 def solve_chinese_remainder(request: ChineseRemainderRequest) -> ChineseRemainderResult:
     from sympy.ntheory.modular import solve_congruence
 
+    _admit_crt(request)
     result = solve_congruence(
         *zip(request.residues, request.moduli, strict=True), check=True
     )

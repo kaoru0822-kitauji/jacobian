@@ -10,6 +10,7 @@ from pydantic_core import PydanticCustomError
 from jacobian._exact import CanonicalInteger
 from jacobian._models import StrictModel
 from jacobian.catalog._examples import example
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.number_theory._models import MAX_INTEGER_DIGITS
 from jacobian.math.number_theory._support import number_theory_operation
 from jacobian.math.number_theory.ramanujan_sums import (
@@ -35,8 +36,8 @@ RamanujanModulus = Annotated[
 # so negative zero cannot bind and mathematically equal inputs share one
 # serialized identity across request and result.  Operation-specific execution
 # bounds are applied on top of the owner type, never by restating its grammar;
-# the modulus's nonnegativity is a mathematical precondition enforced by model
-# validation rather than part of the owned encoding.
+# the modulus's nonnegativity is a mathematical precondition enforced by the
+# native operation rather than part of the owned encoding.
 RamanujanSumInteger = Annotated[
     CanonicalInteger,
     Field(max_length=MAX_INTEGER_DIGITS),
@@ -59,14 +60,6 @@ class RamanujanSumRequest(StrictModel):
             "minus sign with no leading zeros."
         )
     )
-
-    @model_validator(mode="after")
-    def require_nonnegative_modulus(self) -> Self:
-        if int(self.modulus) < 0:
-            raise _validation_error(
-                "modulus_must_be_nonnegative", "modulus must be nonnegative"
-            )
-        return self
 
 
 class RamanujanSumResult(StrictModel):
@@ -94,7 +87,7 @@ class RamanujanSumResult(StrictModel):
     def _from_kernel(cls, request: RamanujanSumRequest, *, value: int) -> Self:
         """Build one result after the admitted sum kernel established its value."""
 
-        return cls(
+        return cls.model_construct(
             modulus=request.modulus, frequency=request.frequency, value=str(value)
         )
 
@@ -102,6 +95,12 @@ class RamanujanSumResult(StrictModel):
 def compute_ramanujan_sum(request: RamanujanSumRequest) -> RamanujanSumResult:
     """Evaluate one admitted exact Ramanujan sum."""
 
+    if int(request.modulus) < 0:
+        raise OperationDomainValidationError(
+            location=("modulus",),
+            code="number_theory.modulus_must_be_nonnegative",
+            message="modulus must be nonnegative",
+        )
     value = ramanujan_sum(int(request.modulus), int(request.frequency))
     return RamanujanSumResult._from_kernel(request, value=value)
 
