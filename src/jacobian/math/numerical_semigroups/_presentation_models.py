@@ -12,8 +12,6 @@ from jacobian.math.numerical_semigroups._models import (
     _GENERAL_GENERATOR_ENVELOPE,
     MAX_GENERATORS,
     _require_canonical_minimal_axis,
-    _require_global_betti_bound,
-    _require_minimal_generators,
     _validation_error,
 )
 
@@ -30,12 +28,6 @@ class MinimalPresentationRequest(StrictModel):
             + "The presentation may be reordered or redundant; returned relations use its increasing minimal generator axis."
         ),
     )
-
-    @model_validator(mode="after")
-    def require_complete_candidate_range(self) -> Self:
-        _require_global_betti_bound(_require_minimal_generators(self.generators))
-        return self
-
 
 class MinimalPresentationRelation(StrictModel):
     """One relation (pair of distinct factorizations) in a presentation."""
@@ -117,31 +109,6 @@ class PresentationBinomialsRequest(StrictModel):
         ),
     )
     relations: tuple[MinimalPresentationRelation, ...]
-
-    @model_validator(mode="after")
-    def require_kernel_relations(self) -> Self:
-        generators = _require_minimal_generators(self.generators)
-        for relation in self.relations:
-            if len(relation.first) != len(generators):
-                raise _validation_error(
-                    "relation coordinates must match the minimal generating system"
-                )
-            if sum(
-                coefficient * generator
-                for coefficient, generator in zip(
-                    relation.first, generators, strict=True
-                )
-            ) != sum(
-                coefficient * generator
-                for coefficient, generator in zip(
-                    relation.second, generators, strict=True
-                )
-            ):
-                raise _validation_error(
-                    "relation factorizations must have the same semigroup degree"
-                )
-        return self
-
 
 class PresentationBinomial(StrictModel):
     """One sparse binomial (aX - bX) arising from a presentation relation."""

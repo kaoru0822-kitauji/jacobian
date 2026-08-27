@@ -14,10 +14,6 @@ from jacobian.math.numerical_semigroups._models import (
     _GENERAL_GENERATOR_ENVELOPE,
     MAX_GENERATORS,
     _require_canonical_minimal_axis,
-    _require_global_betti_bound,
-    _require_global_catenary_bound,
-    _require_global_delta_bound,
-    _require_minimal_generators,
     _validation_error,
 )
 
@@ -34,12 +30,6 @@ class BettiElementsRequest(StrictModel):
             + "The presentation may be reordered or redundant; derived data uses its increasing minimal generator axis."
         ),
     )
-
-    @model_validator(mode="after")
-    def require_complete_candidate_range(self) -> Self:
-        _require_global_betti_bound(_require_minimal_generators(self.generators))
-        return self
-
 
 class BettiElementsResult(StrictModel):
     """Betti elements of a semigroup."""
@@ -93,12 +83,6 @@ class DeltaSetRequest(StrictModel):
             + "The presentation may be reordered or redundant; the complete delta set uses its increasing minimal generator axis."
         ),
     )
-
-    @model_validator(mode="after")
-    def require_complete_periodicity_range(self) -> Self:
-        _require_global_delta_bound(_require_minimal_generators(self.generators))
-        return self
-
 
 class DeltaSetResult(StrictModel):
     """Global delta set of the semigroup."""
@@ -160,12 +144,6 @@ class ElasticityRequest(StrictModel):
         ),
     )
 
-    @model_validator(mode="after")
-    def require_positive_generators(self) -> Self:
-        _require_minimal_generators(self.generators)
-        return self
-
-
 class ElasticityResult(StrictModel):
     """Global elasticity of the semigroup."""
 
@@ -196,12 +174,6 @@ class CatenaryDegreeRequest(StrictModel):
             + "The presentation may be reordered or redundant; factorization coordinates use its increasing minimal generator axis."
         ),
     )
-
-    @model_validator(mode="after")
-    def require_complete_betti_graphs(self) -> Self:
-        _require_global_catenary_bound(_require_minimal_generators(self.generators))
-        return self
-
 
 class BettiCatenaryDegree(StrictModel):
     """Catenary degree witnessed at one Betti element."""

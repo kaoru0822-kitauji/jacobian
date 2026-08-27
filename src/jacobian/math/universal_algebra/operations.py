@@ -48,6 +48,14 @@ def _evaluate_node(
     raise AssertionError("closed term union admitted an unknown node")
 
 
+def _evaluate_term_unchecked(
+    algebra: FiniteAlgebra, term: FlatTerm, assignment: dict[int, int]
+) -> int:
+    """Evaluate a term after the caller has completed source-bound admission."""
+
+    return _evaluate_node(algebra, term, assignment, len(algebra.carrier), term.root)
+
+
 def evaluate_term(
     algebra: FiniteAlgebra, term: FlatTerm, assignment: dict[int, int]
 ) -> int:
@@ -59,7 +67,7 @@ def evaluate_term(
     require_term_for_algebra(term, algebra)
     if any(not 0 <= v < n for v in assignment.values()):
         raise ValueError("assignment value out of carrier range")
-    return _evaluate_node(algebra, term, assignment, n, term.root)
+    return _evaluate_term_unchecked(algebra, term, assignment)
 
 
 def equation_profile(
@@ -72,13 +80,23 @@ def equation_profile(
     """
     from itertools import product as iproduct
 
+    require_term_for_algebra(left, algebra)
+    require_term_for_algebra(right, algebra)
+    return _equation_profile_unchecked(algebra, left, right, variable_count)
+
+
+def _equation_profile_unchecked(
+    algebra: FiniteAlgebra, left: FlatTerm, right: FlatTerm, variable_count: int
+) -> dict[str, object]:
+    """Profile an equation after source-bound term admission."""
+
     n = len(algebra.carrier)
     satisfying = 0
     first_counterassignment = None
     for values in iproduct(range(n), repeat=variable_count):
         assignment = dict(enumerate(values))
-        lv = evaluate_term(algebra, left, assignment)
-        rv = evaluate_term(algebra, right, assignment)
+        lv = _evaluate_term_unchecked(algebra, left, assignment)
+        rv = _evaluate_term_unchecked(algebra, right, assignment)
         if lv == rv:
             satisfying += 1
         else:

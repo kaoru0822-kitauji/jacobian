@@ -8,7 +8,10 @@ from jacobian.math.numerical_semigroups._algorithms import (
     factorization_predecessors,
     reconstruct_factorization,
 )
-from jacobian.math.numerical_semigroups._models import _require_minimal_generators
+from jacobian.math.numerical_semigroups._models import (
+    _require_global_betti_bound,
+    _require_minimal_generators,
+)
 from jacobian.math.numerical_semigroups._presentation_models import (
     MinimalPresentationRelation,
     MinimalPresentationRequest,
@@ -19,18 +22,13 @@ from jacobian.math.numerical_semigroups._presentation_models import (
 )
 
 
-def _minimal_generators(generators: tuple[str, ...]) -> tuple[int, ...]:
-    """Normalize a presentation to its canonical generator axis."""
-
-    return _require_minimal_generators(generators)
-
-
 def compute_minimal_presentation(
     request: MinimalPresentationRequest,
 ) -> MinimalPresentationResult:
     """Build minimal spanning relations for every Betti fiber."""
 
-    generators = _minimal_generators(request.generators)
+    generators = _require_minimal_generators(request.generators)
+    _require_global_betti_bound(generators)
     _, _, disconnected = betti_data(generators)
     predecessors = factorization_predecessors(generators, max(disconnected, default=0))
     relations: list[MinimalPresentationRelation] = []
@@ -66,7 +64,14 @@ def compute_presentation_binomials(
 ) -> PresentationBinomialsResult:
     """Project homogeneous presentation relations to sparse binomials."""
 
-    generators = _minimal_generators(request.generators)
+    generators = _require_minimal_generators(request.generators)
+    for relation in request.relations:
+        if len(relation.first) != len(generators):
+            raise ValueError("relation coordinates must match the minimal generating system")
+        first_degree = sum(c * g for c, g in zip(relation.first, generators, strict=True))
+        second_degree = sum(c * g for c, g in zip(relation.second, generators, strict=True))
+        if first_degree != second_degree:
+            raise ValueError("relation factorizations must have the same semigroup degree")
     return PresentationBinomialsResult(
         minimal_generators=tuple(
             format_canonical_integer(value) for value in generators

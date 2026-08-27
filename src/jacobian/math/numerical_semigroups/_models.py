@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Self
-
-from pydantic import Field, model_validator
+from pydantic import Field
 from pydantic_core import PydanticCustomError
 
 from jacobian._exact import CanonicalInteger
@@ -36,12 +34,6 @@ class NumericalSemigroupRequest(StrictModel):
     generators: tuple[CanonicalInteger, ...] = Field(
         min_length=1, max_length=MAX_GENERATORS
     )
-
-    @model_validator(mode="after")
-    def require_positive_generators(self) -> Self:
-        _require_positive_bounded_generators(self.generators)
-        return self
-
 
 def _validation_error(message: str) -> PydanticCustomError:
     """Build a stable owner-local error for a failed semigroup invariant."""

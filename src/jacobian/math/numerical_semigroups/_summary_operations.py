@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from jacobian.canonical import format_canonical_integer, parse_canonical_integer
 from jacobian.math.numerical_semigroups._algorithms import apery_set, belongs
+from jacobian.math.numerical_semigroups._models import (
+    _require_bounded_value,
+    _require_minimal_generators,
+)
 from jacobian.math.numerical_semigroups._summary_models import (
     NumericalSemigroupSummaryRequest,
     NumericalSemigroupSummaryResult,
@@ -12,16 +16,10 @@ from jacobian.math.numerical_semigroups._summary_models import (
 )
 
 
-def _normalize_generators(generators: tuple[str, ...]) -> list[int]:
-    """Return sorted unique positive generators."""
-
-    return sorted({parse_canonical_integer(generator) for generator in generators})
-
-
 def _compute_summary(generators: list[int]) -> NumericalSemigroupSummaryResult:
     multiplicity = generators[0]
     if multiplicity == 1:
-        return NumericalSemigroupSummaryResult(
+        return NumericalSemigroupSummaryResult._from_kernel(
             minimal_generators=("1",),
             multiplicity="1",
             embedding_dimension=1,
@@ -71,7 +69,7 @@ def _compute_summary(generators: list[int]) -> NumericalSemigroupSummaryResult:
         if not can_reach[generator]:
             minimal_generators.append(generator)
 
-    return NumericalSemigroupSummaryResult(
+    return NumericalSemigroupSummaryResult._from_kernel(
         minimal_generators=tuple(
             format_canonical_integer(generator) for generator in minimal_generators
         ),
@@ -89,7 +87,8 @@ def compute_summary(
 ) -> NumericalSemigroupSummaryResult:
     """Compute the exact summary on the canonical minimal generator axis."""
 
-    return _compute_summary(_normalize_generators(request.generators))
+    generators = _require_minimal_generators(request.generators)
+    return _compute_summary(list(generators))
 
 
 def compute_membership(
@@ -97,7 +96,8 @@ def compute_membership(
 ) -> SemigroupMembershipResult:
     """Check whether one admitted integer belongs to the generated semigroup."""
 
-    generators = tuple(_normalize_generators(request.generators))
+    generators = _require_minimal_generators(request.generators)
+    _require_bounded_value(generators, request.value)
     value = parse_canonical_integer(request.value)
     return SemigroupMembershipResult(
         value=request.value,

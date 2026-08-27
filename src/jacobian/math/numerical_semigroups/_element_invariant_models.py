@@ -13,12 +13,8 @@ from jacobian.math.numerical_semigroups._models import (
     _GENERAL_ELEMENT_ENVELOPE,
     _GENERAL_GENERATOR_ENVELOPE,
     MAX_GENERATORS,
-    MAX_GRAPH_FACTORIZATIONS,
     _require_bounded_value,
     _require_canonical_minimal_axis,
-    _require_materializable_factorizations,
-    _require_member,
-    _require_minimal_generators,
     _validation_error,
 )
 
@@ -37,14 +33,6 @@ class ElementDeltaSetRequest(StrictModel):
         ),
     )
     value: CanonicalInteger
-
-    @model_validator(mode="after")
-    def require_semigroup_element(self) -> Self:
-        generators = _require_minimal_generators(self.generators)
-        value = _require_bounded_value(generators, self.value)
-        _require_member(generators, value)
-        return self
-
 
 class ElementDeltaSetResult(StrictModel):
     """Delta set of one element."""
@@ -110,18 +98,6 @@ class ElementElasticityRequest(StrictModel):
         description="Positive semigroup element. " + _GENERAL_ELEMENT_ENVELOPE
     )
 
-    @model_validator(mode="after")
-    def require_nonzero_semigroup_element(self) -> Self:
-        generators = _require_minimal_generators(self.generators)
-        value = _require_bounded_value(generators, self.value)
-        if value <= 0:
-            raise _validation_error(
-                "elasticity is defined here only for positive elements"
-            )
-        _require_member(generators, value)
-        return self
-
-
 class ElementElasticityResult(StrictModel):
     """Elasticity of one element."""
 
@@ -180,17 +156,6 @@ class ElementCatenaryDegreeRequest(StrictModel):
         ),
     )
     value: CanonicalInteger
-
-    @model_validator(mode="after")
-    def require_exact_bounded_element(self) -> Self:
-        generators = _require_minimal_generators(self.generators)
-        value = _require_bounded_value(generators, self.value)
-        _require_member(generators, value)
-        _require_materializable_factorizations(
-            generators, value, MAX_GRAPH_FACTORIZATIONS
-        )
-        return self
-
 
 class ElementCatenaryDegreeResult(StrictModel):
     """Catenary degree of one element."""

@@ -8,7 +8,6 @@ from jacobian.canonical import format_canonical_integer, parse_canonical_integer
 from jacobian.math.numerical_semigroups._algorithms import (
     factorization_lengths,
     factorizations,
-    minimal_generating_system,
 )
 from jacobian.math.numerical_semigroups._factorization_models import (
     FactorizationComputeRequest,
@@ -20,15 +19,13 @@ from jacobian.math.numerical_semigroups._factorization_models import (
     FactorizationLengthsComputeRequest,
     FactorizationLengthsComputeResult,
 )
-
-
-def _minimal_generators(generators: tuple[str, ...]) -> list[int]:
-    """Return the increasing minimal atom axis as native integers."""
-
-    raw = tuple(
-        sorted({parse_canonical_integer(generator) for generator in generators})
-    )
-    return list(minimal_generating_system(raw))
+from jacobian.math.numerical_semigroups._models import (
+    MAX_GRAPH_FACTORIZATIONS,
+    MAX_MATERIALIZED_FACTORIZATIONS,
+    _require_bounded_value,
+    _require_materializable_factorizations,
+    _require_minimal_generators,
+)
 
 
 def _enumerate_factorizations(
@@ -79,8 +76,10 @@ def compute_factorizations(
 ) -> FactorizationComputeResult:
     """Compute the complete admitted factorization family Z(s)."""
 
-    generators = _minimal_generators(request.generators)
-    value = parse_canonical_integer(request.value)
+    atoms = _require_minimal_generators(request.generators)
+    value = _require_bounded_value(atoms, request.value)
+    _require_materializable_factorizations(atoms, value, MAX_MATERIALIZED_FACTORIZATIONS)
+    generators = list(atoms)
     minimal_generators = tuple(
         format_canonical_integer(generator) for generator in generators
     )
@@ -105,7 +104,9 @@ def compute_factorization_lengths(
 ) -> FactorizationLengthsComputeResult:
     """Compute the complete admitted factorization-length set."""
 
-    generators = _minimal_generators(request.generators)
+    atoms = _require_minimal_generators(request.generators)
+    _require_bounded_value(atoms, request.value)
+    generators = list(atoms)
     value = parse_canonical_integer(request.value)
     minimal_generators = tuple(
         format_canonical_integer(generator) for generator in generators
@@ -131,6 +132,14 @@ def compute_factorization_distance(
 ) -> FactorizationDistanceResult:
     """Compute the standard distance between two admitted factorizations."""
 
+    generators = _require_minimal_generators(request.generators)
+    value = _require_bounded_value(generators, request.value)
+    if any(c < 0 for c in (*request.first, *request.second)):
+        raise ValueError("factorization coordinates must be non-negative")
+    if len(request.first) != len(generators) or len(request.second) != len(generators):
+        raise ValueError("factorization coordinates must match the minimal generating system")
+    if any(sum(c * g for c, g in zip(f, generators, strict=True)) != value for f in (request.first, request.second)):
+        raise ValueError("both factorizations must evaluate to the declared value")
     first = tuple(request.first)
     second = tuple(request.second)
     return FactorizationDistanceResult(
@@ -146,8 +155,10 @@ def compute_factorization_graph(
 ) -> FactorizationGraphComputeResult:
     """Compute the exact shared-support graph of an admitted family."""
 
-    generators = _minimal_generators(request.generators)
-    value = parse_canonical_integer(request.value)
+    atoms = _require_minimal_generators(request.generators)
+    value = _require_bounded_value(atoms, request.value)
+    _require_materializable_factorizations(atoms, value, MAX_GRAPH_FACTORIZATIONS)
+    generators = list(atoms)
     minimal_generators = tuple(
         format_canonical_integer(generator) for generator in generators
     )

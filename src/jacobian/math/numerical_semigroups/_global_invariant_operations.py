@@ -6,13 +6,12 @@ from fractions import Fraction
 from itertools import pairwise
 
 from jacobian._exact import format_canonical_rational
-from jacobian.canonical import format_canonical_integer, parse_canonical_integer
+from jacobian.canonical import format_canonical_integer
 from jacobian.math.numerical_semigroups._algorithms import (
     betti_data,
     catenary_degree_from_factorizations,
     delta_periodicity_bound,
     factorizations,
-    minimal_generating_system,
 )
 from jacobian.math.numerical_semigroups._global_invariant_models import (
     BettiCatenaryDegree,
@@ -25,14 +24,12 @@ from jacobian.math.numerical_semigroups._global_invariant_models import (
     ElasticityRequest,
     ElasticityResult,
 )
-
-
-def _minimal_generators(generators: tuple[str, ...]) -> tuple[int, ...]:
-    """Normalize an admitted presentation to its minimal atom axis."""
-
-    return minimal_generating_system(
-        tuple(sorted({parse_canonical_integer(generator) for generator in generators}))
-    )
+from jacobian.math.numerical_semigroups._models import (
+    _require_global_betti_bound,
+    _require_global_catenary_bound,
+    _require_global_delta_bound,
+    _require_minimal_generators,
+)
 
 
 def _catenary_degree(atoms: tuple[int, ...], value: int) -> int:
@@ -46,7 +43,8 @@ def compute_betti_elements(
 ) -> BettiElementsResult:
     """Compute the complete Betti-element profile on the minimal atom axis."""
 
-    atoms = _minimal_generators(request.generators)
+    atoms = _require_minimal_generators(request.generators)
+    _require_global_betti_bound(atoms)
     apery, candidates, disconnected = betti_data(atoms)
     return BettiElementsResult._from_kernel(
         minimal_generators=tuple(format_canonical_integer(atom) for atom in atoms),
@@ -59,7 +57,8 @@ def compute_betti_elements(
 def compute_delta_set(request: DeltaSetRequest) -> DeltaSetResult:
     """Compute the complete global delta set through its periodicity bound."""
 
-    atoms = _minimal_generators(request.generators)
+    atoms = _require_minimal_generators(request.generators)
+    _require_global_delta_bound(atoms)
     periodicity_bound = delta_periodicity_bound(atoms)
     checked_through = periodicity_bound + atoms[-1] - 1
     all_deltas: set[int] = set()
@@ -86,7 +85,7 @@ def compute_delta_set(request: DeltaSetRequest) -> DeltaSetResult:
 def compute_elasticity(request: ElasticityRequest) -> ElasticityResult:
     """Compute the exact global elasticity from the minimal atom extrema."""
 
-    atoms = _minimal_generators(request.generators)
+    atoms = _require_minimal_generators(request.generators)
     return ElasticityResult(
         elasticity=format_canonical_rational(Fraction(atoms[-1], atoms[0])),
         smallest_generator=format_canonical_integer(atoms[0]),
@@ -99,7 +98,8 @@ def compute_catenary_degree(
 ) -> CatenaryDegreeResult:
     """Compute the global catenary degree from its complete Betti witnesses."""
 
-    atoms = _minimal_generators(request.generators)
+    atoms = _require_minimal_generators(request.generators)
+    _require_global_catenary_bound(atoms)
     _, _, disconnected = betti_data(atoms)
     degrees = tuple(
         BettiCatenaryDegree(
