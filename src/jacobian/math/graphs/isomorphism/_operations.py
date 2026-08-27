@@ -8,6 +8,9 @@ import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from pydantic_core import PydanticCustomError
+
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.isomorphism._canonicalization import (
     canonicalize_colored_graph_data,
 )
@@ -158,7 +161,14 @@ def compute_colored_graph_canonicalization(
     admission without constructing a wire request.
     """
 
-    return canonicalize_colored_graph_kernel(request.colored_graph)
+    try:
+        return canonicalize_colored_graph_kernel(request.colored_graph)
+    except PydanticCustomError as error:
+        raise OperationDomainValidationError(
+            location=("colored_graph",),
+            code=error.type,
+            message=str(error),
+        ) from error
 
 
 def canonicalize_colored_graph_kernel(

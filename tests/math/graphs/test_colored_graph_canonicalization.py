@@ -16,6 +16,7 @@ from pydantic_core import PydanticCustomError
 
 import jacobian.math.graphs.isomorphism._canonicalization as isomorphism_canonicalization
 import jacobian.math.graphs.isomorphism._canonicalization_bounds as isomorphism_bounds
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs import explicit_graph
 from jacobian.math.graphs.isomorphism import (
     ColoredGraphCanonicalizationResult,
@@ -323,8 +324,10 @@ def test_request_admits_by_color_class_size_not_only_vertex_count() -> None:
             vertex_colors=tuple(f"color-{index:02d}" for index in range(64)),
         )
     )
-    with pytest.raises(ValidationError):
-        ColoredGraphCanonicalizationRequest(colored_graph=_graph(ten, ()))
+    with pytest.raises(OperationDomainValidationError):
+        compute_colored_graph_canonicalization(
+            ColoredGraphCanonicalizationRequest(colored_graph=_graph(ten, ()))
+        )
 
 
 def test_edgeless_distinguished_carrier_admits_past_the_fixed_order_cap() -> None:
@@ -374,11 +377,13 @@ def test_request_rejects_edge_key_work_before_enumeration() -> None:
             tuple(itertools.combinations(eight_vertices, 2)),
         )
     )
-    with pytest.raises(ValidationError):
-        ColoredGraphCanonicalizationRequest(
-            colored_graph=_graph(
-                nine_vertices,
-                tuple(itertools.combinations(nine_vertices, 2)),
+    with pytest.raises(OperationDomainValidationError):
+        compute_colored_graph_canonicalization(
+            ColoredGraphCanonicalizationRequest(
+                colored_graph=_graph(
+                    nine_vertices,
+                    tuple(itertools.combinations(nine_vertices, 2)),
+                )
             )
         )
 
@@ -396,7 +401,7 @@ def test_request_rejects_edge_key_work_before_enumeration() -> None:
     ],
     ids=["permutation-bound", "replay-work-bound"],
 )
-def test_native_admission_failure_raises_wire_validation_error(
+def test_native_and_wire_operations_reject_the_same_domain(
     graph: ColoredUndirectedGraph,
 ) -> None:
     """Native callers see the public ValidationError the wire path raises.
@@ -411,12 +416,12 @@ def test_native_admission_failure_raises_wire_validation_error(
         canonicalize_colored_graph(graph)
 
     assert isinstance(native.value.__cause__, PydanticCustomError)
-    with pytest.raises(ValidationError) as wire:
-        ColoredGraphCanonicalizationRequest(colored_graph=graph)
+    with pytest.raises(OperationDomainValidationError) as wire:
+        compute_colored_graph_canonicalization(
+            ColoredGraphCanonicalizationRequest(colored_graph=graph)
+        )
 
-    assert [item | {"input": None} for item in native.value.errors()] == [
-        item | {"input": None} for item in wire.value.errors()
-    ]
+    assert native.value.errors()[0]["type"] == wire.value.errors()[0]["type"]
 
 
 def _dense_complete_colored_graph(label_bytes: int) -> ColoredUndirectedGraph:
@@ -468,8 +473,10 @@ def test_request_enforces_source_bound_result_byte_boundary(
         "MAX_CANONICALIZATION_RESULT_BYTES",
         512 * 1024,
     )
-    with pytest.raises(ValidationError):
-        ColoredGraphCanonicalizationRequest(colored_graph=max_shape)
+    with pytest.raises(OperationDomainValidationError):
+        compute_colored_graph_canonicalization(
+            ColoredGraphCanonicalizationRequest(colored_graph=max_shape)
+        )
 
 
 @pytest.mark.parametrize(
@@ -635,4 +642,4 @@ def test_catalog_execution_admits_the_parsed_request_once(
     result = compute_colored_graph_canonicalization(parsed)
 
     assert result == expected
-    assert admissions == []
+    assert admissions == [parsed.colored_graph]

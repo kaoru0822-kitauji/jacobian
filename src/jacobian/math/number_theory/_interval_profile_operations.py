@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import math
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.number_theory._interval_profile_models import (
     MAX_PROFILE_RESULT_BYTES,
     MAX_SIEVE_WORK,
@@ -49,19 +50,31 @@ def _admit_interval(request: IntervalProfileRequest) -> IntervalAdmission:
     max_width = type(request)._max_width
     width = request.width()
     if max_width is not None and width > max_width:
-        raise ValueError("interval width exceeds maximum supported width")
+        raise OperationDomainValidationError(
+            location=("upper_bound",),
+            code="number_theory.interval.width_bound",
+            message="interval width exceeds maximum supported width",
+        )
     estimated_result_bytes = type(request)._result_estimator(
         request.lower_bound, request.upper_bound
     )
     if estimated_result_bytes > MAX_PROFILE_RESULT_BYTES:
-        raise ValueError("interval result exceeds the canonical output budget")
+        raise OperationDomainValidationError(
+            location=("upper_bound",),
+            code="number_theory.interval.output_bound",
+            message="interval result exceeds the canonical output budget",
+        )
     estimated_work = type(request)._work_estimator(
         request.lower_bound, request.upper_bound
     )
     if estimated_work > MAX_SIEVE_WORK:
-        raise ValueError(
-            "interval exceeds the segmented-sieve work budget of "
-            f"{MAX_SIEVE_WORK} steps"
+        raise OperationDomainValidationError(
+            location=("upper_bound",),
+            code="number_theory.interval.work_bound",
+            message=(
+                "interval exceeds the segmented-sieve work budget of "
+                f"{MAX_SIEVE_WORK} steps"
+            ),
         )
     return IntervalAdmission(
         lower_bound=request.lower_bound,

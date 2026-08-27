@@ -3,7 +3,8 @@
 import pytest
 
 from jacobian.catalog.catalog import Catalog
-from jacobian.dispatch import OperationRequestValidationError, invoke_operation
+from jacobian.catalog.models import OperationDomainValidationError
+from jacobian.dispatch import invoke_operation
 from jacobian.math.number_theory._interval_profile_models import (
     MAX_INTERVAL_WIDTH,
     MAX_PROFILE_RESULT_BYTES,
@@ -119,10 +120,8 @@ def test_interval_profile_schemas_publish_coupled_admission_limits() -> None:
         )
 
 
-def test_row_profile_rejection_is_request_validation_at_the_catalog_boundary() -> None:
-    with pytest.raises(
-        OperationRequestValidationError, match="payload failed validation"
-    ):
+def test_row_profile_rejection_is_domain_validation_at_execution() -> None:
+    with pytest.raises(OperationDomainValidationError, match="output budget"):
         invoke_operation(
             "number_theory.integer_interval.divisor_count_profile.compute",
             {"lower_bound": 1, "upper_bound": MAX_INTERVAL_WIDTH},
