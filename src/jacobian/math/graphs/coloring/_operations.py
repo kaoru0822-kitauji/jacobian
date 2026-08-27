@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+import json
+import sys
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import Literal
+
 from jacobian.math.graphs.coloring._chromatic_number_models import (
     ChromaticNumberCertificateCheckRequest,
     ChromaticNumberCertificateCheckResult,
@@ -23,53 +29,148 @@ from jacobian.math.graphs.values import (
     IndexedSimpleUndirectedGraph,
     SimpleUndirectedGraph,
 )
+from jacobian.process import (
+    ProcessResourceLimits,
+    run_bounded_process,
+    worker_environment,
+)
+
+# ``max_conflicts`` bounds only Z3's search.  Formula construction and model
+# extraction remain executable work, so the owner also places the complete
+# transaction in a killable process with a deliberately generous fallback
+# envelope.  Its expiry carries no mathematical conclusion.
+_COLORING_WORKER = Path(__file__).with_name("_worker.py")
+_COLORING_WORKER_WALL_SECONDS = 30
+_WORKER_OUTPUT_BYTES = 64 * 1024
+_WORKER_ERROR_BYTES = 16_384
+_WORKER_ADDRESS_SPACE_BYTES = 1_536 * 1024 * 1024
+_WORKER_FILE_SIZE_BYTES = 1_024 * 1_024
+_ColoringWorkerOutcome = Literal["sat", "unsat", "budget_exceeded", "execution_failed"]
 
 
-def _run_k_colorability_solver(
+def _run_k_colorability_solver_kernel(
     graph: IndexedSimpleUndirectedGraph,
     colors: int,
     solver_conflicts: int,
-) -> tuple[str, tuple[int, ...] | None]:
+) -> tuple[_ColoringWorkerOutcome, tuple[int, ...] | None]:
     """Run the existing bounded vertex-coloring Z3 adapter once."""
 
     import z3  # type: ignore[import-untyped]
 
-    solver = z3.Solver()
-    solver.set("max_conflicts", solver_conflicts)
-    vertex_colors = [z3.Int(f"color_{vertex}") for vertex in range(graph.vertex_count)]
-    solver.add(*(z3.And(color >= 0, color < colors) for color in vertex_colors))
-    solver.add(*(vertex_colors[u] != vertex_colors[v] for u, v in graph.edges))
-    outcome = solver.check()
-    if outcome == z3.sat:
-        model = solver.model()
-        return "sat", tuple(model.eval(color).as_long() for color in vertex_colors)
-    if outcome == z3.unsat:
-        return "unsat", None
-    return "unknown", None
+    try:
+        solver = z3.Solver()
+        solver.set("max_conflicts", solver_conflicts)
+        vertex_colors = [
+            z3.Int(f"color_{vertex}") for vertex in range(graph.vertex_count)
+        ]
+        solver.add(*(z3.And(color >= 0, color < colors) for color in vertex_colors))
+        solver.add(*(vertex_colors[u] != vertex_colors[v] for u, v in graph.edges))
+        outcome = solver.check()
+        if outcome == z3.sat:
+            model = solver.model()
+            return "sat", tuple(model.eval(color).as_long() for color in vertex_colors)
+        if outcome == z3.unsat:
+            return "unsat", None
+        return (
+            "budget_exceeded"
+            if "max-conflicts-reached" in solver.reason_unknown()
+            else "execution_failed",
+            None,
+        )
+    except z3.Z3Exception:
+        return "execution_failed", None
 
 
-def _run_edge_coloring_solver(
+def _run_edge_coloring_solver_kernel(
     graph: SimpleUndirectedGraph,
     colors: int,
     solver_conflicts: int,
-) -> tuple[str, tuple[int, ...] | None]:
+) -> tuple[_ColoringWorkerOutcome, tuple[int, ...] | None]:
     """Run the existing bounded edge-coloring Z3 adapter once."""
 
     import z3
 
-    solver = z3.Solver()
-    solver.set("max_conflicts", solver_conflicts)
-    edge_colors = [z3.Int(f"c_{index}") for index in range(len(graph.edges))]
-    solver.add(*(z3.And(color >= 0, color < colors) for color in edge_colors))
-    for first, second in _incident_edge_index_pairs_for_canonical_graph(graph):
-        solver.add(edge_colors[first] != edge_colors[second])
-    outcome = solver.check()
-    if outcome == z3.sat:
-        model = solver.model()
-        return "sat", tuple(model.eval(color).as_long() for color in edge_colors)
-    if outcome == z3.unsat:
-        return "unsat", None
-    return "unknown", None
+    try:
+        solver = z3.Solver()
+        solver.set("max_conflicts", solver_conflicts)
+        edge_colors = [z3.Int(f"c_{index}") for index in range(len(graph.edges))]
+        solver.add(*(z3.And(color >= 0, color < colors) for color in edge_colors))
+        for first, second in _incident_edge_index_pairs_for_canonical_graph(graph):
+            solver.add(edge_colors[first] != edge_colors[second])
+        outcome = solver.check()
+        if outcome == z3.sat:
+            model = solver.model()
+            return "sat", tuple(model.eval(color).as_long() for color in edge_colors)
+        if outcome == z3.unsat:
+            return "unsat", None
+        return (
+            "budget_exceeded"
+            if "max-conflicts-reached" in solver.reason_unknown()
+            else "execution_failed",
+            None,
+        )
+    except z3.Z3Exception:
+        return "execution_failed", None
+
+
+def _run_coloring_worker(
+    kind: Literal["vertex", "edge"],
+    graph: IndexedSimpleUndirectedGraph | SimpleUndirectedGraph,
+    colors: int,
+    solver_conflicts: int,
+) -> tuple[_ColoringWorkerOutcome, tuple[int, ...] | None]:
+    """Run one complete coloring solver transaction in an isolated worker."""
+
+    try:
+        with TemporaryDirectory(prefix="jacobian-graph-coloring-") as directory:
+            completed = run_bounded_process(
+                [sys.executable, str(_COLORING_WORKER)],
+                input_bytes=json.dumps(
+                    {
+                        "kind": kind,
+                        "graph": graph.model_dump(mode="json"),
+                        "colors": colors,
+                        "solver_conflicts": solver_conflicts,
+                    },
+                    separators=(",", ":"),
+                    ensure_ascii=False,
+                ).encode("utf-8"),
+                timeout_seconds=_COLORING_WORKER_WALL_SECONDS,
+                environment=worker_environment(locale="C.UTF-8"),
+                stdout_limit=_WORKER_OUTPUT_BYTES,
+                stderr_limit=_WORKER_ERROR_BYTES,
+                resource_limits=ProcessResourceLimits(
+                    cpu_seconds=_COLORING_WORKER_WALL_SECONDS,
+                    address_space_bytes=_WORKER_ADDRESS_SPACE_BYTES,
+                    file_size_bytes=_WORKER_FILE_SIZE_BYTES,
+                ),
+                cwd=directory,
+            )
+    except OSError:
+        return "execution_failed", None
+    if (
+        completed.timed_out
+        or completed.cancelled
+        or completed.stdout_exceeded
+        or completed.stderr_exceeded
+        or completed.returncode != 0
+    ):
+        return "execution_failed", None
+    try:
+        payload = json.loads(completed.stdout.decode("utf-8"))
+        outcome = payload["outcome"]
+        coloring = payload["coloring"]
+        if outcome not in {"sat", "unsat", "budget_exceeded", "execution_failed"}:
+            raise ValueError("worker returned an invalid solver outcome")
+        if coloring is None:
+            return outcome, None
+        if not isinstance(coloring, list) or not all(
+            isinstance(value, int) and not isinstance(value, bool) for value in coloring
+        ):
+            raise ValueError("worker returned an invalid coloring")
+        return outcome, tuple(coloring)
+    except (UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError, ValueError):
+        return "execution_failed", None
 
 
 def compute_chromatic_number_certificate_check(
@@ -137,8 +238,8 @@ def compute_k_colorability(request: KColorabilityRequest) -> KColorabilityResult
     separately supplied negative or incomplete claims may be replayed through
     the explicit verifier.
     """
-    outcome, coloring = _run_k_colorability_solver(
-        request.graph, request.colors, request.solver_conflicts
+    outcome, coloring = _run_coloring_worker(
+        "vertex", request.graph, request.colors, request.solver_conflicts
     )
     if outcome == "sat":
         if coloring is None:
@@ -166,7 +267,11 @@ def compute_k_colorability(request: KColorabilityRequest) -> KColorabilityResult
         graph=request.graph,
         colors=request.colors,
         solver_conflicts=request.solver_conflicts,
-        status="SOLVER_BUDGET_EXCEEDED",
+        status=(
+            "SOLVER_BUDGET_EXCEEDED"
+            if outcome == "budget_exceeded"
+            else "EXECUTION_FAILED"
+        ),
         colorable=None,
         coloring=None,
     )
@@ -177,11 +282,13 @@ def verify_k_colorability_result(result: KColorabilityResult) -> bool:
 
     if result.status == "DECIDED" and result.colorable is True:
         return True
-    outcome, _coloring = _run_k_colorability_solver(
-        result.graph, result.colors, result.solver_conflicts
+    outcome, _coloring = _run_coloring_worker(
+        "vertex", result.graph, result.colors, result.solver_conflicts
     )
     if result.status == "SOLVER_BUDGET_EXCEEDED":
-        return outcome == "unknown"
+        return outcome == "budget_exceeded"
+    if result.status == "EXECUTION_FAILED":
+        return False
     return outcome == "unsat"
 
 
@@ -245,8 +352,8 @@ def compute_edge_k_colorability(
 
     if not edges:
         return _colorable_result(())
-    outcome, coloring = _run_edge_coloring_solver(
-        request.graph, request.colors, request.solver_conflicts
+    outcome, coloring = _run_coloring_worker(
+        "edge", request.graph, request.colors, request.solver_conflicts
     )
     if outcome == "sat":
         if coloring is None:
@@ -267,7 +374,11 @@ def compute_edge_k_colorability(
         graph=request.graph,
         colors=request.colors,
         solver_conflicts=request.solver_conflicts,
-        status="SOLVER_BUDGET_EXCEEDED",
+        status=(
+            "SOLVER_BUDGET_EXCEEDED"
+            if outcome == "budget_exceeded"
+            else "EXECUTION_FAILED"
+        ),
         colorable=None,
         coloring=None,
     )
@@ -278,11 +389,13 @@ def verify_edge_k_colorability_result(result: EdgeKColorabilityResult) -> bool:
 
     if result.status == "DECIDED" and result.colorable is True:
         return True
-    outcome, _coloring = _run_edge_coloring_solver(
-        result.graph, result.colors, result.solver_conflicts
+    outcome, _coloring = _run_coloring_worker(
+        "edge", result.graph, result.colors, result.solver_conflicts
     )
     if result.status == "SOLVER_BUDGET_EXCEEDED":
-        return outcome == "unknown"
+        return outcome == "budget_exceeded"
+    if result.status == "EXECUTION_FAILED":
+        return False
     return outcome == "unsat"
 
 
