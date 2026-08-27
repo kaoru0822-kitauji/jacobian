@@ -3,7 +3,6 @@
 from fractions import Fraction
 
 import pytest
-from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
 from jacobian.math.finite_game_theory._models import (
@@ -62,22 +61,20 @@ class TestBestResponse:
 class TestNashEquilibrium:
     def test_payoffs_must_bound_exact_strategy_growth(self) -> None:
         large = 10**32_767
-        with pytest.raises(ValidationError) as exc_info:
-            NashEquilibriumRequest(
-                payoff_matrix=PayoffMatrix(
-                    n_rows=2,
-                    n_cols=2,
-                    entries=(
-                        _r(Fraction(1, large - 1)),
-                        _r(0),
-                        _r(0),
-                        _r(Fraction(1, large - 2)),
-                    ),
-                )
+        request = NashEquilibriumRequest(
+            payoff_matrix=PayoffMatrix(
+                n_rows=2,
+                n_cols=2,
+                entries=(
+                    _r(Fraction(1, large - 1)),
+                    _r(0),
+                    _r(0),
+                    _r(Fraction(1, large - 2)),
+                ),
             )
-        assert (
-            exc_info.value.errors()[0]["type"] == "finite_game.exact_equilibrium_budget"
         )
+        with pytest.raises(ValueError, match="exact-equilibrium work bound"):
+            compute_nash_equilibrium(request)
 
     def test_pure_strategy(self) -> None:
         req = NashEquilibriumRequest(

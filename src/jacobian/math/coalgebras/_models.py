@@ -152,10 +152,6 @@ class Coalgebra(StrictModel):
             raise _validation_error(
                 "counit_shape", "counit must have dimension entries"
             )
-        from sympy import isprime
-
-        if not isprime(self.prime):
-            raise _validation_error("prime_not_prime", "prime must be a prime integer")
         self._require_canonical_residues()
         return self
 
@@ -451,10 +447,14 @@ __all__ = [
 def require_coalgebra_admission(coalgebra: Coalgebra) -> None:
     """Check tensor, field, and coalgebra axioms at operation execution time."""
 
+    _require_admitted_prime_digits(coalgebra.prime)
+    from sympy import isprime
+
+    if not isprime(coalgebra.prime):
+        raise _validation_error("prime_not_prime", "prime must be a prime integer")
     if coalgebra.dimension**3 > MAX_TENSOR_ENTRIES:
         raise _validation_error(
             "tensor_budget_exceeded",
             f"coalgebra admission allows at most {MAX_TENSOR_ENTRIES} structure constants",
         )
-    _require_admitted_prime_digits(coalgebra.prime)
     coalgebra._require_coalgebra_axioms()

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from itertools import product
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.coalgebras._models import (
     GROUP_LIKE_SCAN_WORK_BUDGET,
     Coalgebra,
@@ -117,7 +118,11 @@ def find_group_like_elements(
     require_coalgebra_admission(request.coalgebra)
     work = group_like_scan_work(request.coalgebra.prime, request.coalgebra.dimension)
     if work > GROUP_LIKE_SCAN_WORK_BUDGET:
-        raise ValueError("group-like enumeration scan work exceeds the documented budget")
+        raise OperationDomainValidationError(
+            location=("coalgebra",),
+            code="coalgebra.scan_work_budget_exceeded",
+            message="group-like enumeration scan work exceeds the documented budget",
+        )
     ca = request.coalgebra
     found = _group_like_coefficients(ca)
 

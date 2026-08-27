@@ -346,18 +346,15 @@ class TestHomomorphismProfile:
         target = FiniteAlgebra(
             carrier=(oversized_label + "y",), operations=(), tables=()
         )
-        with pytest.raises(ValidationError) as error:
-            HomomorphismProfileRequest(
-                carrier_map=FiniteAlgebraCarrierMap(
-                    source=source,
-                    target=target,
-                    mapping=(0,),
-                )
+        request = HomomorphismProfileRequest(
+            carrier_map=FiniteAlgebraCarrierMap(
+                source=source,
+                target=target,
+                mapping=(0,),
             )
-        assert (
-            error.value.errors()[0]["type"]
-            == "universal_algebra.carrier_map_output_exceeded"
         )
+        with pytest.raises(ValueError, match="output"):
+            compute_homomorphism_profile(request)
 
 
 # ---------------------------------------------------------------------------
@@ -422,12 +419,9 @@ class TestQuotient:
             tables=(),
         )
 
-        with pytest.raises(ValidationError) as error:
-            QuotientRequest(algebra=source, partition=((0,),))
-        assert (
-            error.value.errors()[0]["type"]
-            == "universal_algebra.quotient_output_exceeded"
-        )
+        request = QuotientRequest(algebra=source, partition=((0,),))
+        with pytest.raises(ValueError, match="output"):
+            compute_quotient(request)
 
     def test_quotient_charges_construction_work(self) -> None:
         def constant_ternary_algebra(size: int) -> FiniteAlgebra:
@@ -445,15 +439,12 @@ class TestQuotient:
         assert len(accepted.partition) == accepted_size
 
         rejected_size = 24
-        with pytest.raises(ValidationError) as error:
-            QuotientRequest(
-                algebra=constant_ternary_algebra(rejected_size),
-                partition=tuple((index,) for index in range(rejected_size)),
-            )
-        assert (
-            error.value.errors()[0]["type"]
-            == "universal_algebra.quotient_work_exceeded"
+        request = QuotientRequest(
+            algebra=constant_ternary_algebra(rejected_size),
+            partition=tuple((index,) for index in range(rejected_size)),
         )
+        with pytest.raises(ValueError, match="work"):
+            compute_quotient(request)
 
 
 # ---------------------------------------------------------------------------
@@ -536,21 +527,16 @@ class TestValidation:
             ),
             root=1,
         )
-        with pytest.raises(ValidationError) as error:
-            EvaluateRequest(
-                algebra=_boolean_algebra(), term=wrong_arity, assignment=(0,)
-            )
-        assert (
-            error.value.errors()[0]["type"] == "universal_algebra.term_arity_mismatch"
+        wrong_request = EvaluateRequest(
+            algebra=_boolean_algebra(), term=wrong_arity, assignment=(0,)
         )
-        with pytest.raises(ValidationError) as error:
-            EvaluateRequest(
-                algebra=_boolean_algebra(), term=_and_term(), assignment=(0,)
-            )
-        assert (
-            error.value.errors()[0]["type"]
-            == "universal_algebra.assignment_length_mismatch"
+        with pytest.raises(ValueError, match="arity"):
+            compute_evaluate(wrong_request)
+        short_request = EvaluateRequest(
+            algebra=_boolean_algebra(), term=_and_term(), assignment=(0,)
         )
+        with pytest.raises(ValueError, match="assignment"):
+            compute_evaluate(short_request)
 
     @pytest.mark.parametrize("partition", [((0,),), ((), (0, 1)), ((0, 1), (1,))])
     def test_partition_must_be_nonempty_disjoint_exact_cover(
@@ -566,17 +552,14 @@ class TestValidation:
             tables=(),
         )
         term = _variable_term(0)
-        with pytest.raises(ValidationError) as error:
-            EquationProfileRequest(
-                algebra=algebra,
-                left=term,
-                right=term,
-                variable_count=7,
-            )
-        assert (
-            error.value.errors()[0]["type"]
-            == "universal_algebra.equation_profile_work_exceeded"
+        request = EquationProfileRequest(
+            algebra=algebra,
+            left=term,
+            right=term,
+            variable_count=7,
         )
+        with pytest.raises(ValueError, match="assignment work"):
+            compute_equation_profile(request)
 
     def test_carrier_map_rejects_incomplete_or_wrong_signature_input(self) -> None:
         source = _boolean_algebra()

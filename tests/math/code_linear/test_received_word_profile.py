@@ -43,6 +43,13 @@ def _validation_error(code: str) -> Iterator[None]:
     assert code in exc_info.value.errors()[0]["type"]
 
 
+@contextmanager
+def _operation_error(code: str) -> Iterator[None]:
+    with pytest.raises(ValueError) as exc_info:
+        yield
+    assert exc_info.value.errors()[0]["type"] == code
+
+
 def _encoder(
     generator: tuple[tuple[int, ...], ...],
     *,
@@ -397,8 +404,9 @@ def test_work_bound_still_rejects_before_enumeration() -> None:
         )
 
     assert rectangular_identity(28).profile_replay_work == 2_981_888
-    with _validation_error("replay_work"):
-        rectangular_identity(29)
+    request = rectangular_identity(29)
+    with _operation_error("code_linear.profile_replay_work_exceeded"):
+        compute_received_word_profile(request)
 
 
 def test_codeword_budget_is_derived_from_the_replay_work_bound() -> None:
@@ -414,11 +422,12 @@ def test_codeword_budget_is_derived_from_the_replay_work_bound() -> None:
     assert admitted.encoder.codeword_count == MAX_RECEIVED_PROFILE_CODEWORDS
     assert admitted.profile_replay_work == 2_491_752
 
-    with _validation_error("replay_work"):
-        ReceivedWordProfileRequest(
+    over_budget = ReceivedWordProfileRequest(
             encoder=_encoder(identity, field_order=53),
             received_word=(0, 0, 0),
         )
+    with _operation_error("code_linear.profile_replay_work_exceeded"):
+        compute_received_word_profile(over_budget)
 
 
 def test_all_witness_output_has_a_separate_preflight_bound() -> None:
@@ -433,8 +442,7 @@ def test_all_witness_output_has_a_separate_preflight_bound() -> None:
         threshold=_threshold("DISTANCE", "GE", 0),
         witness_mode="FIRST",
     )
-    with _validation_error("witness_cells"):
-        ReceivedWordProfileRequest.model_validate(
+    all_witness = ReceivedWordProfileRequest.model_validate(
             {
                 "encoder": encoder,
                 "received_word": (0,) * 32,
@@ -446,6 +454,8 @@ def test_all_witness_output_has_a_separate_preflight_bound() -> None:
                 "witness_mode": "ALL",
             }
         )
+    with _operation_error("code_linear.witness_cells_exceeded"):
+        compute_received_word_profile(all_witness)
 
 
 def test_all_witness_bound_uses_the_threshold_hamming_ball() -> None:

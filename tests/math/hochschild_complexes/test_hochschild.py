@@ -160,12 +160,15 @@ class TestHochschildAdmissionAndTopDegree:
             ((0, 0), (0, 0)),
             ((1, 0), (0, 0)),
         )
-        with _validation_error("hochschild_complex.associativity"):
-            AlgebraStructure(
+        algebra = AlgebraStructure(
                 prime=5,
                 dimension=2,
                 structure_constants=c,
                 augmentation=(0, 0),
+            )
+        with pytest.raises(ValueError, match="associative"):
+            compute_hochschild_chain_complex(
+                HochschildChainComplexRequest(algebra=algebra, max_degree=1)
             )
 
     def test_top_degree_uses_extra_differential(self) -> None:
@@ -187,10 +190,12 @@ class TestHochschildAdmissionAndTopDegree:
         """GF(2)^7 at max_degree=4 passes the tensor budget but not the matrix budget."""
         alg = _coordinatewise_algebra(2, 7)
         assert alg.dimension ** (4 + 1) <= 20_000
-        with _validation_error("hochschild_complex.matrix_budget"):
-            HochschildHomologyRequest(algebra=alg, max_degree=4)
-        with _validation_error("hochschild_complex.matrix_budget"):
-            HochschildChainComplexRequest(algebra=alg, max_degree=4)
+        with pytest.raises(ValueError, match="matrix"):
+            compute_hochschild_homology(HochschildHomologyRequest(algebra=alg, max_degree=4))
+        with pytest.raises(ValueError, match="matrix"):
+            compute_hochschild_chain_complex(
+                HochschildChainComplexRequest(algebra=alg, max_degree=4)
+            )
 
     def test_largest_admitted_homology_request(self) -> None:
         """The densest admitted elimination stays inside the entry budget."""
@@ -232,8 +237,11 @@ class TestHochschildAdmissionAndTopDegree:
         boundary = 25
         assert 2 * boundary**5 <= MAX_ASSOCIATIVITY_DOT_STEPS
         assert 2 * (boundary + 1) ** 5 > MAX_ASSOCIATIVITY_DOT_STEPS
-        with _validation_error("hochschild_complex.associativity_budget"):
-            _coordinatewise_algebra(2, boundary + 1)
+        algebra = _coordinatewise_algebra(2, boundary + 1)
+        with pytest.raises(ValueError, match="associativity"):
+            compute_hochschild_chain_complex(
+                HochschildChainComplexRequest(algebra=algebra, max_degree=1)
+            )
 
     def test_structure_input_budget_rejected(self) -> None:
         """Multiplication tables beyond the dense-payload entry budget fail."""
@@ -243,15 +251,19 @@ class TestHochschildAdmissionAndTopDegree:
 
         oversized = 51
         assert oversized**3 > MAX_STRUCTURE_CONSTANT_ENTRIES
-        with _validation_error("hochschild_complex.input_budget"):
-            _coordinatewise_algebra(2, oversized)
+        algebra = _coordinatewise_algebra(2, oversized)
+        with pytest.raises(ValueError, match="structure"):
+            compute_hochschild_chain_complex(
+                HochschildChainComplexRequest(algebra=algebra, max_degree=1)
+            )
 
     def test_request_budgets_bind_above_the_old_dimension_ceiling(self) -> None:
         """Larger admitted algebras still face the per-request envelopes."""
-        with _validation_error("hochschild_complex.tensor_budget"):
-            HochschildHomologyRequest(
-                algebra=_coordinatewise_algebra(2, 10), max_degree=4
-            )
+        request = HochschildHomologyRequest(
+            algebra=_coordinatewise_algebra(2, 10), max_degree=4
+        )
+        with pytest.raises(ValueError, match="tensor"):
+            compute_hochschild_homology(request)
 
 
 class TestChainComplexSourceBinding:
@@ -496,8 +508,7 @@ class TestAugmentationEndpointFaces:
 
     def test_non_multiplicative_augmentation_rejected(self) -> None:
         """An augmentation that is not an algebra map must fail admission."""
-        with _validation_error("hochschild_complex.augmentation_homomorphism"):
-            AlgebraStructure(
+        algebra = AlgebraStructure(
                 prime=5,
                 dimension=2,
                 structure_constants=(
@@ -505,6 +516,10 @@ class TestAugmentationEndpointFaces:
                     ((0, 1), (0, 0)),
                 ),
                 augmentation=(1, 1),
+            )
+        with pytest.raises(ValueError, match="augmentation"):
+            compute_hochschild_chain_complex(
+                HochschildChainComplexRequest(algebra=algebra, max_degree=1)
             )
 
     def test_noncanonical_and_mismatched_augmentation_rejected(self) -> None:

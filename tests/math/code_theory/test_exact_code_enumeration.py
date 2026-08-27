@@ -23,6 +23,12 @@ def _assert_validation_error_code(factory: Callable[[], object], code: str) -> N
     assert exc_info.value.errors()[0]["type"] == code
 
 
+def _assert_operation_error(factory: Callable[[], object], code: str) -> None:
+    with pytest.raises(ValueError) as exc_info:
+        factory()
+    assert exc_info.value.errors()[0]["type"] == code
+
+
 def test_prime_field_code_enumeration_uses_the_declared_matrix() -> None:
     request = LinearCodeRequest(field_order=2, generator_matrix=((1, 1),))
 
@@ -37,12 +43,16 @@ def test_code_weight_distribution_counts_distinct_words_for_dependent_rows() -> 
 
 
 def test_code_contract_rejects_nonprime_fields_and_unbounded_enumeration() -> None:
-    _assert_validation_error_code(
-        lambda: LinearCodeRequest(field_order=4, generator_matrix=((1,),)),
+    _assert_operation_error(
+        lambda: compute_min_distance(
+            LinearCodeRequest(field_order=4, generator_matrix=((1,),))
+        ),
         "code_theory.field_order_not_prime",
     )
-    _assert_validation_error_code(
-        lambda: LinearCodeRequest(field_order=251, generator_matrix=((1,),) * 3),
+    _assert_operation_error(
+        lambda: compute_min_distance(
+            LinearCodeRequest(field_order=251, generator_matrix=((1,),) * 3)
+        ),
         "code_theory.enumeration_work_exceeded",
     )
 
@@ -145,11 +155,11 @@ def test_zero_code_has_covering_radius_equal_to_length() -> None:
 def test_covering_radius_contract_rejects_dependent_row_state_space_hole() -> None:
     repeated_row = (1, 0, 0, 0, 0, 0, 0, 0)
 
-    _assert_validation_error_code(
-        lambda: CoveringRadiusRequest(
+    _assert_operation_error(
+        lambda: compute_covering_radius(CoveringRadiusRequest(
             field_order=251,
             generator_matrix=(repeated_row,) * 8,
-        ),
+        )),
         "code_theory.syndrome_state_bound_exceeded",
     )
 
@@ -159,21 +169,21 @@ def test_covering_radius_contract_rejects_excessive_transition_work() -> None:
         tuple(1 if column == row else 0 for column in range(18)) for row in range(8)
     )
 
-    _assert_validation_error_code(
-        lambda: CoveringRadiusRequest(
+    _assert_operation_error(
+        lambda: compute_covering_radius(CoveringRadiusRequest(
             field_order=3,
             generator_matrix=generator_matrix,
-        ),
+        )),
         "code_theory.syndrome_transition_bound_exceeded",
     )
 
 
 def test_covering_radius_contract_rejects_nonprime_field() -> None:
-    _assert_validation_error_code(
-        lambda: CoveringRadiusRequest(
+    _assert_operation_error(
+        lambda: compute_covering_radius(CoveringRadiusRequest(
             field_order=4,
             generator_matrix=((1, 1),),
-        ),
+        )),
         "code_theory.field_order_not_prime",
     )
 
@@ -306,8 +316,10 @@ def test_enumeration_budget_charges_the_selected_kernel_path() -> None:
     assert compute_min_distance(boundary).minimum_distance == 1
     assert compute_weight_dist(boundary).weights == ((0, 1), (1, 250))
 
-    _assert_validation_error_code(
-        lambda: LinearCodeRequest(field_order=251, generator_matrix=((1,),) * 3),
+    _assert_operation_error(
+        lambda: compute_min_distance(
+            LinearCodeRequest(field_order=251, generator_matrix=((1,),) * 3)
+        ),
         "code_theory.enumeration_work_exceeded",
     )
 
@@ -333,10 +345,10 @@ def test_covering_radius_budget_charges_the_selected_bfs_path() -> None:
     assert states == MAX_COVERING_RADIUS_STATES_PER_PASS
     assert states * 24 * SYNDROME_BFS_PASSES <= MAX_COVERING_RADIUS_TRANSITIONS
 
-    _assert_validation_error_code(
-        lambda: CoveringRadiusRequest(
+    _assert_operation_error(
+        lambda: compute_covering_radius(CoveringRadiusRequest(
             field_order=2,
             generator_matrix=tuple(row + (1,) * 17 for row in identity),
-        ),
+        )),
         "code_theory.syndrome_state_bound_exceeded",
     )

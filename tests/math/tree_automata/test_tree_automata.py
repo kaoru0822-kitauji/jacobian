@@ -1023,6 +1023,6 @@ class TestValidation:
             final_states=(0,),
         )
 
-        with pytest.raises(ValidationError) as exc:
-            AcceptedTreeCountRequest(automaton=automaton, tree_size=100)
-        _assert_validation_code(exc, "tree_automata.count_work_bound")
+        request = AcceptedTreeCountRequest(automaton=automaton, tree_size=100)
+        with pytest.raises(ValueError, match="work"):
+            compute_accepted_tree_count(request)
