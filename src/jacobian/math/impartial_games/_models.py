@@ -8,7 +8,6 @@ from pydantic import Field, StrictBool, StrictInt, model_validator
 from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
-from jacobian.math.impartial_games._nim_admission import nim_option_plan
 from jacobian.math.impartial_games.values import (
     MAX_HEAP_BOUND,
     MAX_HEAP_SIZE,
@@ -255,12 +254,6 @@ class NimOptionsRequest(StrictModel):
             "Canonical sorted heap multiset whose one-move option family is requested."
         )
     )
-
-    @model_validator(mode="after")
-    def require_bounded_complete_family(self) -> Self:
-        nim_option_plan(self.position)
-        return self
-
 
 class NimOptionsResult(NimOptionsRequest):
     """Every distinct legal one-heap reduction, in option-position order."""

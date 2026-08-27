@@ -29,6 +29,8 @@ from jacobian.math.incidence_structures._models import (
     LeviGraphResult,
     RestrictionRequest,
     RestrictionResult,
+    _require_containment_profile_admitted,
+    _require_incidence_trade_admitted,
 )
 
 type _SubsetProfile = tuple[tuple[tuple[str, ...], int], ...]
@@ -155,6 +157,7 @@ def compute_containment_profile(
     request: ContainmentProfileRequest,
 ) -> ContainmentProfileResult:
     """Compute t-subset containment multiplicity profiles."""
+    _require_containment_profile_admitted(request.incidence, request.t)
     return ContainmentProfileResult._from_kernel(
         request.incidence,
         request.t,
@@ -164,6 +167,8 @@ def compute_containment_profile(
 
 def compute_incidence_trade(request: IncidenceTradeRequest) -> IncidenceTradeResult:
     """Compare two indexed block families through a positive subset order."""
+
+    _require_incidence_trade_admitted(request.left, request.right, request.max_order)
 
     zeroth_difference, comparisons, _positive_moments_equal = _incidence_trade_data(
         request.left, request.right, request.max_order

@@ -271,15 +271,6 @@ class ContainmentProfileRequest(StrictModel):
         description="Subset order for the complete containment profile.",
     )
 
-    @model_validator(mode="after")
-    def require_complete_profile_bounded(self) -> Self:
-        try:
-            _require_containment_profile_admitted(self.incidence, self.t)
-        except IncidenceStructureAdmissionError as exc:
-            raise _validation_error(exc.reason, str(exc)) from None
-        return self
-
-
 class ContainmentProfileResult(StrictModel):
     """One complete fixed-order profile bound to its indexed block family."""
 
@@ -504,15 +495,6 @@ class IncidenceTradeRequest(StrictModel):
             "budgets fit; the schema ceiling is a conservative fallback."
         ),
     )
-
-    @model_validator(mode="after")
-    def require_trade_comparison_bounded(self) -> Self:
-        try:
-            _require_incidence_trade_admitted(self.left, self.right, self.max_order)
-        except IncidenceStructureAdmissionError as exc:
-            raise _validation_error(exc.reason, str(exc)) from None
-        return self
-
 
 class IncidenceTradeResult(StrictModel):
     """An exact through-order comparison bound to both indexed block families."""

@@ -119,15 +119,19 @@ def test_nim_options_preflight_distinguishes_raw_and_distinct_counts() -> None:
     assert sum(set(exact_distinct)) == MAX_NIM_DISTINCT_OPTIONS
     NimOptionsRequest(position=NimPosition(heaps=exact_distinct))
 
-    with pytest.raises(ValidationError):
-        NimOptionsRequest(
-            position=NimPosition(heaps=(16, 9_995, 9_996, 9_997, 9_998, 9_999))
+    with pytest.raises(ValueError):
+        compute_nim_options(
+            NimOptionsRequest(
+                position=NimPosition(heaps=(16, 9_995, 9_996, 9_997, 9_998, 9_999))
+            )
         )
 
 
 def test_nim_options_reject_result_bytes_before_option_expansion() -> None:
-    with pytest.raises(ValidationError):
-        NimOptionsRequest(position=NimPosition(heaps=tuple(range(951, 1_001))))
+    with pytest.raises(ValueError):
+        compute_nim_options(
+            NimOptionsRequest(position=NimPosition(heaps=tuple(range(951, 1_001))))
+        )
 
 
 def test_nim_options_result_is_source_bound_and_canonical_json_bounded() -> None:
