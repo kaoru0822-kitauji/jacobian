@@ -184,10 +184,11 @@ class TestEnumeration:
 
     def test_contranominal_context_beyond_result_budget_is_rejected(self) -> None:
         """A 21x21 contranominal context has exactly 2^21 concepts, beyond
-        the declared enumeration budget: admission must reject it with one
-        capped preflight instead of raising mid-enumeration."""
-        with pytest.raises(ValidationError):
-            EnumerateConceptsRequest(context=self._contranominal(21))
+        the declared enumeration budget: native admission rejects it during
+        execution rather than hiding enumeration inside wire parsing."""
+        request = EnumerateConceptsRequest(context=self._contranominal(21))
+        with pytest.raises(ValueError, match="concept count exceeds"):
+            compute_enumerate_concepts(request)
 
     def test_empty_square_context_beyond_worst_case_stays_admissible(self) -> None:
         """A 14x14 empty-incidence context has worst case 2^14 but only two
@@ -250,8 +251,8 @@ class TestEnumeration:
             "actual_length": 65,
         }
 
-    def test_wide_admission_reuses_its_one_exact_concept_enumeration(self) -> None:
-        """The exact wide-context admission probe is the served family."""
+    def test_wide_context_is_admitted_by_the_native_operation(self) -> None:
+        """Wire parsing stays structural while each native operation admits work."""
         context = FormalContext(
             objects=tuple(f"o{index}" for index in range(14)),
             attributes=tuple(f"a{index}" for index in range(14)),

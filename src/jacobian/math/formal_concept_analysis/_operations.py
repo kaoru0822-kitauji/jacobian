@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+from jacobian.math.formal_concept_analysis._concepts import enumerate_concept_pairs
 from jacobian.math.formal_concept_analysis._models import (
     AttributeSubsetRequest,
     ClosureResult,
@@ -110,7 +111,7 @@ def compute_concept_from_attributes(request: AttributeSubsetRequest) -> ConceptR
 def compute_enumerate_concepts(
     request: EnumerateConceptsRequest,
 ) -> EnumerateConceptsResult:
-    concepts = request._concepts_for_execution()
+    concepts = enumerate_concept_pairs(request.context)
     return EnumerateConceptsResult(
         concepts=concepts,
         count=len(concepts),
@@ -120,7 +121,9 @@ def compute_enumerate_concepts(
 def compute_concept_lattice(
     request: EnumerateConceptsRequest,
 ) -> ConceptLatticeResult:
-    result = _concept_lattice_from_canonical_concepts(request._concepts_for_execution())
+    result = _concept_lattice_from_canonical_concepts(
+        enumerate_concept_pairs(request.context)
+    )
     concepts = cast(list[Any], result["concepts"])
     return ConceptLatticeResult(
         concepts=tuple(

@@ -4,14 +4,11 @@ from __future__ import annotations
 
 from typing import Self
 
-from pydantic import ConfigDict, Field, PrivateAttr, StrictInt, model_validator
+from pydantic import ConfigDict, Field, StrictInt, model_validator
 from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
-from jacobian.math.formal_concept_analysis._concepts import (
-    MAX_CONCEPTS,
-    enumerate_concept_pairs,
-)
+from jacobian.math.formal_concept_analysis._concepts import MAX_CONCEPTS
 from jacobian.math.formal_concept_analysis.basis import (
     MAX_DG_ATTRIBUTES,
     MAX_DG_CANDIDATE_STATES,
@@ -134,71 +131,10 @@ class ConceptResult(StrictModel):
     intent: tuple[int, ...]
 
 
-# Bound the concept enumeration by its declared output budget. NextClosure's
-# cost is proportional to the number of concepts, and that number is bounded
-# by 2^min(|objects|, |attributes|): intents biject with a closure system on
-# the attribute axis and extents with one on the object axis.  Admission is
-# therefore two-tier and result-sensitive.  When that tight worst case fits
-# MAX_CONCEPTS the request is admitted statically.  Otherwise one capped
-# NextClosure preflight — bounded by the same budget it guards — counts the
-# true family, so sparse wide or square contexts stay admissible and only
-# contexts whose actual family overflows are rejected before execution.
 class EnumerateConceptsRequest(StrictModel):
     """Enumerate all formal concepts."""
 
     context: FormalContext
-    _admitted_concept_family: (
-        tuple[
-            FormalContext,
-            tuple[tuple[tuple[int, ...], tuple[int, ...]], ...],
-        ]
-        | None
-    ) = PrivateAttr(default=None)
-
-    @model_validator(mode="after")
-    def require_bounded_concept_family(self) -> Self:
-        worst_case_concepts = 2 ** min(
-            len(self.context.objects), len(self.context.attributes)
-        )
-        if worst_case_concepts > MAX_CONCEPTS:
-            try:
-                concepts = enumerate_concept_pairs(self.context)
-            except ValueError as exc:
-                raise PydanticCustomError(
-                    "formal_concept_analysis.concept_family_exceeds_bound",
-                    f"the context carries more than {MAX_CONCEPTS} concepts "
-                    "and concept enumeration returns at most "
-                    f"{MAX_CONCEPTS}; narrow the context or split the "
-                    "enumeration",
-                ) from exc
-            object.__setattr__(
-                self,
-                "_admitted_concept_family",
-                (
-                    self.context,
-                    concepts,
-                ),
-            )
-        return self
-
-    def _concepts_for_execution(
-        self,
-    ) -> tuple[tuple[tuple[int, ...], tuple[int, ...]], ...]:
-        """Return the exact family admitted by this request when available.
-
-        Wide contexts need a bounded exact family probe because their
-        worst-case carrier alone cannot decide admission. That probe is the
-        same deterministic NextClosure traversal the operation serves, so an
-        accepted request retains its canonical projection instead of running
-        a second exhaustive traversal. Requests constructed outside normal
-        Pydantic validation (or copied with a new context) conservatively run
-        the same bounded kernel once rather than trusting stale private data.
-        """
-        cached = self._admitted_concept_family
-        if cached is not None and cached[0] == self.context:
-            return cached[1]
-
-        return enumerate_concept_pairs(self.context)
 
 
 class EnumerateConceptsResult(StrictModel):
