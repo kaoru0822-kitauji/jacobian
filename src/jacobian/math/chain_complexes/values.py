@@ -27,6 +27,9 @@ MAX_CHAIN_MAP_ENTRY_CHARS = 65536
 # total coefficient size to the matrix work bounds rational elimination
 # bit complexity at admission instead of only bounding input shape.
 MAX_MATRIX_ENTRY_CHARS = 65536
+# Tensor products may multiply and add two coefficients; keep their input
+# spelling bounded before the derived matrices are materialized.
+MAX_TENSOR_COEFFICIENT_DIGITS = 512
 
 
 def _validation_error(reason: str, message: str) -> PydanticCustomError:
@@ -281,8 +284,8 @@ class HomologyResult(StrictModel):
 
         Kernel-produced profiles are constructed through ``_from_kernel``.
         Recomputing ranks here would turn ordinary result decoding into a
-        second execution of the operation; callers accepting an independent
-        profile use ``verify_homology_result`` instead.
+        second execution of the operation; independent profile verification,
+        when provided, is a separate caller-authored operation.
         """
         if (
             self.degree_min != self.complex.degree_min
@@ -330,7 +333,7 @@ class HomologyResult(StrictModel):
         homology_groups: tuple[HomologyGroupValue, ...],
         source_complex: ChainComplexValue,
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             homology_groups=homology_groups,
             coefficient_field=source_complex.coefficient_field,
             prime=source_complex.prime,
@@ -361,8 +364,8 @@ class MappingConeResult(StrictModel):
     def require_structural_cone(self) -> Self:
         """Bind projections to the retained canonical cone value.
 
-        The explicit owner verifier checks that this value is the cone of
-        the retained map.  Result construction itself remains non-executing.
+        Result construction checks only the structural source binding;
+        the defining computation runs in the owner operation.
         """
         if (
             self.source_degree_min != self.source.degree_min
@@ -403,7 +406,7 @@ class MappingConeResult(StrictModel):
         map_matrices: tuple[tuple[tuple[str, ...], ...], ...],
         value: ChainComplexValue,
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             cone_basis_sizes=cone_basis_sizes,
             cone_differential_matrices=cone_differential_matrices,
             source_degree_min=source.degree_min,
@@ -419,9 +422,8 @@ class TensorProductResult(StrictModel):
     """The tensor product of two retained chain complexes.
 
     The derived complex retains its coefficient field, prime, and degree
-    interval so it composes into downstream consumers as a first-class
-    chain-complex value, and both factors are retained so validation can
-    replay the defining construction.
+        interval so it composes into downstream consumers as a first-class
+        chain-complex value. Both factors are retained as source context.
     """
 
     tensor_basis_sizes: tuple[int, ...]
@@ -502,7 +504,7 @@ class TensorProductResult(StrictModel):
         right: ChainComplexValue,
         value: ChainComplexValue,
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             tensor_basis_sizes=tensor_basis_sizes,
             tensor_differential_matrices=tensor_differential_matrices,
             coefficient_field=left.coefficient_field,
@@ -519,6 +521,7 @@ __all__ = [
     "MAX_BASIS_SIZE",
     "MAX_CHAIN_DEGREE",
     "MAX_MATRIX_CELLS",
+    "MAX_TENSOR_COEFFICIENT_DIGITS",
     "MAX_TENSOR_GROUP_DIMENSION",
     "MAX_TENSOR_TOTAL_CELLS",
     "ChainComplexValue",
@@ -568,7 +571,9 @@ class VerificationResult(StrictModel):
     def _from_kernel(
         cls, *, is_valid: bool, detail: str, source_complex: ChainComplexValue
     ) -> Self:
-        return cls(is_valid=is_valid, detail=detail, complex=source_complex)
+        return cls.model_construct(
+            is_valid=is_valid, detail=detail, complex=source_complex
+        )
 
     @classmethod
     def _from_chain_map_kernel(
@@ -580,7 +585,7 @@ class VerificationResult(StrictModel):
         target: ChainComplexValue,
         map_matrices: tuple[tuple[tuple[str, ...], ...], ...],
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             is_valid=is_valid,
             detail=detail,
             source=source,

@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from fractions import Fraction
 
-from pydantic_core import PydanticCustomError
-
 from jacobian.canonical import format_canonical_integer
 from jacobian.math.chain_complexes._models import (
     ComputeHomologyRequest,
@@ -14,8 +12,13 @@ from jacobian.math.chain_complexes._models import (
     TensorProductRequest,
     VerifyChainMapRequest,
     VerifyDifferentialRequest,
+    _require_chain_map_components,
 )
 from jacobian.math.chain_complexes.values import (
+    MAX_MATRIX_ENTRY_CHARS,
+    MAX_TENSOR_COEFFICIENT_DIGITS,
+    MAX_TENSOR_GROUP_DIMENSION,
+    MAX_TENSOR_TOTAL_CELLS,
     ChainComplexValue,
     HomologyGroupValue,
     HomologyResult,
@@ -23,6 +26,129 @@ from jacobian.math.chain_complexes.values import (
     TensorProductResult,
     VerificationResult,
 )
+
+
+class ChainComplexAdmissionError(ValueError):
+    """Expected boundedness failure before a derived complex is allocated."""
+
+    def __init__(self, reason: str, message: str) -> None:
+        super().__init__(message)
+        self.reason = reason
+
+
+def _require_tensor_admission(
+    left: ChainComplexValue, right: ChainComplexValue
+) -> None:
+    if left.coefficient_field != right.coefficient_field or left.prime != right.prime:
+        raise ChainComplexAdmissionError(
+            "tensor_context_mismatch", "tensor product requires same coefficient field and prime"
+        )
+    group_count = len(left.basis_sizes) + len(right.basis_sizes) - 1
+    group_sizes: list[int] = []
+    for degree in range(group_count):
+        size = sum(
+            left.basis_sizes[i] * right.basis_sizes[degree - i]
+            for i in range(min(degree + 1, len(left.basis_sizes)))
+            if degree - i < len(right.basis_sizes)
+        )
+        if size > MAX_TENSOR_GROUP_DIMENSION:
+            raise ChainComplexAdmissionError(
+                "tensor_group_dimension_budget_exceeded",
+                f"tensor product group dimension {size} exceeds the "
+                f"{MAX_TENSOR_GROUP_DIMENSION}-dimension work bound",
+            )
+        group_sizes.append(size)
+    allocated_cells = sum(
+        group_sizes[index - 1] * group_sizes[index]
+        for index in range(1, group_count)
+    )
+    if sum(group_sizes) > MAX_TENSOR_TOTAL_CELLS or allocated_cells > MAX_TENSOR_TOTAL_CELLS:
+        raise ChainComplexAdmissionError(
+            "tensor_cell_budget_exceeded",
+            f"tensor product allocates {max(sum(group_sizes), allocated_cells)} cells, "
+            f"exceeding the {MAX_TENSOR_TOTAL_CELLS}-cell work bound",
+        )
+    for complex_value in (left, right):
+        for matrix in complex_value.differential_matrices:
+            for row in matrix:
+                for entry in row:
+                    numerator, _, denominator = entry.partition("/")
+                    if (
+                        len(numerator.lstrip("-")) > MAX_TENSOR_COEFFICIENT_DIGITS
+                        or len(denominator.lstrip("-")) > MAX_TENSOR_COEFFICIENT_DIGITS
+                    ):
+                        raise ChainComplexAdmissionError(
+                            "tensor_coefficient_digit_budget_exceeded",
+                            "tensor product inputs are limited to "
+                            f"{MAX_TENSOR_COEFFICIENT_DIGITS}-digit coefficients",
+                        )
+    _require_square_zero(
+        _parsed_differentials(left, left.prime), left.prime, label="tensor product left",
+        group_columns=list(left.basis_sizes), degree_min=left.degree_min,
+    )
+    _require_square_zero(
+        _parsed_differentials(right, right.prime), right.prime, label="tensor product right",
+        group_columns=list(right.basis_sizes), degree_min=right.degree_min,
+    )
+    tensor_degree_min = left.degree_min + right.degree_min
+    placeholder_diffs = tuple(
+        tuple(("0",) * group_sizes[index + 1] for _ in range(group_sizes[index]))
+        for index in range(max(0, group_count - 1))
+    )
+    ChainComplexValue(
+        coefficient_field=left.coefficient_field,
+        prime=left.prime,
+        degree_min=tensor_degree_min,
+        degree_max=tensor_degree_min + group_count - 1,
+        basis_sizes=tuple(group_sizes),
+        differential_matrices=placeholder_diffs,
+    )
+    def max_entry_length(value: ChainComplexValue) -> int:
+        return max((len(entry) for matrix in value.differential_matrices for row in matrix for entry in row), default=1)
+    worst_entry_chars = max(max_entry_length(left), max_entry_length(right)) + 1
+    if allocated_cells * worst_entry_chars > MAX_MATRIX_ENTRY_CHARS:
+        raise ChainComplexAdmissionError(
+            "tensor_output_budget_exceeded",
+            f"tensor product serialization exceeds the canonical {MAX_MATRIX_ENTRY_CHARS}-character budget",
+        )
+
+
+def _require_cone_admission(
+    source: ChainComplexValue,
+    target: ChainComplexValue,
+    map_matrices: tuple[tuple[tuple[str, ...], ...], ...],
+) -> None:
+    cone_basis_sizes = tuple(
+        (target.basis_sizes[index] if index < len(target.basis_sizes) else 0)
+        + (source.basis_sizes[index - 1] if 0 < index <= len(source.basis_sizes) else 0)
+        for index in range(max(len(source.basis_sizes), len(target.basis_sizes)) + 1)
+    )
+    placeholder_diffs = tuple(
+        tuple(("0",) * cone_basis_sizes[index + 1] for _ in range(cone_basis_sizes[index]))
+        for index in range(max(0, len(cone_basis_sizes) - 1))
+    )
+    ChainComplexValue(
+        coefficient_field=source.coefficient_field, prime=source.prime,
+        degree_min=source.degree_min,
+        degree_max=source.degree_min + len(cone_basis_sizes) - 1,
+        basis_sizes=cone_basis_sizes, differential_matrices=placeholder_diffs,
+    )
+    cone_cells = sum(
+        cone_basis_sizes[index] * cone_basis_sizes[index + 1]
+        for index in range(len(cone_basis_sizes) - 1)
+    )
+    entry_chars = sum(
+        len(entry)
+        for value in (source, target)
+        for matrix in value.differential_matrices
+        for row in matrix
+        for entry in row
+    ) + sum(len(entry) for matrix in map_matrices for row in matrix for entry in row)
+    if entry_chars + cone_cells > MAX_MATRIX_ENTRY_CHARS:
+        raise ChainComplexAdmissionError(
+            "mapping_cone_output_budget_exceeded",
+            f"mapping cone serialization exceeds the canonical {MAX_MATRIX_ENTRY_CHARS}-character budget",
+        )
 
 
 def _parse_fraction(s: str, prime: int | None = None) -> Fraction:
@@ -260,7 +386,7 @@ def construct_chain_complex(request: ConstructChainComplexRequest) -> ChainCompl
     degree_min = 0
     degree_max = n - 1
 
-    return ChainComplexValue(
+    value = ChainComplexValue(
         coefficient_field=request.coefficient_field,
         prime=request.prime,
         degree_min=degree_min,
@@ -268,6 +394,14 @@ def construct_chain_complex(request: ConstructChainComplexRequest) -> ChainCompl
         basis_sizes=basis_sizes,
         differential_matrices=request.differential_matrices,
     )
+    _require_square_zero(
+        _parsed_differentials(value, value.prime),
+        value.prime,
+        label="constructed",
+        group_columns=list(value.basis_sizes),
+        degree_min=value.degree_min,
+    )
+    return value
 
 
 def _differential_verdict(complex_value: ChainComplexValue) -> tuple[bool, str]:
@@ -718,6 +852,10 @@ def compute_mapping_cone(request: MappingConeRequest) -> MappingConeResult:
     The mapping cone has groups cone_n = C_{n-1} ⊕ D_n and differential
     [[ -d_C, 0 ], [ f, d_D ]] as block matrices.
     """
+    _require_chain_map_components(
+        request.source, request.target, request.map_matrices, label="mapping cone"
+    )
+    _require_cone_admission(request.source, request.target, request.map_matrices)
     cone_basis_sizes, cone_diffs = _compute_mapping_cone(
         request.source, request.target, request.map_matrices
     )
@@ -738,7 +876,6 @@ def compute_mapping_cone(request: MappingConeRequest) -> MappingConeResult:
         map_matrices=request.map_matrices,
         value=value,
     )
-
 
 def _tensor_group_sizes(
     left: ChainComplexValue, right: ChainComplexValue
@@ -927,6 +1064,7 @@ def compute_tensor_product(request: TensorProductRequest) -> TensorProductResult
     """
     left = request.left
     right = request.right
+    _require_tensor_admission(left, right)
     tensor_basis_sizes, tensor_diffs = _compute_tensor_product(left, right)
 
     # Tensor degrees are pairwise sums: the derived complex concentrates
@@ -950,66 +1088,3 @@ def compute_tensor_product(request: TensorProductRequest) -> TensorProductResult
         right=right,
         value=value,
     )
-
-
-def verify_homology_result(result: HomologyResult) -> bool:
-    """Independently replay a bounded supplied homology claim."""
-    try:
-        request = ComputeHomologyRequest(complex=result.complex)
-        return compute_homology(request) == result
-    except (ValueError, PydanticCustomError):
-        return False
-
-
-def verify_mapping_cone_result(result: MappingConeResult) -> bool:
-    """Independently replay a bounded supplied mapping-cone claim."""
-    try:
-        request = MappingConeRequest(
-            source=result.source,
-            target=result.target,
-            map_matrices=result.map_matrices,
-        )
-        return compute_mapping_cone(request) == result
-    except (ValueError, PydanticCustomError):
-        return False
-
-
-def verify_tensor_product_result(result: TensorProductResult) -> bool:
-    """Independently replay a bounded supplied tensor-product claim."""
-    try:
-        return (
-            compute_tensor_product(
-                TensorProductRequest(left=result.left, right=result.right)
-            )
-            == result
-        )
-    except (ValueError, PydanticCustomError):
-        return False
-
-
-def verify_verification_result(result: VerificationResult) -> bool:
-    """Independently replay a bounded supplied verification verdict."""
-    try:
-        if result.complex is not None:
-            return (
-                verify_differential(VerifyDifferentialRequest(complex=result.complex))
-                == result
-            )
-        if (
-            result.source is not None
-            and result.target is not None
-            and result.map_matrices is not None
-        ):
-            return (
-                verify_chain_map(
-                    VerifyChainMapRequest(
-                        source=result.source,
-                        target=result.target,
-                        map_matrices=result.map_matrices,
-                    )
-                )
-                == result
-            )
-    except (ValueError, PydanticCustomError):
-        return False
-    return False

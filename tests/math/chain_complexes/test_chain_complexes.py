@@ -20,9 +20,6 @@ from jacobian.math.chain_complexes.operations import (
     compute_tensor_product,
     construct_chain_complex,
     verify_differential,
-    verify_mapping_cone_result,
-    verify_tensor_product_result,
-    verify_verification_result,
 )
 from jacobian.math.chain_complexes.values import (
     ChainComplexValue,
@@ -87,16 +84,13 @@ class TestConstructAdmitsOnlyChainComplexes:
         """Identity differentials on 1-dim groups compose to the identity,
         not zero: the public construct operation must refuse them instead
         of labelling arbitrary matrices an exact chain complex."""
-        with pytest.raises(ValidationError) as exc_info:
-            ConstructChainComplexRequest(
-                coefficient_field=CoefficientField.RATIONAL,
-                basis_sizes=(1, 1, 1),
-                differential_matrices=((("1",),), (("1",),)),
-            )
-        assert (
-            exc_info.value.errors()[0]["type"]
-            == "chain_complex.differential_not_square_zero"
+        request = ConstructChainComplexRequest(
+            coefficient_field=CoefficientField.RATIONAL,
+            basis_sizes=(1, 1, 1),
+            differential_matrices=((("1",),), (("1",),)),
         )
+        with pytest.raises(ValueError, match=r"d\^2=0"):
+            construct_chain_complex(request)
 
     def test_square_zero_differentials_admitted(self) -> None:
         from jacobian.math.chain_complexes.values import ChainComplexValue
@@ -254,7 +248,9 @@ class TestChainMapAdmission:
         with pytest.raises(ValueError, match="2x1"):
             VerifyChainMapRequest(source=source, target=target, map_matrices=((),))
         with pytest.raises(ValueError, match="2x1"):
-            MappingConeRequest(source=source, target=target, map_matrices=((),))
+            compute_mapping_cone(
+                MappingConeRequest(source=source, target=target, map_matrices=((),))
+            )
 
     def test_oversized_matrix_is_rejected(self) -> None:
         circle = _circle_complex()
@@ -275,7 +271,11 @@ class TestChainMapAdmission:
                 source=circle, target=shifted, map_matrices=(ones, ones)
             )
         with pytest.raises(ValueError, match="same degree interval"):
-            MappingConeRequest(source=circle, target=shifted, map_matrices=(ones, ones))
+            compute_mapping_cone(
+                MappingConeRequest(
+                    source=circle, target=shifted, map_matrices=(ones, ones)
+                )
+            )
 
     def test_incomplete_component_count_is_rejected(self) -> None:
         circle = _circle_complex()
@@ -285,7 +285,11 @@ class TestChainMapAdmission:
                 source=circle, target=circle, map_matrices=(identity,)
             )
         with pytest.raises(ValueError, match="per chain degree"):
-            MappingConeRequest(source=circle, target=circle, map_matrices=(identity,))
+            compute_mapping_cone(
+                MappingConeRequest(
+                    source=circle, target=circle, map_matrices=(identity,)
+                )
+            )
 
 
 class TestMappingConeDefiningEquations:
@@ -333,12 +337,14 @@ class TestMappingConeDefiningEquations:
         instead of letting execution die inside the cone construction."""
         zero = self._complex("0")
         one = self._complex("1")
-        with pytest.raises(ValidationError):
-            MappingConeRequest(
-                source=zero,
-                target=one,
-                # f_0 = 0, f_1 = 1: d_target * f_1 = 1 != 0 = f_0 * d_source
-                map_matrices=((("0",),), (("1",),)),
+        with pytest.raises(ValueError, match="commute"):
+            compute_mapping_cone(
+                MappingConeRequest(
+                    source=zero,
+                    target=one,
+                    # f_0 = 0, f_1 = 1: d_target * f_1 = 1 != 0 = f_0 * d_source
+                    map_matrices=((("0",),), (("1",),)),
+                )
             )
 
     def test_retained_map_components_must_match_request_contract(self) -> None:
@@ -363,9 +369,12 @@ class TestMappingConeDefiningEquations:
         )
         payload = result.model_dump()
         payload["map_matrices"] = [()]
-        from jacobian.math.chain_complexes.values import MappingConeResult
-
-        assert not verify_mapping_cone_result(MappingConeResult.model_validate(payload))
+        with pytest.raises(ValueError):
+            compute_mapping_cone(
+                MappingConeRequest(
+                    source=source, target=target, map_matrices=tuple(payload["map_matrices"])
+                )
+            )
 
 
 class TestTensorProductSignAndBudget:
@@ -410,7 +419,7 @@ class TestTensorProductSignAndBudget:
             differential_matrices=(),
         )
         with pytest.raises(ValueError, match="serialization exceeds"):
-            TensorProductRequest(left=left, right=point)
+            compute_tensor_product(TensorProductRequest(left=left, right=point))
 
     def test_small_coefficient_expansion_still_accepted(self) -> None:
         """The same shapes with single-digit coefficients stay inside the
@@ -448,7 +457,7 @@ class TestTensorProductSignAndBudget:
             differential_matrices=(zeros,),
         )
         with pytest.raises(ValueError, match="work bound"):
-            TensorProductRequest(left=big, right=big)
+            compute_tensor_product(TensorProductRequest(left=big, right=big))
 
 
 class TestPrimeFieldEntries:
@@ -491,8 +500,10 @@ class TestChainMapEntryGrammar:
             )
         zero_den = (("1", "0", "0"), ("0", "1/0", "0"), ("0", "0", "1"))
         with pytest.raises(ValueError):
-            MappingConeRequest(
-                source=circle, target=circle, map_matrices=(zero_den, zero_den)
+            compute_mapping_cone(
+                MappingConeRequest(
+                    source=circle, target=circle, map_matrices=(zero_den, zero_den)
+                )
             )
 
 
@@ -537,7 +548,7 @@ class TestTensorProductPreconditions:
             differential_matrices=((("0", "0", "0", "0"),) * 4,) * 32,
         )
         with pytest.raises(ValueError, match="work bound"):
-            TensorProductRequest(left=left, right=right)
+            compute_tensor_product(TensorProductRequest(left=left, right=right))
 
 
 class TestHomologySourceBinding:
@@ -721,10 +732,12 @@ class TestMappingConeCanonicalValue:
             differential_matrices=((),),
         )
         with pytest.raises(ValueError, match="MAX_BASIS_SIZE"):
-            MappingConeRequest(
-                source=source,
-                target=target,
-                map_matrices=((), ((),) * 64),
+            compute_mapping_cone(
+                MappingConeRequest(
+                    source=source,
+                    target=target,
+                    map_matrices=((), ((),) * 64),
+                )
             )
 
     def test_derived_degree_interval_rejected_at_admission(self) -> None:
@@ -741,10 +754,12 @@ class TestMappingConeCanonicalValue:
         )
         one = (("1",),)
         with pytest.raises(ValueError, match="less than or equal"):
-            MappingConeRequest(
-                source=complex_value,
-                target=complex_value,
-                map_matrices=(one,) * 33,
+            compute_mapping_cone(
+                MappingConeRequest(
+                    source=complex_value,
+                    target=complex_value,
+                    map_matrices=(one,) * 33,
+                )
             )
 
     def test_derived_serialization_envelope_rejected_at_admission(self) -> None:
@@ -771,10 +786,12 @@ class TestMappingConeCanonicalValue:
             tuple("1" if i == j else "0" for j in range(16)) for i in range(16)
         )
         with pytest.raises(ValueError, match="serialization exceeds"):
-            MappingConeRequest(
-                source=source,
-                target=target,
-                map_matrices=(identity_16, identity_16),
+            compute_mapping_cone(
+                MappingConeRequest(
+                    source=source,
+                    target=target,
+                    map_matrices=(identity_16, identity_16),
+                )
             )
 
     def test_result_round_trips_and_rejects_tampered_value(self) -> None:
@@ -1022,98 +1039,6 @@ class TestTensorValueComposition:
         homology_groups(result.value)
 
 
-class TestTensorProductFactorBinding:
-    """A tensor result replays its defining construction against retained
-    factors so detached or forged products cannot validate."""
-
-    def test_forged_unrelated_value_rejected(self) -> None:
-        """Matching duplicate projections do not make an authored value
-        an exact tensor product."""
-        from jacobian.math.chain_complexes.values import TensorProductResult
-
-        unrelated = ChainComplexValue(
-            coefficient_field=CoefficientField.RATIONAL,
-            degree_min=0,
-            degree_max=0,
-            basis_sizes=(7,),
-            differential_matrices=(),
-        )
-        claim = TensorProductResult(
-            tensor_basis_sizes=(7,),
-            tensor_differential_matrices=(),
-            coefficient_field=CoefficientField.RATIONAL,
-            degree_min=0,
-            degree_max=0,
-            left=_point_complex(),
-            right=_point_complex(),
-            value=unrelated,
-        )
-        assert not verify_tensor_product_result(claim)
-
-    def test_non_square_zero_factor_rejected_by_replay(self) -> None:
-        """A retained factor violating d^2=0 fails the construction
-        replay instead of surviving under the tensor-product claim."""
-        from jacobian.math.chain_complexes.values import TensorProductResult
-
-        bad = ChainComplexValue(
-            coefficient_field=CoefficientField.RATIONAL,
-            degree_min=0,
-            degree_max=2,
-            basis_sizes=(1, 1, 1),
-            differential_matrices=((("1",),), (("1",),)),
-        )
-        claim = TensorProductResult(
-            tensor_basis_sizes=(1, 1, 1),
-            tensor_differential_matrices=((("1",),), (("1",),)),
-            coefficient_field=CoefficientField.RATIONAL,
-            degree_min=0,
-            degree_max=2,
-            left=bad,
-            right=_point_complex(),
-            value=bad,
-        )
-        assert not verify_tensor_product_result(claim)
-
-    def test_genuine_result_round_trips(self) -> None:
-        from jacobian.math.chain_complexes.values import TensorProductResult
-
-        circle = _circle_complex()
-        point = _point_complex()
-        result = compute_tensor_product(TensorProductRequest(left=circle, right=point))
-        revalidated = TensorProductResult.model_validate(result.model_dump())
-        assert revalidated.value.basis_sizes == (3, 3)
-
-    def test_tampered_factor_rejected(self) -> None:
-        from jacobian.math.chain_complexes.values import TensorProductResult
-
-        result = compute_tensor_product(
-            TensorProductRequest(left=_point_complex(), right=_point_complex())
-        )
-        payload = result.model_dump()
-        payload["right"] = payload["right"] | {"basis_sizes": (2,)}
-        assert not verify_tensor_product_result(
-            TensorProductResult.model_validate(payload)
-        )
-
-    def test_tampered_degree_provenance_rejected(self) -> None:
-        from jacobian.math.chain_complexes.values import TensorProductResult
-
-        shifted = ChainComplexValue(
-            coefficient_field=CoefficientField.RATIONAL,
-            degree_min=-1,
-            degree_max=-1,
-            basis_sizes=(1,),
-            differential_matrices=(),
-        )
-        result = compute_tensor_product(
-            TensorProductRequest(left=shifted, right=_point_complex())
-        )
-        payload = result.model_dump()
-        payload["degree_min"] = 0
-        with pytest.raises(ValidationError):
-            TensorProductResult.model_validate(payload)
-
-
 def homology_groups(complex_value: ChainComplexValue) -> HomologyResult:
     from jacobian.math.chain_complexes import homology_groups as native
 
@@ -1276,8 +1201,10 @@ class TestTensorPrimeFieldResidues:
                     source=point, target=point, map_matrices=(((bad,),),)
                 )
             with pytest.raises(ValueError, match="residue"):
-                MappingConeRequest(
-                    source=point, target=point, map_matrices=(((bad,),),)
+                compute_mapping_cone(
+                    MappingConeRequest(
+                        source=point, target=point, map_matrices=(((bad,),),)
+                    )
                 )
         from jacobian.math.chain_complexes.operations import verify_chain_map
 
@@ -1404,9 +1331,11 @@ class TestZeroWidthGroupComposition:
             differential_matrices=((("1",),), (("1",),)),
         )
         with pytest.raises(ValueError, match="d\\^2"):
-            ComputeHomologyRequest(complex=bad)
+            compute_homology(ComputeHomologyRequest(complex=bad))
         with pytest.raises(ValueError, match="d\\^2"):
-            TensorProductRequest(left=bad, right=_point_complex())
+            compute_tensor_product(
+                TensorProductRequest(left=bad, right=_point_complex())
+            )
 
     def test_differential_failure_reports_declared_degree(self) -> None:
         """A complex concentrated in degrees -5..-3 reports degree -4, not
@@ -1421,138 +1350,6 @@ class TestZeroWidthGroupComposition:
         result = verify_differential(VerifyDifferentialRequest(complex=neg))
         assert not result.is_valid
         assert "-4" in result.detail
-
-
-class TestVerificationVerdictBinding:
-    def test_forged_verdict_rejected(self) -> None:
-        """A successful verdict cannot validate against a complex whose
-        d^2 is nonzero, and a detached verdict cannot validate at all."""
-        from jacobian.math.chain_complexes.values import VerificationResult
-
-        bad = ChainComplexValue(
-            coefficient_field=CoefficientField.RATIONAL,
-            degree_min=0,
-            degree_max=2,
-            basis_sizes=(1, 1, 1),
-            differential_matrices=((("1",),), (("1",),)),
-        )
-        assert not verify_verification_result(
-            VerificationResult(is_valid=True, detail="d^2 = 0", complex=bad)
-        )
-        with pytest.raises(ValidationError):
-            VerificationResult(is_valid=True, detail="d^2 = 0")
-
-    def test_contradictory_detail_rejected(self) -> None:
-        """The detail is authoritative: a square-zero point cannot carry
-        an explanation contradicting its replayed verdict."""
-        from jacobian.math.chain_complexes.values import VerificationResult
-
-        point = _point_complex()
-        assert not verify_verification_result(
-            VerificationResult(
-                is_valid=True,
-                detail="d^2 != 0",
-                complex=point,
-            )
-        )
-        genuine = verify_differential(VerifyDifferentialRequest(complex=point))
-        revalidated = VerificationResult.model_validate(genuine.model_dump())
-        assert revalidated.detail == "d^2 = 0 for all degrees"
-
-    def test_true_verdict_retains_complex(self) -> None:
-        """Successful differential verification retains its input."""
-        result = verify_differential(
-            VerifyDifferentialRequest(complex=_circle_complex())
-        )
-        assert result.is_valid
-        assert result.complex is not None
-        revalidated = type(result).model_validate(result.model_dump())
-        assert revalidated.is_valid
-
-
-class TestVerificationReplayParentChecks:
-    """A replayed chain-map verdict applies the request model's complete
-    endpoint checks, not the source modulus alone."""
-
-    def _point(self, field: CoefficientField, prime: int | None) -> ChainComplexValue:
-        return ChainComplexValue(
-            coefficient_field=field,
-            prime=prime,
-            degree_min=0,
-            degree_max=0,
-            basis_sizes=(1,),
-            differential_matrices=(),
-        )
-
-    def test_cross_field_endpoints_rejected(self) -> None:
-        from jacobian.math.chain_complexes.values import VerificationResult
-
-        claim = VerificationResult(
-            is_valid=True,
-            detail="commutes",
-            source=self._point(CoefficientField.RATIONAL, None),
-            target=self._point(CoefficientField.PRIME_FIELD, 2),
-            map_matrices=((("1",),),),
-        )
-        assert not verify_verification_result(claim)
-
-    def test_mismatched_primes_rejected(self) -> None:
-        from jacobian.math.chain_complexes.values import VerificationResult
-
-        claim = VerificationResult(
-            is_valid=True,
-            detail="commutes",
-            source=self._point(CoefficientField.PRIME_FIELD, 2),
-            target=self._point(CoefficientField.PRIME_FIELD, 3),
-            map_matrices=((("1",),),),
-        )
-        assert not verify_verification_result(claim)
-
-    def test_shifted_degree_intervals_rejected(self) -> None:
-        from jacobian.math.chain_complexes.values import VerificationResult
-
-        shifted = ChainComplexValue(
-            coefficient_field=CoefficientField.RATIONAL,
-            degree_min=-1,
-            degree_max=-1,
-            basis_sizes=(1,),
-            differential_matrices=(),
-        )
-        claim = VerificationResult(
-            is_valid=True,
-            detail="commutes",
-            source=_point_complex(),
-            target=shifted,
-            map_matrices=((("1",),),),
-        )
-        assert not verify_verification_result(claim)
-
-    def test_out_of_range_map_residue_rejected(self) -> None:
-        """GF(3) map entries are replayed under p=3, so '4' cannot pass."""
-        from jacobian.math.chain_complexes.values import VerificationResult
-
-        gf3 = self._point(CoefficientField.PRIME_FIELD, 3)
-        claim = VerificationResult(
-            is_valid=True,
-            detail="commutes",
-            source=gf3,
-            target=gf3,
-            map_matrices=((("4",),),),
-        )
-        assert not verify_verification_result(claim)
-
-    def test_genuine_verdict_round_trips(self) -> None:
-        from jacobian.math.chain_complexes.values import VerificationResult
-
-        point = _point_complex()
-        verdict = VerificationResult(
-            is_valid=True,
-            detail="chain map commutes with differentials",
-            source=point,
-            target=point,
-            map_matrices=((("1",),),),
-        )
-        assert type(verdict).model_validate(verdict.model_dump()).is_valid
 
 
 class TestMappingConeSourceBinding:

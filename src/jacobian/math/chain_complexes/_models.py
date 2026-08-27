@@ -8,28 +8,11 @@ from pydantic import Field, model_validator
 from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
-from jacobian.math.chain_complexes._algebra import (
-    require_chain_map_relation,
-    require_square_zero,
-)
-from jacobian.math.chain_complexes.values import (
-    MAX_TENSOR_GROUP_DIMENSION,
-    MAX_TENSOR_TOTAL_CELLS,
-    ChainComplexValue,
-    CoefficientField,
-)
+from jacobian.math.chain_complexes.values import ChainComplexValue, CoefficientField
 
 
 def _validation_error(reason: str, message: str) -> PydanticCustomError:
     return PydanticCustomError(f"chain_complex.{reason}", message)
-
-
-class ChainComplexAdmissionError(ValueError):
-    """Native admission failure for chain-complex tensor operations."""
-
-    def __init__(self, reason: str, message: str) -> None:
-        super().__init__(message)
-        self.reason = reason
 
 
 class ConstructChainComplexRequest(StrictModel):
@@ -73,38 +56,6 @@ class ConstructChainComplexRequest(StrictModel):
                 "basis_differential_count_mismatch",
                 "need one more basis size than differential matrices",
             )
-        # Full canonical admission: the constructed value must satisfy the
-        # chain-complex value contract here rather than failing inside
-        # execution.
-        from jacobian.math.chain_complexes.values import ChainComplexValue
-
-        ChainComplexValue(
-            coefficient_field=self.coefficient_field,
-            prime=self.prime,
-            degree_min=0,
-            degree_max=len(self.basis_sizes) - 1,
-            basis_sizes=self.basis_sizes,
-            differential_matrices=self.differential_matrices,
-        )
-        # A chain complex must satisfy d^2 = 0; unchecked candidate data
-        # would let the public operation label arbitrary matrices as an
-        # exact chain complex.
-        try:
-            require_square_zero(
-                ChainComplexValue(
-                    coefficient_field=self.coefficient_field,
-                    prime=self.prime,
-                    degree_min=0,
-                    degree_max=len(self.basis_sizes) - 1,
-                    basis_sizes=self.basis_sizes,
-                    differential_matrices=self.differential_matrices,
-                ),
-                label="constructed",
-            )
-        except ValueError as error:
-            raise _validation_error(
-                "differential_not_square_zero", str(error)
-            ) from None
         return self
 
 
@@ -241,92 +192,10 @@ class VerifyChainMapRequest(StrictModel):
         return self
 
 
-def _require_square_zero_at_admission(
-    complex_value: ChainComplexValue, *, label: str
-) -> None:
-    """Homology-type outputs are defined only for genuine complexes."""
-    require_square_zero(complex_value, label=label)
-
-
 class ComputeHomologyRequest(StrictModel):
     """Compute homology of a chain complex."""
 
     complex: ChainComplexValue
-
-    @model_validator(mode="after")
-    def require_genuine_chain_complex(self) -> Self:
-        # Homology is defined only when d^2 = 0; checking here keeps an
-        # unbounded execution failure out of math.run's typed contract.
-        _require_square_zero_at_admission(self.complex, label="homology")
-        return self
-
-
-def _entry_character_count(complex_value: ChainComplexValue) -> int:
-    """Total printed characters across one complex's differential cells."""
-    return sum(
-        len(entry)
-        for matrix in complex_value.differential_matrices
-        for row in matrix
-        for entry in row
-    )
-
-
-def _require_admissible_cone_value(
-    source: ChainComplexValue,
-    target: ChainComplexValue,
-    map_matrices: tuple[tuple[tuple[str, ...], ...], ...],
-) -> None:
-    """Bound the derived mapping-cone work before any allocation.
-
-    The cone becomes a first-class ``ChainComplexValue``, so its degree
-    interval, group dimensions, dense cell budget, and serialization
-    envelope must be established at admission rather than discovered
-    during execution.
-    """
-    from jacobian.math.chain_complexes.values import (
-        MAX_MATRIX_ENTRY_CHARS,
-        ChainComplexValue,
-    )
-
-    cone_basis_sizes = tuple(
-        (target.basis_sizes[index] if index < len(target.basis_sizes) else 0)
-        + (source.basis_sizes[index - 1] if 0 < index <= len(source.basis_sizes) else 0)
-        for index in range(max(len(source.basis_sizes), len(target.basis_sizes)) + 1)
-    )
-    degree_min = source.degree_min
-    placeholder_diffs = tuple(
-        tuple(("0",) * cone_basis_sizes[deg + 1] for _ in range(cone_basis_sizes[deg]))
-        for deg in range(max(0, len(cone_basis_sizes) - 1))
-    )
-    ChainComplexValue(
-        coefficient_field=source.coefficient_field,
-        prime=source.prime,
-        degree_min=degree_min,
-        degree_max=degree_min + len(cone_basis_sizes) - 1,
-        basis_sizes=cone_basis_sizes,
-        differential_matrices=placeholder_diffs,
-    )
-    # Every populated cone cell copies one admitted coefficient string
-    # (possibly gaining a leading '-') and every remaining cell prints
-    # "0", so this bounds the derived serialization from above.
-    cone_cells = sum(
-        cone_basis_sizes[i] * cone_basis_sizes[i + 1]
-        for i in range(len(cone_basis_sizes) - 1)
-    )
-    worst_case_chars = (
-        _entry_character_count(source)
-        + _entry_character_count(target)
-        + sum(len(entry) for matrix in map_matrices for row in matrix for entry in row)
-        + cone_cells
-    )
-    if worst_case_chars > MAX_MATRIX_ENTRY_CHARS:
-        raise _validation_error(
-            "mapping_cone_output_budget_exceeded",
-            "mapping cone serialization exceeds the canonical output "
-            f"ceiling ({worst_case_chars} characters against "
-            f"{MAX_MATRIX_ENTRY_CHARS}); supply smaller coefficients",
-        )
-
 
 class MappingConeRequest(StrictModel):
     """Compute the mapping cone of a chain map."""
@@ -343,158 +212,11 @@ class MappingConeRequest(StrictModel):
         )
     )
 
-    @model_validator(mode="after")
-    def require_admissible_map_components(self) -> Self:
-        _require_chain_map_components(
-            self.source,
-            self.target,
-            self.map_matrices,
-            label="mapping cone",
-        )
-        _require_square_zero_at_admission(self.source, label="mapping cone source")
-        _require_square_zero_at_admission(self.target, label="mapping cone target")
-        # The mapping cone is defined only for a genuine chain map, so the
-        # commutation relation d_target * f_{i+1} == f_i * d_source is part
-        # of the accepted request domain: checking it here keeps an accepted
-        # math.run request from dying in execution.
-        require_chain_map_relation(self.source, self.target, self.map_matrices)
-        # The returned cone is exposed as a first-class canonical value, so
-        # its derived bounds are part of the accepted request domain.
-        _require_admissible_cone_value(self.source, self.target, self.map_matrices)
-        return self
-
-
-def _require_serializable_entries(*complex_values: ChainComplexValue) -> None:
-    """Tensor inputs stay within the serialization envelope: printed
-    entries are products/sums of two coefficients, so each component is
-    capped at 512 digits."""
-    for complex_value in complex_values:
-        for matrix in complex_value.differential_matrices:
-            for row in matrix:
-                for entry in row:
-                    numerator, _, denominator = entry.partition("/")
-                    if (
-                        len(numerator.lstrip("-")) > 512
-                        or len(denominator.lstrip("-")) > 512
-                    ):
-                        raise ChainComplexAdmissionError(
-                            "tensor_coefficient_digit_budget_exceeded",
-                            "tensor product inputs are limited to "
-                            "512-digit coefficients",
-                        )
-
-
-def _require_admissible_tensor_work(
-    left: ChainComplexValue, right: ChainComplexValue
-) -> None:
-    """Bound the derived tensor work before any allocation.
-
-    Shared by the request model and the result validator's construction
-    replay: each tensor-product group dimension, the total group cells,
-    and the dense differential cells actually allocated between
-    consecutive groups stay within conservative budgets derived from the
-    input bounds.
-    """
-    if left.coefficient_field != right.coefficient_field or left.prime != right.prime:
-        raise ChainComplexAdmissionError(
-            "tensor_context_mismatch",
-            "tensor product requires same coefficient field and prime",
-        )
-    group_count = len(left.basis_sizes) + len(right.basis_sizes) - 1
-    group_sizes: list[int] = []
-    for degree in range(group_count):
-        size = 0
-        for i in range(min(degree + 1, len(left.basis_sizes))):
-            j = degree - i
-            if j < len(right.basis_sizes):
-                size += left.basis_sizes[i] * right.basis_sizes[j]
-        if size > MAX_TENSOR_GROUP_DIMENSION:
-            raise ChainComplexAdmissionError(
-                "tensor_group_dimension_budget_exceeded",
-                f"tensor product group dimension {size} exceeds the "
-                f"{MAX_TENSOR_GROUP_DIMENSION}-dimension work bound",
-            )
-        group_sizes.append(size)
-    total = sum(group_sizes)
-    allocated_cells = sum(
-        group_sizes[degree - 1] * group_sizes[degree]
-        for degree in range(1, group_count)
-    )
-    if total > MAX_TENSOR_TOTAL_CELLS or allocated_cells > MAX_TENSOR_TOTAL_CELLS:
-        raise ChainComplexAdmissionError(
-            "tensor_cell_budget_exceeded",
-            f"tensor product allocates {max(total, allocated_cells)} "
-            f"cells, exceeding the {MAX_TENSOR_TOTAL_CELLS}-cell work bound",
-        )
-    _require_serializable_entries(left, right)
-    _require_square_zero_at_admission(left, label="tensor product left")
-    _require_square_zero_at_admission(right, label="tensor product right")
-    # Admission guarantees the derived complex value is canonical: the
-    # degree interval must fit the shared chain-degree bounds, so
-    # constructing it here fails at the boundary rather than inside
-    # execution when the result is exposed as a ChainComplexValue.
-    from jacobian.math.chain_complexes.values import ChainComplexValue
-
-    tensor_degree_min = left.degree_min + right.degree_min
-    # Shape-correct zero placeholders: differential deg has
-    # group_sizes[deg] rows and group_sizes[deg+1] columns.
-    placeholder_diffs = tuple(
-        tuple(("0",) * group_sizes[deg + 1] for _ in range(group_sizes[deg]))
-        for deg in range(max(0, group_count - 1))
-    )
-    ChainComplexValue(
-        coefficient_field=left.coefficient_field,
-        prime=left.prime,
-        degree_min=tensor_degree_min,
-        degree_max=tensor_degree_min + group_count - 1,
-        basis_sizes=tuple(group_sizes),
-        differential_matrices=placeholder_diffs,
-    )
-    # Every populated tensor cell copies one admitted coefficient string
-    # (a Koszul negation may add a leading '-') and every remaining cell
-    # prints "0", so the expanded differentials print at most this many
-    # characters. The derived value enforces MAX_MATRIX_ENTRY_CHARS
-    # against its real coefficients, so admission must couple the same
-    # budget to the expansion instead of to shape alone.
-    from jacobian.math.chain_complexes.values import MAX_MATRIX_ENTRY_CHARS
-
-    def _max_entry_length(complex_value: ChainComplexValue) -> int:
-        return max(
-            (
-                len(entry)
-                for matrix in complex_value.differential_matrices
-                for row in matrix
-                for entry in row
-            ),
-            default=1,
-        )
-
-    worst_entry_chars = max(_max_entry_length(left), _max_entry_length(right)) + 1
-    expanded_entry_chars = allocated_cells * worst_entry_chars
-    if expanded_entry_chars > MAX_MATRIX_ENTRY_CHARS:
-        raise ChainComplexAdmissionError(
-            "tensor_output_budget_exceeded",
-            "tensor product serialization exceeds the canonical "
-            f"{MAX_MATRIX_ENTRY_CHARS}-character budget: {allocated_cells} "
-            f"expanded cells x ~{worst_entry_chars} characters per copied "
-            "coefficient; supply smaller coefficients",
-        )
-
-
 class TensorProductRequest(StrictModel):
     """Compute the tensor product of two chain complexes."""
 
     left: ChainComplexValue
     right: ChainComplexValue
-
-    @model_validator(mode="after")
-    def require_admissible_tensor_work(self) -> Self:
-        try:
-            _require_admissible_tensor_work(self.left, self.right)
-        except ChainComplexAdmissionError as exc:
-            raise _validation_error(exc.reason, str(exc)) from None
-        return self
-
 
 __all__ = [
     "ComputeHomologyRequest",
