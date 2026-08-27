@@ -17,7 +17,6 @@ from jacobian.math.graphs.optimization._maximum_cut import (
     MAXIMUM_CUT_RESULT_BYTES,
     GraphMaximumCutRequest,
     GraphMaximumCutResult,
-    _verify_maximum_cut_result,
     compute_maximum_cut,
 )
 from jacobian.math.graphs.values import SimpleUndirectedGraph
@@ -272,18 +271,6 @@ def test_approximate_upper_bound_and_lower_valued_cut_cannot_claim_exactness() -
 
     with pytest.raises(ValidationError):
         GraphMaximumCutResult.model_validate(honest)
-
-
-def test_feasible_suboptimal_cut_with_forged_exact_bounds_fails_replay() -> None:
-    forged = _validated_result(_cycle(5)).model_dump(mode="json")
-    forged["left_vertices"] = ["00"]
-    forged["right_vertices"] = ["01", "02", "03", "04"]
-    forged["crossing_edges"] = [["00", "01"], ["00", "04"]]
-    forged["cut_value"] = 2
-    forged["lower_bound"] = 2
-    forged["upper_bound"] = 2
-
-    assert not _verify_maximum_cut_result(GraphMaximumCutResult.model_validate(forged))
 
 
 def test_result_deserialization_never_replays_the_exhaustive_kernel(

@@ -311,10 +311,8 @@ class GraphMaximumCutResult(StrictModel):
     def bind_cut_to_source(self) -> Self:
         """Validate the linear source-bound witness shape only.
 
-        Exact optimality is a nonlocal claim.  Replaying it here would make
-        ordinary result deserialization execute the exhaustive kernel; callers
-        that receive an independently supplied result must opt into
-        :func:`_verify_maximum_cut_result` instead.
+        Exact optimality is established by the trusted owner kernel rather than
+        replayed during ordinary result deserialization.
         """
 
         graph_vertices = set(self.graph.vertices)
@@ -373,18 +371,6 @@ class GraphMaximumCutResult(StrictModel):
             lower_bound=cut_value,
             upper_bound=cut_value,
         )
-
-
-def _verify_maximum_cut_result(result: GraphMaximumCutResult) -> bool:
-    """Replay one independently supplied exact maximum-cut claim.
-
-    The request envelope has already bounded the exhaustive enumeration.  It
-    is deliberately explicit so Pydantic result parsing remains structural.
-    """
-
-    analysis = _require_graph_envelope(result.graph)
-    replayed_value, _sides = _solve_analysis_by_enumeration(analysis)
-    return result.cut_value == replayed_value
 
 
 def _solve_component_by_enumeration(
