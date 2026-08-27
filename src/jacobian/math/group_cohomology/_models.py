@@ -85,6 +85,32 @@ def _admitted_max_degree(order: int) -> int:
     return degree - 1
 
 
+def _require_admitted_request(request: GroupCohomologyRequest) -> int:
+    """Admit one cohomology computation and return its enumerated group order."""
+
+    from sympy import isprime
+
+    if not isprime(request.prime):
+        raise _validation_error("prime_not_prime", "prime must be a prime integer")
+    order = _enumerated_group_order(request.group)
+    if order > MAX_GROUP_ORDER:
+        raise _validation_error(
+            "group_order_exceeds_bound",
+            f"enumerated group order {order} exceeds the bounded maximum {MAX_GROUP_ORDER}",
+        )
+    admitted_degree = _admitted_max_degree(order)
+    if request.max_degree > admitted_degree:
+        raise _validation_error(
+            "degree_exceeds_work_budget",
+            f"max_degree {request.max_degree} exceeds the work-derived degree budget "
+            f"{admitted_degree} for enumerated group order {order}: cochain spaces "
+            f"|G|^(n+1) must stay within the {MAX_COCHAIN_TENSOR_ELEMENTS}-element "
+            f"budget and dense bar coboundaries |G|^(2n+1) within the "
+            f"{MAX_BAR_MATRIX_CELLS}-cell budget",
+        )
+    return order
+
+
 class GroupCohomologyRequest(StrictModel):
     """Compute group cohomology with trivial coefficients over GF(p).
 
@@ -103,32 +129,6 @@ class GroupCohomologyRequest(StrictModel):
     )
     prime: int = Field(ge=2, le=MAX_PRIME)
     max_degree: int = Field(ge=0, le=MAX_COCHAIN_DEGREE)
-
-    @model_validator(mode="after")
-    def require_admissible_domain(self) -> Self:
-        from sympy import isprime
-
-        if not isprime(self.prime):
-            raise _validation_error("prime_not_prime", "prime must be a prime integer")
-        order = _enumerated_group_order(self.group)
-        if order > MAX_GROUP_ORDER:
-            raise _validation_error(
-                "group_order_exceeds_bound",
-                f"enumerated group order {order} exceeds the bounded maximum "
-                f"{MAX_GROUP_ORDER}",
-            )
-        admitted_degree = _admitted_max_degree(order)
-        if self.max_degree > admitted_degree:
-            raise _validation_error(
-                "degree_exceeds_work_budget",
-                f"max_degree {self.max_degree} exceeds the work-derived "
-                f"degree budget {admitted_degree} for enumerated group order "
-                f"{order}: cochain spaces |G|^(n+1) must stay within the "
-                f"{MAX_COCHAIN_TENSOR_ELEMENTS}-element budget and dense bar "
-                f"coboundaries |G|^(2n+1) within the "
-                f"{MAX_BAR_MATRIX_CELLS}-cell budget",
-            )
-        return self
 
 
 class CohomologyGroup(StrictModel):

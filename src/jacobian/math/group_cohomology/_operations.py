@@ -9,6 +9,7 @@ from jacobian.math.group_cohomology._models import (
     CohomologyGroup,
     GroupCohomologyRequest,
     GroupCohomologyResult,
+    _require_admitted_request,
 )
 
 
@@ -138,15 +139,9 @@ def compute_group_cohomology(request: GroupCohomologyRequest) -> GroupCohomology
     coboundaries are materialized exactly; each ``betti`` number is
     dim ker(delta^n) - rank(im(delta^{n-1})) = dim H^n(G, GF(p)).
     """
+    _require_admitted_request(request)
     groups, group_order = _cohomology_profile(request)
     return GroupCohomologyResult._from_kernel(request, groups, group_order)
 
 
-def verify_group_cohomology_result(result: GroupCohomologyResult) -> bool:
-    """Replay a separately supplied claim inside its admitted owner envelope."""
-
-    groups, group_order = _cohomology_profile(result.request)
-    return result.groups == groups and result.group_order == group_order
-
-
-__all__ = ["compute_group_cohomology", "verify_group_cohomology_result"]
+__all__ = ["compute_group_cohomology"]
