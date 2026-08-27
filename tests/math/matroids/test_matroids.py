@@ -9,6 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian._exact import CanonicalInteger  # noqa: F401  (canonical grammar)
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.matroids import (
     LinearMatroid,
     compute_matroid_closure,
@@ -125,8 +126,9 @@ class TestClosure:
 
     def test_subset_indices_validated(self) -> None:
         m = _matroid(5, [(1, 0), (0, 1)], 2)
-        with pytest.raises(ValidationError) as exc_info:
-            MatroidClosureRequest(matroid=m, subset=(2,))
+        request = MatroidClosureRequest(matroid=m, subset=(2,))
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_closure(request)
         assert exc_info.value.errors()[0]["type"] == "matroid.subset.invalid"
 
     def test_native_closure_validates_indices(self) -> None:

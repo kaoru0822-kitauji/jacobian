@@ -3,10 +3,11 @@
 from typing import Any
 
 from jacobian.catalog._examples import example
-from jacobian.catalog.models import MathTool
+from jacobian.catalog.models import MathTool, OperationDomainValidationError
 from jacobian.math.matroids._models import (
     MatroidClosureRequest,
     MatroidClosureResult,
+    validate_subset_indices,
 )
 from jacobian.math.matroids._operations import (
     _closure_invariant,
@@ -15,6 +16,14 @@ from jacobian.math.matroids._operations import (
 
 def compute_closure(request: MatroidClosureRequest) -> MatroidClosureResult:
     """Compute the closure (smallest flat) of a subset in a linear matroid."""
+    try:
+        validate_subset_indices(request.matroid, request.subset)
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=("subset",),
+            code="matroid.subset.invalid",
+            message=str(exc),
+        ) from exc
     closure, subset_rank = _closure_invariant(request.matroid, list(request.subset))
     return MatroidClosureResult._from_kernel(request, closure, subset_rank)
 

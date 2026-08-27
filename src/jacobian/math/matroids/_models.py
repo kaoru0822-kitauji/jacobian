@@ -122,14 +122,6 @@ class MatroidClosureRequest(StrictModel):
         json_schema_extra={"uniqueItems": True},
     )
 
-    @model_validator(mode="after")
-    def require_valid_subset(self) -> Self:
-        try:
-            validate_subset_indices(self.matroid, self.subset)
-        except ValueError as exc:
-            raise _validation_error("subset.invalid", str(exc)) from exc
-        return self
-
 
 class MatroidClosureResult(MatroidClosureRequest):
     """The claimed closure (flat) of a subset in a linear matroid.
@@ -154,6 +146,10 @@ class MatroidClosureResult(MatroidClosureRequest):
 
     @model_validator(mode="after")
     def require_bounded_canonical_claim(self) -> Self:
+        try:
+            validate_subset_indices(self.matroid, self.subset)
+        except ValueError as exc:
+            raise _validation_error("subset.invalid", str(exc)) from exc
         if self.closure != tuple(sorted(set(self.closure))):
             raise _validation_error(
                 "closure.canonical",
