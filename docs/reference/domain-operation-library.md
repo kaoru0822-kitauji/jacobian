@@ -143,9 +143,8 @@ source-indexed map
 F \longmapsto \chi(G-F) \quad \text{for every } F\subseteq E(G),\ |F|\leq b.
 \]
 
-This is one complete profile, not a theorem about critical graphs and not a
-workflow for choosing which deletions matter.  A sound contract would make the
-following choices explicit:
+This is one complete profile. A sound contract makes the following choices
+explicit:
 
 - **Canonical rows:** order each source-edge subset by increasing cardinality
   and then lexicographically by source-edge index, including the empty subset.
@@ -165,10 +164,9 @@ following choices explicit:
   family, recognizing a theorem-specific criticality class, and deriving a
   Ramsey or extremal conclusion remain caller composition.
 
-The profile's exhaustive source relation is the defining invariant.  A graph
-colouring backend is only a private kernel for individual rows, and a paper
-that uses the profile as one lemma supplies a theorem-specific lift rather
-than the operation's public meaning.
+The exhaustive source relation is the defining invariant. A graph-colouring
+backend computes individual rows; choosing deletions or drawing a larger
+conclusion remains caller composition.
 
 ### Validated mathematical subtypes and exact-success states
 

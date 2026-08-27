@@ -78,10 +78,9 @@ of the postcondition, not an implementation footnote.
 
 ### Sieve continuous and analytic proof moves
 
-For a source whose decisive step is smooth, complex-analytic, metric,
-asymptotic, probabilistic, or PDE-based, state explicitly whether the proposed
-carrier preserves the semantics on which that step depends.  Check at least
-the following when they apply:
+For a smooth, complex-analytic, metric, asymptotic, probabilistic, or PDE
+source, state whether the proposed carrier preserves the semantics used by the
+decisive step. Check, where relevant:
 
 - the ambient category and regularity (for example, a fixed rational chart
   versus an atlas or a smooth manifold);
@@ -91,15 +90,13 @@ the following when they apply:
 - scale, approximation, and quantified error/loss conventions; and
 - the exact domain on which a claimed identity or inequality is valid.
 
-A finite discretisation, rational-coordinate sample, or numerical trace is
-not an implementation of the source move merely because it shares its nouns.
-It may still expose a valid exact local leaf—such as a gradient, coordinate
-curvature profile, covariant derivative, or rigorous scalar range enclosure—
-when that leaf has its own stable postcondition.  Do not turn it into a
-`ricci_flow`, Kakeya-tube, HRT-cocycle, compactness, or limit operation unless
-the proposed input and result retain the required continuum semantics and
-validated error guarantees.  Otherwise record caller reasoning, a missing
-representation prerequisite, or no supported Jacobian action.
+A finite discretisation, coordinate sample, or numerical trace is not the
+source move merely because it shares its nouns. It may expose an exact local
+leaf—such as a gradient, curvature profile, covariant derivative, or rigorous
+range enclosure—when that leaf has its own stable postcondition. Otherwise
+record caller reasoning, a representation prerequisite, or no action; do not
+publish a `ricci_flow`, Kakeya-tube, HRT-cocycle, compactness, or limit
+operation without the required continuum semantics and validated errors.
 
 Classify an established technique as a public-operation candidate, native-only
 function, private kernel, invariant or fixture, or caller reasoning. Technique

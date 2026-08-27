@@ -39,20 +39,16 @@ the quantities that actually control the kernel or exact output.
 
 ## Define the operation before its implementation or source theorem
 
-Write the candidate in three deliberately separate layers:
+State the candidate as a postcondition: for valid input `X`, it returns a
+canonical value `Y` satisfying a mathematical relation `P(X, Y)`.  Then state
+the defining invariant—an identity, reconstruction, exhaustive relation, or
+independent oracle—that establishes a computed `Y` satisfies `P`.  The
+postcondition is the admission object; the invariant is its test evidence, not
+a second operation or a proof replay during ordinary execution.
 
-| Layer | Question | Owner |
-| --- | --- | --- |
-| **Postcondition** | For valid input `X`, what canonical value `Y` is returned, and what mathematical relation `P(X, Y)` does it establish? | The public operation contract. |
-| **Defining invariant** | What identity, reconstruction, exhaustive relation, or independent oracle establishes that one computed `Y` satisfies `P(X, Y)`? | The trusted kernel and its tests. |
-| **Theorem-specific lift** | How does a paper, conjecture investigation, or caller combine `Y` with other choices and arguments to obtain a larger conclusion? | Caller reasoning, not the operation. |
-
-The postcondition is the admission object.  A defining invariant is evidence
-for that postcondition; it is not a second operation and does not require
-ordinary execution to replay a proof.  A source theorem can reveal a useful
-postcondition, but its reduction, parameter choices, contradiction, and
-stopping rule remain caller-owned unless they themselves return a distinct,
-bounded, reusable value.
+A source theorem may reveal a useful postcondition, but its reduction,
+parameter choices, contradiction, and stopping rule remain caller-owned unless
+they return a distinct bounded reusable value.
 
 For smooth, analytic, or asymptotic source material, first establish that the
 proposed carrier retains the required category, regularity, metric or measure,
