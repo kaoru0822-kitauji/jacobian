@@ -75,9 +75,11 @@ def test_proper_divisor_aliases_preserve_complete_result_postconditions() -> Non
 
     assert divisors is not None
     assert "every positive divisor" in divisors.description
-    assert "callers obtain its proper divisors" in divisors.description
-    assert "by removing the input itself" in divisors.description
+    assert "proper-divisor" in divisors.description
+    assert "aliquot proper-divisor list" in divisors.description
+    assert "by removing the input itself" not in divisors.description
     assert divisor_sum is not None
     assert "every positive divisor" in divisor_sum.description
-    assert "Callers obtain the sum of proper divisors" in divisor_sum.description
-    assert "by subtracting the input integer" in divisor_sum.description
+    assert "proper-divisor sum" in divisor_sum.description
+    assert "aliquot sum" in divisor_sum.description
+    assert "by subtracting the input integer" not in divisor_sum.description

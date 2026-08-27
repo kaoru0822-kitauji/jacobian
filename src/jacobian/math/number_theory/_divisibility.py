@@ -117,8 +117,8 @@ DIVISIBILITY_OPERATIONS = (
         "Sum positive divisors",
         (
             "Compute the sum of every positive divisor of one positive integer, "
-            "including the integer itself. Callers obtain the sum of proper "
-            "divisors (the aliquot sum) by subtracting the input integer."
+            "including the integer itself. The proper-divisor sum is also "
+            "called the aliquot sum."
         ),
         PositiveIntegerRequest,
         IntegerValue,
