@@ -259,58 +259,6 @@ def test_canonical_equality_agrees_with_networkx_on_all_order_four_graphs() -> N
             )
 
 
-def test_result_round_trip_is_structural_and_private_verifier_rejects_mutations() -> (
-    None
-):
-    from jacobian.math.graphs.isomorphism._operations import (
-        _verify_colored_graph_canonicalization_result,
-    )
-
-    source = _graph(
-        ("a", "b", "c", "d"),
-        (("a", "b"), ("b", "c"), ("c", "d")),
-    )
-    result = _canonicalize(source)
-
-    changed_source = result.model_dump(mode="json")
-    changed_source["source_graph"]["graph"]["edges"] = [
-        ["a", "b"],
-        ["c", "d"],
-    ]
-    assert not _verify_colored_graph_canonicalization_result(
-        ColoredGraphCanonicalizationResult.model_validate(changed_source)
-    )
-
-    changed_graph = result.model_dump(mode="json")
-    changed_graph["canonical_graph"]["graph"]["edges"] = [
-        ["v00", "v01"],
-        ["v00", "v02"],
-        ["v00", "v03"],
-    ]
-    assert not _verify_colored_graph_canonicalization_result(
-        ColoredGraphCanonicalizationResult.model_validate(changed_graph)
-    )
-
-    changed_tie_break = result.model_dump(mode="json")
-    relabeling = changed_tie_break["relabeling"]
-    index_by_source = {
-        item["source_vertex"]: index for index, item in enumerate(relabeling)
-    }
-    for left, right in (("a", "d"), ("b", "c")):
-        left_index = index_by_source[left]
-        right_index = index_by_source[right]
-        (
-            relabeling[left_index]["canonical_vertex"],
-            relabeling[right_index]["canonical_vertex"],
-        ) = (
-            relabeling[right_index]["canonical_vertex"],
-            relabeling[left_index]["canonical_vertex"],
-        )
-    assert not _verify_colored_graph_canonicalization_result(
-        ColoredGraphCanonicalizationResult.model_validate(changed_tie_break)
-    )
-
-
 def test_request_admits_by_color_class_size_not_only_vertex_count() -> None:
     nine = tuple(f"v{index:02d}" for index in range(9))
     ten = tuple(f"v{index:02d}" for index in range(10))

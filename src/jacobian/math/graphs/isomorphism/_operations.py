@@ -200,16 +200,3 @@ def canonicalize_colored_graph_kernel(
             for source, target in relabeling
         ),
     )
-
-
-def _verify_colored_graph_canonicalization_result(
-    result: ColoredGraphCanonicalizationResult,
-) -> bool:
-    """Fail closed for a deliberately supplied canonicalization claim."""
-
-    try:
-        request = ColoredGraphCanonicalizationRequest(colored_graph=result.source_graph)
-        expected = canonicalize_colored_graph_kernel(request.colored_graph)
-    except ValueError:
-        return False
-    return expected == result
