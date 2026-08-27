@@ -22,7 +22,9 @@ def test_positive_divisor_language_keeps_existing_first_rank(
     assert result.matches[0].operation_id == operation_id
 
 
-def test_complete_divisor_declarations_do_not_claim_proper_result_postconditions() -> None:
+def test_complete_divisor_declarations_do_not_claim_proper_result_postconditions() -> (
+    None
+):
     catalog = Catalog.open()
     divisors = catalog.operation("integer.compute.divisors")
     divisor_sum = catalog.operation("integer.compute.divisor_sum")
