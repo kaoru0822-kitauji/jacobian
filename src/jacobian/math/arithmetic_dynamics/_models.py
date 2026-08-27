@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from fractions import Fraction
 from functools import wraps
-from itertools import pairwise
 from typing import Any, Literal, Self
 
 from pydantic import Field
@@ -257,11 +256,6 @@ class PolynomialCoefficientRequest(StrictModel):
         min_length=1, max_length=MAX_DEGREE + 1
     )
 
-    @model_validator(mode="after")
-    def require_canonical_coefficients(self) -> Self:
-        parse_polynomial_coefficients(self.coefficients)
-        return self
-
     def coefficient_values(self) -> tuple[Fraction, ...]:
         return parse_polynomial_coefficients(self.coefficients)
 
@@ -275,16 +269,6 @@ class MapIterateRequest(PolynomialCoefficientRequest):
 
     n: int = Field(ge=0, le=MAX_ITERATE)
 
-    @model_validator(mode="after")
-    def require_bounded_iterate_degree(self) -> Self:
-        degree = self.polynomial_degree()
-        output_degree = 1 if self.n == 0 else degree**self.n
-        if output_degree > MAX_ITERATE_DEGREE:
-            raise _validation_error("iterate output degree exceeds bound")
-        source = tuple(_fraction_height(value) for value in self.coefficient_values())
-        _iterate_heights(source, self.n)
-        return self
-
 
 class OrbitPrefixRequest(PolynomialCoefficientRequest):
     """Compute until a first repeat or an explicit finite/output bound."""
@@ -292,73 +276,19 @@ class OrbitPrefixRequest(PolynomialCoefficientRequest):
     start: CanonicalRational
     max_steps: int = Field(ge=0, le=MAX_ORBIT_STEPS)
 
-    @model_validator(mode="after")
-    def require_canonical_start(self) -> Self:
-        _bounded_fraction(self.start, max_digits=MAX_COEFFICIENT_DIGITS, label="start")
-        return self
-
 
 class DynatomicPolynomialRequest(PolynomialCoefficientRequest):
     """Compute the n-th dynatomic polynomial of a degree-at-least-two map."""
 
     n: int = Field(ge=1, le=MAX_ITERATE)
 
-    @model_validator(mode="after")
-    def require_bounded_dynatomic_degree(self) -> Self:
-        degree = self.polynomial_degree()
-        if degree < 2:
-            raise _validation_error(
-                "dynatomic polynomial requires map degree at least two"
-            )
-        if degree**self.n > MAX_DYNATOMIC_DEGREE:
-            raise _validation_error("dynatomic output degree exceeds bound")
-        source = tuple(_fraction_height(value) for value in self.coefficient_values())
-        numerator: tuple[CoefficientHeight, ...] = (RationalHeight(1, 1),)
-        denominator: tuple[CoefficientHeight, ...] = (RationalHeight(1, 1),)
-        for divisor in range(1, self.n + 1):
-            if self.n % divisor != 0:
-                continue
-            term = list(_iterate_heights(source, divisor))
-            if len(term) < 2:
-                term.extend([None] * (2 - len(term)))
-            term[1] = _add_heights(term[1], RationalHeight(1, 1))
-            mobius = _mobius(self.n // divisor)
-            if mobius == 1:
-                numerator = _multiply_height_polynomials(numerator, tuple(term))
-                _require_polynomial_height(numerator, "dynatomic numerator")
-            elif mobius == -1:
-                denominator = _multiply_height_polynomials(denominator, tuple(term))
-                _require_polynomial_height(denominator, "dynatomic denominator")
-        quotient = _divide_height_polynomials(numerator, denominator)
-        _require_polynomial_height(quotient, "dynatomic quotient")
-        return self
-
 
 class CycleMultiplierRequest(PolynomialCoefficientRequest):
-    """Compute the multiplier of a supplied, validated exact rational cycle."""
+    """Compute the multiplier of a supplied exact rational cycle."""
 
     cycle: tuple[CanonicalRational, ...] = Field(
         min_length=1, max_length=MAX_ORBIT_STEPS
     )
-
-    @model_validator(mode="after")
-    def require_exact_cycle(self) -> Self:
-        points = tuple(
-            _bounded_fraction(
-                value, max_digits=MAX_COEFFICIENT_DIGITS, label="cycle point"
-            )
-            for value in self.cycle
-        )
-        if len(set(points)) != len(points):
-            raise _validation_error("cycle points must be distinct")
-        coefficients = self.coefficient_values()
-        for index, point in enumerate(points):
-            expected = points[(index + 1) % len(points)]
-            if _evaluate(coefficients, point) != expected:
-                raise _validation_error(
-                    "cycle points must follow the polynomial map in order"
-                )
-        return self
 
 
 class FiniteFieldMapRequest(StrictModel):
@@ -366,17 +296,6 @@ class FiniteFieldMapRequest(StrictModel):
 
     prime: int = Field(ge=2, le=MAX_FIELD_PRIME)
     coefficients: tuple[str, ...] = Field(min_length=1, max_length=MAX_DEGREE + 1)
-
-    @model_validator(mode="after")
-    def require_canonical_prime_field_map(self) -> Self:
-        if not _is_prime(self.prime):
-            raise _validation_error("prime must be a prime number")
-        values = tuple(_parse_canonical_integer(value) for value in self.coefficients)
-        if len(values) > 1 and values[-1] % self.prime == 0:
-            raise _validation_error(
-                "coefficients must omit trailing zeros modulo the prime"
-            )
-        return self
 
 
 class MapIterateResult(StrictModel):
@@ -390,6 +309,23 @@ class MapIterateResult(StrictModel):
     degree: int = Field(ge=0, le=MAX_ITERATE_DEGREE)
     complete: Literal[True] = True
     method: Literal["EXACT_POLYNOMIAL_COMPOSITION"] = "EXACT_POLYNOMIAL_COMPOSITION"
+
+    @classmethod
+    def _from_kernel(
+        cls,
+        request: MapIterateRequest,
+        *,
+        coefficients: tuple[CanonicalRational, ...],
+        degree: int,
+    ) -> Self:
+        return cls.model_construct(
+            source_coefficients=request.coefficients,
+            n=request.n,
+            coefficients=coefficients,
+            degree=degree,
+            complete=True,
+            method="EXACT_POLYNOMIAL_COMPOSITION",
+        )
 
     @model_validator(mode="after")
     def bind_degree_and_coefficients(self) -> Self:
@@ -438,9 +374,30 @@ class OrbitPrefixResult(StrictModel):
     eventual_behavior_complete: bool
     truncated: bool
 
+    @classmethod
+    def _from_kernel(
+        cls,
+        request: OrbitPrefixRequest,
+        *,
+        orbit: tuple[CanonicalRational, ...],
+        termination: Literal["REPEAT_FOUND", "STEP_BOUND_REACHED", "OUTPUT_BOUND_REACHED"],
+        repeat: OrbitRepeatEvidence | None,
+    ) -> Self:
+        found_repeat = termination == "REPEAT_FOUND"
+        return cls.model_construct(
+            source_coefficients=request.coefficients,
+            start=request.start,
+            orbit=orbit,
+            requested_steps=request.max_steps,
+            computed_steps=len(orbit) - 1,
+            termination=termination,
+            repeat=repeat,
+            eventual_behavior_complete=found_repeat,
+            truncated=not found_repeat,
+        )
+
     @model_validator(mode="after")
     def bind_termination_evidence(self) -> Self:
-        _require_bound_orbit(self.source_coefficients, self.start, self.orbit)
         if len(self.orbit) != self.computed_steps + 1:
             raise _validation_error("orbit length must equal computed steps plus one")
         if self.computed_steps > self.requested_steps:
@@ -490,6 +447,23 @@ class DynatomicPolynomialResult(StrictModel):
     method: Literal["MOBIUS_EXACT_POLYNOMIAL_DIVISION"] = (
         "MOBIUS_EXACT_POLYNOMIAL_DIVISION"
     )
+
+    @classmethod
+    def _from_kernel(
+        cls,
+        request: DynatomicPolynomialRequest,
+        *,
+        coefficients: tuple[CanonicalRational, ...],
+        degree: int,
+    ) -> Self:
+        return cls.model_construct(
+            source_coefficients=request.coefficients,
+            coefficients=coefficients,
+            degree=degree,
+            n=request.n,
+            complete=True,
+            method="MOBIUS_EXACT_POLYNOMIAL_DIVISION",
+        )
 
     @model_validator(mode="after")
     def bind_degree_and_coefficients(self) -> Self:
@@ -550,7 +524,7 @@ class CycleMultiplierResult(StrictModel):
             max_digits=MAX_POLYNOMIAL_OUTPUT_DIGITS,
             label="multiplier",
         )
-        return cls(
+        return cls.model_construct(
             source_coefficients=request.coefficients,
             multiplier=multiplier,
             cycle=request.cycle,
@@ -571,13 +545,8 @@ class FiniteFieldMapResult(StrictModel):
 
     @model_validator(mode="after")
     def require_structural_consistency(self) -> Self:
-        if not _is_prime(self.prime):
-            raise _validation_error("prime must be a prime number")
-        values = tuple(_parse_canonical_integer(value) for value in self.coefficients)
-        if len(values) > 1 and values[-1] % self.prime == 0:
-            raise _validation_error(
-                "coefficients must omit trailing zeros modulo the prime"
-            )
+        for coefficient in self.coefficients:
+            _parse_canonical_integer(coefficient)
         self._require_complete_edges()
         cycle_set = self._require_canonical_cycles()
         self._require_tail_evidence(cycle_set)
@@ -594,7 +563,7 @@ class FiniteFieldMapResult(StrictModel):
     ) -> Self:
         """Build a result after complete graph enumeration established it."""
 
-        return cls(
+        return cls.model_construct(
             prime=request.prime,
             coefficients=request.coefficients,
             edges=edges,
@@ -640,41 +609,6 @@ class FiniteFieldMapResult(StrictModel):
             raise ValueError("tail lengths must decrease by one along every tail edge")
 
 
-def _evaluate(coefficients: tuple[Fraction, ...], point: Fraction) -> Fraction:
-    value = Fraction(0)
-    for coefficient in reversed(coefficients):
-        value = value * point + coefficient
-    return value
-
-
-def _require_bound_orbit(
-    source_coefficients: tuple[CanonicalRational, ...],
-    start: CanonicalRational,
-    orbit_values: tuple[CanonicalRational, ...],
-) -> None:
-    source = parse_polynomial_coefficients(source_coefficients)
-    initial = _bounded_fraction(start, max_digits=MAX_COEFFICIENT_DIGITS, label="start")
-    orbit = tuple(
-        _bounded_fraction(
-            value,
-            max_digits=MAX_ORBIT_VALUE_DIGITS,
-            label="orbit value",
-        )
-        for value in orbit_values
-    )
-    if orbit[0] != initial:
-        raise ValueError("orbit must begin at the bound start point")
-    if any(_evaluate(source, point) != target for point, target in pairwise(orbit)):
-        raise ValueError("orbit values must follow the bound polynomial map")
-
-
-def _evaluate_mod_prime(coefficients: tuple[int, ...], point: int, prime: int) -> int:
-    value = 0
-    for coefficient in reversed(coefficients):
-        value = (value * point + coefficient) % prime
-    return value
-
-
 def _parse_canonical_integer(value: str) -> int:
     if len(value) > MAX_COEFFICIENT_DIGITS + 1:
         raise ValueError("coefficient exceeds the integer digit bound")
@@ -685,21 +619,6 @@ def _parse_canonical_integer(value: str) -> int:
     if str(parsed) != value:
         raise ValueError("coefficient must be a canonical integer")
     return parsed
-
-
-def _is_prime(n: int) -> bool:
-    if n < 2:
-        return False
-    if n < 4:
-        return True
-    if n % 2 == 0 or n % 3 == 0:
-        return False
-    i = 5
-    while i * i <= n:
-        if n % i == 0 or n % (i + 2) == 0:
-            return False
-        i += 6
-    return True
 
 
 __all__ = [

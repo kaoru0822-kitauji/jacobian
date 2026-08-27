@@ -5,7 +5,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from jacobian.canonical import format_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.padic_arithmetic._models import (
+    MAX_PRIME,
     HenselFactorLiftRequest,
     HenselFactorLiftResult,
     HenselRootRequest,
@@ -16,6 +18,78 @@ from jacobian.math.padic_arithmetic._models import (
     PAdicRootsResult,
     _kernel_coefficients,
 )
+
+_MAX_PADIC_COEFFICIENTS = 64
+
+
+def _domain_error(location: tuple[str | int, ...], code: str, message: str) -> None:
+    raise OperationDomainValidationError(
+        location=location,
+        code=f"padic_arithmetic.{code}",
+        message=message,
+    )
+
+
+def _require_prime(value: int) -> None:
+    if value < 2 or value > MAX_PRIME or any(
+        value % divisor == 0 for divisor in range(2, int(value**0.5) + 1)
+    ):
+        _domain_error(("prime",), "prime_not_prime", "prime must be a prime modulus")
+
+
+def _require_polynomial_budget(polynomial: IntegerPolynomial, field: str) -> None:
+    if len(polynomial.coefficients) > _MAX_PADIC_COEFFICIENTS:
+        _domain_error(
+            (field, "coefficients"),
+            "polynomial_budget",
+            "p-adic polynomial exceeds the 64-coefficient operation budget",
+        )
+
+
+def _poly_eval_mod_p(coeffs: tuple[int, ...], x: int, p: int) -> int:
+    result = 0
+    for coeff in reversed(coeffs):
+        result = (result * x + coeff) % p
+    return result
+
+
+def _poly_deriv_mod_p(coeffs: tuple[int, ...], x: int, p: int) -> int:
+    if len(coeffs) <= 1:
+        return 0
+    return _poly_eval_mod_p(tuple(i * coeffs[i] for i in range(1, len(coeffs))), x, p)
+
+
+def _admit_root(request: HenselRootRequest) -> tuple[int, ...]:
+    _require_polynomial_budget(request.polynomial, "polynomial")
+    _require_prime(request.prime)
+    if request.root_mod_p >= request.prime:
+        _domain_error(
+            ("root_mod_p",), "root_out_of_range", "root_mod_p must be in 0..p-1"
+        )
+    coeffs = _kernel_coefficients(request.polynomial)
+    if _poly_eval_mod_p(coeffs, request.root_mod_p, request.prime) != 0:
+        _domain_error(
+            ("root_mod_p",),
+            "root_not_root",
+            "root_mod_p must satisfy f(root_mod_p) = 0 mod p",
+        )
+    if _poly_deriv_mod_p(coeffs, request.root_mod_p, request.prime) % request.prime == 0:
+        _domain_error(
+            ("root_mod_p",),
+            "root_not_simple",
+            "Hensel lifting requires a simple root: f'(root_mod_p) must be nonzero mod p",
+        )
+    return coeffs
+
+
+def _admit_factors(request: HenselFactorLiftRequest) -> None:
+    for field, polynomial in (
+        ("polynomial", request.polynomial),
+        ("factor_g", request.factor_g),
+        ("factor_h", request.factor_h),
+    ):
+        _require_polynomial_budget(polynomial, field)
+    _require_prime(request.prime)
 
 
 def _trim_asc(coefficients: Sequence[int]) -> list[int]:
@@ -91,8 +165,8 @@ def _hensel_lift_root(
 
 
 def hensel_lift_root(request: HenselRootRequest) -> HenselRootResult:
-    """Lift the simple root of f(x) mod p validated by the request model."""
-    coeffs = _kernel_coefficients(request.polynomial)
+    """Normalize, admit, and lift one simple root of ``f`` modulo ``p``."""
+    coeffs = _admit_root(request)
     lifted = _hensel_lift_root(
         coeffs, request.prime, request.root_mod_p, request.precision
     )
@@ -203,6 +277,7 @@ def hensel_lift_factors(request: HenselFactorLiftRequest) -> HenselFactorLiftRes
     preserving the product congruence exactly. The reconstructed product
     is validated against ``f`` modulo ``p^k`` before returning.
     """
+    _admit_factors(request)
     f_asc = _kernel_coefficients(request.polynomial)
     g_asc = _kernel_coefficients(request.factor_g)
     h_asc = _kernel_coefficients(request.factor_h)
@@ -282,6 +357,8 @@ def find_padic_roots(request: PAdicRootsRequest) -> PAdicRootsResult:
     their mod-p^k solution sets can grow unboundedly (x^2 has five roots mod
     25), so enumerating them would not be bounded.
     """
+    _require_polynomial_budget(request.polynomial, "polynomial")
+    _require_prime(request.prime)
     coeffs = _kernel_coefficients(request.polynomial)
     p = request.prime
     k = request.precision

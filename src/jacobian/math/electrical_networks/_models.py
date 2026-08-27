@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Literal, Self
+from typing import Literal
 
-from pydantic import Field, model_validator
-from pydantic_core import PydanticCustomError
+from pydantic import Field
 
-from jacobian._exact import CanonicalRational, require_bounded_rational
+from jacobian._exact import CanonicalRational
 from jacobian._models import StrictModel
 
 MAX_NETWORK_VERTICES = 128
@@ -23,41 +22,12 @@ MAX_NETWORK_EDGES = 512
 MAX_CONDUCTANCE_DIGITS = 50
 
 
-def _validation_error(reason: str, message: str) -> PydanticCustomError:
-    """Build a stable validation error owned by electrical-network contracts."""
-
-    return PydanticCustomError(f"electrical_network.{reason}", message)
-
-
 class ConductanceEdge(StrictModel):
     """One undirected edge with a positive rational conductance (1/resistance)."""
 
     source: int = Field(ge=0, le=MAX_NETWORK_VERTICES - 1)
     target: int = Field(ge=0, le=MAX_NETWORK_VERTICES - 1)
     conductance: CanonicalRational
-
-    @model_validator(mode="after")
-    def require_distinct_positive(self) -> Self:
-        if self.source == self.target:
-            raise _validation_error(
-                "edge_endpoints_not_distinct", "edge endpoint must be distinct"
-            )
-        if self.conductance.as_fraction() <= 0:
-            raise _validation_error(
-                "conductance_not_positive", "conductance must be strictly positive"
-            )
-        try:
-            require_bounded_rational(
-                self.conductance,
-                max_digits=MAX_CONDUCTANCE_DIGITS,
-                label="conductance",
-            )
-        except ValueError as exc:
-            raise _validation_error(
-                "conductance_exceeds_digit_bound", str(exc)
-            ) from exc
-        return self
-
 
 class ConductanceNetwork(StrictModel):
     """An undirected graph of positive conductances over vertices 0..vertex_count-1."""
@@ -67,82 +37,12 @@ class ConductanceNetwork(StrictModel):
         min_length=1, max_length=MAX_NETWORK_EDGES
     )
 
-    @model_validator(mode="after")
-    def require_valid_unique_edges(self) -> Self:
-        seen: set[tuple[int, int]] = set()
-        for edge in self.edges:
-            if not (
-                0 <= edge.source < self.vertex_count
-                and 0 <= edge.target < self.vertex_count
-            ):
-                raise _validation_error(
-                    "edge_vertex_out_of_range",
-                    "edge vertices must be in 0..vertex_count-1",
-                )
-            key = (
-                (edge.source, edge.target)
-                if edge.source < edge.target
-                else (edge.target, edge.source)
-            )
-            if key in seen:
-                raise _validation_error(
-                    "duplicate_edges",
-                    "edges must be unique (ignoring direction)",
-                )
-            seen.add(key)
-        return self
-
-
-def _require_connected(network: ConductanceNetwork) -> None:
-    """Reject networks whose reduced Laplacian solve is singular."""
-
-    adjacency: list[list[int]] = [[] for _ in range(network.vertex_count)]
-    for edge in network.edges:
-        adjacency[edge.source].append(edge.target)
-        adjacency[edge.target].append(edge.source)
-
-    seen: list[bool] = [False] * network.vertex_count
-    seen[0] = True
-    stack = [0]
-    while stack:
-        node = stack.pop()
-        for neighbor in adjacency[node]:
-            if not seen[neighbor]:
-                seen[neighbor] = True
-                stack.append(neighbor)
-
-    if not all(seen):
-        raise _validation_error("network_not_connected", "network must be connected")
-
-
 class EffectiveResistanceRequest(StrictModel):
     """Effective resistance between two distinct terminals of a conductance network."""
 
     network: ConductanceNetwork
     terminal_a: int = Field(ge=0, le=MAX_NETWORK_VERTICES - 1)
     terminal_b: int = Field(ge=0, le=MAX_NETWORK_VERTICES - 1)
-
-    @model_validator(mode="after")
-    def require_valid_distinct_terminals(self) -> Self:
-        if not (0 <= self.terminal_a < self.network.vertex_count):
-            raise _validation_error(
-                "terminal_a_out_of_range", "terminal_a must be in 0..vertex_count-1"
-            )
-        if not (0 <= self.terminal_b < self.network.vertex_count):
-            raise _validation_error(
-                "terminal_b_out_of_range", "terminal_b must be in 0..vertex_count-1"
-            )
-        if self.terminal_a == self.terminal_b:
-            raise _validation_error(
-                "terminals_not_distinct", "terminals must be distinct"
-            )
-        return self
-
-    @model_validator(mode="after")
-    def require_connected_network(self) -> Self:
-        _require_connected(self.network)
-        return self
-
 
 class EffectiveResistanceResult(StrictModel):
     """Exact effective resistance between two terminals."""
@@ -159,28 +59,6 @@ class NodePotentialRequest(StrictModel):
     network: ConductanceNetwork
     source: int = Field(ge=0, le=MAX_NETWORK_VERTICES - 1)
     sink: int = Field(ge=0, le=MAX_NETWORK_VERTICES - 1)
-
-    @model_validator(mode="after")
-    def require_valid_distinct_terminals(self) -> Self:
-        if not (0 <= self.source < self.network.vertex_count):
-            raise _validation_error(
-                "source_out_of_range", "source must be in 0..vertex_count-1"
-            )
-        if not (0 <= self.sink < self.network.vertex_count):
-            raise _validation_error(
-                "sink_out_of_range", "sink must be in 0..vertex_count-1"
-            )
-        if self.source == self.sink:
-            raise _validation_error(
-                "source_sink_not_distinct", "source and sink must be distinct"
-            )
-        return self
-
-    @model_validator(mode="after")
-    def require_connected_network(self) -> Self:
-        _require_connected(self.network)
-        return self
-
 
 class NodePotentialValue(StrictModel):
     """One node's exact potential after solving a Dirichlet problem."""

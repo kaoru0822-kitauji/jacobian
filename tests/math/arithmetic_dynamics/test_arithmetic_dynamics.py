@@ -7,6 +7,7 @@ import sympy
 from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.arithmetic_dynamics import (
     finite_field_functional_graph,
     fixed_point_equation,
@@ -17,7 +18,6 @@ from jacobian.math.arithmetic_dynamics import (
 from jacobian.math.arithmetic_dynamics._models import (
     MAX_FIELD_PRIME,
     CycleMultiplierRequest,
-    CycleMultiplierResult,
     DynatomicPolynomialRequest,
     FiniteFieldMapRequest,
     FiniteFieldMapResult,
@@ -31,8 +31,6 @@ from jacobian.math.arithmetic_dynamics._operations import (
     compute_finite_field_map,
     compute_map_iterate,
     compute_orbit_prefix,
-    verify_cycle_multiplier_result,
-    verify_finite_field_map_result,
 )
 from jacobian.math.arithmetic_dynamics._tools import TOOLS
 
@@ -66,10 +64,10 @@ class TestMapIterate:
         assert result.degree == 0
 
     def test_degree_growth_beyond_output_bound_is_rejected(self) -> None:
-        with pytest.raises(ValidationError) as exc_info:
-            MapIterateRequest(
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_map_iterate(MapIterateRequest(
                 coefficients=(_r(1), _r(0), _r(0), _r(0), _r(0), _r(1)), n=5
-            )
+            ))
         assert (
             exc_info.value.errors()[0]["type"]
             == "arithmetic_dynamics.iterate_degree_exceeds_bound"
@@ -147,24 +145,6 @@ class TestOrbitPrefix:
             == "arithmetic_dynamics.bounded_termination_claims_eventual_behavior"
         )
 
-    def test_result_model_rejects_orbit_not_bound_to_source_map(self) -> None:
-        with pytest.raises(ValidationError) as exc_info:
-            OrbitPrefixResult(
-                source_coefficients=(_r(1), _r(1)),
-                start=_r(0),
-                orbit=(_r(0), _r(2)),
-                requested_steps=1,
-                computed_steps=1,
-                termination="STEP_BOUND_REACHED",
-                repeat=None,
-                eventual_behavior_complete=False,
-                truncated=True,
-            )
-        assert (
-            exc_info.value.errors()[0]["type"]
-            == "arithmetic_dynamics.orbit_map_mismatch"
-        )
-
 
 class TestDynatomicPolynomial:
     def test_first_dynatomic_polynomial(self) -> None:
@@ -201,8 +181,10 @@ class TestDynatomicPolynomial:
         assert product == fixed_point_equation(source, 4)
 
     def test_linear_map_is_outside_dynatomic_contract(self) -> None:
-        with pytest.raises(ValidationError) as exc_info:
-            DynatomicPolynomialRequest(coefficients=(_r(1), _r(1)), n=2)
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_dynatomic_polynomial(
+                DynatomicPolynomialRequest(coefficients=(_r(1), _r(1)), n=2)
+            )
         assert (
             exc_info.value.errors()[0]["type"]
             == "arithmetic_dynamics.dynatomic_degree_too_small"
@@ -220,34 +202,24 @@ class TestCycleMultiplier:
         assert result.validated_cycle is True
 
     def test_arbitrary_points_cannot_be_labeled_a_cycle(self) -> None:
-        with pytest.raises(ValidationError) as exc_info:
-            CycleMultiplierRequest(
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_cycle_multiplier(CycleMultiplierRequest(
                 coefficients=(_r(0), _r(0), _r(1)), cycle=(_r(0), _r(1))
-            )
+            ))
         assert (
             exc_info.value.errors()[0]["type"]
             == "arithmetic_dynamics.cycle_map_mismatch"
         )
 
     def test_repeated_cycle_points_are_rejected(self) -> None:
-        with pytest.raises(ValidationError) as exc_info:
-            CycleMultiplierRequest(
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_cycle_multiplier(CycleMultiplierRequest(
                 coefficients=(_r(0), _r(0), _r(1)), cycle=(_r(0), _r(0))
-            )
+            ))
         assert (
             exc_info.value.errors()[0]["type"]
             == "arithmetic_dynamics.cycle_points_not_distinct"
         )
-
-    def test_deserialized_cycle_claim_is_structural_not_a_proof(self) -> None:
-        result = compute_cycle_multiplier(
-            CycleMultiplierRequest(coefficients=(_r(1), _r(-1)), cycle=(_r(0), _r(1)))
-        )
-        forged = CycleMultiplierResult.model_validate(
-            {**result.model_dump(mode="json"), "cycle": [_r(0), _r(2)]}
-        )
-
-        assert not verify_cycle_multiplier_result(forged)
 
 
 class TestFiniteFieldFunctionalGraph:
@@ -313,38 +285,16 @@ class TestFiniteFieldFunctionalGraph:
             == "arithmetic_dynamics.cycle_tail_mismatch"
         )
 
-    def test_deserialized_edges_are_structural_not_a_proof(self) -> None:
-        forged = FiniteFieldMapResult(
-            prime=3,
-            coefficients=("0", "0", "1"),
-            edges=((0, 0), (1, 2), (2, 1)),
-            cycles=((0,), (1, 2)),
-            tail_lengths=(0, 0, 0),
-        )
-
-        assert not verify_finite_field_map_result(forged)
-
     def test_nonprime_modulus_is_rejected(self) -> None:
-        with pytest.raises(ValidationError) as exc_info:
-            FiniteFieldMapRequest(prime=4, coefficients=("1",))
-        assert (
-            exc_info.value.errors()[0]["type"] == "arithmetic_dynamics.prime_not_prime"
-        )
-        with pytest.raises(ValidationError) as exc_info:
-            FiniteFieldMapResult(
-                prime=4,
-                coefficients=("1",),
-                edges=((0, 0), (1, 1), (2, 2), (3, 3)),
-                cycles=((0,), (1,), (2,), (3,)),
-                tail_lengths=(0, 0, 0, 0),
-            )
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_finite_field_map(FiniteFieldMapRequest(prime=4, coefficients=("1",)))
         assert (
             exc_info.value.errors()[0]["type"] == "arithmetic_dynamics.prime_not_prime"
         )
 
     def test_noncanonical_integer_coefficients_have_an_owner_code(self) -> None:
-        with pytest.raises(ValidationError) as exc_info:
-            FiniteFieldMapRequest(prime=5, coefficients=("01",))
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_finite_field_map(FiniteFieldMapRequest(prime=5, coefficients=("01",)))
         assert exc_info.value.errors()[0]["type"] == (
             "arithmetic_dynamics.coefficient_not_canonical"
         )
@@ -359,8 +309,8 @@ class TestFiniteFieldFunctionalGraph:
             finite_field_functional_graph((1,), oversized_prime)
 
     def test_trailing_zero_mod_prime_is_rejected(self) -> None:
-        with pytest.raises(ValidationError) as exc_info:
-            FiniteFieldMapRequest(prime=5, coefficients=("1", "5"))
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_finite_field_map(FiniteFieldMapRequest(prime=5, coefficients=("1", "5")))
         assert (
             exc_info.value.errors()[0]["type"]
             == "arithmetic_dynamics.trailing_zero_coefficients"
@@ -379,8 +329,8 @@ class TestCanonicalAndPortfolioContracts:
             MapIterateRequest.model_validate({"coefficients": [coefficient], "n": 1})
 
     def test_trailing_zero_coefficients_are_rejected(self) -> None:
-        with pytest.raises(ValidationError) as exc_info:
-            MapIterateRequest(coefficients=(_r(1), _r(0)), n=1)
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_map_iterate(MapIterateRequest(coefficients=(_r(1), _r(0)), n=1))
         assert (
             exc_info.value.errors()[0]["type"]
             == "arithmetic_dynamics.trailing_zero_coefficients"
