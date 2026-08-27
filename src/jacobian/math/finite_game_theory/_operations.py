@@ -6,7 +6,9 @@ from fractions import Fraction
 from math import lcm
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.finite_game_theory._models import (
+    MAX_EXACT_EQUILIBRIUM_WORK,
     BestResponseResult,
     DeterministicTerminalGameRequest,
     NashEquilibriumRequest,
@@ -14,7 +16,10 @@ from jacobian.math.finite_game_theory._models import (
     ZeroSumGameRequest,
 )
 from jacobian.math.finite_game_theory.operations import _solve_terminal_game_data
-from jacobian.math.finite_game_theory.values import DeterministicTerminalGameSolution
+from jacobian.math.finite_game_theory.values import (
+    DeterministicTerminalGameSolution,
+    _require_terminal_game_envelope,
+)
 
 
 def _wire_rational(value: Fraction) -> CanonicalRational:
@@ -49,6 +54,20 @@ def compute_nash_equilibrium(
     request: NashEquilibriumRequest,
 ) -> NashEquilibriumResult:
     """Compute one exact saddle point of a finite 2-player zero-sum game."""
+
+    matrix_value = request.payoff_matrix
+    denominator_digits = sum(len(value.den) for value in matrix_value.entries)
+    numerator_digits = max(
+        len(value.num.lstrip("-")) for value in matrix_value.entries
+    )
+    elimination_dimension = max(matrix_value.n_rows, matrix_value.n_cols) + 2
+    work = elimination_dimension * (denominator_digits + numerator_digits)
+    if work > MAX_EXACT_EQUILIBRIUM_WORK:
+        raise OperationDomainValidationError(
+            location=("payoff_matrix",),
+            code="finite_game.exact_equilibrium_budget",
+            message="payoffs exceed the published exact-equilibrium work bound",
+        )
 
     import sympy
     from sympy.solvers.simplex import lpmax, lpmin
@@ -127,6 +146,7 @@ def compute_deterministic_terminal_game(
 ) -> DeterministicTerminalGameSolution:
     """Compute every value and canonical optimal stationary strategy pair."""
 
+    _require_terminal_game_envelope(request.game)
     value_classes, max_strategy, min_strategy = _solve_terminal_game_data(request.game)
     return DeterministicTerminalGameSolution._from_kernel(
         request.game, value_classes, max_strategy, min_strategy

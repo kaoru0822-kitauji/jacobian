@@ -119,13 +119,6 @@ class ReceivedWordProfileRequest(StrictModel):
                 "received_word_entries_must_be_canonical_field_residues",
                 "received-word entries must be canonical field residues",
             )
-        if self.profile_replay_work > MAX_RECEIVED_PROFILE_REPLAY_WORK:
-            raise _validation_error(
-                "profile_replay_work_exceeded",
-                "received-word profile replay work exceeds the bound of "
-                f"{MAX_RECEIVED_PROFILE_REPLAY_WORK}",
-            )
-
         if self.threshold is None and self.witness_mode != "NONE":
             raise _validation_error(
                 "a_witness_mode_requires_an_exact_threshold",
@@ -143,15 +136,6 @@ class ReceivedWordProfileRequest(StrictModel):
                     "threshold value cannot exceed the code length",
                 )
 
-        if (
-            self.witness_mode == "ALL"
-            and self.maximum_witness_cells > MAX_RECEIVED_PROFILE_WITNESS_CELLS
-        ):
-            raise _validation_error(
-                "witness_cells_exceeded",
-                "all-witness result exceeds the aggregate witness-cell bound of "
-                f"{MAX_RECEIVED_PROFILE_WITNESS_CELLS}",
-            )
         return self
 
     @property
@@ -392,15 +376,6 @@ class GeneratorMatrixRequest(StrictModel):
     def require_bounded_prime_matrix(self) -> Self:
         width = _validate_prime_matrix(self.field_order, self.generator_matrix)
         _validate_coordinate_axis(self.coordinate_axis, width=width)
-        if self.field_order ** len(self.generator_matrix) > MAX_CODEWORDS:
-            raise _validation_error(
-                "generator_matrix_exceeds_exact_enumeration_bound",
-                "generator matrix exceeds exact enumeration bound",
-            )
-        if width > MAX_LENGTH:
-            raise _validation_error(
-                "code_length_exceeds_bound", "code length exceeds bound"
-            )
         return self
 
 
@@ -533,14 +508,6 @@ class CodeEqualRequest(StrictModel):
             raise _validation_error(
                 "encoders_must_share_one_ordered_coordinate_axis",
                 "encoders must share one ordered coordinate axis",
-            )
-        if (
-            self.encoder_a.codeword_count > MAX_CODEWORDS
-            or self.encoder_b.codeword_count > MAX_CODEWORDS
-        ):
-            raise _validation_error(
-                "code_cardinality_exceeds_exact_enumeration_bound",
-                "code cardinality exceeds exact enumeration bound",
             )
         return self
 

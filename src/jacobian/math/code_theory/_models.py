@@ -104,14 +104,6 @@ class LinearCodeRequest(StrictModel):
     @model_validator(mode="after")
     def require_bounded_prime_field_matrix(self) -> Self:
         _validate_prime_field_matrix(self.field_order, self.generator_matrix)
-        if (
-            EXACT_ENUMERATION_PASSES * self.field_order ** len(self.generator_matrix)
-            > MAX_EXACT_CODEWORD_EVALUATIONS
-        ):
-            raise _error(
-                "code_theory.enumeration_work_exceeded",
-                "generator matrix exceeds the exact enumeration bound",
-            )
         return self
 
 
@@ -190,31 +182,8 @@ class CoveringRadiusRequest(StrictModel):
     generator_matrix: tuple[tuple[int, ...], ...] = Field(min_length=1, max_length=8)
 
     @model_validator(mode="after")
-    def require_bounded_syndrome_graph(self) -> Self:
-        width = _validate_prime_field_matrix(
-            self.field_order,
-            self.generator_matrix,
-        )
-        rank = _matrix_rank_mod_prime(self.generator_matrix, self.field_order)
-        syndrome_dimension = width - rank
-        state_count = self.field_order**syndrome_dimension
-        if state_count > MAX_COVERING_RADIUS_STATES_PER_PASS:
-            raise _error(
-                "code_theory.syndrome_state_bound_exceeded",
-                "syndrome space exceeds the exact state bound",
-            )
-        move_count_bound = min(
-            width * (self.field_order - 1),
-            max(state_count - 1, 0),
-        )
-        if (
-            SYNDROME_BFS_PASSES * state_count * move_count_bound
-            > MAX_COVERING_RADIUS_TRANSITIONS
-        ):
-            raise _error(
-                "code_theory.syndrome_transition_bound_exceeded",
-                "syndrome graph exceeds the exact transition bound",
-            )
+    def require_prime_field_matrix(self) -> Self:
+        _validate_prime_field_matrix(self.field_order, self.generator_matrix)
         return self
 
 

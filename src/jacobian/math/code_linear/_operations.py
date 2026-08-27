@@ -5,7 +5,11 @@ from __future__ import annotations
 from itertools import product
 from typing import NamedTuple
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.code_linear._models import (
+    MAX_CODEWORDS,
+    MAX_RECEIVED_PROFILE_REPLAY_WORK,
+    MAX_RECEIVED_PROFILE_WITNESS_CELLS,
     CodeEqualRequest,
     CodeEqualResult,
     CodewordCheckRequest,
@@ -29,6 +33,7 @@ from jacobian.math.code_linear._models import (
     SyndromeRequest,
     SyndromeResult,
     _threshold_matches_distance,
+    _validate_prime_matrix,
 )
 from jacobian.math.code_linear.values import PrimeFieldLinearEncoder
 from jacobian.math.prime_field_linear_algebra import (
@@ -110,6 +115,21 @@ def _received_word_profile_data(
 def compute_received_word_profile(
     request: ReceivedWordProfileRequest,
 ) -> ReceivedWordProfileResult:
+    if request.profile_replay_work > MAX_RECEIVED_PROFILE_REPLAY_WORK:
+        raise OperationDomainValidationError(
+            location=("encoder",),
+            code="code_linear.profile_replay_work_exceeded",
+            message="received-word profile replay work exceeds its bound",
+        )
+    if (
+        request.witness_mode == "ALL"
+        and request.maximum_witness_cells > MAX_RECEIVED_PROFILE_WITNESS_CELLS
+    ):
+        raise OperationDomainValidationError(
+            location=("witness_mode",),
+            code="code_linear.witness_cells_exceeded",
+            message="all-witness result exceeds its aggregate witness-cell bound",
+        )
     data = _received_word_profile_data(request)
     return ReceivedWordProfileResult._from_kernel(
         source=request,
@@ -195,6 +215,13 @@ def _hamming_weight(word: list[int] | tuple[int, ...]) -> int:
 
 
 def compute_from_generator(request: GeneratorMatrixRequest) -> FromGeneratorResult:
+    _validate_prime_matrix(request.field_order, request.generator_matrix)
+    if request.field_order ** len(request.generator_matrix) > MAX_CODEWORDS:
+        raise OperationDomainValidationError(
+            location=("generator_matrix",),
+            code="code_linear.generator_matrix_exceeds_exact_enumeration_bound",
+            message="generator matrix exceeds exact enumeration bound",
+        )
     matrix = [list(row) for row in request.generator_matrix]
     canonical = _canonical_generator(matrix, request.field_order)
     dim = len(canonical)
@@ -346,6 +373,15 @@ def _enumerate_code(
 
 
 def compute_code_equal(request: CodeEqualRequest) -> CodeEqualResult:
+    if (
+        request.encoder_a.codeword_count > MAX_CODEWORDS
+        or request.encoder_b.codeword_count > MAX_CODEWORDS
+    ):
+        raise OperationDomainValidationError(
+            location=("encoder",),
+            code="code_linear.code_cardinality_exceeds_exact_enumeration_bound",
+            message="code cardinality exceeds exact enumeration bound",
+        )
     q = request.encoder_a.field_order
     mat_a = [list(row) for row in request.encoder_a.generator_matrix]
     mat_b = [list(row) for row in request.encoder_b.generator_matrix]

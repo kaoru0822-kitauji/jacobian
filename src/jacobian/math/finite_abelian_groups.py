@@ -112,14 +112,6 @@ class FiniteAbelianGroupFactorizationRequest(StrictModel):
         max_length=MAX_FINITE_GROUP_FACTOR_SIZE,
     )
 
-    @model_validator(mode="after")
-    def require_bounded_product_group(self) -> Self:
-        _require_factorization_admission(
-            FiniteAbelianProductGroup(moduli=self.moduli), self.left, self.right
-        )
-        return self
-
-
 def _require_factorization_admission(
     group: FiniteAbelianProductGroup,
     left: tuple[tuple[int, ...], ...],
@@ -255,15 +247,6 @@ class FiniteAbelianSpectralPairRequest(StrictModel):
     """
 
     source: FiniteAbelianSpectralPairSource
-
-    @model_validator(mode="after")
-    def require_bounded_exact_decision(self) -> Self:
-        try:
-            _spectral_pair_work(self.source)
-        except ValueError as error:
-            raise _validation_error("spectral_admission", str(error)) from error
-        return self
-
 
 class FiniteAbelianNonorthogonalityWitness(StrictModel):
     """First nonorthogonal frequency pair and its exact cyclotomic remainder.

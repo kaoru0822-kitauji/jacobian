@@ -9,9 +9,6 @@ from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
 from jacobian.math.prime_field_linear_algebra import (
-    _MAX_DIMENSION as PRIME_FIELD_MAX_DIM,
-)
-from jacobian.math.prime_field_linear_algebra import (
     PrimeFieldMatrix,
 )
 
@@ -136,28 +133,7 @@ class AlgebraStructure(StrictModel):
             raise _validation_error(
                 "hochschild_complex.prime", "prime must be a prime integer"
             )
-        # Gate the multiplication-table walks on the derived input and work
-        # budgets before touching the constants, so oversized tables fail fast.
-        structure_entries = self.dimension**3 + self.dimension
-        if structure_entries > MAX_STRUCTURE_CONSTANT_ENTRIES:
-            raise _validation_error(
-                "hochschild_complex.input_budget",
-                "structure constants exceed the supported input-entry budget "
-                f"(dimension^3 + dimension = {structure_entries} "
-                f"> {MAX_STRUCTURE_CONSTANT_ENTRIES})",
-            )
-        associativity_steps = 2 * self.dimension**5
-        if associativity_steps > MAX_ASSOCIATIVITY_DOT_STEPS:
-            raise _validation_error(
-                "hochschild_complex.associativity_budget",
-                "algebra dimension exceeds the associativity-admission work "
-                f"budget (2*dimension^5 = {associativity_steps} "
-                f"> {MAX_ASSOCIATIVITY_DOT_STEPS}); admitting larger algebras "
-                "requires an accelerated associativity check",
-            )
         self._require_canonical_residues()
-        self._require_associative()
-        self._require_multiplicative_augmentation()
         return self
 
     def _require_associative(self) -> None:
@@ -197,45 +173,6 @@ class HochschildChainComplexRequest(StrictModel):
 
     algebra: AlgebraStructure
     max_degree: int = Field(ge=1, le=MAX_HOCHSCHILD_DEGREE)
-
-    @model_validator(mode="after")
-    def require_within_budget(self) -> Self:
-        dimension = self.algebra.dimension
-        if dimension ** (self.max_degree + 1) > MAX_HOCHSCHILD_TENSOR_ELEMENTS:
-            raise _validation_error(
-                "hochschild_complex.tensor_budget",
-                "requested max_degree exceeds the supported tensor-element budget "
-                f"(dimension^{self.max_degree + 1} > {MAX_HOCHSCHILD_TENSOR_ELEMENTS})",
-            )
-        densest_entries = dimension ** (2 * self.max_degree - 1)
-        if densest_entries > MAX_HOCHSCHILD_MATRIX_ENTRIES:
-            raise _validation_error(
-                "hochschild_complex.matrix_budget",
-                "requested max_degree exceeds the supported boundary-matrix "
-                f"entry budget (dimension^(2*max_degree-1) = {densest_entries} "
-                f"> {MAX_HOCHSCHILD_MATRIX_ENTRIES})",
-            )
-        # The emitted differential is carried as the canonical PrimeFieldMatrix
-        # (rows = n^{k-1}, cols = n^{k}); it must fit the matrix dimension
-        # bound so an admitted request never fails at construction. Check the
-        # densest axis n**max_degree (and n**(max_degree-1) for the row side).
-        if dimension**self.max_degree > PRIME_FIELD_MAX_DIM:
-            raise _validation_error(
-                "hochschild_complex.matrix_dimension",
-                "requested max_degree exceeds the supported matrix dimension bound "
-                f"(dimension^max_degree = {dimension**self.max_degree} > {PRIME_FIELD_MAX_DIM})",
-            )
-        if (
-            self.max_degree >= 1
-            and dimension ** (self.max_degree - 1) > PRIME_FIELD_MAX_DIM
-        ):
-            raise _validation_error(
-                "hochschild_complex.matrix_dimension",
-                "requested max_degree exceeds the supported matrix dimension bound "
-                f"(dimension^max_degree-1 = {dimension ** (self.max_degree - 1)} > {PRIME_FIELD_MAX_DIM})",
-            )
-        return self
-
 
 class HochschildDifferential(StrictModel):
     """One Hochschild differential as the canonical prime-field matrix value.
@@ -359,12 +296,6 @@ class HochschildHomologyRequest(StrictModel):
     algebra: AlgebraStructure
     max_degree: int = Field(ge=1, le=MAX_HOCHSCHILD_DEGREE)
 
-    @model_validator(mode="after")
-    def require_within_budget(self) -> Self:
-        require_hochschild_budget(self.algebra.dimension, self.max_degree)
-        return self
-
-
 def require_hochschild_budget(dimension: int, max_degree: int) -> None:
     """Reject degrees whose tensor or boundary-matrix budget is exceeded."""
 
@@ -382,6 +313,25 @@ def require_hochschild_budget(dimension: int, max_degree: int) -> None:
             f"entry budget (dimension^(2*max_degree+1) = {densest_entries} "
             f"> {MAX_HOCHSCHILD_MATRIX_ENTRIES})",
         )
+
+
+def require_algebra_admission(algebra: AlgebraStructure) -> None:
+    """Check expensive algebra invariants at operation execution time."""
+
+    structure_entries = algebra.dimension**3 + algebra.dimension
+    if structure_entries > MAX_STRUCTURE_CONSTANT_ENTRIES:
+        raise _validation_error(
+            "hochschild_complex.input_budget",
+            "structure constants exceed the supported input-entry budget",
+        )
+    associativity_steps = 2 * algebra.dimension**5
+    if associativity_steps > MAX_ASSOCIATIVITY_DOT_STEPS:
+        raise _validation_error(
+            "hochschild_complex.associativity_budget",
+            "algebra dimension exceeds the associativity-admission work budget",
+        )
+    algebra._require_associative()
+    algebra._require_multiplicative_augmentation()
 
 
 class HochschildHomologyGroup(StrictModel):
@@ -410,8 +360,6 @@ class HochschildHomologyResult(StrictModel):
                 "hochschild_complex.prime_binding",
                 "prime must match the retained algebra",
             )
-        # Retain the same derived envelope for independently supplied claims.
-        require_hochschild_budget(self.algebra.dimension, self.max_degree)
         if len(self.groups) != self.max_degree + 1 or tuple(
             group.degree for group in self.groups
         ) != tuple(range(self.max_degree + 1)):

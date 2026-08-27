@@ -16,15 +16,6 @@ MAX_STRATEGIES = 50
 MAX_EXACT_EQUILIBRIUM_WORK = 32_768
 
 
-def _exact_equilibrium_work(matrix: PayoffMatrix) -> int:
-    """Return the conservative exact primal/dual work measure for ``matrix``."""
-
-    denominator_digits = sum(len(value.den) for value in matrix.entries)
-    numerator_digits = max(len(value.num.lstrip("-")) for value in matrix.entries)
-    elimination_dimension = max(matrix.n_rows, matrix.n_cols) + 2
-    return elimination_dimension * (denominator_digits + numerator_digits)
-
-
 class PayoffMatrix(StrictModel):
     """A payoff matrix for a 2-player normal-form game.
 
@@ -83,17 +74,6 @@ class NashEquilibriumRequest(ZeroSumGameRequest):
             },
         }
     )
-
-    @model_validator(mode="after")
-    def require_bounded_exact_equilibrium(self) -> Self:
-        matrix = self.payoff_matrix
-        if _exact_equilibrium_work(matrix) > MAX_EXACT_EQUILIBRIUM_WORK:
-            raise PydanticCustomError(
-                "finite_game.exact_equilibrium_budget",
-                "payoffs exceed the published exact-equilibrium work bound",
-            )
-        return self
-
 
 class BestResponseResult(StrictModel):
     """Best response values for the row player."""

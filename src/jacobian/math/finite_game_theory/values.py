@@ -136,7 +136,6 @@ class DeterministicTerminalGame(StrictModel):
                     "every nonterminal position must have an outgoing move",
                 )
 
-        _require_terminal_game_envelope(self)
         return self
 
 

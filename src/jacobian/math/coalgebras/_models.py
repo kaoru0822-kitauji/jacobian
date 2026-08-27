@@ -133,15 +133,6 @@ class Coalgebra(StrictModel):
 
     @model_validator(mode="after")
     def require_valid(self) -> Self:
-        # Fail fast on the derived size budget before any O(n^3) scan: it
-        # bounds every later validation pass.
-        if self.dimension**3 > MAX_TENSOR_ENTRIES:
-            raise _validation_error(
-                "tensor_budget_exceeded",
-                f"coalgebra admission allows at most {MAX_TENSOR_ENTRIES} "
-                f"structure constants; dimension {self.dimension} would "
-                f"carry {self.dimension**3}",
-            )
         if len(self.comultiplication) != self.dimension:
             raise _validation_error(
                 "comultiplication_shape", "comultiplication must have dimension entries"
@@ -161,13 +152,11 @@ class Coalgebra(StrictModel):
             raise _validation_error(
                 "counit_shape", "counit must have dimension entries"
             )
-        _require_admitted_prime_digits(self.prime)
         from sympy import isprime
 
         if not isprime(self.prime):
             raise _validation_error("prime_not_prime", "prime must be a prime integer")
         self._require_canonical_residues()
-        self._require_coalgebra_axioms()
         return self
 
     def _require_canonical_residues(self) -> None:
@@ -391,20 +380,6 @@ class GroupLikeElementsRequest(StrictModel):
 
     coalgebra: Coalgebra
 
-    @model_validator(mode="after")
-    def require_enumerable(self) -> Self:
-        work = group_like_scan_work(self.coalgebra.prime, self.coalgebra.dimension)
-        if work > GROUP_LIKE_SCAN_WORK_BUDGET:
-            raise _validation_error(
-                "scan_work_budget_exceeded",
-                "group-like enumeration scan work exceeds the documented "
-                f"budget: {work} units for prime {self.coalgebra.prime}, "
-                f"dimension {self.coalgebra.dimension} exceeds "
-                f"{GROUP_LIKE_SCAN_WORK_BUDGET}",
-            )
-        return self
-
-
 class GroupLikeElement(StrictModel):
     """One group-like element with its coefficients."""
 
@@ -423,15 +398,6 @@ class GroupLikeElementsResult(StrictModel):
         """Check bounded canonical result structure without replaying a search."""
         if self.count != len(self.elements):
             raise _validation_error("count_mismatch", "count must match element count")
-        work = group_like_scan_work(self.coalgebra.prime, self.coalgebra.dimension)
-        if work > GROUP_LIKE_SCAN_WORK_BUDGET:
-            raise _validation_error(
-                "scan_work_budget_exceeded",
-                "group-like enumeration scan work exceeds the documented "
-                f"budget: {work} units for prime {self.coalgebra.prime}, "
-                f"dimension {self.coalgebra.dimension} exceeds "
-                f"{GROUP_LIKE_SCAN_WORK_BUDGET}",
-            )
         n = self.coalgebra.dimension
         seen = set()
         for element in self.elements:
@@ -480,3 +446,15 @@ __all__ = [
     "GroupLikeElementsResult",
     "group_like_scan_work",
 ]
+
+
+def require_coalgebra_admission(coalgebra: Coalgebra) -> None:
+    """Check tensor, field, and coalgebra axioms at operation execution time."""
+
+    if coalgebra.dimension**3 > MAX_TENSOR_ENTRIES:
+        raise _validation_error(
+            "tensor_budget_exceeded",
+            f"coalgebra admission allows at most {MAX_TENSOR_ENTRIES} structure constants",
+        )
+    _require_admitted_prime_digits(coalgebra.prime)
+    coalgebra._require_coalgebra_axioms()

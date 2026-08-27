@@ -44,6 +44,10 @@ def compute_tree_run(request: TreeRunRequest) -> TreeRunResult:
 def compute_accepted_tree_count(
     request: AcceptedTreeCountRequest,
 ) -> AcceptedTreeCountResult:
+    try:
+        accepted_tree_count_work_bound(request.automaton, request.tree_size)
+    except ValueError as exc:
+        raise ValueError(str(exc)) from exc
     return AcceptedTreeCountResult._from_kernel(
         request,
         count=format_canonical_integer(

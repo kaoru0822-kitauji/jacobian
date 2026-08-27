@@ -17,7 +17,6 @@ from jacobian.math.tree_automata.values import (
     MAX_TREE_AUTOMATON_REACHABILITY_WORK,
     BottomUpTreeAutomaton,
     RankedTree,
-    accepted_tree_count_work_bound,
     validate_ranked_tree,
 )
 
@@ -94,15 +93,6 @@ class AcceptedTreeCountRequest(StrictModel):
 
     automaton: BottomUpTreeAutomaton
     tree_size: int = Field(ge=1, le=100)
-
-    @model_validator(mode="after")
-    def require_bounded_exact_count(self) -> Self:
-        try:
-            accepted_tree_count_work_bound(self.automaton, self.tree_size)
-        except ValueError as exc:
-            raise _validation_error("count_work_bound", str(exc)) from exc
-        return self
-
 
 class AcceptedTreeCountResult(AcceptedTreeCountRequest):
     """Exact count of accepted trees."""
