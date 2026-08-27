@@ -16,6 +16,7 @@ from jacobian.canonical import (
     encode_strict_json,
     format_canonical_integer,
 )
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.matrices._operation_models import SquareRationalMatrixRequest
 from jacobian.math.matrices._operations import compute_characteristic_polynomial
 from jacobian.math.matrices.canonical_forms._models import (
@@ -83,6 +84,11 @@ def _polynomial(*terms: tuple[RationalInput, int]) -> RationalPolynomial:
             )
         ),
     )
+
+
+def _assert_admission_rejected(request: MatrixPolynomialEvaluationRequest) -> None:
+    with pytest.raises(OperationDomainValidationError):
+        compute_matrix_polynomial_evaluation(request)
 
 
 def _fractions(matrix: RationalMatrix) -> tuple[tuple[Fraction, ...], ...]:
@@ -614,11 +620,12 @@ def test_result_rejects_independent_source_value_and_work_mutations(
 
 
 def test_request_rejects_non_square_and_multivariate_sources() -> None:
-    with pytest.raises(ValidationError):
+    _assert_admission_rejected(
         MatrixPolynomialEvaluationRequest(
             matrix=_matrix((1, 2)),
             polynomial=_polynomial((1, 1)),
         )
+    )
 
     multivariate = RationalPolynomial(
         variables=("s", "t"),
@@ -631,11 +638,12 @@ def test_request_rejects_non_square_and_multivariate_sources() -> None:
             )
         ),
     )
-    with pytest.raises(ValidationError):
+    _assert_admission_rejected(
         MatrixPolynomialEvaluationRequest(
             matrix=_matrix((1,)),
             polynomial=multivariate,
         )
+    )
 
 
 def test_horner_work_boundary_is_derived_from_degree_and_matrix_order() -> None:
@@ -659,11 +667,12 @@ def test_horner_work_boundary_is_derived_from_degree_and_matrix_order() -> None:
     )
     assert accepted.polynomial.polynomial.terms[0].exponents == (maximum_degree,)
 
-    with pytest.raises(ValidationError):
+    _assert_admission_rejected(
         MatrixPolynomialEvaluationRequest(
             matrix=identity,
             polynomial=_polynomial((1, maximum_degree + 1)),
         )
+    )
 
 
 def test_work_admission_couples_products_to_exact_component_growth() -> None:
@@ -673,11 +682,12 @@ def test_work_admission_couples_products_to_exact_component_growth() -> None:
     )
     assert moderate.polynomial.polynomial.terms[0].exponents == (500,)
 
-    with pytest.raises(ValidationError):
+    _assert_admission_rejected(
         MatrixPolynomialEvaluationRequest(
             matrix=_matrix((10**30,)),
             polynomial=_polynomial((1, 1_000)),
         )
+    )
 
 
 def test_result_sensitive_admission_accepts_maximum_sparse_exponent_at_one_by_one() -> (
@@ -719,22 +729,24 @@ def test_zero_matrix_admission_does_not_combine_irrelevant_denominators() -> Non
 def test_request_rejects_predicted_scalar_and_aggregate_output_overflow() -> None:
     denominator = "1" + "0" * 100
     overflowing_exponent = MAX_CANONICAL_RATIONAL_DIGITS // 100 + 1
-    with pytest.raises(ValidationError):
+    _assert_admission_rejected(
         MatrixPolynomialEvaluationRequest(
             matrix=RationalMatrix(entries=((_rational(1, denominator),),)),
             polynomial=_polynomial((1, overflowing_exponent)),
         )
+    )
 
     overflowing_entry_digits = CanonicalLimits().max_output_bytes // 32**2 + 1_000
     huge_coefficient = "1" * overflowing_entry_digits
     dense = RationalMatrix(
         entries=tuple(tuple(_rational(1) for _ in range(32)) for _ in range(32))
     )
-    with pytest.raises(ValidationError):
+    _assert_admission_rejected(
         MatrixPolynomialEvaluationRequest(
             matrix=dense,
             polynomial=_polynomial((huge_coefficient, 1)),
         )
+    )
 
 
 def test_structurally_nilpotent_powers_are_admitted_and_evaluate_to_zero() -> None:
@@ -767,7 +779,7 @@ def test_height_maximum_is_not_cancelled_from_the_result_bound() -> None:
     # The squared output must be predicted and rejected during request
     # validation instead of passing admission and failing result conversion.
     denominator = "1" + "0" * 17_000
-    with pytest.raises(ValidationError):
+    _assert_admission_rejected(
         MatrixPolynomialEvaluationRequest(
             matrix=RationalMatrix(
                 entries=(
@@ -777,6 +789,7 @@ def test_height_maximum_is_not_cancelled_from_the_result_bound() -> None:
             ),
             polynomial=_polynomial((1, 2)),
         )
+    )
 
 
 def test_dead_powers_do_not_demand_a_global_clearing_denominator() -> None:
@@ -849,7 +862,7 @@ def test_unprovable_height_growth_is_rejected_during_request_validation() -> Non
     # establish the tighter claim, so the request must be rejected here rather
     # than admitted and rescued by result conversion.
     base = format_canonical_integer(2**40_000)
-    with pytest.raises(ValidationError):
+    _assert_admission_rejected(
         MatrixPolynomialEvaluationRequest(
             matrix=RationalMatrix(
                 entries=(
@@ -859,6 +872,7 @@ def test_unprovable_height_growth_is_rejected_during_request_validation() -> Non
             ),
             polynomial=_polynomial((1, 2)),
         )
+    )
 
 
 def test_structural_zero_reduces_to_surviving_terms_exactly() -> None:
@@ -912,8 +926,9 @@ def test_admission_still_charges_live_structural_growth() -> None:
             (_rational(height), _rational(0)),
         )
     )
-    with pytest.raises(ValidationError):
+    _assert_admission_rejected(
         MatrixPolynomialEvaluationRequest(matrix=cyclic, polynomial=_polynomial((1, 2)))
+    )
 
     chain = RationalMatrix(
         entries=(
@@ -922,8 +937,9 @@ def test_admission_still_charges_live_structural_growth() -> None:
             (_rational(0), _rational(0), _rational(0)),
         )
     )
-    with pytest.raises(ValidationError):
+    _assert_admission_rejected(
         MatrixPolynomialEvaluationRequest(matrix=chain, polynomial=_polynomial((1, 2)))
+    )
 
     vanishing_chain_value = compute_matrix_polynomial_evaluation(
         MatrixPolynomialEvaluationRequest(matrix=chain, polynomial=_polynomial((1, 3)))
@@ -991,7 +1007,7 @@ def test_degree_two_admission_still_rejects_uncancellable_power_growth() -> None
     coefficient_numerator = format_canonical_integer(11**18_900)
     coefficient_denominator = format_canonical_integer(13**17_400)
 
-    with pytest.raises(ValidationError):
+    _assert_admission_rejected(
         MatrixPolynomialEvaluationRequest(
             matrix=RationalMatrix(
                 entries=((_rational(entry_numerator, entry_denominator),),)
@@ -1003,15 +1019,17 @@ def test_degree_two_admission_still_rejects_uncancellable_power_growth() -> None
                 )
             ),
         )
+    )
 
 
 def test_admission_falls_back_to_dense_bound_beyond_materialization_ceiling() -> None:
     height = "1" + "0" * 20_000
-    with pytest.raises(ValidationError):
+    _assert_admission_rejected(
         MatrixPolynomialEvaluationRequest(
             matrix=RationalMatrix(entries=((_rational(height),),)),
             polynomial=_polynomial((1, 5)),
         )
+    )
 
     moderate = "1" + "0" * 15_000
     request = MatrixPolynomialEvaluationRequest(
@@ -1042,8 +1060,9 @@ def test_constant_result_work_estimates_are_not_clipped_at_the_component_cap() -
         )
     )
 
-    with pytest.raises(ValidationError):
+    _assert_admission_rejected(
         MatrixPolynomialEvaluationRequest(matrix=chain, polynomial=_polynomial((1, 4)))
+    )
 
     moderate_height = "1" + "0" * 13_999
     admitted = compute_matrix_polynomial_evaluation(
@@ -1114,7 +1133,7 @@ def test_horner_charges_shifted_dead_leading_terms_during_their_ride() -> None:
     # 40,000-digit product, so honest charging must reject it here while the
     # same shape at smaller heights stays admitted and evaluates exactly.
     height = "1" + "0" * 20_000
-    with pytest.raises(ValidationError):
+    _assert_admission_rejected(
         MatrixPolynomialEvaluationRequest(
             matrix=RationalMatrix(
                 entries=(
@@ -1124,6 +1143,7 @@ def test_horner_charges_shifted_dead_leading_terms_during_their_ride() -> None:
             ),
             polynomial=_polynomial(("1" + "0" * 20_000, 50), (1, 1)),
         )
+    )
 
     moderate_height = "1" + "0" * 14_999
     admitted = compute_matrix_polynomial_evaluation(
@@ -1190,7 +1210,7 @@ def test_overlapping_dead_denominators_are_charged_at_shared_entries() -> None:
     second_denominator = format_canonical_integer(11**31_400)
     chain = _matrix((0, 1, 1), (0, 0, 1), (0, 0, 0))
 
-    with pytest.raises(ValidationError):
+    _assert_admission_rejected(
         MatrixPolynomialEvaluationRequest(
             matrix=chain,
             polynomial=_rational_polynomial(
@@ -1198,6 +1218,7 @@ def test_overlapping_dead_denominators_are_charged_at_shared_entries() -> None:
                 (_rational(1, second_denominator), 4),
             ),
         )
+    )
 
     moderate_first = "1" + "0" * 16_383
     moderate_second = format_canonical_integer(11**15_700)
@@ -1272,7 +1293,7 @@ def test_mixed_overlap_of_dead_denominators_is_still_charged() -> None:
     second_denominator = format_canonical_integer(11**29_800)
     chain = _matrix((0, 1, 1), (0, 0, 1), (0, 0, 0))
 
-    with pytest.raises(ValidationError):
+    _assert_admission_rejected(
         MatrixPolynomialEvaluationRequest(
             matrix=chain,
             polynomial=_rational_polynomial(
@@ -1281,6 +1302,7 @@ def test_mixed_overlap_of_dead_denominators_is_still_charged() -> None:
                 (_rational(1), 1),
             ),
         )
+    )
 
     moderate_first = "1" + "0" * 8_000
     moderate_second = format_canonical_integer(11**7_700)
@@ -1325,11 +1347,12 @@ def test_converging_matrix_paths_compound_shared_cell_denominators() -> None:
         )
     )
 
-    with pytest.raises(ValidationError):
+    _assert_admission_rejected(
         MatrixPolynomialEvaluationRequest(
             matrix=diamond,
             polynomial=_polynomial((1, 3)),
         )
+    )
 
     small_first = format_canonical_integer(3**12_578)
     small_second = format_canonical_integer(7**7_117)
@@ -1453,7 +1476,7 @@ def test_surviving_coefficient_denominators_still_demand_a_common_denominator() 
     first_denominator = "1" + "0" * 17_000
     second_denominator = format_canonical_integer(11**16_325)
 
-    with pytest.raises(ValidationError):
+    _assert_admission_rejected(
         MatrixPolynomialEvaluationRequest(
             matrix=_matrix((1,)),
             polynomial=RationalPolynomial(
@@ -1472,8 +1495,9 @@ def test_surviving_coefficient_denominators_still_demand_a_common_denominator() 
                 ),
             ),
         )
+    )
 
-    with pytest.raises(ValidationError):
+    _assert_admission_rejected(
         MatrixPolynomialEvaluationRequest(
             matrix=_matrix((2, 0), (0, 2)),
             polynomial=RationalPolynomial(
@@ -1492,6 +1516,7 @@ def test_surviving_coefficient_denominators_still_demand_a_common_denominator() 
                 ),
             ),
         )
+    )
 
 
 def test_linear_admission_cross_cancels_rational_product_factors() -> None:
@@ -1525,7 +1550,7 @@ def test_linear_admission_still_rejects_uncancellable_product_growth() -> None:
     entry_numerator = format_canonical_integer(7**24_048)
     entry_denominator = format_canonical_integer(5**28_072)
 
-    with pytest.raises(ValidationError):
+    _assert_admission_rejected(
         MatrixPolynomialEvaluationRequest(
             matrix=RationalMatrix(
                 entries=((_rational(entry_numerator, entry_denominator),),)
@@ -1534,6 +1559,7 @@ def test_linear_admission_still_rejects_uncancellable_product_growth() -> None:
                 (_rational(coefficient_numerator, coefficient_denominator), 1)
             ),
         )
+    )
 
 
 def test_linear_output_bounds_preserve_additive_cancellation() -> None:
@@ -1562,11 +1588,12 @@ def test_linear_output_bounds_still_reject_uncancellable_additive_growth() -> No
     # to 2H, whose 32,769 digits exceed the canonical component cap, so the
     # reduced exact bound still rejects during request validation.
     height = "9" + "0" * 32_767
-    with pytest.raises(ValidationError):
+    _assert_admission_rejected(
         MatrixPolynomialEvaluationRequest(
             matrix=RationalMatrix(entries=((_rational(height),),)),
             polynomial=_rational_polynomial((_rational(1), 1), (_rational(height), 0)),
         )
+    )
 
 
 def test_request_schema_publishes_coupled_degree_order_work_bound() -> None:

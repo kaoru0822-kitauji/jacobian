@@ -52,7 +52,7 @@ TOOLS: MathTools = (
         "Evaluate an exact rational polynomial at a square matrix",
         "Compute f(A) over QQ by bounded exact Horner evaluation. The result "
         "retains the source matrix and canonical one-variable rational polynomial "
-        "and independently replays the defining evaluation.",
+        "alongside the exact evaluated matrix.",
         MatrixPolynomialEvaluationRequest,
         MatrixPolynomialEvaluationResult,
         compute_matrix_polynomial_evaluation,

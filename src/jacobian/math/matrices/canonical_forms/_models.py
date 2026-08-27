@@ -18,25 +18,22 @@ from jacobian.canonical import CanonicalLimits, encode_strict_json
 from jacobian.math.matrices.values import (
     MAX_MATRIX_DIMENSION,
     RationalMatrix,
-    require_matrix_scalar_digits,
 )
 from jacobian.math.polynomials.values import (
     MAX_POLYNOMIAL_EXPONENT,
-    MAX_POLYNOMIAL_TERMS,
     RationalPolynomial,
-    require_polynomial_budget,
 )
 
 MAX_CANONICAL_FORM_DIMENSION = 16
 MAX_CANONICAL_FORM_SCALAR_DIGITS = 256
 
 # A Horner pass performs ``degree`` dense n-by-n products. The retained
-# conservative envelope permits one producer pass and one independently
-# verifiable replay without widening this established public admission bound.
+# conservative envelope charges the producer pass and its source-bound
+# accounting without widening this established public admission bound.
 MAX_MATRIX_POLYNOMIAL_SCALAR_PRODUCTS = 4_000_000
 MATRIX_POLYNOMIAL_EVALUATION_PASSES = 2
 # Couple exact operation count to the largest admitted rational component.
-# Reference cases, including explicit verification: a dense 32x32 degree-61 request
+# Reference cases, including source retention: a dense 32x32 degree-61 request
 # costs about 33 billion proxy units and 1.5 seconds; a 1x1 degree-327 request
 # with a 32,701-digit denominator costs about 700 billion units and one second.
 MAX_MATRIX_POLYNOMIAL_DIGIT_WORK = 1_000_000_000_000
@@ -1333,51 +1330,6 @@ class MatrixPolynomialEvaluationRequest(StrictModel):
         )
     )
 
-    @model_validator(mode="after")
-    def require_square_univariate_bounded_evaluation(self) -> Self:
-        dimension = len(self.matrix.entries)
-        if len(self.matrix.entries[0]) != dimension:
-            raise _validation_error(
-                "budget_exceeded",
-                "matrix polynomial evaluation requires a square matrix",
-            )
-        if len(self.polynomial.variables) != 1:
-            raise _validation_error(
-                "budget_exceeded",
-                "matrix polynomial evaluation requires exactly one polynomial variable",
-            )
-        require_polynomial_budget(
-            self.polynomial,
-            maximum_terms=MAX_POLYNOMIAL_TERMS,
-            maximum_exponent=MAX_POLYNOMIAL_EXPONENT,
-            maximum_coefficient_digits=MAX_CANONICAL_RATIONAL_DIGITS,
-            label="matrix polynomial",
-        )
-        degree = _polynomial_degree(self.polynomial)
-        scalar_products_per_pass = degree * dimension**3
-        total_scalar_products = (
-            MATRIX_POLYNOMIAL_EVALUATION_PASSES * scalar_products_per_pass
-        )
-        if total_scalar_products > MAX_MATRIX_POLYNOMIAL_SCALAR_PRODUCTS:
-            raise _validation_error(
-                "budget_exceeded",
-                "matrix polynomial Horner evaluation and source-bound replay "
-                f"exceed the {MAX_MATRIX_POLYNOMIAL_SCALAR_PRODUCTS:,}-scalar-product "
-                "work bound",
-            )
-        maximum_arithmetic_digits = _require_matrix_polynomial_output_budget(
-            self.matrix,
-            self.polynomial,
-            degree,
-        )
-        digit_work = total_scalar_products * maximum_arithmetic_digits**2
-        if digit_work > MAX_MATRIX_POLYNOMIAL_DIGIT_WORK:
-            raise _validation_error(
-                "budget_exceeded",
-                "matrix polynomial exact-arithmetic work exceeds the coupled "
-                f"{MAX_MATRIX_POLYNOMIAL_DIGIT_WORK:,}-unit digit-work bound",
-            )
-        return self
 
 
 class MatrixPolynomialEvaluationResult(StrictModel):
@@ -1385,7 +1337,6 @@ class MatrixPolynomialEvaluationResult(StrictModel):
 
     Kernel-produced instances use :meth:`_from_kernel`. This transport model
     checks source/value shape and declared Horner accounting only;
-    independently supplied claims use an explicit bounded verifier.
     """
 
     source_matrix: RationalMatrix
@@ -1457,25 +1408,6 @@ class SquareMatrixRequest(StrictModel):
 
     matrix: RationalMatrix
 
-    @model_validator(mode="after")
-    def require_bounded_square(self) -> Self:
-        rows = len(self.matrix.entries)
-        columns = len(self.matrix.entries[0])
-        if rows != columns:
-            raise _validation_error(
-                "budget_exceeded", "canonical-form operations require a square matrix"
-            )
-        if rows > MAX_CANONICAL_FORM_DIMENSION:
-            raise _validation_error(
-                "budget_exceeded",
-                "canonical-form operations are bounded to 16 x 16 matrices",
-            )
-        require_matrix_scalar_digits(
-            self.matrix.entries,
-            maximum=MAX_CANONICAL_FORM_SCALAR_DIGITS,
-            label="canonical-form matrix",
-        )
-        return self
 
 
 class MonicPolynomial(StrictModel):
@@ -1499,8 +1431,7 @@ class MinimalPolynomialResult(StrictModel):
     """Exact minimal polynomial of a square rational matrix.
 
     Retains source and structural polynomial metadata. Kernel output uses
-    :meth:`_from_kernel`; independently supplied claims use an explicit
-    bounded defining-invariant verifier.
+    :meth:`_from_kernel`.
     """
 
     matrix: SquareMatrixRequest
@@ -1551,8 +1482,7 @@ class RationalCanonicalFormResult(StrictModel):
     """Exact rational (Frobenius) canonical form of a square rational matrix.
 
     Retains source and structural metadata. Kernel output uses
-    :meth:`_from_kernel`; independently supplied claims use an explicit
-    bounded defining-invariant verifier.
+    :meth:`_from_kernel`.
     """
 
     matrix: SquareMatrixRequest
@@ -1608,9 +1538,7 @@ class RationalCanonicalFormResult(StrictModel):
 class PrimaryDecompositionResult(StrictModel):
     """Primary decomposition of the minimal polynomial into irreducible-power components.
 
-    Retains source and component values. Kernel output uses :meth:`_from_kernel`;
-    independently supplied claims use an explicit bounded defining-invariant
-    verifier.
+    Retains source and component values. Kernel output uses :meth:`_from_kernel`.
     """
 
     matrix: SquareMatrixRequest
