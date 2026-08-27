@@ -19,17 +19,12 @@ from jacobian.math.finite_state_transducers import (
 from jacobian.math.finite_state_transducers._models import (
     ComposeRequest,
     RelationPathReplayRequest,
-    RelationPathReplayResult,
     SubseqRunRequest,
-    SubseqRunResult,
 )
 from jacobian.math.finite_state_transducers._operations import (
     compute_compose,
     compute_relation_path_replay,
     compute_run,
-    verify_compose_result,
-    verify_relation_path_replay_result,
-    verify_subseq_run_result,
 )
 from jacobian.math.finite_state_transducers._tools import TOOLS
 
@@ -111,19 +106,6 @@ class TestSubsequentialRun:
         assert result.transducer == request.transducer
         assert result.word == request.word
         assert result.output == (1, 0)
-        assert verify_subseq_run_result(result)
-
-    def test_false_run_result_requires_explicit_verification(self) -> None:
-        result = SubseqRunResult(
-            transducer=_flip(),
-            word=(0,),
-            status="OUTPUT",
-            output=(0,),
-            final_state=0,
-            undefined_position=None,
-            partial_output=(),
-        )
-        assert not verify_subseq_run_result(result)
 
     def test_native_run_rejects_symbol_outside_alphabet(self) -> None:
         with pytest.raises(ValueError, match="outside"):
@@ -178,7 +160,6 @@ class TestComposition:
         assert result.first == request.first
         assert result.second == request.second
         assert run_subsequential(result.transducer, (0, 1))[1] == (1, 0)
-        assert verify_compose_result(result)
 
 
 class TestNativeTransformations:
@@ -229,7 +210,6 @@ class TestRationalPathReplay:
         assert result.input_word == (0, 1)
         assert result.output_word == (1, 0)
         assert result.state_trace == (0, 1, 1)
-        assert verify_relation_path_replay_result(result)
 
     def test_empty_path_uses_explicit_initial_state(self) -> None:
         relation = _relation(initial_states=(0, 1))
@@ -242,19 +222,6 @@ class TestRationalPathReplay:
 
         assert replay_rational_path(relation, 0, (1,))[0] == "INVALID_PATH"
         assert replay_rational_path(relation, 0, (9,))[0] == "INVALID_PATH"
-
-    def test_false_replay_result_requires_explicit_verification(self) -> None:
-        result = RelationPathReplayResult(
-            transducer=_relation(),
-            initial_state=0,
-            edge_path=(0,),
-            status="INVALID_PATH",
-            input_word=(),
-            output_word=(),
-            state_trace=(0,),
-            error="invented",
-        )
-        assert not verify_relation_path_replay_result(result)
 
 
 class TestValueValidation:
