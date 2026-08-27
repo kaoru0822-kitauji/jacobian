@@ -50,8 +50,6 @@ from jacobian.math.term_rewriting._operations import (
     compute_rewrite_step,
     compute_substitution,
     compute_unification,
-    verify_critical_pairs_result,
-    verify_substitution_result,
 )
 from jacobian.math.term_rewriting._tools import TOOLS
 from jacobian.math.term_rewriting.values import (
@@ -302,20 +300,6 @@ class TestSubstitution:
         term = _app(0, _var(0))
         result = apply_substitution(term, {})
         assert result == term
-
-    def test_result_is_bound_to_the_source_substitution(self) -> None:
-        result = compute_substitution(
-            SubstitutionRequest(
-                signature=_signature(1, 0),
-                term=_app(0, _var(0)),
-                substitution=_substitution({0: _app(1)}),
-            )
-        )
-        payload = result.model_dump()
-        payload["result"] = _app(1).model_dump()
-        assert not verify_substitution_result(
-            SubstitutionResult.model_validate(payload)
-        )
 
 
 class TestMatching:
@@ -707,20 +691,6 @@ class TestCriticalPairs:
             CriticalPairsRequest(signature=signature, rules=(rule, rule))
         with pytest.raises(ValueError, match="result nodes"):
             critical_pairs(signature, (rule, rule))
-
-    def test_result_replays_exact_critical_pair_family(self) -> None:
-        rules = (
-            RewriteRule(lhs=_app(0, _app(1, _var(0))), rhs=_var(0)),
-            RewriteRule(lhs=_app(1, _var(1)), rhs=_var(1)),
-        )
-        result = compute_critical_pairs(
-            CriticalPairsRequest(signature=_signature(1, 1), rules=rules)
-        )
-        payload = result.model_dump()
-        payload["profile"]["pairs"][0]["outer_reduct"] = _app(0, _var(1)).model_dump()
-        assert not verify_critical_pairs_result(
-            CriticalPairsResult.model_validate(payload)
-        )
 
     def test_duplicate_rules_are_rejected_before_trivial_root_pairs(self) -> None:
         first = RewriteRule(lhs=_app(0, _var(7)), rhs=_var(7))

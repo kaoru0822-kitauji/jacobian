@@ -35,12 +35,6 @@ __all__ = [
     "compute_rewrite_step",
     "compute_substitution",
     "compute_unification",
-    "verify_critical_pairs_result",
-    "verify_matching_result",
-    "verify_normal_form_result",
-    "verify_rewrite_step_result",
-    "verify_substitution_result",
-    "verify_unification_result",
 ]
 
 
@@ -92,62 +86,3 @@ def compute_critical_pairs(request: CriticalPairsRequest) -> CriticalPairsResult
     return CriticalPairsResult._from_kernel(
         request, critical_pairs(request.signature, request.rules)
     )
-
-
-def verify_substitution_result(result: SubstitutionResult) -> bool:
-    """Check one admitted externally supplied substitution result."""
-
-    return result.result == apply_substitution(result.term, result.substitution.mapping)
-
-
-def verify_matching_result(result: MatchingResult) -> bool:
-    """Check one admitted externally supplied matching claim."""
-
-    expected = match(result.pattern, result.subject)
-    return (result.matched, result.substitution) == (
-        expected is not None,
-        expected or {},
-    )
-
-
-def verify_unification_result(result: UnificationResult) -> bool:
-    """Check one admitted externally supplied MGU claim."""
-
-    expected = _bounded_unify(result.left, result.right)
-    return (result.unified, result.substitution) == (
-        expected is not None,
-        expected or {},
-    )
-
-
-def verify_rewrite_step_result(result: RewriteStepResult) -> bool:
-    """Check an admitted rewrite-step result against its declared scope."""
-
-    if result.selection is None:
-        return (
-            result.scope == "ALL_APPLICABLE_STEPS"
-            and result.applications == rewrite_steps(result.source_term, result.rules)
-        )
-    application = selected_rewrite_step(
-        result.source_term,
-        result.rules,
-        result.selection.position,
-        result.selection.rule_index,
-    )
-    return result.scope == "SELECTED_STEP" and result.applications == (
-        () if application is None else (application,)
-    )
-
-
-def verify_normal_form_result(result: NormalFormResult) -> bool:
-    """Check one bounded normal-form trace result."""
-
-    return (result.term, result.status, result.steps, result.next_step) == normal_form(
-        result.source_term, result.rules, result.max_steps
-    )
-
-
-def verify_critical_pairs_result(result: CriticalPairsResult) -> bool:
-    """Check one admitted complete critical-pair profile."""
-
-    return result.profile == critical_pairs(result.signature, result.rules)
