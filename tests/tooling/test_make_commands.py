@@ -92,11 +92,15 @@ def test_lanes_use_their_declared_worker_and_fixture_affinity() -> None:
     math = makefile.split("test-math:", 1)[1].split("test-catalog:", 1)[0]
     catalog = makefile.split("test-catalog:", 1)[1].split("test-dispatch:", 1)[0]
     integration = makefile.split("test-integration:", 1)[1].split("test-fast:", 1)[0]
+    scale = makefile.split("_test-scale:", 1)[1].split("test-exhaustive:", 1)[0]
+    exhaustive = makefile.split("_test-exhaustive:", 1)[1].split("test-property:", 1)[0]
 
     assert "pytest -n auto --dist worksteal" in math
     assert "pytest -n 2 --dist worksteal" in catalog
     assert "pytest -n 2 --dist worksteal" in integration
     assert '-m "$(ORDINARY_MARKER_EXPRESSION)"' in integration
+    assert "pytest -n 2 --dist worksteal" in scale
+    assert "pytest -n 2 --dist worksteal" in exhaustive
 
 
 def test_semantic_marker_lanes_are_excluded_from_ordinary_math() -> None:

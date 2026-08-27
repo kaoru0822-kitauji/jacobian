@@ -160,19 +160,19 @@ test-property: ## Run explicitly marked invariant checks once.
 test-stress: ## Repeat explicitly marked property tests on the scheduled lane.
 	$(MAKE) test-property PYTEST_ARGS="--count=$(STRESS_COUNT) $(PYTEST_ARGS)"
 
-test-scale: ## Run optional near-envelope mathematical execution evidence.
+test-scale: ## Run optional near-envelope mathematical execution evidence (2 workers).
 	$(VALIDATION_LOCK) run --target test-scale -- $(MAKE) _test-scale
 
 _test-scale:
-	$(UV_RUN) pytest -n 0 --timeout=180 --timeout-method=thread -m scale \
+	$(UV_RUN) pytest -n 2 --dist worksteal --timeout=180 --timeout-method=thread -m scale \
 		$(if $(TESTS),$(TESTS),tests) \
 		$(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
-test-exhaustive: ## Broad finite reference sweeps reserved for scheduled validation.
+test-exhaustive: ## Broad finite reference sweeps reserved for scheduled validation (2 workers).
 	$(VALIDATION_LOCK) run --target test-exhaustive -- $(MAKE) _test-exhaustive
 
 _test-exhaustive:
-	$(UV_RUN) pytest -n 0 --timeout=180 --timeout-method=thread -m exhaustive \
+	$(UV_RUN) pytest -n 2 --dist worksteal --timeout=180 --timeout-method=thread -m exhaustive \
 		$(if $(TESTS),$(TESTS),tests) \
 		$(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
