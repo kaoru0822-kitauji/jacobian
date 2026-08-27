@@ -6,8 +6,8 @@ import re
 import pytest
 from jsonschema import Draft202012Validator
 from pydantic import ValidationError
-from tests.math.number_theory._validation import expect_validation
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math import modular_polynomials
 from jacobian.math.modular_polynomials import (
     _INTEGER,
@@ -86,8 +86,8 @@ def test_identity_native_api_exposes_values_and_semantic_scalars() -> None:
 
 
 def test_residue_image_keeps_its_narrower_exponent_admission() -> None:
-    with expect_validation("number_theory.term_outside_residue_image_admission"):
-        _request(exponent=33)
+    with pytest.raises(OperationDomainValidationError, match="exponents"):
+        compute_modular_polynomial_residue_image(_request(exponent=33))
 
 
 def test_published_term_schema_matches_residue_image_admission() -> None:
@@ -200,8 +200,10 @@ def test_coefficient_boundary_follows_the_advertised_envelope() -> None:
     admitted = _request_with_coefficient("-" + "9" * 255)
     assert int(admitted.terms[0].coefficient) < 0
 
-    with expect_validation("number_theory.term_outside_residue_image_admission"):
-        _request_with_coefficient("-" + "9" * 256)
+    with pytest.raises(OperationDomainValidationError, match="coefficient"):
+        compute_modular_polynomial_residue_image(
+            _request_with_coefficient("-" + "9" * 256)
+        )
 
 
 def test_shared_term_type_retains_its_wider_envelope_elsewhere() -> None:

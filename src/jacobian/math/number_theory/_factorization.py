@@ -15,7 +15,7 @@ from jacobian.math.number_theory._certification_models import (
 )
 from jacobian.math.number_theory._direct_factorization_models import (
     DivisorListResult,
-    NonzeroFactorizationRequest,
+    FactorizationRequest,
     PrimeFactorizationResult,
     RadicalResult,
     SquarefreeResult,
@@ -47,19 +47,19 @@ def _compute_pratt_certificate(
 
 
 def _compute_divisors(
-    request: NonzeroFactorizationRequest,
+    request: FactorizationRequest,
 ) -> DivisorListResult:
     return enumerate_divisors(request)
 
 
 def _compute_proper_divisors(
-    request: NonzeroFactorizationRequest,
+    request: FactorizationRequest,
 ) -> DivisorListResult:
     return enumerate_proper_divisors(request)
 
 
 def _compute_prime_factorization(
-    request: NonzeroFactorizationRequest,
+    request: FactorizationRequest,
 ) -> PrimeFactorizationResult:
     return factorize_primes(request)
 
@@ -151,7 +151,7 @@ FACTORIZATION_OPERATIONS = (
             "absolute value, or return UNKNOWN when the bounded factorization "
             "worker cannot establish the enumeration."
         ),
-        request_model=NonzeroFactorizationRequest,
+        request_model=FactorizationRequest,
         result_model=DivisorListResult,
         implementation=_compute_divisors,
         tags=("number-theory", "enumeration"),
@@ -169,7 +169,7 @@ FACTORIZATION_OPERATIONS = (
             "Enumerate every positive proper divisor exactly, or return UNKNOWN "
             "when the bounded factorization worker cannot establish it."
         ),
-        request_model=NonzeroFactorizationRequest,
+        request_model=FactorizationRequest,
         result_model=DivisorListResult,
         implementation=_compute_proper_divisors,
         tags=("number-theory", "enumeration"),
@@ -189,7 +189,7 @@ FACTORIZATION_OPERATIONS = (
             "prime-power factorization, or UNKNOWN when the bounded worker "
             "cannot establish it."
         ),
-        request_model=NonzeroFactorizationRequest,
+        request_model=FactorizationRequest,
         result_model=PrimeFactorizationResult,
         implementation=_compute_prime_factorization,
         tags=("number-theory", "factorization"),

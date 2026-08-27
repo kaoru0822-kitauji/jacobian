@@ -12,6 +12,7 @@ from time import monotonic
 from typing import Literal
 
 from jacobian.canonical import format_canonical_integer, parse_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.number_theory._certification_models import (
     CertifiedFactor,
     CertifiedFactorizationRequest,
@@ -21,6 +22,8 @@ from jacobian.math.number_theory._certification_models import (
     PrimalityCertificateResult,
 )
 from jacobian.math.number_theory._direct_factorization_models import (
+    MAX_DIRECT_DIVISORS,
+    MAX_DIRECT_FACTOR_ENTRIES,
     DivisorListResult,
     FactorizationRequest,
     PrimeFactorizationResult,
@@ -229,6 +232,15 @@ def factorize_certified(
 # ---------------------------------------------------------------------------
 
 
+def _admit_nonzero(request: FactorizationRequest) -> None:
+    if int(request.value) == 0:
+        raise OperationDomainValidationError(
+            location=("value",),
+            code="number_theory.zero_has_no_finite_factorization_or_divisor_enumeration",
+            message="zero has no finite factorization or divisor enumeration",
+        )
+
+
 def _bounded_direct_factorization(
     value: int,
     *,
@@ -313,7 +325,7 @@ def _bounded_direct_factorization(
             PrimePower.model_validate({"prime": pair[0], "power": pair[1]})
             for pair in raw_factors
         )
-        if len(factors) > 256:
+        if len(factors) > MAX_DIRECT_FACTOR_ENTRIES:
             raise ValueError("too many factors")
         if [factor.prime for factor in factors] != sorted(
             (factor.prime for factor in factors), key=int
@@ -339,10 +351,10 @@ def _bounded_direct_factorization(
 
 
 def _divisors_from_factors(
-    factors: tuple[PrimePower, ...], *, proper: bool, value: int
+    factors: tuple[PrimePower, ...], *, proper: bool
 ) -> tuple[str, ...]:
     divisor_count = math.prod(factor.power + 1 for factor in factors)
-    if divisor_count > 4_096:
+    if divisor_count > MAX_DIRECT_DIVISORS:
         raise ValueError("divisor output exceeds admitted bound")
     divisors = [1]
     for factor in factors:
@@ -355,38 +367,9 @@ def _divisors_from_factors(
     return ordered[:-1] if proper else ordered
 
 
-def verify_divisor_list_result(result: DivisorListResult) -> bool:
-    """Replay one bounded divisor claim through the owner kernel."""
-
-    if result.status != "COMPLETE":
-        return False
-    factors = _bounded_direct_factorization(int(result.value))
-    if factors is None:
-        return False
-    try:
-        divisors = _divisors_from_factors(
-            factors,
-            proper=result.convention == "PROPER_DIVISORS",
-            value=int(result.value),
-        )
-    except ValueError:
-        return False
-    return result.divisors == divisors
-
-
-def verify_prime_factorization_result(result: PrimeFactorizationResult) -> bool:
-    """Replay one complete prime-factorization claim through the owner kernel."""
-
-    if result.status != "COMPLETE":
-        return False
-    factors = _bounded_direct_factorization(int(result.value))
-    return factors is not None and result.factors == factors
-
-
 def enumerate_divisors(request: FactorizationRequest) -> DivisorListResult:
+    _admit_nonzero(request)
     value = int(request.value)
-    if value == 0:
-        raise ValueError("zero has infinitely many divisors")
     factors = _bounded_direct_factorization(value)
     if factors is None:
         return DivisorListResult._unknown(
@@ -395,22 +378,23 @@ def enumerate_divisors(request: FactorizationRequest) -> DivisorListResult:
             detail="the bounded factorization worker did not establish every divisor",
         )
     try:
-        divisors = _divisors_from_factors(factors, proper=False, value=value)
+        divisors = _divisors_from_factors(factors, proper=False)
     except ValueError:
         return DivisorListResult._unknown(
             value=request.value,
             convention="ALL_POSITIVE_DIVISORS",
             detail="the complete divisor family exceeds the admitted output bound",
         )
-    return DivisorListResult(
-        value=request.value, divisors=divisors, convention="ALL_POSITIVE_DIVISORS"
+    return DivisorListResult._from_kernel(
+        value=request.value,
+        divisors=divisors,
+        convention="ALL_POSITIVE_DIVISORS",
     )
 
 
 def enumerate_proper_divisors(request: FactorizationRequest) -> DivisorListResult:
+    _admit_nonzero(request)
     value = int(request.value)
-    if value == 0:
-        raise ValueError("zero has infinitely many divisors")
     factors = _bounded_direct_factorization(value)
     if factors is None:
         return DivisorListResult._unknown(
@@ -419,29 +403,32 @@ def enumerate_proper_divisors(request: FactorizationRequest) -> DivisorListResul
             detail="the bounded factorization worker did not establish every proper divisor",
         )
     try:
-        divisors = _divisors_from_factors(factors, proper=True, value=value)
+        divisors = _divisors_from_factors(factors, proper=True)
     except ValueError:
         return DivisorListResult._unknown(
             value=request.value,
             convention="PROPER_DIVISORS",
             detail="the complete divisor family exceeds the admitted output bound",
         )
-    return DivisorListResult(
-        value=request.value, divisors=divisors, convention="PROPER_DIVISORS"
+    return DivisorListResult._from_kernel(
+        value=request.value,
+        divisors=divisors,
+        convention="PROPER_DIVISORS",
     )
 
 
 def factorize_primes(request: FactorizationRequest) -> PrimeFactorizationResult:
+    _admit_nonzero(request)
     value = int(request.value)
-    if value == 0:
-        raise ValueError("zero has no finite prime factorization")
     factors = _bounded_direct_factorization(value)
     if factors is None:
         return PrimeFactorizationResult._unknown(
             value=request.value,
             detail="the bounded factorization worker did not establish a complete result",
         )
-    return PrimeFactorizationResult(value=request.value, factors=factors)
+    return PrimeFactorizationResult._from_kernel(
+        value=request.value, factors=factors
+    )
 
 
 def decide_squarefree(request: ArithmeticFunctionRequest) -> SquarefreeResult:

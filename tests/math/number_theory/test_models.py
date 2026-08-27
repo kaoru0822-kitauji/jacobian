@@ -14,10 +14,6 @@ from jacobian.math.number_theory._direct_factorization_models import (
     FactorizationRequest,
     PrimeFactorizationResult,
 )
-from jacobian.math.number_theory._factorization_kernels import (
-    verify_divisor_list_result,
-    verify_prime_factorization_result,
-)
 from jacobian.math.number_theory._integer_models import (
     NonnegativeIntegerRequest,
     PositiveIntegerRequest,
@@ -153,7 +149,7 @@ def test_direct_factorization_contract_schemas_preserve_their_envelopes() -> Non
     assert factorization_source["maxLength"] == MAX_DIRECT_FACTORIZATION_DIGITS
 
 
-def test_modular_residue_image_contract_replays_canonical_assignments() -> None:
+def test_modular_residue_image_contract_round_trips_canonical_assignments() -> None:
     from jacobian.math.number_theory._modular_operations import (
         compute_modular_polynomial_residue_assignments,
     )
@@ -184,7 +180,7 @@ def test_modular_residue_image_contract_replays_canonical_assignments() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_divisor_list_result_replays_source_enumeration() -> None:
+def test_divisor_list_result_preserves_structural_constraints() -> None:
     full = DivisorListResult(value="12", divisors=("1", "2", "3", "4", "6", "12"))
     assert full.convention == "ALL_POSITIVE_DIVISORS"
     proper = DivisorListResult(
@@ -207,7 +203,7 @@ def test_divisor_list_result_replays_source_enumeration() -> None:
 
 
 def test_divisor_list_result_admits_twenty_digit_source_boundary() -> None:
-    """The replayed source keeps the producing operations' 20-digit bound."""
+    """The result keeps the producing operations' 20-digit source bound."""
 
     from sympy import isprime
 
@@ -227,66 +223,29 @@ def test_divisor_list_result_admits_twenty_digit_source_boundary() -> None:
         )
 
 
-def test_divisor_list_result_rejects_sources_beyond_factorization_domain() -> None:
-    """A forged serialized output whose divisor list does not enumerate the
-    source's divisors exactly is rejected by the source-bound replay."""
-
-    assert not verify_divisor_list_result(
-        DivisorListResult.model_validate(
-            {
-                "value": "12",
-                "divisors": ["1", "2", "3", "12"],
-                "convention": "ALL_POSITIVE_DIVISORS",
-            }
-        )
-    )
-
-
-def test_divisor_list_verifier_rejects_sources_beyond_its_output_envelope() -> None:
-    """Replay must reject a complete claim whose source has too many divisors."""
-
-    assert not verify_divisor_list_result(
-        DivisorListResult(
-            value="4839309619200000",
-            divisors=("1",),
-            convention="ALL_POSITIVE_DIVISORS",
-        )
-    )
-
-
 def test_divisor_list_result_rejects_mutations() -> None:
-    assert not verify_divisor_list_result(
-        DivisorListResult(value="99", divisors=("1", "2", "3", "4", "6", "12"))
-    )
-    assert not verify_divisor_list_result(
-        DivisorListResult(value="12", divisors=("1", "2", "3", "4", "6"))
-    )
-    assert not verify_divisor_list_result(
-        DivisorListResult(value="12", divisors=("1", "2", "3", "4", "6", "8", "12"))
-    )
     with expect_validation("number_theory."):
         DivisorListResult(
             value="12",
             divisors=("12", "6", "4", "3", "2", "1"),
             convention="ALL_POSITIVE_DIVISORS",
         )
-    assert not verify_divisor_list_result(
-        DivisorListResult(
-            value="12", divisors=("2", "99"), convention="ALL_POSITIVE_DIVISORS"
-        )
-    )
-    with expect_validation("number_theory."):
-        DivisorListResult(value="0", divisors=())
-    assert not verify_divisor_list_result(
-        DivisorListResult(
-            value="12",
-            divisors=("1", "2", "3", "4", "6"),
-            convention="ALL_POSITIVE_DIVISORS",
-        )
-    )
 
 
-def test_prime_factorization_result_replays_source() -> None:
+def test_direct_factorization_admits_nonzero_values_in_models() -> None:
+    from jacobian.math.number_theory._factorization_kernels import (
+        enumerate_divisors,
+        enumerate_proper_divisors,
+        factorize_primes,
+    )
+
+    request = FactorizationRequest(value="0")
+    for operation in (enumerate_divisors, enumerate_proper_divisors, factorize_primes):
+        with pytest.raises(OperationDomainValidationError, match="zero"):
+            operation(request)
+
+
+def test_prime_factorization_result_accepts_kernel_shape() -> None:
     from jacobian.math.number_theory._integer_models import PrimePower
 
     result = PrimeFactorizationResult(
@@ -303,17 +262,9 @@ def test_prime_factorization_result_replays_source() -> None:
     assert prime_power.factors[0].power == 3
 
 
-def test_prime_factorization_result_rejects_mutations() -> None:
+def test_prime_factorization_result_preserves_structural_constraints() -> None:
     from jacobian.math.number_theory._integer_models import PrimePower
 
-    assert not verify_prime_factorization_result(
-        PrimeFactorizationResult(value="4", factors=(PrimePower(prime="4", power=1),))
-    )
-    with expect_validation("number_theory."):
-        PrimeFactorizationResult(
-            value="12",
-            factors=(PrimePower(prime="2", power=1), PrimePower(prime="3", power=1)),
-        )
     with expect_validation("number_theory."):
         PrimeFactorizationResult(
             value="12",
@@ -324,37 +275,10 @@ def test_prime_factorization_result_rejects_mutations() -> None:
             value="4",
             factors=(PrimePower(prime="2", power=1), PrimePower(prime="2", power=2)),
         )
-    with expect_validation("number_theory."):
-        PrimeFactorizationResult(value="0", factors=())
-
-
-def test_prime_factorization_result_bounds_reconstruction_work() -> None:
-    """Replay rejects reconstructions larger than the source before expanding."""
-
-    from jacobian.math.number_theory._integer_models import PrimePower
-
-    with expect_validation("number_theory."):
-        PrimeFactorizationResult(
-            value="3", factors=(PrimePower(prime="2", power=1000),)
-        )
-    with expect_validation("number_theory."):
-        PrimeFactorizationResult(
-            value="6",
-            factors=(PrimePower(prime="2", power=1), PrimePower(prime="3", power=1000)),
-        )
-    with expect_validation("number_theory."):
-        PrimeFactorizationResult(
-            value="1024",
-            factors=(
-                PrimePower(prime="2", power=10),
-                PrimePower(prime="3", power=999),
-                PrimePower(prime="5", power=999),
-            ),
-        )
 
 
 def test_prime_factorization_result_rejects_source_beyond_worker_envelope() -> None:
-    """A direct result cannot claim a source its producer cannot factor."""
+    """The result retains the producer's bounded source envelope."""
 
     width = 256
     exponent = 849

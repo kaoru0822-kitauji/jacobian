@@ -19,40 +19,13 @@ def decide_powerful(request: PowerfulNumberRequest) -> PowerfulNumberResult:
     return PowerfulNumberResult._from_kernel(request, data=data)
 
 
-def verify_powerful_number_result(result: PowerfulNumberResult) -> bool:
-    """Verify one independently supplied powerful-number decision."""
-
-    expected = decide_powerful_data(parse_canonical_integer(result.value))
-    factors = tuple(
-        (parse_canonical_integer(factor.prime), factor.power)
-        for factor in result.stripped_factors
-    )
-    perfect_power = (
-        None
-        if result.residual_perfect_power is None
-        else (
-            parse_canonical_integer(result.residual_perfect_power.base),
-            result.residual_perfect_power.exponent,
-        )
-    )
-    return (
-        result.conclusion == expected.conclusion
-        and result.is_powerful == (expected.conclusion == "POWERFUL")
-        and result.cutoff == expected.cutoff
-        and result.checked_through == expected.checked_through
-        and factors == expected.stripped_factors
-        and parse_canonical_integer(result.residual) == expected.residual
-        and perfect_power == expected.perfect_power
-    )
-
-
 POWERFUL_NUMBER_OPERATION = number_theory_operation(
     "integer.decide.powerful",
     "Decide powerful-number status",
     "Decide exactly whether every prime exponent of one positive integer is at "
     "least two. Trial division through the derived cutoff B=ceil(n^(1/5)) and "
     "exact perfect-power classification of the B-rough residual avoid complete "
-    "factorization while returning a source-bound replayable certificate.",
+    "factorization while returning a source-bound partial certificate.",
     PowerfulNumberRequest,
     PowerfulNumberResult,
     decide_powerful,

@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from copy import deepcopy
 from math import gcd
-from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -21,8 +18,6 @@ from jacobian.math.number_theory._powerful_models import (
     PowerfulNumberRequest,
     PowerfulNumberResult,
 )
-
-PayloadMutation = Callable[[dict[str, Any]], None]
 
 
 def _full_factorization_oracle(value: int) -> bool:
@@ -192,39 +187,14 @@ def test_request_rejects_nonpositive_noncanonical_or_nonstring_values(
         PowerfulNumberRequest.model_validate({"value": value})
 
 
-@pytest.mark.parametrize(
-    ("value", "mutation"),
-    [
-        (12168, lambda payload: payload.update(value="12167")),
-        (12168, lambda payload: payload.update(cutoff=payload["cutoff"] + 1)),
-        (
-            12168,
-            lambda payload: payload["stripped_factors"][0].update(power=2),
-        ),
-        (12168, lambda payload: payload.update(residual="168")),
-        (
-            12168,
-            lambda payload: payload["residual_perfect_power"].update(exponent=3),
-        ),
-        (
-            2**6 * 3**4 * 7,
-            lambda payload: payload.update(checked_through=payload["cutoff"]),
-        ),
-    ],
-)
-def test_owner_verifier_rejects_mutated_source_or_certificate(
-    value: int,
-    mutation: PayloadMutation,
-) -> None:
-    genuine = decide_powerful(PowerfulNumberRequest(value=str(value)))
-    payload = deepcopy(genuine.model_dump(mode="json"))
-    mutation(payload)
-
-    from jacobian.math.number_theory._powerful import verify_powerful_number_result
-
-    assert not verify_powerful_number_result(
-        PowerfulNumberResult.model_validate(payload)
+def test_result_keeps_cheap_branch_consistency_validation() -> None:
+    payload = decide_powerful(PowerfulNumberRequest(value="12168")).model_dump(
+        mode="json"
     )
+    payload["is_powerful"] = False
+
+    with pytest.raises(ValidationError, match="must agree"):
+        PowerfulNumberResult.model_validate(payload)
 
 
 @pytest.mark.exhaustive

@@ -10,6 +10,10 @@ import pytest
 from jacobian.catalog.catalog import Catalog
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.dispatch import invoke_operation
+from jacobian.math.modular_polynomials import ModularPolynomialTerm
+from jacobian.math.number_theory._direct_factorization_models import (
+    FactorizationRequest,
+)
 from jacobian.math.number_theory._discrete_logarithm import (
     DISCRETE_LOGARITHM_OPERATION,
     DiscreteLogarithmRequest,
@@ -18,14 +22,20 @@ from jacobian.math.number_theory._divisibility_models import ValuationRequest
 from jacobian.math.number_theory._divisibility_operations import (
     compute_valuation,
 )
+from jacobian.math.number_theory._factorization_kernels import enumerate_divisors
 from jacobian.math.number_theory._modular_basic_models import (
     ChineseRemainderRequest,
     JacobiSymbolRequest,
     ModularUnitRequest,
 )
+from jacobian.math.number_theory._modular_models import (
+    ModularPolynomialResidueImageRequest,
+    ModularPolynomialVariable,
+)
 from jacobian.math.number_theory._modular_operations import (
     compute_jacobi_symbol,
     compute_modular_inverse,
+    compute_modular_polynomial_residue_image,
     solve_chinese_remainder,
 )
 from jacobian.math.number_theory._ramanujan_sum import (
@@ -99,6 +109,50 @@ def test_discrete_log_request_admission_is_native() -> None:
         invoke_operation(
             "modular.compute.discrete_logarithm",
             {"base": 5, "target": 1, "modulus": 5},
+            Catalog.open(),
+        )
+
+    assert dispatch_error.value.errors() == native_error.value.errors()
+
+
+def test_direct_factorization_admission_is_native() -> None:
+    request = FactorizationRequest(value="0")
+    with pytest.raises(OperationDomainValidationError) as native_error:
+        enumerate_divisors(request)
+    with pytest.raises(OperationDomainValidationError) as dispatch_error:
+        invoke_operation(
+            "integer.compute.divisors",
+            {"value": "0"},
+            Catalog.open(),
+        )
+
+    assert dispatch_error.value.errors() == native_error.value.errors()
+
+
+def test_modular_polynomial_admission_is_native() -> None:
+    request = ModularPolynomialResidueImageRequest(
+        modulus=5,
+        variables=(
+            ModularPolynomialVariable(name="x", residues=(0, 1)),
+            ModularPolynomialVariable(name="x", residues=(0, 1)),
+        ),
+        terms=(
+            ModularPolynomialTerm(coefficient="1", exponents=(1, 1)),
+        ),
+    )
+    with pytest.raises(OperationDomainValidationError) as native_error:
+        compute_modular_polynomial_residue_image(request)
+    with pytest.raises(OperationDomainValidationError) as dispatch_error:
+        invoke_operation(
+            "modular.polynomial_residue_image.compute",
+            {
+                "modulus": 5,
+                "variables": [
+                    {"name": "x", "residues": [0, 1]},
+                    {"name": "x", "residues": [0, 1]},
+                ],
+                "terms": [{"coefficient": "1", "exponents": [1, 1]}],
+            },
             Catalog.open(),
         )
 

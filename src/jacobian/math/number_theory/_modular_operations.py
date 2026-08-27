@@ -9,6 +9,7 @@ from typing import Literal, cast
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.arithmetic.values import IntegerValue
 from jacobian.math.modular_polynomials import NormalizedModularPolynomialTerm
+from jacobian.math.number_theory._models import _MAX_INTEGER_LENGTH
 from jacobian.math.number_theory._modular_basic_models import (
     MAX_CRT_COMBINED_MODULUS,
     MAX_MODULUS,
@@ -21,6 +22,8 @@ from jacobian.math.number_theory._modular_basic_models import (
     QuadraticResiduesResult,
 )
 from jacobian.math.number_theory._modular_models import (
+    _MAX_RESIDUE_ASSIGNMENTS,
+    _MAX_RESIDUE_EXPONENT,
     ModularPolynomialResidueCount,
     ModularPolynomialResidueImageRequest,
     ModularPolynomialResidueImageResult,
@@ -86,6 +89,69 @@ def _admit_crt(request: ChineseRemainderRequest) -> None:
                 )
 
 
+def _admit_residue_image(request: ModularPolynomialResidueImageRequest) -> None:
+    variable_names = [variable.name for variable in request.variables]
+    if len(variable_names) != len(set(variable_names)):
+        _domain_error(
+            ("variables",),
+            "polynomial_variable_names_must_be_unique",
+            "polynomial variable names must be unique",
+        )
+    if any(
+        residue >= request.modulus
+        for variable in request.variables
+        for residue in variable.residues
+    ):
+        _domain_error(
+            ("variables",),
+            "every_variable_residue_must_be_less_than_the_modulus",
+            "every variable residue must be less than the modulus",
+        )
+    assignment_count = math.prod(
+        len(variable.residues) for variable in request.variables
+    )
+    if assignment_count > _MAX_RESIDUE_ASSIGNMENTS:
+        _domain_error(
+            ("variables",),
+            "declared_residue_domains_exceed_the_4_096_assignment_bound",
+            "declared residue domains exceed the 4,096-assignment bound",
+        )
+    if any(len(term.exponents) != len(request.variables) for term in request.terms):
+        _domain_error(
+            ("terms",),
+            "every_term_exponent_vector_must_match_the_variable_count",
+            "every term exponent vector must match the variable count",
+        )
+    if any(
+        len(term.coefficient) > _MAX_INTEGER_LENGTH
+        or any(
+            exponent < 0 or exponent > _MAX_RESIDUE_EXPONENT
+            for exponent in term.exponents
+        )
+        for term in request.terms
+    ):
+        _domain_error(
+            ("terms",),
+            "term_outside_residue_image_admission",
+            "term coefficient or exponents exceed the residue-image admission",
+        )
+    exponent_vectors = [term.exponents for term in request.terms]
+    if exponent_vectors != sorted(set(exponent_vectors)):
+        _domain_error(
+            ("terms",),
+            "term_exponent_vectors_must_be_unique_and_lexicographically_increasing",
+            "term exponent vectors must be unique and lexicographically increasing",
+        )
+    if any(
+        int(term.coefficient) % request.modulus == 0 for term in request.terms
+    ):
+        _domain_error(
+            ("terms",),
+            "sparse_polynomial_terms_must_have_nonzero_coefficient_modulo_m",
+            "sparse polynomial terms must have nonzero coefficient modulo m",
+        )
+
+
 def compute_jacobi_symbol(request: JacobiSymbolRequest) -> JacobiSymbolResult:
     from sympy import jacobi_symbol
 
@@ -140,6 +206,7 @@ def _residue_image(
     *,
     table: list[ModularPolynomialResidueTableRow] | None,
 ) -> ModularPolynomialResidueImageResult:
+    _admit_residue_image(request)
     normalized_terms = tuple(
         NormalizedModularPolynomialTerm(
             coefficient=int(term.coefficient) % request.modulus,
@@ -162,12 +229,11 @@ def _residue_image(
         counts[residue] = counts.get(residue, 0) + 1
         first_assignments.setdefault(residue, assignment)
     image = tuple(sorted(counts))
-    return ModularPolynomialResidueImageResult(
+    return ModularPolynomialResidueImageResult._from_kernel(
         modulus=request.modulus,
         variable_order=tuple(variable.name for variable in request.variables),
         domains=tuple(variable.residues for variable in request.variables),
         normalized_terms=normalized_terms,
-        enumeration_scope="COMPLETE_DECLARED_CARTESIAN_PRODUCT",
         total_assignments=total_assignments,
         image=image,
         residue_counts=tuple(
