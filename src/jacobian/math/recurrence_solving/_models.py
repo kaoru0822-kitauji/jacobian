@@ -7,34 +7,23 @@ from typing import Literal, Self
 from pydantic import Field, StrictInt, model_validator
 from pydantic_core import PydanticCustomError
 
-from jacobian._exact import CanonicalRational, require_bounded_rational
+from jacobian._exact import CanonicalRational
 from jacobian._models import StrictModel
 
 MAX_RATIONAL_DIGITS = 256
+MAX_RATIONAL_SEQUENCE_LENGTH = 256
 
 
 def _validation_error(reason: str, message: str) -> PydanticCustomError:
     return PydanticCustomError(f"recurrence_solving.{reason}", message)
 
 
-def _require_rationals(values: tuple[CanonicalRational, ...], *, label: str) -> None:
-    for value in values:
-        try:
-            require_bounded_rational(value, max_digits=MAX_RATIONAL_DIGITS, label=label)
-        except ValueError as exc:
-            raise _validation_error("rational_out_of_bounds", str(exc)) from exc
-
-
 class RecurrenceFindRequest(StrictModel):
     """Find the minimal linear recurrence of a sequence over QQ."""
 
-    sequence: tuple[CanonicalRational, ...] = Field(min_length=2, max_length=256)
-
-    @model_validator(mode="after")
-    def require_rational_sequence(self) -> Self:
-        _require_rationals(self.sequence, label="sequence value")
-        return self
-
+    sequence: tuple[CanonicalRational, ...] = Field(
+        min_length=2, max_length=MAX_RATIONAL_SEQUENCE_LENGTH
+    )
 
 class RecurrenceFindResult(StrictModel):
     """A fitted recurrence or an explicit finite-prefix missing outcome."""
@@ -87,31 +76,6 @@ class ClosedFormRequest(StrictModel):
     )
     initial_values: tuple[CanonicalRational, ...] = Field(min_length=1, max_length=16)
 
-    @model_validator(mode="after")
-    def require_initial_values_for_order(self) -> Self:
-        order = len(self.characteristic_coefficients) - 1
-        if order < 1:
-            raise _validation_error(
-                "characteristic_degree_invalid",
-                "characteristic polynomial must have positive degree",
-            )
-        if len(self.initial_values) != order:
-            raise _validation_error(
-                "initial_value_count_mismatch",
-                "initial value count must match the recurrence order",
-            )
-        _require_rationals(
-            self.characteristic_coefficients, label="characteristic coefficient"
-        )
-        _require_rationals(self.initial_values, label="initial value")
-        if self.characteristic_coefficients[0].as_fraction() == 0:
-            raise _validation_error(
-                "leading_coefficient_zero",
-                "characteristic polynomial must have nonzero leading coefficient",
-            )
-        return self
-
-
 class ClosedFormResult(StrictModel):
     """The closed-form solution as a SymPy expression string."""
 
@@ -131,18 +95,6 @@ class ClosedFormResult(StrictModel):
 
 _MAX_FIELD_SEQUENCE_LENGTH = 256
 _MAX_FIELD_PRIME = 10_000
-
-
-def _require_bounded_prime(prime: int) -> None:
-    if not 2 <= prime <= _MAX_FIELD_PRIME:
-        raise _validation_error(
-            "prime_out_of_bounds",
-            f"prime must be a prime number between 2 and {_MAX_FIELD_PRIME}",
-        )
-    from sympy import isprime
-
-    if not isprime(prime):
-        raise _validation_error("prime_not_prime", "prime must be a prime integer")
 
 
 def _require_canonical_residues(
@@ -183,7 +135,6 @@ class PrimeFieldRecurrence(StrictModel):
 
     @model_validator(mode="after")
     def require_canonical(self) -> Self:
-        _require_bounded_prime(self.prime)
         _require_canonical_residues(self.coefficients, self.prime, "coefficients")
         if self.order != len(self.coefficients):
             raise _validation_error(
@@ -211,13 +162,6 @@ class PrimeFieldRecurrenceFindRequest(StrictModel):
         ),
     )
 
-    @model_validator(mode="after")
-    def require_valid_field_sequence(self) -> Self:
-        _require_bounded_prime(self.prime)
-        _require_canonical_residues(self.sequence, self.prime, "sequence values")
-        return self
-
-
 class PrimeFieldRecurrenceFindResult(StrictModel):
     """The minimal LFSR over ``GF(p)`` found by Berlekamp-Massey.
 
@@ -239,7 +183,6 @@ class PrimeFieldRecurrenceFindResult(StrictModel):
 
     @model_validator(mode="after")
     def require_status_consistent_coefficients(self) -> Self:
-        _require_bounded_prime(self.recurrence.prime)
         _require_canonical_residues(
             self.sequence, self.recurrence.prime, "sequence values"
         )

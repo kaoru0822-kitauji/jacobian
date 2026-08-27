@@ -82,11 +82,15 @@ class TestPrimeFieldRecurrenceFind:
 
     def test_rejects_nonprime(self) -> None:
         with pytest.raises(ValueError, match="prime"):
-            PrimeFieldRecurrenceFindRequest(prime=4, sequence=(1, 2, 3))
+            compute_prime_field_find_recurrence(
+                PrimeFieldRecurrenceFindRequest(prime=4, sequence=(1, 2, 3))
+            )
 
     def test_rejects_out_of_range_value(self) -> None:
         with pytest.raises(ValueError, match="residues"):
-            PrimeFieldRecurrenceFindRequest(prime=3, sequence=(1, 3, 2))
+            compute_prime_field_find_recurrence(
+                PrimeFieldRecurrenceFindRequest(prime=3, sequence=(1, 3, 2))
+            )
 
     def test_wire_and_native_paths_share_prime_field_bounds(self) -> None:
         with pytest.raises(ValidationError) as exc_info:

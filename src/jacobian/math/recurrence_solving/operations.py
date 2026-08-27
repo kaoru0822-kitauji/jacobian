@@ -5,10 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from jacobian._exact import CanonicalRational
+from jacobian._exact import CanonicalRational, require_bounded_rational
 from jacobian.math.recurrence_solving._models import (
     _MAX_FIELD_PRIME,
     _MAX_FIELD_SEQUENCE_LENGTH,
+    MAX_RATIONAL_DIGITS,
+    MAX_RATIONAL_SEQUENCE_LENGTH,
     PrimeFieldRecurrence,
 )
 
@@ -27,6 +29,13 @@ class Recurrence:
     coefficients: tuple[CanonicalRational, ...]
     order: int
     status: Literal["FOUND", "NO_FITTING_RECURRENCE"]
+
+
+def _validate_rationals(
+    values: tuple[CanonicalRational, ...], *, label: str
+) -> None:
+    for value in values:
+        require_bounded_rational(value, max_digits=MAX_RATIONAL_DIGITS, label=label)
 
 
 def _validate_berlekamp_inputs(sequence: list[int], prime: int) -> None:
@@ -74,11 +83,14 @@ class ClosedForm:
 def find_recurrence(sequence: tuple[CanonicalRational, ...]) -> Recurrence:
     import sympy
 
-    from jacobian.math.recurrence_solving._models import RecurrenceFindRequest
+    if not 2 <= len(sequence) <= MAX_RATIONAL_SEQUENCE_LENGTH:
+        raise ValueError(
+            "sequence must have length between 2 and "
+            f"{MAX_RATIONAL_SEQUENCE_LENGTH}"
+        )
+    _validate_rationals(sequence, label="sequence value")
 
-    request = RecurrenceFindRequest(sequence=sequence)
-
-    values = [sympy.Rational(*value.as_integer_ratio()) for value in request.sequence]
+    values = [sympy.Rational(*value.as_integer_ratio()) for value in sequence]
     for order in range(1, len(values)):
         coefficient_matrix = sympy.Matrix(
             [
@@ -110,18 +122,21 @@ def closed_form(
 ) -> ClosedForm:
     import sympy
 
-    from jacobian.math.recurrence_solving._models import ClosedFormRequest
-
-    request = ClosedFormRequest(
-        characteristic_coefficients=char_coeffs,
-        initial_values=initial_values,
-    )
+    order = len(char_coeffs) - 1
+    if not 1 <= order <= 16:
+        raise ValueError("characteristic polynomial must have degree between 1 and 16")
+    if len(initial_values) != order:
+        raise ValueError("initial value count must match the recurrence order")
+    _validate_rationals(char_coeffs, label="characteristic coefficient")
+    _validate_rationals(initial_values, label="initial value")
+    if char_coeffs[0].as_fraction() == 0:
+        raise ValueError("characteristic polynomial must have nonzero leading coefficient")
 
     x = sympy.Symbol("x")
     n = sympy.Symbol("n", integer=True, nonnegative=True)
     char_poly_coeffs = [
         sympy.Rational(*value.as_integer_ratio())
-        for value in request.characteristic_coefficients
+        for value in char_coeffs
     ]
     char_poly = sum(
         c * x ** (len(char_poly_coeffs) - 1 - i) for i, c in enumerate(char_poly_coeffs)
@@ -135,9 +150,7 @@ def closed_form(
         for root in nonzero_roots
         for power in range(roots.count(root))
     )
-    init = [
-        sympy.Rational(*value.as_integer_ratio()) for value in request.initial_values
-    ]
+    init = [sympy.Rational(*value.as_integer_ratio()) for value in initial_values]
     a = sympy.Matrix([[term.subs(n, i) for term in basis] for i in range(len(basis))])
     b = sympy.Matrix(init)
     consts = a.solve(b)
@@ -189,10 +202,10 @@ def berlekamp_massey(sequence: list[int], prime: int) -> PrimeFieldRecurrence:
     # The recurrence is s_n = -c_1 s_{n-1} - ... - c_L s_{n-L}, so the
     # recurrence coefficients are [-c_1, ..., -c_L].
     if length == 0:
-        return PrimeFieldRecurrence(
+        return PrimeFieldRecurrence.model_construct(
             prime=prime, coefficients=(), order=0, status="FOUND"
         )
     recurrence = tuple((-coeffs[j]) % prime for j in range(1, length + 1))
-    return PrimeFieldRecurrence(
+    return PrimeFieldRecurrence.model_construct(
         prime=prime, coefficients=recurrence, order=length, status="FOUND"
     )
