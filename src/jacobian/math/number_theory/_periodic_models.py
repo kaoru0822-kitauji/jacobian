@@ -234,9 +234,9 @@ class PeriodicCongruenceUnionRequest(StrictModel):
     """A bounded family of residue subsets interpreted by union and complement.
 
     The family may be empty and may repeat moduli or residue representatives.
-    Validation normalizes representatives modulo their positive modulus, merges
-    repeated moduli, and admits a bounded period lift, sparse lift, or
-    generalized-CRT inclusion-exclusion computation.
+    The native operation normalizes representatives modulo their positive
+    modulus, merges repeated moduli, and admits a bounded period lift, sparse
+    lift, or generalized-CRT inclusion-exclusion computation.
     """
 
     model_config = ConfigDict(
