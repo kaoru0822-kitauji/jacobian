@@ -81,26 +81,6 @@ class MaxFlowRequest(StrictModel):
     source: int = Field(ge=0, le=63)
     sink: int = Field(ge=0, le=63)
 
-    @model_validator(mode="after")
-    def require_valid_terminals(self) -> Self:
-        if not (0 <= self.source < self.graph.vertex_count):
-            raise PydanticCustomError(
-                "graph.source_must_be_in_0_graph_vertex_count_1",
-                "source must be in 0..graph.vertex_count-1",
-            )
-        if not (0 <= self.sink < self.graph.vertex_count):
-            raise PydanticCustomError(
-                "graph.sink_must_be_in_0_graph_vertex_count_1",
-                "sink must be in 0..graph.vertex_count-1",
-            )
-        if self.source == self.sink:
-            raise PydanticCustomError(
-                "graph.source_and_sink_must_be_distinct",
-                "source and sink must be distinct",
-            )
-        return self
-
-
 class FlowEdgeValue(StrictModel):
     """The flow assigned to one directed edge."""
 
@@ -121,26 +101,6 @@ class MinCutRequest(StrictModel):
     graph: FlowGraph
     source: int = Field(ge=0, le=63)
     sink: int = Field(ge=0, le=63)
-
-    @model_validator(mode="after")
-    def require_valid_terminals(self) -> Self:
-        if not (0 <= self.source < self.graph.vertex_count):
-            raise PydanticCustomError(
-                "graph.source_must_be_in_0_graph_vertex_count_1",
-                "source must be in 0..graph.vertex_count-1",
-            )
-        if not (0 <= self.sink < self.graph.vertex_count):
-            raise PydanticCustomError(
-                "graph.sink_must_be_in_0_graph_vertex_count_1",
-                "sink must be in 0..graph.vertex_count-1",
-            )
-        if self.source == self.sink:
-            raise PydanticCustomError(
-                "graph.source_and_sink_must_be_distinct",
-                "source and sink must be distinct",
-            )
-        return self
-
 
 class MinCutResult(StrictModel):
     cut_value: CanonicalRational
@@ -184,26 +144,6 @@ class EdgeDisjointPathsRequest(StrictModel):
     graph: EdgeDisjointPathsGraph
     source: int = Field(ge=0, le=63)
     sink: int = Field(ge=0, le=63)
-
-    @model_validator(mode="after")
-    def require_valid_terminals(self) -> Self:
-        if not (0 <= self.source < self.graph.vertex_count):
-            raise PydanticCustomError(
-                "graph.source_must_be_in_0_graph_vertex_count_1",
-                "source must be in 0..graph.vertex_count-1",
-            )
-        if not (0 <= self.sink < self.graph.vertex_count):
-            raise PydanticCustomError(
-                "graph.sink_must_be_in_0_graph_vertex_count_1",
-                "sink must be in 0..graph.vertex_count-1",
-            )
-        if self.source == self.sink:
-            raise PydanticCustomError(
-                "graph.source_and_sink_must_be_distinct",
-                "source and sink must be distinct",
-            )
-        return self
-
 
 class EdgeDisjointPathsResult(StrictModel):
     path_count: int = Field(ge=0)
@@ -259,26 +199,6 @@ class MinCostFlowRequest(StrictModel):
     graph: CostedFlowGraph
     demands: tuple[int, ...] = Field(default=(), max_length=64)
 
-    @model_validator(mode="after")
-    def require_valid(self) -> Self:
-        if len(self.demands) != self.graph.vertex_count:
-            raise PydanticCustomError(
-                "graph.demands_length_must_match_vertex_count",
-                "demands length must match vertex_count",
-            )
-        if sum(self.demands) != 0:
-            raise PydanticCustomError(
-                "graph.demands_must_sum_to_zero", "demands must sum to zero"
-            )
-        capacity_denominators = tuple(
-            edge.capacity.as_integer_ratio()[1] for edge in self.graph.edges
-        )
-        cost_denominators = tuple(
-            edge.cost.as_integer_ratio()[1] for edge in self.graph.edges
-        )
-        _bounded_denominator_scale(capacity_denominators, "capacity")
-        _bounded_denominator_scale(cost_denominators, "cost")
-        return self
 
 
 class FlowEdgeResult(StrictModel):

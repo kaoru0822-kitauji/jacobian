@@ -7,6 +7,7 @@ from fractions import Fraction
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.flow._models import (
     EdgeDisjointPathsRequest,
     EdgeDisjointPathsResult,
@@ -170,42 +171,44 @@ class TestMaxFlow:
         assert result.flow_value.as_fraction() == Fraction(1, 3)
 
     def test_contract_rejects_source_equals_sink(self) -> None:
-        with pytest.raises(ValidationError):
-            MaxFlowRequest.model_validate(
-                {
-                    "graph": {
-                        "vertex_count": 2,
-                        "edges": [
-                            {
-                                "source": 0,
-                                "target": 1,
-                                "capacity": {"num": "1", "den": "1"},
-                            },
-                        ],
-                    },
-                    "source": 0,
-                    "sink": 0,
-                }
-            )
+        request = MaxFlowRequest.model_validate(
+            {
+                "graph": {
+                    "vertex_count": 2,
+                    "edges": [
+                        {
+                            "source": 0,
+                            "target": 1,
+                            "capacity": {"num": "1", "den": "1"},
+                        },
+                    ],
+                },
+                "source": 0,
+                "sink": 0,
+            }
+        )
+        with pytest.raises(OperationDomainValidationError):
+            compute_max_flow(request)
 
     def test_contract_rejects_out_of_range_source(self) -> None:
-        with pytest.raises(ValidationError):
-            MaxFlowRequest.model_validate(
-                {
-                    "graph": {
-                        "vertex_count": 2,
-                        "edges": [
-                            {
-                                "source": 0,
-                                "target": 1,
-                                "capacity": {"num": "1", "den": "1"},
-                            },
-                        ],
-                    },
-                    "source": 5,
-                    "sink": 1,
-                }
-            )
+        request = MaxFlowRequest.model_validate(
+            {
+                "graph": {
+                    "vertex_count": 2,
+                    "edges": [
+                        {
+                            "source": 0,
+                            "target": 1,
+                            "capacity": {"num": "1", "den": "1"},
+                        },
+                    ],
+                },
+                "source": 5,
+                "sink": 1,
+            }
+        )
+        with pytest.raises(OperationDomainValidationError):
+            compute_max_flow(request)
 
 
 # ---------------------------------------------------------------------------
@@ -483,17 +486,18 @@ class TestEdgeDisjointPaths:
             )
 
     def test_contract_rejects_source_equals_sink(self) -> None:
-        with pytest.raises(ValidationError):
-            EdgeDisjointPathsRequest.model_validate(
-                {
-                    "graph": {
-                        "vertex_count": 2,
-                        "edges": [[0, 1]],
-                    },
-                    "source": 0,
-                    "sink": 0,
-                }
-            )
+        request = EdgeDisjointPathsRequest.model_validate(
+            {
+                "graph": {
+                    "vertex_count": 2,
+                    "edges": [[0, 1]],
+                },
+                "source": 0,
+                "sink": 0,
+            }
+        )
+        with pytest.raises(OperationDomainValidationError):
+            compute_edge_disjoint_paths(request)
 
     def test_contract_rejects_out_of_range_vertex_in_edge(self) -> None:
         with pytest.raises(ValidationError):

@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.flow import _operations as flow_operations
 from jacobian.math.graphs.flow._models import (
     CostedFlowEdge,
@@ -385,5 +386,6 @@ def test_min_cost_flow_derived_scale_admission_fails_closed() -> None:
         for (source, target), prime in zip(pairs, primes, strict=True)
     )
     graph = CostedFlowGraph(vertex_count=64, edges=edges)
-    with pytest.raises(ValidationError):
-        MinCostFlowRequest(graph=graph, demands=tuple([0] * 63 + [0]))
+    request = MinCostFlowRequest(graph=graph, demands=tuple([0] * 64))
+    with pytest.raises(OperationDomainValidationError, match="derived-scale"):
+        compute_min_cost_flow(request)

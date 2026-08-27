@@ -9,6 +9,7 @@ import networkx as nx
 
 from jacobian._exact import CanonicalRational
 from jacobian.canonical import format_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.flow._models import (
     EdgeDisjointPathsRequest,
     EdgeDisjointPathsResult,
@@ -21,7 +22,59 @@ from jacobian.math.graphs.flow._models import (
     MinCostFlowResult,
     MinCutRequest,
     MinCutResult,
+    _bounded_denominator_scale,
 )
+
+
+def _admit_terminals(request: MaxFlowRequest | MinCutRequest | EdgeDisjointPathsRequest) -> None:
+    if not 0 <= request.source < request.graph.vertex_count:
+        raise OperationDomainValidationError(
+            location=("source",),
+            code="graph.source_must_be_in_0_graph_vertex_count_1",
+            message="source must be in 0..graph.vertex_count-1",
+        )
+    if not 0 <= request.sink < request.graph.vertex_count:
+        raise OperationDomainValidationError(
+            location=("sink",),
+            code="graph.sink_must_be_in_0_graph_vertex_count_1",
+            message="sink must be in 0..graph.vertex_count-1",
+        )
+    if request.source == request.sink:
+        raise OperationDomainValidationError(
+            location=("source", "sink"),
+            code="graph.source_and_sink_must_be_distinct",
+            message="source and sink must be distinct",
+        )
+
+
+def _admit_min_cost_flow(request: MinCostFlowRequest) -> None:
+    if len(request.demands) != request.graph.vertex_count:
+        raise OperationDomainValidationError(
+            location=("demands",),
+            code="graph.demands_length_must_match_vertex_count",
+            message="demands length must match vertex_count",
+        )
+    if sum(request.demands) != 0:
+        raise OperationDomainValidationError(
+            location=("demands",),
+            code="graph.demands_must_sum_to_zero",
+            message="demands must sum to zero",
+        )
+    try:
+        _bounded_denominator_scale(
+            tuple(edge.capacity.as_integer_ratio()[1] for edge in request.graph.edges),
+            "capacity",
+        )
+        _bounded_denominator_scale(
+            tuple(edge.cost.as_integer_ratio()[1] for edge in request.graph.edges),
+            "cost",
+        )
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=("graph", "edges"),
+            code="graph.flow.derived_scale_bound",
+            message=str(exc),
+        ) from exc
 
 
 def _build_digraph(graph: FlowGraph) -> nx.DiGraph[int]:
@@ -42,6 +95,7 @@ def _rational(value: Fraction | int) -> CanonicalRational:
 
 
 def compute_max_flow(request: MaxFlowRequest) -> MaxFlowResult:
+    _admit_terminals(request)
     g = _build_digraph(request.graph)
     flow_value, flow_dict = nx.maximum_flow(g, request.source, request.sink)
     if not isinstance(flow_value, (int, Fraction)):
@@ -69,6 +123,7 @@ def compute_max_flow(request: MaxFlowRequest) -> MaxFlowResult:
 
 
 def compute_min_cut(request: MinCutRequest) -> MinCutResult:
+    _admit_terminals(request)
     g = _build_digraph(request.graph)
     cut_value, partition = nx.minimum_cut(g, request.source, request.sink)
     if not isinstance(cut_value, (int, Fraction)):
@@ -89,6 +144,7 @@ def compute_edge_disjoint_paths(
     Uses NetworkX's ``edge_disjoint_paths`` (which internally computes a
     maximum flow with unit capacities and extracts the paths).
     """
+    _admit_terminals(request)
     g: nx.DiGraph[Any] = nx.DiGraph()
     g.add_nodes_from(range(request.graph.vertex_count))
     for source, target in request.graph.edges:
@@ -125,9 +181,8 @@ def compute_min_cost_flow(request: MinCostFlowRequest) -> MinCostFlowResult:
     divided back exactly.  The request model bounds the derived scales before
     any backend graph is built.
     """
+    _admit_min_cost_flow(request)
     edges = request.graph.edges
-
-    from jacobian.math.graphs.flow._models import _bounded_denominator_scale
 
     flow_scale = _bounded_denominator_scale(
         tuple(edge.capacity.as_integer_ratio()[1] for edge in edges), "capacity"
