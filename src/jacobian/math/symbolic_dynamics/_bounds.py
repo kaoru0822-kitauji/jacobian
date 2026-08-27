@@ -4,13 +4,11 @@ from __future__ import annotations
 
 from jacobian.math.symbolic_dynamics.values import (
     MAX_ENUMERATED_BLOCKS,
-    MAX_PERIOD,
     MAX_PRESENTATION_CELLS,
     AdjacencyShift,
     ForbiddenBlockShift,
 )
 
-MAX_ZETA_REPLAY_PERIOD = MAX_PERIOD
 MAX_ZETA_COEFFICIENT_DIGITS = 128
 MAX_ZETA_RESULT_DIGITS = 100_000
 MAX_ZETA_WORK = 13_000_000
@@ -77,11 +75,9 @@ def require_bounded_presentation(shift: ForbiddenBlockShift, memory: int) -> Non
         raise ValueError("presentation adjacency exceeds the result bound")
 
 
-def require_zeta_budget(shift: AdjacencyShift, replay_period: int) -> None:
-    """Admit determinant, trace replay, and their derivable exact result size."""
+def require_zeta_budget(shift: AdjacencyShift) -> None:
+    """Admit the determinant and its derivable exact result size."""
 
-    if not 1 <= replay_period <= MAX_ZETA_REPLAY_PERIOD:
-        raise ValueError("replay period is outside the supported bounds")
     states = len(shift.matrix)
     maximum_entry = max(entry for row in shift.matrix for entry in row)
     # The degree-k coefficient is a sum of principal k-minors. Its absolute
@@ -89,22 +85,16 @@ def require_zeta_budget(shift: AdjacencyShift, replay_period: int) -> None:
     coefficient_digits = states * len(str(states * max(1, maximum_entry))) + 1
     if coefficient_digits > MAX_ZETA_COEFFICIENT_DIGITS:
         raise ValueError("zeta polynomial exceeds the coefficient digit bound")
-    work = states**4 + states**3 * replay_period
+    work = states**4
     if work > MAX_ZETA_WORK:
-        raise ValueError("zeta determinant and replay exceed the work bound")
-    maximum_row_sum = max(sum(row) for row in shift.matrix)
-    count_bound = states * max(1, maximum_row_sum) ** replay_period
-    count_digits = len(str(count_bound))
-    result_digits = (
-        2 * (states + 1) * coefficient_digits + 2 * replay_period * count_digits
-    )
+        raise ValueError("zeta determinant exceeds the work bound")
+    result_digits = 2 * (states + 1) * coefficient_digits
     if result_digits > MAX_ZETA_RESULT_DIGITS:
         raise ValueError("zeta result exceeds the aggregate digit bound")
 
 
 __all__ = [
     "MAX_PERIODIC_PROFILE_DIGITS",
-    "MAX_ZETA_REPLAY_PERIOD",
     "enumeration_size",
     "normalize_forbidden_blocks",
     "presentation_memory",

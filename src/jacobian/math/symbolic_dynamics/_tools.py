@@ -110,7 +110,6 @@ SYMBOLIC_DYNAMICS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
                 "Compute the Golden Mean shift zeta function through five replay coefficients.",
                 {
                     "shift": {"matrix": [[1, 1], [1, 0]], "two_sided": True},
-                    "replay_period": 5,
                 },
             ),
         ),

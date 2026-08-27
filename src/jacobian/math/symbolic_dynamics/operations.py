@@ -282,31 +282,12 @@ def _determinant_coefficients(shift: AdjacencyShift) -> tuple[int, ...]:
     return tuple(int(coefficient) for coefficient in characteristic.all_coeffs())
 
 
-def _logarithmic_derivative_coefficients(
-    determinant_coefficients: tuple[int, ...], period_count: int
-) -> tuple[int, ...]:
-    """Return coefficients of ``-t D'(t) / D(t)`` through ``period_count``."""
-
-    result: list[int] = []
-    degree = len(determinant_coefficients) - 1
-    for period in range(1, period_count + 1):
-        derivative_term = (
-            -period * determinant_coefficients[period] if period <= degree else 0
-        )
-        convolution = sum(
-            determinant_coefficients[offset] * result[period - offset - 1]
-            for offset in range(1, min(degree, period - 1) + 1)
-        )
-        result.append(derivative_term - convolution)
-    return tuple(result)
-
-
 def artin_mazur_zeta(
-    shift: AdjacencyShift, replay_period: int
-) -> tuple[RationalPolynomial, RationalFunction, tuple[int, ...]]:
-    """Return ``det(I-tA)``, ``1/det(I-tA)``, and its fixed-point replay."""
+    shift: AdjacencyShift,
+) -> tuple[RationalPolynomial, RationalFunction]:
+    """Return ``det(I-tA)`` and ``1/det(I-tA)``."""
 
-    require_zeta_budget(shift, replay_period)
+    require_zeta_budget(shift)
     from sympy import QQ, Poly, Symbol
 
     variable = Symbol("t")
@@ -316,14 +297,6 @@ def artin_mazur_zeta(
         variable,
         domain=QQ,
     )
-    logarithmic_derivative = _logarithmic_derivative_coefficients(
-        coefficients, replay_period
-    )
-    fixed_points, _, _ = periodic_point_profile(shift, replay_period)
-    if logarithmic_derivative != fixed_points:
-        raise RuntimeError(
-            "zeta logarithmic derivative disagrees with periodic-point traces"
-        )
     return (
         rational_polynomial_from_sympy(
             determinant, ("t",), maximum_terms=MAX_ADJACENCY_STATES + 1
@@ -333,7 +306,6 @@ def artin_mazur_zeta(
             ("t",),
             maximum_terms=MAX_ADJACENCY_STATES + 1,
         ),
-        logarithmic_derivative,
     )
 
 

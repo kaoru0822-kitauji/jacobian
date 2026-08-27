@@ -11,7 +11,6 @@ from jacobian._exact import CanonicalInteger
 from jacobian._models import StrictModel
 from jacobian.canonical import format_canonical_integer
 from jacobian.math.polynomials.values import RationalFunction, RationalPolynomial
-from jacobian.math.symbolic_dynamics._bounds import MAX_ZETA_REPLAY_PERIOD
 from jacobian.math.symbolic_dynamics.values import (
     MAX_FORBIDDEN_BLOCK_LENGTH,
     MAX_PERIOD,
@@ -109,70 +108,35 @@ class ArtinMazurZetaRequest(StrictModel):
     """Request the exact Artin--Mazur zeta function of one edge shift."""
 
     shift: AdjacencyShift
-    replay_period: int = Field(ge=1, le=MAX_ZETA_REPLAY_PERIOD)
-
-
-class ArtinMazurZetaReplayRow(StrictModel):
-    period: int = Field(ge=1, le=MAX_ZETA_REPLAY_PERIOD)
-    trace_fixed_points: CanonicalInteger
-    logarithmic_derivative_coefficient: CanonicalInteger
 
 
 class ArtinMazurZetaResult(ArtinMazurZetaRequest):
     determinant_polynomial: RationalPolynomial
     zeta_function: RationalFunction
-    replay: tuple[ArtinMazurZetaReplayRow, ...] = Field(
-        min_length=1, max_length=MAX_ZETA_REPLAY_PERIOD
-    )
     convention: Literal["EDGE_SHIFT_ARTIN_MAZUR_ZETA"] = "EDGE_SHIFT_ARTIN_MAZUR_ZETA"
     method: Literal["SYMPY_EXACT_CHARACTERISTIC_POLYNOMIAL"] = (
         "SYMPY_EXACT_CHARACTERISTIC_POLYNOMIAL"
     )
 
-    @model_validator(mode="after")
-    def require_replay_scope(self) -> Self:
-        if len(self.replay) != self.replay_period or tuple(
-            row.period for row in self.replay
-        ) != tuple(range(1, self.replay_period + 1)):
-            raise _validation_error(
-                "artin_mazur_zeta_replay_scope",
-                "zeta replay must cover each requested period exactly once",
-            )
-        return self
-
-
 def _from_kernel_artin_mazur_zeta(
     request: ArtinMazurZetaRequest,
     determinant_polynomial: RationalPolynomial,
     zeta_function: RationalFunction,
-    coefficients: tuple[int, ...],
 ) -> ArtinMazurZetaResult:
     """Construct a zeta result from the trusted one-pass owner kernel."""
 
     if (
         determinant_polynomial.variables != ("t",)
         or zeta_function.variables != ("t",)
-        or len(coefficients) != request.replay_period
     ):
         raise _validation_error(
             "artin_mazur_zeta_computed_shape",
-            "computed zeta values must retain the canonical t axis and replay scope",
+            "computed zeta values must retain the canonical t axis",
         )
     return ArtinMazurZetaResult(
         shift=request.shift,
-        replay_period=request.replay_period,
         determinant_polynomial=determinant_polynomial,
         zeta_function=zeta_function,
-        replay=tuple(
-            ArtinMazurZetaReplayRow(
-                period=period,
-                trace_fixed_points=format_canonical_integer(coefficient),
-                logarithmic_derivative_coefficient=format_canonical_integer(
-                    coefficient
-                ),
-            )
-            for period, coefficient in enumerate(coefficients, 1)
-        ),
         convention="EDGE_SHIFT_ARTIN_MAZUR_ZETA",
         method="SYMPY_EXACT_CHARACTERISTIC_POLYNOMIAL",
     )
@@ -233,7 +197,6 @@ def _from_kernel_higher_block(
 
 
 __all__ = [
-    "ArtinMazurZetaReplayRow",
     "ArtinMazurZetaRequest",
     "ArtinMazurZetaResult",
     "BlockLanguageRequest",

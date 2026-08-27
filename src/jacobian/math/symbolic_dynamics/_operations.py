@@ -32,14 +32,11 @@ from jacobian.math.symbolic_dynamics.operations import (
 def compute_artin_mazur_zeta(
     request: ArtinMazurZetaRequest,
 ) -> ArtinMazurZetaResult:
-    determinant, zeta, coefficients = artin_mazur_zeta(
-        request.shift, request.replay_period
-    )
+    determinant, zeta = artin_mazur_zeta(request.shift)
     return _from_kernel_artin_mazur_zeta(
         request,
         determinant,
         zeta,
-        coefficients,
     )
 
 
