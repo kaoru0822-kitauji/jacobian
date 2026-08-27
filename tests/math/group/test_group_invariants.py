@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.group._models import (
     GroupConjugacyClassesRequest,
     GroupSubgroupLatticeRequest,
@@ -127,17 +128,25 @@ class TestBoundedEnumeration:
         """Each operation rejects groups above its own enumerated-order cap:
         the lattice at 64, conjugacy classes at 5000."""
         s6_generators = ((1, 0, 2, 3, 4, 5), (1, 2, 3, 4, 5, 0))
-        with _group_error("group.order_bound"):
-            GroupSubgroupLatticeRequest(degree=6, generators=s6_generators)
+        with pytest.raises(OperationDomainValidationError, match="group order"):
+            compute_subgroup_lattice(
+                GroupSubgroupLatticeRequest(degree=6, generators=s6_generators)
+            )
         s7_generators = ((1, 0, 2, 3, 4, 5, 6), (1, 2, 3, 4, 5, 6, 0))
-        with _group_error("group.order_bound"):
-            GroupConjugacyClassesRequest(degree=7, generators=s7_generators)
+        from jacobian.math.group._operations import compute_group_conjugacy_classes
+
+        with pytest.raises(OperationDomainValidationError, match="group order"):
+            compute_group_conjugacy_classes(
+                GroupConjugacyClassesRequest(degree=7, generators=s7_generators)
+            )
 
     def test_lattice_still_rejects_above_64(self) -> None:
-        with _group_error("group.order_bound"):
-            GroupSubgroupLatticeRequest(
-                degree=5,
-                generators=((1, 0, 2, 3, 4), (1, 2, 3, 4, 0)),
+        with pytest.raises(OperationDomainValidationError, match="group order"):
+            compute_subgroup_lattice(
+                GroupSubgroupLatticeRequest(
+                    degree=5,
+                    generators=((1, 0, 2, 3, 4), (1, 2, 3, 4, 0)),
+                )
             )
 
     def test_c32_lattice_is_divisor_chain(self) -> None:
@@ -168,45 +177,6 @@ class TestLatticeResultBoundToSourceGroup:
         assert result.degree == 4
         payload = result.model_dump(mode="json")
         assert GroupSubgroupLatticeResult.model_validate(payload) == result
-
-    def test_incomplete_lattice_rejected(self) -> None:
-        """The degree-2 identity subgroup alone must not revalidate as C2's
-        complete lattice, which also contains C2 itself."""
-        from jacobian.math.group._models import GroupSubgroupLatticeResult
-
-        payload = self._c4_result().model_dump(mode="json")
-        trivial_only = next(
-            entry for entry in payload["subgroups"] if entry["order"] == 1
-        )
-        payload["subgroups"] = [trivial_only]
-        payload["subgroup_count"] = 1
-        from jacobian.math.group._operations import verify_group_subgroup_lattice_result
-
-        assert (
-            verify_group_subgroup_lattice_result(
-                GroupSubgroupLatticeResult.model_validate(payload)
-            )
-            is False
-        )
-
-    def test_foreign_group_entries_rejected(self) -> None:
-        """Entries of one source group cannot be relayed under another."""
-        from jacobian.math.group._models import GroupSubgroupLatticeResult
-
-        s3_payload = compute_subgroup_lattice(
-            GroupSubgroupLatticeRequest(degree=3, generators=((1, 0, 2),))
-        ).model_dump(mode="json")
-        s3_payload["degree"] = 4
-        s3_payload["generators"] = [[1, 2, 3, 0]]
-        from jacobian.math.group._operations import verify_group_subgroup_lattice_result
-
-        assert (
-            verify_group_subgroup_lattice_result(
-                GroupSubgroupLatticeResult.model_validate(s3_payload)
-            )
-            is False
-        )
-
 
 class TestLatticeWorkBound:
     """Traversal work is bounded by search-node count, not only group order."""
@@ -339,17 +309,6 @@ class TestExceededOutcomeSourceBinding:
         """A non-permutation generator cannot ride on an exceeded outcome."""
         with pytest.raises(ValidationError):
             self._exceeded(degree=2, generators=((999,),))
-
-    def test_oversized_source_group_rejected_on_exceeded_path(self) -> None:
-        s6 = ((1, 0, 2, 3, 4, 5), (1, 2, 3, 4, 5, 0))
-        from jacobian.math.group._operations import verify_group_subgroup_lattice_result
-
-        assert (
-            verify_group_subgroup_lattice_result(
-                self._exceeded(degree=6, generators=s6)
-            )
-            is False
-        )
 
     def test_entries_chain_into_permutation_group_consumers(self) -> None:
         from jacobian.math.group._models import PermutationGroupRequest

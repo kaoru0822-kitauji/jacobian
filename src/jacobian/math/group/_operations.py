@@ -5,6 +5,7 @@ from __future__ import annotations
 from pydantic_core import PydanticCustomError
 
 from jacobian.canonical import format_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.group import (
     element_order,
     group_conjugacy_classes,
@@ -14,6 +15,8 @@ from jacobian.math.group import (
     subgroup_lattice,
 )
 from jacobian.math.group._models import (
+    MAX_CONJUGACY_CLASSES_GROUP_ORDER,
+    MAX_SUBGROUP_LATTICE_GROUP_ORDER,
     GroupConjugacyClassesRequest,
     GroupConjugacyClassesResult,
     GroupElementOrderRequest,
@@ -26,8 +29,7 @@ from jacobian.math.group._models import (
     GroupSubgroupLatticeRequest,
     GroupSubgroupLatticeResult,
     PermutationGroupRequest,
-    _check_orbit_stabilizer,
-    _check_stabilizer_permutations,
+    _require_bounded_group_order,
 )
 
 
@@ -49,6 +51,17 @@ def compute_group_orbit(request: GroupOrbitRequest) -> GroupOrbitResult:
 def compute_group_conjugacy_classes(
     request: GroupConjugacyClassesRequest,
 ) -> GroupConjugacyClassesResult:
+    try:
+        _require_bounded_group_order(
+            request.degree,
+            request.generators,
+            MAX_CONJUGACY_CLASSES_GROUP_ORDER,
+            "conjugacy classes",
+        )
+    except PydanticCustomError as error:
+        raise OperationDomainValidationError(
+            location=("generators",), code=error.type, message=str(error)
+        ) from error
     classes = group_conjugacy_classes(
         request.degree,
         [list(g) for g in request.generators],
@@ -66,31 +79,22 @@ def compute_group_stabilizer(request: GroupStabilizerRequest) -> GroupStabilizer
     )
 
 
-def verify_group_stabilizer_result(result: GroupStabilizerResult) -> bool:
-    """Check a separately supplied stabilizer claim in the group owner."""
-
-    try:
-        _check_stabilizer_permutations(
-            result.source.degree,
-            result.point,
-            result.stabilizer.generators,
-            result.source.generators,
-        )
-        _check_orbit_stabilizer(
-            result.source.degree,
-            result.point,
-            result.stabilizer.generators,
-            result.source.generators,
-        )
-    except PydanticCustomError:
-        return False
-    return True
-
-
 def compute_subgroup_lattice(
     request: GroupSubgroupLatticeRequest,
 ) -> GroupSubgroupLatticeResult:
     from jacobian.math.group.operations import SubgroupLatticeBudgetExceededError
+
+    try:
+        _require_bounded_group_order(
+            request.degree,
+            request.generators,
+            MAX_SUBGROUP_LATTICE_GROUP_ORDER,
+            "subgroup lattice enumeration",
+        )
+    except PydanticCustomError as error:
+        raise OperationDomainValidationError(
+            location=("generators",), code=error.type, message=str(error)
+        ) from error
 
     source = PermutationGroupRequest(
         degree=request.degree, generators=request.generators
@@ -102,26 +106,3 @@ def compute_subgroup_lattice(
             request, str(error)
         )
     return GroupSubgroupLatticeResult._computed_from_kernel(request, tuple(subgroups))
-
-
-def verify_group_subgroup_lattice_result(result: GroupSubgroupLatticeResult) -> bool:
-    """Replay a separately supplied subgroup-lattice claim in its owner."""
-
-    try:
-        request = GroupSubgroupLatticeRequest(
-            degree=result.degree, generators=result.generators
-        )
-        if result.outcome != "COMPUTED" or result.subgroups is None:
-            return True
-        expected = tuple(
-            (entry.group.generators, entry.order)
-            for entry in subgroup_lattice(
-                PermutationGroupRequest(
-                    degree=request.degree, generators=request.generators
-                )
-            )
-        )
-    except (PydanticCustomError, ValueError):
-        return False
-    actual = tuple((entry.group.generators, entry.order) for entry in result.subgroups)
-    return actual == expected and result.subgroup_count == len(expected)

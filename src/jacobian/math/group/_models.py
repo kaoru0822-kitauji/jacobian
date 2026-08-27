@@ -191,23 +191,6 @@ class GroupConjugacyClassesRequest(StrictModel):
                     "group.generator_permutation",
                     "each generator must be a permutation of 0..n-1",
                 )
-        # Bound enumeration by the generated group's order before invoking
-        # the SymPy backend which materializes every element.  The degree
-        # cap alone does not bound work: S12 has order 479M and would
-        # exhaust memory; compute |G| cheaply via Schreier-Sims and reject
-        # when it exceeds the conservative limit.
-        from sympy.combinatorics import Permutation, PermutationGroup
-
-        perms = [Permutation(list(p)) for p in self.generators]
-        group = PermutationGroup(perms)
-        order = int(group.order())
-        if order > MAX_CONJUGACY_CLASSES_GROUP_ORDER:
-            raise _validation_error(
-                "group.order_bound",
-                "group order {order} exceeds the bounded maximum {maximum} for conjugacy classes (would materialize |G|={order} elements)",
-                order=order,
-                maximum=MAX_CONJUGACY_CLASSES_GROUP_ORDER,
-            )
         return self
 
 
@@ -545,12 +528,6 @@ class GroupSubgroupLatticeRequest(StrictModel):
                     "group.generator_permutation",
                     "each generator must be a permutation of 0..n-1",
                 )
-        _require_bounded_group_order(
-            self.degree,
-            self.generators,
-            MAX_SUBGROUP_LATTICE_GROUP_ORDER,
-            "subgroup lattice enumeration",
-        )
         return self
 
 
