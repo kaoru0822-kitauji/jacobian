@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from fractions import Fraction
+
 from jacobian.math.finite_stochastic_processes._poisson_binomial_models import (
     PoissonBinomialRequest,
     PoissonBinomialResult,
+    _admit_probabilities,
 )
 from jacobian.math.finite_stochastic_processes.operations import (
     _poisson_binomial_kernel,
@@ -29,4 +32,29 @@ def compute_poisson_binomial(
     )
 
 
-__all__ = ["compute_poisson_binomial"]
+def verify_poisson_binomial_result(result: PoissonBinomialResult) -> bool:
+    """Replay the bounded recurrence for an independently supplied result."""
+
+    try:
+        admission = _admit_probabilities(
+            tuple(probability.as_fraction() for probability in result.probabilities)
+        )
+        expected = [Fraction(0)] * (len(admission.probabilities) + 1)
+        expected[0] = Fraction(1)
+        for probability in admission.probabilities:
+            for index in range(len(expected) - 1, 0, -1):
+                expected[index] = (
+                    expected[index] * (1 - probability)
+                    + expected[index - 1] * probability
+                )
+            expected[0] *= 1 - probability
+
+        actual = tuple(
+            atom.probability.as_fraction() for atom in result.count_distribution.atoms
+        )
+        return tuple(expected) == actual
+    except (AttributeError, IndexError, TypeError, ValueError):
+        return False
+
+
+__all__ = ["compute_poisson_binomial", "verify_poisson_binomial_result"]

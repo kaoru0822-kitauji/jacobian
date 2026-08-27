@@ -14,6 +14,7 @@ from jacobian.math.finite_stochastic_processes._poisson_binomial_models import (
 )
 from jacobian.math.finite_stochastic_processes._poisson_binomial_operations import (
     compute_poisson_binomial,
+    verify_poisson_binomial_result,
 )
 
 
@@ -163,6 +164,30 @@ def test_serialized_result_probabilities_compose_into_request() -> None:
     request = PoissonBinomialRequest.model_validate(payload)
 
     assert request.probabilities == result.probabilities
+
+
+def test_result_verifier_rejects_forged_serialized_distribution_masses() -> None:
+    result = compute_poisson_binomial(
+        PoissonBinomialRequest(
+            probabilities=(CanonicalRational.from_integer_ratio(1, 2),)
+        )
+    )
+    assert verify_poisson_binomial_result(result)
+
+    payload = result.model_dump(mode="json")
+    payload["count_distribution"]["atoms"] = [
+        {
+            "value": {"num": "0", "den": "1"},
+            "probability": {"num": "1", "den": "1"},
+        },
+        {
+            "value": {"num": "1", "den": "1"},
+            "probability": {"num": "0", "den": "1"},
+        },
+    ]
+    forged = type(result).model_validate(payload)
+
+    assert not verify_poisson_binomial_result(forged)
 
 
 def test_result_distribution_round_trips_into_finite_raw_moment() -> None:
