@@ -122,47 +122,9 @@ def compute_weyl_group_order(request: CartanMatrixRequest) -> WeylGroupOrderResu
     return WeylGroupOrderResult._from_kernel(request, _weyl_group_order(request.matrix))
 
 
-def verify_positive_roots_result(result: PositiveRootsResult) -> bool:
-    """Verify a claimed positive-root enumeration within the admitted envelope."""
-
-    expected = enumerate_positive_roots(result.matrix)
-    return result.positive_roots == expected and result.num_positive_roots == len(
-        expected
-    )
-
-
-def verify_root_system_data_result(result: RootSystemDataResult) -> bool:
-    """Verify claimed root-system data within the admitted finite-type envelope."""
-
-    request = CartanMatrixRequest(matrix=result.cartan_matrix)
-    expected = compute_root_system_data(request)
-    return result == expected
-
-
-def verify_simple_reflection_result(result: SimpleReflectionResult) -> bool:
-    """Verify one claimed simple reflection without re-entering model validation."""
-
-    expected = _apply_reflection(
-        [list(row) for row in result.matrix],
-        list(result.vector),
-        result.simple_index,
-    )
-    return result.reflected_vector == tuple(expected)
-
-
-def verify_weyl_group_order_result(result: WeylGroupOrderResult) -> bool:
-    """Verify one claimed signed-root-action order in the admitted envelope."""
-
-    return result.group_order == _weyl_group_order(result.matrix)
-
-
 __all__ = [
     "compute_positive_roots",
     "compute_root_system_data",
     "compute_simple_reflection",
     "compute_weyl_group_order",
-    "verify_positive_roots_result",
-    "verify_root_system_data_result",
-    "verify_simple_reflection_result",
-    "verify_weyl_group_order_result",
 ]
