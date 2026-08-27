@@ -70,6 +70,37 @@ State the source representation as part of this boundary. Materialized,
 succinct, generated, and oracle-backed inputs can denote related objects while
 requiring different admission proofs, algorithms, and result bounds.
 
+### The carrier ladder for smooth and analytic mathematics
+
+Mathematical data that sounds geometrically related need not belong to one
+interchangeable record.  Treat the following as a ladder of increasingly rich
+semantics, rather than as fields to add opportunistically to a generic
+`geometry` value:
+
+```text
+exact scalars
+  -> algebraic or complex values
+  -> coordinate-local tensors on a specified chart
+  -> compatible chart atlases
+  -> global smooth or analytic objects
+  -> PDE evolution, approximation, convergence, and limit semantics
+```
+
+The lower layers can support useful atomic operations.  For example, a
+gradient of a rational function, a coordinate curvature profile of a
+nondegenerate rational metric, or a coordinate Lie derivative can each have a
+precise input, output, and defining identity.  They do not thereby define a
+smooth manifold, a global Riemannian geometry, or a Ricci flow.
+
+Moving up the ladder requires the data and laws of the next layer: transition
+maps and compatibility for an atlas; regularity, bundles, and global
+topological compatibility for smooth objects; and a time-dependent state,
+norm/error model, domain, and convergence semantics for analytic estimates or
+PDEs.  A finite mesh, samples, or a rational local chart can be an honest input
+to a different bounded operation, but must not be presented as an exact solver
+for a global or limiting argument simply because a source proof used related
+vocabulary.
+
 ### Techniques, functions, and operations
 
 An established technique is evidence for executable vocabulary, not an
