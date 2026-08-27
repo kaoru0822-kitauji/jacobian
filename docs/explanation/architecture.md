@@ -24,6 +24,12 @@ a distinct execution-plan value only when admission derives information that
 execution genuinely reuses, such as an algorithm choice, prepared finite data,
 or work and output reservations.
 
+Wire-model validation is narrower than native operation admission. Pydantic may
+enforce field types, canonical encodings, cheap representation limits, and
+intrinsic cross-field relations needed to construct the request value. It must
+not call a mathematical backend, enumerate a search space, select an algorithm,
+reserve result work, or cache execution data in a private model attribute.
+
 The MCP path wraps that same native operation with discovery, wire parsing, and
 transport projection:
 
@@ -54,8 +60,11 @@ backend, enumerate candidates, or check a defining relation. A wrapper or
 kernel must not recompute an admission quantity already established by
 admission or held by a plan.
 
-A named bounded verifier is the only replay path, and only verifies
-independently supplied theorem-bearing data.
+Ordinary execution does not replay its own computation. Add a named bounded
+verifier only when a public operation or consumer accepts independently
+supplied theorem-bearing data and verification is itself a required trust
+boundary. Do not create a companion ``verify_*`` function merely because a
+compute function exists; defining-invariant replay normally belongs in tests.
 
 The domain function may compose a maintained backend such as SymPy, FLINT,
 NetworkX, or Z3 where that algorithm is relevant. Those backends remain private

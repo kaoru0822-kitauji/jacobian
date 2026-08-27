@@ -8,9 +8,9 @@ validates then executes exactly one of them.
 The canonical operation path and ownership boundaries are defined in the
 [architecture](../explanation/architecture.md). A domain function may use a
 maintained library privately for its algorithm;
-callers see Jacobian's typed mathematical values, not backend objects. The
-execution plan is request-scoped and internal. It is not caller-owned workflow
-state and does not add another MCP operation.
+callers see Jacobian's typed mathematical values, not backend objects. When an
+execution plan is needed, it is request-scoped and internal. It is not
+caller-owned workflow state and does not add another MCP operation.
 
 Keep values, codecs, invariants, and backend conversions with their domain.
 Shared contracts are limited to passive cross-domain primitives. A bounded
@@ -24,8 +24,11 @@ and a minimal valid example in the exported schema. The Pydantic model is
 authoritative for the serialized request contract; the metadata lets a caller
 form a valid first request rather than discover the rule only through a
 rejected call. Schema and model validation express structural representation
-constraints only. The owner admission function runs after parsing and is shared
-by the kernel and trusted result construction.
+constraints only: field types and bounds, canonical encoding, container shape,
+and cheap intrinsic cross-field consistency. They must not invoke a backend,
+enumerate candidates, select a kernel, reserve result work, or retain an
+execution plan in a Pydantic private attribute. The owner admission function
+runs after parsing and is shared by native and MCP execution.
 
 Every built-in `MathTool` declaration must publish at least one small valid
 invocation example. An example is part of the public contract: it must validate
@@ -211,11 +214,12 @@ that reconstruction, target matching, optimality, or certificate validation
 failed. Diagnostic fields may explain a non-success branch; they cannot weaken
 the operation's advertised postcondition.
 
-This rule does not require ordinary result construction to replay an expensive
-proof. The trusted kernel must establish the defining invariant before calling
-its private construction path, while owning tests replay the invariant on
+Ordinary result construction must not replay the computation that produced it.
+The trusted kernel establishes the defining invariant before calling its
+private construction path, while owning tests replay the invariant on
 known-answer, adversarial, and property-based fixtures. Independently supplied
-claims still use the explicit bounded verifier described below.
+claims need an explicit bounded verifier only when a public consumer accepts
+those claims as theorem-bearing input.
 
 These checks have distinct owners. Catalog admission decides whether an
 operation is published; it does not admit a particular runtime request.
@@ -248,12 +252,14 @@ owner-local factory such as ``_from_kernel``. It may use trusted construction
 only after the kernel has established every invariant it skips. Pydantic result
 validators remain limited to structural, linearly bounded checks; they do not
 call a backend, enumerate a search space, invoke a solver, or recompute the
-operation's defining relation. An independently supplied claim instead uses
-the explicit verifier below.
+operation's defining relation.
 
 Do not use ordinary result construction to validate independently supplied
-results. When a request or consumer can provide result data for verification,
-use an explicit replay verifier with a declared replay-work ceiling and a
+results. Do not add a companion verifier by default, either. A compute-only
+operation normally needs defining-invariant tests, not production replay. When
+a public request or consumer accepts caller-authored result data as a
+theorem-bearing claim, use an explicit verifier or perform bounded recognition
+inside that consumer. Any verifier needs a declared replay-work ceiling and a
 soundness statement for the claim being checked. Transport limits are not a
 substitute for that replay bound, and a cheap identity must not authenticate a
 stronger claim such as canonicity, irreducibility, or non-existence.

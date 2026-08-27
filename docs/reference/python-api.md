@@ -38,6 +38,13 @@ than constructing a wire Pydantic model. Native and wire parity tests should
 assert equal exact results and typed outcomes, and should document any
 difference as an explicit transport-only constraint.
 
+Pydantic request models are transport contracts, not containers for hidden
+execution state. They may enforce typed shape, canonical representation, and
+cheap intrinsic cross-field consistency. They must not store admission plans in
+``PrivateAttr`` fields or perform backend calls, candidate enumeration,
+algorithm selection, or result-work planning in validators. Those steps belong
+to the native function after wire-to-domain conversion.
+
 ## Canonical native values
 
 Each mathematical value has one owner-defined public type, normally in the
