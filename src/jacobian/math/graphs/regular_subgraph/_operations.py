@@ -41,8 +41,8 @@ def compute_k_regular_subgraph(
 
     # Precompute edge endpoints as index pairs.
     edge_pairs: list[tuple[int, int]] = []
-    for u, v in edges:
-        edge_pairs.append((vertex_to_idx[u], vertex_to_idx[v]))
+    for left_label, right_label in edges:
+        edge_pairs.append((vertex_to_idx[left_label], vertex_to_idx[right_label]))
 
     # Try edge subsets in increasing size. A nonempty subgraph with at least one
     # vertex of positive degree requires at least k+1 vertices and ceil(k*|V|/2) edges.
@@ -52,25 +52,30 @@ def compute_k_regular_subgraph(
         for edge_combo in combinations(range(n_edges), edge_count):
             selected_edges = [edge_pairs[i] for i in edge_combo]
             used_vertices: set[int] = set()
-            for u, v in selected_edges:
-                used_vertices.add(u)
-                used_vertices.add(v)
+            for left_idx, right_idx in selected_edges:
+                used_vertices.add(left_idx)
+                used_vertices.add(right_idx)
 
             if not used_vertices:
                 continue
 
             # Check k-regularity: every used vertex has degree exactly k.
             degree: dict[int, int] = {}
-            for u, v in selected_edges:
-                degree[u] = degree.get(u, 0) + 1
-                degree[v] = degree.get(v, 0) + 1
+            for left_idx, right_idx in selected_edges:
+                degree[left_idx] = degree.get(left_idx, 0) + 1
+                degree[right_idx] = degree.get(right_idx, 0) + 1
 
             if all(d == k for d in degree.values()):
                 # Found a k-regular subgraph.
                 used_vertex_labels = tuple(sorted(vertices[i] for i in used_vertices))
-                used_edge_list = tuple(
-                    tuple(sorted((vertices[u], vertices[v]))) for u, v in selected_edges
-                )
+                used_edge_list: list[tuple[str, str]] = []
+                for left_idx, right_idx in selected_edges:
+                    left_label, right_label = vertices[left_idx], vertices[right_idx]
+                    used_edge_list.append(
+                        (left_label, right_label)
+                        if left_label <= right_label
+                        else (right_label, left_label)
+                    )
                 return RegularSubgraphResult(
                     graph=graph,
                     k=k,
