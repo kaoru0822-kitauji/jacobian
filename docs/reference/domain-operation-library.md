@@ -117,35 +117,20 @@ Before trusting backend output for a new claim, consult the
 whenever the adapter compensates for backend behavior instead of narrowing
 the public domain.
 
-Every new or materially changed operation contract—including an existing
-operation's request, result, backend, or transport behavior—must include the
-following completed review artifact in its issue or pull request. A field may
-say `Not applicable` with a reason; it must not be omitted.
+Every new public operation, or change to a request, result, backend, or
+transport contract, records the decisions that apply in its issue or pull
+request. Do not fill a universal form: link to the relevant conditional section
+below for subtype trust, boundedness, a backend adapter, or a process boundary.
 
 ### Public operation contract
 
 - Semantic mathematical domain and postcondition:
 - Canonical public value type:
-- Source representation: materialized, succinct, generated, or oracle-backed:
-- Expansion performed by the kernel and its pre-execution bound:
-- Representation-sensitive complexity, including any compact representation
-  that changes the algorithmic problem:
-- Request bounds and their controlling quantities:
-- Producer/consumer closure, or why not applicable:
-- Degenerate inputs:
-- Parent/ring/field identity:
-- Deterministic work bound:
-- Maximum intermediate growth:
-- Exact result-size bound:
-- Backend and supported version:
-- Backend input domain:
-- Conversion/coercion behavior:
 - Result type:
-- Theorem-dependent preconditions and validated input type, or why not applicable:
 - Reconstruction or defining invariant:
-- Exact-success state and impossible field/status combinations:
-- Typed execution failures:
-- Property and boundary tests:
+- Request representation, admission quantities, and degenerate cases:
+- Result-size bound and exact-success/non-success states:
+- Evidence: defining invariant plus the changed boundary regression:
 
 ### Validated mathematical subtypes and exact-success states
 
@@ -451,13 +436,13 @@ universal short default. If callers may select wall time, expose only an
 operation-owned range whose upper bound remains compatible with the admitted
 work, memory, and cleanup envelope.
 
-One accepted request has one execution envelope. Parsing, normalization,
+One accepted request has one owner-local execution plan. Parsing, normalization,
 presolve, backend calls, exact replay, result validation, serialization, and
-cancellation cleanup consume the same request-scoped deadline and work ledger.
-No phase receives a fresh hidden budget. A caller or MCP read timeout must
-cover the declared operation envelope plus bounded transport overhead; a
-shorter outer timeout may abort the call, but it cannot establish an operation
-result.
+cancellation cleanup consume its shared deadline and charged work quantities;
+no phase receives a fresh hidden budget. This is an owner-level contract, not a
+generic production ledger. A caller or MCP read timeout must cover the declared
+operation envelope plus bounded transport overhead; a shorter outer timeout may
+abort the call, but it cannot establish an operation result.
 
 For a killable subprocess or interactive backend, that envelope begins before
 input spooling, launch, resource setup, and reader/writer startup. It also

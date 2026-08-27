@@ -56,9 +56,17 @@ A child-process adapter has the same obligations plus:
 - distinct typed unavailable, timeout, cancellation, and execution-error
   outcomes.
 
+The parent owns admission, the retained canonical source, and final result
+construction. A worker returns a compact derived projection only; it must not
+echo or replace source values. Bind its projection to the admitted parent source
+before validating the result. Size stdin and stdout limits for the actual UTF-8
+worker payload, not for a different public representation.
+
 Child processes use the shared bounded-process supervisor. Backend adapters test
-their codec and outcome projection; the supervisor's owning tests prove
-process-group termination and descendant cleanup.
+their codec, source binding, and outcome projection; the supervisor's owning
+tests prove process-group termination and descendant cleanup. Register each
+process owner in the architecture check and Import Linter exception list; these
+are narrow ownership declarations, not a general math-to-process dependency.
 
 The supervisor's wall deadline starts at adapter entry and is shared by input
 spooling, launch, resource setup, capture, execution, conversion, and result

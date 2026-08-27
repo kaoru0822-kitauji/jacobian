@@ -59,6 +59,23 @@ transport envelope; they must not discover a mathematical or work bound only
 after execution. Independently supplied result data uses an explicit, bounded
 replay verifier rather than ordinary result construction.
 
+## Bounded worker adapters
+
+Use a child process only for a concrete isolation, killability, or fixed-toolchain
+need. The mathematical owner remains responsible for the complete request
+envelope: it admits the request, retains its canonical source, starts the
+worker, and constructs the final result. The worker receives one strict payload
+and returns only a bounded derived projection. The parent binds that projection
+to its admitted source before result validation; a worker does not echo or
+replace retained canonical values.
+
+The owner charges parsing, launch, backend work, projection, validation, and
+cleanup against one local execution plan and deadline. Worker capture limits
+cover the actual UTF-8 projection, not an assumed public-result shape. A new
+process owner must be named in both the architecture check and the import
+contract, with a concrete backend rationale. The detailed codec, cleanup, and
+typed-failure rules live in the [mathematical backend contract](../reference/mathematical-backends.md#child-process-adapters).
+
 ## Package organization and family folding
 
 A domain is a top-level `jacobian.math.<family>` package when it owns a
@@ -91,8 +108,8 @@ owner per tool (request, result, and run share the first path segment), deletes
 the old path in the same change, and lands as one family per change.
 
 Logic follows the same rule. CNF canonicalization and assignment checks are
-pure direct operations. SAT and bounded QF SMT-LIB solving call the maintained
-Z3 Python binding in process.
+pure direct operations. SAT and bounded QF SMT-LIB solving use the maintained
+Z3 Python binding through bounded owner-local workers.
 
 Remote serving uses the same immutable operation library. Authentication
 produces a small request-scoped context. Deployment supplies an immutable
