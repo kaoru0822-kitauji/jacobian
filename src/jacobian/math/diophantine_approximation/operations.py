@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from math import isqrt
 
+from jacobian.math.arithmetic._integer_predicates import is_square_free
+
 __all__ = ["continued_fraction", "convergents", "solve_pell"]
 
 
@@ -14,6 +16,8 @@ def _require_periodic_discriminant(discriminant: int) -> None:
     root = isqrt(discriminant)
     if root * root == discriminant:
         raise ValueError("discriminant must not be a perfect square")
+    if not is_square_free(discriminant):
+        raise ValueError("discriminant must be squarefree")
 
 
 def _cf_coefficients(discriminant: int) -> tuple[tuple[int, ...], tuple[int, ...]]:

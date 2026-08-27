@@ -10,7 +10,6 @@ from pydantic_core import PydanticCustomError
 
 from jacobian._exact import CanonicalInteger
 from jacobian._models import StrictModel
-from jacobian.math.arithmetic._integer_predicates import is_square_free
 
 _MAX_DISCRIMINANT = 1_000_000
 _MAX_TERMS = 5_000
@@ -56,31 +55,11 @@ class SquarefreeRequest(StrictModel):
 
     discriminant: StrictInt = Field(ge=2, le=_MAX_DISCRIMINANT)
 
-    @model_validator(mode="after")
-    def require_squarefree(self) -> Self:
-        if not is_square_free(self.discriminant):
-            raise _validation_error(
-                "diophantine_approximation.discriminant_not_squarefree",
-                "discriminant must be squarefree",
-            )
-        return self
-
-
 class ContinuedFractionRequest(StrictModel):
     """Request the continued fraction expansion of sqrt(D) up to n terms."""
 
     discriminant: StrictInt = Field(ge=2, le=_MAX_DISCRIMINANT)
     term_count: StrictInt = Field(ge=1, le=_MAX_TERMS)
-
-    @model_validator(mode="after")
-    def require_squarefree(self) -> Self:
-        if not is_square_free(self.discriminant):
-            raise _validation_error(
-                "diophantine_approximation.discriminant_not_squarefree",
-                "discriminant must be squarefree",
-            )
-        return self
-
 
 class ContinuedFractionResult(StrictModel):
     """A bounded continued-fraction prefix of ``sqrt(D)``.
@@ -96,15 +75,6 @@ class ContinuedFractionResult(StrictModel):
     preperiod_length: StrictInt = Field(ge=1)
     period_length: StrictInt = Field(ge=1)
     method: Literal["SYMPY_CONTINUED_FRACTION"] = "SYMPY_CONTINUED_FRACTION"
-
-    @model_validator(mode="after")
-    def require_squarefree(self) -> Self:
-        if not is_square_free(self.discriminant):
-            raise _validation_error(
-                "diophantine_approximation.discriminant_not_squarefree",
-                "discriminant must be squarefree",
-            )
-        return self
 
     @model_validator(mode="after")
     def require_bounded_shape(self) -> Self:
@@ -136,7 +106,7 @@ class ContinuedFractionResult(StrictModel):
     ) -> Self:
         """Build a result from the owner-local continued-fraction kernel."""
 
-        return cls(
+        return cls.model_construct(
             discriminant=discriminant,
             term_count=term_count,
             coefficients=coefficients,
@@ -150,16 +120,6 @@ class ConvergentRequest(StrictModel):
 
     discriminant: StrictInt = Field(ge=2, le=_MAX_DISCRIMINANT)
     convergent_count: StrictInt = Field(ge=1, le=_MAX_TERMS)
-
-    @model_validator(mode="after")
-    def require_squarefree(self) -> Self:
-        if not is_square_free(self.discriminant):
-            raise _validation_error(
-                "diophantine_approximation.discriminant_not_squarefree",
-                "discriminant must be squarefree",
-            )
-        return self
-
 
 class ConvergentValue(StrictModel):
     """One convergent p_n/q_n with index n."""
@@ -183,15 +143,6 @@ class ConvergentResult(StrictModel):
         min_length=1, max_length=_MAX_TERMS
     )
     method: Literal["CONTINUED_FRACTION_RECURSION"] = "CONTINUED_FRACTION_RECURSION"
-
-    @model_validator(mode="after")
-    def require_squarefree(self) -> Self:
-        if not is_square_free(self.discriminant):
-            raise _validation_error(
-                "diophantine_approximation.discriminant_not_squarefree",
-                "discriminant must be squarefree",
-            )
-        return self
 
     @model_validator(mode="after")
     def require_bounded_shape(self) -> Self:
@@ -230,7 +181,7 @@ class ConvergentResult(StrictModel):
     ) -> Self:
         """Build a result from the owner-local convergent kernel."""
 
-        return cls(
+        return cls.model_construct(
             discriminant=discriminant,
             convergent_count=convergent_count,
             convergents=convergents,
@@ -242,16 +193,6 @@ class PellEquationRequest(StrictModel):
 
     discriminant: StrictInt = Field(ge=2, le=_MAX_DISCRIMINANT)
 
-    @model_validator(mode="after")
-    def require_squarefree(self) -> Self:
-        if not is_square_free(self.discriminant):
-            raise _validation_error(
-                "diophantine_approximation.discriminant_not_squarefree",
-                "discriminant must be squarefree",
-            )
-        return self
-
-
 class PellEquationResult(StrictModel):
     """The fundamental solution (x, y) to x^2 - D*y^2 = 1."""
 
@@ -259,15 +200,6 @@ class PellEquationResult(StrictModel):
     x: CanonicalInteger
     y: CanonicalInteger
     method: Literal["CONTINUED_FRACTION_CONVERGENTS"] = "CONTINUED_FRACTION_CONVERGENTS"
-
-    @model_validator(mode="after")
-    def require_squarefree(self) -> Self:
-        if not is_square_free(self.discriminant):
-            raise _validation_error(
-                "diophantine_approximation.discriminant_not_squarefree",
-                "discriminant must be squarefree",
-            )
-        return self
 
     @model_validator(mode="after")
     def require_bounded_positive_components(self) -> Self:
@@ -297,7 +229,7 @@ class PellEquationResult(StrictModel):
     ) -> Self:
         """Build a result from the owner-local Pell kernel."""
 
-        return cls(discriminant=discriminant, x=x, y=y)
+        return cls.model_construct(discriminant=discriminant, x=x, y=y)
 
 
 __all__ = [

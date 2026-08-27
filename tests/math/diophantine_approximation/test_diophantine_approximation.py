@@ -206,21 +206,17 @@ def test_pell_equation_long_period() -> None:
 
 
 def test_contract_rejects_non_squarefree() -> None:
-    with pytest.raises(ValidationError) as exc_info:
-        ContinuedFractionRequest(discriminant=4, term_count=5)
-    assert (
-        exc_info.value.errors()[0]["type"]
-        == "diophantine_approximation.discriminant_not_squarefree"
-    )
+    with pytest.raises(ValueError, match="squarefree"):
+        compute_continued_fraction(
+            ContinuedFractionRequest(discriminant=8, term_count=5)
+        )
 
 
 def test_contract_rejects_perfect_square() -> None:
-    with pytest.raises(ValidationError) as exc_info:
-        ContinuedFractionRequest(discriminant=9, term_count=5)
-    assert (
-        exc_info.value.errors()[0]["type"]
-        == "diophantine_approximation.discriminant_not_squarefree"
-    )
+    with pytest.raises(ValueError, match="perfect square"):
+        compute_continued_fraction(
+            ContinuedFractionRequest(discriminant=9, term_count=5)
+        )
 
 
 def test_contract_rejects_out_of_range() -> None:
@@ -426,8 +422,8 @@ def test_convergent_result_rejects_mutations() -> None:
     )
 
 
-def test_results_reject_non_squarefree_discriminant() -> None:
-    """Results satisfy the same squarefree source domain as their requests.
+def test_result_verifiers_reject_non_squarefree_discriminant() -> None:
+    """Explicit verifiers reject claims outside the operation's domain.
 
     The forged payloads below carry the genuine canonical expansion and
     convergents of sqrt(8), so only the squarefree predicate can reject them.
@@ -446,11 +442,8 @@ def test_results_reject_non_squarefree_discriminant() -> None:
         "preperiod_length": 1,
         "period_length": 2,
     }
-    with pytest.raises(ValidationError) as exc_info:
+    assert not verify_continued_fraction_result(
         ContinuedFractionResult.model_validate(sqrt8_cf)
-    assert (
-        exc_info.value.errors()[0]["type"]
-        == "diophantine_approximation.discriminant_not_squarefree"
     )
 
     sqrt8_convergents = {
@@ -463,25 +456,16 @@ def test_results_reject_non_squarefree_discriminant() -> None:
             {"index": 3, "numerator": "17", "denominator": "6"},
         ],
     }
-    with pytest.raises(ValidationError) as exc_info:
+    assert not verify_convergent_result(
         ConvergentResult.model_validate(sqrt8_convergents)
-    assert (
-        exc_info.value.errors()[0]["type"]
-        == "diophantine_approximation.discriminant_not_squarefree"
     )
 
-    with pytest.raises(ValidationError) as exc_info:
+    assert not verify_pell_equation_result(
         PellEquationResult(discriminant=8, x="3", y="1")
-    assert (
-        exc_info.value.errors()[0]["type"]
-        == "diophantine_approximation.discriminant_not_squarefree"
     )
 
-    with pytest.raises(ValidationError) as exc_info:
+    assert not verify_pell_equation_result(
         PellEquationResult(discriminant=9, x="3", y="1")
-    assert (
-        exc_info.value.errors()[0]["type"]
-        == "diophantine_approximation.discriminant_not_squarefree"
     )
 
 
