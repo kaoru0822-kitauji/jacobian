@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Annotated, Any, Self
+from typing import Annotated, Any
 
 from pydantic import (
     ConfigDict,
@@ -18,7 +18,7 @@ from pydantic_core import PydanticCustomError
 from jacobian._exact import CanonicalRational
 from jacobian._models import StrictModel, canonicalize_json_containers
 from jacobian.catalog._examples import example
-from jacobian.catalog.models import MathTool
+from jacobian.catalog.models import MathTool, OperationDomainValidationError
 from jacobian.math.probability.local_lemma import (
     MAX_LOCAL_LEMMA_EVENTS,
     MAX_LOCAL_LEMMA_INCIDENCES,
@@ -195,14 +195,6 @@ class AsymmetricLocalLemmaWitnessRequest(StrictModel):
 
         return _bound_raw_source(value)
 
-    @model_validator(mode="after")
-    def require_admitted_source(self) -> Self:
-        try:
-            self.as_native()
-        except ValueError as exc:
-            raise _validation_error(str(exc)) from exc
-        return self
-
     def as_native(self) -> AsymmetricLocalLemmaWitness:
         return AsymmetricLocalLemmaWitness(
             event_labels=self.event_labels,
@@ -353,14 +345,6 @@ class AsymmetricLocalLemmaWitnessCheckResult(StrictModel):
 
         return _bound_raw_result(value)
 
-    @model_validator(mode="after")
-    def bind_result_to_source(self) -> Self:
-        try:
-            self.as_native()
-        except ValueError as exc:
-            raise _validation_error(str(exc)) from exc
-        return self
-
     def as_native(self) -> NativeWitnessCheckResult:
         return NativeWitnessCheckResult(
             source=self.source.as_native(),
@@ -375,7 +359,7 @@ class AsymmetricLocalLemmaWitnessCheckResult(StrictModel):
         cls,
         result: NativeWitnessCheckResult,
     ) -> AsymmetricLocalLemmaWitnessCheckResult:
-        return cls(
+        return cls.model_construct(
             source=AsymmetricLocalLemmaWitnessRequest.from_native(result.source),
             inequalities=tuple(
                 AsymmetricLocalLemmaInequalityResult.from_native(row)
@@ -390,8 +374,21 @@ class AsymmetricLocalLemmaWitnessCheckResult(StrictModel):
 def compute_asymmetric_local_lemma_witness_check(
     request: AsymmetricLocalLemmaWitnessRequest,
 ) -> AsymmetricLocalLemmaWitnessCheckResult:
+    try:
+        source = request.as_native()
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=(
+                "event_labels",
+                "probability_upper_bounds",
+                "witness_parameters",
+                "neighborhoods",
+            ),
+            code="probability.local_lemma_invariant",
+            message=str(exc),
+        ) from exc
     return AsymmetricLocalLemmaWitnessCheckResult.from_native(
-        check_asymmetric_local_lemma_witness(request.as_native())
+        check_asymmetric_local_lemma_witness(source)
     )
 
 

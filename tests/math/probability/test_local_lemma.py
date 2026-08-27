@@ -11,6 +11,7 @@ from math import prod
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.probability._local_lemma import (
     ASYMMETRIC_LOCAL_LEMMA_OPERATION,
     AsymmetricLocalLemmaWitnessCheckResult,
@@ -49,6 +50,15 @@ def _payload(
 def _compute(payload: dict[str, object]) -> AsymmetricLocalLemmaWitnessCheckResult:
     request = AsymmetricLocalLemmaWitnessRequest.model_validate(payload)
     return compute_asymmetric_local_lemma_witness_check(request)
+
+
+def _assert_result_claim_invalid(payload: dict[str, object]) -> None:
+    try:
+        result = AsymmetricLocalLemmaWitnessCheckResult.model_validate(payload)
+    except ValidationError:
+        return
+    with pytest.raises(ValueError):
+        result.as_native()
 
 
 def test_source_backed_tangent_collision_numerics_reconstruct_exactly() -> None:
@@ -188,8 +198,8 @@ def test_listed_self_neighbor_is_included_once() -> None:
 def test_neighborhoods_must_be_canonical_axis_subsets(
     neighborhoods: tuple[tuple[int, ...], ...],
 ) -> None:
-    with pytest.raises(ValidationError):
-        AsymmetricLocalLemmaWitnessRequest.model_validate(
+    with pytest.raises(OperationDomainValidationError):
+        _compute(
             _payload(
                 ("A", "B"),
                 (Fraction(), Fraction()),
@@ -214,10 +224,8 @@ def test_probability_and_witness_domains_are_admitted_before_multiplication(
     witness: Fraction,
     message: str,
 ) -> None:
-    with pytest.raises(ValidationError):
-        AsymmetricLocalLemmaWitnessRequest.model_validate(
-            _payload(("A",), (probability,), (witness,), ((),))
-        )
+    with pytest.raises(OperationDomainValidationError):
+        _compute(_payload(("A",), (probability,), (witness,), ((),)))
 
 
 def test_zero_witness_has_the_exact_expected_boundary_behavior() -> None:
@@ -241,13 +249,13 @@ def test_axis_aligned_fields_and_labels_are_canonical() -> None:
     )
     misaligned = deepcopy(base)
     misaligned["witness_parameters"] = [_rational(Fraction())]
-    with pytest.raises(ValidationError):
-        AsymmetricLocalLemmaWitnessRequest.model_validate(misaligned)
+    with pytest.raises(OperationDomainValidationError):
+        _compute(misaligned)
 
     duplicated = deepcopy(base)
     duplicated["event_labels"] = ["A", "A"]
-    with pytest.raises(ValidationError):
-        AsymmetricLocalLemmaWitnessRequest.model_validate(duplicated)
+    with pytest.raises(OperationDomainValidationError):
+        _compute(duplicated)
 
     non_nfc = _payload(
         ("e\N{COMBINING ACUTE ACCENT}",),
@@ -255,8 +263,8 @@ def test_axis_aligned_fields_and_labels_are_canonical() -> None:
         (Fraction(),),
         ((),),
     )
-    with pytest.raises(ValidationError):
-        AsymmetricLocalLemmaWitnessRequest.model_validate(non_nfc)
+    with pytest.raises(OperationDomainValidationError):
+        _compute(non_nfc)
 
 
 def test_result_rejects_independent_source_and_conclusion_forgeries() -> None:
@@ -272,28 +280,23 @@ def test_result_rejects_independent_source_and_conclusion_forgeries() -> None:
 
     source_forgery = deepcopy(serialized)
     source_forgery["source"]["probability_upper_bounds"][0] = _rational(Fraction(1, 4))
-    with pytest.raises(ValidationError):
-        AsymmetricLocalLemmaWitnessCheckResult.model_validate(source_forgery)
+    _assert_result_claim_invalid(source_forgery)
 
     conclusion_forgery = deepcopy(serialized)
     conclusion_forgery["inequalities"][0]["slack"] = _rational(Fraction())
-    with pytest.raises(ValidationError):
-        AsymmetricLocalLemmaWitnessCheckResult.model_validate(conclusion_forgery)
+    _assert_result_claim_invalid(conclusion_forgery)
 
     validity_forgery = deepcopy(serialized)
     validity_forgery["valid"] = False
-    with pytest.raises(ValidationError):
-        AsymmetricLocalLemmaWitnessCheckResult.model_validate(validity_forgery)
+    _assert_result_claim_invalid(validity_forgery)
 
     failure_forgery = deepcopy(serialized)
     failure_forgery["failed_event_indices"] = [0]
-    with pytest.raises(ValidationError):
-        AsymmetricLocalLemmaWitnessCheckResult.model_validate(failure_forgery)
+    _assert_result_claim_invalid(failure_forgery)
 
     product_forgery = deepcopy(serialized)
     product_forgery["witness_product"] = _rational(Fraction(1, 3))
-    with pytest.raises(ValidationError):
-        AsymmetricLocalLemmaWitnessCheckResult.model_validate(product_forgery)
+    _assert_result_claim_invalid(product_forgery)
 
 
 def test_numerical_validity_is_not_labeled_dependency_graph_correctness() -> None:
@@ -370,7 +373,7 @@ def test_event_count_is_rejected_in_raw_preflight() -> None:
         "neighborhoods": [],
     }
     with pytest.raises(ValidationError):
-        AsymmetricLocalLemmaWitnessRequest.model_validate(payload)
+        _compute(payload)
 
 
 def test_incidence_count_is_rejected_in_raw_preflight() -> None:
@@ -384,7 +387,7 @@ def test_incidence_count_is_rejected_in_raw_preflight() -> None:
         (full_neighborhood,) * full_rows + ((),) * (MAX_LOCAL_LEMMA_EVENTS - full_rows),
     )
     with pytest.raises(ValidationError):
-        AsymmetricLocalLemmaWitnessRequest.model_validate(payload)
+        _compute(payload)
 
 
 def test_preflight_rejects_one_overgrown_exact_result_component() -> None:
@@ -397,8 +400,8 @@ def test_preflight_rejects_one_overgrown_exact_result_component() -> None:
         (tuple(range(1, event_count)),) + ((),) * (event_count - 1),
     )
 
-    with pytest.raises(ValidationError):
-        AsymmetricLocalLemmaWitnessRequest.model_validate(payload)
+    with pytest.raises(OperationDomainValidationError):
+        _compute(payload)
 
 
 def test_preflight_rejects_overgrown_complete_result_ledger() -> None:
@@ -411,8 +414,8 @@ def test_preflight_rejects_overgrown_complete_result_ledger() -> None:
         (tuple(range(8)),) * event_count,
     )
 
-    with pytest.raises(ValidationError):
-        AsymmetricLocalLemmaWitnessRequest.model_validate(payload)
+    with pytest.raises(OperationDomainValidationError):
+        _compute(payload)
 
 
 def test_operation_declares_the_exact_public_contract() -> None:
