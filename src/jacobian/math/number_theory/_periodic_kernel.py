@@ -129,12 +129,10 @@ def require_admitted_periodic_source(
 
 def require_materializable_periodic_source(
     source: PeriodicCongruenceUnionSource,
-    plan: _ExecutionPlan | None = None,
+    plan: _ExecutionPlan,
 ) -> _ExecutionPlan:
     """Require the complete residue rows and their construction to fit."""
 
-    if plan is None:
-        plan = require_admitted_periodic_source(source)
     if plan.method == "FULL_UNION":
         if not source.complement and plan.common_period > MAX_MATERIALIZED_RESIDUES:
             raise ValueError(
@@ -258,12 +256,10 @@ def _measure_by_inclusion_exclusion(
 
 def measure_periodic_union(
     source: PeriodicCongruenceUnionSource,
-    plan: _ExecutionPlan | None = None,
+    plan: _ExecutionPlan,
 ) -> int:
     """Return the exact occupied count, respecting the complement flag."""
 
-    if plan is None:
-        plan = require_admitted_periodic_source(source)
     if plan.method == "FULL_UNION":
         union_count = plan.common_period
     elif plan.method == "PERIOD_LIFT":
@@ -277,7 +273,7 @@ def measure_periodic_union(
 
 def materialize_periodic_union(
     source: PeriodicCongruenceUnionSource,
-    plan: _ExecutionPlan | None = None,
+    plan: _ExecutionPlan,
 ) -> tuple[int, ...]:
     """Return every occupied representative in canonical increasing order."""
 

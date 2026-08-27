@@ -54,9 +54,10 @@ def _admit_source(
     source: PeriodicCongruenceUnionSource, *, materializable: bool = False
 ) -> _ExecutionPlan:
     try:
+        plan = require_admitted_periodic_source(source)
         if materializable:
-            return require_materializable_periodic_source(source)
-        return require_admitted_periodic_source(source)
+            return require_materializable_periodic_source(source, plan)
+        return plan
     except ValueError as exc:
         raise OperationDomainValidationError(
             location=("subsets",),
