@@ -14,21 +14,21 @@ from jacobian._digest import Sha256Digest
 from jacobian._exact import (
     MAX_CANONICAL_RATIONAL_DIGITS,
     CanonicalRational,
-    require_bounded_rational,
 )
 from jacobian._models import StrictModel
 from jacobian.canonical import canonicalize_json
 from jacobian.math.geometry.projective.values import RationalProjectiveLine
 from jacobian.math.polynomials.values import (
+    MAX_POLYNOMIAL_TERMS,
     MAX_POLYNOMIAL_VARIABLES,
     PolynomialVariable,
     RationalPolynomial,
-    require_polynomial_budget,
 )
 
 ExponentVector = tuple[StrictInt, ...]
 
 MAX_SOURCE_DEGREE = 16
+MAX_SOURCE_TERMS = MAX_POLYNOMIAL_TERMS
 MAX_MULTIPLIER_DEGREE = 8
 MAX_MAP_DIMENSION = 512
 MAX_TOTAL_BASIS_MONOMIALS = 2_048
@@ -271,7 +271,7 @@ class GradedJacobianSyzygyRequestBase(StrictModel):
     coefficient_map_detail: Literal["CERTIFICATES", "SPARSE_ENTRIES"]
 
     @model_validator(mode="after")
-    def require_bounded_homogeneous_input(self) -> Self:
+    def require_structural_input(self) -> Self:
         if self.polynomial is not None:
             if self.linear_factors is not None:
                 raise _validation_error(
@@ -281,15 +281,7 @@ class GradedJacobianSyzygyRequestBase(StrictModel):
                 raise _validation_error(
                     "linear_factor_variables is only valid with linear_factors"
                 )
-            polynomial = self.polynomial
-            variables = polynomial.variables
-            require_polynomial_budget(
-                polynomial,
-                maximum_terms=4_096,
-                maximum_exponent=MAX_SOURCE_DEGREE,
-                maximum_coefficient_digits=MAX_SOURCE_COEFFICIENT_DIGITS,
-                label="graded Jacobian source polynomial",
-            )
+            variables = self.polynomial.variables
         elif self.linear_factors is not None:
             if self.linear_factor_variables is None:
                 raise _validation_error(
@@ -298,13 +290,6 @@ class GradedJacobianSyzygyRequestBase(StrictModel):
             labels = tuple(factor.label for factor in self.linear_factors)
             if len(labels) != len(set(labels)):
                 raise _validation_error("labelled linear-factor names must be unique")
-            for factor in self.linear_factors:
-                for coefficient in factor.coefficients:
-                    require_bounded_rational(
-                        coefficient,
-                        max_digits=MAX_LINEAR_FACTOR_COEFFICIENT_DIGITS,
-                        label="graded Jacobian linear-factor coefficient",
-                    )
             variables = self.linear_factor_variables
         else:
             raise _validation_error(
@@ -316,40 +301,6 @@ class GradedJacobianSyzygyRequestBase(StrictModel):
             )
         if len(set(variables)) != len(variables):
             raise _validation_error("graded Jacobian syzygy variables must be unique")
-        source_degree = _compute_homogeneous_source_degree(
-            self.polynomial, self.linear_factors
-        )
-        if not 1 <= source_degree <= MAX_SOURCE_DEGREE:
-            raise _validation_error(
-                "the source homogeneous degree must lie between 1 and 16"
-            )
-        entry_coefficient_digits = (
-            MAX_SOURCE_COEFFICIENT_DIGITS + _decimal_log_upper(source_degree)
-            if self.polynomial is not None
-            else source_degree * MAX_LINEAR_FACTOR_COEFFICIENT_DIGITS
-            + _decimal_log_upper(_basis_size(3, source_degree))
-            + _decimal_log_upper(source_degree)
-        )
-        # Execution stops at the first non-injective map, so admission charges
-        # only degrees a run can actually reach. The degree-zero rank is exact
-        # and cheap from the request alone; later degrees stay fully budgeted.
-        budgeted_max_degree = (
-            0
-            if _degree_zero_kernel_is_forced(
-                variable_count=len(variables),
-                source_terms=_expanded_source_terms(
-                    self.polynomial, self.linear_factors
-                ),
-            )
-            else self.max_degree
-        )
-        _require_coefficient_map_budget(
-            variable_count=len(variables),
-            source_degree=source_degree,
-            max_degree=budgeted_max_degree,
-            coefficient_map_detail=self.coefficient_map_detail,
-            entry_coefficient_digits=entry_coefficient_digits,
-        )
         return self
 
 

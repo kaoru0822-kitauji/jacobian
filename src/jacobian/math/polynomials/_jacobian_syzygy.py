@@ -6,11 +6,11 @@ import hashlib
 from fractions import Fraction
 from typing import Any, Literal
 
-from jacobian._exact import CanonicalRational
+from pydantic_core import PydanticCustomError
+
+from jacobian._exact import CanonicalRational, require_bounded_rational
 from jacobian.canonical import canonicalize_json, format_canonical_integer
-from jacobian.catalog.models import (
-    OperationExample,
-)
+from jacobian.catalog.models import OperationDomainValidationError, OperationExample
 from jacobian.math.arithmetic import primitive_integer_vector
 from jacobian.math.polynomials._conversions import (
     rational_from_sympy,
@@ -20,6 +20,10 @@ from jacobian.math.polynomials._conversions import (
 )
 from jacobian.math.polynomials._support import polynomial_operation
 from jacobian.math.polynomials._syzygy_models import (
+    MAX_LINEAR_FACTOR_COEFFICIENT_DIGITS,
+    MAX_SOURCE_COEFFICIENT_DIGITS,
+    MAX_SOURCE_DEGREE,
+    MAX_SOURCE_TERMS,
     GradedJacobianCoefficientMap,
     GradedJacobianKernelWitness,
     GradedJacobianMapEntry,
@@ -28,12 +32,20 @@ from jacobian.math.polynomials._syzygy_models import (
     GradedJacobianSyzygyRequest,
     GradedJacobianSyzygyRequestBase,
     GradedJacobianSyzygyResult,
+    _basis_size,
+    _compute_homogeneous_source_degree,
+    _decimal_log_upper,
+    _degree_zero_kernel_is_forced,
+    _expanded_source_terms,
     _homogeneous_basis,
+    _require_coefficient_map_budget,
+    _validation_error,
 )
 from jacobian.math.polynomials.values import (
     RationalPolynomial,
     RationalPolynomialTerm,
     SparseRationalPolynomial,
+    require_polynomial_budget,
 )
 
 
@@ -140,9 +152,82 @@ def _coefficient_matrix(
     return source_basis, target_basis, matrix, entries
 
 
+def _run_admission(admission: Any) -> None:
+    try:
+        admission()
+    except OperationDomainValidationError:
+        raise
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=(), code=exc.type, message=exc.message()
+        ) from exc
+    except (TypeError, ValueError) as exc:
+        raise OperationDomainValidationError(
+            location=(), code="polynomial.syzygy_admission", message=str(exc)
+        ) from exc
+
+
+def _admit_graded_jacobian_syzygy(
+    request: GradedJacobianSyzygyRequestBase,
+) -> None:
+    if request.polynomial is not None:
+        variables = request.polynomial.variables
+        require_polynomial_budget(
+            request.polynomial,
+            maximum_terms=MAX_SOURCE_TERMS,
+            maximum_exponent=MAX_SOURCE_DEGREE,
+            maximum_coefficient_digits=MAX_SOURCE_COEFFICIENT_DIGITS,
+            label="graded Jacobian source polynomial",
+        )
+    else:
+        factor_variables = request.linear_factor_variables
+        if factor_variables is None or request.linear_factors is None:
+            raise _validation_error("linear-factor input is incomplete")
+        variables = tuple(factor_variables)
+        for factor in request.linear_factors:
+            for coefficient in factor.coefficients:
+                require_bounded_rational(
+                    coefficient,
+                    max_digits=MAX_LINEAR_FACTOR_COEFFICIENT_DIGITS,
+                    label="graded Jacobian linear-factor coefficient",
+                )
+    source_degree = _compute_homogeneous_source_degree(
+        request.polynomial, request.linear_factors
+    )
+    if not 1 <= source_degree <= MAX_SOURCE_DEGREE:
+        raise _validation_error(
+            f"the source homogeneous degree must lie between 1 and {MAX_SOURCE_DEGREE}"
+        )
+    entry_coefficient_digits = (
+        MAX_SOURCE_COEFFICIENT_DIGITS + _decimal_log_upper(source_degree)
+        if request.polynomial is not None
+        else source_degree * MAX_LINEAR_FACTOR_COEFFICIENT_DIGITS
+        + _decimal_log_upper(_basis_size(3, source_degree))
+        + _decimal_log_upper(source_degree)
+    )
+    budgeted_max_degree = (
+        0
+        if _degree_zero_kernel_is_forced(
+            variable_count=len(variables),
+            source_terms=_expanded_source_terms(
+                request.polynomial, request.linear_factors
+            ),
+        )
+        else request.max_degree
+    )
+    _require_coefficient_map_budget(
+        variable_count=len(variables),
+        source_degree=source_degree,
+        max_degree=budgeted_max_degree,
+        coefficient_map_detail=request.coefficient_map_detail,
+        entry_coefficient_digits=entry_coefficient_digits,
+    )
+
+
 def compute_graded_jacobian_syzygy(
     request: GradedJacobianSyzygyRequest,
 ) -> GradedJacobianSyzygyResult:
+    _run_admission(lambda: _admit_graded_jacobian_syzygy(request))
     return _compute_graded_jacobian_syzygy(request)
 
 
@@ -150,6 +235,7 @@ def compute_graded_jacobian_syzygy_coefficients(
     request: GradedJacobianSyzygyCoefficientRequest,
 ) -> GradedJacobianSyzygyResult:
     """Retain the full sparse coefficient maps as explicit evidence."""
+    _run_admission(lambda: _admit_graded_jacobian_syzygy(request))
     return _compute_graded_jacobian_syzygy(request)
 
 

@@ -8,6 +8,7 @@ import pytest
 from tests.math.polynomials._support import polynomial_validation_error
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.geometry.projective.values import RationalProjectiveLine
 from jacobian.math.polynomials._jacobian_syzygy import (
     compute_graded_jacobian_syzygy,
@@ -323,8 +324,8 @@ def test_replayed_results_accept_every_admitted_variable_count() -> None:
 
 
 def test_dimension_specific_basis_boundary_rejects_before_backend_execution() -> None:
-    with polynomial_validation_error():
-        GradedJacobianSyzygyRequest(
+    with pytest.raises(OperationDomainValidationError):
+        compute_graded_jacobian_syzygy(GradedJacobianSyzygyRequest(
             polynomial=_sparse_polynomial(
                 ("x", "y", "z", "w"),
                 {
@@ -335,16 +336,16 @@ def test_dimension_specific_basis_boundary_rejects_before_backend_execution() ->
                 },
             ),
             max_degree=3,
-        )
+        ))
 
-    with polynomial_validation_error():
-        GradedJacobianSyzygyRequest(
+    with pytest.raises(OperationDomainValidationError):
+        compute_graded_jacobian_syzygy(GradedJacobianSyzygyRequest(
             polynomial=_sparse_polynomial(
                 ("x", "y", "z", "w"),
                 {(9, 0, 0, 0): 1, (0, 9, 0, 0): 1, (0, 0, 9, 0): 1, (0, 0, 0, 9): 1},
             ),
             max_degree=4,
-        )
+        ))
 
 
 def test_syzygy_kernel_rejects_an_incomplete_linear_factor_request() -> None:
@@ -356,7 +357,9 @@ def test_syzygy_kernel_rejects_an_incomplete_linear_factor_request() -> None:
         coefficient_map_detail="CERTIFICATES",
     )
 
-    with pytest.raises(ValueError, match="linear-factor input is incomplete"):
+    with pytest.raises(
+        OperationDomainValidationError, match="linear-factor input is incomplete"
+    ):
         compute_graded_jacobian_syzygy(request)
 
 
