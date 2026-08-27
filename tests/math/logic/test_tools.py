@@ -961,6 +961,7 @@ def test_smt_request_admits_at_the_declaration_boundary_and_still_solves() -> No
             smtlib=(
                 f"(set-logic QF_LIA)\n{declarations}\n(assert (= v0 1))\n(check-sat)"
             ),
+            timeout_ms=10_000,
         )
     )
 
