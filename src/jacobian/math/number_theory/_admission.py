@@ -258,6 +258,15 @@ ADMISSIONS: tuple[OperationAdmission, ...] = (
         AdmissionDecision.KEEP,
         "complete exact friable count with result-sensitive materialized and generated regimes, avoiding caller-side factorization of every source integer",
     ),
+   OperationAdmission(
+        "number_theory.integer_interval.prime_coverage_profile.compute",
+        AdmissionDecision.KEEP,
+        "distinct complete interval profile that a loop of scalar omega calls cannot establish as one source-bound value",
+    ),
+    OperationAdmission(
+        "number_theory.binomial_valuation.profile.compute",
+        AdmissionDecision.KEEP,
+        "distinct complete p-adic valuation profile of binomial coefficients using Kummer theorem that replaces a loop of scalar valuation calls",
+    ),
 )
-
 REGISTRATION = OperationRegistration(TOOLS, ADMISSIONS)
