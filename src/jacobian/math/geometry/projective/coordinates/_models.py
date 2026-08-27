@@ -21,20 +21,6 @@ MAX_DIM = 16
 MAX_PROJECTIVE_COORDINATE_DIGITS = MAX_CANONICAL_RATIONAL_DIGITS // 2
 
 
-def _require_ratio_result_budget(
-    coordinates: tuple[CanonicalRational, ...],
-) -> None:
-    if any(
-        len(component.lstrip("-")) > MAX_PROJECTIVE_COORDINATE_DIGITS
-        for coordinate in coordinates
-        for component in (coordinate.num, coordinate.den)
-    ):
-        raise _validation_error(
-            "projective_coordinate_components_exceed_digit_ratio",
-            "projective coordinate components exceed the 16,384-digit ratio budget",
-        )
-
-
 class RationalProjectivePoint(StrictModel):
     """A projective point [x0 : x1 : ... : xn] over the rationals."""
 
@@ -62,17 +48,6 @@ class RationalPointConstructRequest(StrictModel):
         ),
     )
 
-    @model_validator(mode="after")
-    def require_valid(self) -> Self:
-        _require_ratio_result_budget(self.coordinates)
-        if all(c.as_fraction() == 0 for c in self.coordinates):
-            raise _validation_error(
-                "projective_point_least_nonzero_coordinate",
-                "projective point must have at least one nonzero coordinate",
-            )
-        return self
-
-
 class StandardChartRequest(StrictModel):
     point: RationalProjectivePoint = Field(
         description=(
@@ -81,18 +56,6 @@ class StandardChartRequest(StrictModel):
         )
     )
     chart_index: int = Field(ge=0)
-
-    @model_validator(mode="after")
-    def require_valid(self) -> Self:
-        _require_ratio_result_budget(self.point.coordinates)
-        if self.chart_index >= len(self.point.coordinates):
-            raise _validation_error("chart_index_out_range", "chart_index out of range")
-        if self.point.coordinates[self.chart_index].as_fraction() == 0:
-            raise _validation_error(
-                "chart_coordinate_nonzero", "chart coordinate must be nonzero"
-            )
-        return self
-
 
 class ChartTransitionRequest(StrictModel):
     point: RationalProjectivePoint = Field(
@@ -103,19 +66,6 @@ class ChartTransitionRequest(StrictModel):
     )
     chart_i: int = Field(ge=0)
     chart_j: int = Field(ge=0)
-
-    @model_validator(mode="after")
-    def require_valid(self) -> Self:
-        _require_ratio_result_budget(self.point.coordinates)
-        n = len(self.point.coordinates)
-        if self.chart_i >= n or self.chart_j >= n:
-            raise _validation_error("chart_index_out_range", "chart index out of range")
-        if self.point.coordinates[self.chart_i].as_fraction() == 0:
-            raise _validation_error(
-                "chart_i_coordinate_nonzero", "chart_i coordinate must be nonzero"
-            )
-        return self
-
 
 # Results
 

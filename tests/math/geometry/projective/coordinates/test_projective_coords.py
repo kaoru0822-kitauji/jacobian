@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.geometry.projective.coordinates._models import (
     ChartTransitionRequest,
     ChartTransitionResult,
@@ -103,8 +104,7 @@ def test_chart_transition_reports_outside_target_chart() -> None:
 def test_chart_transition_rejects_unrepresentable_ratio_growth() -> None:
     component = "1" + "0" * 16_384
 
-    with pytest.raises(ValidationError):
-        ChartTransitionRequest(
+    request = ChartTransitionRequest(
             point=RationalProjectivePoint(
                 coordinates=(
                     CanonicalRational(num=component, den="1"),
@@ -114,6 +114,8 @@ def test_chart_transition_rejects_unrepresentable_ratio_growth() -> None:
             chart_i=0,
             chart_j=1,
         )
+    with pytest.raises(OperationDomainValidationError):
+        compute_chart_transition(request)
 
 
 def test_chart_transition_round_trips_between_defined_charts() -> None:

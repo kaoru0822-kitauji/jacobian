@@ -10,6 +10,7 @@ from pydantic import ValidationError
 
 from jacobian._exact import MAX_CANONICAL_RATIONAL_DIGITS, CanonicalRational
 from jacobian.canonical import encode_strict_json
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.geometry.boxes import (
     BoxUnionVolumeResult,
     RationalAxisAlignedBox,
@@ -231,7 +232,7 @@ def test_native_api_accepts_canonical_box_tuple_without_request_wrapper() -> Non
 
 
 def test_native_call_admits_the_family_before_the_kernel() -> None:
-    with pytest.raises(ValidationError):
+    with pytest.raises(OperationDomainValidationError):
         compute_box_union_volume((_box((0, 1)), _box((0, 1), (0, 1))))
 
 
@@ -286,8 +287,9 @@ def test_rejects_malformed_interval_and_dimension_mismatch() -> None:
     with pytest.raises(ValidationError):
         RationalClosedInterval(lower=_rational(2), upper=_rational(1))
 
-    with pytest.raises(ValidationError):
-        BoxUnionVolumeRequest(boxes=(_box((0, 1)), _box((0, 1), (0, 1))))
+    request = BoxUnionVolumeRequest(boxes=(_box((0, 1)), _box((0, 1), (0, 1))))
+    with pytest.raises(OperationDomainValidationError):
+        compute_box_union_volume(request.boxes)
 
 
 def test_single_box_with_257_digit_endpoint_is_admitted_with_exact_volume() -> None:
@@ -306,8 +308,9 @@ def test_endpoint_at_derived_growth_boundary_is_admitted() -> None:
 
 
 def test_endpoint_beyond_derived_growth_budget_is_rejected() -> None:
-    with pytest.raises(ValidationError):
-        BoxUnionVolumeRequest(boxes=(_box((0, Fraction(10**16_377 - 1))),))
+    request = BoxUnionVolumeRequest(boxes=(_box((0, Fraction(10**16_377 - 1))),))
+    with pytest.raises(OperationDomainValidationError):
+        compute_box_union_volume(request.boxes)
 
 
 def test_accepts_immediately_below_small_coordinate_result_boundary() -> None:
@@ -319,20 +322,23 @@ def test_accepts_immediately_below_small_coordinate_result_boundary() -> None:
 
 def test_rejects_next_small_coordinate_result_boundary() -> None:
     box = _box((0, 1))
-    with pytest.raises(ValidationError):
-        BoxUnionVolumeRequest(boxes=(box,) * 16)
+    request = BoxUnionVolumeRequest(boxes=(box,) * 16)
+    with pytest.raises(OperationDomainValidationError):
+        compute_box_union_volume(request.boxes)
 
 
 def test_rejects_worst_case_ledger_bytes_before_expansion() -> None:
     endpoint = Fraction(10**255, 10**255 + 1)
     box = _box((0, endpoint))
-    with pytest.raises(ValidationError):
-        BoxUnionVolumeRequest(boxes=(box,) * 14)
+    request = BoxUnionVolumeRequest(boxes=(box,) * 14)
+    with pytest.raises(OperationDomainValidationError):
+        compute_box_union_volume(request.boxes)
 
 
 def test_rejects_nonempty_candidate_limit() -> None:
-    with pytest.raises(ValidationError):
-        BoxUnionVolumeRequest(boxes=(_box((0, 1)),) * 17)
+    request = BoxUnionVolumeRequest(boxes=(_box((0, 1)),) * 17)
+    with pytest.raises(OperationDomainValidationError):
+        compute_box_union_volume(request.boxes)
 
 
 def test_high_dimension_single_box_is_admitted_by_scaled_budgets() -> None:
@@ -363,12 +369,13 @@ def test_high_dimension_families_remain_bounded_by_derived_budgets() -> None:
     assert result.intersections[0].volume.as_fraction() == endpoint
 
     wide_box = _box(*((0, endpoint),) * MAX_CANONICAL_BOX_DIMENSION)
-    with pytest.raises(ValidationError):
+    with pytest.raises(OperationDomainValidationError):
         compute_box_union_volume((wide_box,))
 
     unit_box = _box(*((0, 1),) * MAX_CANONICAL_BOX_DIMENSION)
-    with pytest.raises(ValidationError):
-        BoxUnionVolumeRequest(boxes=(unit_box,) * 16)
+    request = BoxUnionVolumeRequest(boxes=(unit_box,) * 16)
+    with pytest.raises(OperationDomainValidationError):
+        compute_box_union_volume(request.boxes)
 
 
 def test_schema_explains_empty_boxes_and_coupled_bounds() -> None:

@@ -8,7 +8,7 @@ from typing import cast
 
 from jacobian.canonical import format_canonical_integer
 from jacobian.catalog._examples import example
-from jacobian.catalog.models import MathTool
+from jacobian.catalog.models import MathTool, OperationDomainValidationError
 from jacobian.math.arithmetic import primitive_integer_vector
 from jacobian.math.geometry.projective._models import (
     NormalizedProjectiveLine,
@@ -17,7 +17,10 @@ from jacobian.math.geometry.projective._models import (
     ProjectiveLineArrangementResult,
     ProjectiveMultiplicityCount,
 )
-from jacobian.math.geometry.projective.values import PrimitiveProjectiveTriple
+from jacobian.math.geometry.projective.values import (
+    PrimitiveProjectiveTriple,
+    _primitive_integer_triple,
+)
 
 
 def _primitive(values: tuple[Fraction, Fraction, Fraction]) -> tuple[int, int, int]:
@@ -56,6 +59,14 @@ def compute_projective_line_flats(
 ) -> ProjectiveLineArrangementResult:
     """Compute the complete exact flat lattice for one labelled arrangement."""
 
+    try:
+        _admit_projective_line_arrangement(request)
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=("lines",),
+            code="geometry.projective_line_arrangement_invalid",
+            message=str(exc),
+        ) from exc
     normalized = tuple(
         sorted(
             (
@@ -107,7 +118,7 @@ def compute_projective_line_flats(
     histogram: dict[int, int] = {}
     for flat in flats:
         histogram[flat.multiplicity] = histogram.get(flat.multiplicity, 0) + 1
-    return ProjectiveLineArrangementResult(
+    return ProjectiveLineArrangementResult._from_kernel(
         line_count=len(normalized),
         normalized_lines=tuple(
             NormalizedProjectiveLine(
@@ -129,6 +140,19 @@ def compute_projective_line_flats(
         ),
         pair_count_total=comb(len(normalized), 2),
     )
+
+
+def _admit_projective_line_arrangement(
+    request: ProjectiveLineArrangementRequest,
+) -> None:
+    labels = tuple(line.label for line in request.lines)
+    if len(labels) != len(set(labels)):
+        raise ValueError("projective line labels must be unique")
+    normalized = tuple(
+        _primitive_integer_triple(line.coefficients) for line in request.lines
+    )
+    if len(normalized) != len(set(normalized)):
+        raise ValueError("projectively duplicate lines must be merged before invocation")
 
 
 PROJECTIVE_LINE_ARRANGEMENT_OPERATION: MathTool[
