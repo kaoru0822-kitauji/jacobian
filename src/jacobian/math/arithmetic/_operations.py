@@ -18,8 +18,10 @@ from typing import Literal
 
 from jacobian._exact import CanonicalRational
 from jacobian.canonical import format_canonical_integer, parse_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math import arithmetic as native_arithmetic
 from jacobian.math.arithmetic._models import (
+    MAX_BASE_DIGITS,
     IntegerBaseDigitsRequest,
     IntegerBaseDigitsResult,
     IntegerNthRootRequest,
@@ -73,6 +75,18 @@ def decimal_digit_count(request: IntegerValue) -> IntegerValue:
 
 
 def base_digits(request: IntegerBaseDigitsRequest) -> IntegerBaseDigitsResult:
+    magnitude = request.value.lstrip("-")
+    maximum_value = format_canonical_integer(request.base**MAX_BASE_DIGITS)
+    if len(magnitude) > len(maximum_value) or (
+        len(magnitude) == len(maximum_value) and magnitude >= maximum_value
+    ):
+        raise OperationDomainValidationError(
+            location=("value",),
+            code="arithmetic.base_expansion_exceeds_bound",
+            message=(
+                f"base expansion exceeds the {MAX_BASE_DIGITS}-digit result bound"
+            ),
+        )
     from sympy.ntheory import digits as sympy_digits
 
     value = _int(request.value)
@@ -95,6 +109,12 @@ def nth_root(request: IntegerNthRootRequest) -> IntegerNthRootResult:
     from sympy import integer_nthroot
 
     value = _int(request.value)
+    if value < 0 and request.degree % 2 == 0:
+        raise OperationDomainValidationError(
+            location=("value", "degree"),
+            code="arithmetic.even_root_of_negative",
+            message="even root of a negative integer is not integral-real",
+        )
     root, exact = integer_nthroot(abs(value), request.degree)
     if value < 0 and not exact:
         root += 1

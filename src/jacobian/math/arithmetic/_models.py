@@ -15,7 +15,6 @@ from pydantic_core import PydanticCustomError
 
 from jacobian._exact import CanonicalInteger
 from jacobian._models import StrictModel
-from jacobian.canonical import format_canonical_integer, parse_canonical_integer
 
 # ---------------------------------------------------------------------------
 # Shared bounds
@@ -60,21 +59,6 @@ class IntegerBaseDigitsRequest(StrictModel):
     value: CanonicalInteger
     base: int = Field(ge=2, le=_MAX_BASE)
 
-    @model_validator(mode="after")
-    def require_bounded_output(self) -> Self:
-        """Reject inputs that necessarily exceed the bounded positional output."""
-        magnitude = self.value.lstrip("-")
-        maximum_value = format_canonical_integer(self.base**MAX_BASE_DIGITS)
-        if len(magnitude) > len(maximum_value) or (
-            len(magnitude) == len(maximum_value) and magnitude >= maximum_value
-        ):
-            raise _validation_error(
-                "base_expansion_exceeds_bound",
-                f"base expansion exceeds the {MAX_BASE_DIGITS}-digit result bound",
-            )
-        return self
-
-
 # ---------------------------------------------------------------------------
 # Requests — nth root
 # ---------------------------------------------------------------------------
@@ -89,16 +73,6 @@ class IntegerNthRootRequest(StrictModel):
 
     value: CanonicalInteger
     degree: int = Field(ge=1, le=_MAX_NTH_ROOT_DEGREE)
-
-    @model_validator(mode="after")
-    def require_valid_root_domain(self) -> Self:
-        if parse_canonical_integer(self.value) < 0 and self.degree % 2 == 0:
-            raise _validation_error(
-                "even_root_of_negative",
-                "even root of a negative integer is not integral-real",
-            )
-        return self
-
 
 class IntegerSignResult(StrictModel):
     """The sign of one integer as -1, 0, or 1."""
