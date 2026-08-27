@@ -67,29 +67,4 @@ def compute_differential_operator_application(
     return DifferentialOperatorApplyResult._from_kernel(request, output)
 
 
-def verify_differential_operator_application_result(
-    result: DifferentialOperatorApplyResult,
-) -> bool:
-    """Replay one independently supplied result inside its admitted envelope."""
-
-    try:
-        envelope = _admit_application(
-            result.polynomial,
-            result.operator,
-            result.iterations,
-            result.expected,
-        )
-        return result.output == apply_with_flint(
-            result.polynomial,
-            result.operator,
-            result.iterations,
-            envelope,
-        )
-    except (ImportError, RuntimeError, TypeError, ValueError):
-        return False
-
-
-__all__ = [
-    "compute_differential_operator_application",
-    "verify_differential_operator_application_result",
-]
+__all__ = ["compute_differential_operator_application"]
