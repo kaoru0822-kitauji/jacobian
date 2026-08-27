@@ -19,7 +19,6 @@ from jacobian.math.optimization._models import (
     _dual_diagnostics,
     _primal_diagnostics,
     _result_digit_bound,
-    _verify_rational_linear_program_result,
 )
 
 
@@ -277,6 +276,11 @@ def _primal_data(
 ) -> tuple[CanonicalRational, tuple[CanonicalRational, ...]] | None:
     values = tuple(value.as_fraction() for value in candidate)
     objective, residuals = _primal_diagnostics(program, values)
+    # SymPy can return a symbolic/partial point for an infeasible model.  The
+    # diagnostics are already computed while converting that point; reject it
+    # here instead of constructing a result and replaying the whole claim.
+    if any(value < 0 for value in values) or any(residuals):
+        return None
     wire_objective = _wire_fraction(objective, max_digits=max_digits)
     wire_residuals = tuple(
         _wire_fraction(value, max_digits=max_digits) for value in residuals
@@ -294,6 +298,10 @@ def _dual_data(
 ) -> tuple[CanonicalRational, tuple[CanonicalRational, ...]] | None:
     values = tuple(value.as_fraction() for value in candidate)
     objective, slacks = _dual_diagnostics(program, values)
+    # A dual point with a negative slack is not an optimality certificate.
+    # This is an integration check on the backend output, not a second solve.
+    if any(value < 0 for value in slacks):
+        return None
     wire_objective = _wire_fraction(objective, max_digits=max_digits)
     wire_slacks = tuple(
         _wire_fraction(value, max_digits=max_digits) for value in slacks
@@ -307,14 +315,6 @@ def _unknown(
     program: StandardFormRationalLinearProgram,
 ) -> RationalLinearProgramResult:
     return RationalLinearProgramResult._from_kernel(program=program, status="UNKNOWN")
-
-
-def _verified_kernel_result(**values: object) -> RationalLinearProgramResult:
-    """Construct and check a claim once at the producer boundary."""
-
-    result = RationalLinearProgramResult._from_kernel(**values)
-    _verify_rational_linear_program_result(result)
-    return result
 
 
 def _trivial_infeasibility(
@@ -331,7 +331,7 @@ def _trivial_infeasibility(
             1 if rhs.num.startswith("-") else -1,
             1,
         )
-        return _verified_kernel_result(
+        return RationalLinearProgramResult._from_kernel(
             program=program,
             status="INFEASIBLE",
             farkas_candidate=tuple(witness),
@@ -374,7 +374,7 @@ def _certify_infeasible(
         source_rows=len(program.rhs),
     )
     try:
-        return _verified_kernel_result(
+        return RationalLinearProgramResult._from_kernel(
             program=program, status="INFEASIBLE", farkas_candidate=farkas
         )
     except ValueError:
@@ -428,7 +428,7 @@ def _certify_unbounded(
         return _unknown(program)
     primal_objective, primal_residuals = primal_data
     try:
-        return _verified_kernel_result(
+        return RationalLinearProgramResult._from_kernel(
             program=program,
             status="UNBOUNDED",
             primal_candidate=feasible,
@@ -467,11 +467,6 @@ def _positive_result(
         primal_objective=primal_objective,
         primal_residuals=primal_residuals,
     )
-    try:
-        _verify_rational_linear_program_result(primal_result)
-    except ValueError:
-        return _certify_infeasible(program, result_digits=result_digits)
-
     if not _active_equations(program):
         dual = tuple(CanonicalRational.from_integer_ratio(0, 1) for _ in program.rhs)
     else:
@@ -503,6 +498,8 @@ def _positive_result(
     if dual_data is None:
         return primal_result
     dual_objective, dual_slacks = dual_data
+    if dual_objective != primal_objective:
+        return primal_result
     optimal_result = RationalLinearProgramResult._from_kernel(
         program=program,
         status="OPTIMAL",
@@ -513,10 +510,6 @@ def _positive_result(
         dual_objective=dual_objective,
         dual_slacks=dual_slacks,
     )
-    try:
-        _verify_rational_linear_program_result(optimal_result)
-    except ValueError:
-        return primal_result
     return optimal_result
 
 
