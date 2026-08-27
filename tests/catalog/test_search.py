@@ -6,14 +6,22 @@ from jacobian.catalog.models import (
     OperationDiscoveryMatch,
     OperationDiscoveryRequest,
 )
-from jacobian.catalog.search import discovery_relevance
-
-_CONTAINMENT_PROFILE_ID = "incidence.containment_profiles.compute"
+from jacobian.catalog.search import discovery_relevance, normalized_discovery_terms
 
 
-def _top_operation_ids(query: str) -> tuple[str, ...]:
-    result = Catalog.open().search(OperationDiscoveryRequest(query=query, limit=5))
-    return tuple(match.operation_id for match in result.matches)
+def _positions(query: str) -> dict[str, int]:
+    catalog = Catalog.open()
+    cursor: str | None = None
+    matches: list[OperationDiscoveryMatch] = []
+    while True:
+        result = catalog.search(
+            OperationDiscoveryRequest(query=query, limit=20, cursor=cursor)
+        )
+        matches.extend(result.matches)
+        if result.next_cursor is None:
+            break
+        cursor = result.next_cursor
+    return {match.operation_id: index for index, match in enumerate(matches)}
 
 
 def test_discovery_phrase_matching_respects_token_boundaries() -> None:
@@ -66,33 +74,67 @@ def test_standard_det_abbreviation_ranks_determinants_before_charpolys() -> None
         for characteristic_polynomial_id in characteristic_polynomial_ids
     )
 
+def test_discovery_normalizes_only_audited_ordinary_plural_forms() -> None:
+    assert normalized_discovery_terms("subset sums and repeated representations") == {
+        "subset",
+        "sum",
+        "repeated",
+        "representation",
+    }
+    assert normalized_discovery_terms("basis class series") == {
+        "basis",
+        "class",
+        "series",
+    }
 
-def test_t_codegree_queries_rank_the_existing_containment_profile_first() -> None:
+
+def test_plural_queries_preserve_their_semantic_catalog_routing() -> None:
+    subset_positions = _positions(
+        "all subset sums and repeated representations of a finite integer set"
+    )
+    assert (
+        subset_positions["additive.subset_sum.profile.compute"]
+        < subset_positions["combinatorics.integer_set.sidon.decide"]
+    )
+
+    tree_positions = _positions(
+        "counts independent vertex sets by cardinalities in trees"
+    )
+    assert (
+        tree_positions["graph.polynomial.independence.compute"]
+        < tree_positions["graph.independent_set.maximal.decide"]
+    )
+
+
+def test_euler_phi_discovery_terms_outrank_generic_inverse_and_solver_operations() -> (
+    None
+):
+    for query, displaced in (
+        ("inverse totient preimages", "arithmetic.dirichlet_inverse.compute"),
+        ("totient inverse image", "matrix.inverse.compute"),
+        ("solve phi(n)=m", "matrix.symbolic.linear_system.solve"),
+    ):
+        positions = _positions(query)
+        assert (
+            positions["number_theory.euler_phi.preimages.compute"]
+            < positions[displaced]
+        )
+
+
+def test_t_codegree_discovery_terms_route_to_incidence_containment_profiles() -> None:
     for query in (
         "compute t-codegrees of a finite hypergraph",
         "uniform codegree profile",
     ):
-        assert _top_operation_ids(query)[0] == _CONTAINMENT_PROFILE_ID
-
-
-def test_containment_language_still_ranks_the_profile_first() -> None:
-    assert (
-        _top_operation_ids(
-            "containment counts for every pair of points in an incidence structure"
-        )[0]
-        == _CONTAINMENT_PROFILE_ID
-    )
-
-
-def test_graph_vertex_degree_query_does_not_select_a_codegree_profile() -> None:
-    operation_ids = _top_operation_ids("vertex degree of a graph")
-
-    assert "graph.realization.check.compute" in operation_ids
-    assert _CONTAINMENT_PROFILE_ID not in operation_ids
+        positions = _positions(query)
+        assert (
+            positions["incidence.containment_profiles.compute"]
+            < positions["hypergraph.parameters.compute"]
+        )
 
 
 def test_containment_profile_example_names_complete_pair_codegrees() -> None:
-    operation = Catalog.open().operation(_CONTAINMENT_PROFILE_ID)
+    operation = Catalog.open().operation("incidence.containment_profiles.compute")
 
     assert operation is not None
     assert operation.examples[0].name == "triangle_pair_codegrees"

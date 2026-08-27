@@ -52,6 +52,7 @@ def _op[RequestT: StrictModel, ResultT: StrictModel](
     result_model: type[ResultT],
     operation: Callable[[RequestT], ResultT],
     *tags: str,
+    discovery_terms: tuple[str, ...] = (),
     examples: tuple[OperationExample, ...] = (),
 ) -> MathTool[RequestT, ResultT]:
     return MathTool(
@@ -62,6 +63,7 @@ def _op[RequestT: StrictModel, ResultT: StrictModel](
         result_type=result_model,
         run=operation,
         tags=tags,
+        discovery_terms=discovery_terms,
         examples=examples,
     )
 
@@ -133,6 +135,7 @@ TOOLS: tuple[MathTool[Any, Any], ...] = (
         "codegree",
         "codegree-profile",
         "exact",
+        discovery_terms=("t-codegree", "codegree profile"),
         examples=(
             example(
                 "triangle_pair_codegrees",
