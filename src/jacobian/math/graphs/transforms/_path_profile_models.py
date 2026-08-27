@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import math
-from typing import Self
 
-from pydantic import Field, model_validator
-from pydantic_core import PydanticCustomError
+from pydantic import Field
 
 from jacobian._models import StrictModel
-from jacobian.canonical import CanonicalLimits, encode_strict_json
+from jacobian.canonical import encode_strict_json
 from jacobian.math.graphs.values import SimpleUndirectedGraph
 
 MAX_PATH_PROFILE_SEARCH_WORK = 10_000_000
@@ -59,29 +57,6 @@ class PathProfileRequest(StrictModel):
 
     graph: SimpleUndirectedGraph
     path_length: int = Field(ge=0, le=10)
-
-    @model_validator(mode="after")
-    def require_bounded_search(self) -> Self:
-        vertex_count = len(self.graph.vertices)
-        degree_bound = _canonical_max_degree(self.graph)
-        # The DFS can visit at most this many simple prefixes for one source;
-        # charge every source and retain a conservative margin for endpoint rows.
-        work = vertex_count * _path_prefix_work_bound(
-            vertex_count, degree_bound, self.path_length
-        )
-        if work > MAX_PATH_PROFILE_SEARCH_WORK:
-            raise PydanticCustomError(
-                "graph.path_profile_search_exceeds_work_budget",
-                "fixed-length simple path profile search exceeds the "
-                f"{MAX_PATH_PROFILE_SEARCH_WORK}-node work budget",
-            )
-        if _path_profile_result_bytes(self) > CanonicalLimits().max_output_bytes:
-            raise PydanticCustomError(
-                "graph.path_profile_result_exceeds_output_budget",
-                "fixed-length simple path profile result exceeds the canonical "
-                f"{CanonicalLimits().max_output_bytes}-byte output budget",
-            )
-        return self
 
 
 class PathProfileRow(StrictModel):

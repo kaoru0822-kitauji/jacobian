@@ -2,11 +2,44 @@
 
 from __future__ import annotations
 
+from jacobian.canonical import CanonicalLimits
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.transforms._path_profile_models import (
+    MAX_PATH_PROFILE_SEARCH_WORK,
     PathProfileRequest,
     PathProfileResult,
     PathProfileRow,
+    _canonical_max_degree,
+    _path_prefix_work_bound,
+    _path_profile_result_bytes,
 )
+
+
+def _admit_path_profile(request: PathProfileRequest) -> None:
+    vertex_count = len(request.graph.vertices)
+    degree_bound = _canonical_max_degree(request.graph)
+    work = vertex_count * _path_prefix_work_bound(
+        vertex_count, degree_bound, request.path_length
+    )
+    if work > MAX_PATH_PROFILE_SEARCH_WORK:
+        raise OperationDomainValidationError(
+            location=("graph", "path_length"),
+            code="graph.path_profile_search_exceeds_work_budget",
+            message=(
+                "fixed-length simple path profile search exceeds the "
+                f"{MAX_PATH_PROFILE_SEARCH_WORK}-node work budget"
+            ),
+        )
+    output_limit = CanonicalLimits().max_output_bytes
+    if _path_profile_result_bytes(request) > output_limit:
+        raise OperationDomainValidationError(
+            location=("graph", "path_length"),
+            code="graph.path_profile_result_exceeds_output_budget",
+            message=(
+                "fixed-length simple path profile result exceeds the canonical "
+                f"{output_limit}-byte output budget"
+            ),
+        )
 
 
 def compute_path_profile(request: PathProfileRequest) -> PathProfileResult:
@@ -15,6 +48,7 @@ def compute_path_profile(request: PathProfileRequest) -> PathProfileResult:
     Uses depth-first search with backtracking. For path_length=0, each vertex
     has a trivial path to itself. For path_length=1, adjacency determines counts.
     """
+    _admit_path_profile(request)
     graph = request.graph
     length = request.path_length
     vertices = list(graph.vertices)

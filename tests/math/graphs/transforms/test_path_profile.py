@@ -3,6 +3,7 @@
 import pytest
 
 from jacobian.canonical import CanonicalLimits, encode_strict_json
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.transforms._path_profile_models import PathProfileRequest
 from jacobian.math.graphs.transforms._path_profile_operations import (
     compute_path_profile,
@@ -46,8 +47,9 @@ def test_path_profile_rejects_unbounded_dense_search() -> None:
     )
     graph = SimpleUndirectedGraph(vertices=vertices, edges=edges)
 
-    with pytest.raises(ValueError, match="work budget"):
-        PathProfileRequest(graph=graph, path_length=10)
+    request = PathProfileRequest(graph=graph, path_length=10)
+    with pytest.raises(OperationDomainValidationError, match="work budget"):
+        compute_path_profile(request)
 
 
 def test_path_profile_result_budget_scales_to_requested_endpoint_pairs() -> None:
