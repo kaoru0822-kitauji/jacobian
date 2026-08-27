@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import math
-from typing import Self
 
-from pydantic import Field, model_validator
+from pydantic import Field
 
 from jacobian._models import StrictModel
 from jacobian.canonical import (
@@ -79,26 +78,6 @@ class PrimeCoverageProfileRequest(StrictModel):
 
     lower_bound: int = Field(ge=1, le=MAX_COVERAGE_UPPER)
     upper_bound: int = Field(ge=1, le=MAX_COVERAGE_UPPER)
-
-    @model_validator(mode="after")
-    def require_valid_interval(self) -> Self:
-        if self.upper_bound < self.lower_bound:
-            raise ValueError("upper_bound must be >= lower_bound")
-        predicted = _coverage_result_upper_bound_bytes(
-            self.lower_bound, self.upper_bound
-        )
-        if predicted > MAX_COVERAGE_RESULT_BYTES:
-            raise ValueError(
-                "interval result exceeds the canonical output budget of "
-                f"{MAX_COVERAGE_RESULT_BYTES} bytes"
-            )
-        work = _coverage_work_upper_bound(self.lower_bound, self.upper_bound)
-        if work > MAX_COVERAGE_WORK:
-            raise ValueError(
-                "interval exceeds the segmented prime-coverage work budget of "
-                f"{MAX_COVERAGE_WORK} steps"
-            )
-        return self
 
 
 class PrimeCoverageProfileRow(StrictModel):

@@ -1,8 +1,8 @@
 """Tests for prime-coverage and binomial-valuation profiles."""
 
 import pytest
-from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.number_theory._binomial_valuation_models import (
     BinomialValuationProfileRequest,
 )
@@ -50,21 +50,26 @@ def test_prime_coverage_admits_narrow_high_interval() -> None:
 
 
 def test_prime_coverage_rejects_result_over_canonical_output_budget() -> None:
-    with pytest.raises(ValueError, match="canonical output budget"):
-        PrimeCoverageProfileRequest(
-            lower_bound=1,
-            upper_bound=1_000_000,
-        )
+    request = PrimeCoverageProfileRequest(lower_bound=1, upper_bound=1_000_000)
+
+    with pytest.raises(OperationDomainValidationError, match="canonical output budget"):
+        compute_prime_coverage_profile(request)
 
 
 def test_prime_coverage_rejects_square_root_work_budget() -> None:
-    with pytest.raises(ValueError, match="segmented prime-coverage work budget"):
-        PrimeCoverageProfileRequest(lower_bound=10**13, upper_bound=10**13)
+    request = PrimeCoverageProfileRequest(lower_bound=10**13, upper_bound=10**13)
+
+    with pytest.raises(
+        OperationDomainValidationError, match="segmented prime-coverage work budget"
+    ):
+        compute_prime_coverage_profile(request)
 
 
 def test_binomial_valuation_rejects_composite_base() -> None:
-    with pytest.raises(ValidationError, match="prime must be a prime number"):
-        BinomialValuationProfileRequest(n=4, prime=4)
+    request = BinomialValuationProfileRequest(n=4, prime=4)
+
+    with pytest.raises(OperationDomainValidationError, match="prime must be"):
+        compute_binomial_valuation_profile(request)
 
 
 def test_binomial_valuation_admits_output_bound_n_and_large_prime() -> None:
@@ -80,8 +85,10 @@ def test_binomial_valuation_admits_output_bound_n_and_large_prime() -> None:
 
 
 def test_binomial_valuation_rejects_digitwise_work_budget() -> None:
-    with pytest.raises(ValueError, match="digitwise work budget"):
-        BinomialValuationProfileRequest(n=120_000, prime=2)
+    request = BinomialValuationProfileRequest(n=120_000, prime=2)
+
+    with pytest.raises(OperationDomainValidationError, match="digitwise work budget"):
+        compute_binomial_valuation_profile(request)
 
 
 def test_binomial_valuation_basic() -> None:

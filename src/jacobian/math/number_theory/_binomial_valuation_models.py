@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Self
-
-from pydantic import Field, model_validator
+from pydantic import Field
 
 from jacobian._models import StrictModel
 from jacobian.canonical import (
@@ -68,29 +66,6 @@ class BinomialValuationProfileRequest(StrictModel):
 
     n: int = Field(ge=0)
     prime: int = Field(ge=2, le=_MAX_SAFE_JSON_INTEGER)
-
-    @model_validator(mode="after")
-    def require_prime(self) -> Self:
-        """Validate that prime is actually prime."""
-        if self.n + 1 > _MAX_BINOMIAL_ROWS_FROM_OUTPUT:
-            raise ValueError("valuation profile exceeds the canonical output budget")
-        predicted = _binomial_result_upper_bound_bytes(self.n, self.prime)
-        if predicted > MAX_BINOMIAL_PROFILE_RESULT_BYTES:
-            raise ValueError(
-                "valuation profile exceeds the canonical output budget of "
-                f"{MAX_BINOMIAL_PROFILE_RESULT_BYTES} bytes"
-            )
-        digit_work = (self.n + 1) * max(1, _base_digit_count(self.n, self.prime))
-        if digit_work > MAX_BINOMIAL_DIGIT_WORK:
-            raise ValueError(
-                "valuation profile exceeds the digitwise work budget of "
-                f"{MAX_BINOMIAL_DIGIT_WORK} steps"
-            )
-        from sympy import isprime
-
-        if not isprime(self.prime):
-            raise ValueError("prime must be a prime number")
-        return self
 
 
 class BinomialValuationProfileRow(StrictModel):
