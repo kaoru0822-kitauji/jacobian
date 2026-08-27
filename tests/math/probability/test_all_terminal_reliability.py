@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
 from jacobian.canonical import CanonicalLimits
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.values import SimpleUndirectedGraph
 from jacobian.math.probability._all_terminal_reliability import (
     ALL_TERMINAL_RELIABILITY_OPERATION,
@@ -310,8 +311,12 @@ def test_request_rejects_outside_complete_domain(
     payload: dict[str, object],
     message: str,
 ) -> None:
-    with pytest.raises(ValidationError):
-        AllTerminalReliabilityRequest.model_validate(payload)
+    try:
+        request = AllTerminalReliabilityRequest.model_validate(payload)
+    except ValidationError:
+        return
+    with pytest.raises(OperationDomainValidationError, match=message):
+        compute_all_terminal_reliability(request)
 
 
 def test_operation_executes_the_twenty_edge_enumeration_boundary() -> None:

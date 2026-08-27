@@ -17,7 +17,7 @@ from jacobian._exact import (
 from jacobian._models import StrictModel, canonicalize_json_containers
 from jacobian.canonical import format_canonical_integer, parse_canonical_integer
 from jacobian.catalog._examples import example
-from jacobian.catalog.models import MathTool
+from jacobian.catalog.models import MathTool, OperationDomainValidationError
 from jacobian.math.graphs.values import SimpleUndirectedGraph
 from jacobian.math.probability.all_terminal_reliability import (
     MAX_ALL_TERMINAL_RELIABILITY_EDGES,
@@ -65,13 +65,6 @@ class AllTerminalReliabilityRequest(StrictModel):
         )
     )
     event: Literal["ALL_VERTICES_CONNECTED"] = "ALL_VERTICES_CONNECTED"
-
-    @model_validator(mode="after")
-    def require_bounded_complete_enumeration(self) -> Self:
-        all_terminal_reliability_input = self.open_probability.as_fraction()
-        # The native boundary owns all mathematical and two-pass work admission.
-        _require_bounded_problem(self.graph, all_terminal_reliability_input)
-        return self
 
 
 class AllTerminalReliabilityWireResult(StrictModel):
@@ -202,6 +195,14 @@ def compute_all_terminal_reliability(
     request: AllTerminalReliabilityRequest,
 ) -> AllTerminalReliabilityWireResult:
     probability = request.open_probability.as_fraction()
+    try:
+        _require_bounded_problem(request.graph, probability)
+    except (TypeError, ValueError) as exc:
+        raise OperationDomainValidationError(
+            location=("graph", "open_probability"),
+            code="probability.all_terminal_reliability_not_admitted",
+            message=str(exc),
+        ) from None
     counts, reliability_probability, visited_states = _compute_all_terminal_reliability(
         request.graph, probability
     )
