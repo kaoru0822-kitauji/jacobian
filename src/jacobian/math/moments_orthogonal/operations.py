@@ -5,6 +5,7 @@ from __future__ import annotations
 from fractions import Fraction
 
 from jacobian._exact import MAX_CANONICAL_RATIONAL_DIGITS, CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math._rational_height import RationalHeight
 from jacobian.math.moments_orthogonal._jacobi import jacobi_matrix_from_family
 from jacobian.math.moments_orthogonal._models import (
@@ -421,9 +422,16 @@ def compute_orthogonal_polynomials(
 ) -> OrthogonalPolynomialFamily:
     """MCP adapter: validate the wire request, then run the shared kernel."""
     moments = [_to_fraction(m) for m in request.prefix.moments]
-    return orthogonal_polynomials_from_moments(
-        moments, request.max_degree, request.prefix.variable
-    )
+    try:
+        return orthogonal_polynomials_from_moments(
+            moments, request.max_degree, request.prefix.variable
+        )
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=("prefix", "max_degree"),
+            code="moments_orthogonal.family_not_admitted",
+            message=str(exc),
+        ) from exc
 
 
 def _require_quasi_definite_family(family: OrthogonalPolynomialFamily) -> None:
@@ -720,7 +728,14 @@ def compute_gaussian_quadrature(
     request: GaussianQuadratureRequest,
 ) -> GaussianQuadratureRule:
     """MCP adapter: parse one request, call the canonical-prefix kernel."""
-    return gaussian_quadrature_rule_from_prefix(request.prefix, request.order)
+    try:
+        return gaussian_quadrature_rule_from_prefix(request.prefix, request.order)
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=("prefix", "order"),
+            code="moments_orthogonal.quadrature_not_admitted",
+            message=str(exc),
+        ) from exc
 
 
 def _solve_linear_system(

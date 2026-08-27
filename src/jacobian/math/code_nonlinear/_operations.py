@@ -7,6 +7,7 @@ from itertools import combinations
 
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.code_nonlinear._budget import (
     require_constant_weight_admission,
     require_profile_admission,
@@ -201,7 +202,14 @@ def _constant_weight(code: ExplicitBinaryCode) -> int:
 
 def compute_constant_weight(request: ConstantWeightRequest) -> ConstantWeightResult:
     """Generate the complete constant-weight binary code."""
-    require_constant_weight_admission(request.length, request.weight)
+    try:
+        require_constant_weight_admission(request.length, request.weight)
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=("length", "weight"),
+            code="nonlinear_code.constant_weight_not_admitted",
+            message=str(exc),
+        ) from exc
     code = _constant_weight_code(request.length, request.weight)
     return ConstantWeightResult._from_kernel(
         length=request.length, weight=request.weight, code=code
@@ -250,7 +258,14 @@ def compute_constant_weight_profile(
     """Compute distance and intersection profiles of a constant-weight code."""
     code = request.code
     plan = require_profile_admission(code)
-    weight = _constant_weight(code)
+    try:
+        weight = _constant_weight(code)
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=("code",),
+            code="nonlinear_code.not_constant_weight",
+            message=str(exc),
+        ) from exc
     profile = _constant_weight_profile_data(code)
     return ConstantWeightProfileResult._from_kernel(
         source=code,

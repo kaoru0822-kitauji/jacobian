@@ -10,7 +10,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian.catalog.catalog import Catalog
-from jacobian.catalog.models import MathTool
+from jacobian.catalog.models import MathTool, OperationDomainValidationError
 from jacobian.dispatch import invoke_operation
 
 MAX_MUTATIONS_PER_EXAMPLE = 256
@@ -137,6 +137,11 @@ def test_every_accepted_boundary_mutation_returns_the_declared_result(
                 continue
             try:
                 result = operation.run(request)
+            except OperationDomainValidationError:
+                # Structural request models cannot encode every owner-local
+                # mathematical precondition. A typed semantic rejection is
+                # therefore valid for a schema-valid mutation.
+                continue
             except Exception as exc:
                 pytest.fail(
                     f"{operation.operation_id} accepted {mutation} but raised "
