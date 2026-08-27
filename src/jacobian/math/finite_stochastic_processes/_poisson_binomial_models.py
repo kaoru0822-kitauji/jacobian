@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from typing import Annotated, Self
+from typing import Self
 
-from pydantic import Field, StringConstraints, model_validator
+from pydantic import Field, model_validator
 
 from jacobian._exact import CanonicalRational
 from jacobian._models import StrictModel
@@ -17,28 +17,20 @@ MAX_INPUT_RATIONAL_DIGITS = 100
 MAX_PROBABILITIES = 255
 MAX_INTERMEDIATE_RATIONAL_DIGITS = MAX_RESULT_RATIONAL_DIGITS
 
-RationalString = Annotated[
-    str,
-    StringConstraints(
-        pattern=r"^(?:0|-?[1-9][0-9]*)(?:\/[1-9][0-9]*)?$",
-        max_length=100,
-        strict=True,
-    ),
-]
-
 
 class PoissonBinomialRequest(StrictModel):
-    """A list of rational Bernoulli success probabilities."""
+    """A list of canonical rational Bernoulli success probabilities."""
 
-    probabilities: tuple[RationalString, ...] = Field(
+    probabilities: tuple[CanonicalRational, ...] = Field(
         min_length=1,
         max_length=MAX_PROBABILITIES,
     )
 
     @model_validator(mode="after")
     def require_probability_domain_and_digit_budget(self) -> Self:
-        parsed = tuple(Fraction(value) for value in self.probabilities)
-        require_admitted_probabilities(parsed)
+        require_admitted_probabilities(
+            tuple(probability.as_fraction() for probability in self.probabilities)
+        )
         return self
 
 

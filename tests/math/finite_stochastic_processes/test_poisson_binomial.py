@@ -17,7 +17,12 @@ from jacobian.math.finite_stochastic_processes._poisson_binomial_operations impo
 
 def test_two_fair_coins() -> None:
     result = compute_poisson_binomial(
-        PoissonBinomialRequest(probabilities=("1/2", "1/2"))
+        PoissonBinomialRequest(
+            probabilities=(
+                CanonicalRational.from_integer_ratio(1, 2),
+                CanonicalRational.from_integer_ratio(1, 2),
+            )
+        )
     )
     dist = [atom.probability.as_fraction() for atom in result.count_distribution.atoms]
     assert dist == [Fraction(1, 4), Fraction(1, 2), Fraction(1, 4)]
@@ -38,20 +43,34 @@ def test_native_api_returns_the_canonical_distribution() -> None:
 
 
 def test_single_certain() -> None:
-    result = compute_poisson_binomial(PoissonBinomialRequest(probabilities=("1",)))
+    result = compute_poisson_binomial(
+        PoissonBinomialRequest(
+            probabilities=(CanonicalRational.from_integer_ratio(1, 1),)
+        )
+    )
     dist = [atom.probability.as_fraction() for atom in result.count_distribution.atoms]
     assert dist == [Fraction(0), Fraction(1)]
 
 
 def test_single_impossible() -> None:
-    result = compute_poisson_binomial(PoissonBinomialRequest(probabilities=("0",)))
+    result = compute_poisson_binomial(
+        PoissonBinomialRequest(
+            probabilities=(CanonicalRational.from_integer_ratio(0, 1),)
+        )
+    )
     dist = [atom.probability.as_fraction() for atom in result.count_distribution.atoms]
     assert dist == [Fraction(1), Fraction(0)]
 
 
 def test_three_fair_coins() -> None:
     result = compute_poisson_binomial(
-        PoissonBinomialRequest(probabilities=("1/2", "1/2", "1/2"))
+        PoissonBinomialRequest(
+            probabilities=(
+                CanonicalRational.from_integer_ratio(1, 2),
+                CanonicalRational.from_integer_ratio(1, 2),
+                CanonicalRational.from_integer_ratio(1, 2),
+            )
+        )
     )
     dist = [atom.probability.as_fraction() for atom in result.count_distribution.atoms]
     assert dist == [Fraction(1, 8), Fraction(3, 8), Fraction(3, 8), Fraction(1, 8)]
@@ -61,20 +80,61 @@ def test_three_fair_coins() -> None:
 
 def test_rejects_probabilities_outside_the_unit_interval() -> None:
     with pytest.raises(ValidationError, match="closed unit interval"):
-        PoissonBinomialRequest(probabilities=("-1/2",))
+        PoissonBinomialRequest(
+            probabilities=(CanonicalRational.from_integer_ratio(-1, 2),)
+        )
     with pytest.raises(ValidationError, match="closed unit interval"):
-        PoissonBinomialRequest(probabilities=("2",))
+        PoissonBinomialRequest(
+            probabilities=(CanonicalRational.from_integer_ratio(2, 1),)
+        )
 
 
 def test_rejects_result_digit_growth_before_execution() -> None:
     denominator = str(10**97 + 3)
     with pytest.raises(ValidationError, match="exact result digit budget"):
-        PoissonBinomialRequest(probabilities=(f"1/{denominator}",) * 45)
+        PoissonBinomialRequest(
+            probabilities=(CanonicalRational(num="1", den=denominator),) * 45
+        )
+
+
+def test_native_result_probabilities_compose_into_request() -> None:
+    result = compute_poisson_binomial(
+        PoissonBinomialRequest(
+            probabilities=(
+                CanonicalRational.from_integer_ratio(1, 2),
+                CanonicalRational.from_integer_ratio(1, 3),
+            )
+        )
+    )
+
+    composed = compute_poisson_binomial(
+        PoissonBinomialRequest(probabilities=result.probabilities)
+    )
+
+    assert composed == result
+
+
+def test_serialized_result_probabilities_compose_into_request() -> None:
+    result = compute_poisson_binomial(
+        PoissonBinomialRequest(
+            probabilities=(CanonicalRational.from_integer_ratio(1, 2),)
+        )
+    )
+    payload = {"probabilities": result.model_dump(mode="json")["probabilities"]}
+
+    request = PoissonBinomialRequest.model_validate(payload)
+
+    assert request.probabilities == result.probabilities
 
 
 def test_result_distribution_round_trips_into_finite_raw_moment() -> None:
     result = compute_poisson_binomial(
-        PoissonBinomialRequest(probabilities=("1/2", "1/3"))
+        PoissonBinomialRequest(
+            probabilities=(
+                CanonicalRational.from_integer_ratio(1, 2),
+                CanonicalRational.from_integer_ratio(1, 3),
+            )
+        )
     )
     restored = type(result).model_validate_json(result.model_dump_json())
 

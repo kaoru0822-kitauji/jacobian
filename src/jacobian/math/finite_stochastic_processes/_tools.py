@@ -199,7 +199,12 @@ _POISSON_BINOMIAL_TOOL = MathTool(
         example(
             "poisson_binomial_basic",
             "Compute the count distribution for two fair coins.",
-            {"probabilities": ["1/2", "1/2"]},
+            {
+                "probabilities": [
+                    {"num": "1", "den": "2"},
+                    {"num": "1", "den": "2"},
+                ]
+            },
         ),
     ),
 )
