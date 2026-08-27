@@ -6,6 +6,13 @@ from typing import Any
 from jacobian._models import StrictModel
 from jacobian.catalog._examples import example
 from jacobian.catalog.models import MathTool, OperationExample
+from jacobian.math.finite_stochastic_processes._poisson_binomial_models import (
+    PoissonBinomialRequest,
+    PoissonBinomialResult,
+)
+from jacobian.math.finite_stochastic_processes._poisson_binomial_operations import (
+    compute_poisson_binomial,
+)
 from jacobian.math.finite_stochastic_processes._models import (
     ConditionalExpectationRequest,
     DoobMartingaleRequest,
@@ -177,6 +184,26 @@ FINIT_STOCHASTIC_PROCESS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = FINIT_STOCHASTIC_PROCESS_OPERATIONS
+_POISSON_BINOMIAL_TOOL = MathTool(
+    operation_id="probability.poisson_binomial.distribution.compute",
+    title="Compute exact Poisson-binomial count distribution",
+    description=(
+        "Given independent Bernoulli trials with success probabilities, "
+        "compute the exact probability of exactly k successes for each k."
+    ),
+    request_type=PoissonBinomialRequest,
+    result_type=PoissonBinomialResult,
+    run=compute_poisson_binomial,
+    tags=("probability", "poisson-binomial", "exact"),
+    examples=(
+        example(
+            "poisson_binomial_basic",
+            "Compute the count distribution for two fair coins.",
+            {"probabilities": ["1/2", "1/2"]},
+        ),
+    ),
+)
+
+TOOLS = FINIT_STOCHASTIC_PROCESS_OPERATIONS + (_POISSON_BINOMIAL_TOOL,)
 
 __all__ = ["TOOLS"]

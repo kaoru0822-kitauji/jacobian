@@ -34,6 +34,10 @@ ADMISSIONS: tuple[OperationAdmission, ...] = (
         "probability.process.doob_martingale.compute",
         AdmissionDecision.KEEP,
         "exact Doob martingale M_t = E[payoff | F_t] with rational-valued conditional expectations",
+    ),    OperationAdmission(
+        "probability.poisson_binomial.distribution.compute",
+        AdmissionDecision.KEEP,
+        "distinct exact Poisson-binomial count distribution that a loop of scalar Bernoulli convolution calls cannot establish as one source-bound value",
     ),
 )
 
