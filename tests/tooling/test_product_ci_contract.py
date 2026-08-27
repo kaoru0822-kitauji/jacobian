@@ -188,6 +188,25 @@ def test_product_ci_uses_bounded_timing_balanced_math_shards() -> None:
     assert "needs.math.result == 'success'" in workflow
 
 
+def test_scheduled_deferred_lanes_run_as_independent_jobs() -> None:
+    workflow = (ROOT / ".github/workflows/scheduled-validation.yml").read_text(
+        encoding="utf-8"
+    )
+    stress = workflow.split("  stress:", 1)[1].split("  exhaustive:", 1)[0]
+    exhaustive = workflow.split("  exhaustive:", 1)[1].split("  scale:", 1)[0]
+    scale = workflow.split("  scale:", 1)[1].split("  ordering:", 1)[0]
+
+    assert "run: make test-stress" in stress
+    assert "run: make test-exhaustive" not in stress
+    assert "run: make test-scale" not in stress
+    assert "run: make test-exhaustive" in exhaustive
+    assert "run: make test-scale" in scale
+    assert all(
+        "uses: ./.github/actions/setup-python-tests" in job
+        for job in (stress, exhaustive, scale)
+    )
+
+
 def test_coverage_report_lives_in_the_job_summary_not_a_pr_comment() -> None:
     workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     coverage = workflow.split("  coverage:", 1)[1].split("  required:", 1)[0]

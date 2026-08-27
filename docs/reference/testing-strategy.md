@@ -93,7 +93,9 @@ and unmapped paths fail closed to the complete ordinary suite.
 Merge-group candidates run the complete ordinary suite plus optional
 near-envelope scale evidence. `main` runs the landed-tree ordinary suite and
 coverage. Scheduled validation owns exhaustive evidence, repeated property
-checks, optional scale evidence, and randomized order/provider variation.
+checks, optional scale evidence, and randomized order/provider variation; the
+deferred exhaustive and scale lanes run as independent jobs so they do not
+serialize one another.
 Each ordinary CI lane retains JUnit timing evidence for 90 days. Use those node
 durations to tier near-envelope regressions before proposing more workers or
 timing-based sharding; ordinary product lanes remain unsharded until the
