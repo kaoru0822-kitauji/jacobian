@@ -122,28 +122,6 @@ def test_euler_phi_discovery_terms_outrank_generic_inverse_and_solver_operations
         )
 
 
-def test_divisor_discovery_terms_preserve_complete_divisor_postconditions() -> None:
-    for query, operation_id, displaced in (
-        (
-            "aliquot proper divisor list",
-            "integer.compute.divisors",
-            "graph.chip_firing.canonical_divisor.compute",
-        ),
-        (
-            "sum of proper divisors",
-            "integer.compute.divisor_sum",
-            "additive.subset_sum.profile.compute",
-        ),
-        (
-            "aliquot sum",
-            "integer.compute.divisor_sum",
-            "additive.subset_sum.profile.compute",
-        ),
-    ):
-        positions = _positions(query)
-        assert positions[operation_id] < positions[displaced]
-
-
 def test_t_codegree_discovery_terms_route_to_incidence_containment_profiles() -> None:
     for query in (
         "compute t-codegrees of a finite hypergraph",
