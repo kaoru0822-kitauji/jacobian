@@ -382,6 +382,7 @@ def test_request_jointly_bounds_level_root_isolation_degree_and_height() -> None
         _request(close_root_polynomial)
 
 
+@pytest.mark.exhaustive
 def test_small_integer_polynomials_match_sympy_inequality_sets_exhaustively() -> None:
     """Differentially compare every degree-one/two polynomial in {-1,0,1}[x]."""
 

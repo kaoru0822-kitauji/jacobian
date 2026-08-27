@@ -77,6 +77,7 @@ def _encoded_inertia_payload_near_limit(offset: int) -> bytes:
     return build(offset)
 
 
+@pytest.mark.scale
 def test_dispatch_rejects_unfittable_inertia_request_as_typed_error() -> None:
     with pytest.raises(OperationRequestValidationError) as excinfo:
         invoke_operation(

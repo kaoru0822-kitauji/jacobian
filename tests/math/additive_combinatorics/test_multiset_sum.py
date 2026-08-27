@@ -113,6 +113,7 @@ def test_translation_translates_sums_by_arity_times_offset() -> None:
     }
 
 
+@pytest.mark.exhaustive
 def test_bounded_exhaustive_profiles_match_itertools_oracle() -> None:
     universe = (-2, 0, 3, 7)
     for source_size in range(len(universe) + 1):
@@ -206,6 +207,7 @@ def test_arity_above_schema_bound_is_rejected() -> None:
         _request((2,), _MAX_MULTISET_SUM_ARITY + 1)
 
 
+@pytest.mark.scale
 def test_compact_singleton_admits_arity_beyond_the_former_fixed_ceiling() -> None:
     # Reported failure mode: one candidate, one coordinate step, one result
     # row; the derived work and support preflights admit it at any arity.
@@ -240,6 +242,7 @@ def test_bar_positions_match_the_itertools_combinations_oracle() -> None:
             )
 
 
+@pytest.mark.scale
 def test_large_slot_pool_is_never_materialized_during_iteration() -> None:
     # Before the lazy iterator, combinations(range(slots), bars) snapshotted
     # the whole admitted slot range into memory (about 400 MB at the work
@@ -260,6 +263,7 @@ def test_large_slot_pool_is_never_materialized_during_iteration() -> None:
     "window",
     [(10**15, 10**15 + 7), (-(10**15), -(10**15) + 7)],
 )
+@pytest.mark.scale
 def test_disjoint_window_over_admitted_two_element_source_is_exactly_empty(
     window: tuple[int, int],
 ) -> None:
@@ -274,6 +278,7 @@ def test_disjoint_window_over_admitted_two_element_source_is_exactly_empty(
     "window",
     [(-10, -1), (10**15 + 1, 10**15 + 7)],
 )
+@pytest.mark.scale
 def test_disjoint_window_charges_zero_work_above_the_enumeration_cap(
     window: tuple[int, int],
 ) -> None:
@@ -288,6 +293,7 @@ def test_disjoint_window_charges_zero_work_above_the_enumeration_cap(
     "window",
     [(0, 0), (0, 3)],
 )
+@pytest.mark.scale
 def test_intersecting_window_still_pays_full_enumeration_work(
     window: tuple[int, int],
 ) -> None:
@@ -335,6 +341,7 @@ def test_full_profile_rejects_worst_case_support_above_result_bound() -> None:
         _request(source, 2)
 
 
+@pytest.mark.scale
 def test_dense_full_profile_uses_the_attainable_sum_range_bound() -> None:
     source = tuple(range(_MAX_SET_SIZE))
     result = compute_multiset_sum_representation_profile(_request(source, 2))
@@ -345,6 +352,7 @@ def test_dense_full_profile_uses_the_attainable_sum_range_bound() -> None:
     )
 
 
+@pytest.mark.scale
 def test_narrow_window_admits_large_candidate_family_with_small_output() -> None:
     source = tuple(range(327))
     result = compute_multiset_sum_representation_profile(_request(source, 3, (0, 0)))
@@ -365,6 +373,7 @@ def test_widened_source_axis_preserves_cartesian_pair_bound() -> None:
         compute_representation_profile(request)
 
 
+@pytest.mark.scale
 def test_near_maximal_full_profile_stays_inside_owner_result_budget() -> None:
     source_size = 360
     # With spacing above every i^2+j^2, a pair sum encodes i+j and i^2+j^2
@@ -381,6 +390,7 @@ def test_near_maximal_full_profile_stays_inside_owner_result_budget() -> None:
     assert len(encoded) <= RESULT_BUDGET_BYTES
 
 
+@pytest.mark.scale
 def test_oeis_prime_cube_targets_have_published_multiplicities() -> None:
     # https://oeis.org/A385316 publishes these five values and uses the first
     # 327 primes for the fifth. The pinned Atlas certificate records the same

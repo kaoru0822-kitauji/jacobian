@@ -611,6 +611,7 @@ def _expanded_product(
 
 
 class TestKillableFactorBackend:
+    @pytest.mark.scale
     def test_reviewer_sparse_completing_counterexample_returns_typed_outcome(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:

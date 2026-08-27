@@ -561,6 +561,7 @@ def test_merged_unit_paths_still_gate_at_the_coefficient_budget() -> None:
         )
 
 
+@pytest.mark.scale
 def test_growing_derivatives_still_gate_at_the_coefficient_budget() -> None:
     variables = ("x",)
     coefficient = CanonicalRational(num="1" + "0" * 32_767, den="1")
@@ -604,6 +605,7 @@ def test_growing_derivatives_still_gate_at_the_coefficient_budget() -> None:
         )
 
 
+@pytest.mark.scale
 def test_nonunit_scalar_growth_still_gates_at_the_coefficient_budget() -> None:
     variables = ("x",)
     coefficient = CanonicalRational(num="1" + "0" * 32_767, den="1")
@@ -622,6 +624,7 @@ def test_nonunit_scalar_growth_still_gates_at_the_coefficient_budget() -> None:
         )
 
 
+@pytest.mark.scale
 def test_no_growth_derivatives_are_admitted_at_the_coefficient_boundary() -> None:
     variables = ("x",)
     source = RationalPolynomial(
@@ -774,6 +777,7 @@ def test_guaranteed_zero_admits_sources_beyond_expansion_caps() -> None:
     assert tall_vanished == _polynomial(("x",), {})
 
 
+@pytest.mark.scale
 def test_tall_source_coefficients_are_admitted_by_derived_growth() -> None:
     variables = ("x",)
     coefficient = CanonicalRational(num=str(10**300 - 1), den="1")
@@ -1293,6 +1297,7 @@ def test_tall_order_growth_gates_on_the_coefficient_budget() -> None:
         )
 
 
+@pytest.mark.scale
 def test_sparse_power_work_boundary_is_admitted_then_rejected() -> None:
     source = _polynomial(("x",), {(128,): 1})
     operator = _operator(("x",), {(1,): 1, (0,): 1})
@@ -1508,6 +1513,7 @@ def test_scalar_on_source_regime_skips_unreachable_expansion() -> None:
         )
 
 
+@pytest.mark.scale
 def test_distinct_source_denominators_are_not_merged_without_collision() -> None:
     variables = ("x",)
     numerator_p = 10**20000 + 1
@@ -1575,6 +1581,7 @@ def test_signed_unit_scalars_short_circuit_by_exponent_parity() -> None:
     assert odd.matches_expected is True
 
 
+@pytest.mark.scale
 def test_cross_canceling_operator_weights_keep_true_heights() -> None:
     variables = ("x",)
     numerator_n = 10**20000 + 1
@@ -1600,6 +1607,7 @@ def test_cross_canceling_operator_weights_keep_true_heights() -> None:
     assert replayed == result
 
 
+@pytest.mark.scale
 def test_annihilating_rescale_terms_are_excluded_from_growth() -> None:
     variables = ("x",)
     numerator_n = 10**20000 + 1
@@ -1625,6 +1633,7 @@ def test_annihilating_rescale_terms_are_excluded_from_growth() -> None:
     assert replayed == result
 
 
+@pytest.mark.scale
 def test_weight_enumeration_aborts_before_huge_powers_materialize() -> None:
     variables = ("x",)
     numerator_n = CanonicalRational(num="1" + "0" * 32_767, den="1")
@@ -1694,6 +1703,7 @@ def test_rescale_scan_overflow_falls_back_to_expansion_gates() -> None:
         )
 
 
+@pytest.mark.scale
 def test_rescale_scaling_reduces_against_source_denominators() -> None:
     variables = ("x",)
     numerator_n = "1" + "0" * 19999 + "1"
@@ -1736,6 +1746,7 @@ def test_rescale_scaling_reduces_against_source_denominators() -> None:
     assert replayed == result
 
 
+@pytest.mark.scale
 def test_boundary_scalar_coefficient_is_measured_exactly() -> None:
     variables = ("x",)
     coefficient = CanonicalRational(num="9" * 32_768, den="1")
@@ -1784,6 +1795,7 @@ def test_wide_operator_weight_growth_gates_at_the_height_cap() -> None:
         )
 
 
+@pytest.mark.scale
 def test_coprime_tall_operator_denominators_defer_the_shared_height() -> None:
     variables = ("x",)
 
@@ -1839,6 +1851,7 @@ def test_coprime_tall_operator_denominators_defer_the_shared_height() -> None:
     assert replayed == result
 
 
+@pytest.mark.scale
 def test_falling_factorial_growth_is_measured_exactly() -> None:
     variables = ("x",)
     factorial = math.factorial(8_500)
@@ -1869,6 +1882,7 @@ def test_falling_factorial_growth_is_measured_exactly() -> None:
         )
 
 
+@pytest.mark.scale
 def test_falling_factorial_cancels_against_source_denominators() -> None:
     variables = ("x",)
     source = RationalPolynomial(
@@ -1910,6 +1924,7 @@ def test_falling_factorial_cancels_against_source_denominators() -> None:
     assert replayed == result
 
 
+@pytest.mark.scale
 def test_class_sums_are_reduced_before_height_measurement() -> None:
     variables = ("x",)
     big = 10**32_767
@@ -2000,6 +2015,7 @@ def test_colliding_output_exponents_share_the_candidate_budget() -> None:
     assert replayed == result
 
 
+@pytest.mark.scale
 def test_class_heights_keep_signed_cancellation() -> None:
     variables = ("x",)
     height = 6 * 10**32_767

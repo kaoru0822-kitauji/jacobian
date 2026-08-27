@@ -542,6 +542,7 @@ class TestEuclideanTriangulation:
             term.as_fraction() for term in shifted.optimum.squared_lengths
         ) == (Fraction(2),)
 
+    @pytest.mark.scale
     def test_request_admits_a_square_scaled_past_the_integer_string_limit(
         self,
     ) -> None:
@@ -566,6 +567,7 @@ class TestEuclideanTriangulation:
             Fraction(scale * scale + 1),
         )
 
+    @pytest.mark.scale
     def test_request_rejects_unrepresentable_squared_lengths_at_admission(
         self,
     ) -> None:
@@ -580,6 +582,7 @@ class TestEuclideanTriangulation:
                 )
             )
 
+    @pytest.mark.scale
     def test_request_admits_squared_lengths_inside_the_canonical_rational_cap(
         self,
     ) -> None:
@@ -611,6 +614,7 @@ class TestEuclideanTriangulation:
                 )
             )
 
+    @pytest.mark.scale
     def test_request_rejects_a_root_optimum_expression_beyond_the_output_bound(
         self,
     ) -> None:
@@ -637,6 +641,7 @@ class TestEuclideanTriangulation:
                 )
             )
 
+    @pytest.mark.scale
     def test_request_admits_a_ring_sized_by_span_specific_term_counts(self) -> None:
         # A strict convex (i, i^2) ring of 49 vertices carries four-digit
         # pairwise differences: charging every DP state the root's 46 terms
@@ -651,6 +656,7 @@ class TestEuclideanTriangulation:
         assert len(result.split_table) == (49 - 1) * (49 - 2) // 2
         assert len(result.diagonals) == result.vertex_count - 3
 
+    @pytest.mark.scale
     def test_request_rejects_a_translation_ring_whose_echo_exceeds_the_output_bound(
         self,
     ) -> None:
@@ -665,6 +671,7 @@ class TestEuclideanTriangulation:
         with pytest.raises(ValidationError):
             _request(_translated_parabola_ring(64, 1200))
 
+    @pytest.mark.scale
     def test_request_admits_a_translation_ring_on_the_refined_envelope_boundary(
         self,
     ) -> None:
@@ -675,6 +682,7 @@ class TestEuclideanTriangulation:
 
         assert len(request.polygon.points) == 64
 
+    @pytest.mark.scale
     def test_request_rejects_a_translation_ring_one_step_past_the_refined_boundary(
         self,
     ) -> None:
@@ -684,6 +692,7 @@ class TestEuclideanTriangulation:
         with pytest.raises(ValidationError):
             _request(_translated_parabola_ring(64, 900))
 
+    @pytest.mark.scale
     def test_translated_source_completes_inside_the_published_result_bound(
         self,
     ) -> None:

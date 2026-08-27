@@ -307,6 +307,7 @@ def test_known_generic_degrees(
 
 @requires_singular
 @pytest.mark.requires_backend("singular")
+@pytest.mark.scale
 def test_accepted_triangular_map_returns_replayable_degree_128() -> None:
     result = _compute(
         _map(

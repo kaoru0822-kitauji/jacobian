@@ -158,6 +158,7 @@ def test_proper_divisors_of_seventy_do_not_attain_seventy() -> None:
     assert result.status == "NOT_ATTAINED"
 
 
+@pytest.mark.exhaustive
 def test_solver_agrees_with_exhaustive_bitmasks() -> None:
     for size in range(5):
         for values in product(range(-2, 3), repeat=size):
@@ -370,6 +371,7 @@ def test_out_of_range_targets_resolve_before_state_expansion() -> None:
     assert just_inside.status == "NOT_ATTAINED"
 
 
+@pytest.mark.scale
 def test_complete_call_charges_admission_and_kernel_passes() -> None:
     assert (
         MAX_SUBSET_SUM_TOTAL_TRANSITIONS

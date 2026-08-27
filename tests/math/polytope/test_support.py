@@ -1175,6 +1175,7 @@ def test_extremality_budget_bounds_are_enforced_before_exact_conversion(
         require_full_dimensional_extreme_vertices(polytope)
 
 
+@pytest.mark.scale
 def test_extremality_height_work_bound_is_enforced_before_exact_conversion(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1210,6 +1211,7 @@ def test_extremality_height_work_bound_is_enforced_before_exact_conversion(
         require_full_dimensional_extreme_vertices(polytope)
 
 
+@pytest.mark.scale
 def test_extremality_height_work_grades_admission_by_coordinate_height() -> None:
     """At a height the count gates alone would admit freely, only families
     whose orientation-test count fits the coupled budget still validate:

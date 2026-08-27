@@ -676,6 +676,7 @@ class TestBacktrackingNodeBudget:
         edges = tuple((a, b) for idx, a in enumerate(verts) for b in verts[idx + 1 :])
         return SimpleUndirectedGraph(vertices=verts, edges=edges)
 
+    @pytest.mark.scale
     def test_internal_backtracking_nodes_are_charged_to_the_budget(self) -> None:
         """K10 into K10-minus-an-edge cannot return a free negative.
 

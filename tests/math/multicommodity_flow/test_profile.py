@@ -402,6 +402,7 @@ def test_large_exact_scalars_are_admitted_when_derived_digits_stay_bounded() -> 
     assert result.work.logical_steps_per_call == 8
 
 
+@pytest.mark.scale
 def test_operand_digit_budget_bounds_the_canonical_boundary() -> None:
     def unit_edge_amounts(
         amounts: tuple[CanonicalRational, ...],
@@ -451,6 +452,7 @@ def test_operand_digit_budget_bounds_the_canonical_boundary() -> None:
         compute_multicommodity_flow_profile(over_boundary)
 
 
+@pytest.mark.scale
 def test_sole_operand_components_inherit_their_canonical_sides() -> None:
     # A two-vertex, one-edge tensor whose sole entry, matching capacity, and
     # demand are the same reduced rational with a 20,000-digit numerator and
@@ -486,6 +488,7 @@ def test_sole_operand_components_inherit_their_canonical_sides() -> None:
     ]
 
 
+@pytest.mark.scale
 def test_rational_components_are_bounded_independently() -> None:
     # A reduced capacity whose numerator and denominator are EACH 20,000
     # digits is itself a valid canonical rational: its slack equals that
@@ -510,6 +513,7 @@ def test_rational_components_are_bounded_independently() -> None:
     assert result.edge_profiles[0].slack == capacity
 
 
+@pytest.mark.scale
 def test_per_component_digit_bounds_admit_unrelated_large_operands() -> None:
     # Loads and slacks are computed independently per edge and divergence
     # cells independently per commodity/vertex pair, so each component's
@@ -860,6 +864,7 @@ def test_result_envelope_prices_rows_at_their_actual_sides() -> None:
         compute_multicommodity_flow_profile(flow)
 
 
+@pytest.mark.scale
 def test_congestion_bound_uses_the_capacity_denominator() -> None:
     # A unit load over capacity 1/D reduces to exactly D: cross-multiplication
     # grows the congestion numerator by the capacity denominator's 4,000
@@ -918,6 +923,7 @@ def oversized_ratio_tensor() -> MulticommodityFlow:
     )
 
 
+@pytest.mark.scale
 def test_null_congestion_admits_ratios_the_result_omits() -> None:
     # A positive-capacity edge whose reduced load/capacity quotient exceeds
     # the canonical cap stands beside an unrelated loaded zero-capacity edge,
@@ -1003,6 +1009,7 @@ def test_null_congestion_admits_ratios_the_result_omits() -> None:
     assert result.work.logical_steps_per_call == 14 + 2 + 0 + 11
 
 
+@pytest.mark.scale
 def test_returned_congestion_ratio_is_still_capped() -> None:
     # Without a loaded zero-capacity edge the same oversized quotient is the
     # value the result actually returns under "congestion", so the canonical
@@ -1013,6 +1020,7 @@ def test_returned_congestion_ratio_is_still_capped() -> None:
         compute_multicommodity_flow_profile(flow)
 
 
+@pytest.mark.scale
 def test_shared_denominator_sums_stay_at_operand_size() -> None:
     # Two commodities carry 1/D and (D-1)/D over one unit-capacity edge with
     # matching demands: the exact load is 1, the slack is exactly zero, the
@@ -1045,6 +1053,7 @@ def test_shared_denominator_sums_stay_at_operand_size() -> None:
     assert result.edge_profiles[0].slack == q(0)
 
 
+@pytest.mark.scale
 def test_cancelling_amounts_are_admitted_regardless_of_entry_order() -> None:
     # Canonical entry order processes both edges leaving vertex 0 before the
     # incoming ones, so the partial divergence at vertex 0 is 2A. The
@@ -1081,6 +1090,7 @@ def test_cancelling_amounts_are_admitted_regardless_of_entry_order() -> None:
     assert result.capacity_feasible is True
 
 
+@pytest.mark.scale
 def test_coprime_denominator_flood_fails_closed() -> None:
     # Two unit-fraction entries whose distinct near-cap denominators are
     # coprime complete to a roughly 32,777-digit load denominator above the
@@ -1299,6 +1309,7 @@ def test_ledger_charges_every_performed_bucket_fold_addition() -> None:
     assert result.edge_profiles[0].load.as_fraction() == Fraction(1)
 
 
+@pytest.mark.scale
 def test_fold_intermediates_admit_coprime_sums_with_small_components() -> None:
     # One edge, four commodities carrying 1/p, 1/q, (p-2)/(2p), (q-2)/(2q)
     # with p and q coprime 20,000-digit odd integers: denominator sorting
@@ -1362,6 +1373,7 @@ def test_fold_intermediates_admit_coprime_sums_with_small_components() -> None:
     ]
 
 
+@pytest.mark.scale
 def test_folding_intermediates_cancel_beneath_the_completed_cap() -> None:
     # One edge carries 1/p and 1/q alongside (p-2)/(2p) and (q-2)/(2q) for
     # coprime 20,000-digit odd p and q, with matching demands. Folding the
@@ -1415,6 +1427,7 @@ def test_folding_intermediates_cancel_beneath_the_completed_cap() -> None:
     assert result.work.logical_steps_per_call == 25 + 4 + 1 + 11
 
 
+@pytest.mark.scale
 def test_folds_are_bounded_by_the_intermediate_budget_not_the_component_cap() -> None:
     # Three pairwise-coprime 24,000-digit denominators meet in one divergence
     # cell (+1/p - 1/q - 1/r, sources minus sinks). Any pair fold keeps its
@@ -1463,6 +1476,7 @@ def test_folds_are_bounded_by_the_intermediate_budget_not_the_component_cap() ->
         compute_multicommodity_flow_profile(cancelling_cell)
 
 
+@pytest.mark.scale
 def test_near_cap_coprime_growth_aborts_within_budget_sized_arithmetic() -> None:
     # The exhaustion shape behind the finding: distinct near-cap coprime
     # denominators folded into one divergence cell (+1/p - 1/q - 1/r,
