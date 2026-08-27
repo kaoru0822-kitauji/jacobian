@@ -245,9 +245,10 @@ service behavior.
 - Fetch the branch immediately before pushing. If its head changed, inspect
   the landed work instead of retrying an equivalent fix. Never push to a
   merged or closed PR head: move remaining work to a new follow-up branch.
-- Run `make check` and the named lane that owns changed behavior before
-  handoff. Only the coordinating agent may run exhaustive validation in a
-  shared checkout.
+- Run the validation selected by [CONTRIBUTING.md](CONTRIBUTING.md), including
+  the named lane that owns changed behavior. Run `make check` only when that
+  guide calls for the broad gate. Only the coordinating agent may run
+  exhaustive validation in a shared checkout.
 - Follow [CONTRIBUTING.md](CONTRIBUTING.md) and the
   [testing strategy](docs/reference/testing-strategy.md) when selecting
   specialist validation or preparing a contribution.
