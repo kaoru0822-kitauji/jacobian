@@ -6,6 +6,7 @@ import math
 from fractions import Fraction
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.number_theory._divisibility_profile_models import (
     GcdQuotientProfileRequest,
     GcdQuotientProfileResult,
@@ -14,10 +15,20 @@ from jacobian.math.number_theory._divisibility_profile_models import (
 )
 
 
+def _admit_positive(elements: tuple[str, ...], *, profile: str) -> None:
+    if any(int(element) <= 0 for element in elements):
+        raise OperationDomainValidationError(
+            location=("elements",),
+            code=f"number_theory.{profile}_elements_must_be_positive",
+            message=f"{profile.replace('_', '-')} profile elements must be positive",
+        )
+
+
 def compute_gcd_quotient_profile(
     request: GcdQuotientProfileRequest,
 ) -> GcdQuotientProfileResult:
     """For each pair, compute the normalized ratio gcd(a,b)/max(|a|,|b|)."""
+    _admit_positive(request.elements, profile="gcd_quotient")
     elements = [int(e) for e in request.elements]
     n = len(elements)
     quotients: list[list[CanonicalRational]] = []
@@ -40,6 +51,7 @@ def compute_product_divisibility_profile(
     request: ProductDivisibilityProfileRequest,
 ) -> ProductDivisibilityProfileResult:
     """For each pair (a, b), determine if a*b divides the product of all elements."""
+    _admit_positive(request.elements, profile="product_divisibility")
 
     elements = [int(e) for e in request.elements]
     n = len(elements)

@@ -9,7 +9,6 @@ from pydantic_core import PydanticCustomError
 
 from jacobian._exact import CanonicalInteger, CanonicalRational
 from jacobian._models import StrictModel
-from jacobian.canonical import parse_canonical_integer
 from jacobian.math.number_theory._models import BoundedInteger
 
 MAX_FAMILY_SIZE: int = 100
@@ -25,16 +24,6 @@ class GcdQuotientProfileRequest(StrictModel):
             "strictly greater than zero. Zero and negative integers are invalid."
         ),
     )
-
-    @model_validator(mode="after")
-    def require_positive_elements(self) -> Self:
-        if any(parse_canonical_integer(element) <= 0 for element in self.elements):
-            raise PydanticCustomError(
-                "number_theory.gcd_quotient_elements_must_be_positive",
-                "gcd-quotient profile elements must be positive",
-            )
-        return self
-
 
 class GcdQuotientProfileResult(StrictModel):
     """Complete gcd-normalized quotient profile."""
@@ -65,16 +54,6 @@ class ProductDivisibilityProfileRequest(StrictModel):
             "strictly greater than zero. Zero and negative integers are invalid."
         ),
     )
-
-    @model_validator(mode="after")
-    def require_positive_elements(self) -> Self:
-        if any(parse_canonical_integer(element) <= 0 for element in self.elements):
-            raise PydanticCustomError(
-                "number_theory.product_divisibility_elements_must_be_positive",
-                "product-divisibility profile elements must be positive",
-            )
-        return self
-
 
 class ProductDivisibilityProfileResult(StrictModel):
     """Complete product-divisibility relation profile."""

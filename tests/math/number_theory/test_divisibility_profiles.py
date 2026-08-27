@@ -3,8 +3,8 @@
 from fractions import Fraction
 
 import pytest
-from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.number_theory._divisibility_profile_models import (
     GcdQuotientProfileRequest,
     ProductDivisibilityProfileRequest,
@@ -44,10 +44,12 @@ def test_product_divisibility_basic() -> None:
 
 
 def test_profile_requests_reject_nonpositive_elements() -> None:
-    with pytest.raises(ValidationError, match="must be positive"):
-        GcdQuotientProfileRequest(elements=("0",))
-    with pytest.raises(ValidationError, match="must be positive"):
-        ProductDivisibilityProfileRequest(elements=("-2",))
+    with pytest.raises(OperationDomainValidationError, match="must be positive"):
+        compute_gcd_quotient_profile(GcdQuotientProfileRequest(elements=("0",)))
+    with pytest.raises(OperationDomainValidationError, match="must be positive"):
+        compute_product_divisibility_profile(
+            ProductDivisibilityProfileRequest(elements=("-2",))
+        )
 
 
 def test_profile_declarations_publish_positive_integer_domain() -> None:

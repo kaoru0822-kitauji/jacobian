@@ -5,6 +5,7 @@ from typing import Any, cast
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.number_theory._divisibility_graph_models import (
     DivisibilityIncidenceGraphRequest,
 )
@@ -59,7 +60,7 @@ def test_bipartite() -> None:
         assert e[0].startswith("L") and e[1].startswith("R")
 
 
-@pytest.mark.parametrize("value", ["abc", "0", "-1", "01", "9" * 257, 3])
+@pytest.mark.parametrize("value", ["abc", "01", "9" * 257, 3])
 def test_rejects_non_positive_canonical_integer(value: object) -> None:
     with pytest.raises(ValidationError):
         DivisibilityIncidenceGraphRequest.model_validate(
@@ -67,14 +68,24 @@ def test_rejects_non_positive_canonical_integer(value: object) -> None:
         )
 
 
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_native_operation_rejects_non_positive_integer(value: str) -> None:
+    request = DivisibilityIncidenceGraphRequest(
+        left_family=(value,), right_family=("1",)
+    )
+    with pytest.raises(OperationDomainValidationError, match="positive"):
+        compute_divisibility_incidence_graph(request)
+
+
 def test_rejects_combined_vertex_budget() -> None:
-    with pytest.raises(ValidationError, match="total values"):
-        DivisibilityIncidenceGraphRequest.model_validate(
-            {
-                "left_family": [str(value) for value in range(1, 257)],
-                "right_family": ["1"],
-            }
-        )
+    request = DivisibilityIncidenceGraphRequest.model_validate(
+        {
+            "left_family": [str(value) for value in range(1, 257)],
+            "right_family": ["1"],
+        }
+    )
+    with pytest.raises(OperationDomainValidationError, match="total values"):
+        compute_divisibility_incidence_graph(request)
 
 
 @pytest.mark.parametrize(
@@ -84,7 +95,8 @@ def test_rejects_combined_vertex_budget() -> None:
 def test_rejects_duplicate_family_values(
     left_family: list[str], right_family: list[str]
 ) -> None:
-    with pytest.raises(ValidationError, match="values must be unique"):
-        DivisibilityIncidenceGraphRequest.model_validate(
-            {"left_family": left_family, "right_family": right_family}
-        )
+    request = DivisibilityIncidenceGraphRequest.model_validate(
+        {"left_family": left_family, "right_family": right_family}
+    )
+    with pytest.raises(OperationDomainValidationError, match="values must be unique"):
+        compute_divisibility_incidence_graph(request)
