@@ -28,7 +28,7 @@ from jacobian.math.formal_concept_analysis._tools import TOOLS
 
 
 def _cross_context() -> FormalContext:
-    """A cross-shaped context: o0 has a0, o1 has a1. Three concepts."""
+    """A cross-shaped context: o0 has a0, o1 has a1. Four concepts."""
     return FormalContext(
         objects=("o0", "o1"),
         attributes=("a0", "a1"),
@@ -135,11 +135,12 @@ class TestConcept:
         assert result.intent == (0,)
 
     def test_concepts_agree(self) -> None:
+        context = _cross_context()
         from_objects = compute_concept_from_objects(
-            ObjectSubsetRequest(context=_cross_context(), subset=(0,))
+            ObjectSubsetRequest(context=context, subset=(0,))
         )
         from_attrs = compute_concept_from_attributes(
-            AttributeSubsetRequest(context=_cross_context(), subset=(0,))
+            AttributeSubsetRequest(context=context, subset=(0,))
         )
         assert from_objects == from_attrs
 
@@ -150,11 +151,12 @@ class TestConcept:
 
 
 class TestEnumeration:
-    def test_cross_context_has_three_concepts(self) -> None:
+    def test_cross_context_has_four_concepts(self) -> None:
         result = compute_enumerate_concepts(
             EnumerateConceptsRequest(context=_cross_context())
         )
-        # Cross context: ({}, {a0,a1}), ({o0}, {a0}), ({o1}, {a1})
+        # Cross context: ({}, {a0,a1}), ({o0}, {a0}), ({o1}, {a1}),
+        # and ({o0,o1}, {}).
         assert result.count == 4
 
     def test_diagonal_context_has_two_concepts(self) -> None:
@@ -182,6 +184,7 @@ class TestEnumeration:
             ),
         )
 
+    @pytest.mark.scale
     def test_contranominal_context_beyond_result_budget_is_rejected(self) -> None:
         """A 21x21 contranominal context has exactly 2^21 concepts, beyond
         the declared enumeration budget: native admission rejects it during
@@ -203,6 +206,7 @@ class TestEnumeration:
         result = compute_enumerate_concepts(request)
         assert result.count == 2
 
+    @pytest.mark.scale
     def test_contranominal_boundary_context_enumerates_complete_family(self) -> None:
         """13 is the static boundary of the smaller axis (2^13 = 8192 fits
         the budget; 2^14 does not), and the boundary context returns the
@@ -315,9 +319,7 @@ def test_lattice_embedded_concepts_replay_defining_equations() -> None:
     )
 
     context = _diagonal_context()
-    result = compute_concept_lattice(
-        EnumerateConceptsRequest(context=_diagonal_context())
-    )
+    result = compute_concept_lattice(EnumerateConceptsRequest(context=context))
     assert len(result.concepts) == 2
     for extent_tuple, intent_tuple in result.concepts:
         extent = frozenset(extent_tuple)

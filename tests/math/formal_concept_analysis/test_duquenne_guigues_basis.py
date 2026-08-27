@@ -184,6 +184,7 @@ def test_chain_and_diamond_contexts_match_every_subset_closure(
         assert closure_result.closure == closure_row.closure
 
 
+@pytest.mark.exhaustive
 def test_every_binary_two_by_three_context_matches_definition_oracle() -> None:
     attribute_count = 3
     for incidence_mask in range(1 << (2 * attribute_count)):
@@ -324,6 +325,7 @@ def test_nine_attribute_contranominal_context_admitted_with_empty_basis() -> Non
     assert replayed.work.candidate_states == 512
 
 
+@pytest.mark.scale
 def test_candidate_work_and_output_envelopes_at_boundary() -> None:
     boundary = _contranominal_context(MAX_DG_ATTRIBUTES)
     request = DuquenneGuiguesBasisRequest(context=boundary)
@@ -431,6 +433,7 @@ def test_native_and_catalog_invocations_report_identical_exact_work() -> None:
     assert native.work.context_closure_queries == len(native.closure_matrix)
 
 
+@pytest.mark.scale
 def test_result_byte_reservation_accepts_its_last_byte_and_rejects_the_next() -> None:
     def accepts(label_length: int) -> bool:
         context = FormalContext(
