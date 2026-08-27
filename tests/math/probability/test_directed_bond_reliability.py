@@ -5,12 +5,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from fractions import Fraction
 from importlib import import_module
-from typing import Any, cast
+from typing import cast
 
 import pytest
 from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.directed._models import (
     MAX_DIRECTED_GRAPH_PARSE_EDGES,
     DirectedGraph,
@@ -26,7 +27,6 @@ from jacobian.math.probability._directed_bond_reliability import (
     DirectedBondConnectionProbabilitySource,
     DirectedBondReliabilityArcProbability,
     _directed_bond_connection_probability,
-    verify_directed_bond_connection_probability_result,
 )
 
 
@@ -259,47 +259,6 @@ def test_ledger_estimate_bounds_subset_numerator_growth_not_per_state_maxima() -
     assert result.visited_states == 4096
 
 
-def _mutate_open_arcs(payload: dict[str, Any]) -> None:
-    payload["states"][1]["open_arcs"] = []
-
-
-def _mutate_reachability(payload: dict[str, Any]) -> None:
-    payload["states"][3]["source_reaches_target"] = False
-
-
-def _mutate_connection_probability(payload: dict[str, Any]) -> None:
-    payload["connection_probability"] = _rational(Fraction())
-
-
-@pytest.mark.parametrize(
-    "mutation",
-    (
-        _mutate_open_arcs,
-        _mutate_reachability,
-        _mutate_connection_probability,
-    ),
-    ids=("open-arcs", "reachability", "aggregate-probability"),
-)
-def test_explicit_result_verifier_rejects_mutated_source_bound_conclusions(
-    mutation: Callable[[dict[str, Any]], None],
-) -> None:
-    result = _directed_bond_connection_probability(
-        _request(
-            vertex_count=3,
-            arcs=((0, 1), (1, 2)),
-            probabilities=(Fraction(1, 2), Fraction(1, 2)),
-            source=0,
-            target=2,
-        )
-    )
-    payload = result.model_dump(mode="json")
-    mutation(payload)
-
-    claim = DirectedBondConnectionProbabilityResult.model_validate(payload)
-
-    assert not verify_directed_bond_connection_probability_result(claim)
-
-
 def test_probability_bound_rejects_thirteenth_arc_before_enumeration() -> None:
     arcs = tuple((index, index + 1) for index in range(13))
     with pytest.raises(ValidationError):
@@ -363,14 +322,15 @@ def test_ledger_bound_rejects_large_exact_probability_products_before_enumeratio
     arcs = tuple((index, index + 1) for index in range(12))
     large_denominator = int("9" * 128)
     large_probability = Fraction(large_denominator - 1, large_denominator)
-    with pytest.raises(ValidationError):
-        _request(
-            vertex_count=13,
-            arcs=arcs,
-            probabilities=(large_probability,) * len(arcs),
-            source=0,
-            target=12,
-        )
+    request = _request(
+        vertex_count=13,
+        arcs=arcs,
+        probabilities=(large_probability,) * len(arcs),
+        source=0,
+        target=12,
+    )
+    with pytest.raises(OperationDomainValidationError):
+        _directed_bond_connection_probability(request)
 
 
 def test_zero_and_one_probabilities_keep_complete_state_convention() -> None:
@@ -480,14 +440,15 @@ def test_dense_source_at_the_relevant_vertex_bound_is_admitted() -> None:
 def test_declared_vertex_admission_rejects_one_past_the_label_bound() -> None:
     """The scalar transport ceiling, not traversal work, caps vertex labels."""
 
-    with pytest.raises(ValidationError):
-        _request(
-            vertex_count=MAX_DIRECTED_BOND_RELIABILITY_DECLARED_VERTICES + 1,
-            arcs=(),
-            probabilities=(),
-            source=0,
-            target=1,
-        )
+    request = _request(
+        vertex_count=MAX_DIRECTED_BOND_RELIABILITY_DECLARED_VERTICES + 1,
+        arcs=(),
+        probabilities=(),
+        source=0,
+        target=1,
+    )
+    with pytest.raises(OperationDomainValidationError):
+        _directed_bond_connection_probability(request)
 
 
 class TestPublishedBondReliabilityEnvelope:

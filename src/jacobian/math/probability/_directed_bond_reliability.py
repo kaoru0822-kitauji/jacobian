@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from fractions import Fraction
 from typing import Annotated, Any, Literal, Self
 
-from pydantic import Field, StrictInt, WithJsonSchema, model_validator
+from pydantic import Field, StrictInt, ValidationError, WithJsonSchema, model_validator
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticCustomError
 
@@ -16,7 +15,7 @@ from jacobian.canonical import (
     format_canonical_integer,
 )
 from jacobian.catalog._examples import example
-from jacobian.catalog.models import MathTool
+from jacobian.catalog.models import MathTool, OperationDomainValidationError
 from jacobian.math.graphs.directed._models import DirectedGraph
 from jacobian.math.probability._models import MAX_INPUT_RATIONAL_DIGITS
 
@@ -313,20 +312,6 @@ class DirectedBondConnectionProbabilityRequest(StrictModel):
     )
     event: Literal["DIRECTED_PATH_EXISTS"] = "DIRECTED_PATH_EXISTS"
 
-    @model_validator(mode="after")
-    def require_canonical_source(self) -> Self:
-        canonical_source = DirectedBondConnectionProbabilitySource(
-            graph=self.graph,
-            arc_probabilities=self.arc_probabilities,
-            source=self.source,
-            target=self.target,
-        )
-        object.__setattr__(self, "graph", canonical_source.graph)
-        object.__setattr__(
-            self, "arc_probabilities", canonical_source.arc_probabilities
-        )
-        return self
-
 
 class DirectedBondReliabilityState(StrictModel):
     """One exact directed arc-subset state from a bond-percolation source."""
@@ -442,67 +427,6 @@ def _wire(value: Any) -> CanonicalRational:
     )
 
 
-def _directed_bond_connection_probability_data(
-    source: DirectedBondConnectionProbabilitySource,
-) -> tuple[Fraction, tuple[tuple[tuple[tuple[int, int], ...], bool, Fraction], ...]]:
-    """Replay the full directed bond-percolation source with exact rationals.
-
-    Directed reachability is delegated to the directed-graph owner.  The
-    standard-library ``Fraction`` replay is deliberately independent from the
-    Python-FLINT producer used by the public operation below.
-    """
-
-    probabilities = tuple(
-        item.open_probability.as_fraction() for item in source.arc_probabilities
-    )
-    states: list[tuple[tuple[tuple[int, int], ...], bool, Fraction]] = []
-    connection_probability = Fraction()
-    for state_index in range(1 << len(source.graph.edges)):
-        open_arcs = tuple(
-            arc
-            for index, arc in enumerate(source.graph.edges)
-            if state_index & (1 << index)
-        )
-        state_probability = Fraction(1)
-        for index, probability in enumerate(probabilities):
-            state_probability *= (
-                probability if state_index & (1 << index) else 1 - probability
-            )
-        reaches_target = _directed_path_exists(
-            arcs=open_arcs,
-            source=source.source,
-            target=source.target,
-        )
-        if reaches_target:
-            connection_probability += state_probability
-        states.append((open_arcs, reaches_target, state_probability))
-    return connection_probability, tuple(states)
-
-
-def verify_directed_bond_connection_probability_result(
-    result: DirectedBondConnectionProbabilityResult,
-) -> bool:
-    """Replay one bounded independently supplied directed bond claim."""
-
-    try:
-        connection_probability, expected_states = (
-            _directed_bond_connection_probability_data(result.source)
-        )
-    except (TypeError, ValueError):
-        return False
-    if len(expected_states) != len(result.states):
-        return False
-    for state, expected in zip(result.states, expected_states, strict=True):
-        open_arcs, reaches_target, state_probability = expected
-        if (
-            state.open_arcs != open_arcs
-            or state.source_reaches_target != reaches_target
-            or state.state_probability.as_fraction() != state_probability
-        ):
-            return False
-    return result.connection_probability.as_fraction() == connection_probability
-
-
 def _directed_path_exists(
     *,
     arcs: tuple[tuple[int, int], ...],
@@ -529,12 +453,20 @@ def _directed_bond_connection_probability(
 
     from flint import fmpq
 
-    source = DirectedBondConnectionProbabilitySource(
-        graph=request.graph,
-        arc_probabilities=request.arc_probabilities,
-        source=request.source,
-        target=request.target,
-    )
+    try:
+        source = DirectedBondConnectionProbabilitySource(
+            graph=request.graph,
+            arc_probabilities=request.arc_probabilities,
+            source=request.source,
+            target=request.target,
+        )
+    except ValidationError as exc:
+        error = exc.errors()[0]
+        raise OperationDomainValidationError(
+            location=tuple(error["loc"]),
+            code=str(error["type"]),
+            message=str(error["msg"]),
+        ) from None
     probabilities = tuple(
         fmpq(
             item.open_probability.as_fraction().numerator,
@@ -641,5 +573,4 @@ __all__ = [
     "DirectedBondConnectionProbabilitySource",
     "DirectedBondReliabilityArcProbability",
     "DirectedBondReliabilityState",
-    "verify_directed_bond_connection_probability_result",
 ]
