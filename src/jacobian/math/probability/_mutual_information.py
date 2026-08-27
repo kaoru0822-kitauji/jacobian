@@ -12,12 +12,11 @@ from pydantic_core import PydanticCustomError
 from jacobian._exact import (
     CanonicalInteger,
     CanonicalRational,
-    require_bounded_rational,
 )
 from jacobian._models import StrictModel, canonicalize_json_containers
 from jacobian.canonical import format_canonical_integer, parse_canonical_integer
 from jacobian.catalog._examples import example
-from jacobian.catalog.models import MathTool
+from jacobian.catalog.models import MathTool, OperationDomainValidationError
 from jacobian.math.probability.mutual_information import (
     FiniteJointTable,
     MutualInformationResult,
@@ -232,35 +231,6 @@ class FiniteJointTableMutualInformationRequest(StrictModel):
         value = canonicalize_json_containers(value)
         return _bound_raw_probability_matrix(value)
 
-    @model_validator(mode="after")
-    def require_normalized_rectangular_table(self) -> Self:
-        if len(set(self.row_labels)) != len(self.row_labels):
-            raise _validation_error("joint-table row labels must be unique")
-        if len(set(self.column_labels)) != len(self.column_labels):
-            raise _validation_error("joint-table column labels must be unique")
-        _require_native_probability_shape(
-            self.row_labels,
-            self.column_labels,
-            self.probabilities,
-        )
-        total = Fraction()
-        for row in self.probabilities:
-            for probability in row:
-                require_bounded_rational(
-                    probability,
-                    max_digits=MAX_INPUT_RATIONAL_DIGITS,
-                    label="joint-table probability",
-                )
-                native = probability.as_fraction()
-                if native < 0:
-                    raise _validation_error(
-                        "joint-table probabilities must be nonnegative"
-                    )
-                total += native
-        if total != 1:
-            raise _validation_error("joint-table probabilities must sum exactly to 1")
-        return self
-
     def as_native(self) -> FiniteJointTable:
         """Parse the canonical wire request once into native mathematical values."""
 
@@ -443,8 +413,16 @@ class FiniteJointTableMutualInformationResult(StrictModel):
 def compute_mutual_information(
     request: FiniteJointTableMutualInformationRequest,
 ) -> FiniteJointTableMutualInformationResult:
+    try:
+        source = request.as_native()
+    except (TypeError, ValueError) as exc:
+        raise OperationDomainValidationError(
+            location=("probabilities",),
+            code="probability.mutual_information_source_not_admitted",
+            message=str(exc),
+        ) from None
     return FiniteJointTableMutualInformationResult.from_native(
-        mutual_information(request.as_native())
+        mutual_information(source)
     )
 
 
