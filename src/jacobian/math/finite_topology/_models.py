@@ -27,21 +27,6 @@ def _validation_error(reason: str, message: str) -> PydanticCustomError:
     return PydanticCustomError(f"finite_topology.{reason}", message)
 
 
-def _require_topology_operation_admission(topology: FiniteTopology) -> None:
-    if topology.point_count > MAX_TOPOLOGY_OPERATION_POINTS:
-        raise _validation_error(
-            "topology_point_budget_exceeded",
-            "finite-topology operations support at most "
-            f"{MAX_TOPOLOGY_OPERATION_POINTS} points",
-        )
-    if len(topology.open_sets) > MAX_TOPOLOGY_OPERATION_OPENS:
-        raise _validation_error(
-            "topology_open_set_budget_exceeded",
-            "finite-topology operations support at most "
-            f"{MAX_TOPOLOGY_OPERATION_OPENS} open sets",
-        )
-
-
 def _topology_operation_schema() -> JsonSchemaValue:
     """Project the wire-operation envelope onto the shared topology value."""
 
@@ -99,27 +84,8 @@ def _require_canonical_subset(
         )
 
 
-def _is_t0_topology(topology: FiniteTopology) -> bool:
-    """Check the request-domain T0 relation without entering a kernel."""
-
-    neighborhoods = tuple(
-        frozenset(
-            index
-            for index, open_set in enumerate(topology.open_sets)
-            if point in open_set
-        )
-        for point in range(topology.point_count)
-    )
-    return len(set(neighborhoods)) == topology.point_count
-
-
 class SpecializationPreorderRequest(StrictModel):
     topology: TopologyOperationInput
-
-    @model_validator(mode="after")
-    def require_operation_admission(self) -> Self:
-        _require_topology_operation_admission(self.topology)
-        return self
 
 
 class SpecializationPreorderResult(SpecializationPreorderRequest):
@@ -161,11 +127,6 @@ class SpecializationPreorderResult(SpecializationPreorderRequest):
 
 class ConnectedComponentsRequest(StrictModel):
     topology: TopologyOperationInput
-
-    @model_validator(mode="after")
-    def require_operation_admission(self) -> Self:
-        _require_topology_operation_admission(self.topology)
-        return self
 
 
 class ConnectedComponentsResult(ConnectedComponentsRequest):
@@ -224,8 +185,6 @@ class ContinuityRequest(StrictModel):
 
     @model_validator(mode="after")
     def bind_map_carriers(self) -> Self:
-        _require_topology_operation_admission(self.domain)
-        _require_topology_operation_admission(self.codomain)
         if self.point_map.domain_point_count != self.domain.point_count:
             raise _validation_error(
                 "map_domain_size_mismatch",
@@ -296,16 +255,6 @@ class ContinuityResult(ContinuityRequest):
 
 class BeatPointsRequest(StrictModel):
     topology: TopologyOperationInput
-
-    @model_validator(mode="after")
-    def require_t0_semantics(self) -> Self:
-        _require_topology_operation_admission(self.topology)
-        if not _is_t0_topology(self.topology):
-            raise _validation_error(
-                "beat_points_require_t0",
-                "beat-point computation requires a T0 topology",
-            )
-        return self
 
 
 class BeatPointsResult(BeatPointsRequest):

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from jacobian.math.finite_topology._models import (
+    MAX_TOPOLOGY_OPERATION_OPENS,
+    MAX_TOPOLOGY_OPERATION_POINTS,
     BeatPointsRequest,
     BeatPointsResult,
     ConnectedComponentsRequest,
@@ -20,9 +22,23 @@ from jacobian.math.finite_topology.operations import (
 )
 
 
+def _admit_topology(topology) -> None:
+    if topology.point_count > MAX_TOPOLOGY_OPERATION_POINTS:
+        raise ValueError(
+            "finite-topology operations support at most "
+            f"{MAX_TOPOLOGY_OPERATION_POINTS} points"
+        )
+    if len(topology.open_sets) > MAX_TOPOLOGY_OPERATION_OPENS:
+        raise ValueError(
+            "finite-topology operations support at most "
+            f"{MAX_TOPOLOGY_OPERATION_OPENS} open sets"
+        )
+
+
 def compute_specialization_preorder(
     request: SpecializationPreorderRequest,
 ) -> SpecializationPreorderResult:
+    _admit_topology(request.topology)
     return SpecializationPreorderResult._from_kernel(
         request, specialization_preorder(request.topology)
     )
@@ -31,11 +47,14 @@ def compute_specialization_preorder(
 def compute_connected_components(
     request: ConnectedComponentsRequest,
 ) -> ConnectedComponentsResult:
+    _admit_topology(request.topology)
     components = connected_components(request.topology)
     return ConnectedComponentsResult._from_kernel(request, components)
 
 
 def compute_continuity(request: ContinuityRequest) -> ContinuityResult:
+    _admit_topology(request.domain)
+    _admit_topology(request.codomain)
     analysis = continuity(request.domain, request.codomain, request.point_map)
     return ContinuityResult._from_kernel(
         request,
@@ -46,6 +65,7 @@ def compute_continuity(request: ContinuityRequest) -> ContinuityResult:
 
 
 def compute_beat_points(request: BeatPointsRequest) -> BeatPointsResult:
+    _admit_topology(request.topology)
     analysis = beat_points(request.topology)
     return BeatPointsResult._from_kernel(
         request,

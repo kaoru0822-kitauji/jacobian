@@ -10,7 +10,6 @@ from pydantic import ValidationError
 from jacobian.math.finite_topology import (
     FiniteTopology,
     PointMap,
-    beat_points,
     closure,
     connected_components,
     continuity,
@@ -107,12 +106,10 @@ def test_carriers_are_structural_while_wire_requests_own_operation_bounds() -> N
     assert "maximum" not in value_schema["properties"]["point_count"]
     assert "maxItems" not in value_schema["properties"]["open_sets"]
 
-    with pytest.raises(ValidationError) as exc_info:
-        SpecializationPreorderRequest(topology=topology)
-    assert (
-        exc_info.value.errors()[0]["type"]
-        == "finite_topology.topology_point_budget_exceeded"
-    )
+    with pytest.raises(ValueError, match="at most 32 points"):
+        compute_specialization_preorder(
+            SpecializationPreorderRequest(topology=topology)
+        )
 
     request_schema = SpecializationPreorderRequest.model_json_schema()
     topology_schema = request_schema["properties"]["topology"]
@@ -205,13 +202,8 @@ def test_beat_points_use_strict_t0_order_and_return_witnesses() -> None:
 
 def test_non_t0_beat_point_request_fails_closed() -> None:
     assert is_t0(_indiscrete(2)) is False
-    with pytest.raises(ValidationError) as exc_info:
-        BeatPointsRequest(topology=_indiscrete(2))
-    assert (
-        exc_info.value.errors()[0]["type"] == "finite_topology.beat_points_require_t0"
-    )
     with pytest.raises(ValueError, match="T0"):
-        beat_points(_indiscrete(2))
+        compute_beat_points(BeatPointsRequest(topology=_indiscrete(2)))
 
 
 def _all_topologies(size: int) -> tuple[FiniteTopology, ...]:

@@ -167,9 +167,13 @@ def _unique_extremum(
 
 
 def beat_points(topology: FiniteTopology) -> BeatPointAnalysis:
-    if not is_t0(topology):
-        raise ValueError("beat points require a T0 finite topology")
     relation = specialization_preorder(topology)
+    if any(
+        relation[left][right] and relation[right][left]
+        for left in range(topology.point_count)
+        for right in range(left + 1, topology.point_count)
+    ):
+        raise ValueError("beat points require a T0 finite topology")
     down: list[BeatPointWitness] = []
     up: list[BeatPointWitness] = []
     for point in range(topology.point_count):
