@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from copy import deepcopy
 from fractions import Fraction
 
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
-from pydantic import ValidationError
 from tests.integration.linear._support import linear_validation_error
 from tests.support.rationals import rational_payload as q
 
@@ -22,16 +20,10 @@ from jacobian.math.optimization._models import (
     RationalLinearProgramRequest,
     RationalLinearProgramResult,
     StandardFormRationalLinearProgram,
-    _verify_rational_linear_program_result,
 )
 from jacobian.math.optimization._tools import TOOLS as OPTIMIZATION_TOOLS
 
 pytestmark = pytest.mark.requires_backend("flint")
-
-
-def _assert_rejected_by_verifier(result: RationalLinearProgramResult) -> None:
-    with pytest.raises(ValueError):
-        _verify_rational_linear_program_result(result)
 
 
 def _system(rhs: list[dict[str, str]]) -> dict[str, object]:
@@ -321,76 +313,6 @@ def test_source_derived_result_height_exceeds_input_scalar_limit() -> None:
     )
 
 
-def test_optimal_result_rejects_source_and_diagnostic_mutations() -> None:
-    result = _run_linear_program(
-        {
-            "variables": ["x"],
-            "objective": [q(1)],
-            "coefficients": [[q(1)]],
-            "rhs": [q(1)],
-        }
-    )
-    payload = result.model_dump(mode="json")
-    mutations: list[tuple[tuple[str, ...], object]] = [
-        (("program", "rhs"), [q(2)]),
-        (("primal_candidate",), [q(2)]),
-        (("primal_objective",), q(2)),
-        (("primal_residuals",), [q(1)]),
-        (("dual_candidate",), [q(0)]),
-        (("dual_objective",), q(0)),
-        (("dual_slacks",), [q(1)]),
-    ]
-
-    for path, replacement in mutations:
-        mutated = deepcopy(payload)
-        target = mutated
-        for key in path[:-1]:
-            target = target[key]
-        target[path[-1]] = replacement
-        _assert_rejected_by_verifier(
-            RationalLinearProgramResult.model_validate(mutated)
-        )
-
-
-def test_optimal_result_rejects_matrix_objective_and_variable_order_mutations() -> None:
-    result = _run_linear_program(
-        {
-            "variables": ["x", "y"],
-            "objective": [q(1), q(3)],
-            "coefficients": [[q(1), q(0)], [q(0), q(1)]],
-            "rhs": [q(1), q(2)],
-        }
-    )
-    payload = result.model_dump(mode="json")
-    mutations = []
-
-    coefficient = deepcopy(payload)
-    coefficient["program"]["coefficients"][0][0] = q(2)
-    mutations.append(coefficient)
-    rhs = deepcopy(payload)
-    rhs["program"]["rhs"][0] = q(2)
-    mutations.append(rhs)
-    objective = deepcopy(payload)
-    objective["program"]["objective"][0] = q(2)
-    mutations.append(objective)
-    row = deepcopy(payload)
-    row["program"]["coefficients"] = [[q(0), q(1)], [q(1), q(0)]]
-    mutations.append(row)
-    variable_order = deepcopy(payload)
-    variable_order["program"]["variables"] = ["y", "x"]
-    variable_order["program"]["objective"] = [q(3), q(1)]
-    variable_order["program"]["coefficients"] = [
-        [q(0), q(1)],
-        [q(1), q(0)],
-    ]
-    mutations.append(variable_order)
-
-    for mutation in mutations:
-        _assert_rejected_by_verifier(
-            RationalLinearProgramResult.model_validate(mutation)
-        )
-
-
 def test_missing_dual_evidence_remains_primal_feasible(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -435,52 +357,6 @@ def test_missing_negative_certificate_returns_unknown(
     assert result.status == "UNKNOWN"
     assert result.farkas_candidate is None
     assert result.recession_direction is None
-
-
-def test_negative_results_reject_bare_or_source_mutated_claims() -> None:
-    infeasible = _run_linear_program(
-        {
-            "variables": ["x"],
-            "objective": [q(0)],
-            "coefficients": [[q(1)], [q(1)]],
-            "rhs": [q(0), q(1)],
-        }
-    ).model_dump(mode="json")
-    unbounded = _run_linear_program(
-        {
-            "variables": ["x", "y"],
-            "objective": [q(-1), q(0)],
-            "coefficients": [[q(1), q(-1)]],
-            "rhs": [q(1)],
-        }
-    ).model_dump(mode="json")
-
-    mutations = []
-    bare_infeasible = deepcopy(infeasible)
-    bare_infeasible["farkas_candidate"] = None
-    mutations.append(bare_infeasible)
-    zero_farkas = deepcopy(infeasible)
-    zero_farkas["farkas_candidate"] = [q(0), q(0)]
-    mutations.append(zero_farkas)
-    feasible_source = deepcopy(infeasible)
-    feasible_source["program"]["rhs"] = [q(0), q(0)]
-    mutations.append(feasible_source)
-    bare_unbounded = deepcopy(unbounded)
-    bare_unbounded["recession_direction"] = None
-    mutations.append(bare_unbounded)
-    flat_direction = deepcopy(unbounded)
-    flat_direction["recession_direction"] = [q(0), q(0)]
-    mutations.append(flat_direction)
-    bounded_source = deepcopy(unbounded)
-    bounded_source["program"]["objective"] = [q(1), q(0)]
-    mutations.append(bounded_source)
-
-    for mutation in mutations:
-        try:
-            parsed = RationalLinearProgramResult.model_validate(mutation)
-        except ValidationError:
-            continue
-        _assert_rejected_by_verifier(parsed)
 
 
 @st.composite

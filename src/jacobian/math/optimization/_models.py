@@ -13,7 +13,6 @@ from pydantic_core import PydanticCustomError
 from jacobian._exact import (
     MAX_CANONICAL_RATIONAL_DIGITS,
     CanonicalRational,
-    require_bounded_rational,
 )
 from jacobian._models import StrictModel, canonicalize_json_containers
 from jacobian.math.optimization._arithmetic import rational_dot
@@ -645,122 +644,6 @@ def _require_result_shape(result: RationalLinearProgramResult) -> None:
         raise ValueError("an infeasible result requires exactly one Farkas candidate")
     if (result.status == "UNBOUNDED") != (result.recession_direction is not None):
         raise ValueError("an unbounded result requires exactly one recession direction")
-
-
-def _require_result_heights(result: RationalLinearProgramResult) -> None:
-    result_bound = _result_digit_bound(result.program)
-    vector_fields = (
-        result.primal_candidate,
-        result.dual_candidate,
-        result.primal_residuals,
-        result.dual_slacks,
-        result.farkas_candidate,
-        result.recession_direction,
-    )
-    scalar_fields = (result.primal_objective, result.dual_objective)
-    values = tuple(
-        value for field in vector_fields if field is not None for value in field
-    ) + tuple(value for value in scalar_fields if value is not None)
-    for value in values:
-        require_bounded_rational(
-            value,
-            max_digits=result_bound,
-            label="rational linear-program result",
-        )
-
-
-def _verify_rational_linear_program_result(result: RationalLinearProgramResult) -> None:
-    """Deliberately verify an independently supplied LP claim.
-
-    This owner-private path is intentionally separate from ordinary result
-    parsing.  Callers that need certificate verification must opt into the
-    bounded replay rather than treating deserialization as proof.
-    """
-
-    _require_result_shape(result)
-    _require_result_heights(result)
-    primal_objective = _replay_primal(result)
-    _replay_dual(result, primal_objective)
-    _replay_farkas(result)
-    _replay_recession(result)
-
-
-def _replay_primal(result: RationalLinearProgramResult) -> Fraction | None:
-    if result.primal_candidate is None:
-        return None
-    if len(result.primal_candidate) != len(result.program.variables):
-        raise ValueError("primal candidate length must match the source")
-    primal = tuple(value.as_fraction() for value in result.primal_candidate)
-    if any(value < 0 for value in primal):
-        raise ValueError("primal candidate must be nonnegative")
-    objective, residuals = _primal_diagnostics(result.program, primal)
-    assert result.primal_objective is not None
-    assert result.primal_residuals is not None
-    if result.primal_objective.as_fraction() != objective:
-        raise ValueError("primal objective must be recomputed from the source")
-    if tuple(value.as_fraction() for value in result.primal_residuals) != residuals:
-        raise ValueError("primal residuals must be recomputed from the source")
-    if len(residuals) != len(result.program.rhs) or any(residuals):
-        raise ValueError("primal candidate must satisfy the source equalities")
-    return objective
-
-
-def _replay_dual(
-    result: RationalLinearProgramResult,
-    primal_objective: Fraction | None,
-) -> None:
-    if result.dual_candidate is None:
-        return
-    if len(result.dual_candidate) != len(result.program.rhs):
-        raise ValueError("dual candidate length must match the source")
-    dual = tuple(value.as_fraction() for value in result.dual_candidate)
-    objective, slacks = _dual_diagnostics(result.program, dual)
-    assert result.dual_objective is not None
-    assert result.dual_slacks is not None
-    if result.dual_objective.as_fraction() != objective:
-        raise ValueError("dual objective must be recomputed from the source")
-    if tuple(value.as_fraction() for value in result.dual_slacks) != slacks:
-        raise ValueError("dual slacks must be recomputed from the source")
-    if len(slacks) != len(result.program.variables) or any(
-        value < 0 for value in slacks
-    ):
-        raise ValueError("dual candidate must satisfy the source inequalities")
-    if primal_objective != objective:
-        raise ValueError("optimal primal and dual objectives must agree")
-
-
-def _replay_farkas(result: RationalLinearProgramResult) -> None:
-    if result.farkas_candidate is None:
-        return
-    if len(result.farkas_candidate) != len(result.program.rhs):
-        raise ValueError("Farkas candidate length must match the source")
-    farkas = tuple(value.as_fraction() for value in result.farkas_candidate)
-    _, slacks = _dual_diagnostics(result.program, farkas)
-    # _dual_diagnostics returns c-Aᵀy; remove c to recover Aᵀy.
-    objective = tuple(value.as_fraction() for value in result.program.objective)
-    pairings = tuple(
-        objective[column] - slacks[column] for column in range(len(objective))
-    )
-    rhs = tuple(value.as_fraction() for value in result.program.rhs)
-    if any(value < 0 for value in pairings) or rational_dot(rhs, farkas) >= 0:
-        raise ValueError(
-            "Farkas candidate must satisfy Aᵀy>=0 and bᵀy<0 for the source"
-        )
-
-
-def _replay_recession(result: RationalLinearProgramResult) -> None:
-    if result.recession_direction is None:
-        return
-    if len(result.recession_direction) != len(result.program.variables):
-        raise ValueError("recession direction length must match the source")
-    direction = tuple(value.as_fraction() for value in result.recession_direction)
-    if any(value < 0 for value in direction):
-        raise ValueError("recession direction must be nonnegative")
-    objective, residuals = _recession_diagnostics(result.program, direction)
-    if any(residuals) or objective >= 0:
-        raise ValueError(
-            "recession direction must satisfy Ad=0 and cᵀd<0 for the source"
-        )
 
 
 __all__ = [

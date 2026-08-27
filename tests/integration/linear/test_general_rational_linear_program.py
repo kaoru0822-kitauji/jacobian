@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from copy import deepcopy
 from fractions import Fraction
 
 import pytest
@@ -16,7 +15,6 @@ from jacobian._exact import CanonicalRational
 from jacobian.math.optimization._general_models import (
     GeneralRationalLinearProgramRequest,
     GeneralRationalLinearProgramResult,
-    _verify_general_rational_linear_program_result,
 )
 from jacobian.math.optimization._tools import TOOLS
 
@@ -77,11 +75,6 @@ def _fractions(
 ) -> tuple[Fraction, ...]:
     assert values is not None
     return tuple(value.as_fraction() for value in values)
-
-
-def _assert_rejected_by_verifier(result: GeneralRationalLinearProgramResult) -> None:
-    with pytest.raises(ValueError):
-        _verify_general_rational_linear_program_result(result)
 
 
 def test_general_lp_replays_le_ge_and_equality_in_original_coordinates() -> None:
@@ -206,18 +199,11 @@ def test_general_lp_replays_source_farkas_and_free_unbounded_ray() -> None:
     assert infeasible.status == "INFEASIBLE"
     assert _fractions(infeasible.farkas_constraints) == (Fraction(1),)
     assert _fractions(infeasible.farkas_lower_bounds) == (Fraction(-1),)
-    forged_farkas = deepcopy(infeasible.model_dump(mode="json"))
-    forged_farkas["farkas_constraints"] = [q(0)]
-    _assert_rejected_by_verifier(
-        GeneralRationalLinearProgramResult.model_validate(forged_farkas)
-    )
     assert unbounded.status == "UNBOUNDED"
     assert _fractions(unbounded.recession_direction) == (Fraction(1),)
 
 
-def test_general_lp_rejects_invalid_bound_order_and_verifies_mutation_on_demand() -> (
-    None
-):
+def test_general_lp_rejects_invalid_bound_order() -> None:
     invalid = _program(
         variables=[_variable("x", q(2), q(1))],
         sense="MINIMIZE",
@@ -228,26 +214,20 @@ def test_general_lp_rejects_invalid_bound_order_and_verifies_mutation_on_demand(
         GeneralRationalLinearProgramRequest.model_validate({"program": invalid})
     assert caught.value.errors()[0]["type"] == "general_linear_program.bound_order"
 
-    result = _run(
-        _program(
-            variables=[_variable("x", q(0))],
-            sense="MINIMIZE",
-            objective=[q(1)],
-            constraints=[_row("minimum", [q(1)], "GE", q(1))],
-        )
-    )
-    assert result.status == "OPTIMAL"
-    forged = deepcopy(result.model_dump(mode="json"))
-    assert isinstance(forged["program"], dict)
-    assert isinstance(forged["program"]["constraints"], list)
-    forged["program"]["constraints"][0]["rhs"] = q(2)
-    _assert_rejected_by_verifier(
-        GeneralRationalLinearProgramResult.model_validate(forged)
-    )
+    valid_program = GeneralRationalLinearProgramRequest.model_validate(
+        {
+            "program": _program(
+                variables=[_variable("x")],
+                sense="MINIMIZE",
+                objective=[q(1)],
+                constraints=[],
+            )
+        }
+    ).program
     with linear_validation_error():
         GeneralRationalLinearProgramResult.model_validate(
             {
-                "program": result.program,
+                "program": valid_program,
                 "status": "UNKNOWN",
                 "primal_candidate": [q(1)],
             }
@@ -360,24 +340,6 @@ def test_general_lp_returns_offset_shifted_optima_within_the_mapped_height_bound
     assert result.dual_objective is not None
     assert result.dual_objective.as_fraction() == expected_objective
     assert _fractions(result.stationarity_residuals) == (Fraction(),)
-
-
-def test_general_lp_verifier_rejects_values_taller_than_the_mapped_result_bound() -> (
-    None
-):
-    result = _run(
-        _program(
-            variables=[_variable("x", q(10000000))],
-            sense="MINIMIZE",
-            objective=[q(1)],
-            constraints=[],
-        )
-    )
-    forged = deepcopy(result.model_dump(mode="json"))
-    forged["primal_candidate"] = [{"num": "9" * 400, "den": "1"}]
-    _assert_rejected_by_verifier(
-        GeneralRationalLinearProgramResult.model_validate(forged)
-    )
 
 
 def test_general_lp_admits_the_full_one_sided_variable_envelope() -> None:
