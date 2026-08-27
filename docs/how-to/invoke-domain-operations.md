@@ -1,19 +1,62 @@
 # Discover and invoke domain operations
 
 Use `math.find` progressively, then call `math.run` once with the selected
-operation ID and a `payload` matching its request model. Use `search` when the
-operation is unknown, `browse` for compact operation-ID-sorted pages in an
-unfamiliar domain, and `inspect` for the selected operation's exact typed request,
-result, and valid examples. For example:
+operation ID and a `payload` matching its request model. The ordinary path is:
+
+1. Search for the mathematical outcome when the operation is unknown. Search
+   ranking is deterministic lexical retrieval, not a recommendation.
+2. Inspect the selected operation before forming an unfamiliar payload. Its
+   schemas and examples are authoritative for that installed catalog.
+3. Run exactly that operation with one typed payload.
+4. Retain the mathematical result and decide the next move yourself.
+
+For example, search for a small number of matrix operations, then inspect an
+exact candidate:
+
+```json
+{"request":{"op":"search","query":"exact matrix determinant","domain":"matrix","limit":3}}
+```
+
+```json
+{"request":{"op":"inspect","operation_id":"matrix.determinant.compute"}}
+```
+
+Use `browse` instead to map an unfamiliar domain in operation-ID order:
+
+```json
+{"request":{"op":"browse","domain":"matrix","limit":20}}
+```
+
+After inspection, run the selected operation. For example:
 
 ```json
 {"operation_id":"integer.compute.extended_gcd","payload":{"left":"84","right":"30"}}
 ```
 
-The result is returned directly. To continue a calculation, retain the relevant
-typed fields, update the hypothesis, and pass those fields in the next operation's
-payload. Jacobian does not retain caller values, workflow state, artifacts, ports,
+## Compose a returned value
+
+The result is returned directly. When a subsequent operation accepts a canonical
+value from the first result, pass that complete value unchanged into its typed
+field. Do not rebuild a context-bearing value from selected fields: its
+normalization, axes, ambient object, or other mathematical context may be part
+of the value. Extract a scalar, witness, or projection only when the inspected
+input schema explicitly asks for it.
+
+For example, `sat.cnf.canonicalize` returns `output.cnf`, and both `sat.solve`
+and `sat.assignment.check` accept that entire canonical CNF as their `cnf`
+payload field. The caller chooses whether solving or checking is the useful
+next move; Jacobian does not retain values, workflow state, artifacts, ports,
 or workspace documents.
+
+## Interpret outcomes before continuing
+
+A successful tool call returns the operation's own mathematical result model.
+For `sat.solve`, `SAT` and `UNSAT` have their stated meanings, while `UNKNOWN`
+is a non-conclusion; its `exhausted` field may say whether a time, work, or
+memory budget was exhausted. A malformed payload or unknown operation ID is a
+tool error, not a mathematical result. A client timeout aborts transport and is
+also not a conclusion. Preserve the selected operation, exact payload or digest,
+and the changed budget, backend, representation, or partition before retrying.
 
 ## Use the same contract from the CLI
 

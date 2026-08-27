@@ -11,9 +11,14 @@ Built-in membership follows the
 [public mathematical operation admission contract](public-operation-admission.md),
 which keeps the public catalog distinct from the broader native Python API.
 
-Larger workflows are caller-owned: retain the returned value, choose the next
-operation, and construct its payload from the relevant fields. Incomplete or
-unknown outcomes belong to the operation's own result model.
+Larger workflows are caller-owned: retain the returned value and choose the
+next operation. When its inspected input schema accepts a canonical value from
+the first result, pass that value unchanged; otherwise construct the requested
+payload from the relevant fields. Incomplete or unknown outcomes belong to the
+operation's own result model.
+
+For the ordinary search-to-inspection-to-execution path, see
+[Discover and invoke operations](../how-to/invoke-domain-operations.md).
 
 ## Execution deadlines
 
@@ -28,10 +33,6 @@ the operation ID and version, exact payload or digest, resource budget, elapsed
 time, error, timeout layer, and repository revision before retrying or
 reporting a gap. A retry should state what changed: budget, backend,
 representation, or deterministic partition.
-
-```json
-{"operation_id":"integer.compute.extended_gcd","payload":{"left":"84","right":"30"}}
-```
 
 Use `math.find` progressively: `search` finds a few relevance-ranked candidates,
 `browse` pages compact operation cards in operation-ID order (optionally within a
@@ -51,5 +52,4 @@ smallest correction before drawing a mathematical conclusion from any result.
 `browse` is recomputed from immutable declarations on every request, with a
 caller-supplied pagination cursor. The built-in MCP resource
 `operation://catalog` provides an exact bulk export; ordinary discovery should
-prefer `math.find`. The server registers typed Pydantic tools directly with the
-MCP Python SDK.
+prefer `math.find`.

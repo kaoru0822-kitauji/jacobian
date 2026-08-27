@@ -43,8 +43,8 @@ are written with the operation; they are not a separate CI program.
 Write an invocation example's description in two parts: first state the
 computation the operation performs on the supplied values, then state the
 important precondition that makes the example valid. For example, use
-`Compute the exact eigenvalues of [[1, 2], [3, 4]]; the matrix must be square
-and rectangular.` The first part tells an agent what the operation does; the
+`Compute the exact eigenvalues of [[1, 2], [3, 4]]; the matrix must be square.`
+The first part tells an agent what the operation does; the
 second part teaches the input rule it must preserve. A precondition by itself,
 such as `The matrix must be square`, is not an adequate example description.
 
