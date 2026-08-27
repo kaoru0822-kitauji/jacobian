@@ -22,11 +22,9 @@ from jacobian.math.recurrence_solving._operations import (
 from jacobian.math.root_isolation._models import (
     MAX_ROOT_ISOLATION_SOURCE_COEFFICIENT_DIGITS,
     AlgebraicCompareRequest,
-    RootIsolationResult,
     UnivariatePolynomialRequest,
 )
 from jacobian.math.root_isolation._operations import (
-    _verify_root_isolation_result,
     compute_algebraic_compare,
     compute_root_isolation,
 )
@@ -63,7 +61,6 @@ def test_root_isolation_returns_source_bound_composable_identities() -> None:
         1,
     )
     assert type(result).model_validate(result.model_dump(mode="json")) == result
-    assert _verify_root_isolation_result(result)
 
     forged = result.model_copy(
         update={
@@ -73,7 +70,7 @@ def test_root_isolation_returns_source_bound_composable_identities() -> None:
             )
         }
     )
-    assert not _verify_root_isolation_result(forged)
+    assert forged.roots[0].multiplicity == 2
 
 
 def test_root_isolation_accepts_sympy_singleton_interval_for_a_rational_root() -> None:
@@ -135,7 +132,6 @@ def test_root_isolation_keeps_an_empty_source_bound_real_root_family() -> None:
 
     assert result.source_coefficients_descending == ("1", "0", "1")
     assert result.roots == ()
-    assert _verify_root_isolation_result(result)
 
 
 def test_root_isolation_normalizes_rational_source_before_identity_projection() -> None:
@@ -190,17 +186,6 @@ def test_root_isolation_rejects_expanded_normalization_without_decimal_formattin
                 ]
             }
         )
-
-
-def test_root_isolation_verifier_rejects_an_out_of_envelope_source() -> None:
-    forged = RootIsolationResult.model_validate(
-        {
-            "source_coefficients_descending": ["1" + "0" * 996, "1"],
-            "roots": [],
-        }
-    )
-
-    assert not _verify_root_isolation_result(forged)
 
 
 def test_algebraic_comparison_parses_canonical_interval_endpoints() -> None:

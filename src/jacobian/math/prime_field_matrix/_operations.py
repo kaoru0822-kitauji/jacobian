@@ -52,42 +52,6 @@ def compute_nullspace(request: PrimeFieldMatrixRequest) -> PrimeFieldNullspaceRe
     )
 
 
-def _verify_rank_result(result: PrimeFieldMatrixRankResult) -> bool:
-    """Deliberately recheck one independently supplied rank claim."""
-
-    source = PrimeFieldMatrixRequest.model_validate(result.source.model_dump())
-    return result.prime == source.matrix.prime and result.rank == _rank(source.matrix)
-
-
-def _verify_rref_result(result: PrimeFieldRrefResult) -> bool:
-    """Deliberately recheck one independently supplied RREF claim."""
-
-    source = PrimeFieldMatrixRequest.model_validate(result.source.model_dump())
-    rows, pivots = _rref(source.matrix)
-    return (
-        result.prime == source.matrix.prime
-        and result.rref_matrix.entries == tuple(rows)
-        and result.rref_matrix.prime == source.matrix.prime
-        and result.rref_matrix.columns == source.matrix.columns
-        and result.pivot_columns == tuple(pivots)
-        and result.rank == len(pivots)
-    )
-
-
-def _verify_nullspace_result(result: PrimeFieldNullspaceResult) -> bool:
-    """Deliberately recheck one independently supplied nullspace claim."""
-
-    source = PrimeFieldMatrixRequest.model_validate(result.source.model_dump())
-    basis = _nullspace(source.matrix)
-    return (
-        result.prime == source.matrix.prime
-        and result.nullspace_matrix.entries == tuple(basis)
-        and result.nullspace_matrix.prime == source.matrix.prime
-        and result.nullspace_matrix.columns == source.matrix.columns
-        and result.nullity == len(basis)
-    )
-
-
 __all__ = [
     "compute_nullspace",
     "compute_rank",

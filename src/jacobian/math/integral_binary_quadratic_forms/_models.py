@@ -21,8 +21,8 @@ MAX_REPRESENTATION_OUTPUT_ROWS = 2 * MAX_REPRESENTATION_Y_CANDIDATES
 # ``|x| <= (25_000*10^6 + sqrt(4*10^6*10^12)) / 2``.
 MAX_REPRESENTATION_COORDINATE = 13_500_000_000
 # A reduced-form search examines ``sum_{a=1}^A (2a+1) = A(A+2)`` candidates,
-# where ``A = floor(sqrt(|D| / 3)) + 1``.  The bound keeps both the complete
-# canonical class tuple and its independent result replay in one request.
+# where ``A = floor(sqrt(|D| / 3)) + 1``.  The bound keeps the complete
+# canonical class tuple within the request envelope.
 MAX_REDUCED_CLASS_SEARCH_STATES = 10_000
 MAX_REDUCED_CLASS_OUTPUT_ROWS = MAX_REDUCED_CLASS_SEARCH_STATES
 # Canonical JSON carries integers only up to the interoperable IEEE 754 double

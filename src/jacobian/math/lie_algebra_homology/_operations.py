@@ -169,23 +169,6 @@ def compute_lie_homology(request: LieHomologyRequest) -> LieHomologyResult:
     )
 
 
-def _verify_ce_complex_result(result: ChevalleyEilenbergComplexResult) -> bool:
-    """Replay an independently supplied CE complex in its admitted envelope.
-
-    ``LieAlgebra`` bounds the dimension so this rebuilds at most the dense
-    complex described by the request contract; it is deliberately opt-in for
-    untrusted claims and never a result-model side effect.
-    """
-
-    return result.differentials == _ce_differentials(result.lie_algebra)
-
-
-def _verify_lie_homology_result(result: LieHomologyResult) -> bool:
-    """Replay an independently supplied homology claim in its admitted envelope."""
-
-    return result.groups == lie_homology_groups(result.lie_algebra)
-
-
 __all__ = [
     "compute_chevalley_eilenberg_complex",
     "compute_lie_homology",

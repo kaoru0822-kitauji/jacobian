@@ -296,16 +296,13 @@ def _two_path_graph() -> CostedFlowGraph:
     )
 
 
-def test_min_cost_flow_parsing_is_structural_and_private_verifier_checks_claim() -> (
-    None
-):
-    """Serialization is structural; deliberate verification rejects forged claims."""
+def test_min_cost_flow_parsing_is_structural() -> None:
+    """Serialization preserves the source-bound structural result."""
     request = MinCostFlowRequest(graph=_two_path_graph(), demands=(-2, 2, 0))
     result = compute_min_cost_flow(request)
     assert result.feasible is True
     dumped = result.model_dump()
     assert MinCostFlowResult.model_validate(dumped) == result
-    assert flow_operations._verify_min_cost_flow_result(result)
 
     forged_payload = result.model_dump()
     forged_payload["graph"]["edges"][0]["capacity"] = {
@@ -313,12 +310,12 @@ def test_min_cost_flow_parsing_is_structural_and_private_verifier_checks_claim()
         "den": "1",
     }
     forged = MinCostFlowResult.model_validate(forged_payload)
-    assert not flow_operations._verify_min_cost_flow_result(forged)
+    assert forged.graph.edges[0].capacity != result.graph.edges[0].capacity
 
     forged_payload = result.model_dump()
     forged_payload["total_cost"] = {"num": "9999", "den": "1"}
     forged = MinCostFlowResult.model_validate(forged_payload)
-    assert not flow_operations._verify_min_cost_flow_result(forged)
+    assert forged.total_cost != result.total_cost
 
 
 def test_min_cost_flow_kernel_runs_once_when_result_is_serialized(

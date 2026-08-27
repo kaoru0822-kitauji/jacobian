@@ -2,8 +2,6 @@
 
 from math import isqrt
 
-from pydantic import ValidationError
-
 from jacobian.math.integral_binary_quadratic_forms._models import (
     BinaryQuadraticFormCheckRequest,
     BinaryQuadraticFormCheckResult,
@@ -335,65 +333,6 @@ def compute_representations(
     return BinaryQuadraticFormRepresentationsResult._from_kernel(
         form=request.form, target=request.target, representations=representations
     )
-
-
-def _verify_check_result(result: BinaryQuadraticFormCheckResult) -> bool:
-    """Verify an independently supplied form-domain classification."""
-    expected = compute_check(
-        BinaryQuadraticFormCheckRequest(a=result.a, b=result.b, c=result.c)
-    )
-    return result == expected
-
-
-def _verify_evaluate_result(result: BinaryQuadraticFormEvaluateResult) -> bool:
-    """Verify an independently supplied exact form-evaluation claim."""
-    try:
-        expected = compute_evaluate(
-            BinaryQuadraticFormEvaluateRequest(form=result.form, x=result.x, y=result.y)
-        )
-    except ValidationError:
-        return False
-    return result == expected
-
-
-def _verify_reduced_form_result(result: ReducedBinaryQuadraticFormResult) -> bool:
-    """Verify an independently supplied Gauss-reduction result."""
-    expected = compute_reduce(BinaryQuadraticFormReduceRequest(form=result.form))
-    return result == expected
-
-
-def _verify_proper_equivalence_result(result: ProperEquivalenceResult) -> bool:
-    """Verify an independently supplied proper-equivalence decision and witness."""
-    expected = compute_proper_equivalence(
-        BinaryQuadraticFormProperEquivRequest(first=result.first, second=result.second)
-    )
-    return result == expected
-
-
-def _verify_representations_result(
-    result: BinaryQuadraticFormRepresentationsResult,
-) -> bool:
-    """Verify an independently supplied complete representation-set claim."""
-    try:
-        expected = compute_representations(
-            BinaryQuadraticFormRepresentationsRequest(
-                form=result.form, target=result.target
-            )
-        )
-    except ValidationError:
-        return False
-    return result == expected
-
-
-def _verify_reduced_classes_result(result: ReducedClassesResult) -> bool:
-    """Verify an independently supplied complete reduced-class enumeration."""
-    try:
-        expected = compute_reduced_classes(
-            BinaryQuadraticFormReducedClassesRequest(discriminant=result.discriminant)
-        )
-    except ValidationError:
-        return False
-    return result == expected
 
 
 def _enumerate_reduced_classes(

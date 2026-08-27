@@ -6,7 +6,6 @@ from fractions import Fraction
 from typing import Any
 
 import networkx as nx
-from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
 from jacobian.canonical import format_canonical_integer
@@ -181,13 +180,3 @@ def compute_min_cost_flow(request: MinCostFlowRequest) -> MinCostFlowResult:
         feasible=True,
         flow_edges=tuple(flow_edges),
     )
-
-
-def _verify_min_cost_flow_result(result: MinCostFlowResult) -> bool:
-    """Deliberately recompute one independently supplied min-cost-flow claim."""
-
-    try:
-        request = MinCostFlowRequest(graph=result.graph, demands=result.demands)
-    except ValidationError:
-        return False
-    return compute_min_cost_flow(request) == result

@@ -118,45 +118,6 @@ def find_group_like_elements(
     )
 
 
-def _verify_comultiplication_result(result: ComultiplicationResult) -> bool:
-    """Verify an independently supplied comultiplication claim."""
-    coalgebra = result.coalgebra
-    expected = tuple(
-        tuple(
-            coalgebra.comultiplication[result.element_index][row][column]
-            % coalgebra.prime
-            for column in range(coalgebra.dimension)
-        )
-        for row in range(coalgebra.dimension)
-    )
-    return result.matrix.entries == expected
-
-
-def _verify_counit_result(result: CounitResult) -> bool:
-    """Verify an independently supplied counit claim."""
-    return (
-        result.value
-        == result.coalgebra.counit[result.element_index] % result.coalgebra.prime
-    )
-
-
-def _verify_group_like_elements_result(result: GroupLikeElementsResult) -> bool:
-    """Verify one exhaustive group-like claim within its admitted scan envelope."""
-    from jacobian.math.coalgebras._models import (
-        GROUP_LIKE_SCAN_WORK_BUDGET,
-        group_like_scan_work,
-    )
-
-    coalgebra = result.coalgebra
-    if (
-        group_like_scan_work(coalgebra.prime, coalgebra.dimension)
-        > GROUP_LIKE_SCAN_WORK_BUDGET
-    ):
-        return False
-    expected = _group_like_coefficients(coalgebra)
-    return tuple(element.coefficients for element in result.elements) == expected
-
-
 __all__ = [
     "compute_comultiplication",
     "compute_counit",

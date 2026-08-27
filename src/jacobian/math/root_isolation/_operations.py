@@ -67,22 +67,6 @@ def compute_root_isolation(request: UnivariatePolynomialRequest) -> RootIsolatio
     )
 
 
-def _verify_root_isolation_result(result: RootIsolationResult) -> bool:
-    """Check an independently supplied isolation ledger inside the request envelope."""
-
-    try:
-        request = UnivariatePolynomialRequest(
-            coefficients_descending=tuple(
-                CanonicalRational(num=coefficient, den="1")
-                for coefficient in result.source_coefficients_descending
-            )
-        )
-        expected = compute_root_isolation(request)
-    except ValueError:
-        return False
-    return result == expected
-
-
 def compute_algebraic_compare(
     request: AlgebraicCompareRequest,
 ) -> RealAlgebraicOrderValue:

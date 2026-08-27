@@ -196,10 +196,9 @@ class DifferentialMatrix(StrictModel):
 class ChevalleyEilenbergComplexResult(StrictModel):
     """A structurally coherent Chevalley-Eilenberg chain complex.
 
-    Kernel-produced results use :meth:`_from_kernel`.  Separately supplied
-    complexes are checked only for their source binding, canonical field, and
-    finite chain-complex envelope here; :func:`_verify_ce_complex_result` is
-    the explicit bounded owner verifier for the defining bracket differential.
+    Kernel-produced results use :meth:`_from_kernel`.  Result parsing checks
+    source binding, canonical field, and the finite chain-complex envelope;
+    it does not rerun the defining bracket differential.
     """
 
     lie_algebra: LieAlgebra
@@ -296,8 +295,8 @@ class LieHomologyGroup(StrictModel):
 class LieHomologyResult(StrictModel):
     """Structurally bounded Lie homology groups with trivial coefficients.
 
-    Exact rank computation belongs to :func:`_verify_lie_homology_result`, not
-    to model validation.
+    Exact rank computation belongs to the native operation, not to model
+    validation.
     """
 
     lie_algebra: LieAlgebra

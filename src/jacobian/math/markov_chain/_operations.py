@@ -110,20 +110,6 @@ def compute_stationary_distribution(
     )
 
 
-def _verify_stationary_distribution_result(
-    result: StationaryDistributionResult,
-) -> bool:
-    """Recompute a supplied stationary simplex inside its admitted envelope."""
-
-    try:
-        expected = compute_stationary_distribution(
-            StationaryDistributionRequest(matrix=result.transition_matrix)
-        )
-    except ValueError:
-        return False
-    return result == expected
-
-
 def compute_ergodic_decision(request: TransitionMatrixRequest) -> ErgodicDecisionResult:
     matrix = tuple(
         tuple(value.as_fraction() for value in row) for row in request.matrix
@@ -148,11 +134,3 @@ def compute_communicating_classes(
         classes=classes,
         state_class=state_class,
     )
-
-
-def _verify_communicating_classes_result(result: CommunicatingClassesResult) -> bool:
-    """Replay the SCC relation for an independently supplied bounded result."""
-
-    request = TransitionMatrixRequest(matrix=result.transition_matrix)
-    classes, state_class = _derive_communicating_classes(request.matrix)
-    return result.classes == classes and result.state_class == state_class

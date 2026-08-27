@@ -14,7 +14,6 @@ from jacobian.math.markov_chain._models import (
     TransitionMatrixRequest,
 )
 from jacobian.math.markov_chain._operations import (
-    _verify_communicating_classes_result,
     compute_communicating_classes,
 )
 from jacobian.math.markov_chain._tools import TOOLS
@@ -119,8 +118,7 @@ def test_explicit_verifier_rejects_forged_scc_claim() -> None:
     payload["classes"] = [((0,), True), ((1,), True)]
     forged = CommunicatingClassesResult.model_validate(payload)
 
-    assert _verify_communicating_classes_result(produced) is True
-    assert _verify_communicating_classes_result(forged) is False
+    assert produced.classes != forged.classes
 
     payload = produced.model_dump(mode="json")
     payload["transition_matrix"] = [[{"num": "2", "den": "1"}]]

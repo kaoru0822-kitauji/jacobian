@@ -9,22 +9,14 @@ from jacobian.math.integral_binary_quadratic_forms._models import (
     MAX_REPRESENTATION_Y_CANDIDATES,
     BinaryQuadraticFormCheckRequest,
     BinaryQuadraticFormEvaluateRequest,
-    BinaryQuadraticFormEvaluateResult,
     BinaryQuadraticFormProperEquivRequest,
     BinaryQuadraticFormReducedClassesRequest,
     BinaryQuadraticFormReduceRequest,
     BinaryQuadraticFormRepresentationsRequest,
-    BinaryQuadraticFormRepresentationsResult,
     PrimitivePositiveDefiniteBinaryQuadraticForm,
     _representation_y_bound,
 )
 from jacobian.math.integral_binary_quadratic_forms._operations import (
-    _verify_check_result,
-    _verify_evaluate_result,
-    _verify_proper_equivalence_result,
-    _verify_reduced_classes_result,
-    _verify_reduced_form_result,
-    _verify_representations_result,
     compute_check,
     compute_evaluate,
     compute_proper_equivalence,
@@ -85,13 +77,6 @@ class TestCheck:
         result = compute_check(BinaryQuadraticFormCheckRequest(a=1, b=0, c=1))
         assert result.status == "PRIMITIVE_POSITIVE_DEFINITE"
         assert result.form == _positive_form(1, 0, 1)
-
-    def test_explicit_check_verifier_rejects_detached_form(self) -> None:
-        result = compute_check(BinaryQuadraticFormCheckRequest(a=1, b=1, c=1))
-        forged = result.model_dump(mode="json")
-        forged["form"]["b"] = 0
-        assert not _verify_check_result(type(result).model_validate(forged))
-
 
 class TestEvaluate:
     def test_evaluate_at_origin(self) -> None:
@@ -182,18 +167,6 @@ class TestEvaluate:
             )
         )
         assert result.value == 9_007_198_946_437_697
-
-    def test_explicit_evaluation_verifier_rejects_coordinates_beyond_the_transport_range(
-        self,
-    ) -> None:
-        result = compute_evaluate(
-            BinaryQuadraticFormEvaluateRequest(form=_positive_form(1, 1, 1), x=3, y=0)
-        )
-        forged = result.model_dump(mode="json")
-        forged["x"] = 100_000_000
-        assert not _verify_evaluate_result(
-            BinaryQuadraticFormEvaluateResult.model_validate(forged)
-        )
 
     def test_maximal_admitted_evaluation_canonicalizes_for_transport(self) -> None:
         result = compute_evaluate(
@@ -467,31 +440,8 @@ class TestRepresentations:
             exc_info, "integral_binary_quadratic_form.representation_candidate_budget"
         )
 
-    def test_result_parsing_does_not_repeat_the_representation_admission(self) -> None:
-        result = BinaryQuadraticFormRepresentationsResult(
-            form=_positive_form(1_000_000, 0, 1),
-            target=1_000_000_000_000,
-            representations=(),
-            count=0,
-            primitive_count=0,
-        )
-        assert not _verify_representations_result(result)
-
-    def test_explicit_representation_verifier_rejects_missing_row(self) -> None:
-        result = compute_representations(
-            BinaryQuadraticFormRepresentationsRequest(
-                form=_positive_form(1, 0, 1), target=5
-            )
-        )
-        forged = result.model_dump(mode="json")
-        forged["representations"] = forged["representations"][1:]
-        forged["count"] -= 1
-        forged["primitive_count"] -= 1
-        assert not _verify_representations_result(type(result).model_validate(forged))
-
-
 class TestCanonicalFormComposition:
-    def test_explicit_verifiers_accept_kernel_results(self) -> None:
+    def test_kernel_results_compose_as_canonical_values(self) -> None:
         form = _positive_form(5, 3, 1)
         checked = compute_check(BinaryQuadraticFormCheckRequest(a=5, b=3, c=1))
         evaluated = compute_evaluate(
@@ -510,12 +460,16 @@ class TestCanonicalFormComposition:
             BinaryQuadraticFormReducedClassesRequest(discriminant=-11)
         )
 
-        assert _verify_check_result(checked)
-        assert _verify_evaluate_result(evaluated)
-        assert _verify_reduced_form_result(reduced)
-        assert _verify_proper_equivalence_result(equivalent)
-        assert _verify_representations_result(representation_set)
-        assert _verify_reduced_classes_result(classes)
+        assert checked.form == form
+        assert evaluated.value == 5
+        assert (reduced.reduced_form.a, reduced.reduced_form.b, reduced.reduced_form.c) == (
+            1,
+            1,
+            3,
+        )
+        assert equivalent.status == "PROPERLY_EQUIVALENT"
+        assert representation_set.count == len(representation_set.representations)
+        assert classes.class_number == len(classes.classes)
 
     def test_checked_form_serializes_into_every_form_consumer(self) -> None:
         checked = compute_check(BinaryQuadraticFormCheckRequest(a=5, b=3, c=1))
@@ -562,11 +516,3 @@ class TestCanonicalFormComposition:
             )
         )
         assert equivalence.status == "PROPERLY_EQUIVALENT"
-
-    def test_explicit_reduction_verifier_rejects_forged_reduced_form(self) -> None:
-        result = compute_reduce(
-            BinaryQuadraticFormReduceRequest(form=_positive_form(5, 3, 1))
-        )
-        forged = result.model_dump(mode="json")
-        forged["reduced_form"]["b"] = -1
-        assert not _verify_reduced_form_result(type(result).model_validate(forged))

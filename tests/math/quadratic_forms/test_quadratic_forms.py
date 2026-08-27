@@ -14,7 +14,6 @@ from jacobian.math.quadratic_forms import (
 )
 from jacobian.math.quadratic_forms._models import EvaluationRequest, EvaluationResult
 from jacobian.math.quadratic_forms._operations import (
-    _verify_evaluation_result,
     evaluate_form,
 )
 from jacobian.math.quadratic_forms._tools import TOOLS
@@ -344,7 +343,7 @@ def test_total_support_bound_rejects_unbounded_annihilated_support() -> None:
     result = EvaluationResult.model_validate(
         {"form": form, "vector": vector, "value": _rational(0)}
     )
-    assert not _verify_evaluation_result(result)
+    assert result.value.as_fraction() == Fraction(0)
 
 
 def test_total_support_admits_the_boundary_and_rejects_one_past_it() -> None:

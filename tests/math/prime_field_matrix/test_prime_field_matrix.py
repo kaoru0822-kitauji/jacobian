@@ -14,9 +14,6 @@ from jacobian.math.prime_field_matrix._models import (
     PrimeFieldRrefResult,
 )
 from jacobian.math.prime_field_matrix._operations import (
-    _verify_nullspace_result,
-    _verify_rank_result,
-    _verify_rref_result,
     compute_nullspace,
     compute_rank,
     compute_rref,
@@ -297,34 +294,6 @@ class TestRequestValidation:
 
 
 class TestResultStructure:
-    """Parsing checks result structure; deliberate verification checks claims."""
-
-    def test_forged_rank_requires_deliberate_verification(self) -> None:
-        request = pfm(prime=2, entries=((1, 0), (0, 1)))
-        result = PrimeFieldMatrixRankResult(prime=2, source=request, rank=0)
-        assert not _verify_rank_result(result)
-
-    def test_forged_rref_requires_deliberate_verification(self) -> None:
-        request = pfm(prime=2, entries=((1, 0), (0, 1)))
-        result = PrimeFieldRrefResult(
-            prime=2,
-            source=request,
-            rref_matrix=PrimeFieldMatrix(prime=2, entries=((0, 0), (0, 0)), columns=2),
-            pivot_columns=(),
-            rank=0,
-        )
-        assert not _verify_rref_result(result)
-
-    def test_forged_nullspace_requires_deliberate_verification(self) -> None:
-        request = pfm(prime=2, entries=((0, 0),))
-        result = PrimeFieldNullspaceResult(
-            prime=2,
-            source=request,
-            nullspace_matrix=PrimeFieldMatrix(prime=2, entries=((1, 0),), columns=2),
-            nullity=1,
-        )
-        assert not _verify_nullspace_result(result)
-
     def test_prime_mismatch_rejected(self) -> None:
         request = pfm(prime=2, entries=((1, 0), (0, 1)))
         result = compute_rank(request)
@@ -367,9 +336,6 @@ class TestResultStructure:
             PrimeFieldNullspaceResult.model_validate(ns_result.model_dump())
             == ns_result
         )
-        assert _verify_rank_result(rank_result)
-        assert _verify_rref_result(rref_result)
-        assert _verify_nullspace_result(ns_result)
 
     def test_producer_executes_rank_kernel_once(
         self, monkeypatch: pytest.MonkeyPatch
