@@ -6,7 +6,6 @@ from fractions import Fraction
 
 from jacobian._exact import CanonicalRational
 from jacobian.math.finite_stochastic_processes._poisson_binomial_models import (
-    PoissonBinomialAdmission,
     _admit_probabilities,
 )
 from jacobian.math.probability._distribution import (
@@ -30,18 +29,16 @@ def poisson_binomial(
     probabilities: tuple[CanonicalRational, ...],
 ) -> FiniteRationalDistribution:
     """Return the exact count distribution of independent Bernoulli trials."""
-    admission = _admit_probabilities(
-        tuple(probability.as_fraction() for probability in probabilities)
-    )
-    return _poisson_binomial_kernel(admission)
+    values = tuple(probability.as_fraction() for probability in probabilities)
+    _admit_probabilities(values)
+    return _poisson_binomial_kernel(values)
 
 
 def _poisson_binomial_kernel(
-    admission: PoissonBinomialAdmission,
+    values: tuple[Fraction, ...],
 ) -> FiniteRationalDistribution:
-    """Run the recurrence from one already-admitted request-scoped plan."""
+    """Run the recurrence from one already-admitted probability tuple."""
 
-    values = admission.probabilities
     distribution = [Fraction(0)] * (len(values) + 1)
     distribution[0] = Fraction(1)
     for probability in values:

@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from fractions import Fraction
 from typing import Self
 
-from pydantic import Field, PrivateAttr, model_validator
+from pydantic import Field, model_validator
 
 from jacobian._exact import CanonicalRational
 from jacobian._models import StrictModel
@@ -19,39 +18,13 @@ MAX_PROBABILITIES = 255
 MAX_INTERMEDIATE_RATIONAL_DIGITS = MAX_RESULT_RATIONAL_DIGITS
 
 
-@dataclass(frozen=True, slots=True)
-class PoissonBinomialAdmission:
-    """Request-scoped semantic admission and recurrence input."""
-
-    probabilities: tuple[Fraction, ...]
-
-
 class PoissonBinomialRequest(StrictModel):
     """A list of canonical rational Bernoulli success probabilities."""
-
-    _admission_plan: PoissonBinomialAdmission = PrivateAttr()
 
     probabilities: tuple[CanonicalRational, ...] = Field(
         min_length=1,
         max_length=MAX_PROBABILITIES,
     )
-
-    @model_validator(mode="after")
-    def require_probability_domain_and_digit_budget(self) -> Self:
-        object.__setattr__(
-            self,
-            "_admission_plan",
-            _admit_probabilities(
-                tuple(probability.as_fraction() for probability in self.probabilities)
-            ),
-        )
-        return self
-
-    @property
-    def admission_plan(self) -> PoissonBinomialAdmission:
-        """Return the immutable plan established by request admission."""
-
-        return self._admission_plan
 
 
 class PoissonBinomialResult(StrictModel):
@@ -78,9 +51,6 @@ class PoissonBinomialResult(StrictModel):
             for probability in self.probabilities
         ):
             raise ValueError("probabilities must lie in the closed unit interval")
-        require_admitted_probabilities(
-            tuple(probability.as_fraction() for probability in self.probabilities)
-        )
         return self
 
     @classmethod
@@ -99,8 +69,8 @@ class PoissonBinomialResult(StrictModel):
 
 def _admit_probabilities(
     probabilities: tuple[Fraction, ...],
-) -> PoissonBinomialAdmission:
-    """Validate probabilities and return their request-scoped execution plan."""
+) -> None:
+    """Validate the exact native computation envelope."""
 
     if not 1 <= len(probabilities) <= MAX_PROBABILITIES:
         raise ValueError(
@@ -130,21 +100,10 @@ def _admit_probabilities(
             "probability denominators exceed the exact result digit budget of "
             f"{MAX_INTERMEDIATE_RATIONAL_DIGITS} digits"
         )
-    return PoissonBinomialAdmission(probabilities=probabilities)
-
-
-def require_admitted_probabilities(probabilities: tuple[Fraction, ...]) -> None:
-    """Validate native probabilities and the complete exact result envelope."""
-
-    _admit_probabilities(probabilities)
-
-
 __all__ = [
     "MAX_INPUT_RATIONAL_DIGITS",
     "MAX_INTERMEDIATE_RATIONAL_DIGITS",
     "MAX_PROBABILITIES",
-    "PoissonBinomialAdmission",
     "PoissonBinomialRequest",
     "PoissonBinomialResult",
-    "require_admitted_probabilities",
 ]

@@ -3,7 +3,6 @@
 from fractions import Fraction
 
 import pytest
-from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
 from jacobian.math.finite_stochastic_processes import poisson_binomial
@@ -12,7 +11,6 @@ from jacobian.math.finite_stochastic_processes._poisson_binomial_models import (
 )
 from jacobian.math.finite_stochastic_processes._poisson_binomial_operations import (
     compute_poisson_binomial,
-    verify_poisson_binomial_result,
 )
 
 
@@ -79,22 +77,18 @@ def test_three_fair_coins() -> None:
     assert sum(dist) == Fraction(1)
 
 
-def test_rejects_probabilities_outside_the_unit_interval() -> None:
-    with pytest.raises(ValidationError, match="closed unit interval"):
-        PoissonBinomialRequest(
-            probabilities=(CanonicalRational.from_integer_ratio(-1, 2),)
-        )
-    with pytest.raises(ValidationError, match="closed unit interval"):
-        PoissonBinomialRequest(
-            probabilities=(CanonicalRational.from_integer_ratio(2, 1),)
-        )
+def test_native_admission_rejects_probabilities_outside_the_unit_interval() -> None:
+    with pytest.raises(ValueError, match="closed unit interval"):
+        poisson_binomial((CanonicalRational.from_integer_ratio(-1, 2),))
+    with pytest.raises(ValueError, match="closed unit interval"):
+        poisson_binomial((CanonicalRational.from_integer_ratio(2, 1),))
 
 
-def test_rejects_result_digit_growth_before_execution() -> None:
+def test_native_admission_rejects_result_digit_growth_before_execution() -> None:
     denominator = str(10**97 + 3)
-    with pytest.raises(ValidationError, match="exact result digit budget"):
-        PoissonBinomialRequest(
-            probabilities=(CanonicalRational(num="1", den=denominator),) * 45
+    with pytest.raises(ValueError, match="exact result digit budget"):
+        poisson_binomial(
+            (CanonicalRational(num="1", den=denominator),) * 45
         )
 
 
@@ -126,30 +120,6 @@ def test_serialized_result_probabilities_compose_into_request() -> None:
     request = PoissonBinomialRequest.model_validate(payload)
 
     assert request.probabilities == result.probabilities
-
-
-def test_result_verifier_rejects_forged_serialized_distribution_masses() -> None:
-    result = compute_poisson_binomial(
-        PoissonBinomialRequest(
-            probabilities=(CanonicalRational.from_integer_ratio(1, 2),)
-        )
-    )
-    assert verify_poisson_binomial_result(result)
-
-    payload = result.model_dump(mode="json")
-    payload["count_distribution"]["atoms"] = [
-        {
-            "value": {"num": "0", "den": "1"},
-            "probability": {"num": "1", "den": "1"},
-        },
-        {
-            "value": {"num": "1", "den": "1"},
-            "probability": {"num": "0", "den": "1"},
-        },
-    ]
-    forged = type(result).model_validate(payload)
-
-    assert not verify_poisson_binomial_result(forged)
 
 
 def test_result_distribution_round_trips_into_finite_raw_moment() -> None:

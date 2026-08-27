@@ -3,7 +3,6 @@
 from itertools import combinations
 
 import pytest
-from pydantic import ValidationError
 
 from jacobian.canonical import CanonicalLimits, canonicalize_json
 from jacobian.math.hypergraphs._models import (
@@ -13,7 +12,6 @@ from jacobian.math.hypergraphs._models import (
 )
 from jacobian.math.hypergraphs._operations import (
     compute_induced_type_profile,
-    verify_induced_type_profile_result,
 )
 
 # The Fano-plane-like hypergraph used across the domain.
@@ -127,26 +125,21 @@ class TestInducedTypeProfile:
         assert counts[("a", "b")] == 1
 
     def test_subset_size_exceeds_vertex_count_rejected(self) -> None:
-        with pytest.raises(ValidationError):
-            InducedTypeProfileRequest(
-                hypergraph=FiniteHypergraph.model_validate(HYPERGRAPH),
-                subset_size=5,
-            )
+        with pytest.raises(ValueError):
+            _profile(HYPERGRAPH, 5)
 
     def test_subset_exceeds_profile_bound_rejected(self) -> None:
         # C(20, 10) = 184_756 > 4096 bound
         hg = {"vertices": [f"v{i}" for i in range(20)], "edges": []}
-        with pytest.raises(ValidationError):
-            InducedTypeProfileRequest(
-                hypergraph=FiniteHypergraph.model_validate(hg), subset_size=10
-            )
+        with pytest.raises(ValueError):
+            _profile(hg, 10)
 
     def test_profile_bound_accounts_for_actual_subset_label_bytes(self) -> None:
         wide_vertices = [f"{index:03d}" + "😀" * 61 for index in range(256)]
-        with pytest.raises(ValidationError, match="canonical output limit"):
-            InducedTypeProfileRequest(
-                hypergraph=FiniteHypergraph(vertices=tuple(wide_vertices), edges=()),
-                subset_size=255,
+        with pytest.raises(ValueError, match="canonical output limit"):
+            _profile(
+                {"vertices": wide_vertices, "edges": []},
+                255,
             )
 
         compact = _profile(
@@ -156,23 +149,6 @@ class TestInducedTypeProfile:
         assert len(canonicalize_json(compact.model_dump(mode="json"))) <= (
             CanonicalLimits().max_output_bytes
         )
-
-    def test_verify_round_trip(self) -> None:
-        result = _profile(HYPERGRAPH, 3)
-        assert verify_induced_type_profile_result(result)
-
-    def test_verify_rejects_tampered_count(self) -> None:
-        result = _profile(HYPERGRAPH, 2)
-        tampered = result.model_copy(
-            update={
-                "entries": (
-                    *result.entries[:1],
-                    result.entries[1].model_copy(update={"induced_edge_count": 99}),
-                    *result.entries[2:],
-                )
-            }
-        )
-        assert not verify_induced_type_profile_result(tampered)
 
     def test_entries_in_lexicographic_order(self) -> None:
         result = _profile(

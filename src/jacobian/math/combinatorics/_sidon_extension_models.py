@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from types import MappingProxyType
 from typing import Self
 
-from pydantic import Field, PrivateAttr, StrictBool, model_validator
+from pydantic import Field, StrictBool, model_validator
 
 from jacobian._models import StrictModel
 from jacobian.math.combinatorics._difference_set_models import (
@@ -285,47 +284,11 @@ class SidonExtensionProfileRequest(StrictModel):
             "admitted from the exact work and result-size budgets."
         )
     )
-    _admission_plan: _SidonExtensionAdmissionPlan | None = PrivateAttr(default=None)
-
     @model_validator(mode="after")
     def require_unique_and_disjoint(self) -> Self:
         _validate_source_and_candidates(
             self.source_elements,
             self.candidate_elements,
-        )
-        _require_extension_work_budget(
-            len(self.source_elements),
-            len(self.candidate_elements),
-        )
-        _require_source_profile_memory_budget(self.source_elements)
-        source_differences = _validate_source_is_sidon(self.source_elements)
-        result_bytes = _maximum_result_bytes(
-            self.source_elements,
-            self.candidate_elements,
-        )
-        candidate_obstructions: tuple[_CandidateObstruction | None, ...] | None = None
-        if result_bytes > MAX_EXTENSION_RESULT_BYTES:
-            candidate_obstructions = tuple(
-                _candidate_obstruction(
-                    self.source_elements,
-                    source_differences,
-                    candidate,
-                )
-                for candidate in self.candidate_elements
-            )
-            result_bytes = _maximum_result_bytes(
-                self.source_elements,
-                self.candidate_elements,
-                candidate_obstructions,
-            )
-        if result_bytes > MAX_EXTENSION_RESULT_BYTES:
-            raise _difference_set_validation_error(
-                "combinatorics.sidon_extension_result_budget",
-                "Sidon extension result exceeds the canonical output budget",
-            )
-        self._admission_plan = _SidonExtensionAdmissionPlan(
-            source_differences=MappingProxyType(source_differences),
-            candidate_obstructions=candidate_obstructions,
         )
         return self
 
@@ -396,7 +359,7 @@ class SidonExtensionProfileResult(StrictModel):
     rejected: tuple[SidonExtensionCandidateResult, ...]
 
     @model_validator(mode="after")
-    def require_complete_replayable_partition(self) -> Self:
+    def require_complete_partition(self) -> Self:
         _validate_profile_structure(
             self.source_elements,
             self.candidate_elements,
@@ -433,16 +396,6 @@ def _validate_profile_structure(
     """Validate cheap source binding, partition, and obstruction structure."""
 
     _validate_source_and_candidates(source_elements, candidate_elements)
-    _require_extension_work_budget(len(source_elements), len(candidate_elements))
-    _require_source_profile_memory_budget(source_elements)
-    _validate_source_is_sidon(source_elements)
-    result_bytes = _maximum_result_bytes(source_elements, candidate_elements)
-    if result_bytes > MAX_EXTENSION_RESULT_BYTES:
-        raise _difference_set_validation_error(
-            "combinatorics.sidon_extension_result_budget",
-            "Sidon extension result exceeds the canonical output budget",
-        )
-
     candidates = tuple(candidate_elements)
     rejected_candidates = tuple(item.candidate for item in rejected)
     partition = (*admissible, *rejected_candidates)
@@ -482,41 +435,6 @@ def _validate_profile_structure(
             )
 
 
-def verify_sidon_extension_profile_result(
-    result: SidonExtensionProfileResult,
-) -> bool:
-    """Replay an independently supplied profile claim within its bound."""
-
-    try:
-        _validate_profile_structure(
-            result.source_elements,
-            result.candidate_elements,
-            result.admissible,
-            result.rejected,
-        )
-    except (TypeError, ValueError):
-        return False
-
-    source_pairs = _ordered_difference_pairs(result.source_elements)
-    for candidate in result.admissible:
-        if (
-            _candidate_obstruction(result.source_elements, source_pairs, candidate)
-            is not None
-        ):
-            return False
-    for item in result.rejected:
-        if (
-            _candidate_obstruction(
-                result.source_elements,
-                source_pairs,
-                item.candidate,
-            )
-            is None
-        ):
-            return False
-    return True
-
-
 def _candidate_obstruction(
     source_elements: tuple[AdditiveInteger, ...],
     source_pairs: Mapping[int, _DifferencePair],
@@ -550,5 +468,4 @@ __all__ = [
     "SidonExtensionObstruction",
     "SidonExtensionProfileRequest",
     "SidonExtensionProfileResult",
-    "verify_sidon_extension_profile_result",
 ]

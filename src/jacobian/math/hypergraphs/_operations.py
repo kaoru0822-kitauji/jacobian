@@ -2,6 +2,7 @@
 
 from jacobian.math.graphs.values import SimpleUndirectedGraph
 from jacobian.math.hypergraphs._models import (
+    MAX_INDUCED_PROFILE_RESULT_BYTES,
     CliqueExpansionRequest,
     CliqueExpansionResult,
     DualRequest,
@@ -29,6 +30,7 @@ from jacobian.math.hypergraphs._models import (
     _induced_type_profile_admission_plan,
     _InducedTypeProfileAdmissionPlan,
     _minimum_transversal_search_plan,
+    _validation_error,
 )
 
 
@@ -411,29 +413,26 @@ def compute_induced_type_profile(
 ) -> InducedTypeProfileResult:
     """Compute the induced uniform type profile of a finite hypergraph."""
 
-    plan = request._admission_plan
+    plan = _induced_type_profile_admission_plan(
+        request.hypergraph,
+        request.subset_size,
+    )
+    if plan.result_bytes > MAX_INDUCED_PROFILE_RESULT_BYTES:
+        raise _validation_error(
+            "the induced type profile would exceed the "
+            f"{MAX_INDUCED_PROFILE_RESULT_BYTES}-byte canonical output limit; "
+            "shorten vertex labels or reduce the profile"
+        )
     rows = _induced_type_profile_data(plan)
     entries = tuple(
         InducedTypeProfileEntry(vertex_subset=subset, induced_edge_count=count)
         for subset, count in rows
     )
-    return InducedTypeProfileResult._from_admitted_kernel(
+    return InducedTypeProfileResult._from_kernel(
         hypergraph=request.hypergraph,
         subset_size=request.subset_size,
         entries=entries,
-        plan=plan,
     )
-
-
-def verify_induced_type_profile_result(
-    result: InducedTypeProfileResult,
-) -> bool:
-    """Verify an independently supplied induced type profile."""
-
-    plan = _induced_type_profile_admission_plan(result.hypergraph, result.subset_size)
-    return tuple(
-        (entry.vertex_subset, entry.induced_edge_count) for entry in result.entries
-    ) == _induced_type_profile_data(plan)
 
 
 def _minimum_transversal_data(

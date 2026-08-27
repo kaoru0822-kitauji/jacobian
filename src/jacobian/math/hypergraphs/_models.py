@@ -8,7 +8,6 @@ from typing import Literal, Self
 
 from pydantic import (
     Field,
-    PrivateAttr,
     StrictBool,
     StrictInt,
     model_validator,
@@ -1008,21 +1007,6 @@ class InducedTypeProfileRequest(StrictModel):
             "k-subsets."
         ),
     )
-    _admission_plan: _InducedTypeProfileAdmissionPlan = PrivateAttr()
-
-    @model_validator(mode="after")
-    def require_bounded_profile(self) -> Self:
-        plan = _induced_type_profile_admission_plan(self.hypergraph, self.subset_size)
-        if plan.result_bytes > MAX_INDUCED_PROFILE_RESULT_BYTES:
-            raise _validation_error(
-                "the induced type profile would exceed the "
-                f"{MAX_INDUCED_PROFILE_RESULT_BYTES}-byte canonical output limit; "
-                "shorten vertex labels or reduce the profile"
-            )
-        self._admission_plan = plan
-        return self
-
-
 def _strict_json_array_size(item_sizes: tuple[int, ...]) -> int:
     """Return the exact canonical JSON size of an array from item sizes."""
 
@@ -1129,40 +1113,16 @@ class InducedTypeProfileResult(StrictModel):
     subset_size: StrictInt = Field(ge=0, le=MAX_INDUCED_SUBSET_SIZE)
     entries: tuple[InducedTypeProfileEntry, ...] = Field(max_length=MAX_INDUCED_SUBSETS)
 
-    @model_validator(mode="after")
-    def bind_induced_type_profile(self) -> Self:
-        plan = _induced_type_profile_admission_plan(self.hypergraph, self.subset_size)
-        if plan.result_bytes > MAX_INDUCED_PROFILE_RESULT_BYTES:
-            raise _validation_error(
-                "the induced type profile would exceed the "
-                f"{MAX_INDUCED_PROFILE_RESULT_BYTES}-byte canonical output limit; "
-                "shorten vertex labels or reduce the profile"
-            )
-        if (
-            tuple(entry.vertex_subset for entry in self.entries)
-            != plan.expected_subsets
-        ):
-            raise _validation_error(
-                "induced type profile entries must list each k-subset of "
-                "vertices exactly once in lexicographic order"
-            )
-        return self
-
     @classmethod
-    def _from_admitted_kernel(
+    def _from_kernel(
         cls,
         *,
         hypergraph: FiniteHypergraph,
         subset_size: int,
         entries: tuple[InducedTypeProfileEntry, ...],
-        plan: _InducedTypeProfileAdmissionPlan,
     ) -> Self:
-        """Construct typed kernel output using its already-admitted plan."""
+        """Construct output after the admitted owner-local kernel completes."""
 
-        if tuple(entry.vertex_subset for entry in entries) != plan.expected_subsets:
-            raise AssertionError(
-                "induced profile kernel output violated its admission plan"
-            )
         return cls.model_construct(
             hypergraph=hypergraph,
             subset_size=subset_size,

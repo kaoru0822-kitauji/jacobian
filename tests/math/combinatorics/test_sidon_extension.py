@@ -19,7 +19,6 @@ from jacobian.math.combinatorics._sidon_extension_models import (
     SidonExtensionProfileRequest,
     SidonExtensionProfileResult,
     _maximum_result_bytes,
-    verify_sidon_extension_profile_result,
 )
 from jacobian.math.combinatorics._sidon_extension_operations import (
     compute_sidon_extension_profile,
@@ -42,7 +41,6 @@ class TestSidonExtensionProfile:
         assert len(result.rejected) == 1
         assert result.rejected[0].candidate == "3"
         assert not result.rejected[0].is_admissible
-        assert verify_sidon_extension_profile_result(result)
 
     def test_all_candidates_admissible(self) -> None:
         """If candidates are far enough, all should be admissible."""
@@ -115,15 +113,15 @@ class TestSidonExtensionProfile:
             str(10**120 + index * base + index * index) for index in range(2_000)
         )
 
-        with pytest.raises(ValidationError) as error:
-            SidonExtensionProfileRequest(
-                source_elements=source,
-                candidate_elements=(),
+        with pytest.raises(ValueError) as error:
+            compute_sidon_extension_profile(
+                SidonExtensionProfileRequest(
+                    source_elements=source,
+                    candidate_elements=(),
+                )
             )
 
-        assert error.value.errors()[0]["type"] == (
-            "combinatorics.sidon_extension_intermediate_budget"
-        )
+        assert "Sidon source-difference profiling" in str(error.value)
 
     def test_large_all_admissible_profile_fits_result_budget(self) -> None:
         """An empty source rules out rejected rows in the result bound."""
@@ -174,15 +172,6 @@ class TestSidonExtensionProfile:
                 admissible=("4",),
                 rejected=(),
             )
-
-    def test_explicit_verifier_rejects_a_forged_admissible_candidate(self) -> None:
-        result = SidonExtensionProfileResult(
-            source_elements=("1", "2"),
-            candidate_elements=("3",),
-            admissible=("3",),
-            rejected=(),
-        )
-        assert not verify_sidon_extension_profile_result(result)
 
     def test_result_rejects_an_unbound_obstruction(self) -> None:
         with pytest.raises(ValidationError):
@@ -261,8 +250,5 @@ class TestSidonExtensionProfile:
             return real_profile(*args, **kwargs)
 
         monkeypatch.setattr(sidon_models, "_ordered_difference_pairs", counted_profile)
-        monkeypatch.setattr(
-            sidon_operations, "_ordered_difference_pairs", counted_profile
-        )
         _extension(["1", "2", "5"], ["3", "4"])
         assert calls == 1
