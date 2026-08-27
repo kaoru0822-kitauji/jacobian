@@ -8,6 +8,7 @@ from jacobian.math.graphs.multicommodity_flow._models import (
     MulticommodityFlow,
     MulticommodityFlowProfileRequest,
     MulticommodityFlowProfileResult,
+    _require_profile_output_admission,
 )
 
 
@@ -17,16 +18,16 @@ def compute_multicommodity_flow_profile(
     """Compute the exact bounded load and conservation profile of one tensor.
 
     The canonical tensor value carries only representation bounds; this
-    execution boundary admits the profile work and result envelope inside
-    its own measured scan. Parsed MCP requests reuse their parse-time scan.
+    execution boundary performs the profile's semantic admission and exact
+    computation. Request parsing remains structural.
     """
 
-    return _profile_result(flow, None)
+    return _profile_result(flow, _require_profile_output_admission(flow))
 
 
 def _profile_result(
     flow: MulticommodityFlow,
-    admitted: AdmittedProfileScan | None,
+    admitted: AdmittedProfileScan,
 ) -> MulticommodityFlowProfileResult:
     (
         divergences,
@@ -52,11 +53,11 @@ def _run_multicommodity_flow_profile(
 ) -> MulticommodityFlowProfileResult:
     """Run one parsed MCP request through the native profile computation.
 
-    Request validation already performed and admitted the operation's single
-    component scan; it is reused directly by the producer.
+    The wire request is structural. Native execution performs semantic
+    admission once and passes the resulting reusable scan to the kernel.
     """
 
-    return _profile_result(request.flow, request._admitted_scan)
+    return _profile_result(request.flow, _require_profile_output_admission(request.flow))
 
 
 __all__ = ["compute_multicommodity_flow_profile"]

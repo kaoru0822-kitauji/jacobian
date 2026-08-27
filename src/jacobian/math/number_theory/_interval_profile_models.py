@@ -7,7 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import ClassVar, Self
 
-from pydantic import ConfigDict, Field, PrivateAttr, StrictInt, model_validator
+from pydantic import ConfigDict, Field, StrictInt, model_validator
 
 from jacobian._models import StrictModel
 from jacobian.canonical import CanonicalLimits
@@ -183,42 +183,14 @@ class IntervalProfileRequest(StrictModel):
     )
     _work_estimator: ClassVar[_WORK_ESTIMATOR] = _estimate_factor_profile_work
     _max_width: ClassVar[int | None] = MAX_INTERVAL_WIDTH
-    _admission: IntervalAdmission = PrivateAttr()
-
     @model_validator(mode="after")
-    def require_admitted_interval(self) -> Self:
+    def require_ordered_interval(self) -> Self:
         if self.upper_bound < self.lower_bound:
             raise ValueError("upper_bound must be >= lower_bound")
-        max_width = type(self)._max_width
-        if max_width is not None and self.width() > max_width:
-            raise ValueError("interval width exceeds maximum supported width")
-        estimated_result_bytes = type(self)._result_estimator(
-            self.lower_bound, self.upper_bound
-        )
-        if estimated_result_bytes > MAX_PROFILE_RESULT_BYTES:
-            raise ValueError("interval result exceeds the canonical output budget")
-        estimated_work = type(self)._work_estimator(self.lower_bound, self.upper_bound)
-        if estimated_work > MAX_SIEVE_WORK:
-            raise ValueError(
-                "interval exceeds the segmented-sieve work budget of "
-                f"{MAX_SIEVE_WORK} steps"
-            )
-        self._admission = IntervalAdmission(
-            lower_bound=self.lower_bound,
-            upper_bound=self.upper_bound,
-            width=self.width(),
-            estimated_work=estimated_work,
-            estimated_result_bytes=estimated_result_bytes,
-        )
         return self
 
     def width(self) -> int:
         return self.upper_bound - self.lower_bound + 1
-
-    @property
-    def admission(self) -> IntervalAdmission:
-        """Return the admission decision computed during request validation."""
-        return self._admission
 
 
 class SquarefreeProfileRequest(IntervalProfileRequest):

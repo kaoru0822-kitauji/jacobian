@@ -5,7 +5,7 @@ from __future__ import annotations
 from fractions import Fraction
 from typing import NamedTuple, Self
 
-from pydantic import Field, PrivateAttr, StrictStr, model_validator
+from pydantic import Field, StrictStr, model_validator
 from pydantic_core import PydanticCustomError
 
 from jacobian._exact import MAX_CANONICAL_RATIONAL_DIGITS, CanonicalRational
@@ -55,10 +55,10 @@ MAX_COMMODITY_VERTEX_CELLS = 512
 # when its own component bounds limit the two sides separately; the
 # conservative row overhead reserves ASCII keys, labels, separators, and
 # vertices. This envelope belongs to the profile operation, not to the
-# canonical tensor value: request parsing performs the operation's single
-# component scan, admits work and result envelope from it, and hands the
-# measured components directly to the producer. The work ledger records that
-# one bounded scan; result parsing does not repeat mathematical execution.
+# canonical tensor value: the profile operation performs one component scan,
+# admits work and result envelope from it, and hands the measured components
+# directly to the producer. The work ledger records that one bounded scan;
+# request and result parsing do not perform mathematical execution.
 MAX_PROFILE_RESULT_BYTES = 8 * 1024 * 1024
 _DIVERGENCE_ROW_OVERHEAD_BYTES = 128
 _EDGE_ROW_OVERHEAD_BYTES = 128
@@ -543,11 +543,10 @@ def derived_profile_digit_budget(flow: MulticommodityFlow) -> int:
 def _require_profile_output_admission(flow: MulticommodityFlow) -> AdmittedProfileScan:
     """Admit the profile envelope and return its once-computed components.
 
-    Request parsing runs this complete mathematical validation so every
-    accepted ``math.run`` request reaches the kernel guaranteed admissible,
-    and native callers get the same typed rejection before any result
-    construction. The returned scan is reused directly by the producer, so
-    an accepted call executes one charged pass.
+    The native operation runs this complete mathematical validation so every
+    accepted request reaches the kernel guaranteed admissible. The returned
+    scan is reused directly by the producer, so an accepted call executes
+    one charged pass.
     """
 
     _require_profile_source_room(flow)
@@ -715,13 +714,6 @@ class MulticommodityFlowProfileRequest(StrictModel):
         )
     )
 
-    _admitted_scan: AdmittedProfileScan | None = PrivateAttr(default=None)
-
-    @model_validator(mode="after")
-    def require_admitted_profile_work_and_result(self) -> Self:
-        self._admitted_scan = _require_profile_output_admission(self.flow)
-        return self
-
 
 class CommodityDivergence(StrictModel):
     """The exact outgoing-minus-incoming flow for one commodity at one vertex."""
@@ -834,27 +826,6 @@ class MulticommodityFlowProfileResult(StrictModel):
             congestion=congestion,
             work=work,
         )
-
-
-def _verify_multicommodity_flow_profile_result(
-    result: MulticommodityFlowProfileResult,
-) -> None:
-    """Recompute one independently supplied profile under normal admission."""
-
-    from jacobian.math.graphs.multicommodity_flow._kernel import profile_components
-
-    request = MulticommodityFlowProfileRequest(flow=result.flow)
-    expected = profile_components(result.flow, request._admitted_scan)
-    actual = (
-        result.divergences,
-        result.edge_profiles,
-        result.all_demands_routed,
-        result.capacity_feasible,
-        result.congestion,
-        result.work,
-    )
-    if actual != expected:
-        raise ValueError("result must match the exact multicommodity-flow profile")
 
 
 __all__ = [

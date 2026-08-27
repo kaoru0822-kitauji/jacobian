@@ -17,6 +17,8 @@ from __future__ import annotations
 import math
 
 from jacobian.math.number_theory._interval_profile_models import (
+    MAX_PROFILE_RESULT_BYTES,
+    MAX_SIEVE_WORK,
     DivisorCountProfileRequest,
     DivisorCountProfileResult,
     DivisorCountProfileRow,
@@ -40,6 +42,34 @@ from jacobian.math.number_theory._interval_profile_models import (
     SquarefreeProfileRequest,
     SquarefreeProfileResult,
 )
+
+
+def _admit_interval(request: IntervalProfileRequest) -> IntervalAdmission:
+    """Build one operation-local execution envelope after wire parsing."""
+    max_width = type(request)._max_width
+    width = request.width()
+    if max_width is not None and width > max_width:
+        raise ValueError("interval width exceeds maximum supported width")
+    estimated_result_bytes = type(request)._result_estimator(
+        request.lower_bound, request.upper_bound
+    )
+    if estimated_result_bytes > MAX_PROFILE_RESULT_BYTES:
+        raise ValueError("interval result exceeds the canonical output budget")
+    estimated_work = type(request)._work_estimator(
+        request.lower_bound, request.upper_bound
+    )
+    if estimated_work > MAX_SIEVE_WORK:
+        raise ValueError(
+            "interval exceeds the segmented-sieve work budget of "
+            f"{MAX_SIEVE_WORK} steps"
+        )
+    return IntervalAdmission(
+        lower_bound=request.lower_bound,
+        upper_bound=request.upper_bound,
+        width=width,
+        estimated_work=estimated_work,
+        estimated_result_bytes=estimated_result_bytes,
+    )
 
 
 def _simple_sieve(limit: int) -> list[int]:
@@ -147,7 +177,7 @@ def compute_squarefree_profile(
 ) -> SquarefreeProfileResult:
     """Partition [L, U] into squarefree and non-squarefree integers."""
     request = _require_request_type(request, SquarefreeProfileRequest)
-    return _squarefree_profile_kernel(request.admission)
+    return _squarefree_profile_kernel(_admit_interval(request))
 
 
 def _squarefree_profile_kernel(admission: IntervalAdmission) -> SquarefreeProfileResult:
@@ -193,7 +223,7 @@ def compute_divisor_count_profile(
 ) -> DivisorCountProfileResult:
     """Compute tau(n) for every n in [L, U]."""
     request = _require_request_type(request, DivisorCountProfileRequest)
-    return _divisor_count_profile_kernel(request.admission)
+    return _divisor_count_profile_kernel(_admit_interval(request))
 
 
 def _divisor_count_profile_kernel(
@@ -242,7 +272,7 @@ def compute_greatest_prime_factor_profile(
 ) -> GreatestPrimeFactorProfileResult:
     """Compute P+(n) for every n in [L, U]."""
     request = _require_request_type(request, GreatestPrimeFactorProfileRequest)
-    return _greatest_prime_factor_profile_kernel(request.admission)
+    return _greatest_prime_factor_profile_kernel(_admit_interval(request))
 
 
 def _greatest_prime_factor_profile_kernel(
@@ -289,7 +319,7 @@ def compute_prime_gap_profile(
 ) -> PrimeGapProfileResult:
     """Compute consecutive-prime gaps for primes p with L <= p <= U."""
     request = _require_request_type(request, PrimeGapProfileRequest)
-    return _prime_gap_profile_kernel(request.admission)
+    return _prime_gap_profile_kernel(_admit_interval(request))
 
 
 def _prime_gap_profile_kernel(admission: IntervalAdmission) -> PrimeGapProfileResult:
@@ -334,7 +364,9 @@ def compute_least_prime_factor_profile(
     request: LeastPrimeFactorProfileRequest,
 ) -> LeastPrimeFactorProfileResult:
     """Compute p(n), the least prime factor, for every n in [L, U]."""
-    admission = _require_request_type(request, LeastPrimeFactorProfileRequest).admission
+    admission = _admit_interval(
+        _require_request_type(request, LeastPrimeFactorProfileRequest)
+    )
     lo, hi = admission.lower_bound, admission.upper_bound
     _, _, least_prime_factors, _, _ = _segmented_factor_profile_data(lo, hi)
     rows = tuple(
@@ -348,7 +380,9 @@ def compute_euler_totient_profile(
     request: EulerTotientProfileRequest,
 ) -> EulerTotientProfileResult:
     """Compute phi(n), Euler's totient, for every n in [L, U]."""
-    admission = _require_request_type(request, EulerTotientProfileRequest).admission
+    admission = _admit_interval(
+        _require_request_type(request, EulerTotientProfileRequest)
+    )
     lo, hi = admission.lower_bound, admission.upper_bound
     _, _, _, euler_totients, _ = _segmented_factor_profile_data(lo, hi)
     rows = tuple(
@@ -362,7 +396,7 @@ def compute_divisor_sum_profile(
     request: DivisorSumProfileRequest,
 ) -> DivisorSumProfileResult:
     """Compute sigma(n), the divisor sum, for every n in [L, U]."""
-    admission = _require_request_type(request, DivisorSumProfileRequest).admission
+    admission = _admit_interval(_require_request_type(request, DivisorSumProfileRequest))
     lo, hi = admission.lower_bound, admission.upper_bound
     _, _, _, _, divisor_sums = _segmented_factor_profile_data(lo, hi)
     rows = tuple(

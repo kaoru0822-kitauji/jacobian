@@ -23,6 +23,7 @@ from jacobian.math.number_theory._interval_profile_models import (
     _estimate_successor_prime_search_work,
 )
 from jacobian.math.number_theory._interval_profile_operations import (
+    _admit_interval,
     compute_divisor_count_profile,
     compute_divisor_sum_profile,
     compute_euler_totient_profile,
@@ -106,18 +107,20 @@ class TestSquarefreeProfile:
             IntervalProfileRequest(lower_bound=2, upper_bound=1)
 
     def test_request_rejects_overwide_interval(self) -> None:
-        with pytest.raises(ValidationError, match="interval width exceeds"):
-            IntervalProfileRequest(
-                lower_bound=1,
-                upper_bound=MAX_INTERVAL_WIDTH + 1,
-            )
+        request = IntervalProfileRequest(
+            lower_bound=1,
+            upper_bound=MAX_INTERVAL_WIDTH + 1,
+        )
+        with pytest.raises(ValueError, match="interval width exceeds"):
+            _admit_interval(request)
 
     def test_request_rejects_result_over_canonical_budget(self) -> None:
-        with pytest.raises(ValidationError, match="canonical output budget"):
-            DivisorCountProfileRequest(
-                lower_bound=1,
-                upper_bound=MAX_INTERVAL_WIDTH,
-            )
+        request = DivisorCountProfileRequest(
+            lower_bound=1,
+            upper_bound=MAX_INTERVAL_WIDTH,
+        )
+        with pytest.raises(ValueError, match="canonical output budget"):
+            _admit_interval(request)
 
     def test_operation_specific_result_bounds_preserve_sparse_profiles(self) -> None:
         sparse_width = MAX_INTERVAL_WIDTH + 1
@@ -126,13 +129,17 @@ class TestSquarefreeProfile:
 
         assert squarefree.width() == sparse_width
         assert prime_gap.width() == sparse_width
-        assert squarefree.admission.estimated_result_bytes <= MAX_PROFILE_RESULT_BYTES
-        assert prime_gap.admission.estimated_result_bytes <= MAX_PROFILE_RESULT_BYTES
-        with pytest.raises(ValidationError, match="canonical output budget"):
-            DivisorCountProfileRequest(lower_bound=1, upper_bound=MAX_INTERVAL_WIDTH)
-        with pytest.raises(ValidationError, match="canonical output budget"):
-            GreatestPrimeFactorProfileRequest(
-                lower_bound=1, upper_bound=MAX_INTERVAL_WIDTH
+        assert _admit_interval(squarefree).estimated_result_bytes <= MAX_PROFILE_RESULT_BYTES
+        assert _admit_interval(prime_gap).estimated_result_bytes <= MAX_PROFILE_RESULT_BYTES
+        with pytest.raises(ValueError, match="canonical output budget"):
+            _admit_interval(
+                DivisorCountProfileRequest(lower_bound=1, upper_bound=MAX_INTERVAL_WIDTH)
+            )
+        with pytest.raises(ValueError, match="canonical output budget"):
+            _admit_interval(
+                GreatestPrimeFactorProfileRequest(
+                    lower_bound=1, upper_bound=MAX_INTERVAL_WIDTH
+                )
             )
 
     def test_narrow_high_intervals_use_work_and_result_budgets(self) -> None:
@@ -145,8 +152,9 @@ class TestSquarefreeProfile:
 
         for request_type in requests:
             request = request_type(lower_bound=10_000_001, upper_bound=10_000_001)
-            assert request.admission.estimated_work <= MAX_SIEVE_WORK
-            assert request.admission.estimated_result_bytes <= MAX_PROFILE_RESULT_BYTES
+            admission = _admit_interval(request)
+            assert admission.estimated_work <= MAX_SIEVE_WORK
+            assert admission.estimated_result_bytes <= MAX_PROFILE_RESULT_BYTES
 
     def test_prime_gap_bounds_rows_by_interval_density(self) -> None:
         request = PrimeGapProfileRequest(
@@ -154,12 +162,12 @@ class TestSquarefreeProfile:
             upper_bound=10_000_000,
         )
 
-        assert request.admission.estimated_result_bytes <= MAX_PROFILE_RESULT_BYTES
+        assert _admit_interval(request).estimated_result_bytes <= MAX_PROFILE_RESULT_BYTES
 
     def test_prime_gap_work_charges_successor_search(self) -> None:
         request = PrimeGapProfileRequest(lower_bound=1, upper_bound=1_000_001)
 
-        assert request.admission.estimated_work == _estimate_prime_gap_work(
+        assert _admit_interval(request).estimated_work == _estimate_prime_gap_work(
             request.lower_bound, request.upper_bound
         )
         assert _estimate_successor_prime_search_work(request.upper_bound) > 0
@@ -175,8 +183,9 @@ class TestSquarefreeProfile:
             compute_greatest_prime_factor_profile(sparse_request)  # type: ignore[arg-type]
 
     def test_work_budget_replaces_fixed_upper_bound(self) -> None:
-        with pytest.raises(ValidationError, match="segmented-sieve work budget"):
-            SquarefreeProfileRequest(lower_bound=10**13, upper_bound=10**13)
+        request = SquarefreeProfileRequest(lower_bound=10**13, upper_bound=10**13)
+        with pytest.raises(ValueError, match="segmented-sieve work budget"):
+            compute_squarefree_profile(request)
 
     def test_prime_square_boundary(self) -> None:
         """4 = 2^2 is the first non-squarefree, 9 = 3^2 is another."""

@@ -11,9 +11,6 @@ from jacobian.math.graphs.multicommodity_flow._models import (
     EdgeLoadProfile,
     MulticommodityFlow,
     MulticommodityFlowProfileWork,
-    _require_admitted_profile_rows,
-    _require_profile_source_room,
-    measured_profile_components,
 )
 
 
@@ -29,7 +26,7 @@ def _wire(value: Fraction, *, max_digits: int) -> CanonicalRational:
 
 def profile_components(
     flow: MulticommodityFlow,
-    admitted: AdmittedProfileScan | None = None,
+    admitted: AdmittedProfileScan,
 ) -> tuple[
     tuple[CommodityDivergence, ...],
     tuple[EdgeLoadProfile, ...],
@@ -44,24 +41,12 @@ def profile_components(
     and aggregate edge loads.  The aggregate result envelope is admitted from
     the same measured components -- the echoed source before the scan, every
     priced row afterwards -- so admission adds no arithmetic pass of its own.
-    Request parsing may supply ``admitted``, the scan it already performed
-    and validated against, which then serves as this producer pass verbatim;
-    otherwise the pass runs here. Result parsing performs structural checks
-    only and never re-enters this kernel.
+    The caller supplies the admitted scan, which serves as the producer pass
+    verbatim. Request and result parsing perform structural checks only and
+    never re-enter this kernel.
     """
 
-    if admitted is None:
-        _require_profile_source_room(flow)
-        scan = measured_profile_components(flow)
-        _require_admitted_profile_rows(
-            flow,
-            scan.cell_bounds,
-            scan.load_bounds,
-            scan.slack_bounds,
-            scan.congestion_bound,
-        )
-    else:
-        scan = admitted
+    scan = admitted
 
     commodity_ids = tuple(commodity.commodity_id for commodity in flow.commodities)
     divergences = scan.divergences

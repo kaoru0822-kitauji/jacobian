@@ -24,7 +24,6 @@ from jacobian.math.graphs.multicommodity_flow._models import (
     MulticommodityFlowProfileRequest,
     MulticommodityFlowProfileResult,
     _profile_component_digit_bounds,
-    _verify_multicommodity_flow_profile_result,
     derived_profile_digit_budget,
 )
 from jacobian.math.graphs.multicommodity_flow._operations import (
@@ -447,8 +446,7 @@ def test_operand_digit_budget_bounds_the_canonical_boundary() -> None:
             CanonicalRational(num="9" * 32_768, den="1"),
         )
     )
-    with multicommodity_validation_error():
-        MulticommodityFlowProfileRequest(flow=over_boundary)
+    MulticommodityFlowProfileRequest(flow=over_boundary)
     with pytest.raises(ValueError, match="canonical cap"):
         compute_multicommodity_flow_profile(over_boundary)
 
@@ -854,10 +852,12 @@ def test_result_envelope_prices_rows_at_their_actual_sides() -> None:
 
     # Unit-capacity edges carrying 22,000-digit amounts make the echoed
     # entries, divergence cells, loads, slacks, and congestion genuinely
-    # exceed 8 MiB together, so request parsing fails closed before any
-    # backend.
-    with multicommodity_validation_error():
-        MulticommodityFlowProfileRequest(flow=comb_amount_tensor(22_000))
+    # exceed 8 MiB together. Wire parsing remains structural; execution
+    # admission rejects the profile before result construction.
+    flow = comb_amount_tensor(22_000)
+    MulticommodityFlowProfileRequest(flow=flow)
+    with pytest.raises(ValueError, match="aggregate result bound"):
+        compute_multicommodity_flow_profile(flow)
 
 
 def test_congestion_bound_uses_the_capacity_denominator() -> None:
@@ -1009,8 +1009,6 @@ def test_returned_congestion_ratio_is_still_capped() -> None:
     # cap still applies to it fail-closed on both surfaces: narrowing the
     # scan to returned values did not widen the returned-value contract.
     flow = oversized_ratio_tensor()
-    with multicommodity_validation_error():
-        MulticommodityFlowProfileRequest(flow=flow)
     with pytest.raises(ValueError, match="canonical cap"):
         compute_multicommodity_flow_profile(flow)
 
@@ -1114,8 +1112,7 @@ def test_coprime_denominator_flood_fails_closed() -> None:
     flood = MulticommodityFlow(
         network=network, commodities=commodities, entries=entries
     )
-    with multicommodity_validation_error():
-        MulticommodityFlowProfileRequest(flow=flood)
+    MulticommodityFlowProfileRequest(flow=flood)
     with pytest.raises(ValueError, match="canonical cap"):
         compute_multicommodity_flow_profile(flood)
 
@@ -1174,12 +1171,10 @@ def test_oversized_source_is_rejected_before_the_component_scan(
 
     monkeypatch.setattr(_models, "_profile_component_digit_bounds", bounds_spy)
     monkeypatch.setattr(_models, "_component_sums_with_folds", scan_spy)
-    # Request parsing measures the echoed source first and fails closed
-    # before its own component measurement, and execution therefore never
-    # starts, so neither spy records the tensor.
+    # Request parsing remains structural. Execution measures the echoed source
+    # before its own component scan and therefore never starts the scan.
     flow = oversized_echo_flow()
-    with multicommodity_validation_error():
-        MulticommodityFlowProfileRequest(flow=flow)
+    MulticommodityFlowProfileRequest(flow=flow)
     assert measured == []
     assert executed == []
     # A native call is rejected by the same preflight inside the kernel's
@@ -1237,8 +1232,7 @@ def test_oversized_source_rejection_precedes_a_doomed_exact_scan() -> None:
             ),
         ),
     )
-    with multicommodity_validation_error():
-        MulticommodityFlowProfileRequest(flow=doomed_echo)
+    MulticommodityFlowProfileRequest(flow=doomed_echo)
     with pytest.raises(ValueError, match="aggregate result bound"):
         compute_multicommodity_flow_profile(doomed_echo)
 
@@ -1464,8 +1458,7 @@ def test_folds_are_bounded_by_the_intermediate_budget_not_the_component_cap() ->
             ),
         ),
     )
-    with multicommodity_validation_error():
-        MulticommodityFlowProfileRequest(flow=cancelling_cell)
+    MulticommodityFlowProfileRequest(flow=cancelling_cell)
     with pytest.raises(ValueError, match="fold-intermediate budget"):
         compute_multicommodity_flow_profile(cancelling_cell)
 
@@ -1515,13 +1508,12 @@ def test_near_cap_coprime_growth_aborts_within_budget_sized_arithmetic() -> None
             ),
         ),
     )
-    with multicommodity_validation_error():
-        MulticommodityFlowProfileRequest(flow=near_cap_growth)
+    MulticommodityFlowProfileRequest(flow=near_cap_growth)
     with pytest.raises(ValueError, match="fold-intermediate budget"):
         compute_multicommodity_flow_profile(near_cap_growth)
 
 
-def test_structural_round_trip_and_private_verifier_rejects_forged_claims() -> None:
+def test_result_round_trip_and_validation_remains_structural_only() -> None:
     result = compute_multicommodity_flow_profile(shared_bottleneck_flow())
     payload = result.model_dump(mode="json")
 
@@ -1529,18 +1521,12 @@ def test_structural_round_trip_and_private_verifier_rejects_forged_claims() -> N
 
     forged_load = deepcopy(payload)
     forged_load["edge_profiles"][2]["load"] = {"num": "2", "den": "1"}
-    parsed_load = MulticommodityFlowProfileResult.model_validate(forged_load)
-    with pytest.raises(ValueError, match="must match"):
-        _verify_multicommodity_flow_profile_result(parsed_load)
+    assert MulticommodityFlowProfileResult.model_validate(forged_load)
 
     forged_source = deepcopy(payload)
     forged_source["flow"]["commodities"][1]["demand"] = {"num": "1", "den": "1"}
-    parsed_source = MulticommodityFlowProfileResult.model_validate(forged_source)
-    with pytest.raises(ValueError, match="must match"):
-        _verify_multicommodity_flow_profile_result(parsed_source)
+    assert MulticommodityFlowProfileResult.model_validate(forged_source)
 
     forged_work = deepcopy(payload)
     forged_work["work"]["logical_steps_per_call"] = 1
-    parsed_work = MulticommodityFlowProfileResult.model_validate(forged_work)
-    with pytest.raises(ValueError, match="must match"):
-        _verify_multicommodity_flow_profile_result(parsed_work)
+    assert MulticommodityFlowProfileResult.model_validate(forged_work)
