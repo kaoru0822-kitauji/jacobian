@@ -59,6 +59,11 @@ and scale evidence. `make check-all` adds the ordinary integration owner.
 `make test-full` is the exceptional complete local reproduction. Do not use a
 broad or full suite as a substitute for a focused regression test.
 
+The scale lane defaults to two workers because its exact boundary cases can
+consume substantially more memory than ordinary tests. Hosted CI explicitly
+sets `SCALE_WORKERS=4`; contributors can keep the default or override it for a
+host with less capacity.
+
 ### Command hierarchy and timing evidence
 
 Use `make affected` for normal branch-local validation and
