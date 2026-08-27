@@ -7,7 +7,7 @@ from typing import Self
 from pydantic import Field, model_validator
 from pydantic_core import PydanticCustomError
 
-from jacobian._exact import CanonicalRational, require_bounded_rational
+from jacobian._exact import CanonicalRational
 from jacobian._models import StrictModel
 
 # The checks run the local characterizations: monotonicity scans n*2^n
@@ -36,20 +36,6 @@ def _validation_error(reason: str, message: str) -> PydanticCustomError:
     """Build a stable validation error owned by submodular-opt contracts."""
 
     return PydanticCustomError(f"submodular_opt.{reason}", message)
-
-
-def _require_scan_value_height(function: SetFunction) -> None:
-    """Bound value heights for the millions-of-comparisons scan kernels."""
-
-    for entry in function.entries:
-        try:
-            require_bounded_rational(
-                entry.value,
-                max_digits=MAX_SUBMODULAR_SCAN_VALUE_DIGITS,
-                label="set-function scan value",
-            )
-        except ValueError as error:
-            raise _validation_error("scan_value_height_exceeded", str(error)) from error
 
 
 class SetFunctionEntry(StrictModel):
@@ -146,12 +132,6 @@ class MonotonicityCheckRequest(StrictModel):
 
     function: SetFunction
 
-    @model_validator(mode="after")
-    def require_bounded_scan_height(self) -> Self:
-        _require_scan_value_height(self.function)
-        return self
-
-
 class MonotonicityCheckResult(StrictModel):
     """Whether the function is monotone non-decreasing."""
 
@@ -163,12 +143,6 @@ class SubmodularityCheckRequest(StrictModel):
     """Check if a set function is submodular."""
 
     function: SetFunction
-
-    @model_validator(mode="after")
-    def require_bounded_scan_height(self) -> Self:
-        _require_scan_value_height(self.function)
-        return self
-
 
 class SubmodularityCheckResult(StrictModel):
     """Whether the function is submodular."""

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from fractions import Fraction
 
-from jacobian._exact import format_canonical_rational
+from jacobian._exact import format_canonical_rational, require_bounded_rational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.submodular_opt._models import (
+    MAX_SUBMODULAR_SCAN_VALUE_DIGITS,
     MonotonicityCheckRequest,
     MonotonicityCheckResult,
     SetFunction,
@@ -28,6 +30,22 @@ def _table_by_mask(function: SetFunction) -> dict[int, Fraction]:
             mask |= 1 << element
         table[mask] = entry.value.as_fraction()
     return table
+
+
+def _admit_scan(function: SetFunction) -> None:
+    for entry in function.entries:
+        try:
+            require_bounded_rational(
+                entry.value,
+                max_digits=MAX_SUBMODULAR_SCAN_VALUE_DIGITS,
+                label="set-function scan value",
+            )
+        except ValueError as error:
+            raise OperationDomainValidationError(
+                location=("function", "entries"),
+                code="submodular_opt.scan_value_height_exceeded",
+                message=str(error),
+            ) from error
 
 
 def evaluate_set_function(
@@ -62,6 +80,7 @@ def check_monotonicity(
     checks; violating any one covering relation violates some comparable
     pair, so the local scan is exact.
     """
+    _admit_scan(request.function)
     size = request.function.ground_set_size
     table = _table_by_mask(request.function)
 
@@ -97,6 +116,7 @@ def check_submodularity(
     scan, and it is complete: any violated inequality anywhere in 2^N has a
     violated local instance (take S minimal inside the differing part).
     """
+    _admit_scan(request.function)
     size = request.function.ground_set_size
     table = _table_by_mask(request.function)
 

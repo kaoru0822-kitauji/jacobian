@@ -3,6 +3,7 @@
 import pytest
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.submodular_opt._models import (
     MonotonicityCheckRequest,
     SetFunction,
@@ -220,25 +221,25 @@ def test_value_height_bound_keeps_scan_work_small() -> None:
     """Scan requests reject 129-digit values so the ~8M-inequality scan stays
     on small big-ints; the shared entry type keeps admitting them so the
     single-lookup evaluator can return any exact representable height."""
-    from pydantic import ValidationError
-
     wide_empty = SetFunctionEntry(
         subset=(), value=CanonicalRational(num="9" * 129, den="1")
     )
     wide_full = SetFunctionEntry(
         subset=(0,), value=CanonicalRational(num="9" * 129, den="1")
     )
-    with pytest.raises(ValidationError) as error:
-        MonotonicityCheckRequest(
+    monotonicity_request = MonotonicityCheckRequest(
             function=SetFunction(ground_set_size=1, entries=(wide_empty, wide_full))
         )
+    with pytest.raises(OperationDomainValidationError) as error:
+        check_monotonicity(monotonicity_request)
     assert (
         error.value.errors()[0]["type"] == "submodular_opt.scan_value_height_exceeded"
     )
-    with pytest.raises(ValidationError) as error:
-        SubmodularityCheckRequest(
+    submodularity_request = SubmodularityCheckRequest(
             function=SetFunction(ground_set_size=1, entries=(wide_empty, wide_full))
         )
+    with pytest.raises(OperationDomainValidationError) as error:
+        check_submodularity(submodularity_request)
     assert (
         error.value.errors()[0]["type"] == "submodular_opt.scan_value_height_exceeded"
     )
