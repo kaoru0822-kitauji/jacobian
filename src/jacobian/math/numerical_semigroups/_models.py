@@ -201,35 +201,6 @@ def _require_global_delta_bound(generators: tuple[int, ...]) -> None:
         )
 
 
-def _betti_component_index(
-    factorization: tuple[int, ...], components: tuple[tuple[int, ...], ...]
-) -> int:
-    support = {
-        index for index, coordinate in enumerate(factorization) if coordinate > 0
-    }
-    matches = [
-        index for index, component in enumerate(components) if support <= set(component)
-    ]
-    if len(matches) != 1:
-        raise _validation_error(
-            "relation factorization is not bound to one Betti component"
-        )
-    return matches[0]
-
-
-def _edges_span(component_count: int, edges: list[tuple[int, int]]) -> bool:
-    reached = {0}
-    while True:
-        expanded = reached | {
-            right if left in reached else left
-            for left, right in edges
-            if left in reached or right in reached
-        }
-        if expanded == reached:
-            return reached == set(range(component_count))
-        reached = expanded
-
-
 def _require_exact_factorization_family(
     generators: tuple[int, ...], value: int, family: tuple[tuple[int, ...], ...]
 ) -> None:

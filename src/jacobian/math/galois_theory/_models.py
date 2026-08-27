@@ -280,15 +280,6 @@ class FinitePermutationGroup(StrictModel):
         return self
 
 
-def _permutation_group_properties(group: FinitePermutationGroup) -> tuple[int, bool]:
-    from sympy.combinatorics import Permutation, PermutationGroup
-
-    backend = PermutationGroup(
-        *(Permutation(list(generator)) for generator in group.generators)
-    )
-    return int(backend.order()), bool(backend.is_solvable)
-
-
 class GaloisGroupResult(StrictModel):
     group: FinitePermutationGroup
     group_name: str
