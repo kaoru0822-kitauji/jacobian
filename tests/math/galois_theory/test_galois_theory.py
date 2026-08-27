@@ -7,23 +7,17 @@ from pydantic import ValidationError
 from sympy.combinatorics import Permutation, PermutationGroup
 
 from jacobian.math.galois_theory._models import (
-    FiniteFieldFactor,
     FrobeniusCycleRequest,
     GaloisFactorRequest,
     GaloisFactorResult,
     GaloisGroupRequest,
-    GaloisGroupResult,
     SolvableRequest,
-    SolvableResult,
 )
 from jacobian.math.galois_theory._operations import (
-    _verify_galois_factor_result,
     compute_frobenius_cycle,
     compute_galois_factor,
     compute_galois_group,
     compute_solvable,
-    verify_galois_group_result,
-    verify_solvable_result,
 )
 from jacobian.math.galois_theory._tools import TOOLS
 
@@ -145,35 +139,17 @@ def test_zero_and_noncanonical_degree_are_rejected_before_sympy() -> None:
     assert exc.value.errors()[0]["type"] == "galois_theory.polynomial_zero"
 
 
-def test_factorization_result_parses_structurally_and_private_verification_rejects_forgery() -> (
-    None
-):
+def test_factorization_result_parses_structurally() -> None:
     result = compute_galois_factor(
         GaloisFactorRequest(field_order=5, coefficients=(1, 0, 1))
     )
     payload = result.model_dump()
     assert GaloisFactorResult.model_validate(payload) == result
 
-    payload["unit"] = 2
-    altered_unit = GaloisFactorResult.model_validate(payload)
-    assert altered_unit.unit == 2
-    assert not _verify_galois_factor_result(altered_unit)
-
     payload = result.model_dump()
     payload["field_order"] = 4
     with pytest.raises(ValidationError, match="field_order must be prime"):
         GaloisFactorResult.model_validate(payload)
-
-    forged = GaloisFactorResult(
-        field_order=3,
-        source_coefficients=(2, 0, 1),
-        unit=1,
-        factors=(FiniteFieldFactor(coefficients=(2, 0, 1), multiplicity=1),),
-        distinct_factor_count=1,
-        factor_count=1,
-        is_irreducible=True,
-    )
-    assert not _verify_galois_factor_result(forged)
 
 
 def test_factor_producer_runs_the_backend_once(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -264,10 +240,6 @@ def test_galois_group_returns_composable_generators() -> None:
     assert result.group.root_axis == tuple(f"root_{index}" for index in range(5))
     assert _group_from_result(result).order() == result.order
 
-    forged = GaloisGroupResult.model_validate(
-        {**result.model_dump(), "order": result.order + 1}
-    )
-    assert not verify_galois_group_result(forged)
 
 
 def test_solvable_quintic_returns_the_group_certificate() -> None:
@@ -275,10 +247,6 @@ def test_solvable_quintic_returns_the_group_certificate() -> None:
     assert result.solvable_by_radicals is True
     assert _group_from_result(result).order() == 20
 
-    forged = SolvableResult.model_validate(
-        {**result.model_dump(), "solvable_by_radicals": False}
-    )
-    assert not verify_solvable_result(forged)
 
 
 def test_unsolvable_quintic_uses_actual_group() -> None:

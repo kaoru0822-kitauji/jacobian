@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pydantic import ValidationError
-
 if TYPE_CHECKING:
     from sympy.combinatorics.perm_groups import PermutationGroup
 
@@ -20,7 +18,6 @@ from jacobian.math.galois_theory._models import (
     GaloisGroupResult,
     SolvableRequest,
     SolvableResult,
-    _permutation_group_properties,
 )
 
 
@@ -59,27 +56,6 @@ def compute_galois_factor(request: GaloisFactorRequest) -> GaloisFactorResult:
         factor_count=factor_count,
         is_irreducible=is_irred,
     )
-
-
-def _verify_galois_factor_result(result: GaloisFactorResult) -> bool:
-    """Check one independently supplied factorization within request admission.
-
-    Normal result parsing deliberately checks only wire structure.  This owner-
-    private path is for a caller that deliberately treats supplied result data
-    as a mathematical claim, so it re-enters request admission and compares
-    against one bounded kernel computation.
-    """
-
-    try:
-        candidate = GaloisFactorResult.model_validate(result.model_dump())
-        request = GaloisFactorRequest(
-            field_order=candidate.field_order,
-            coefficients=candidate.source_coefficients,
-        )
-        expected = compute_galois_factor(request)
-    except (TypeError, ValidationError, ValueError):
-        return False
-    return candidate == expected
 
 
 def compute_frobenius_cycle(request: FrobeniusCycleRequest) -> FrobeniusCycleResult:
@@ -138,17 +114,6 @@ def compute_galois_group(request: GaloisGroupRequest) -> GaloisGroupResult:
     )
 
 
-def verify_galois_group_result(result: GaloisGroupResult) -> bool:
-    """Replay bounded group properties for an independently supplied claim."""
-
-    order, is_solvable = _permutation_group_properties(result.group)
-    return (
-        result.degree == len(result.group.root_axis)
-        and result.order == order
-        and result.is_solvable == is_solvable
-    )
-
-
 def compute_solvable(request: SolvableRequest) -> SolvableResult:
     """Determine if a polynomial is solvable by radicals.
 
@@ -161,10 +126,3 @@ def compute_solvable(request: SolvableRequest) -> SolvableResult:
         solvable_by_radicals=is_solvable,
         group=_wire_group(perm_group, len(request.coefficients) - 1),
     )
-
-
-def verify_solvable_result(result: SolvableResult) -> bool:
-    """Replay bounded group solvability for an independently supplied claim."""
-
-    _, is_solvable = _permutation_group_properties(result.group)
-    return result.solvable_by_radicals == is_solvable

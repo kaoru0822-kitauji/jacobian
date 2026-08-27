@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pydantic import ValidationError
-
 from jacobian.math.universal_algebra._models import (
     CongruenceRequest,
     CongruenceResult,
@@ -77,26 +75,6 @@ def compute_homomorphism_profile(
     return HomomorphismProfileResult._from_kernel(
         homomorphism_profile(request.carrier_map)
     )
-
-
-def _verify_homomorphism_profile_result(result: HomomorphismProfileResult) -> bool:
-    """Deliberately recheck one independently supplied homomorphism claim."""
-
-    source = (
-        result.homomorphism if result.status == "HOMOMORPHISM" else result.carrier_map
-    )
-    if source is None:
-        return False
-    try:
-        request = HomomorphismProfileRequest.model_validate(
-            {"carrier_map": source.model_dump(mode="python")}
-        )
-    except ValidationError:
-        return False
-    expected = HomomorphismProfileResult._from_kernel(
-        homomorphism_profile(request.carrier_map)
-    )
-    return result == expected
 
 
 def compute_congruence(request: CongruenceRequest) -> CongruenceResult:

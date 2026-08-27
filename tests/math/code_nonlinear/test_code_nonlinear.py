@@ -25,22 +25,13 @@ from jacobian.math.code_nonlinear._budget import (
 from jacobian.math.code_nonlinear._models import (
     BinaryCodeDistanceWitness,
     ConstantWeightProfileRequest,
-    ConstantWeightProfileResult,
     ConstantWeightRequest,
     ConstantWeightResult,
     ExplicitProfileRequest,
-    ExplicitProfileResult,
     ToSetSystemRequest,
-    ToSetSystemResult,
     WordDistanceRequest,
-    WordDistanceResult,
 )
 from jacobian.math.code_nonlinear._operations import (
-    _verify_constant_weight_profile_result,
-    _verify_constant_weight_result,
-    _verify_explicit_profile_result,
-    _verify_to_set_system_result,
-    _verify_word_distance_result,
     compute_constant_weight,
     compute_constant_weight_profile,
     compute_explicit_profile,
@@ -203,15 +194,6 @@ class TestWordDistance:
         assert result.weight1 == result.weight2 == 2
         assert result.support_intersection == 1
 
-    def test_explicit_verifier_rejects_conclusion_mutation(self) -> None:
-        result = compute_word_distance(
-            WordDistanceRequest(word1=(1, 0, 1), word2=(0, 1, 1))
-        )
-        payload = result.model_dump(mode="json")
-        payload["distance"] = 1
-        supplied = type(result).model_validate(payload)
-        assert not _verify_word_distance_result(supplied)
-
     def test_contract_version_tracks_the_wire_shape_change(self) -> None:
         from jacobian.math.code_nonlinear._tools import TOOLS
 
@@ -229,9 +211,6 @@ class TestWordDistance:
         assert result.differing_coordinates == ()
         assert result.weight1 == result.weight2 == 0
         assert result.support_intersection == 0
-        replayed = WordDistanceResult.model_validate(result.model_dump(mode="json"))
-        assert replayed == result
-        assert _verify_word_distance_result(replayed)
 
     def test_word_distance_output_bound_covers_the_canonical_result(self) -> None:
         word = [0] * MAX_EXPLICIT_CODE_LENGTH
@@ -247,17 +226,6 @@ class TestWordDistance:
         request = WordDistanceRequest.model_validate({"word1": left, "word2": right})
         with pytest.raises(ValueError, match="result can use"):
             compute_word_distance(request)
-        payload = {
-            "word1": left,
-            "word2": right,
-            "distance": MAX_EXPLICIT_CODE_LENGTH,
-            "differing_coordinates": list(range(MAX_EXPLICIT_CODE_LENGTH)),
-            "weight1": 0,
-            "weight2": MAX_EXPLICIT_CODE_LENGTH,
-            "support_intersection": 0,
-        }
-        supplied = WordDistanceResult.model_validate(payload)
-        assert not _verify_word_distance_result(supplied)
 
     def test_differing_coordinate_wire_size_tracks_actual_difference_positions(
         self,
@@ -334,55 +302,6 @@ class TestExplicitProfile:
             assert result.minimum_distance_witness is None
             assert result.maximum_distance_witness is None
 
-    def test_equivalent_tied_extremal_witness_revalidates(self) -> None:
-        source = _code((0, 0, 0), (0, 1, 1), (1, 0, 1), (1, 1, 0))
-        result = compute_explicit_profile(ExplicitProfileRequest(code=source))
-        assert result.minimum_distance == result.maximum_distance == 2
-        payload = result.model_dump(mode="json")
-        payload["minimum_distance_witness"] = _witness(source, 1, 2).model_dump(
-            mode="json"
-        )
-        replayed = ExplicitProfileResult.model_validate(payload)
-        assert replayed.minimum_distance_witness == _witness(source, 1, 2)
-        assert _verify_explicit_profile_result(replayed)
-
-    @pytest.mark.parametrize(
-        ("path", "replacement"),
-        [
-            (("length",), 5),
-            (("cardinality",), 4),
-            (("pair_count",), 2),
-            (("distance_histogram", 2), 1),
-            (("minimum_distance_witness", "right_index"), 2),
-            (("minimum_distance_witness", "distance"), 4),
-        ],
-    )
-    def test_rejects_metadata_histogram_and_witness_mutations(
-        self, path: tuple[str | int, ...], replacement: object
-    ) -> None:
-        result = compute_explicit_profile(
-            ExplicitProfileRequest(code=_code((0, 0, 0, 0), (0, 0, 1, 1), (1, 1, 1, 1)))
-        )
-        payload = result.model_dump(mode="json")
-        target: object = payload
-        for component in path[:-1]:
-            target = target[component]  # type: ignore[index]
-        target[path[-1]] = replacement  # type: ignore[index]
-        try:
-            supplied = ExplicitProfileResult.model_validate(payload)
-        except ValidationError:
-            return
-        assert not _verify_explicit_profile_result(supplied)
-
-    def test_rejects_one_bit_source_mutation(self) -> None:
-        result = compute_explicit_profile(
-            ExplicitProfileRequest(code=_code((0, 0, 0, 0), (0, 0, 1, 1), (1, 1, 1, 1)))
-        )
-        payload = result.model_dump(mode="json")
-        payload["source"]["codewords"][1][0] = 1
-        supplied = ExplicitProfileResult.model_validate(payload)
-        assert not _verify_explicit_profile_result(supplied)
-
     def test_standard_a_23_6_10_2992_profile_fits_the_kernel_envelope(self) -> None:
         """The source has length 23, minimum distance 6, and constant weight 10."""
         source = _source_scale_code()
@@ -432,7 +351,6 @@ class TestExplicitProfile:
             0,
         )
         assert sum(result.distance_histogram) == 4_474_536
-        assert _verify_explicit_profile_result(result)
 
 
 class TestConstantWeightProfile:
@@ -486,30 +404,6 @@ class TestConstantWeightProfile:
         with pytest.raises(ValueError, match="all codewords"):
             compute_constant_weight_profile(request)
 
-    @pytest.mark.parametrize(
-        ("field", "replacement"),
-        [
-            ("weight", 1),
-            ("pair_count", 2),
-            ("intersection_histogram", [0, 3, 0, 0, 0]),
-        ],
-    )
-    def test_rejects_constant_metadata_and_conclusion_mutations(
-        self, field: str, replacement: object
-    ) -> None:
-        result = compute_constant_weight_profile(
-            ConstantWeightProfileRequest(
-                code=_code((0, 0, 1, 1), (0, 1, 0, 1), (1, 0, 1, 0))
-            )
-        )
-        payload = result.model_dump(mode="json")
-        payload[field] = replacement
-        try:
-            supplied = ConstantWeightProfileResult.model_validate(payload)
-        except ValidationError:
-            return
-        assert not _verify_constant_weight_profile_result(supplied)
-
 
 class TestSetSystemConversion:
     def test_exact_source_bound_bijection(self) -> None:
@@ -554,19 +448,6 @@ class TestSetSystemConversion:
         assert result.coordinate_axis == ()
         assert result.supports == expected_supports
         assert result.cardinality == len(source.codewords)
-
-    @pytest.mark.parametrize("mutation", ["bit", "axis", "support"])
-    def test_rejects_source_axis_and_support_mutations(self, mutation: str) -> None:
-        result = to_set_system(_code((0, 1, 0, 1), (1, 0, 1, 0)))
-        payload = result.model_dump(mode="json")
-        if mutation == "bit":
-            payload["source"]["codewords"][0][0] = 1
-        elif mutation == "axis":
-            payload["coordinate_axis"][2] = 3
-        else:
-            payload["supports"][0][0] = 0
-        supplied = ToSetSystemResult.model_validate(payload)
-        assert not _verify_to_set_system_result(supplied)
 
 
 class TestProducerConsumerClosure:
@@ -781,7 +662,6 @@ class TestCanonicalConsumers:
         serialized = wide.model_dump(mode="json")
         replayed = ConstantWeightResult.model_validate(serialized)
         assert replayed.code == wide.code
-        assert _verify_constant_weight_result(replayed)
         axis = compute_constant_weight(
             ConstantWeightRequest(length=MAX_EXPLICIT_CODE_LENGTH, weight=0)
         )

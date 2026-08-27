@@ -301,28 +301,6 @@ class BoxUnionVolumeResult(StrictModel):
         )
 
 
-def _verify_box_union_volume_result(result: BoxUnionVolumeResult) -> bool:
-    """Check one independently supplied source-bound inclusion-exclusion claim."""
-
-    from jacobian.math.geometry.boxes._kernel import complete_intersection_ledger
-
-    try:
-        source = BoxUnionVolumeRequest.model_validate(result.source.model_dump())
-    except ValueError:
-        return False
-    expected, expected_union = complete_intersection_ledger(source.boxes)
-    return (
-        len(result.intersections) == len(expected)
-        and all(
-            actual.box_indices == wanted.box_indices
-            and actual.intersection == wanted.intersection
-            and actual.volume.as_fraction() == wanted.volume
-            for actual, wanted in zip(result.intersections, expected, strict=True)
-        )
-        and result.union_volume.as_fraction() == expected_union
-    )
-
-
 __all__ = [
     "BoxIntersectionLedgerEntry",
     "BoxUnionVolumeRequest",

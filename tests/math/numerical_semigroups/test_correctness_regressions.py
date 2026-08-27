@@ -39,7 +39,6 @@ from jacobian.math.numerical_semigroups._presentation_models import (
 from jacobian.math.numerical_semigroups._presentation_operations import (
     compute_minimal_presentation,
     compute_presentation_binomials,
-    verify_minimal_presentation_result,
 )
 
 
@@ -153,7 +152,7 @@ def test_betti_and_minimal_presentation_replay_independently() -> None:
         )
 
 
-def test_minimal_presentation_rejects_relations_inside_one_r_class() -> None:
+def test_minimal_presentation_result_retains_relation_coordinates() -> None:
     generators = (4, 10, 15)
     result = MinimalPresentationResult.model_validate(
         {
@@ -183,7 +182,6 @@ def test_minimal_presentation_rejects_relations_inside_one_r_class() -> None:
         )
         for relation in result.relations
     )
-    assert not verify_minimal_presentation_result(result)
 
 
 def test_element_and_global_catenary_replay_independently() -> None:

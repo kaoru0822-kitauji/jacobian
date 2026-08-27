@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import networkx as _nx
-from pydantic import ValidationError
 
 from jacobian.canonical import format_canonical_integer, parse_canonical_integer
 from jacobian.math.numerical_semigroups._algorithms import (
@@ -174,66 +173,6 @@ def compute_factorization_graph(
             tuple(sorted(component)) for component in components
         ),
         is_connected=connected,
-    )
-
-
-def _verify_factorization_compute_result(result: FactorizationComputeResult) -> bool:
-    """Replay one bounded factorization-family claim."""
-
-    try:
-        FactorizationComputeRequest(
-            generators=result.minimal_generators, value=result.value
-        )
-    except ValidationError:
-        return False
-    generators = tuple(
-        parse_canonical_integer(item) for item in result.minimal_generators
-    )
-    family = tuple(factorizations(generators, parse_canonical_integer(result.value)))
-    return result.in_semigroup == bool(family) and result.factorizations == family
-
-
-def _verify_factorization_lengths_compute_result(
-    result: FactorizationLengthsComputeResult,
-) -> bool:
-    """Replay one bounded factorization-length claim."""
-
-    try:
-        FactorizationLengthsComputeRequest(
-            generators=result.minimal_generators, value=result.value
-        )
-    except ValidationError:
-        return False
-    generators = tuple(
-        parse_canonical_integer(item) for item in result.minimal_generators
-    )
-    lengths = factorization_lengths(generators, parse_canonical_integer(result.value))
-    return result.in_semigroup == bool(lengths) and result.lengths == lengths
-
-
-def _verify_factorization_graph_compute_result(
-    result: FactorizationGraphComputeResult,
-) -> bool:
-    """Replay the family and derived graph for one supplied claim."""
-
-    try:
-        FactorizationGraphComputeRequest(
-            generators=result.minimal_generators, value=result.value
-        )
-    except ValidationError:
-        return False
-    generators = tuple(
-        parse_canonical_integer(item) for item in result.minimal_generators
-    )
-    family = tuple(factorizations(generators, parse_canonical_integer(result.value)))
-    edges, components, connected = _build_factorization_graph(list(family))
-    return (
-        result.in_semigroup == bool(family)
-        and result.factorizations == family
-        and result.edges == tuple(edges)
-        and result.connected_components
-        == tuple(tuple(sorted(component)) for component in components)
-        and result.is_connected == connected
     )
 
 

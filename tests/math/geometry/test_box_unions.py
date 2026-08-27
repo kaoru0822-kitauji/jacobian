@@ -19,7 +19,6 @@ from jacobian.math.geometry.boxes import (
 from jacobian.math.geometry.boxes._models import (
     MAX_BOX_UNION_RESULT_BYTES,
     BoxUnionVolumeRequest,
-    _verify_box_union_volume_result,
 )
 from jacobian.math.geometry.boxes.values import MAX_CANONICAL_BOX_DIMENSION
 
@@ -205,28 +204,6 @@ def test_input_order_changes_indices_but_not_union_volume() -> None:
     assert (
         compute_box_union_volume(boxes).union_volume
         == compute_box_union_volume(tuple(reversed(boxes))).union_volume
-    )
-
-
-@pytest.mark.parametrize(
-    "mutate",
-    (
-        lambda payload: payload.__setitem__("union_volume", {"num": "5", "den": "1"}),
-        lambda payload: payload.__setitem__(
-            "intersections", payload["intersections"][:-1]
-        ),
-        lambda payload: payload["intersections"][3].__setitem__(
-            "intersection", _box((0, 1), (0, 1), (0, 1)).model_dump(mode="json")
-        ),
-    ),
-)
-def test_forged_ledger_claim_fails_the_explicit_verifier(mutate: object) -> None:
-    result = compute_box_union_volume(_three_boxes())
-    payload = result.model_dump(mode="json")
-    assert callable(mutate)
-    mutate(payload)
-    assert not _verify_box_union_volume_result(
-        BoxUnionVolumeResult.model_validate(payload)
     )
 
 

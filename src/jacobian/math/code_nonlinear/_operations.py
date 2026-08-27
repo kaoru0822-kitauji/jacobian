@@ -5,8 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from itertools import combinations
 
-from pydantic import ValidationError
-
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.code_nonlinear._budget import (
     require_constant_weight_admission,
@@ -307,126 +305,6 @@ def to_set_system(code: ExplicitBinaryCode) -> ToSetSystemResult:
         supports=tuple(
             tuple(i for i, bit in enumerate(word) if bit) for word in code.codewords
         ),
-    )
-
-
-def _verify_constant_weight_result(result: ConstantWeightResult) -> bool:
-    """Verify an independently supplied generated-code claim."""
-
-    try:
-        require_constant_weight_admission(result.length, result.weight)
-    except ValueError:
-        return False
-    expected = _constant_weight_code(result.length, result.weight)
-    return result.code == expected and result.count == len(expected.codewords)
-
-
-def _verify_word_distance_result(result: WordDistanceResult) -> bool:
-    """Verify an independently supplied exact Hamming-relation claim."""
-
-    try:
-        WordDistanceRequest(word1=result.word1, word2=result.word2)
-        require_word_distance_output_bound(result.word1, result.word2)
-    except (ValidationError, ValueError):
-        return False
-    expected = _word_distance_data(result.word1, result.word2)
-    return (
-        result.distance,
-        result.differing_coordinates,
-        result.weight1,
-        result.weight2,
-        result.support_intersection,
-    ) == expected
-
-
-def _verify_extremal_witness(
-    source: ExplicitBinaryCode,
-    witness: BinaryCodeDistanceWitness | None,
-    distance: int | None,
-) -> bool:
-    if distance is None:
-        return witness is None
-    if witness is None or not 0 <= witness.left_index < witness.right_index < len(
-        source.codewords
-    ):
-        return False
-    left = source.codewords[witness.left_index]
-    right = source.codewords[witness.right_index]
-    expected_distance, differing, left_weight, right_weight, intersection = (
-        _word_distance_data(left, right)
-    )
-    return (
-        witness.left_word == left
-        and witness.right_word == right
-        and witness.left_support == tuple(i for i, bit in enumerate(left) if bit)
-        and witness.right_support == tuple(i for i, bit in enumerate(right) if bit)
-        and witness.differing_coordinates == differing
-        and witness.left_weight == left_weight
-        and witness.right_weight == right_weight
-        and witness.support_intersection == intersection
-        and witness.distance == expected_distance == distance
-    )
-
-
-def _verify_explicit_profile_result(result: ExplicitProfileResult) -> bool:
-    """Replay an independently supplied profile inside its admitted envelope."""
-
-    try:
-        require_profile_admission(result.source)
-    except ValueError:
-        return False
-    expected = _explicit_profile_data(result.source)
-    return (
-        result.weight_distribution == expected.weight_distribution
-        and result.minimum_distance == expected.minimum_distance
-        and result.maximum_distance == expected.maximum_distance
-        and result.distance_histogram == expected.distance_histogram
-        and _verify_extremal_witness(
-            result.source, result.minimum_distance_witness, result.minimum_distance
-        )
-        and _verify_extremal_witness(
-            result.source, result.maximum_distance_witness, result.maximum_distance
-        )
-    )
-
-
-def _verify_constant_weight_profile_result(result: ConstantWeightProfileResult) -> bool:
-    """Replay an independently supplied constant-weight profile claim."""
-
-    try:
-        require_profile_admission(result.source)
-        weight = _constant_weight(result.source)
-    except ValueError:
-        return False
-    if result.weight != weight:
-        return False
-    expected = _constant_weight_profile_data(result.source)
-    return (
-        result.minimum_distance == expected.minimum_distance
-        and result.maximum_distance == expected.maximum_distance
-        and result.distance_histogram == expected.distance_histogram
-        and result.intersection_histogram == expected.intersection_histogram
-        and _verify_extremal_witness(
-            result.source, result.minimum_distance_witness, result.minimum_distance
-        )
-        and _verify_extremal_witness(
-            result.source, result.maximum_distance_witness, result.maximum_distance
-        )
-    )
-
-
-def _verify_to_set_system_result(result: ToSetSystemResult) -> bool:
-    """Verify an independently supplied source-indexed support claim."""
-
-    try:
-        require_set_system_output_bound(result.source)
-    except ValueError:
-        return False
-    return result.coordinate_axis == tuple(
-        range(result.source.length)
-    ) and result.supports == tuple(
-        tuple(index for index, bit in enumerate(word) if bit)
-        for word in result.source.codewords
     )
 
 
