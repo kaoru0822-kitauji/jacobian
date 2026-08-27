@@ -40,26 +40,16 @@ MAX_CHROMATIC_CERTIFICATE_DERIVED_RATIONAL_DIGITS = (
     + 1
 )
 
-# One byte records each subset's independence during exhaustive replay.  The
-# checker visits every subset twice overall: once for the operation and once
-# when the source-bound result validator replays the defining relation.
+# One byte records each subset's independence during the exhaustive check.
 MAX_CHROMATIC_CERTIFICATE_SUBSET_STATES = 1 << MAX_CHROMATIC_CERTIFICATE_VERTICES
-CHROMATIC_CERTIFICATE_REPLAY_PASSES = 2
 
 # Work is charged in conservative elementary decimal-digit operations.  For
-# each pass, admission includes common-denominator construction and scaling,
+# Admission includes common-denominator construction and scaling,
 # one independence-state update per subset, and one bounded-height integer
 # update and comparison per Gray-code step.  This result-sensitive cap admits
 # order 20 with ordinary small weights and order 19 with distinct 40-digit
 # denominators, while rejecting the corresponding order-20 adversarial case.
 MAX_CHROMATIC_CERTIFICATE_DIGIT_WORK = 3_000_000_000
-
-# Authored results may carry two derived rationals at the static height above.
-# Charge their canonical reduction and exact replay comparisons independently
-# of the source-sensitive producer/replay estimate.
-_RESULT_RATIONAL_VALIDATION_DIGIT_WORK = (
-    8 * MAX_CHROMATIC_CERTIFICATE_DERIVED_RATIONAL_DIGITS**2
-)
 
 _RESULT_ENVELOPE_RESERVE_BYTES = 4_096
 
@@ -204,11 +194,7 @@ def _estimated_digit_work(
     arithmetic_setup = 6 * order * intermediate_digits * intermediate_digits
     subset_replay = subset_states * (1 + 2 * intermediate_digits)
     graph_setup = order + 3 * len(graph.edges)
-    return (
-        CHROMATIC_CERTIFICATE_REPLAY_PASSES
-        * (arithmetic_setup + subset_replay + graph_setup)
-        + _RESULT_RATIONAL_VALIDATION_DIGIT_WORK
-    )
+    return arithmetic_setup + subset_replay + graph_setup
 
 
 def _require_bounded_sources(
@@ -594,12 +580,23 @@ class ChromaticNumberCertificateCheckResult(StrictModel):
 
     @model_validator(mode="after")
     def require_structural_result_bounds(self) -> Self:
-        _require_bounded_sources(
-            self.graph,
-            self.claimed_chromatic_number,
-            self.coloring,
-            self.weights,
-        )
+        order = len(self.graph.vertices)
+        if order > MAX_CHROMATIC_CERTIFICATE_VERTICES:
+            raise PydanticCustomError(
+                "graph.chromatic_number_certificate_checking_supports_at_most",
+                "chromatic-number certificate checking supports at most "
+                f"{MAX_CHROMATIC_CERTIFICATE_VERTICES} vertices",
+            )
+        if len(self.coloring) != order:
+            raise PydanticCustomError(
+                "graph.coloring_must_assign_one_color_per_graph_vertex",
+                "coloring must assign one color per graph vertex",
+            )
+        if len(self.weights) != order:
+            raise PydanticCustomError(
+                "graph.weights_must_assign_one_exact_rational_per_graph",
+                "weights must assign one exact rational per graph vertex",
+            )
         return self
 
 

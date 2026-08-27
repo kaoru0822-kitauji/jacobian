@@ -4,6 +4,7 @@ the canonical chain-complex consumers unchanged."""
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from jacobian.catalog.models import MathTool
 from jacobian.math.chain_complexes._models import (
@@ -67,8 +68,6 @@ def test_gf_p_chain_result_enters_homology_unchanged() -> None:
 def test_producer_result_carries_its_canonical_value() -> None:
     """The public GF(p) producer exposes the canonical chain-complex
     value on the serialized result boundary itself."""
-    from pydantic import ValidationError
-
     result = _prime_field_chain(_circle(), 2)
     assert result.canonical_value is not None
     assert result.canonical_value == simplicial_chain_complex_value(result)
@@ -77,7 +76,7 @@ def test_producer_result_carries_its_canonical_value() -> None:
 
     payload = result.model_dump()
     payload["canonical_value"]["prime"] = 3
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError, match="must match retained chain data"):
         type(result).model_validate(payload)
 
 

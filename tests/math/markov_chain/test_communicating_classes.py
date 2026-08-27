@@ -5,6 +5,7 @@ from __future__ import annotations
 from fractions import Fraction
 
 import pytest
+from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
 from jacobian.math.markov_chain import _operations
@@ -13,8 +14,8 @@ from jacobian.math.markov_chain._models import (
     TransitionMatrixRequest,
 )
 from jacobian.math.markov_chain._operations import (
+    _verify_communicating_classes_result,
     compute_communicating_classes,
-    verify_communicating_classes_result,
 )
 from jacobian.math.markov_chain._tools import TOOLS
 
@@ -118,5 +119,10 @@ def test_explicit_verifier_rejects_forged_scc_claim() -> None:
     payload["classes"] = [((0,), True), ((1,), True)]
     forged = CommunicatingClassesResult.model_validate(payload)
 
-    assert verify_communicating_classes_result(produced) is True
-    assert verify_communicating_classes_result(forged) is False
+    assert _verify_communicating_classes_result(produced) is True
+    assert _verify_communicating_classes_result(forged) is False
+
+    payload = produced.model_dump(mode="json")
+    payload["transition_matrix"] = [[{"num": "2", "den": "1"}]]
+    with pytest.raises(ValidationError, match="must sum to one"):
+        CommunicatingClassesResult.model_validate(payload)
