@@ -114,21 +114,23 @@ class TestCongruenceBoxCount:
 
     def test_rejects_oversized_box(self) -> None:
         import pytest
-        from pydantic import ValidationError
 
-        with pytest.raises(ValidationError) as error:
-            CongruenceBoxCountRequest.model_validate(
-                CongruenceBoxCountPayload(
-                    x_lo=-10_000,
-                    x_hi=10_000,
-                    y_lo=-10_000,
-                    y_hi=10_000,
-                    u=1,
-                    v=1,
-                    c=0,
-                    modulus=3,
-                )
+        from jacobian.catalog.models import OperationDomainValidationError
+
+        request = CongruenceBoxCountRequest.model_validate(
+            CongruenceBoxCountPayload(
+                x_lo=-10_000,
+                x_hi=10_000,
+                y_lo=-10_000,
+                y_hi=10_000,
+                u=1,
+                v=1,
+                c=0,
+                modulus=3,
             )
+        )
+        with pytest.raises(OperationDomainValidationError) as error:
+            compute_congruence_box_count(request)
         assert (
             error.value.errors()[0]["type"]
             == "arithmetic_counting.box_area_exceeds_budget"

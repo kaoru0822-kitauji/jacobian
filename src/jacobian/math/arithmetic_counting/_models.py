@@ -17,7 +17,6 @@ from jacobian._models import StrictModel
 # the exact output digits.
 _MAX_FLOOR_SUM_N = 10**15
 _MAX_FLOOR_SUM_PARAM = 1_000_000
-_MAX_FLOOR_SUM_RESULT_DIGITS = 32_768
 _MAX_BOX_COORD = 10_000
 _MAX_BOX_AREA = 250_000
 _MAX_BOX_MODULUS = 10_000
@@ -37,8 +36,7 @@ class FloorSumRequest(StrictModel):
             "description": (
                 "Exact sum of floor((a*i+b)/m) for i in [0, n). Executed by the "
                 "Euclidean-like recursion whose work is logarithmic in the "
-                "parameters, so large n is admitted; |result| <= n*(a+b) stays "
-                f"inside the {_MAX_FLOOR_SUM_RESULT_DIGITS}-digit canonical bound."
+                "parameters, so large n is admitted."
             )
         }
     )
@@ -47,20 +45,6 @@ class FloorSumRequest(StrictModel):
     m: int = Field(ge=1, le=_MAX_FLOOR_SUM_PARAM)
     a: int = Field(ge=0, le=_MAX_FLOOR_SUM_PARAM)
     b: int = Field(ge=0, le=_MAX_FLOOR_SUM_PARAM)
-
-    @model_validator(mode="after")
-    def require_bounded_result(self) -> Self:
-        # Worst case m=1: |sum| <= n*(a+b).  Bound its decimal digits before
-        # execution so the exact result always fits the canonical contract.
-        magnitude_digits = len(str((self.n + 1) * (self.a + self.b) + 1))
-        if magnitude_digits > _MAX_FLOOR_SUM_RESULT_DIGITS:
-            raise _validation_error(
-                "floor_sum_result_exceeds_bound",
-                "floor-sum result can exceed the "
-                f"{_MAX_FLOOR_SUM_RESULT_DIGITS}-digit canonical integer bound",
-            )
-        return self
-
 
 class FloorSumResult(StrictModel):
     """The exact floor sum value."""
@@ -86,11 +70,6 @@ class CongruenceBoxCountRequest(StrictModel):
             raise _validation_error("x_interval_invalid", "x_lo must be <= x_hi")
         if self.y_lo > self.y_hi:
             raise _validation_error("y_interval_invalid", "y_lo must be <= y_hi")
-        area = (self.x_hi - self.x_lo + 1) * (self.y_hi - self.y_lo + 1)
-        if area > _MAX_BOX_AREA:
-            raise _validation_error(
-                "box_area_exceeds_budget", "box area exceeds the computational budget"
-            )
         return self
 
 

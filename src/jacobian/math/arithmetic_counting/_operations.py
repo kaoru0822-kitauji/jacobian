@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from jacobian.canonical import format_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.arithmetic_counting._models import (
+    _MAX_BOX_AREA,
     CongruenceBoxCountRequest,
     CongruenceBoxCountResult,
     FloorSumRequest,
@@ -47,6 +49,15 @@ def compute_congruence_box_count(
     request: CongruenceBoxCountRequest,
 ) -> CongruenceBoxCountResult:
     """Count lattice points in a box satisfying u*x + v*y = c (mod modulus)."""
+    area = (request.x_hi - request.x_lo + 1) * (
+        request.y_hi - request.y_lo + 1
+    )
+    if area > _MAX_BOX_AREA:
+        raise OperationDomainValidationError(
+            location=("x_lo", "x_hi", "y_lo", "y_hi"),
+            code="arithmetic_counting.box_area_exceeds_budget",
+            message="box area exceeds the computational budget",
+        )
     modulus = request.modulus
     count = 0
     for x in range(request.x_lo, request.x_hi + 1):
