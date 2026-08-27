@@ -3,6 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.algebraic_combinatorics._models import (
     RSKPermutationRequest,
     RSKResult,
@@ -63,8 +64,9 @@ class TestRSK:
         assert result.lds_length == 2
 
     def test_invalid_not_permutation(self) -> None:
-        with pytest.raises(ValidationError) as error:
-            RSKPermutationRequest(permutation=(1, 2, 2))
+        request = RSKPermutationRequest(permutation=(1, 2, 2))
+        with pytest.raises(OperationDomainValidationError) as error:
+            compute_rsk_permutation(request)
         assert (
             error.value.errors()[0]["type"]
             == "algebraic_combinatorics.permutation_invalid"

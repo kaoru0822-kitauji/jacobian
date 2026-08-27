@@ -103,12 +103,6 @@ class RSKPermutationRequest(StrictModel):
     )
     convention: RSKConvention = "ROW_INSERTION_RSK_V1"
 
-    @model_validator(mode="after")
-    def require_valid_permutation(self) -> Self:
-        _require_permutation(self.permutation)
-        return self
-
-
 class RSKResult(StrictModel):
     """Canonical tableaux produced by one admitted permutation-RSK kernel."""
 

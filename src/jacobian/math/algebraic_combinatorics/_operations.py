@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from jacobian.canonical import format_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.algebraic_combinatorics import (
     conjugate_partition,
     hook_lengths,
@@ -60,6 +61,12 @@ def compute_rsk_permutation(request: RSKPermutationRequest) -> RSKResult:
     Q is the recording tableau. The shape gives the partition.
     LIS length = first row length, LDS length = first column length.
     """
+    if sorted(request.permutation) != list(range(1, len(request.permutation) + 1)):
+        raise OperationDomainValidationError(
+            location=("permutation",),
+            code="algebraic_combinatorics.permutation_invalid",
+            message="permutation must be a permutation of 1..n",
+        )
     insertion_rows, recording_rows = _row_insert(request.permutation)
     return RSKResult._from_kernel(
         request,
