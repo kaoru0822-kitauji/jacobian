@@ -32,18 +32,16 @@ def test_load_registry_returns_unique_well_formed_datasets() -> None:
     assert all(suite.tasks_dir.is_dir() for suite in suites)
 
 
-def test_load_registry_rejects_wrong_schema_version(
-    tmp_path: Path, synthetic_harbor_root: Path
-) -> None:
+@pytest.mark.usefixtures("synthetic_harbor_root")
+def test_load_registry_rejects_wrong_schema_version(tmp_path: Path) -> None:
     reg = tmp_path / "registry.toml"
     reg.write_text('schema_version = "99"\ndatasets = []')
     with pytest.raises(HarborSuiteError, match="schema_version"):
         load_registry(reg)
 
 
-def test_load_registry_fails_closed_on_missing_suite_toml(
-    tmp_path: Path, synthetic_harbor_root: Path
-) -> None:
+@pytest.mark.usefixtures("synthetic_harbor_root")
+def test_load_registry_fails_closed_on_missing_suite_toml(tmp_path: Path) -> None:
     ds_path = tmp_path / "test-v1"
     ds_path.mkdir()
     (ds_path / "jobs").mkdir()
@@ -56,9 +54,8 @@ def test_load_registry_fails_closed_on_missing_suite_toml(
         load_registry(reg)
 
 
-def test_suite_loads_tasks_when_suite_toml_exists(
-    tmp_path: Path, synthetic_harbor_root: Path
-) -> None:
+@pytest.mark.usefixtures("synthetic_harbor_root")
+def test_suite_loads_tasks_when_suite_toml_exists(tmp_path: Path) -> None:
     ds_path = tmp_path / "test-v1"
     _make_canonical_task(tmp_path)
     (ds_path / "jobs").mkdir()
@@ -86,9 +83,8 @@ def test_suite_loads_tasks_when_suite_toml_exists(
 # ---------------------------------------------------------------------------
 
 
-def test_suite_parses_tasks_without_assurance_ceiling(
-    tmp_path: Path, synthetic_harbor_root: Path
-) -> None:
+@pytest.mark.usefixtures("synthetic_harbor_root")
+def test_suite_parses_tasks_without_assurance_ceiling(tmp_path: Path) -> None:
     ds_path = tmp_path / "test-v1"
     _make_canonical_task(tmp_path)
     (ds_path / "jobs").mkdir()
@@ -111,7 +107,8 @@ def test_suite_parses_tasks_without_assurance_ceiling(
     assert suite.tasks[0].required_provider == "core"
 
 
-def test_suite_allows_empty_tasks(tmp_path: Path, synthetic_harbor_root: Path) -> None:
+@pytest.mark.usefixtures("synthetic_harbor_root")
+def test_suite_allows_empty_tasks(tmp_path: Path) -> None:
     ds_path = tmp_path / "test-v1"
     ds_path.mkdir()
     (ds_path / "jobs").mkdir()
@@ -125,9 +122,8 @@ def test_suite_allows_empty_tasks(tmp_path: Path, synthetic_harbor_root: Path) -
     assert suite.tasks == ()
 
 
-def test_suite_rejects_task_path_outside_tasks_root(
-    tmp_path: Path, synthetic_harbor_root: Path
-) -> None:
+@pytest.mark.usefixtures("synthetic_harbor_root")
+def test_suite_rejects_task_path_outside_tasks_root(tmp_path: Path) -> None:
     ds_path = tmp_path / "test-v1"
     (ds_path / "jobs").mkdir(parents=True)
     (ds_path / "jobs" / "oracle.json").write_text("{}")
@@ -146,9 +142,8 @@ def test_suite_rejects_task_path_outside_tasks_root(
         load_registry(reg)
 
 
-def test_suite_rejects_symlinked_task_path(
-    tmp_path: Path, synthetic_harbor_root: Path
-) -> None:
+@pytest.mark.usefixtures("synthetic_harbor_root")
+def test_suite_rejects_symlinked_task_path(tmp_path: Path) -> None:
     ds_path = tmp_path / "test-v1"
     _make_canonical_task(tmp_path)
     (ds_path / "jobs").mkdir(parents=True)
@@ -166,9 +161,8 @@ def test_suite_rejects_symlinked_task_path(
         load_registry(reg)
 
 
-def test_suite_rejects_noncanonical_task_id(
-    tmp_path: Path, synthetic_harbor_root: Path
-) -> None:
+@pytest.mark.usefixtures("synthetic_harbor_root")
+def test_suite_rejects_noncanonical_task_id(tmp_path: Path) -> None:
     ds_path = tmp_path / "test-v1"
     ds_path.mkdir()
     (ds_path / "jobs").mkdir()
@@ -191,9 +185,8 @@ def test_suite_rejects_noncanonical_task_id(
         load_registry(reg)
 
 
-def test_registry_rejects_nested_canonical_task_bundle(
-    tmp_path: Path, synthetic_harbor_root: Path
-) -> None:
+@pytest.mark.usefixtures("synthetic_harbor_root")
+def test_registry_rejects_nested_canonical_task_bundle(tmp_path: Path) -> None:
     ds_path = tmp_path / "test-v1"
     (ds_path / "jobs").mkdir(parents=True)
     (ds_path / "jobs" / "oracle.json").write_text("{}")
@@ -208,9 +201,8 @@ def test_registry_rejects_nested_canonical_task_bundle(
         load_registry(reg)
 
 
-def test_registry_rejects_incomplete_canonical_task_directory(
-    tmp_path: Path, synthetic_harbor_root: Path
-) -> None:
+@pytest.mark.usefixtures("synthetic_harbor_root")
+def test_registry_rejects_incomplete_canonical_task_directory(tmp_path: Path) -> None:
     ds_path = tmp_path / "test-v1"
     (ds_path / "jobs").mkdir(parents=True)
     (ds_path / "jobs" / "oracle.json").write_text("{}")
@@ -222,9 +214,8 @@ def test_registry_rejects_incomplete_canonical_task_directory(
         load_registry(reg)
 
 
-def test_registry_rejects_unowned_direct_task_bundle(
-    tmp_path: Path, synthetic_harbor_root: Path
-) -> None:
+@pytest.mark.usefixtures("synthetic_harbor_root")
+def test_registry_rejects_unowned_direct_task_bundle(tmp_path: Path) -> None:
     ds_path = tmp_path / "test-v1"
     _make_canonical_task(tmp_path)
     (ds_path / "jobs").mkdir()

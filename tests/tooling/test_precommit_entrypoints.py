@@ -9,9 +9,9 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
-from pre_commit.clientlib import load_config  # type: ignore[import-untyped]
-from pre_commit.lang_base import hook_cmd  # type: ignore[import-untyped]
-from pre_commit.parse_shebang import normalize_cmd  # type: ignore[import-untyped]
+from pre_commit.clientlib import load_config
+from pre_commit.lang_base import hook_cmd
+from pre_commit.parse_shebang import normalize_cmd
 
 ROOT = Path(__file__).parents[2]
 

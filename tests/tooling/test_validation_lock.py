@@ -41,7 +41,12 @@ def test_second_broad_run_is_rejected_while_lock_is_held(
             "--",
             sys.executable,
             "-c",
-            "open('held', 'w').write('1'); import time; time.sleep(2)",
+            "import os\n"
+            "import time\n"
+            "with open('held', 'w') as marker:\n"
+            "    marker.write('1')\n"
+            "while not os.path.exists('release'):\n"
+            "    time.sleep(0.01)\n",
         ],
         cwd=tmp_path,
     )
@@ -56,6 +61,7 @@ def test_second_broad_run_is_rejected_while_lock_is_held(
         with pytest.raises(SystemExit, match="already running broad validation"):
             main(["run", "--target", "test-exhaustive", "--", "true"])
     finally:
+        (tmp_path / "release").write_text("1", encoding="utf-8")
         holder.wait(timeout=15)
     assert holder.returncode == 0
 

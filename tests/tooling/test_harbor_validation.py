@@ -17,16 +17,14 @@ from tests.tooling.harbor_suite_support import (
 )
 
 
-def test_validate_task_topology_passes_for_minimal_task(
-    tmp_path: Path, synthetic_harbor_root: Path
-) -> None:
+@pytest.mark.usefixtures("synthetic_harbor_root")
+def test_validate_task_topology_passes_for_minimal_task(tmp_path: Path) -> None:
     suite, task = _make_suite_with_task(tmp_path)
     assert validate_task_topology(suite, task) == []
 
 
-def test_validate_task_topology_binds_verifier_support(
-    tmp_path: Path, synthetic_harbor_root: Path
-) -> None:
+@pytest.mark.usefixtures("synthetic_harbor_root")
+def test_validate_task_topology_binds_verifier_support(tmp_path: Path) -> None:
     suite, task = _make_suite_with_task(tmp_path)
     support = task / "tests" / "verifier_support.py"
     support.write_text("# changed verifier support\n")
@@ -36,18 +34,16 @@ def test_validate_task_topology_binds_verifier_support(
     assert any("verifier checksum label is stale" in failure for failure in failures)
 
 
-def test_validate_task_topology_reports_missing_readme(
-    tmp_path: Path, synthetic_harbor_root: Path
-) -> None:
+@pytest.mark.usefixtures("synthetic_harbor_root")
+def test_validate_task_topology_reports_missing_readme(tmp_path: Path) -> None:
     suite, task = _make_suite_with_task(tmp_path)
     (task / "README.md").unlink()
     failures = validate_task_topology(suite, task)
     assert any("README.md" in f for f in failures)
 
 
-def test_validate_task_topology_reports_missing_metadata_field(
-    tmp_path: Path, synthetic_harbor_root: Path
-) -> None:
+@pytest.mark.usefixtures("synthetic_harbor_root")
+def test_validate_task_topology_reports_missing_metadata_field(tmp_path: Path) -> None:
     suite, task = _make_suite_with_task(tmp_path)
     task_toml = (task / "task.toml").read_text()
     task_toml = task_toml.replace('evaluation_kind = "workflow"\n', "")
@@ -56,8 +52,9 @@ def test_validate_task_topology_reports_missing_metadata_field(
     assert any("metadata" in f.lower() for f in failures)
 
 
+@pytest.mark.usefixtures("synthetic_harbor_root")
 def test_validate_task_topology_reports_unknown_environment_profile(
-    tmp_path: Path, synthetic_harbor_root: Path
+    tmp_path: Path,
 ) -> None:
     suite, task = _make_suite_with_task(tmp_path)
     unknown = dataclasses.replace(suite.tasks[0], environment_profile="not-a-profile")
@@ -68,8 +65,9 @@ def test_validate_task_topology_reports_unknown_environment_profile(
     assert any("unknown environment profile" in failure for failure in failures)
 
 
+@pytest.mark.usefixtures("synthetic_harbor_root")
 def test_validate_task_topology_reports_workflow_fixture_digest_drift(
-    tmp_path: Path, synthetic_harbor_root: Path
+    tmp_path: Path,
 ) -> None:
     suite, task = _make_suite_with_task(tmp_path)
     task_toml = (
@@ -85,8 +83,9 @@ def test_validate_task_topology_reports_workflow_fixture_digest_drift(
     assert any("fixture_digest" in f for f in failures)
 
 
+@pytest.mark.usefixtures("synthetic_harbor_root")
 def test_validate_task_topology_reports_env_dockerfile_copies_solution(
-    tmp_path: Path, synthetic_harbor_root: Path
+    tmp_path: Path,
 ) -> None:
     suite, task = _make_suite_with_task(tmp_path)
     (task / "environment" / "Dockerfile").write_text(
@@ -96,18 +95,16 @@ def test_validate_task_topology_reports_env_dockerfile_copies_solution(
     assert any("hidden" in f.lower() for f in failures)
 
 
-def test_validate_task_topology_forbids_root_input_json(
-    tmp_path: Path, synthetic_harbor_root: Path
-) -> None:
+@pytest.mark.usefixtures("synthetic_harbor_root")
+def test_validate_task_topology_forbids_root_input_json(tmp_path: Path) -> None:
     suite, task = _make_suite_with_task(tmp_path)
     (task / "input.json").write_text("{}")
     failures = validate_task_topology(suite, task)
     assert any("input.json" in f for f in failures)
 
 
-def test_validate_task_topology_forbids_raw_interpreter_caches(
-    tmp_path: Path, synthetic_harbor_root: Path
-) -> None:
+@pytest.mark.usefixtures("synthetic_harbor_root")
+def test_validate_task_topology_forbids_raw_interpreter_caches(tmp_path: Path) -> None:
     suite, task = _make_suite_with_task(tmp_path)
     cache = task / "tests" / "__pycache__"
     cache.mkdir()
@@ -116,8 +113,9 @@ def test_validate_task_topology_forbids_raw_interpreter_caches(
     assert any("cache" in f for f in failures)
 
 
+@pytest.mark.usefixtures("synthetic_harbor_root")
 def test_validate_task_topology_ignores_gitignored_interpreter_caches(
-    tmp_path: Path, synthetic_harbor_root: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import benchmarks.tooling.harbor_suite as harbor_suite
 
@@ -139,8 +137,9 @@ def test_validate_task_topology_ignores_gitignored_interpreter_caches(
     assert validate_task_topology(suite, task) == []
 
 
+@pytest.mark.usefixtures("synthetic_harbor_root")
 def test_validate_task_topology_rejects_tracked_interpreter_caches(
-    tmp_path: Path, synthetic_harbor_root: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import benchmarks.tooling.harbor_suite as harbor_suite
 
@@ -173,36 +172,34 @@ def test_validate_task_topology_rejects_tracked_interpreter_caches(
     assert all("--no-index" not in command for command in commands)
 
 
-def test_validate_task_visibility_detects_host_path(
-    tmp_path: Path, synthetic_harbor_root: Path
-) -> None:
+@pytest.mark.usefixtures("synthetic_harbor_root")
+def test_validate_task_visibility_detects_host_path(tmp_path: Path) -> None:
     _suite, task = _make_suite_with_task(tmp_path)
     (task / "instruction.md").write_text("Read /home/user/secret.txt for the answer.")
     failures = validate_task_visibility(task)
     assert any("host path" in f for f in failures)
 
 
-def test_validate_task_visibility_detects_secret(
-    tmp_path: Path, synthetic_harbor_root: Path
-) -> None:
+@pytest.mark.usefixtures("synthetic_harbor_root")
+def test_validate_task_visibility_detects_secret(tmp_path: Path) -> None:
     _suite, task = _make_suite_with_task(tmp_path)
-    (task / "instruction.md").write_text('api_key = "supersecretkey12345"')
+    (task / "instruction.md").write_text(
+        'api_key = "supersecretkey12345"'  # pragma: allowlist secret
+    )
     failures = validate_task_visibility(task)
     assert any("secret" in f for f in failures)
 
 
-def test_validate_task_visibility_rejects_oracle_named_files(
-    tmp_path: Path, synthetic_harbor_root: Path
-) -> None:
+@pytest.mark.usefixtures("synthetic_harbor_root")
+def test_validate_task_visibility_rejects_oracle_named_files(tmp_path: Path) -> None:
     _suite, task = _make_suite_with_task(tmp_path)
     (task / "environment" / "expected.json").write_text("{}")
     failures = validate_task_visibility(task)
     assert any("Oracle/verifier" in f for f in failures)
 
 
-def test_validate_task_visibility_clean_for_normal_task(
-    tmp_path: Path, synthetic_harbor_root: Path
-) -> None:
+@pytest.mark.usefixtures("synthetic_harbor_root")
+def test_validate_task_visibility_clean_for_normal_task(tmp_path: Path) -> None:
     _suite, task = _make_suite_with_task(tmp_path)
     assert validate_task_visibility(task) == []
 
