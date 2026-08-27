@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from pydantic_core import PydanticCustomError
+
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.polynomials._conversions import (
     rational_function_to_sympy,
     symbols_for_variables,
@@ -9,6 +12,7 @@ from jacobian.math.polynomials._conversions import (
 from jacobian.math.polynomials.rational_functions._models import (
     HermiteReductionRequest,
     HermiteReductionResult,
+    require_hermite_reduction_budget,
 )
 from jacobian.math.polynomials.rational_functions.operations import hermite_reduction
 
@@ -16,6 +20,16 @@ from jacobian.math.polynomials.rational_functions.operations import hermite_redu
 def compute_hermite_reduction(
     request: HermiteReductionRequest,
 ) -> HermiteReductionResult:
+    try:
+        require_hermite_reduction_budget(request.function)
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=(), code=exc.type, message=exc.message()
+        ) from exc
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=(), code="polynomial.rational_function_admission", message=str(exc)
+        ) from exc
     rational_part, remainder = hermite_reduction(request.function)
     return HermiteReductionResult._from_kernel(
         function=request.function,

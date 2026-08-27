@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
+from pydantic_core import PydanticCustomError
+
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math import polynomials
 from jacobian.math.polynomials._conversions import (
     rational_from_sympy,
@@ -12,6 +16,12 @@ from jacobian.math.polynomials._conversions import (
     symbols_for_variables,
 )
 from jacobian.math.polynomials._models import (
+    _MAX_DISCRIMINANT_DEGREE,
+    _MAX_ELIMINATION_DEGREE_SUM,
+    _MAX_GCD_DEGREE,
+    _MAX_GCD_TERMS,
+    _MAX_INVARIANT_TERMS,
+    _MAX_SQUARE_FREE_EXPONENT,
     PolynomialBezoutIdentity,
     PolynomialDiscriminantRequest,
     PolynomialDiscriminantResult,
@@ -30,14 +40,109 @@ from jacobian.math.polynomials._models import (
     PolynomialSquareFreeFactor,
     PolynomialSquareFreeRequest,
     PolynomialValue,
+    _degree,
+    _validation_error,
 )
-from jacobian.math.polynomials.values import RationalPolynomial
+from jacobian.math.polynomials.values import (
+    MAX_POLYNOMIAL_TERMS,
+    RationalPolynomial,
+    require_polynomial_budget,
+)
 
 _MAX_OUTPUT_TERMS = 1024
 
 
 class PolynomialOutputBudgetError(RuntimeError):
     """A valid computation produced more output than its public contract permits."""
+
+
+def _run_admission[ResultT](admission: Callable[[], ResultT]) -> ResultT:
+    """Expose owner admission as a typed native-domain failure."""
+
+    try:
+        return admission()
+    except OperationDomainValidationError:
+        raise
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=(), code=exc.type, message=exc.message()
+        ) from exc
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=(), code="polynomial.admission", message=str(exc)
+        ) from exc
+
+
+def _admit_gcd(request: PolynomialGcdRequest) -> None:
+    if len(request.left.variables) != 1:
+        raise _validation_error("Bézout GCD currently supports one variable over QQ")
+    for polynomial in (request.left, request.right):
+        require_polynomial_budget(
+            polynomial,
+            maximum_terms=_MAX_GCD_TERMS,
+            maximum_exponent=_MAX_GCD_DEGREE,
+        )
+    if not request.left.polynomial.terms and not request.right.polynomial.terms:
+        raise _validation_error("gcd(0, 0) is undefined: zero has no monic normalization")
+
+
+def _admit_resultant(request: PolynomialResultantRequest) -> None:
+    if request.elimination_variable not in request.left.variables:
+        raise _validation_error("elimination variable must belong to the declared ring")
+    for polynomial in (request.left, request.right):
+        require_polynomial_budget(
+            polynomial,
+            maximum_terms=_MAX_INVARIANT_TERMS,
+            maximum_exponent=_MAX_ELIMINATION_DEGREE_SUM,
+        )
+    index = request.left.variables.index(request.elimination_variable)
+    if _degree(request.left, index) + _degree(request.right, index) > _MAX_ELIMINATION_DEGREE_SUM:
+        raise _validation_error("Sylvester degree exceeds the resultant budget")
+
+
+def _admit_discriminant(request: PolynomialDiscriminantRequest) -> None:
+    if request.variable not in request.polynomial.variables:
+        raise _validation_error("discriminant variable must belong to the declared ring")
+    require_polynomial_budget(
+        request.polynomial,
+        maximum_terms=_MAX_INVARIANT_TERMS,
+        maximum_exponent=_MAX_SQUARE_FREE_EXPONENT,
+    )
+    if _degree(request.polynomial, request.polynomial.variables.index(request.variable)) > _MAX_DISCRIMINANT_DEGREE:
+        raise _validation_error("main-variable degree exceeds the discriminant budget")
+
+
+def _admit_square_free(request: PolynomialSquareFreeRequest) -> None:
+    require_polynomial_budget(
+        request.polynomial,
+        maximum_terms=_MAX_GCD_TERMS,
+        maximum_exponent=_MAX_SQUARE_FREE_EXPONENT,
+    )
+
+
+def _admit_factorization(request: PolynomialFactorRequest) -> None:
+    if len(request.polynomial.variables) != 1:
+        raise _validation_error("factorization currently supports one variable over QQ")
+    require_polynomial_budget(
+        request.polynomial,
+        maximum_terms=_MAX_GCD_TERMS,
+        maximum_exponent=_MAX_GCD_DEGREE,
+    )
+
+
+def _admit_groebner(request: PolynomialGroebnerBasisRequest) -> None:
+    if sum(len(generator.polynomial.terms) for generator in request.generators) > 256:
+        raise _validation_error("ideal generators exceed the aggregate term budget")
+    for generator in request.generators:
+        require_polynomial_budget(
+            generator,
+            maximum_terms=MAX_POLYNOMIAL_TERMS,
+            maximum_exponent=12,
+            maximum_coefficient_digits=128,
+            label="ideal generator",
+        )
+        if any(sum(term.exponents) > 12 for term in generator.polynomial.terms):
+            raise _validation_error("ideal generator exceeds total degree 12")
 
 
 def _result_polynomial(poly: object, variables: tuple[str, ...]) -> RationalPolynomial:
@@ -70,6 +175,7 @@ def _invariant_value(
 
 
 def polynomial_gcd(request: PolynomialGcdRequest) -> PolynomialGcdResult:
+    _run_admission(lambda: _admit_gcd(request))
     left = rational_polynomial_to_sympy(request.left)
     right = rational_polynomial_to_sympy(request.right)
     left_multiplier, right_multiplier, gcd = polynomials.gcdex(left, right)
@@ -86,6 +192,7 @@ def polynomial_gcd(request: PolynomialGcdRequest) -> PolynomialGcdResult:
 def polynomial_resultant(
     request: PolynomialResultantRequest,
 ) -> PolynomialResultantResult:
+    _run_admission(lambda: _admit_resultant(request))
     variables = request.left.variables
     elimination_index = variables.index(request.elimination_variable)
     generator = symbols_for_variables(variables)[elimination_index]
@@ -106,6 +213,7 @@ def polynomial_resultant(
 def polynomial_discriminant(
     request: PolynomialDiscriminantRequest,
 ) -> PolynomialDiscriminantResult:
+    _run_admission(lambda: _admit_discriminant(request))
     variables = request.polynomial.variables
     variable_index = variables.index(request.variable)
     generator = symbols_for_variables(variables)[variable_index]
@@ -124,6 +232,7 @@ def polynomial_discriminant(
 def polynomial_square_free_decomposition(
     request: PolynomialSquareFreeRequest,
 ) -> PolynomialSquareFreeDecompositionResult:
+    _run_admission(lambda: _admit_square_free(request))
     source = rational_polynomial_to_sympy(request.polynomial)
     coefficient, canonical_factors, reconstructed = (
         polynomials.square_free_decomposition(source)
@@ -162,6 +271,7 @@ def _irreducible_factor_sort_key(
 def polynomial_factorization(
     request: PolynomialFactorRequest,
 ) -> PolynomialFactorizationResult:
+    _run_admission(lambda: _admit_factorization(request))
     source = rational_polynomial_to_sympy(request.polynomial)
     coefficient, canonical_factors, reconstructed = polynomials.factorization(source)
     factors = tuple(
@@ -188,6 +298,8 @@ def polynomial_groebner_basis(
     request: PolynomialGroebnerBasisRequest,
 ) -> PolynomialGroebnerBasisResult:
     """Compute one complete reduced basis inside the isolated worker."""
+
+    _run_admission(lambda: _admit_groebner(request))
 
     variables = request.generators[0].variables
     wire_basis = tuple(

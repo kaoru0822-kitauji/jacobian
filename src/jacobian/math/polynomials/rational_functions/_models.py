@@ -92,10 +92,6 @@ class HermiteReductionRequest(StrictModel):
         )
     )
 
-    @model_validator(mode="after")
-    def require_univariate_reduction_budget(self) -> Self:
-        require_hermite_reduction_budget(self.function)
-        return self
 
 
 class HermiteReductionResult(HermiteReductionRequest):

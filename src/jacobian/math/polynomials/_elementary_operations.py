@@ -5,7 +5,10 @@ from __future__ import annotations
 from functools import cache
 from typing import Any
 
+from pydantic_core import PydanticCustomError
+
 from jacobian.canonical import format_canonical_integer, parse_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math import polynomials
 from jacobian.math.polynomials._conversions import (
     rational_from_sympy,
@@ -13,6 +16,10 @@ from jacobian.math.polynomials._conversions import (
     rational_polynomial_to_sympy,
 )
 from jacobian.math.polynomials._models import (
+    _MAX_ELEMENTARY_DEGREE,
+    _MAX_GCD_TERMS,
+    _MAX_INTEGER_COEFFICIENT_DIGITS,
+    _MAX_INVARIANT_TERMS,
     IntegerPolynomial,
     IntegerPolynomialCompositionRequest,
     IntegerPolynomialCompositionResult,
@@ -35,7 +42,75 @@ from jacobian.math.polynomials._models import (
     RationalPolynomialEvaluationResult,
     RationalPolynomialIntegralResult,
     RationalPolynomialRequest,
+    _validation_error,
 )
+from jacobian.math.polynomials.values import require_polynomial_budget
+
+
+def _run_admission(admission: Any) -> None:
+    try:
+        admission()
+    except OperationDomainValidationError:
+        raise
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=(), code=exc.type, message=exc.message()
+        ) from exc
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=(), code="polynomial.admission", message=str(exc)
+        ) from exc
+
+
+def _admit_integer(polynomial: IntegerPolynomial) -> None:
+    if len(polynomial.coefficients) > _MAX_ELEMENTARY_DEGREE + 1:
+        raise _validation_error("integer polynomial exceeds the degree-127 operation budget")
+    if any(len(coefficient.lstrip("-")) > _MAX_INTEGER_COEFFICIENT_DIGITS for coefficient in polynomial.coefficients):
+        raise _validation_error("integer coefficient exceeds the decimal-digit budget")
+
+
+def _admit_integer_pair(request: IntegerPolynomialPairRequest) -> None:
+    _admit_integer(request.left)
+    _admit_integer(request.right)
+
+
+def _admit_integer_evaluation(request: IntegerPolynomialEvaluationRequest) -> None:
+    _admit_integer(request.polynomial)
+    if len(request.point.lstrip("-")) > _MAX_INTEGER_COEFFICIENT_DIGITS:
+        raise _validation_error("evaluation point exceeds the decimal-digit budget")
+
+
+def _admit_integer_composition(request: IntegerPolynomialCompositionRequest) -> None:
+    _admit_integer(request.outer)
+    _admit_integer(request.inner)
+    if (len(request.outer.coefficients) - 1) * (len(request.inner.coefficients) - 1) > _MAX_ELEMENTARY_DEGREE:
+        raise _validation_error("composition exceeds the degree-127 output budget")
+
+
+def _admit_rational(request: RationalPolynomialRequest) -> None:
+    if len(request.polynomial.variables) != 1:
+        raise _validation_error("elementary polynomial operations require one variable")
+    require_polynomial_budget(request.polynomial, maximum_terms=_MAX_GCD_TERMS, maximum_exponent=_MAX_ELEMENTARY_DEGREE)
+
+
+def _admit_division(request: RationalPolynomialDivisionRequest) -> None:
+    if len(request.left.variables) != 1:
+        raise _validation_error("polynomial division requires one variable")
+    if not request.right.polynomial.terms:
+        raise _validation_error("divisor polynomial must be nonzero")
+    for polynomial in (request.left, request.right):
+        require_polynomial_budget(polynomial, maximum_terms=_MAX_GCD_TERMS, maximum_exponent=_MAX_ELEMENTARY_DEGREE)
+
+
+def _admit_partial_fractions(request: RationalFunctionRequest) -> None:
+    if request.numerator.variables != request.denominator.variables:
+        raise _validation_error("numerator and denominator must use the same ring")
+    if len(request.numerator.variables) != 1:
+        raise _validation_error("partial fractions require one variable")
+    if not request.denominator.polynomial.terms:
+        raise _validation_error("denominator polynomial must be nonzero")
+    for polynomial in (request.numerator, request.denominator):
+        require_polynomial_budget(polynomial, maximum_terms=_MAX_INVARIANT_TERMS, maximum_exponent=_MAX_ELEMENTARY_DEGREE)
 
 
 @cache
@@ -72,6 +147,7 @@ def _integer_wire(polynomial: Any) -> IntegerPolynomial:
 def integer_polynomial_gcd(
     request: IntegerPolynomialPairRequest,
 ) -> IntegerPolynomialGcdResult:
+    _run_admission(lambda: _admit_integer_pair(request))
     left = _integer_poly(request.left)
     right = _integer_poly(request.right)
     gcd = left.gcd(right)
@@ -86,6 +162,7 @@ def integer_polynomial_gcd(
 def integer_polynomial_content(
     request: IntegerPolynomialRequest,
 ) -> IntegerPolynomialContentResult:
+    _run_admission(lambda: _admit_integer(request.polynomial))
     return IntegerPolynomialContentResult(
         content=format_canonical_integer(
             int(_integer_poly(request.polynomial).content())
@@ -96,6 +173,7 @@ def integer_polynomial_content(
 def integer_polynomial_primitive_part(
     request: IntegerPolynomialRequest,
 ) -> IntegerPolynomialPrimitivePartResult:
+    _run_admission(lambda: _admit_integer(request.polynomial))
     source = _integer_poly(request.polynomial)
     content, primitive = source.primitive()
     reconstructed = primitive.mul_ground(content)
@@ -109,6 +187,7 @@ def integer_polynomial_primitive_part(
 def integer_polynomial_evaluate(
     request: IntegerPolynomialEvaluationRequest,
 ) -> IntegerPolynomialEvaluationResult:
+    _run_admission(lambda: _admit_integer_evaluation(request))
     point = parse_canonical_integer(request.point)
     value = _integer_poly(request.polynomial).eval(point)
     return IntegerPolynomialEvaluationResult(
@@ -120,6 +199,7 @@ def integer_polynomial_evaluate(
 def integer_polynomial_compose(
     request: IntegerPolynomialCompositionRequest,
 ) -> IntegerPolynomialCompositionResult:
+    _run_admission(lambda: _admit_integer_composition(request))
     composition = _integer_poly(request.outer).compose(_integer_poly(request.inner))
     return IntegerPolynomialCompositionResult(composition=_integer_wire(composition))
 
@@ -128,6 +208,7 @@ def integer_polynomial_shift(
     request: IntegerPolynomialShiftRequest,
 ) -> IntegerPolynomialShiftResult:
     """Compute ``p(x + a)`` using SymPy's exact dense shift."""
+    _run_admission(lambda: _admit_integer(request.polynomial))
     shifted = _integer_poly(request.polynomial).shift(request.shift)
     return IntegerPolynomialShiftResult(
         shift=request.shift,
@@ -138,6 +219,7 @@ def integer_polynomial_shift(
 def rational_polynomial_division(
     request: RationalPolynomialDivisionRequest,
 ) -> RationalPolynomialDivisionResult:
+    _run_admission(lambda: _admit_division(request))
     left = rational_polynomial_to_sympy(request.left)
     right = rational_polynomial_to_sympy(request.right)
     quotient, remainder, reconstruction = polynomials.divide(left, right)
@@ -152,6 +234,7 @@ def rational_polynomial_division(
 def rational_polynomial_evaluate(
     request: RationalPolynomialEvaluationRequest,
 ) -> RationalPolynomialEvaluationResult:
+    _run_admission(lambda: _admit_rational(request))
     point = request.point.as_fraction()
     from sympy import Rational
 
@@ -168,6 +251,7 @@ def rational_polynomial_evaluate(
 def rational_polynomial_derivative(
     request: RationalPolynomialRequest,
 ) -> RationalPolynomialDerivativeResult:
+    _run_admission(lambda: _admit_rational(request))
     return RationalPolynomialDerivativeResult(
         derivative=rational_polynomial_from_sympy(
             polynomials.derivative(rational_polynomial_to_sympy(request.polynomial)),
@@ -179,6 +263,7 @@ def rational_polynomial_derivative(
 def rational_polynomial_integral(
     request: RationalPolynomialRequest,
 ) -> RationalPolynomialIntegralResult:
+    _run_admission(lambda: _admit_rational(request))
     return RationalPolynomialIntegralResult(
         antiderivative=rational_polynomial_from_sympy(
             polynomials.integral(rational_polynomial_to_sympy(request.polynomial)),
@@ -230,6 +315,7 @@ def _partial_fraction_sort_key(
 def rational_partial_fraction_decomposition(
     request: RationalFunctionRequest,
 ) -> RationalPartialFractionResult:
+    _run_admission(lambda: _admit_partial_fractions(request))
     from sympy import Add, Poly, cancel, fraction, together
 
     variables = request.numerator.variables

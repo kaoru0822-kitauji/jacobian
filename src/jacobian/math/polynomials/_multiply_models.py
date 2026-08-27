@@ -2,20 +2,12 @@
 
 from __future__ import annotations
 
-import math
-from typing import Self
-
-from pydantic import model_validator
-
 from jacobian._exact import (
-    MAX_CANONICAL_RATIONAL_DIGITS,
     canonical_rational_component_digits,
 )
 from jacobian._models import StrictModel
 from jacobian.canonical import CanonicalLimits, strict_json_object_size
-from jacobian.math.polynomials._models import _validation_error
 from jacobian.math.polynomials.values import (
-    MAX_POLYNOMIAL_EXPONENT,
     MAX_POLYNOMIAL_TERMS,
     RationalPolynomial,
 )
@@ -139,57 +131,6 @@ class RationalPolynomialMultiplyRequest(StrictModel):
 
     left: RationalPolynomial
     right: RationalPolynomial
-
-    @model_validator(mode="after")
-    def require_matching_rings_and_budget(self) -> Self:
-        if self.left.variables != self.right.variables:
-            raise _validation_error("polynomials must use the same ordered variables")
-        product_term_work = len(self.left.polynomial.terms) * len(
-            self.right.polynomial.terms
-        )
-        if product_term_work > MAX_MULTIPLY_PRODUCT_WORK:
-            raise _validation_error(
-                "the polynomial product exceeds the bounded convolution work limit"
-            )
-        coefficient_digits = _maximum_product_coefficient_digits(self.left, self.right)
-        if coefficient_digits > MAX_CANONICAL_RATIONAL_DIGITS:
-            raise _validation_error(
-                "the polynomial product may exceed the canonical coefficient digit limit"
-            )
-        maximum_exponents = tuple(
-            max(
-                (term.exponents[index] for term in self.left.polynomial.terms),
-                default=0,
-            )
-            + max(
-                (term.exponents[index] for term in self.right.polynomial.terms),
-                default=0,
-            )
-            for index in range(len(self.left.variables))
-        )
-        support_term_bound = math.prod(exponent + 1 for exponent in maximum_exponents)
-        result_term_bound = min(product_term_work, support_term_bound)
-        if result_term_bound > MAX_MULTIPLY_RESULT_TERMS:
-            raise _validation_error(
-                "the polynomial product may exceed the canonical term limit"
-            )
-        if any(exponent > MAX_POLYNOMIAL_EXPONENT for exponent in maximum_exponents):
-            raise _validation_error(
-                "the polynomial product may exceed the canonical exponent limit"
-            )
-        if (
-            _result_wire_upper_bound(
-                self.left.variables,
-                term_count=result_term_bound,
-                coefficient_digits=coefficient_digits,
-                maximum_exponents=maximum_exponents,
-            )
-            > MAX_MULTIPLY_RESULT_BYTES
-        ):
-            raise _validation_error(
-                "the polynomial product may exceed the canonical serialized result size"
-            )
-        return self
 
 
 __all__ = [
