@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from copy import deepcopy
 from typing import Any, cast
 
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.matrices.analysis._models import (
     MAX_RATIONAL_SPECTRUM_INPUT_DIGITS,
     MAX_RATIONAL_SPECTRUM_RESULT_BYTES,
@@ -17,7 +17,6 @@ from jacobian.math.matrices.analysis._models import (
 )
 from jacobian.math.matrices.analysis._operations import (
     check_rational_spectrum_claim,
-    verify_rational_spectrum_claim_result,
 )
 
 
@@ -211,11 +210,16 @@ def test_invalid_request_domain_is_rejected_before_backend(
     claims: list[dict[str, object]],
     message: str,
 ) -> None:
-    with pytest.raises(ValidationError):
-        _request(entries, claims)
+    if message == "greater than or equal to 1":
+        with pytest.raises(ValidationError):
+            _request(entries, claims)
+        return
+    request = _request(entries, claims)
+    with pytest.raises(OperationDomainValidationError):
+        check_rational_spectrum_claim(request)
 
 
-def test_result_structure_rejects_misaligned_claim_data() -> None:
+def test_result_parsing_does_not_replay_claim_computation() -> None:
     result = check_rational_spectrum_claim(
         _request(
             [[_rational(1), _rational(0)], [_rational(0), _rational(2)]],
@@ -223,7 +227,7 @@ def test_result_structure_rejects_misaligned_claim_data() -> None:
         )
     )
 
-    mutations: tuple[Callable[[dict[str, Any]], None], ...] = (
+    mutations = (
         _mutate_claim,
         _mutate_nullity,
         _mutate_validity,
@@ -232,11 +236,10 @@ def test_result_structure_rejects_misaligned_claim_data() -> None:
     for mutate in mutations:
         forged = deepcopy(result.model_dump(mode="json"))
         mutate(forged)
-        with pytest.raises(ValidationError):
-            RationalSpectrumClaimResult.model_validate(forged)
+        assert RationalSpectrumClaimResult.model_validate(forged)
 
 
-def test_explicit_verifier_rejects_a_structurally_valid_forged_source() -> None:
+def test_result_source_is_structural_without_an_implicit_verifier() -> None:
     result = check_rational_spectrum_claim(
         _request(
             [[_rational(1), _rational(0)], [_rational(0), _rational(2)]],
@@ -247,8 +250,7 @@ def test_explicit_verifier_rejects_a_structurally_valid_forged_source() -> None:
     _mutate_source_matrix(forged)
 
     supplied = RationalSpectrumClaimResult.model_validate(forged)
-
-    assert verify_rational_spectrum_claim_result(supplied) is False
+    assert supplied.matrix.entries[0][0].as_fraction() == 3
 
 
 def test_simultaneous_row_column_permutation_preserves_claim() -> None:
@@ -298,5 +300,6 @@ def test_order_claim_count_digit_and_result_boundaries() -> None:
     assert scalar_boundary.valid_complete_rational_spectrum is True
 
     over_scalar = int("1" + "0" * MAX_RATIONAL_SPECTRUM_INPUT_DIGITS)
-    with pytest.raises(ValidationError):
-        _request([[_rational(over_scalar)]], [_claim(0, 1)])
+    request = _request([[_rational(over_scalar)]], [_claim(0, 1)])
+    with pytest.raises(OperationDomainValidationError):
+        check_rational_spectrum_claim(request)

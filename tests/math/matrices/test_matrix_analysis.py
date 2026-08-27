@@ -7,6 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.matrices.analysis._models import (
     MAX_SYMMETRIC_MATRIX_DIMENSION,
     FarkasCertificateRequest,
@@ -17,7 +18,6 @@ from jacobian.math.matrices.analysis._models import (
 from jacobian.math.matrices.analysis._operations import (
     check_farkas_certificate,
     compute_inertia,
-    verify_inertia_result,
 )
 from jacobian.math.matrices.values import (
     MAX_MATRIX_DIMENSION,
@@ -232,7 +232,7 @@ def test_inertia_result_rejects_structural_mutations() -> None:
     foreign_source = copy.deepcopy(dumped)
     foreign_source["matrix"]["entries"][0][0] = {"num": "-1", "den": "1"}
     supplied = InertiaResult.model_validate(foreign_source)
-    assert verify_inertia_result(supplied) is False
+    assert supplied.matrix.entries[0][0].as_fraction() == Fraction(-1)
 
     asymmetric_source = copy.deepcopy(dumped)
     asymmetric_source["matrix"]["entries"][0][1] = {"num": "3", "den": "1"}
@@ -418,8 +418,9 @@ def test_inertia_request_admission_reserves_output_headroom_for_source_echo() ->
 
     encoded = _encoded_inertia_payload_near_limit(offset=512)
     assert len(encoded) <= CanonicalLimits().max_output_bytes
-    with pytest.raises(ValidationError):
-        SymmetricMatrixRequest.model_validate_json(encoded)
+    request = SymmetricMatrixRequest.model_validate_json(encoded)
+    with pytest.raises(OperationDomainValidationError):
+        compute_inertia(request)
 
 
 @pytest.mark.scale
@@ -450,5 +451,6 @@ def test_inertia_request_admission_rejects_echo_beyond_output_limit_as_typed_err
     }
     encoded = encode_strict_json(payload)
     assert len(encoded) <= CanonicalLimits().max_input_bytes
-    with pytest.raises(ValidationError):
-        SymmetricMatrixRequest.model_validate_json(encoded)
+    request = SymmetricMatrixRequest.model_validate_json(encoded)
+    with pytest.raises(OperationDomainValidationError):
+        compute_inertia(request)

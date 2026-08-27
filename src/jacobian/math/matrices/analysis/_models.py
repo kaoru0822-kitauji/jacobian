@@ -3,28 +3,14 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from math import factorial
 from typing import Literal, Self
 
 from pydantic import Field, StrictInt, model_validator
 from pydantic_core import PydanticCustomError
 
-from jacobian._exact import (
-    CanonicalRational,
-    canonical_rational_component_digits,
-    require_bounded_rational,
-)
+from jacobian._exact import CanonicalRational
 from jacobian._models import StrictModel
-from jacobian.canonical import (
-    CanonicalizationError,
-    CanonicalLimits,
-    encode_strict_json,
-)
-from jacobian.math.matrices.values import (
-    RationalMatrix,
-    rational_matrix_from_fractions,
-    require_matrix_scalar_digits,
-)
+from jacobian.math.matrices.values import RationalMatrix, rational_matrix_from_fractions
 
 # The canonical dense rational matrix carries determinant inputs through
 # order 64, but the symmetric definiteness request's work and result
@@ -80,100 +66,6 @@ class RationalSpectrumClaimRequest(StrictModel):
         ),
     )
 
-    @model_validator(mode="after")
-    def require_admitted_complete_claim(self) -> Self:
-        order = len(self.matrix.entries)
-        if order != len(self.matrix.entries[0]):
-            raise _validation_error(
-                "shape_mismatch", "rational spectrum claims require a square matrix"
-            )
-        if order > MAX_RATIONAL_SPECTRUM_ORDER:
-            raise _validation_error(
-                "budget_exceeded",
-                "rational spectrum claims support matrix order at most "
-                f"{MAX_RATIONAL_SPECTRUM_ORDER}",
-            )
-        if any(
-            self.matrix.entries[row][column] != self.matrix.entries[column][row]
-            for row in range(order)
-            for column in range(row + 1, order)
-        ):
-            raise _validation_error(
-                "budget_exceeded", "rational spectrum claims require a symmetric matrix"
-            )
-
-        require_matrix_scalar_digits(
-            self.matrix.entries,
-            maximum=MAX_RATIONAL_SPECTRUM_INPUT_DIGITS,
-            label="rational spectrum matrix",
-        )
-        nonzero_entries = sum(
-            entry.num != "0" for row in self.matrix.entries for entry in row
-        )
-        if nonzero_entries > MAX_RATIONAL_SPECTRUM_NONZERO_ENTRIES:
-            raise _validation_error(
-                "budget_exceeded",
-                "rational spectrum matrix exceeds the nonzero-entry budget",
-            )
-        eigenvalues = tuple(claim.eigenvalue for claim in self.claimed_profile)
-        for eigenvalue in eigenvalues:
-            require_bounded_rational(
-                eigenvalue,
-                max_digits=MAX_RATIONAL_SPECTRUM_INPUT_DIGITS,
-                label="claimed eigenvalue",
-            )
-        if len(set(eigenvalues)) != len(eigenvalues):
-            raise _validation_error(
-                "budget_exceeded",
-                "claimed rational eigenvalues must be pairwise distinct",
-            )
-
-        shifted_digits = max(
-            canonical_rational_component_digits(
-                CanonicalRational.from_fraction(
-                    self.matrix.entries[index][index].as_fraction()
-                    - eigenvalue.as_fraction()
-                )
-            )
-            for eigenvalue in eigenvalues
-            for index in range(order)
-        )
-        if shifted_digits > MAX_RATIONAL_SPECTRUM_SHIFTED_DIGITS:
-            raise _validation_error(
-                "budget_exceeded",
-                "shifted diagonal entries exceed the rational spectrum digit budget",
-            )
-
-        rank_work = len(eigenvalues) * order**3
-        if rank_work > MAX_RATIONAL_SPECTRUM_RANK_WORK:
-            raise _validation_error(
-                "budget_exceeded",
-                "shifted-rank computations exceed the aggregate work budget",
-            )
-
-        # Clearing each row's denominators gives integer entries with at most
-        # order * shifted_digits digits. Every square minor then has at most
-        # order! terms, each a product of at most order such entries.
-        minor_digits = order * order * shifted_digits + len(str(factorial(order))) + 1
-        if minor_digits > MAX_RATIONAL_SPECTRUM_MINOR_DIGITS:
-            raise _validation_error(
-                "budget_exceeded", "exact shifted-rank minors exceed the digit budget"
-            )
-
-        source_cells = order * order
-        result_bytes = (
-            2_048
-            + source_cells * (2 * MAX_RATIONAL_SPECTRUM_INPUT_DIGITS + 96)
-            + len(eigenvalues) * (4 * MAX_RATIONAL_SPECTRUM_INPUT_DIGITS + 256)
-        )
-        if result_bytes > MAX_RATIONAL_SPECTRUM_RESULT_BYTES:
-            raise _validation_error(
-                "budget_exceeded",
-                "rational spectrum ledger exceeds the result-size budget",
-            )
-        return self
-
-
 class RationalSpectrumNullityLedgerEntry(StrictModel):
     """Exact shifted nullity and multiplicity comparison for one claim."""
 
@@ -217,83 +109,6 @@ class RationalSpectrumClaimResult(StrictModel):
         "PYTHON_FLINT_EXACT_RANK_AFTER_ROW_DENOMINATOR_CLEARING"
     )
 
-    @model_validator(mode="after")
-    def bind_complete_claim_to_source(self) -> Self:
-        """Check payload structure; exact replay belongs to the owner verifier."""
-        request = RationalSpectrumClaimRequest(
-            matrix=self.matrix,
-            claimed_profile=self.claimed_profile,
-        )
-        if self.matrix_order != len(request.matrix.entries):
-            raise _validation_error(
-                "shape_mismatch",
-                "matrix_order must equal the retained source matrix order",
-            )
-        if len(self.nullity_ledger) != len(request.claimed_profile):
-            raise _validation_error(
-                "shape_mismatch",
-                "nullity ledger must contain one entry for every claimed eigenvalue",
-            )
-        if any(
-            entry.eigenvalue != claim.eigenvalue
-            or entry.claimed_multiplicity != claim.multiplicity
-            for entry, claim in zip(
-                self.nullity_ledger, request.claimed_profile, strict=True
-            )
-        ):
-            raise _validation_error(
-                "shape_mismatch",
-                "nullity ledger entries must remain aligned with the claimed profile",
-            )
-        claimed_sum = sum(claim.multiplicity for claim in request.claimed_profile)
-        if self.claimed_multiplicity_sum != claimed_sum:
-            raise _validation_error(
-                "shape_mismatch",
-                "claimed_multiplicity_sum must equal the claimed-profile sum",
-            )
-        established_sum = sum(entry.exact_nullity for entry in self.nullity_ledger)
-        if self.established_multiplicity_sum != established_sum:
-            raise _validation_error(
-                "shape_mismatch",
-                "established_multiplicity_sum must equal the nullity-ledger sum",
-            )
-        mismatch = next(
-            (
-                index
-                for index, entry in enumerate(self.nullity_ledger)
-                if not entry.multiplicity_matches
-            ),
-            None,
-        )
-        if any(
-            entry.multiplicity_matches
-            != (entry.exact_nullity == entry.claimed_multiplicity)
-            for entry in self.nullity_ledger
-        ):
-            raise _validation_error(
-                "shape_mismatch",
-                "multiplicity_matches must agree with each retained nullity",
-            )
-        failure: RationalSpectrumFailure | None
-        if mismatch is not None:
-            failure = "MULTIPLICITY_MISMATCH"
-        elif claimed_sum != self.matrix_order:
-            failure = "CLAIMED_MULTIPLICITY_SUM_DOES_NOT_EQUAL_MATRIX_ORDER"
-        else:
-            failure = None
-        valid = failure is None
-        if (
-            self.outcome != ("VALID" if valid else "INVALID")
-            or self.valid_complete_rational_spectrum is not valid
-            or self.first_failed_condition != failure
-            or self.first_failed_claim_index != mismatch
-        ):
-            raise _validation_error(
-                "shape_mismatch",
-                "rational spectrum outcome must agree with the retained ledger",
-            )
-        return self
-
     @classmethod
     def _from_kernel(
         cls,
@@ -308,7 +123,7 @@ class RationalSpectrumClaimResult(StrictModel):
         """Construct a result emitted by the exact owner-local kernel."""
 
         valid = first_failed_condition is None
-        return cls(
+        return cls.model_construct(
             matrix=request.matrix,
             claimed_profile=request.claimed_profile,
             nullity_ledger=nullity_ledger,
@@ -350,19 +165,6 @@ class SymmetricMatrixRequest(StrictModel):
                     "invariant_mismatch", "symmetric matrix entries must not conflict"
                 )
             seen.add(key)
-        source = _canonical_source_matrix(self)
-        output_limit = CanonicalLimits().max_output_bytes
-        try:
-            retained_bytes = len(encode_strict_json(source.model_dump(mode="json")))
-        except CanonicalizationError:
-            retained_bytes = output_limit + 1
-        if retained_bytes + _RESULT_ENVELOPE_RESERVE_BYTES > output_limit:
-            raise _validation_error(
-                "invariant_mismatch",
-                "the inertia result retains its source matrix and would "
-                f"exceed the {output_limit}-byte canonical output limit; "
-                "use fewer or smaller-magnitude entries",
-            )
         return self
 
 

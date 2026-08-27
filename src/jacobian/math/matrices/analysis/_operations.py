@@ -3,10 +3,31 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from math import lcm
+from math import factorial, lcm
+from typing import Any
 
-from jacobian._exact import CanonicalRational, format_canonical_rational
+from pydantic_core import PydanticCustomError
+
+from jacobian._exact import (
+    CanonicalRational,
+    canonical_rational_component_digits,
+    format_canonical_rational,
+    require_bounded_rational,
+)
+from jacobian.canonical import (
+    CanonicalizationError,
+    CanonicalLimits,
+    encode_strict_json,
+)
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.matrices.analysis._models import (
+    MAX_RATIONAL_SPECTRUM_INPUT_DIGITS,
+    MAX_RATIONAL_SPECTRUM_MINOR_DIGITS,
+    MAX_RATIONAL_SPECTRUM_NONZERO_ENTRIES,
+    MAX_RATIONAL_SPECTRUM_ORDER,
+    MAX_RATIONAL_SPECTRUM_RANK_WORK,
+    MAX_RATIONAL_SPECTRUM_RESULT_BYTES,
+    MAX_RATIONAL_SPECTRUM_SHIFTED_DIGITS,
     FarkasCertificateRequest,
     FarkasCertificateResult,
     InertiaResult,
@@ -16,8 +37,64 @@ from jacobian.math.matrices.analysis._models import (
     RationalSpectrumNullityLedgerEntry,
     SymmetricMatrixRequest,
     _canonical_source_matrix,
+    _validation_error,
 )
-from jacobian.math.matrices.values import RationalMatrix
+from jacobian.math.matrices.values import RationalMatrix, require_matrix_scalar_digits
+
+
+def _admit_rational_spectrum_claim(request: RationalSpectrumClaimRequest) -> None:
+    order = len(request.matrix.entries)
+    if order != len(request.matrix.entries[0]):
+        raise _validation_error("shape_mismatch", "rational spectrum claims require a square matrix")
+    if order > MAX_RATIONAL_SPECTRUM_ORDER:
+        raise _validation_error("budget_exceeded", f"rational spectrum claims support matrix order at most {MAX_RATIONAL_SPECTRUM_ORDER}")
+    if any(request.matrix.entries[row][column] != request.matrix.entries[column][row] for row in range(order) for column in range(row + 1, order)):
+        raise _validation_error("budget_exceeded", "rational spectrum claims require a symmetric matrix")
+    require_matrix_scalar_digits(request.matrix.entries, maximum=MAX_RATIONAL_SPECTRUM_INPUT_DIGITS, label="rational spectrum matrix")
+    nonzero_entries = sum(entry.num != "0" for row in request.matrix.entries for entry in row)
+    if nonzero_entries > MAX_RATIONAL_SPECTRUM_NONZERO_ENTRIES:
+        raise _validation_error("budget_exceeded", "rational spectrum matrix exceeds the nonzero-entry budget")
+    eigenvalues = tuple(claim.eigenvalue for claim in request.claimed_profile)
+    for eigenvalue in eigenvalues:
+        require_bounded_rational(eigenvalue, max_digits=MAX_RATIONAL_SPECTRUM_INPUT_DIGITS, label="claimed eigenvalue")
+    if len(set(eigenvalues)) != len(eigenvalues):
+        raise _validation_error("budget_exceeded", "claimed rational eigenvalues must be pairwise distinct")
+    shifted_digits = max(canonical_rational_component_digits(CanonicalRational.from_fraction(request.matrix.entries[index][index].as_fraction() - eigenvalue.as_fraction())) for eigenvalue in eigenvalues for index in range(order))
+    if shifted_digits > MAX_RATIONAL_SPECTRUM_SHIFTED_DIGITS:
+        raise _validation_error("budget_exceeded", "shifted diagonal entries exceed the rational spectrum digit budget")
+    if len(eigenvalues) * order**3 > MAX_RATIONAL_SPECTRUM_RANK_WORK:
+        raise _validation_error("budget_exceeded", "shifted-rank computations exceed the aggregate work budget")
+    minor_digits = order * order * shifted_digits + len(str(factorial(order))) + 1
+    if minor_digits > MAX_RATIONAL_SPECTRUM_MINOR_DIGITS:
+        raise _validation_error("budget_exceeded", "exact shifted-rank minors exceed the digit budget")
+    result_bytes = 2_048 + order * order * (2 * MAX_RATIONAL_SPECTRUM_INPUT_DIGITS + 96) + len(eigenvalues) * (4 * MAX_RATIONAL_SPECTRUM_INPUT_DIGITS + 256)
+    if result_bytes > MAX_RATIONAL_SPECTRUM_RESULT_BYTES:
+        raise _validation_error("budget_exceeded", "rational spectrum ledger exceeds the result-size budget")
+
+
+def _admit(request: Any) -> None:
+    try:
+        if isinstance(request, RationalSpectrumClaimRequest):
+            _admit_rational_spectrum_claim(request)
+        else:
+            seen: set[tuple[int, int]] = set()
+            for entry in request.entries:
+                if entry.row >= request.dimension or entry.col >= request.dimension:
+                    raise _validation_error("shape_mismatch", "entry indices must be < dimension")
+                key = (min(entry.row, entry.col), max(entry.row, entry.col))
+                if key in seen:
+                    raise _validation_error("invariant_mismatch", "symmetric matrix entries must not conflict")
+                seen.add(key)
+            source = _canonical_source_matrix(request)
+            output_limit = CanonicalLimits().max_output_bytes
+            try:
+                retained_bytes = len(encode_strict_json(source.model_dump(mode="json")))
+            except CanonicalizationError:
+                retained_bytes = output_limit + 1
+            if retained_bytes + 1_024 > output_limit:
+                raise _validation_error("invariant_mismatch", "the inertia result retains its source matrix and would exceed the canonical output limit")
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(location=("request",), code=exc.type, message=exc.message()) from exc
 
 
 def _exact_shifted_nullities(
@@ -60,6 +137,7 @@ def check_rational_spectrum_claim(
     request: RationalSpectrumClaimRequest,
 ) -> RationalSpectrumClaimResult:
     """Check a claimed complete rational spectrum of a symmetric QQ matrix."""
+    _admit(request)
     ledger, claimed_sum, established_sum, mismatch, failure = (
         _replay_rational_spectrum_claim(request)
     )
@@ -108,27 +186,6 @@ def _replay_rational_spectrum_claim(
     else:
         failure = None
     return ledger, claimed_sum, sum(nullities), mismatch, failure
-
-
-def verify_rational_spectrum_claim_result(result: RationalSpectrumClaimResult) -> bool:
-    """Replay an independently supplied spectrum claim in its admitted envelope."""
-
-    request = RationalSpectrumClaimRequest(
-        matrix=result.matrix,
-        claimed_profile=result.claimed_profile,
-    )
-    ledger, claimed_sum, established_sum, mismatch, failure = (
-        _replay_rational_spectrum_claim(request)
-    )
-    expected = RationalSpectrumClaimResult._from_kernel(
-        request=request,
-        nullity_ledger=ledger,
-        claimed_multiplicity_sum=claimed_sum,
-        established_multiplicity_sum=established_sum,
-        first_failed_claim_index=mismatch,
-        first_failed_condition=failure,
-    )
-    return result == expected
 
 
 def _build_matrix(request: SymmetricMatrixRequest) -> list[list[Fraction]]:
@@ -258,22 +315,13 @@ def _symmetric_inertia(matrix: list[list[Fraction]]) -> tuple[int, int, int]:
 
 def compute_inertia(request: SymmetricMatrixRequest) -> InertiaResult:
     """Compute the Sylvester inertia of a symmetric rational matrix."""
+    _admit(request)
     n_pos, n_neg, n_zero = _symmetric_inertia(_build_matrix(request))
     return InertiaResult._from_kernel(
         matrix=_canonical_source_matrix(request),
         n_positive=n_pos,
         n_negative=n_neg,
         n_zero=n_zero,
-    )
-
-
-def verify_inertia_result(result: InertiaResult) -> bool:
-    """Replay an independently supplied inertia claim over its retained matrix."""
-
-    return _symmetric_inertia(_dense_fractions(result.matrix)) == (
-        result.n_positive,
-        result.n_negative,
-        result.n_zero,
     )
 
 
@@ -332,6 +380,4 @@ __all__ = [
     "check_farkas_certificate",
     "check_rational_spectrum_claim",
     "compute_inertia",
-    "verify_inertia_result",
-    "verify_rational_spectrum_claim_result",
 ]
