@@ -59,24 +59,6 @@ class GraphIsomorphismRequest(StrictModel):
     graph_a: SimpleGraph
     graph_b: SimpleGraph
 
-    @model_validator(mode="after")
-    def require_consistent_directedness(self) -> Self:
-        if self.graph_a.directed != self.graph_b.directed:
-            raise PydanticCustomError(
-                "graph.both_graphs_must_have_the_same_directedness",
-                "both graphs must have the same directedness",
-            )
-        return self
-
-    @model_validator(mode="after")
-    def require_consistent_vertex_count(self) -> Self:
-        if self.graph_a.vertex_count != self.graph_b.vertex_count:
-            raise PydanticCustomError(
-                "graph.both_graphs_must_have_the_same_vertex_count",
-                "both graphs must have the same vertex count",
-            )
-        return self
-
 
 class VertexMappingPair(StrictModel):
     """One ``(from_vertex, to_vertex)`` entry in an isomorphism witness."""

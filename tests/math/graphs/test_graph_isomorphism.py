@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.isomorphism._models import (
     GraphIsomorphismRequest,
     GraphIsomorphismResult,
@@ -275,23 +276,22 @@ class TestNonisomorphicSameDegreeSequence:
 
 class TestMismatchedVertexCount:
     def test_mismatched_vertex_count_rejected(self) -> None:
-        # The contract-level validator should reject mismatched vertex counts
-        # before any NetworkX call is made.
-        with pytest.raises(ValidationError) as exc_info:
-            GraphIsomorphismRequest.model_validate(
-                {
-                    "graph_a": {
-                        "vertex_count": 3,
-                        "directed": False,
-                        "edges": _path_edges(3),
-                    },
-                    "graph_b": {
-                        "vertex_count": 4,
-                        "directed": False,
-                        "edges": _path_edges(4),
-                    },
-                }
-            )
+        request = GraphIsomorphismRequest.model_validate(
+            {
+                "graph_a": {
+                    "vertex_count": 3,
+                    "directed": False,
+                    "edges": _path_edges(3),
+                },
+                "graph_b": {
+                    "vertex_count": 4,
+                    "directed": False,
+                    "edges": _path_edges(4),
+                },
+            }
+        )
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            decide_graph_isomorphism(request)
         assert "vertex count" in str(exc_info.value)
 
 
@@ -418,21 +418,22 @@ class TestValidation:
             )
 
     def test_mismatched_directedness_rejected(self) -> None:
-        with pytest.raises(ValidationError) as exc_info:
-            GraphIsomorphismRequest.model_validate(
-                {
-                    "graph_a": {
-                        "vertex_count": 3,
-                        "directed": True,
-                        "edges": [(0, 1)],
-                    },
-                    "graph_b": {
-                        "vertex_count": 3,
-                        "directed": False,
-                        "edges": [(0, 1)],
-                    },
-                }
-            )
+        request = GraphIsomorphismRequest.model_validate(
+            {
+                "graph_a": {
+                    "vertex_count": 3,
+                    "directed": True,
+                    "edges": [(0, 1)],
+                },
+                "graph_b": {
+                    "vertex_count": 3,
+                    "directed": False,
+                    "edges": [(0, 1)],
+                },
+            }
+        )
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            decide_graph_isomorphism(request)
         assert "directedness" in str(exc_info.value)
 
 

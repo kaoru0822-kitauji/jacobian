@@ -36,6 +36,23 @@ _VF2_ADDRESS_SPACE_BYTES = 1024 * 1024 * 1024
 _VF2_FILE_SIZE_BYTES = 1024 * 1024
 
 
+def _admit_graph_isomorphism(request: GraphIsomorphismRequest) -> None:
+    """Admit the cross-graph domain required by the VF2 kernel."""
+
+    if request.graph_a.directed != request.graph_b.directed:
+        raise OperationDomainValidationError(
+            location=("graph_a", "directed"),
+            code="graph.both_graphs_must_have_the_same_directedness",
+            message="both graphs must have the same directedness",
+        )
+    if request.graph_a.vertex_count != request.graph_b.vertex_count:
+        raise OperationDomainValidationError(
+            location=("graph_a", "vertex_count"),
+            code="graph.both_graphs_must_have_the_same_vertex_count",
+            message="both graphs must have the same vertex count",
+        )
+
+
 def _vertex_mapping(
     graph_a: SimpleGraph,
     graph_b: SimpleGraph,
@@ -135,10 +152,7 @@ def decide_graph_isomorphism(
     request: GraphIsomorphismRequest,
 ) -> GraphIsomorphismResult:
     """Decide whether two simple graphs are isomorphic."""
-    # Fail closed on mismatched vertex counts (also enforced at the contract
-    # level, but keep a defense-in-depth check at the domain boundary).
-    if request.graph_a.vertex_count != request.graph_b.vertex_count:
-        raise ValueError("both graphs must have the same vertex count")
+    _admit_graph_isomorphism(request)
     try:
         mapping = _vertex_mapping(request.graph_a, request.graph_b)
     except RuntimeError:
