@@ -37,6 +37,30 @@ arbitrary cap on a composable primitive. Follow the
 [boundedness proof](domain-operation-library.md#boundedness-proof) and prefer
 the quantities that actually control the kernel or exact output.
 
+## Define the operation before its implementation or source theorem
+
+Write the candidate in three deliberately separate layers:
+
+| Layer | Question | Owner |
+| --- | --- | --- |
+| **Postcondition** | For valid input `X`, what canonical value `Y` is returned, and what mathematical relation `P(X, Y)` does it establish? | The public operation contract. |
+| **Defining invariant** | What identity, reconstruction, exhaustive relation, or independent oracle establishes that one computed `Y` satisfies `P(X, Y)`? | The trusted kernel and its tests. |
+| **Theorem-specific lift** | How does a paper, conjecture investigation, or caller combine `Y` with other choices and arguments to obtain a larger conclusion? | Caller reasoning, not the operation. |
+
+The postcondition is the admission object.  A defining invariant is evidence
+for that postcondition; it is not a second operation and does not require
+ordinary execution to replay a proof.  A source theorem can reveal a useful
+postcondition, but its reduction, parameter choices, contradiction, and
+stopping rule remain caller-owned unless they themselves return a distinct,
+bounded, reusable value.
+
+For smooth, analytic, or asymptotic source material, first establish that the
+proposed carrier retains the required category, regularity, metric or measure,
+error, and limit semantics.  The [carrier ladder for smooth and analytic
+mathematics](../explanation/executable-mathematical-vocabulary.md#the-carrier-ladder-for-smooth-and-analytic-mathematics)
+explains why a coordinate-local derivative can be a valid operation while a
+global geometry or PDE workflow is not thereby defined.
+
 ## Execution-envelope review
 
 Keep the public mathematical postcondition as broad as its semantics permit.

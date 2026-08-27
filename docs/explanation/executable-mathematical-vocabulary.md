@@ -191,6 +191,17 @@ Admission gates decide that later disposition; they should not suppress an
 evidence-backed gap record. Conversely, recording an operation gap does not
 pre-admit a catalog operation.
 
+### Common boundary mistakes
+
+| Candidate description | Usual disposition | Why |
+| --- | --- | --- |
+| “Return the next proof step.” | Reasoning or workflow | The result depends on strategy, available lemmas, and a caller-selected stopping rule. |
+| “Solve this named conjecture.” | Theorem wrapper | It bundles representation, search, interpretation, and conclusion around one motivating statement. |
+| “Run the backend's algorithm X.” | Private kernel or discovery vocabulary | An algorithm is not a public result; retain it privately unless it establishes a distinct postcondition. |
+| “Compute the canonical source-indexed profile of this bounded family.” | Plausible operation candidate | A complete, independently useful relation can compose with multiple later arguments when its carrier and bounds are explicit. |
+| “Add a new operation because the existing one rejects large `n`.” | Scale/backend or contract review first | The existing postcondition may be right; derive work and output bounds before duplicating it. |
+| “Discretise a continuous source argument and expose the same name.” | Representation prerequisite, reasoning, or no action | Samples or meshes do not automatically retain the source's metric, error, regularity, or limit semantics. |
+
 ## What tends to be useful
 
 Useful operations usually turn substantial computation or mathematical

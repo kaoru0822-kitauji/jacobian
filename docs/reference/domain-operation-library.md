@@ -132,6 +132,44 @@ below for subtype trust, boundedness, a backend adapter, or a process boundary.
 - Result-size bound and exact-success/non-success states:
 - Evidence: defining invariant plus the changed boundary regression:
 
+### Worked boundary: a complete bounded profile
+
+Consider an operation that receives a finite graph `G` and a non-negative
+deletion order `b`, and returns the chromatic number of every graph obtained by
+deleting at most `b` source edges.  Its semantic postcondition is the canonical
+source-indexed map
+
+\[
+F \longmapsto \chi(G-F) \quad \text{for every } F\subseteq E(G),\ |F|\leq b.
+\]
+
+This is one complete profile, not a theorem about critical graphs and not a
+workflow for choosing which deletions matter.  A sound contract would make the
+following choices explicit:
+
+- **Canonical rows:** order each source-edge subset by increasing cardinality
+  and then lexicographically by source-edge index, including the empty subset.
+  Every eligible `F` appears exactly once.
+- **Result semantics:** each row carries the exact chromatic-number result for
+  its own `G-F`.  The outer profile is `COMPLETE_EXACT` only if every row is
+  exact; rows that are unknown or incomplete are retained explicitly rather
+  than omitted or silently treated as a negative conclusion.
+- **Admission:** with `m = |E(G)|`, the request preflights
+  \(\sum_{k=0}^{b}\binom{m}{k}\) rows, the predicted work of each row, and
+  the full serialized profile.  All row work shares one deadline and ledger.
+- **Defining tests:** `b=0`, edgeless graphs, source-edge permutation, and
+  small exact profiles such as `K_4` with `b=1` (one row of value 4 and four
+  rows of value 3) distinguish source indexing, completeness, and row
+  semantics.
+- **Non-goals:** selecting a deletion set, minimizing over an unbounded graph
+  family, recognizing a theorem-specific criticality class, and deriving a
+  Ramsey or extremal conclusion remain caller composition.
+
+The profile's exhaustive source relation is the defining invariant.  A graph
+colouring backend is only a private kernel for individual rows, and a paper
+that uses the profile as one lemma supplies a theorem-specific lift rather
+than the operation's public meaning.
+
 ### Validated mathematical subtypes and exact-success states
 
 A structurally valid candidate is not a theorem-bearing value. A raw set
