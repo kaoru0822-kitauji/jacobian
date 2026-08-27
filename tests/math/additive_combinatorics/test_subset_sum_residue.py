@@ -21,7 +21,6 @@ from jacobian.math.additive_combinatorics._subset_sum_residue import (
     MAX_RESIDUE_PROFILE_RESULT_BYTES,
     SubsetSumResidueProfileRequest,
     SubsetSumResidueProfileResult,
-    _verify_subset_sum_residue_profile,
     compute_subset_sum_residue_profile,
 )
 
@@ -86,7 +85,6 @@ def test_request_and_result_compose_through_strict_json_parsing() -> None:
         )
         == result
     )
-    assert _verify_subset_sum_residue_profile(result)
 
 
 def test_two_items_have_nonempty_zero_residue_with_canonical_witnesses() -> None:
@@ -220,62 +218,7 @@ def test_total_multiplicity_is_the_number_of_permitted_subsets(
     assert sum(map(int, result.residue_counts)) == expected_total
 
 
-def test_owner_verifier_rejects_mutated_count() -> None:
-    result = compute_subset_sum_residue_profile(
-        _request((1, 2, 4), 5, include_empty_subset=False)
-    )
-    payload = result.model_dump(mode="json")
-    payload["residue_counts"][0] = "8"
-    assert not _verify_subset_sum_residue_profile(
-        SubsetSumResidueProfileResult.model_validate(payload)
-    )
-
-
-@pytest.mark.parametrize(
-    ("field", "replacement"),
-    [
-        ("source", {"items": ["1", "2", "3"]}),
-        ("include_empty_subset", True),
-    ],
-)
-def test_owner_verifier_rejects_mutated_source_relation(
-    field: str,
-    replacement: object,
-) -> None:
-    result = compute_subset_sum_residue_profile(
-        _request(
-            (1, 2, 4),
-            5,
-            include_empty_subset=False,
-            include_witnesses=True,
-        )
-    )
-    payload = result.model_dump(mode="json")
-    payload[field] = replacement
-    assert not _verify_subset_sum_residue_profile(
-        SubsetSumResidueProfileResult.model_validate(payload)
-    )
-
-
-def test_owner_verifier_rejects_source_reordering_that_changes_canonical_witnesses() -> (
-    None
-):
-    result = compute_subset_sum_residue_profile(
-        _request(
-            (1, 2, 4),
-            5,
-            include_empty_subset=False,
-            include_witnesses=True,
-        )
-    )
-    payload = result.model_dump(mode="json")
-    payload["source"] = {"items": ["4", "2", "1"]}
-    assert not _verify_subset_sum_residue_profile(
-        SubsetSumResidueProfileResult.model_validate(payload)
-    )
-
-
-def test_owner_verifier_rejects_noncanonical_or_mutated_witness() -> None:
+def test_result_rejects_noncanonical_witness() -> None:
     result = compute_subset_sum_residue_profile(
         _request(
             (0, 0),
@@ -284,12 +227,6 @@ def test_owner_verifier_rejects_noncanonical_or_mutated_witness() -> None:
             include_witnesses=True,
         )
     )
-    payload = result.model_dump(mode="json")
-    payload["residue_witnesses"][0] = {"indices": [1]}
-    assert not _verify_subset_sum_residue_profile(
-        SubsetSumResidueProfileResult.model_validate(payload)
-    )
-
     payload = result.model_dump(mode="json")
     payload["residue_witnesses"][0] = {"indices": [1, 0]}
     with pytest.raises(ValidationError):

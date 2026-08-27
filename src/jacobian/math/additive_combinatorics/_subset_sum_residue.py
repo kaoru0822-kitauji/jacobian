@@ -547,26 +547,6 @@ def _admit_subset_sum_residue_profile(
         )
 
 
-def _verify_subset_sum_residue_profile(result: SubsetSumResidueProfileResult) -> bool:
-    """Verify an independently supplied residue profile within its envelope."""
-
-    try:
-        request = SubsetSumResidueProfileRequest(
-            source=result.source,
-            modulus=result.modulus,
-            include_empty_subset=result.include_empty_subset,
-            include_witnesses=result.include_witnesses,
-        )
-        _admit_subset_sum_residue_profile(request)
-        expected_counts, expected_witnesses = _compute_residue_profile(request)
-    except ValueError:
-        return False
-    return (
-        result.residue_counts == expected_counts
-        and result.residue_witnesses == expected_witnesses
-    )
-
-
 __all__ = [
     "MAX_RESIDUE_PROFILE_DP_CELLS",
     "MAX_RESIDUE_PROFILE_INPUT_INTEGER_DIGITS",
