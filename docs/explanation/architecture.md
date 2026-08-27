@@ -8,18 +8,30 @@ The serving process compiles one immutable catalog directly from explicit
 `MathTool` entries and exposes `math.find` and `math.run` through the MCP Python
 SDK.
 
-Each operation parses one typed request, performs owner-local request admission,
-executes one bounded Jacobian kernel path (which may use a maintained private
-backend), constructs one canonical typed result, and returns it through one
-transport projection.
+For most native functions, the ordinary call path is deliberately small:
 
-The ordinary call path is:
+```text
+user calls a function
+  -> validate and normalize its mathematical input
+  -> perform the computation
+  -> return a canonical Jacobian value
+```
+
+Request admission is part of validation, not a requirement to build an
+orchestration layer. A simple operation may use one owner-local guard that
+returns nothing on success, followed directly by its kernel. An operation needs
+a distinct execution-plan value only when admission derives information that
+execution genuinely reuses, such as an algorithm choice, prepared finite data,
+or work and output reservations.
+
+The MCP path wraps that same native operation with discovery, wire parsing, and
+transport projection:
 
 ```text
 operation ID + JSON
   -> declaration
   -> strict typed request
-  -> owner-local request admission and execution plan
+  -> owner-local native operation
   -> bounded Jacobian kernel or private backend adapter
   -> canonical typed result construction
   -> MCP/JSON transport projection
@@ -28,15 +40,19 @@ operation ID + JSON
 ### Runtime ownership rule
 
 Parsing establishes only the canonical request shape and cheap representation
-limits. The owner then computes one semantic admission plan for the invocation.
-That plan contains only facts the kernel or trusted result construction reuses:
-the selected algorithm or backend, derived work and output bounds, and prepared
-finite data. The owner executes exactly one kernel from that plan and constructs
-the result from trusted kernel output.
+limits. The owner then makes one semantic admission decision for the
+invocation. When that decision produces facts the kernel or trusted result
+construction reuses—the selected algorithm or backend, derived work and output
+bounds, or prepared finite data—the owner may represent them as a request-scoped
+execution plan. Otherwise, a guard followed directly by the kernel is the
+preferred shape. "One semantic admission decision" means one consistent check
+and any reusable derived facts; it does not require a plan class, planner
+abstraction, or extra module for every operation.
 
 Request and ordinary result models must not perform semantic admission, call a
 backend, enumerate candidates, or check a defining relation. A wrapper or
-kernel must not recompute an admission quantity already held by the plan.
+kernel must not recompute an admission quantity already established by
+admission or held by a plan.
 
 A named bounded verifier is the only replay path, and only verifies
 independently supplied theorem-bearing data.
@@ -89,8 +105,9 @@ claim. This keeps ordinary morphology in the shared lexical normalizer and
 domain terminology with the owner that can review its meaning.
 
 Catalog admission decides publication and is not runtime planning. The
-mathematical owner decides request admission, builds the request-scoped
-execution plan, owns the backend adapter, and constructs the canonical result.
+mathematical owner decides request admission, builds a request-scoped execution
+plan when one is useful, owns the backend adapter, and constructs the canonical
+result.
 Defining-invariant evidence belongs in the operation's tests; a full replay is
 not part of ordinary execution. An adapter may reject malformed backend data
 while converting it, but that is integration safety rather than a separate

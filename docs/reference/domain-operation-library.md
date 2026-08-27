@@ -220,8 +220,9 @@ claims still use the explicit bounded verifier described below.
 These checks have distinct owners. Catalog admission decides whether an
 operation is published; it does not admit a particular runtime request.
 Request admission proves that one parsed request belongs to the advertised
-mathematical and execution envelope and produces the owner-local execution
-plan. Backend conversion converts an already-admitted value; it does not widen
+mathematical and execution envelope. It may also produce an owner-local
+execution plan when the kernel needs reusable derived facts. Backend conversion
+converts an already-admitted value; it does not widen
 or discover that domain. Result construction converts the output of that
 execution into the canonical typed result. The defining invariant is
 primarily established by the operation's known-answer, defining-identity, and
@@ -235,10 +236,12 @@ Request-model validation is not a second execution-plan layer. A raw
 shape, nesting, digit length, or an aggregate source limit—before expensive
 canonicalization. It must not perform full candidate enumeration, invoke a
 solver or backend, or replay the operation's defining relation merely to
-validate a request. After canonicalization, the owner computes one semantic
-admission plan for the invocation and reuses it through the kernel and trusted
-result construction; request validators and operation wrappers must not
-recompute that plan independently.
+validate a request. After canonicalization, the owner makes one semantic
+admission decision for the invocation. It reuses any derived facts through the
+kernel and trusted result construction; request validators and operation
+wrappers must not recompute the decision independently. A simple admission
+guard may return nothing on success. Do not introduce a plan class or module
+unless it carries information that a later phase genuinely consumes.
 
 When result construction needs to bypass semantic replay, expose one private
 owner-local factory such as ``_from_kernel``. It may use trusted construction
@@ -483,20 +486,22 @@ universal short default. If callers may select wall time, expose only an
 operation-owned range whose upper bound remains compatible with the admitted
 work, memory, and cleanup envelope.
 
-One accepted request has one owner-local execution plan. Parsing, normalization,
-presolve, backend calls, exact replay, result validation, serialization, and
-cancellation cleanup consume its shared deadline and charged work quantities;
-no phase receives a fresh hidden budget. This is an owner-level contract, not a
-generic production ledger. A caller or MCP read timeout must cover the declared
-operation envelope plus bounded transport overhead; a shorter outer timeout may
-abort the call, but it cannot establish an operation result.
+One accepted request has one owner-local execution envelope. Parsing,
+normalization, presolve, backend calls, exact replay, result validation,
+serialization, and cancellation cleanup consume its shared deadline and
+charged work quantities; no phase receives a fresh hidden budget. This is an
+owner-level contract, not a generic production ledger. A caller or MCP read
+timeout must cover the declared operation envelope plus bounded transport
+overhead; a shorter outer timeout may abort the call, but it cannot establish an
+operation result.
 
-The plan includes the semantic admission decision and its derived work,
-intermediate, memory, and exact-output reservations. Compute those quantities
-once after canonicalization and pass or otherwise reuse the owner-local plan;
-do not make a request model, operation wrapper, and trusted result constructor
-independently repeat the same admission probe. A separately supplied result is
-a different trust boundary and may incur an explicit bounded verifier replay.
+When admission derives work, intermediate, memory, or exact-output reservations,
+compute them once after canonicalization and pass or otherwise reuse them in an
+owner-local plan. Do not make a request model, operation wrapper, and trusted
+result constructor independently repeat the same admission probe. Operations
+without reusable derived facts need no plan object. A separately supplied
+result is a different trust boundary and may incur an explicit bounded verifier
+replay.
 
 For a killable subprocess or interactive backend, that envelope begins before
 input spooling, launch, resource setup, and reader/writer startup. It also

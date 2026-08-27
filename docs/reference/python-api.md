@@ -22,10 +22,13 @@ meaning. Private backend modules perform lazy conversions and calls to SymPy,
 NetworkX, FLINT, or Z3.
 
 Native values are mathematical values rather than wire envelopes. Native and
-MCP calls use the same domain-owned request-admission function, execution plan,
-kernel path, canonical result construction, and typed outcome semantics. The
-MCP path adds only wire parsing and the final transport projection; native code
-must not
+MCP calls use the same domain-owned request admission, kernel path, canonical
+result construction, and typed outcome semantics. Most native functions simply
+normalize and validate their input, perform the computation, and return a
+canonical value. An operation uses a distinct execution plan only when
+admission derives information that its kernel or result construction needs to
+reuse. The MCP path adds only wire parsing and the final transport projection;
+native code must not
 inherit MCP byte/depth/echo limits unless those limits are part of the
 mathematical operation itself.
 
