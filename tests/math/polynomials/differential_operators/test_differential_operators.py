@@ -5,7 +5,9 @@ from __future__ import annotations
 import itertools
 import math
 import random
+from collections.abc import Callable, Mapping
 from fractions import Fraction
+from typing import Any
 
 import pytest
 import sympy
@@ -51,9 +53,9 @@ def _rational(value: int | Fraction) -> CanonicalRational:
     return CanonicalRational.from_fraction(Fraction(value))
 
 
-def _polynomial(
+def _polynomial[Order: tuple[int, ...]](
     variables: tuple[str, ...],
-    terms: dict[tuple[int, ...], int | Fraction],
+    terms: Mapping[Order, int | Fraction],
 ) -> RationalPolynomial:
     return RationalPolynomial(
         variables=variables,
@@ -70,9 +72,9 @@ def _polynomial(
     )
 
 
-def _operator(
+def _operator[Order: tuple[int, ...]](
     variables: tuple[str, ...],
-    terms: dict[tuple[int, ...], int | Fraction],
+    terms: Mapping[Order, int | Fraction],
 ) -> ConstantCoefficientDifferentialOperator:
     return ConstantCoefficientDifferentialOperator(
         variables=variables,
@@ -653,6 +655,7 @@ def test_no_growth_derivatives_are_admitted_at_the_coefficient_boundary() -> Non
     assert len(result.output.polynomial.terms[0].coefficient.num) == 32_768
 
 
+@pytest.mark.scale
 def test_multinomial_path_multiplicity_gates_the_coefficient_bound() -> None:
     variables = ("x",)
     operator = _operator(variables, {(0,): 1, (1,): 1})
@@ -1009,6 +1012,7 @@ def test_expected_comparison_admits_values_beyond_the_kernel_regime() -> None:
     assert replayed == result
 
 
+@pytest.mark.scale
 def test_expected_retention_still_honors_the_retained_byte_budget() -> None:
     coefficient = CanonicalRational(num="1" + "0" * 32_767, den="1")
     heavy_expected = RationalPolynomial(
@@ -2072,7 +2076,7 @@ def test_explicit_result_verifier_rejects_source_operator_iteration_and_output_m
     request = TOOLS[0].request_type.model_validate(TOOLS[0].examples[0].input)
     result = compute_differential_operator_application(request)
 
-    for mutate in (
+    mutations: tuple[Callable[[dict[str, Any]], None], ...] = (
         lambda payload: payload.__setitem__("iterations", 1),
         lambda payload: payload["operator"]["terms"][0]["coefficient"].__setitem__(
             "num", "-1"
@@ -2080,7 +2084,8 @@ def test_explicit_result_verifier_rejects_source_operator_iteration_and_output_m
         lambda payload: payload["output"]["polynomial"]["terms"][0][
             "coefficient"
         ].__setitem__("num", "-5"),
-    ):
+    )
+    for mutate in mutations:
         payload = result.model_dump(mode="json")
         mutate(payload)
         if payload["expected"] is not None:
@@ -2245,6 +2250,7 @@ def test_common_denominator_height_gate_is_exact_at_its_boundary() -> None:
             for _ in range(rng.randrange(1, 12))
         ]
         ungated = _common_denominator_height(values)
+        assert ungated is not None
         cap = rng.randrange(1, 400)
         gated = _common_denominator_height(values, maximum_digits=cap)
         if gated is None:

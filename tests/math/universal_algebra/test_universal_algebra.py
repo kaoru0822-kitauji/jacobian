@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import cast
+
 import pytest
 from pydantic import ValidationError
 
@@ -381,9 +384,12 @@ class TestHomomorphismProfile:
         import jacobian.math.universal_algebra.operations as operations
 
         calls = 0
-        original_scan = operations._first_homomorphism_failure
+        original_scan = cast(
+            Callable[[FiniteAlgebraCarrierMap], object],
+            vars(operations)["_first_homomorphism_failure"],
+        )
 
-        def observed_scan(carrier_map: FiniteAlgebraCarrierMap):
+        def observed_scan(carrier_map: FiniteAlgebraCarrierMap) -> object:
             nonlocal calls
             calls += 1
             return original_scan(carrier_map)

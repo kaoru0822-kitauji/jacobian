@@ -1,5 +1,10 @@
 """Tests for truncated formal power series operations."""
 
+from typing import Any, cast
+
+from jacobian._exact import CanonicalRational
+from jacobian._models import StrictModel
+from jacobian.catalog.models import MathTool
 from jacobian.math.formal_power_series import (
     compose,
     derivative,
@@ -26,8 +31,8 @@ from jacobian.math.formal_power_series._operations import (
 )
 
 
-def _coeff(num: str, den: str = "1") -> dict[str, str]:
-    return {"num": num, "den": den}
+def _coeff(num: str, den: str = "1") -> CanonicalRational:
+    return CanonicalRational(num=num, den=den)
 
 
 def _ascending(order: int) -> TruncatedSeries:
@@ -216,9 +221,9 @@ def test_native_exports_admit_inputs_before_kernel_work() -> None:
         truncation_order=1,
         coefficients=(_coeff(tall),),
     )
-    with pytest.raises(ValueError) as error:
+    with pytest.raises(ValueError) as overflow_error:
         multiply(oversized, oversized)
-    assert str(error.value) == "input coefficient exceeds the 256-digit bound"
+    assert str(overflow_error.value) == "input coefficient exceeds the 256-digit bound"
 
 
 def test_native_and_wire_operations_return_the_same_canonical_values() -> None:
@@ -235,8 +240,11 @@ def test_native_and_wire_operations_return_the_same_canonical_values() -> None:
     )
     from jacobian.math.formal_power_series._tools import TOOLS
 
-    def run_wire(operation_id: str, payload: dict[str, object]) -> object:
-        tool = next(tool for tool in TOOLS if tool.operation_id == operation_id)
+    def run_wire(operation_id: str, payload: dict[str, object]) -> StrictModel:
+        tool = cast(
+            MathTool[Any, StrictModel],
+            next(tool for tool in TOOLS if tool.operation_id == operation_id),
+        )
         return tool.run(tool.request_type.model_validate(payload))
 
     series = TruncatedSeries(
@@ -254,8 +262,6 @@ def test_native_and_wire_operations_return_the_same_canonical_values() -> None:
         truncation_order=3,
         coefficients=(_coeff("0"), _coeff("1"), _coeff("1")),
     )
-    from jacobian._exact import CanonicalRational
-
     scalar = CanonicalRational(num="3", den="2")
     cases = (
         (
@@ -393,6 +399,7 @@ def test_identity_check_admits_bounded_inputs_whose_product_would_overflow() -> 
     mismatch = identity_check(left, differing)
     assert mismatch.status == "NOT_EQUAL"
     assert mismatch.first_differing_index == 7
+    assert mismatch.exact_difference is not None
     assert mismatch.exact_difference.as_fraction() == -2 / 2**800
 
     payload = {
@@ -403,11 +410,13 @@ def test_identity_check_admits_bounded_inputs_whose_product_would_overflow() -> 
     assert admitted.right.coefficients == differing.coefficients
 
     with pytest.raises(ValidationError) as error:
-        _SeriesIdentityCheckRequest(
-            left=left.model_dump(),
-            right=TruncatedSeries(
-                variable="x", truncation_order=19, coefficients=tall[:19]
-            ).model_dump(),
+        _SeriesIdentityCheckRequest.model_validate(
+            {
+                "left": left.model_dump(),
+                "right": TruncatedSeries(
+                    variable="x", truncation_order=19, coefficients=tall[:19]
+                ).model_dump(),
+            }
         )
     assert (
         error.value.errors()[0]["type"] == "formal_power_series.operand_order_mismatch"
@@ -422,8 +431,8 @@ def test_relaxed_identity_check_request_is_versioned_as_version_two() -> None:
 
 def test_truncate_accepts_widened_carrier_orders_and_replays_the_prefix() -> None:
     source = _ascending(1477)
-    request = SeriesTruncateRequest(
-        series=source.model_dump(), target_order=MAX_TRUNCATION_ORDER
+    request = SeriesTruncateRequest.model_validate(
+        {"series": source.model_dump(), "target_order": MAX_TRUNCATION_ORDER}
     )
     result = compute_truncate(request.series, request.target_order)
     assert result.result.truncation_order == MAX_TRUNCATION_ORDER
@@ -436,8 +445,11 @@ def test_truncate_accepts_widened_carrier_orders_and_replays_the_prefix() -> Non
     from pydantic import ValidationError
 
     with pytest.raises(ValidationError) as error:
-        SeriesTruncateRequest(
-            series=source.model_dump(), target_order=MAX_TRUNCATION_ORDER + 1
+        SeriesTruncateRequest.model_validate(
+            {
+                "series": source.model_dump(),
+                "target_order": MAX_TRUNCATION_ORDER + 1,
+            }
         )
     assert (
         error.value.errors()[0]["type"]
@@ -450,7 +462,9 @@ def test_truncate_source_admission_bounds_the_request_before_parsing() -> None:
     from pydantic import ValidationError
 
     edge = _ascending(MAX_TRUNCATE_SOURCE_ORDER)
-    request = SeriesTruncateRequest(series=edge.model_dump(), target_order=1)
+    request = SeriesTruncateRequest.model_validate(
+        {"series": edge.model_dump(), "target_order": 1}
+    )
     assert (
         compute_truncate(request.series, request.target_order).result.coefficients
         == edge.coefficients[:1]
@@ -458,7 +472,9 @@ def test_truncate_source_admission_bounds_the_request_before_parsing() -> None:
 
     oversized = _ascending(MAX_TRUNCATE_SOURCE_ORDER + 1)
     with pytest.raises(ValidationError) as error:
-        SeriesTruncateRequest(series=oversized.model_dump(), target_order=1)
+        SeriesTruncateRequest.model_validate(
+            {"series": oversized.model_dump(), "target_order": 1}
+        )
     assert error.value.errors()[0]["type"] == "less_than_equal"
 
 
@@ -493,7 +509,7 @@ def test_truncate_source_ceiling_covers_the_level_one_replay_envelope() -> None:
     )
     from jacobian.math.modular_forms.values import LevelOneModularQExpansion
 
-    assert require_level_one_replay("E4", MAX_TRUNCATE_SOURCE_ORDER) is None
+    require_level_one_replay("E4", MAX_TRUNCATE_SOURCE_ORDER)
     widest, lo, hi = 1, 1, MAX_TRUNCATE_SOURCE_ORDER + 1
     while lo < hi:
         middle = (lo + hi + 1) // 2

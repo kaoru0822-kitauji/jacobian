@@ -14,19 +14,26 @@ from jacobian.math.posets._closure_operations import (
     lower_closure,
     upper_closure,
 )
-from jacobian.math.posets._models import FinitePosetRequest
+from jacobian.math.posets._models import (
+    FinitePoset,
+    FinitePosetRequest,
+    PresentationPair,
+    RelationInterpretation,
+)
 from jacobian.math.posets._operations import _materialized_poset
 
 
 def make_poset(
     elements: tuple[str, ...],
     edges: tuple[tuple[str, str], ...],
-) -> object:
+) -> FinitePoset:
     """Materialize a poset from cover edges."""
     req = FinitePosetRequest(
         elements=elements,
-        relation=tuple({"lower": a, "upper": b} for a, b in edges),
-        interpretation="COVER_EDGES",
+        relation=tuple(
+            PresentationPair(lower=lower, upper=upper) for lower, upper in edges
+        ),
+        interpretation=RelationInterpretation.COVER_EDGES,
     )
     return _materialized_poset(req)
 

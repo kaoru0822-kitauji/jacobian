@@ -27,8 +27,8 @@ from jacobian.math.elliptic_curves._operations import (
 )
 
 
-def _pt(num: str, den: str = "1") -> dict:
-    return {"num": num, "den": den}
+def _pt(num: str, den: str = "1") -> CanonicalRational:
+    return CanonicalRational(num=num, den=den)
 
 
 def _assert_error_code(
@@ -38,25 +38,25 @@ def _assert_error_code(
 
 
 class TestDiscriminant:
-    def test_nonsingular_curve(self):
+    def test_nonsingular_curve(self) -> None:
         curve = ShortWeierstrassCurve(coefficient_a=_pt("1"), coefficient_b=_pt("0"))
         result = compute_discriminant(EllipticCurveRequest(curve=curve))
         assert result.discriminant.as_fraction() == -64
         assert result.is_nonsingular
 
-    def test_singular_curve(self):
+    def test_singular_curve(self) -> None:
         curve = ShortWeierstrassCurve(coefficient_a=_pt("0"), coefficient_b=_pt("0"))
         result = compute_discriminant(EllipticCurveRequest(curve=curve))
         assert result.discriminant.as_fraction() == 0
         assert not result.is_nonsingular
 
-    def test_curve_y2_x3_minus_2x(self):
+    def test_curve_y2_x3_minus_2x(self) -> None:
         curve = ShortWeierstrassCurve(coefficient_a=_pt("-2"), coefficient_b=_pt("0"))
         result = compute_discriminant(EllipticCurveRequest(curve=curve))
         assert result.discriminant.as_fraction() == 512
         assert result.is_nonsingular
 
-    def test_coefficients_exceeding_result_bound_rejected(self):
+    def test_coefficients_exceeding_result_bound_rejected(self) -> None:
         """Exact Δ = -64·10^59997 for A=10^19999 has ~60k digits, past the
         canonical limit."""
         curve = ShortWeierstrassCurve(
@@ -66,7 +66,7 @@ class TestDiscriminant:
             EllipticCurveRequest(curve=curve)
         _assert_error_code(exc_info, "elliptic_curve.discriminant_result_bound")
 
-    def test_boundary_coefficients_accepted_and_returned(self):
+    def test_boundary_coefficients_accepted_and_returned(self) -> None:
         """The exact reduced Δ = -64A^3 for A=10^N has 3N+2 digits: N=10923
         exceeds the canonical bound and N=10921 stays within it."""
         rejected = ShortWeierstrassCurve(
@@ -85,7 +85,7 @@ class TestDiscriminant:
         digits = max(len(result.discriminant.num), len(result.discriminant.den))
         assert digits <= 32_768
 
-    def test_exact_discriminant_cancellation_admitted(self):
+    def test_exact_discriminant_cancellation_admitted(self) -> None:
         """A=-3t², B=2t³ makes 4A³+27B² vanish exactly despite ~20k- and
         ~30k-digit terms; the reduced exact discriminant admits the request
         and reports singularity."""
@@ -98,7 +98,7 @@ class TestDiscriminant:
         assert result.discriminant.as_fraction() == 0
         assert not result.is_nonsingular
 
-    def test_near_cancellation_admitted_with_exact_value(self):
+    def test_near_cancellation_admitted_with_exact_value(self) -> None:
         """Large terms cancelling almost exactly stay admitted: with
         A=-3t², B=2t³+t the exact Δ = 108t⁴ + 27t² fits the bound."""
         t = 10**8000
@@ -115,20 +115,22 @@ class TestDiscriminant:
 
 
 class TestPointOnCurve:
-    def test_point_on_curve(self):
+    def test_point_on_curve(self) -> None:
         curve = ShortWeierstrassCurve(coefficient_a=_pt("-2"), coefficient_b=_pt("0"))
         point = RationalAffinePoint(x=_pt("2"), y=_pt("2"))
         result = check_point_on_curve(CurvePointRequest(curve=curve, point=point))
         assert result.on_curve
 
-    def test_point_not_on_curve(self):
+    def test_point_not_on_curve(self) -> None:
         curve = ShortWeierstrassCurve(coefficient_a=_pt("-2"), coefficient_b=_pt("0"))
         point = RationalAffinePoint(x=_pt("1"), y=_pt("1"))
         result = check_point_on_curve(CurvePointRequest(curve=curve, point=point))
         assert not result.on_curve
 
 
-def _operand(curve, point):
+def _operand(
+    curve: ShortWeierstrassCurve, point: RationalAffinePoint
+) -> EllipticCurvePointResult:
     """Wrap a rational affine point as the parent-bearing curve-point value."""
     return EllipticCurvePointResult(
         curve=curve,
@@ -138,7 +140,7 @@ def _operand(curve, point):
 
 
 class TestPointAddition:
-    def test_double_y_zero(self):
+    def test_double_y_zero(self) -> None:
         curve = ShortWeierstrassCurve(coefficient_a=_pt("1"), coefficient_b=_pt("0"))
         point = RationalAffinePoint(x=_pt("0"), y=_pt("0"))
         result = add_points(
@@ -148,7 +150,7 @@ class TestPointAddition:
         )
         assert result.at_infinity
 
-    def test_add_distinct_points(self):
+    def test_add_distinct_points(self) -> None:
         curve = ShortWeierstrassCurve(coefficient_a=_pt("-2"), coefficient_b=_pt("0"))
         p = RationalAffinePoint(x=_pt("2"), y=_pt("2"))
         result = add_points(
@@ -160,7 +162,7 @@ class TestPointAddition:
         assert result.point.x.as_fraction() == Fraction(9, 4)
         assert result.point.y.as_fraction() == Fraction(-21, 8)
 
-    def test_add_negatives(self):
+    def test_add_negatives(self) -> None:
         curve = ShortWeierstrassCurve(coefficient_a=_pt("-2"), coefficient_b=_pt("0"))
         p = RationalAffinePoint(x=_pt("2"), y=_pt("2"))
         neg_p = RationalAffinePoint(x=_pt("2"), y=_pt("-2"))
@@ -173,7 +175,7 @@ class TestPointAddition:
 
 
 class TestScalarMultiplication:
-    def test_zero_times_point(self):
+    def test_zero_times_point(self) -> None:
         curve = ShortWeierstrassCurve(coefficient_a=_pt("-2"), coefficient_b=_pt("0"))
         p = RationalAffinePoint(x=_pt("2"), y=_pt("2"))
         result = scalar_multiply(
@@ -181,7 +183,7 @@ class TestScalarMultiplication:
         )
         assert result.at_infinity
 
-    def test_one_times_point(self):
+    def test_one_times_point(self) -> None:
         curve = ShortWeierstrassCurve(coefficient_a=_pt("-2"), coefficient_b=_pt("0"))
         p = RationalAffinePoint(x=_pt("2"), y=_pt("2"))
         result = scalar_multiply(
@@ -191,7 +193,7 @@ class TestScalarMultiplication:
         assert result.point.x.as_fraction() == 2
         assert result.point.y.as_fraction() == 2
 
-    def test_two_times_point(self):
+    def test_two_times_point(self) -> None:
         curve = ShortWeierstrassCurve(coefficient_a=_pt("-2"), coefficient_b=_pt("0"))
         p = RationalAffinePoint(x=_pt("2"), y=_pt("2"))
         result = scalar_multiply(
@@ -201,7 +203,7 @@ class TestScalarMultiplication:
         assert result.point.x.as_fraction() == Fraction(9, 4)
         assert result.point.y.as_fraction() == Fraction(-21, 8)
 
-    def test_three_times_point(self):
+    def test_three_times_point(self) -> None:
         curve = ShortWeierstrassCurve(coefficient_a=_pt("-2"), coefficient_b=_pt("0"))
         p = RationalAffinePoint(x=_pt("2"), y=_pt("2"))
         result = scalar_multiply(
@@ -215,7 +217,7 @@ class TestScalarMultiplication:
 class TestGroupLawAdmission:
     """The chord-and-tangent domain is enforced at the typed boundary."""
 
-    def test_order_two_point_odd_multiple(self):
+    def test_order_two_point_odd_multiple(self) -> None:
         """P=(0,0) on y^2=x^3+x has 2P=O, so 3P=P (not infinity)."""
         curve = ShortWeierstrassCurve(coefficient_a=_pt("1"), coefficient_b=_pt("0"))
         p = RationalAffinePoint(x=_pt("0"), y=_pt("0"))
@@ -226,7 +228,7 @@ class TestGroupLawAdmission:
         assert result.point.x.as_fraction() == 0
         assert result.point.y.as_fraction() == 0
 
-    def test_point_off_curve_rejected(self):
+    def test_point_off_curve_rejected(self) -> None:
         """(1,1) does not lie on y^2=x^3+x; the old code returned a fake sum."""
         curve = ShortWeierstrassCurve(coefficient_a=_pt("1"), coefficient_b=_pt("0"))
         p = RationalAffinePoint(x=_pt("1"), y=_pt("1"))
@@ -238,7 +240,7 @@ class TestGroupLawAdmission:
             )
         _assert_error_code(exc_info, "elliptic_curve.result_point_off_curve")
 
-    def test_singular_curve_rejected(self):
+    def test_singular_curve_rejected(self) -> None:
         """y^2=x^3 has a cusp at the origin: discriminant zero."""
         curve = ShortWeierstrassCurve(coefficient_a=_pt("0"), coefficient_b=_pt("0"))
         p = RationalAffinePoint(x=_pt("1"), y=_pt("1"))
@@ -246,7 +248,7 @@ class TestGroupLawAdmission:
             ScalarMultiplicationRequest(curve=curve, point=_operand(curve, p), scalar=2)
         _assert_error_code(exc_info, "elliptic_curve.singular_curve")
 
-    def test_singular_curve_with_identity_operands_rejected(self):
+    def test_singular_curve_with_identity_operands_rejected(self) -> None:
         """The identity shortcut must not bypass nonsingularity: a singular
         curve is rejected even when every operand is the point at infinity."""
         curve = ShortWeierstrassCurve(coefficient_a=_pt("0"), coefficient_b=_pt("0"))
@@ -263,17 +265,17 @@ class TestGroupLawAdmission:
             ScalarMultiplicationRequest(curve=curve, point=identity, scalar=0)
         _assert_error_code(exc_info, "elliptic_curve.singular_curve")
 
-    def test_double_order_two_point_huge_denominator_admitted(self):
+    def test_double_order_two_point_huge_denominator_admitted(self) -> None:
         """Doubling P=(1/q, 0) on y²=x³+x+B is O: admission must not
         propagate a fictional tangent slope through a y=0 doubling."""
         q = 10**4000 + 1
         curve = ShortWeierstrassCurve(
             coefficient_a=_pt("1"),
             # B = -(x³ + A·x) with x = 1/q, so P lies on the curve.
-            coefficient_b={
-                "num": format_canonical_integer(-(q * q + 1)),
-                "den": format_canonical_integer(q**3),
-            },
+            coefficient_b=CanonicalRational(
+                num=format_canonical_integer(-(q * q + 1)),
+                den=format_canonical_integer(q**3),
+            ),
         )
         p = RationalAffinePoint(x=_pt("1", str(q)), y=_pt("0"))
         result = add_points(
@@ -287,7 +289,7 @@ class TestGroupLawAdmission:
         )
         assert doubled.at_infinity
 
-    def test_order_two_point_odd_scalar_admitted(self):
+    def test_order_two_point_odd_scalar_admitted(self) -> None:
         """11P=P for order-two P=(0,0) on y²=x³+x; the height budget must
         track the infinity state instead of fabricating slope growth past
         the identity."""
@@ -306,7 +308,7 @@ class TestGroupLawAdmission:
 class TestResultSourceBinding:
     """Authoritative elliptic results are bound to their source curves."""
 
-    def _curve(self, a: str = "1", b: str = "0"):
+    def _curve(self, a: str = "1", b: str = "0") -> ShortWeierstrassCurve:
         return ShortWeierstrassCurve(
             coefficient_a=CanonicalRational(num=a, den="1"),
             coefficient_b=CanonicalRational(num=b, den="1"),
@@ -400,6 +402,7 @@ class TestGroupLawComposition:
             )
         )
         assert chained.at_infinity is False
+        assert chained.point is not None
         assert chained.point.x.as_fraction() == Fraction(0)
 
     def test_point_addition_result_feeds_scalar_multiply(self) -> None:

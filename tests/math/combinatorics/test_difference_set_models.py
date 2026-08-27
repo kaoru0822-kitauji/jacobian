@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Iterator
 from contextlib import contextmanager
 
 import pytest
@@ -17,7 +18,7 @@ from jacobian.math.combinatorics._difference_set_models import (
 
 
 @contextmanager
-def raises_code(code: str):
+def raises_code(code: str) -> Iterator[None]:
     with pytest.raises(ValidationError) as exc_info:
         yield
     assert exc_info.value.errors()[0]["type"] == code

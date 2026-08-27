@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from fractions import Fraction
 
 import pytest
@@ -31,7 +32,7 @@ from jacobian.math.polynomials.values import (
 
 def _polynomial(
     variables: tuple[str, ...],
-    terms: dict[tuple[int, ...], int | Fraction],
+    terms: Mapping[tuple[int, ...], int | Fraction],
 ) -> RationalPolynomial:
     return RationalPolynomial(
         variables=variables,
@@ -167,7 +168,7 @@ def test_vector_components_must_share_the_same_ring() -> None:
 
 def test_vector_field_rejects_aggregate_result_term_growth() -> None:
     variables = ("x", "y")
-    monomials = [
+    monomials: list[tuple[int, ...]] = [
         (left, right) for left in range(1, 64) for right in range(1, 64 - left)
     ]
     first = dict.fromkeys(monomials[:128], 1)

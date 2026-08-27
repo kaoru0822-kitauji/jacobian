@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 
 import pytest
 from pydantic import ValidationError
+from sympy import Matrix, Rational
 
+from jacobian._exact import CanonicalRational
 from jacobian.canonical import format_canonical_integer
 from jacobian.math.lattice_polytopes._models import (
     MAX_BOUND_SPAN,
@@ -24,8 +27,8 @@ from jacobian.math.lattice_polytopes._operations import (
 from jacobian.math.polytope import Halfspace, Vertex
 
 
-def _cr(num: str, den: str = "1") -> dict[str, str]:
-    return {"num": num, "den": den}
+def _cr(num: str, den: str = "1") -> CanonicalRational:
+    return CanonicalRational.model_validate({"num": num, "den": den})
 
 
 def _v(*coords: tuple[str, str]) -> Vertex:
@@ -40,7 +43,7 @@ def _hs(coeffs: tuple[tuple[str, str], ...], offset: tuple[str, str]) -> Halfspa
 
 
 @contextmanager
-def raises_code(code: str):
+def raises_code(code: str) -> Iterator[None]:
     with pytest.raises(ValidationError) as error:
         yield
     assert error.value.errors()[0]["type"] == f"lattice_polytope.{code}"
@@ -400,6 +403,7 @@ class TestMembershipWorkBudget:
             _hs((("0", "1"), ("-1", "1")), ("0", "1")),
         )
         request = LatticePolytopeRequest(halfspaces=sides * 16)
+        assert request.halfspaces is not None
         assert len(request.halfspaces) == 64
         assert count_lattice_points(request).point_count == 100
 
@@ -415,6 +419,7 @@ class TestMembershipWorkBudget:
             _hs((("0", "1"), ("-1", "1")), ("0", "1")),
         )
         request = LatticePolytopeRequest(halfspaces=sides * 16)
+        assert request.halfspaces is not None
         assert len(request.halfspaces) == 64
 
     def test_distinct_facet_excess_is_rejected_at_validation(self) -> None:
@@ -446,9 +451,11 @@ class TestMembershipWorkBudget:
             _hs((("1", "1"), ("1", "1")), (str(c), "1")) for c in range(10998, 11004)
         ]
         boundary = LatticePolytopeRequest(halfspaces=tuple(sides + six_cuts))
+        assert boundary.halfspaces is not None
         padded = LatticePolytopeRequest(
             halfspaces=tuple(list(boundary.halfspaces) + [sides[0]] * 6)
         )
+        assert padded.halfspaces is not None
         assert len(padded.halfspaces) == 16
 
 
@@ -482,15 +489,17 @@ class TestCountResultConstraints:
         )
 
         with pytest.raises(ValidationError):
-            CountLatticePointsResult(
-                dimension=2, point_count=0, representation="anything"
+            CountLatticePointsResult.model_validate(
+                {"dimension": 2, "point_count": 0, "representation": "anything"}
             )
         with pytest.raises(ValidationError):
-            EnumerateLatticePointsResult(
-                dimension=2,
-                point_count=1,
-                points=(LatticePoint(coordinates=("0", "0")),),
-                representation="anything",
+            EnumerateLatticePointsResult.model_validate(
+                {
+                    "dimension": 2,
+                    "point_count": 1,
+                    "points": (LatticePoint(coordinates=("0", "0")),),
+                    "representation": "anything",
+                }
             )
 
 
@@ -718,11 +727,13 @@ class TestFacetGeometryComputedOnce:
     def _count_facet_passes(self, monkeypatch: pytest.MonkeyPatch) -> list[int]:
         from jacobian.math.polytope import _rational_geometry
 
-        passes = []
+        passes: list[int] = []
 
         original = _rational_geometry.facets_from_points
 
-        def counting(verts, d):
+        def counting(
+            verts: Sequence[Sequence[Rational]], d: int
+        ) -> list[tuple[Matrix, Rational]]:
             passes.append(d)
             return original(verts, d)
 
@@ -925,7 +936,7 @@ class TestEnumerationResultPointCap:
 
 
 class TestReviewRegressions:
-    def test_infeasible_but_bounded_h_system_admitted_as_empty(self):
+    def test_infeasible_but_bounded_h_system_admitted_as_empty(self) -> None:
         """x<=0 and -x<=-1 is empty (bounded); normals span only one axis."""
         from jacobian.math.lattice_polytopes._operations import _facets_and_box
 
@@ -939,7 +950,7 @@ class TestReviewRegressions:
         # The canonical empty box: per-axis [0, -1] scanning no candidate.
         assert geometry[2] == [-1, -1]
 
-    def test_feasible_unbounded_lineality_system_still_rejected(self):
+    def test_feasible_unbounded_lineality_system_still_rejected(self) -> None:
         """A feasible vertex-free system with lineality stays rejected."""
 
         with raises_code("geometry_invalid"):
@@ -947,13 +958,13 @@ class TestReviewRegressions:
                 halfspaces=(_hs((("1", "1"), ("0", "1")), ("0", "1")),)
             )
 
-    def test_examples_state_their_validator_owned_preconditions(self):
+    def test_examples_state_their_validator_owned_preconditions(self) -> None:
         """Discovery examples teach the admission preconditions."""
         from jacobian.math.lattice_polytopes._tools import TOOLS
 
         for tool in TOOLS:
             for ex in tool.examples:
-                lowered = ex.description.lower()
+                lowered = (ex.description or "").lower()
                 if ex.name == "unit_square_vertices":
                     assert "full" in lowered
                 if ex.name == "unit_square_halfspaces":
@@ -961,12 +972,12 @@ class TestReviewRegressions:
 
 
 class TestSecondWaveRegressions:
-    def test_feasibility_probe_uses_unrestricted_coordinates(self):
+    def test_feasibility_probe_uses_unrestricted_coordinates(self) -> None:
         """x <= -1 is unbounded, not empty: the probe must not assume x >= 0."""
         with raises_code("geometry_invalid"):
             LatticePolytopeRequest(halfspaces=(_hs((("-1", "1"),), ("-1", "1")),))
 
-    def test_empty_integer_slice_detected_before_span_budgets(self):
+    def test_empty_integer_slice_detected_before_span_budgets(self) -> None:
         """[0,9999]^2 x [1/3,2/3] has an exactly empty integer scan."""
         request = LatticePolytopeRequest.model_validate(
             {
@@ -990,7 +1001,7 @@ class TestSecondWaveRegressions:
         result = count_lattice_points(request)
         assert result.point_count == 0
 
-    def test_derived_h_vertex_coordinates_bounded_at_admission(self):
+    def test_derived_h_vertex_coordinates_bounded_at_admission(self) -> None:
         """x/(10^m) <= 10^k pinned from below derives x = 10^(k+m).
 
         Every input component stays beneath the canonical component limit,
@@ -1007,7 +1018,7 @@ class TestSecondWaveRegressions:
                 )
             )
 
-    def test_representation_bounds_are_schema_visible(self):
+    def test_representation_bounds_are_schema_visible(self) -> None:
         from jacobian.math.lattice_polytopes._models import (
             MAX_HALFSPACES,
             MAX_VERTICES,
@@ -1049,7 +1060,7 @@ def _singleton_halfspaces(*, negative: bool) -> tuple[Halfspace, ...]:
 class TestDerivedCoordinateSignBoundary:
     """The canonical digit bound measures magnitude, not sign length."""
 
-    def test_reviewer_negative_singleton_at_boundary_is_admitted(self):
+    def test_reviewer_negative_singleton_at_boundary_is_admitted(self) -> None:
         """x pinned to -10^32767 derives a vertex whose magnitude has exactly
         32,768 digits; the request and its single lattice point are valid."""
         request = LatticePolytopeRequest(
@@ -1057,7 +1068,7 @@ class TestDerivedCoordinateSignBoundary:
         )
         assert count_lattice_points(request).point_count == 1
 
-    def test_negative_boundary_singleton_enumerates_exactly(self):
+    def test_negative_boundary_singleton_enumerates_exactly(self) -> None:
         from jacobian.math.lattice_polytopes._models import COORDINATE_DIGITS
 
         result = enumerate_lattice_points(
@@ -1070,7 +1081,7 @@ class TestDerivedCoordinateSignBoundary:
         # The returned coordinate satisfies the same magnitude convention.
         assert len(result.points[0].coordinates[0].lstrip("-")) == COORDINATE_DIGITS
 
-    def test_positive_boundary_singleton_is_admitted_symmetrically(self):
+    def test_positive_boundary_singleton_is_admitted_symmetrically(self) -> None:
         request = LatticePolytopeRequest(
             halfspaces=_singleton_halfspaces(negative=False)
         )
@@ -1079,7 +1090,9 @@ class TestDerivedCoordinateSignBoundary:
         assert enumerated.points[0].coordinates == (BOUNDARY_COORDINATE,)
 
     @pytest.mark.parametrize("negative", [False, True])
-    def test_derived_magnitudes_beyond_the_bound_stay_rejected(self, negative):
+    def test_derived_magnitudes_beyond_the_bound_stay_rejected(
+        self, negative: bool
+    ) -> None:
         """x/10^10000 <= ±10^25000 pins x = ±10^35000: beyond the canonical
         representable magnitude regardless of sign, so admission rejects."""
         small_den = "1" + "0" * 10000
@@ -1132,7 +1145,7 @@ UNIT_SQUARE_4D_SIDES = (
 
 
 class TestThirdWaveRegressions:
-    def test_nonzero_normal_precondition_is_schema_visible(self):
+    def test_nonzero_normal_precondition_is_schema_visible(self) -> None:
         """The validator-owned nonzero-normal restriction is published in
         the Halfspace schema, the halfspaces field, and both declarations."""
         from jacobian.math.lattice_polytopes._tools import TOOLS
@@ -1144,7 +1157,7 @@ class TestThirdWaveRegressions:
         ].lower()
         assert "nonzero" in coefficients_description
         halfspaces_field = LatticePolytopeRequest.model_fields["halfspaces"]
-        assert "nonzero" in halfspaces_field.description.lower()
+        assert "nonzero" in (halfspaces_field.description or "").lower()
         tools = {tool.operation_id: tool for tool in TOOLS}
         for operation_id in (
             "polytope.lattice_points.enumerate",
@@ -1153,7 +1166,9 @@ class TestThirdWaveRegressions:
             description = tools[operation_id].description.lower()
             assert "nonzero" in description
 
-    def test_halfspace_example_no_longer_claims_lower_dimensional_rejection(self):
+    def test_halfspace_example_no_longer_claims_lower_dimensional_rejection(
+        self,
+    ) -> None:
         """Only V-representations are rejected for lower dimension; the
         H-example must not advertise that restriction."""
         from jacobian.math.lattice_polytopes._tools import TOOLS
@@ -1161,9 +1176,9 @@ class TestThirdWaveRegressions:
         for tool in TOOLS:
             for ex in tool.examples:
                 if ex.name == "unit_square_halfspaces":
-                    assert "lower-dimensional" not in ex.description.lower()
+                    assert "lower-dimensional" not in (ex.description or "").lower()
 
-    def test_lower_dimensional_h_segment_is_accepted(self):
+    def test_lower_dimensional_h_segment_is_accepted(self) -> None:
         """x<=0, -x<=0, y<=1, -y<=0 is the segment from (0,0) to (0,1):
         bounded with positively spanning normals, so it is admitted and
         counts its two endpoints."""
@@ -1176,7 +1191,9 @@ class TestThirdWaveRegressions:
         result = count_lattice_points(LatticePolytopeRequest(halfspaces=segment))
         assert result.point_count == 2
 
-    def test_repeated_rows_deduplicated_before_vertex_enumeration(self, monkeypatch):
+    def test_repeated_rows_deduplicated_before_vertex_enumeration(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """The reviewer's [0,1]^4 with every side repeated eight times:
         vertex enumeration and the recession-cone test see the 8 distinct
         primitive rows, not the 32 raw ones."""
@@ -1185,12 +1202,15 @@ class TestThirdWaveRegressions:
         seen_sizes: list[int] = []
         original = _operations._vertices_from_h_representation
 
-        def counting(halfspaces):
+        def counting(
+            halfspaces: list[tuple[list[Rational], Rational]],
+        ) -> tuple[list[list[Rational]], int]:
             seen_sizes.append(len(halfspaces))
             return original(halfspaces)
 
         monkeypatch.setattr(_operations, "_vertices_from_h_representation", counting)
         request = LatticePolytopeRequest(halfspaces=UNIT_SQUARE_4D_SIDES * 4)
+        assert request.halfspaces is not None
         assert len(request.halfspaces) == 32
         assert seen_sizes == [8]
         geometry = request.admitted_geometry()
@@ -1198,7 +1218,9 @@ class TestThirdWaveRegressions:
         assert count_lattice_points(request).point_count == 16
         assert seen_sizes == [8]
 
-    def test_rescaled_duplicate_rows_collapse_before_enumeration(self, monkeypatch):
+    def test_rescaled_duplicate_rows_collapse_before_enumeration(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Positive rescalings of the same inequality collapse onto the
         primitive row before any geometry routine runs."""
         from jacobian.math.lattice_polytopes import _operations
@@ -1206,7 +1228,9 @@ class TestThirdWaveRegressions:
         seen_sizes: list[int] = []
         original = _operations._vertices_from_h_representation
 
-        def counting(halfspaces):
+        def counting(
+            halfspaces: list[tuple[list[Rational], Rational]],
+        ) -> tuple[list[list[Rational]], int]:
             seen_sizes.append(len(halfspaces))
             return original(halfspaces)
 

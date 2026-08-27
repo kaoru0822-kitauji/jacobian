@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
-from mcp.types import TextContent, TextResourceContents
+from mcp.types import ContentBlock, TextContent, TextResourceContents
 from mcp.types.methods import serialize_server_result
 
 import jacobian.mcp.server as server_module
@@ -18,6 +18,11 @@ from jacobian.catalog.models import MathTool, OperationCatalogSnapshot, Operatio
 from jacobian.mcp.runtime import AppState
 from jacobian.mcp.server import _build_server, create_server
 from jacobian.mcp.tools import math_run
+
+
+def _content_text(block: ContentBlock) -> str:
+    assert isinstance(block, TextContent)
+    return block.text
 
 
 def test_mcp_sdk_is_exactly_pinned_and_v2_bindings_are_used() -> None:
@@ -180,7 +185,7 @@ def test_math_run_projects_unexpected_operation_failures() -> None:
             )
         assert result.is_error is True
         assert result.structured_content is None
-        text = result.content[0].text if result.content else ""
+        text = _content_text(result.content[0]) if result.content else ""
         assert text == "Error executing tool math.run: operation execution failed"
         assert "private backend failure" not in text
 

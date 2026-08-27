@@ -6,7 +6,7 @@ import lzma
 import tarfile
 from io import BytesIO
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from benchmarks.tooling.providers.cgal import run_spike
 from tests.process.providers._spike_support import (
@@ -21,9 +21,9 @@ from tools.command_runner import ToolCommandResult
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
-def _base_pin() -> dict[str, object]:
+def _base_pin() -> dict[str, Any]:
     path = PROJECT_ROOT / "tests/fixtures/providers/cgal/cgal_delaunay_pin.json"
-    return json.loads(path.read_text(encoding="utf-8"))
+    return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
 
 
 def RUN_SPIKE(**kwargs: Any) -> dict[str, Any]:  # noqa: N802
@@ -31,7 +31,10 @@ def RUN_SPIKE(**kwargs: Any) -> dict[str, Any]:  # noqa: N802
     if not isinstance(runner, _ExpectedRunner):
         return run_spike(cwd=PROJECT_ROOT, **kwargs)
     executable = Path(kwargs["executable"])
-    pin = json.loads(Path(kwargs["pin_path"]).read_text(encoding="utf-8"))
+    pin = cast(
+        dict[str, Any],
+        json.loads(Path(kwargs["pin_path"]).read_text(encoding="utf-8")),
+    )
     timeout = float(kwargs.get("timeout_seconds", 5))
     commands = [
         ("--version",),

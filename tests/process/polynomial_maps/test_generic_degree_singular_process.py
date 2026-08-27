@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 import threading
 from pathlib import Path
@@ -10,7 +11,6 @@ from pathlib import Path
 import pytest
 
 from jacobian._exact import CanonicalRational
-from jacobian.math import _singular as shared_singular
 from jacobian.math.polynomials.maps import (
     RationalPolynomialMap,
     _operations,
@@ -85,7 +85,7 @@ def _select_executable(
     executable: str,
 ) -> None:
     monkeypatch.setattr(
-        shared_singular.shutil,
+        shutil,
         "which",
         lambda name: executable if name == "Singular" else None,
     )

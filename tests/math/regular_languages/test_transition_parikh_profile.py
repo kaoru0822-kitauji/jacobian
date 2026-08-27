@@ -73,7 +73,7 @@ def _path_id_sequences(
     target_state: int,
     path_length: int,
 ) -> tuple[tuple[int, ...], ...]:
-    layer = ((source_state, ()),)
+    layer: tuple[tuple[int, tuple[int, ...]], ...] = ((source_state, ()),)
     for _ in range(path_length):
         layer = tuple(
             (transition.target, (*path, transition.transition_id))
@@ -373,11 +373,11 @@ def test_profile_verifier_rejects_source_and_conclusion_forgeries() -> None:
     forgeries: list[dict[str, object]] = []
 
     wrong_vector = deepcopy(payload)
-    wrong_vector["entries"][0]["transition_counts"] = [1, 0, 0]  # type: ignore[index]
+    wrong_vector["entries"][0]["transition_counts"] = [1, 0, 0]
     forgeries.append(wrong_vector)
 
     wrong_multiplicity = deepcopy(payload)
-    wrong_multiplicity["entries"][0]["multiplicity"] = "2"  # type: ignore[index]
+    wrong_multiplicity["entries"][0]["multiplicity"] = "2"
     wrong_multiplicity["total_path_count"] = "2"
     forgeries.append(wrong_multiplicity)
 
@@ -394,7 +394,7 @@ def test_profile_verifier_rejects_source_and_conclusion_forgeries() -> None:
     forgeries.append(wrong_length)
 
     wrong_transition = deepcopy(payload)
-    wrong_transition["automaton"]["transitions"][1]["target"] = 0  # type: ignore[index]
+    wrong_transition["automaton"]["transitions"][1]["target"] = 0
     forgeries.append(wrong_transition)
 
     for forged in forgeries:

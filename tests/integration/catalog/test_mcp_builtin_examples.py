@@ -11,6 +11,8 @@ from __future__ import annotations
 import asyncio
 import json
 
+from mcp.types import TextContent
+
 from jacobian.catalog.catalog import Catalog
 from jacobian.mcp.server import create_server
 from mcp import Client
@@ -36,8 +38,11 @@ def test_mcp_advertised_examples_execute_as_typed_results() -> None:
                         {"operation_id": descriptor.operation_id, "payload": payload},
                     )
                     if result.is_error:
+                        first = result.content[0] if result.content else None
                         text = (
-                            result.content[0].text if result.content else "<no content>"
+                            first.text
+                            if isinstance(first, TextContent)
+                            else "<no content>"
                         )
                         failures.append(
                             f"{descriptor.operation_id} {example.name}: is_error {text[:500]}"
@@ -122,7 +127,8 @@ def test_mcp_unexpected_operation_fault_uses_the_sdk_failure_path() -> None:
             # than being mislabeled as a generic Jacobian ToolError.
             assert result.is_error is True
             assert result.structured_content is None
-            text = result.content[0].text if result.content else ""
+            first = result.content[0] if result.content else None
+            text = first.text if isinstance(first, TextContent) else ""
             assert text == "Error executing tool math.run: operation execution failed"
             assert len(text) < 5000
 

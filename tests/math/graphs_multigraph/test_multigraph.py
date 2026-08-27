@@ -26,6 +26,10 @@ from jacobian.math.graphs.multigraph._models import (
     MultigraphFlowCheckResult,
     MultigraphFlowFindRequest,
     MultigraphFlowFindResult,
+    MultigraphFlowSearchBudget,
+    VertexDivergence,
+    _compute_divergence_ledger,
+    _FlowSearchOutcome,
 )
 from jacobian.math.graphs.multigraph._operations import (
     check_cycle_multicover,
@@ -146,14 +150,20 @@ class TestFlowCheckNowhereZero:
         assert forged.conservation_holds is False
         assert not multigraph_operations._verify_multigraph_flow_check_result(forged)
 
-    def test_flow_kernel_runs_once_when_result_is_serialized(self, monkeypatch) -> None:
+    def test_flow_kernel_runs_once_when_result_is_serialized(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         calls = 0
-        original = multigraph_operations._compute_divergence_ledger
+        original = _compute_divergence_ledger
 
-        def counted(*args: object):
+        def counted(
+            graph: LooplessMultigraph,
+            group: FiniteAbelianGroup,
+            records: tuple[FlowEdgeAssignment, ...],
+        ) -> tuple[tuple[VertexDivergence, ...], bool]:
             nonlocal calls
             calls += 1
-            return original(*args)
+            return original(graph, group, records)
 
         monkeypatch.setattr(
             multigraph_operations, "_compute_divergence_ledger", counted
@@ -755,7 +765,9 @@ class TestZeroEdgeIdentification:
 
 
 class TestSourceBinding:
-    def test_forged_exhausted_on_flow_admitting_graph_fails_verification(self):
+    def test_forged_exhausted_on_flow_admitting_graph_fails_verification(
+        self,
+    ) -> None:
         """Parsing retains the claim; deliberate verification rejects it."""
         payload = {
             "graph": TRIANGLE.model_dump(),
@@ -770,21 +782,25 @@ class TestSourceBinding:
             MultigraphFlowFindResult.model_validate(payload)
         )
 
-    def test_genuine_exhausted_roundtrips(self):
+    def test_genuine_exhausted_roundtrips(self) -> None:
         request = MultigraphFlowFindRequest(
             graph=BRIDGE_GRAPH,
             group=Z3,  # the bridge admits no nonzero flow: search exhausts
-            resource_budget={"max_states": 1_000_000, "require_nowhere_zero": True},
+            resource_budget=MultigraphFlowSearchBudget(
+                max_states=1_000_000, require_nowhere_zero=True
+            ),
         )
         result = find_multigraph_flow(request)
         assert result.status == "EXHAUSTED"
         assert MultigraphFlowFindResult.model_validate(result.model_dump()) == result
 
-    def test_mutated_exhausted_state_count_fails_verification(self):
+    def test_mutated_exhausted_state_count_fails_verification(self) -> None:
         request = MultigraphFlowFindRequest(
             graph=BRIDGE_GRAPH,
             group=Z3,
-            resource_budget={"max_states": 1_000_000, "require_nowhere_zero": True},
+            resource_budget=MultigraphFlowSearchBudget(
+                max_states=1_000_000, require_nowhere_zero=True
+            ),
         )
         genuine = find_multigraph_flow(request)
         payload = genuine.model_dump()
@@ -793,11 +809,15 @@ class TestSourceBinding:
             MultigraphFlowFindResult.model_validate(payload)
         )
 
-    def test_status_swap_between_non_witness_outcomes_fails_verification(self):
+    def test_status_swap_between_non_witness_outcomes_fails_verification(
+        self,
+    ) -> None:
         request = MultigraphFlowFindRequest(
             graph=TRIANGLE,
             group=Z3,
-            resource_budget={"max_states": 1, "require_nowhere_zero": False},
+            resource_budget=MultigraphFlowSearchBudget(
+                max_states=1, require_nowhere_zero=False
+            ),
         )
         unknown = find_multigraph_flow(request)
         assert unknown.status == "UNKNOWN"
@@ -808,21 +828,23 @@ class TestSourceBinding:
             MultigraphFlowFindResult.model_validate(payload)
         )
 
-    def test_unbound_results_are_rejected(self):
+    def test_unbound_results_are_rejected(self) -> None:
         """Public results must retain their search domain: a payload without
         graph/group/budget cannot assert any outcome."""
         with pytest.raises(ValidationError):
-            MultigraphFlowFindResult(
-                graph=None,
-                group=None,
-                resource_budget=None,
-                status="EXHAUSTED",
-                flow=None,
-                states_explored=0,
-                termination_reason="SEARCH_EXHAUSTED",
+            MultigraphFlowFindResult.model_validate(
+                {
+                    "graph": None,
+                    "group": None,
+                    "resource_budget": None,
+                    "status": "EXHAUSTED",
+                    "flow": None,
+                    "states_explored": 0,
+                    "termination_reason": "SEARCH_EXHAUSTED",
+                }
             )
 
-    def test_forged_found_within_tiny_budget_fails_verification(self):
+    def test_forged_found_within_tiny_budget_fails_verification(self) -> None:
         """A source-bound verifier rejects the out-of-budget FOUND claim."""
         payload = {
             "graph": TRIANGLE.model_dump(),
@@ -853,11 +875,13 @@ class TestSourceBinding:
             MultigraphFlowFindResult.model_validate(payload)
         )
 
-    def test_genuine_found_roundtrips(self):
+    def test_genuine_found_roundtrips(self) -> None:
         request = MultigraphFlowFindRequest(
             graph=TRIANGLE,
             group=Z3,
-            resource_budget={"max_states": 1024, "require_nowhere_zero": True},
+            resource_budget=MultigraphFlowSearchBudget(
+                max_states=1024, require_nowhere_zero=True
+            ),
         )
         result = find_multigraph_flow(request)
         assert result.status == "FOUND"
@@ -865,7 +889,9 @@ class TestSourceBinding:
         assert len(result.flow) == 3
         assert MultigraphFlowFindResult.model_validate(result.model_dump()) == result
 
-    def test_duplicate_edge_assignment_in_found_witness_fails_verification(self):
+    def test_duplicate_edge_assignment_in_found_witness_fails_verification(
+        self,
+    ) -> None:
         """A source-bound verifier rejects a malformed FOUND witness."""
         payload = {
             "graph": PARALLEL_TRIANGLE.model_dump(),
@@ -887,15 +913,13 @@ class TestSourceBinding:
 
 
 class TestEulerianSourceRequired:
-    def test_result_requires_source_graph(self):
+    def test_result_requires_source_graph(self) -> None:
         with pytest.raises(ValidationError):
-            EulerianCyclesResult(
-                cycles=(),
-                edge_usage=(),
-                covers_all=True,
+            EulerianCyclesResult.model_validate(
+                {"cycles": (), "edge_usage": (), "covers_all": True}
             )
 
-    def test_forged_empty_decomposition_fails_verification(self):
+    def test_forged_empty_decomposition_fails_verification(self) -> None:
         payload = {
             "graph": SQUARE.model_dump(),
             "edge_subset": None,
@@ -907,7 +931,7 @@ class TestEulerianSourceRequired:
             EulerianCyclesResult.model_validate(payload)
         )
 
-    def test_genuine_decomposition_roundtrips(self):
+    def test_genuine_decomposition_roundtrips(self) -> None:
         request = EulerianCyclesRequest(graph=SQUARE)
         result = compute_eulerian_cycles(request)
         rebuilt = EulerianCyclesResult.model_validate(result.model_dump())
@@ -915,7 +939,7 @@ class TestEulerianSourceRequired:
 
 
 class TestEulerianSubsetDuplicates:
-    def test_duplicate_ids_in_result_subset_rejected(self):
+    def test_duplicate_ids_in_result_subset_rejected(self) -> None:
         """Duplicate edge IDs must be rejected before set conversion so the
         retained multiset cannot differ from the admitted request subset."""
         request = EulerianCyclesRequest(graph=TRIANGLE)
@@ -925,7 +949,7 @@ class TestEulerianSubsetDuplicates:
         with pytest.raises(ValidationError):
             EulerianCyclesResult.model_validate(payload)
 
-    def test_request_still_rejects_duplicate_ids(self):
+    def test_request_still_rejects_duplicate_ids(self) -> None:
         with pytest.raises(ValidationError):
             EulerianCyclesRequest(graph=TRIANGLE, edge_subset=("e0", "e0"))
 
@@ -1055,7 +1079,11 @@ class TestAggregateSearchBudgetAcrossValidation:
         calls = {"count": 0}
         real_search = multigraph_operations._search_flow_unbound
 
-        def counting_search(graph: object, group: object, budget: object) -> object:
+        def counting_search(
+            graph: LooplessMultigraph,
+            group: FiniteAbelianGroup,
+            budget: MultigraphFlowSearchBudget,
+        ) -> _FlowSearchOutcome:
             calls["count"] += 1
             return real_search(graph, group, budget)
 

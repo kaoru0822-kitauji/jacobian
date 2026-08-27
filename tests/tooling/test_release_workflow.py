@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from tomllib import loads
+from typing import cast
 
 import yaml
 
@@ -44,7 +45,8 @@ def _step_names(job: dict[str, object]) -> list[str]:
 
 def test_release_build_resolves_and_verifies_one_immutable_sha() -> None:
     workflow = _workflow()
-    triggers = workflow[True]
+    yaml_workflow = cast(dict[object, object], workflow)
+    triggers = yaml_workflow[True]
     assert isinstance(triggers, dict)
     assert triggers["release"] == {"types": ["published"]}
     assert "workflow_dispatch" in triggers

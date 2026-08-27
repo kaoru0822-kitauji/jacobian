@@ -64,7 +64,7 @@ def _oversized_symmetric_group_degree() -> int:
     return degree
 
 
-def _mathematical_payload(result: SubsetCanonicalizationResult) -> dict:
+def _mathematical_payload(result: SubsetCanonicalizationResult) -> dict[str, object]:
     """The canonicalization content independent of how the action is presented."""
     return {
         "source_positions": result.source_subset.positions,

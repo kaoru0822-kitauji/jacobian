@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import pytest
 from pydantic import ValidationError
 
-from jacobian._exact import parse_canonical_integer
+from jacobian.canonical import parse_canonical_integer
 from jacobian.math.cluster_algebras._models import (
     ExchangeMatrix,
     GVectorRequest,
@@ -21,7 +23,11 @@ from jacobian.math.cluster_algebras._operations import (
 )
 
 
-def em(n, entries, symmetrizer):
+def em(
+    n: int,
+    entries: Sequence[Sequence[int | str]],
+    symmetrizer: Sequence[int | str],
+) -> ExchangeMatrix:
     """Build an ExchangeMatrix from raw integers using canonical strings."""
     return ExchangeMatrix(
         n=n,
@@ -30,7 +36,7 @@ def em(n, entries, symmetrizer):
     )
 
 
-def ientries(matrix):
+def ientries(matrix: ExchangeMatrix) -> tuple[tuple[int, ...], ...]:
     """Parsed integer view of an ExchangeMatrix's entries."""
     return tuple(
         tuple(parse_canonical_integer(v) for v in row) for row in matrix.entries
@@ -40,21 +46,21 @@ def ientries(matrix):
 class TestSeedMutation:
     """Test cluster seed mutation."""
 
-    def test_a2_mutation_at_0(self):
+    def test_a2_mutation_at_0(self) -> None:
         """Mutate the A2 seed at index 0."""
         b = em(2, ((str(0), str(1)), (str(-1), str(0))), (str(1), str(1)))
         result = mutate_seed(SeedMutationRequest(exchange_matrix=b, mutation_index=0))
         assert result.exchange_matrix.entries[0][1] == "-1"
         assert result.exchange_matrix.entries[1][0] == "1"
 
-    def test_a2_mutation_at_1(self):
+    def test_a2_mutation_at_1(self) -> None:
         """Mutate the A2 seed at index 1."""
         b = em(2, ((str(0), str(1)), (str(-1), str(0))), (str(1), str(1)))
         result = mutate_seed(SeedMutationRequest(exchange_matrix=b, mutation_index=1))
         assert result.exchange_matrix.entries[0][1] == "-1"
         assert result.exchange_matrix.entries[1][0] == "1"
 
-    def test_mutation_involutive(self):
+    def test_mutation_involutive(self) -> None:
         """Double mutation at the same index returns to the original."""
         b = em(2, ((str(0), str(1)), (str(-1), str(0))), (str(1), str(1)))
         result1 = mutate_seed(SeedMutationRequest(exchange_matrix=b, mutation_index=0))
@@ -65,7 +71,7 @@ class TestSeedMutation:
         )
         assert ientries(result2.exchange_matrix) == ientries(b)
 
-    def test_3x3_mutation(self):
+    def test_3x3_mutation(self) -> None:
         """Mutate a 3x3 skew-symmetric matrix."""
         b = em(
             3,
@@ -82,23 +88,23 @@ class TestSeedMutation:
         for i in range(3):
             assert new[i][i] == 0
 
-    def test_invalid_mutation_index(self):
+    def test_invalid_mutation_index(self) -> None:
         """Mutation index out of range should fail."""
         b = em(2, ((str(0), str(1)), (str(-1), str(0))), (str(1), str(1)))
         with pytest.raises(ValueError, match="mutation_index"):
             SeedMutationRequest(exchange_matrix=b, mutation_index=2)
 
-    def test_skew_symmetrizable(self):
+    def test_skew_symmetrizable(self) -> None:
         """A non-skew-symmetrizable matrix should fail."""
         with pytest.raises(ValueError, match="skew-symmetrizability"):
             em(2, ((str(0), str(1)), (str(1), str(0))), (str(1), str(1)))
 
-    def test_zero_symmetrizer_rejected(self):
+    def test_zero_symmetrizer_rejected(self) -> None:
         """A symmetrizer with a zero entry is not an exchange matrix."""
         with pytest.raises(ValueError, match="strictly positive"):
             em(2, ((str(0), str(1)), (str(-1), str(0))), (str(0), str(2)))
 
-    def test_negative_symmetrizer_rejected(self):
+    def test_negative_symmetrizer_rejected(self) -> None:
         """A symmetrizer with a negative entry is rejected."""
         with pytest.raises(ValueError, match="strictly positive"):
             em(2, ((str(0), str(1)), (str(-1), str(0))), (str(1), str(-1)))
@@ -107,7 +113,7 @@ class TestSeedMutation:
 class TestCoefficientBounds:
     """Admitted seeds derive their mutation budget from their own entries."""
 
-    def test_mutation_result_is_admissible_as_next_input(self):
+    def test_mutation_result_is_admissible_as_next_input(self) -> None:
         # A valid mutation output composes back into the same operation.
         edge = 10**63
         b = em(
@@ -129,7 +135,7 @@ class TestCoefficientBounds:
         )
         assert ientries(mutate_seed(composed).exchange_matrix) == ientries(b)
 
-    def test_involutive_mutation_near_ceiling_admitted(self):
+    def test_involutive_mutation_near_ceiling_admitted(self) -> None:
         # b01=10**64, b12=6*10**64, b02=10**128 mutates to b'02=7*10**128;
         # resubmitting that result must be admitted because the signed update
         # returns b''02=7*10**128 - 6*10**128 = 10**128, not 13*10**128.
@@ -152,7 +158,7 @@ class TestCoefficientBounds:
         )
         assert ientries(involuted.exchange_matrix) == ientries(b)
 
-    def test_request_rejects_mutation_exceeding_representation_ceiling(self):
+    def test_request_rejects_mutation_exceeding_representation_ceiling(self) -> None:
         edge = 10**100
         b = em(
             3,
@@ -167,13 +173,13 @@ class TestCoefficientBounds:
             SeedMutationRequest(exchange_matrix=b, mutation_index=1)
         assert exc_info.value.errors()[0]["type"] == "cluster_algebra.mutation_bounded"
 
-    def test_request_accepts_large_entries_under_negation_only_mutation(self):
+    def test_request_accepts_large_entries_under_negation_only_mutation(self) -> None:
         edge = 10**129 - 1
         b = em(2, ((str(0), str(edge)), (str(-edge), str(0))), (str(1), str(1)))
         result = mutate_seed(SeedMutationRequest(exchange_matrix=b, mutation_index=0))
         assert ientries(result.exchange_matrix) == ((0, -edge), (edge, 0))
 
-    def test_mutation_near_bound_stays_within_result_ceiling(self):
+    def test_mutation_near_bound_stays_within_result_ceiling(self) -> None:
         # Mutating a path matrix at the middle index forms an entry of
         # magnitude ~N^2; it must remain an admissible exchange matrix.
         edge = 10**63
@@ -191,7 +197,7 @@ class TestCoefficientBounds:
         assert abs(mutated) == edge * edge
         assert len(str(abs(mutated))) <= 129
 
-    def test_rejects_symmetrizer_beyond_bound(self):
+    def test_rejects_symmetrizer_beyond_bound(self) -> None:
         # A zero row-pair keeps the matrix skew-symmetrizable so the
         # symmetrizer bound is what rejects the seed.
         with pytest.raises(ValidationError) as exc_info:
@@ -200,7 +206,7 @@ class TestCoefficientBounds:
             exc_info.value.errors()[0]["type"] == "cluster_algebra.symmetrizer_bounded"
         )
 
-    def test_result_ceiling_rejects_oversized_entries(self):
+    def test_result_ceiling_rejects_oversized_entries(self) -> None:
         # Even skew-symmetrizable matrices cannot carry unbounded integers.
         # Enforcement precedes integer conversion: the schema caps canonical
         # string length, and the digit-bound validator rejects values the
@@ -216,7 +222,7 @@ class TestCoefficientBounds:
             == "cluster_algebra.exchange_entries_bounded"
         )
 
-    def test_seventeen_by_seventeen_zero_matrix_is_admitted(self):
+    def test_seventeen_by_seventeen_zero_matrix_is_admitted(self) -> None:
         # Work and output derive from cells times coefficient heights, not a
         # rank cap: 289 trivial updates returning a small exact matrix.
         n = 17
@@ -224,12 +230,12 @@ class TestCoefficientBounds:
         result = mutate_seed(SeedMutationRequest(exchange_matrix=b, mutation_index=0))
         assert ientries(result.exchange_matrix) == tuple((0,) * n for _ in range(n))
 
-    def test_zero_matrix_beyond_cell_budget_rejected(self):
+    def test_zero_matrix_beyond_cell_budget_rejected(self) -> None:
         n = 65  # 65**2 > MAX_EXCHANGE_CELLS even for an all-zero matrix
         with pytest.raises(ValidationError):
             em(n, tuple((0,) * n for _ in range(n)), (1,) * n)
 
-    def test_gvector_request_accepts_representable_coefficients(self):
+    def test_gvector_request_accepts_representable_coefficients(self) -> None:
         # The g-vector result is the identity, so any representable seed works.
         b = em(
             2,
@@ -243,7 +249,7 @@ class TestCoefficientBounds:
 class TestGVectorBinding:
     """Exact g-vector results must replay against their retained source."""
 
-    def test_result_binds_to_source_and_convention(self):
+    def test_result_binds_to_source_and_convention(self) -> None:
         b = em(
             3,
             (
@@ -259,7 +265,7 @@ class TestGVectorBinding:
         assert result.convention == "FOMIN_ZELEVINSKY"
         GVectorResult.model_validate(result.model_dump())
 
-    def test_result_model_accepts_structural_non_identity_matrix(self):
+    def test_result_model_accepts_structural_non_identity_matrix(self) -> None:
         b = em(2, ((str(0), str(1)), (str(-1), str(0))), (str(1), str(1)))
         result = GVectorResult(
             exchange_matrix=b,
@@ -268,7 +274,7 @@ class TestGVectorBinding:
         )
         assert not verify_g_vector_result(result)
 
-    def test_result_rejects_dimension_mismatch(self):
+    def test_result_rejects_dimension_mismatch(self) -> None:
         b = em(2, ((str(0), str(1)), (str(-1), str(0))), (str(1), str(1)))
         with pytest.raises(ValidationError) as exc_info:
             GVectorResult(
@@ -278,16 +284,18 @@ class TestGVectorBinding:
             )
         assert exc_info.value.errors()[0]["type"] == "cluster_algebra.g_matrix_shape"
 
-    def test_result_rejects_arbitrary_convention(self):
+    def test_result_rejects_arbitrary_convention(self) -> None:
         b = em(2, ((str(0), str(1)), (str(-1), str(0))), (str(1), str(1)))
         with pytest.raises(ValidationError):
-            GVectorResult(
-                exchange_matrix=b,
-                g_matrix=((1, 0), (0, 1)),
-                convention="anything",
+            GVectorResult.model_validate(
+                {
+                    "exchange_matrix": b,
+                    "g_matrix": ((1, 0), (0, 1)),
+                    "convention": "anything",
+                }
             )
 
-    def test_forged_empty_payload_rejected(self):
+    def test_forged_empty_payload_rejected(self) -> None:
         b = em(
             3,
             (
@@ -298,9 +306,11 @@ class TestGVectorBinding:
             (str(1), str(1), str(1)),
         )
         with pytest.raises(ValidationError):
-            GVectorResult(exchange_matrix=b, g_matrix=(), convention="anything")
+            GVectorResult.model_validate(
+                {"exchange_matrix": b, "g_matrix": (), "convention": "anything"}
+            )
 
-    def test_mutation_verifier_rejects_a_structurally_valid_forgery(self):
+    def test_mutation_verifier_rejects_a_structurally_valid_forgery(self) -> None:
         b = em(2, ((str(0), str(1)), (str(-1), str(0))), (str(1), str(1)))
         forged = SeedMutationResult(
             source_exchange_matrix=b,
@@ -313,13 +323,13 @@ class TestGVectorBinding:
 class TestGVector:
     """Test g-vector computation."""
 
-    def test_initial_g_vectors(self):
+    def test_initial_g_vectors(self) -> None:
         """Initial g-vectors should be the identity."""
         b = em(2, ((str(0), str(1)), (str(-1), str(0))), (str(1), str(1)))
         result = compute_g_vectors(GVectorRequest(exchange_matrix=b))
         assert result.g_matrix == ((1, 0), (0, 1))
 
-    def test_3x3_g_vectors(self):
+    def test_3x3_g_vectors(self) -> None:
         """g-vectors for a 3x3 seed should be identity."""
         b = em(
             3,
@@ -335,7 +345,7 @@ class TestGVector:
 
 
 class TestCanonicalTransport:
-    def test_mutated_coefficients_survive_canonical_output(self):
+    def test_mutated_coefficients_survive_canonical_output(self) -> None:
         """N=10**8 path mutation squares an entry to 10**16 > 2**53-1.
 
         Coefficients are canonical integer strings, so the serialized result
@@ -353,7 +363,7 @@ class TestCanonicalTransport:
         assert payload["exchange_matrix"]["entries"][0][2] == str(n * n)
         assert SeedMutationResult.model_validate(payload) == result
 
-    def test_entries_are_canonical_integer_strings(self):
+    def test_entries_are_canonical_integer_strings(self) -> None:
         b = ExchangeMatrix(
             n=2,
             entries=(("0", "1"), ("-1", "0")),

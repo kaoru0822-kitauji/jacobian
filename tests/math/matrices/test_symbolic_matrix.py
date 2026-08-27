@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -1102,7 +1103,7 @@ def test_matrix_rejects_nonrectangular_mismatched_and_invalid_axes() -> None:
 
 
 def test_public_matrix_entries_reject_expression_strings_without_execution(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     marker = tmp_path / "sympy-evaluated"
     payload = f"__import__('pathlib').Path({str(marker)!r}).touch()"

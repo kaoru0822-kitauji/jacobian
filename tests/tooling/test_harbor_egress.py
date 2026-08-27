@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import TypedDict, cast
 
 import yaml
 
@@ -40,14 +41,60 @@ OBSERVATION_COMPOSE = (
 )
 
 
+class _JobEnvironment(TypedDict, total=False):
+    extra_allowed_hosts: list[str]
+    extra_docker_compose: list[str]
+
+
+class _Dataset(TypedDict):
+    path: str
+    task_names: list[str]
+
+
+class _Artifact(TypedDict):
+    source: str
+    service: str
+
+
+class _HarborJob(TypedDict, total=False):
+    agents: list[dict[str, object]]
+    artifacts: list[str | _Artifact]
+    datasets: list[_Dataset]
+    environment: _JobEnvironment
+    n_attempts: int
+
+
+class _ComposeService(TypedDict, total=False):
+    command: list[str]
+    environment: dict[str, str]
+    extra_hosts: list[str]
+
+
 def _read_json(path: Path) -> dict[str, object]:
     value = json.loads(path.read_text(encoding="utf-8"))
     assert isinstance(value, dict)
     return value
 
 
+def _read_harbor_job(path: Path) -> _HarborJob:
+    return cast(_HarborJob, _read_json(path))
+
+
+def _read_yaml(path: Path) -> dict[str, object]:
+    value: object = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert isinstance(value, dict)
+    return cast(dict[str, object], value)
+
+
+def _compose_services(path: Path) -> dict[str, _ComposeService]:
+    parsed = _read_yaml(path)
+    services = parsed.get("services")
+    assert isinstance(services, dict)
+    return cast(dict[str, _ComposeService], services)
+
+
 def test_observation_job_keeps_the_minimal_jacobian_treatment() -> None:
-    job = _read_json(JOB)
+    job = _read_harbor_job(JOB)
 
     assert job["agents"] == [
         {
@@ -116,8 +163,8 @@ def test_agent_eval_docs_exclude_host_codex_from_the_control_protocol() -> None:
 
 
 def test_proxy_observation_job_is_opt_in_and_preserves_local_mcp_access() -> None:
-    proxy_job = _read_json(OBSERVATION_PROXY_JOB)
-    proxy_control = _read_json(CONTROL_PROXY_JOB)
+    proxy_job = _read_harbor_job(OBSERVATION_PROXY_JOB)
+    proxy_control = _read_harbor_job(CONTROL_PROXY_JOB)
     proxy_overlay = EGRESS_PROXY_COMPOSE.read_text(encoding="utf-8")
     assert proxy_job["environment"]["extra_docker_compose"] == [
         "benchmarks/config/agent-eval-egress-proxy.compose.yaml",
@@ -155,7 +202,7 @@ def test_jacobian_sidecar_keeps_its_project_network_under_egress_control() -> No
 
 
 def test_proxy_control_job_is_valid_harbor_job_json() -> None:
-    job = _read_json(CONTROL_PROXY_JOB)
+    job = _read_harbor_job(CONTROL_PROXY_JOB)
 
     assert job["n_attempts"] == 3
     assert job["datasets"] == [
@@ -176,17 +223,17 @@ def test_compose_overlays_parse_as_valid_yaml() -> None:
     them as YAML rather than only asserting on substring presence.
     """
     for compose_path in (EGRESS_PROXY_COMPOSE, OBSERVATION_COMPOSE):
-        parsed = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
-        assert isinstance(parsed, dict), f"{compose_path.name}: root must be a mapping"
+        parsed = _read_yaml(compose_path)
         assert "services" in parsed, f"{compose_path.name}: missing services table"
-        assert isinstance(parsed["services"], dict), (
+        services = parsed["services"]
+        assert isinstance(services, dict), (
             f"{compose_path.name}: services must be a mapping"
         )
 
 
 def test_proxy_compose_overlay_declares_proxy_environment() -> None:
-    parsed = yaml.safe_load(EGRESS_PROXY_COMPOSE.read_text(encoding="utf-8"))
-    main = parsed["services"]["main"]
+    services = _compose_services(EGRESS_PROXY_COMPOSE)
+    main = services["main"]
 
     assert "environment" in main
     env = main["environment"]
@@ -204,14 +251,13 @@ def test_proxy_compose_overlay_declares_proxy_environment() -> None:
     assert env["http_proxy"] == "http://127.0.0.1:12346"
     assert env["https_proxy"] == "http://127.0.0.1:12346"
 
-    sidecar = parsed["services"]["harbor-docker-egress-control-sidecar"]
+    sidecar = services["harbor-docker-egress-control-sidecar"]
     assert "host.docker.internal:host-gateway" in sidecar["extra_hosts"]
 
 
 def test_observation_compose_overlay_declares_jacobian_service() -> None:
-    parsed = yaml.safe_load(OBSERVATION_COMPOSE.read_text(encoding="utf-8"))
-
-    jacobian = parsed["services"]["jacobian"]
+    services = _compose_services(OBSERVATION_COMPOSE)
+    jacobian = services["jacobian"]
     command = jacobian["command"]
 
     assert 'exec uv run --no-sync jacobian-remote-mcp "$@"' in command[0]
@@ -222,8 +268,8 @@ def test_observation_compose_overlay_declares_jacobian_service() -> None:
 
 
 def test_paired_jobs_keep_the_same_egress_allowlist() -> None:
-    treatment = _read_json(JOB)
-    control = _read_json(CONTROL_JOB)
+    treatment = _read_harbor_job(JOB)
+    control = _read_harbor_job(CONTROL_JOB)
 
     assert treatment["environment"]["extra_allowed_hosts"] == [
         "api.openai.com",

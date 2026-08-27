@@ -44,7 +44,7 @@ def _sl2_gf5() -> LieAlgebra:
     )
 
 
-def _compose(d1, d2, prime: int) -> list[list[int]]:
+def _compose(d1: list[list[int]], d2: list[list[int]], prime: int) -> list[list[int]]:
     """Return the composition matrix d1 after d2 (target x source)."""
     rows, inner = len(d1), len(d1[0])
     assert inner == len(d2)
@@ -58,7 +58,7 @@ def _compose(d1, d2, prime: int) -> list[list[int]]:
 class TestChevalleyEilenbergComplex:
     """Test Chevalley-Eilenberg complex computation."""
 
-    def test_abelian_2d(self):
+    def test_abelian_2d(self) -> None:
         """CE complex of a 2D abelian Lie algebra has zero differentials."""
         g = LieAlgebra(
             prime=2,
@@ -71,7 +71,7 @@ class TestChevalleyEilenbergComplex:
         assert result.dimension == 2
         assert result.group_dimensions == (1, 2, 1)
 
-    def test_3d_abelian(self):
+    def test_3d_abelian(self) -> None:
         """CE complex of a 3D abelian Lie algebra."""
         g = LieAlgebra(
             prime=5,
@@ -87,7 +87,7 @@ class TestChevalleyEilenbergComplex:
         )
         assert result.group_dimensions == (1, 3, 3, 1)
 
-    def test_sl2_differentials_square_to_zero(self):
+    def test_sl2_differentials_square_to_zero(self) -> None:
         """Consecutive CE differentials of sl(2)/GF(5) compose to exactly zero."""
         result = compute_chevalley_eilenberg_complex(
             ChevalleyEilenbergComplexRequest(lie_algebra=_sl2_gf5())
@@ -103,7 +103,7 @@ class TestChevalleyEilenbergComplex:
             composed = _compose(matrices[degree], matrices[degree + 1], result.prime)
             assert all(value == 0 for row in composed for value in row)
 
-    def test_sl2_d2_matrix_entries(self):
+    def test_sl2_d2_matrix_entries(self) -> None:
         """The d_2 matrix of sl(2) encodes the bracket columns exactly."""
         result = compute_chevalley_eilenberg_complex(
             ChevalleyEilenbergComplexRequest(lie_algebra=_sl2_gf5())
@@ -114,7 +114,7 @@ class TestChevalleyEilenbergComplex:
         # d(E^F) = -H, d(E^H) = -(-2E) = 2E... encoded as exact GF(5) residues.
         assert d2.matrix.entries == ((0, 2, 0), (0, 0, 3), (4, 0, 0))
 
-    def test_differential_serializes_canonical_matrix(self):
+    def test_differential_serializes_canonical_matrix(self) -> None:
         """The CE differential serializes as one reusable GF(p) matrix value."""
         result = compute_chevalley_eilenberg_complex(
             ChevalleyEilenbergComplexRequest(lie_algebra=_sl2_gf5())
@@ -138,7 +138,7 @@ class TestChevalleyEilenbergComplex:
 class TestLieAlgebraValidation:
     """Adversarial rejection of tensors that are not Lie brackets."""
 
-    def test_composite_prime_rejected(self):
+    def test_composite_prime_rejected(self) -> None:
         with pytest.raises(ValidationError) as exc_info:
             LieAlgebra(
                 prime=4,
@@ -147,7 +147,7 @@ class TestLieAlgebraValidation:
             )
         _assert_error_type(exc_info, "lie_algebra_homology.prime_not_prime")
 
-    def test_alternation_violation_rejected(self):
+    def test_alternation_violation_rejected(self) -> None:
         constants = (
             ((0, 0), (1, 0)),
             ((4, 0), (0, 1)),
@@ -156,7 +156,7 @@ class TestLieAlgebraValidation:
             LieAlgebra(prime=5, dimension=2, structure_constants=constants)
         _assert_error_type(exc_info, "lie_algebra_homology.alternating")
 
-    def test_antisymmetry_violation_rejected(self):
+    def test_antisymmetry_violation_rejected(self) -> None:
         constants = (
             ((0, 0), (1, 0)),
             ((1, 0), (0, 0)),
@@ -165,7 +165,7 @@ class TestLieAlgebraValidation:
             LieAlgebra(prime=5, dimension=2, structure_constants=constants)
         _assert_error_type(exc_info, "lie_algebra_homology.antisymmetric")
 
-    def test_jacobi_violation_rejected(self):
+    def test_jacobi_violation_rejected(self) -> None:
         # [e0, e1] = e0 and [e1, e2] = e1 violate the Jacobi identity:
         # [[e0, e1], e2] + [[e1, e2], e0] + [[e2, e0], e1] = -e0 != 0.
         constants = (
@@ -177,7 +177,7 @@ class TestLieAlgebraValidation:
             LieAlgebra(prime=5, dimension=3, structure_constants=constants)
         _assert_error_type(exc_info, "lie_algebra_homology.jacobi")
 
-    def test_noncanonical_diagonal_residue_rejected(self):
+    def test_noncanonical_diagonal_residue_rejected(self) -> None:
         # 2 mod 2 is zero, so every Lie identity holds vacuously; the entry
         # must still be rejected because it is not a canonical GF(2) residue.
         with pytest.raises(ValidationError) as exc_info:
@@ -188,7 +188,7 @@ class TestLieAlgebraValidation:
             )
         _assert_error_type(exc_info, "lie_algebra_homology.canonical_residues")
 
-    def test_noncanonical_offdiagonal_residue_rejected(self):
+    def test_noncanonical_offdiagonal_residue_rejected(self) -> None:
         # c[0][1] = 5 and c[1][0] = 5 are antisymmetric and Jacobi modulo 5
         # (both reduce to zero) but are not canonical GF(5) residues.
         constants = (
@@ -199,7 +199,7 @@ class TestLieAlgebraValidation:
             LieAlgebra(prime=5, dimension=2, structure_constants=constants)
         _assert_error_type(exc_info, "lie_algebra_homology.canonical_residues")
 
-    def test_canonical_residues_accepted(self):
+    def test_canonical_residues_accepted(self) -> None:
         g = LieAlgebra(
             prime=2,
             dimension=1,
@@ -211,7 +211,7 @@ class TestLieAlgebraValidation:
 class TestLieHomology:
     """Test Lie algebra homology computation."""
 
-    def test_abelian_2d(self):
+    def test_abelian_2d(self) -> None:
         """Homology of a 2D abelian Lie algebra over GF(2)."""
         g = LieAlgebra(
             prime=2,
@@ -223,7 +223,7 @@ class TestLieHomology:
         assert result.groups[1].betti == 2
         assert result.groups[2].betti == 1
 
-    def test_abelian_1d(self):
+    def test_abelian_1d(self) -> None:
         """Homology of a 1D abelian Lie algebra."""
         g = LieAlgebra(
             prime=7,
@@ -234,7 +234,7 @@ class TestLieHomology:
         assert result.groups[0].betti == 1
         assert result.groups[1].betti == 1
 
-    def test_abelian_3d(self):
+    def test_abelian_3d(self) -> None:
         """Homology of a 3D abelian Lie algebra over GF(5)."""
         g = LieAlgebra(
             prime=5,
@@ -252,7 +252,7 @@ class TestLieHomology:
         assert result.groups[2].betti == 3
         assert result.groups[3].betti == 1
 
-    def test_sl2_gf5(self):
+    def test_sl2_gf5(self) -> None:
         """Homology of sl(2) over GF(5): trivial below the top degree.
 
         d_1 = 0, rank d_2 = 3, d_3 = 0, so the Betti numbers are
@@ -261,7 +261,7 @@ class TestLieHomology:
         result = compute_lie_homology(LieHomologyRequest(lie_algebra=_sl2_gf5()))
         assert tuple(group.betti for group in result.groups) == (1, 0, 0, 1)
 
-    def test_chain_dimension_names_the_chain_group(self):
+    def test_chain_dimension_names_the_chain_group(self) -> None:
         """The chain-group dimension field is explicit about what it counts.
 
         For sl(2) the degree-1 homology vanishes (betti=0) while the chain
@@ -280,7 +280,7 @@ class TestLieHomology:
         with pytest.raises(ValidationError):
             LieHomologyGroup.model_validate(payload | {"dimension": 3})
 
-    def test_affine_algebra_gf5(self):
+    def test_affine_algebra_gf5(self) -> None:
         """Homology of the 2D non-abelian algebra [x, y] = x over GF(5)."""
         g = LieAlgebra(
             prime=5,
@@ -295,7 +295,7 @@ class TestLieHomology:
         assert tuple(group.betti for group in result.groups) == (1, 1, 0)
 
 
-def test_malformed_middle_axis_rejected():
+def test_malformed_middle_axis_rejected() -> None:
     """structure_constants rows shorter than dimension are rejected, not indexed."""
     with pytest.raises(ValidationError):
         LieAlgebra(
@@ -308,7 +308,7 @@ def test_malformed_middle_axis_rejected():
 class TestComplexResultBinding:
     """The returned complex is validated against its retained source algebra."""
 
-    def test_computed_complex_round_trips_against_source(self):
+    def test_computed_complex_round_trips_against_source(self) -> None:
         from jacobian.math.lie_algebra_homology._models import (
             ChevalleyEilenbergComplexResult,
         )
@@ -326,17 +326,19 @@ class TestComplexResultBinding:
         assert replayed == result
         assert _verify_ce_complex_result(replayed)
 
-    def test_reviewer_payload_shape_rejected(self):
+    def test_reviewer_payload_shape_rejected(self) -> None:
         """A complex without its source algebra cannot validate."""
         with pytest.raises(ValidationError):
-            ChevalleyEilenbergComplexResult(
-                dimension=1,
-                group_dimensions=(1, 1),
-                differentials=(),
-                prime=2,
+            ChevalleyEilenbergComplexResult.model_validate(
+                {
+                    "dimension": 1,
+                    "group_dimensions": (1, 1),
+                    "differentials": (),
+                    "prime": 2,
+                }
             )
 
-    def test_missing_differential_degree_rejected(self):
+    def test_missing_differential_degree_rejected(self) -> None:
         g = _sl2_gf5()
         full = compute_chevalley_eilenberg_complex(
             ChevalleyEilenbergComplexRequest(lie_algebra=g)
@@ -351,7 +353,7 @@ class TestComplexResultBinding:
             )
         _assert_error_type(exc_info, "lie_algebra_homology.complex_degrees")
 
-    def test_wrong_matrix_shape_rejected(self):
+    def test_wrong_matrix_shape_rejected(self) -> None:
         g = _sl2_gf5()
         full = compute_chevalley_eilenberg_complex(
             ChevalleyEilenbergComplexRequest(lie_algebra=g)
@@ -389,7 +391,7 @@ class TestComplexResultBinding:
         )
         assert not _verify_ce_complex_result(claimed)
 
-    def test_broken_d_squared_composition_rejected(self):
+    def test_broken_d_squared_composition_rejected(self) -> None:
         """Tampering one d_2 entry must fail the bracket reconstruction.
 
         d_1 of sl(2)/GF(5) is identically zero, so a composition-only check
@@ -421,7 +423,7 @@ class TestComplexResultBinding:
         )
         assert not _verify_ce_complex_result(claimed)
 
-    def test_non_residue_entries_rejected(self):
+    def test_non_residue_entries_rejected(self) -> None:
         g = _sl2_gf5()
         full = compute_chevalley_eilenberg_complex(
             ChevalleyEilenbergComplexRequest(lie_algebra=g)
@@ -443,11 +445,11 @@ class TestComplexResultBinding:
 
 
 class TestHomologySourceBinding:
-    def test_kernel_homology_verifies(self):
+    def test_kernel_homology_verifies(self) -> None:
         result = compute_lie_homology(LieHomologyRequest(lie_algebra=_sl2_gf5()))
         assert _verify_lie_homology_result(result)
 
-    def test_forged_groups_require_explicit_verification(self):
+    def test_forged_groups_require_explicit_verification(self) -> None:
         genuine = compute_lie_homology(LieHomologyRequest(lie_algebra=_sl2_gf5()))
         payload = genuine.model_dump()
         payload["groups"] = [
@@ -459,7 +461,7 @@ class TestHomologySourceBinding:
         claimed = LieHomologyResult.model_validate(payload)
         assert not _verify_lie_homology_result(claimed)
 
-    def test_dimension_mismatch_with_source_rejected(self):
+    def test_dimension_mismatch_with_source_rejected(self) -> None:
         from pydantic import ValidationError
 
         genuine = compute_lie_homology(LieHomologyRequest(lie_algebra=_sl2_gf5()))
@@ -500,7 +502,7 @@ def _ut5_gf2() -> LieAlgebra:
 class TestDimensionEnvelope:
     """The dimension cap is derived from the execution envelope, not fixed."""
 
-    def test_widest_chain_group_fits_one_prime_field_matrix(self):
+    def test_widest_chain_group_fits_one_prime_field_matrix(self) -> None:
         from math import comb
 
         from jacobian.math.lie_algebra_homology._models import (
@@ -516,7 +518,7 @@ class TestDimensionEnvelope:
         next_dimension = MAX_LIE_ALGEBRA_DIMENSION + 1
         assert comb(next_dimension, next_dimension // 2) > 256
 
-    def test_nine_dimensional_abelian_complex_and_homology_execute(self):
+    def test_nine_dimensional_abelian_complex_and_homology_execute(self) -> None:
         """A 9-dim GF(2) abelian algebra fits every kernel and output bound
         and must not be rejected by a coarse dimension ceiling."""
         from math import comb
@@ -534,7 +536,7 @@ class TestDimensionEnvelope:
             complex_result.group_dimensions
         )
 
-    def test_ten_dimensional_nonabelian_algebra_executes(self):
+    def test_ten_dimensional_nonabelian_algebra_executes(self) -> None:
         """The envelope boundary admits non-abelian brackets at dimension 10;
         d^2 = 0 is replayed by the result validator."""
         g = _ut5_gf2()
@@ -548,7 +550,7 @@ class TestDimensionEnvelope:
         homology = compute_lie_homology(LieHomologyRequest(lie_algebra=g))
         assert [group.betti for group in homology.groups][:2] == [1, 4]
 
-    def test_eleven_dimensional_algebra_rejected_at_boundary(self):
+    def test_eleven_dimensional_algebra_rejected_at_boundary(self) -> None:
         """Dimension 11 would push C(11,5) = 462 rows past one matrix axis,
         so it stays rejected at the request boundary."""
         with pytest.raises(ValidationError) as exc_info:
@@ -559,14 +561,14 @@ class TestDimensionEnvelope:
 class TestCharacteristicEnvelope:
     """The characteristic bound is the documented shared conservative fallback."""
 
-    def test_envelope_matches_the_shared_prime_field_backend(self):
+    def test_envelope_matches_the_shared_prime_field_backend(self) -> None:
         from jacobian.math.lie_algebra_homology._models import (
             MAX_LIE_ALGEBRA_PRIME,
         )
 
         assert MAX_LIE_ALGEBRA_PRIME == 2_147_483_647
 
-    def test_large_characteristic_trivial_algebra_executes(self):
+    def test_large_characteristic_trivial_algebra_executes(self) -> None:
         """A 1-dim abelian algebra over GF(10007) must not be rejected."""
         g = LieAlgebra(prime=10007, dimension=1, structure_constants=(((0,),),))
         homology = compute_lie_homology(LieHomologyRequest(lie_algebra=g))
@@ -576,7 +578,7 @@ class TestCharacteristicEnvelope:
         )
         assert complex_result.prime == 10007
 
-    def test_shared_envelope_maximum_executes(self):
+    def test_shared_envelope_maximum_executes(self) -> None:
         """The largest admitted characteristic runs through the CE kernel."""
         from jacobian.math.lie_algebra_homology._models import (
             MAX_LIE_ALGEBRA_PRIME,
@@ -588,7 +590,7 @@ class TestCharacteristicEnvelope:
         homology = compute_lie_homology(LieHomologyRequest(lie_algebra=g))
         assert [group.betti for group in homology.groups] == [1, 1]
 
-    def test_characteristic_above_shared_envelope_rejected(self):
+    def test_characteristic_above_shared_envelope_rejected(self) -> None:
         with pytest.raises(ValidationError):
             LieAlgebra(
                 prime=2_147_483_648,

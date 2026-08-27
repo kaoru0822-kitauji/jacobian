@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
 from itertools import product
+from typing import Literal
 
 import pytest
 from pydantic import ValidationError
@@ -29,9 +31,13 @@ from jacobian.math.code_linear._operations import (
 )
 from jacobian.math.code_linear.values import PrimeFieldLinearEncoder
 
+Metric = Literal["DISTANCE", "AGREEMENT"]
+Comparison = Literal["LT", "LE", "GT", "GE"]
+WitnessMode = Literal["NONE", "COUNT", "FIRST", "ALL"]
+
 
 @contextmanager
-def _validation_error(code: str):
+def _validation_error(code: str) -> Iterator[None]:
     with pytest.raises(ValidationError) as exc_info:
         yield
     assert code in exc_info.value.errors()[0]["type"]
@@ -63,6 +69,16 @@ def _profile(
             encoder=_encoder(generator, field_order=field_order),
             received_word=received_word,
         )
+    )
+
+
+def _threshold(
+    metric: Metric,
+    comparison: Comparison,
+    value: int,
+) -> ReceivedWordThreshold:
+    return ReceivedWordThreshold.model_validate(
+        {"metric": metric, "comparison": comparison, "value": value}
     )
 
 
@@ -230,20 +246,16 @@ def test_ternary_repetition_profile_counts_every_distinct_codeword() -> None:
     ],
 )
 def test_exact_threshold_modes_preserve_strict_boundary_semantics(
-    metric: str,
-    comparison: str,
-    mode: str,
+    metric: Metric,
+    comparison: Comparison,
+    mode: WitnessMode,
     expected_count: int,
     expected_witnesses: int,
 ) -> None:
     request = ReceivedWordProfileRequest(
         encoder=_encoder(((1, 1),)),
         received_word=(1, 0),
-        threshold=ReceivedWordThreshold(
-            metric=metric,
-            comparison=comparison,
-            value=1,
-        ),
+        threshold=_threshold(metric, comparison, 1),
         witness_mode=mode,
     )
 
@@ -278,11 +290,7 @@ def test_independently_supplied_result_claims_use_the_explicit_verifier() -> Non
     request = ReceivedWordProfileRequest(
         encoder=_encoder(((1, 1),)),
         received_word=(1, 0),
-        threshold=ReceivedWordThreshold(
-            metric="AGREEMENT",
-            comparison="GE",
-            value=1,
-        ),
+        threshold=_threshold("AGREEMENT", "GE", 1),
         witness_mode="ALL",
     )
     result = compute_received_word_profile(request)
@@ -337,10 +345,16 @@ def test_profile_request_rejects_misalignment_and_mode_holes() -> None:
             witness_mode="FIRST",
         )
     with _validation_error("requires_count"):
-        ReceivedWordProfileRequest(
-            encoder=encoder,
-            received_word=(1, 0),
-            threshold={"metric": "DISTANCE", "comparison": "LE", "value": 1},
+        ReceivedWordProfileRequest.model_validate(
+            {
+                "encoder": encoder,
+                "received_word": (1, 0),
+                "threshold": {
+                    "metric": "DISTANCE",
+                    "comparison": "LE",
+                    "value": 1,
+                },
+            }
         )
 
 
@@ -416,15 +430,21 @@ def test_all_witness_output_has_a_separate_preflight_bound() -> None:
     ReceivedWordProfileRequest(
         encoder=encoder,
         received_word=(0,) * 32,
-        threshold={"metric": "DISTANCE", "comparison": "GE", "value": 0},
+        threshold=_threshold("DISTANCE", "GE", 0),
         witness_mode="FIRST",
     )
     with _validation_error("witness_cells"):
-        ReceivedWordProfileRequest(
-            encoder=encoder,
-            received_word=(0,) * 32,
-            threshold={"metric": "DISTANCE", "comparison": "GE", "value": 0},
-            witness_mode="ALL",
+        ReceivedWordProfileRequest.model_validate(
+            {
+                "encoder": encoder,
+                "received_word": (0,) * 32,
+                "threshold": {
+                    "metric": "DISTANCE",
+                    "comparison": "GE",
+                    "value": 0,
+                },
+                "witness_mode": "ALL",
+            }
         )
 
 
@@ -438,7 +458,7 @@ def test_all_witness_bound_uses_the_threshold_hamming_ball() -> None:
     request = ReceivedWordProfileRequest(
         encoder=_encoder(generator),
         received_word=(0,) * length,
-        threshold={"metric": "DISTANCE", "comparison": "LE", "value": 0},
+        threshold=_threshold("DISTANCE", "LE", 0),
         witness_mode="ALL",
     )
 
@@ -450,7 +470,7 @@ def test_all_witness_bound_uses_the_threshold_hamming_ball() -> None:
     impossible = ReceivedWordProfileRequest(
         encoder=request.encoder,
         received_word=request.received_word,
-        threshold={"metric": "DISTANCE", "comparison": "LT", "value": 0},
+        threshold=_threshold("DISTANCE", "LT", 0),
         witness_mode="ALL",
     )
     assert impossible.maximum_witness_cells == 0

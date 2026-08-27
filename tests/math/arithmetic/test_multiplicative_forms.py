@@ -66,6 +66,8 @@ class TestPerfectPowerProfile:
         for n in ["64", "-64", "729", "-729", "72", "-16", "2", "-1"]:
             result = compute_perfect_power_profile(IntegerRequest(value=n))
             if result.kind == "NONUNIT":
+                assert result.base is not None
+                assert result.exponent is not None
                 base = int(result.base)
                 exp = result.exponent
                 assert base**exp == int(n), f"{base}^{exp} != {n}"
@@ -133,6 +135,8 @@ class TestKFreeDecomposition:
             for k in [2, 3, 4]:
                 result = compute_k_free_decomposition(IntegerKRequest(value=n, k=k))
                 if result.kind == "NONUNIT":
+                    assert result.base is not None
+                    assert result.cofactor is not None
                     base = int(result.base)
                     cofactor = int(result.cofactor)
                     assert base**k * cofactor == int(n)
@@ -183,6 +187,8 @@ class TestSquarefreeDecomposition:
         for n in ["72", "-72", "30", "-30", "144", "-144", "1", "-1"]:
             result = compute_squarefree_decomposition(IntegerRequest(value=n))
             if result.kind == "NONUNIT":
+                assert result.square_factor is not None
+                assert result.squarefree_part is not None
                 s = int(result.square_factor)
                 d = int(result.squarefree_part)
                 assert s**2 * d == int(n)

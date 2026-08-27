@@ -661,7 +661,7 @@ def test_random_words_match_independent_factor_and_period_oracles() -> None:
                 assert analysis.factors == expected_factors
                 assert analysis.occurrences == expected_positions
 
-            analysis = periods(word)
+            period_analysis = periods(word)
             expected_periods = tuple(
                 period
                 for period in range(1, length + 1)
@@ -672,8 +672,8 @@ def test_random_words_match_independent_factor_and_period_oracles() -> None:
                 and letters[:root_length] * (length // root_length) == letters
                 for root_length in range(1, length)
             )
-            assert analysis.periods == expected_periods
-            assert analysis.primitive is (length > 0 and not proper_power)
+            assert period_analysis.periods == expected_periods
+            assert period_analysis.primitive is (length > 0 and not proper_power)
 
 
 def test_incidence_matrix_matches_independent_count_oracle() -> None:

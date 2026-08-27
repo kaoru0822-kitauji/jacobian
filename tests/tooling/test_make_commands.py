@@ -93,7 +93,7 @@ def test_lanes_use_their_declared_worker_and_fixture_affinity() -> None:
     catalog = makefile.split("test-catalog:", 1)[1].split("test-dispatch:", 1)[0]
     integration = makefile.split("test-integration:", 1)[1].split("test-fast:", 1)[0]
 
-    assert "pytest -n 4 --dist worksteal" in math
+    assert "pytest -n auto --dist worksteal" in math
     assert "pytest -n 2 --dist worksteal" in catalog
     assert "pytest -n 2 --dist worksteal" in integration
     assert '-m "$(ORDINARY_MARKER_EXPRESSION)"' in integration

@@ -88,7 +88,7 @@ class TestGramProfile:
 
     def test_tall_matrix_retains_every_diagonal_residual(self) -> None:
         result = compute_gram_profile(
-            GramProfileRequest(matrix={"rows": [[1], [1], [-1]]})
+            GramProfileRequest.model_validate({"matrix": {"rows": [[1], [1], [-1]]}})
         )
         assert result.diagonal_residuals == (0, 0, 0)
 

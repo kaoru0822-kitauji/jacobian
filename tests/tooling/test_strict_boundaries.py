@@ -282,7 +282,7 @@ def test_load_environment_profiles_rejects_missing_allow_apt(tmp_path: Path) -> 
 # ---------------------------------------------------------------------------
 
 
-def _write_plan(tmp_path: Path, runs: list[dict]) -> Path:
+def _write_plan(tmp_path: Path, runs: list[dict[str, object]]) -> Path:
     plan = {
         "schema_version": "3",
         "manifest_digest": "sha256:" + "a" * 64,

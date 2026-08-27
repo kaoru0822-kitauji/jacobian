@@ -210,7 +210,7 @@ def test_short_row_family_beyond_any_row_cap_is_recognized() -> None:
     # and 220,832 ordered exchange candidate checks. The family fits every
     # derived membership, candidate-work, and result bound, so no row-count
     # ceiling may exclude it.
-    feasible = [()]
+    feasible: list[tuple[int, ...]] = [()]
     feasible.extend((index,) for index in range(16))
     feasible.extend(
         (left, right) for left in range(15) for right in range(left + 1, 16)

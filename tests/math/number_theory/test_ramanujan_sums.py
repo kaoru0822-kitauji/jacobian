@@ -3,7 +3,7 @@ from __future__ import annotations
 from math import gcd, lcm
 
 import pytest
-from pydantic import TypeAdapter, ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError
 from sympy import divisors, mobius
 from tests.math.number_theory._validation import expect_validation
 
@@ -125,7 +125,7 @@ def test_result_rejects_noncanonical_value_encodings(noncanonical: str) -> None:
     ),
 )
 def test_negative_zero_frequency_is_rejected_before_source_binding(
-    model: type, payload: dict[str, str]
+    model: type[BaseModel], payload: dict[str, str]
 ) -> None:
     with pytest.raises(ValidationError):
         model.model_validate(payload)

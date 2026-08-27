@@ -4,7 +4,7 @@ import json
 import tarfile
 from io import BytesIO
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from benchmarks.tooling.providers.cddlib import _expected_mathematical, run_spike
 from tests.process.providers._spike_support import (
@@ -23,7 +23,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 def _base_pin() -> dict[str, Any]:
     path = PROJECT_ROOT / "tests/fixtures/providers/cddlib/pin.json"
-    return json.loads(path.read_text(encoding="utf-8"))
+    return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
 
 
 def RUN_SPIKE(**kwargs: Any) -> dict[str, Any]:  # noqa: N802

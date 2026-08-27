@@ -12,7 +12,7 @@ from jacobian.math.boolean._operations import compute_walsh_hadamard_transform
 
 
 def _request(truth_table: list[int]) -> BooleanTruthTableRequest:
-    return BooleanTruthTableRequest(truth_table=tuple(truth_table))
+    return BooleanTruthTableRequest.model_validate({"truth_table": truth_table})
 
 
 def _character_sum_spectrum(truth_table: list[int]) -> tuple[int, ...]:

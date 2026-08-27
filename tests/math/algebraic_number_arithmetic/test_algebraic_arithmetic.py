@@ -35,7 +35,7 @@ def _element(a: int, b: int, d: int) -> RealQuadraticValue:
 def _req(
     left: tuple[int, int, int],
     right: tuple[int, int, int],
-    request_type: type[AlgebraicArithmeticRequest] = AlgebraicArithmeticRequest,
+    request_type: type[AlgebraicArithmeticRequest],
 ) -> AlgebraicArithmeticRequest:
     return request_type(
         left=_element(*left),
@@ -46,13 +46,13 @@ def _req(
 def _add_req(
     left: tuple[int, int, int], right: tuple[int, int, int]
 ) -> AlgebraicAdditionRequest:
-    return _req(left, right, AlgebraicAdditionRequest)
+    return AlgebraicAdditionRequest(left=_element(*left), right=_element(*right))
 
 
 def _mul_req(
     left: tuple[int, int, int], right: tuple[int, int, int]
 ) -> AlgebraicMultiplicationRequest:
-    return _req(left, right, AlgebraicMultiplicationRequest)
+    return AlgebraicMultiplicationRequest(left=_element(*left), right=_element(*right))
 
 
 def test_addition_is_component_wise() -> None:
@@ -119,7 +119,7 @@ def test_fractional_coefficients() -> None:
     result = compute_algebraic_multiply(
         AlgebraicMultiplicationRequest(left=left, right=right)
     )
-    assert result.rational_part.as_fraction() == pytest.approx(-11 / 4)  # type: ignore[comparison-overlap]
+    assert result.rational_part.as_fraction() == pytest.approx(-11 / 4)
     # exact check via Fraction
     from fractions import Fraction
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import pytest
 from pydantic import ValidationError
 
@@ -18,7 +20,7 @@ from jacobian.math.code_theory._operations import (
 )
 
 
-def _assert_validation_error_code(factory, code: str) -> None:
+def _assert_validation_error_code(factory: Callable[[], object], code: str) -> None:
     with pytest.raises(ValidationError) as exc_info:
         factory()
     assert exc_info.value.errors()[0]["type"] == code

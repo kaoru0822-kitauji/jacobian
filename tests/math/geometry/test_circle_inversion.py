@@ -17,8 +17,8 @@ from jacobian.math.geometry._operations import circle_inversion
 
 def _pt(x: int | str, y: int | str) -> RationalPoint2D:
     return RationalPoint2D(
-        x={"num": str(x), "den": "1"},
-        y={"num": str(y), "den": "1"},
+        x=_cr(str(x), "1"),
+        y=_cr(str(y), "1"),
     )
 
 
@@ -27,7 +27,7 @@ def _cr(num: str, den: str) -> CanonicalRational:
 
 
 class TestCircleInversion:
-    def test_unit_inversion_of_two_zero(self):
+    def test_unit_inversion_of_two_zero(self) -> None:
         result = circle_inversion(
             CircleInversionRequest(
                 center=_pt(0, 0),
@@ -39,7 +39,7 @@ class TestCircleInversion:
         assert result.point.x.as_fraction() == Fraction(1, 2)
         assert result.point.y.as_fraction() == Fraction(0)
 
-    def test_unit_inversion_of_one_two(self):
+    def test_unit_inversion_of_one_two(self) -> None:
         result = circle_inversion(
             CircleInversionRequest(
                 center=_pt(0, 0),
@@ -51,7 +51,7 @@ class TestCircleInversion:
         assert result.point.x.as_fraction() == Fraction(1, 5)
         assert result.point.y.as_fraction() == Fraction(2, 5)
 
-    def test_non_origin_center(self):
+    def test_non_origin_center(self) -> None:
         result = circle_inversion(
             CircleInversionRequest(
                 center=_pt(1, 1),
@@ -63,7 +63,7 @@ class TestCircleInversion:
         assert result.point.x.as_fraction() == Fraction(2, 1)
         assert result.point.y.as_fraction() == Fraction(1, 1)
 
-    def test_involutive_on_the_inversion_circle(self):
+    def test_involutive_on_the_inversion_circle(self) -> None:
         # A point at distance sqrt(s) from the center is fixed by inversion.
         result = circle_inversion(
             CircleInversionRequest(
@@ -75,7 +75,7 @@ class TestCircleInversion:
         assert result.point.x.as_fraction() == Fraction(2, 1)
         assert result.point.y.as_fraction() == Fraction(0, 1)
 
-    def test_double_inversion_recovers_original(self):
+    def test_double_inversion_recovers_original(self) -> None:
         first = circle_inversion(
             CircleInversionRequest(
                 center=_pt(0, 0),
@@ -93,7 +93,7 @@ class TestCircleInversion:
         assert second.point.x.as_fraction() == Fraction(1, 1)
         assert second.point.y.as_fraction() == Fraction(1, 1)
 
-    def test_rejects_point_at_center(self):
+    def test_rejects_point_at_center(self) -> None:
         with pytest.raises(ValidationError):
             CircleInversionRequest(
                 center=_pt(1, 1),
@@ -101,7 +101,7 @@ class TestCircleInversion:
                 point=_pt(1, 1),
             )
 
-    def test_rejects_nonpositive_power(self):
+    def test_rejects_nonpositive_power(self) -> None:
         with pytest.raises(ValidationError):
             CircleInversionRequest(
                 center=_pt(0, 0),
@@ -115,7 +115,7 @@ class TestCircleInversion:
                 point=_pt(1, 0),
             )
 
-    def test_rejects_output_that_exceeds_canonical_digits(self):
+    def test_rejects_output_that_exceeds_canonical_digits(self) -> None:
         # center=(0,0), power=(10^20000+1)/1, point=(10^{-20000}, 0): the
         # exact inverted coordinate (10^20000+1)*10^20000 would need 40,001
         # digits, but the input components themselves already exceed the
@@ -131,7 +131,7 @@ class TestCircleInversion:
                 ),
             )
 
-    def test_rejects_oversized_result_off_center(self):
+    def test_rejects_oversized_result_off_center(self) -> None:
         # c=(1,1), s=10^1600, p=(1+10^{-3200},1): scale*dx = 10^4800, so the
         # exact inverted x-coordinate needs 4,801 digits; the inputs fit the
         # admission bound but the inverted result does not.
@@ -147,7 +147,7 @@ class TestCircleInversion:
                 ),
             )
 
-    def test_rejects_near_limit_inputs_before_expanding_the_result(self):
+    def test_rejects_near_limit_inputs_before_expanding_the_result(self) -> None:
         # Reviewer P1 shape: every request component fits the canonical limit
         # (exactly 32,768 digits here), so parsing is schema-valid, but the
         # exact inversion would form ~262,000-digit intermediates. Admission
@@ -170,7 +170,7 @@ class TestCircleInversion:
                 ),
             )
 
-    def test_reviewer_counterexample_is_closed_under_reinversion(self):
+    def test_reviewer_counterexample_is_closed_under_reinversion(self) -> None:
         # c=(0,0), s=1, p=(10^{-800},1): the first request returns components
         # within the admission bound (at most 1,601 digits), which the
         # fed-back request accepts identically. Admission must accept both
@@ -190,7 +190,7 @@ class TestCircleInversion:
         recovered = circle_inversion(second)
         assert recovered.point == point
 
-    def test_admission_bound_boundary_is_exact(self):
+    def test_admission_bound_boundary_is_exact(self) -> None:
         # A component with exactly 2,048 digits sits at the admission bound:
         # p=(10^2047,0) inverts to 1/10^2047 whose denominator carries
         # exactly 2,048 digits, so both sides fit and the request is
@@ -213,7 +213,7 @@ class TestCircleInversion:
                 point=RationalPoint2D(x=_cr(over, "1"), y=_cr("0", "1")),
             )
 
-    def test_admitted_domain_is_symmetric_under_involution(self):
+    def test_admitted_domain_is_symmetric_under_involution(self) -> None:
         # Defining invariant: for every admitted (c,s,p), the fed-back request
         # (c,s,I(p)) is admitted again and recovers p.
         cases = (
@@ -234,13 +234,13 @@ class TestCircleInversion:
             )
             assert circle_inversion(second).point == point
 
-    def test_schema_documents_point_not_equal_center(self):
+    def test_schema_documents_point_not_equal_center(self) -> None:
         schema = CircleInversionRequest.model_json_schema()
         assert "p != c" in schema.get("description", "")
         assert "p != c" in schema["properties"]["center"]["description"]
         assert "p != c" in schema["properties"]["point"]["description"]
 
-    def test_schema_publishes_numeric_admission_bound(self):
+    def test_schema_publishes_numeric_admission_bound(self) -> None:
         from jacobian.math.geometry._models import INVERSION_ADMISSION_DIGITS
 
         assert INVERSION_ADMISSION_DIGITS == 2048

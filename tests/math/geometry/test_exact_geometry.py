@@ -1,5 +1,8 @@
 """Tests for exact geometry operations."""
 
+from fractions import Fraction
+from typing import TypedDict
+
 from jacobian._exact import CanonicalRational
 from jacobian.canonical import format_canonical_integer
 from jacobian.math.geometry.exact._models import (
@@ -7,8 +10,11 @@ from jacobian.math.geometry.exact._models import (
     DistanceGraphRequest,
     DistanceProfileRequest,
     LabelledRationalPoint,
+    PinnedBoundedRational,
+    PinnedLineConfiguration,
     PinnedLineDistanceRequest,
     PinnedLineDistanceResult,
+    PinnedLinePoint,
     PointConfiguration,
 )
 from jacobian.math.geometry.exact._operations import (
@@ -18,16 +24,56 @@ from jacobian.math.geometry.exact._operations import (
 from jacobian.math.graphs.spectral._models import GraphSpectrumRequest
 from jacobian.math.graphs.values import IndexedSimpleUndirectedGraph
 
+type Scalar = int | Fraction
+
+
+class RationalWire(TypedDict):
+    num: str
+    den: str
+
+
+class PointWire(TypedDict):
+    label: str
+    coordinates: list[RationalWire]
+
+
+class EntryWire(TypedDict):
+    line_coefficients: list[RationalWire]
+    squared_distance: RationalWire
+    pairs: list[list[int]]
+
 
 def _make_point(label: str, coords: list[tuple[str, str]]) -> LabelledRationalPoint:
-    return LabelledRationalPoint(
+    wire: PointWire = {
+        "label": label,
+        "coordinates": [{"num": n, "den": d} for n, d in coords],
+    }
+    return LabelledRationalPoint.model_validate(wire)
+
+
+def _cr(value: Scalar) -> CanonicalRational:
+    return CanonicalRational.from_fraction(Fraction(value))
+
+
+def _pinned(value: Scalar) -> PinnedBoundedRational:
+    return PinnedBoundedRational.model_validate(_cr(value))
+
+
+def _pinned_configuration(
+    points: tuple[PinnedLinePoint, ...],
+) -> PinnedLineConfiguration:
+    return PinnedLineConfiguration(points=points)
+
+
+def _pinned_wire_point(label: str, x: Scalar, y: Scalar) -> PinnedLinePoint:
+    return PinnedLinePoint(
         label=label,
-        coordinates=tuple({"num": n, "den": d} for n, d in coords),
+        coordinates=(_pinned(x), _pinned(y)),
     )
 
 
 class TestDistanceProfile:
-    def test_unit_square(self):
+    def test_unit_square(self) -> None:
         pts = (
             _make_point("a", [("0", "1"), ("0", "1")]),
             _make_point("b", [("1", "1"), ("0", "1")]),
@@ -44,7 +90,7 @@ class TestDistanceProfile:
         assert entries.get(one) == 4  # 4 unit-distance pairs
         assert entries.get(two) == 2  # 2 diagonal pairs
 
-    def test_collinear(self):
+    def test_collinear(self) -> None:
         pts = (
             _make_point("a", [("0", "1"), ("0", "1")]),
             _make_point("b", [("1", "1"), ("0", "1")]),
@@ -62,7 +108,7 @@ class TestDistanceProfile:
 
 
 class TestDistanceGraph:
-    def test_unit_square_distance_1(self):
+    def test_unit_square_distance_1(self) -> None:
         pts = (
             _make_point("a", [("0", "1"), ("0", "1")]),
             _make_point("b", [("1", "1"), ("0", "1")]),
@@ -77,7 +123,7 @@ class TestDistanceGraph:
         assert isinstance(result, IndexedSimpleUndirectedGraph)
         assert len(result.edges) == 4
 
-    def test_serialized_result_feeds_graph_consumer_unchanged(self):
+    def test_serialized_result_feeds_graph_consumer_unchanged(self) -> None:
         """A distance graph is the graphs owner's value, including no-edge cases."""
         configuration = PointConfiguration(
             points=(
@@ -100,14 +146,14 @@ class TestDistanceGraph:
             == produced
         )
 
-    def test_rejects_single_point_configuration(self):
+    def test_rejects_single_point_configuration(self) -> None:
         import pytest
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError):
             PointConfiguration(points=(_make_point("a", [("0", "1")]),))
 
-    def test_rejects_negative_squared_distance(self):
+    def test_rejects_negative_squared_distance(self) -> None:
         import pytest
         from pydantic import ValidationError
 
@@ -125,38 +171,20 @@ class TestDistanceGraph:
 
 
 class TestPinnedLineDistance:
-    def _cfg(self, pts):
-        from fractions import Fraction
-
-        from jacobian._exact import CanonicalRational
-        from jacobian.math.geometry.exact._models import (
-            LabelledRationalPoint,
-            PointConfiguration,
+    def _cfg(self, pts: list[tuple[str, Scalar, Scalar]]) -> PinnedLineConfiguration:
+        return _pinned_configuration(
+            points=tuple(_pinned_wire_point(label, x, y) for label, x, y in pts),
         )
 
-        def cr(x):
-            return CanonicalRational.from_fraction(Fraction(x))
-
-        return PointConfiguration(
-            points=tuple(
-                LabelledRationalPoint(label=label, coordinates=(cr(x), cr(y)))
-                for label, x, y in pts
-            ),
-        )
-
-    def _anchor(self, x, y):
-        from fractions import Fraction
-
-        from jacobian._exact import CanonicalRational
-
+    def _anchor(
+        self, x: Scalar, y: Scalar
+    ) -> tuple[PinnedBoundedRational, PinnedBoundedRational]:
         return (
-            CanonicalRational.from_fraction(Fraction(x)),
-            CanonicalRational.from_fraction(Fraction(y)),
+            _pinned(x),
+            _pinned(y),
         )
 
-    def test_inverted_orthocentric_equal_distance(self):
-        from fractions import Fraction
-
+    def test_inverted_orthocentric_equal_distance(self) -> None:
         from jacobian.math.geometry.exact._models import (
             PinnedLineDistanceRequest,
         )
@@ -181,9 +209,7 @@ class TestPinnedLineDistance:
         mult = [(m[0].as_fraction(), m[1]) for m in result.distance_multiplicities]
         assert mult == [(Fraction(4, 65), 3)]
 
-    def test_unit_square_anchor_origin(self):
-        from fractions import Fraction
-
+    def test_unit_square_anchor_origin(self) -> None:
         from jacobian.math.geometry.exact._models import (
             PinnedLineDistanceRequest,
         )
@@ -207,9 +233,7 @@ class TestPinnedLineDistance:
         ]
         assert len(zero_lines) == 3
 
-    def test_collinear_pairs_collapse_to_one_line(self):
-        from fractions import Fraction
-
+    def test_collinear_pairs_collapse_to_one_line(self) -> None:
         from jacobian.math.geometry.exact._models import (
             PinnedLineDistanceRequest,
         )
@@ -229,7 +253,7 @@ class TestPinnedLineDistance:
         # distance from (0,1) to y=0 is 1.
         assert entry.squared_distance.as_fraction() == Fraction(1, 1)
 
-    def test_canonical_line_invariance_under_pair_order(self):
+    def test_canonical_line_invariance_under_pair_order(self) -> None:
         from jacobian.math.geometry.exact._models import (
             PinnedLineDistanceRequest,
         )
@@ -254,31 +278,33 @@ class TestPinnedLineDistance:
         }
         assert coeffs_a == coeffs_b
 
-    def test_rejects_nonplanar(self):
+    def test_rejects_nonplanar(self) -> None:
         import pytest
 
-        from jacobian._exact import CanonicalRational
         from jacobian.math.geometry.exact._models import (
             LabelledRationalPoint,
-            PinnedLineDistanceRequest,
             PointConfiguration,
         )
 
-        def cr(x):
-            return CanonicalRational.from_fraction(__import__("fractions").Fraction(x))
-
         pts = (
-            LabelledRationalPoint(label="a", coordinates=(cr(0), cr(0), cr(0))),
-            LabelledRationalPoint(label="b", coordinates=(cr(1), cr(0), cr(0))),
-            LabelledRationalPoint(label="c", coordinates=(cr(0), cr(1), cr(0))),
+            LabelledRationalPoint(label="a", coordinates=(_cr(0), _cr(0), _cr(0))),
+            LabelledRationalPoint(label="b", coordinates=(_cr(1), _cr(0), _cr(0))),
+            LabelledRationalPoint(label="c", coordinates=(_cr(0), _cr(1), _cr(0))),
         )
         with pytest.raises(ValueError):
-            PinnedLineDistanceRequest(
-                configuration=PointConfiguration(points=pts),
-                anchor=(cr(0), cr(0)),
+            PinnedLineDistanceRequest.model_validate(
+                {
+                    "configuration": PointConfiguration(points=pts).model_dump(
+                        mode="json"
+                    ),
+                    "anchor": [
+                        {"num": "0", "den": "1"},
+                        {"num": "0", "den": "1"},
+                    ],
+                }
             )
 
-    def test_result_rejects_nonplanar_retained_configuration(self):
+    def test_result_rejects_nonplanar_retained_configuration(self) -> None:
         import pytest
         from pydantic import ValidationError
 
@@ -303,16 +329,18 @@ class TestPinnedLineDistance:
             )
         )
         with pytest.raises(ValidationError):
-            PinnedLineDistanceResult(
-                configuration=cfg3d,
-                anchor=self._anchor(0, 0),
-                dimension=2,
-                point_count=4,
-                lines=result.lines,
-                distance_multiplicities=result.distance_multiplicities,
+            PinnedLineDistanceResult.model_validate(
+                {
+                    "configuration": cfg3d.model_dump(mode="json"),
+                    "anchor": self._anchor(0, 0),
+                    "dimension": 2,
+                    "point_count": 4,
+                    "lines": result.lines,
+                    "distance_multiplicities": result.distance_multiplicities,
+                }
             )
 
-    def test_result_rejects_one_dimensional_retained_configuration(self):
+    def test_result_rejects_one_dimensional_retained_configuration(self) -> None:
         import pytest
         from pydantic import ValidationError
 
@@ -325,16 +353,18 @@ class TestPinnedLineDistance:
             )
         )
         with pytest.raises(ValidationError):
-            PinnedLineDistanceResult(
-                configuration=cfg1d,
-                anchor=self._anchor(0, 0),
-                dimension=2,
-                point_count=2,
-                lines=(),
-                distance_multiplicities=(),
+            PinnedLineDistanceResult.model_validate(
+                {
+                    "configuration": cfg1d.model_dump(mode="json"),
+                    "anchor": self._anchor(0, 0),
+                    "dimension": 2,
+                    "point_count": 2,
+                    "lines": (),
+                    "distance_multiplicities": (),
+                }
             )
 
-    def test_result_rejects_3d_points_differing_only_outside_plane(self):
+    def test_result_rejects_3d_points_differing_only_outside_plane(self) -> None:
         import pytest
         from pydantic import ValidationError
 
@@ -349,16 +379,18 @@ class TestPinnedLineDistance:
             )
         )
         with pytest.raises(ValidationError):
-            PinnedLineDistanceResult(
-                configuration=cfgz,
-                anchor=self._anchor(0, 1),
-                dimension=2,
-                point_count=2,
-                lines=(),
-                distance_multiplicities=(),
+            PinnedLineDistanceResult.model_validate(
+                {
+                    "configuration": cfgz.model_dump(mode="json"),
+                    "anchor": self._anchor(0, 1),
+                    "dimension": 2,
+                    "point_count": 2,
+                    "lines": (),
+                    "distance_multiplicities": (),
+                }
             )
 
-    def test_anchor_arity_is_schema_expressed(self):
+    def test_anchor_arity_is_schema_expressed(self) -> None:
         import pytest
         from pydantic import ValidationError
 
@@ -375,18 +407,25 @@ class TestPinnedLineDistance:
         cfg = self._cfg([("a", 0, 0), ("b", 1, 0)])
         for bad_anchor in (self._anchor(0, 0)[:1], (*self._anchor(0, 0), _cr(1))):
             with pytest.raises(ValidationError):
-                PinnedLineDistanceRequest(configuration=cfg, anchor=bad_anchor)
+                PinnedLineDistanceRequest.model_validate(
+                    {
+                        "configuration": cfg.model_dump(mode="json"),
+                        "anchor": bad_anchor,
+                    }
+                )
             with pytest.raises(ValidationError):
-                PinnedLineDistanceResult(
-                    configuration=cfg,
-                    anchor=bad_anchor,
-                    dimension=2,
-                    point_count=2,
-                    lines=(),
-                    distance_multiplicities=(),
+                PinnedLineDistanceResult.model_validate(
+                    {
+                        "configuration": cfg.model_dump(mode="json"),
+                        "anchor": bad_anchor,
+                        "dimension": 2,
+                        "point_count": 2,
+                        "lines": (),
+                        "distance_multiplicities": (),
+                    }
                 )
 
-    def test_pair_ledger_is_schema_bounded_before_validation(self):
+    def test_pair_ledger_is_schema_bounded_before_validation(self) -> None:
         import pytest
         from pydantic import ValidationError
 
@@ -432,7 +471,7 @@ class TestPinnedLineDistance:
                 distance_multiplicities=(),
             )
 
-    def test_outer_result_ledgers_are_schema_bounded_before_validation(self):
+    def test_outer_result_ledgers_are_schema_bounded_before_validation(self) -> None:
         import pytest
         from pydantic import ValidationError
 
@@ -477,9 +516,7 @@ class TestPinnedLineDistance:
                 distance_multiplicities=tuple([(_cr(1), 1)] * (MAX_PAIRS + 1)),
             )
 
-    def test_aggregate_output_budget_rejects_unencodable_profiles(self):
-        from fractions import Fraction
-
+    def test_aggregate_output_budget_rejects_unencodable_profiles(self) -> None:
         import pytest
         from pydantic import ValidationError
 
@@ -488,7 +525,7 @@ class TestPinnedLineDistance:
             _maximum_pinned_profile_wire_bytes,
         )
 
-        def big_pt(index: int) -> dict:
+        def big_pt(index: int) -> PointWire:
             fx = Fraction(1, 10**249 + index * 10**123 + 2 * index + 1)
             fy = Fraction(index + 1, 10**250 + index + 7)
             return {
@@ -520,9 +557,14 @@ class TestPinnedLineDistance:
             > MAX_PINNED_PROFILE_RESULT_BYTES
         )
         with pytest.raises(ValidationError):
-            PinnedLineDistanceRequest(configuration=cfg, anchor=anchor)
+            PinnedLineDistanceRequest.model_validate(
+                {
+                    "configuration": cfg.model_dump(mode="json"),
+                    "anchor": anchor,
+                }
+            )
 
-    def test_estimate_dominates_actual_encoding_for_admitted_requests(self):
+    def test_estimate_dominates_actual_encoding_for_admitted_requests(self) -> None:
         from jacobian.canonical import encode_strict_json
         from jacobian.math.geometry.exact._models import (
             MAX_PINNED_PROFILE_RESULT_BYTES,
@@ -542,7 +584,7 @@ class TestPinnedLineDistance:
         assert actual <= MAX_PINNED_PROFILE_RESULT_BYTES
         assert actual <= _maximum_pinned_profile_wire_bytes(cfg, request.anchor)
 
-    def test_result_budget_metadata_is_schema_published(self):
+    def test_result_budget_metadata_is_schema_published(self) -> None:
         from jacobian.math.geometry.exact._models import (
             COORDINATE_DIGITS,
             MAX_PINNED_PROFILE_RESULT_BYTES,
@@ -554,14 +596,6 @@ class TestPinnedLineDistance:
         assert (
             metadata["aggregate_result_budget_bytes"] == MAX_PINNED_PROFILE_RESULT_BYTES
         )
-
-
-def _cr(x):
-    from fractions import Fraction
-
-    from jacobian._exact import CanonicalRational
-
-    return CanonicalRational.from_fraction(Fraction(x))
 
 
 class TestCanonicalPointValueComposition:
@@ -580,7 +614,7 @@ class TestCanonicalPointValueComposition:
             )
         )
 
-    def test_every_surviving_operation_accepts_canonical_configuration(self):
+    def test_every_surviving_operation_accepts_canonical_configuration(self) -> None:
         from jacobian.math.geometry.exact._operations import (
             compute_pinned_line_distance_profile,
         )
@@ -596,15 +630,21 @@ class TestCanonicalPointValueComposition:
             )
         )
         pinned = compute_pinned_line_distance_profile(
-            PinnedLineDistanceRequest(
-                configuration=configuration, anchor=(_cr(0), _cr(0))
+            PinnedLineDistanceRequest.model_validate(
+                {
+                    "configuration": configuration.model_dump(mode="json"),
+                    "anchor": [
+                        _cr(0).model_dump(mode="json"),
+                        _cr(0).model_dump(mode="json"),
+                    ],
+                }
             )
         )
         assert profile.point_count == 3
         assert graph.vertex_count == 3
         assert pinned.point_count == 3
 
-    def test_retained_configuration_feeds_sibling_operations_unchanged(self):
+    def test_retained_configuration_feeds_sibling_operations_unchanged(self) -> None:
         """A producer's retained configuration is the canonical domain value,
         so consumers accept it without translation through a second type."""
         from jacobian.math.geometry.exact._operations import (
@@ -613,8 +653,14 @@ class TestCanonicalPointValueComposition:
 
         configuration = self._configuration()
         result = compute_pinned_line_distance_profile(
-            PinnedLineDistanceRequest(
-                configuration=configuration, anchor=(_cr(0), _cr(1))
+            PinnedLineDistanceRequest.model_validate(
+                {
+                    "configuration": configuration.model_dump(mode="json"),
+                    "anchor": [
+                        _cr(0).model_dump(mode="json"),
+                        _cr(1).model_dump(mode="json"),
+                    ],
+                }
             )
         )
         # The retained value is the shared configuration (the pinned request's
@@ -645,7 +691,7 @@ class TestCanonicalPointValueComposition:
             )
         )
 
-    def test_incidence_projections_no_longer_define_local_value_models(self):
+    def test_incidence_projections_no_longer_define_local_value_models(self) -> None:
         """The removed duplicate family took its recreated CanonicalRational /
         LabelledRationalPoint / PointConfiguration views with it."""
         import jacobian.math.geometry.exact._models as models
@@ -662,7 +708,7 @@ class TestCanonicalPointValueComposition:
 
 
 class TestAggregatePairLedgerBound:
-    def test_oversized_aggregate_pair_ledger_rejected_before_parsing(self):
+    def test_oversized_aggregate_pair_ledger_rejected_before_parsing(self) -> None:
         """2016 entries each carrying 2016 distinct pairs would amplify into
         over four million pair tuples during parsing; the aggregate ledger
         must be rejected at the mathematical MAX_PAIRS bound instead."""
@@ -704,12 +750,11 @@ class TestAggregatePairLedgerBound:
         with pytest.raises(ValidationError):
             PinnedLineDistanceResult.model_validate(payload)
 
-    def test_prevalidated_entries_counted_in_aggregate_cap(self):
+    def test_prevalidated_entries_counted_in_aggregate_cap(self) -> None:
         """Pre-validated ``PinnedLineEntry`` instances bypass dict-only
         counting, so a native caller could supply individually valid entries
         whose aggregate pair total far exceeds MAX_PAIRS; the cap must count
         already-parsed entries too before any replay work runs."""
-        from fractions import Fraction
         from itertools import combinations
 
         import pytest
@@ -720,17 +765,10 @@ class TestAggregatePairLedgerBound:
             PinnedLineConfiguration,
             PinnedLineDistanceResult,
             PinnedLineEntry,
-            PinnedLinePoint,
         )
 
-        def _cr(value):
-            return CanonicalRational.from_fraction(Fraction(value))
-
         cfg = PinnedLineConfiguration(
-            points=tuple(
-                PinnedLinePoint(label=f"p{i}", coordinates=(_cr(i), _cr(i * i)))
-                for i in range(64)
-            )
+            points=tuple(_pinned_wire_point(f"p{i}", i, i * i) for i in range(64))
         )
         full_ledger = tuple((i, j) for i, j in combinations(range(64), 2))
         assert len(full_ledger) == MAX_PAIRS
@@ -746,15 +784,14 @@ class TestAggregatePairLedgerBound:
         with pytest.raises(ValidationError):
             PinnedLineDistanceResult(
                 configuration=cfg,
-                anchor=(_cr(0), _cr(0)),
+                anchor=(_pinned(0), _pinned(0)),
                 dimension=2,
                 point_count=64,
                 lines=entries,
                 distance_multiplicities=(),
             )
 
-    def test_mixed_dict_and_instance_entries_counted_in_aggregate_cap(self):
-        from fractions import Fraction
+    def test_mixed_dict_and_instance_entries_counted_in_aggregate_cap(self) -> None:
         from itertools import combinations
 
         import pytest
@@ -765,17 +802,10 @@ class TestAggregatePairLedgerBound:
             PinnedLineConfiguration,
             PinnedLineDistanceResult,
             PinnedLineEntry,
-            PinnedLinePoint,
         )
 
-        def _cr(value):
-            return CanonicalRational.from_fraction(Fraction(value))
-
         cfg = PinnedLineConfiguration(
-            points=tuple(
-                PinnedLinePoint(label=f"p{i}", coordinates=(_cr(i), _cr(i * i)))
-                for i in range(64)
-            )
+            points=tuple(_pinned_wire_point(f"p{i}", i, i * i) for i in range(64))
         )
         full_ledger = tuple((i, j) for i, j in combinations(range(64), 2))
         assert len(full_ledger) == MAX_PAIRS
@@ -785,7 +815,7 @@ class TestAggregatePairLedgerBound:
             squared_distance=_cr(1),
             pairs=full_ledger,
         )
-        dict_entry = {
+        dict_entry: EntryWire = {
             "line_coefficients": [
                 {"num": "0", "den": "1"},
                 {"num": "1", "den": "1"},
@@ -796,16 +826,21 @@ class TestAggregatePairLedgerBound:
         }
         assert len(instance_entry.pairs) + len(dict_entry["pairs"]) > MAX_PAIRS
         with pytest.raises(ValidationError):
-            PinnedLineDistanceResult(
-                configuration=cfg,
-                anchor=(_cr(0), _cr(0)),
-                dimension=2,
-                point_count=64,
-                lines=(instance_entry, dict_entry),
-                distance_multiplicities=(),
+            PinnedLineDistanceResult.model_validate(
+                {
+                    "configuration": cfg.model_dump(mode="json"),
+                    "anchor": [
+                        _cr(0).model_dump(mode="json"),
+                        _cr(0).model_dump(mode="json"),
+                    ],
+                    "dimension": 2,
+                    "point_count": 64,
+                    "lines": [instance_entry, dict_entry],
+                    "distance_multiplicities": [],
+                }
             )
 
-    def test_valid_profile_ledger_roundtrips(self):
+    def test_valid_profile_ledger_roundtrips(self) -> None:
         from jacobian.math.geometry.exact._models import (
             LabelledRationalPoint,
             PinnedLineDistanceRequest,
@@ -817,19 +852,26 @@ class TestAggregatePairLedgerBound:
             compute_pinned_line_distance_profile,
         )
 
-        def _cr(value):
+        def _wire(value: int) -> RationalWire:
             return {"num": str(value), "den": "1"}
 
         cfg = PointConfiguration(
             points=tuple(
-                LabelledRationalPoint(label=label, coordinates=(_cr(x), _cr(y)))
+                LabelledRationalPoint.model_validate(
+                    {
+                        "label": label,
+                        "coordinates": [_wire(x), _wire(y)],
+                    }
+                )
                 for label, x, y in [("a", 0, 0), ("b", 1, 0), ("c", 0, 1), ("d", 1, 1)]
             )
         )
         result = compute_pinned_line_distance_profile(
-            PinnedLineDistanceRequest(
-                configuration=cfg,
-                anchor=({"num": "0", "den": "1"}, {"num": "0", "den": "1"}),
+            PinnedLineDistanceRequest.model_validate(
+                {
+                    "configuration": cfg.model_dump(mode="json"),
+                    "anchor": [_wire(0), _wire(0)],
+                }
             )
         )
         total_pairs = sum(len(line.pairs) for line in result.lines)
@@ -840,7 +882,7 @@ class TestAggregatePairLedgerBound:
         )
         _verify_pinned_line_distance_claim(result)
 
-    def test_profile_verifier_rejects_forged_pair_assignment(self):
+    def test_profile_verifier_rejects_forged_pair_assignment(self) -> None:
         import pytest
 
         from jacobian.math.geometry.exact._models import (
@@ -854,20 +896,27 @@ class TestAggregatePairLedgerBound:
 
         configuration = PointConfiguration(
             points=tuple(
-                LabelledRationalPoint(
-                    label=label,
-                    coordinates=(
-                        {"num": str(x), "den": "1"},
-                        {"num": str(y), "den": "1"},
-                    ),
+                LabelledRationalPoint.model_validate(
+                    {
+                        "label": label,
+                        "coordinates": [
+                            {"num": str(x), "den": "1"},
+                            {"num": str(y), "den": "1"},
+                        ],
+                    }
                 )
                 for label, x, y in [("a", 0, 0), ("b", 1, 0), ("c", 0, 1), ("d", 1, 1)]
             )
         )
         result = compute_pinned_line_distance_profile(
-            PinnedLineDistanceRequest(
-                configuration=configuration,
-                anchor=({"num": "0", "den": "1"}, {"num": "0", "den": "1"}),
+            PinnedLineDistanceRequest.model_validate(
+                {
+                    "configuration": configuration.model_dump(mode="json"),
+                    "anchor": [
+                        {"num": "0", "den": "1"},
+                        {"num": "0", "den": "1"},
+                    ],
+                }
             )
         )
         payload = result.model_dump(mode="json")
@@ -882,33 +931,33 @@ class TestAggregatePairLedgerBound:
 
 
 class TestSortedPairLedger:
-    def _collinear_profile(self):
+    def _collinear_profile(self) -> PinnedLineDistanceResult:
         from jacobian.math.geometry.exact._models import (
-            LabelledRationalPoint,
             PinnedLineDistanceRequest,
-            PointConfiguration,
         )
         from jacobian.math.geometry.exact._operations import (
             compute_pinned_line_distance_profile,
         )
 
-        cfg = PointConfiguration(
+        cfg = PinnedLineConfiguration(
             points=tuple(
-                LabelledRationalPoint(label=label, coordinates=(_cr(x), _cr(y)))
+                _pinned_wire_point(label, x, y)
                 for label, x, y in [("a", 0, 0), ("b", 1, 0), ("c", 2, 0)]
             )
         )
         return compute_pinned_line_distance_profile(
-            PinnedLineDistanceRequest(configuration=cfg, anchor=(_cr(0), _cr(1)))
+            PinnedLineDistanceRequest(
+                configuration=cfg, anchor=(_pinned(0), _pinned(1))
+            )
         )
 
-    def test_producer_emits_sorted_pair_ledgers(self):
+    def test_producer_emits_sorted_pair_ledgers(self) -> None:
         result = self._collinear_profile()
         assert len(result.lines) >= 1
         for entry in result.lines:
             assert entry.pairs == tuple(sorted(entry.pairs))
 
-    def test_unsorted_pair_ledger_rejected(self):
+    def test_unsorted_pair_ledger_rejected(self) -> None:
         import pytest
         from pydantic import ValidationError
 
@@ -925,7 +974,7 @@ class TestSortedPairLedger:
         with pytest.raises(ValidationError):
             PinnedLineDistanceResult.model_validate(payload)
 
-    def test_serialization_identity_preserved_for_authentic_results(self):
+    def test_serialization_identity_preserved_for_authentic_results(self) -> None:
         from jacobian.math.geometry.exact._models import PinnedLineDistanceResult
 
         result = self._collinear_profile()
@@ -945,31 +994,20 @@ class TestPinnedCoordinateCapIsSchemaEnforced:
     def _big_num(self, digits: int) -> str:
         return "9" * digits
 
-    def _cfg(self, pts):
-        from fractions import Fraction
-
-        return PointConfiguration(
-            points=tuple(
-                LabelledRationalPoint(
-                    label=label,
-                    coordinates=(
-                        CanonicalRational.from_fraction(Fraction(x)),
-                        CanonicalRational.from_fraction(Fraction(y)),
-                    ),
-                )
-                for label, x, y in pts
-            ),
+    def _cfg(self, pts: list[tuple[str, Scalar, Scalar]]) -> PinnedLineConfiguration:
+        return _pinned_configuration(
+            points=tuple(_pinned_wire_point(label, x, y) for label, x, y in pts),
         )
 
-    def _anchor(self, x, y):
-        from fractions import Fraction
-
+    def _anchor(
+        self, x: Scalar, y: Scalar
+    ) -> tuple[PinnedBoundedRational, PinnedBoundedRational]:
         return (
-            CanonicalRational.from_fraction(Fraction(x)),
-            CanonicalRational.from_fraction(Fraction(y)),
+            _pinned(x),
+            _pinned(y),
         )
 
-    def test_schema_publishes_enforceable_component_bounds(self):
+    def test_schema_publishes_enforceable_component_bounds(self) -> None:
 
         schema = PinnedLineDistanceRequest.model_json_schema()
         defs = schema["$defs"]
@@ -993,57 +1031,64 @@ class TestPinnedCoordinateCapIsSchemaEnforced:
         result_anchor = result_schema["properties"]["anchor"]["items"]["$ref"]
         assert result_anchor.endswith("/PinnedBoundedRational")
 
-    def test_over_cap_configuration_numerator_rejected_at_parse_time(self):
+    def test_over_cap_configuration_numerator_rejected_at_parse_time(self) -> None:
         import pytest
         from pydantic import ValidationError
 
         over = self._big_num(COORDINATE_DIGITS + 1)
         with pytest.raises(ValidationError):
-            PinnedLineDistanceRequest(
-                configuration={
-                    "points": [
-                        {"label": "a", "coordinates": [{"num": "0", "den": "1"}]},
-                        {
-                            "label": "b",
-                            "coordinates": [
-                                {"num": "1", "den": "1"},
-                                {"num": over, "den": "1"},
-                            ],
-                        },
-                        {"label": "c", "coordinates": [{"num": "0", "den": "1"}]},
-                    ]
-                },
-                anchor=({"num": "0", "den": "1"}, {"num": "0", "den": "1"}),
+            PinnedLineDistanceRequest.model_validate(
+                {
+                    "configuration": {
+                        "points": [
+                            {"label": "a", "coordinates": [{"num": "0", "den": "1"}]},
+                            {
+                                "label": "b",
+                                "coordinates": [
+                                    {"num": "1", "den": "1"},
+                                    {"num": over, "den": "1"},
+                                ],
+                            },
+                            {"label": "c", "coordinates": [{"num": "0", "den": "1"}]},
+                        ]
+                    },
+                    "anchor": [
+                        {"num": "0", "den": "1"},
+                        {"num": "0", "den": "1"},
+                    ],
+                }
             )
 
-    def test_over_cap_anchor_rejected_at_parse_time(self):
+    def test_over_cap_anchor_rejected_at_parse_time(self) -> None:
         import pytest
         from pydantic import ValidationError
 
         over = self._big_num(COORDINATE_DIGITS + 1)
         cfg = self._cfg([("a", 0, 0), ("b", 1, 0), ("c", 0, 1)])
         with pytest.raises(ValidationError):
-            PinnedLineDistanceRequest(
-                configuration=cfg,
-                anchor=(
-                    CanonicalRational(num="0", den="1"),
-                    CanonicalRational(num=over, den="1"),
-                ),
+            PinnedLineDistanceRequest.model_validate(
+                {
+                    "configuration": cfg.model_dump(mode="json"),
+                    "anchor": [
+                        {"num": "0", "den": "1"},
+                        {"num": over, "den": "1"},
+                    ],
+                }
             )
 
-    def test_boundary_cap_components_are_accepted(self):
-        edge = CanonicalRational(num=self._big_num(COORDINATE_DIGITS), den="1")
+    def test_boundary_cap_components_are_accepted(self) -> None:
+        edge = PinnedBoundedRational(num=self._big_num(COORDINATE_DIGITS), den="1")
         cfg = self._cfg(
             [("a", 0, 0), ("b", 1, 0), ("c", 0, 1)],
         )
         request = PinnedLineDistanceRequest(
-            configuration=cfg, anchor=(edge, CanonicalRational(num="0", den="1"))
+            configuration=cfg, anchor=(edge, _pinned(0))
         )
         assert request.anchor[0].as_fraction().numerator == int(
             self._big_num(COORDINATE_DIGITS)
         )
 
-    def test_shared_point_type_is_not_narrowed(self):
+    def test_shared_point_type_is_not_narrowed(self) -> None:
         """distance_profile/distance_graph keep the canonical component range;
         only the pinned-line view carries the 256-digit cap."""
         big = CanonicalRational(num=self._big_num(300), den="1")
@@ -1054,7 +1099,7 @@ class TestPinnedCoordinateCapIsSchemaEnforced:
         configuration = PointConfiguration(points=pts)
         DistanceProfileRequest(configuration=configuration)
 
-    def test_shared_configuration_value_composes_unchanged(self):
+    def test_shared_configuration_value_composes_unchanged(self) -> None:
         """An existing shared PointConfiguration instance is accepted by the
         pinned request without translation."""
         cfg = self._cfg([("a", 0, 0), ("b", 1, 0), ("c", 0, 1)])
@@ -1066,7 +1111,7 @@ class TestPinnedCoordinateCapIsSchemaEnforced:
 
 
 class TestAuthoredComponentBudget:
-    def test_forged_rational_components_rejected_before_parsing(self):
+    def test_forged_rational_components_rejected_before_parsing(self) -> None:
         """Multi-megabyte authored coefficients are rejected pre-parse."""
         import pytest
         from pydantic import ValidationError
@@ -1105,7 +1150,7 @@ class TestAuthoredComponentBudget:
 
 
 class TestAuthoredComponentCoverage:
-    def test_oversized_line_coefficient_rejected_before_parsing(self):
+    def test_oversized_line_coefficient_rejected_before_parsing(self) -> None:
         """Line coefficients count toward the pre-parse aggregate budget."""
         import pytest
         from pydantic import ValidationError
@@ -1135,7 +1180,7 @@ class TestAuthoredComponentCoverage:
         with pytest.raises(ValidationError):
             PinnedLineDistanceResult.model_validate(payload)
 
-    def test_oversized_multiplicity_rational_rejected_before_parsing(self):
+    def test_oversized_multiplicity_rational_rejected_before_parsing(self) -> None:
         """Distance-multiplicity rationals count toward the pre-parse bound."""
         import pytest
         from pydantic import ValidationError

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from pydantic import ValidationError
 
@@ -64,13 +66,15 @@ def _large_rational(digits: int) -> CanonicalRational:
     return CanonicalRational(num=numerator, den="8")
 
 
-def _oversized_simplex_payload() -> dict:
+def _oversized_simplex_payload() -> dict[str, Any]:
     """A six-dimensional simplex whose first axis carries 151 digits."""
     axes = ["x1", "x2", "x3", "x4", "x5", "x6"]
     zero = {"num": "0", "den": "1"}
     one = {"num": "1", "den": "1"}
     oversized = _large_rational(MAX_SUPPORT_COMPONENT_DIGITS + 1).model_dump()
-    vertices = [{"vertex_id": "origin", "coordinates": [zero] * 6}]
+    vertices: list[dict[str, Any]] = [
+        {"vertex_id": "origin", "coordinates": [zero] * 6}
+    ]
     vertices.extend(
         {
             "vertex_id": f"e{axis}",
@@ -87,7 +91,7 @@ def _oversized_simplex_payload() -> dict:
     }
 
 
-def _square_payload() -> dict:
+def _square_payload() -> dict[str, Any]:
     """A valid serialized square support request payload."""
     zero = {"num": "0", "den": "1"}
     one = {"num": "1", "den": "1"}
@@ -599,7 +603,7 @@ def test_support_accepts_components_at_the_envelope_boundary() -> None:
     assert tuple(vertex.vertex_id for vertex in result.exposed_face.vertices) == ("b",)
 
 
-def _over_envelope_source_result_payload() -> dict:
+def _over_envelope_source_result_payload() -> dict[str, Any]:
     """A self-consistent serialized result whose retained source the
     support request would reject: the triangle carries one 151-digit
     coordinate, the zero covector makes the support value zero and every
@@ -1353,7 +1357,7 @@ def test_seven_axis_polytope_cannot_pair_with_any_covector() -> None:
 
     polytope = RationalVPolytope(
         space=axes,
-        vertices=(
+        vertices=tuple(
             RationalPolytopeVertex(
                 vertex_id=f"v{index:02d}",
                 coordinates=tuple(
@@ -1368,7 +1372,9 @@ def test_seven_axis_polytope_cannot_pair_with_any_covector() -> None:
         polytope_operations.polytope_support(polytope, _covector(0, 1))
 
 
-def test_accepted_result_encodes_strict_json(square_result) -> None:
+def test_accepted_result_encodes_strict_json(
+    square_result: PolytopeSupportResult,
+) -> None:
     """Every accepted canonical result crosses the supported serialization
     boundary unchanged."""
     from jacobian.canonical import CanonicalLimits, encode_strict_json

@@ -212,18 +212,25 @@ def test_stationary_family_solves_each_nonsingleton_closed_class_exactly() -> No
 
 
 @pytest.mark.parametrize(
-    "matrix",
+    ("matrix", "error_code"),
     [
-        [[{"num": "1", "den": "1"}], [{"num": "0", "den": "1"}]],
-        [[{"num": "2", "den": "1"}]],
-        [[{"num": "-1", "den": "1"}]],
+        (
+            [[{"num": "1", "den": "1"}], [{"num": "0", "den": "1"}]],
+            "markov_chain.transition_matrix_not_square",
+        ),
+        (
+            [[{"num": "2", "den": "1"}]],
+            "markov_chain.transition_row_not_stochastic",
+        ),
+        (
+            [[{"num": "-1", "den": "1"}]],
+            "markov_chain.transition_probability_negative",
+        ),
     ],
 )
-def test_transition_contract_rejects_non_stochastic_matrices(matrix: object) -> None:
+def test_transition_contract_rejects_non_stochastic_matrices(
+    matrix: object, error_code: str
+) -> None:
     with pytest.raises(ValidationError) as error:
         TransitionMatrixRequest.model_validate({"matrix": matrix})
-    assert error.value.errors()[0]["type"] in {
-        "markov_chain.transition_matrix_not_square",
-        "markov_chain.transition_probability_negative",
-        "markov_chain.transition_row_not_stochastic",
-    }
+    assert error.value.errors()[0]["type"] == error_code

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
 from itertools import combinations
+from typing import Any, cast
 
 import pytest
 from pydantic import ValidationError
@@ -23,7 +25,7 @@ from jacobian.math.combinatorics.exact_cover import (
 
 
 @contextmanager
-def raises_code(code: str):
+def raises_code(code: str) -> Iterator[None]:
     with pytest.raises(ValidationError) as exc_info:
         yield
     assert exc_info.value.errors()[0]["type"] not in {"value_error", "assertion_error"}
@@ -63,7 +65,9 @@ def test_native_exact_cover_accepts_canonical_values_not_wire_requests() -> None
 
     assert find_generalized_exact_cover(instance).selected_row_ids == ("row",)
     with pytest.raises(TypeError, match="GeneralizedExactCoverInstance"):
-        find_generalized_exact_cover(GeneralizedExactCoverRequest(instance=instance))
+        find_generalized_exact_cover(
+            cast(Any, GeneralizedExactCoverRequest(instance=instance))
+        )
 
 
 def test_knuth_exact_cover_known_answer_is_deterministic() -> None:

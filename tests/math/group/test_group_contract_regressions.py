@@ -1,5 +1,6 @@
 """Contract regression tests for the finite group operations."""
 
+from collections.abc import Iterator
 from contextlib import contextmanager
 
 import pytest
@@ -23,7 +24,7 @@ S3_GENERATORS = ((1, 2, 0), (1, 0, 2))
 
 
 @contextmanager
-def _group_error(code: str):
+def _group_error(code: str) -> Iterator[None]:
     with pytest.raises(ValidationError) as info:
         yield
     assert info.value.errors()[0]["type"] == code
@@ -38,8 +39,6 @@ def test_group_orbit_contract_binds_the_point_to_the_declared_degree() -> None:
 def test_group_orbit_request_accepts_stabilizer_value_unchanged() -> None:
     """The advertised chaining shape: a stabilizer result's canonical
     subgroup value feeds the orbit request without reshaping."""
-    from jacobian.math.group._operations import compute_group_orbit
-
     stabilizer_value = PermutationGroupRequest(degree=4, generators=((0, 1, 2, 3),))
     request = GroupOrbitRequest(group=stabilizer_value, point=0)
     assert request.group == stabilizer_value
@@ -69,9 +68,8 @@ def test_group_conjugacy_classes_partition_s3() -> None:
     # classes partition the group: total elements == |S3| = 6
     assert sum(len(cls) for cls in result.classes) == 6
     # the identity (0,1,2) is its own class
-    identity_class = [cls for cls in result.classes if (0, 1, 2) in cls]
-    assert len(identity_class) == 1
-    assert len(identity_class[0]) == 1
+    identity_class = next(cls for cls in result.classes if (0, 1, 2) in cls)
+    assert identity_class == ((0, 1, 2),)
 
 
 def test_group_conjugacy_classes_abelian_group_is_singletons() -> None:
@@ -249,7 +247,9 @@ def test_group_stabilizer_request_takes_the_canonical_group_value() -> None:
     # The pre-fix parallel field shape must stay rejected so callers cannot
     # silently rebuild the canonical value as top-level degree/generators.
     with pytest.raises(ValidationError):
-        GroupStabilizerRequest(degree=3, generators=S3_GENERATORS, point=0)
+        GroupStabilizerRequest.model_validate(
+            {"degree": 3, "generators": S3_GENERATORS, "point": 0}
+        )
 
 
 def test_group_stabilizer_chains_its_own_result_unchanged() -> None:
@@ -284,9 +284,8 @@ def test_group_stabilizer_result_serializes_into_the_next_request() -> None:
     """The serialized nested subgroup drops into the next wire request."""
     group = PermutationGroupRequest(degree=4, generators=((1, 2, 3, 0),))
     result = compute_group_stabilizer(GroupStabilizerRequest(group=group, point=0))
-    chained = GroupStabilizerRequest(
-        group=result.stabilizer.model_dump(),
-        point=0,
+    chained = GroupStabilizerRequest.model_validate(
+        {"group": result.stabilizer.model_dump(), "point": 0}
     )
     assert chained.group == result.stabilizer
 

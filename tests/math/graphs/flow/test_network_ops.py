@@ -1,7 +1,8 @@
 """Tests for network optimization operations."""
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from fractions import Fraction
+from typing import Any, cast
 
 import pytest
 from pydantic import ValidationError
@@ -320,16 +321,19 @@ def test_min_cost_flow_parsing_is_structural_and_private_verifier_checks_claim()
     assert not flow_operations._verify_min_cost_flow_result(forged)
 
 
-def test_min_cost_flow_kernel_runs_once_when_result_is_serialized(monkeypatch) -> None:
+def test_min_cost_flow_kernel_runs_once_when_result_is_serialized(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     calls = 0
-    original = flow_operations.nx.network_simplex
+    nx_module = cast(Any, vars(flow_operations)["nx"])
+    original = cast(Callable[..., object], nx_module.network_simplex)
 
-    def counted(*args: object, **kwargs: object):
+    def counted(*args: object, **kwargs: object) -> object:
         nonlocal calls
         calls += 1
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(flow_operations.nx, "network_simplex", counted)
+    monkeypatch.setattr(nx_module, "network_simplex", counted)
     result = compute_min_cost_flow(
         MinCostFlowRequest(graph=_two_path_graph(), demands=(-2, 2, 0))
     )

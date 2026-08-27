@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any, cast
+
 import pytest
 
 from jacobian.math import prime_field_linear_algebra
@@ -81,7 +83,7 @@ def test_matrix_rejects_noncanonical_entries() -> None:
     with pytest.raises(ValueError, match="canonical"):
         PrimeFieldMatrix(prime=3, entries=((1, -1),), columns=2)
     with pytest.raises(ValueError):
-        PrimeFieldMatrix(prime=2, entries=((1.0,),), columns=1)
+        PrimeFieldMatrix(prime=2, entries=cast(Any, ((1.0,),)), columns=1)
 
 
 def test_matrix_accepts_canonical_residues_at_the_boundary() -> None:

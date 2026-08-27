@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import Any, NoReturn, TypedDict
 
 import pytest
 from pydantic import ValidationError
@@ -30,8 +32,21 @@ from jacobian.math.coalgebras._operations import (
 )
 
 
+class MatrixPayload(TypedDict):
+    prime: int
+    entries: list[list[int]]
+    columns: int
+
+
+class ComultiplicationResultPayload(TypedDict):
+    coalgebra: dict[str, Any]
+    element_index: int
+    matrix: MatrixPayload
+    dimension: int
+
+
 @contextmanager
-def _raises_code(code: str):
+def _raises_code(code: str) -> Iterator[None]:
     with pytest.raises(ValidationError) as exc_info:
         yield
     assert exc_info.value.errors()[0]["type"] == code
@@ -40,7 +55,7 @@ def _raises_code(code: str):
 class TestComultiplication:
     """Test comultiplication computation."""
 
-    def test_trivial_group_coalgebra(self):
+    def test_trivial_group_coalgebra(self) -> None:
         """Delta(1) = 1 ⊗ 1 for the trivial group coalgebra."""
         ca = Coalgebra(
             prime=5,
@@ -53,7 +68,7 @@ class TestComultiplication:
         )
         assert result.matrix.entries[0][0] == 1
 
-    def test_two_dim(self):
+    def test_two_dim(self) -> None:
         """Compute comultiplication for a 2D coalgebra."""
         ca = Coalgebra(
             prime=7,
@@ -74,7 +89,7 @@ class TestComultiplication:
 class TestCounit:
     """Test counit computation."""
 
-    def test_counit_unity(self):
+    def test_counit_unity(self) -> None:
         """epsilon(1) = 1 for the group-like element."""
         ca = Coalgebra(
             prime=5,
@@ -85,7 +100,7 @@ class TestCounit:
         result = compute_counit(CounitRequest(coalgebra=ca, element_index=0))
         assert result.value == 1
 
-    def test_counit_second_group_like(self):
+    def test_counit_second_group_like(self) -> None:
         """epsilon(e2) = 1 in the two-group-like coalgebra."""
         ca = Coalgebra(
             prime=5,
@@ -103,7 +118,7 @@ class TestCounit:
 class TestGroupLikeElements:
     """Test group-like element finding."""
 
-    def test_trivial_group(self):
+    def test_trivial_group(self) -> None:
         """The trivial group coalgebra has 1 group-like element."""
         ca = Coalgebra(
             prime=5,
@@ -114,7 +129,7 @@ class TestGroupLikeElements:
         result = find_group_like_elements(GroupLikeElementsRequest(coalgebra=ca))
         assert result.count == 1
 
-    def test_scaled_group_like_found(self):
+    def test_scaled_group_like_found(self) -> None:
         """Delta(c)=2c tensor c with epsilon(c)=3 admits the scaled group-like 2c."""
         ca = Coalgebra(
             prime=5,
@@ -125,7 +140,7 @@ class TestGroupLikeElements:
         result = find_group_like_elements(GroupLikeElementsRequest(coalgebra=ca))
         assert result.count == 1
 
-    def test_two_group_like(self):
+    def test_two_group_like(self) -> None:
         """A coalgebra with two group-like elements."""
         ca = Coalgebra(
             prime=5,
@@ -139,7 +154,7 @@ class TestGroupLikeElements:
         result = find_group_like_elements(GroupLikeElementsRequest(coalgebra=ca))
         assert result.count == 2
 
-    def test_scaled_group_like(self):
+    def test_scaled_group_like(self) -> None:
         """A scaled basis vector can be group-like: g = 2c over GF(5).
 
         With Delta(c) = 2 c (x) c and epsilon(c) = 3, g = 2c satisfies
@@ -156,7 +171,7 @@ class TestGroupLikeElements:
         assert result.count == 1
         assert result.elements[0].coefficients == (2,)
 
-    def test_composite_prime_rejected(self):
+    def test_composite_prime_rejected(self) -> None:
         """A composite modulus is not a field and must be rejected."""
         with _raises_code("coalgebra.prime_not_prime"):
             Coalgebra(
@@ -166,7 +181,7 @@ class TestGroupLikeElements:
                 counit=(1,),
             )
 
-    def test_scan_work_budget_rejected(self):
+    def test_scan_work_budget_rejected(self) -> None:
         """Requests whose derived scan work exceeds the budget are rejected."""
         oversized = _direct_sum_group_like_coalgebra(12)
         assert group_like_scan_work(2, 12) > GROUP_LIKE_SCAN_WORK_BUDGET
@@ -186,7 +201,7 @@ class TestGroupLikeElements:
         with _raises_code("coalgebra.scan_work_budget_exceeded"):
             GroupLikeElementsRequest(coalgebra=large_prime_squared)
 
-    def test_within_scan_work_budget_admitted(self):
+    def test_within_scan_work_budget_admitted(self) -> None:
         """An element space whose scan work fits the budget enumerates."""
         ca = Coalgebra(
             prime=251,
@@ -221,7 +236,7 @@ class TestSourceBoundResults:
             counit=(1, 1),
         )
 
-    def test_results_revalidate_round_trip(self):
+    def test_results_revalidate_round_trip(self) -> None:
         ca = self._two_dim_coalgebra()
         comult = compute_comultiplication(
             ComultiplicationRequest(coalgebra=ca, element_index=1)
@@ -238,17 +253,17 @@ class TestSourceBoundResults:
         assert _verify_counit_result(counit)
         assert _verify_group_like_elements_result(group_like)
 
-    def test_detached_empty_group_like_result_is_rejected(self):
+    def test_detached_empty_group_like_result_is_rejected(self) -> None:
         with pytest.raises(ValidationError):
-            GroupLikeElementsResult(elements=(), count=0)
+            GroupLikeElementsResult.model_validate({"elements": (), "count": 0})
 
-    def test_forged_group_like_set_fails_explicit_verification(self):
+    def test_forged_group_like_set_fails_explicit_verification(self) -> None:
         """Structural parsing does not replay the exhaustive conclusion."""
         ca = self._two_dim_coalgebra()
         claimed = GroupLikeElementsResult(coalgebra=ca, elements=(), count=0)
         assert not _verify_group_like_elements_result(claimed)
 
-    def test_detached_result_reapplies_scan_work_budget(self):
+    def test_detached_result_reapplies_scan_work_budget(self) -> None:
         """A serialized result validates its coalgebra as a plain Coalgebra,
         so the replay must reapply the derived scan-work admission itself."""
         ca = Coalgebra(
@@ -266,7 +281,9 @@ class TestSourceBoundResults:
         with _raises_code("coalgebra.scan_work_budget_exceeded"):
             GroupLikeElementsResult(coalgebra=ca, elements=(), count=0)
 
-    def test_forged_comultiplication_coefficients_fail_explicit_verification(self):
+    def test_forged_comultiplication_coefficients_fail_explicit_verification(
+        self,
+    ) -> None:
         from jacobian.math.prime_field_linear_algebra import PrimeFieldMatrix
 
         ca = self._two_dim_coalgebra()
@@ -282,12 +299,12 @@ class TestSourceBoundResults:
         )
         assert not _verify_comultiplication_result(claimed)
 
-    def test_forged_counit_value_fails_explicit_verification(self):
+    def test_forged_counit_value_fails_explicit_verification(self) -> None:
         ca = self._two_dim_coalgebra()
         claimed = CounitResult(coalgebra=ca, element_index=0, value=3)
         assert not _verify_counit_result(claimed)
 
-    def test_result_from_other_coalgebra_fails_explicit_verification(self):
+    def test_result_from_other_coalgebra_fails_explicit_verification(self) -> None:
         ca = self._two_dim_coalgebra()
         other = Coalgebra(
             prime=5,
@@ -308,7 +325,7 @@ class TestSourceBoundResults:
 
 
 class TestScanWorkBeforeReplay:
-    def test_oversized_direct_result_rejected_before_enumeration(self):
+    def test_oversized_direct_result_rejected_before_enumeration(self) -> None:
         """A serialized result with an over-budget scan fails fast."""
         import time
 
@@ -331,7 +348,7 @@ class TestScanWorkBeforeReplay:
 
 
 class TestCanonicalResidues:
-    def test_noncanonical_structure_constant_rejected(self):
+    def test_noncanonical_structure_constant_rejected(self) -> None:
         with _raises_code("coalgebra.noncanonical_structure_constants"):
             Coalgebra(
                 prime=2,
@@ -340,7 +357,7 @@ class TestCanonicalResidues:
                 counit=(1,),
             )
 
-    def test_noncanonical_counit_rejected(self):
+    def test_noncanonical_counit_rejected(self) -> None:
         with _raises_code("coalgebra.noncanonical_counit"):
             Coalgebra(
                 prime=3,
@@ -371,7 +388,7 @@ def _direct_sum_group_like_coalgebra(n: int, prime: int = 2) -> Coalgebra:
 class TestDerivedDimensionAdmission:
     """Dimension admission derives from tensor size and scan work."""
 
-    def test_nine_dim_gf2_direct_sum_admitted(self):
+    def test_nine_dim_gf2_direct_sum_admitted(self) -> None:
         """729 tensor entries and ~2*10**5 scan-work units fit both budgets."""
         ca = _direct_sum_group_like_coalgebra(9, prime=2)
         assert ca.dimension**3 == 729
@@ -393,7 +410,7 @@ class TestDerivedDimensionAdmission:
         counit = compute_counit(CounitRequest(coalgebra=ca, element_index=8))
         assert counit.value == 1
 
-    def test_boundary_dimension_sixteen_admitted(self):
+    def test_boundary_dimension_sixteen_admitted(self) -> None:
         """16^3 = 4096 entries sits exactly on the derived tensor budget."""
         ca = _direct_sum_group_like_coalgebra(16)
         assert ca.dimension**3 == MAX_TENSOR_ENTRIES
@@ -402,12 +419,12 @@ class TestDerivedDimensionAdmission:
         )
         assert result.matrix.entries[15][15] == 1
 
-    def test_above_tensor_budget_rejected(self):
+    def test_above_tensor_budget_rejected(self) -> None:
         """A 17-dim tensor would carry 4913 structure constants and is rejected."""
         with _raises_code("coalgebra.tensor_budget_exceeded"):
             _direct_sum_group_like_coalgebra(17)
 
-    def test_large_prime_nine_dim_rejected_by_scan_work_budget(self):
+    def test_large_prime_nine_dim_rejected_by_scan_work_budget(self) -> None:
         """A 9-dim GF(13) coalgebra fits the tensor budget but reconstructing
         its surviving candidates exceeds the scan-work budget."""
         ca = _direct_sum_group_like_coalgebra(9, prime=13)
@@ -420,7 +437,7 @@ class TestCounitOperationRemovalFromCatalog:
     """epsilon(c_i) is a deterministic projection of retained data, so it
     stays native-only and out of the declared public operations."""
 
-    def test_counit_operation_is_not_declared(self):
+    def test_counit_operation_is_not_declared(self) -> None:
         from jacobian.math.coalgebras._tools import COALGEBRA_OPERATIONS
 
         assert {tool.operation_id for tool in COALGEBRA_OPERATIONS} == {
@@ -428,7 +445,7 @@ class TestCounitOperationRemovalFromCatalog:
             "coalgebra.group_like_elements.compute",
         }
 
-    def test_native_counit_kernel_remains_available(self):
+    def test_native_counit_kernel_remains_available(self) -> None:
         ca = Coalgebra(
             prime=5,
             dimension=1,
@@ -443,7 +460,7 @@ class TestScanWorkBoundary:
     """Admission bounds combined kernel-plus-replay work, not just the
     candidate count."""
 
-    def test_largest_admitted_gf2_boundary_completes_quickly(self):
+    def test_largest_admitted_gf2_boundary_completes_quickly(self) -> None:
         """The admitted boundary (11-dim GF(2) direct sum) finishes fast even
         though kernel and replay each scan its whole element space."""
         import time
@@ -461,7 +478,7 @@ class TestScanWorkBoundary:
         }
         assert elapsed < 5
 
-    def test_first_rejected_boundary_names_the_budget(self):
+    def test_first_rejected_boundary_names_the_budget(self) -> None:
         """12-dim GF(2) direct sum: 4096 candidates whose reconstruction
         exceeds the documented scan-work budget are rejected up front."""
         ca = _direct_sum_group_like_coalgebra(12)
@@ -471,7 +488,9 @@ class TestScanWorkBoundary:
         with _raises_code("coalgebra.scan_work_budget_exceeded"):
             GroupLikeElementsRequest(coalgebra=ca)
 
-    def test_reported_sixteen_dim_request_typed_rejected(self, monkeypatch):
+    def test_reported_sixteen_dim_request_typed_rejected(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """The originally reported 16-dim GF(2) direct-sum request pays
         roughly 152M reconstruction units per pass (kernel plus replay),
         far above the budget, so it fails admission without enumerating.
@@ -485,7 +504,7 @@ class TestScanWorkBoundary:
         """
         import jacobian.math.coalgebras._operations as coalgebra_operations
 
-        def forbid_enumeration(coalgebra):
+        def forbid_enumeration(coalgebra: Coalgebra) -> NoReturn:
             raise AssertionError("admission must reject before enumeration")
 
         monkeypatch.setattr(
@@ -503,7 +522,7 @@ class TestNestedModulusPrevalidation:
     """The raw nested matrix modulus is checked before PrimeFieldMatrix
     construction runs its primality test."""
 
-    def _payload(self, matrix_prime: int) -> dict:
+    def _payload(self, matrix_prime: int) -> ComultiplicationResultPayload:
         ca = Coalgebra(
             prime=5,
             dimension=1,
@@ -517,7 +536,7 @@ class TestNestedModulusPrevalidation:
             "dimension": 1,
         }
 
-    def test_huge_nested_modulus_rejected_before_primality_test(self):
+    def test_huge_nested_modulus_rejected_before_primality_test(self) -> None:
         """A multi-thousand-digit nested modulus is rejected by digit
         admission, never reaching the shared type's unbounded primality
         test."""
@@ -529,7 +548,7 @@ class TestNestedModulusPrevalidation:
             ComultiplicationResult.model_validate(payload)
         assert time.monotonic() - started < 5
 
-    def test_foreign_nested_modulus_rejected_before_matrix_construction(self):
+    def test_foreign_nested_modulus_rejected_before_matrix_construction(self) -> None:
         """A 63-digit composite passes the digit budget but would fail the
         shared type's primality test; the field-mismatch message proves the
         raw-modulus check ran first."""
@@ -537,7 +556,7 @@ class TestNestedModulusPrevalidation:
         with _raises_code("coalgebra.matrix_prime_mismatch"):
             ComultiplicationResult.model_validate(self._payload(composite))
 
-    def test_matching_nested_modulus_still_round_trips(self):
+    def test_matching_nested_modulus_still_round_trips(self) -> None:
         from jacobian.math.coalgebras._operations import compute_comultiplication
 
         ca = Coalgebra(
@@ -556,7 +575,7 @@ class TestPrimeDigitAdmission:
     """Field admission derives from characteristic digit length, not a fixed
     magnitude ceiling."""
 
-    def test_one_dimensional_gf10007_coalgebra_admitted(self):
+    def test_one_dimensional_gf10007_coalgebra_admitted(self) -> None:
         """The one-entry GF(10007) coalgebra is admissible end to end."""
         ca = Coalgebra(
             prime=10007,
@@ -574,7 +593,7 @@ class TestPrimeDigitAdmission:
         assert result.count == 1
         assert result.elements[0].coefficients == (1,)
 
-    def test_multithousand_digit_prime_rejected_before_primality_test(self):
+    def test_multithousand_digit_prime_rejected_before_primality_test(self) -> None:
         import time
 
         started = time.monotonic()
@@ -587,7 +606,7 @@ class TestPrimeDigitAdmission:
             )
         assert time.monotonic() - started < 5
 
-    def test_digit_boundary(self):
+    def test_digit_boundary(self) -> None:
         """A 65-digit characteristic is rejected while a full-budget
         64-digit prime is admitted."""
         with _raises_code("coalgebra.prime_digits_exceeded"):

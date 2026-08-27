@@ -75,7 +75,7 @@ def _const(value: int) -> dict[str, Any]:
 
 
 def test_analysis_and_geometry_boxes_compose_through_the_same_interval_value() -> None:
-    interval = RationalClosedInterval(lower=_q(0), upper=_q(1))
+    interval = RationalClosedInterval.model_validate({"lower": _q(0), "upper": _q(1)})
 
     analysis_box = RationalIntervalBox(variables=("x",), intervals=(interval,))
     geometry_box = RationalAxisAlignedBox(dimension=1, intervals=(interval,))
@@ -86,12 +86,14 @@ def test_analysis_and_geometry_boxes_compose_through_the_same_interval_value() -
 
 
 def test_analysis_request_keeps_its_endpoint_digit_admission() -> None:
-    interval = RationalClosedInterval(lower=_q(0), upper={"num": "1" * 129, "den": "1"})
+    interval = RationalClosedInterval.model_validate(
+        {"lower": _q(0), "upper": {"num": "1" * 129, "den": "1"}}
+    )
     box = RationalIntervalBox(variables=("x",), intervals=(interval,))
 
     with analysis_validation_error():
-        IntervalExpressionBoxEnclosureRequest(
-            expression={"op": "var", "variable": "x"}, box=box
+        IntervalExpressionBoxEnclosureRequest.model_validate(
+            {"expression": {"op": "var", "variable": "x"}, "box": box}
         )
 
 

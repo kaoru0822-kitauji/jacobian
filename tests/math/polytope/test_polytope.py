@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from fractions import Fraction
+from typing import TypedDict, cast
 
 import pytest
 from pydantic import ValidationError
@@ -24,20 +25,36 @@ from jacobian.math.polytope._models import (
     FacetIncidenceRequest,
     FacetIncidenceResult,
     PolytopeSupportRequest,
+    PolytopeSupportResult,
     PolytopeVolumeRequest,
     PolytopeVolumeResult,
+    PrimitiveFacet,
     RationalCoordinateSpace,
     RationalCovector,
     RationalPolytopeVertex,
     RationalVPolytope,
 )
 from jacobian.math.polytope._operations import (
-    PrimitiveFacet,
     compute_facet_incidence,
     compute_polytope_support,
     compute_polytope_volume,
     verify_facet_incidence_result,
 )
+
+
+class _RationalWire(TypedDict):
+    num: str
+    den: str
+
+
+class _PolytopeVertexWire(TypedDict):
+    vertex_id: str
+    coordinates: list[_RationalWire]
+
+
+class _VPolytopeWire(TypedDict):
+    space: dict[str, list[str]]
+    vertices: list[_PolytopeVertexWire]
 
 
 def _cr0() -> CanonicalRational:
@@ -47,15 +64,19 @@ def _cr0() -> CanonicalRational:
 def _v(*coords: tuple[int, int]) -> Vertex:
     """Build a vertex from (num, den) pairs."""
     return Vertex(
-        coordinates=tuple({"num": str(num), "den": str(den)} for num, den in coords)
+        coordinates=tuple(
+            CanonicalRational(num=str(num), den=str(den)) for num, den in coords
+        )
     )
 
 
 def _h(*coeffs: tuple[int, int], offset: tuple[int, int]) -> Halfspace:
     """Build a half-space ``<a, x> <= b`` from (num, den) pairs."""
     return Halfspace(
-        coefficients=tuple({"num": str(num), "den": str(den)} for num, den in coeffs),
-        offset={"num": str(offset[0]), "den": str(offset[1])},
+        coefficients=tuple(
+            CanonicalRational(num=str(num), den=str(den)) for num, den in coeffs
+        ),
+        offset=CanonicalRational(num=str(offset[0]), den=str(offset[1])),
     )
 
 
@@ -499,7 +520,7 @@ class TestFacetIncidence:
 
 
 class TestUnitCube:
-    def test_unit_square_vertices(self):
+    def test_unit_square_vertices(self) -> None:
         """Unit square [0,1]^2 has volume 1."""
         result = _volume_via_vertices(
             (
@@ -513,7 +534,7 @@ class TestUnitCube:
         assert result.dimension == 2
         assert result.representation == "vertices"
 
-    def test_unit_cube_vertices(self):
+    def test_unit_cube_vertices(self) -> None:
         """Unit cube [0,1]^3 has volume 1."""
         result = _volume_via_vertices(
             (
@@ -530,7 +551,7 @@ class TestUnitCube:
         assert result.volume == CanonicalRational(num="1", den="1")
         assert result.dimension == 3
 
-    def test_unit_cube_halfspaces(self):
+    def test_unit_cube_halfspaces(self) -> None:
         """Unit cube [0,1]^3 from half-spaces has volume 1."""
         result = _volume_via_halfspaces(
             (
@@ -548,7 +569,7 @@ class TestUnitCube:
 
 
 class TestSimplex:
-    def test_standard_3simplex(self):
+    def test_standard_3simplex(self) -> None:
         """Standard 3-simplex has volume 1/6."""
         result = _volume_via_vertices(
             (
@@ -560,7 +581,7 @@ class TestSimplex:
         )
         assert result.volume == CanonicalRational(num="1", den="6")
 
-    def test_standard_6simplex(self):
+    def test_standard_6simplex(self) -> None:
         """Standard 6-simplex has volume 1/720."""
         origin = _v(*((0, 1),) * 6)
         basis = tuple(
@@ -570,7 +591,7 @@ class TestSimplex:
         assert result.volume == CanonicalRational(num="1", den="720")
         assert result.dimension == 6
 
-    def test_simplex_scales_with_side_length(self):
+    def test_simplex_scales_with_side_length(self) -> None:
         """A 3-simplex with doubled edges has 8x the volume."""
         small = _volume_via_vertices(
             (
@@ -593,7 +614,7 @@ class TestSimplex:
 
 
 class TestRationalVolume:
-    def test_pyramid(self):
+    def test_pyramid(self) -> None:
         """Square pyramid: base area 4, height 1, volume 4/3."""
         result = _volume_via_vertices(
             (
@@ -606,7 +627,7 @@ class TestRationalVolume:
         )
         assert result.volume == CanonicalRational(num="4", den="3")
 
-    def test_rational_triangle(self):
+    def test_rational_triangle(self) -> None:
         """Triangle with base 2 and height 3 has area 3."""
         result = _volume_via_vertices(
             (
@@ -617,7 +638,7 @@ class TestRationalVolume:
         )
         assert result.volume == CanonicalRational(num="3", den="1")
 
-    def test_fractional_pyramid(self):
+    def test_fractional_pyramid(self) -> None:
         """Pyramid with fractional base and height has rational volume."""
         result = _volume_via_vertices(
             (
@@ -632,7 +653,7 @@ class TestRationalVolume:
 
 
 class TestRejection:
-    def test_unbounded_halfspace_representation(self):
+    def test_unbounded_halfspace_representation(self) -> None:
         """An unbounded H-representation (no upper bounds) is rejected."""
         with pytest.raises(ValueError):
             _volume_via_halfspaces(
@@ -642,7 +663,7 @@ class TestRejection:
                 )
             )
 
-    def test_collinear_vertices(self):
+    def test_collinear_vertices(self) -> None:
         """Collinear vertices are lower-dimensional and have volume zero."""
         result = _volume_via_vertices(
             (
@@ -654,7 +675,7 @@ class TestRejection:
         assert result.volume == CanonicalRational(num="0", den="1")
         assert result.dimension == 2
 
-    def test_dimension_exceeds_bound(self):
+    def test_dimension_exceeds_bound(self) -> None:
         """Ambient dimension 7 exceeds the d <= 6 bound."""
         with pytest.raises(ValueError):
             PolytopeVolumeRequest(
@@ -666,7 +687,7 @@ class TestRejection:
                 )
             )
 
-    def test_work_bound_rejection(self):
+    def test_work_bound_rejection(self) -> None:
         """A large polytope that exceeds the hull work bound is rejected."""
         # 5-cube: 32 vertices, C(32, 5) = 201376 > 200000.
         vertices = tuple(
@@ -680,7 +701,7 @@ class TestRejection:
         with pytest.raises(ValueError, match="combinatorial bound"):
             _volume_via_vertices(vertices)
 
-    def test_derived_vertex_work_bound_rejected_for_halfspaces(self):
+    def test_derived_vertex_work_bound_rejected_for_halfspaces(self) -> None:
         """An H-representation whose derived vertex set exceeds the hull
         work bound is rejected at request validation.
 
@@ -699,7 +720,7 @@ class TestRejection:
         with pytest.raises(ValueError, match="combinatorial bound"):
             PolytopeVolumeRequest(halfspaces=tuple(halfspaces))
 
-    def test_result_carries_only_the_exact_volume(self):
+    def test_result_carries_only_the_exact_volume(self) -> None:
         """The result exposes no generic assurance field."""
         result = _volume_via_vertices(
             (
@@ -715,7 +736,7 @@ class TestRejection:
             "representation",
         }
 
-    def test_coordinates_whose_volume_leaves_the_canonical_bound_rejected(self):
+    def test_coordinates_whose_volume_leaves_the_canonical_bound_rejected(self) -> None:
         """The triangle (0,0),(10^20000,0),(0,10^20000) has a 40,000-digit
         area numerator; admission rejects it instead of failing result
         conversion after acceptance."""
@@ -740,7 +761,7 @@ class TestRejection:
                 )
             )
 
-    def test_large_but_representable_triangle_is_returned(self):
+    def test_large_but_representable_triangle_is_returned(self) -> None:
         """A triangle whose 20,000-digit area still fits is computed."""
         big = format_canonical_integer(10**10000)
         result = compute_polytope_volume(
@@ -764,7 +785,7 @@ class TestRejection:
         )
         assert len(result.volume.num) == 20_000
 
-    def test_request_schema_advertises_representation_size_bounds(self):
+    def test_request_schema_advertises_representation_size_bounds(self) -> None:
         """The generated schema exposes the vertex/half-space count bounds."""
         import math
 
@@ -779,7 +800,7 @@ class TestRejection:
 
 
 class TestRequestValidation:
-    def test_requires_exactly_one_representation(self):
+    def test_requires_exactly_one_representation(self) -> None:
         """Both representations provided is rejected."""
         with pytest.raises(ValueError):
             PolytopeVolumeRequest(
@@ -787,12 +808,12 @@ class TestRequestValidation:
                 halfspaces=(_h((1, 1), (0, 1), offset=(0, 1)),),
             )
 
-    def test_no_representation_rejected(self):
+    def test_no_representation_rejected(self) -> None:
         """No representation provided is rejected."""
         with pytest.raises(ValueError):
             PolytopeVolumeRequest()
 
-    def test_nonuniform_dimension_rejected(self):
+    def test_nonuniform_dimension_rejected(self) -> None:
         """Vertices of differing dimension are rejected."""
         with pytest.raises(ValueError):
             PolytopeVolumeRequest(
@@ -801,7 +822,7 @@ class TestRequestValidation:
 
 
 class TestDimensionOne:
-    def test_interval_vertices(self):
+    def test_interval_vertices(self) -> None:
         """The convex hull of 0 and 1 is the advertised d=1 case."""
         result = compute_polytope_volume(
             PolytopeVolumeRequest(
@@ -814,7 +835,7 @@ class TestDimensionOne:
         assert result.volume == CanonicalRational(num="1", den="1")
         assert result.dimension == 1
 
-    def test_interval_halfspaces(self):
+    def test_interval_halfspaces(self) -> None:
         """x <= 1 and -x <= 0 bound the unit interval."""
         result = _volume_via_halfspaces(
             (
@@ -825,7 +846,7 @@ class TestDimensionOne:
         assert result.volume == CanonicalRational(num="1", den="1")
         assert result.dimension == 1
 
-    def test_small_denominator_interval_is_measured_in_digits(self):
+    def test_small_denominator_interval_is_measured_in_digits(self) -> None:
         """Admission measures decimal component lengths, not numeric values:
         the interval [0, 1/40000] has only a five-digit volume denominator
         and must be admitted despite the raw denominator value 40000."""
@@ -840,7 +861,7 @@ class TestDimensionOne:
         assert result.volume == CanonicalRational(num="1", den="40000")
         assert result.dimension == 1
 
-    def test_negative_endpoints_are_measured_by_length(self):
+    def test_negative_endpoints_are_measured_by_length(self) -> None:
         """Signed numerators contribute their digit length, not their value."""
         result = compute_polytope_volume(
             PolytopeVolumeRequest(
@@ -852,7 +873,7 @@ class TestDimensionOne:
         )
         assert result.volume == CanonicalRational(num="8", den="1")
 
-    def test_endpoint_denominator_product_beyond_the_bound_rejected(self):
+    def test_endpoint_denominator_product_beyond_the_bound_rejected(self) -> None:
         """Endpoints 1/A and 1/(A+1) at ~16,401-digit denominators have a
         reduced volume denominator of ~32,802 digits; the product bound
         rejects them instead of leaking a canonical-conversion failure."""
@@ -868,7 +889,7 @@ class TestDimensionOne:
         with pytest.raises(ValueError, match="result bound"):
             PolytopeVolumeRequest(vertices=(endpoint(big), endpoint(big + 1)))
 
-    def test_representable_large_denominator_interval_computed(self):
+    def test_representable_large_denominator_interval_computed(self) -> None:
         """Coprime ~10,001-digit endpoint denominators multiply to a
         20,001-digit volume denominator that fits and must be returned."""
 
@@ -887,7 +908,7 @@ class TestDimensionOne:
         assert result.dimension == 1
         assert len(result.volume.den) == 20_001
 
-    def test_degenerate_singleton_at_the_coordinate_bound_is_admitted(self):
+    def test_degenerate_singleton_at_the_coordinate_bound_is_admitted(self) -> None:
         """A single vertex at ``1/10^32767`` satisfies the coordinate
         bound; fewer than two distinct coordinates is a degenerate hull of
         exact volume zero, so admission must deduplicate and return before
@@ -904,14 +925,14 @@ class TestDimensionOne:
         assert result.volume == CanonicalRational(num="0", den="1")
         assert result.dimension == 1
 
-    def test_duplicated_singleton_interval_is_admitted_with_zero_volume(self):
+    def test_duplicated_singleton_interval_is_admitted_with_zero_volume(self) -> None:
         """Two identical huge-denominator endpoints still describe one
         distinct coordinate; the kernel returns exact zero."""
         point = Vertex(coordinates=(CanonicalRational(num="1", den="1" + "0" * 32767),))
         result = compute_polytope_volume(PolytopeVolumeRequest(vertices=(point, point)))
         assert result.volume == CanonicalRational(num="0", den="1")
 
-    def test_bounded_halfspace_singleton_is_admitted_with_zero_volume(self):
+    def test_bounded_halfspace_singleton_is_admitted_with_zero_volume(self) -> None:
         """``x <= c`` with ``-x <= -c`` derives the single vertex ``c``
         whose hull volume is exact zero even at the coordinate bound."""
         den = "1" + "0" * 32767
@@ -930,7 +951,7 @@ class TestDimensionOne:
         assert result.volume == CanonicalRational(num="0", den="1")
         assert result.dimension == 1
 
-    def test_two_distinct_endpoints_beyond_the_bound_still_rejected(self):
+    def test_two_distinct_endpoints_beyond_the_bound_still_rejected(self) -> None:
         """Deduplication must not over-admit: endpoints at
         ``+/- (10^32768 - 1)`` are two distinct coordinates whose reduced
         difference has a 32,769-digit numerator, so the interval growth
@@ -945,7 +966,7 @@ class TestDimensionOne:
 
 
 class TestDenominatorGrowth:
-    def test_denominator_products_beyond_the_result_bound_rejected(self):
+    def test_denominator_products_beyond_the_result_bound_rejected(self) -> None:
         """Vertices (1/p,1/q),(1/r,1/s) with ~8,500-digit denominators
         produce a reduced area denominator near 34,000 digits; admission
         bounds common-denominator products, not just component length."""
@@ -1023,7 +1044,7 @@ class TestNativeApi:
 
 
 class TestTriangulationWideDenominatorBound:
-    def test_eight_prime_polygon_denominator_sum_rejected(self):
+    def test_eight_prime_polygon_denominator_sum_rejected(self) -> None:
         """An eight-vertex convex polygon on distinct ~5000-digit prime
         denominators passes any per-vertex estimate but its shoelace sum
         accumulates a common denominator far beyond the canonical bound;
@@ -1059,7 +1080,7 @@ class TestTriangulationWideDenominatorBound:
 
 
 class TestDuplicateVertexAdmission:
-    def test_duplicated_corners_cannot_bypass_the_result_bound(self):
+    def test_duplicated_corners_cannot_bypass_the_result_bound(self) -> None:
         """Duplicating each corner of the 40,000-digit triangle must not
         let an empty triangulation skip result-size admission; the
         deduplicated guard rejects before execution can fail conversion."""
@@ -1083,7 +1104,7 @@ class TestDuplicateVertexAdmission:
         with pytest.raises(ValueError, match="result bound"):
             PolytopeVolumeRequest(vertices=duplicated)
 
-    def test_duplicated_representable_square_is_still_computed(self):
+    def test_duplicated_representable_square_is_still_computed(self) -> None:
         """Exact deduplication keeps ordinary duplicate-laden inputs working."""
         square = (
             _v((0, 1), (0, 1)),
@@ -1098,7 +1119,7 @@ class TestDuplicateVertexAdmission:
         )
         assert result.volume == CanonicalRational(num="1", den="1")
 
-    def test_all_duplicate_points_admit_a_trivial_hull_with_zero_volume(self):
+    def test_all_duplicate_points_admit_a_trivial_hull_with_zero_volume(self) -> None:
         """The hull-work budget counts unique points: 64 copies of one
         six-dimensional point form a trivial hull whose documented volume
         is exact zero, so raw C(64, 6) counting must not reject it."""
@@ -1107,7 +1128,7 @@ class TestDuplicateVertexAdmission:
         assert result.volume == CanonicalRational(num="0", den="1")
         assert result.dimension == 6
 
-    def test_few_unique_points_among_many_copies_are_admitted(self):
+    def test_few_unique_points_among_many_copies_are_admitted(self) -> None:
         """32 copies each of two distinct six-dimensional points have a
         degenerate hull of exact zero volume."""
         pair = (
@@ -1118,7 +1139,7 @@ class TestDuplicateVertexAdmission:
         assert result.volume == CanonicalRational(num="0", den="1")
         assert result.dimension == 6
 
-    def test_distinct_points_still_exceed_the_hull_budget(self):
+    def test_distinct_points_still_exceed_the_hull_budget(self) -> None:
         """64 distinct six-dimensional points remain rejected at C(64, 6)."""
         vertices = tuple(
             _v(*((i**k % 97 + i, 1) for k in range(6))) for i in range(1, 65)
@@ -1128,7 +1149,7 @@ class TestDuplicateVertexAdmission:
 
 
 class TestNativeApiAdmission:
-    def test_native_rejects_dimension_and_vertex_excess(self):
+    def test_native_rejects_dimension_and_vertex_excess(self) -> None:
         """A 7-dimensional simplex exceeds the 6-dimension native bound."""
         from jacobian.math.polytope import convex_hull_volume
 
@@ -1137,7 +1158,7 @@ class TestNativeApiAdmission:
         with pytest.raises(ValueError, match="dimension"):
             convex_hull_volume((origin, *axes))
 
-    def test_native_rejects_unrepresentable_result_growth(self):
+    def test_native_rejects_unrepresentable_result_growth(self) -> None:
         """The native call on a 40,000-digit triangle must be rejected at
         admission instead of leaking a canonical-validation exception."""
         from jacobian.math.polytope import convex_hull_volume
@@ -1152,7 +1173,7 @@ class TestNativeApiAdmission:
                 )
             )
 
-    def test_native_still_returns_representable_volumes(self):
+    def test_native_still_returns_representable_volumes(self) -> None:
         from jacobian.math.polytope import convex_hull_volume
 
         big = Fraction(10) ** 10000
@@ -1165,7 +1186,7 @@ class TestNativeApiAdmission:
         )
         assert len(area.num) == 20_000
 
-    def test_native_rejects_hull_work_overflow_before_enumeration(self):
+    def test_native_rejects_hull_work_overflow_before_enumeration(self) -> None:
         """64 generic six-dimensional points exceed the hull-work bound at
         C(64, 6) = 74,974,368 subsets; the native wrapper rejects exactly
         like ``PolytopeVolumeRequest`` instead of enumerating unguarded."""
@@ -1175,7 +1196,7 @@ class TestNativeApiAdmission:
         with pytest.raises(ValueError, match="combinatorial bound"):
             convex_hull_volume(points)
 
-    def test_native_admits_all_duplicate_points_with_zero_volume(self):
+    def test_native_admits_all_duplicate_points_with_zero_volume(self) -> None:
         """The native wrapper applies the hull budget to unique points: 64
         copies of one six-dimensional point return exact zero."""
         from jacobian.math.polytope import convex_hull_volume
@@ -1183,7 +1204,7 @@ class TestNativeApiAdmission:
         value = convex_hull_volume(tuple((Fraction(0),) * 6 for _ in range(64)))
         assert value == CanonicalRational(num="0", den="1")
 
-    def test_native_admits_degenerate_singleton_at_the_coordinate_bound(self):
+    def test_native_admits_degenerate_singleton_at_the_coordinate_bound(self) -> None:
         """A single ``1/10^32767`` coordinate is a degenerate one-point
         hull of exact zero volume; admission must not apply the interval
         growth estimate before deduplication (review counterexample)."""
@@ -1452,7 +1473,7 @@ def _canonical_square() -> RationalVPolytope:
     )
 
 
-def _support_square_result():
+def _support_square_result() -> PolytopeSupportResult:
     covector = RationalCovector(
         space=RationalCoordinateSpace(axes=("x", "y")),
         components=(_canonical_rational(0), _canonical_rational(1)),
@@ -1601,11 +1622,14 @@ class TestCanonicalVPolytopeComposition:
                 {"vertices": cube.model_dump(mode="json"), "dimension_bound": 2}
             )
 
-    def _forged_serialized_square(self) -> dict:
+    def _forged_serialized_square(self) -> _VPolytopeWire:
         """A serialized canonical value carrying a non-extreme vertex, so
         any hull replay would fail with the extremality error before an
         outer rejection could be reported."""
-        payload = _support_square_result().polytope.model_dump(mode="json")
+        payload = cast(
+            _VPolytopeWire,
+            _support_square_result().polytope.model_dump(mode="json"),
+        )
         payload["vertices"].insert(
             2,
             {
@@ -1839,7 +1863,7 @@ class TestCanonicalVPolytopeFacetComposition:
         )
         assert len(result.facets) == 4
 
-    def _serialized_support_simplex(self, digits: int) -> dict[str, object]:
+    def _serialized_support_simplex(self, digits: int) -> _VPolytopeWire:
         """A six-dimensional simplex as a serialized support-source value.
 
         Every vertex is an exact extreme vertex of the full-dimensional
@@ -1847,10 +1871,10 @@ class TestCanonicalVPolytopeFacetComposition:
         extremality proof at any coordinate height; the first axis carries
         the requested digit count.
         """
-        zero = {"num": "0", "den": "1"}
-        one = {"num": "1", "den": "1"}
-        big = {"num": "9" * digits, "den": "1"}
-        rows = [("v00", [zero] * 6)]
+        zero: _RationalWire = {"num": "0", "den": "1"}
+        one: _RationalWire = {"num": "1", "den": "1"}
+        big: _RationalWire = {"num": "9" * digits, "den": "1"}
+        rows: list[tuple[str, list[_RationalWire]]] = [("v00", [zero] * 6)]
         for axis in range(6):
             coordinates = [zero] * 6
             coordinates[axis] = big if axis == 0 else one
@@ -1964,8 +1988,11 @@ class TestCanonicalVPolytopeFacetComposition:
 
         assert "RationalVPolytope" in operation.description
 
-    def _forged_serialized_square(self) -> dict:
-        payload = _support_square_result().polytope.model_dump(mode="json")
+    def _forged_serialized_square(self) -> _VPolytopeWire:
+        payload = cast(
+            _VPolytopeWire,
+            _support_square_result().polytope.model_dump(mode="json"),
+        )
         payload["vertices"].insert(
             2,
             {

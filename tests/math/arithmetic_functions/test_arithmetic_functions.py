@@ -7,6 +7,7 @@ from fractions import Fraction
 import pytest
 from pydantic import ValidationError
 
+from jacobian._exact import CanonicalRational
 from jacobian.math.arithmetic_functions._models import (
     DirichletConvolutionRequest,
     DirichletInverseRequest,
@@ -33,7 +34,7 @@ def _vals(*vals: tuple[int, int]) -> list[dict[str, str]]:
     return [{"num": str(n), "den": str(d)} for n, d in vals]
 
 
-def _frac(v) -> Fraction:
+def _frac(v: CanonicalRational) -> Fraction:
     return v.as_fraction()
 
 

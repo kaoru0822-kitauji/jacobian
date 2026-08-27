@@ -7,7 +7,7 @@ import tarfile
 from copy import deepcopy
 from io import BytesIO
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from benchmarks.tooling.providers.nauty import run_spike
@@ -25,7 +25,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 def _base_pin() -> dict[str, Any]:
     path = PROJECT_ROOT / "tests/fixtures/providers/nauty/nauty_provider_pin.json"
-    return json.loads(path.read_text(encoding="utf-8"))
+    return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
 
 
 GENG_HELP = (

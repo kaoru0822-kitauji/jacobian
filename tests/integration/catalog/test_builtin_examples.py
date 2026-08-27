@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from jacobian.catalog.catalog import Catalog
@@ -11,7 +13,7 @@ from jacobian.dispatch import OperationRequestValidationError, invoke_operation
 _CATALOG = Catalog.open()
 
 
-def _builtin_operations() -> tuple[MathTool, ...]:
+def _builtin_operations() -> tuple[MathTool[Any, Any], ...]:
     return tuple(
         operation
         for descriptor in _CATALOG.snapshot().operations
@@ -25,7 +27,7 @@ def _builtin_operations() -> tuple[MathTool, ...]:
     ids=lambda operation: operation.operation_id,
 )
 def test_advertised_invocation_example_executes_successfully(
-    operation: MathTool,
+    operation: MathTool[Any, Any],
 ) -> None:
     operation_id = operation.operation_id
     examples = operation.examples

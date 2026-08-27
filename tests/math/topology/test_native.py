@@ -3,6 +3,8 @@ the canonical chain-complex consumers unchanged."""
 
 from __future__ import annotations
 
+from typing import Any, Literal, overload
+
 import pytest
 from pydantic import ValidationError
 
@@ -16,22 +18,46 @@ from jacobian.math.chain_complexes.operations import (
     compute_tensor_product,
 )
 from jacobian.math.chain_complexes.values import CoefficientField
-from jacobian.math.topology._homology import SimplicialHomologyRequest
+from jacobian.math.topology._homology import (
+    SimplicialHomologyRequest,
+    SimplicialHomologyResult,
+)
 from jacobian.math.topology._models import (
     ChainCoefficientRing,
     ChainComplexRequest,
+    ChainComplexResult,
+    FiniteSimplicialComplex,
     HomologyConvention,
+    SimplicialComplexCanonicalizationResult,
     SimplicialComplexRequest,
 )
 from jacobian.math.topology._tools import TOOLS
 from jacobian.math.topology.native import simplicial_chain_complex_value
 
 
-def _operation(operation_id: str) -> MathTool:
+@overload
+def _operation(
+    operation_id: Literal["topology.simplicial_complex.canonicalize"],
+) -> MathTool[SimplicialComplexRequest, SimplicialComplexCanonicalizationResult]: ...
+
+
+@overload
+def _operation(
+    operation_id: Literal["topology.simplicial_complex.chain_complex.compute"],
+) -> MathTool[ChainComplexRequest, ChainComplexResult]: ...
+
+
+@overload
+def _operation(
+    operation_id: Literal["topology.simplicial_homology.compute"],
+) -> MathTool[SimplicialHomologyRequest, SimplicialHomologyResult]: ...
+
+
+def _operation(operation_id: str) -> MathTool[Any, Any]:
     return next(tool for tool in TOOLS if tool.operation_id == operation_id)
 
 
-def _circle() -> object:
+def _circle() -> FiniteSimplicialComplex:
     request = SimplicialComplexRequest(
         vertices=("a", "b", "c"),
         facets=(("a", "b"), ("b", "c"), ("a", "c")),
@@ -39,7 +65,9 @@ def _circle() -> object:
     return _operation("topology.simplicial_complex.canonicalize").run(request).complex
 
 
-def _prime_field_chain(complex_: object, prime: int):
+def _prime_field_chain(
+    complex_: FiniteSimplicialComplex, prime: int
+) -> ChainComplexResult:
     return _operation("topology.simplicial_complex.chain_complex.compute").run(
         ChainComplexRequest(
             complex=complex_,

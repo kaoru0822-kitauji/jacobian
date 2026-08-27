@@ -223,7 +223,8 @@ class TestWordDistance:
 
     def test_identical_maximal_words_admit_result_sensitive_bound(self) -> None:
         word = [0] * MAX_EXPLICIT_CODE_LENGTH
-        result = compute_word_distance(WordDistanceRequest(word1=word, word2=word))
+        request = WordDistanceRequest.model_validate({"word1": word, "word2": word})
+        result = compute_word_distance(request)
         assert result.distance == 0
         assert result.differing_coordinates == ()
         assert result.weight1 == result.weight2 == 0
@@ -234,15 +235,16 @@ class TestWordDistance:
 
     def test_word_distance_output_bound_covers_the_canonical_result(self) -> None:
         word = [0] * MAX_EXPLICIT_CODE_LENGTH
-        result = compute_word_distance(WordDistanceRequest(word1=word, word2=word))
-        bound = require_word_distance_output_bound(word, word)
+        request = WordDistanceRequest.model_validate({"word1": word, "word2": word})
+        result = compute_word_distance(request)
+        bound = require_word_distance_output_bound(request.word1, request.word2)
         assert len(encode_strict_json(result.model_dump(mode="json"))) <= bound
         assert bound <= MAX_CODE_RESULT_BYTES
 
     def test_all_different_maximal_words_still_exceed_the_result_bound(self) -> None:
         left = [0] * MAX_EXPLICIT_CODE_LENGTH
         right = [1] * MAX_EXPLICIT_CODE_LENGTH
-        request = WordDistanceRequest(word1=left, word2=right)
+        request = WordDistanceRequest.model_validate({"word1": left, "word2": right})
         with pytest.raises(ValueError, match="result can use"):
             compute_word_distance(request)
         payload = {
@@ -264,7 +266,7 @@ class TestWordDistance:
         low = [0] * MAX_EXPLICIT_CODE_LENGTH
         for index in range(200_000):
             low[index] = 1
-        admitted = WordDistanceRequest(word1=left, word2=low)
+        admitted = WordDistanceRequest.model_validate({"word1": left, "word2": low})
         assert (
             sum(a != b for a, b in zip(admitted.word1, admitted.word2, strict=True))
             == 200_000
@@ -274,7 +276,7 @@ class TestWordDistance:
             MAX_EXPLICIT_CODE_LENGTH - 300_000, MAX_EXPLICIT_CODE_LENGTH
         ):
             high[index] = 1
-        request = WordDistanceRequest(word1=left, word2=high)
+        request = WordDistanceRequest.model_validate({"word1": left, "word2": high})
         with pytest.raises(ValueError, match="result can use"):
             compute_word_distance(request)
 

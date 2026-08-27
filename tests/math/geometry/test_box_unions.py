@@ -35,7 +35,9 @@ def test_native_namespace_exposes_box_values_not_wire_requests() -> None:
     assert boxes.compute_box_union_volume is compute_box_union_volume
 
 
-def _box(*bounds: tuple[str | int, str | int]) -> RationalAxisAlignedBox:
+def _box(
+    *bounds: tuple[str | int | Fraction, str | int | Fraction],
+) -> RationalAxisAlignedBox:
     return RationalAxisAlignedBox(
         dimension=len(bounds),
         intervals=tuple(
@@ -270,12 +272,12 @@ def test_math_tool_consumes_parsed_request_without_reconstruction(
     request = _three_box_source()
 
     constructions = 0
-    request_type = operations.BoxUnionVolumeRequest
 
     def counting_request(*args: object, **kwargs: object) -> BoxUnionVolumeRequest:
         nonlocal constructions
         constructions += 1
-        return request_type(*args, **kwargs)
+        assert not args
+        return BoxUnionVolumeRequest.model_validate(kwargs)
 
     monkeypatch.setattr(operations, "BoxUnionVolumeRequest", counting_request)
     tool_result = tool.run(request)

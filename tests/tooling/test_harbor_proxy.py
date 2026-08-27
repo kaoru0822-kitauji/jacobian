@@ -1,17 +1,35 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import pytest
 from benchmarks.tooling.harbor_proxy import render_config
 
 
-def test_render_config_chains_transparent_egress_through_http_proxy() -> None:
-    config = render_config("http://docker-host:7890")
+def _mapping(value: object) -> Mapping[str, object]:
+    assert isinstance(value, Mapping)
+    return value
 
-    transparent_service = config["services"][0]
-    explicit_service = config["services"][1]
-    hop = config["chains"][0]["hops"][0]
-    node = hop["nodes"][0]
-    assert transparent_service["handler"]["chain"] == "upstream-proxy"
+
+def _sequence(value: object) -> list[object]:
+    assert isinstance(value, list)
+    return value
+
+
+def test_render_config_chains_transparent_egress_through_http_proxy() -> None:
+    config = _mapping(render_config("http://docker-host:7890"))
+
+    services = _sequence(config["services"])
+    transparent_service = _mapping(services[0])
+    explicit_service = _mapping(services[1])
+    chains = _sequence(config["chains"])
+    chain = _mapping(chains[0])
+    hops = _sequence(chain["hops"])
+    hop = _mapping(hops[0])
+    nodes = _sequence(hop["nodes"])
+    node = _mapping(nodes[0])
+    transparent_handler = _mapping(transparent_service["handler"])
+    assert transparent_handler["chain"] == "upstream-proxy"
     assert transparent_service["bypass"] == "allowlist"
     assert transparent_service["sockopts"] == {"mark": 114514}
     assert explicit_service == {
@@ -25,7 +43,9 @@ def test_render_config_chains_transparent_egress_through_http_proxy() -> None:
     assert hop["sockopts"] == {"mark": 114514}
     assert node["addr"] == "docker-host:7890"
     assert node["connector"] == {"type": "http"}
-    assert config["bypasses"][1]["matchers"] == [
+    bypasses = _sequence(config["bypasses"])
+    direct_private = _mapping(bypasses[1])
+    assert direct_private["matchers"] == [
         "127.0.0.0/8",
         "10.0.0.0/8",
         "172.16.0.0/12",

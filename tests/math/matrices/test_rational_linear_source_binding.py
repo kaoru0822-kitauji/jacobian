@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import json
 from fractions import Fraction
+from typing import Any, cast
 
 import pytest
 from pydantic import ValidationError
@@ -25,6 +26,10 @@ from jacobian.math.matrices.rational_linear._operations import (
 pytestmark = pytest.mark.requires_backend("flint")
 
 
+def _q(value: Fraction) -> dict[str, str]:
+    return q(value.numerator, value.denominator)
+
+
 def _system(
     variables: list[str],
     entries: list[list[Fraction]],
@@ -32,8 +37,8 @@ def _system(
 ) -> dict[str, object]:
     return {
         "variables": variables,
-        "coefficients": {"entries": [[q(value) for value in row] for row in entries]},
-        "rhs": [q(value) for value in rhs],
+        "coefficients": {"entries": [[_q(value) for value in row] for row in entries]},
+        "rhs": [_q(value) for value in rhs],
     }
 
 
@@ -61,10 +66,10 @@ def _underdetermined_system() -> dict[str, object]:
     )
 
 
-def _mutable(dumped: dict) -> dict:
+def _mutable(dumped: dict[str, Any]) -> dict[str, Any]:
     """JSON round-trip so nested tuple payloads become mutable lists."""
 
-    return json.loads(json.dumps(dumped))
+    return cast(dict[str, Any], json.loads(json.dumps(dumped)))
 
 
 def test_producer_results_retain_their_source_system() -> None:
@@ -177,7 +182,7 @@ def test_solution_result_rejects_forged_and_foreign_claims() -> None:
     assert dumped["status"] == "SOLUTION"
 
     forged_value = copy.deepcopy(dumped)
-    forged_value["values"][0] = q(Fraction(7))
+    forged_value["values"][0] = _q(Fraction(7))
     with pytest.raises(ValidationError):
         LinearRationalSolutionResult.model_validate(forged_value)
 
@@ -187,7 +192,7 @@ def test_solution_result_rejects_forged_and_foreign_claims() -> None:
         LinearRationalSolutionResult.model_validate(dropped_value)
 
     foreign_source = copy.deepcopy(dumped)
-    foreign_source["system"]["rhs"][0] = q(Fraction(6))
+    foreign_source["system"]["rhs"][0] = _q(Fraction(6))
     with pytest.raises(ValidationError):
         LinearRationalSolutionResult.model_validate(foreign_source)
 
@@ -203,28 +208,33 @@ def test_inconsistent_result_rejects_forged_and_foreign_claims() -> None:
         ).model_dump()
     )
     assert dumped["status"] == "INCONSISTENT"
-    witness = tuple(
+    witness: tuple[Fraction, ...] = tuple(
         Fraction(int(value["num"]), int(value["den"]))
         for value in dumped["left_witness"]
     )
-    true_pairing = sum(
-        bound * coordinate
-        for bound, coordinate in zip((Fraction(0), Fraction(1)), witness, strict=True)
+    true_pairing: Fraction = sum(
+        (
+            bound * coordinate
+            for bound, coordinate in zip(
+                (Fraction(0), Fraction(1)), witness, strict=True
+            )
+        ),
+        Fraction(0),
     )
 
     forged_witness = copy.deepcopy(dumped)
-    forged_witness["left_witness"][0] = q(witness[0] + 1)
+    forged_witness["left_witness"][0] = _q(witness[0] + 1)
     with pytest.raises(ValidationError):
         LinearRationalInconsistencyResult.model_validate(forged_witness)
 
     forged_pairing = copy.deepcopy(dumped)
-    forged_pairing["rhs_pairing"] = q(true_pairing + 1)
+    forged_pairing["rhs_pairing"] = _q(true_pairing + 1)
     with pytest.raises(ValidationError):
         LinearRationalInconsistencyResult.model_validate(forged_pairing)
 
     flat_witness = copy.deepcopy(dumped)
-    flat_witness["left_witness"] = [q(Fraction(0)) for _ in dumped["left_witness"]]
-    flat_witness["rhs_pairing"] = q(Fraction(0))
+    flat_witness["left_witness"] = [_q(Fraction(0)) for _ in dumped["left_witness"]]
+    flat_witness["rhs_pairing"] = _q(Fraction(0))
     with pytest.raises(ValidationError):
         LinearRationalInconsistencyResult.model_validate(flat_witness)
 
@@ -235,8 +245,8 @@ def test_inconsistent_result_rejects_forged_and_foreign_claims() -> None:
 
     foreign_source = copy.deepcopy(dumped)
     foreign_source["system"]["coefficients"]["entries"][1] = [
-        q(Fraction(1)),
-        q(Fraction(2)),
+        _q(Fraction(1)),
+        _q(Fraction(2)),
     ]
     with pytest.raises(ValidationError):
         LinearRationalInconsistencyResult.model_validate(foreign_source)
@@ -257,15 +267,15 @@ def test_consistent_outcome_rejects_bare_or_mutated_claims() -> None:
     assert consistent["rhs_pairing"] is None
 
     bare_witness = copy.deepcopy(consistent)
-    bare_witness["left_witness"] = [q(Fraction(1)), q(Fraction(-1))]
-    bare_witness["rhs_pairing"] = q(Fraction(1))
+    bare_witness["left_witness"] = [_q(Fraction(1)), _q(Fraction(-1))]
+    bare_witness["rhs_pairing"] = _q(Fraction(1))
     with pytest.raises(ValidationError):
         LinearRationalInconsistencyResult.model_validate(bare_witness)
 
     flipped_status = copy.deepcopy(consistent)
     flipped_status["status"] = "INCONSISTENT"
-    flipped_status["left_witness"] = [q(Fraction(1)), q(Fraction(1))]
-    flipped_status["rhs_pairing"] = q(Fraction(1))
+    flipped_status["left_witness"] = [_q(Fraction(1)), _q(Fraction(1))]
+    flipped_status["rhs_pairing"] = _q(Fraction(1))
     with pytest.raises(ValidationError):
         LinearRationalInconsistencyResult.model_validate(flipped_status)
 

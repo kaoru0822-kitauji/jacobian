@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from typing import Any, TypedDict
+
 import pytest
 from pydantic import ValidationError
 
@@ -21,7 +24,19 @@ from jacobian.math.sum_of_squares._operations import (
 )
 
 
-def _poly(variables, *terms):
+class RationalWire(TypedDict):
+    """JSON representation accepted for one canonical rational."""
+
+    num: str
+    den: str
+
+
+type GramEntries = tuple[tuple[RationalWire, ...], ...]
+
+
+def _poly(
+    variables: Sequence[str], *terms: tuple[int, int, tuple[int, ...]]
+) -> RationalPolynomial:
     return RationalPolynomial.model_validate(
         {
             "domain": "QQ",
@@ -42,7 +57,7 @@ def _poly(variables, *terms):
 class TestSOSDecompositionCheck:
     """Test sum-of-squares decomposition checking."""
 
-    def test_valid_decomposition(self):
+    def test_valid_decomposition(self) -> None:
         """x^2 + 1 = x^2 + 1^2 is a valid SOS decomposition."""
         p = _poly(("x",), (1, 1, (2,)), (1, 1, (0,)))
         q1 = _poly(("x",), (1, 1, (1,)))
@@ -52,7 +67,7 @@ class TestSOSDecompositionCheck:
         )
         assert result.is_valid
 
-    def test_invalid_decomposition(self):
+    def test_invalid_decomposition(self) -> None:
         """x^2 + 1 ≠ x^2 alone."""
         p = _poly(("x",), (1, 1, (2,)), (1, 1, (0,)))
         q1 = _poly(("x",), (1, 1, (1,)))
@@ -61,7 +76,7 @@ class TestSOSDecompositionCheck:
         )
         assert not result.is_valid
 
-    def test_two_variable_decomposition(self):
+    def test_two_variable_decomposition(self) -> None:
         """x^2 + y^2 = x^2 + y^2 is valid."""
         p = _poly(("x", "y"), (1, 1, (2, 0)), (1, 1, (0, 2)))
         q1 = _poly(("x", "y"), (1, 1, (1, 0)))
@@ -71,7 +86,7 @@ class TestSOSDecompositionCheck:
         )
         assert result.is_valid
 
-    def test_cross_term_decomposition(self):
+    def test_cross_term_decomposition(self) -> None:
         """(x+y)^2 + (x-y)^2 = 2x^2 + 2y^2 is valid."""
         p = _poly(("x", "y"), (2, 1, (2, 0)), (2, 1, (0, 2)))
         q1 = _poly(("x", "y"), (1, 1, (1, 0)), (1, 1, (0, 1)))
@@ -81,14 +96,14 @@ class TestSOSDecompositionCheck:
         )
         assert result.is_valid
 
-    def test_ring_mismatch_rejected(self):
+    def test_ring_mismatch_rejected(self) -> None:
         """Summands must use the same ring as the polynomial."""
         p = _poly(("x",), (1, 1, (2,)), (1, 1, (0,)))
         q1 = _poly(("y",), (1, 1, (1,)))
         with pytest.raises(ValueError, match="same ring"):
             SOSDecompositionCheckRequest(polynomial=p, summands=(q1,))
 
-    def test_single_summand(self):
+    def test_single_summand(self) -> None:
         """x^2 = (x)^2 is valid."""
         p = _poly(("x",), (1, 1, (2,)))
         q1 = _poly(("x",), (1, 1, (1,)))
@@ -97,7 +112,7 @@ class TestSOSDecompositionCheck:
         )
         assert result.is_valid
 
-    def test_empty_decomposition_is_the_canonical_zero_sum(self):
+    def test_empty_decomposition_is_the_canonical_zero_sum(self) -> None:
         """The zero polynomial has the empty sum-of-squares decomposition."""
         zero = _poly(("x",))
         result = check_sos_decomposition(
@@ -107,7 +122,7 @@ class TestSOSDecompositionCheck:
         assert result.summands == ()
         assert result.computed_sum == zero
 
-    def test_empty_decomposition_does_not_certify_a_nonzero_polynomial(self):
+    def test_empty_decomposition_does_not_certify_a_nonzero_polynomial(self) -> None:
         """The same degenerate witness is rejected by the exact identity check."""
         nonzero = _poly(("x",), (1, 1, (0,)))
         result = check_sos_decomposition(
@@ -117,7 +132,7 @@ class TestSOSDecompositionCheck:
         assert result.computed_sum.polynomial.terms == ()
 
 
-def _expand_poly(expr, variables) -> RationalPolynomial:
+def _expand_poly(expr: Any, variables: tuple[str, ...]) -> RationalPolynomial:
     """Exact sympy expansion into the domain's canonical polynomial."""
     import sympy
 
@@ -143,7 +158,7 @@ def _sos_poly(*polys: RationalPolynomial) -> RationalPolynomial:
 class TestSOSTermBudgets:
     """Target polynomials take the wider budget; squared summands stay narrow."""
 
-    def test_wide_target_polynomial_is_admitted(self):
+    def test_wide_target_polynomial_is_admitted(self) -> None:
         """q1 = x1^3+...+x4^3 + x1+...+x8 + 1 squares to 91 distinct terms;
         q2 = x1^4+...+x8^4 squares to 36 more. The 127-term target sits
         above the 64-term summand budget but inside the 256-term target
@@ -163,7 +178,7 @@ class TestSOSTermBudgets:
         )
         assert expanded.is_valid
 
-    def test_wide_summand_still_rejected_by_narrow_budget(self):
+    def test_wide_summand_still_rejected_by_narrow_budget(self) -> None:
         """A single 65-term summand fails the 64-term summand budget even
         though its predicted square stays inside the product cap."""
         wide = _poly(("x",), *[(1, 1, (k,)) for k in range(64, -1, -1)])
@@ -172,7 +187,7 @@ class TestSOSTermBudgets:
             SOSDecompositionCheckRequest(polynomial=p, summands=(wide,))
         assert exc_info.value.errors()[0]["type"] == "sum_of_squares.term_bound"
 
-    def test_target_above_256_terms_rejected(self):
+    def test_target_above_256_terms_rejected(self) -> None:
         """The target budget is 256: a 257-term polynomial is rejected."""
         triples = [
             (a, b, c)
@@ -190,23 +205,25 @@ class TestSOSTermBudgets:
 class TestGramCertificateAdmission:
     """Gram certificates bound every matrix coefficient before PSD work."""
 
-    def _request(self, gram_entries):
+    def _request(self, gram_entries: GramEntries) -> GramCertificateRequest:
         p = _poly(("x",), (1, 1, (2,)), (1, 1, (0,)))
         basis = (_poly(("x",), (1, 1, (1,))), _poly(("x",), (1, 1, (0,))))
-        return GramCertificateRequest(
-            polynomial=p,
-            monomial_basis=basis,
-            gram_matrix={
-                "domain": "QQ",
-                "entries": gram_entries,
-            },
+        return GramCertificateRequest.model_validate(
+            {
+                "polynomial": p.model_dump(mode="json"),
+                "monomial_basis": [item.model_dump(mode="json") for item in basis],
+                "gram_matrix": {
+                    "domain": "QQ",
+                    "entries": gram_entries,
+                },
+            }
         )
 
     @staticmethod
-    def _entry(num: str, den: str = "1") -> dict:
+    def _entry(num: str, den: str = "1") -> RationalWire:
         return {"num": num, "den": den}
 
-    def test_valid_certificate(self):
+    def test_valid_certificate(self) -> None:
         result = check_gram_certificate(
             self._request(
                 (
@@ -220,7 +237,7 @@ class TestGramCertificateAdmission:
         assert result.reconstructs_polynomial
         assert result.is_psd
 
-    def test_produced_rational_matrix_is_accepted_unchanged(self):
+    def test_produced_rational_matrix_is_accepted_unchanged(self) -> None:
         """A serialized producer {domain, entries}
         value validates directly and its returned form enters a matrices
         rank consumer unchanged."""
@@ -252,11 +269,11 @@ class TestGramCertificateAdmission:
             {"matrix": request.gram_matrix.model_dump(mode="json")}
         )
 
-    def test_non_square_side_vs_basis_rejected(self):
+    def test_non_square_side_vs_basis_rejected(self) -> None:
         with pytest.raises(ValueError, match="square"):
             self._request(((self._entry("1"),),))
 
-    def test_oversized_matrix_coefficient_rejected_before_eigenvalues(self):
+    def test_oversized_matrix_coefficient_rejected_before_eigenvalues(self) -> None:
         huge = "9" * 129
         with pytest.raises(ValidationError) as exc_info:
             self._request(
@@ -267,7 +284,7 @@ class TestGramCertificateAdmission:
             )
         assert exc_info.value.errors()[0]["type"] == "sum_of_squares.coefficient_bound"
 
-    def test_boundary_coefficient_admitted(self):
+    def test_boundary_coefficient_admitted(self) -> None:
         edge = "9" * 128
         request = self._request(
             (
@@ -281,25 +298,33 @@ class TestGramCertificateAdmission:
 class TestGramCertificateResultAdmission:
     """Deserialized Gram results retain bounded source structure."""
 
-    def _valid_result(self):
+    def _valid_result(self) -> dict[str, Any]:
         p = _poly(("x",), (1, 1, (2,)), (1, 1, (0,)))
         basis = (_poly(("x",), (1, 1, (1,))), _poly(("x",), (1, 1, (0,))))
         request = check_gram_certificate(
-            GramCertificateRequest(
-                polynomial=p,
-                monomial_basis=basis,
-                gram_matrix={
-                    "domain": "QQ",
-                    "entries": (
-                        ({"num": "1", "den": "1"}, {"num": "0", "den": "1"}),
-                        ({"num": "0", "den": "1"}, {"num": "1", "den": "1"}),
-                    ),
-                },
+            GramCertificateRequest.model_validate(
+                {
+                    "polynomial": p.model_dump(mode="json"),
+                    "monomial_basis": [item.model_dump(mode="json") for item in basis],
+                    "gram_matrix": {
+                        "domain": "QQ",
+                        "entries": (
+                            (
+                                {"num": "1", "den": "1"},
+                                {"num": "0", "den": "1"},
+                            ),
+                            (
+                                {"num": "0", "den": "1"},
+                                {"num": "1", "den": "1"},
+                            ),
+                        ),
+                    },
+                }
             )
         )
         return request.model_dump(mode="json")
 
-    def test_oversized_result_matrix_is_rejected_before_verification(self):
+    def test_oversized_result_matrix_is_rejected_before_verification(self) -> None:
         payload = self._valid_result()
         huge = "9" * 129
         payload["gram_matrix"]["entries"][0][0] = {"num": huge, "den": "1"}
@@ -307,7 +332,7 @@ class TestGramCertificateResultAdmission:
             GramCertificateResult.model_validate(payload)
         assert exc_info.value.errors()[0]["type"] == "sum_of_squares.coefficient_bound"
 
-    def test_oversized_result_dimension_is_rejected_at_field_validation(self):
+    def test_oversized_result_dimension_is_rejected_at_field_validation(self) -> None:
         """A 40x40 result matrix fails the parse-time dimension bound before
         any explicit verification traverses its entries."""
         payload = self._valid_result()
@@ -326,7 +351,7 @@ class TestGramCertificateResultAdmission:
             GramCertificateResult.model_validate(payload)
         assert exc_info.value.errors()[0]["type"] == "too_long"
 
-    def test_oversized_result_basis_is_rejected_at_field_validation(self):
+    def test_oversized_result_basis_is_rejected_at_field_validation(self) -> None:
         """A basis longer than the Gram dimension bound is rejected at the
         field level, before admission scans any coefficient."""
         payload = self._valid_result()
@@ -337,7 +362,7 @@ class TestGramCertificateResultAdmission:
             GramCertificateResult.model_validate(payload)
         assert exc_info.value.errors()[0]["type"] == "too_long"
 
-    def test_non_monomial_basis_entry_is_rejected(self):
+    def test_non_monomial_basis_entry_is_rejected(self) -> None:
         payload = self._valid_result()
         shifted = RationalPolynomial.model_validate(
             {
@@ -361,41 +386,55 @@ class TestGramCertificateResultAdmission:
 
 
 class TestGramMonomialBasisAdmission:
-    def test_request_with_polynomial_basis_entry_is_rejected(self):
+    def test_request_with_polynomial_basis_entry_is_rejected(self) -> None:
         p = _poly(("x",), (1, 1, (2,)), (2, 1, (1,)), (1, 1, (0,)))
         with pytest.raises(ValidationError) as exc_info:
             check_gram_certificate(
-                GramCertificateRequest(
-                    polynomial=p,
-                    monomial_basis=(_poly(("x",), (1, 1, (1,)), (1, 1, (0,))),),
-                    gram_matrix={"entries": (({"num": "1", "den": "1"},),)},
+                GramCertificateRequest.model_validate(
+                    {
+                        "polynomial": p.model_dump(mode="json"),
+                        "monomial_basis": [
+                            _poly(("x",), (1, 1, (1,)), (1, 1, (0,))).model_dump(
+                                mode="json"
+                            )
+                        ],
+                        "gram_matrix": {"entries": (({"num": "1", "den": "1"},),)},
+                    }
                 )
             )
         assert exc_info.value.errors()[0]["type"] == "sum_of_squares.basis_monomial"
 
-    def test_duplicate_monomials_are_rejected(self):
+    def test_duplicate_monomials_are_rejected(self) -> None:
         p = _poly(("x",), (2, 1, (2,)), (1, 1, (0,)))
         with pytest.raises(ValidationError) as exc_info:
             check_gram_certificate(
-                GramCertificateRequest(
-                    polynomial=p,
-                    monomial_basis=(
-                        _poly(("x",), (1, 1, (1,))),
-                        _poly(("x",), (1, 1, (1,))),
-                    ),
-                    gram_matrix={
-                        "entries": (
-                            ({"num": "2", "den": "1"}, {"num": "0", "den": "1"}),
-                            ({"num": "0", "den": "1"}, {"num": "1", "den": "1"}),
-                        )
-                    },
+                GramCertificateRequest.model_validate(
+                    {
+                        "polynomial": p.model_dump(mode="json"),
+                        "monomial_basis": [
+                            _poly(("x",), (1, 1, (1,))).model_dump(mode="json"),
+                            _poly(("x",), (1, 1, (1,))).model_dump(mode="json"),
+                        ],
+                        "gram_matrix": {
+                            "entries": (
+                                (
+                                    {"num": "2", "den": "1"},
+                                    {"num": "0", "den": "1"},
+                                ),
+                                (
+                                    {"num": "0", "den": "1"},
+                                    {"num": "1", "den": "1"},
+                                ),
+                            )
+                        },
+                    }
                 )
             )
         assert exc_info.value.errors()[0]["type"] == "sum_of_squares.basis_distinct"
 
 
 class TestSOSResultAdmission:
-    def test_oversized_result_summands_are_rejected_before_expansion(self):
+    def test_oversized_result_summands_are_rejected_before_expansion(self) -> None:
         exponent_rows = [(k,) for k in range(8, 0, -1)] + [(0,)]
         wide = _poly(("x",), *[(1, 1, row) for row in exponent_rows])
         p = _poly(("x",), (1, 1, (2,)), (1, 1, (0,)))
@@ -410,7 +449,7 @@ class TestSOSResultAdmission:
             SOSDecompositionCheckResult.model_validate(payload)
         assert exc_info.value.errors()[0]["type"] == "sum_of_squares.sos_work_bound"
 
-    def test_forged_sos_claim_is_rejected_by_explicit_verifier(self):
+    def test_forged_sos_claim_is_rejected_by_explicit_verifier(self) -> None:
         """Result parsing is structural; only the verifier replays the identity."""
         p = _poly(("x",), (1, 1, (2,)), (1, 1, (0,)))
         q = _poly(("x",), (1, 1, (1,)))
@@ -424,7 +463,7 @@ class TestSOSResultAdmission:
 
 
 class TestSOSResultRingAdmission:
-    def test_result_replay_rejects_mismatched_summand_ring(self):
+    def test_result_replay_rejects_mismatched_summand_ring(self) -> None:
         """A serialized result whose summand uses another ring is rejected at
         the typed boundary instead of leaking a SymPy coercion exception."""
         p = _poly(("x",), (1, 1, (2,)), (1, 1, (0,)))
@@ -446,13 +485,15 @@ class TestSOSResultRingAdmission:
 class TestExactPsdCriterion:
     """The Gram PSD test is total: no backend exception on any input."""
 
-    def _request(self, gram_entries):
+    def _request(self, gram_entries: GramEntries) -> GramCertificateRequest:
         p = _poly(("x",), (1, 1, (2,)), (1, 1, (0,)))
         basis = (_poly(("x",), (1, 1, (1,))), _poly(("x",), (1, 1, (0,))))
-        return GramCertificateRequest(
-            polynomial=p,
-            monomial_basis=basis,
-            gram_matrix={"entries": gram_entries},
+        return GramCertificateRequest.model_validate(
+            {
+                "polynomial": p.model_dump(mode="json"),
+                "monomial_basis": [item.model_dump(mode="json") for item in basis],
+                "gram_matrix": {"entries": gram_entries},
+            }
         )
 
     def test_irreducible_characteristic_polynomial_is_decided(self) -> None:
@@ -460,7 +501,7 @@ class TestExactPsdCriterion:
         irreducible over QQ: eigenvals() raises MatrixError, the exact
         symmetric-elimination criterion must still decide PSD."""
 
-        def entry(value: int) -> dict:
+        def entry(value: int) -> RationalWire:
             return {"num": str(value), "den": "1"}
 
         rows = [
@@ -472,46 +513,65 @@ class TestExactPsdCriterion:
         ]
         gram = tuple(tuple(entry(v) for v in row) for row in rows)
         result = check_gram_certificate(
-            GramCertificateRequest(
-                polynomial=_poly(
-                    ("x",),
-                    (1, 1, (2,)),
-                    (1, 1, (0,)),
-                ),
-                monomial_basis=tuple(_poly(("x",), (1, 1, (k,))) for k in range(5)),
-                gram_matrix={"entries": gram},
+            GramCertificateRequest.model_validate(
+                {
+                    "polynomial": _poly(
+                        ("x",),
+                        (1, 1, (2,)),
+                        (1, 1, (0,)),
+                    ).model_dump(mode="json"),
+                    "monomial_basis": [
+                        _poly(("x",), (1, 1, (k,))).model_dump(mode="json")
+                        for k in range(5)
+                    ],
+                    "gram_matrix": {"entries": gram},
+                }
             )
         )
         assert result.is_psd is True
 
     def test_indefinite_matrix_is_decided_not_psd(self) -> None:
-        def entry(num: str) -> dict:
+        def entry(num: str) -> RationalWire:
             return {"num": num, "den": "1"}
 
         gram = ((entry("-1"),),)
         result = check_gram_certificate(
-            GramCertificateRequest(
-                polynomial=_poly(("x",), (-1, 1, (2,))),
-                monomial_basis=(_poly(("x",), (1, 1, (1,))),),
-                gram_matrix={"entries": gram},
+            GramCertificateRequest.model_validate(
+                {
+                    "polynomial": _poly(("x",), (-1, 1, (2,))).model_dump(mode="json"),
+                    "monomial_basis": [
+                        _poly(("x",), (1, 1, (1,))).model_dump(mode="json")
+                    ],
+                    "gram_matrix": {"entries": gram},
+                }
             )
         )
         assert result.is_psd is False
 
     def test_forged_gram_claim_is_rejected_by_explicit_verifier(self) -> None:
         result = check_gram_certificate(
-            GramCertificateRequest(
-                polynomial=_poly(("x",), (1, 1, (2,)), (1, 1, (0,))),
-                monomial_basis=(
-                    _poly(("x",), (1, 1, (1,))),
-                    _poly(("x",), (1, 1, (0,))),
-                ),
-                gram_matrix={
-                    "entries": (
-                        ({"num": "1", "den": "1"}, {"num": "0", "den": "1"}),
-                        ({"num": "0", "den": "1"}, {"num": "1", "den": "1"}),
-                    )
-                },
+            GramCertificateRequest.model_validate(
+                {
+                    "polynomial": _poly(("x",), (1, 1, (2,)), (1, 1, (0,))).model_dump(
+                        mode="json"
+                    ),
+                    "monomial_basis": [
+                        _poly(("x",), (1, 1, (1,))).model_dump(mode="json"),
+                        _poly(("x",), (1, 1, (0,))).model_dump(mode="json"),
+                    ],
+                    "gram_matrix": {
+                        "entries": (
+                            (
+                                {"num": "1", "den": "1"},
+                                {"num": "0", "den": "1"},
+                            ),
+                            (
+                                {"num": "0", "den": "1"},
+                                {"num": "1", "den": "1"},
+                            ),
+                        )
+                    },
+                }
             )
         )
         payload = result.model_dump(mode="json")
@@ -530,7 +590,7 @@ class TestSOSCoefficientGrowthAdmission:
         reduced denominator far exceeds the canonical limit, so admission —
         not execution — must reject."""
 
-        def summand(k: int):
+        def summand(k: int) -> RationalPolynomial:
             # Eight terms with pairwise-distinct large prime-like
             # denominators, all squaring down onto low degrees.
             terms = [

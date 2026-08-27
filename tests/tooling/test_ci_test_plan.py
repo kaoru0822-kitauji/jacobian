@@ -6,8 +6,13 @@ import importlib.util
 import sys
 from pathlib import Path
 from types import ModuleType
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from tools.ci_test_plan import TestPlan
+
 
 ROOT = Path(__file__).parents[2]
 
@@ -22,15 +27,16 @@ def _load() -> ModuleType:
     return module
 
 
-def _plan(paths: list[str], *, event: str = "pull_request") -> object:
+def _plan(paths: list[str], *, event: str = "pull_request") -> TestPlan:
     planner = _load()
-    return planner.build_plan(
+    plan: TestPlan = planner.build_plan(
         event=event,
         base_revision="a" * 40,
         head_revision="b" * 40,
         changed_paths=paths,
         repository=ROOT,
     )
+    return plan
 
 
 def test_model_change_selects_its_math_owner_and_public_contract_evidence() -> None:

@@ -1,5 +1,7 @@
 """Known-answer and adversarial tests for finite group-action operations."""
 
+import itertools
+
 import pytest
 from pydantic import ValidationError
 
@@ -30,7 +32,7 @@ def _assert_error_type(error: ValidationError, expected: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _trivial(n: int) -> dict:
+def _trivial(n: int) -> FinitePermutationAction:
     """The trivial group acting on n labelled points."""
     return FinitePermutationAction(
         domain=tuple(f"p{i}" for i in range(n)),
@@ -360,17 +362,17 @@ def _fixed_points(perm: tuple[int, ...]) -> int:
 def _brute_tuple_orbit_count(action: FinitePermutationAction, r: int) -> int:
     n = len(action.domain)
     group = _enumerate_group(action)
-    all_tuples = tuple(_itertools_product(range(n), repeat=r))
+    all_tuples = tuple(itertools.product(range(n), repeat=r))
 
     parent: dict[tuple[int, ...], tuple[int, ...]] = {t: t for t in all_tuples}
 
-    def find(x):
+    def find(x: tuple[int, ...]) -> tuple[int, ...]:
         while parent[x] != x:
             parent[x] = parent[parent[x]]
             x = parent[x]
         return x
 
-    def union(a, b):
+    def union(a: tuple[int, ...], b: tuple[int, ...]) -> None:
         ra, rb = find(a), find(b)
         if ra != rb:
             parent[rb] = ra
@@ -380,12 +382,6 @@ def _brute_tuple_orbit_count(action: FinitePermutationAction, r: int) -> int:
             image = tuple(perm[t[i]] for i in range(r))
             union(t, image)
     return len({find(t) for t in all_tuples})
-
-
-def _itertools_product(*args, **kwargs):
-    import itertools
-
-    return itertools.product(*args, **kwargs)
 
 
 # ---------------------------------------------------------------------------

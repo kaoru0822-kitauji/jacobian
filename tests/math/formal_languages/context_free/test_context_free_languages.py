@@ -1,5 +1,7 @@
 """Tests for context-free language operations."""
 
+from collections.abc import Mapping
+
 import pytest
 
 from jacobian.math.formal_languages.context_free._models import (
@@ -37,6 +39,10 @@ GRAMMAR2 = {
 }
 
 
+def _grammar(payload: Mapping[str, object]) -> FiniteCFGO:
+    return FiniteCFGO.model_validate(payload)
+
+
 def test_catalog_contains_only_audited_operations() -> None:
     assert {tool.operation_id for tool in TOOLS} == {
         "grammar.symbol_profiles.compute",
@@ -46,25 +52,25 @@ def test_catalog_contains_only_audited_operations() -> None:
 
 
 def test_symbol_profiles_nullable() -> None:
-    request = SymbolProfilesRequest(grammar=GRAMMAR)
+    request = SymbolProfilesRequest(grammar=_grammar(GRAMMAR))
     result = compute_symbol_profiles(request)
     assert result.nullable == (False, True)
 
 
 def test_symbol_profiles_nullable_simple() -> None:
-    request = SymbolProfilesRequest(grammar=GRAMMAR2)
+    request = SymbolProfilesRequest(grammar=_grammar(GRAMMAR2))
     result = compute_symbol_profiles(request)
     assert result.nullable == (True,)
 
 
 def test_dependency_graph() -> None:
-    request = DependencyGraphRequest(grammar=GRAMMAR)
+    request = DependencyGraphRequest(grammar=_grammar(GRAMMAR))
     result = compute_dependency_graph(request)
     assert ("S", "A") in result.edges
 
 
 def test_first_sets() -> None:
-    request = FirstSetsRequest(grammar=GRAMMAR2)
+    request = FirstSetsRequest(grammar=_grammar(GRAMMAR2))
     result = compute_first_sets(request)
     assert result.first_sets == (("a",),)
 
@@ -75,7 +81,7 @@ def test_first_sets_nullable_prefix() -> None:
     For S -> A a, A -> b | epsilon, FIRST(S) = {a, b} because A is nullable
     so the terminal a following A is also reachable.
     """
-    request = FirstSetsRequest(grammar=GRAMMAR)
+    request = FirstSetsRequest(grammar=_grammar(GRAMMAR))
     result = compute_first_sets(request)
     assert result.first_sets == (("a", "b"), ("b",))
 
@@ -96,7 +102,7 @@ def test_first_sets_nullable_prefix_two_symbol() -> None:
         ],
         "start_symbol": "S",
     }
-    request = FirstSetsRequest(grammar=grammar)
+    request = FirstSetsRequest(grammar=_grammar(grammar))
     result = compute_first_sets(request)
     assert result.first_sets == (("c",), (), ())
 
@@ -119,7 +125,7 @@ def test_first_sets_nullable_prefix_mixed() -> None:
         ],
         "start_symbol": "S",
     }
-    request = FirstSetsRequest(grammar=grammar)
+    request = FirstSetsRequest(grammar=_grammar(grammar))
     result = compute_first_sets(request)
     assert result.first_sets == (("a", "b"), ("a",), ("b",))
 

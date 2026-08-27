@@ -91,7 +91,7 @@ def test_trace_requires_square_matrix() -> None:
 
 def test_rref_rejects_non_matrix_inputs() -> None:
     with pytest.raises(TypeError):
-        matrices.rref([[1, 2], [3, 4]])  # type: ignore[arg-type]
+        matrices.rref([[1, 2], [3, 4]])
 
 
 def test_rref_rejects_oversized_matrices() -> None:
@@ -101,7 +101,7 @@ def test_rref_rejects_oversized_matrices() -> None:
 
 def test_matrix_input_errors_are_stable() -> None:
     with pytest.raises(TypeError):
-        matrices.trace([[1]])  # type: ignore[arg-type]
+        matrices.trace([[1]])
     with pytest.raises(ValueError):
         matrices.inverse(sympy.Matrix([[1, 2]]))
     with pytest.raises(ValueError):

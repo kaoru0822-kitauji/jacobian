@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any, cast
 
+from jacobian.catalog.catalog import Catalog
 from jacobian.catalog.models import OperationDiscoveryResult
 from jacobian.mcp.models import (
     OperationBrowseRequest,
@@ -34,7 +35,7 @@ class _Catalog:
 
 def test_math_find_does_not_acquire_an_execution_runtime() -> None:
     state = AppState(
-        operation_catalog=_Catalog(),
+        operation_catalog=cast(Catalog, _Catalog()),
     )
     context = SimpleNamespace(request_context=SimpleNamespace(lifespan_context=state))
 
@@ -54,7 +55,7 @@ def test_math_find_search_accepts_a_long_mathematical_query() -> None:
 
 def test_math_find_browse_does_not_acquire_an_execution_runtime() -> None:
     state = AppState(
-        operation_catalog=_Catalog(),
+        operation_catalog=cast(Catalog, _Catalog()),
     )
     context = SimpleNamespace(request_context=SimpleNamespace(lifespan_context=state))
 

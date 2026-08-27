@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from fractions import Fraction
 
 import pytest
@@ -107,7 +108,10 @@ def test_trusted_canonical_form_producers_run_each_kernel_once(
         original = getattr(canonical_operations, name)
 
         def counted(
-            *args: object, _original=original, _name=name, **kwargs: object
+            *args: object,
+            _original: Callable[..., object] = original,
+            _name: str = name,
+            **kwargs: object,
         ) -> object:
             calls[_name] += 1
             return _original(*args, **kwargs)

@@ -14,7 +14,9 @@ from jacobian.math.analysis._models import MAX_DYADIC_EXPONENT, ExactDyadic
 from jacobian.math.analysis._operations import _expression_enclosure
 
 
-def _run(expression: dict[str, object], argument: str = "0"):
+def _run(
+    expression: dict[str, object], argument: str = "0"
+) -> IntervalExpressionEnclosureResult:
     return _expression_enclosure(
         IntervalExpressionEnclosureRequest.model_validate(
             {

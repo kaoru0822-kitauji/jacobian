@@ -39,14 +39,16 @@ def _request(
     arity: int,
     window: tuple[int, int] | None = None,
 ) -> MultisetSumRepresentationProfileRequest:
-    return MultisetSumRepresentationProfileRequest(
-        source={"elements": [str(value) for value in source]},
-        arity=arity,
-        window=(
-            None
-            if window is None
-            else {"lower": str(window[0]), "upper": str(window[1])}
-        ),
+    return MultisetSumRepresentationProfileRequest.model_validate(
+        {
+            "source": {"elements": [str(value) for value in source]},
+            "arity": arity,
+            "window": (
+                None
+                if window is None
+                else {"lower": str(window[0]), "upper": str(window[1])}
+            ),
+        }
     )
 
 
@@ -178,8 +180,8 @@ def test_request_requires_canonical_source_order() -> None:
 def test_request_rejects_oversized_source_integer_before_parsing() -> None:
     oversized = "9" * (_MAX_MULTISET_SUM_ELEMENT_DIGITS + 1)
     with pytest.raises(ValidationError):
-        MultisetSumRepresentationProfileRequest(
-            source={"elements": [oversized]}, arity=2
+        MultisetSumRepresentationProfileRequest.model_validate(
+            {"source": {"elements": [oversized]}, "arity": 2}
         )
 
 

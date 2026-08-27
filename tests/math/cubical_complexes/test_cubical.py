@@ -17,7 +17,7 @@ from jacobian.math.cubical_complexes._operations import (
 class TestFaceClosure:
     def test_single_2d_cell(self) -> None:
         result = compute_face_closure(
-            FaceClosureRequest(cells=[CubicalCell(intervals=((0, 1), (0, 1)))])
+            FaceClosureRequest(cells=(CubicalCell(intervals=((0, 1), (0, 1))),))
         )
         assert result.original_cells == 1
         # 4 vertices + 4 edges + 1 square = 9 cells
@@ -26,7 +26,7 @@ class TestFaceClosure:
 
     def test_single_1d_cell(self) -> None:
         result = compute_face_closure(
-            FaceClosureRequest(cells=[CubicalCell(intervals=((0, 1),))])
+            FaceClosureRequest(cells=(CubicalCell(intervals=((0, 1),)),))
         )
         assert result.original_cells == 1
         # 2 vertices + 1 edge = 3 cells
@@ -37,7 +37,7 @@ class TestFaceClosure:
 class TestFVector:
     def test_single_square(self) -> None:
         result = compute_f_vector(
-            CubicalComplexRequest(cells=[CubicalCell(intervals=((0, 1), (0, 1)))])
+            CubicalComplexRequest(cells=(CubicalCell(intervals=((0, 1), (0, 1))),))
         )
         assert result.dimension == 2
         # 4 vertices + 4 edges + 1 square

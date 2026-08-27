@@ -610,28 +610,6 @@ class TestDiscrepancyOptimum:
         assert replayed == result.optimal_discrepancy
         assert elapsed < 60
 
-    def test_hard_instance_reports_honest_outcome(self) -> None:
-        """A genuinely hard instance either proves its optimum or reports
-        BUDGET_EXCEEDED; when optimal, the coloring replays exactly."""
-        import random
-
-        generator = random.Random(7)
-        n = 36
-        sets = tuple(tuple(sorted(generator.sample(range(n), 18))) for _ in range(24))
-        system = FiniteSetSystem(ground_set_size=n, sets=sets)
-        result = compute_optimal_discrepancy(
-            DiscrepancyOptimumRequest(set_system=system)
-        )
-        if result.status == "OPTIMAL":
-            replayed = max(
-                abs(sum(result.optimal_coloring[element] for element in subset))
-                for subset in sets
-            )
-            assert replayed == result.optimal_discrepancy
-        else:
-            assert result.optimal_coloring == ()
-            assert result.optimal_discrepancy is None
-
     @pytest.mark.parametrize(
         ("milp_status", "expected_status"),
         [
@@ -996,7 +974,8 @@ class TestDiscrepancyOptimum:
         )
         assert replayed == result.optimal_discrepancy
 
-    def test_hard_instance_outcome_is_always_honest(self) -> None:
+    @pytest.mark.scale
+    def test_hard_instance_outcome_is_honest(self) -> None:
         """Whatever the budget outcome, an OPTIMAL claim replays exactly and
         BUDGET_EXCEEDED carries no witness — a timed-out incumbent must not
         be labeled optimal."""
@@ -1005,10 +984,13 @@ class TestDiscrepancyOptimum:
         generator = random.Random(7)
         n = 36
         sets = tuple(tuple(sorted(generator.sample(range(n), 18))) for _ in range(24))
-        system = FiniteSetSystem(ground_set_size=n, sets=sets)
-        result = compute_optimal_discrepancy(
-            DiscrepancyOptimumRequest(set_system=system)
+        request = DiscrepancyOptimumRequest(
+            set_system=FiniteSetSystem(ground_set_size=n, sets=sets)
         )
+        result = compute_optimal_discrepancy(request)
+        assert result.status in {"OPTIMAL", "BUDGET_EXCEEDED"}
+        assert result.set_system == request.set_system
+        sets = request.set_system.sets
         if result.status == "OPTIMAL":
             replayed = max(
                 abs(sum(result.optimal_coloring[element] for element in subset))

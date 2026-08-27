@@ -1,5 +1,6 @@
 """Regression coverage for the advertised rational recurrence domain."""
 
+from jacobian._exact import CanonicalRational
 from jacobian.math.recurrence_solving._models import (
     ClosedFormRequest,
     RecurrenceFindRequest,
@@ -11,8 +12,8 @@ from jacobian.math.recurrence_solving._operations import (
 )
 
 
-def _q(numerator: int, denominator: int = 1) -> dict[str, str]:
-    return {"num": str(numerator), "den": str(denominator)}
+def _q(numerator: int, denominator: int = 1) -> CanonicalRational:
+    return CanonicalRational(num=str(numerator), den=str(denominator))
 
 
 def test_find_recurrence_accepts_exact_rational_sequence() -> None:

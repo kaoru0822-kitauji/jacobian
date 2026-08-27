@@ -253,7 +253,7 @@ def test_erasure_noise_constant_one() -> None:
             base_input=(0, 0),
         )
     )
-    assert result.expected_value.as_fraction() == 1  # type: ignore[comparison]
+    assert result.expected_value.as_fraction() == 1
 
 
 def test_erasure_noise_rejects_invalid_probability() -> None:

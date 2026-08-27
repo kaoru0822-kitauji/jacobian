@@ -28,7 +28,7 @@ def _assert_error_code(
 class TestSteenrodSquare:
     """Test Steenrod square computation."""
 
-    def test_sq0_identity(self):
+    def test_sq0_identity(self) -> None:
         """Sq^0 is the identity."""
         # Minimal ambient where a single edge is vacuously a cocycle (no triangles).
         ambient = ((0,), (1,), (0, 1))
@@ -44,7 +44,7 @@ class TestSteenrodSquare:
         assert not result.is_zero
         assert result.result_degree == 1
 
-    def test_sq_above_degree_is_zero(self):
+    def test_sq_above_degree_is_zero(self) -> None:
         """Sq^k(x) = 0 for k > deg(x) (instability)."""
         ambient = ((0,), (1,), (0, 1))
         result = compute_steenrod_square(
@@ -58,7 +58,7 @@ class TestSteenrodSquare:
         )
         assert result.is_zero
 
-    def test_sq_above_degree_zero(self):
+    def test_sq_above_degree_zero(self) -> None:
         """Sq^3(x) = 0 for a degree-1 cocycle."""
         ambient = ((0,), (1,), (0, 1))
         result = compute_steenrod_square(
@@ -72,7 +72,7 @@ class TestSteenrodSquare:
         )
         assert result.is_zero
 
-    def test_sq_n_cup_n(self):
+    def test_sq_n_cup_n(self) -> None:
         """Sq^n(x) = x cup x for a degree-n cocycle."""
         # For degree 1, x supported on edges (0,1) and (1,2) cups to triangle
         # (0,1,2) only when that 2-simplex lies in the ambient complex.
@@ -89,7 +89,7 @@ class TestSteenrodSquare:
         assert result.result_degree == 2
         assert result.result_simplex_values == ((0, 1, 2),)
 
-    def test_top_square_requires_target_in_ambient(self):
+    def test_top_square_requires_target_in_ambient(self) -> None:
         """Edges [0,1],[1,2] of a graph emit no absent triangle [0,1,2]."""
         import pytest
 
@@ -114,7 +114,7 @@ class TestSteenrodSquare:
         assert result.is_zero
         assert result.result_simplex_values == ()
 
-    def test_support_must_lie_in_ambient_complex(self):
+    def test_support_must_lie_in_ambient_complex(self) -> None:
         with pytest.raises(ValidationError) as excinfo:
             SteenrodSquareRequest(
                 cochain_degree=1,
@@ -126,7 +126,7 @@ class TestSteenrodSquare:
         _assert_error_code(excinfo, "cohomology_operation.support_outside_ambient")
 
     # Cups that don't share the middle vertex should not contribute
-    def test_disjoint_edges_do_not_contribute(self):
+    def test_disjoint_edges_do_not_contribute(self) -> None:
         result2 = compute_steenrod_square(
             SteenrodSquareRequest(
                 cochain_degree=1,
@@ -138,7 +138,7 @@ class TestSteenrodSquare:
         )
         assert result2.is_zero
 
-    def test_sq0_duplicate_support_sums_modulo_two(self):
+    def test_sq0_duplicate_support_sums_modulo_two(self) -> None:
         """Repeated simplex keys denote one cochain: coefficients sum in GF(2)."""
         result = compute_steenrod_square(
             SteenrodSquareRequest(
@@ -152,7 +152,7 @@ class TestSteenrodSquare:
         assert result.result_simplex_values == ()
         assert result.result_simplex_coefficients == ()
 
-    def test_sq0_duplicate_support_survivor(self):
+    def test_sq0_duplicate_support_survivor(self) -> None:
         """Only keys whose summed coefficient survives mod 2 remain."""
         result = compute_steenrod_square(
             SteenrodSquareRequest(
@@ -179,7 +179,7 @@ class TestSteenrodSquare:
         assert result2.result_simplex_values == ((1,),)
         assert result2.result_simplex_coefficients == (1,)
 
-    def test_cup_product_with_duplicate_support_is_linear(self):
+    def test_cup_product_with_duplicate_support_is_linear(self) -> None:
         """Sq^deg of a zero cochain represented by duplicated keys is zero."""
         result = compute_steenrod_square(
             SteenrodSquareRequest(
@@ -192,7 +192,7 @@ class TestSteenrodSquare:
         )
         assert result.is_zero
 
-    def test_forged_result_is_rejected_by_explicit_verifier(self):
+    def test_forged_result_is_rejected_by_explicit_verifier(self) -> None:
         """An authored claim is structural but fails the bounded replay verifier."""
         request = SteenrodSquareRequest(
             cochain_degree=1,
@@ -214,7 +214,7 @@ class TestSteenrodSquare:
 class TestBockstein:
     """Test Bockstein homomorphism."""
 
-    def test_zero_cocycle(self):
+    def test_zero_cocycle(self) -> None:
         """Bockstein of a zero cocycle is zero."""
         result = compute_bockstein(
             BocksteinRequest(
@@ -226,7 +226,7 @@ class TestBockstein:
         )
         assert result.is_zero
 
-    def test_cancelling_duplicate_support_is_zero(self):
+    def test_cancelling_duplicate_support_is_zero(self) -> None:
         """Sparse supports that cancel modulo p are the zero cocycle."""
         result = compute_bockstein(
             BocksteinRequest(
@@ -240,7 +240,7 @@ class TestBockstein:
         assert result.result_degree == 3
         assert result.result_simplex_values == ()
 
-    def test_zero_cocycle_with_ambient_complex(self):
+    def test_zero_cocycle_with_ambient_complex(self) -> None:
         """The optional ambient stays validated and the result is unchanged."""
         ambient = ((0,), (1,), (2,), (0, 1), (0, 2), (1, 2), (0, 1, 2))
         result = compute_bockstein(
@@ -255,7 +255,7 @@ class TestBockstein:
         assert result.is_zero
         assert result.result_degree == 2
 
-    def test_every_admissible_input_returns_predetermined_zero(self):
+    def test_every_admissible_input_returns_predetermined_zero(self) -> None:
         """Admission reduces every request to the zero cocycle first, so
         execution can only return the empty degree-(n+1) cochain."""
         admissible = [
@@ -280,7 +280,7 @@ class TestBockstein:
                 result.is_zero,
             ) == (degree + 1, (), (), True)
 
-    def test_forged_result_is_rejected_by_explicit_verifier(self):
+    def test_forged_result_is_rejected_by_explicit_verifier(self) -> None:
         request = BocksteinRequest(
             prime=2,
             cochain_degree=1,
@@ -294,7 +294,7 @@ class TestBockstein:
         _assert_error_code(excinfo, "cohomology_operation.result_shape")
         assert verify_bockstein_result(compute_bockstein(request))
 
-    def test_nonzero_cocycle(self):
+    def test_nonzero_cocycle(self) -> None:
         """Bockstein of a non-zero cocycle is unsupported without the complex."""
         with pytest.raises(ValidationError) as excinfo:
             BocksteinRequest(
@@ -307,7 +307,7 @@ class TestBockstein:
             excinfo, "cohomology_operation.nonzero_bockstein_unsupported"
         )
 
-    def test_prime_5(self):
+    def test_prime_5(self) -> None:
         """Bockstein with a different prime still requires zero cocycle."""
         import pytest
 
@@ -324,7 +324,7 @@ class TestBockstein:
 
 
 class TestCocycleAdmission:
-    def test_non_cocycle_rejected(self):
+    def test_non_cocycle_rejected(self) -> None:
         """A degree-1 cochain on one edge of the triangle is not a cocycle."""
         with pytest.raises(ValidationError) as excinfo:
             SteenrodSquareRequest(
@@ -336,7 +336,7 @@ class TestCocycleAdmission:
             )
         _assert_error_code(excinfo, "cohomology_operation.not_cocycle")
 
-    def test_genuine_cocycle_admitted(self):
+    def test_genuine_cocycle_admitted(self) -> None:
         result = compute_steenrod_square(
             SteenrodSquareRequest(
                 cochain_degree=1,
@@ -373,7 +373,7 @@ _TETRAHEDRON = (
 class TestAmbientComplexClosure:
     """The supplied complex must carry every face its simplices imply."""
 
-    def test_non_closed_complex_rejected(self):
+    def test_non_closed_complex_rejected(self) -> None:
         """A tetrahedron entry implies faces that are not listed here."""
         with pytest.raises(ValidationError) as excinfo:
             SteenrodSquareRequest(
@@ -385,7 +385,7 @@ class TestAmbientComplexClosure:
             )
         _assert_error_code(excinfo, "cohomology_operation.ambient_not_downward_closed")
 
-    def test_implied_triangle_enforces_cocycle(self):
+    def test_implied_triangle_enforces_cocycle(self) -> None:
         """On the closed tetrahedron the triangle (0,1,2) exists, so an edge
         (0,1)-supported cochain has nonzero coboundary and cannot pass."""
         with pytest.raises(ValidationError) as excinfo:
@@ -398,7 +398,7 @@ class TestAmbientComplexClosure:
             )
         _assert_error_code(excinfo, "cohomology_operation.not_cocycle")
 
-    def test_coboundary_of_vertex_on_closed_tetrahedron_admitted(self):
+    def test_coboundary_of_vertex_on_closed_tetrahedron_admitted(self) -> None:
         """d(vertex 0) is a genuine cocycle of the closed tetrahedron."""
         result = compute_steenrod_square(
             SteenrodSquareRequest(
@@ -412,7 +412,7 @@ class TestAmbientComplexClosure:
         assert result.is_zero
         assert result.result_simplex_values == ()
 
-    def test_ambient_simplex_vertex_cap(self):
+    def test_ambient_simplex_vertex_cap(self) -> None:
         """The advertised per-simplex cap fails at schema parse time."""
         with pytest.raises(ValidationError) as excinfo:
             SteenrodSquareRequest(
@@ -424,7 +424,7 @@ class TestAmbientComplexClosure:
             )
         _assert_error_code(excinfo, "too_long")
 
-    def test_huge_single_ambient_simplex_rejected_before_traversal(self):
+    def test_huge_single_ambient_simplex_rejected_before_traversal(self) -> None:
         """One extremely large inner array dies at the schema length bound.
 
         The rejection must come from the ``BoundedAmbientSimplex`` schema
@@ -443,7 +443,9 @@ class TestAmbientComplexClosure:
         assert "too_long" in error_types
         assert "cohomology_operation.ambient_simplex_bound" not in error_types
 
-    def test_bockstein_huge_single_ambient_simplex_rejected_before_traversal(self):
+    def test_bockstein_huge_single_ambient_simplex_rejected_before_traversal(
+        self,
+    ) -> None:
         """Bockstein shares the schema-bounded inner simplex type."""
         with pytest.raises(ValidationError) as excinfo:
             BocksteinRequest(
@@ -457,7 +459,7 @@ class TestAmbientComplexClosure:
         assert "too_long" in error_types
         assert "cohomology_operation.ambient_simplex_bound" not in error_types
 
-    def test_ambient_vertex_label_magnitude_is_schema_bounded(self):
+    def test_ambient_vertex_label_magnitude_is_schema_bounded(self) -> None:
         """A 7-digit label is rejected by the element constraint itself."""
         with pytest.raises(ValidationError) as excinfo:
             SteenrodSquareRequest(
@@ -473,7 +475,7 @@ class TestAmbientComplexClosure:
 class TestInstabilityDegreeAdmission:
     """Sq^k = 0 for k > deg(x) is admitted output-sensitively."""
 
-    def test_high_degree_trivial_square_returns_tiny_exact_zero(self):
+    def test_high_degree_trivial_square_returns_tiny_exact_zero(self) -> None:
         """cochain_degree=16 with square_degree=17 exceeds the old ceiling."""
         result = compute_steenrod_square(
             SteenrodSquareRequest(
@@ -488,7 +490,7 @@ class TestInstabilityDegreeAdmission:
         assert result.result_simplex_values == ()
         assert result.result_simplex_coefficients == ()
 
-    def test_result_degree_budget_boundary(self):
+    def test_result_degree_budget_boundary(self) -> None:
         """Requests are admitted exactly up to the returned-degree budget."""
         edge = compute_steenrod_square(
             SteenrodSquareRequest(
@@ -510,7 +512,7 @@ class TestInstabilityDegreeAdmission:
             )
         _assert_error_code(excinfo, "cohomology_operation.result_degree_bound")
 
-    def test_nonzero_cocycle_instability_square_above_old_ceiling(self):
+    def test_nonzero_cocycle_instability_square_above_old_ceiling(self) -> None:
         """A genuine cocycle admits large trivial squares too."""
         ambient = (
             (0,),
@@ -541,7 +543,7 @@ class TestInstabilityDegreeAdmission:
         assert result.is_zero
         assert result.result_degree == 41
 
-    def test_top_and_intermediate_squares_keep_prior_boundaries(self):
+    def test_top_and_intermediate_squares_keep_prior_boundaries(self) -> None:
         """k <= n envelopes are unchanged by the output-sensitive bound."""
         # Top square still requires ambient targets.
         with pytest.raises(ValidationError) as excinfo:
@@ -570,7 +572,7 @@ class TestInstabilityDegreeAdmission:
 class TestCatalogAdmission:
     """Owner-local admission expectations for the cohomology domain."""
 
-    def test_bockstein_is_native_only(self):
+    def test_bockstein_is_native_only(self) -> None:
         from jacobian.catalog.admission import AdmissionDecision
         from jacobian.math.cohomology_operations._admission import ADMISSIONS
 
@@ -581,7 +583,7 @@ class TestCatalogAdmission:
         )
         assert record.decision is AdmissionDecision.NATIVE_ONLY
 
-    def test_published_catalog_keeps_only_the_steenrod_square(self):
+    def test_published_catalog_keeps_only_the_steenrod_square(self) -> None:
         from jacobian.catalog.admission import curate_public_tools
         from jacobian.math.cohomology_operations._admission import ADMISSIONS
         from jacobian.math.cohomology_operations._tools import TOOLS
@@ -591,7 +593,7 @@ class TestCatalogAdmission:
         )
         assert published == ("cohomology.steenrod_square.compute",)
 
-    def test_bockstein_native_symbol_is_supported(self):
+    def test_bockstein_native_symbol_is_supported(self) -> None:
         import jacobian.math.cohomology_operations as public_module
 
         assert "compute_bockstein" in public_module.__all__

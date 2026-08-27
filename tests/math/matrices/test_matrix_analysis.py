@@ -27,13 +27,13 @@ from jacobian.math.matrices.values import (
 
 
 class TestInertia:
-    def test_identity(self):
+    def test_identity(self) -> None:
         req = SymmetricMatrixRequest(
             dimension=3,
             entries=(
-                MatrixEntry(row=0, col=0, value={"num": "1", "den": "1"}),
-                MatrixEntry(row=1, col=1, value={"num": "1", "den": "1"}),
-                MatrixEntry(row=2, col=2, value={"num": "1", "den": "1"}),
+                MatrixEntry(row=0, col=0, value=CanonicalRational(num="1", den="1")),
+                MatrixEntry(row=1, col=1, value=CanonicalRational(num="1", den="1")),
+                MatrixEntry(row=2, col=2, value=CanonicalRational(num="1", den="1")),
             ),
         )
         result = compute_inertia(req)
@@ -42,12 +42,12 @@ class TestInertia:
         assert result.n_zero == 0
         assert result.definiteness == "positive_definite"
 
-    def test_negative_identity(self):
+    def test_negative_identity(self) -> None:
         req = SymmetricMatrixRequest(
             dimension=2,
             entries=(
-                MatrixEntry(row=0, col=0, value={"num": "-1", "den": "1"}),
-                MatrixEntry(row=1, col=1, value={"num": "-1", "den": "1"}),
+                MatrixEntry(row=0, col=0, value=CanonicalRational(num="-1", den="1")),
+                MatrixEntry(row=1, col=1, value=CanonicalRational(num="-1", den="1")),
             ),
         )
         result = compute_inertia(req)
@@ -55,12 +55,12 @@ class TestInertia:
         assert result.n_negative == 2
         assert result.definiteness == "negative_definite"
 
-    def test_indefinite(self):
+    def test_indefinite(self) -> None:
         req = SymmetricMatrixRequest(
             dimension=2,
             entries=(
-                MatrixEntry(row=0, col=0, value={"num": "1", "den": "1"}),
-                MatrixEntry(row=1, col=1, value={"num": "-1", "den": "1"}),
+                MatrixEntry(row=0, col=0, value=CanonicalRational(num="1", den="1")),
+                MatrixEntry(row=1, col=1, value=CanonicalRational(num="-1", den="1")),
             ),
         )
         result = compute_inertia(req)
@@ -68,10 +68,16 @@ class TestInertia:
         assert result.n_negative == 1
         assert result.definiteness == "indefinite"
 
-    def test_off_diagonal_hyperbolic_pair(self):
+    def test_off_diagonal_hyperbolic_pair(self) -> None:
         req = SymmetricMatrixRequest(
             dimension=2,
-            entries=(MatrixEntry(row=0, col=1, value={"num": "1", "den": "1"}),),
+            entries=(
+                MatrixEntry(
+                    row=0,
+                    col=1,
+                    value=CanonicalRational(num="1", den="1"),
+                ),
+            ),
         )
         result = compute_inertia(req)
         assert result.n_positive == 1
@@ -79,7 +85,7 @@ class TestInertia:
         assert result.n_zero == 0
         assert result.definiteness == "indefinite"
 
-    def test_rejects_conflicting_symmetric_entries(self):
+    def test_rejects_conflicting_symmetric_entries(self) -> None:
         import pytest
         from pydantic import ValidationError
 
@@ -87,52 +93,64 @@ class TestInertia:
             SymmetricMatrixRequest(
                 dimension=2,
                 entries=(
-                    MatrixEntry(row=0, col=1, value={"num": "1", "den": "1"}),
-                    MatrixEntry(row=1, col=0, value={"num": "2", "den": "1"}),
+                    MatrixEntry(
+                        row=0,
+                        col=1,
+                        value=CanonicalRational(num="1", den="1"),
+                    ),
+                    MatrixEntry(
+                        row=1,
+                        col=0,
+                        value=CanonicalRational(num="2", den="1"),
+                    ),
                 ),
             )
 
 
 class TestFarkas:
-    def test_valid_certificate(self):
+    def test_valid_certificate(self) -> None:
         # System: x1 + x2 <= -1, x1 + x2 >= 1 is infeasible.
         # A = [[1, 1], [-1, -1]], b = [-1, -1]
         # y = (1, 1), y^T A = (1-1, 1-1) = (0, 0), y^T b = -1 + -1 = -2 < 0 => valid
-        req = FarkasCertificateRequest(
-            constraint_matrix=[
-                ({"num": "1", "den": "1"}, {"num": "1", "den": "1"}),
-                ({"num": "-1", "den": "1"}, {"num": "-1", "den": "1"}),
-            ],
-            rhs_vector=(
-                {"num": "-1", "den": "1"},
-                {"num": "-1", "den": "1"},
-            ),
-            multipliers=(
-                {"num": "1", "den": "1"},
-                {"num": "1", "den": "1"},
-            ),
+        req = FarkasCertificateRequest.model_validate(
+            {
+                "constraint_matrix": [
+                    ({"num": "1", "den": "1"}, {"num": "1", "den": "1"}),
+                    ({"num": "-1", "den": "1"}, {"num": "-1", "den": "1"}),
+                ],
+                "rhs_vector": (
+                    {"num": "-1", "den": "1"},
+                    {"num": "-1", "den": "1"},
+                ),
+                "multipliers": (
+                    {"num": "1", "den": "1"},
+                    {"num": "1", "den": "1"},
+                ),
+            }
         )
         result = check_farkas_certificate(req)
         assert result.valid is True
 
-    def test_rejects_nonrectangular_matrix(self):
+    def test_rejects_nonrectangular_matrix(self) -> None:
         import pytest
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError):
-            FarkasCertificateRequest(
-                constraint_matrix=[
-                    ({"num": "1", "den": "1"}, {"num": "1", "den": "1"}),
-                    ({"num": "-1", "den": "1"},),
-                ],
-                rhs_vector=(
-                    {"num": "-1", "den": "1"},
-                    {"num": "-1", "den": "1"},
-                ),
-                multipliers=(
-                    {"num": "1", "den": "1"},
-                    {"num": "1", "den": "1"},
-                ),
+            FarkasCertificateRequest.model_validate(
+                {
+                    "constraint_matrix": [
+                        ({"num": "1", "den": "1"}, {"num": "1", "den": "1"}),
+                        ({"num": "-1", "den": "1"},),
+                    ],
+                    "rhs_vector": (
+                        {"num": "-1", "den": "1"},
+                        {"num": "-1", "den": "1"},
+                    ),
+                    "multipliers": (
+                        {"num": "1", "den": "1"},
+                        {"num": "1", "den": "1"},
+                    ),
+                }
             )
 
 
@@ -141,7 +159,9 @@ class TestFarkas:
 # ---------------------------------------------------------------------------
 
 
-def _inertia_request(dimension: int, entries: dict[tuple[int, int], str]):
+def _inertia_request(
+    dimension: int, entries: dict[tuple[int, int], str]
+) -> SymmetricMatrixRequest:
     from jacobian.math.matrices.analysis._models import MatrixEntry
 
     return SymmetricMatrixRequest(
@@ -392,6 +412,7 @@ def _encoded_inertia_payload_near_limit(offset: int) -> bytes:
     return build(offset)
 
 
+@pytest.mark.scale
 def test_inertia_request_admission_reserves_output_headroom_for_source_echo() -> None:
     from jacobian.canonical import CanonicalLimits
 
@@ -401,12 +422,14 @@ def test_inertia_request_admission_reserves_output_headroom_for_source_echo() ->
         SymmetricMatrixRequest.model_validate_json(encoded)
 
 
+@pytest.mark.scale
 def test_inertia_request_admission_accepts_payload_inside_reserved_budget() -> None:
     encoded = _encoded_inertia_payload_near_limit(offset=2048)
     request = SymmetricMatrixRequest.model_validate_json(encoded)
     assert request.dimension == MAX_MATRIX_DIMENSION
 
 
+@pytest.mark.scale
 def test_inertia_request_admission_rejects_echo_beyond_output_limit_as_typed_error() -> (
     None
 ):

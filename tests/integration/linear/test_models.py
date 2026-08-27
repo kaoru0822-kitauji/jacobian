@@ -4,6 +4,7 @@ import pytest
 from tests.integration.linear._support import linear_validation_error
 from tests.support.rationals import rational_payload as _q
 
+from jacobian._exact import CanonicalRational
 from jacobian.math.matrices.rational_linear._models import (
     LinearRationalInconsistencyResult,
     LinearRationalSolutionFindRequest,
@@ -14,6 +15,10 @@ from jacobian.math.optimization._models import (
     RationalLinearProgramResult,
     StandardFormRationalLinearProgram,
 )
+
+
+def _canonical(numerator: int, denominator: int = 1) -> CanonicalRational:
+    return CanonicalRational.model_validate(_q(numerator, denominator))
 
 
 def _system() -> dict[str, object]:
@@ -54,7 +59,10 @@ def test_linear_find_request_rejects_ambiguous_or_oversized_rationals() -> None:
 
 def test_inline_results_keep_only_mathematical_values() -> None:
     system = LinearRationalSystem.model_validate(_system())
-    solution = LinearRationalSolutionResult(system=system, values=(_q(2), _q(1)))
+    solution = LinearRationalSolutionResult(
+        system=system,
+        values=(_canonical(2), _canonical(1)),
+    )
     dependent = LinearRationalSystem.model_validate(
         {
             "variables": ["x", "y"],
@@ -64,8 +72,8 @@ def test_inline_results_keep_only_mathematical_values() -> None:
     )
     inconsistency = LinearRationalInconsistencyResult(
         system=dependent,
-        left_witness=(_q(-1), _q(1)),
-        rhs_pairing=_q(1),
+        left_witness=(_canonical(-1), _canonical(1)),
+        rhs_pairing=_canonical(1),
     )
 
     assert solution.status == "SOLUTION"
@@ -103,14 +111,14 @@ def test_inline_results_preserve_completed_no_candidate_outcomes() -> None:
         LinearRationalSolutionResult(
             system=dependent,
             status="INCONSISTENT",
-            values=(_q(2), _q(1)),
+            values=(_canonical(2), _canonical(1)),
         )
     with linear_validation_error():
         LinearRationalInconsistencyResult(
             system=dependent,
             status="CONSISTENT",
-            left_witness=(_q(-1), _q(1)),
-            rhs_pairing=_q(1),
+            left_witness=(_canonical(-1), _canonical(1)),
+            rhs_pairing=_canonical(1),
         )
 
 

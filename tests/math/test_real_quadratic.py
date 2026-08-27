@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 from fractions import Fraction
+from typing import cast
 
 import pytest
 from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import MathTool
 from jacobian.math.arithmetic._real_quadratic import RealQuadraticOrderRequest
 from jacobian.math.real_quadratic import (
+    RealQuadraticOrderValue,
     RealQuadraticValue,
     real_quadratic_order,
 )
@@ -58,8 +61,10 @@ def test_order_declaration_projects_its_wire_request_to_the_native_kernel() -> N
 
     tools = {tool.operation_id: tool for tool in REAL_QUADRATIC_OPERATIONS}
     left, right = _value(3), _value(1)
-    result = tools["arithmetic.real_quadratic.order.compute"].run(
-        RealQuadraticOrderRequest(left=left, right=right)
+    order_tool = cast(
+        MathTool[RealQuadraticOrderRequest, RealQuadraticOrderValue],
+        tools["arithmetic.real_quadratic.order.compute"],
     )
+    result = order_tool.run(RealQuadraticOrderRequest(left=left, right=right))
 
     assert result == real_quadratic_order(left, right)

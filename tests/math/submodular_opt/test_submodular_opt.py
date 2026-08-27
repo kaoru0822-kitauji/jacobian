@@ -2,6 +2,7 @@
 
 import pytest
 
+from jacobian._exact import CanonicalRational
 from jacobian.math.submodular_opt._models import (
     MonotonicityCheckRequest,
     SetFunction,
@@ -21,21 +22,30 @@ def _make_uniform_function(n: int) -> SetFunction:
     entries = []
     for mask in range(1 << n):
         subset = tuple(i for i in range(n) if mask & (1 << i))
-        entries.append(
-            SetFunctionEntry(subset=subset, value={"num": str(len(subset)), "den": "1"})
-        )
+        entries.append(_entry(subset, len(subset)))
     return SetFunction(ground_set_size=n, entries=tuple(entries))
 
 
+def _entry(
+    subset: tuple[int, ...], num: int | str, den: int | str = "1"
+) -> SetFunctionEntry:
+    return SetFunctionEntry.model_validate(
+        {
+            "subset": subset,
+            "value": {"num": str(num), "den": str(den)},
+        }
+    )
+
+
 class TestSetFunctionEval:
-    def test_simple(self):
+    def test_simple(self) -> None:
         fn = _make_uniform_function(2)
         req = SetFunctionEvalRequest(function=fn, subset=(0, 1))
         result = evaluate_set_function(req)
         assert result.found is True
         assert result.value == "2"
 
-    def test_rejects_duplicate_eval_subset(self):
+    def test_rejects_duplicate_eval_subset(self) -> None:
         import pytest
         from pydantic import ValidationError
 
@@ -48,13 +58,13 @@ class TestSetFunctionEval:
 
 
 class TestMonotonicity:
-    def test_monotone(self):
+    def test_monotone(self) -> None:
         fn = _make_uniform_function(2)
         req = MonotonicityCheckRequest(function=fn)
         result = check_monotonicity(req)
         assert result.is_monotone is True
 
-    def test_rejects_incomplete_table(self):
+    def test_rejects_incomplete_table(self) -> None:
         import pytest
         from pydantic import ValidationError
 
@@ -62,11 +72,8 @@ class TestMonotonicity:
             SetFunction(
                 ground_set_size=2,
                 entries=(
-                    SetFunctionEntry(subset=(), value={"num": "0", "den": "1"}),
-                    SetFunctionEntry(
-                        subset=(0, 1),
-                        value={"num": "-1", "den": "1"},
-                    ),
+                    _entry((), "0"),
+                    _entry((0, 1), "-1"),
                 ),
             )
         assert (
@@ -76,7 +83,7 @@ class TestMonotonicity:
 
 
 class TestSubmodularity:
-    def test_modular_is_submodular(self):
+    def test_modular_is_submodular(self) -> None:
         """f(S) = |S| is modular (hence submodular)."""
         fn = _make_uniform_function(2)
         req = SubmodularityCheckRequest(function=fn)
@@ -103,10 +110,9 @@ class TestKernelEquivalence:
             entries.append(
                 SetFunctionEntry(
                     subset=subset,
-                    value={
-                        "num": str(fraction.numerator),
-                        "den": str(fraction.denominator),
-                    },
+                    value=CanonicalRational(
+                        num=str(fraction.numerator), den=str(fraction.denominator)
+                    ),
                 )
             )
         return SetFunction(ground_set_size=n, entries=tuple(entries))
@@ -139,7 +145,7 @@ class TestKernelEquivalence:
         n = function.ground_set_size
         masks = list(range(1 << n))
 
-        def to_mask(subset):
+        def to_mask(subset: tuple[int, ...]) -> int:
             value = 0
             for element in subset:
                 value |= 1 << element
@@ -157,7 +163,7 @@ class TestKernelEquivalence:
         del masks, n
         return True
 
-    def test_local_matches_bruteforce_integer_tables(self):
+    def test_local_matches_bruteforce_integer_tables(self) -> None:
         for seed in range(6):
             function = self._random_function(6, seed=seed)
             assert check_monotonicity(
@@ -167,18 +173,18 @@ class TestKernelEquivalence:
                 SubmodularityCheckRequest(function=function)
             ).is_submodular == self._bruteforce_submodular(function)
 
-    def test_local_matches_bruteforce_fractional_tables(self):
+    def test_local_matches_bruteforce_fractional_tables(self) -> None:
         for seed in range(4):
             function = self._random_function(5, seed=100 + seed, fractional=True)
             assert check_submodularity(
                 SubmodularityCheckRequest(function=function)
             ).is_submodular == self._bruteforce_submodular(function)
 
-    def test_violation_message_names_witnesses(self):
+    def test_violation_message_names_witnesses(self) -> None:
         # f({}) = 0 but f({0}) = -1 violates monotonicity at a covering edge.
         entries = [
-            SetFunctionEntry(subset=(), value={"num": "0", "den": "1"}),
-            SetFunctionEntry(subset=(0,), value={"num": "-1", "den": "1"}),
+            _entry((), "0"),
+            _entry((0,), "-1"),
         ]
         result = check_monotonicity(
             MonotonicityCheckRequest(
@@ -188,7 +194,7 @@ class TestKernelEquivalence:
         assert result.is_monotone is False
         assert result.violation == "f(()) > f((0,))"
 
-    def test_transport_preflight_rejects_unwritable_tables(self):
+    def test_transport_preflight_rejects_unwritable_tables(self) -> None:
         """A complete 2^16 table with wide values exceeds the byte envelope."""
         from pydantic import ValidationError
 
@@ -199,7 +205,7 @@ class TestKernelEquivalence:
             entries.append(
                 SetFunctionEntry(
                     subset=subset,
-                    value={"num": "9" * 90, "den": "1"},
+                    value=CanonicalRational(num="9" * 90, den="1"),
                 )
             )
         with pytest.raises(ValidationError) as error:
@@ -216,8 +222,12 @@ def test_value_height_bound_keeps_scan_work_small() -> None:
     single-lookup evaluator can return any exact representable height."""
     from pydantic import ValidationError
 
-    wide_empty = SetFunctionEntry(subset=(), value={"num": "9" * 129, "den": "1"})
-    wide_full = SetFunctionEntry(subset=(0,), value={"num": "9" * 129, "den": "1"})
+    wide_empty = SetFunctionEntry(
+        subset=(), value=CanonicalRational(num="9" * 129, den="1")
+    )
+    wide_full = SetFunctionEntry(
+        subset=(0,), value=CanonicalRational(num="9" * 129, den="1")
+    )
     with pytest.raises(ValidationError) as error:
         MonotonicityCheckRequest(
             function=SetFunction(ground_set_size=1, entries=(wide_empty, wide_full))
@@ -233,7 +243,9 @@ def test_value_height_bound_keeps_scan_work_small() -> None:
         error.value.errors()[0]["type"] == "submodular_opt.scan_value_height_exceeded"
     )
 
-    narrow = SetFunctionEntry(subset=(0,), value={"num": "9" * 128, "den": "1"})
+    narrow = SetFunctionEntry(
+        subset=(0,), value=CanonicalRational(num="9" * 128, den="1")
+    )
     # Exactly-128-digit values are admitted and the scan completes normally.
     assert (
         check_monotonicity(
@@ -241,7 +253,7 @@ def test_value_height_bound_keeps_scan_work_small() -> None:
                 function=SetFunction(
                     ground_set_size=1,
                     entries=(
-                        SetFunctionEntry(subset=(), value={"num": "0", "den": "1"}),
+                        _entry((), "0"),
                         narrow,
                     ),
                 )

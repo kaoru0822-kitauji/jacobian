@@ -87,9 +87,11 @@ def _non_greedoid_exchange() -> FiniteFeasibleSetSystem:
         ),
     ),
 )
-def test_result_models_reject_mixed_outcome_branches(result: object) -> None:
+def test_result_models_reject_mixed_outcome_branches(
+    result: RankResult | BasesResult | ConvexGeometryResult,
+) -> None:
     with pytest.raises(ValidationError):
-        type(result).model_validate(result.model_dump())
+        result.model_validate(result.model_dump())
 
 
 # ---------------------------------------------------------------------------

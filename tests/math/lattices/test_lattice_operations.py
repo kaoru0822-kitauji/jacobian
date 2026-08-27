@@ -33,9 +33,11 @@ from jacobian.math.lattices._models import (
 
 
 def _lattice(ambient: int, basis: list[list[int]]) -> IntegerLattice:
-    return IntegerLattice(
-        ambient_dimension=ambient,
-        basis={"entries": [[str(v) for v in row] for row in basis]},
+    return IntegerLattice.model_validate(
+        {
+            "ambient_dimension": ambient,
+            "basis": {"entries": [[str(v) for v in row] for row in basis]},
+        }
     )
 
 
@@ -58,7 +60,9 @@ def test_integer_lattice_rejects_too_many_rows() -> None:
 
 def test_integer_lattice_rejects_empty_basis() -> None:
     with pytest.raises(ValidationError) as exc_info:
-        IntegerLattice(ambient_dimension=2, basis={"entries": []})
+        IntegerLattice.model_validate(
+            {"ambient_dimension": 2, "basis": {"entries": []}}
+        )
     assert exc_info.value.errors()[0]["type"] == "too_short"
 
 
@@ -188,10 +192,12 @@ def test_saturation_rank_deficient() -> None:
 def test_sublattice_index_double() -> None:
     """Index of 2ZZ inside ZZ is 2."""
     result = compute_sublattice_index(
-        SublatticeIndexRequest(
-            sublattice=_lattice(1, [[2]]),
-            parent=_lattice(1, [[1]]),
-            embedding={"entries": [["2"]]},
+        SublatticeIndexRequest.model_validate(
+            {
+                "sublattice": _lattice(1, [[2]]),
+                "parent": _lattice(1, [[1]]),
+                "embedding": {"entries": [["2"]]},
+            }
         )
     )
     assert result.index == 2
@@ -202,10 +208,12 @@ def test_sublattice_index_double() -> None:
 def test_sublattice_index_quadratic() -> None:
     """Index of <(2,0),(0,2)> inside <(1,0),(0,1)> is 4."""
     result = compute_sublattice_index(
-        SublatticeIndexRequest(
-            sublattice=_lattice(2, [[2, 0], [0, 2]]),
-            parent=_lattice(2, [[1, 0], [0, 1]]),
-            embedding={"entries": [["2", "0"], ["0", "2"]]},
+        SublatticeIndexRequest.model_validate(
+            {
+                "sublattice": _lattice(2, [[2, 0], [0, 2]]),
+                "parent": _lattice(2, [[1, 0], [0, 1]]),
+                "embedding": {"entries": [["2", "0"], ["0", "2"]]},
+            }
         )
     )
     assert result.index == 4
@@ -215,10 +223,12 @@ def test_sublattice_index_quadratic() -> None:
 
 def test_sublattice_index_rejects_dimension_mismatch() -> None:
     with pytest.raises(ValidationError) as exc_info:
-        SublatticeIndexRequest(
-            sublattice=_lattice(1, [[1]]),
-            parent=_lattice(2, [[1, 0], [0, 1]]),
-            embedding={"entries": [["1", "0"]]},
+        SublatticeIndexRequest.model_validate(
+            {
+                "sublattice": _lattice(1, [[1]]),
+                "parent": _lattice(2, [[1, 0], [0, 1]]),
+                "embedding": {"entries": [["1", "0"]]},
+            }
         )
     assert exc_info.value.errors()[0]["type"] == "lattice.ambient_dimensions_mismatch"
 

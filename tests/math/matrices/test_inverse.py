@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from fractions import Fraction
 from random import Random
+from typing import Any
 
 import pytest
 
@@ -18,7 +19,7 @@ from jacobian.math.matrices._operation_models import MatrixInverseResult
 from jacobian.math.matrices._tools import TOOLS
 
 
-def _operation(operation_id: str) -> MathTool:
+def _operation(operation_id: str) -> MathTool[Any, Any]:
     return next(tool for tool in TOOLS if tool.operation_id == operation_id)
 
 
@@ -55,7 +56,13 @@ def _multiply(
 ) -> tuple[tuple[Fraction, ...], ...]:
     return tuple(
         tuple(
-            sum(left[row][index] * right[index][column] for index in range(len(right)))
+            sum(
+                (
+                    left[row][index] * right[index][column]
+                    for index in range(len(right))
+                ),
+                Fraction(0),
+            )
             for column in range(len(right[0]))
         )
         for row in range(len(left))

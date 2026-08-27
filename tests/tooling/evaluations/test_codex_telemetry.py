@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from pathlib import Path
+from typing import TypedDict
 
 from benchmarks.tooling.codex_telemetry import (
     parse_agent_transcript,
@@ -12,11 +14,30 @@ from benchmarks.tooling.codex_telemetry import (
 from jacobian.canonical import canonicalize_json
 
 
+class _ToolResult(TypedDict, total=False):
+    isError: bool
+    content: list[dict[str, object]]
+    contents: list[dict[str, object]]
+
+
+class _ToolCall(TypedDict):
+    type: str
+    tool: str
+    arguments: Mapping[str, object]
+    status: str
+    result: _ToolResult
+
+
+class _ToolEvent(TypedDict):
+    type: str
+    item: _ToolCall
+
+
 def _tool_event(
     tool: str,
-    arguments: dict[str, object],
-    response: dict[str, object],
-) -> dict[str, object]:
+    arguments: Mapping[str, object],
+    response: Mapping[str, object],
+) -> _ToolEvent:
     return {
         "type": "item.completed",
         "item": {
@@ -515,7 +536,7 @@ def test_agent_telemetry_separates_wire_model_and_logical_invocation_bytes(
 def test_agent_telemetry_tracks_resource_link_follow_through(
     tmp_path: Path,
 ) -> None:
-    def read_event(name: str) -> tuple[str, dict[str, object]]:
+    def read_event(name: str) -> tuple[str, _ToolEvent]:
         uri = f"operation://{name}"
         return uri, _tool_event(
             "resources/read",
@@ -525,12 +546,13 @@ def test_agent_telemetry_tracks_resource_link_follow_through(
 
     uri, first_read = read_event("a")
     first_result = first_read["item"]["result"]
-    first_result["contents"] = first_result.pop("content")
+    first_result["contents"] = first_result["content"]
+    del first_result["content"]
     unnecessary_uri, second_read = read_event("b")
     malformed_uri = "operation://missing"
 
-    def link_event(link_uri: str) -> dict[str, object]:
-        content = [{"type": "resource_link", "uri": link_uri}]
+    def link_event(link_uri: str) -> _ToolEvent:
+        content: list[dict[str, object]] = [{"type": "resource_link", "uri": link_uri}]
         return {
             "type": "item.completed",
             "item": {

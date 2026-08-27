@@ -1,5 +1,7 @@
 """Known-answer and adversarial tests for finite hypergraph operations."""
 
+from typing import TypedDict
+
 import pytest
 from pydantic import ValidationError
 
@@ -28,7 +30,23 @@ from jacobian.math.hypergraphs._operations import (
 
 # ---- Fixtures ----------------------------------------------------------------
 
-HYPERGRAPH = {
+type HyperedgeWire = list[str | list[str]]
+
+
+class HypergraphWire(TypedDict):
+    """Raw JSON-shaped input accepted by ``FiniteHypergraph``."""
+
+    vertices: list[str]
+    edges: list[HyperedgeWire]
+
+
+def _hypergraph(wire: HypergraphWire) -> FiniteHypergraph:
+    """Cross the raw-wire boundary into the canonical hypergraph model."""
+
+    return FiniteHypergraph.model_validate(wire)
+
+
+HYPERGRAPH: HypergraphWire = {
     "vertices": ["a", "b", "c", "d"],
     "edges": [
         ["e1", ["a", "b", "c"]],
@@ -38,7 +56,7 @@ HYPERGRAPH = {
 }
 
 # Uniform hypergraph: every edge has 2 vertices.
-UNIFORM = {
+UNIFORM: HypergraphWire = {
     "vertices": ["x", "y", "z"],
     "edges": [
         ["p", ["x", "y"]],
@@ -48,19 +66,19 @@ UNIFORM = {
 }
 
 # Hypergraph with no edges.
-NO_EDGES = {
+NO_EDGES: HypergraphWire = {
     "vertices": ["a", "b"],
     "edges": [],
 }
 
 # Singleton vertex with one edge.
-SINGLETON = {
+SINGLETON: HypergraphWire = {
     "vertices": ["v"],
     "edges": [["e", ["v"]]],
 }
 
 # Declared vertex order disagrees with lexical order (issue #2300).
-REVERSED_ORDER = {
+REVERSED_ORDER: HypergraphWire = {
     "vertices": ["z", "a"],
     "edges": [["e", ["z", "a"]]],
 }
@@ -68,52 +86,54 @@ REVERSED_ORDER = {
 
 class TestFiniteHypergraph:
     def test_construct(self) -> None:
-        hg = FiniteHypergraph(**HYPERGRAPH)
+        hg = _hypergraph(HYPERGRAPH)
         assert hg.vertices == ("a", "b", "c", "d")
         assert hg.edges[0] == ("e1", ("a", "b", "c"))
 
     def test_member_order_canonicalized(self) -> None:
-        hg = FiniteHypergraph(vertices=["a", "b"], edges=[["e", ["b", "a"]]])
+        hg = _hypergraph({"vertices": ["a", "b"], "edges": [["e", ["b", "a"]]]})
         assert hg.edges == (("e", ("a", "b")),)
-        hg2 = FiniteHypergraph(vertices=["a", "b"], edges=[["e", ["a", "b"]]])
+        hg2 = _hypergraph({"vertices": ["a", "b"], "edges": [["e", ["a", "b"]]]})
         assert hg == hg2
 
     def test_duplicate_vertices_rejected(self) -> None:
         with pytest.raises(ValidationError):
-            FiniteHypergraph(vertices=["a", "a"], edges=[])
+            _hypergraph({"vertices": ["a", "a"], "edges": []})
 
     def test_undeclared_member_rejected(self) -> None:
         with pytest.raises(ValidationError):
-            FiniteHypergraph(vertices=["a", "b"], edges=[["e", ["a", "z"]]])
+            _hypergraph({"vertices": ["a", "b"], "edges": [["e", ["a", "z"]]]})
 
     def test_duplicate_edge_ids_rejected(self) -> None:
         with pytest.raises(ValidationError):
-            FiniteHypergraph(
-                vertices=["a", "b"],
-                edges=[["e", ["a"]], ["e", ["b"]]],
+            _hypergraph(
+                {
+                    "vertices": ["a", "b"],
+                    "edges": [["e", ["a"]], ["e", ["b"]]],
+                }
             )
 
     def test_duplicate_members_in_edge_rejected(self) -> None:
         with pytest.raises(ValidationError):
-            FiniteHypergraph(vertices=["a", "b"], edges=[["e", ["a", "a"]]])
+            _hypergraph({"vertices": ["a", "b"], "edges": [["e", ["a", "a"]]]})
 
     def test_lone_surrogate_vertex_label_rejected(self) -> None:
         with pytest.raises(ValidationError):
-            FiniteHypergraph(vertices=["\ud800"], edges=[])
+            _hypergraph({"vertices": ["\ud800"], "edges": []})
 
     def test_lone_surrogate_edge_id_rejected(self) -> None:
         with pytest.raises(ValidationError):
-            FiniteHypergraph(vertices=["a"], edges=[["\udfff", ["a"]]])
+            _hypergraph({"vertices": ["a"], "edges": [["\udfff", ["a"]]]})
 
     def test_astral_plane_label_accepted(self) -> None:
-        hg = FiniteHypergraph(vertices=["\U0001d5a0"], edges=[["e", ["\U0001d5a0"]]])
+        hg = _hypergraph({"vertices": ["\U0001d5a0"], "edges": [["e", ["\U0001d5a0"]]]})
         assert hg.vertices == ("\U0001d5a0",)
         assert hg.edges[0][1] == ("\U0001d5a0",)
 
 
 class TestParameters:
     def test_basic(self) -> None:
-        r = compute_parameters(ParametersRequest(hypergraph=HYPERGRAPH))
+        r = compute_parameters(ParametersRequest(hypergraph=_hypergraph(HYPERGRAPH)))
         assert r.vertex_count == 4
         assert r.edge_count == 3
         assert r.rank == 3
@@ -122,13 +142,13 @@ class TestParameters:
         assert r.total_incidences == 8
 
     def test_uniform(self) -> None:
-        r = compute_parameters(ParametersRequest(hypergraph=UNIFORM))
+        r = compute_parameters(ParametersRequest(hypergraph=_hypergraph(UNIFORM)))
         assert r.uniform_size == 2
         assert r.rank == 2
         assert r.corank == 2
 
     def test_no_edges(self) -> None:
-        r = compute_parameters(ParametersRequest(hypergraph=NO_EDGES))
+        r = compute_parameters(ParametersRequest(hypergraph=_hypergraph(NO_EDGES)))
         assert r.vertex_count == 2
         assert r.edge_count == 0
         assert r.rank == 0
@@ -137,7 +157,7 @@ class TestParameters:
         assert r.total_incidences == 0
 
     def test_singleton(self) -> None:
-        r = compute_parameters(ParametersRequest(hypergraph=SINGLETON))
+        r = compute_parameters(ParametersRequest(hypergraph=_hypergraph(SINGLETON)))
         assert r.vertex_count == 1
         assert r.edge_count == 1
         assert r.rank == 1
@@ -147,7 +167,7 @@ class TestParameters:
     def test_wrong_vertex_count_requires_explicit_verification(self) -> None:
         from jacobian.math.hypergraphs._models import ParametersResult
 
-        hg = FiniteHypergraph(**HYPERGRAPH)
+        hg = _hypergraph(HYPERGRAPH)
         result = ParametersResult(
             hypergraph=hg,
             vertex_count=99,
@@ -162,7 +182,9 @@ class TestParameters:
 
 class TestVertexDegrees:
     def test_degrees(self) -> None:
-        r = compute_vertex_degrees(VertexDegreesRequest(hypergraph=HYPERGRAPH))
+        r = compute_vertex_degrees(
+            VertexDegreesRequest(hypergraph=_hypergraph(HYPERGRAPH))
+        )
         d = dict(r.degrees)
         assert d["a"] == 2  # e1, e3
         assert d["b"] == 2  # e1, e2
@@ -171,32 +193,38 @@ class TestVertexDegrees:
         assert dict(r.histogram) == {2: 4}
 
     def test_uniform(self) -> None:
-        r = compute_vertex_degrees(VertexDegreesRequest(hypergraph=UNIFORM))
+        r = compute_vertex_degrees(
+            VertexDegreesRequest(hypergraph=_hypergraph(UNIFORM))
+        )
         assert dict(r.degrees) == {"x": 2, "y": 2, "z": 2}
 
     def test_no_edges(self) -> None:
-        r = compute_vertex_degrees(VertexDegreesRequest(hypergraph=NO_EDGES))
+        r = compute_vertex_degrees(
+            VertexDegreesRequest(hypergraph=_hypergraph(NO_EDGES))
+        )
         assert dict(r.degrees) == {"a": 0, "b": 0}
         assert dict(r.histogram) == {0: 2}
 
     def test_histogram_sorted(self) -> None:
-        hg = {
+        hg: HypergraphWire = {
             "vertices": ["a", "b", "c", "d"],
             "edges": [["e", ["a", "b"]]],
         }
-        r = compute_vertex_degrees(VertexDegreesRequest(hypergraph=hg))
+        r = compute_vertex_degrees(VertexDegreesRequest(hypergraph=_hypergraph(hg)))
         assert dict(r.histogram) == {0: 2, 1: 2}
         degrees = [d for _, d in r.histogram]
         assert degrees == sorted(degrees)
 
     def test_degrees_in_vertex_order(self) -> None:
-        r = compute_vertex_degrees(VertexDegreesRequest(hypergraph=HYPERGRAPH))
+        r = compute_vertex_degrees(
+            VertexDegreesRequest(hypergraph=_hypergraph(HYPERGRAPH))
+        )
         assert [v for v, _ in r.degrees] == ["a", "b", "c", "d"]
 
 
 class TestDual:
     def test_dual_basic(self) -> None:
-        r = compute_dual(DualRequest(hypergraph=HYPERGRAPH))
+        r = compute_dual(DualRequest(hypergraph=_hypergraph(HYPERGRAPH)))
         dual = r.dual
         assert dual.vertices == ("e1", "e2", "e3")
         d_edges = dict(dual.edges)
@@ -206,7 +234,7 @@ class TestDual:
         assert d_edges["d"] == ("e2", "e3")
 
     def test_dual_of_dual_recovers_original(self) -> None:
-        r = compute_dual(DualRequest(hypergraph=HYPERGRAPH))
+        r = compute_dual(DualRequest(hypergraph=_hypergraph(HYPERGRAPH)))
         r2 = compute_dual(DualRequest(hypergraph=r.dual))
         recovered = r2.dual
         assert recovered.vertices == ("a", "b", "c", "d")
@@ -217,21 +245,23 @@ class TestDual:
         }
 
     def test_dual_no_edges(self) -> None:
-        r = compute_dual(DualRequest(hypergraph=NO_EDGES))
+        r = compute_dual(DualRequest(hypergraph=_hypergraph(NO_EDGES)))
         assert r.dual.vertices == ()
         assert r.dual.edges == (("a", ()), ("b", ()))
 
     def test_wrong_dual_requires_explicit_verification(self) -> None:
         from jacobian.math.hypergraphs._models import DualResult
 
-        hg = FiniteHypergraph(**HYPERGRAPH)
-        wrong = FiniteHypergraph(vertices=["e1"], edges=[["e1", ["e1"]]])
+        hg = _hypergraph(HYPERGRAPH)
+        wrong = _hypergraph({"vertices": ["e1"], "edges": [["e1", ["e1"]]]})
         assert not verify_dual_result(DualResult(hypergraph=hg, dual=wrong))
 
 
 class TestIncidenceGraph:
     def test_incidence(self) -> None:
-        r = compute_incidence_graph(IncidenceGraphRequest(hypergraph=HYPERGRAPH))
+        r = compute_incidence_graph(
+            IncidenceGraphRequest(hypergraph=_hypergraph(HYPERGRAPH))
+        )
         vi = dict(r.vertex_incidence)
         assert vi["a"] == ("e1", "e3")
         assert vi["b"] == ("e1", "e2")
@@ -253,21 +283,25 @@ class TestIncidenceGraph:
         }
 
     def test_no_edges(self) -> None:
-        r = compute_incidence_graph(IncidenceGraphRequest(hypergraph=NO_EDGES))
+        r = compute_incidence_graph(
+            IncidenceGraphRequest(hypergraph=_hypergraph(NO_EDGES))
+        )
         assert dict(r.vertex_incidence) == {"a": (), "b": ()}
         assert r.edge_incidence == ()
         assert r.edges == ()
 
     def test_edge_incidence_is_canonical(self) -> None:
-        hg = FiniteHypergraph(
-            vertices=["a", "b", "c"],
-            edges=[["e", ["c", "a", "b"]]],
+        hg = _hypergraph(
+            {
+                "vertices": ["a", "b", "c"],
+                "edges": [["e", ["c", "a", "b"]]],
+            }
         )
         r = compute_incidence_graph(IncidenceGraphRequest(hypergraph=hg))
         assert dict(r.edge_incidence)["e"] == ("a", "b", "c")
 
     def test_vertex_incidence_preserves_edge_order(self) -> None:
-        hg = {
+        hg: HypergraphWire = {
             "vertices": ["v"],
             "edges": [
                 ["z", ["v"]],
@@ -275,13 +309,15 @@ class TestIncidenceGraph:
                 ["m", ["v"]],
             ],
         }
-        r = compute_incidence_graph(IncidenceGraphRequest(hypergraph=hg))
+        r = compute_incidence_graph(IncidenceGraphRequest(hypergraph=_hypergraph(hg)))
         assert dict(r.vertex_incidence)["v"] == ("z", "a", "m")
 
 
 class TestCliqueExpansion:
     def test_canonical_graph(self) -> None:
-        r = compute_clique_expansion(CliqueExpansionRequest(hypergraph=HYPERGRAPH))
+        r = compute_clique_expansion(
+            CliqueExpansionRequest(hypergraph=_hypergraph(HYPERGRAPH))
+        )
         assert isinstance(r.graph, SimpleUndirectedGraph)
         assert r.graph.vertices == ("a", "b", "c", "d")
         assert set(r.graph.edges) == {
@@ -296,13 +332,15 @@ class TestCliqueExpansion:
     def test_endpoint_order_follows_graph_convention(self) -> None:
         """The ('z', 'a') reproduction: endpoints are lexical, not declared."""
 
-        r = compute_clique_expansion(CliqueExpansionRequest(hypergraph=REVERSED_ORDER))
+        r = compute_clique_expansion(
+            CliqueExpansionRequest(hypergraph=_hypergraph(REVERSED_ORDER))
+        )
         assert r.graph.vertices == ("z", "a")
         assert r.graph.edges == (("a", "z"),)
 
     def test_defining_property_against_source(self) -> None:
         for hypergraph in (HYPERGRAPH, UNIFORM):
-            hg = FiniteHypergraph(**hypergraph)
+            hg = _hypergraph(hypergraph)
             r = compute_clique_expansion(CliqueExpansionRequest(hypergraph=hg))
             members = [set(members) for _, members in hg.edges]
             adjacent = set(r.graph.edges)
@@ -314,7 +352,7 @@ class TestCliqueExpansion:
                     assert (pair in adjacent) == shared
 
     def test_degenerate_edges_admitted(self) -> None:
-        hg = {
+        hg: HypergraphWire = {
             "vertices": ["a", "b", "c"],
             "edges": [
                 ["empty", []],
@@ -324,37 +362,45 @@ class TestCliqueExpansion:
                 ["pair", ["b", "c"]],
             ],
         }
-        r = compute_clique_expansion(CliqueExpansionRequest(hypergraph=hg))
+        r = compute_clique_expansion(CliqueExpansionRequest(hypergraph=_hypergraph(hg)))
         assert r.graph.vertices == ("a", "b", "c")
         assert r.graph.edges == (("a", "b"), ("b", "c"))
 
     def test_no_edges(self) -> None:
-        r = compute_clique_expansion(CliqueExpansionRequest(hypergraph=NO_EDGES))
+        r = compute_clique_expansion(
+            CliqueExpansionRequest(hypergraph=_hypergraph(NO_EDGES))
+        )
         assert r.graph.vertices == ("a", "b")
         assert r.graph.edges == ()
 
     def test_singleton(self) -> None:
-        r = compute_clique_expansion(CliqueExpansionRequest(hypergraph=SINGLETON))
+        r = compute_clique_expansion(
+            CliqueExpansionRequest(hypergraph=_hypergraph(SINGLETON))
+        )
         assert r.graph.vertices == ("v",)
         assert r.graph.edges == ()
 
     def test_non_nfc_vertex_label_rejected(self) -> None:
         decomposed = "e\u0301"
         with pytest.raises(ValidationError):
-            CliqueExpansionRequest(
-                hypergraph={
-                    "vertices": [decomposed, "a"],
-                    "edges": [["e", [decomposed, "a"]]],
+            CliqueExpansionRequest.model_validate(
+                {
+                    "hypergraph": {
+                        "vertices": [decomposed, "a"],
+                        "edges": [["e", [decomposed, "a"]]],
+                    }
                 }
             )
 
     def test_nfc_vertex_label_accepted(self) -> None:
         composed = "\u00e9"
         r = compute_clique_expansion(
-            CliqueExpansionRequest(
-                hypergraph={
-                    "vertices": [composed, "a"],
-                    "edges": [["e", [composed, "a"]]],
+            CliqueExpansionRequest.model_validate(
+                {
+                    "hypergraph": {
+                        "vertices": [composed, "a"],
+                        "edges": [["e", [composed, "a"]]],
+                    }
                 }
             )
         )
@@ -369,14 +415,16 @@ class TestCliqueExpansion:
         pairwise-disjoint family of source hyperedges.
         """
 
-        hg = FiniteHypergraph(
-            vertices=["a", "b", "c", "d", "e", "f"],
-            edges=[
-                ["e1", ["a", "b"]],
-                ["e2", ["c", "d"]],
-                ["e3", ["e", "f"]],
-                ["e4", ["a", "c"]],
-            ],
+        hg = _hypergraph(
+            {
+                "vertices": ["a", "b", "c", "d", "e", "f"],
+                "edges": [
+                    ["e1", ["a", "b"]],
+                    ["e2", ["c", "d"]],
+                    ["e3", ["e", "f"]],
+                    ["e4", ["a", "c"]],
+                ],
+            }
         )
         dual = compute_dual(DualRequest(hypergraph=hg)).dual
         expansion = compute_clique_expansion(CliqueExpansionRequest(hypergraph=dual))
@@ -393,7 +441,9 @@ class TestCliqueExpansion:
                 assert not set(members[u]) & set(members[v])
 
     def test_serialization_round_trip(self) -> None:
-        r = compute_clique_expansion(CliqueExpansionRequest(hypergraph=HYPERGRAPH))
+        r = compute_clique_expansion(
+            CliqueExpansionRequest(hypergraph=_hypergraph(HYPERGRAPH))
+        )
         restored = CliqueExpansionResult.model_validate_json(r.model_dump_json())
         assert restored == r
 
@@ -404,7 +454,7 @@ class TestBindingSafety:
     def test_vertex_degrees_binding(self) -> None:
         from jacobian.math.hypergraphs._models import VertexDegreesResult
 
-        hg = FiniteHypergraph(**HYPERGRAPH)
+        hg = _hypergraph(HYPERGRAPH)
         with pytest.raises(ValidationError):
             VertexDegreesResult(
                 hypergraph=hg,
@@ -417,7 +467,7 @@ class TestBindingSafety:
             IncidenceGraphResult,
         )
 
-        hg = FiniteHypergraph(**HYPERGRAPH)
+        hg = _hypergraph(HYPERGRAPH)
         result = IncidenceGraphResult(
             hypergraph=hg,
             vertex_incidence=(
@@ -436,7 +486,7 @@ class TestBindingSafety:
         assert not verify_incidence_graph_result(result)
 
     def test_clique_expansion_claim_requires_explicit_verification(self) -> None:
-        hg = FiniteHypergraph(**HYPERGRAPH)
+        hg = _hypergraph(HYPERGRAPH)
         missing_edge = SimpleUndirectedGraph(
             vertices=("a", "b", "c", "d"),
             edges=(
@@ -456,9 +506,11 @@ class TestBindingSafety:
             SimpleUndirectedGraph(vertices=("z", "a"), edges=(("z", "a"),))
 
     def test_spurious_clique_adjacency_requires_explicit_verification(self) -> None:
-        disjoint = FiniteHypergraph(
-            vertices=["u", "v", "w"],
-            edges=[["p", ["u", "v"]]],
+        disjoint = _hypergraph(
+            {
+                "vertices": ["u", "v", "w"],
+                "edges": [["p", ["u", "v"]]],
+            }
         )
         spurious = SimpleUndirectedGraph(
             vertices=("u", "v", "w"),

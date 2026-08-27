@@ -5,7 +5,7 @@ from copy import deepcopy
 from fractions import Fraction
 from importlib import import_module
 from itertools import combinations
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from pydantic import ValidationError
@@ -323,7 +323,10 @@ def test_successful_compute_enumerates_each_edge_subset_once(
         (("a", "b"), ("a", "c"), ("a", "d"), ("b", "c")),
     )
     call_count = 0
-    original = native_module._connected_spanning_subgraph_counts
+    original = cast(
+        Callable[[SimpleUndirectedGraph], tuple[int, ...]],
+        native_module._connected_spanning_subgraph_counts,
+    )
 
     def counted(value: SimpleUndirectedGraph) -> tuple[int, ...]:
         nonlocal call_count

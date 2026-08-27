@@ -33,11 +33,13 @@ def _request(
     include_empty_subset: bool,
     include_witnesses: bool = False,
 ) -> SubsetSumResidueProfileRequest:
-    return SubsetSumResidueProfileRequest(
-        source={"items": [str(value) for value in values]},
-        modulus=modulus,
-        include_empty_subset=include_empty_subset,
-        include_witnesses=include_witnesses,
+    return SubsetSumResidueProfileRequest.model_validate(
+        {
+            "source": {"items": [str(value) for value in values]},
+            "modulus": modulus,
+            "include_empty_subset": include_empty_subset,
+            "include_witnesses": include_witnesses,
+        }
     )
 
 
@@ -57,7 +59,8 @@ def _bitmask_oracle(
             % modulus
         )
         counts[residue] += 1
-        if masks[residue] is None or mask < masks[residue]:
+        current = masks[residue]
+        if current is None or mask < current:
             masks[residue] = mask
     witnesses = tuple(
         None
@@ -295,19 +298,23 @@ def test_owner_verifier_rejects_noncanonical_or_mutated_witness() -> None:
 def test_request_rejects_one_oversized_source_integer_before_parsing() -> None:
     oversized = "1" + "0" * MAX_RESIDUE_PROFILE_INPUT_INTEGER_DIGITS
     with pytest.raises(ValidationError):
-        SubsetSumResidueProfileRequest(
-            source={"items": [oversized]},
-            modulus=2,
-            include_empty_subset=True,
+        SubsetSumResidueProfileRequest.model_validate(
+            {
+                "source": {"items": [oversized]},
+                "modulus": 2,
+                "include_empty_subset": True,
+            }
         )
 
 
 def test_request_rejects_multiplicity_intermediate_above_bound() -> None:
     with pytest.raises(ValidationError):
-        SubsetSumResidueProfileRequest(
-            source={"items": ["0"] * MAX_RESIDUE_PROFILE_MULTIPLICITY_BITS},
-            modulus=1,
-            include_empty_subset=True,
+        SubsetSumResidueProfileRequest.model_validate(
+            {
+                "source": {"items": ["0"] * MAX_RESIDUE_PROFILE_MULTIPLICITY_BITS},
+                "modulus": 1,
+                "include_empty_subset": True,
+            }
         )
 
 
@@ -368,10 +375,12 @@ def test_single_integer_beyond_legacy_digit_cap_is_admitted() -> None:
 def test_exact_dp_cell_boundary_is_complete_and_serializable() -> None:
     item_count = 200
     modulus = MAX_RESIDUE_PROFILE_DP_CELLS // item_count
-    request = SubsetSumResidueProfileRequest(
-        source={"items": ["0"] * item_count},
-        modulus=modulus,
-        include_empty_subset=True,
+    request = SubsetSumResidueProfileRequest.model_validate(
+        {
+            "source": {"items": ["0"] * item_count},
+            "modulus": modulus,
+            "include_empty_subset": True,
+        }
     )
     result = compute_subset_sum_residue_profile(request)
     assert result.residue_counts[0] == str(1 << item_count)
@@ -387,10 +396,12 @@ def test_request_just_above_dp_cell_boundary_is_rejected() -> None:
     item_count = 201
     modulus = MAX_RESIDUE_PROFILE_DP_CELLS // 200
     with pytest.raises(ValidationError):
-        SubsetSumResidueProfileRequest(
-            source={"items": ["0"] * item_count},
-            modulus=modulus,
-            include_empty_subset=True,
+        SubsetSumResidueProfileRequest.model_validate(
+            {
+                "source": {"items": ["0"] * item_count},
+                "modulus": modulus,
+                "include_empty_subset": True,
+            }
         )
 
 
@@ -416,20 +427,24 @@ def test_modulus_boundary_and_schema_are_explicit() -> None:
     assert "distinct indexed items" in items_schema["description"]
 
     with pytest.raises(ValidationError):
-        SubsetSumResidueProfileRequest(
-            source={"items": []},
-            modulus=2,
-            include_empty_subset=1,
+        SubsetSumResidueProfileRequest.model_validate(
+            {
+                "source": {"items": []},
+                "modulus": 2,
+                "include_empty_subset": 1,
+            }
         )
 
 
 def test_witness_and_result_output_budgets_reject_before_work() -> None:
     with pytest.raises(ValidationError):
-        SubsetSumResidueProfileRequest(
-            source={"items": ["0"] * 251},
-            modulus=1000,
-            include_empty_subset=False,
-            include_witnesses=True,
+        SubsetSumResidueProfileRequest.model_validate(
+            {
+                "source": {"items": ["0"] * 251},
+                "modulus": 1000,
+                "include_empty_subset": False,
+                "include_witnesses": True,
+            }
         )
 
 
@@ -472,10 +487,12 @@ def test_result_bounds_raw_arrays_before_source_binding_replay() -> None:
 
     widest = "1" + "0" * (MAX_RESIDUE_PROFILE_INPUT_INTEGER_DIGITS - 1)
     with pytest.raises(ValidationError):
-        SubsetSumResidueProfileRequest(
-            source={"items": [widest] * 128},
-            modulus=1,
-            include_empty_subset=False,
+        SubsetSumResidueProfileRequest.model_validate(
+            {
+                "source": {"items": [widest] * 128},
+                "modulus": 1,
+                "include_empty_subset": False,
+            }
         )
 
 

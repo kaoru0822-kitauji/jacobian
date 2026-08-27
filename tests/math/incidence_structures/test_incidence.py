@@ -28,33 +28,37 @@ from jacobian.math.incidence_structures._operations import (
     compute_restriction,
 )
 
-STRUCTURE = {
-    "points": ["p1", "p2", "p3"],
-    "block_ids": ["b1", "b2"],
-    "blocks": [["p1", "p2"], ["p2", "p3"]],
-}
+STRUCTURE = IncidenceStructure.model_validate(
+    {
+        "points": ["p1", "p2", "p3"],
+        "block_ids": ["b1", "b2"],
+        "blocks": [["p1", "p2"], ["p2", "p3"]],
+    }
+)
 
-FANO = {
-    "points": ["1", "2", "3", "4", "5", "6", "7"],
-    "block_ids": [
-        "L1",
-        "L2",
-        "L3",
-        "L4",
-        "L5",
-        "L6",
-        "L7",
-    ],
-    "blocks": [
-        ["1", "2", "3"],
-        ["1", "4", "5"],
-        ["1", "6", "7"],
-        ["2", "4", "6"],
-        ["2", "5", "7"],
-        ["3", "4", "7"],
-        ["3", "5", "6"],
-    ],
-}
+FANO = IncidenceStructure.model_validate(
+    {
+        "points": ["1", "2", "3", "4", "5", "6", "7"],
+        "block_ids": [
+            "L1",
+            "L2",
+            "L3",
+            "L4",
+            "L5",
+            "L6",
+            "L7",
+        ],
+        "blocks": [
+            ["1", "2", "3"],
+            ["1", "4", "5"],
+            ["1", "6", "7"],
+            ["2", "4", "6"],
+            ["2", "5", "7"],
+            ["3", "4", "7"],
+            ["3", "5", "6"],
+        ],
+    }
+)
 
 
 class TestIncidenceMatrix:
@@ -66,21 +70,25 @@ class TestIncidenceMatrix:
 
     def test_duplicate_points_rejected(self) -> None:
         with pytest.raises(ValidationError):
-            IncidenceMatrixRequest(
-                incidence={
-                    "points": ["p1", "p1"],
-                    "block_ids": ["b1"],
-                    "blocks": [["p1"]],
+            IncidenceMatrixRequest.model_validate(
+                {
+                    "incidence": {
+                        "points": ["p1", "p1"],
+                        "block_ids": ["b1"],
+                        "blocks": [["p1"]],
+                    }
                 }
             )
 
     def test_validation_uses_stable_error_code(self) -> None:
         with pytest.raises(ValidationError) as exc_info:
-            IncidenceMatrixRequest(
-                incidence={
-                    "points": ["p1", "p1"],
-                    "block_ids": ["b1"],
-                    "blocks": [["p1"]],
+            IncidenceMatrixRequest.model_validate(
+                {
+                    "incidence": {
+                        "points": ["p1", "p1"],
+                        "block_ids": ["b1"],
+                        "blocks": [["p1"]],
+                    }
                 }
             )
         assert exc_info.value.errors()[0]["type"] == (
@@ -89,11 +97,13 @@ class TestIncidenceMatrix:
 
     def test_invalid_block_member(self) -> None:
         with pytest.raises(ValidationError):
-            IncidenceMatrixRequest(
-                incidence={
-                    "points": ["p1"],
-                    "block_ids": ["b1"],
-                    "blocks": [["p2"]],
+            IncidenceMatrixRequest.model_validate(
+                {
+                    "incidence": {
+                        "points": ["p1"],
+                        "block_ids": ["b1"],
+                        "blocks": [["p2"]],
+                    }
                 }
             )
 
@@ -149,11 +159,13 @@ class TestDegreeProfile:
 
     def test_single_point(self) -> None:
         result = compute_degree_profile(
-            IncidenceMatrixRequest(
-                incidence={
-                    "points": ["p1"],
-                    "block_ids": ["b1"],
-                    "blocks": [["p1"]],
+            IncidenceMatrixRequest.model_validate(
+                {
+                    "incidence": {
+                        "points": ["p1"],
+                        "block_ids": ["b1"],
+                        "blocks": [["p1"]],
+                    }
                 }
             )
         )
@@ -243,11 +255,13 @@ class TestDual:
         first = compute_dual(DualRequest(incidence=STRUCTURE))
         # Build a new structure from the dual and dual again
         second = compute_dual(
-            DualRequest(
-                incidence={
-                    "points": list(first.points),
-                    "block_ids": list(first.block_ids),
-                    "blocks": [list(b) for b in first.blocks],
+            DualRequest.model_validate(
+                {
+                    "incidence": {
+                        "points": list(first.points),
+                        "block_ids": list(first.block_ids),
+                        "blocks": [list(b) for b in first.blocks],
+                    }
                 }
             )
         )
@@ -274,7 +288,7 @@ class TestComplement:
     def test_complement_size_identity(self) -> None:
         """Complement maps block size k to v-k."""
         result = compute_complement(ComplementRequest(incidence=STRUCTURE))
-        v = len(STRUCTURE["points"])
+        v = len(STRUCTURE.points)
         # b1 size 2 -> complement size v-2 = 1
         # b2 size 2 -> complement size v-2 = 1
         assert len(result.blocks[0]) == v - 2
@@ -286,7 +300,7 @@ class TestRestriction:
         result = compute_restriction(
             RestrictionRequest(
                 incidence=STRUCTURE,
-                points=["p1", "p2"],
+                points=("p1", "p2"),
             )
         )
         assert result.points == ("p1", "p2")
@@ -299,7 +313,7 @@ class TestRestriction:
         result = compute_restriction(
             RestrictionRequest(
                 incidence=STRUCTURE,
-                block_ids=["b1"],
+                block_ids=("b1",),
             )
         )
         assert result.block_ids == ("b1",)
@@ -310,8 +324,8 @@ class TestRestriction:
         result = compute_restriction(
             RestrictionRequest(
                 incidence=STRUCTURE,
-                points=["p2"],
-                block_ids=["b2"],
+                points=("p2",),
+                block_ids=("b2",),
             )
         )
         assert result.points == ("p2",)
@@ -367,11 +381,13 @@ class TestLeviGraph:
     def test_label_collision(self) -> None:
         """Point and block labels with same raw string stay distinct."""
         result = compute_levi_graph(
-            LeviGraphRequest(
-                incidence={
-                    "points": ["a"],
-                    "block_ids": ["a"],
-                    "blocks": [["a"]],
+            LeviGraphRequest.model_validate(
+                {
+                    "incidence": {
+                        "points": ["a"],
+                        "block_ids": ["a"],
+                        "blocks": [["a"]],
+                    }
                 }
             )
         )

@@ -21,7 +21,7 @@ from jacobian.math.group_cohomology._operations import (
 class TestGroupCohomology:
     """Test group cohomology computation."""
 
-    def test_h0_is_field(self):
+    def test_h0_is_field(self) -> None:
         """H^0(G, K) = K always (trivial action)."""
         req = GroupCohomologyRequest(
             group=PermutationGroup(degree=2, generators=((1, 0),)),
@@ -31,7 +31,7 @@ class TestGroupCohomology:
         result = compute_group_cohomology(req)
         assert result.groups[0].betti == 1
 
-    def test_group_order(self):
+    def test_group_order(self) -> None:
         """The result should report the group order."""
         req = GroupCohomologyRequest(
             group=PermutationGroup(degree=3, generators=((1, 0, 2), (0, 2, 1))),
@@ -41,7 +41,7 @@ class TestGroupCohomology:
         result = compute_group_cohomology(req)
         assert result.group_order == 6
 
-    def test_cochain_dimensions(self):
+    def test_cochain_dimensions(self) -> None:
         """C^n has dimension |G|^n."""
         req = GroupCohomologyRequest(
             group=PermutationGroup(degree=2, generators=((1, 0),)),
@@ -54,7 +54,7 @@ class TestGroupCohomology:
         assert result.groups[2].cochain_dimension == 4
         assert result.groups[3].cochain_dimension == 8
 
-    def test_prime_reported(self):
+    def test_prime_reported(self) -> None:
         """The result should report the prime."""
         req = GroupCohomologyRequest(
             group=PermutationGroup(degree=2, generators=((1, 0),)),
@@ -64,7 +64,7 @@ class TestGroupCohomology:
         result = compute_group_cohomology(req)
         assert result.request.prime == 7
 
-    def test_trivial_group(self):
+    def test_trivial_group(self) -> None:
         """The trivial group has H^0 = K and higher groups = 0."""
         req = GroupCohomologyRequest(
             group=PermutationGroup(degree=1, generators=((0,),)),
@@ -75,7 +75,7 @@ class TestGroupCohomology:
         assert result.groups[0].betti == 1
         assert result.group_order == 1
 
-    def test_trivial_group_high_degree_admitted_and_exact(self):
+    def test_trivial_group_high_degree_admitted_and_exact(self) -> None:
         """Regression: degree admission derives from the coupled work
         budgets, not a fixed ceiling. For the trivial group every cochain
         space and coboundary is one-dimensional and both budgets stay at
@@ -92,7 +92,7 @@ class TestGroupCohomology:
         assert all(g.betti == 0 for g in result.groups[1:])
         assert all(g.cochain_dimension == 1 for g in result.groups)
 
-    def test_trivial_group_fallback_ceiling_is_the_only_remaining_cap(self):
+    def test_trivial_group_fallback_ceiling_is_the_only_remaining_cap(self) -> None:
         """The conservative fallback binds only order-1 requests; its
         boundary degree is admitted and one past it is rejected."""
         request = GroupCohomologyRequest(
@@ -114,7 +114,13 @@ class TestGroupCohomology:
 class TestExactBarComplex:
     """The kernel materializes the inhomogeneous bar complex exactly."""
 
-    def _compute(self, degree, generators, prime, max_degree=3):
+    def _compute(
+        self,
+        degree: int,
+        generators: tuple[tuple[int, ...], ...],
+        prime: int,
+        max_degree: int = 3,
+    ) -> GroupCohomologyResult:
         request = GroupCohomologyRequest(
             group=PermutationGroup(degree=degree, generators=generators),
             prime=prime,
@@ -122,36 +128,36 @@ class TestExactBarComplex:
         )
         return compute_group_cohomology(request)
 
-    def test_c2_over_gf2_has_betti_one(self):
+    def test_c2_over_gf2_has_betti_one(self) -> None:
         result = self._compute(2, ((1, 0),), 2)
         bettis = {g.degree: g.betti for g in result.groups}
         assert bettis[1] == 1
 
-    def test_cyclic_p_modular_series(self):
+    def test_cyclic_p_modular_series(self) -> None:
         """H*(C_p; GF(p)) has betti 1 in every positive degree."""
         result = self._compute(3, ((1, 2, 0),), 3)
         bettis = {g.degree: g.betti for g in result.groups}
         assert bettis == {0: 1, 1: 1, 2: 1, 3: 1}
 
-    def test_trivial_group_higher_homology_vanishes(self):
+    def test_trivial_group_higher_homology_vanishes(self) -> None:
         result = self._compute(1, ((0,),), 5)
         bettis = {g.degree: g.betti for g in result.groups}
         assert bettis == {0: 1, 1: 0, 2: 0, 3: 0}
 
-    def test_coprime_characteristic_vanishes(self):
+    def test_coprime_characteristic_vanishes(self) -> None:
         """p not dividing |G| kills all higher cohomology."""
         result = self._compute(2, ((1, 0),), 3)
         bettis = {g.degree: g.betti for g in result.groups}
         assert bettis == {0: 1, 1: 0, 2: 0, 3: 0}
 
-    def test_cochain_dimension_is_not_the_cohomology_dimension(self):
+    def test_cochain_dimension_is_not_the_cohomology_dimension(self) -> None:
         """H^1(C2; GF(3)) is zero-dimensional inside a 2-dim cochain space."""
         result = self._compute(2, ((1, 0),), 3)
         first = result.groups[1]
         assert first.betti == 0
         assert first.cochain_dimension == 2
 
-    def test_composite_prime_rejected_at_model(self):
+    def test_composite_prime_rejected_at_model(self) -> None:
         with pytest.raises(ValidationError) as error:
             GroupCohomologyRequest(
                 group=PermutationGroup(degree=2, generators=((1, 0),)),
@@ -160,7 +166,7 @@ class TestExactBarComplex:
             )
         assert error.value.errors()[0]["type"] == "group_cohomology.prime_not_prime"
 
-    def test_oversized_enumerated_order_rejected(self):
+    def test_oversized_enumerated_order_rejected(self) -> None:
         # The canonical permutation-group value allows degree up to 64 and
         # does not bound order itself; the cohomology outer request owns the
         # 64-element order budget.
@@ -178,7 +184,7 @@ class TestExactBarComplex:
             == "group_cohomology.group_order_exceeds_bound"
         )
 
-    def test_degree_above_sixteen_with_bounded_order_admitted(self):
+    def test_degree_above_sixteen_with_bounded_order_admitted(self) -> None:
         """The duplicate degree-16 cap is gone: a degree-20 action whose
         enumerated order stays bounded is admitted."""
         GroupCohomologyRequest(
@@ -187,7 +193,7 @@ class TestExactBarComplex:
             max_degree=0,
         )
 
-    def test_cochain_budget_rejected(self):
+    def test_cochain_budget_rejected(self) -> None:
         """Order 6 at max_degree 4 would need 6^5 cochain elements; the
         work-derived degree budget for order 6 is 2 and rejects it."""
         with pytest.raises(ValidationError) as error:
@@ -203,7 +209,7 @@ class TestExactBarComplex:
             == "group_cohomology.degree_exceeds_work_budget"
         )
 
-    def test_dense_bar_matrix_budget_rejected(self):
+    def test_dense_bar_matrix_budget_rejected(self) -> None:
         """Order 4 at max_degree 5 fits no derived envelope: its degree-5
         coboundary is a dense 4096x1024 matrix and the cell bound caps
         order 4 at degree 3."""
@@ -218,7 +224,7 @@ class TestExactBarComplex:
             == "group_cohomology.degree_exceeds_work_budget"
         )
 
-    def test_dense_bar_matrix_budget_admits_bounded_requests(self):
+    def test_dense_bar_matrix_budget_admits_bounded_requests(self) -> None:
         """C2 at the maximum degree and C4 at degree 3 stay inside the cells."""
         GroupCohomologyRequest(
             group=PermutationGroup(degree=2, generators=((1, 0),)),
@@ -231,7 +237,7 @@ class TestExactBarComplex:
             max_degree=3,
         )
 
-    def test_derived_budget_rejects_oversized_work_before_kernel(self):
+    def test_derived_budget_rejects_oversized_work_before_kernel(self) -> None:
         """Order 32 admits degree 1, but its degree-8 coboundary would be a
         dense 32^17-cell matrix; the work-derived budget rejects it during
         request validation, before any kernel expansion runs."""
@@ -246,7 +252,7 @@ class TestExactBarComplex:
             == "group_cohomology.degree_exceeds_work_budget"
         )
 
-    def test_derived_budget_boundary_admitted(self):
+    def test_derived_budget_boundary_admitted(self) -> None:
         """Order 32 at its work-derived maximum degree 1 stays inside both
         budgets: 32^2 cochain elements and 32^3 matrix cells."""
         GroupCohomologyRequest(
@@ -255,7 +261,7 @@ class TestExactBarComplex:
             max_degree=1,
         )
 
-    def test_c2_degree_seven_admitted_by_derived_budget(self):
+    def test_c2_degree_seven_admitted_by_derived_budget(self) -> None:
         """Order 2's coupled budgets (2^15 cells <= 65536) admit degree 7,
         which the removed fixed ceiling rejected. Known answer:
         H*(C2; GF(2)) = GF(2)[x] has betti 1 in every degree."""
@@ -267,7 +273,7 @@ class TestExactBarComplex:
         result = compute_group_cohomology(request)
         assert {g.degree: g.betti for g in result.groups} == dict.fromkeys(range(8), 1)
 
-    def test_reuses_canonical_permutation_group_value(self):
+    def test_reuses_canonical_permutation_group_value(self) -> None:
         """GroupCohomologyRequest reuses PermutationGroupRequest so native
         composition such as GroupCohomologyRequest(group=result.stabilizer)
         and result.request.group -> group consumer works unchanged."""
@@ -291,7 +297,7 @@ class TestExactBarComplex:
 class TestDeclarationContract:
     """The declaration must describe the implemented complex."""
 
-    def test_description_names_unnormalized_inhomogeneous_complex(self):
+    def test_description_names_unnormalized_inhomogeneous_complex(self) -> None:
         from jacobian.math.group_cohomology._tools import TOOLS
 
         assert len(TOOLS) == 1
@@ -299,7 +305,7 @@ class TestDeclarationContract:
         assert "unnormalized inhomogeneous bar complex" in description
         assert "the normalized bar complex" not in description
 
-    def test_reported_dimensions_match_unnormalized_construction(self):
+    def test_reported_dimensions_match_unnormalized_construction(self) -> None:
         """Unnormalized C^n = {functions G^n -> GF(p)} has dimension |G|^n."""
         request = GroupCohomologyRequest(
             group=PermutationGroup(degree=2, generators=((1, 0),)),
@@ -313,14 +319,14 @@ class TestDeclarationContract:
 class TestResultBinding:
     """Results are structural; explicit verification replays the bar complex."""
 
-    def _request(self):
+    def _request(self) -> GroupCohomologyRequest:
         return GroupCohomologyRequest(
             group=PermutationGroup(degree=3, generators=((1, 0, 2), (0, 2, 1))),
             prime=3,
             max_degree=2,
         )
 
-    def test_result_retains_request_without_replaying(self):
+    def test_result_retains_request_without_replaying(self) -> None:
         request = self._request()
         result = compute_group_cohomology(request)
         assert result.request == request
@@ -330,7 +336,7 @@ class TestResultBinding:
             group_order=result.group_order,
         )
 
-    def test_forged_table_requires_explicit_verification(self):
+    def test_forged_table_requires_explicit_verification(self) -> None:
         request = self._request()
         forged = GroupCohomologyResult(
             request=request,
@@ -343,7 +349,7 @@ class TestResultBinding:
         )
         assert verify_group_cohomology_result(forged) is False
 
-    def test_composite_prime_table_rejected_via_source_request(self):
+    def test_composite_prime_table_rejected_via_source_request(self) -> None:
         with pytest.raises(ValidationError) as error:
             GroupCohomologyResult(
                 request=GroupCohomologyRequest(

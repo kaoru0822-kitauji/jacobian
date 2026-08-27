@@ -5,7 +5,26 @@ from __future__ import annotations
 import asyncio
 import json
 
+from mcp.types import (
+    BlobResourceContents,
+    ContentBlock,
+    TextContent,
+    TextResourceContents,
+)
+
 from jacobian.mcp.server import create_server
+
+
+def _resource_text(
+    content: TextResourceContents | BlobResourceContents,
+) -> str:
+    assert isinstance(content, TextResourceContents)
+    return content.text
+
+
+def _content_text(content: ContentBlock) -> str:
+    assert isinstance(content, TextContent)
+    return content.text
 
 
 def test_mcp_catalog_is_the_complete_static_operation_library() -> None:
@@ -17,7 +36,7 @@ def test_mcp_catalog_is_the_complete_static_operation_library() -> None:
             raise_exceptions=True,
         ) as client:
             resource = await client.read_resource("operation://catalog")
-            catalog = json.loads(resource.contents[0].text)
+            catalog = json.loads(_resource_text(resource.contents[0]))
             assert catalog["operations"]
             assert "policy_profile" not in catalog
             assert "policy_digest" not in catalog
@@ -39,7 +58,7 @@ def test_mcp_compact_operation_index_is_searchable_and_paginated() -> None:
             raise_exceptions=True,
         ) as client:
             resource_result = await client.read_resource("operation://catalog")
-            full_catalog = json.loads(resource_result.contents[0].text)
+            full_catalog = json.loads(_resource_text(resource_result.contents[0]))
             discoverable_ids = {
                 descriptor["operation_id"] for descriptor in full_catalog["operations"]
             }
@@ -50,8 +69,9 @@ def test_mcp_compact_operation_index_is_searchable_and_paginated() -> None:
             )
             assert isinstance(listed.structured_content, dict)
             index = listed.structured_content
-            assert len(listed.content[0].text.encode("utf-8")) <= 16 * 1024
-            assert json.loads(listed.content[0].text) == index
+            listed_text = _content_text(listed.content[0])
+            assert len(listed_text.encode("utf-8")) <= 16 * 1024
+            assert json.loads(listed_text) == index
             assert "discovery_version" not in index
             assert len(index["matches"]) <= 20
             indexed_ids = {
@@ -75,7 +95,10 @@ def test_mcp_compact_operation_index_is_searchable_and_paginated() -> None:
                 )
                 assert isinstance(next_page.structured_content, dict)
                 page = next_page.structured_content
-                assert len(next_page.content[0].text.encode("utf-8")) <= 16 * 1024
+                assert (
+                    len(_content_text(next_page.content[0]).encode("utf-8"))
+                    <= 16 * 1024
+                )
                 indexed_ids.update(
                     descriptor["operation_id"] for descriptor in page["matches"]
                 )
@@ -119,7 +142,7 @@ def test_mcp_compact_operation_index_is_searchable_and_paginated() -> None:
                     }
                 },
             )
-            invalid = json.loads(invalid_cursor.content[0].text)
+            invalid = json.loads(_content_text(invalid_cursor.content[0]))
             assert invalid["error"]["code"] == "INVALID_CURSOR"
 
     asyncio.run(scenario())
@@ -134,7 +157,7 @@ def test_mcp_operation_browse_pages_the_complete_immutable_library() -> None:
             raise_exceptions=True,
         ) as client:
             resource_result = await client.read_resource("operation://catalog")
-            full_catalog = json.loads(resource_result.contents[0].text)
+            full_catalog = json.loads(_resource_text(resource_result.contents[0]))
             catalog_ids = [
                 descriptor["operation_id"] for descriptor in full_catalog["operations"]
             ]
@@ -146,8 +169,9 @@ def test_mcp_operation_browse_pages_the_complete_immutable_library() -> None:
                 assert isinstance(page_result.structured_content, dict)
                 page = page_result.structured_content
                 assert page["kind"] == "browse"
-                assert len(page_result.content[0].text.encode("utf-8")) <= 16 * 1024
-                assert json.loads(page_result.content[0].text) == page
+                page_text = _content_text(page_result.content[0])
+                assert len(page_text.encode("utf-8")) <= 16 * 1024
+                assert json.loads(page_text) == page
                 assert "discovery_version" not in page
                 assert len(page["operations"]) <= 20
                 assert all(
@@ -178,7 +202,7 @@ def test_mcp_operation_browse_pages_the_complete_immutable_library() -> None:
                     }
                 },
             )
-            invalid = json.loads(invalid_cursor.content[0].text)
+            invalid = json.loads(_content_text(invalid_cursor.content[0]))
             assert invalid["error"]["code"] == "INVALID_CURSOR"
 
     asyncio.run(scenario())

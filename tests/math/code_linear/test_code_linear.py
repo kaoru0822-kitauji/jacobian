@@ -1,5 +1,6 @@
 """Tests for linear code structural operations."""
 
+from collections.abc import Iterator
 from contextlib import contextmanager
 
 import pytest
@@ -32,7 +33,7 @@ from jacobian.math.code_linear.values import PrimeFieldLinearEncoder
 
 
 @contextmanager
-def _validation_error(code: str):
+def _validation_error(code: str) -> Iterator[None]:
     with pytest.raises(ValidationError) as exc_info:
         yield
     assert code in exc_info.value.errors()[0]["type"]
@@ -145,14 +146,16 @@ def test_codeword_check_nonmember() -> None:
 
 
 def test_syndrome_zero_for_codeword() -> None:
-    request = SyndromeRequest(
-        parity_check={
-            "field_order": 2,
+    request = SyndromeRequest.model_validate(
+        {
+            "parity_check": {
+                "field_order": 2,
+                "coordinate_axis": ["x0", "x1"],
+                "rows": ((1, 1),),
+            },
             "coordinate_axis": ["x0", "x1"],
-            "rows": ((1, 1),),
+            "word": (1, 1),
         },
-        coordinate_axis=["x0", "x1"],
-        word=(1, 1),
     )
     result = compute_syndrome(request)
     assert result.syndrome == (0,)
@@ -160,14 +163,16 @@ def test_syndrome_zero_for_codeword() -> None:
 
 
 def test_syndrome_nonzero_for_noncodeword() -> None:
-    request = SyndromeRequest(
-        parity_check={
-            "field_order": 2,
+    request = SyndromeRequest.model_validate(
+        {
+            "parity_check": {
+                "field_order": 2,
+                "coordinate_axis": ["x0", "x1"],
+                "rows": ((1, 1),),
+            },
             "coordinate_axis": ["x0", "x1"],
-            "rows": ((1, 1),),
+            "word": (1, 0),
         },
-        coordinate_axis=["x0", "x1"],
-        word=(1, 0),
     )
     result = compute_syndrome(request)
     assert result.syndrome == (1,)
@@ -176,14 +181,16 @@ def test_syndrome_nonzero_for_noncodeword() -> None:
 
 def test_syndrome_is_computed_modulo_the_field_order() -> None:
     result = compute_syndrome(
-        SyndromeRequest(
-            parity_check={
-                "field_order": 3,
+        SyndromeRequest.model_validate(
+            {
+                "parity_check": {
+                    "field_order": 3,
+                    "coordinate_axis": ["x0", "x1"],
+                    "rows": ((1, 1), (0, 1)),
+                },
                 "coordinate_axis": ["x0", "x1"],
-                "rows": ((1, 1), (0, 1)),
+                "word": (2, 2),
             },
-            coordinate_axis=["x0", "x1"],
-            word=(2, 2),
         )
     )
     assert result.syndrome == (1, 2)
@@ -473,10 +480,12 @@ def test_dual_and_parity_check_accept_length_zero_encoders() -> None:
     assert parity.parity_check.coordinate_axis == ()
 
     empty_syndrome = compute_syndrome(
-        SyndromeRequest(
-            parity_check=dual.model_dump(mode="json")["parity_check"],
-            coordinate_axis=[],
-            word=[],
+        SyndromeRequest.model_validate(
+            {
+                "parity_check": dual.model_dump(mode="json")["parity_check"],
+                "coordinate_axis": [],
+                "word": [],
+            }
         )
     )
     assert empty_syndrome.syndrome == ()
@@ -521,25 +530,31 @@ def test_syndrome_request_rejects_misaligned_or_mutated_axes() -> None:
     serialized = parity.model_dump(mode="json")["parity_check"]
 
     with _validation_error("column_axis"):
-        SyndromeRequest(
-            parity_check=serialized,
-            coordinate_axis=["x1", "x0"],
-            word=(1, 0),
+        SyndromeRequest.model_validate(
+            {
+                "parity_check": serialized,
+                "coordinate_axis": ["x1", "x0"],
+                "word": (1, 0),
+            }
         )
     with _validation_error("length"):
-        SyndromeRequest(
-            parity_check=serialized,
-            coordinate_axis=["x0", "x1"],
-            word=(1,),
+        SyndromeRequest.model_validate(
+            {
+                "parity_check": serialized,
+                "coordinate_axis": ["x0", "x1"],
+                "word": (1,),
+            }
         )
 
     mutated = dict(serialized)
     mutated["coordinate_axis"] = ["y0", "y1"]
     with _validation_error("column_axis"):
-        SyndromeRequest(
-            parity_check=mutated,
-            coordinate_axis=["x0", "x1"],
-            word=(1, 0),
+        SyndromeRequest.model_validate(
+            {
+                "parity_check": mutated,
+                "coordinate_axis": ["x0", "x1"],
+                "word": (1, 0),
+            }
         )
     with _validation_error("unique"):
         SyndromeRequest.model_validate(
@@ -598,7 +613,7 @@ def test_requests_reject_rank_deficient_or_ambiguous_encoders() -> None:
         "generator_matrix": [[1, 1]],
     }
     with _validation_error("unique"):
-        PunctureRequest(encoder=ambiguous, coordinate=0)
+        PunctureRequest.model_validate({"encoder": ambiguous, "coordinate": 0})
 
     dependent = {
         "field_order": 2,
@@ -607,9 +622,9 @@ def test_requests_reject_rank_deficient_or_ambiguous_encoders() -> None:
         "generator_matrix": [[1, 1], [1, 1]],
     }
     with _validation_error("full_row_rank"):
-        PunctureRequest(encoder=dependent, coordinate=0)
+        PunctureRequest.model_validate({"encoder": dependent, "coordinate": 0})
     with _validation_error("full_row_rank"):
-        ShortenRequest(encoder=dependent, coordinate=1)
+        ShortenRequest.model_validate({"encoder": dependent, "coordinate": 1})
 
 
 def test_macwilliams_ternary() -> None:
@@ -655,14 +670,16 @@ def test_code_producer_requests_reject_ambiguous_coordinate_axes() -> None:
 
 def test_syndrome_request_rejects_bad_word_length() -> None:
     with _validation_error("length"):
-        SyndromeRequest(
-            parity_check={
-                "field_order": 2,
+        SyndromeRequest.model_validate(
+            {
+                "parity_check": {
+                    "field_order": 2,
+                    "coordinate_axis": ["x0", "x1"],
+                    "rows": ((1, 1),),
+                },
                 "coordinate_axis": ["x0", "x1"],
-                "rows": ((1, 1),),
+                "word": (1,),
             },
-            coordinate_axis=["x0", "x1"],
-            word=(1,),
         )
 
 

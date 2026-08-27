@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, cast
@@ -8,10 +9,15 @@ from typing import Any, cast
 import pytest
 from benchmarks.tooling.providers import cddlib, cgal, gudhi, nauty, regina
 from benchmarks.tooling.spike_utils import default_runner
-from tests.process.providers._spike_support import _request, _result, _runner
+from tests.process.providers._spike_support import (
+    _request,
+    _result,
+    _runner,
+)
+from tools.command_runner import ToolCommandRequest
 
 
-def _expected(tmp_path: Path):
+def _expected(tmp_path: Path) -> ToolCommandRequest:
     executable = tmp_path / "provider"
     executable.touch()
     return _request(
@@ -36,7 +42,10 @@ def _expected(tmp_path: Path):
         lambda request, tmp_path: replace(request, stdout_limit_bytes=2048),
     ],
 )
-def test_strict_runner_rejects_mutated_request_fields(tmp_path: Path, mutation) -> None:
+def test_strict_runner_rejects_mutated_request_fields(
+    tmp_path: Path,
+    mutation: Callable[[ToolCommandRequest, Path], ToolCommandRequest],
+) -> None:
     expected = _expected(tmp_path)
     runner = _runner([_result()])
     runner.expect((expected,))

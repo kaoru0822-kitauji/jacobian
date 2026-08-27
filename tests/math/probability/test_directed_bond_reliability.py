@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from fractions import Fraction
 from importlib import import_module
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from pydantic import ValidationError
@@ -344,12 +344,12 @@ def test_successful_compute_enumerates_each_arc_subset_once(
         target=3,
     )
     call_count = 0
-    original = reliability_module._directed_path_exists
+    original = cast(Callable[..., bool], reliability_module._directed_path_exists)
 
     def counted(**kwargs: object) -> bool:
         nonlocal call_count
         call_count += 1
-        return original(**kwargs)  # type: ignore[arg-type]
+        return original(**kwargs)
 
     monkeypatch.setattr(reliability_module, "_directed_path_exists", counted)
     _directed_bond_connection_probability(request)

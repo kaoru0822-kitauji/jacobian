@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
 from copy import deepcopy
 
@@ -16,7 +17,7 @@ from jacobian.math.combinatorics._recurrence_models import (
 
 
 @contextmanager
-def raises_code(code: str):
+def raises_code(code: str) -> Iterator[None]:
     with pytest.raises(ValidationError) as exc_info:
         yield
     assert exc_info.value.errors()[0]["type"] == code

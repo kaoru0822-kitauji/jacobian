@@ -22,13 +22,17 @@ def _vec(*coords: int) -> IntegerVector:
 
 
 def _request(*vectors: tuple[int, ...]) -> OrderedDifferenceProfileRequest:
-    return OrderedDifferenceProfileRequest(
-        vectors={"vectors": [{"coordinates": [str(c) for c in vec]} for vec in vectors]}
+    return OrderedDifferenceProfileRequest.model_validate(
+        {
+            "vectors": {
+                "vectors": [{"coordinates": [str(c) for c in vec]} for vec in vectors]
+            }
+        }
     )
 
 
 class TestOrderedDifferenceProfile:
-    def test_three_points_2d(self):
+    def test_three_points_2d(self) -> None:
         """Three points in Z^2 with known differences."""
         req = _request((0, 0), (1, 0), (0, 1))
         result = compute_ordered_difference_profile(req)
@@ -39,7 +43,7 @@ class TestOrderedDifferenceProfile:
         for entry in result.entries:
             assert entry.multiplicity == len(entry.pairs)
 
-    def test_no_repeated(self):
+    def test_no_repeated(self) -> None:
         """A Sidon set has no repeated differences."""
         req = _request((0, 0, 0), (1, 0, 0), (0, 1, 0))
         result = compute_ordered_difference_profile(req)
@@ -47,7 +51,7 @@ class TestOrderedDifferenceProfile:
             for pair in entry.pairs:
                 assert pair.left_index != pair.right_index
 
-    def test_repeated_difference(self):
+    def test_repeated_difference(self) -> None:
         """Four points forming a parallelogram have repeated differences."""
         req = _request((0, 0), (1, 0), (0, 1), (1, 1))
         result = compute_ordered_difference_profile(req)
@@ -55,13 +59,13 @@ class TestOrderedDifferenceProfile:
         assert result.first_collision is not None
         assert result.max_multiplicity >= 2
 
-    def test_total_pairs_formula(self):
+    def test_total_pairs_formula(self) -> None:
         """Total ordered pairs must equal |A|(|A|-1)."""
         req = _request((0, 0), (1, 0), (2, 0), (3, 0))
         result = compute_ordered_difference_profile(req)
         assert result.total_ordered_pairs == 4 * 3
 
-    def test_single_point(self):
+    def test_single_point(self) -> None:
         """A single point has no differences."""
         req = _request((1, 2))
         result = compute_ordered_difference_profile(req)
@@ -70,26 +74,28 @@ class TestOrderedDifferenceProfile:
         assert result.entries == ()
         assert not result.has_repeated_difference
 
-    def test_one_dimensional(self):
+    def test_one_dimensional(self) -> None:
         """One-dimensional vectors work correctly."""
         req = _request((0,), (1,), (2,))
         result = compute_ordered_difference_profile(req)
         assert result.dimension == 1
         assert result.total_ordered_pairs == 6  # 3*2
 
-    def test_mismatched_dimensions_rejected(self):
+    def test_mismatched_dimensions_rejected(self) -> None:
         """Vectors with different dimensions should raise."""
         with pytest.raises(ValidationError):
-            OrderedDifferenceProfileRequest(
-                vectors={
-                    "vectors": [
-                        {"coordinates": ["0", "0"]},
-                        {"coordinates": ["1"]},
-                    ]
+            OrderedDifferenceProfileRequest.model_validate(
+                {
+                    "vectors": {
+                        "vectors": [
+                            {"coordinates": ["0", "0"]},
+                            {"coordinates": ["1"]},
+                        ]
+                    }
                 }
             )
 
-    def test_translation_invariance(self):
+    def test_translation_invariance(self) -> None:
         base = compute_ordered_difference_profile(_request((0, 0), (1, 0), (0, 1)))
         shifted = compute_ordered_difference_profile(
             _request((5, -3), (6, -3), (5, -2))
@@ -100,7 +106,7 @@ class TestOrderedDifferenceProfile:
         }
         assert base_diffs == shifted_diffs
 
-    def test_sign_reversal_symmetry(self):
+    def test_sign_reversal_symmetry(self) -> None:
         result = compute_ordered_difference_profile(
             _request((0, 0), (1, 0), (0, 1), (1, 1))
         )
@@ -109,12 +115,12 @@ class TestOrderedDifferenceProfile:
         for d, count in mult.items():
             assert mult[tuple(-c for c in d)] == count
 
-    def test_result_retains_canonical_source(self):
+    def test_result_retains_canonical_source(self) -> None:
         req = _request((0, 0), (1, 0), (0, 1))
         result = compute_ordered_difference_profile(req)
         assert result.vectors == req.vectors
 
-    def test_retained_source_feeds_requests_unchanged(self):
+    def test_retained_source_feeds_requests_unchanged(self) -> None:
         """The canonical IntegerVectorSet result value composes: it can be
         supplied unchanged as the source of another vector-set request."""
         result = compute_ordered_difference_profile(_request((0, 0), (1, 0), (0, 1)))
@@ -123,7 +129,7 @@ class TestOrderedDifferenceProfile:
         )
         assert recomputed == result
 
-    def test_result_rejects_empty_source(self):
+    def test_result_rejects_empty_source(self) -> None:
         """The kernel never emits a profile without a valid nonempty source,
         so an empty serialized result cannot pass the trust boundary."""
         with pytest.raises(ValidationError):
@@ -138,7 +144,7 @@ class TestOrderedDifferenceProfile:
                 }
             )
 
-    def test_result_replays_every_difference_from_source(self):
+    def test_result_replays_every_difference_from_source(self) -> None:
         req = _request((0, 0), (1, 0), (1, 1), (0, 1))
         result = compute_ordered_difference_profile(req)
         seen = set()
@@ -155,7 +161,7 @@ class TestOrderedDifferenceProfile:
         n = result.set_size
         assert seen == {(i, j) for i in range(n) for j in range(n) if i != j}
 
-    def test_verifier_rejects_forged_difference(self):
+    def test_verifier_rejects_forged_difference(self) -> None:
         req = _request((0,), (1,))
         result = compute_ordered_difference_profile(req)
         payload = result.model_dump()
@@ -164,7 +170,7 @@ class TestOrderedDifferenceProfile:
             OrderedDifferenceProfileResult.model_validate(payload)
         )
 
-    def test_verifier_rejects_mutated_source(self):
+    def test_verifier_rejects_mutated_source(self) -> None:
         req = _request((0, 0), (1, 0), (1, 1), (0, 1))
         result = compute_ordered_difference_profile(req)
         payload = result.model_dump()
@@ -176,7 +182,7 @@ class TestOrderedDifferenceProfile:
             OrderedDifferenceProfileResult.model_validate(payload)
         )
 
-    def test_result_rejects_later_collision_as_first_witness(self):
+    def test_result_rejects_later_collision_as_first_witness(self) -> None:
         """The witness must be pairs[0] of the first sorted repeated entry,
         not a designated pair from any later repeated entry."""
         req = _request((0, 0), (1, 0), (0, 1), (1, 1))
@@ -188,7 +194,7 @@ class TestOrderedDifferenceProfile:
         with pytest.raises(ValidationError):
             OrderedDifferenceProfileResult.model_validate(payload)
 
-    def test_result_rejects_nondesignated_pair_from_first_entry(self):
+    def test_result_rejects_nondesignated_pair_from_first_entry(self) -> None:
         """Swapping in a different valid pair of the same first repeated
         entry breaks the canonical lexicographic pair order, so the swap
         cannot move a forged pair into the witness position."""
@@ -204,7 +210,7 @@ class TestOrderedDifferenceProfile:
         with pytest.raises(ValidationError):
             OrderedDifferenceProfileResult.model_validate(payload)
 
-    def test_first_collision_is_canonical_minimum_pair(self):
+    def test_first_collision_is_canonical_minimum_pair(self) -> None:
         """The witness must equal the lexicographic minimum pair of the
         first sorted repeated-difference entry."""
         req = _request((0, 0), (1, 0), (0, 1), (1, 1), (3, 2))
@@ -218,32 +224,34 @@ class TestOrderedDifferenceProfile:
             result.first_collision.right_index,
         ) == minimum
 
-    def test_request_coordinate_bound_enforced_before_integer_conversion(self):
+    def test_request_coordinate_bound_enforced_before_integer_conversion(self) -> None:
         """A seven-digit coordinate must fail the domain digit bound on the
         string itself; a coordinate longer than any legal vector string is
         rejected by the schema-level character ceiling without parsing."""
         seven_digits = "1234567"
         with pytest.raises(ValidationError):
-            OrderedDifferenceProfileRequest(
-                vectors={
-                    "vectors": [
-                        {"coordinates": [seven_digits]},
-                        {"coordinates": ["0"]},
-                    ]
+            OrderedDifferenceProfileRequest.model_validate(
+                {
+                    "vectors": {
+                        "vectors": [
+                            {"coordinates": [seven_digits]},
+                            {"coordinates": ["0"]},
+                        ]
+                    }
                 }
             )
         with pytest.raises(ValidationError) as schema_error:
-            IntegerVector(coordinates=["9" * 100_000])
+            IntegerVector.model_validate({"coordinates": ["9" * 100_000]})
         assert schema_error.value.errors()[0]["type"] == "string_too_long"
 
-    def test_difference_coordinates_may_carry_one_extra_digit(self):
+    def test_difference_coordinates_may_carry_one_extra_digit(self) -> None:
         """Exact differences of maximally bounded sources stay representable."""
         req = _request((-999999,), (999999,))
         result = compute_ordered_difference_profile(req)
         diffs = {e.difference.as_int_tuple()[0] for e in result.entries}
         assert diffs == {-1999998, 1999998}
 
-    def test_request_schema_exposes_vector_constraints(self):
+    def test_request_schema_exposes_vector_constraints(self) -> None:
         """math.find consumers must see the set-size and coordinate ceilings."""
         request_schema = OrderedDifferenceProfileRequest.model_json_schema()
         vector_set_schema = request_schema["$defs"]["IntegerVectorSet"]
@@ -253,15 +261,17 @@ class TestOrderedDifferenceProfile:
         vector_schema = request_schema["$defs"]["IntegerVector"]
         assert vector_schema["properties"]["coordinates"]["items"]["maxLength"] == 8
 
-    def test_set_size_above_derived_bound_rejected(self):
+    def test_set_size_above_derived_bound_rejected(self) -> None:
         vectors = [
             {"coordinates": [str(i), str(i * i)]}
             for i in range(_MAX_VECTOR_SET_SIZE + 1)
         ]
         with pytest.raises(ValidationError):
-            OrderedDifferenceProfileRequest(vectors={"vectors": vectors})
+            OrderedDifferenceProfileRequest.model_validate(
+                {"vectors": {"vectors": vectors}}
+            )
 
-    def test_worst_case_profile_stays_within_result_budget(self):
+    def test_worst_case_profile_stays_within_result_budget(self) -> None:
         """A maximal Sidon family has n*(n-1) distinct difference entries,
         which is the worst-case serialized shape for the bound."""
         side = _MAX_VECTOR_SET_SIZE
@@ -278,7 +288,7 @@ class TestOrderedDifferenceProfile:
         )
         assert len(encoded) <= _MAX_PROFILE_RESULT_BUDGET_BYTES
 
-    def test_result_roundtrip(self):
+    def test_result_roundtrip(self) -> None:
         req = _request((0, 0), (1, 0), (0, 1), (1, 1))
         result = compute_ordered_difference_profile(req)
         assert (

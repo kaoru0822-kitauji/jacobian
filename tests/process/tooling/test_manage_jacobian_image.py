@@ -17,7 +17,7 @@ def _module() -> ModuleType:
     return module
 
 
-def _inspect_payload() -> dict:
+def _inspect_payload() -> dict[str, object]:
     return {
         "Id": "sha256:" + "2" * 64,
         "RepoDigests": ["ghcr.io/morluto/jacobian@sha256:" + "1" * 64],
@@ -58,7 +58,12 @@ def test_select_builds_local_image_for_dirty_tree(
     module = _module()
     monkeypatch.setattr(module, "_source_dirty", lambda: True)
     built: list[str] = []
-    monkeypatch.setattr(module, "build", lambda image: built.append(image) or image)
+
+    def build(image: str) -> str:
+        built.append(image)
+        return image
+
+    monkeypatch.setattr(module, "build", build)
 
     assert module.select("ghcr.io/morluto/jacobian") == "jacobian:local"
     assert built == ["jacobian:local"]

@@ -192,9 +192,9 @@ def test_modulus_boundary_is_complete_and_next_value_is_rejected() -> None:
 
 def test_native_api_rejects_boolean_modulus_and_integer() -> None:
     with pytest.raises(TypeError, match="modulus"):
-        principal_dirichlet_character(True)  # type: ignore[arg-type]
+        principal_dirichlet_character(True)
     with pytest.raises(TypeError, match="input"):
-        principal_dirichlet_character_value(principal_dirichlet_character(3), True)  # type: ignore[arg-type]
+        principal_dirichlet_character_value(principal_dirichlet_character(3), True)
 
 
 def test_catalog_declares_the_composable_principal_operations() -> None:

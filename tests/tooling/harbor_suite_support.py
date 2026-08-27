@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import textwrap
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,9 @@ from benchmarks.tooling.harbor_suite import (
     verifier_bundle_checksum_bytes,
 )
 from tools.command_runner import ToolCommandStatus, run_operator_command
+
+type TomlValue = str | int | float | bool | Sequence[TomlValue] | dict[str, TomlValue]
+type TomlTable = dict[str, TomlValue]
 
 
 def _apply_synthetic_profiles(
@@ -70,16 +74,20 @@ def patch_harbor_root_with_git(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
 
 def _write_registry(
     tmp_path: Path,
-    datasets: list[dict],
+    datasets: list[TomlTable],
 ) -> Path:
-    registry = {"schema_version": "1", "datasets": datasets}
+    registry: TomlTable = {"schema_version": "1", "datasets": datasets}
     path = tmp_path / "registry.toml"
     path.write_text(tomli_w.dumps(registry))
     return path
 
 
-def _make_dataset_entry(ds_id: str, ds_path: Path, **overrides) -> dict:
-    entry = {
+def _make_dataset_entry(
+    ds_id: str,
+    ds_path: Path,
+    **overrides: TomlValue,
+) -> TomlTable:
+    entry: TomlTable = {
         "id": ds_id,
         "directory": str(ds_path),
         "evaluation_kind": "test",
@@ -102,9 +110,9 @@ def _write_suite_toml(
     path: Path,
     *,
     ds_id: str = "jacobian/test-v1",
-    tasks: list[dict] | None = None,
+    tasks: list[TomlTable] | None = None,
 ) -> None:
-    raw: dict = {
+    raw: TomlTable = {
         "schema_version": "2",
         "dataset": {
             "id": ds_id,

@@ -300,11 +300,14 @@ def test_continued_fraction_result_rejects_mutations() -> None:
     )
 
     with pytest.raises(ValidationError):
-        ContinuedFractionResult(
-            discriminant=2,
-            coefficients=(99,),
-            preperiod_length=7,
-            period_length=8,
+        ContinuedFractionResult.model_validate(
+            {
+                "discriminant": 2,
+                "coefficients": (99,),
+                "preperiod_length": 7,
+                "period_length": 8,
+                "term_count": 15,
+            }
         )
     result = compute_continued_fraction(
         ContinuedFractionRequest(discriminant=2, term_count=5)

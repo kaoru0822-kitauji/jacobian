@@ -27,14 +27,22 @@ def _read_json(path: Path) -> dict[str, object]:
     return value
 
 
+def _first_agent(value: dict[str, object]) -> dict[str, object]:
+    agents = value.get("agents")
+    assert isinstance(agents, list) and agents
+    agent = agents[0]
+    assert isinstance(agent, dict)
+    return agent
+
+
 def test_observation_mcp_config_is_external_to_the_task_job() -> None:
     job = _read_json(JOB)
     control = _read_json(CONTROL_JOB)
     mcp = _read_json(MCP_CONFIG)
     loopback_mcp = _read_json(LOOPBACK_MCP_CONFIG)
 
-    assert "mcp_servers" not in job["agents"][0]
-    assert "mcp_servers" not in control["agents"][0]
+    assert "mcp_servers" not in _first_agent(job)
+    assert "mcp_servers" not in _first_agent(control)
     assert mcp["mcp_servers"] == [
         {
             "name": "jacobian",

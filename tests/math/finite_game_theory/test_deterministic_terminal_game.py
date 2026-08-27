@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from fractions import Fraction
 from itertools import product
+from typing import cast
 
 import pytest
 from pydantic import ValidationError
@@ -440,12 +442,15 @@ def test_trusted_terminal_game_producers_run_the_minimax_kernel_once(
     game = _paper_game()
     request = DeterministicTerminalGameRequest(game=game)
     calls = 0
-    original = terminal_operations._solve_terminal_game_data
+    original = cast(
+        Callable[[DeterministicTerminalGame], object],
+        vars(terminal_operations)["_solve_terminal_game_data"],
+    )
 
-    def counted_native(*args: object) -> object:
+    def counted_native(game: DeterministicTerminalGame) -> object:
         nonlocal calls
         calls += 1
-        return original(*args)
+        return original(game)
 
     monkeypatch.setattr(
         terminal_operations, "_solve_terminal_game_data", counted_native
@@ -454,12 +459,15 @@ def test_trusted_terminal_game_producers_run_the_minimax_kernel_once(
     assert calls == 1
 
     calls = 0
-    original_adapter = operation_adapter._solve_terminal_game_data
+    original_adapter = cast(
+        Callable[[DeterministicTerminalGame], object],
+        vars(operation_adapter)["_solve_terminal_game_data"],
+    )
 
-    def counted_adapter(*args: object) -> object:
+    def counted_adapter(game: DeterministicTerminalGame) -> object:
         nonlocal calls
         calls += 1
-        return original_adapter(*args)
+        return original_adapter(game)
 
     monkeypatch.setattr(operation_adapter, "_solve_terminal_game_data", counted_adapter)
     compute_deterministic_terminal_game(request)

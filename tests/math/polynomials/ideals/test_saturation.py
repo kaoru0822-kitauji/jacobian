@@ -80,7 +80,7 @@ def _ideals_equal(
 class TestIdealSaturation:
     @requires_singular
     @pytest.mark.requires_backend("singular")
-    def test_saturation_xy_by_x(self):
+    def test_saturation_xy_by_x(self) -> None:
         """<xy> : <x>^inf = <y> in Q[x,y]."""
         ideal = _ideal(("x", "y"), {(1, 1): 1})
         denominator = _polynomial(("x", "y"), {(1, 0): 1})
@@ -96,7 +96,7 @@ class TestIdealSaturation:
 
     @requires_singular
     @pytest.mark.requires_backend("singular")
-    def test_already_saturated(self):
+    def test_already_saturated(self) -> None:
         """An already saturated ideal remains unchanged."""
         ideal = _ideal(("x", "y"), {(1, 0): 1})
         denominator = _polynomial(("x", "y"), {(0, 1): 1})
@@ -109,7 +109,7 @@ class TestIdealSaturation:
 
     @requires_singular
     @pytest.mark.requires_backend("singular")
-    def test_saturation_by_unit(self):
+    def test_saturation_by_unit(self) -> None:
         """Saturation by a unit (nonzero constant) returns the original ideal."""
         ideal = _ideal(("x", "y"), {(2, 0): 1})
         denominator = _polynomial(("x", "y"), {(0, 0): 1})
@@ -121,7 +121,7 @@ class TestIdealSaturation:
 
     @requires_singular
     @pytest.mark.requires_backend("singular")
-    def test_principal_saturation_by_product_gives_unit_ideal(self):
+    def test_principal_saturation_by_product_gives_unit_ideal(self) -> None:
         """<xy> : <xy>^inf is the unit ideal for the single polynomial xy."""
 
         ideal = _ideal(("x", "y"), {(1, 1): 1})
@@ -134,15 +134,17 @@ class TestIdealSaturation:
             "saturation <xy>:<xy>^inf should be the unit ideal"
         )
 
-    def test_denominator_must_be_single_polynomial(self):
+    def test_denominator_must_be_single_polynomial(self) -> None:
         """The operation advertises principal saturation I : <d>^infinity."""
 
         ideal = _ideal(("x", "y"), {(1, 1): 1})
         denominator = _ideal(("x", "y"), {(1, 0): 1}, {(0, 1): 1})
         with pytest.raises(ValidationError):
-            IdealSaturationRequest(ideal=ideal, denominator=denominator)
+            IdealSaturationRequest.model_validate(
+                {"ideal": ideal, "denominator": denominator}
+            )
 
-    def test_zero_denominator_rejected(self):
+    def test_zero_denominator_rejected(self) -> None:
         """Saturation by the zero polynomial is not admitted."""
 
         ideal = _ideal(("x", "y"), {(1, 1): 1})
@@ -150,14 +152,14 @@ class TestIdealSaturation:
         with pytest.raises(ValidationError):
             IdealSaturationRequest(ideal=ideal, denominator=denominator)
 
-    def test_mismatched_rings_rejected(self):
+    def test_mismatched_rings_rejected(self) -> None:
         """Saturation operands must use the same ordered ring."""
         ideal = _ideal(("x", "y"), {(1, 1): 1})
         denominator = _polynomial(("x", "y", "z"), {(1, 0, 0): 1})
         with pytest.raises(ValidationError):
             IdealSaturationRequest(ideal=ideal, denominator=denominator)
 
-    def test_denominator_exceeding_total_degree_rejected(self):
+    def test_denominator_exceeding_total_degree_rejected(self) -> None:
         """The denominator polynomial obeys the same degree-20 bound."""
 
         ideal = _ideal(("x",), {(2,): 1})
@@ -167,7 +169,7 @@ class TestIdealSaturation:
 
     @requires_singular
     @pytest.mark.requires_backend("singular")
-    def test_saturation_result_has_backend_version(self):
+    def test_saturation_result_has_backend_version(self) -> None:
         """Computed saturation should include a backend version."""
         ideal = _ideal(("x", "y"), {(1, 1): 1})
         denominator = _polynomial(("x", "y"), {(1, 0): 1})

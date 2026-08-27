@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
 
 import pytest
@@ -12,7 +13,6 @@ from jacobian.math.hochschild_complexes._models import (
     AlgebraStructure,
     HochschildChainComplexRequest,
     HochschildChainComplexResult,
-    HochschildDifferential,
     HochschildHomologyRequest,
     HochschildHomologyResult,
 )
@@ -22,13 +22,10 @@ from jacobian.math.hochschild_complexes._operations import (
     verify_hochschild_chain_complex_result,
     verify_hochschild_homology_result,
 )
-from jacobian.math.prime_field_linear_algebra import (
-    PrimeFieldMatrix,
-)
 
 
 @contextmanager
-def _validation_error(code: str):
+def _validation_error(code: str) -> Iterator[None]:
     with pytest.raises(ValidationError) as error:
         yield
     assert error.value.errors()[0]["type"] == code
@@ -53,7 +50,7 @@ def _coordinatewise_algebra(prime: int, dimension: int) -> AlgebraStructure:
 class TestHochschildChainComplex:
     """Test Hochschild chain complex computation."""
 
-    def test_one_dim_algebra(self):
+    def test_one_dim_algebra(self) -> None:
         """Chain complex of a 1D algebra over GF(5)."""
         alg = AlgebraStructure(
             prime=5,
@@ -66,7 +63,7 @@ class TestHochschildChainComplex:
         )
         assert result.group_dimensions == (1, 1, 1)
 
-    def test_two_dim_algebra(self):
+    def test_two_dim_algebra(self) -> None:
         """Chain complex of a 2D algebra."""
         alg = AlgebraStructure(
             prime=7,
@@ -83,7 +80,7 @@ class TestHochschildChainComplex:
         assert result.group_dimensions[0] == 1
         assert result.group_dimensions[1] == 2
 
-    def test_has_differentials(self):
+    def test_has_differentials(self) -> None:
         """The chain complex should have differentials."""
         alg = AlgebraStructure(
             prime=5,
@@ -103,7 +100,7 @@ class TestHochschildChainComplex:
 class TestHochschildHomology:
     """Test Hochschild homology computation."""
 
-    def test_identity_algebra(self):
+    def test_identity_algebra(self) -> None:
         """HH_0 of the identity algebra is K."""
         alg = AlgebraStructure(
             prime=5,
@@ -116,7 +113,7 @@ class TestHochschildHomology:
         )
         assert result.groups[0].betti == 1
 
-    def test_2d_commutative(self):
+    def test_2d_commutative(self) -> None:
         """Test with a 2D commutative algebra."""
         alg = AlgebraStructure(
             prime=7,
@@ -132,7 +129,7 @@ class TestHochschildHomology:
         )
         assert len(result.groups) >= 2
 
-    def test_zero_algebra(self):
+    def test_zero_algebra(self) -> None:
         """Test with the zero algebra (e*e = 0)."""
         alg = AlgebraStructure(
             prime=5,
@@ -148,7 +145,7 @@ class TestHochschildHomology:
 
 
 class TestHochschildAdmissionAndTopDegree:
-    def test_composite_prime_rejected(self):
+    def test_composite_prime_rejected(self) -> None:
         with _validation_error("hochschild_complex.prime"):
             AlgebraStructure(
                 prime=4,
@@ -157,7 +154,7 @@ class TestHochschildAdmissionAndTopDegree:
                 augmentation=(1,),
             )
 
-    def test_non_associative_rejected(self):
+    def test_non_associative_rejected(self) -> None:
         """[e0,e1]=e0 style left-zero multiplication fails associativity."""
         c = (
             ((0, 0), (0, 0)),
@@ -171,7 +168,7 @@ class TestHochschildAdmissionAndTopDegree:
                 augmentation=(0, 0),
             )
 
-    def test_top_degree_uses_extra_differential(self):
+    def test_top_degree_uses_extra_differential(self) -> None:
         """e*e=e algebra: H_1 must vanish because d_2 is nonzero."""
         alg = AlgebraStructure(
             prime=5,
@@ -186,7 +183,7 @@ class TestHochschildAdmissionAndTopDegree:
         assert bettis[1] == 0
         assert bettis[0] == 1
 
-    def test_dense_elimination_budget_rejected(self):
+    def test_dense_elimination_budget_rejected(self) -> None:
         """GF(2)^7 at max_degree=4 passes the tensor budget but not the matrix budget."""
         alg = _coordinatewise_algebra(2, 7)
         assert alg.dimension ** (4 + 1) <= 20_000
@@ -195,7 +192,7 @@ class TestHochschildAdmissionAndTopDegree:
         with _validation_error("hochschild_complex.matrix_budget"):
             HochschildChainComplexRequest(algebra=alg, max_degree=4)
 
-    def test_largest_admitted_homology_request(self):
+    def test_largest_admitted_homology_request(self) -> None:
         """The densest admitted elimination stays inside the entry budget."""
         alg = _coordinatewise_algebra(5, 5)
         request = HochschildHomologyRequest(algebra=alg, max_degree=3)
@@ -203,7 +200,7 @@ class TestHochschildAdmissionAndTopDegree:
         result = compute_hochschild_homology(request)
         assert [group.betti for group in result.groups] == [1, 0, 0, 0]
 
-    def test_nine_dim_coordinatewise_algebra_admitted(self):
+    def test_nine_dim_coordinatewise_algebra_admitted(self) -> None:
         """GF(5)^9 with max_degree=1 fits every derived budget and must be admitted.
 
         Regression: a fixed dimension<=8 ceiling used to reject it even though
@@ -226,7 +223,7 @@ class TestHochschildAdmissionAndTopDegree:
         # The accepted payload round-trips through its own validator.
         HochschildChainComplexResult.model_validate(complex_result.model_dump())
 
-    def test_associativity_admission_budget_rejected(self):
+    def test_associativity_admission_budget_rejected(self) -> None:
         """Dimensions whose 2*n^5 associativity walk exceeds the work budget fail."""
         from jacobian.math.hochschild_complexes._models import (
             MAX_ASSOCIATIVITY_DOT_STEPS,
@@ -238,7 +235,7 @@ class TestHochschildAdmissionAndTopDegree:
         with _validation_error("hochschild_complex.associativity_budget"):
             _coordinatewise_algebra(2, boundary + 1)
 
-    def test_structure_input_budget_rejected(self):
+    def test_structure_input_budget_rejected(self) -> None:
         """Multiplication tables beyond the dense-payload entry budget fail."""
         from jacobian.math.hochschild_complexes._models import (
             MAX_STRUCTURE_CONSTANT_ENTRIES,
@@ -249,7 +246,7 @@ class TestHochschildAdmissionAndTopDegree:
         with _validation_error("hochschild_complex.input_budget"):
             _coordinatewise_algebra(2, oversized)
 
-    def test_request_budgets_bind_above_the_old_dimension_ceiling(self):
+    def test_request_budgets_bind_above_the_old_dimension_ceiling(self) -> None:
         """Larger admitted algebras still face the per-request envelopes."""
         with _validation_error("hochschild_complex.tensor_budget"):
             HochschildHomologyRequest(
@@ -268,7 +265,7 @@ class TestChainComplexSourceBinding:
             augmentation=(1, 1),
         )
 
-    def test_result_retains_and_replays_source(self):
+    def test_result_retains_and_replays_source(self) -> None:
         algebra = self._swap_algebra()
         result = compute_hochschild_chain_complex(
             HochschildChainComplexRequest(algebra=algebra, max_degree=3)
@@ -279,21 +276,27 @@ class TestChainComplexSourceBinding:
         assert verify_hochschild_chain_complex_result(result)
         HochschildChainComplexResult.model_validate(result.model_dump())
 
-    def test_authored_payload_rejected(self):
+    def test_authored_payload_rejected(self) -> None:
         with _validation_error("missing"):
-            HochschildChainComplexResult(
-                algebra_dimension=5,
-                group_dimensions=(1, 2),
-                differentials=(
-                    HochschildDifferential(
-                        degree=1,
-                        matrix=PrimeFieldMatrix(prime=5, entries=((0, 0),), columns=2),
-                    ),
-                ),
-                prime=5,
+            HochschildChainComplexResult.model_validate(
+                {
+                    "algebra_dimension": 5,
+                    "group_dimensions": [1, 2],
+                    "differentials": [
+                        {
+                            "degree": 1,
+                            "matrix": {
+                                "prime": 5,
+                                "entries": [[0, 0]],
+                                "columns": 2,
+                            },
+                        }
+                    ],
+                    "prime": 5,
+                }
             )
 
-    def test_tampered_differential_entry_requires_explicit_verifier(self):
+    def test_tampered_differential_entry_requires_explicit_verifier(self) -> None:
         algebra = self._swap_algebra()
         result = compute_hochschild_chain_complex(
             HochschildChainComplexRequest(algebra=algebra, max_degree=2)
@@ -304,7 +307,7 @@ class TestChainComplexSourceBinding:
         supplied = HochschildChainComplexResult.model_validate(payload)
         assert not verify_hochschild_chain_complex_result(supplied)
 
-    def test_inconsistent_group_dimensions_rejected(self):
+    def test_inconsistent_group_dimensions_rejected(self) -> None:
         algebra = self._swap_algebra()
         result = compute_hochschild_chain_complex(
             HochschildChainComplexRequest(algebra=algebra, max_degree=2)
@@ -314,7 +317,7 @@ class TestChainComplexSourceBinding:
         with _validation_error("hochschild_complex.group_dimensions"):
             HochschildChainComplexResult.model_validate(payload)
 
-    def test_mismatched_prime_rejected(self):
+    def test_mismatched_prime_rejected(self) -> None:
         algebra = self._swap_algebra()
         result = compute_hochschild_chain_complex(
             HochschildChainComplexRequest(algebra=algebra, max_degree=1)
@@ -324,7 +327,7 @@ class TestChainComplexSourceBinding:
         with _validation_error("hochschild_complex.algebra_binding"):
             HochschildChainComplexResult.model_validate(payload)
 
-    def test_mismatched_differential_prime_rejected(self):
+    def test_mismatched_differential_prime_rejected(self) -> None:
         """A differential over another prime must be rejected, not reinterpreted.
 
         The exact GF(5) entries stay canonical residues of the larger GF(7),
@@ -341,7 +344,7 @@ class TestChainComplexSourceBinding:
         with _validation_error("hochschild_complex.differential_prime"):
             HochschildChainComplexResult.model_validate(payload)
 
-    def test_all_zero_differential_foreign_prime_rejected(self):
+    def test_all_zero_differential_foreign_prime_rejected(self) -> None:
         """The review's example: an all-zero GF(7) differential for a GF(5) algebra."""
         zero_algebra = AlgebraStructure(
             prime=5,
@@ -361,7 +364,7 @@ class TestChainComplexSourceBinding:
         with _validation_error("hochschild_complex.differential_prime"):
             HochschildChainComplexResult.model_validate(payload)
 
-    def test_matching_differential_prime_accepted(self):
+    def test_matching_differential_prime_accepted(self) -> None:
         """Round-tripped differentials carrying the algebra prime still validate."""
         algebra = self._swap_algebra()
         result = compute_hochschild_chain_complex(
@@ -375,7 +378,7 @@ class TestChainComplexSourceBinding:
 
 
 class TestHomologySourceBinding:
-    def test_forged_groups_require_explicit_verifier(self):
+    def test_forged_groups_require_explicit_verifier(self) -> None:
         alg = AlgebraStructure(
             prime=5,
             dimension=1,
@@ -391,7 +394,7 @@ class TestHomologySourceBinding:
         supplied = HochschildHomologyResult.model_validate(payload)
         assert not verify_hochschild_homology_result(supplied)
 
-    def test_prime_mismatch_rejected(self):
+    def test_prime_mismatch_rejected(self) -> None:
         alg = AlgebraStructure(
             prime=5,
             dimension=1,
@@ -423,14 +426,14 @@ def _dual_numbers(prime: int) -> AlgebraStructure:
 class TestAugmentationEndpointFaces:
     """The trivial module acts through epsilon, so both endpoint faces count."""
 
-    def test_dual_numbers_hh_is_one_in_every_degree(self):
+    def test_dual_numbers_hh_is_one_in_every_degree(self) -> None:
         """HH_n(GF(p)[x]/(x^2), K) = K for all n; adjacent-only would give H_1 = 0."""
         result = compute_hochschild_homology(
             HochschildHomologyRequest(algebra=_dual_numbers(5), max_degree=4)
         )
         assert [group.betti for group in result.groups] == [1, 1, 1, 1, 1]
 
-    def test_zero_augmentation_reduces_to_adjacent_faces(self):
+    def test_zero_augmentation_reduces_to_adjacent_faces(self) -> None:
         """epsilon = 0 kills both endpoint faces, leaving interior multiplication."""
         zeroed = AlgebraStructure(
             prime=5,
@@ -449,7 +452,7 @@ class TestAugmentationEndpointFaces:
         bettis = {group.degree: group.betti for group in result.groups}
         assert bettis[1] == 0
 
-    def test_differential_squares_to_zero(self):
+    def test_differential_squares_to_zero(self) -> None:
         """d^2 = 0 for consecutive degrees on two different augmented algebras."""
         from jacobian.math.hochschild_complexes._bar import (
             bar_differential_entries,
@@ -491,7 +494,7 @@ class TestAugmentationEndpointFaces:
                 ]
                 assert all(value == 0 for row in composition for value in row)
 
-    def test_non_multiplicative_augmentation_rejected(self):
+    def test_non_multiplicative_augmentation_rejected(self) -> None:
         """An augmentation that is not an algebra map must fail admission."""
         with _validation_error("hochschild_complex.augmentation_homomorphism"):
             AlgebraStructure(
@@ -504,7 +507,7 @@ class TestAugmentationEndpointFaces:
                 augmentation=(1, 1),
             )
 
-    def test_noncanonical_and_mismatched_augmentation_rejected(self):
+    def test_noncanonical_and_mismatched_augmentation_rejected(self) -> None:
         dual = _dual_numbers(5)
         with _validation_error("hochschild_complex.canonical_residues"):
             AlgebraStructure(
@@ -521,7 +524,7 @@ class TestAugmentationEndpointFaces:
                 augmentation=(1,),
             )
 
-    def test_result_verifier_uses_retained_augmentation(self):
+    def test_result_verifier_uses_retained_augmentation(self) -> None:
         """Tampering with the retained augmentation invalidates entries."""
         from jacobian.math.hochschild_complexes._models import (
             HochschildChainComplexResult,

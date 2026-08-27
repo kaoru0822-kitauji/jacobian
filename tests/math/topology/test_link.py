@@ -1,5 +1,8 @@
 """Tests for simplicial complex link operation."""
 
+from typing import TypedDict
+
+from jacobian.math.topology._models import SimplicialComplexRequest
 from jacobian.math.topology._structural import (
     FVectorRequest,
     LinkRequest,
@@ -7,10 +10,25 @@ from jacobian.math.topology._structural import (
 )
 
 
+class ComplexWire(TypedDict):
+    """Facet-presentation payload at a raw JSON boundary."""
+
+    vertices: list[str]
+    facets: list[list[str]]
+
+
+def _complex(data: ComplexWire) -> SimplicialComplexRequest:
+    """Validate a raw facet presentation at the model boundary."""
+
+    return SimplicialComplexRequest.model_validate(data)
+
+
 def test_link_of_vertex_in_triangle() -> None:
     result = compute_link(
         LinkRequest(
-            complex={"vertices": ["v0", "v1", "v2"], "facets": [["v0", "v1", "v2"]]},
+            complex=_complex(
+                {"vertices": ["v0", "v1", "v2"], "facets": [["v0", "v1", "v2"]]}
+            ),
             simplex=("v0",),
         )
     )
@@ -21,7 +39,9 @@ def test_link_of_vertex_in_triangle() -> None:
 def test_link_of_edge_in_triangle() -> None:
     result = compute_link(
         LinkRequest(
-            complex={"vertices": ["v0", "v1", "v2"], "facets": [["v0", "v1", "v2"]]},
+            complex=_complex(
+                {"vertices": ["v0", "v1", "v2"], "facets": [["v0", "v1", "v2"]]}
+            ),
             simplex=("v0", "v1"),
         )
     )
@@ -31,7 +51,7 @@ def test_link_of_edge_in_triangle() -> None:
 def test_link_of_vertex_in_discrete_complex() -> None:
     result = compute_link(
         LinkRequest(
-            complex={"vertices": ["v0", "v1"], "facets": [["v0"], ["v1"]]},
+            complex=_complex({"vertices": ["v0", "v1"], "facets": [["v0"], ["v1"]]}),
             simplex=("v0",),
         )
     )
@@ -41,10 +61,12 @@ def test_link_of_vertex_in_discrete_complex() -> None:
 def test_link_of_face_in_boundary() -> None:
     result = compute_link(
         LinkRequest(
-            complex={
-                "vertices": ["v0", "v1", "v2"],
-                "facets": [["v0", "v1"], ["v1", "v2"], ["v0", "v2"]],
-            },
+            complex=_complex(
+                {
+                    "vertices": ["v0", "v1", "v2"],
+                    "facets": [["v0", "v1"], ["v1", "v2"], ["v0", "v2"]],
+                }
+            ),
             simplex=("v0",),
         )
     )
@@ -57,7 +79,9 @@ def test_f_vector_filled_triangle() -> None:
     from jacobian.math.topology._structural import compute_f_vector
 
     request = FVectorRequest(
-        complex={"vertices": ["v0", "v1", "v2"], "facets": [["v0", "v1", "v2"]]}
+        complex=_complex(
+            {"vertices": ["v0", "v1", "v2"], "facets": [["v0", "v1", "v2"]]}
+        )
     )
     result = compute_f_vector(request)
     assert result.f_vector == (3, 3, 1)
@@ -69,7 +93,7 @@ def test_f_vector_single_edge() -> None:
     from jacobian.math.topology._structural import compute_f_vector
 
     request = FVectorRequest(
-        complex={"vertices": ["v0", "v1"], "facets": [["v0", "v1"]]}
+        complex=_complex({"vertices": ["v0", "v1"], "facets": [["v0", "v1"]]})
     )
     result = compute_f_vector(request)
     assert result.f_vector == (2, 1)
@@ -81,7 +105,9 @@ def test_f_vector_h_vector_invariant() -> None:
     from jacobian.math.topology._structural import compute_f_vector
 
     request = FVectorRequest(
-        complex={"vertices": ["v0", "v1", "v2"], "facets": [["v0", "v1", "v2"]]}
+        complex=_complex(
+            {"vertices": ["v0", "v1", "v2"], "facets": [["v0", "v1", "v2"]]}
+        )
     )
     result = compute_f_vector(request)
     assert result.h_vector[0] == 1
@@ -94,10 +120,12 @@ def test_link_rejects_non_face() -> None:
     try:
         compute_link(
             LinkRequest(
-                complex={
-                    "vertices": ["v0", "v1", "v2", "v3"],
-                    "facets": [["v0", "v1"], ["v2", "v3"]],
-                },
+                complex=_complex(
+                    {
+                        "vertices": ["v0", "v1", "v2", "v3"],
+                        "facets": [["v0", "v1"], ["v2", "v3"]],
+                    }
+                ),
                 simplex=("v0", "v2"),
             )
         )

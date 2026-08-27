@@ -29,7 +29,7 @@ from jacobian.math.padic_arithmetic._operations import (
 class TestHenselRootLifting:
     """Test Hensel root lifting."""
 
-    def test_lift_simple_root(self):
+    def test_lift_simple_root(self) -> None:
         """Lift root 2 of x^2+1 mod 5 to mod 5^3."""
         poly = IntegerPolynomial(coefficients=("1", "0", "1"))
         result = hensel_lift_root(
@@ -38,7 +38,7 @@ class TestHenselRootLifting:
         assert result.is_simple_root
         assert (result.lifted_root**2 + 1) % 125 == 0
 
-    def test_lift_mod_p_squared(self):
+    def test_lift_mod_p_squared(self) -> None:
         """Lift root to mod p^2."""
         poly = IntegerPolynomial(coefficients=("1", "0", "0", "-1"))  # x^3 - 1
         result = hensel_lift_root(
@@ -47,7 +47,7 @@ class TestHenselRootLifting:
         assert result.is_simple_root
         assert (result.lifted_root**3 - 1) % 25 == 0
 
-    def test_non_root_rejected(self):
+    def test_non_root_rejected(self) -> None:
         """A non-root mod p should be rejected."""
         poly = IntegerPolynomial(coefficients=("1", "0", "1"))  # x^2 + 1
         with pytest.raises(ValidationError) as exc_info:
@@ -56,7 +56,7 @@ class TestHenselRootLifting:
             )
         assert exc_info.value.errors()[0]["type"] == "padic_arithmetic.root_not_root"
 
-    def test_root_in_range(self):
+    def test_root_in_range(self) -> None:
         """Lifted root should be in [0, p^k - 1]."""
         poly = IntegerPolynomial(coefficients=("1", "0", "3"))  # x^2 + 3
         result = hensel_lift_root(
@@ -69,7 +69,7 @@ class TestHenselRootLifting:
 class TestPAdicRoots:
     """Test p-adic root finding."""
 
-    def test_find_roots_x3_minus_1(self):
+    def test_find_roots_x3_minus_1(self) -> None:
         """Find roots of x^3 - 1 mod 5^2."""
         poly = IntegerPolynomial(coefficients=("1", "0", "0", "-1"))
         result = find_padic_roots(
@@ -79,7 +79,7 @@ class TestPAdicRoots:
         for root in result.roots:
             assert (root.root**3 - 1) % 25 == 0
 
-    def test_find_roots_no_roots(self):
+    def test_find_roots_no_roots(self) -> None:
         """Find roots of x^2 + 1 mod 3 (no roots mod 3)."""
         poly = IntegerPolynomial(coefficients=("1", "0", "1"))
         result = find_padic_roots(
@@ -87,7 +87,7 @@ class TestPAdicRoots:
         )
         assert result.root_count == 0
 
-    def test_find_roots_x_squared_mod_5(self):
+    def test_find_roots_x_squared_mod_5(self) -> None:
         """x^2 mod 5 has one multiple residue (0) and no simple roots."""
         poly = IntegerPolynomial(coefficients=("1", "0", "0"))
         result = find_padic_roots(
@@ -96,14 +96,14 @@ class TestPAdicRoots:
         assert result.root_count == 0
         assert result.multiple_residues == (0,)
 
-    def test_composite_prime_rejected(self):
+    def test_composite_prime_rejected(self) -> None:
         """Composite moduli are rejected at the typed boundary."""
         poly = IntegerPolynomial(coefficients=("1", "-1"))
         with pytest.raises(ValidationError) as exc_info:
             HenselRootRequest(polynomial=poly, prime=4, root_mod_p=1, precision=2)
         assert exc_info.value.errors()[0]["type"] == "padic_arithmetic.prime_not_prime"
 
-    def test_result_is_structural_and_owner_verifier_binds_source(self):
+    def test_result_is_structural_and_owner_verifier_binds_source(self) -> None:
         """Parsing retains shape checks; deliberate claim checks stay private."""
         poly = IntegerPolynomial(coefficients=("1", "0", "1"))  # x^2 + 1
         result = hensel_lift_root(
@@ -142,7 +142,7 @@ class TestPAdicRoots:
             exc_info.value.errors()[0]["type"] == "padic_arithmetic.simple_flag_invalid"
         )
 
-    def test_roots_profile_verifier_rejects_forged_source(self):
+    def test_roots_profile_verifier_rejects_forged_source(self) -> None:
         result = find_padic_roots(
             PAdicRootsRequest(
                 polynomial=IntegerPolynomial(coefficients=("1", "0", "0", "-1")),
@@ -156,7 +156,7 @@ class TestPAdicRoots:
         with pytest.raises(PydanticCustomError):
             verify_padic_roots_result(PAdicRootsResult.model_validate(forged))
 
-    def test_roots_profile_rejects_out_of_range_structural_entries(self):
+    def test_roots_profile_rejects_out_of_range_structural_entries(self) -> None:
         result = find_padic_roots(
             PAdicRootsRequest(
                 polynomial=IntegerPolynomial(coefficients=("1", "0", "0", "-1")),
@@ -172,14 +172,14 @@ class TestPAdicRoots:
             exc_info.value.errors()[0]["type"] == "padic_arithmetic.root_out_of_range"
         )
 
-    def test_multiple_root_lift_rejected(self):
+    def test_multiple_root_lift_rejected(self) -> None:
         """f=x^2+5, p=5: r=0 is a multiple root; lifting is refused."""
         poly = IntegerPolynomial(coefficients=("1", "0", "5"))
         with pytest.raises(ValidationError) as exc_info:
             HenselRootRequest(polynomial=poly, prime=5, root_mod_p=0, precision=2)
         assert exc_info.value.errors()[0]["type"] == "padic_arithmetic.root_not_simple"
 
-    def test_all_roots_are_valid(self):
+    def test_all_roots_are_valid(self) -> None:
         """All returned roots should satisfy f(root) ≡ 0 (mod p^k)."""
         poly = IntegerPolynomial(coefficients=("1", "0", "0", "-1"))  # x^3 - 1
         result = find_padic_roots(
@@ -210,7 +210,7 @@ def _poly_value_at(polynomial: IntegerPolynomial, x: int, modulus: int) -> int:
 class TestHenselFactorLifting:
     """Test coprime factorization lifting with Bézout corrections."""
 
-    def test_thread_example_requires_bezout_correction(self):
+    def test_thread_example_requires_bezout_correction(self) -> None:
         """f = x^2+x+3, g = x, h = x+1, p = 3: the lift must correct both
         factors through the Bézout relation, not shift coefficients of f-gh
         into g alone."""
@@ -230,7 +230,7 @@ class TestHenselFactorLifting:
             ) % modulus
             assert product == _poly_value_at(f, x, modulus)
 
-    def test_lift_preserves_product_mod_p_k(self):
+    def test_lift_preserves_product_mod_p_k(self) -> None:
         """(x+2)(x+3) ≡ x^2+1 (mod 5); lifting preserves it to 5^3."""
         f = IntegerPolynomial(coefficients=("1", "0", "1"))
         g = _wire_poly(2, 1)
@@ -248,7 +248,7 @@ class TestHenselFactorLifting:
             ) % modulus
             assert product == _poly_value_at(f, x, modulus)
 
-    def test_higher_precision_lift(self):
+    def test_higher_precision_lift(self) -> None:
         """A three-step lift stays exact modulo p^4."""
         f = _wire_poly(2, 3, 2, 1)  # (x+1)(x^2+x+2)
         g = _wire_poly(1, 1)
@@ -266,7 +266,7 @@ class TestHenselFactorLifting:
             ) % modulus
             assert product == _poly_value_at(f, x, modulus)
 
-    def test_precision_one_returns_factors_mod_p(self):
+    def test_precision_one_returns_factors_mod_p(self) -> None:
         """With k = 1 no lift happens; factors return reduced mod p."""
         f = IntegerPolynomial(coefficients=("1", "0", "1"))
         g = _wire_poly(7, 11)
@@ -279,7 +279,7 @@ class TestHenselFactorLifting:
         assert result.lifted_g.coefficients == ("1", "2")
         assert result.lifted_h.coefficients == ("1", "3")
 
-    def test_non_congruent_product_rejected(self):
+    def test_non_congruent_product_rejected(self) -> None:
         """Factors whose product misses f mod p are a typed domain error."""
         f = IntegerPolynomial(coefficients=("1", "0", "1"))
         g = _wire_poly(2, 1)
@@ -291,7 +291,7 @@ class TestHenselFactorLifting:
                 )
             )
 
-    def test_shared_factor_rejected(self):
+    def test_shared_factor_rejected(self) -> None:
         """Factors sharing a root mod p are not coprime and are rejected."""
         f = IntegerPolynomial(coefficients=("1", "0", "0"))  # x^2
         g = _wire_poly(0, 1)
@@ -303,7 +303,7 @@ class TestHenselFactorLifting:
                 )
             )
 
-    def test_result_coefficients_stay_canonical(self):
+    def test_result_coefficients_stay_canonical(self) -> None:
         """Lifted factors omit leading zeros and stay below p^k."""
         f = IntegerPolynomial(coefficients=("1", "0", "1"))
         g = _wire_poly(2, 1)
@@ -325,7 +325,7 @@ class TestHenselFactorLifting:
     )
     def test_random_coprime_splits_reconstruct(
         self, constant: int, linear: int, quadratic: int, prime: int, precision: int
-    ):
+    ) -> None:
         """Every coprime split lifts with an exact product reconstruction.
 
         The defining invariant of Hensel factor lifting is

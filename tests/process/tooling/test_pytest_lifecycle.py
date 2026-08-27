@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import pytest
@@ -14,21 +15,19 @@ def _tree_result(exit_code: int, *, timed_out: bool = False) -> ProcessTreeResul
 def test_success_uses_unique_worktree_basetemp_and_cleans_it(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    observed: list[tuple[object, ...]] = []
+    observed: list[tuple[tuple[str, ...], Path]] = []
 
     def run(
-        command: object,
+        command: Sequence[str],
         *,
         timeout: float,
         cwd: Path,
-        env: object,
+        env: Mapping[str, str],
     ) -> ProcessTreeResult:
         del timeout, env
         observed.append((tuple(command), cwd))
         basetemp_argument = next(
-            argument
-            for argument in command  # type: ignore[union-attr]
-            if str(argument).startswith("--basetemp=")
+            argument for argument in command if str(argument).startswith("--basetemp=")
         )
         basetemp = Path(str(basetemp_argument).split("=", 1)[1])
         (basetemp.parent / "session-template").mkdir()

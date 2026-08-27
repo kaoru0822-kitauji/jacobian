@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shutil
+from collections.abc import Mapping, Sequence
 from fractions import Fraction
 from itertools import combinations
 
@@ -13,6 +14,7 @@ from jacobian._exact import CanonicalRational
 from jacobian.math.polynomials._conversions import rational_polynomial_to_sympy
 from jacobian.math.polynomials.ideals import _singular
 from jacobian.math.polynomials.ideals._models import (
+    EliminationIdealResult,
     IdealComputationBudget,
     IdealQuotientRequest,
     IdealRadicalMembershipRequest,
@@ -34,7 +36,7 @@ from jacobian.math.polynomials.values import (
 
 def _polynomial(
     variables: tuple[str, ...],
-    terms: dict[tuple[int, ...], int | Fraction],
+    terms: Mapping[tuple[int, ...], int | Fraction],
 ) -> RationalPolynomial:
     return RationalPolynomial(
         variables=variables,
@@ -53,7 +55,7 @@ def _polynomial(
 
 def _ideal(
     variables: tuple[str, ...],
-    *generators: dict[tuple[int, ...], int | Fraction],
+    *generators: Mapping[tuple[int, ...], int | Fraction],
 ) -> RationalPolynomialIdeal:
     return RationalPolynomialIdeal(
         variables=variables,
@@ -68,7 +70,9 @@ def _contains(ideal: RationalPolynomialIdeal, polynomial: RationalPolynomial) ->
         *symbols,
         domain=sympy.QQ,
     )
-    return basis.reduce(rational_polynomial_to_sympy(polynomial).as_expr())[1] == 0
+    return bool(
+        basis.reduce(rational_polynomial_to_sympy(polynomial).as_expr())[1] == 0
+    )
 
 
 def _equal(left: RationalPolynomialIdeal, right: RationalPolynomialIdeal) -> bool:
@@ -92,7 +96,7 @@ def _contains_product(
         rational_polynomial_to_sympy(left).as_expr()
         * rational_polynomial_to_sympy(right).as_expr()
     )
-    return basis.reduce(product)[1] == 0
+    return bool(basis.reduce(product)[1] == 0)
 
 
 def _monomial_radical_oracle(
@@ -142,7 +146,7 @@ def test_ideal_contract_rejects_mixed_polynomial_rings() -> None:
 def test_backend_unavailability_is_a_typed_execution_outcome(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(_singular.shutil, "which", lambda _name: None)
+    monkeypatch.setattr(shutil, "which", lambda _name: None)
     result = compute_ideal_radical(IdealRadicalRequest(ideal=_ideal(("x",), {(2,): 1})))
     assert result.outcome == "UNAVAILABLE"
     assert result.radical is None
@@ -395,7 +399,10 @@ def test_ideal_radical_handles_zero_and_unit_ideals(
 def test_ideal_radical_agrees_with_independent_monomial_oracle(
     generators: tuple[tuple[int, int], ...],
 ) -> None:
-    source = _ideal(("x", "y"), *({generator: 1} for generator in generators))
+    monomial_generators: list[dict[tuple[int, ...], int]] = [
+        {generator: 1} for generator in generators
+    ]
+    source = _ideal(("x", "y"), *monomial_generators)
     result = compute_ideal_radical(IdealRadicalRequest(ideal=source))
 
     assert result.outcome == "COMPUTED"
@@ -602,9 +609,10 @@ def test_ideal_quotient_by_product_equals_iterated_quotient() -> None:
     assert _equal(by_product.quotient, _ideal(variables, {(2, 1): 1}))
 
 
-def _poly(variables, terms):
-    from jacobian._exact import CanonicalRational
-
+def _poly(
+    variables: tuple[str, ...],
+    terms: Sequence[tuple[tuple[int, ...], int | Fraction]],
+) -> RationalPolynomial:
     return RationalPolynomial(
         variables=variables,
         polynomial=SparseRationalPolynomial(
@@ -620,7 +628,7 @@ def _poly(variables, terms):
 
 
 class TestIdealMembershipViaGroebnerBasis:
-    def test_membership_needs_groebner_reduction(self):
+    def test_membership_needs_groebner_reduction(self) -> None:
         """x-y lies in <xy-1, y^2-1> though neither generator divides it."""
         from jacobian.math.polynomials.ideals._models import (
             IdealNormalFormRequest,
@@ -644,11 +652,16 @@ class TestIdealMembershipViaGroebnerBasis:
             )
         )
         assert result.in_ideal is True
+        assert result.remainder is not None
         assert len(result.remainder.polynomial.terms) == 0
 
 
 class TestEliminationIdealSemantics:
-    def _eliminate(self, generators, eliminated):
+    def _eliminate(
+        self,
+        generators: Sequence[Sequence[tuple[tuple[int, ...], int | Fraction]]],
+        eliminated: tuple[str, ...],
+    ) -> EliminationIdealResult:
         from jacobian.math.polynomials.ideals._models import (
             EliminationIdealRequest,
         )
@@ -666,14 +679,17 @@ class TestEliminationIdealSemantics:
         )
 
     @staticmethod
-    def _terms(result):
+    def _terms(
+        result: EliminationIdealResult,
+    ) -> list[tuple[str, str, tuple[int, ...]]]:
+        assert result.elimination_ideal is not None
         return [
             (str(t.coefficient.num), str(t.coefficient.den), t.exponents)
             for g in result.elimination_ideal.generators
             for t in g.polynomial.terms
         ]
 
-    def test_eliminated_variables_lead_lex_order(self):
+    def test_eliminated_variables_lead_lex_order(self) -> None:
         """Eliminating y from <x-y, y^2-1> yields <x^2-1>."""
         result = self._eliminate(
             [(((1, 0), 1), ((0, 1), -1)), (((0, 2), 1), ((0, 0), -1))],
@@ -686,13 +702,14 @@ class TestEliminationIdealSemantics:
             ("-1", "1", (0,)),
         )
 
-    def test_zero_elimination_ideal_preserved(self):
+    def test_zero_elimination_ideal_preserved(self) -> None:
         """<x> ∩ QQ[y] = (0): the zero ideal must not become the whole ring."""
         result = self._eliminate([(((1, 0), 1),)], ("x",))
+        assert result.elimination_ideal is not None
         assert len(result.elimination_ideal.generators) == 1
         assert len(result.elimination_ideal.generators[0].polynomial.terms) == 0
 
-    def test_unit_elimination_ideal(self):
+    def test_unit_elimination_ideal(self) -> None:
         """An ideal containing 1 eliminates to the whole ring."""
         result = self._eliminate([(((0, 0), 1),)], ("y",))
         terms = self._terms(result)

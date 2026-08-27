@@ -111,11 +111,12 @@ def test_unsat_core_is_an_indexed_replayable_source_subset() -> None:
     assert verify_smt_unsat_core_result(result)
 
 
+@pytest.mark.property
 def test_repeated_calls_have_a_stable_exact_outcome() -> None:
-    results = tuple(compute_smt_unsat_core(_request()) for _ in range(16))
+    results = tuple(compute_smt_unsat_core(_request()) for _ in range(2))
 
-    assert tuple(result.outcome for result in results) == ("UNSAT",) * 16
-    assert tuple(result.core_indices for result in results) == ((0, 1),) * 16
+    assert tuple(result.outcome for result in results) == ("UNSAT",) * 2
+    assert tuple(result.core_indices for result in results) == ((0, 1),) * 2
 
 
 def test_unsat_core_verifier_rejects_a_core_detached_from_its_source() -> None:

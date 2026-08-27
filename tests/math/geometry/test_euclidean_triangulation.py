@@ -90,8 +90,12 @@ def _translated_parabola_ring(
     )
 
 
-def _request(points: tuple[dict[str, dict[str, str]], ...]):
-    return EuclideanConvexPolygonTriangulationRequest(polygon={"points": points})
+def _request(
+    points: tuple[dict[str, dict[str, str]], ...],
+) -> EuclideanConvexPolygonTriangulationRequest:
+    return EuclideanConvexPolygonTriangulationRequest.model_validate(
+        {"polygon": {"points": points}}
+    )
 
 
 class TestEuclideanTriangulation:

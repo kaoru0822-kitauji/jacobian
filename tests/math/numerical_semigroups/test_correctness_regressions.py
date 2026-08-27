@@ -133,15 +133,19 @@ def test_betti_and_minimal_presentation_replay_independently() -> None:
     )
     brute_betti: list[int] = []
     required_relations = 0
-    for value in range(1, max(map(int, betti.betti_elements)) + 1):
+    # Keep the replay bound independent of the implementation's returned
+    # candidates; deriving it from ``betti`` could hide an omitted maximum.
+    for value in range(1, 31):
         factorizations = _brute_factorizations(generators, value)
         if len(factorizations) > 1:
             components = _r_components(factorizations)
             if len(components) > 1:
                 brute_betti.append(value)
                 required_relations += len(components) - 1
+    assert tuple(brute_betti) == (30,)
     assert tuple(map(int, betti.betti_elements)) == tuple(brute_betti)
-    assert len(presentation.relations) == required_relations == 2
+    assert required_relations == 2
+    assert len(presentation.relations) == required_relations
     for relation in presentation.relations:
         assert sum(a * b for a, b in zip(relation.first, generators, strict=True)) == 30
         assert (
@@ -150,6 +154,7 @@ def test_betti_and_minimal_presentation_replay_independently() -> None:
 
 
 def test_minimal_presentation_rejects_relations_inside_one_r_class() -> None:
+    generators = (4, 10, 15)
     result = MinimalPresentationResult.model_validate(
         {
             "minimal_generators": ["4", "10", "15"],
@@ -161,6 +166,23 @@ def test_minimal_presentation_rejects_relations_inside_one_r_class() -> None:
         }
     )
 
+    assert tuple(
+        tuple(
+            sum(
+                coordinate * generator
+                for coordinate, generator in zip(side, generators, strict=True)
+            )
+            for side in (relation.first, relation.second)
+        )
+        for relation in result.relations
+    ) == ((20, 20), (30, 30))
+    assert any(
+        any(
+            left > 0 and right > 0
+            for left, right in zip(relation.first, relation.second, strict=True)
+        )
+        for relation in result.relations
+    )
     assert not verify_minimal_presentation_result(result)
 
 
@@ -190,7 +212,8 @@ def test_global_catenary_includes_distances_inside_betti_r_classes() -> None:
         _brute_catenary(_brute_factorizations(generators, int(record.betti_element)))
         for record in result.betti_degrees
     )
-    assert result.catenary_degree == expected == 5
+    assert expected == 5
+    assert result.catenary_degree == expected
     assert {
         int(record.betti_element): record.catenary_degree
         for record in result.betti_degrees
@@ -209,7 +232,8 @@ def test_global_delta_replays_every_element_through_theorem_bound() -> None:
             }
         )
         observed.update(right - left for left, right in pairwise(lengths))
-    assert tuple(sorted(observed)) == result.delta_set == (1, 2, 3, 4)
+    assert tuple(sorted(observed)) == (1, 2, 3, 4)
+    assert result.delta_set == tuple(sorted(observed))
 
 
 def test_global_elasticity_has_an_exact_attaining_witness() -> None:
@@ -222,7 +246,9 @@ def test_global_elasticity_has_an_exact_attaining_witness() -> None:
         sum(factorization)
         for factorization in _brute_factorizations(generators, witness)
     )
-    assert result.elasticity == f"{max(lengths)}/{min(lengths)}" == "9/4"
+    expected_ratio = f"{max(lengths)}/{min(lengths)}"
+    assert expected_ratio == "9/4"
+    assert result.elasticity == expected_ratio
     assert (result.smallest_generator, result.largest_generator) == ("4", "9")
 
 

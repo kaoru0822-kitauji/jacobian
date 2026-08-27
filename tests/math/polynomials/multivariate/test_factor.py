@@ -552,6 +552,7 @@ class TestAggregateContentAdmission:
     integer coefficients published as the reconstructed polynomial.
     """
 
+    @pytest.mark.scale
     def test_many_prime_denominators_rejected_before_backend(self) -> None:
         """129 distinct 256-digit prime denominators pass every per-term
         budget yet their least common multiple exceeds the canonical
@@ -560,6 +561,7 @@ class TestAggregateContentAdmission:
         with pytest.raises(ValidationError):
             MultivariateFactorRequest(polynomial=_prime_denominator_poly(129))
 
+    @pytest.mark.scale
     def test_content_within_limit_but_primitive_coefficients_rejected(self) -> None:
         """Even with the least common multiple inside the canonical limit,
         clearing denominators can push every primitive coefficient past the

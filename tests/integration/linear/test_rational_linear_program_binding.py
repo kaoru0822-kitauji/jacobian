@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import copy
 from fractions import Fraction
+from typing import cast
 
 import pytest
 from tests.integration.linear._support import linear_validation_error
 from tests.support.rationals import rational_payload as q
 
+from jacobian._exact import CanonicalRational
 from jacobian.math.optimization._models import (
     RationalLinearProgramRequest,
     RationalLinearProgramResult,
@@ -20,6 +22,14 @@ from jacobian.math.optimization._tools import TOOLS as OPTIMIZATION_TOOLS
 pytestmark = pytest.mark.requires_backend("sympy")
 
 OPERATION = OPTIMIZATION_TOOLS[0]
+
+
+def _canonical(
+    numerator: int,
+    denominator: int = 1,
+) -> CanonicalRational:
+    return CanonicalRational.model_validate(q(numerator, denominator))
+
 
 # minimize y subject to x+y=3 and x=1; the unique optimum is (1,2) with
 # value 2 and a dual optimum (1,-1) that requires a free dual variable.
@@ -44,13 +54,17 @@ UNBOUNDED_PROGRAM: dict[str, object] = {
 
 
 def _solve(program: dict[str, object]) -> RationalLinearProgramResult:
-    return OPERATION.run(
+    result = OPERATION.run(
         RationalLinearProgramRequest.model_validate({"program": program})
     )
+    assert isinstance(result, RationalLinearProgramResult)
+    return result
 
 
-def _fractions(values: object) -> list[Fraction]:
-    assert isinstance(values, tuple)
+def _fractions(
+    values: tuple[CanonicalRational, ...] | None,
+) -> list[Fraction]:
+    assert values is not None
     return [value.as_fraction() for value in values]
 
 
@@ -61,6 +75,7 @@ def _dot(left: list[Fraction], right: list[Fraction]) -> Fraction:
 def test_optimal_outcome_retains_source_and_replays_strong_duality() -> None:
     request = RationalLinearProgramRequest.model_validate({"program": BOUND_PROGRAM})
     result = OPERATION.run(request)
+    assert isinstance(result, RationalLinearProgramResult)
 
     assert result.status == "OPTIMAL"
     assert result.program == request.program
@@ -169,12 +184,12 @@ def test_fully_authored_optimal_payload_parses_but_is_not_proof() -> None:
     forged = RationalLinearProgramResult(
         status="OPTIMAL",
         program=program,
-        primal_candidate=(q(999), q(0)),
-        primal_objective=q(-123),
-        primal_residuals=(q(77), q(77)),
-        dual_candidate=(q(456), q(456)),
-        dual_objective=q(-123),
-        dual_slacks=(q(-88), q(88)),
+        primal_candidate=(_canonical(999), _canonical(0)),
+        primal_objective=_canonical(-123),
+        primal_residuals=(_canonical(77), _canonical(77)),
+        dual_candidate=(_canonical(456), _canonical(456)),
+        dual_objective=_canonical(-123),
+        dual_slacks=(_canonical(-88), _canonical(88)),
     )
     _assert_rejected_by_verifier(forged)
     with linear_validation_error():
@@ -189,6 +204,12 @@ def test_fully_authored_optimal_payload_parses_but_is_not_proof() -> None:
 def _bound_result() -> tuple[RationalLinearProgramResult, dict[str, object]]:
     result = _solve(BOUND_PROGRAM)
     return result, result.model_dump(mode="json")
+
+
+def _program_dump(dumped: dict[str, object]) -> dict[str, object]:
+    program = dumped.get("program")
+    assert isinstance(program, dict)
+    return cast(dict[str, object], program)
 
 
 def _assert_rejected_by_verifier(result: RationalLinearProgramResult) -> None:
@@ -209,14 +230,13 @@ def test_mutating_one_source_entry_requires_deliberate_verification(
     mutation: object,
 ) -> None:
     _, dumped = _bound_result()
-    dumped["program"][field] = mutation  # type: ignore[literal-required]
+    _program_dump(dumped)[field] = mutation
     _assert_rejected_by_verifier(RationalLinearProgramResult.model_validate(dumped))
 
 
 def test_variable_order_mutation_requires_deliberate_verification() -> None:
     _, dumped = _bound_result()
-    program = dumped["program"]
-    assert isinstance(program, dict)
+    program = _program_dump(dumped)
     program["variables"] = ["y", "x"]
     program["objective"] = [q(1), q(0)]
     program["coefficients"] = [[q(1), q(1)], [q(0), q(1)]]
@@ -254,21 +274,23 @@ def test_feasible_point_without_dual_remains_only_primal_feasible() -> None:
     feasible = RationalLinearProgramResult(
         status="PRIMAL_FEASIBLE",
         program=program,
-        primal_candidate=(q(1), q(2)),
-        primal_objective=q(2),
-        primal_residuals=(q(0), q(0)),
+        primal_candidate=(_canonical(1), _canonical(2)),
+        primal_objective=_canonical(2),
+        primal_residuals=(_canonical(0), _canonical(0)),
     )
     assert feasible.status == "PRIMAL_FEASIBLE"
     assert feasible.dual_candidate is None
     assert feasible.dual_objective is None
     with linear_validation_error():
-        RationalLinearProgramResult(
-            status="PRIMAL_FEASIBLE",
-            program=program,
-            primal_candidate=(q(1), q(2)),
-            primal_objective=q(2),
-            primal_residuals=(q(0), q(0)),
-            dual_candidate=(q(1), q(-1)),
+        RationalLinearProgramResult.model_validate(
+            {
+                "status": "PRIMAL_FEASIBLE",
+                "program": program,
+                "primal_candidate": [q(1), q(2)],
+                "primal_objective": q(2),
+                "primal_residuals": [q(0), q(0)],
+                "dual_candidate": [q(1), q(-1)],
+            }
         )
 
 
@@ -283,7 +305,7 @@ def test_corrupted_farkas_certificates_require_deliberate_verification() -> None
             status="INFEASIBLE",
             program=program,
             farkas_candidate=tuple(
-                q(-value.numerator, value.denominator) for value in witness
+                _canonical(-value.numerator, value.denominator) for value in witness
             ),
         )
     )
@@ -291,7 +313,7 @@ def test_corrupted_farkas_certificates_require_deliberate_verification() -> None
         RationalLinearProgramResult(
             status="INFEASIBLE",
             program=program,
-            farkas_candidate=(q(1),),
+            farkas_candidate=(_canonical(1),),
         )
     )
 
@@ -312,7 +334,7 @@ def test_corrupted_unboundedness_pairs_require_deliberate_verification() -> None
     ray = result.recession_direction
 
     def unbounded_with(
-        direction: tuple[object, ...],
+        direction: tuple[CanonicalRational, ...],
     ) -> RationalLinearProgramResult:
         return RationalLinearProgramResult(
             status="UNBOUNDED",
@@ -324,19 +346,21 @@ def test_corrupted_unboundedness_pairs_require_deliberate_verification() -> None
         )
 
     # The zero ray satisfies Ad=0 but does not strictly improve c^T d.
-    _assert_rejected_by_verifier(unbounded_with((q(0), q(0))))
+    _assert_rejected_by_verifier(unbounded_with((_canonical(0), _canonical(0))))
     # (2,1) is nonnegative but violates A d = 0.
-    _assert_rejected_by_verifier(unbounded_with((q(2), q(1))))
-    negated_ray = [q(-value.numerator, value.denominator) for value in _fractions(ray)]
+    _assert_rejected_by_verifier(unbounded_with((_canonical(2), _canonical(1))))
+    negated_ray = [
+        _canonical(-value.numerator, value.denominator) for value in _fractions(ray)
+    ]
     _assert_rejected_by_verifier(unbounded_with(tuple(negated_ray)))
     # An infeasible retained point cannot anchor an unbounded outcome.
     _assert_rejected_by_verifier(
         RationalLinearProgramResult(
             status="UNBOUNDED",
             program=program,
-            primal_candidate=(q(1), q(0)),
-            primal_objective=q(-1),
-            primal_residuals=(q(1),),
+            primal_candidate=(_canonical(1), _canonical(0)),
+            primal_objective=_canonical(-1),
+            primal_residuals=(_canonical(1),),
             recession_direction=ray,
         )
     )
@@ -353,21 +377,21 @@ def test_dimension_mismatches_require_deliberate_verification() -> None:
         RationalLinearProgramResult(
             status="PRIMAL_FEASIBLE",
             program=program,
-            primal_candidate=(q(1), q(1), q(1)),
-            primal_objective=q(1),
-            primal_residuals=(q(0), q(0)),
+            primal_candidate=(_canonical(1), _canonical(1), _canonical(1)),
+            primal_objective=_canonical(1),
+            primal_residuals=(_canonical(0), _canonical(0)),
         )
     )
     _assert_rejected_by_verifier(
         RationalLinearProgramResult(
             status="OPTIMAL",
             program=program,
-            primal_candidate=(q(1), q(2)),
-            primal_objective=q(2),
-            primal_residuals=(q(0), q(0)),
-            dual_candidate=(q(1),),
-            dual_objective=q(2),
-            dual_slacks=(q(0), q(0)),
+            primal_candidate=(_canonical(1), _canonical(2)),
+            primal_objective=_canonical(2),
+            primal_residuals=(_canonical(0), _canonical(0)),
+            dual_candidate=(_canonical(1),),
+            dual_objective=_canonical(2),
+            dual_slacks=(_canonical(0), _canonical(0)),
         )
     )
 
@@ -379,10 +403,12 @@ def test_unknown_outcome_carries_no_mathematical_claim() -> None:
     assert unknown.status == "UNKNOWN"
     assert unknown.primal_candidate is None
     with linear_validation_error():
-        RationalLinearProgramResult(
-            status="UNKNOWN",
-            program=program,
-            primal_candidate=(q(1), q(1)),
+        RationalLinearProgramResult.model_validate(
+            {
+                "status": "UNKNOWN",
+                "program": program,
+                "primal_candidate": [q(1), q(1)],
+            }
         )
     with linear_validation_error():
         RationalLinearProgramResult(status="UNBOUNDED", program=program)

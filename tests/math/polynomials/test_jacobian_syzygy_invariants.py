@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from fractions import Fraction
+from typing import cast
 
 import pytest
 from tests.math.polynomials._support import polynomial_validation_error
@@ -54,7 +55,7 @@ def _four_variable_counterexample() -> RationalPolynomial:
                         continue
                     target = list(exponents)
                     target[variable] += 1
-                    target_tuple = tuple(target)
+                    target_tuple = cast(tuple[int, int, int, int], tuple(target))
                     product[target_tuple] = product.get(target_tuple, Fraction(0)) + (
                         coefficient * factor_coefficient
                     )

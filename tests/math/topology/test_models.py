@@ -1,27 +1,59 @@
 from __future__ import annotations
 
+from typing import Any, Literal, overload
+
 import pytest
 from pydantic import ValidationError
 
 from jacobian.catalog.models import MathTool
 from jacobian.math.topology._homology import (
     IntegralSimplicialHomologyRequest,
+    IntegralSimplicialHomologyResult,
     SimplicialHomologyRequest,
+    SimplicialHomologyResult,
 )
 from jacobian.math.topology._models import (
     ChainCoefficientRing,
     ChainComplexRequest,
+    ChainComplexResult,
     FiniteSimplicialComplex,
+    SimplicialComplexCanonicalizationResult,
     SimplicialComplexRequest,
 )
 from jacobian.math.topology._tools import TOOLS
 
 
-def _operation(operation_id: str) -> MathTool:
+@overload
+def _operation(
+    operation_id: Literal["topology.simplicial_complex.canonicalize"],
+) -> MathTool[SimplicialComplexRequest, SimplicialComplexCanonicalizationResult]: ...
+
+
+@overload
+def _operation(
+    operation_id: Literal["topology.simplicial_complex.chain_complex.compute"],
+) -> MathTool[ChainComplexRequest, ChainComplexResult]: ...
+
+
+@overload
+def _operation(
+    operation_id: Literal["topology.simplicial_homology.compute"],
+) -> MathTool[SimplicialHomologyRequest, SimplicialHomologyResult]: ...
+
+
+@overload
+def _operation(
+    operation_id: Literal["topology.simplicial_homology.integral.compute"],
+) -> MathTool[IntegralSimplicialHomologyRequest, IntegralSimplicialHomologyResult]: ...
+
+
+def _operation(operation_id: str) -> MathTool[Any, Any]:
     return next(tool for tool in TOOLS if tool.operation_id == operation_id)
 
 
-def _canonical_complex(vertices, facets):
+def _canonical_complex(
+    vertices: tuple[str, ...], facets: tuple[tuple[str, ...], ...]
+) -> FiniteSimplicialComplex:
     """Build a canonical FiniteSimplicialComplex via its owner declaration."""
     request = SimplicialComplexRequest(vertices=vertices, facets=facets)
     operation = _operation("topology.simplicial_complex.canonicalize")

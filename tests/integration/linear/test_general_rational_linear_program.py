@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from copy import deepcopy
 from fractions import Fraction
 
@@ -11,6 +12,7 @@ from sympy import nextprime
 from tests.integration.linear._support import linear_validation_error
 from tests.support.rationals import rational_payload as q
 
+from jacobian._exact import CanonicalRational
 from jacobian.math.optimization._general_models import (
     GeneralRationalLinearProgramRequest,
     GeneralRationalLinearProgramResult,
@@ -70,7 +72,9 @@ def _run(program: dict[str, object]) -> GeneralRationalLinearProgramResult:
     return result
 
 
-def _fractions(values: object) -> tuple[Fraction, ...]:
+def _fractions(
+    values: Sequence[CanonicalRational] | None,
+) -> tuple[Fraction, ...]:
     assert values is not None
     return tuple(value.as_fraction() for value in values)
 

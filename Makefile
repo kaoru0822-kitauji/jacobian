@@ -38,8 +38,8 @@ help: ## Show the primary developer workflow.
 help-all: ## Show every low-level and lifecycle developer command.
 	@awk 'BEGIN {FS = ":.*## "; printf "All Jacobian developer commands:\n\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-26s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-test-math: ## Ordinary domain-owned mathematical behavior (4 workers, 120s).
-	$(UV_RUN) pytest -n 4 --dist worksteal --timeout=120 \
+test-math: ## Ordinary domain-owned mathematical behavior (auto workers, 120s).
+	$(UV_RUN) pytest -n auto --dist worksteal --timeout=120 \
 		-m "$(ORDINARY_MARKER_EXPRESSION)" $(if $(TESTS),$(TESTS),tests/math) \
 		$(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 

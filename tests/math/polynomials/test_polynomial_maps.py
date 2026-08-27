@@ -10,7 +10,6 @@ from jacobian._exact import CanonicalRational
 from jacobian.math.polynomials.maps._models import (
     CompositionRequest,
     EvalRequest,
-    RationalPolynomialMap,
     VariablePoint,
 )
 from jacobian.math.polynomials.maps._operations import (
@@ -18,6 +17,7 @@ from jacobian.math.polynomials.maps._operations import (
     compute_jacobian,
     evaluate_polynomial,
 )
+from jacobian.math.polynomials.maps.values import RationalPolynomialMap
 from jacobian.math.polynomials.values import (
     RationalPolynomial,
     RationalPolynomialTerm,

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from copy import deepcopy
 from fractions import Fraction
+from typing import cast
 
 import pytest
 from pydantic import ValidationError
@@ -306,9 +307,12 @@ def test_fractional_polygon_round_trips_structurally() -> None:
 
 def test_trusted_producer_runs_kernel_once(monkeypatch: pytest.MonkeyPatch) -> None:
     calls = 0
-    original = _operations.compute_kernel_data
+    original = cast(
+        Callable[[KernelPolygon], object],
+        vars(_operations)["compute_kernel_data"],
+    )
 
-    def counted(polygon: KernelPolygon):
+    def counted(polygon: KernelPolygon) -> object:
         nonlocal calls
         calls += 1
         return original(polygon)

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from typing import Any
+from importlib import import_module
+from typing import Any, cast
 
 import pytest
 from pydantic import ValidationError
@@ -537,7 +538,7 @@ def test_checker_agrees_with_high_precision_mpmath_values(
     numerator: int,
     denominator: int,
 ) -> None:
-    from mpmath import mp
+    mp = cast(Any, import_module("mpmath").mp)
 
     dyadic_bits = 256
     with mp.workprec(1024):

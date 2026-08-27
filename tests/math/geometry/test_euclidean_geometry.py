@@ -5,6 +5,7 @@ from fractions import Fraction
 import pytest
 from pydantic import ValidationError
 
+from jacobian._exact import CanonicalRational
 from jacobian.canonical import encode_strict_json, format_canonical_integer
 from jacobian.math.geometry._models import (
     MAX_TRIANGULATION_OUTPUT_CHARS,
@@ -29,11 +30,24 @@ from jacobian.math.geometry.euclidean._operations import (
 )
 
 
-def _pt(x, y):
-    return RationalPoint2D(x={"num": str(x), "den": "1"}, y={"num": str(y), "den": "1"})
+def _pt(x: int, y: int) -> RationalPoint2D:
+    return RationalPoint2D(
+        x=CanonicalRational(num=str(x), den="1"),
+        y=CanonicalRational(num=str(y), den="1"),
+    )
 
 
-def test_euclidean_points_use_the_canonical_geometry_value():
+def _triangulation_request(
+    *, polygon: object, diagonal_weights: object
+) -> ConvexPolygonTriangulationRequest:
+    """Parse raw wire fixtures at the same boundary as the public request."""
+
+    return ConvexPolygonTriangulationRequest.model_validate(
+        {"polygon": polygon, "diagonal_weights": diagonal_weights}
+    )
+
+
+def test_euclidean_points_use_the_canonical_geometry_value() -> None:
     point = _pt(1, 2)
 
     assert RationalPoint2D is GeometryRationalPoint2D
@@ -41,7 +55,7 @@ def test_euclidean_points_use_the_canonical_geometry_value():
 
 
 class TestSegmentRatio:
-    def test_equal_segments(self):
+    def test_equal_segments(self) -> None:
         req = SegmentRatioRequest(
             segment1=(_pt(0, 0), _pt(1, 0)),
             segment2=(_pt(0, 0), _pt(1, 0)),
@@ -49,7 +63,7 @@ class TestSegmentRatio:
         result = compute_segment_ratio(req)
         assert result.squared_ratio == "1"
 
-    def test_double_length(self):
+    def test_double_length(self) -> None:
         req = SegmentRatioRequest(
             segment1=(_pt(0, 0), _pt(2, 0)),
             segment2=(_pt(0, 0), _pt(1, 0)),
@@ -57,7 +71,7 @@ class TestSegmentRatio:
         result = compute_segment_ratio(req)
         assert result.squared_ratio == "4"
 
-    def test_rejects_zero_second_segment(self):
+    def test_rejects_zero_second_segment(self) -> None:
         import pytest
         from pydantic import ValidationError
 
@@ -70,14 +84,14 @@ class TestSegmentRatio:
 
 class TestRationalWeightTriangulation:
     @staticmethod
-    def _ring(*coordinates: tuple[int, int]):
+    def _ring(*coordinates: tuple[int, int]) -> tuple[dict[str, dict[str, str]], ...]:
         return tuple(
             {"x": {"num": str(x), "den": "1"}, "y": {"num": str(y), "den": "1"}}
             for x, y in coordinates
         )
 
-    def test_charges_a_selected_diagonal_once(self):
-        request = ConvexPolygonTriangulationRequest(
+    def test_charges_a_selected_diagonal_once(self) -> None:
+        request = _triangulation_request(
             polygon={
                 "points": (
                     {"x": {"num": "0", "den": "1"}, "y": {"num": "0", "den": "1"}},
@@ -100,7 +114,10 @@ class TestRationalWeightTriangulation:
         )
 
     @staticmethod
-    def _weights(pairs, assignments: dict[tuple[int, int], tuple[str, str]]):
+    def _weights(
+        pairs: tuple[tuple[int, int], ...],
+        assignments: dict[tuple[int, int], tuple[str, str]],
+    ) -> tuple[dict[str, object], ...]:
         return tuple(
             {
                 "first": first,
@@ -128,7 +145,7 @@ class TestRationalWeightTriangulation:
         (3, 5),
     )
 
-    def test_boundary_ledger_overflow_is_rejected_at_request_validation(self):
+    def test_boundary_ledger_overflow_is_rejected_at_request_validation(self) -> None:
         weights = self._weights(
             self._PENTAGON_DIAGONALS,
             {
@@ -139,19 +156,19 @@ class TestRationalWeightTriangulation:
         )
 
         with pytest.raises(ValidationError):
-            ConvexPolygonTriangulationRequest(
+            _triangulation_request(
                 polygon={"points": self._ring(*self._PENTAGON)},
                 diagonal_weights=weights,
             )
 
-    def test_single_large_weight_remains_admitted(self):
+    def test_single_large_weight_remains_admitted(self) -> None:
         denominator = 10**30000 + 3
         weights = self._weights(
             self._HEXAGON_DIAGONALS,
             {(0, 2): ("1", format_canonical_integer(denominator))},
         )
 
-        request = ConvexPolygonTriangulationRequest(
+        request = _triangulation_request(
             polygon={"points": self._ring(*self._HEXAGON)},
             diagonal_weights=weights,
         )
@@ -170,7 +187,7 @@ class TestRationalWeightTriangulation:
             edge.weight for edge in result.diagonals
         )
 
-    def test_crossing_large_weights_remain_admitted(self):
+    def test_crossing_large_weights_remain_admitted(self) -> None:
         # (0,2) and (1,3) cross, so no triangulation - and therefore no
         # split-table ledger sum - can contain both 20,001-digit
         # denominators; feasibility-aware admission must accept them.
@@ -183,7 +200,7 @@ class TestRationalWeightTriangulation:
             },
         )
 
-        request = ConvexPolygonTriangulationRequest(
+        request = _triangulation_request(
             polygon={"points": self._ring(*self._PENTAGON)},
             diagonal_weights=weights,
         )
@@ -199,7 +216,9 @@ class TestRationalWeightTriangulation:
         )
         assert validated.optimum.as_fraction() == 0
 
-    def test_shared_denominator_weights_stay_admitted_with_ledger_invariant(self):
+    def test_shared_denominator_weights_stay_admitted_with_ledger_invariant(
+        self,
+    ) -> None:
         # Every non-hull diagonal carries the same 20,001-digit denominator,
         # so each retained ledger optimum is k/P with that same denominator -
         # shared factors cancel and height multiplication would over-reject.
@@ -209,7 +228,7 @@ class TestRationalWeightTriangulation:
             dict.fromkeys(self._PENTAGON_DIAGONALS, ("1", denominator)),
         )
 
-        request = ConvexPolygonTriangulationRequest(
+        request = _triangulation_request(
             polygon={"points": self._ring(*self._PENTAGON)},
             diagonal_weights=weights,
         )
@@ -219,7 +238,7 @@ class TestRationalWeightTriangulation:
         for entry in result.split_table:
             assert len(entry.optimum.den) == 20001
 
-    def test_noncrossing_large_weight_pair_is_still_rejected(self):
+    def test_noncrossing_large_weight_pair_is_still_rejected(self) -> None:
         # Distinct large denominators on the noncrossing pair ((0,2), (0,3))
         # are forced into one retained ledger sum by w(1,3)=1, so their
         # reduced product denominator genuinely exceeds the canonical cap.
@@ -233,12 +252,12 @@ class TestRationalWeightTriangulation:
         )
 
         with pytest.raises(ValidationError):
-            ConvexPolygonTriangulationRequest(
+            _triangulation_request(
                 polygon={"points": self._ring(*self._PENTAGON)},
                 diagonal_weights=weights,
             )
 
-    def test_boundary_height_pair_stays_admitted_with_ledger_invariant(self):
+    def test_boundary_height_pair_stays_admitted_with_ledger_invariant(self) -> None:
         small = 10**16383 + 1
         large = 10**16383 + 7
         huge = 10**100 + 9
@@ -251,7 +270,7 @@ class TestRationalWeightTriangulation:
             },
         )
 
-        request = ConvexPolygonTriangulationRequest(
+        request = _triangulation_request(
             polygon={"points": self._ring(*self._PENTAGON)},
             diagonal_weights=weights,
         )
@@ -264,7 +283,7 @@ class TestRationalWeightTriangulation:
         assert len(entry.optimum.den) <= 32_768
         assert result.optimum.as_fraction() == 0
 
-    def test_cap_crossing_forced_sum_is_rejected_at_request_validation(self):
+    def test_cap_crossing_forced_sum_is_rejected_at_request_validation(self) -> None:
         # w(1,3)=1 forces the (0,3) ledger optimum onto the sum of two
         # 16,385-digit denominators whose reduced product has 32,769 digits.
         weights = self._weights(
@@ -277,12 +296,12 @@ class TestRationalWeightTriangulation:
         )
 
         with pytest.raises(ValidationError):
-            ConvexPolygonTriangulationRequest(
+            _triangulation_request(
                 polygon={"points": self._ring(*self._PENTAGON)},
                 diagonal_weights=weights,
             )
 
-    def test_boundary_height_pair_stays_admitted_at_the_exact_cap(self):
+    def test_boundary_height_pair_stays_admitted_at_the_exact_cap(self) -> None:
         # The same forced shape one digit below the cap stays admitted: the
         # retained (0,3) optimum is the exact two-term sum, still representable.
         weights = self._weights(
@@ -294,7 +313,7 @@ class TestRationalWeightTriangulation:
             },
         )
 
-        request = ConvexPolygonTriangulationRequest(
+        request = _triangulation_request(
             polygon={"points": self._ring(*self._PENTAGON)},
             diagonal_weights=weights,
         )
@@ -312,7 +331,7 @@ class TestRationalWeightTriangulation:
     _REVIEW_PENTAGON_DIAGONALS = ((0, 2), (0, 3), (1, 3), (1, 4), (2, 4))
 
     @staticmethod
-    def _mixed_extreme_weights(scale: int):
+    def _mixed_extreme_weights(scale: int) -> tuple[dict[str, object], ...]:
         huge = format_canonical_integer(2 * scale)
         assignments = {
             (0, 2): (format_canonical_integer(scale), "1"),
@@ -333,19 +352,23 @@ class TestRationalWeightTriangulation:
             for first, second in TestRationalWeightTriangulation._REVIEW_PENTAGON_DIAGONALS
         )
 
-    def test_complementary_region_coexistence_is_rejected_at_request_validation(self):
+    def test_complementary_region_coexistence_is_rejected_at_request_validation(
+        self,
+    ) -> None:
         # Regression: the complementary interval dropped its closing vertex,
         # so anchoring (0,2) hid the coexisting 20,001-digit denominator on
         # (0,3); admission accepted these weights and serializing the ledger
         # sum later raised inside CanonicalRational instead.
         with pytest.raises(ValidationError):
-            ConvexPolygonTriangulationRequest(
+            _triangulation_request(
                 polygon={"points": self._ring(*self._REVIEW_PENTAGON)},
                 diagonal_weights=self._mixed_extreme_weights(10**20000),
             )
 
-    def test_complementary_region_coexistence_stays_admitted_below_the_cap(self):
-        request = ConvexPolygonTriangulationRequest(
+    def test_complementary_region_coexistence_stays_admitted_below_the_cap(
+        self,
+    ) -> None:
+        request = _triangulation_request(
             polygon={"points": self._ring(*self._REVIEW_PENTAGON)},
             diagonal_weights=self._mixed_extreme_weights(10**16000),
         )
@@ -370,15 +393,16 @@ class TestRationalWeightTriangulation:
         if second != first + 1 and (first, second) != (0, 31)
     )
 
-    def _uniform_ring_weights(self, numerator: str):
+    def _uniform_ring_weights(self, numerator: str) -> tuple[dict[str, object], ...]:
         return self._weights(
             self._UNIFORM_RING_DIAGONALS,
             dict.fromkeys(self._UNIFORM_RING_DIAGONALS, (numerator, "1")),
         )
 
+    @pytest.mark.scale
     def test_uniform_heavy_ring_aggregate_overflow_rejected_at_request_validation(
         self,
-    ):
+    ) -> None:
         # Regression: every non-hull diagonal carries the same 22,000-digit
         # integer 10^21999, so each derived ledger optimum stays far below
         # the canonical component cap while the aggregate serialization of
@@ -389,18 +413,18 @@ class TestRationalWeightTriangulation:
         weights = self._uniform_ring_weights(format_canonical_integer(10**21999))
 
         with pytest.raises(ValidationError):
-            ConvexPolygonTriangulationRequest(
+            _triangulation_request(
                 polygon={"points": self._ring(*self._UNIFORM_RING)},
                 diagonal_weights=weights,
             )
 
-    def test_uniform_ring_with_fitting_aggregate_stays_certified(self):
+    def test_uniform_ring_with_fitting_aggregate_stays_certified(self) -> None:
         # The same uniform ring with materially lighter weights keeps the
         # per-entry bound times the entry count inside the published budget,
         # so the request executes, certifies, round-trips, and its encoded
         # result fits the aggregate envelope admission predicted.
         weight = 10**4000
-        request = ConvexPolygonTriangulationRequest(
+        request = _triangulation_request(
             polygon={"points": self._ring(*self._UNIFORM_RING)},
             diagonal_weights=self._uniform_ring_weights(
                 format_canonical_integer(weight)
@@ -416,7 +440,7 @@ class TestRationalWeightTriangulation:
         encoded = encode_strict_json(result.model_dump(mode="json"))
         assert len(encoded) <= MAX_TRIANGULATION_OUTPUT_CHARS
 
-    def test_lone_heavy_weight_ring_aggregate_is_measured_exactly(self):
+    def test_lone_heavy_weight_ring_aggregate_is_measured_exactly(self) -> None:
         # Regression: charging every retained state and echoed diagonal at
         # the largest component height estimated ~29.7 MB here, although
         # only the (0,2) ledger entry retains the 30,001-digit denominator,
@@ -426,7 +450,7 @@ class TestRationalWeightTriangulation:
         # weights instead, so this ring is admitted and its encoded result
         # stays inside the aggregate envelope.
         denominator = format_canonical_integer(10**30000 + 1)
-        request = ConvexPolygonTriangulationRequest(
+        request = _triangulation_request(
             polygon={"points": self._ring(*self._UNIFORM_RING)},
             diagonal_weights=self._weights(
                 self._UNIFORM_RING_DIAGONALS,
@@ -451,7 +475,10 @@ class TestRationalWeightTriangulation:
         encoded = encode_strict_json(result.model_dump(mode="json"))
         assert len(encoded) <= MAX_TRIANGULATION_OUTPUT_CHARS
 
-    def test_uniform_heavy_denominator_ring_aggregate_overflow_rejected(self):
+    @pytest.mark.scale
+    def test_uniform_heavy_denominator_ring_aggregate_overflow_rejected(
+        self,
+    ) -> None:
         # Every non-hull diagonal carries the same 16,001-digit denominator,
         # so each shared-denominator ledger optimum stays far below the
         # canonical component cap while their combined serialization
@@ -464,14 +491,14 @@ class TestRationalWeightTriangulation:
         )
 
         with pytest.raises(ValidationError):
-            ConvexPolygonTriangulationRequest(
+            _triangulation_request(
                 polygon={"points": self._ring(*self._UNIFORM_RING)},
                 diagonal_weights=weights,
             )
 
 
 class TestAngleEquality:
-    def test_right_angles(self):
+    def test_right_angles(self) -> None:
         req = AngleEqualityRequest(
             vertex1=_pt(0, 0),
             ray1_a=_pt(1, 0),
@@ -483,7 +510,7 @@ class TestAngleEquality:
         result = compute_angle_equality(req)
         assert result.equal is True
 
-    def test_different_angles(self):
+    def test_different_angles(self) -> None:
         req = AngleEqualityRequest(
             vertex1=_pt(0, 0),
             ray1_a=_pt(1, 0),
@@ -495,7 +522,7 @@ class TestAngleEquality:
         result = compute_angle_equality(req)
         assert result.equal is False
 
-    def test_supplementary_angles_are_not_equal(self):
+    def test_supplementary_angles_are_not_equal(self) -> None:
         req = AngleEqualityRequest(
             vertex1=_pt(0, 0),
             ray1_a=_pt(1, 0),
@@ -507,7 +534,7 @@ class TestAngleEquality:
         result = compute_angle_equality(req)
         assert result.equal is False
 
-    def test_rejects_zero_length_ray(self):
+    def test_rejects_zero_length_ray(self) -> None:
         import pytest
         from pydantic import ValidationError
 
@@ -523,7 +550,7 @@ class TestAngleEquality:
 
 
 class TestTriangleSimilarity:
-    def test_similar(self):
+    def test_similar(self) -> None:
         req = TriangleSimilarityRequest(
             triangle1=Triangle(a=_pt(0, 0), b=_pt(1, 0), c=_pt(0, 1)),
             triangle2=Triangle(a=_pt(0, 0), b=_pt(2, 0), c=_pt(0, 2)),
@@ -531,7 +558,7 @@ class TestTriangleSimilarity:
         result = compute_triangle_similarity(req)
         assert result.similar is True
 
-    def test_not_similar(self):
+    def test_not_similar(self) -> None:
         req = TriangleSimilarityRequest(
             triangle1=Triangle(a=_pt(0, 0), b=_pt(1, 0), c=_pt(0, 1)),
             triangle2=Triangle(a=_pt(0, 0), b=_pt(2, 0), c=_pt(0, 3)),

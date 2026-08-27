@@ -315,6 +315,7 @@ def test_erdos_536_reduced_forbidden_subset_fixture() -> None:
     )
 
 
+@pytest.mark.exhaustive
 def test_all_three_vertex_hypergraphs_match_exhaustive_search() -> None:
     vertices = ("a", "b", "c")
     possible_edges = tuple(

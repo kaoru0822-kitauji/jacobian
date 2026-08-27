@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from fractions import Fraction
+from typing import cast
 
 import pytest
 from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import MathTool
 from jacobian.math.algebraic_number_arithmetic._models import (
     AlgebraicMultiplicationRequest,
 )
@@ -136,7 +138,12 @@ def test_result_bound_is_proved_from_the_accepted_input_envelope() -> None:
 def test_embedding_declaration_adapter_serves_the_native_profile() -> None:
     tools = {tool.operation_id: tool for tool in REAL_QUADRATIC_OPERATIONS}
     tool = tools["arithmetic.real_quadratic.embeddings.compute"]
-    profile = tool.run(RealQuadraticEmbeddingsRequest(element=_element(1, 1, 2)))
+    embedding_tool = cast(
+        MathTool[RealQuadraticEmbeddingsRequest, RealQuadraticEmbeddingProfile], tool
+    )
+    profile = embedding_tool.run(
+        RealQuadraticEmbeddingsRequest(element=_element(1, 1, 2))
+    )
 
     assert profile == real_quadratic_embeddings(_element(1, 1, 2))
     assert profile.trace.as_fraction() == 2
@@ -156,6 +163,7 @@ def test_embedding_declaration_is_native_only_with_a_supported_symbol() -> None:
     )
 
     assert record.decision is AdmissionDecision.NATIVE_ONLY
+    assert record.native_symbol is not None
     module_name, _, symbol_name = record.native_symbol.rpartition(".")
     module = importlib.import_module(module_name)
     assert symbol_name in module.__all__

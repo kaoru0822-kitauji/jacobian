@@ -8,9 +8,12 @@ from jacobian.math.graphs.values import SimpleUndirectedGraph
 
 
 def _graph(vertices: list[str], edges: list[tuple[str, str]]) -> SimpleUndirectedGraph:
+    canonical_edges = tuple(
+        (left, right) if left <= right else (right, left) for left, right in edges
+    )
     return SimpleUndirectedGraph(
         vertices=tuple(vertices),
-        edges=tuple(tuple(sorted(e)) for e in edges),
+        edges=canonical_edges,
     )
 
 

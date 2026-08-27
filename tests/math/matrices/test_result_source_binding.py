@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 from fractions import Fraction
+from typing import Any, cast
 
 import pytest
 from pydantic import ValidationError
@@ -83,10 +84,6 @@ def test_producer_results_replay_across_shapes() -> None:
         rref = compute_rref(request)
         assert rref.matrix == matrix
         assert verify_rref_result(rref)
-        assert (
-            rref.reduced_matrix.entries
-            == compute_rref(RationalMatrixRequest(matrix=matrix)).reduced_matrix.entries
-        )
 
         rank_request = MatrixRankRequest(matrix=matrix)
         rank = compute_rank(rank_request)
@@ -111,28 +108,25 @@ def test_producer_results_replay_across_shapes() -> None:
 )
 def test_serialized_results_round_trip(rows: list[list[str]]) -> None:
     matrix = _matrix(rows)
-    dumped_rref = compute_rref(RationalMatrixRequest(matrix=matrix)).model_dump()
-    assert (
-        RrefResult.model_validate(dumped_rref).reduced_matrix
-        == compute_rref(RationalMatrixRequest(matrix=matrix)).reduced_matrix
-    )
-    dumped_rank = compute_rank(MatrixRankRequest(matrix=matrix)).model_dump()
-    assert (
-        MatrixRankResult.model_validate(dumped_rank).rank
-        == compute_rank(MatrixRankRequest(matrix=matrix)).rank
-    )
-    dumped_null = compute_nullspace(RationalMatrixRequest(matrix=matrix)).model_dump()
-    assert (
-        NullspaceResult.model_validate(dumped_null).nullity
-        == compute_nullspace(RationalMatrixRequest(matrix=matrix)).nullity
-    )
+    rref = compute_rref(RationalMatrixRequest(matrix=matrix))
+    assert RrefResult.model_validate(rref.model_dump()) == rref
+
+    rank = compute_rank(MatrixRankRequest(matrix=matrix))
+    assert MatrixRankResult.model_validate(rank.model_dump()) == rank
+
+    nullspace = compute_nullspace(RationalMatrixRequest(matrix=matrix))
+    assert NullspaceResult.model_validate(nullspace.model_dump()) == nullspace
 
 
-def _mutable(dumped: dict) -> dict:
-    """JSON round-trip so nested tuple payloads become mutable lists."""
+def _mutable(dumped: dict[str, Any]) -> dict[str, Any]:
+    """JSON round-trip so nested tuple payloads become mutable lists.
+
+    The explicit ``Any`` is limited to this dynamic JSON mutation boundary;
+    each resulting payload is immediately validated by its result model.
+    """
     import json
 
-    return json.loads(json.dumps(dumped))
+    return cast(dict[str, object], json.loads(json.dumps(dumped)))
 
 
 def test_rref_result_rejects_mutations() -> None:
@@ -171,10 +165,6 @@ def test_rank_result_rejects_mutations() -> None:
     forged_rank["pivot_columns"] = [1]
     assert not verify_rank_result(MatrixRankResult.model_validate(forged_rank))
 
-    forged_pivots = copy.deepcopy(_mutable(dumped))
-    forged_pivots["pivot_columns"] = [1]
-    assert not verify_rank_result(MatrixRankResult.model_validate(forged_pivots))
-
     foreign_source = copy.deepcopy(_mutable(dumped))
     foreign_source["matrix"]["entries"] = [
         [{"num": "1", "den": "1"}, {"num": "0", "den": "1"}],
@@ -189,8 +179,8 @@ def test_nullspace_result_rejects_mutations() -> None:
     dumped = result.model_dump()
     assert result.nullity == 1
     assert result.basis_vectors[0][-2:] == (
-        __import__("jacobian")._exact.CanonicalRational(num="-2", den="1"),
-        __import__("jacobian")._exact.CanonicalRational(num="1", den="1"),
+        CanonicalRational(num="-2", den="1"),
+        CanonicalRational(num="1", den="1"),
     )
 
     outside_vector = copy.deepcopy(_mutable(dumped))

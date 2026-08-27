@@ -2,10 +2,12 @@
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import TypedDict
 
 import pytest
 from pydantic import ValidationError
 
+from jacobian._exact import CanonicalRational
 from jacobian.math.polynomial_support_geometry._models import (
     InitialFormRequest,
     NewtonPolytopeRequest,
@@ -25,6 +27,16 @@ from jacobian.math.polynomial_support_geometry.operations import (
 from jacobian.math.polynomials.values import RationalPolynomial
 
 
+class _CanonicalRationalPayload(TypedDict):
+    num: str
+    den: str
+
+
+class _RationalTermPayload(TypedDict):
+    coefficient: _CanonicalRationalPayload
+    exponents: list[int]
+
+
 @contextmanager
 def raises_code(code: str) -> Iterator[None]:
     with pytest.raises(ValidationError) as caught:
@@ -40,14 +52,14 @@ def raises_pydantic_code(code: str) -> Iterator[None]:
 
 
 def _polynomial(
-    terms: tuple[dict, ...], variables: tuple[str, ...]
+    terms: tuple[_RationalTermPayload, ...], variables: tuple[str, ...]
 ) -> RationalPolynomial:
     return RationalPolynomial.model_validate(
         {"variables": list(variables), "polynomial": {"terms": list(terms)}}
     )
 
 
-def _term(coeff: str, exponents: list[int]) -> dict:
+def _term(coeff: str, exponents: list[int]) -> _RationalTermPayload:
     return {"coefficient": {"num": coeff, "den": "1"}, "exponents": exponents}
 
 
@@ -154,7 +166,7 @@ class TestNewtonPolytope:
 class TestWeightProfile:
     def test_weight_profile_uniform(self) -> None:
         result = compute_weight_profile(
-            WeightProfileRequest(polynomial=_polynomial(_XY_TERMS, VARS), weight=[1, 1])
+            WeightProfileRequest(polynomial=_polynomial(_XY_TERMS, VARS), weight=(1, 1))
         )
         # All exponents have weight 2, so min weight is 2
         assert result.minimum_weight == 2
@@ -165,7 +177,7 @@ class TestWeightProfile:
 
     def test_weight_profile_nonuniform(self) -> None:
         result = compute_weight_profile(
-            WeightProfileRequest(polynomial=_polynomial(_XY_TERMS, VARS), weight=[1, 0])
+            WeightProfileRequest(polynomial=_polynomial(_XY_TERMS, VARS), weight=(1, 0))
         )
         assert verify_weight_profile(result)
         # Weights: (2,0)->2, (0,2)->0, (1,1)->1
@@ -176,28 +188,28 @@ class TestWeightProfile:
     def test_dimension_mismatch(self) -> None:
         with pytest.raises(ValueError, match="weight vector length"):
             WeightProfileRequest(
-                polynomial=_polynomial(_XY_TERMS, VARS), weight=[1, 1, 1]
+                polynomial=_polynomial(_XY_TERMS, VARS), weight=(1, 1, 1)
             )
 
     def test_zero_polynomial_rejected(self) -> None:
         """The empty support has no minimum; the zero polynomial is inadmissible."""
         with pytest.raises(ValueError, match="zero polynomial"):
-            WeightProfileRequest(polynomial=_polynomial((), VARS), weight=[1, 1])
+            WeightProfileRequest(polynomial=_polynomial((), VARS), weight=(1, 1))
         with pytest.raises(ValueError, match="zero polynomial"):
-            InitialFormRequest(polynomial=_polynomial((), VARS), weight=[1, 1])
+            InitialFormRequest(polynomial=_polynomial((), VARS), weight=(1, 1))
 
 
 class TestInitialForm:
     def test_initial_form_uniform(self) -> None:
         result = compute_initial_form(
-            InitialFormRequest(polynomial=_polynomial(_XY_TERMS, VARS), weight=[1, 1])
+            InitialFormRequest(polynomial=_polynomial(_XY_TERMS, VARS), weight=(1, 1))
         )
         # All terms at min weight 2, so initial form is the whole polynomial
         assert len(result.initial_form.polynomial.terms) == 3
 
     def test_initial_form_nonuniform(self) -> None:
         result = compute_initial_form(
-            InitialFormRequest(polynomial=_polynomial(_XY_TERMS, VARS), weight=[1, 0])
+            InitialFormRequest(polynomial=_polynomial(_XY_TERMS, VARS), weight=(1, 0))
         )
         # Minimum weight 0 at (0,2), initial form is y^2 over the same ring
         assert result.initial_form.variables == VARS
@@ -208,7 +220,7 @@ class TestInitialForm:
     def test_initial_form_with_coeffs(self) -> None:
         terms = (_term("3", [2, 0]), _term("5", [0, 2]))
         result = compute_initial_form(
-            InitialFormRequest(polynomial=_polynomial(terms, VARS), weight=[1, 0])
+            InitialFormRequest(polynomial=_polynomial(terms, VARS), weight=(1, 0))
         )
         # Minimum weight 0 at (0,2), initial form is 5*y^2
         term = result.initial_form.polynomial.terms[0]
@@ -222,7 +234,7 @@ class TestInitialForm:
         )
 
         result = compute_initial_form(
-            InitialFormRequest(polynomial=_polynomial(_XY_TERMS, VARS), weight=[1, 0])
+            InitialFormRequest(polynomial=_polynomial(_XY_TERMS, VARS), weight=(1, 0))
         )
         revalidated = PolynomialFaceData.model_validate(result.model_dump())
         assert revalidated.initial_form.variables == VARS
@@ -235,7 +247,7 @@ class TestInitialForm:
     def test_initial_form_composes_as_polynomial_input(self) -> None:
         """The returned canonical value feeds another request unchanged."""
         first = compute_initial_form(
-            InitialFormRequest(polynomial=_polynomial(_XY_TERMS, VARS), weight=[1, 0])
+            InitialFormRequest(polynomial=_polynomial(_XY_TERMS, VARS), weight=(1, 0))
         )
         follow_up = compute_support(SupportRequest(polynomial=first.initial_form))
         assert follow_up.term_count == 1
@@ -247,7 +259,7 @@ class TestTransportableBounds:
         big = 9007199254740991
         with raises_code("weight_component_out_of_range"):
             WeightProfileRequest(
-                polynomial=_polynomial(_XY_TERMS, VARS), weight=[big, 1]
+                polynomial=_polynomial(_XY_TERMS, VARS), weight=(big, 1)
             )
 
     def test_initial_form_output_growth_bounded(self) -> None:
@@ -260,7 +272,7 @@ class TestTransportableBounds:
         with raises_code("initial_form_term_count_exceeded"):
             InitialFormRequest(
                 polynomial=_polynomial(many, VARS),
-                weight=[0, 0],
+                weight=(0, 0),
             )
 
 
@@ -343,8 +355,8 @@ class TestSupportCrossFieldValidation:
                 term_count=1,
                 exponents=((2, 0), (0, 2)),
                 coefficients=(
-                    {"num": "1", "den": "1"},
-                    {"num": "1", "den": "1"},
+                    CanonicalRational(num="1", den="1"),
+                    CanonicalRational(num="1", den="1"),
                 ),
                 variables=VARS,
                 total_degree_min=2,
@@ -438,7 +450,7 @@ class TestExplicitResultVerification:
 
     def test_weight_profile_is_verified_outside_result_parsing(self) -> None:
         result = compute_weight_profile(
-            WeightProfileRequest(polynomial=_polynomial(_XY_TERMS, VARS), weight=[1, 0])
+            WeightProfileRequest(polynomial=_polynomial(_XY_TERMS, VARS), weight=(1, 0))
         )
         payload = result.model_dump()
         payload["minimum_weight"] = 99
@@ -462,7 +474,7 @@ class TestSupportValueInvariants:
                 is_zero=False,
                 term_count=1,
                 exponents=((1, 0),),
-                coefficients=({"num": "0", "den": "1"},),
+                coefficients=(CanonicalRational(num="0", den="1"),),
                 variables=VARS,
                 total_degree_min=1,
                 total_degree_max=1,
@@ -491,7 +503,7 @@ class TestSupportValueInvariants:
                 is_zero=False,
                 term_count=1,
                 exponents=((1, 0),),
-                coefficients=({"num": "1", "den": "1"},),
+                coefficients=(CanonicalRational(num="1", den="1"),),
                 variables=("x", "x"),
                 total_degree_min=1,
                 total_degree_max=1,
@@ -511,7 +523,10 @@ class TestSupportValueInvariants:
                 is_zero=False,
                 term_count=2,
                 exponents=((1,), (1,)),
-                coefficients=({"num": "1", "den": "1"}, {"num": "2", "den": "1"}),
+                coefficients=(
+                    CanonicalRational(num="1", den="1"),
+                    CanonicalRational(num="2", den="1"),
+                ),
                 variables=("x",),
                 total_degree_min=1,
                 total_degree_max=1,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+from typing import Any, cast
 
 import pytest
 import sympy
@@ -19,11 +20,11 @@ from jacobian.math.matrices._operations import (
 )
 
 
-def _matrix(entries: list[list[str]]) -> list[list[dict]]:
+def _matrix(entries: list[list[str]]) -> list[list[dict[str, str]]]:
     return [[{"num": e, "den": "1"} for e in row] for row in entries]
 
 
-def _rhs(*values: str) -> list[dict]:
+def _rhs(*values: str) -> list[dict[str, str]]:
     return [{"num": v, "den": "1"} for v in values]
 
 
@@ -109,11 +110,11 @@ def test_singular_inverse_rejected_by_the_exact_kernel() -> None:
         compute_inverse(request)
 
 
-def _mutable(dumped: dict) -> dict:
+def _mutable(dumped: dict[str, Any]) -> dict[str, Any]:
     """JSON round-trip so nested tuple payloads become mutable lists."""
     import json
 
-    return json.loads(json.dumps(dumped))
+    return cast(dict[str, Any], json.loads(json.dumps(dumped)))
 
 
 def test_results_retain_their_source_system() -> None:

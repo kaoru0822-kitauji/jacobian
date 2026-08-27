@@ -1,7 +1,9 @@
 """Tests for first-order term rewriting operations."""
 
 import tracemalloc
+from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import NotRequired, TypedDict
 
 import pytest
 from pydantic import ValidationError
@@ -36,6 +38,7 @@ from jacobian.math.term_rewriting._models import (
     NormalFormResult,
     RewriteStepRequest,
     RewriteStepResult,
+    RewriteStepSelection,
     SubstitutionRequest,
     SubstitutionResult,
     UnificationRequest,
@@ -59,17 +62,54 @@ from jacobian.math.term_rewriting.values import (
     MAX_VARIABLE_LABEL,
     RankedSignature,
     RewriteRule,
+    Substitution,
     Term,
 )
 
 
+class _TermWire(TypedDict):
+    is_variable: bool
+    symbol: int
+    children: NotRequired[list["_TermWire"]]
+
+
+class _SignatureWire(TypedDict):
+    arities: list[int]
+
+
+class _SubstitutionWire(TypedDict):
+    mapping: dict[int, _TermWire]
+
+
+class _SubstitutionRequestWire(TypedDict):
+    signature: _SignatureWire
+    term: _TermWire
+    substitution: _SubstitutionWire
+
+
 @contextmanager
-def _validation_error(code: str):
+def _validation_error(code: str) -> Iterator[None]:
     """Assert a structured owner-local Pydantic validation code."""
 
     with pytest.raises(ValidationError) as caught:
         yield
     assert caught.value.errors()[0]["type"] == code
+
+
+def _signature(*arities: int) -> RankedSignature:
+    return RankedSignature(arities=arities)
+
+
+def _signature_wire(*arities: int) -> _SignatureWire:
+    return {"arities": list(arities)}
+
+
+def _selection(position: tuple[int, ...], rule_index: int) -> RewriteStepSelection:
+    return RewriteStepSelection(position=position, rule_index=rule_index)
+
+
+def _substitution(mapping: dict[int, Term]) -> Substitution:
+    return Substitution(mapping=mapping)
 
 
 # Helpers
@@ -248,27 +288,27 @@ def test_native_choice_and_bound_validation_is_explicit() -> None:
 
 
 class TestSubstitution:
-    def test_substitute_variable(self):
+    def test_substitute_variable(self) -> None:
         term = _var(0)
         result = apply_substitution(term, {0: _app(1)})
         assert result == _app(1)
 
-    def test_substitute_in_children(self):
+    def test_substitute_in_children(self) -> None:
         term = _app(0, _var(0), _var(1))
         result = apply_substitution(term, {0: _app(1)})
         assert result == _app(0, _app(1), _var(1))
 
-    def test_substitute_no_change(self):
+    def test_substitute_no_change(self) -> None:
         term = _app(0, _var(0))
         result = apply_substitution(term, {})
         assert result == term
 
-    def test_result_is_bound_to_the_source_substitution(self):
+    def test_result_is_bound_to_the_source_substitution(self) -> None:
         result = compute_substitution(
             SubstitutionRequest(
-                signature={"arities": [1, 0]},
+                signature=_signature(1, 0),
                 term=_app(0, _var(0)),
-                substitution={"mapping": {0: _app(1)}},
+                substitution=_substitution({0: _app(1)}),
             )
         )
         payload = result.model_dump()
@@ -279,59 +319,59 @@ class TestSubstitution:
 
 
 class TestMatching:
-    def test_match_variable(self):
+    def test_match_variable(self) -> None:
         result = match(_var(0), _app(1))
         assert result == {0: _app(1)}
 
-    def test_match_function(self):
+    def test_match_function(self) -> None:
         pattern = _app(0, _var(0), _var(1))
         subject = _app(0, _app(1), _app(2))
         result = match(pattern, subject)
         assert result == {0: _app(1), 1: _app(2)}
 
-    def test_match_symbol_mismatch(self):
+    def test_match_symbol_mismatch(self) -> None:
         result = match(_app(0), _app(1))
         assert result is None
 
-    def test_match_arity_mismatch(self):
+    def test_match_arity_mismatch(self) -> None:
         result = match(_app(0, _var(0)), _app(0, _var(0), _var(1)))
         assert result is None
 
 
 class TestUnification:
-    def test_unify_same_symbol(self):
+    def test_unify_same_symbol(self) -> None:
         result = unify(_app(0, _var(0), _app(1)), _app(0, _app(2), _app(1)))
         assert result is not None
         assert result == {0: _app(2)}
 
-    def test_unify_variables(self):
+    def test_unify_variables(self) -> None:
         result = unify(_var(0), _var(1))
         assert result is not None
 
-    def test_unify_failure(self):
+    def test_unify_failure(self) -> None:
         result = unify(_app(0), _app(1))
         assert result is None
 
-    def test_unify_occurs_check(self):
+    def test_unify_occurs_check(self) -> None:
         result = unify(_var(0), _app(1, _var(0)))
         assert result is None
 
-    def test_unifier_is_idempotent_and_independently_replays(self):
+    def test_unifier_is_idempotent_and_independently_replays(self) -> None:
         left = _app(0, _var(0), _var(0))
         right = _app(0, _var(1), _app(2))
         result = unify(left, right)
         assert result == {0: _app(2), 1: _app(2)}
         assert apply_substitution(left, result) == apply_substitution(right, result)
         wire_result = compute_unification(
-            UnificationRequest(signature={"arities": [2, 0, 0]}, left=left, right=right)
+            UnificationRequest(signature=_signature(2, 0, 0), left=left, right=right)
         )
         assert wire_result.unified
         assert wire_result.substitution == result
 
-    def test_result_rejects_terms_outside_its_ranked_signature(self):
+    def test_result_rejects_terms_outside_its_ranked_signature(self) -> None:
         with _validation_error("term_rewriting.undeclared_symbol"):
             UnificationResult(
-                signature={"arities": [0]},
+                signature=_signature(0),
                 left=_app(1),
                 right=_app(1),
                 unified=True,
@@ -340,7 +380,7 @@ class TestUnification:
 
 
 class TestRewriteStep:
-    def test_rewrite_root(self):
+    def test_rewrite_root(self) -> None:
         # Rule: f(x) -> g(x)
         rules = (RewriteRule(lhs=_app(0, _var(0)), rhs=_app(1, _var(0))),)
         term = _app(0, _app(2))
@@ -351,7 +391,7 @@ class TestRewriteStep:
         assert applications[0].substitution == {0: _app(2)}
         assert applications[0].term == _app(1, _app(2))
 
-    def test_rewrite_in_child(self):
+    def test_rewrite_in_child(self) -> None:
         # Rule: f(x) -> g(x)
         rules = (RewriteRule(lhs=_app(0, _var(0)), rhs=_app(1, _var(0))),)
         term = _app(3, _app(0, _app(2)))
@@ -360,21 +400,19 @@ class TestRewriteStep:
         assert applications[0].position == (0,)
         assert applications[0].term == _app(3, _app(1, _app(2)))
 
-    def test_no_rewrite(self):
+    def test_no_rewrite(self) -> None:
         rules = (RewriteRule(lhs=_app(0, _var(0)), rhs=_app(1, _var(0))),)
         term = _app(2, _app(2))
         assert rewrite_steps(term, rules) == ()
 
-    def test_all_steps_preserve_rule_and_position_choices(self):
+    def test_all_steps_preserve_rule_and_position_choices(self) -> None:
         rules = (
             RewriteRule(lhs=_app(0, _var(0)), rhs=_app(1, _var(0))),
             RewriteRule(lhs=_app(0, _var(0)), rhs=_app(2, _var(0))),
         )
         term = _app(0, _app(0, _app(3)))
         result = compute_rewrite_step(
-            RewriteStepRequest(
-                signature={"arities": [1, 1, 1, 0]}, term=term, rules=rules
-            )
+            RewriteStepRequest(signature=_signature(1, 1, 1, 0), term=term, rules=rules)
         )
         assert result.scope == "ALL_APPLICABLE_STEPS"
         assert tuple(
@@ -388,7 +426,7 @@ class TestRewriteStep:
             _app(0, _app(2, _app(3))),
         )
 
-    def test_selected_step_applies_only_declared_choice(self):
+    def test_selected_step_applies_only_declared_choice(self) -> None:
         rules = (
             RewriteRule(lhs=_app(0, _var(0)), rhs=_app(1, _var(0))),
             RewriteRule(lhs=_app(0, _var(0)), rhs=_app(2, _var(0))),
@@ -396,34 +434,34 @@ class TestRewriteStep:
         term = _app(0, _app(0, _app(3)))
         result = compute_rewrite_step(
             RewriteStepRequest(
-                signature={"arities": [1, 1, 1, 0]},
+                signature=_signature(1, 1, 1, 0),
                 term=term,
                 rules=rules,
-                selection={"position": [0], "rule_index": 1},
+                selection=_selection((0,), 1),
             )
         )
         assert result.scope == "SELECTED_STEP"
         assert len(result.applications) == 1
         assert result.applications[0].term == _app(0, _app(2, _app(3)))
 
-    def test_selected_inapplicable_rule_is_exact_negative(self):
+    def test_selected_inapplicable_rule_is_exact_negative(self) -> None:
         rules = (RewriteRule(lhs=_app(0), rhs=_app(1)),)
         assert selected_rewrite_step(_app(2), rules, (), 0) is None
         result = compute_rewrite_step(
             RewriteStepRequest(
-                signature={"arities": [0, 0, 0]},
+                signature=_signature(0, 0, 0),
                 term=_app(2),
                 rules=rules,
-                selection={"position": [], "rule_index": 0},
+                selection=_selection((), 0),
             )
         )
         assert result.scope == "SELECTED_STEP"
         assert result.applications == ()
 
-    def test_result_reestablishes_signature_membership(self):
+    def test_result_reestablishes_signature_membership(self) -> None:
         result = compute_rewrite_step(
             RewriteStepRequest(
-                signature={"arities": [1, 0]},
+                signature=_signature(1, 0),
                 term=_app(0, _app(1)),
                 rules=(RewriteRule(lhs=_app(0, _var(0)), rhs=_var(0)),),
             )
@@ -435,7 +473,7 @@ class TestRewriteStep:
 
 
 class TestNormalForm:
-    def test_convergent(self):
+    def test_convergent(self) -> None:
         # Rule: f(x) -> x  (strips one f per step)
         rules = (RewriteRule(lhs=_app(0, _var(0)), rhs=_var(0)),)
         term = _app(0, _app(0, _app(1)))
@@ -445,7 +483,7 @@ class TestNormalForm:
         assert steps == 2
         assert next_step is None
 
-    def test_non_convergent(self):
+    def test_non_convergent(self) -> None:
         # Rule: f(x) -> f(f(x))  (divergent)
         rules = (RewriteRule(lhs=_app(0, _var(0)), rhs=_app(0, _app(0, _var(0)))),)
         term = _app(0, _app(1))
@@ -454,11 +492,11 @@ class TestNormalForm:
         assert steps == 10
         assert next_step is not None
 
-    def test_normal_form_reached_exactly_at_step_limit(self):
+    def test_normal_form_reached_exactly_at_step_limit(self) -> None:
         rule = RewriteRule(lhs=_app(0, _var(0)), rhs=_var(0))
         result = compute_normal_form(
             NormalFormRequest(
-                signature={"arities": [1, 0]},
+                signature=_signature(1, 0),
                 term=_app(0, _app(1)),
                 rules=(rule,),
                 strategy="LEFTMOST_OUTERMOST_RULE_ORDER",
@@ -477,7 +515,7 @@ class TestNormalForm:
 
 
 class TestCriticalPairs:
-    def test_empty_rewrite_system_yields_the_empty_profile(self):
+    def test_empty_rewrite_system_yields_the_empty_profile(self) -> None:
         # An empty finite TRS has an unambiguously empty overlap ledger and
         # pair family, so admission must accept it without work.
         signature = term_rewriting.RankedSignature(arities=(1,))
@@ -486,7 +524,7 @@ class TestCriticalPairs:
         assert profile.pairs == ()
 
         result = compute_critical_pairs(
-            CriticalPairsRequest(signature={"arities": [1]}, rules=())
+            CriticalPairsRequest(signature=_signature(1), rules=())
         )
         assert result.rules == ()
         assert result.profile.candidates == ()
@@ -495,14 +533,14 @@ class TestCriticalPairs:
             CriticalPairsResult.model_validate_json(result.model_dump_json()) == result
         )
 
-    def test_nested_overlap_records_both_peak_reducts(self):
+    def test_nested_overlap_records_both_peak_reducts(self) -> None:
         # f(g(x)) -> x overlaps g(y) -> y at the nested g-position.
         rules = (
             RewriteRule(lhs=_app(0, _app(1, _var(7))), rhs=_var(7)),
             RewriteRule(lhs=_app(1, _var(99)), rhs=_var(99)),
         )
         result = compute_critical_pairs(
-            CriticalPairsRequest(signature={"arities": [1, 1]}, rules=rules)
+            CriticalPairsRequest(signature=_signature(1, 1), rules=rules)
         )
         assert len(result.profile.candidates) == 4
         candidate = result.profile.candidates[2]
@@ -531,7 +569,7 @@ class TestCriticalPairs:
             CriticalPairsResult.model_validate_json(result.model_dump_json()) == result
         )
 
-    def test_nested_overlap_with_constant_reducts(self):
+    def test_nested_overlap_with_constant_reducts(self) -> None:
         # Nullary reducts are valid overlap results and have depth one.
         rules = (
             RewriteRule(lhs=_app(0, _app(1, _var(7))), rhs=_app(2)),
@@ -552,7 +590,7 @@ class TestCriticalPairs:
             result
         )
 
-    def test_standardize_apart_makes_variable_labels_irrelevant(self):
+    def test_standardize_apart_makes_variable_labels_irrelevant(self) -> None:
         first = (
             RewriteRule(lhs=_app(0, _app(1, _var(7))), rhs=_var(7)),
             RewriteRule(lhs=_app(1, _var(99)), rhs=_var(99)),
@@ -589,26 +627,26 @@ class TestCriticalPairs:
             for pair in renamed_profile.pairs
         )
 
-    def test_self_root_overlap_is_tautological_and_excluded(self):
+    def test_self_root_overlap_is_tautological_and_excluded(self) -> None:
         rule = RewriteRule(lhs=_app(0, _var(0)), rhs=_var(0))
         assert (
             critical_pairs(term_rewriting.RankedSignature(arities=(1,)), (rule,)).pairs
             == ()
         )
 
-    def test_nonunifiable_overlap_produces_no_pair(self):
+    def test_nonunifiable_overlap_produces_no_pair(self) -> None:
         rules = (
             RewriteRule(lhs=_app(0, _app(1)), rhs=_app(2)),
             RewriteRule(lhs=_app(2), rhs=_app(1)),
         )
         result = compute_critical_pairs(
-            CriticalPairsRequest(signature={"arities": [1, 0, 0]}, rules=rules)
+            CriticalPairsRequest(signature=_signature(1, 0, 0), rules=rules)
         )
         assert result.profile.pairs == ()
         assert len(result.profile.candidates) == 4
         assert all(not candidate.unifiable for candidate in result.profile.candidates)
 
-    def test_schema_describes_critical_pair_admission_limits(self):
+    def test_schema_describes_critical_pair_admission_limits(self) -> None:
         rules = CriticalPairsRequest.model_json_schema()["properties"]["rules"]
         assert rules["maxItems"] == 8
         assert rules["x-jacobian-bounds"] == {
@@ -624,7 +662,7 @@ class TestCriticalPairs:
         ]["symbol"]
         assert symbol["maximum"] == MAX_VARIABLE_LABEL
 
-    def test_retained_rules_pay_for_the_result_envelope_without_overlaps(self):
+    def test_retained_rules_pay_for_the_result_envelope_without_overlaps(self) -> None:
         # f(x) -> R excludes its single tautological root overlap, so the
         # overlap ledger is empty and only the retained rules carry the
         # envelope cost of the result.
@@ -640,7 +678,7 @@ class TestCriticalPairs:
         with pytest.raises(ValueError, match="result nodes"):
             critical_pairs(signature, (rule,))
 
-    def test_large_retained_rules_admit_within_the_shared_envelope(self):
+    def test_large_retained_rules_admit_within_the_shared_envelope(self) -> None:
         signature = term_rewriting.RankedSignature(arities=(1, 15))
         rule = RewriteRule(
             lhs=_app(0, _var(0)),
@@ -656,7 +694,7 @@ class TestCriticalPairs:
             CriticalPairsResult.model_validate_json(result.model_dump_json()) == result
         )
 
-    def test_retained_source_bound_precedes_duplicate_detection(self):
+    def test_retained_source_bound_precedes_duplicate_detection(self) -> None:
         # Canonicalizing a bushy rule allocates a full copy plus its JSON
         # serialization, so the retained-source bound must reject an oversized
         # system before the duplicate check ever reconstructs one.
@@ -670,13 +708,13 @@ class TestCriticalPairs:
         with pytest.raises(ValueError, match="result nodes"):
             critical_pairs(signature, (rule, rule))
 
-    def test_result_replays_exact_critical_pair_family(self):
+    def test_result_replays_exact_critical_pair_family(self) -> None:
         rules = (
             RewriteRule(lhs=_app(0, _app(1, _var(0))), rhs=_var(0)),
             RewriteRule(lhs=_app(1, _var(1)), rhs=_var(1)),
         )
         result = compute_critical_pairs(
-            CriticalPairsRequest(signature={"arities": [1, 1]}, rules=rules)
+            CriticalPairsRequest(signature=_signature(1, 1), rules=rules)
         )
         payload = result.model_dump()
         payload["profile"]["pairs"][0]["outer_reduct"] = _app(0, _var(1)).model_dump()
@@ -684,15 +722,15 @@ class TestCriticalPairs:
             CriticalPairsResult.model_validate(payload)
         )
 
-    def test_duplicate_rules_are_rejected_before_trivial_root_pairs(self):
+    def test_duplicate_rules_are_rejected_before_trivial_root_pairs(self) -> None:
         first = RewriteRule(lhs=_app(0, _var(7)), rhs=_var(7))
         alpha_equivalent = RewriteRule(lhs=_app(0, _var(12)), rhs=_var(12))
         with _validation_error("term_rewriting.critical_pair_source"):
             CriticalPairsRequest(
-                signature={"arities": [1]}, rules=(first, alpha_equivalent)
+                signature=_signature(1), rules=(first, alpha_equivalent)
             )
 
-    def test_candidate_work_is_preflight_bounded(self):
+    def test_candidate_work_is_preflight_bounded(self) -> None:
         def unary_chain(variable: int, length: int) -> Term:
             result = _var(variable)
             for _ in range(length):
@@ -704,9 +742,9 @@ class TestCriticalPairs:
             for index in range(7)
         )
         with _validation_error("term_rewriting.critical_pair_source"):
-            CriticalPairsRequest(signature={"arities": [1]}, rules=rules)
+            CriticalPairsRequest(signature=_signature(1), rules=rules)
 
-    def test_exact_candidate_boundary_has_bounded_complete_output(self):
+    def test_exact_candidate_boundary_has_bounded_complete_output(self) -> None:
         def unary_chain(variable: int, length: int) -> Term:
             result = _var(variable)
             for _ in range(length):
@@ -720,13 +758,13 @@ class TestCriticalPairs:
             RewriteRule(lhs=unary_chain(3, 2), rhs=unary_chain(3, 2)),
         )
         result = compute_critical_pairs(
-            CriticalPairsRequest(signature={"arities": [1]}, rules=rules)
+            CriticalPairsRequest(signature=_signature(1), rules=rules)
         )
         assert len(result.profile.candidates) == 32
         assert len(result.profile.pairs) == 32
         assert len(result.model_dump_json()) <= MAX_CRITICAL_PAIR_RESULT_BYTES
 
-    def test_long_rules_reach_the_result_sensitive_preflight(self):
+    def test_long_rules_reach_the_result_sensitive_preflight(self) -> None:
         # f^16(x) -> x has a 17-node left side, yet its complete overlap
         # family is 15 non-root self-overlaps with a small exact profile.
         lhs = _var(0)
@@ -735,7 +773,7 @@ class TestCriticalPairs:
         assert _term_node_count(lhs) == 17
         rule = RewriteRule(lhs=lhs, rhs=_var(0))
         result = compute_critical_pairs(
-            CriticalPairsRequest(signature={"arities": [1]}, rules=(rule,))
+            CriticalPairsRequest(signature=_signature(1), rules=(rule,))
         )
         assert len(result.profile.candidates) == 15
         assert len(result.profile.pairs) == 15
@@ -745,17 +783,19 @@ class TestCriticalPairs:
             CriticalPairsResult.model_validate_json(result.model_dump_json()) == result
         )
 
-    def test_oversized_rule_work_stays_derived_bound_bounded(self):
+    def test_oversized_rule_work_stays_derived_bound_bounded(self) -> None:
         lhs = _var(0)
         for _ in range(64):
             lhs = _app(0, lhs)
         with _validation_error("term_rewriting.critical_pair_source"):
             CriticalPairsRequest(
-                signature={"arities": [1]},
+                signature=_signature(1),
                 rules=(RewriteRule(lhs=lhs, rhs=_var(0)),),
             )
 
-    def test_deep_unary_source_rejects_by_candidates_without_path_expansion(self):
+    def test_deep_unary_source_rejects_by_candidates_without_path_expansion(
+        self,
+    ) -> None:
         # A 20000-node unary left side fits the retained-source envelope and
         # exceeds the candidate bound by orders of magnitude, but duplicate
         # detection and candidate counting must stay linear: admission
@@ -783,7 +823,7 @@ class TestCriticalPairs:
         with _validation_error("term_rewriting.critical_pair_source"):
             CriticalPairsRequest(signature=signature, rules=(rule,))
 
-    def test_root_overlap_composed_reduct_depth_is_admission_bounded(self):
+    def test_root_overlap_composed_reduct_depth_is_admission_bounded(self) -> None:
         # Two individually transport-safe rules overlap at the root: the
         # unifier splices g^14(y) into h^30(x), so the outer reduct is a
         # 45-node chain even though every source path carries at most 31
@@ -805,7 +845,7 @@ class TestCriticalPairs:
         with pytest.raises(ValueError, match="result depth"):
             critical_pairs(signature, rules)
 
-    def test_boundary_composed_reduct_admits_and_transports(self):
+    def test_boundary_composed_reduct_admits_and_transports(self) -> None:
         # h^16 after g^13 composes exactly MAX_TERM_DEPTH - 1 nodes on its
         # only path, the deepest reduct a root overlap can serialize under
         # profile.pairs once each node's children array is counted, so this
@@ -837,7 +877,7 @@ class TestCriticalPairs:
             CriticalPairsResult.model_validate_json(result.model_dump_json()) == result
         )
 
-    def test_one_deeper_composed_reduct_is_rejected_typed(self):
+    def test_one_deeper_composed_reduct_is_rejected_typed(self) -> None:
         # The same overlap shape with one more h node composes a 31-node
         # reduct, so depth alone - not candidates or nodes - must trigger
         # the typed rejection.
@@ -856,7 +896,7 @@ class TestCriticalPairs:
                 signature=RankedSignature(arities=(1, 1, 1)), rules=rules
             )
 
-    def test_failed_overlap_charges_commit_to_the_shared_budget(self):
+    def test_failed_overlap_charges_commit_to_the_shared_budget(self) -> None:
         signature, outer_rule, inner_rule = _failed_overlap_witness(8)
         rules = (outer_rule, inner_rule)
         candidates = len(rules) * sum(
@@ -883,7 +923,7 @@ class TestCriticalPairs:
         with _validation_error("term_rewriting.critical_pair_source"):
             CriticalPairsRequest(signature=signature, rules=rules)
 
-    def test_failed_overlap_family_within_budget_still_admits(self):
+    def test_failed_overlap_family_within_budget_still_admits(self) -> None:
         signature, outer_rule, inner_rule = _failed_overlap_witness(7)
         result = compute_critical_pairs(
             CriticalPairsRequest(signature=signature, rules=(outer_rule, inner_rule))
@@ -892,7 +932,7 @@ class TestCriticalPairs:
         assert result.profile.pairs == ()
         assert all(not candidate.unifiable for candidate in result.profile.candidates)
 
-    def test_wide_variable_labels_admit_by_serialized_size(self):
+    def test_wide_variable_labels_admit_by_serialized_size(self) -> None:
         # Variable labels never change the mathematical work: a single rule
         # whose only self-root overlap is excluded must admit regardless of
         # its label magnitudes, because its echoed result is far below both
@@ -908,7 +948,7 @@ class TestCriticalPairs:
             result
         )
 
-    def test_label_serialization_width_is_charged_against_the_byte_bound(self):
+    def test_label_serialization_width_is_charged_against_the_byte_bound(self) -> None:
         # Six bush rules repeat their wide-label leaves across the echoed
         # source. Labels stay inside the interoperable integer maximum, so
         # sixteen-digit labels push the serialized result past the byte
@@ -943,7 +983,7 @@ class TestCriticalPairs:
     @pytest.mark.parametrize("depth", [1, 2, 3, 4, 5])
     def test_chained_binding_family_admits_and_replays_within_envelope(
         self, depth: int
-    ):
+    ) -> None:
         signature, outer_rule, inner_rule = _chained_overlap_witness(depth)
         rules = (outer_rule, inner_rule)
         result = compute_critical_pairs(
@@ -981,7 +1021,7 @@ class TestCriticalPairs:
                 standardized_outer.rhs, substitution
             )
 
-    def test_dependency_chained_mgu_expansion_is_preflight_bounded(self):
+    def test_dependency_chained_mgu_expansion_is_preflight_bounded(self) -> None:
         signature, outer_rule, inner_rule = _chained_overlap_witness(6)
         rules = (outer_rule, inner_rule)
         assert all(
@@ -998,7 +1038,7 @@ class TestCriticalPairs:
         with pytest.raises(ValueError, match="result nodes"):
             critical_pairs(signature, rules)
 
-    def test_deep_chained_binding_growth_is_preflight_bounded(self):
+    def test_deep_chained_binding_growth_is_preflight_bounded(self) -> None:
         signature, outer_rule, inner_rule = _chained_overlap_witness(9)
         rules = (outer_rule, inner_rule)
         candidates = len(rules) * sum(
@@ -1010,7 +1050,7 @@ class TestCriticalPairs:
         with pytest.raises(ValueError, match="result nodes"):
             critical_pairs(signature, rules)
 
-    def test_repeated_binding_growth_is_preflight_bounded(self):
+    def test_repeated_binding_growth_is_preflight_bounded(self) -> None:
         # The chained MGU binds the first variable to a 4369-node term and the
         # leading slot then repeats it sixteen times, so substituting that one
         # pending equation expands to 69905 nodes. Prediction must charge the
@@ -1026,7 +1066,7 @@ class TestCriticalPairs:
         with pytest.raises(ValueError, match="result nodes"):
             critical_pairs(signature, rules)
 
-    def test_refreshed_binding_sizes_charge_the_repeated_equation_exactly(self):
+    def test_refreshed_binding_sizes_charge_the_repeated_equation_exactly(self) -> None:
         # The stored w binding is eagerly rewritten when x is bound, so its
         # cached size must be refreshed at the same moment: the final
         # sixteen-fold repetition of w is precharged from |f(T)|, and any
@@ -1054,7 +1094,7 @@ class TestCriticalPairs:
         with pytest.raises(_ResultEnvelopeError):
             _unify(left, right, _MaterializationBudget(expected_spend - 1))
 
-    def test_stale_binding_sizes_neither_admit_nor_materialize_the_chain(self):
+    def test_stale_binding_sizes_neither_admit_nor_materialize_the_chain(self) -> None:
         # End-to-end form of the refreshed-size obligation: processing the
         # overlap equations stores W = A(y) first, then binds y = C(z),
         # which eagerly expands the stored W binding from 17 to 273 nodes.
@@ -1101,16 +1141,16 @@ class TestCriticalPairs:
             CriticalPairsRequest(signature=signature, rules=rules)
 
     def test_failed_overlaps_rename_only_the_terms_unification_inspects(
-        self, monkeypatch
-    ):
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Standardize-apart work is bounded by what unification actually
         # reads: a failed overlap renames only the inner left side and the
         # overlap subterm, never either right side, and duplicate detection
         # compares flat canonical keys without renaming anything.
-        renamed_nodes = []
+        renamed_nodes: list[int] = []
         original_rename = operations_module._rename_variables
 
-        def counting_rename(term, renaming):
+        def counting_rename(term: Term, renaming: dict[int, int]) -> Term:
             renamed = original_rename(term, renaming)
             renamed_nodes.append(_term_node_count(renamed))
             return renamed
@@ -1128,7 +1168,9 @@ class TestCriticalPairs:
         )
         assert sum(renamed_nodes) == expected_renamed_nodes
 
-    def test_standardize_apart_copies_are_charged_against_the_shared_envelope(self):
+    def test_standardize_apart_copies_are_charged_against_the_shared_envelope(
+        self,
+    ) -> None:
         # Three rules whose six root overlaps all unify carry near-envelope
         # right sides; replaying them materializes renamed rules, splices,
         # and both right sides per pair, so the shared envelope must reject
@@ -1158,7 +1200,7 @@ class TestCriticalPairs:
         with _validation_error("term_rewriting.critical_pair_source"):
             CriticalPairsRequest(signature=signature, rules=rules)
 
-    def test_budgeted_unification_charges_exactly_the_materialized_sizes(self):
+    def test_budgeted_unification_charges_exactly_the_materialized_sizes(self) -> None:
         for depth in range(1, 6):
             _, outer_rule, inner_rule = _chained_overlap_witness(depth)
             standardized_outer, standardized_inner, _, _ = _standardize_apart(
@@ -1176,7 +1218,7 @@ class TestCriticalPairs:
             with pytest.raises(_ResultEnvelopeError):
                 _unify(inner_lhs, overlap, _MaterializationBudget(spent - 1))
 
-    def test_budgeted_unification_prepends_equation_growth_exactly(self):
+    def test_budgeted_unification_prepends_equation_growth_exactly(self) -> None:
         _, outer_rule, inner_rule = _repeated_chain_overlap_witness(2)
         standardized_outer, standardized_inner, _, _ = _standardize_apart(
             outer_rule, inner_rule
@@ -1195,7 +1237,7 @@ class TestCriticalPairs:
 
     def test_repeated_bound_variable_expansion_is_charged_before_materialization(
         self,
-    ):
+    ) -> None:
         # Twelve alternating overlap slots build a dependency-chain MGU whose
         # top stored binding grows to an 8191-node term while both rule sides
         # stay small. The last processed slot opposes a sixteen-fold
@@ -1253,7 +1295,7 @@ class TestCriticalPairs:
         # materialization would reach.
         assert peak < 16 * 1024 * 1024
 
-    def test_bushy_retained_rhs_is_rejected_before_canonical_copy(self):
+    def test_bushy_retained_rhs_is_rejected_before_canonical_copy(self) -> None:
         # One rule whose schema-valid RHS is a complete arity-16 tree of ~70k
         # nodes: the retained-source node bound must reject it during request
         # validation before any canonical copy or JSON serialization exists.
@@ -1274,7 +1316,7 @@ class TestCriticalPairs:
 
 
 class TestDeepTermTraversal:
-    def test_deep_rule_source_returns_a_profile_not_a_recursion_error(self):
+    def test_deep_rule_source_returns_a_profile_not_a_recursion_error(self) -> None:
         # A schema-valid 1200-deep unary right side stays far below the node
         # envelope and its single rule excludes its tautological root
         # overlap, so kernel traversal must stay iterative and return the
@@ -1293,9 +1335,9 @@ class TestDeepTermTraversal:
         assert profile.candidates == ()
         assert profile.pairs == ()
         with _validation_error("term_rewriting.transport_depth"):
-            CriticalPairsRequest(signature={"arities": [1]}, rules=(rule,))
+            CriticalPairsRequest(signature=_signature(1), rules=(rule,))
 
-    def test_transport_depth_boundary_rejects_one_deeper_node_typed(self):
+    def test_transport_depth_boundary_rejects_one_deeper_node_typed(self) -> None:
         # One more unary node exceeds MAX_TERM_DEPTH; direct model
         # construction fails with the typed depth error instead of relying
         # on the shared JSON transport limit to reject the payload later.
@@ -1319,18 +1361,18 @@ class TestDeepTermTraversal:
                 }
             )
         request = CriticalPairsRequest(
-            signature={"arities": [1]},
+            signature=_signature(1),
             rules=(RewriteRule(lhs=unary_chain(MAX_TERM_DEPTH - 1), rhs=_var(0)),),
         )
         assert len(request.rules) == 1
 
-    def test_substitution_labels_share_the_interoperable_bound(self):
+    def test_substitution_labels_share_the_interoperable_bound(self) -> None:
         # Substitution keys travel as JSON object keys, which bypasses the
         # integer-range check on values, so the model owns the same label
         # bound for them.
-        def substitution_payload(key: int) -> dict:
+        def substitution_payload(key: int) -> _SubstitutionRequestWire:
             return {
-                "signature": {"arities": [0]},
+                "signature": _signature_wire(0),
                 "term": {"is_variable": False, "symbol": 0},
                 "substitution": {"mapping": {key: {"is_variable": True, "symbol": 0}}},
             }
@@ -1344,7 +1386,7 @@ class TestDeepTermTraversal:
                 substitution_payload(MAX_VARIABLE_LABEL + 1)
             )
 
-    def test_composed_substitution_depth_is_transport_bounded(self):
+    def test_composed_substitution_depth_is_transport_bounded(self) -> None:
         # Each side of a substitution passes the 31-node checks separately,
         # but composing f^30(x) with x -> f^30(c) yields a 61-node chain, so
         # admission must preflight the composed result and reject typedly
@@ -1355,17 +1397,17 @@ class TestDeepTermTraversal:
                 term = _app(0, term)
             return term
 
-        signature = {"arities": [1, 0]}
+        signature = _signature(1, 0)
         with _validation_error("term_rewriting.transport_depth"):
             SubstitutionRequest(
                 signature=signature,
                 term=unary_chain(30, _var(0)),
-                substitution={"mapping": {0: unary_chain(30, _app(1))}},
+                substitution=_substitution({0: unary_chain(30, _app(1))}),
             )
         boundary = SubstitutionRequest(
             signature=signature,
             term=unary_chain(15, _var(0)),
-            substitution={"mapping": {0: unary_chain(15, _app(1))}},
+            substitution=_substitution({0: unary_chain(15, _app(1))}),
         )
         result = compute_substitution(boundary)
         assert _term_depth(result.result) == 2 * MAX_TERM_DEPTH - 31
@@ -1373,7 +1415,9 @@ class TestDeepTermTraversal:
             result
         )
 
-    def test_native_substitution_result_rejects_untransportable_composition(self):
+    def test_native_substitution_result_rejects_untransportable_composition(
+        self,
+    ) -> None:
         def unary_chain(length: int, leaf: Term) -> Term:
             term = leaf
             for _ in range(length):
@@ -1384,13 +1428,13 @@ class TestDeepTermTraversal:
         mapping = {0: unary_chain(30, _app(1))}
         with _validation_error("term_rewriting.transport_depth"):
             SubstitutionResult(
-                signature={"arities": [1, 0]},
+                signature=_signature(1, 0),
                 term=term,
-                substitution={"mapping": mapping},
+                substitution=_substitution(mapping),
                 result=apply_substitution(term, mapping),
             )
 
-    def test_spliced_rewrite_step_depth_is_transport_bounded(self):
+    def test_spliced_rewrite_step_depth_is_transport_bounded(self) -> None:
         # f(g^15(x)) with rule g(y) -> f^30(y): every input path stays within
         # 31 nodes, but the rewritten term splices the expanded right side
         # under the f-prefix and reaches 46 nodes, so both enumeration modes
@@ -1399,25 +1443,25 @@ class TestDeepTermTraversal:
         term = _app(0, _chain_unary(1, 15, _var(0)))
         with _validation_error("term_rewriting.transport_depth"):
             RewriteStepRequest(
-                signature={"arities": [1, 1]},
+                signature=_signature(1, 1),
                 term=term,
                 rules=rules,
-                selection={"position": [0], "rule_index": 0},
+                selection=_selection((0,), 0),
             )
         with _validation_error("term_rewriting.transport_depth"):
-            RewriteStepRequest(signature={"arities": [1, 1]}, term=term, rules=rules)
+            RewriteStepRequest(signature=_signature(1, 1), term=term, rules=rules)
 
-    def test_boundary_spliced_rewrite_step_admits_and_transports(self):
+    def test_boundary_spliced_rewrite_step_admits_and_transports(self) -> None:
         # The same shape with f^14 instead of f^30 composes a 30-node term,
         # one node inside the transport bound, so the step admits and its
         # exact application replays.
         rules = (RewriteRule(lhs=_app(1, _var(3)), rhs=_chain_unary(0, 14, _var(3))),)
         result = compute_rewrite_step(
             RewriteStepRequest(
-                signature={"arities": [1, 1]},
+                signature=_signature(1, 1),
                 term=_app(0, _chain_unary(1, 15, _var(0))),
                 rules=rules,
-                selection={"position": [0], "rule_index": 0},
+                selection=_selection((0,), 0),
             )
         )
         assert len(result.applications) == 1
@@ -1426,28 +1470,28 @@ class TestDeepTermTraversal:
             result
         )
 
-    def test_normal_form_run_depth_is_transport_bounded(self):
+    def test_normal_form_run_depth_is_transport_bounded(self) -> None:
         # One step of g(y) -> f^30(y) under f(g^15(x)) pushes the run's term
         # to 46 nodes, so admission must simulate the declared strategy and
         # reject typedly before the operation runs.
         rules = (RewriteRule(lhs=_app(1, _var(3)), rhs=_chain_unary(0, 30, _var(3))),)
         with _validation_error("term_rewriting.transport_depth"):
             NormalFormRequest(
-                signature={"arities": [1, 1]},
+                signature=_signature(1, 1),
                 term=_app(0, _chain_unary(1, 15, _var(0))),
                 rules=rules,
                 strategy="LEFTMOST_OUTERMOST_RULE_ORDER",
                 max_steps=1,
             )
 
-    def test_normal_form_step_limit_within_depth_admits_and_transports(self):
+    def test_normal_form_step_limit_within_depth_admits_and_transports(self) -> None:
         # A self-looping rule keeps every intermediate term at the source
         # depth, so the bounded prefix admits with its open next step even
         # though the strategy exhausts its step budget.
         rules = (RewriteRule(lhs=_app(1, _var(3)), rhs=_app(1, _var(3))),)
         result = compute_normal_form(
             NormalFormRequest(
-                signature={"arities": [1, 1]},
+                signature=_signature(1, 1),
                 term=_app(0, _chain_unary(1, 15, _var(0))),
                 rules=rules,
                 strategy="LEFTMOST_OUTERMOST_RULE_ORDER",
@@ -1462,7 +1506,7 @@ class TestDeepTermTraversal:
             result
         )
 
-    def test_composed_mgu_binding_depth_is_transport_bounded(self):
+    def test_composed_mgu_binding_depth_is_transport_bounded(self) -> None:
         # Unifying f(x, y) with f(u^16(y), u^16(c)) keeps every input path
         # inside 31 nodes, but the idempotent MGU composes x -> u^32(c),
         # whose 33-node path strict JSON transport cannot carry, so
@@ -1477,7 +1521,7 @@ class TestDeepTermTraversal:
         assert _term_depth(mgu[1]) == MAX_TERM_DEPTH - 14
         assert _term_depth(mgu[0]) == 2 * MAX_TERM_DEPTH - 29
         with _validation_error("term_rewriting.transport_depth"):
-            UnificationRequest(signature={"arities": [2, 1, 0]}, left=left, right=right)
+            UnificationRequest(signature=_signature(2, 1, 0), left=left, right=right)
         payload = {
             "signature": {"arities": [2, 1, 0]},
             "left": left.model_dump(mode="json"),
@@ -1488,14 +1532,14 @@ class TestDeepTermTraversal:
             UnificationRequest.model_validate_json(encoded)
         with _validation_error("term_rewriting.transport_depth"):
             UnificationResult(
-                signature={"arities": [2, 1, 0]},
+                signature=_signature(2, 1, 0),
                 left=left,
                 right=right,
                 unified=True,
                 substitution=mgu,
             )
 
-    def test_boundary_composed_mgu_admits_and_transports(self):
+    def test_boundary_composed_mgu_admits_and_transports(self) -> None:
         # With u^15 chains every composed binding stays exactly within the
         # envelope: x binds to u^30(c), whose 31-node path equals
         # MAX_TERM_DEPTH, so the request computes a typed idempotent MGU
@@ -1503,7 +1547,7 @@ class TestDeepTermTraversal:
         left = _app(0, _var(0), _var(1))
         right = _app(0, _chain_unary(1, 15, _var(1)), _chain_unary(1, 15, _app(2)))
         result = compute_unification(
-            UnificationRequest(signature={"arities": [2, 1, 0]}, left=left, right=right)
+            UnificationRequest(signature=_signature(2, 1, 0), left=left, right=right)
         )
         assert result.unified
         assert result.substitution[1] == _chain_unary(1, 15, _app(2))
@@ -1516,7 +1560,7 @@ class TestDeepTermTraversal:
             result
         )
 
-    def test_dependency_chained_mgu_is_rejected_before_materialization(self):
+    def test_dependency_chained_mgu_is_rejected_before_materialization(self) -> None:
         # Six equations x_i = F(x_{i+1}, ..., x_{i+1}) followed by x_6 = c
         # have shallow, small inputs but expand x_0 to 17,895,697 nodes.
         # The bounded kernel must charge the growth before constructing it.
@@ -1533,7 +1577,7 @@ class TestDeepTermTraversal:
         with _validation_error("term_rewriting.unification_bound"):
             UnificationRequest(signature=signature, left=left, right=right)
 
-    def test_deep_unification_and_matching_stay_typed(self):
+    def test_deep_unification_and_matching_stay_typed(self) -> None:
         def chain(length: int) -> Term:
             term = _var(7)
             for _ in range(length - 1):
@@ -1548,7 +1592,7 @@ class TestDeepTermTraversal:
         substituted = apply_substitution(chain(1500), {7: _app(2)})
         assert _term_node_count(substituted) == 1500
 
-    def test_deep_replacement_and_positions_remain_exact(self):
+    def test_deep_replacement_and_positions_remain_exact(self) -> None:
         subject = _var(3)
         for _ in range(1500):
             subject = _app(0, subject)
@@ -1560,31 +1604,31 @@ class TestDeepTermTraversal:
 
 
 class TestValidation:
-    def test_public_terms_must_use_one_ranked_signature(self):
+    def test_public_terms_must_use_one_ranked_signature(self) -> None:
         with _validation_error("term_rewriting.signature_arity"):
             UnificationRequest(
-                signature={"arities": [1]},
+                signature=_signature(1),
                 left=_app(0, _var(0)),
                 right=_app(0, _var(0), _var(1)),
             )
 
-    def test_variable_with_children_rejected(self):
+    def test_variable_with_children_rejected(self) -> None:
         with _validation_error("term_rewriting.variable_children"):
             Term(is_variable=True, symbol=0, children=(_var(1),))
 
-    def test_lhs_must_be_function(self):
+    def test_lhs_must_be_function(self) -> None:
         with _validation_error("term_rewriting.lhs_variable"):
             RewriteRule(lhs=_var(0), rhs=_app(1))
 
-    def test_rhs_variables_must_be_bound_by_lhs(self):
+    def test_rhs_variables_must_be_bound_by_lhs(self) -> None:
         with _validation_error("term_rewriting.rhs_variables"):
             RewriteRule(lhs=_app(0, _var(0)), rhs=_app(1, _var(1)))
 
-    def test_selected_position_must_exist(self):
+    def test_selected_position_must_exist(self) -> None:
         with _validation_error("term_rewriting.selection_position"):
             RewriteStepRequest(
-                signature={"arities": [0, 0]},
+                signature=_signature(0, 0),
                 term=_app(0),
                 rules=(RewriteRule(lhs=_app(0), rhs=_app(1)),),
-                selection={"position": [0], "rule_index": 0},
+                selection=_selection((0,), 0),
             )

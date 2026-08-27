@@ -1,8 +1,12 @@
 """Tests for prime-field matrix operations."""
 
+from collections.abc import Callable
+from typing import cast
+
 import pytest
 from pydantic import ValidationError
 
+from jacobian.math.prime_field_linear_algebra import PrimeFieldMatrix
 from jacobian.math.prime_field_matrix._models import (
     PrimeFieldMatrixRankResult,
     PrimeFieldMatrixRequest,
@@ -19,10 +23,8 @@ from jacobian.math.prime_field_matrix._operations import (
 )
 
 
-def pfm(prime: int, entries: tuple[tuple[int, ...], ...]):
+def pfm(prime: int, entries: tuple[tuple[int, ...], ...]) -> PrimeFieldMatrixRequest:
     """Build a request from raw rows using the canonical matrix value."""
-    from jacobian.math.prime_field_linear_algebra import PrimeFieldMatrix
-
     return PrimeFieldMatrixRequest(
         matrix=PrimeFieldMatrix(
             prime=prime,
@@ -40,7 +42,7 @@ def assert_error_type(
 
 
 class TestRank:
-    def test_full_rank_gf2(self):
+    def test_full_rank_gf2(self) -> None:
         """Identity 3x3 over GF(2) has rank 3."""
         req = pfm(prime=2, entries=((1, 0, 0), (0, 1, 0), (0, 0, 1)))
         result = compute_rank(req)
@@ -49,13 +51,13 @@ class TestRank:
         assert len(result.source.matrix.entries) == 3
         assert len(result.source.matrix.entries[0]) == 3
 
-    def test_zero_matrix_gf2(self):
+    def test_zero_matrix_gf2(self) -> None:
         """Zero matrix over GF(2) has rank 0."""
         req = pfm(prime=2, entries=((0, 0), (0, 0)))
         result = compute_rank(req)
         assert result.rank == 0
 
-    def test_characteristic_dependent_rank(self):
+    def test_characteristic_dependent_rank(self) -> None:
         """The same integer matrix has different rank over different primes.
 
         This is the core motivation from issue #2183: the integer matrix
@@ -73,7 +75,7 @@ class TestRank:
         rank_gf3 = compute_rank(pfm(prime=3, entries=((2, 0), (0, 2))))
         assert rank_gf3.rank == 2
 
-    def test_rank_gf5(self):
+    def test_rank_gf5(self) -> None:
         """3x3 matrix with one zero row over GF(5)."""
         req = pfm(
             prime=5,
@@ -82,7 +84,7 @@ class TestRank:
         result = compute_rank(req)
         assert result.rank == 2
 
-    def test_dependency_rows(self):
+    def test_dependency_rows(self) -> None:
         """Dependent rows produce lower rank."""
         req = pfm(
             prime=7,
@@ -92,7 +94,7 @@ class TestRank:
         # Row 2 is 2 * row 1 over GF(7), so rank 2.
         assert result.rank == 2
 
-    def test_rectangular_tall(self):
+    def test_rectangular_tall(self) -> None:
         """Tall rectangular matrix."""
         req = pfm(
             prime=2,
@@ -101,7 +103,7 @@ class TestRank:
         result = compute_rank(req)
         assert result.rank == 2
 
-    def test_rectangular_wide(self):
+    def test_rectangular_wide(self) -> None:
         """Wide rectangular matrix."""
         req = pfm(
             prime=2,
@@ -110,25 +112,23 @@ class TestRank:
         result = compute_rank(req)
         assert result.rank == 2
 
-    def test_invalid_non_prime(self):
+    def test_invalid_non_prime(self) -> None:
         """Non-prime modulus should raise."""
         with pytest.raises(ValidationError):
             pfm(prime=4, entries=((1, 0), (0, 1)))
 
-    def test_invalid_entry_out_of_range(self):
+    def test_invalid_entry_out_of_range(self) -> None:
         """Entry >= prime should raise."""
         with pytest.raises(ValidationError):
             pfm(prime=2, entries=((2, 0), (0, 1)))
 
-    def test_empty_entries_with_explicit_columns_accepted(self):
+    def test_empty_entries_with_explicit_columns_accepted(self) -> None:
         """The canonical empty matrix composes as a bounded request.
 
         Full-rank nullspace producers return `PrimeFieldMatrix(entries=(),
         columns=n)`; that value must enter rank, RREF, and nullspace
         unchanged instead of being rejected as non-composable.
         """
-        from jacobian.math.prime_field_linear_algebra import PrimeFieldMatrix
-
         empty = PrimeFieldMatrix(prime=5, entries=(), columns=3)
         req = PrimeFieldMatrixRequest(matrix=empty)
         assert compute_rank(req).rank == 0
@@ -141,10 +141,8 @@ class TestRank:
         assert ns_result.nullity == 3
         assert ns_result.nullspace_matrix.entries == ((1, 0, 0), (0, 1, 0), (0, 0, 1))
 
-    def test_full_rank_nullspace_value_feeds_all_consumers(self):
+    def test_full_rank_nullspace_value_feeds_all_consumers(self) -> None:
         """Relay scenario from review: the empty nullspace basis is a request."""
-        from jacobian.math.prime_field_linear_algebra import PrimeFieldMatrix
-
         source = PrimeFieldMatrix(prime=5, entries=((1, 2), (3, 4)), columns=2)
         ns_result = compute_nullspace(PrimeFieldMatrixRequest(matrix=source))
         assert ns_result.nullspace_matrix.entries == ()
@@ -154,7 +152,7 @@ class TestRank:
         assert relayed_ns.nullspace_matrix.columns == 2
         assert relayed_ns.nullity == 2
 
-    def test_prime_2147483647(self):
+    def test_prime_2147483647(self) -> None:
         """Large prime from the issue example."""
         req = pfm(
             prime=2147483647,
@@ -165,7 +163,7 @@ class TestRank:
 
 
 class TestRref:
-    def test_identity_gf2(self):
+    def test_identity_gf2(self) -> None:
         """Identity matrix is already in RREF."""
         req = pfm(prime=2, entries=((1, 0), (0, 1)))
         result = compute_rref(req)
@@ -173,7 +171,7 @@ class TestRref:
         assert result.pivot_columns == (0, 1)
         assert result.rank == 2
 
-    def test_rref_gf2_dependent(self):
+    def test_rref_gf2_dependent(self) -> None:
         """RREF of a matrix with a dependent row over GF(2)."""
         req = pfm(
             prime=2,
@@ -183,7 +181,7 @@ class TestRref:
         assert result.rank == 2
         assert len(result.pivot_columns) == 2
 
-    def test_rref_gf3(self):
+    def test_rref_gf3(self) -> None:
         """RREF over GF(3)."""
         req = pfm(
             prime=3,
@@ -193,7 +191,7 @@ class TestRref:
         assert result.rank == 1
         assert result.pivot_columns == (0,)
 
-    def test_rref_entries_canonical(self):
+    def test_rref_entries_canonical(self) -> None:
         """RREF entries should be canonical residues."""
         req = pfm(
             prime=5,
@@ -204,7 +202,7 @@ class TestRref:
             for value in row:
                 assert 0 <= value < 5
 
-    def test_rref_rank_equals_pivots(self):
+    def test_rref_rank_equals_pivots(self) -> None:
         """Rank must equal the number of pivot columns."""
         req = pfm(
             prime=11,
@@ -215,14 +213,14 @@ class TestRref:
 
 
 class TestNullspace:
-    def test_full_rank_nullspace_empty(self):
+    def test_full_rank_nullspace_empty(self) -> None:
         """Full rank matrix has empty nullspace."""
         req = pfm(prime=2, entries=((1, 0), (0, 1)))
         result = compute_nullspace(req)
         assert result.nullity == 0
         assert result.nullspace_matrix.entries == ()
 
-    def test_nullspace_gf2(self):
+    def test_nullspace_gf2(self) -> None:
         """Nullspace of [[1,0,1],[0,1,1]] over GF(2)."""
         req = pfm(
             prime=2,
@@ -238,7 +236,7 @@ class TestNullspace:
             for x in v:
                 assert 0 <= x < 2
 
-    def test_zero_matrix_nullspace(self):
+    def test_zero_matrix_nullspace(self) -> None:
         """Zero matrix has full nullspace."""
         req = pfm(
             prime=2,
@@ -247,7 +245,7 @@ class TestNullspace:
         result = compute_nullspace(req)
         assert result.nullity == 2
 
-    def test_nullspace_entries_canonical(self):
+    def test_nullspace_entries_canonical(self) -> None:
         """Nullspace entries should be canonical residues."""
         req = pfm(
             prime=5,
@@ -258,7 +256,7 @@ class TestNullspace:
             for x in v:
                 assert 0 <= x < 5
 
-    def test_nullity_plus_rank_equals_columns(self):
+    def test_nullity_plus_rank_equals_columns(self) -> None:
         """Rank-nullity theorem: rank + nullity = columns."""
         req = pfm(
             prime=3,
@@ -270,31 +268,29 @@ class TestNullspace:
 
 
 class TestRequestValidation:
-    def test_non_prime_rejected(self):
+    def test_non_prime_rejected(self) -> None:
         """4 is not prime."""
         with pytest.raises(ValidationError):
             pfm(prime=4, entries=((1, 0), (0, 1)))
 
-    def test_jagged_rows_rejected(self):
+    def test_jagged_rows_rejected(self) -> None:
         """Rows of different lengths should raise."""
         with pytest.raises(ValidationError):
             pfm(prime=2, entries=((1, 0, 1), (0, 1)))
 
-    def test_negative_entry_rejected(self):
+    def test_negative_entry_rejected(self) -> None:
         """Negative entries are not canonical residues."""
         with pytest.raises(ValidationError):
             pfm(prime=2, entries=((-1, 0), (0, 1)))
 
-    def test_entry_ge_prime_rejected(self):
+    def test_entry_ge_prime_rejected(self) -> None:
         """Entries >= prime are not canonical."""
         with pytest.raises(ValidationError):
             pfm(prime=2, entries=((2, 0), (0, 1)))
 
-    def test_canonical_object_composition_cannot_bypass_prime_bound(self):
+    def test_canonical_object_composition_cannot_bypass_prime_bound(self) -> None:
         """Python-mode composition must not smuggle an out-of-domain field
         past the request bound: the request model owns the MAX_PRIME bound."""
-        from jacobian.math.prime_field_linear_algebra import PrimeFieldMatrix
-
         canonical = PrimeFieldMatrix(prime=2**127 - 1, entries=((1,),), columns=1)
         with pytest.raises(ValidationError):
             PrimeFieldMatrixRequest(matrix=canonical)
@@ -303,14 +299,12 @@ class TestRequestValidation:
 class TestResultStructure:
     """Parsing checks result structure; deliberate verification checks claims."""
 
-    def test_forged_rank_requires_deliberate_verification(self):
+    def test_forged_rank_requires_deliberate_verification(self) -> None:
         request = pfm(prime=2, entries=((1, 0), (0, 1)))
         result = PrimeFieldMatrixRankResult(prime=2, source=request, rank=0)
         assert not _verify_rank_result(result)
 
-    def test_forged_rref_requires_deliberate_verification(self):
-        from jacobian.math.prime_field_linear_algebra import PrimeFieldMatrix
-
+    def test_forged_rref_requires_deliberate_verification(self) -> None:
         request = pfm(prime=2, entries=((1, 0), (0, 1)))
         result = PrimeFieldRrefResult(
             prime=2,
@@ -321,9 +315,7 @@ class TestResultStructure:
         )
         assert not _verify_rref_result(result)
 
-    def test_forged_nullspace_requires_deliberate_verification(self):
-        from jacobian.math.prime_field_linear_algebra import PrimeFieldMatrix
-
+    def test_forged_nullspace_requires_deliberate_verification(self) -> None:
         request = pfm(prime=2, entries=((0, 0),))
         result = PrimeFieldNullspaceResult(
             prime=2,
@@ -333,7 +325,7 @@ class TestResultStructure:
         )
         assert not _verify_nullspace_result(result)
 
-    def test_prime_mismatch_rejected(self):
+    def test_prime_mismatch_rejected(self) -> None:
         request = pfm(prime=2, entries=((1, 0), (0, 1)))
         result = compute_rank(request)
         with pytest.raises(ValidationError) as exc_info:
@@ -359,7 +351,7 @@ class TestResultStructure:
             )
         assert_error_type(exc_info, "prime_field_matrix.result.source_prime")
 
-    def test_genuine_results_round_trip_structurally(self):
+    def test_genuine_results_round_trip_structurally(self) -> None:
         request = pfm(prime=5, entries=((1, 2, 3), (2, 4, 1)))
         rank_result = compute_rank(request)
         rref_result = compute_rref(request)
@@ -379,13 +371,17 @@ class TestResultStructure:
         assert _verify_rref_result(rref_result)
         assert _verify_nullspace_result(ns_result)
 
-    def test_producer_executes_rank_kernel_once(self, monkeypatch: pytest.MonkeyPatch):
+    def test_producer_executes_rank_kernel_once(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import jacobian.math.prime_field_matrix._operations as operations
 
         calls = 0
-        original_rank = operations._rank
+        original_rank = cast(
+            Callable[[PrimeFieldMatrix], int], operations.__dict__["_rank"]
+        )
 
-        def observed_rank(matrix):
+        def observed_rank(matrix: PrimeFieldMatrix) -> int:
             nonlocal calls
             calls += 1
             return original_rank(matrix)
@@ -396,7 +392,7 @@ class TestResultStructure:
 
 
 class TestCanonicalValueComposition:
-    def test_oversized_prime_rejected_before_construction(self):
+    def test_oversized_prime_rejected_before_construction(self) -> None:
         """A huge characteristic is bounded before primality work."""
         with pytest.raises(ValidationError) as exc_info:
             PrimeFieldMatrixRequest.model_validate(
@@ -412,7 +408,7 @@ class TestCanonicalValueComposition:
             )
         assert_error_type(exc_info, "prime_field_matrix.request.prime_bound")
 
-    def test_rref_and_nullspace_results_feed_rank_unchanged(self):
+    def test_rref_and_nullspace_results_feed_rank_unchanged(self) -> None:
         """The canonical result matrices compose into consumers unchanged."""
         request = pfm(prime=5, entries=((1, 2), (2, 4)))
         rref_result = compute_rref(request)
@@ -431,7 +427,7 @@ class TestCanonicalValueComposition:
             == 1
         )
 
-    def test_duplicate_family_removed_from_catalog(self):
+    def test_duplicate_family_removed_from_catalog(self) -> None:
         """The duplicate underscore-named family is gone from discovery."""
         import subprocess
         import sys

@@ -7,6 +7,7 @@ import itertools
 import math
 from collections.abc import Iterator, Mapping
 from fractions import Fraction
+from typing import cast
 
 import pytest
 from tests.math.number_theory._validation import expect_validation
@@ -611,7 +612,7 @@ def test_many_individually_valid_rows_are_admitted_to_the_aggregate_bound() -> N
 
     result = _measure(payload)
 
-    assert len(payload["subsets"]) == MAX_PERIODIC_FAMILY_SIZE
+    assert len(cast(list[object], payload["subsets"])) == MAX_PERIODIC_FAMILY_SIZE
     assert result.occupied_count == "64"
     assert result.density.as_fraction() == Fraction(64, 97)
 

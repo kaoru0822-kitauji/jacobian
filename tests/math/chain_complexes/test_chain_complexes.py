@@ -1,6 +1,7 @@
 """Tests for chain complex operations (#1824)."""
 
-from typing import Any
+from fractions import Fraction
+from typing import Any, NoReturn
 
 import pytest
 from pydantic import ValidationError
@@ -23,7 +24,13 @@ from jacobian.math.chain_complexes.operations import (
     verify_tensor_product_result,
     verify_verification_result,
 )
-from jacobian.math.chain_complexes.values import ChainComplexValue, CoefficientField
+from jacobian.math.chain_complexes.values import (
+    ChainComplexValue,
+    CoefficientField,
+    HomologyResult,
+)
+
+MapMatrices = tuple[tuple[tuple[str, ...], ...], ...]
 
 
 def _circle_complex() -> ChainComplexValue:
@@ -137,8 +144,8 @@ class TestTensorProduct:
         from jacobian.math.chain_complexes.values import TensorProductResult
 
         with pytest.raises(ValidationError):
-            TensorProductResult(
-                tensor_basis_sizes=(1,), tensor_differential_matrices=()
+            TensorProductResult.model_validate(
+                {"tensor_basis_sizes": (1,), "tensor_differential_matrices": ()}
             )
         result = compute_tensor_product(
             TensorProductRequest(left=_point_complex(), right=_point_complex())
@@ -649,7 +656,7 @@ class TestNativeSurface:
             degree_min=0,
             degree_max=1,
             basis_sizes=(64, 64),
-            differential_matrices=([["0"] * 64 for _ in range(64)],),
+            differential_matrices=(tuple(("0",) * 64 for _ in range(64)),),
         )
         # The derived tensor group sizes would be (4096, 8192, 4096); the
         # admission bound must reject before any dense expansion allocates.
@@ -878,7 +885,7 @@ class TestEmptyRowWidthChainMaps:
             differential_matrices=((),),
         )
 
-    def _map(self) -> tuple[tuple[str, ...], ...]:
+    def _map(self) -> MapMatrices:
         return ((), (("1",),))
 
     def test_zero_row_target_differential_verifies(self) -> None:
@@ -1107,7 +1114,7 @@ class TestTensorProductFactorBinding:
             TensorProductResult.model_validate(payload)
 
 
-def homology_groups(complex_value):
+def homology_groups(complex_value: ChainComplexValue) -> HomologyResult:
     from jacobian.math.chain_complexes import homology_groups as native
 
     return native(complex_value)
@@ -1329,7 +1336,7 @@ class TestNativeHomologyFieldBinding:
     homology over different coefficient fields stays distinct."""
 
     @staticmethod
-    def _native(complex_value: ChainComplexValue):
+    def _native(complex_value: ChainComplexValue) -> HomologyResult:
         from jacobian.math.chain_complexes import (
             homology_groups as native_homology_groups,
         )
@@ -1602,14 +1609,16 @@ class TestMappingConeSourceBinding:
         )
         one = (("1",),)
         with pytest.raises(ValidationError):
-            MappingConeResult(
-                cone_basis_sizes=(1, 1, 1),
-                cone_differential_matrices=((("1",),), (("1",),)),
-                source_degree_min=0,
-                target_degree_min=0,
-                source=bad,
-                target=bad,
-                map_matrices=(one, one, one),
+            MappingConeResult.model_validate(
+                {
+                    "cone_basis_sizes": (1, 1, 1),
+                    "cone_differential_matrices": ((("1",),), (("1",),)),
+                    "source_degree_min": 0,
+                    "target_degree_min": 0,
+                    "source": bad.model_dump(),
+                    "target": bad.model_dump(),
+                    "map_matrices": (one, one, one),
+                }
             )
 
     def test_tampered_cone_differentials_rejected(self) -> None:
@@ -1656,10 +1665,9 @@ class TestMappingConeSourceBinding:
 
 
 class TestReviewRegressions2236:
-    def test_empty_width_construct_replay_preserves_declared_widths(self):
+    def test_empty_width_construct_replay_preserves_declared_widths(self) -> None:
         """A valid declared 0x1 map survives the construct-time d^2 replay."""
         from jacobian.math.chain_complexes._models import (
-            CoefficientField,
             ConstructChainComplexRequest,
         )
 
@@ -1671,7 +1679,7 @@ class TestReviewRegressions2236:
         )
         assert request.basis_sizes == (0, 1, 1)
 
-    def test_endpoint_replay_reports_shifted_chain_degrees(self):
+    def test_endpoint_replay_reports_shifted_chain_degrees(self) -> None:
         """The shared endpoint replay names declared chain degrees, not 0."""
 
         from jacobian.math.chain_complexes.operations import (
@@ -1679,7 +1687,7 @@ class TestReviewRegressions2236:
             _require_square_zero,
         )
 
-        def broken_diffs():
+        def broken_diffs() -> list[list[list[Fraction]]]:
             # Two 2x2 identity differentials over GF(5): d^2 != 0 by design.
             identity = (("1", "0"), ("0", "1"))
             return [
@@ -1714,11 +1722,13 @@ class TestNativeWrappersCallKernelsDirectly:
             differential_matrices=((("0",),),),
         )
 
-    def test_native_paths_survive_disabled_wire_handlers(self, monkeypatch):
+    def test_native_paths_survive_disabled_wire_handlers(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Blocking every wire handler still yields correct native results."""
         import jacobian.math.chain_complexes.operations as ops
 
-        def blocked(*args, **kwargs):
+        def blocked(*args: Any, **kwargs: Any) -> NoReturn:
             raise AssertionError("wire handler reached from the native path")
 
         for name in (
@@ -1736,7 +1746,7 @@ class TestNativeWrappersCallKernelsDirectly:
         homology = native.homology_groups(circle)
         assert homology.homology_groups[0].betti_number == 1
         assert native.differential_squares_to_zero(circle).is_valid is True
-        identity_map = ((("1",),),)
+        identity_map: MapMatrices = ((("1",),),)
         assert len(identity_map) == 1
         identity_map = ((("1",),), (("1",),))
         cone = native.mapping_cone(circle, circle, identity_map)
@@ -1744,10 +1754,12 @@ class TestNativeWrappersCallKernelsDirectly:
         tensor = native.tensor_product_complex(circle, circle)
         assert tensor.value.degree_max == 2
 
-    def test_native_chain_map_verdict_matches_wire_semantics(self, monkeypatch):
+    def test_native_chain_map_verdict_matches_wire_semantics(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import jacobian.math.chain_complexes.operations as ops
 
-        def blocked(*args, **kwargs):
+        def blocked(*args: Any, **kwargs: Any) -> NoReturn:
             raise AssertionError("wire handler reached from the native path")
 
         monkeypatch.setattr(ops, "verify_chain_map", blocked)

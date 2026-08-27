@@ -1,5 +1,7 @@
 """Known-answer and adversarial tests for finite semigroup operations."""
 
+from typing import TypedDict
+
 import pytest
 from pydantic import ValidationError
 
@@ -29,8 +31,22 @@ from jacobian.math.finite_semigroups._operations import (
     verify_principal_ideals_result,
 )
 
+
+class SemigroupWire(TypedDict):
+    """Raw fixture shape passed through Pydantic at validation boundaries."""
+
+    elements: list[str]
+    multiplication: list[list[str]]
+
+
+def _finite_semigroup(data: SemigroupWire) -> FiniteSemigroup:
+    """Validate a raw semigroup fixture into the public domain model."""
+
+    return FiniteSemigroup.model_validate(data)
+
+
 # Z/3Z as a semigroup under addition mod 3
-Z3 = {
+Z3: SemigroupWire = {
     "elements": ["0", "1", "2"],
     "multiplication": [
         ["0", "1", "2"],
@@ -40,7 +56,7 @@ Z3 = {
 }
 
 # A band semigroup (idempotent): {a, b} with a*a=a, b*b=b, a*b=a, b*a=b
-BAND = {
+BAND: SemigroupWire = {
     "elements": ["a", "b"],
     "multiplication": [
         ["a", "a"],
@@ -49,7 +65,7 @@ BAND = {
 }
 
 # Null semigroup: x*y = 0 for all x, y
-NULL_SG = {
+NULL_SG: SemigroupWire = {
     "elements": ["0", "x", "y"],
     "multiplication": [
         ["0", "0", "0"],
@@ -59,7 +75,7 @@ NULL_SG = {
 }
 
 # Monogenic semigroup <a> with a^1=x, a^2=y, a^3=z, a^4=y (index 2, period 2).
-CYCLIC_TAIL = {
+CYCLIC_TAIL: SemigroupWire = {
     "elements": ["x", "y", "z"],
     "multiplication": [
         ["y", "z", "y"],
@@ -69,7 +85,7 @@ CYCLIC_TAIL = {
 }
 
 # The five matrix units of the 2x2 Brandt semigroup, with zero.
-MATRIX_UNITS = {
+MATRIX_UNITS: SemigroupWire = {
     "elements": ["0", "e11", "e12", "e21", "e22"],
     "multiplication": [
         ["0", "0", "0", "0", "0"],
@@ -83,38 +99,42 @@ MATRIX_UNITS = {
 
 class TestFiniteSemigroup:
     def test_z3_is_valid(self) -> None:
-        sg = FiniteSemigroup(**Z3)
+        sg = _finite_semigroup(Z3)
         assert sg.elements == ("0", "1", "2")
 
     def test_band_is_valid(self) -> None:
-        sg = FiniteSemigroup(**BAND)
+        sg = _finite_semigroup(BAND)
         assert sg.elements == ("a", "b")
 
     def test_null_is_valid(self) -> None:
-        sg = FiniteSemigroup(**NULL_SG)
+        sg = _finite_semigroup(NULL_SG)
         assert sg.elements == ("0", "x", "y")
 
     def test_non_associative_rejected(self) -> None:
         # (a*b)*a = b*a = c, but a*(b*a) = a*c = a, so non-associative
         with pytest.raises(ValidationError) as error:
-            FiniteSemigroup(
-                elements=["a", "b", "c"],
-                multiplication=[
-                    ["a", "b", "a"],
-                    ["c", "a", "b"],
-                    ["c", "b", "c"],
-                ],
+            FiniteSemigroup.model_validate(
+                {
+                    "elements": ["a", "b", "c"],
+                    "multiplication": [
+                        ["a", "b", "a"],
+                        ["c", "a", "b"],
+                        ["c", "b", "c"],
+                    ],
+                }
             )
         assert error.value.errors()[0]["type"] == "finite_semigroup.not_associative"
 
     def test_self_loop_rejected(self) -> None:
         with pytest.raises(ValidationError) as error:
-            FiniteSemigroup(
-                elements=["a", "b"],
-                multiplication=[
-                    ["a", "z"],
-                    ["a", "b"],
-                ],
+            FiniteSemigroup.model_validate(
+                {
+                    "elements": ["a", "b"],
+                    "multiplication": [
+                        ["a", "z"],
+                        ["a", "b"],
+                    ],
+                }
             )
         assert (
             error.value.errors()[0]["type"] == "finite_semigroup.product_not_declared"
@@ -122,19 +142,23 @@ class TestFiniteSemigroup:
 
     def test_overlong_label_rejected(self) -> None:
         with pytest.raises(ValidationError) as error:
-            FiniteSemigroup(
-                elements=["a", "x" * 65],
-                multiplication=[
-                    ["a", "a"],
-                    ["a", "a"],
-                ],
+            FiniteSemigroup.model_validate(
+                {
+                    "elements": ["a", "x" * 65],
+                    "multiplication": [
+                        ["a", "a"],
+                        ["a", "a"],
+                    ],
+                }
             )
         assert error.value.errors()[0]["type"] == "string_too_long"
 
 
 class TestPowerProfile:
     def test_z3_element_1(self) -> None:
-        result = compute_power_profile(PowerProfileRequest(semigroup=Z3, element="1"))
+        result = compute_power_profile(
+            PowerProfileRequest(semigroup=_finite_semigroup(Z3), element="1")
+        )
         assert result.element == "1"
         assert result.powers == ("1", "2", "0")
         # a^1 = 1, a^2 = 2, a^3 = 0, a^4 = 1: index 1, period 3.
@@ -143,14 +167,18 @@ class TestPowerProfile:
         assert result.idempotent == "0"
 
     def test_z3_element_0_is_idempotent(self) -> None:
-        result = compute_power_profile(PowerProfileRequest(semigroup=Z3, element="0"))
+        result = compute_power_profile(
+            PowerProfileRequest(semigroup=_finite_semigroup(Z3), element="0")
+        )
         assert result.powers == ("0",)
         assert result.index == 1
         assert result.period == 1
         assert result.idempotent == "0"
 
     def test_band_element_a(self) -> None:
-        result = compute_power_profile(PowerProfileRequest(semigroup=BAND, element="a"))
+        result = compute_power_profile(
+            PowerProfileRequest(semigroup=_finite_semigroup(BAND), element="a")
+        )
         assert result.powers == ("a",)
         assert result.index == 1
         assert result.period == 1
@@ -158,7 +186,7 @@ class TestPowerProfile:
 
     def test_null_element_x(self) -> None:
         result = compute_power_profile(
-            PowerProfileRequest(semigroup=NULL_SG, element="x")
+            PowerProfileRequest(semigroup=_finite_semigroup(NULL_SG), element="x")
         )
         # a^1 = x, a^2 = 0, a^3 = 0: index 2, period 1.
         assert result.powers == ("x", "0")
@@ -167,12 +195,14 @@ class TestPowerProfile:
         assert result.idempotent == "0"
 
     def test_cyclic_subsemigroup(self) -> None:
-        result = compute_power_profile(PowerProfileRequest(semigroup=Z3, element="1"))
+        result = compute_power_profile(
+            PowerProfileRequest(semigroup=_finite_semigroup(Z3), element="1")
+        )
         assert result.cyclic_subsemigroup == ("1", "2", "0")
 
     def test_nontrivial_tail_index_and_period(self) -> None:
         result = compute_power_profile(
-            PowerProfileRequest(semigroup=CYCLIC_TAIL, element="x")
+            PowerProfileRequest(semigroup=_finite_semigroup(CYCLIC_TAIL), element="x")
         )
         assert result.powers == ("x", "y", "z")
         assert result.index == 2
@@ -180,7 +210,9 @@ class TestPowerProfile:
         assert result.idempotent == "y"
 
     def test_powers_replay_from_table(self) -> None:
-        result = compute_power_profile(PowerProfileRequest(semigroup=Z3, element="1"))
+        result = compute_power_profile(
+            PowerProfileRequest(semigroup=_finite_semigroup(Z3), element="1")
+        )
         mult = Z3["multiplication"]
         elements = Z3["elements"]
         idx = {label: i for i, label in enumerate(elements)}
@@ -193,7 +225,7 @@ class TestPowerProfile:
     def test_idempotent_is_idempotent(self) -> None:
         for sg, element in [(Z3, "1"), (Z3, "0"), (BAND, "a"), (NULL_SG, "x")]:
             result = compute_power_profile(
-                PowerProfileRequest(semigroup=sg, element=element)
+                PowerProfileRequest(semigroup=_finite_semigroup(sg), element=element)
             )
             mult = sg["multiplication"]
             elements = sg["elements"]
@@ -202,38 +234,50 @@ class TestPowerProfile:
             assert mult[idx[e]][idx[e]] == e
 
     def test_cyclic_subsemigroup_is_exact_closure(self) -> None:
-        result = compute_power_profile(PowerProfileRequest(semigroup=Z3, element="1"))
+        result = compute_power_profile(
+            PowerProfileRequest(semigroup=_finite_semigroup(Z3), element="1")
+        )
         assert set(result.cyclic_subsemigroup) == set(result.powers)
 
 
 class TestGeneratedSubsemigroup:
     def test_z3_generated_by_1(self) -> None:
         result = compute_generated_subsemigroup(
-            GeneratedSubsemigroupRequest(semigroup=Z3, generators=["1"])
+            GeneratedSubsemigroupRequest(
+                semigroup=_finite_semigroup(Z3), generators=("1",)
+            )
         )
         assert set(result.elements) == {"0", "1", "2"}
 
     def test_band_generated_by_a(self) -> None:
         result = compute_generated_subsemigroup(
-            GeneratedSubsemigroupRequest(semigroup=BAND, generators=["a"])
+            GeneratedSubsemigroupRequest(
+                semigroup=_finite_semigroup(BAND), generators=("a",)
+            )
         )
         assert result.elements == ("a",)
 
     def test_band_generated_by_both(self) -> None:
         result = compute_generated_subsemigroup(
-            GeneratedSubsemigroupRequest(semigroup=BAND, generators=["a", "b"])
+            GeneratedSubsemigroupRequest(
+                semigroup=_finite_semigroup(BAND), generators=("a", "b")
+            )
         )
         assert set(result.elements) == {"a", "b"}
 
     def test_null_generated_by_x(self) -> None:
         result = compute_generated_subsemigroup(
-            GeneratedSubsemigroupRequest(semigroup=NULL_SG, generators=["x"])
+            GeneratedSubsemigroupRequest(
+                semigroup=_finite_semigroup(NULL_SG), generators=("x",)
+            )
         )
         assert set(result.elements) == {"x", "0"}
 
     def test_generators_preserved(self) -> None:
         result = compute_generated_subsemigroup(
-            GeneratedSubsemigroupRequest(semigroup=Z3, generators=["1", "2"])
+            GeneratedSubsemigroupRequest(
+                semigroup=_finite_semigroup(Z3), generators=("1", "2")
+            )
         )
         assert set(result.generators) == {"1", "2"}
 
@@ -241,36 +285,48 @@ class TestGeneratedSubsemigroup:
 class TestElementPower:
     def test_z3_power_2(self) -> None:
         result = compute_element_power(
-            ElementPowerRequest(semigroup=Z3, element="1", exponent=2)
+            ElementPowerRequest(
+                semigroup=_finite_semigroup(Z3), element="1", exponent=2
+            )
         )
         assert result.power == "2"
 
     def test_z3_power_identity(self) -> None:
         result = compute_element_power(
-            ElementPowerRequest(semigroup=Z3, element="1", exponent=1)
+            ElementPowerRequest(
+                semigroup=_finite_semigroup(Z3), element="1", exponent=1
+            )
         )
         assert result.power == "1"
 
     def test_z3_power_4_cycles(self) -> None:
         result = compute_element_power(
-            ElementPowerRequest(semigroup=Z3, element="2", exponent=4)
+            ElementPowerRequest(
+                semigroup=_finite_semigroup(Z3), element="2", exponent=4
+            )
         )
         assert result.power == "2"
 
     def test_null_semigroup_power(self) -> None:
         result = compute_element_power(
-            ElementPowerRequest(semigroup=NULL_SG, element="x", exponent=2)
+            ElementPowerRequest(
+                semigroup=_finite_semigroup(NULL_SG), element="x", exponent=2
+            )
         )
         assert result.power == "0"
 
     def test_exponent_zero_rejected(self) -> None:
         with pytest.raises(ValidationError) as error:
-            ElementPowerRequest(semigroup=Z3, element="1", exponent=0)
+            ElementPowerRequest(
+                semigroup=_finite_semigroup(Z3), element="1", exponent=0
+            )
         assert error.value.errors()[0]["type"] == "greater_than_equal"
 
     def test_missing_element_rejected(self) -> None:
         with pytest.raises(ValidationError) as error:
-            ElementPowerRequest(semigroup=Z3, element="9", exponent=2)
+            ElementPowerRequest(
+                semigroup=_finite_semigroup(Z3), element="9", exponent=2
+            )
         assert (
             error.value.errors()[0]["type"]
             == "finite_semigroup.element_not_in_semigroup"
@@ -278,7 +334,9 @@ class TestElementPower:
 
     def test_power_replays_from_table(self) -> None:
         result = compute_element_power(
-            ElementPowerRequest(semigroup=Z3, element="1", exponent=5)
+            ElementPowerRequest(
+                semigroup=_finite_semigroup(Z3), element="1", exponent=5
+            )
         )
         mult = Z3["multiplication"]
         elements = Z3["elements"]
@@ -290,27 +348,37 @@ class TestElementPower:
 
     def test_huge_exponent_uses_the_finite_power_profile(self) -> None:
         result = compute_element_power(
-            ElementPowerRequest(semigroup=Z3, element="1", exponent=10**100)
+            ElementPowerRequest(
+                semigroup=_finite_semigroup(Z3), element="1", exponent=10**100
+            )
         )
         assert result.power == "1"
 
 
 class TestIdempotents:
     def test_z3_only_zero(self) -> None:
-        result = compute_idempotents(IdempotentsRequest(semigroup=Z3))
+        result = compute_idempotents(
+            IdempotentsRequest(semigroup=_finite_semigroup(Z3))
+        )
         assert result.idempotents == ("0",)
 
     def test_band_both_idempotent(self) -> None:
-        result = compute_idempotents(IdempotentsRequest(semigroup=BAND))
+        result = compute_idempotents(
+            IdempotentsRequest(semigroup=_finite_semigroup(BAND))
+        )
         assert result.idempotents == ("a", "b")
 
     def test_null_semigroup_only_zero(self) -> None:
-        result = compute_idempotents(IdempotentsRequest(semigroup=NULL_SG))
+        result = compute_idempotents(
+            IdempotentsRequest(semigroup=_finite_semigroup(NULL_SG))
+        )
         assert result.idempotents == ("0",)
 
     def test_every_reported_element_is_idempotent(self) -> None:
         for sg in (Z3, BAND, NULL_SG):
-            result = compute_idempotents(IdempotentsRequest(semigroup=sg))
+            result = compute_idempotents(
+                IdempotentsRequest(semigroup=_finite_semigroup(sg))
+            )
             mult = sg["multiplication"]
             elements = sg["elements"]
             idx = {label: i for i, label in enumerate(elements)}
@@ -321,39 +389,49 @@ class TestIdempotents:
 class TestPrincipalIdeals:
     def test_z3_ideal_of_1_is_whole_semigroup(self) -> None:
         result = compute_principal_ideals(
-            PrincipalIdealsRequest(semigroup=Z3, elements=["1"])
+            PrincipalIdealsRequest(semigroup=_finite_semigroup(Z3), elements=("1",))
         )
         assert set(result.ideals[0]) == {"0", "1", "2"}
 
     def test_band_ideals(self) -> None:
         result = compute_principal_ideals(
-            PrincipalIdealsRequest(semigroup=BAND, elements=["a", "b"])
+            PrincipalIdealsRequest(
+                semigroup=_finite_semigroup(BAND), elements=("a", "b")
+            )
         )
         assert result.ideals == (("a", "b"), ("a", "b"))
 
     def test_null_ideal_of_x(self) -> None:
         result = compute_principal_ideals(
-            PrincipalIdealsRequest(semigroup=NULL_SG, elements=["x"])
+            PrincipalIdealsRequest(
+                semigroup=_finite_semigroup(NULL_SG), elements=("x",)
+            )
         )
         assert set(result.ideals[0]) == {"0", "x"}
 
     def test_ideal_contains_the_element(self) -> None:
         for sg, element in [(Z3, "1"), (BAND, "a"), (NULL_SG, "x")]:
             result = compute_principal_ideals(
-                PrincipalIdealsRequest(semigroup=sg, elements=[element])
+                PrincipalIdealsRequest(
+                    semigroup=_finite_semigroup(sg), elements=(element,)
+                )
             )
             assert element in result.ideals[0]
 
     def test_principal_two_sided_ideal_contains_triple_products(self) -> None:
         result = compute_principal_ideals(
-            PrincipalIdealsRequest(semigroup=MATRIX_UNITS, elements=["e11"])
+            PrincipalIdealsRequest(
+                semigroup=_finite_semigroup(MATRIX_UNITS), elements=("e11",)
+            )
         )
         assert result.ideals == (("0", "e11", "e12", "e21", "e22"),)
 
     def test_principal_two_sided_ideal_is_closed_on_both_sides(self) -> None:
         for element in MATRIX_UNITS["elements"]:
             ideal = compute_principal_ideals(
-                PrincipalIdealsRequest(semigroup=MATRIX_UNITS, elements=[element])
+                PrincipalIdealsRequest(
+                    semigroup=_finite_semigroup(MATRIX_UNITS), elements=(element,)
+                )
             ).ideals[0]
             labels = MATRIX_UNITS["elements"]
             table = MATRIX_UNITS["multiplication"]
@@ -365,13 +443,23 @@ class TestPrincipalIdeals:
 
     def test_duplicate_or_out_of_order_elements_are_rejected(self) -> None:
         with pytest.raises(ValidationError) as error:
-            PrincipalIdealsRequest(semigroup=Z3, elements=["1", "1"])
+            PrincipalIdealsRequest.model_validate(
+                {
+                    "semigroup": _finite_semigroup(Z3),
+                    "elements": ["1", "1"],
+                }
+            )
         assert (
             error.value.errors()[0]["type"]
             == "finite_semigroup.requested_elements_not_distinct"
         )
         with pytest.raises(ValidationError) as error:
-            PrincipalIdealsRequest(semigroup=Z3, elements=["2", "1"])
+            PrincipalIdealsRequest.model_validate(
+                {
+                    "semigroup": _finite_semigroup(Z3),
+                    "elements": ["2", "1"],
+                }
+            )
         assert (
             error.value.errors()[0]["type"]
             == "finite_semigroup.requested_elements_wrong_order"
@@ -379,7 +467,12 @@ class TestPrincipalIdeals:
 
     def test_missing_element_rejected(self) -> None:
         with pytest.raises(ValidationError) as error:
-            PrincipalIdealsRequest(semigroup=Z3, elements=["nope"])
+            PrincipalIdealsRequest.model_validate(
+                {
+                    "semigroup": _finite_semigroup(Z3),
+                    "elements": ["nope"],
+                }
+            )
         assert (
             error.value.errors()[0]["type"]
             == "finite_semigroup.element_not_in_semigroup"
@@ -396,7 +489,7 @@ class TestGreenRelations:
         )
         from jacobian.math.finite_semigroups._operations import compute_green_relations
 
-        sg = FiniteSemigroup(**Z3)
+        sg = _finite_semigroup(Z3)
         result = compute_green_relations(GreenRelationsRequest(semigroup=sg))
         # In a group, all elements are J-equivalent (and hence L, R, H, D)
         assert len(result.L) == 1
@@ -412,7 +505,7 @@ class TestGreenRelations:
         )
         from jacobian.math.finite_semigroups._operations import compute_green_relations
 
-        sg = FiniteSemigroup(**NULL_SG)
+        sg = _finite_semigroup(NULL_SG)
         result = compute_green_relations(GreenRelationsRequest(semigroup=sg))
         # Each element has distinct left/right ideals, so all singletons
         assert result.L == (("0",), ("x",), ("y",))
@@ -456,7 +549,7 @@ class TestGreenRelations:
         )
         from jacobian.math.finite_semigroups._operations import compute_green_relations
 
-        sg = FiniteSemigroup(**Z3)
+        sg = _finite_semigroup(Z3)
         req = GreenRelationsRequest(semigroup=sg)
         result = compute_green_relations(req)
         # Reconstruct with same values should work
@@ -475,7 +568,7 @@ class TestGreenRelations:
         from jacobian.math.finite_semigroups._models import GreenRelationsRequest
         from jacobian.math.finite_semigroups._operations import compute_green_relations
 
-        sg = FiniteSemigroup(**Z3)
+        sg = _finite_semigroup(Z3)
         result = compute_green_relations(GreenRelationsRequest(semigroup=sg))
         forged = GreenRelationsResult(
             semigroup=sg,
@@ -492,7 +585,7 @@ class TestClaimVerifiers:
     """Kernel-produced results avoid replay; supplied claims can be checked explicitly."""
 
     def test_forged_bounded_claims_require_explicit_verification(self) -> None:
-        semigroup = FiniteSemigroup(**Z3)
+        semigroup = _finite_semigroup(Z3)
         assert not verify_power_profile_result(
             PowerProfileResult(
                 semigroup=semigroup,

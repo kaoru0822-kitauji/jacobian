@@ -1153,6 +1153,7 @@ def oversized_echo_flow() -> MulticommodityFlow:
     )
 
 
+@pytest.mark.scale
 def test_oversized_source_is_rejected_before_the_component_scan(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1176,18 +1177,20 @@ def test_oversized_source_is_rejected_before_the_component_scan(
     # Request parsing measures the echoed source first and fails closed
     # before its own component measurement, and execution therefore never
     # starts, so neither spy records the tensor.
+    flow = oversized_echo_flow()
     with multicommodity_validation_error():
-        MulticommodityFlowProfileRequest(flow=oversized_echo_flow())
+        MulticommodityFlowProfileRequest(flow=flow)
     assert measured == []
     assert executed == []
     # A native call is rejected by the same preflight inside the kernel's
     # own admission, likewise before any rational arithmetic.
     with pytest.raises(ValueError, match="aggregate result bound"):
-        compute_multicommodity_flow_profile(oversized_echo_flow())
+        compute_multicommodity_flow_profile(flow)
     assert measured == []
     assert executed == []
 
 
+@pytest.mark.scale
 def test_oversized_source_rejection_precedes_a_doomed_exact_scan() -> None:
     # Same oversized echo, but two commodities fold coprime near-cap
     # denominators into one shared edge bucket whose sum would abort the

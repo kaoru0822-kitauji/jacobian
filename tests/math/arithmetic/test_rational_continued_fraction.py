@@ -54,40 +54,25 @@ def test_two_representation_boundary_is_canonical() -> None:
     )
 
 
-def test_result_rejects_mutations() -> None:
+@pytest.mark.parametrize(
+    ("value", "terms", "error_code"),
+    (
+        (
+            ("7", "3"),
+            ("0", "0"),
+            "arithmetic.continued_fraction_nonpositive_term",
+        ),
+        (("7", "3"), ("2", "4"), "arithmetic.continued_fraction_reconstruction"),
+        (("-7", "3"), ("2", "3"), "arithmetic.continued_fraction_reconstruction"),
+        (("5", "1"), ("6",), "arithmetic.continued_fraction_reconstruction"),
+    ),
+)
+def test_result_rejects_mutations(
+    value: tuple[str, str], terms: tuple[str, ...], error_code: str
+) -> None:
     with pytest.raises(ValidationError) as exc_info:
         RationalContinuedFractionResult(
-            value=CanonicalRational(num="7", den="3"),
-            terms=("0", "0"),
+            value=CanonicalRational(num=value[0], den=value[1]),
+            terms=terms,
         )
-    assert (
-        exc_info.value.errors()[0]["type"]
-        == "arithmetic.continued_fraction_nonpositive_term"
-    )
-    with pytest.raises(ValidationError) as exc_info:
-        RationalContinuedFractionResult(
-            value=CanonicalRational(num="7", den="3"),
-            terms=("2", "4"),
-        )
-    assert (
-        exc_info.value.errors()[0]["type"]
-        == "arithmetic.continued_fraction_reconstruction"
-    )
-    with pytest.raises(ValidationError) as exc_info:
-        RationalContinuedFractionResult(
-            value=CanonicalRational(num="-7", den="3"),
-            terms=("2", "3"),
-        )
-    assert (
-        exc_info.value.errors()[0]["type"]
-        == "arithmetic.continued_fraction_reconstruction"
-    )
-    with pytest.raises(ValidationError) as exc_info:
-        RationalContinuedFractionResult(
-            value=CanonicalRational(num="5", den="1"),
-            terms=("6",),
-        )
-    assert (
-        exc_info.value.errors()[0]["type"]
-        == "arithmetic.continued_fraction_reconstruction"
-    )
+    assert exc_info.value.errors()[0]["type"] == error_code

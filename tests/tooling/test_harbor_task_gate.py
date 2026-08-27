@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from benchmarks.tooling.harbor_suite import (
     HarborSuiteError,
+    Suite,
+    TaskRef,
     check_selected_tasks,
     get_suite,
     select_task_refs,
@@ -50,19 +54,31 @@ def test_selected_task_gate_does_not_fall_back_to_all_tasks(
     suite = get_suite("mathematical-benchmarks-v1")
     validated: list[str] = []
 
+    def validate_task_spy(_suite: Suite, path: Path) -> list[str]:
+        validated.append(path.name)
+        return []
+
+    def task_digest_spy(_path: Path) -> str:
+        return "sha256:" + "0" * 64
+
+    def check_verifier_support_spy(
+        _suite: Suite,
+        refs: tuple[TaskRef, ...] | None = None,
+    ) -> list[str]:
+        validated.extend(ref.path.name for ref in (refs or ()))
+        return []
+
     monkeypatch.setattr(
         "benchmarks.tooling.harbor_suite.validate_task",
-        lambda _suite, path: validated.append(path.name) or [],
+        validate_task_spy,
     )
     monkeypatch.setattr(
         "benchmarks.tooling.harbor_suite.task_digest",
-        lambda path: "sha256:" + "0" * 64,
+        task_digest_spy,
     )
     monkeypatch.setattr(
         "benchmarks.tooling.harbor_suite.check_verifier_support",
-        lambda _suite, refs=None: (
-            validated.extend(ref.path.name for ref in (refs or ())) or []
-        ),
+        check_verifier_support_spy,
     )
 
     assert check_selected_tasks(suite, ("graph-counterexample",)) == []

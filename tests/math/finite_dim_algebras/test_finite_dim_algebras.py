@@ -16,7 +16,9 @@ def test_catalog_contains_only_audited_operations() -> None:
     }
 
 
-def _structure(n: int, q: int, mult: tuple) -> StructureConstants:
+def _structure(
+    n: int, q: int, mult: tuple[tuple[tuple[int, ...], ...], ...]
+) -> StructureConstants:
     return StructureConstants(dimension=n, field_order=q, multiplication=mult)
 
 
@@ -159,7 +161,9 @@ def test_structure_constants_rejects_above_its_own_field_cap() -> None:
 
 def test_structure_constants_reject_2d_shape() -> None:
     with pytest.raises(ValueError):
-        StructureConstants(dimension=2, field_order=2, multiplication=((0, 0), (0, 0)))
+        StructureConstants.model_validate(
+            {"dimension": 2, "field_order": 2, "multiplication": ((0, 0), (0, 0))}
+        )
 
 
 def test_structure_constants_reject_non_residue() -> None:

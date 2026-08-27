@@ -6,22 +6,29 @@ from pydantic import ValidationError
 from jacobian.math.root_systems._models import CartanMatrixRequest
 from jacobian.math.root_systems._operations import compute_root_system_data
 
-A2 = [[2, -1], [-1, 2]]
-A3 = [[2, -1, 0], [-1, 2, -1], [0, -1, 2]]
-G2 = [[2, -3], [-1, 2]]
-B2 = [[2, -2], [-1, 2]]
-A1_X_A2 = [[2, 0, 0], [0, 2, -1], [0, -1, 2]]
-D4 = [[2, -1, 0, 0], [-1, 2, -1, -1], [0, -1, 2, 0], [0, -1, 0, 2]]
-E8 = [
-    [2, -1, 0, 0, 0, 0, 0, 0],
-    [-1, 2, -1, 0, 0, 0, 0, 0],
-    [0, -1, 2, -1, 0, 0, 0, -1],
-    [0, 0, -1, 2, -1, 0, 0, 0],
-    [0, 0, 0, -1, 2, -1, 0, 0],
-    [0, 0, 0, 0, -1, 2, -1, 0],
-    [0, 0, 0, 0, 0, -1, 2, 0],
-    [0, 0, -1, 0, 0, 0, 0, 2],
-]
+CartanMatrix = tuple[tuple[int, ...], ...]
+
+A2: CartanMatrix = ((2, -1), (-1, 2))
+A3: CartanMatrix = ((2, -1, 0), (-1, 2, -1), (0, -1, 2))
+G2: CartanMatrix = ((2, -3), (-1, 2))
+B2: CartanMatrix = ((2, -2), (-1, 2))
+A1_X_A2: CartanMatrix = ((2, 0, 0), (0, 2, -1), (0, -1, 2))
+D4: CartanMatrix = (
+    (2, -1, 0, 0),
+    (-1, 2, -1, -1),
+    (0, -1, 2, 0),
+    (0, -1, 0, 2),
+)
+E8: CartanMatrix = (
+    (2, -1, 0, 0, 0, 0, 0, 0),
+    (-1, 2, -1, 0, 0, 0, 0, 0),
+    (0, -1, 2, -1, 0, 0, 0, -1),
+    (0, 0, -1, 2, -1, 0, 0, 0),
+    (0, 0, 0, -1, 2, -1, 0, 0),
+    (0, 0, 0, 0, -1, 2, -1, 0),
+    (0, 0, 0, 0, 0, -1, 2, 0),
+    (0, 0, -1, 0, 0, 0, 0, 2),
+)
 
 
 class TestCartanMatrix:
@@ -33,17 +40,17 @@ class TestCartanMatrix:
 
     def test_invalid_non_symmetric(self) -> None:
         with pytest.raises(ValidationError) as exc_info:
-            CartanMatrixRequest(matrix=[[2, -4], [-1, 2]])
+            CartanMatrixRequest.model_validate({"matrix": [[2, -4], [-1, 2]]})
         assert exc_info.value.errors()[0]["type"] == "root_system.off_diagonal_product"
 
     def test_invalid_diagonal(self) -> None:
         with pytest.raises(ValidationError) as exc_info:
-            CartanMatrixRequest(matrix=[[3, -1], [-1, 2]])
+            CartanMatrixRequest.model_validate({"matrix": [[3, -1], [-1, 2]]})
         assert exc_info.value.errors()[0]["type"] == "root_system.diagonal_entry"
 
     def test_invalid_positive_offdiag(self) -> None:
         with pytest.raises(ValidationError) as exc_info:
-            CartanMatrixRequest(matrix=[[2, 1], [-1, 2]])
+            CartanMatrixRequest.model_validate({"matrix": [[2, 1], [-1, 2]]})
         assert exc_info.value.errors()[0]["type"] == "root_system.positive_off_diagonal"
 
 
@@ -118,7 +125,7 @@ class TestWeylGroupOrder:
     @pytest.mark.parametrize(
         ("matrix", "expected"),
         (
-            ([[2]], 2),
+            (((2,),), 2),
             (A2, 6),
             (B2, 8),
             (G2, 12),
@@ -126,13 +133,13 @@ class TestWeylGroupOrder:
             (D4, 192),
         ),
     )
-    def test_known_orders(self, matrix: list[list[int]], expected: int) -> None:
+    def test_known_orders(self, matrix: CartanMatrix, expected: int) -> None:
         from jacobian.math.root_systems._operations import compute_weyl_group_order
 
         result = compute_weyl_group_order(CartanMatrixRequest(matrix=matrix))
 
         assert result.group_order == expected
-        assert result.matrix == tuple(tuple(row) for row in matrix)
+        assert result.matrix == matrix
         assert result.method == "SYMPY_SCHREIER_SIMS_SIGNED_ROOT_ACTION"
 
     def test_e8_order_does_not_materialize_weyl_group_elements(self) -> None:

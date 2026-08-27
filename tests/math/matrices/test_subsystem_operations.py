@@ -698,6 +698,7 @@ def _dense_equal_operand(digits: int) -> FactorizedHermitianMatrix:
     return _matrix([[value] * 16 for _ in range(16)], (q,))
 
 
+@pytest.mark.scale
 def test_psd_order_rejects_results_beyond_the_canonical_output_limit() -> None:
     from jacobian.canonical import CanonicalLimits, encode_strict_json
 
@@ -709,6 +710,7 @@ def test_psd_order_rejects_results_beyond_the_canonical_output_limit() -> None:
         PsdOrderRequest(left=operand, right=operand)
 
 
+@pytest.mark.scale
 def test_psd_order_admits_dense_equal_operands_inside_the_output_budget() -> None:
     from jacobian.canonical import CanonicalLimits, encode_strict_json
 
@@ -735,7 +737,7 @@ def _trace_source_with_unused_large_block(
     r = MatrixSubsystem(label="r", dimension=8)
     cross = Fraction(10**cross_digits + 3, 10**cross_digits + 9)
     diagonal = Fraction(10**diagonal_digits + 3, 10**diagonal_digits + 9)
-    entries = [[None] * 16 for _ in range(16)]
+    entries: list[list[Fraction | int]] = [[0] * 16 for _ in range(16)]
     for row in range(16):
         row_q, _ = divmod(row, 8)
         for column in range(16):
@@ -748,6 +750,7 @@ def _trace_source_with_unused_large_block(
     return _matrix(entries, (q, r))
 
 
+@pytest.mark.scale
 def test_partial_trace_rejects_results_beyond_the_canonical_output_limit() -> None:
     from jacobian.canonical import (
         CanonicalizationError,
@@ -764,6 +767,7 @@ def test_partial_trace_rejects_results_beyond_the_canonical_output_limit() -> No
         SubsystemPartialTraceRequest(matrix=source, traced_factor_labels=("q",))
 
 
+@pytest.mark.scale
 def test_partial_trace_admits_sources_inside_the_output_budget() -> None:
     from jacobian.canonical import CanonicalLimits, encode_strict_json
 

@@ -14,10 +14,9 @@ from jacobian.dispatch import (
 from jacobian.math.term_rewriting._models import (
     CriticalPairsRequest,
     CriticalPairsResult,
-    Term,
 )
 from jacobian.math.term_rewriting._operations import compute_critical_pairs
-from jacobian.math.term_rewriting.values import MAX_VARIABLE_LABEL
+from jacobian.math.term_rewriting.values import MAX_VARIABLE_LABEL, Term
 
 
 def _var(symbol: int) -> Term:
@@ -28,7 +27,7 @@ def _app(symbol: int, *children: Term) -> Term:
     return Term(is_variable=False, symbol=symbol, children=tuple(children))
 
 
-def test_transport_depth_boundary_admits_the_deepest_unary_chain():
+def test_transport_depth_boundary_admits_the_deepest_unary_chain() -> None:
     # f^30(x) -> x is the deepest rule strict JSON transport carries:
     # each unary node costs one object level plus one children array
     # level inside the request. It must parse end-to-end through math.run
@@ -55,7 +54,7 @@ def test_transport_depth_boundary_admits_the_deepest_unary_chain():
     assert CriticalPairsResult.model_validate_json(result.model_dump_json()) == (result)
 
 
-def test_variable_label_bound_is_the_interoperable_integer_maximum():
+def test_variable_label_bound_is_the_interoperable_integer_maximum() -> None:
     # The widest interoperable label admits through math.run input
     # parsing; one beyond it is rejected by the symbol bound itself.
     widest = MAX_VARIABLE_LABEL
@@ -94,7 +93,7 @@ def test_variable_label_bound_is_the_interoperable_integer_maximum():
         )
 
 
-def test_composed_mgu_depth_rejects_typed_at_request_parsing():
+def test_composed_mgu_depth_rejects_typed_at_request_parsing() -> None:
     # Unification composes binding depth: f(x, y) against f(u^16(y), u^16(c))
     # keeps every input path within the 31-node transport envelope, but its
     # idempotent MGU binds x to a 33-node chain. The rejection must surface
@@ -120,7 +119,7 @@ def test_composed_mgu_depth_rejects_typed_at_request_parsing():
     assert "transport-safe" in str(error.value.errors())
 
 
-def test_boundary_composed_mgu_returns_a_typed_result():
+def test_boundary_composed_mgu_returns_a_typed_result() -> None:
     # With u^15 chains every composed binding stays exactly at the 31-node
     # transport bound, so math.run returns the typed idempotent MGU.
     def unary_chain(length: int, leaf: Term) -> Term:

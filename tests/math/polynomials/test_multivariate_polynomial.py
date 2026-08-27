@@ -57,7 +57,7 @@ def _poly(
     )
 
 
-def _poly_from_sympy(expr) -> RationalPolynomial:
+def _poly_from_sympy(expr: Any) -> RationalPolynomial:
     """Convert a small two-variable SymPy expression to a ``RationalPolynomial``."""
 
     from sympy import Poly, symbols
@@ -445,6 +445,8 @@ class TestMultivariateResultant:
                     left=right, right=left, elimination_variable="x"
                 )
             )
+            assert first.resultant.kind == "POLYNOMIAL"
+            assert second.resultant.kind == "POLYNOMIAL"
             m = max((t.exponents[0] for t in left.polynomial.terms), default=0)
             n = max((t.exponents[0] for t in right.polynomial.terms), default=0)
             sign = -1 if (m * n) % 2 else 1
@@ -473,6 +475,7 @@ class TestMultivariateResultant:
                 left=left, right=right, elimination_variable="x"
             )
         )
+        assert result.resultant.kind == "POLYNOMIAL"
         terms = {
             t.exponents: t.coefficient.as_fraction()
             for t in result.resultant.value.polynomial.terms
@@ -486,6 +489,7 @@ class TestMultivariateResultant:
                 left=symbolic_left, right=symbolic_right, elimination_variable="x"
             )
         )
+        assert result.resultant.kind == "POLYNOMIAL"
         terms = {
             t.exponents: t.coefficient.as_fraction()
             for t in result.resultant.value.polynomial.terms
@@ -511,6 +515,7 @@ class TestMultivariateResultant:
             result = compute_multivariate_resultant(
                 MultivariateResultantRequest(left=f, right=g, elimination_variable="x")
             )
+            assert result.resultant.kind == "POLYNOMIAL"
             expected = together(Matrix(sympy_sylvester(f_expr, g_expr, x)).det())
             claimed = sum(
                 Fraction(int(t.coefficient.num), int(t.coefficient.den))

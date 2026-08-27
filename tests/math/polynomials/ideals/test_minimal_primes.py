@@ -893,6 +893,7 @@ def test_coordinate_axes_are_the_two_qq_minimal_primes() -> None:
     assert result.components == _axes_components()
 
 
+@pytest.mark.scale
 def test_transport_oversize_is_typed_before_operation_result_validation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

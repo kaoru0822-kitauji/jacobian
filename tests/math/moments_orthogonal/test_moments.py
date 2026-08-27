@@ -1,5 +1,7 @@
 """Tests for moment-functional and orthogonal-polynomial operations (#1900)."""
 
+from __future__ import annotations
+
 from fractions import Fraction
 
 import pytest
@@ -11,7 +13,6 @@ from jacobian.math.moments_orthogonal._models import (
     GaussianQuadratureRequest,
     HankelRequest,
     JacobiMatrixRequest,
-    OrthogonalPolynomialFamily,
     OrthogonalPolynomialRequest,
     RecurrenceRequest,
     ShiftedHankelRequest,
@@ -30,13 +31,16 @@ from jacobian.math.moments_orthogonal.operations import (
 )
 from jacobian.math.moments_orthogonal.values import (
     GaussianQuadratureRule,
+    MomentFunctionalPrefix,
+    OrthogonalPolynomialFamily,
+    OrthogonalPolynomialTerm,
     QuadratureNode,
 )
 
+type RationalInput = int | Fraction
 
-def _prefix(moments):
-    from jacobian.math.moments_orthogonal.values import MomentFunctionalPrefix
 
+def _prefix(moments: tuple[CanonicalRational, ...]) -> MomentFunctionalPrefix:
     return MomentFunctionalPrefix(moments=moments, variable="x")
 
 
@@ -253,11 +257,18 @@ class TestChristoffelDarboux:
         )
         # Off-diagonal evaluation K_1(2, 3) = 1/2 + (3/2)*6 = 37/4 replays.
 
-        def evaluate(matrix, xv, yv):
+        def evaluate(
+            matrix: tuple[tuple[CanonicalRational, ...], ...],
+            xv: Fraction,
+            yv: Fraction,
+        ) -> Fraction:
             return sum(
-                Fraction(int(entry.num), int(entry.den)) * xv**i * yv**j
-                for i, row in enumerate(matrix)
-                for j, entry in enumerate(row)
+                (
+                    Fraction(int(entry.num), int(entry.den)) * xv**i * yv**j
+                    for i, row in enumerate(matrix)
+                    for j, entry in enumerate(row)
+                ),
+                Fraction(0),
             )
 
         assert evaluate(result.coefficients, Fraction(2), Fraction(3)) == Fraction(
@@ -380,7 +391,7 @@ class TestJacobiMatrix:
 
 
 class TestGaussianQuadrature:
-    def _moments_rational_nodes(self) -> tuple:
+    def _moments_rational_nodes(self) -> tuple[CanonicalRational, ...]:
         """Measure with weight 7 at +-1 and 5 at +-2: mu_(2j) = 14 + 10*4^j,
         odd moments 0. mu_2/mu_0 = 54/24 = 9/4, so p_2 = x^2 - 9/4 with
         rational nodes +-3/2."""
@@ -468,11 +479,7 @@ class TestGaussianQuadrature:
 
 
 class TestQuadratureSourceBinding:
-    def _prefix(self):
-        from jacobian.math.moments_orthogonal.values import (
-            MomentFunctionalPrefix,
-        )
-
+    def _prefix(self) -> MomentFunctionalPrefix:
         moments = tuple(
             CanonicalRational(num=v, den="1") for v in ("24", "0", "54", "0", "174")
         )
@@ -492,8 +499,8 @@ class TestQuadratureSourceBinding:
             GaussianQuadratureRule.model_validate(payload)
 
     def test_node_count_matches_order(self) -> None:
-        one_node = QuadratureNode(
-            node={"num": "0", "den": "1"}, weight={"num": "1", "den": "1"}
+        one_node = QuadratureNode.model_validate(
+            {"node": {"num": "0", "den": "1"}, "weight": {"num": "1", "den": "1"}}
         )
         with pytest.raises(ValueError):
             GaussianQuadratureRule(
@@ -567,11 +574,12 @@ class TestJacobiCrossField:
 
 
 class TestFamilyResidualBasisCheck:
-    def _term(self, deg, coeffs, norm):
-        from jacobian.math.moments_orthogonal.values import (
-            OrthogonalPolynomialTerm,
-        )
-
+    def _term(
+        self,
+        deg: int,
+        coeffs: tuple[RationalInput, ...],
+        norm: RationalInput,
+    ) -> OrthogonalPolynomialTerm:
         return OrthogonalPolynomialTerm(
             degree=deg,
             coefficients=tuple(
@@ -620,11 +628,12 @@ class TestFamilyResidualBasisCheck:
 
 
 class TestDegenerateNormRecurrenceIdentities:
-    def _term(self, deg, coeffs, norm):
-        from jacobian.math.moments_orthogonal.values import (
-            OrthogonalPolynomialTerm,
-        )
-
+    def _term(
+        self,
+        deg: int,
+        coeffs: tuple[RationalInput, ...],
+        norm: RationalInput,
+    ) -> OrthogonalPolynomialTerm:
         return OrthogonalPolynomialTerm(
             degree=deg,
             coefficients=tuple(
@@ -791,11 +800,11 @@ class TestJacobiNormRatioAdmission:
         never emits h_1/h_0, so an extreme terminal norm ratio must not
         reject an otherwise fully representable result."""
 
-        def term(deg, coeffs, norm):
-            from jacobian.math.moments_orthogonal.values import (
-                OrthogonalPolynomialTerm,
-            )
-
+        def term(
+            deg: int,
+            coeffs: tuple[RationalInput, ...],
+            norm: RationalInput,
+        ) -> OrthogonalPolynomialTerm:
             return OrthogonalPolynomialTerm(
                 degree=deg,
                 coefficients=tuple(
@@ -973,7 +982,11 @@ class TestDerivedAlphaHeightAdmission:
 
         q = Fraction(10) ** 10000
 
-        def term(deg, coeffs, norm):
+        def term(
+            deg: int,
+            coeffs: tuple[RationalInput, ...],
+            norm: RationalInput,
+        ) -> OrthogonalPolynomialTerm:
             return OrthogonalPolynomialTerm(
                 degree=deg,
                 coefficients=tuple(
@@ -1309,7 +1322,7 @@ class TestNativeAdmission:
             OrthogonalPolynomialTerm,
         )
 
-        def term(deg: int, coeffs: tuple[int, ...], h: int):
+        def term(deg: int, coeffs: tuple[int, ...], h: int) -> OrthogonalPolynomialTerm:
             return OrthogonalPolynomialTerm(
                 degree=deg,
                 coefficients=tuple(

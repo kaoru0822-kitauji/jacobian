@@ -1,5 +1,7 @@
 """Tests for finite category operations."""
 
+from typing import TypedDict
+
 import pytest
 from pydantic import ValidationError
 
@@ -7,6 +9,7 @@ from jacobian.canonical import encode_strict_json
 from jacobian.math.finite_categories import (
     FiniteCategory,
     FiniteCategoryProduct,
+    MorphismSpec,
     product,
 )
 from jacobian.math.finite_categories._models import (
@@ -23,7 +26,21 @@ from jacobian.math.finite_categories._product import (
     _verify_product_claim,
 )
 
-CATEGORY = {
+
+class MorphismWire(TypedDict):
+    morphism_id: str
+    source: str
+    target: str
+
+
+class CategoryWire(TypedDict):
+    objects: list[str]
+    morphisms: list[MorphismWire]
+    identities: list[list[str]]
+    composition: list[list[str]]
+
+
+CATEGORY: CategoryWire = {
     "objects": ["A", "B"],
     "morphisms": [
         {"morphism_id": "id_A", "source": "A", "target": "A"},
@@ -39,7 +56,7 @@ CATEGORY = {
     ],
 }
 
-TERMINAL_CATEGORY = {
+TERMINAL_CATEGORY: CategoryWire = {
     "objects": ["T"],
     "morphisms": [
         {"morphism_id": "id_T", "source": "T", "target": "T"},
@@ -49,17 +66,23 @@ TERMINAL_CATEGORY = {
 }
 
 
+def _category_from_wire(**payload: object) -> FiniteCategory:
+    """Validate an intentionally raw category payload at the wire boundary."""
+
+    return FiniteCategory.model_validate(payload)
+
+
 def _discrete_category(size: int, prefix: str) -> FiniteCategory:
     objects = tuple(f"{prefix}{index}" for index in range(size))
     identities = tuple((object_id, f"id_{object_id}") for object_id in objects)
     return FiniteCategory(
         objects=objects,
         morphisms=tuple(
-            {
-                "morphism_id": identity,
-                "source": object_id,
-                "target": object_id,
-            }
+            MorphismSpec(
+                morphism_id=identity,
+                source=object_id,
+                target=object_id,
+            )
             for object_id, identity in identities
         ),
         identities=identities,
@@ -72,7 +95,8 @@ def _cyclic_group_category(order: int) -> FiniteCategory:
     return FiniteCategory(
         objects=("*",),
         morphisms=tuple(
-            {"morphism_id": item, "source": "*", "target": "*"} for item in morphism_ids
+            MorphismSpec(morphism_id=item, source="*", target="*")
+            for item in morphism_ids
         ),
         identities=(("*", "g0"),),
         composition=tuple(
@@ -96,18 +120,10 @@ def _parallel_arrow_category(count: int, label_width: int) -> FiniteCategory:
     return FiniteCategory(
         objects=(source, target),
         morphisms=(
-            {
-                "morphism_id": source_identity,
-                "source": source,
-                "target": source,
-            },
-            {
-                "morphism_id": target_identity,
-                "source": target,
-                "target": target,
-            },
+            MorphismSpec(morphism_id=source_identity, source=source, target=source),
+            MorphismSpec(morphism_id=target_identity, source=target, target=target),
             *(
-                {"morphism_id": arrow, "source": source, "target": target}
+                MorphismSpec(morphism_id=arrow, source=source, target=target)
                 for arrow in arrows
             ),
         ),
@@ -123,39 +139,39 @@ def _parallel_arrow_category(count: int, label_width: int) -> FiniteCategory:
 
 class TestProfile:
     def test_counts(self) -> None:
-        result = compute_category_profile(FiniteCategory(**CATEGORY))
+        result = compute_category_profile(FiniteCategory.model_validate(CATEGORY))
         assert result.num_objects == 2
         assert result.num_morphisms == 3
 
     def test_hom_sets_are_structural(self) -> None:
-        result = compute_category_profile(FiniteCategory(**CATEGORY))
+        result = compute_category_profile(FiniteCategory.model_validate(CATEGORY))
         assert set(result.hom_sets) == {("A", "A", 1), ("A", "B", 1), ("B", "B", 1)}
 
     def test_endomorphisms(self) -> None:
-        result = compute_category_profile(FiniteCategory(**CATEGORY))
+        result = compute_category_profile(FiniteCategory.model_validate(CATEGORY))
         endo = dict(result.endomorphisms)
         assert endo.get("A") == 1
         assert endo.get("B") == 1
 
     def test_identity_morphisms(self) -> None:
-        result = compute_category_profile(FiniteCategory(**CATEGORY))
+        result = compute_category_profile(FiniteCategory.model_validate(CATEGORY))
         ids = dict(result.identity_morphisms)
         assert ids.get("A") == "id_A"
         assert ids.get("B") == "id_B"
 
     def test_explicit_verifier_binds_profile_to_its_source(self) -> None:
-        category = FiniteCategory(**CATEGORY)
+        category = FiniteCategory.model_validate(CATEGORY)
         result = compute_category_profile(category)
 
         assert verify_category_profile_claim(category, result)
         assert not verify_category_profile_claim(
-            FiniteCategory(**TERMINAL_CATEGORY), result
+            FiniteCategory.model_validate(TERMINAL_CATEGORY), result
         )
 
 
 class TestOpposite:
     def test_reverses_morphisms(self) -> None:
-        result = compute_opposite_category(FiniteCategory(**CATEGORY))
+        result = compute_opposite_category(FiniteCategory.model_validate(CATEGORY))
         morph_map = {m.morphism_id: m for m in result.morphisms}
         assert morph_map["f"].source == "B"
         assert morph_map["f"].target == "A"
@@ -163,7 +179,7 @@ class TestOpposite:
         assert morph_map["id_A"].target == "A"
 
     def test_reverses_composition(self) -> None:
-        result = compute_opposite_category(FiniteCategory(**CATEGORY))
+        result = compute_opposite_category(FiniteCategory.model_validate(CATEGORY))
         comp = {(g, f): r for (g, f, r) in result.composition}
         # f∘f is not composable, but id_B∘f = f in the source becomes
         # f∘id_B = f in the opposite.
@@ -171,7 +187,7 @@ class TestOpposite:
         assert comp[("id_A", "f")] == "f"
 
     def test_opposite_is_a_valid_category(self) -> None:
-        result = compute_opposite_category(FiniteCategory(**CATEGORY))
+        result = compute_opposite_category(FiniteCategory.model_validate(CATEGORY))
         # The opposite value must itself satisfy the category laws.
         assert set(result.objects) == set(CATEGORY["objects"])
         assert len(result.morphisms) == 3
@@ -185,17 +201,19 @@ class TestValidation:
         assert category.objects == ()
 
     def test_extensional_row_order_is_canonicalized(self) -> None:
-        shuffled = FiniteCategory(
-            objects=tuple(reversed(CATEGORY["objects"])),
-            morphisms=tuple(reversed(CATEGORY["morphisms"])),
-            identities=tuple(reversed(CATEGORY["identities"])),
-            composition=tuple(reversed(CATEGORY["composition"])),
+        shuffled = FiniteCategory.model_validate(
+            {
+                "objects": tuple(reversed(CATEGORY["objects"])),
+                "morphisms": tuple(reversed(CATEGORY["morphisms"])),
+                "identities": tuple(reversed(CATEGORY["identities"])),
+                "composition": tuple(reversed(CATEGORY["composition"])),
+            }
         )
-        assert shuffled == FiniteCategory(**CATEGORY)
+        assert shuffled == FiniteCategory.model_validate(CATEGORY)
 
     def test_duplicate_objects(self) -> None:
         with pytest.raises(ValidationError) as error:
-            FiniteCategory(
+            _category_from_wire(
                 objects=["A", "A"], morphisms=[], identities=[], composition=[]
             )
 
@@ -206,7 +224,7 @@ class TestValidation:
 
     def test_invalid_morphism_target(self) -> None:
         with pytest.raises(ValidationError) as error:
-            FiniteCategory(
+            _category_from_wire(
                 objects=["A"],
                 morphisms=[{"morphism_id": "f", "source": "A", "target": "B"}],
                 identities=[],
@@ -221,7 +239,7 @@ class TestValidation:
     def test_missing_identity_rejected(self) -> None:
         # No designated identity for object A.
         with pytest.raises(ValidationError) as error:
-            FiniteCategory(
+            _category_from_wire(
                 objects=["A"],
                 morphisms=[{"morphism_id": "id_A", "source": "A", "target": "A"}],
                 identities=[],
@@ -232,7 +250,7 @@ class TestValidation:
 
     def test_non_endomorphism_identity_rejected(self) -> None:
         with pytest.raises(ValidationError) as error:
-            FiniteCategory(
+            _category_from_wire(
                 objects=["A", "B"],
                 morphisms=[
                     {"morphism_id": "id_A", "source": "A", "target": "A"},
@@ -256,7 +274,7 @@ class TestValidation:
     def test_incomplete_composition_rejected(self) -> None:
         # Missing the (f, id_A) composition entry.
         with pytest.raises(ValidationError) as error:
-            FiniteCategory(
+            _category_from_wire(
                 objects=["A", "B"],
                 morphisms=[
                     {"morphism_id": "id_A", "source": "A", "target": "A"},
@@ -280,7 +298,7 @@ class TestValidation:
         # id_B∘g is declared to be f (both A→B), breaking the left identity
         # law id_B∘g = g.
         with pytest.raises(ValidationError) as error:
-            FiniteCategory(
+            _category_from_wire(
                 objects=["A", "B"],
                 morphisms=[
                     {"morphism_id": "id_A", "source": "A", "target": "A"},
@@ -307,16 +325,16 @@ class TestProduct:
         left = FiniteCategory(
             objects=('A"\\é',),
             morphisms=(
-                {
-                    "morphism_id": 'id_A"\\é',
-                    "source": 'A"\\é',
-                    "target": 'A"\\é',
-                },
+                MorphismSpec(
+                    morphism_id='id_A"\\é',
+                    source='A"\\é',
+                    target='A"\\é',
+                ),
             ),
             identities=(('A"\\é', 'id_A"\\é'),),
             composition=((('id_A"\\é'), ('id_A"\\é'), ('id_A"\\é')),),
         )
-        right = FiniteCategory(**TERMINAL_CATEGORY)
+        right = FiniteCategory.model_validate(TERMINAL_CATEGORY)
 
         result = product(left, right)
 
@@ -325,8 +343,8 @@ class TestProduct:
         )
 
     def test_constructs_structural_pairs_componentwise(self) -> None:
-        left = FiniteCategory(**CATEGORY)
-        right = FiniteCategory(**TERMINAL_CATEGORY)
+        left = FiniteCategory.model_validate(CATEGORY)
+        right = FiniteCategory.model_validate(TERMINAL_CATEGORY)
 
         result = compute_category_product(
             CategoryProductRequest(left=left, right=right)
@@ -346,25 +364,31 @@ class TestProduct:
         )
 
     def test_composition_is_componentwise(self) -> None:
-        result = product(FiniteCategory(**CATEGORY), FiniteCategory(**CATEGORY))
+        result = product(
+            FiniteCategory.model_validate(CATEGORY),
+            FiniteCategory.model_validate(CATEGORY),
+        )
         composition = {(g, f): value for g, f, value in result.product.composition}
 
         assert composition[(("id_B", "id_B"), ("f", "f"))] == ("f", "f")
         assert composition[(("f", "f"), ("id_A", "id_A"))] == ("f", "f")
 
     def test_product_value_serializes_into_a_later_product_unchanged(self) -> None:
-        first = product(FiniteCategory(**CATEGORY), FiniteCategory(**TERMINAL_CATEGORY))
+        first = product(
+            FiniteCategory.model_validate(CATEGORY),
+            FiniteCategory.model_validate(TERMINAL_CATEGORY),
+        )
         serialized = first.product.model_dump(mode="json")
         restored = FiniteCategory.model_validate(serialized)
 
-        second = product(restored, FiniteCategory(**TERMINAL_CATEGORY))
+        second = product(restored, FiniteCategory.model_validate(TERMINAL_CATEGORY))
 
         assert second.left == first.product
         assert second.product.objects[0] == (("A", "T"), "T")
 
     def test_empty_factor_retains_both_sources(self) -> None:
         empty = FiniteCategory(objects=(), morphisms=(), identities=(), composition=())
-        terminal = FiniteCategory(**TERMINAL_CATEGORY)
+        terminal = FiniteCategory.model_validate(TERMINAL_CATEGORY)
 
         result = product(empty, terminal)
 
@@ -376,13 +400,13 @@ class TestProduct:
 
     def test_explicit_verifier_rejects_a_different_valid_category(self) -> None:
         expected = product(
-            FiniteCategory(**TERMINAL_CATEGORY),
-            FiniteCategory(**TERMINAL_CATEGORY),
+            FiniteCategory.model_validate(TERMINAL_CATEGORY),
+            FiniteCategory.model_validate(TERMINAL_CATEGORY),
         )
         different_terminal = FiniteCategory(
             objects=("other",),
             morphisms=(
-                {"morphism_id": "id_other", "source": "other", "target": "other"},
+                MorphismSpec(morphism_id="id_other", source="other", target="other"),
             ),
             identities=(("other", "id_other"),),
             composition=(("id_other", "id_other", "id_other"),),
@@ -400,8 +424,8 @@ class TestProduct:
 
     def test_explicit_verifier_rejects_forged_pair_projection(self) -> None:
         result = product(
-            FiniteCategory(**TERMINAL_CATEGORY),
-            FiniteCategory(**TERMINAL_CATEGORY),
+            FiniteCategory.model_validate(TERMINAL_CATEGORY),
+            FiniteCategory.model_validate(TERMINAL_CATEGORY),
         )
         payload = result.model_dump(mode="json")
         payload["object_projections"][0]["left"] = "not_T"
@@ -441,7 +465,7 @@ class TestProduct:
             compute_category_product(CategoryProductRequest(left=long, right=long))
 
     def test_identifier_nesting_is_bounded_before_another_product(self) -> None:
-        terminal = FiniteCategory(**TERMINAL_CATEGORY)
+        terminal = FiniteCategory.model_validate(TERMINAL_CATEGORY)
         category = terminal
         for _ in range(8):
             category = product(category, terminal).product

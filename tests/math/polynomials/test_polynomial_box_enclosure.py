@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from fractions import Fraction
 from itertools import product
 
@@ -30,8 +31,8 @@ from jacobian.math.polynomials.intervals._operations import (
     compute_polynomial_box_enclosure,
 )
 from jacobian.math.polynomials.intervals._tools import TOOLS
-from jacobian.math.polynomials.maps._models import RationalPolynomialMap
 from jacobian.math.polynomials.maps._operations import compute_jacobian
+from jacobian.math.polynomials.maps.values import RationalPolynomialMap
 from jacobian.math.polynomials.values import (
     MAX_POLYNOMIAL_EXPONENT,
     MAX_POLYNOMIAL_TERMS,
@@ -62,7 +63,7 @@ def _box(
 
 def _polynomial(
     variables: tuple[str, ...],
-    terms: dict[tuple[int, ...], int | Fraction],
+    terms: Mapping[tuple[int, ...], int | Fraction],
 ) -> RationalPolynomial:
     return RationalPolynomial(
         variables=variables,

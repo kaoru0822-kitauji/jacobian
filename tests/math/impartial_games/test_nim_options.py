@@ -101,9 +101,9 @@ def test_nim_position_contract_is_canonical_strict_and_bounded() -> None:
     with pytest.raises(ValidationError):
         NimPosition(heaps=(2, 1))
     with pytest.raises(ValidationError):
-        NimPosition(heaps=("1",))
+        NimPosition.model_validate({"heaps": ["1"]})
     with pytest.raises(ValidationError):
-        NimPosition(heaps=(1.0,))
+        NimPosition.model_validate({"heaps": [1.0]})
     with pytest.raises(ValidationError):
         NimPosition(heaps=(10_001,))
     with pytest.raises(ValidationError):

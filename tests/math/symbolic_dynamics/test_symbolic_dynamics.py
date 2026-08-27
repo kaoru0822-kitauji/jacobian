@@ -56,14 +56,30 @@ def test_golden_mean_artin_mazur_zeta_is_bound_to_periodic_traces() -> None:
 
     result = compute_artin_mazur_zeta(request)
 
-    assert tuple(
-        (term.coefficient.as_fraction(), term.exponents)
-        for term in result.determinant_polynomial.polynomial.terms
-    ) == ((-1, (2,)), (-1, (1,)), (1, (0,)))
-    assert tuple(
-        (term.coefficient.as_fraction(), term.exponents)
-        for term in result.zeta_function.denominator.terms
-    ) == ((1, (2,)), (1, (1,)), (-1, (0,)))
+    expected_determinant_terms: tuple[tuple[Fraction, tuple[int, ...]], ...] = (
+        (Fraction(-1), (2,)),
+        (Fraction(-1), (1,)),
+        (Fraction(1), (0,)),
+    )
+    expected_denominator_terms: tuple[tuple[Fraction, tuple[int, ...]], ...] = (
+        (Fraction(1), (2,)),
+        (Fraction(1), (1,)),
+        (Fraction(-1), (0,)),
+    )
+    assert (
+        tuple(
+            (term.coefficient.as_fraction(), term.exponents)
+            for term in result.determinant_polynomial.polynomial.terms
+        )
+        == expected_determinant_terms
+    )
+    assert (
+        tuple(
+            (term.coefficient.as_fraction(), term.exponents)
+            for term in result.zeta_function.denominator.terms
+        )
+        == expected_denominator_terms
+    )
     assert result.zeta_function.numerator.terms[0].coefficient.as_fraction() == -1
     assert tuple(row.trace_fixed_points for row in result.replay) == (
         "1",
@@ -139,7 +155,11 @@ def test_zeta_distinguishes_full_shift_cycle_and_disjoint_components() -> None:
     assert tuple(
         (term.coefficient.as_fraction(), term.exponents)
         for term in disjoint.determinant_polynomial.polynomial.terms
-    ) == ((6, (2,)), (-5, (1,)), (1, (0,)))
+    ) == (
+        (Fraction(6), (2,)),
+        (Fraction(-5), (1,)),
+        (Fraction(1), (0,)),
+    )
     assert disjoint.zeta_function.numerator.terms[0].coefficient.as_fraction() == (
         Fraction(1, 6)
     )
