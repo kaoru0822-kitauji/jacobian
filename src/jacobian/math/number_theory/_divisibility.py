@@ -115,7 +115,11 @@ DIVISIBILITY_OPERATIONS = (
     number_theory_operation(
         "integer.compute.divisor_sum",
         "Sum positive divisors",
-        "Compute the sum of every positive divisor of one positive integer.",
+        (
+            "Compute the sum of every positive divisor of one positive integer, "
+            "including the integer itself. Callers obtain the sum of proper "
+            "divisors (the aliquot sum) by subtracting the input integer."
+        ),
         PositiveIntegerRequest,
         IntegerValue,
         compute_divisor_sum,
