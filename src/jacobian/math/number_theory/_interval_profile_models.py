@@ -183,6 +183,7 @@ class IntervalProfileRequest(StrictModel):
     )
     _work_estimator: ClassVar[_WORK_ESTIMATOR] = _estimate_factor_profile_work
     _max_width: ClassVar[int | None] = MAX_INTERVAL_WIDTH
+
     @model_validator(mode="after")
     def require_ordered_interval(self) -> Self:
         if self.upper_bound < self.lower_bound:

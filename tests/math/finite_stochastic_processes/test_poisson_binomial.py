@@ -87,9 +87,7 @@ def test_native_admission_rejects_probabilities_outside_the_unit_interval() -> N
 def test_native_admission_rejects_result_digit_growth_before_execution() -> None:
     denominator = str(10**97 + 3)
     with pytest.raises(ValueError, match="exact result digit budget"):
-        poisson_binomial(
-            (CanonicalRational(num="1", den=denominator),) * 45
-        )
+        poisson_binomial((CanonicalRational(num="1", den=denominator),) * 45)
 
 
 def test_native_result_probabilities_compose_into_request() -> None:

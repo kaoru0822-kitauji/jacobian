@@ -271,6 +271,7 @@ class ContainmentProfileRequest(StrictModel):
         description="Subset order for the complete containment profile.",
     )
 
+
 class ContainmentProfileResult(StrictModel):
     """One complete fixed-order profile bound to its indexed block family."""
 
@@ -495,6 +496,7 @@ class IncidenceTradeRequest(StrictModel):
             "budgets fit; the schema ceiling is a conservative fallback."
         ),
     )
+
 
 class IncidenceTradeResult(StrictModel):
     """An exact through-order comparison bound to both indexed block families."""

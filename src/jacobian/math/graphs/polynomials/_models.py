@@ -294,6 +294,7 @@ class TreeIndependencePolynomialRequest(StrictModel):
         )
     )
 
+
 class TreeIndependencePolynomialResult(StrictModel):
     """One source-bound exact independence polynomial and its defining values.
 

@@ -57,7 +57,9 @@ def _run_multicommodity_flow_profile(
     admission once and passes the resulting reusable scan to the kernel.
     """
 
-    return _profile_result(request.flow, _require_profile_output_admission(request.flow))
+    return _profile_result(
+        request.flow, _require_profile_output_admission(request.flow)
+    )
 
 
 __all__ = ["compute_multicommodity_flow_profile"]

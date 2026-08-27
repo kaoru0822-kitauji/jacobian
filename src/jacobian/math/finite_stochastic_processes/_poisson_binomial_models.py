@@ -100,6 +100,8 @@ def _admit_probabilities(
             "probability denominators exceed the exact result digit budget of "
             f"{MAX_INTERMEDIATE_RATIONAL_DIGITS} digits"
         )
+
+
 __all__ = [
     "MAX_INPUT_RATIONAL_DIGITS",
     "MAX_INTERMEDIATE_RATIONAL_DIGITS",

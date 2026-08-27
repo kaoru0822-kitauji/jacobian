@@ -277,6 +277,7 @@ class SubsetSumResidueProfileRequest(StrictModel):
         _raw_source_shape(prepared.get("source"))
         return prepared
 
+
 class SubsetSumResidueProfileResult(StrictModel):
     """A complete exact residue profile bound to its indexed source."""
 

@@ -49,6 +49,7 @@ def compute_faces(request: FacesRequest) -> FacesResult:
         successor=tuple(successor),
     )
 
+
 def compute_euler_characteristic(
     request: EulerCharacteristicRequest,
 ) -> EulerCharacteristicResult:

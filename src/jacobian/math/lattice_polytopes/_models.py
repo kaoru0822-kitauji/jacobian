@@ -167,6 +167,7 @@ class LatticePolytopeRequest(StrictModel):
                     "vertices_dimension_mismatch",
                     "all vertices must share one dimension",
                 )
+
     def _validate_halfspaces(self) -> None:
         assert self.halfspaces is not None  # for type checkers
         if len(self.halfspaces) < 1:
@@ -210,6 +211,7 @@ class LatticePolytopeRequest(StrictModel):
                     "halfspaces_dimension_mismatch",
                     "all half-spaces must share one dimension",
                 )
+
     def dimension(self) -> int:
         """Return the ambient dimension implied by the chosen representation."""
         if self.vertices is not None:

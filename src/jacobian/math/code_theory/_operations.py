@@ -23,6 +23,7 @@ def compute_min_distance(request: LinearCodeRequest) -> MinimumDistanceResult:
         minimum_distance=dist,
     )
 
+
 def compute_weight_dist(request: LinearCodeRequest) -> WeightDistributionResult:
     weights = weight_distribution(request.generator_matrix, request.field_order)
     return WeightDistributionResult._from_kernel(

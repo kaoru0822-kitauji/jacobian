@@ -393,6 +393,7 @@ def test_measure_result_is_structural() -> None:
     with expect_validation("number_theory."):
         PeriodicCongruenceUnionMeasureResult.model_validate(bad_density)
 
+
 def test_profile_result_is_structural() -> None:
     result = _profile(
         {

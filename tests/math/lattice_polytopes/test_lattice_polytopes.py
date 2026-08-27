@@ -317,9 +317,7 @@ class TestBudgets:
     def test_bounding_box_span_bound_enforced(self) -> None:
         # A 1D interval spanning more than MAX_BOUND_SPAN integer points.
         far = str(MAX_BOUND_SPAN + 5)
-        request = LatticePolytopeRequest(
-            vertices=(_v(("0", "1")), _v((far, "1")))
-        )
+        request = LatticePolytopeRequest(vertices=(_v(("0", "1")), _v((far, "1"))))
         with pytest.raises(ValueError, match="per-axis span bound"):
             count_lattice_points(request)
 
@@ -878,9 +876,7 @@ class TestBoundedEmptyHalfspacePolytopes:
         assert enumerated.points == ()
 
     def test_unbounded_representation_still_rejected(self) -> None:
-        request = LatticePolytopeRequest(
-            halfspaces=(_hs((("1", "1"),), ("0", "1")),)
-        )
+        request = LatticePolytopeRequest(halfspaces=(_hs((("1", "1"),), ("0", "1")),))
         with pytest.raises(ValueError, match="unbounded"):
             count_lattice_points(request)
 
@@ -982,9 +978,7 @@ class TestReviewRegressions:
 class TestSecondWaveRegressions:
     def test_feasibility_probe_uses_unrestricted_coordinates(self) -> None:
         """x <= -1 is unbounded, not empty: the probe must not assume x >= 0."""
-        request = LatticePolytopeRequest(
-            halfspaces=(_hs((("-1", "1"),), ("-1", "1")),)
-        )
+        request = LatticePolytopeRequest(halfspaces=(_hs((("-1", "1"),), ("-1", "1")),))
         with pytest.raises(ValueError, match="unbounded"):
             count_lattice_points(request)
 

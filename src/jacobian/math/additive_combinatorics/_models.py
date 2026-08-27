@@ -602,6 +602,7 @@ class MultisetSumRepresentationProfileRequest(StrictModel):
         examples=[None, {"lower": "0", "upper": "10"}],
     )
 
+
 class MultisetSumRepresentationProfileResult(StrictModel):
     """Source-bound exact multiplicities for one complete sum scope.
 

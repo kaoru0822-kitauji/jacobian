@@ -335,13 +335,15 @@ def test_request_just_above_dp_cell_boundary_is_rejected() -> None:
     item_count = 201
     modulus = MAX_RESIDUE_PROFILE_DP_CELLS // 200
     with pytest.raises(ValueError):
-        compute_subset_sum_residue_profile(SubsetSumResidueProfileRequest.model_validate(
-            {
-                "source": {"items": ["0"] * item_count},
-                "modulus": modulus,
-                "include_empty_subset": True,
-            }
-        ))
+        compute_subset_sum_residue_profile(
+            SubsetSumResidueProfileRequest.model_validate(
+                {
+                    "source": {"items": ["0"] * item_count},
+                    "modulus": modulus,
+                    "include_empty_subset": True,
+                }
+            )
+        )
 
 
 def test_modulus_boundary_and_schema_are_explicit() -> None:
@@ -377,14 +379,16 @@ def test_modulus_boundary_and_schema_are_explicit() -> None:
 
 def test_witness_and_result_output_budgets_reject_before_work() -> None:
     with pytest.raises(ValueError):
-        compute_subset_sum_residue_profile(SubsetSumResidueProfileRequest.model_validate(
-            {
-                "source": {"items": ["0"] * 251},
-                "modulus": 1000,
-                "include_empty_subset": False,
-                "include_witnesses": True,
-            }
-        ))
+        compute_subset_sum_residue_profile(
+            SubsetSumResidueProfileRequest.model_validate(
+                {
+                    "source": {"items": ["0"] * 251},
+                    "modulus": 1000,
+                    "include_empty_subset": False,
+                    "include_witnesses": True,
+                }
+            )
+        )
 
 
 def test_result_bounds_raw_arrays_before_source_binding_replay() -> None:
@@ -426,13 +430,15 @@ def test_result_bounds_raw_arrays_before_source_binding_replay() -> None:
 
     widest = "1" + "0" * (MAX_RESIDUE_PROFILE_INPUT_INTEGER_DIGITS - 1)
     with pytest.raises(ValueError):
-        compute_subset_sum_residue_profile(SubsetSumResidueProfileRequest.model_validate(
-            {
-                "source": {"items": [widest] * 128},
-                "modulus": 1,
-                "include_empty_subset": False,
-            }
-        ))
+        compute_subset_sum_residue_profile(
+            SubsetSumResidueProfileRequest.model_validate(
+                {
+                    "source": {"items": [widest] * 128},
+                    "modulus": 1,
+                    "include_empty_subset": False,
+                }
+            )
+        )
 
 
 def test_shared_values_reject_ambiguous_index_subsets() -> None:

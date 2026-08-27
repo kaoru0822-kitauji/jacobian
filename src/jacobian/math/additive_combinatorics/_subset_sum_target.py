@@ -249,6 +249,7 @@ class SubsetSumTargetRequest(StrictModel):
             )
         return prepared
 
+
 class SubsetSumTargetResult(StrictModel):
     """An exact source-bound target decision with its canonical witness."""
 

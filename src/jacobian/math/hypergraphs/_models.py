@@ -1007,6 +1007,8 @@ class InducedTypeProfileRequest(StrictModel):
             "k-subsets."
         ),
     )
+
+
 def _strict_json_array_size(item_sizes: tuple[int, ...]) -> int:
     """Return the exact canonical JSON size of an array from item sizes."""
 
@@ -1225,6 +1227,7 @@ class MinimumTransversalRequest(StrictModel):
             "requires_nonempty_hyperedges": True,
         },
     )
+
 
 class MinimumTransversalResult(StrictModel):
     """An exact minimum-cardinality transversal of a finite hypergraph.

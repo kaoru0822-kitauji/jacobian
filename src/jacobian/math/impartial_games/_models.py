@@ -255,6 +255,7 @@ class NimOptionsRequest(StrictModel):
         )
     )
 
+
 class NimOptionsResult(NimOptionsRequest):
     """Every distinct legal one-heap reduction, in option-position order."""
 

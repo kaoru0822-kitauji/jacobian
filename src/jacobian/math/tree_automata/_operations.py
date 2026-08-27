@@ -40,6 +40,7 @@ def compute_tree_run(request: TreeRunRequest) -> TreeRunResult:
         node_count=validate_ranked_tree(request.automaton, request.tree),
     )
 
+
 def compute_accepted_tree_count(
     request: AcceptedTreeCountRequest,
 ) -> AcceptedTreeCountResult:

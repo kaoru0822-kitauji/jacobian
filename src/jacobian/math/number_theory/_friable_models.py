@@ -121,6 +121,7 @@ class FriableCountRequest(StrictModel):
         examples=["5"],
     )
 
+
 class FriableCountResult(StrictModel):
     """An exact friable count bound to its complete source pair."""
 

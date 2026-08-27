@@ -560,4 +560,10 @@ class TestGreenRelations:
         sg = _finite_semigroup(Z3)
         result = compute_green_relations(GreenRelationsRequest(semigroup=sg))
         assert result.semigroup == sg
-        assert len(result.L) == len(result.R) == len(result.H) == len(result.D) == len(result.J)
+        assert (
+            len(result.L)
+            == len(result.R)
+            == len(result.H)
+            == len(result.D)
+            == len(result.J)
+        )

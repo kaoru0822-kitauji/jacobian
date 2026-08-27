@@ -183,9 +183,7 @@ def test_partial_trace_rejects_unknown_and_repeated_factor_labels() -> None:
         SubsystemPartialTraceRequest(matrix=source, traced_factor_labels=("q", "q"))
 
 
-def test_partial_trace_result_round_trips_structurally() -> (
-    None
-):
+def test_partial_trace_result_round_trips_structurally() -> None:
     q = MatrixSubsystem(label="q", dimension=2)
     base = compute_partial_trace(
         SubsystemPartialTraceRequest(

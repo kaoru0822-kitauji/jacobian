@@ -247,11 +247,13 @@ def test_request_admits_large_low_state_and_exact_digit_and_state_boundaries() -
 
 def test_request_rejects_immediately_above_each_search_bound() -> None:
     with pytest.raises(ValueError):
-        _operation().run(SubsetSumTargetRequest(
-            source={"items": ["1" + "0" * 256]},  # type: ignore[arg-type]
-            target="0",
-            allow_empty_subset=False,
-        ))
+        _operation().run(
+            SubsetSumTargetRequest(
+                source={"items": ["1" + "0" * 256]},  # type: ignore[arg-type]
+                target="0",
+                allow_empty_subset=False,
+            )
+        )
     with pytest.raises(ValidationError):
         SubsetSumTargetRequest(
             source={"items": ["-" + "9" * 256]},  # type: ignore[arg-type]
@@ -259,11 +261,13 @@ def test_request_rejects_immediately_above_each_search_bound() -> None:
             allow_empty_subset=True,
         )
     with pytest.raises(ValueError):
-        _operation().run(SubsetSumTargetRequest(
-            source={"items": ["-" + "9" * 256]},  # type: ignore[arg-type]
-            target="9" * 263,
-            allow_empty_subset=True,
-        ))
+        _operation().run(
+            SubsetSumTargetRequest(
+                source={"items": ["-" + "9" * 256]},  # type: ignore[arg-type]
+                target="9" * 263,
+                allow_empty_subset=True,
+            )
+        )
 
     widest = "9" * 256
     above_wire_count = (4 * 1024 * 1024 - 64) // (len(widest) + 4) + 1
@@ -287,13 +291,15 @@ def test_request_rejects_immediately_above_each_search_bound() -> None:
     # (65,535, 131,072) unattainable: target 100000 exhausts the scan and
     # pushes 2**17 reachable states past the 65,536-state bound.
     with pytest.raises(ValueError):
-        _operation().run(SubsetSumTargetRequest(
-            source={  # type: ignore[arg-type]
-                "items": [str(1 << exponent) for exponent in range(16)] + ["131072"]
-            },
-            target="100000",
-            allow_empty_subset=True,
-        ))
+        _operation().run(
+            SubsetSumTargetRequest(
+                source={  # type: ignore[arg-type]
+                    "items": [str(1 << exponent) for exponent in range(16)] + ["131072"]
+                },
+                target="100000",
+                allow_empty_subset=True,
+            )
+        )
 
     with pytest.raises(ValueError):
         _operation().run(_request((2,) * 1000, 3, allow_empty_subset=True))
@@ -568,13 +574,15 @@ def test_resolving_scan_is_charged_against_the_transition_bound() -> None:
     assert replayed == admitted
 
     with pytest.raises(ValueError):
-        _operation().run(SubsetSumTargetRequest(
-            source={  # type: ignore[arg-type]
-                "items": [str(value) for value in powers + (0,) * 6 + (1,)]
-            },
-            target=target,
-            allow_empty_subset=True,
-        ))
+        _operation().run(
+            SubsetSumTargetRequest(
+                source={  # type: ignore[arg-type]
+                    "items": [str(value) for value in powers + (0,) * 6 + (1,)]
+                },
+                target=target,
+                allow_empty_subset=True,
+            )
+        )
 
 
 def test_target_sources_compose_across_indexed_sequence_operations() -> None:

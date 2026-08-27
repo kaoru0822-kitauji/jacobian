@@ -396,7 +396,9 @@ def compute_divisor_sum_profile(
     request: DivisorSumProfileRequest,
 ) -> DivisorSumProfileResult:
     """Compute sigma(n), the divisor sum, for every n in [L, U]."""
-    admission = _admit_interval(_require_request_type(request, DivisorSumProfileRequest))
+    admission = _admit_interval(
+        _require_request_type(request, DivisorSumProfileRequest)
+    )
     lo, hi = admission.lower_bound, admission.upper_bound
     _, _, _, _, divisor_sums = _segmented_factor_profile_data(lo, hi)
     rows = tuple(

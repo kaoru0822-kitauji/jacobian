@@ -78,6 +78,7 @@ class TestCheck:
         assert result.status == "PRIMITIVE_POSITIVE_DEFINITE"
         assert result.form == _positive_form(1, 0, 1)
 
+
 class TestEvaluate:
     def test_evaluate_at_origin(self) -> None:
         result = compute_evaluate(
@@ -440,6 +441,7 @@ class TestRepresentations:
             exc_info, "integral_binary_quadratic_form.representation_candidate_budget"
         )
 
+
 class TestCanonicalFormComposition:
     def test_kernel_results_compose_as_canonical_values(self) -> None:
         form = _positive_form(5, 3, 1)
@@ -462,7 +464,11 @@ class TestCanonicalFormComposition:
 
         assert checked.form == form
         assert evaluated.value == 5
-        assert (reduced.reduced_form.a, reduced.reduced_form.b, reduced.reduced_form.c) == (
+        assert (
+            reduced.reduced_form.a,
+            reduced.reduced_form.b,
+            reduced.reduced_form.c,
+        ) == (
             1,
             1,
             3,

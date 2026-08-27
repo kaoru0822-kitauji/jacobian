@@ -122,6 +122,7 @@ def compute_power_profile(request: PowerProfileRequest) -> PowerProfileResult:
         request, powers, index, period, idempotent, cyclic
     )
 
+
 def compute_generated_subsemigroup(
     request: GeneratedSubsemigroupRequest,
 ) -> GeneratedSubsemigroupResult:

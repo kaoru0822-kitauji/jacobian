@@ -284,6 +284,7 @@ class SidonExtensionProfileRequest(StrictModel):
             "admitted from the exact work and result-size budgets."
         )
     )
+
     @model_validator(mode="after")
     def require_unique_and_disjoint(self) -> Self:
         _validate_source_and_candidates(

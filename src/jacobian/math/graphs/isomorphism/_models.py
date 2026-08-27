@@ -132,6 +132,7 @@ class ColoredGraphCanonicalizationRequest(StrictModel):
         )
     )
 
+
 class GraphRelabelingPair(StrictModel):
     """One source vertex and its canonical vertex label."""
 

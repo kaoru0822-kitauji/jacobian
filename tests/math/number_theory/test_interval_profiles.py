@@ -129,11 +129,19 @@ class TestSquarefreeProfile:
 
         assert squarefree.width() == sparse_width
         assert prime_gap.width() == sparse_width
-        assert _admit_interval(squarefree).estimated_result_bytes <= MAX_PROFILE_RESULT_BYTES
-        assert _admit_interval(prime_gap).estimated_result_bytes <= MAX_PROFILE_RESULT_BYTES
+        assert (
+            _admit_interval(squarefree).estimated_result_bytes
+            <= MAX_PROFILE_RESULT_BYTES
+        )
+        assert (
+            _admit_interval(prime_gap).estimated_result_bytes
+            <= MAX_PROFILE_RESULT_BYTES
+        )
         with pytest.raises(ValueError, match="canonical output budget"):
             _admit_interval(
-                DivisorCountProfileRequest(lower_bound=1, upper_bound=MAX_INTERVAL_WIDTH)
+                DivisorCountProfileRequest(
+                    lower_bound=1, upper_bound=MAX_INTERVAL_WIDTH
+                )
             )
         with pytest.raises(ValueError, match="canonical output budget"):
             _admit_interval(
@@ -162,7 +170,9 @@ class TestSquarefreeProfile:
             upper_bound=10_000_000,
         )
 
-        assert _admit_interval(request).estimated_result_bytes <= MAX_PROFILE_RESULT_BYTES
+        assert (
+            _admit_interval(request).estimated_result_bytes <= MAX_PROFILE_RESULT_BYTES
+        )
 
     def test_prime_gap_work_charges_successor_search(self) -> None:
         request = PrimeGapProfileRequest(lower_bound=1, upper_bound=1_000_001)
