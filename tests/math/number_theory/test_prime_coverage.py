@@ -1,5 +1,8 @@
 """Tests for prime-coverage and binomial-valuation profiles."""
 
+import pytest
+from pydantic import ValidationError
+
 from jacobian.math.number_theory._binomial_valuation_models import (
     BinomialValuationProfileRequest,
 )
@@ -7,6 +10,7 @@ from jacobian.math.number_theory._binomial_valuation_operations import (
     compute_binomial_valuation_profile,
 )
 from jacobian.math.number_theory._prime_coverage_models import (
+    MAX_COVERAGE_WIDTH,
     PrimeCoverageProfileRequest,
 )
 from jacobian.math.number_theory._prime_coverage_operations import (
@@ -32,6 +36,19 @@ def test_prime_coverage_primes() -> None:
 
         if isprime(row.n):
             assert row.distinct_prime_count == 1
+
+
+def test_prime_coverage_rejects_result_over_canonical_output_budget() -> None:
+    with pytest.raises(ValueError, match="canonical output budget"):
+        PrimeCoverageProfileRequest(
+            lower_bound=1,
+            upper_bound=MAX_COVERAGE_WIDTH - 1,
+        )
+
+
+def test_binomial_valuation_rejects_composite_base() -> None:
+    with pytest.raises(ValidationError, match="prime must be a prime number"):
+        BinomialValuationProfileRequest(n=4, prime=4)
 
 
 def test_binomial_valuation_basic() -> None:

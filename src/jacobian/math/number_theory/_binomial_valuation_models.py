@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from pydantic import Field
+from typing import Self
+
+from pydantic import Field, model_validator
 
 from jacobian._models import StrictModel
 
@@ -13,12 +15,14 @@ class BinomialValuationProfileRequest(StrictModel):
     n: int = Field(ge=0, le=1000)
     prime: int = Field(ge=2, le=10000)
 
-    def model_post_validate(self) -> None:
+    @model_validator(mode="after")
+    def require_prime(self) -> Self:
         """Validate that prime is actually prime."""
         from sympy import isprime
 
         if not isprime(self.prime):
             raise ValueError("prime must be a prime number")
+        return self
 
 
 class BinomialValuationProfileRow(StrictModel):
