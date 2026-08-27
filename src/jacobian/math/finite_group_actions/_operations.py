@@ -300,88 +300,10 @@ def compute_polya_inventory(request: PolyaInventoryRequest) -> PolyaInventoryRes
     )
 
 
-def verify_subset_canonicalization_result(
-    result: SubsetCanonicalizationResult,
-) -> bool:
-    """Replay one independently supplied subset-canonicalization claim."""
-    try:
-        canonical, transporter, orbit_size, stabilizer_size = (
-            _subset_canonicalization_data(
-                result.source_subset.action, result.source_subset.positions
-            )
-        )
-    except ValueError:
-        return False
-    return (
-        result.canonical_subset.positions == canonical
-        and result.transporter == transporter
-        and result.orbit_size == orbit_size
-        and result.stabilizer_size == stabilizer_size
-    )
-
-
-def verify_element_cycles_result(result: ElementCyclesResult) -> bool:
-    """Replay one independently supplied element-cycle claim."""
-    try:
-        expected = _element_cycles_data(result.action, result.element)
-    except ValueError:
-        return False
-    return expected == (
-        result.permutation,
-        result.cycles,
-        result.cycle_lengths,
-        result.cycle_type,
-        result.fixed_points,
-        result.support,
-    )
-
-
-def verify_cycle_index_result(result: CycleIndexResult) -> bool:
-    """Replay one independently supplied cycle-index claim."""
-    try:
-        return _cycle_index_data(result.action) == (
-            result.group_order,
-            result.degree,
-            result.cycle_type_counts,
-        )
-    except ValueError:
-        return False
-
-
-def verify_burnside_count_result(result: BurnsideCountResult) -> bool:
-    """Replay one independently supplied Burnside-count claim."""
-    try:
-        group_order, contributions, orbit_count = _burnside_data(result.action)
-    except ValueError:
-        return False
-    return (
-        result.group_order == group_order
-        and result.fixed_point_contributions == contributions
-        and result.fixed_point_sum == sum(contributions)
-        and result.orbit_count == orbit_count
-    )
-
-
-def verify_polya_inventory_result(result: PolyaInventoryResult) -> bool:
-    """Replay one independently supplied Pólya inventory claim."""
-    try:
-        return _polya_inventory_data(result.action, result.colors) == (
-            result.degree,
-            result.terms,
-        )
-    except ValueError:
-        return False
-
-
 __all__ = [
     "compute_burnside_count",
     "compute_cycle_index",
     "compute_element_cycles",
     "compute_polya_inventory",
     "compute_subset_canonicalization",
-    "verify_burnside_count_result",
-    "verify_cycle_index_result",
-    "verify_element_cycles_result",
-    "verify_polya_inventory_result",
-    "verify_subset_canonicalization_result",
 ]

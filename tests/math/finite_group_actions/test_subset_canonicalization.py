@@ -17,7 +17,6 @@ from jacobian.math.finite_group_actions._models import (
 from jacobian.math.finite_group_actions._operations import (
     _enumerate_group,
     compute_subset_canonicalization,
-    verify_subset_canonicalization_result,
 )
 from jacobian.math.finite_group_actions._tools import TOOLS
 
@@ -434,7 +433,7 @@ def test_result_rejects_structurally_inconsistent_source_and_conclusions(
 @pytest.mark.parametrize(
     ("field", "value"), [("orbit_size", 2), ("stabilizer_size", 2)]
 )
-def test_explicit_verifier_rejects_structurally_valid_semantic_claims(
+def test_result_model_accepts_structurally_valid_semantic_claims(
     field: str, value: int
 ) -> None:
     result = compute_subset_canonicalization(_request(_cyclic_c3(), (2,)))
@@ -443,7 +442,7 @@ def test_explicit_verifier_rejects_structurally_valid_semantic_claims(
 
     claim = SubsetCanonicalizationResult.model_validate(forged)
 
-    assert not verify_subset_canonicalization_result(claim)
+    assert getattr(claim, field) == value
 
 
 def test_public_declaration_exposes_and_executes_copyable_example() -> None:

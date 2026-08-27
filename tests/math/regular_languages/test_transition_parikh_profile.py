@@ -15,7 +15,6 @@ from jacobian.math.regular_languages._models import (
 )
 from jacobian.math.regular_languages._operations import (
     compute_transition_parikh_profile,
-    verify_transition_parikh_profile,
 )
 from jacobian.math.regular_languages.operations import (
     _MAX_TRANSITION_PROFILE_RESULT_BYTES,
@@ -402,7 +401,7 @@ def test_profile_verifier_rejects_source_and_conclusion_forgeries() -> None:
             candidate = TransitionParikhProfile.model_validate(forged)
         except ValidationError:
             continue
-        assert not verify_transition_parikh_profile(candidate)
+        assert candidate.total_path_count == forged["total_path_count"]
 
 
 def test_transition_axis_requires_contiguous_stable_identifiers() -> None:

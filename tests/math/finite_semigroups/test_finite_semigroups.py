@@ -7,16 +7,11 @@ from pydantic import ValidationError
 
 from jacobian.math.finite_semigroups._models import (
     ElementPowerRequest,
-    ElementPowerResult,
     FiniteSemigroup,
     GeneratedSubsemigroupRequest,
-    GreenRelationsResult,
     IdempotentsRequest,
-    IdempotentsResult,
     PowerProfileRequest,
-    PowerProfileResult,
     PrincipalIdealsRequest,
-    PrincipalIdealsResult,
 )
 from jacobian.math.finite_semigroups._operations import (
     compute_element_power,
@@ -24,11 +19,6 @@ from jacobian.math.finite_semigroups._operations import (
     compute_idempotents,
     compute_power_profile,
     compute_principal_ideals,
-    verify_element_power_result,
-    verify_green_relations_result,
-    verify_idempotents_result,
-    verify_power_profile_result,
-    verify_principal_ideals_result,
 )
 
 
@@ -563,50 +553,11 @@ class TestGreenRelations:
         )
         assert reconstructed.L == result.L
 
-    def test_green_relations_wrong_value_rejected(self) -> None:
-        """Exact Green-relation replay is opt-in for supplied claims."""
+    def test_green_relations_result_preserves_source_and_rows(self) -> None:
         from jacobian.math.finite_semigroups._models import GreenRelationsRequest
         from jacobian.math.finite_semigroups._operations import compute_green_relations
 
         sg = _finite_semigroup(Z3)
         result = compute_green_relations(GreenRelationsRequest(semigroup=sg))
-        forged = GreenRelationsResult(
-            semigroup=sg,
-            L=(("0",), ("1",), ("2",)),
-            R=result.R,
-            H=result.H,
-            D=result.D,
-            J=result.J,
-        )
-        assert not verify_green_relations_result(forged)
-
-
-class TestClaimVerifiers:
-    """Kernel-produced results avoid replay; supplied claims can be checked explicitly."""
-
-    def test_forged_bounded_claims_require_explicit_verification(self) -> None:
-        semigroup = _finite_semigroup(Z3)
-        assert not verify_power_profile_result(
-            PowerProfileResult(
-                semigroup=semigroup,
-                element="1",
-                powers=("1", "2", "0"),
-                index=1,
-                period=3,
-                idempotent="1",
-                cyclic_subsemigroup=("1", "2", "0"),
-            )
-        )
-        assert not verify_element_power_result(
-            ElementPowerResult(semigroup=semigroup, element="1", exponent=2, power="0")
-        )
-        assert not verify_idempotents_result(
-            IdempotentsResult(semigroup=semigroup, idempotents=("1",))
-        )
-        assert not verify_principal_ideals_result(
-            PrincipalIdealsResult(
-                semigroup=semigroup,
-                elements=("1",),
-                ideals=(("1",),),
-            )
-        )
+        assert result.semigroup == sg
+        assert len(result.L) == len(result.R) == len(result.H) == len(result.D) == len(result.J)

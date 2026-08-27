@@ -146,10 +146,9 @@ class ActionBoundSubset(StrictModel):
 class SubsetCanonicalizationRequest(StrictModel):
     """Request a canonical image of an action-bound subset under its action.
 
-    The subset carries the action giving its positions meaning, so a dumped
-    canonical result replays into this request as one unchanged canonical
-    value.  The generated group must have order at most 10000; validation
-    establishes that bound with SymPy's Schreier--Sims order computation
+    The subset carries the action giving its positions meaning. The generated
+    group must have order at most 10000; validation establishes that bound with
+    SymPy's Schreier--Sims order computation
     before the kernel enumerates any group elements.
     """
 
@@ -179,8 +178,7 @@ class SubsetCanonicalizationResult(StrictModel):
     action's domain.  The canonical image is the lexicographically least
     transported position tuple.  ``transporter`` is the lexicographically
     least array-form group element sending ``source_subset`` to
-    ``canonical_subset``.  Deserialization checks their local structure only;
-    exact group replay belongs to the explicit owner verifier.
+    ``canonical_subset``. Deserialization checks their local structure only.
     """
 
     source_subset: ActionBoundSubset = Field(

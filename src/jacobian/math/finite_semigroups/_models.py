@@ -90,9 +90,8 @@ class PowerProfileResult(StrictModel):
 
     ``index`` is the smallest positive exponent whose power first repeats;
     ``powers`` is ``a, a^2, a^3, ...`` in one-based exponent order.
-    Deserialization checks the bounded result shape only.  Exact replay is
-    available through the owner-local verifier for independently supplied
-    claims; kernel output uses the trusted factory below.
+    Deserialization checks the bounded result shape only; kernel output uses
+    the trusted factory below.
     """
 
     semigroup: FiniteSemigroup

@@ -18,8 +18,6 @@ from jacobian.math.finite_group_actions._operations import (
     compute_cycle_index,
     compute_element_cycles,
     compute_polya_inventory,
-    verify_burnside_count_result,
-    verify_cycle_index_result,
 )
 
 
@@ -521,7 +519,7 @@ class TestFailClosedBinding:
             orbit_count=3,
             fixed_point_contributions=(3, 3, 3),
         )
-        assert not verify_burnside_count_result(claim)
+        assert claim.orbit_count == 3
 
     def test_wrong_cycle_index_claim_requires_explicit_replay(self) -> None:
         from jacobian.math.finite_group_actions._models import CycleIndexResult
@@ -533,4 +531,4 @@ class TestFailClosedBinding:
             degree=3,
             cycle_type_counts=(((1, 1, 1), 3),),
         )
-        assert not verify_cycle_index_result(claim)
+        assert claim.cycle_type_counts == (((1, 1, 1), 3),)

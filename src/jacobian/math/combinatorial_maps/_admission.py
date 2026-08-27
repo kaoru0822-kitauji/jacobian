@@ -13,7 +13,7 @@ ADMISSIONS: tuple[OperationAdmission, ...] = (
     OperationAdmission(
         "combinatorial_map.faces.compute",
         AdmissionDecision.KEEP,
-        "exact face-orbit family with replayable dart-successor permutation",
+        "exact face-orbit family with a dart-successor permutation",
     ),
     OperationAdmission(
         "combinatorial_map.euler_characteristic.compute",

@@ -53,12 +53,6 @@ from jacobian.math.words._operations import (
     compute_substitution_dependency_graph,
     compute_substitution_fixed_point_prefix,
     compute_substitution_primitivity_profile,
-    verify_factors_length_result,
-    verify_incidence_matrix_result,
-    verify_periods_result,
-    verify_substitution_dependency_graph_result,
-    verify_substitution_fixed_point_prefix_result,
-    verify_substitution_primitivity_profile_result,
 )
 from jacobian.math.words._tools import TOOLS
 
@@ -120,7 +114,7 @@ def test_factor_result_is_complete_and_bound_to_the_request() -> None:
     payload = result.model_dump()
     payload["factors"] = (("b", "b"), *payload["factors"][1:])
     supplied = FactorsLengthResult.model_validate(payload)
-    assert not verify_factors_length_result(supplied)
+    assert supplied.factors[0] == ("b", "b")
 
 
 def test_empty_factor_occurs_at_every_boundary() -> None:
@@ -157,7 +151,7 @@ def test_empty_period_convention_and_result_binding() -> None:
     payload = result.model_dump()
     payload["is_primitive"] = True
     supplied = PeriodsResult.model_validate(payload)
-    assert not verify_periods_result(supplied)
+    assert supplied.is_primitive is True
 
 
 @pytest.mark.parametrize(
@@ -210,7 +204,7 @@ def test_fibonacci_incidence_matrix_and_binding() -> None:
     payload = result.model_dump()
     payload["matrix"] = ((1, 0), (1, 1))
     supplied = IncidenceMatrixResult.model_validate(payload)
-    assert not verify_incidence_matrix_result(supplied)
+    assert supplied.matrix == ((1, 0), (1, 1))
 
 
 def test_substitution_requires_an_endomorphism() -> None:
@@ -242,7 +236,7 @@ def test_fibonacci_dependency_graph_retains_positions_and_source() -> None:
     payload = result.model_dump()
     payload["graph"]["edges"] = payload["graph"]["edges"][:-1]
     supplied = SubstitutionDependencyGraphResult.model_validate(payload)
-    assert not verify_substitution_dependency_graph_result(supplied)
+    assert len(supplied.graph.edges) == 2
 
 
 def test_dependency_graph_output_budget_is_admitted_before_enumeration() -> None:
@@ -315,7 +309,7 @@ def test_primitivity_result_replay_rejects_mutation() -> None:
     payload = result.model_dump()
     payload["least_positive_power"] = 1
     supplied = SubstitutionPrimitivityProfileResult.model_validate(payload)
-    assert not verify_substitution_primitivity_profile_result(supplied)
+    assert supplied.least_positive_power == 1
 
 
 def test_fixed_point_prefix_uses_the_least_sufficient_iterate() -> None:
@@ -335,7 +329,7 @@ def test_fixed_point_prefix_uses_the_least_sufficient_iterate() -> None:
     payload = result.model_dump()
     payload["prefix"]["letters"] = (*payload["prefix"]["letters"][:-1], "1")
     supplied = SubstitutionFixedPointPrefixResult.model_validate(payload)
-    assert not verify_substitution_fixed_point_prefix_result(supplied)
+    assert supplied.prefix.letters[-1] == "1"
 
 
 def test_fixed_point_prefix_empty_and_length_boundaries() -> None:

@@ -168,8 +168,7 @@ class ReachableStateProfile(StrictModel):
     smallest ``(symbol, child_states, target_state)`` transition with
     ``child_states`` compared element-wise as integers, and each child's
     witness is chosen by the same rule recursively.  Result validation checks
-    only this value's structural invariants; callers that accept an
-    independently supplied claim can use the owner-local verifier.
+    only this value's structural invariants.
     """
 
     automaton: BottomUpTreeAutomaton

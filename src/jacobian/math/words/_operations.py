@@ -87,92 +87,6 @@ def compute_substitution_fixed_point_prefix(
     )
 
 
-def verify_factors_length_result(result: FactorsLengthResult) -> bool:
-    """Check one independently supplied complete factor enumeration."""
-
-    expected = factors_of_length(result.word, result.factor_length)
-    return (
-        result.factors,
-        result.occurrences,
-        result.multiplicities,
-        result.first_occurrence,
-        result.distinct_count,
-    ) == (
-        expected.factors,
-        expected.occurrences,
-        tuple(len(indices) for indices in expected.occurrences),
-        tuple(indices[0] for indices in expected.occurrences),
-        len(expected.factors),
-    )
-
-
-def verify_periods_result(result: PeriodsResult) -> bool:
-    """Check one independently supplied complete period profile."""
-
-    expected = periods(result.word)
-    return (result.periods, result.least_period, result.is_primitive) == (
-        expected.periods,
-        expected.least_period,
-        expected.primitive,
-    )
-
-
-def verify_incidence_matrix_result(result: IncidenceMatrixResult) -> bool:
-    """Check one independently supplied incidence matrix."""
-
-    return result.matrix == incidence_matrix(result.morphism)
-
-
-def verify_substitution_dependency_graph_result(
-    result: SubstitutionDependencyGraphResult,
-) -> bool:
-    """Check one independently supplied complete dependency graph."""
-
-    return result.graph == substitution_dependency_graph(result.substitution)
-
-
-def verify_substitution_primitivity_profile_result(
-    result: SubstitutionPrimitivityProfileResult,
-) -> bool:
-    """Check one independently supplied bounded primitivity profile."""
-
-    expected = substitution_primitivity_profile(result.dependency_graph)
-    return (
-        result.strongly_connected_components,
-        result.irreducible,
-        result.aperiodic,
-        result.primitive,
-        result.least_positive_power,
-        result.exponent_upper_bound,
-        result.obstruction,
-    ) == (
-        expected.strongly_connected_components,
-        expected.irreducible,
-        expected.aperiodic,
-        expected.primitive,
-        expected.least_positive_power,
-        expected.exponent_upper_bound,
-        expected.obstruction,
-    )
-
-
-def verify_substitution_fixed_point_prefix_result(
-    result: SubstitutionFixedPointPrefixResult,
-) -> bool:
-    """Check one independently supplied prefix within the admitted replay envelope."""
-
-    analysis = fixed_point_prefix(result.source, result.prefix_length)
-    return (
-        result.prefix,
-        result.least_iterate_depth,
-        result.retained_prefix_lengths,
-    ) == (
-        analysis.prefix,
-        analysis.least_iterate_depth,
-        analysis.retained_prefix_lengths,
-    )
-
-
 __all__ = [
     "compute_factors_length",
     "compute_incidence_matrix",
@@ -180,10 +94,4 @@ __all__ = [
     "compute_substitution_dependency_graph",
     "compute_substitution_fixed_point_prefix",
     "compute_substitution_primitivity_profile",
-    "verify_factors_length_result",
-    "verify_incidence_matrix_result",
-    "verify_periods_result",
-    "verify_substitution_dependency_graph_result",
-    "verify_substitution_fixed_point_prefix_result",
-    "verify_substitution_primitivity_profile_result",
 ]

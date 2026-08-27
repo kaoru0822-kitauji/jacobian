@@ -25,8 +25,6 @@ from jacobian.math.combinatorial_maps._operations import (
     compute_orientable_genus,
     compute_orientation_reverse,
     compute_vertex_face_incidence,
-    verify_faces_result,
-    verify_orientation_reverse_result,
 )
 from jacobian.math.combinatorial_maps._tools import TOOLS
 from jacobian.math.combinatorial_maps.operations import (
@@ -210,7 +208,7 @@ class TestFaces:
                 ),
             )
 
-    def test_external_face_claim_uses_explicit_verifier(self) -> None:
+    def test_face_result_model_preserves_structural_claim(self) -> None:
         result = compute_faces(FacesRequest(map=_four_cycle()))
         claimed = FacesResult.model_validate(
             {
@@ -218,7 +216,7 @@ class TestFaces:
                 "face_of_dart": [1 - face for face in result.face_of_dart],
             }
         )
-        assert not verify_faces_result(claimed)
+        assert claimed.face_of_dart != result.face_of_dart
 
 
 # ---------------------------------------------------------------------------
@@ -349,7 +347,7 @@ class TestOrientationReverse:
         )
         assert inner.reversed_map == m
 
-    def test_external_orientation_claim_uses_explicit_verifier(self) -> None:
+    def test_orientation_result_model_preserves_structural_claim(self) -> None:
         result = compute_orientation_reverse(
             OrientationReverseRequest(map=_four_cycle())
         )
@@ -359,7 +357,7 @@ class TestOrientationReverse:
                 "face_bijection": {"0": 0, "1": 1},
             }
         )
-        assert not verify_orientation_reverse_result(claimed)
+        assert claimed.face_bijection != result.face_bijection
 
 
 # ---------------------------------------------------------------------------

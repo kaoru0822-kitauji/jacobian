@@ -21,23 +21,15 @@ from jacobian.math.finite_topology import (
 )
 from jacobian.math.finite_topology._models import (
     BeatPointsRequest,
-    BeatPointsResult,
     ConnectedComponentsRequest,
-    ConnectedComponentsResult,
     ContinuityRequest,
-    ContinuityResult,
     SpecializationPreorderRequest,
-    SpecializationPreorderResult,
 )
 from jacobian.math.finite_topology._operations import (
     compute_beat_points,
     compute_connected_components,
     compute_continuity,
     compute_specialization_preorder,
-    verify_beat_points_result,
-    verify_connected_components_result,
-    verify_continuity_result,
-    verify_specialization_preorder_result,
 )
 from jacobian.math.finite_topology._tools import TOOLS
 
@@ -145,12 +137,7 @@ def test_specialization_orientation_is_explicit_and_bound() -> None:
     )
     assert result.relation == ((True, True), (False, True))
     assert result.orientation == "RELATION_X_Y_MEANS_X_IN_CLOSURE_OF_SINGLETON_Y"
-    assert verify_specialization_preorder_result(result) is True
-
-    payload = result.model_dump()
-    payload["relation"] = ((True, False), (True, True))
-    claimed = SpecializationPreorderResult.model_validate(payload)
-    assert verify_specialization_preorder_result(claimed) is False
+    assert result.topology == _sierpinski()
 
 
 def test_minimal_neighborhoods_and_components() -> None:
@@ -163,17 +150,10 @@ def test_minimal_neighborhoods_and_components() -> None:
     )
     assert connected.components == ((0, 1),)
     assert connected.component_count == 1
-    assert verify_connected_components_result(connected) is True
     discrete = compute_connected_components(
         ConnectedComponentsRequest(topology=_discrete(3))
     )
     assert discrete.components == ((0,), (1,), (2,))
-
-    payload = discrete.model_dump()
-    payload["components"] = ((0, 1), (2,))
-    payload["component_count"] = 2
-    claimed = ConnectedComponentsResult.model_validate(payload)
-    assert verify_connected_components_result(claimed) is False
 
 
 def test_continuity_returns_an_exact_counterexample() -> None:
@@ -188,7 +168,6 @@ def test_continuity_returns_an_exact_counterexample() -> None:
     assert result.is_continuous is False
     assert result.violating_open_set == (1,)
     assert result.violating_preimage == (1,)
-    assert verify_continuity_result(result) is True
 
     identity = compute_continuity(
         ContinuityRequest(
@@ -198,13 +177,6 @@ def test_continuity_returns_an_exact_counterexample() -> None:
     assert identity.is_continuous is True
     assert identity.violating_open_set is None
     assert identity.violating_preimage is None
-
-    payload = result.model_dump()
-    payload["is_continuous"] = True
-    payload["violating_open_set"] = None
-    payload["violating_preimage"] = None
-    claimed = ContinuityResult.model_validate(payload)
-    assert verify_continuity_result(claimed) is False
 
 
 def test_continuity_request_binds_map_carrier_sizes() -> None:
@@ -229,12 +201,6 @@ def test_beat_points_use_strict_t0_order_and_return_witnesses() -> None:
     assert tuple((entry.point, entry.witness) for entry in result.up_beat_points) == (
         (0, 1),
     )
-    assert verify_beat_points_result(result) is True
-
-    payload = result.model_dump()
-    payload["up_beat_points"] = ()
-    claimed = BeatPointsResult.model_validate(payload)
-    assert verify_beat_points_result(claimed) is False
 
 
 def test_non_t0_beat_point_request_fails_closed() -> None:

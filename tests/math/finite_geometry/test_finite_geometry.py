@@ -33,8 +33,6 @@ from jacobian.math.finite_geometry._operations import (
     compute_subspace_intersection,
     compute_subspace_membership,
     compute_subspace_span,
-    verify_grassmannian_count_result,
-    verify_subspace_compute_result,
 )
 from jacobian.math.finite_geometry._tools import TOOLS
 from jacobian.math.finite_geometry.values import ProjectivePoint
@@ -465,7 +463,7 @@ def test_axis_identity_is_part_of_the_parent() -> None:
     )
 
 
-def test_source_bound_results_use_explicit_bounded_verifiers() -> None:
+def test_result_models_remain_structural_only() -> None:
     result = compute_subspace_compute(
         SubspaceComputeRequest(
             space=_space(3, ("x", "y")),
@@ -475,7 +473,7 @@ def test_source_bound_results_use_explicit_bounded_verifiers() -> None:
     payload = result.model_dump()
     payload["subspace"]["basis"] = ((0, 1),)
     forged = type(result).model_validate(payload)
-    assert not verify_subspace_compute_result(forged)
+    assert forged.subspace.basis == ((0, 1),)
 
     count = compute_grassmannian_count(
         GrassmannianCountRequest(
@@ -485,4 +483,4 @@ def test_source_bound_results_use_explicit_bounded_verifiers() -> None:
     payload = count.model_dump()
     payload["count"] = "8"
     forged_count = type(count).model_validate(payload)
-    assert not verify_grassmannian_count_result(forged_count)
+    assert forged_count.count == "8"

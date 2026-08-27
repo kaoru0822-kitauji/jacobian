@@ -26,9 +26,8 @@ class FacesRequest(StrictModel):
 class FacesResult(StrictModel):
     """The complete face-orbit family of the supplied map.
 
-    The retained map binds the carrier and result envelope.  An independently
-    supplied face claim is checked by the explicit owner verifier; parsing
-    this wire value never re-enters an operation.
+    The retained map binds the carrier and result envelope. Parsing this wire
+    value never re-enters an operation.
     """
 
     map: FiniteCombinatorialMap
@@ -142,8 +141,8 @@ class OrientationReverseRequest(StrictModel):
 class OrientationReverseResult(StrictModel):
     """The orientation-reversed map and the induced face bijection.
 
-    The retained map binds the carrier.  The exact reversal and induced face
-    bijection are checked only by the explicit owner verifier.
+    The retained map binds the carrier. The exact reversal and induced face
+    bijection are established by the defining operation.
     """
 
     map: FiniteCombinatorialMap

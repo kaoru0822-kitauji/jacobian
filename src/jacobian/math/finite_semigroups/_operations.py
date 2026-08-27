@@ -1,4 +1,4 @@
-"""Exact bounded finite semigroup operations and claim verifiers."""
+"""Exact bounded finite semigroup operations."""
 
 from jacobian.math.finite_semigroups._models import (
     ElementPowerRequest,
@@ -121,7 +121,6 @@ def compute_power_profile(request: PowerProfileRequest) -> PowerProfileResult:
     return PowerProfileResult._from_kernel(
         request, powers, index, period, idempotent, cyclic
     )
-
 
 def compute_generated_subsemigroup(
     request: GeneratedSubsemigroupRequest,
@@ -387,53 +386,3 @@ def compute_green_relations(
         request.semigroup.elements, request.semigroup.multiplication
     )
     return GreenRelationsResult._from_kernel(request, L, R, H, D, J)
-
-
-def verify_power_profile_result(result: PowerProfileResult) -> bool:
-    """Replay one bounded externally supplied power-profile claim."""
-
-    powers, index, period, idempotent, cyclic = _power_profile_data(
-        result.semigroup.elements, result.semigroup.multiplication, result.element
-    )
-    return (
-        result.powers,
-        result.index,
-        result.period,
-        result.idempotent,
-        result.cyclic_subsemigroup,
-    ) == (powers, index, period, idempotent, cyclic)
-
-
-def verify_element_power_result(result: ElementPowerResult) -> bool:
-    """Replay one bounded externally supplied element-power claim."""
-
-    return result.power == _element_power(
-        result.semigroup.elements,
-        result.semigroup.multiplication,
-        result.element,
-        result.exponent,
-    )
-
-
-def verify_idempotents_result(result: IdempotentsResult) -> bool:
-    """Replay one bounded externally supplied idempotent-list claim."""
-
-    return result.idempotents == _idempotents(
-        result.semigroup.elements, result.semigroup.multiplication
-    )
-
-
-def verify_principal_ideals_result(result: PrincipalIdealsResult) -> bool:
-    """Replay one bounded externally supplied principal-ideal claim."""
-
-    return result.ideals == _principal_ideals(
-        result.semigroup.elements, result.semigroup.multiplication, result.elements
-    )
-
-
-def verify_green_relations_result(result: GreenRelationsResult) -> bool:
-    """Replay one bounded externally supplied Green-relations claim."""
-
-    return _green_relations(
-        result.semigroup.elements, result.semigroup.multiplication
-    ) == (result.L, result.R, result.H, result.D, result.J)

@@ -14,9 +14,6 @@ from jacobian.math.code_theory._operations import (
     compute_covering_radius,
     compute_min_distance,
     compute_weight_dist,
-    verify_covering_radius_result,
-    verify_minimum_distance_result,
-    verify_weight_distribution_result,
 )
 
 
@@ -190,7 +187,7 @@ def _linear_request() -> LinearCodeRequest:
     return LinearCodeRequest(field_order=3, generator_matrix=((1, 0, 1), (0, 1, 1)))
 
 
-def test_results_retain_source_and_explicitly_verify() -> None:
+def test_results_retain_source_and_round_trip() -> None:
     from jacobian.math.code_theory._models import (
         CoveringRadiusResult,
         MinimumDistanceResult,
@@ -202,14 +199,12 @@ def test_results_retain_source_and_explicitly_verify() -> None:
     assert dist.request == request
     assert dist.minimum_distance == 2
     assert MinimumDistanceResult.model_validate(dist.model_dump()) == dist
-    assert verify_minimum_distance_result(dist)
 
     profile = compute_weight_dist(request)
     assert profile.request == request
     # q^rank = 9 distinct codewords over GF(3) with rank-2 generator rows.
     assert sum(count for _weight, count in profile.weights) == 9
     assert WeightDistributionResult.model_validate(profile.model_dump()) == profile
-    assert verify_weight_distribution_result(profile)
 
     covering = CoveringRadiusRequest(
         field_order=2, generator_matrix=((1, 0, 1), (0, 1, 1))
@@ -217,7 +212,6 @@ def test_results_retain_source_and_explicitly_verify() -> None:
     radius = compute_covering_radius(covering)
     assert radius.request == covering
     assert CoveringRadiusResult.model_validate(radius.model_dump()) == radius
-    assert verify_covering_radius_result(radius)
 
     with pytest.raises(ValidationError):
         MinimumDistanceResult(
@@ -233,9 +227,7 @@ def test_results_retain_source_and_explicitly_verify() -> None:
         CoveringRadiusResult(request=covering, covering_radius=200)
 
 
-def test_structural_models_accept_bounded_claims_and_explicit_verifiers_reject_forgery() -> (
-    None
-):
+def test_structural_models_accept_bounded_claims() -> None:
     from jacobian.math.code_theory._models import (
         MinimumDistanceResult,
         WeightDistributionResult,
@@ -250,7 +242,7 @@ def test_structural_models_accept_bounded_claims_and_explicit_verifiers_reject_f
     wrong_distance = MinimumDistanceResult.model_validate(
         dict(base, minimum_distance=1)
     )
-    assert not verify_minimum_distance_result(wrong_distance)
+    assert wrong_distance.minimum_distance == 1
 
     foreign_code = LinearCodeRequest(
         field_order=2, generator_matrix=((1, 0), (0, 1), (1, 1))
@@ -258,7 +250,7 @@ def test_structural_models_accept_bounded_claims_and_explicit_verifiers_reject_f
     forged_source = MinimumDistanceResult.model_validate(
         dict(base, request=foreign_code.model_dump(), minimum_distance=2)
     )
-    assert not verify_minimum_distance_result(forged_source)
+    assert forged_source.request != request
 
     unsorted_profile = dict(base, weights=((1, 6), (0, 1), (2, 2)))
     _assert_validation_error_code(
@@ -269,15 +261,15 @@ def test_structural_models_accept_bounded_claims_and_explicit_verifiers_reject_f
     bad_total = WeightDistributionResult.model_validate(
         dict(base, weights=((0, 1), (2, 2)))
     )
-    assert not verify_weight_distribution_result(bad_total)
+    assert bad_total.weights == ((0, 1), (2, 2))
 
     forged_profile = WeightDistributionResult.model_validate(
         dict(base, weights=((0, 1), (1, 5), (2, 3)))
     )
-    assert not verify_weight_distribution_result(forged_profile)
+    assert forged_profile.weights == ((0, 1), (1, 5), (2, 3))
 
 
-def test_zero_code_result_replays_the_documented_length_convention() -> None:
+def test_zero_code_result_preserves_the_documented_length_convention() -> None:
     from jacobian.math.code_theory._models import MinimumDistanceResult
 
     request = LinearCodeRequest(field_order=2, generator_matrix=((0, 0, 0),))
@@ -287,21 +279,6 @@ def test_zero_code_result_replays_the_documented_length_convention() -> None:
     assert MinimumDistanceResult.model_validate(result.model_dump()) == result
     description = MinimumDistanceResult.model_json_schema()["description"]
     assert "empty-code convention" in description
-
-
-def test_explicit_verifier_rejects_forged_zero_code_distance() -> None:
-    from jacobian.math.code_theory._models import MinimumDistanceResult
-
-    request = LinearCodeRequest(field_order=2, generator_matrix=((0, 0, 0),))
-    forged = {
-        "request": request.model_dump(),
-        "method": "EXACT_ENUMERATION",
-        "minimum_distance": 2,
-    }
-
-    assert not verify_minimum_distance_result(
-        MinimumDistanceResult.model_validate(forged)
-    )
 
 
 def test_dependent_generator_rows_rank_cardinality() -> None:

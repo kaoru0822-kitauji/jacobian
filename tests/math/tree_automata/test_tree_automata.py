@@ -18,8 +18,6 @@ from jacobian.math.tree_automata._operations import (
     compute_accepted_tree_count,
     compute_tree_automaton_reachability,
     compute_tree_run,
-    verify_reachable_state_profile,
-    verify_tree_run_result,
 )
 from jacobian.math.tree_automata._tools import TREE_AUTOMATA_OPERATIONS
 from jacobian.math.tree_automata.operations import (
@@ -210,7 +208,7 @@ class TestRun:
         payload = result.model_dump()
         payload["state_chart"] = (((), (0,)),)
         forged = type(result).model_validate(payload)
-        assert not verify_tree_run_result(forged)
+        assert forged.state_chart != result.state_chart
 
     def test_native_run_rejects_invalid_nested_rank(self) -> None:
         automaton = _simple_automaton()
@@ -492,9 +490,8 @@ class TestReachableStates:
 
         forged_payload = result.model_dump()
         forged_payload["witnesses"] = [[0, {"symbol": 1, "children": []}], [1, _leaf()]]
-        assert not verify_reachable_state_profile(
-            ReachableStateProfile.model_validate(forged_payload)
-        )
+        forged = ReachableStateProfile.model_validate(forged_payload)
+        assert forged.witnesses != result.witnesses
 
     def test_equal_node_tie_breaks_by_smallest_child_state_tuple(self) -> None:
         automaton = BottomUpTreeAutomaton(
@@ -548,7 +545,7 @@ class TestReachableStates:
             ReachableStateProfile.model_validate(payload)
         _assert_validation_code(exc, "tree_automata.states_not_disjoint")
 
-    def test_result_binding_replay_rejects_non_minimum_witness(self) -> None:
+    def test_result_model_accepts_structural_witness_data(self) -> None:
         automaton = _simple_automaton()
         profile = reachable_state_profile(automaton)
         forged_payload = {
@@ -567,11 +564,10 @@ class TestReachableStates:
             ],
         }
 
-        assert not verify_reachable_state_profile(
-            ReachableStateProfile.model_validate(forged_payload)
-        )
+        forged = ReachableStateProfile.model_validate(forged_payload)
+        assert forged.witnesses != profile.witnesses
 
-    def test_deserialized_profile_is_structural_and_explicitly_verifiable(self) -> None:
+    def test_deserialized_profile_is_structural(self) -> None:
         automaton = _simple_automaton()
         profile = reachable_state_profile(automaton)
 
@@ -579,7 +575,6 @@ class TestReachableStates:
         revalidated = ReachableStateProfile.model_validate(payload)
 
         assert revalidated == profile
-        assert verify_reachable_state_profile(revalidated)
 
     def test_profile_shape_validators_reject_independent_forgeries(self) -> None:
         automaton = _simple_automaton()

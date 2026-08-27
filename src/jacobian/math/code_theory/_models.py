@@ -9,9 +9,8 @@ from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
 
-# Each operation selects one exact kernel path.  An independently supplied
-# result can be checked later by the explicit owner-local verifier, but result
-# construction itself never re-enters that path.
+# Each operation selects one exact kernel path. Result construction itself
+# never re-enters that path.
 EXACT_ENUMERATION_PASSES = 1
 SYNDROME_BFS_PASSES = 1
 MAX_EXACT_CODEWORD_EVALUATIONS = 131_072
@@ -119,9 +118,8 @@ class LinearCodeRequest(StrictModel):
 class MinimumDistanceResult(StrictModel):
     """An exact minimum-distance claim in its canonical source coordinates.
 
-    Construction checks the bounded scalar relation only.  Use
-    ``verify_minimum_distance_result`` for an independently supplied claim.
-    For the zero code, the kernel uses the documented empty-code convention.
+    Construction checks the bounded scalar relation only. For the zero code,
+    the kernel uses the documented empty-code convention.
     """
 
     request: LinearCodeRequest
@@ -148,8 +146,7 @@ class MinimumDistanceResult(StrictModel):
 class WeightDistributionResult(StrictModel):
     """An exact weight-distribution claim in canonical source coordinates.
 
-    Construction checks only row shape, bounds, and canonical ordering.  Use
-    ``verify_weight_distribution_result`` for a separately supplied profile.
+    Construction checks only row shape, bounds, and canonical ordering.
     """
 
     request: LinearCodeRequest
@@ -224,8 +221,7 @@ class CoveringRadiusRequest(StrictModel):
 class CoveringRadiusResult(StrictModel):
     """An exact covering-radius claim in canonical source coordinates.
 
-    Construction checks the bounded scalar relation only.  Use
-    ``verify_covering_radius_result`` for an independently supplied claim.
+    Construction checks the bounded scalar relation only.
     """
 
     request: CoveringRadiusRequest
