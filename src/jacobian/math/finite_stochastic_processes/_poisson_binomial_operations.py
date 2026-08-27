@@ -6,7 +6,9 @@ from jacobian.math.finite_stochastic_processes._poisson_binomial_models import (
     PoissonBinomialRequest,
     PoissonBinomialResult,
 )
-from jacobian.math.finite_stochastic_processes.operations import poisson_binomial
+from jacobian.math.finite_stochastic_processes.operations import (
+    _poisson_binomial_kernel,
+)
 
 
 def compute_poisson_binomial(
@@ -21,9 +23,9 @@ def compute_poisson_binomial(
     Uses the direct recurrence with exact rational arithmetic:
     P(k, n) = P(k, n-1) * (1-p_n) + P(k-1, n-1) * p_n
     """
-    return PoissonBinomialResult(
-        probabilities=request.probabilities,
-        count_distribution=poisson_binomial(request.probabilities),
+    return PoissonBinomialResult._from_kernel(
+        request,
+        count_distribution=_poisson_binomial_kernel(request.admission_plan),
     )
 
 
