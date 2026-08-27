@@ -9,6 +9,7 @@ import pytest
 from pydantic import ValidationError
 from tests.math._analysis_support import analysis_validation_error
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.analysis._box_enclosure import (
     IntervalExpressionBoxEnclosureRequest,
     IntervalExpressionBoxEnclosureResult,
@@ -734,13 +735,13 @@ def test_eight_variable_boundary_is_admitted() -> None:
     assert result.status == "ENCLOSED"
 
 
-def test_intermediate_growth_is_rejected_during_request_validation() -> None:
+def test_intermediate_growth_is_rejected_during_operation_admission() -> None:
     _request(
         {"op": "exp", "children": [_const(4095)]},
         (),
     )
-    with analysis_validation_error():
-        _request(
+    with pytest.raises(OperationDomainValidationError):
+        _run(
             {"op": "exp", "children": [_const(4096)]},
             (),
         )
@@ -759,15 +760,15 @@ def test_intermediate_growth_is_rejected_during_request_validation() -> None:
             }
         ],
     }
-    with analysis_validation_error():
-        _request(
+    with pytest.raises(OperationDomainValidationError):
+        _run(
             {"op": "mul", "children": [powered, deepcopy(powered)]},
             (),
         )
 
     wide_power_base = 1 << 128
-    with analysis_validation_error():
-        _request(
+    with pytest.raises(OperationDomainValidationError):
+        _run(
             {
                 "op": "pow",
                 "exponent": 64,

@@ -8,7 +8,7 @@ from typing import Any, Literal, Self
 from pydantic import Field, model_validator
 
 from jacobian.catalog._examples import example
-from jacobian.catalog.models import MathTool
+from jacobian.catalog.models import MathTool, OperationDomainValidationError
 from jacobian.math.analysis._arb import arb_source_interval, dyadic_endpoints
 from jacobian.math.analysis._models import (
     MAX_BOX_PREFLIGHT_TEMPORARY_BITS,
@@ -32,11 +32,6 @@ type IntervalExpressionBoxEnclosureStatus = Literal[
 
 class IntervalExpressionBoxEnclosureRequest(_IntervalExpressionBoxRequest):
     """Enclose one named-variable expression on a complete rational box."""
-
-    @model_validator(mode="after")
-    def require_bounded_box_admission(self) -> Self:
-        _preflight_box_expression(self.expression, _rational_box_bounds(self.box))
-        return self
 
 
 def _preflight_box_expression(
@@ -250,9 +245,16 @@ class IntervalExpressionBoxEnclosureResult(IntervalExpressionBoxEnclosureRequest
 def _box_expression_enclosure(
     request: IntervalExpressionBoxEnclosureRequest,
 ) -> IntervalExpressionBoxEnclosureResult:
-    preflight = _preflight_box_expression(
-        request.expression, _rational_box_bounds(request.box)
-    )
+    try:
+        preflight = _preflight_box_expression(
+            request.expression, _rational_box_bounds(request.box)
+        )
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=("expression",),
+            code="analysis.box.intermediate_bound",
+            message=str(exc),
+        ) from exc
     if isinstance(preflight, IntervalExpressionDomainFailure):
         return IntervalExpressionBoxEnclosureResult._from_kernel(
             request,
