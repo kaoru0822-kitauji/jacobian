@@ -34,6 +34,8 @@ def _transition_map(dfa: DFA) -> dict[tuple[int, int], int]:
 def dfa_run(dfa: DFA, word: tuple[int, ...]) -> tuple[bool, int]:
     """Simulate a total DFA on a word; return ``(accepted, final_state)``."""
 
+    if any(not 0 <= symbol < dfa.alphabet_size for symbol in word):
+        raise ValueError("word symbols must be in 0..alphabet_size-1")
     transitions = _transition_map(dfa)
     state = dfa.initial_state
     for symbol in word:

@@ -8,7 +8,6 @@ from pydantic import Field, model_validator
 from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
-from jacobian.math.words._fixed_point_admission import require_fixed_point_prefix_budget
 from jacobian.math.words.values import (
     MAX_MORPHISM_OUTPUT_LENGTH,
     FiniteWord,
@@ -16,7 +15,6 @@ from jacobian.math.words.values import (
     Substitution,
     SubstitutionDependencyGraph,
     WordMorphism,
-    _require_dependency_occurrence_bound,
 )
 
 
@@ -29,16 +27,6 @@ class FactorsLengthRequest(StrictModel):
 
     word: FiniteWord
     factor_length: int = Field(ge=0)
-
-    @model_validator(mode="after")
-    def require_bounded_factor_length(self) -> Self:
-        if self.factor_length > len(self.word.letters):
-            raise _validation_error(
-                "factor_length_exceeds_word",
-                "factor_length must not exceed the word length",
-            )
-        return self
-
 
 class FactorsLengthResult(FactorsLengthRequest):
     """Complete factor enumeration, ordered by first occurrence."""
@@ -111,7 +99,7 @@ class FactorsLengthResult(FactorsLengthRequest):
         factors: tuple[tuple[str, ...], ...],
         occurrences: tuple[tuple[int, ...], ...],
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             **request.model_dump(),
             factors=factors,
             occurrences=occurrences,
@@ -169,7 +157,7 @@ class PeriodsResult(PeriodsRequest):
         least_period: int,
         is_primitive: bool,
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             **request.model_dump(),
             periods=periods,
             least_period=least_period,
@@ -208,24 +196,13 @@ class IncidenceMatrixResult(IncidenceMatrixRequest):
     def _from_kernel(
         cls, request: IncidenceMatrixRequest, matrix: tuple[tuple[int, ...], ...]
     ) -> Self:
-        return cls(**request.model_dump(), matrix=matrix)
+        return cls.model_construct(**request.model_dump(), matrix=matrix)
 
 
 class SubstitutionDependencyGraphRequest(StrictModel):
     """Construct the exact dependency graph of one bounded substitution."""
 
     substitution: Substitution
-
-    @model_validator(mode="after")
-    def require_bounded_occurrence_output(self) -> Self:
-        try:
-            _require_dependency_occurrence_bound(self.substitution)
-        except ValueError as error:
-            raise _validation_error(
-                "dependency_occurrence_bound", str(error)
-            ) from error
-        return self
-
 
 class SubstitutionDependencyGraphResult(SubstitutionDependencyGraphRequest):
     """Exact source-bound letter graph, including every occurrence position."""
@@ -245,24 +222,13 @@ class SubstitutionDependencyGraphResult(SubstitutionDependencyGraphRequest):
         request: SubstitutionDependencyGraphRequest,
         graph: SubstitutionDependencyGraph,
     ) -> Self:
-        return cls(**request.model_dump(), graph=graph)
+        return cls.model_construct(**request.model_dump(), graph=graph)
 
 
 class SubstitutionPrimitivityProfileRequest(StrictModel):
     """Decide primitivity from a canonical substitution dependency graph."""
 
     dependency_graph: SubstitutionDependencyGraph
-
-    @model_validator(mode="after")
-    def require_bounded_dependency_source(self) -> Self:
-        try:
-            _require_dependency_occurrence_bound(self.dependency_graph.substitution)
-        except ValueError as error:
-            raise _validation_error(
-                "dependency_occurrence_bound", str(error)
-            ) from error
-        return self
-
 
 class SubstitutionPrimitivityProfileResult(SubstitutionPrimitivityProfileRequest):
     """Complete Boolean-power primitivity profile with graph obstruction."""
@@ -335,7 +301,7 @@ class SubstitutionPrimitivityProfileResult(SubstitutionPrimitivityProfileRequest
             "NONE", "REDUCIBLE_DEPENDENCY_GRAPH", "PERIODIC_DEPENDENCY_GRAPH"
         ],
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             **request.model_dump(),
             strongly_connected_components=strongly_connected_components,
             irreducible=irreducible,
@@ -352,15 +318,6 @@ class SubstitutionFixedPointPrefixRequest(StrictModel):
 
     source: ProlongableSubstitution
     prefix_length: int = Field(ge=0, le=MAX_MORPHISM_OUTPUT_LENGTH)
-
-    @model_validator(mode="after")
-    def require_bounded_source_work_and_result(self) -> Self:
-        try:
-            require_fixed_point_prefix_budget(self.source, self.prefix_length)
-        except ValueError as error:
-            raise _validation_error("fixed_point_budget", str(error)) from error
-        return self
-
 
 class SubstitutionFixedPointPrefixResult(SubstitutionFixedPointPrefixRequest):
     """Exact fixed-point prefix from the least sufficient iterate."""
@@ -416,7 +373,7 @@ class SubstitutionFixedPointPrefixResult(SubstitutionFixedPointPrefixRequest):
         least_iterate_depth: int,
         retained_prefix_lengths: tuple[int, ...],
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             **request.model_dump(),
             prefix=prefix,
             least_iterate_depth=least_iterate_depth,

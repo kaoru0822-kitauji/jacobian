@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Annotated, Any, Self
 
-from pydantic import AfterValidator, Field, field_validator, model_validator
+from pydantic import AfterValidator, Field, model_validator
 from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel, canonicalize_json_containers
@@ -292,29 +292,9 @@ class SubstitutionDependencyGraph(StrictModel):
         max_length=MAX_ALPHABET_SIZE * MAX_ALPHABET_SIZE
     )
 
-    @field_validator("substitution")
-    @classmethod
-    def require_bounded_source_before_edges(
-        cls, substitution: Substitution
-    ) -> Substitution:
-        try:
-            _require_dependency_occurrence_bound(substitution)
-        except ValueError as error:
-            raise _validation_error(
-                "dependency_occurrence_bound", str(error)
-            ) from error
-        return substitution
-
     @model_validator(mode="after")
     def require_structural_edges(self) -> Self:
         """Validate graph shape without re-running the graph construction kernel."""
-
-        try:
-            _require_dependency_occurrence_bound(self.substitution)
-        except ValueError as error:
-            raise _validation_error(
-                "dependency_occurrence_bound", str(error)
-            ) from error
         morphism = self.substitution.morphism
         images = dict(zip(morphism.source_alphabet, morphism.images, strict=True))
         edge_pairs = tuple((edge.source, edge.target) for edge in self.edges)

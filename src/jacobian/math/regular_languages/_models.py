@@ -31,17 +31,6 @@ class RunRequest(StrictModel):
     dfa: DFA
     word: tuple[int, ...] = Field(max_length=MAX_WORD_LENGTH)
 
-    @model_validator(mode="after")
-    def require_valid_word(self) -> Self:
-        for symbol in self.word:
-            if not 0 <= symbol < self.dfa.alphabet_size:
-                raise _validation_error(
-                    "word_symbol_out_of_range",
-                    "word symbols must be in 0..alphabet_size-1",
-                )
-        return self
-
-
 class CountRequest(StrictModel):
     """Count accepted words of a given length."""
 

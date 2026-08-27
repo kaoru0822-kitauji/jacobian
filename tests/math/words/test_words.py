@@ -125,9 +125,11 @@ def test_empty_factor_occurs_at_every_boundary() -> None:
     assert result.occurrences == ((0, 1, 2),)
 
 
-def test_factor_length_is_validated_before_computation() -> None:
-    with _raises_code("word.factor_length_exceeds_word"):
-        FactorsLengthRequest(word=_word("aa", ("a",)), factor_length=3)
+def test_factor_length_is_validated_at_operation_time() -> None:
+    with pytest.raises(ValueError, match="factor length"):
+        compute_factors_length(
+            FactorsLengthRequest(word=_word("aa", ("a",)), factor_length=3)
+        )
 
 
 def test_periods_distinguish_overlap_period_from_proper_power() -> None:
@@ -247,29 +249,17 @@ def test_dependency_graph_output_budget_is_admitted_before_enumeration() -> None
     assert tuple(edge.multiplicity for edge in result.graph.edges) == (5_000, 5_000)
 
     above_limit = _substitution((("0",) * 5_001, ("1",) * 5_000))
-    with _raises_code("word.dependency_occurrence_bound"):
-        SubstitutionDependencyGraphRequest(substitution=above_limit)
-    with _raises_code("word.dependency_occurrence_bound"):
-        SubstitutionDependencyGraph(substitution=above_limit, edges=())
+    request = SubstitutionDependencyGraphRequest(substitution=above_limit)
+    with pytest.raises(ValueError, match="aggregate bound"):
+        compute_substitution_dependency_graph(request)
+    graph = SubstitutionDependencyGraph(substitution=above_limit, edges=())
     with pytest.raises(ValueError, match="aggregate bound"):
         substitution_dependency_graph(above_limit)
-    with _raises_code("word.dependency_occurrence_bound"):
-        SubstitutionPrimitivityProfileRequest.model_validate(
-            {
-                "dependency_graph": {
-                    "substitution": above_limit.model_dump(),
-                    "edges": (),
-                }
-            }
-        )
-    unchecked_graph = SubstitutionDependencyGraph.model_construct(
-        substitution=above_limit,
-        edges=(),
-    )
-    with _raises_code("word.dependency_occurrence_bound"):
-        SubstitutionPrimitivityProfileRequest(dependency_graph=unchecked_graph)
+    profile_request = SubstitutionPrimitivityProfileRequest(dependency_graph=graph)
     with pytest.raises(ValueError, match="aggregate bound"):
-        substitution_primitivity_profile(unchecked_graph)
+        compute_substitution_primitivity_profile(profile_request)
+    with pytest.raises(ValueError, match="aggregate bound"):
+        substitution_primitivity_profile(graph)
 
 
 def test_primitivity_profile_distinguishes_positive_reducible_and_periodic() -> None:
@@ -413,8 +403,10 @@ def test_fixed_point_source_and_result_envelopes_cover_exact_boundaries() -> Non
         substitution=_substitution(((rejected_symbol,) * 10_000,), (rejected_symbol,)),
         seed=rejected_symbol,
     )
-    with _raises_code("word.fixed_point_budget"):
-        SubstitutionFixedPointPrefixRequest(source=byte_above, prefix_length=500)
+    with pytest.raises(ValueError, match="byte bound"):
+        compute_substitution_fixed_point_prefix(
+            SubstitutionFixedPointPrefixRequest(source=byte_above, prefix_length=500)
+        )
 
 
 def test_fixed_point_generation_caps_the_intermediate_prefix() -> None:

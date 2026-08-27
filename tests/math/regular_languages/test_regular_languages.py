@@ -240,9 +240,10 @@ def test_contract_rejects_invalid_accepting_states() -> None:
 
 def test_contract_rejects_out_of_range_word_symbol() -> None:
     dfa = _dfa_ends_in_1()
-    with pytest.raises(ValidationError) as exc_info:
-        RunRequest(dfa=dfa, word=(5,))  # symbol 5 is out of range for alphabet_size=2
-    assert _error_type(exc_info) == "regular_language.word_symbol_out_of_range"
+    with pytest.raises(ValueError, match="word symbols"):
+        compute_run(
+            RunRequest(dfa=dfa, word=(5,))
+        )  # symbol 5 is out of range for alphabet_size=2
 
 
 def test_contract_rejects_non_total_dfa() -> None:
