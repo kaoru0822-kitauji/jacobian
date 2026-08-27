@@ -12,6 +12,7 @@ from typing import cast
 import pytest
 from tests.math.number_theory._validation import expect_validation
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.number_theory._periodic_kernel import (
     require_admitted_periodic_source,
 )
@@ -37,6 +38,7 @@ from jacobian.math.number_theory._periodic_models import (
 from jacobian.math.number_theory._periodic_operations import (
     compute_periodic_congruence_union_measure,
     compute_periodic_congruence_union_profile,
+    normalize_periodic_source,
 )
 
 
@@ -60,7 +62,7 @@ def _powerset(values: range) -> tuple[tuple[int, ...], ...]:
 
 def _brute_residues(payload: dict[str, object]) -> tuple[int, ...]:
     request = PeriodicCongruenceUnionRequest.model_validate(payload)
-    source = request.normalized_source()
+    source = normalize_periodic_source(request)
     moduli = tuple(int(subset.modulus) for subset in source.subsets)
     period = math.lcm(*moduli) if moduli else 1
     subsets = tuple(
@@ -343,7 +345,9 @@ def test_sparse_lift_work_boundary_is_exact() -> None:
     assert prime_sum * admitted_scale <= MAX_SPARSE_LIFTED_ROWS
     assert len(admitted.occupied_residues) == 424 * admitted_scale
 
-    with pytest.raises(ValueError, match="exceeds all exact execution regimes"):
+    with pytest.raises(
+        OperationDomainValidationError, match="exceeds all exact execution regimes"
+    ):
         compute_periodic_congruence_union_measure(
             PeriodicCongruenceUnionRequest.model_validate(payload(rejected_scale))
         )
@@ -509,7 +513,7 @@ def test_rejects_integer_and_lcm_above_exact_result_digit_bound() -> None:
             }
         )
 
-    with pytest.raises(ValueError, match="common period exceeds"):
+    with pytest.raises(OperationDomainValidationError, match="common period exceeds"):
         compute_periodic_congruence_union_measure(
             PeriodicCongruenceUnionRequest.model_validate(
                 {
@@ -628,7 +632,7 @@ def test_constructor_path_rejects_oversized_families_and_raw_rows() -> None:
         for _ in range(MAX_PERIODIC_FAMILY_SIZE)
     )
     accepted = PeriodicCongruenceUnionRequest(subsets=boundary_rows, complement=False)
-    assert len(accepted.normalized_source().subsets) == 1
+    assert len(normalize_periodic_source(accepted).subsets) == 1
 
     with expect_validation("number_theory."):
         PeriodicCongruenceUnionRequest(
@@ -683,7 +687,7 @@ def test_materialized_period_boundary_is_separate_from_measure() -> None:
         "complement": True,
     }
     assert _measure(measure_only).occupied_count == str(MAX_MATERIALIZED_RESIDUES + 1)
-    with pytest.raises(ValueError, match="common period"):
+    with pytest.raises(OperationDomainValidationError, match="common period"):
         _profile(measure_only)
 
 
@@ -704,7 +708,7 @@ def test_full_subset_shortcuts_count_and_complement_materialization() -> None:
     assert empty_complement.occupied_count == "0"
     assert empty_complement.density.as_fraction() == 0
 
-    with pytest.raises(ValueError, match="materialized full union"):
+    with pytest.raises(OperationDomainValidationError, match="materialized full union"):
         _profile({"subsets": source, "complement": False})
 
 
@@ -729,7 +733,7 @@ def test_materialized_union_row_bound_is_checked_before_lifting() -> None:
         ],
         "complement": False,
     }
-    with pytest.raises(ValueError, match="materialized union"):
+    with pytest.raises(OperationDomainValidationError, match="materialized union"):
         _profile(rejected_payload)
 
 
@@ -745,7 +749,9 @@ def test_profile_accounts_for_retained_source_and_wide_residue_output_bytes() ->
     }
 
     assert _measure(payload).occupied_count == str(output_rows)
-    with pytest.raises(ValueError, match="canonical output budget"):
+    with pytest.raises(
+        OperationDomainValidationError, match="canonical output budget"
+    ):
         _profile(payload)
 
 
@@ -764,7 +770,9 @@ def test_compressed_intersection_work_boundary_rejects_before_backend() -> None:
 
     rejected_payload = copy.deepcopy(boundary_payload)
     rejected_payload["subsets"].append({"modulus": str(primes[-1]), "residues": ["0"]})
-    with pytest.raises(ValueError, match="exceeds all exact execution regimes"):
+    with pytest.raises(
+        OperationDomainValidationError, match="exceeds all exact execution regimes"
+    ):
         compute_periodic_congruence_union_measure(
             PeriodicCongruenceUnionRequest.model_validate(rejected_payload)
         )
@@ -790,7 +798,7 @@ def test_non_coprime_generalized_crt_replays_scaled_union() -> None:
         ]
     }
     request = PeriodicCongruenceUnionRequest.model_validate(payload)
-    assert require_admitted_periodic_source(request.normalized_source()).method == (
+    assert require_admitted_periodic_source(normalize_periodic_source(request)).method == (
         "INCLUSION_EXCLUSION"
     )
 

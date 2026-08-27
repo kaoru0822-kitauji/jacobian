@@ -14,7 +14,6 @@ from jacobian._exact import CanonicalRational
 from jacobian._models import StrictModel, canonicalize_json_containers
 from jacobian.canonical import (
     CanonicalLimits,
-    format_canonical_integer,
     parse_canonical_integer,
 )
 
@@ -310,32 +309,6 @@ class PeriodicCongruenceUnionRequest(StrictModel):
         normalized_data = dict(data)
         normalized_data["subsets"] = tuple(normalized_subsets)
         return normalized_data
-
-    def normalized_source(self) -> PeriodicCongruenceUnionSource:
-        """Return the canonical union source represented by this request."""
-
-        merged: dict[int, set[int]] = {}
-        for subset in self.subsets:
-            modulus = parse_canonical_integer(subset.modulus)
-            residues = merged.setdefault(modulus, set())
-            residues.update(
-                parse_canonical_integer(residue) % modulus
-                for residue in subset.residues
-            )
-        return PeriodicCongruenceUnionSource(
-            subsets=tuple(
-                PeriodicCongruenceSubset(
-                    modulus=format_canonical_integer(modulus),
-                    residues=tuple(
-                        format_canonical_integer(residue)
-                        for residue in sorted(residues)
-                    ),
-                )
-                for modulus, residues in sorted(merged.items())
-            ),
-            complement=self.complement,
-        )
-
 
 class PeriodicCongruenceUnionProfileRequest(PeriodicCongruenceUnionRequest):
     """A periodic-congruence union whose complete common-period set fits output."""
