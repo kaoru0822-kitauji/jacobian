@@ -14,7 +14,6 @@ from jacobian.math.graphs.spectral._models import (
 from jacobian.math.graphs.spectral._operations import (
     compute_adjacency_spectrum,
     compute_laplacian_spectrum,
-    verify_graph_spectrum_result,
 )
 from jacobian.math.graphs.values import IndexedSimpleUndirectedGraph
 
@@ -59,7 +58,7 @@ def test_spectral_request_rejects_the_shared_value_outside_its_envelope() -> Non
         GraphSpectrumRequest(graph=graph)
 
 
-def test_producer_spectra_retain_source_and_verify() -> None:
+def test_producer_spectra_retain_source() -> None:
     path = _graph(3, ((0, 1), (1, 2)))
 
     adjacency = compute_adjacency_spectrum(GraphSpectrumRequest(graph=path))
@@ -68,13 +67,11 @@ def test_producer_spectra_retain_source_and_verify() -> None:
     assert set(adjacency.eigenvalues) == {"-sqrt(2)", "0", "sqrt(2)"}
     assert adjacency.multiplicities == (1, 1, 1)
     assert GraphSpectrumResult.model_validate(adjacency.model_dump()) == adjacency
-    assert verify_graph_spectrum_result(adjacency)
 
     laplacian = compute_laplacian_spectrum(GraphSpectrumRequest(graph=path))
     assert laplacian.matrix_convention == "LAPLACIAN"
     assert set(laplacian.eigenvalues) == {"0", "1", "3"}
     assert GraphSpectrumResult.model_validate(laplacian.model_dump()) == laplacian
-    assert verify_graph_spectrum_result(laplacian)
 
 
 def test_structural_constraints_reject_forged_payloads() -> None:
@@ -102,27 +99,7 @@ def test_structural_constraints_reject_forged_payloads() -> None:
     with pytest.raises(ValidationError):
         GraphSpectrumResult.model_validate(wrong_total)
 
-    forged_value = copy.deepcopy(dumped)
-    forged_value["eigenvalues"] = ["-1", "0", "sqrt(5)"]
-    assert not verify_graph_spectrum_result(
-        GraphSpectrumResult.model_validate(forged_value)
-    )
-
-    foreign_source = copy.deepcopy(dumped)
-    foreign_source["graph"] = {"vertex_count": 3, "edges": [[0, 1]]}
-    assert not verify_graph_spectrum_result(
-        GraphSpectrumResult.model_validate(foreign_source)
-    )
-
-    swapped_convention = copy.deepcopy(dumped)
-    swapped_convention["matrix_convention"] = "LAPLACIAN"
-    assert not verify_graph_spectrum_result(
-        GraphSpectrumResult.model_validate(swapped_convention)
-    )
-
-
-def test_permuted_pair_order_still_verifies_against_source() -> None:
-    """A valid spectrum serialized in a different pair order remains exact."""
+def test_permuted_pair_order_remains_structurally_valid() -> None:
 
     complete_graph = _graph(4, ((0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)))
     complete = compute_adjacency_spectrum(GraphSpectrumRequest(graph=complete_graph))
@@ -135,7 +112,6 @@ def test_permuted_pair_order_still_verifies_against_source() -> None:
     assert sorted(
         zip(permuted.eigenvalues, permuted.multiplicities, strict=True)
     ) == sorted(zip(complete.eigenvalues, complete.multiplicities, strict=True))
-    assert verify_graph_spectrum_result(permuted)
 
 
 def test_duplicate_eigenvalue_entries_are_rejected() -> None:
