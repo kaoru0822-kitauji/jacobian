@@ -234,12 +234,6 @@ class TruncatedSeries(StrictModel):
                 "coefficient_count_mismatch",
                 "coefficient tuple must have exactly truncation_order entries",
             )
-        for value in self.coefficients:
-            require_bounded_rational(
-                value,
-                max_digits=MAX_RESULT_RATIONAL_DIGITS,
-                label="coefficient",
-            )
         return self
 
 
@@ -253,35 +247,10 @@ class InputTruncatedSeries(TruncatedSeries):
 
     truncation_order: StrictInt = Field(
         ge=1,
-        le=MAX_TRUNCATION_ORDER,
         description=(
             "Truncation order N (coefficients a_0..a_{N-1}); bounded because "
             "operation work scales with N."
         ),
-    )
-
-    @model_validator(mode="after")
-    def require_input_digit_bound(self) -> Self:
-        for value in self.coefficients:
-            require_bounded_rational(
-                value,
-                max_digits=MAX_RATIONAL_DIGITS,
-                label="input coefficient",
-            )
-        return self
-
-
-def as_input_series(series: TruncatedSeries) -> InputTruncatedSeries:
-    """Re-admit one carrier value through the bounded operation input envelope.
-
-    Native callers pass the shared carrier directly, so the native execution
-    path proves the same truncation-order and input-digit admission that wire
-    requests prove before any kernel work starts.
-    """
-    return InputTruncatedSeries(
-        variable=series.variable,
-        truncation_order=series.truncation_order,
-        coefficients=series.coefficients,
     )
 
 
@@ -523,7 +492,6 @@ class TruncateSourceSeries(TruncatedSeries):
 
     truncation_order: StrictInt = Field(
         ge=1,
-        le=MAX_TRUNCATE_SOURCE_ORDER,
         description=(
             "Source truncation order N (coefficients a_0..a_{N-1}); bounded "
             "because request admission validates all N coefficients before "
@@ -558,25 +526,11 @@ class _SeriesPairRequest(StrictModel):
 
 
 class _SeriesAddSubtractRequest(_SeriesPairRequest):
-    @model_validator(mode="after")
-    def require_bounded_result_height(self) -> Self:
-        for left, right in zip(
-            self.left.coefficients, self.right.coefficients, strict=True
-        ):
-            _require_height(sum_heights((_height(left), _height(right))), "sum")
-        return self
+    pass
 
 
 class _SeriesMultiplyRequest(_SeriesPairRequest):
-    @model_validator(mode="after")
-    def require_bounded_result_height(self) -> Self:
-        left = _max_height(self.left.coefficients)
-        right = _max_height(self.right.coefficients)
-        _require_height(
-            _convolution_height(left, right, self.left.truncation_order),
-            "multiplication",
-        )
-        return self
+    pass
 
 
 class _SeriesIdentityCheckRequest(_SeriesPairRequest):
@@ -588,49 +542,9 @@ class _SeriesIdentityCheckRequest(_SeriesPairRequest):
     unrelated Cauchy-convolution growth that multiplication must preflight.
     """
 
-    @model_validator(mode="after")
-    def require_bounded_difference_height(self) -> Self:
-        for left, right in zip(
-            self.left.coefficients, self.right.coefficients, strict=True
-        ):
-            _require_height(
-                sum_heights((_height(left), _height(right))),
-                "difference",
-            )
-        return self
-
 
 class SeriesDivideRequest(_SeriesPairRequest):
     """Divide two series when the denominator is a unit."""
-
-    @model_validator(mode="after")
-    def require_unit_denominator(self) -> Self:
-        if self.right.coefficients[0].as_fraction() == 0:
-            raise _validation_error(
-                "denominator_zero_constant",
-                "denominator must have a nonzero constant term",
-            )
-        return self
-
-    @model_validator(mode="after")
-    def require_bounded_result_height(self) -> Self:
-        inverse = _inverse_height(self.right)
-        quotient = _convolution_height(
-            _max_height(self.left.coefficients),
-            inverse,
-            self.left.truncation_order,
-        )
-        _require_height(quotient, "division")
-        residual = _convolution_height(
-            _max_height(self.right.coefficients),
-            quotient,
-            self.left.truncation_order,
-        )
-        _require_height(
-            sum_heights((residual, _max_height(self.left.coefficients))),
-            "division residual",
-        )
-        return self
 
 
 # ---------------------------------------------------------------------------
@@ -694,14 +608,6 @@ class SeriesScalarMultiplyRequest(StrictModel):
     series: InputTruncatedSeries
     scalar: CanonicalRational
 
-    @model_validator(mode="after")
-    def require_bounded_result_height(self) -> Self:
-        _require_height(
-            _max_height(self.series.coefficients).product(_height(self.scalar)),
-            "scalar multiplication",
-        )
-        return self
-
 
 class SeriesScalarMultiplyResult(StrictModel):
     result: TruncatedSeries
@@ -715,23 +621,7 @@ class SeriesScalarMultiplyResult(StrictModel):
 
 class SeriesPowerRequest(StrictModel):
     series: InputTruncatedSeries
-    exponent: StrictInt = Field(ge=0, le=MAX_POWER_EXPONENT)
-
-    @model_validator(mode="after")
-    def require_result_digit_budget(self) -> Self:
-        order = self.series.truncation_order
-        result = RationalHeight(1, 1)
-        base = _max_height(self.series.coefficients)
-        exponent = self.exponent
-        while exponent > 0:
-            if exponent & 1:
-                result = _convolution_height(result, base, order)
-                _require_height(result, "power")
-            exponent >>= 1
-            if exponent:
-                base = _convolution_height(base, base, order)
-                _require_height(base, "power")
-        return self
+    exponent: StrictInt = Field(ge=0)
 
 
 class SeriesPowerResult(StrictModel):
@@ -752,7 +642,6 @@ class SeriesInverseRequest(StrictModel):
     variable: Variable = Field(description="The single formal variable.")
     truncation_order: StrictInt = Field(
         ge=1,
-        le=MAX_TRUNCATION_ORDER,
         description=(
             "Truncation order N; the inverse growth budget must fit every "
             "returned coefficient in the 4096-digit result bound."
@@ -761,24 +650,6 @@ class SeriesInverseRequest(StrictModel):
     coefficients: tuple[CanonicalRational, ...] = Field(
         description="Exactly N rational coefficients with a nonzero constant term.",
     )
-
-    @model_validator(mode="after")
-    def require_unit_constant(self) -> Self:
-        series = InputTruncatedSeries(
-            variable=self.variable,
-            truncation_order=self.truncation_order,
-            coefficients=self.coefficients,
-        )
-        if series.coefficients[0].as_fraction() == 0:
-            raise _validation_error(
-                "inverse_zero_constant", "inverse requires a nonzero constant term"
-            )
-        inverse = _inverse_height(series)
-        residual = _convolution_height(
-            _max_height(series.coefficients), inverse, self.truncation_order
-        )
-        _require_height(residual, "inverse residual")
-        return self
 
     def as_series(self) -> InputTruncatedSeries:
         return InputTruncatedSeries(
@@ -905,17 +776,6 @@ class SeriesComposeRequest(StrictModel):
                 "composition_order_mismatch",
                 "outer and inner series must share the same truncation order",
             )
-        if self.inner.coefficients[0].as_fraction() != 0:
-            raise _validation_error(
-                "composition_nonzero_inner_constant",
-                "inner series must have zero constant term for composition with a finite prefix",
-            )
-        _composition_height_vector(
-            _height_vector(self.outer.coefficients),
-            _height_vector(self.inner.coefficients),
-            self.outer.truncation_order,
-            "composition",
-        )
         return self
 
 
@@ -934,54 +794,8 @@ class SeriesReversionRequest(StrictModel):
     """Compositional inverse of a series with F(0)=0 and F'(0) != 0."""
 
     variable: Variable
-    truncation_order: StrictInt = Field(ge=2, le=MAX_TRUNCATION_ORDER)
+    truncation_order: StrictInt = Field(ge=2)
     coefficients: tuple[CanonicalRational, ...]
-
-    @model_validator(mode="after")
-    def require_reversion_hypotheses(self) -> Self:
-        series = InputTruncatedSeries(
-            variable=self.variable,
-            truncation_order=self.truncation_order,
-            coefficients=self.coefficients,
-        )
-        if series.coefficients[0].as_fraction() != 0:
-            raise _validation_error(
-                "reversion_nonzero_constant", "reversion requires zero constant term"
-            )
-        if series.coefficients[1].as_fraction() == 0:
-            raise _validation_error(
-                "reversion_zero_linear_coefficient",
-                "reversion requires nonzero linear coefficient",
-            )
-        source = _height_vector(series.coefficients)
-        linear = _height(series.coefficients[1])
-        result: list[CoefficientHeight] = [
-            None,
-            RationalHeight(1, 1).quotient(linear),
-        ]
-        _require_height_vector(tuple(result), "reversion")
-        for degree in range(2, self.truncation_order):
-            padded = (*result, None)
-            power = padded
-            terms: list[RationalHeight] = []
-            for source_degree in range(2, degree + 1):
-                power = _convolve_height_vectors(power, padded, degree + 1, "reversion")
-                source_height = source[source_degree]
-                power_height = power[degree]
-                if source_height is not None and power_height is not None:
-                    terms.append(source_height.product(power_height))
-            known = sum_heights(terms)
-            coefficient = known.quotient(linear)
-            _require_height(coefficient, "reversion")
-            result.append(coefficient)
-        result_vector = tuple(result)
-        _composition_height_vector(
-            source, result_vector, self.truncation_order, "reversion residual"
-        )
-        _composition_height_vector(
-            result_vector, source, self.truncation_order, "reversion residual"
-        )
-        return self
 
     def as_series(self) -> InputTruncatedSeries:
         return InputTruncatedSeries(
@@ -1047,20 +861,7 @@ class SeriesDerivativeResult(StrictModel):
 
 class SeriesIntegralRequest(StrictModel):
     series: InputTruncatedSeries
-    output_order: StrictInt = Field(ge=1, le=MAX_TRUNCATION_ORDER)
-
-    @model_validator(mode="after")
-    def require_output_order_in_range(self) -> Self:
-        if self.output_order > self.series.truncation_order + 1:
-            raise _validation_error(
-                "integral_output_order_exceeds_source",
-                "output_order must not exceed source_order + 1",
-            )
-        integer = RationalHeight(len(str(max(1, self.output_order - 1))), 1)
-        _require_height(
-            _max_height(self.series.coefficients).quotient(integer), "integration"
-        )
-        return self
+    output_order: StrictInt = Field(ge=1)
 
 
 class SeriesIntegralResult(StrictModel):
@@ -1083,20 +884,6 @@ class SeriesTruncateRequest(StrictModel):
         ),
     )
     target_order: StrictInt = Field(ge=1)
-
-    @model_validator(mode="after")
-    def require_target_le_source(self) -> Self:
-        if self.target_order > self.series.truncation_order:
-            raise _validation_error(
-                "truncate_target_exceeds_source",
-                "target_order must not exceed source truncation order",
-            )
-        if self.target_order > MAX_TRUNCATION_ORDER:
-            raise _validation_error(
-                "truncate_target_exceeds_public_bound",
-                "target_order exceeds the public bound",
-            )
-        return self
 
 
 class SeriesTruncateResult(StrictModel):
@@ -1145,9 +932,8 @@ class SeriesFromPolynomialRequest(StrictModel):
     variable: Variable
     coefficients: tuple[CanonicalRational, ...] = Field(
         min_length=1,
-        max_length=MAX_TRUNCATION_ORDER,
     )
-    truncation_order: StrictInt = Field(ge=1, le=MAX_TRUNCATION_ORDER)
+    truncation_order: StrictInt = Field(ge=1)
 
     @model_validator(mode="after")
     def require_dense_tuple(self) -> Self:
@@ -1155,12 +941,6 @@ class SeriesFromPolynomialRequest(StrictModel):
             raise _validation_error(
                 "input_coefficient_count_mismatch",
                 "input coefficients must match truncation_order exactly",
-            )
-        for value in self.coefficients:
-            require_bounded_rational(
-                value,
-                max_digits=MAX_RATIONAL_DIGITS,
-                label="input coefficient",
             )
         return self
 
