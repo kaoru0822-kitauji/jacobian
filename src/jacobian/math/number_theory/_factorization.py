@@ -149,8 +149,7 @@ FACTORIZATION_OPERATIONS = (
         description=(
             "Enumerate every positive divisor exactly, including the input's "
             "absolute value, or return UNKNOWN when the bounded factorization "
-            "worker cannot establish the enumeration. The complete list is "
-            "distinct from the proper-divisor or aliquot proper-divisor list."
+            "worker cannot establish the enumeration."
         ),
         request_model=NonzeroFactorizationRequest,
         result_model=DivisorListResult,
