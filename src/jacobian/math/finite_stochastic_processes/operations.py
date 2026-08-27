@@ -5,6 +5,13 @@ from __future__ import annotations
 from fractions import Fraction
 
 from jacobian._exact import CanonicalRational
+from jacobian.math.finite_stochastic_processes._poisson_binomial_models import (
+    require_admitted_probabilities,
+)
+from jacobian.math.probability._distribution import (
+    FiniteDistributionAtom,
+    FiniteRationalDistribution,
+)
 
 from .values import FiniteProbabilitySpace, FiniteRandomVariable, FiniteSigmaAlgebra
 
@@ -12,9 +19,36 @@ __all__ = [
     "conditional_expectation",
     "doob_martingale",
     "filtration_natural",
+    "poisson_binomial",
     "sigma_algebra_from_observation",
     "sigma_algebra_join",
 ]
+
+
+def poisson_binomial(
+    probabilities: tuple[CanonicalRational, ...],
+) -> FiniteRationalDistribution:
+    """Return the exact count distribution of independent Bernoulli trials."""
+    values = tuple(probability.as_fraction() for probability in probabilities)
+    require_admitted_probabilities(values)
+    distribution = [Fraction(0)] * (len(values) + 1)
+    distribution[0] = Fraction(1)
+    for probability in values:
+        for index in range(len(values), 0, -1):
+            distribution[index] = (
+                distribution[index] * (1 - probability)
+                + distribution[index - 1] * probability
+            )
+        distribution[0] *= 1 - probability
+    return FiniteRationalDistribution(
+        atoms=tuple(
+            FiniteDistributionAtom(
+                value=CanonicalRational.from_fraction(Fraction(index)),
+                probability=CanonicalRational.from_fraction(probability),
+            )
+            for index, probability in enumerate(distribution)
+        )
+    )
 
 
 def _index_of(space: FiniteProbabilitySpace) -> dict[str, int]:

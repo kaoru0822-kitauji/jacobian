@@ -6,13 +6,6 @@ from typing import Any
 from jacobian._models import StrictModel
 from jacobian.catalog._examples import example
 from jacobian.catalog.models import MathTool, OperationExample
-from jacobian.math.finite_stochastic_processes._poisson_binomial_models import (
-    PoissonBinomialRequest,
-    PoissonBinomialResult,
-)
-from jacobian.math.finite_stochastic_processes._poisson_binomial_operations import (
-    compute_poisson_binomial,
-)
 from jacobian.math.finite_stochastic_processes._models import (
     ConditionalExpectationRequest,
     DoobMartingaleRequest,
@@ -28,6 +21,13 @@ from jacobian.math.finite_stochastic_processes._operations import (
     compute_filtration,
     compute_join,
     compute_sigma_from_observation,
+)
+from jacobian.math.finite_stochastic_processes._poisson_binomial_models import (
+    PoissonBinomialRequest,
+    PoissonBinomialResult,
+)
+from jacobian.math.finite_stochastic_processes._poisson_binomial_operations import (
+    compute_poisson_binomial,
 )
 from jacobian.math.finite_stochastic_processes.values import (
     FiniteRandomVariable,
@@ -204,6 +204,6 @@ _POISSON_BINOMIAL_TOOL = MathTool(
     ),
 )
 
-TOOLS = FINIT_STOCHASTIC_PROCESS_OPERATIONS + (_POISSON_BINOMIAL_TOOL,)
+TOOLS = (*FINIT_STOCHASTIC_PROCESS_OPERATIONS, _POISSON_BINOMIAL_TOOL)
 
 __all__ = ["TOOLS"]
