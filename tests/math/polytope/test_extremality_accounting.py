@@ -47,7 +47,7 @@ def test_extremality_charges_every_observed_orientation_determinant() -> None:
     dimension = len(polytope.space.axes)
     vertex_count = len(polytope.vertices)
     charged_orientation_tests = (
-        comb(vertex_count, dimension) * (vertex_count - dimension) + vertex_count
+        comb(vertex_count, dimension) * (vertex_count - dimension) + vertex_count + 1
     )
 
     original_determinant = MutableDenseMatrix.det

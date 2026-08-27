@@ -557,7 +557,8 @@ def require_full_dimensional_extreme_vertices(polytope: RationalVPolytope) -> No
     # ``_extreme_point_indices`` also ranks the active facet normals once per
     # source vertex.  Those exact linear-algebra calls are part of the same
     # height-sensitive proof, so charge them alongside the side tests.
-    rank_tests = vertex_count
+    # The affine-span check below is a further exact rank computation.
+    rank_tests = vertex_count + 1
     extremality_tests = orientation_tests + rank_tests
     if extremality_tests > MAX_SUPPORT_ORIENTATION_TESTS:
         raise ValueError(

@@ -22,6 +22,7 @@ from jacobian.math.recurrence_solving._operations import (
 from jacobian.math.root_isolation._models import (
     MAX_ROOT_ISOLATION_SOURCE_COEFFICIENT_DIGITS,
     AlgebraicCompareRequest,
+    RootIsolationResult,
     UnivariatePolynomialRequest,
 )
 from jacobian.math.root_isolation._operations import (
@@ -189,6 +190,17 @@ def test_root_isolation_rejects_expanded_normalization_without_decimal_formattin
                 ]
             }
         )
+
+
+def test_root_isolation_verifier_rejects_an_out_of_envelope_source() -> None:
+    forged = RootIsolationResult.model_validate(
+        {
+            "source_coefficients_descending": ["1" + "0" * 996, "1"],
+            "roots": [],
+        }
+    )
+
+    assert not _verify_root_isolation_result(forged)
 
 
 def test_algebraic_comparison_parses_canonical_interval_endpoints() -> None:
