@@ -13,7 +13,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tools.makefile_catalog import MakefileCatalogError, discover_makefiles
+from tools.makefile_catalog import (  # noqa: E402
+    MakefileCatalogError,
+    discover_makefiles,
+)
 
 DEFAULT_DOCUMENTS = (
     Path("README.md"),

@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tools.command_runner import ToolCommandStatus, run_operator_command
+from tools.command_runner import ToolCommandStatus, run_operator_command  # noqa: E402
 
 _FIXTURE_PREFIXES = (
     PurePosixPath("tests/fixtures"),

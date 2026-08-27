@@ -23,7 +23,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -31,12 +33,12 @@ if str(ROOT) not in sys.path:
 
 from benchmarks.tooling.benchmark_snapshots import (  # noqa: E402
     DEFAULT_HARBOR_VERSION,
-    HarborSuiteError,
     build_lock,
     generate_publication,
     publication_dir,
     validate_lock,
 )
+from benchmarks.tooling.errors import HarborSuiteError  # noqa: E402
 
 
 def _create(args: argparse.Namespace) -> int:
@@ -152,7 +154,8 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     try:
-        return args.func(args)
+        func = cast(Callable[[argparse.Namespace], int], args.func)
+        return func(args)
     except HarborSuiteError as exc:
         print(f"benchmark snapshot error: {exc}", file=sys.stderr)
         return 2
