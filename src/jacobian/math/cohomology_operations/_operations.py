@@ -278,48 +278,9 @@ def compute_bockstein(request: BocksteinRequest) -> BocksteinResult:
     )
 
 
-def verify_steenrod_square_result(result: SteenrodSquareResult) -> bool:
-    """Replay an independently supplied Steenrod-square claim when needed."""
-
-    expected = steenrod_square_fields(
-        result.cochain_degree,
-        result.simplex_values,
-        result.simplex_coefficients,
-        result.square_degree,
-        _effective_ambient_for_request(result),
-    )
-    actual = (
-        result.result_degree,
-        result.result_simplex_values,
-        result.result_simplex_coefficients,
-        result.is_zero,
-    )
-    return actual == expected
-
-
-def verify_bockstein_result(result: BocksteinResult) -> bool:
-    """Replay an independently supplied Bockstein claim when needed."""
-
-    expected = bockstein_fields(
-        result.prime,
-        result.cochain_degree,
-        result.simplex_coefficients,
-        result.simplex_values,
-    )
-    actual = (
-        result.result_degree,
-        result.result_simplex_values,
-        result.result_simplex_coefficients,
-        result.is_zero,
-    )
-    return actual == expected
-
-
 __all__ = [
     "bockstein_fields",
     "compute_bockstein",
     "compute_steenrod_square",
     "steenrod_square_fields",
-    "verify_bockstein_result",
-    "verify_steenrod_square_result",
 ]

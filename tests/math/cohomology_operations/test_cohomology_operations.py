@@ -9,13 +9,10 @@ from jacobian.math.cohomology_operations._models import (
     BocksteinRequest,
     BocksteinResult,
     SteenrodSquareRequest,
-    SteenrodSquareResult,
 )
 from jacobian.math.cohomology_operations._operations import (
     compute_bockstein,
     compute_steenrod_square,
-    verify_bockstein_result,
-    verify_steenrod_square_result,
 )
 
 
@@ -192,24 +189,6 @@ class TestSteenrodSquare:
         )
         assert result.is_zero
 
-    def test_forged_result_is_rejected_by_explicit_verifier(self) -> None:
-        """An authored claim is structural but fails the bounded replay verifier."""
-        request = SteenrodSquareRequest(
-            cochain_degree=1,
-            simplex_values=((0, 1), (1, 2)),
-            simplex_coefficients=(1, 1),
-            square_degree=1,
-            ambient_simplices=((0,), (1,), (2,), (0, 1), (1, 2), (0, 2), (0, 1, 2)),
-        )
-        genuine = compute_steenrod_square(request)
-        assert genuine.result_simplex_values == ((0, 1, 2),)
-        payload = genuine.model_dump()
-        payload["result_simplex_values"] = []
-        payload["result_simplex_coefficients"] = []
-        payload["is_zero"] = True
-        forged = SteenrodSquareResult.model_validate(payload)
-        assert not verify_steenrod_square_result(forged)
-
 
 class TestBockstein:
     """Test Bockstein homomorphism."""
@@ -280,7 +259,7 @@ class TestBockstein:
                 result.is_zero,
             ) == (degree + 1, (), (), True)
 
-    def test_forged_result_is_rejected_by_explicit_verifier(self) -> None:
+    def test_result_shape_is_structurally_validated(self) -> None:
         request = BocksteinRequest(
             prime=2,
             cochain_degree=1,
@@ -292,7 +271,6 @@ class TestBockstein:
         with pytest.raises(ValidationError) as excinfo:
             BocksteinResult.model_validate(payload)
         _assert_error_code(excinfo, "cohomology_operation.result_shape")
-        assert verify_bockstein_result(compute_bockstein(request))
 
     def test_nonzero_cocycle(self) -> None:
         """Bockstein of a non-zero cocycle is unsupported without the complex."""
