@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from typing import Any, cast
-
 import pytest
+from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
 from jacobian.math.matrices._operation_models import (

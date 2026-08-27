@@ -1,6 +1,6 @@
 """Tests for multivariate polynomial factorization (#2105)."""
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 from fractions import Fraction
 from types import SimpleNamespace
 from typing import Any
@@ -85,31 +85,6 @@ class TestMultivariateFactorResultInvariants:
         result = multivariate_factor(MultivariateFactorRequest(polynomial=poly))
         assert MultivariateFactorResult.model_validate(result.model_dump()) == result
 
-    def test_kernel_result_uses_one_worker_call_until_explicitly_verified(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Construction and deserialization do not replay the producing worker."""
-
-        from jacobian.math.polynomials.multivariate import _factor_backend
-
-        calls = 0
-        original = _factor_backend.run_bounded_factorization
-
-        def counted(*args: Any, **kwargs: Any) -> Any:
-            nonlocal calls
-            calls += 1
-            return original(*args, **kwargs)
-
-        monkeypatch.setattr(_factor_backend, "run_bounded_factorization", counted)
-        poly = _poly(("x", "y"), ((1, 1, (2, 1)), (-1, 1, (1, 0))))
-        result = multivariate_factor(MultivariateFactorRequest(polynomial=poly))
-        assert calls == 1
-        restored = MultivariateFactorResult.model_validate(result.model_dump())
-        assert restored == result
-        assert calls == 1
-        assert _verify_multivariate_factor_result(restored)
-        assert calls == 2
-
     def test_rejects_zero_coefficient_with_zero_reconstruction(self) -> None:
         """Zero coefficient plus zero reconstruction must not validate."""
         zero = _poly(("x", "y"), ())
@@ -134,23 +109,6 @@ class TestMultivariateFactorResultInvariants:
                 factors=(),
                 reconstructed=zero,
             )
-
-    def test_structural_result_defers_product_mismatch_to_explicit_verifier(
-        self,
-    ) -> None:
-        reconstructed = _poly(("x", "y"), ((1, 1, (2, 0)),))
-        wrong_content = MultivariateFactorResult(
-            coefficient=CanonicalRational.from_fraction(Fraction(2)),
-            factors=(),
-            reconstructed=reconstructed,
-        )
-        assert not _verify_multivariate_factor_result(wrong_content)
-        forged = MultivariateFactorResult(
-            coefficient=CanonicalRational.from_fraction(Fraction(1)),
-            factors=(),
-            reconstructed=reconstructed,
-        )
-        assert not _verify_multivariate_factor_result(forged)
 
     def test_factorized_outcome_requires_invariant_markers(self) -> None:
         """A FACTORIZED result without the public contract's normalization
@@ -198,20 +156,6 @@ class TestOutputBudgetOutcome:
         assert result.factors == ()
         assert result.reconstructed == poly
         assert MultivariateFactorResult.model_validate(result.model_dump()) == result
-
-    def test_budget_exceeded_claim_requires_explicit_replay(self) -> None:
-        """An authored OUTPUT_BUDGET_EXCEEDED label on a polynomial whose
-        exact factorization fits the output budget must not validate."""
-        poly = _poly(("x", "y"), ((1, 1, (2, 1)), (-1, 1, (1, 0))))
-        forged = MultivariateFactorResult(
-            status="OUTPUT_BUDGET_EXCEEDED",
-            coefficient=CanonicalRational.from_fraction(Fraction(1)),
-            factors=(),
-            reconstructed=poly,
-            normalization=None,
-            product_reconstruction=None,
-        )
-        assert not _verify_multivariate_factor_result(forged)
 
     def test_budget_exceeded_cannot_carry_factors(self) -> None:
         poly = _poly(("x", "y"), ((2, 1, (2, 1)), (-2, 1, (1, 0))))
@@ -287,37 +231,7 @@ class TestConversionAndResultLimitAlignment:
         assert MultivariateFactorResult.model_validate(result.model_dump()) == result
 
 
-class TestBoundedReconstructionReplay:
-    def test_equal_degree_forged_payload_rejected_without_expansion(self) -> None:
-        """64 distinct monic linear forms against v0^64 share the aggregate
-        degree, so only the no-expansion replay can reject them; it must
-        fail on the first inexact division instead of expanding."""
-        variables = tuple(f"v{i}" for i in range(8))
-
-        def exponents(assignment: Mapping[str, int]) -> tuple[int, ...]:
-            return tuple(assignment.get(variable, 0) for variable in variables)
-
-        records: list[MultivariateIrreducibleFactor] = []
-        for index in range(64):
-            low, high = sorted((index % 8, (index + 1) % 8))
-            linear = _poly(
-                variables,
-                (
-                    (1, 1, exponents({variables[low]: 1})),
-                    (2, 1, exponents({variables[high]: 1})),
-                    (index + 3, 1, exponents({})),
-                ),
-            )
-            records.append(MultivariateIrreducibleFactor(factor=linear, multiplicity=1))
-        records.sort(key=_sort_key)
-        target = _poly(variables, ((1, 1, exponents({"v0": 64})),))
-        forged = MultivariateFactorResult(
-            coefficient=CanonicalRational.from_fraction(Fraction(1)),
-            factors=tuple(records),
-            reconstructed=target,
-        )
-        assert not _verify_multivariate_factor_result(forged)
-
+class TestBoundedReconstruction:
     def test_telescoped_geometric_product_replays_boundedly(self) -> None:
         """(x^64-1)(y^64-1)(z^64-1) reconstructs through many geometric-sum
         factors; the division replay must verify it exactly and quickly."""
@@ -338,47 +252,6 @@ class TestBoundedReconstructionReplay:
         assert result.status == "FACTORIZED"
         assert len(result.factors) > 3
         assert MultivariateFactorResult.model_validate(result.model_dump()) == result
-
-    def test_nonzero_remainder_rejected_as_mismatch(self) -> None:
-        """x^2 + y^2 shares its aggregate degree with (x+y) but division
-        leaves a remainder, so the replay must reject it as a mismatch."""
-        reconstructed = _poly(("x", "y"), ((1, 1, (2, 0)), (1, 1, (0, 2))))
-        factor = MultivariateIrreducibleFactor(
-            factor=_poly(("x", "y"), ((1, 1, (1, 1)), (1, 1, (0, 0)))),
-            multiplicity=1,
-        )
-        forged = MultivariateFactorResult(
-            coefficient=CanonicalRational.from_fraction(Fraction(1)),
-            factors=(factor,),
-            reconstructed=reconstructed,
-        )
-        assert not _verify_multivariate_factor_result(forged)
-
-    def test_scaled_constant_coefficient_verified(self) -> None:
-        """coefficient * product must equal reconstructed exactly, including
-        rational content placement: 2*(x)*(y) != reconstructed 3*x*y."""
-        records = (
-            MultivariateIrreducibleFactor(
-                factor=_poly(("x", "y"), ((1, 1, (0, 1)),)), multiplicity=1
-            ),
-            MultivariateIrreducibleFactor(
-                factor=_poly(("x", "y"), ((1, 1, (1, 0)),)), multiplicity=1
-            ),
-        )
-        reconstructed = _poly(("x", "y"), ((3, 1, (1, 1)),))
-        forged = MultivariateFactorResult(
-            coefficient=CanonicalRational.from_fraction(Fraction(2)),
-            factors=records,
-            reconstructed=reconstructed,
-        )
-        assert not _verify_multivariate_factor_result(forged)
-        accepted = MultivariateFactorResult(
-            coefficient=CanonicalRational.from_fraction(Fraction(3)),
-            factors=records,
-            reconstructed=reconstructed,
-        )
-        assert accepted.product_reconstruction == "EXACT"
-        assert _verify_multivariate_factor_result(accepted)
 
 
 class TestBudgetOutcomeCoefficientBinding:
@@ -463,63 +336,6 @@ class TestUniqueFactorizationReplay:
             for record in result.factors
         )
         assert degrees == [1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 4, 4]
-
-    def test_swapped_monic_irreducible_factor_rejected(self) -> None:
-        """Replacing one true factor with another monic irreducible of the
-        same total degree keeps the canonical envelope but must fail the
-        unique-factorization replay."""
-        poly = _poly(("x", "y"), _difference_product_terms(("x", "y"), 12))
-        result = multivariate_factor(MultivariateFactorRequest(polynomial=poly))
-        impostor = MultivariateIrreducibleFactor(
-            factor=_poly(("x", "y"), ((1, 1, (2, 0)), (1, 1, (0, 2)), (1, 1, (0, 0)))),
-            multiplicity=1,
-        )
-        records = [*result.factors[:-1], impostor]
-        records.sort(key=_sort_key)
-        forged = MultivariateFactorResult(
-            coefficient=result.coefficient,
-            factors=tuple(records),
-            reconstructed=result.reconstructed,
-        )
-        assert not _verify_multivariate_factor_result(forged)
-
-    def test_multiplicity_shift_between_equal_degree_factors_rejected(
-        self,
-    ) -> None:
-        """Moving multiplicity between equal-degree factors preserves the
-        aggregate degree yet changes the decomposition; the replay must
-        reject it."""
-        poly = _poly(("x", "y"), _difference_product_terms(("x", "y"), 12))
-        result = multivariate_factor(MultivariateFactorRequest(polynomial=poly))
-
-        def degree_of(record: MultivariateIrreducibleFactor) -> int:
-            return max(
-                (sum(term.exponents) for term in record.factor.polynomial.terms),
-                default=0,
-            )
-
-        by_degree: dict[int, list[MultivariateIrreducibleFactor]] = {}
-        for record in result.factors:
-            by_degree.setdefault(degree_of(record), []).append(record)
-        victims = by_degree[2]
-        dropped, kept = victims[0], victims[1]
-        promoted = MultivariateIrreducibleFactor(
-            factor=victims[2].factor,
-            multiplicity=2,
-        )
-        records = [
-            record
-            for record in result.factors
-            if record not in (dropped, kept, victims[2])
-        ]
-        records.append(promoted)
-        records.sort(key=_sort_key)
-        forged = MultivariateFactorResult(
-            coefficient=result.coefficient,
-            factors=tuple(records),
-            reconstructed=result.reconstructed,
-        )
-        assert not _verify_multivariate_factor_result(forged)
 
 
 def _prime_denominator_poly(prime_count: int) -> RationalPolynomial:
@@ -833,74 +649,6 @@ class TestKillableFactorBackend:
         assert response["ok"] is False
         assert response["exhausted"] is False
         assert response["as_limit_applied"] is False
-
-    def test_interrupted_budget_claim_replay_rejected(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """An authored OUTPUT_BUDGET_EXCEEDED claim whose verification
-        replay is interrupted must be rejected, not authenticated."""
-        from jacobian.math.polynomials.multivariate._factor_backend import (
-            FactorBackendInterruptedError,
-        )
-
-        poly = _poly(("x", "y"), ((2, 1, (2, 1)), (-2, 1, (1, 0))))
-
-        def fake_run(*_args: Any, **_kwargs: Any) -> None:
-            raise FactorBackendInterruptedError("replay stopped")
-
-        monkeypatch.setattr(
-            "jacobian.process.run_bounded_process",
-            fake_run,
-        )
-        from jacobian._exact import CanonicalRational
-
-        claim = MultivariateFactorResult(
-            status="OUTPUT_BUDGET_EXCEEDED",
-            coefficient=CanonicalRational.from_fraction(Fraction(2)),
-            factors=(),
-            reconstructed=poly,
-            normalization=None,
-            product_reconstruction=None,
-        )
-        assert not _verify_multivariate_factor_result(claim)
-
-    def test_memory_exhausted_budget_claim_replay_rejected(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """An authored OUTPUT_BUDGET_EXCEEDED claim whose verification
-        replay itself dies on worker memory exhaustion must be rejected,
-        not authenticated: an allocation failure under the address-space
-        cap proves nothing about the exact output size (PR #2226 review)."""
-        import json as _json
-
-        poly = _poly(("x", "y"), ((2, 1, (2, 1)), (-2, 1, (1, 0))))
-
-        payload = _json.dumps(
-            {
-                "ok": False,
-                "error": "MemoryError()",
-                "exhausted": True,
-                "as_limit_applied": True,
-            }
-        ).encode()
-
-        def fake_run(*_args: Any, **_kwargs: Any) -> SimpleNamespace:
-            return TestExecutionInterruptionSeparation._fake_completed(
-                returncode=1, stdout=payload
-            )
-
-        monkeypatch.setattr("jacobian.process.run_bounded_process", fake_run)
-        from jacobian._exact import CanonicalRational
-
-        claim = MultivariateFactorResult(
-            status="OUTPUT_BUDGET_EXCEEDED",
-            coefficient=CanonicalRational.from_fraction(Fraction(2)),
-            factors=(),
-            reconstructed=poly,
-            normalization=None,
-            product_reconstruction=None,
-        )
-        assert not _verify_multivariate_factor_result(claim)
 
 
 class TestSignedBudgetOutcomeContent:

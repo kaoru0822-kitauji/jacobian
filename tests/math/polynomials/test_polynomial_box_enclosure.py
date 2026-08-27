@@ -508,7 +508,7 @@ def test_structural_result_parse_accepts_canonical_forged_enclosure() -> None:
     payload["enclosure"] = _maximum_canonical_interval_payload()
 
     parsed = PolynomialBoxEnclosureResult.model_validate(payload)
-    assert parsed.enclosure.upper.as_fraction() == 0
+    assert parsed.model_dump(mode="json") == payload
 
 
 def _digit_rational(

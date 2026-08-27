@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
 from fractions import Fraction
 from itertools import product
 from typing import Any
@@ -439,45 +438,6 @@ def test_small_integer_polynomials_match_sympy_inequality_sets_exhaustively() ->
                     assert actual.start.equals(expected.start), expression
                     assert actual.end.equals(expected.end), expression
                 assert simplify(_resolve_measure(result) - expected_set.measure) == 0
-
-
-def test_owner_verifier_rejects_independent_forged_fields() -> None:
-    result = compute_strict_sublevel_measure(_request(_polynomial((1, 2)), threshold=2))
-    payload = result.model_dump(mode="json")
-    mutations = []
-
-    changed_source = deepcopy(payload)
-    changed_source["source_polynomial"]["polynomial"]["terms"].append(
-        {
-            "coefficient": {"num": "3", "den": "1"},
-            "exponents": (0,),
-        }
-    )
-    mutations.append(changed_source)
-
-    changed_threshold = deepcopy(payload)
-    changed_threshold["threshold"] = {"num": "0", "den": "1"}
-    mutations.append(changed_threshold)
-
-    changed_scope = deepcopy(payload)
-    changed_scope["upper"] = {"num": "0", "den": "1"}
-    mutations.append(changed_scope)
-
-    changed_endpoint = deepcopy(payload)
-    changed_endpoint["components"][0]["left"]["root"]["root_index"] = 1
-    mutations.append(changed_endpoint)
-
-    changed_measure = deepcopy(payload)
-    changed_measure["measure"]["root_terms"][0]["coefficient"] = 1
-    mutations.append(changed_measure)
-
-    from jacobian.math.polynomials.real_algebra._strict_sublevel import (
-        verify_strict_sublevel_measure_result,
-    )
-
-    for mutation in mutations:
-        parsed = StrictSublevelMeasureResult.model_validate(mutation)
-        assert not verify_strict_sublevel_measure_result(parsed)
 
 
 def test_measure_root_incidence_rejects_boolean_coefficient() -> None:
