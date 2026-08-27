@@ -15,9 +15,7 @@ from jacobian.math.matrices.canonical_forms import (
 )
 from jacobian.math.matrices.canonical_forms._models import (
     InvariantFactorEntry,
-    MinimalPolynomialResult,
     MonicPolynomial,
-    PrimaryDecompositionResult,
     RationalCanonicalFormResult,
     SquareMatrixRequest,
 )

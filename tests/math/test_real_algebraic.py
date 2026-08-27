@@ -7,7 +7,6 @@ from pydantic import ValidationError
 from tests.math._real_algebraic_support import real_algebraic_validation_error
 
 from jacobian.math.real_algebraic import (
-    RealAlgebraicOrderValue,
     RealAlgebraicValue,
     compare_real_algebraic,
     isolate_real_algebraic,

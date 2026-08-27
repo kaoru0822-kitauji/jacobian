@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import copy
-from copy import deepcopy
 from fractions import Fraction
 from typing import Any
 
@@ -25,7 +23,6 @@ from jacobian.math.polynomials.multivariate._operations import (
 )
 from jacobian.math.polynomials.multivariate._resultant import (
     MultivariateResultantRequest,
-    MultivariateResultantResult,
 )
 from jacobian.math.polynomials.multivariate._subresultants import (
     MultivariateSubresultantSequenceRequest,
