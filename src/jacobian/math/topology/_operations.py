@@ -39,6 +39,8 @@ from jacobian.math.topology._homology import (
     SimplicialHomologyResult,
 )
 from jacobian.math.topology._models import (
+    MAX_BARYCENTRIC_SOURCE_FACES,
+    MAX_TOPOLOGY_FACETS,
     BarycentricSubdivisionRequest,
     BarycentricSubdivisionResult,
     BoundarySquareLedgerEntry,
@@ -787,13 +789,14 @@ def compute_barycentric_subdivision(
     sorted_faces = sorted(
         _all_faces(request.complex.facets), key=lambda face: (len(face), face)
     )
-    if len(sorted_faces) > 31:
+    if len(sorted_faces) > MAX_BARYCENTRIC_SOURCE_FACES:
         raise OperationDomainValidationError(
             location=("complex",),
             code="topology.require_barycentric_work_bounds_1",
             message=(
-                "barycentric subdivision requires at most 31 faces; "
-                "input would produce more than 128 subdivision facets"
+                "barycentric subdivision requires at most "
+                f"{MAX_BARYCENTRIC_SOURCE_FACES} faces; input would produce "
+                f"more than {MAX_TOPOLOGY_FACETS} subdivision facets"
             ),
         )
     subdivision = barycentric_subdivision(sorted_faces)

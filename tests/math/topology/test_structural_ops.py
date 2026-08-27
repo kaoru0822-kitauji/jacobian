@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian.math.topology._models import (
+    MAX_BARYCENTRIC_SOURCE_FACES,
     BarycentricSubdivisionRequest,
     BarycentricSubdivisionResult,
     ShellingCheckRequest,
@@ -241,7 +242,9 @@ class TestBarycentricSubdivision:
             )
         )
 
-        with pytest.raises(ValueError, match="at most 31 faces"):
+        with pytest.raises(
+            ValueError, match=f"at most {MAX_BARYCENTRIC_SOURCE_FACES} faces"
+        ):
             compute_barycentric_subdivision(request)
 
     def test_subdivide_edge(self) -> None:

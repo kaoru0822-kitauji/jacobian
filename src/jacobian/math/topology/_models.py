@@ -31,6 +31,9 @@ MAX_TOPOLOGY_FACES = 2048
 MAX_TOPOLOGY_CHAIN_GROUP = 512
 MAX_TOPOLOGY_MATRIX_CELLS = 131_072
 MAX_TOPOLOGY_PRIME = 251
+# Barycentric subdivision admits only the source face counts whose maximal
+# chains fit the canonical facet result bound.
+MAX_BARYCENTRIC_SOURCE_FACES = 31
 
 
 def _validation_error(reason: str, message: str) -> PydanticCustomError:
@@ -679,6 +682,7 @@ class ChainComplexResult(TopologyExactResult):
 
 
 __all__ = [
+    "MAX_BARYCENTRIC_SOURCE_FACES",
     "MAX_TOPOLOGY_CHAIN_GROUP",
     "MAX_TOPOLOGY_DIMENSION",
     "MAX_TOPOLOGY_FACES",
