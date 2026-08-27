@@ -1226,32 +1226,6 @@ class MinimumTransversalRequest(StrictModel):
         },
     )
 
-    @model_validator(mode="after")
-    def require_bounded_search(self) -> Self:
-        if any(not members for _, members in self.hypergraph.edges):
-            raise _validation_error(
-                "minimum transversal search does not admit empty edges"
-            )
-        active_vertices, _, _, search_work = _minimum_transversal_search_plan(
-            self.hypergraph
-        )
-        if search_work > MAX_TRANSVERSAL_SEARCH_WORK:
-            raise _validation_error(
-                "minimum transversal search exceeds the "
-                f"{MAX_TRANSVERSAL_SEARCH_WORK}-check exact search bound"
-            )
-        if (
-            _minimum_transversal_result_bytes(self.hypergraph, active_vertices)
-            > MAX_TRANSVERSAL_RESULT_BYTES
-        ):
-            raise _validation_error(
-                "the minimum transversal result retains its source hypergraph "
-                f"and would exceed the {MAX_TRANSVERSAL_RESULT_BYTES}-byte "
-                "canonical output limit; shorten labels or reduce the edge family"
-            )
-        return self
-
-
 class MinimumTransversalResult(StrictModel):
     """An exact minimum-cardinality transversal of a finite hypergraph.
 

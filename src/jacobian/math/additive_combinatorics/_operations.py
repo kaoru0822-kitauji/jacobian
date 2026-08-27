@@ -6,7 +6,11 @@ from collections import Counter
 from collections.abc import Mapping
 
 from jacobian.canonical import format_canonical_integer, parse_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
+from jacobian.math.additive_combinatorics import _multiset_sum
 from jacobian.math.additive_combinatorics._models import (
+    _MAX_MULTISET_SUM_ENUMERATION_WORK,
+    _MAX_MULTISET_SUM_SUPPORT_SIZE,
     AdditiveEnergyRequest,
     AdditiveEnergyResult,
     DirectSumPredicateRequest,
@@ -36,6 +40,7 @@ from jacobian.math.additive_combinatorics._subset_sum_profile import (
 from jacobian.math.additive_combinatorics._subset_sum_target import (
     SubsetSumTargetRequest,
     SubsetSumTargetResult,
+    _admit_subset_sum_target,
 )
 from jacobian.math.additive_combinatorics._subset_sum_target_kernel import (
     _solve_subset_sum_target,
@@ -94,7 +99,15 @@ def compute_multiset_sum_representation_profile(
     An optional closed window filters sums but not candidate inspection, so the
     returned rows remain complete for that exact mathematical scope.
     """
-    values = _multiset_sum_source_values(request.source)
+    try:
+        values = _multiset_sum_source_values(request.source)
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=("source",),
+            code="additive_combinatorics.multiset_sum.source_domain",
+            message=str(exc),
+        ) from exc
+    _admit_multiset_sum_profile(request, values)
     bounds = request.window.as_integer_bounds() if request.window is not None else None
     counts = count_sums(values, request.arity, bounds)
     entries = tuple(
@@ -105,6 +118,41 @@ def compute_multiset_sum_representation_profile(
         for value in sorted(counts)
     )
     return MultisetSumRepresentationProfileResult._from_kernel(request, entries)
+
+
+def _admit_multiset_sum_profile(
+    request: MultisetSumRepresentationProfileRequest,
+    values: tuple[int, ...],
+) -> None:
+    """Admit exact multiset enumeration and output support before the kernel."""
+
+    candidate_count = _multiset_sum.candidate_count(len(values), request.arity)
+    bounds = request.window.as_integer_bounds() if request.window is not None else None
+    work = _multiset_sum.enumeration_work(
+        values, request.arity, bounds, candidate_count
+    )
+    if work > _MAX_MULTISET_SUM_ENUMERATION_WORK:
+        raise OperationDomainValidationError(
+            location=("arity",),
+            code="additive_combinatorics.multiset_sum.work_bound",
+            message=(
+                f"multiset-sum enumeration requires {work} coordinate steps, "
+                f"exceeding the {_MAX_MULTISET_SUM_ENUMERATION_WORK}-step bound"
+            ),
+        )
+    support_bound = _multiset_sum.support_bound(
+        values, request.arity, bounds, candidate_count
+    )
+    if support_bound > _MAX_MULTISET_SUM_SUPPORT_SIZE:
+        raise OperationDomainValidationError(
+            location=("arity",),
+            code="additive_combinatorics.multiset_sum.support_bound",
+            message=(
+                f"multiset-sum profile may contain {support_bound} rows, exceeding "
+                f"the {_MAX_MULTISET_SUM_SUPPORT_SIZE}-row result bound; supply a "
+                "narrower closed sum window"
+            ),
+        )
 
 
 def compute_subset_sum_profile(
@@ -124,6 +172,7 @@ def verify_subset_sum_target_result(result: SubsetSumTargetResult) -> bool:
             target=result.target,
             allow_empty_subset=result.allow_empty_subset,
         )
+        _admit_subset_sum_target(request)
         values = tuple(parse_canonical_integer(value) for value in request.source.items)
         target = parse_canonical_integer(request.target)
         indices = _solve_subset_sum_target(
@@ -337,6 +386,7 @@ def verify_multiset_sum_representation_profile(
             source=result.source, arity=result.arity, window=result.window
         )
         values = _multiset_sum_source_values(request.source)
+        _admit_multiset_sum_profile(request, values)
         bounds = (
             request.window.as_integer_bounds() if request.window is not None else None
         )

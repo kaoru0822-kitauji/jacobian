@@ -11,6 +11,7 @@ from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel, canonicalize_json_containers
 from jacobian.canonical import format_canonical_integer, parse_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.additive_combinatorics.values import (
     IndexedIntegerSequence,
     IndexSubset,
@@ -276,59 +277,6 @@ class SubsetSumResidueProfileRequest(StrictModel):
         _raw_source_shape(prepared.get("source"))
         return prepared
 
-    @model_validator(mode="after")
-    def require_bounded_complete_profile(self) -> Self:
-        item_count = len(self.source.items)
-        if item_count + 1 > MAX_RESIDUE_PROFILE_MULTIPLICITY_BITS:
-            raise _validation_error(
-                "require_bounded_complete_profile",
-                "subset multiplicities exceed the 4,096-bit intermediate bound",
-            )
-
-        oversized = next(
-            (
-                index
-                for index, value in enumerate(self.source.items)
-                if len(value.lstrip("-")) > MAX_RESIDUE_PROFILE_INPUT_INTEGER_DIGITS
-            ),
-            None,
-        )
-        if oversized is not None:
-            raise _validation_error(
-                "require_bounded_complete_profile",
-                f"source value at index {oversized} exceeds the 32,768-digit "
-                "input bound",
-            )
-
-        dp_cells = item_count * self.modulus
-        if dp_cells > MAX_RESIDUE_PROFILE_DP_CELLS:
-            raise _validation_error(
-                "require_bounded_complete_profile",
-                "subset-sum residue DP exceeds the 1,000,000-cell work bound",
-            )
-
-        if (
-            self.include_witnesses
-            and dp_cells > MAX_RESIDUE_PROFILE_WITNESS_INDEX_SLOTS
-        ):
-            raise _validation_error(
-                "require_bounded_complete_profile",
-                "residue witnesses exceed the 250,000 index-slot storage bound",
-            )
-
-        result_bytes = _estimated_result_bytes(
-            self.source,
-            self.modulus,
-            include_witnesses=self.include_witnesses,
-        )
-        if result_bytes > MAX_RESIDUE_PROFILE_RESULT_BYTES:
-            raise _validation_error(
-                "require_bounded_complete_profile",
-                "subset-sum residue profile exceeds the 4 MiB result bound",
-            )
-        return self
-
-
 class SubsetSumResidueProfileResult(StrictModel):
     """A complete exact residue profile bound to its indexed source."""
 
@@ -538,12 +486,65 @@ def compute_subset_sum_residue_profile(
     request: SubsetSumResidueProfileRequest,
 ) -> SubsetSumResidueProfileResult:
     """Return every exact indexed-subset multiplicity modulo ``m``."""
+    _admit_subset_sum_residue_profile(request)
     residue_counts, residue_witnesses = _compute_residue_profile(request)
     return SubsetSumResidueProfileResult._from_kernel(
         request,
         residue_counts=residue_counts,
         residue_witnesses=residue_witnesses,
     )
+
+
+def _admit_subset_sum_residue_profile(
+    request: SubsetSumResidueProfileRequest,
+) -> None:
+    """Admit one native residue profile before running the dense recurrence."""
+
+    item_count = len(request.source.items)
+    if item_count + 1 > MAX_RESIDUE_PROFILE_MULTIPLICITY_BITS:
+        raise OperationDomainValidationError(
+            location=("source",),
+            code="additive_combinatorics.subset_sum_residue.multiplicity_bound",
+            message="subset multiplicities exceed the 4,096-bit intermediate bound",
+        )
+    oversized = next(
+        (
+            index
+            for index, value in enumerate(request.source.items)
+            if len(value.lstrip("-")) > MAX_RESIDUE_PROFILE_INPUT_INTEGER_DIGITS
+        ),
+        None,
+    )
+    if oversized is not None:
+        raise OperationDomainValidationError(
+            location=("source", oversized),
+            code="additive_combinatorics.subset_sum_residue.integer_bound",
+            message=f"source value at index {oversized} exceeds the 32,768-digit input bound",
+        )
+    dp_cells = item_count * request.modulus
+    if dp_cells > MAX_RESIDUE_PROFILE_DP_CELLS:
+        raise OperationDomainValidationError(
+            location=("source",),
+            code="additive_combinatorics.subset_sum_residue.dp_bound",
+            message="subset-sum residue DP exceeds the 1,000,000-cell work bound",
+        )
+    if request.include_witnesses and dp_cells > MAX_RESIDUE_PROFILE_WITNESS_INDEX_SLOTS:
+        raise OperationDomainValidationError(
+            location=("source",),
+            code="additive_combinatorics.subset_sum_residue.witness_bound",
+            message="residue witnesses exceed the 250,000 index-slot storage bound",
+        )
+    result_bytes = _estimated_result_bytes(
+        request.source,
+        request.modulus,
+        include_witnesses=request.include_witnesses,
+    )
+    if result_bytes > MAX_RESIDUE_PROFILE_RESULT_BYTES:
+        raise OperationDomainValidationError(
+            location=("source",),
+            code="additive_combinatorics.subset_sum_residue.result_bound",
+            message="subset-sum residue profile exceeds the 4 MiB result bound",
+        )
 
 
 def _verify_subset_sum_residue_profile(result: SubsetSumResidueProfileResult) -> bool:
@@ -556,6 +557,7 @@ def _verify_subset_sum_residue_profile(result: SubsetSumResidueProfileResult) ->
             include_empty_subset=result.include_empty_subset,
             include_witnesses=result.include_witnesses,
         )
+        _admit_subset_sum_residue_profile(request)
         expected_counts, expected_witnesses = _compute_residue_profile(request)
     except ValueError:
         return False

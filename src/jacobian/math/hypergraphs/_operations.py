@@ -1,8 +1,11 @@
 """Exact bounded finite hypergraph operations."""
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.values import SimpleUndirectedGraph
 from jacobian.math.hypergraphs._models import (
     MAX_INDUCED_PROFILE_RESULT_BYTES,
+    MAX_TRANSVERSAL_RESULT_BYTES,
+    MAX_TRANSVERSAL_SEARCH_WORK,
     CliqueExpansionRequest,
     CliqueExpansionResult,
     DualRequest,
@@ -29,6 +32,7 @@ from jacobian.math.hypergraphs._models import (
     _admit_edge_intersection_profile,
     _induced_type_profile_admission_plan,
     _InducedTypeProfileAdmissionPlan,
+    _minimum_transversal_result_bytes,
     _minimum_transversal_search_plan,
     _validation_error,
 )
@@ -436,7 +440,7 @@ def compute_induced_type_profile(
 
 
 def _minimum_transversal_data(
-    hypergraph: FiniteHypergraph,
+    plan: tuple[tuple[str, ...], tuple[frozenset[str], ...], int, int],
 ) -> tuple[tuple[str, ...], int]:
     """Return one minimum transversal (declared vertex order) and its size.
 
@@ -446,9 +450,7 @@ def _minimum_transversal_data(
     """
     from itertools import combinations
 
-    vertices, edge_sets, search_depth, _search_work = _minimum_transversal_search_plan(
-        hypergraph
-    )
+    vertices, edge_sets, search_depth, _search_work = plan
     if not edge_sets:
         return (), 0
     for size in range(1, search_depth + 1):
@@ -461,12 +463,51 @@ def _minimum_transversal_data(
     raise AssertionError("minimum transversal search exhausted all vertices")
 
 
+def _admit_minimum_transversal(
+    hypergraph: FiniteHypergraph,
+) -> tuple[tuple[str, ...], tuple[frozenset[str], ...], int, int]:
+    """Admit a transversal request and return its reusable search plan."""
+
+    if any(not members for _, members in hypergraph.edges):
+        raise OperationDomainValidationError(
+            location=("hypergraph",),
+            code="hypergraph.minimum_transversal.empty_edge",
+            message="minimum transversal search does not admit empty edges",
+        )
+    plan = _minimum_transversal_search_plan(hypergraph)
+    active_vertices, _, _, search_work = plan
+    if search_work > MAX_TRANSVERSAL_SEARCH_WORK:
+        raise OperationDomainValidationError(
+            location=("hypergraph",),
+            code="hypergraph.minimum_transversal.search_bound",
+            message=(
+                "minimum transversal search exceeds the "
+                f"{MAX_TRANSVERSAL_SEARCH_WORK}-check exact search bound"
+            ),
+        )
+    if (
+        _minimum_transversal_result_bytes(hypergraph, active_vertices)
+        > MAX_TRANSVERSAL_RESULT_BYTES
+    ):
+        raise OperationDomainValidationError(
+            location=("hypergraph",),
+            code="hypergraph.minimum_transversal.result_bound",
+            message=(
+                "the minimum transversal result retains its source hypergraph "
+                f"and would exceed the {MAX_TRANSVERSAL_RESULT_BYTES}-byte "
+                "canonical output limit; shorten labels or reduce the edge family"
+            ),
+        )
+    return plan
+
+
 def compute_minimum_transversal(
     request: MinimumTransversalRequest,
 ) -> MinimumTransversalResult:
     """Compute an exact minimum-cardinality transversal of a finite hypergraph."""
 
-    transversal, cardinality = _minimum_transversal_data(request.hypergraph)
+    plan = _admit_minimum_transversal(request.hypergraph)
+    transversal, cardinality = _minimum_transversal_data(plan)
     return MinimumTransversalResult(
         hypergraph=request.hypergraph,
         transversal=transversal,
@@ -479,8 +520,8 @@ def verify_minimum_transversal_result(
 ) -> bool:
     """Verify an independently supplied minimum transversal."""
 
-    MinimumTransversalRequest(hypergraph=result.hypergraph)
-    _transversal, cardinality = _minimum_transversal_data(result.hypergraph)
+    plan = _admit_minimum_transversal(result.hypergraph)
+    _transversal, cardinality = _minimum_transversal_data(plan)
     return result.cardinality == cardinality
 
 

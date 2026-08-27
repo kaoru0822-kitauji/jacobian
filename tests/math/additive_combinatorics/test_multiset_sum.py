@@ -174,16 +174,14 @@ def test_result_round_trip_has_the_defining_invariant() -> None:
 
 
 def test_request_requires_canonical_source_order() -> None:
-    with pytest.raises(ValidationError):
-        _request((1, -2, 3), 2)
+    with pytest.raises(ValueError):
+        _profile((1, -2, 3), 2)
 
 
 def test_request_rejects_oversized_source_integer_before_parsing() -> None:
     oversized = "9" * (_MAX_MULTISET_SUM_ELEMENT_DIGITS + 1)
-    with pytest.raises(ValidationError):
-        MultisetSumRepresentationProfileRequest.model_validate(
-            {"source": {"elements": [oversized]}, "arity": 2}
-        )
+    with pytest.raises(ValueError):
+        _profile((int(oversized),), 2)
 
 
 def test_request_schema_exposes_collection_and_scalar_bounds() -> None:
@@ -230,8 +228,8 @@ def test_singleton_sum_digits_stay_within_the_derived_result_bound() -> None:
 
 
 def test_costly_large_arity_is_rejected_by_work_not_by_an_arity_cap() -> None:
-    with pytest.raises(ValidationError):
-        _request((0, 1), 10**15)
+    with pytest.raises(ValueError):
+        _profile((0, 1), 10**15)
 
 
 def test_bar_positions_match_the_itertools_combinations_oracle() -> None:
@@ -300,8 +298,8 @@ def test_intersecting_window_still_pays_full_enumeration_work(
     # Boundary of the shortcut: a window sharing any point with the attainable
     # interval requires real candidate inspection, so the work preflight still
     # rejects it even though the declared span is small.
-    with pytest.raises(ValidationError):
-        _request((0, 1), 10**15, window)
+    with pytest.raises(ValueError):
+        _profile((0, 1), 10**15, window)
 
 
 def test_verifier_rejects_disjoint_window_forged_entries() -> None:
@@ -337,8 +335,8 @@ def test_full_profile_rejects_worst_case_support_above_result_bound() -> None:
     spacing = 2 * source_size * source_size
     offset = 10**63
     source = tuple(offset + spacing * i + i * i for i in range(source_size))
-    with pytest.raises(ValidationError):
-        _request(source, 2)
+    with pytest.raises(ValueError):
+        _profile(source, 2)
 
 
 @pytest.mark.scale
@@ -361,8 +359,8 @@ def test_narrow_window_admits_large_candidate_family_with_small_output() -> None
 
 def test_request_rejects_enumeration_above_work_bound() -> None:
     _request(tuple(range(340)), 3, (0, 0))
-    with pytest.raises(ValidationError):
-        _request(tuple(range(341)), 3, (0, 0))
+    with pytest.raises(ValueError):
+        _profile(tuple(range(341)), 3, (0, 0))
 
 
 def test_widened_source_axis_preserves_cartesian_pair_bound() -> None:

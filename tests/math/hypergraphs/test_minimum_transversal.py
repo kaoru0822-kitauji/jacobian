@@ -61,8 +61,8 @@ class TestMinimumTransversal:
 
         source_bytes = len(canonicalize_json(hypergraph.model_dump(mode="json")))
         assert source_bytes < CanonicalLimits().max_output_bytes
-        with pytest.raises(ValidationError, match="canonical output limit"):
-            MinimumTransversalRequest(hypergraph=hypergraph)
+        with pytest.raises(ValueError, match="canonical output limit"):
+            _transversal(hypergraph)
 
     def test_schema_states_nonempty_hyperedge_precondition(self) -> None:
         schema = MinimumTransversalRequest.model_json_schema()
@@ -105,12 +105,8 @@ class TestMinimumTransversal:
         assert result.transversal == ("a",)
 
     def test_empty_edge_rejected(self) -> None:
-        with pytest.raises(ValidationError):
-            MinimumTransversalRequest(
-                hypergraph=FiniteHypergraph.model_validate(
-                    {"vertices": ["a"], "edges": [["e", []]]}
-                )
-            )
+        with pytest.raises(ValueError):
+            _transversal({"vertices": ["a"], "edges": [["e", []]]})
 
     def test_large_carrier_with_small_active_edge_family_is_admitted(self) -> None:
         result = _transversal(
@@ -147,8 +143,8 @@ class TestMinimumTransversal:
             "vertices": vertices,
             "edges": [[f"e{i}", [vertex]] for i, vertex in enumerate(vertices)],
         }
-        with pytest.raises(ValidationError):
-            MinimumTransversalRequest(hypergraph=FiniteHypergraph.model_validate(hg))
+        with pytest.raises(ValueError):
+            _transversal(hg)
 
     def test_verify_round_trip(self) -> None:
         result = _transversal(HYPERGRAPH)
@@ -212,5 +208,5 @@ class TestMinimumTransversal:
             }
         )
 
-        with pytest.raises(ValidationError, match="search exceeds"):
+        with pytest.raises(ValueError, match="search exceeds"):
             verify_minimum_transversal_result(result)

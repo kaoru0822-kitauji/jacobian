@@ -602,33 +602,6 @@ class MultisetSumRepresentationProfileRequest(StrictModel):
         examples=[None, {"lower": "0", "upper": "10"}],
     )
 
-    @model_validator(mode="after")
-    def require_bounded_complete_enumeration(self) -> Self:
-        values = _multiset_sum_source_values(self.source)
-        candidate_count = _multiset_sum.candidate_count(len(values), self.arity)
-        bounds = self.window.as_integer_bounds() if self.window is not None else None
-        work = _multiset_sum.enumeration_work(
-            values, self.arity, bounds, candidate_count
-        )
-        if work > _MAX_MULTISET_SUM_ENUMERATION_WORK:
-            raise _validation_error(
-                "require_bounded_complete_enumeration",
-                f"multiset-sum enumeration requires {work} coordinate steps, "
-                f"exceeding the {_MAX_MULTISET_SUM_ENUMERATION_WORK}-step bound",
-            )
-        support_bound = _multiset_sum.support_bound(
-            values, self.arity, bounds, candidate_count
-        )
-        if support_bound > _MAX_MULTISET_SUM_SUPPORT_SIZE:
-            raise _validation_error(
-                "require_bounded_complete_enumeration",
-                f"multiset-sum profile may contain {support_bound} rows, exceeding "
-                f"the {_MAX_MULTISET_SUM_SUPPORT_SIZE}-row result bound; supply a "
-                "narrower closed sum window",
-            )
-        return self
-
-
 class MultisetSumRepresentationProfileResult(StrictModel):
     """Source-bound exact multiplicities for one complete sum scope.
 
