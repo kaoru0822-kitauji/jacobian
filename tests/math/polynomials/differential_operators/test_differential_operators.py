@@ -15,6 +15,7 @@ from tests.math.polynomials._support import polynomial_validation_error
 
 from jacobian._exact import CanonicalRational
 from jacobian.canonical import encode_strict_json
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.polynomials._conversions import rational_polynomial_from_sympy
 from jacobian.math.polynomials.differential_operators._bounds import (
     MAX_APPLICATION_RESULT_BYTES,
@@ -164,7 +165,7 @@ def test_native_iteration_count_must_be_an_integer() -> None:
     source = _polynomial(("x",), {(1,): 1})
     operator = _operator(("x",), {(1,): 1})
 
-    with pytest.raises(TypeError, match="must be an integer"):
+    with pytest.raises(OperationDomainValidationError, match="must be an integer"):
         apply_constant_coefficient_differential_operator(
             source,
             operator,
@@ -224,17 +225,21 @@ def test_expanding_iterates_gate_on_derived_support_and_growth() -> None:
     )
 
     expanding = _operator(variables, {(1,): 1, (0,): 1})
-    with polynomial_validation_error():
-        DifferentialOperatorApplyRequest(
-            polynomial=source,
-            operator=expanding,
-            iterations=tall_iterations,
+    with pytest.raises(OperationDomainValidationError):
+        compute_differential_operator_application(
+            DifferentialOperatorApplyRequest(
+                polynomial=source,
+                operator=expanding,
+                iterations=tall_iterations,
+            )
         )
-    with polynomial_validation_error():
-        DifferentialOperatorApplyRequest(
-            polynomial=source,
-            operator=expanding,
-            iterations=10**12,
+    with pytest.raises(OperationDomainValidationError):
+        compute_differential_operator_application(
+            DifferentialOperatorApplyRequest(
+                polynomial=source,
+                operator=expanding,
+                iterations=10**12,
+            )
         )
     with pytest.raises(ValueError, match="nonnegative"):
         apply_constant_coefficient_differential_operator(
@@ -339,11 +344,13 @@ def test_scalar_iterate_growth_is_bounded_by_the_coefficient_budget() -> None:
     variables = ("x",)
     scaling = _operator(variables, {(0,): 2})
 
-    with polynomial_validation_error():
-        DifferentialOperatorApplyRequest(
-            polynomial=_polynomial(variables, {(0,): 1}),
-            operator=scaling,
-            iterations=400_000,
+    with pytest.raises(OperationDomainValidationError):
+        compute_differential_operator_application(
+            DifferentialOperatorApplyRequest(
+                polynomial=_polynomial(variables, {(0,): 1}),
+                operator=scaling,
+                iterations=400_000,
+            )
         )
 
 
@@ -553,11 +560,13 @@ def test_merged_unit_paths_still_gate_at_the_coefficient_budget() -> None:
     # Under 1 + ∂x the monomials x·y and y both contribute a unit-height
     # copy to the output monomial y, so its merged coefficient 12·10^32767
     # carries 32,769 digits even though each path alone preserves height.
-    with polynomial_validation_error():
-        DifferentialOperatorApplyRequest(
-            polynomial=_polynomial(variables, {(1, 1): tall, (0, 1): tall}),
-            operator=_operator(variables, {(0, 0): 1, (1, 0): 1}),
-            iterations=1,
+    with pytest.raises(OperationDomainValidationError):
+        compute_differential_operator_application(
+            DifferentialOperatorApplyRequest(
+                polynomial=_polynomial(variables, {(1, 1): tall, (0, 1): tall}),
+                operator=_operator(variables, {(0, 0): 1, (1, 0): 1}),
+                iterations=1,
+            )
         )
 
 
@@ -588,20 +597,24 @@ def test_growing_derivatives_still_gate_at_the_coefficient_budget() -> None:
 
     # Differentiating x^11 multiplies the boundary height by 11, producing a
     # 32,769-digit coefficient that exceeds the budget.
-    with polynomial_validation_error():
-        DifferentialOperatorApplyRequest(
-            polynomial=boundary_source(11),
-            operator=_operator(variables, {(1,): 1}),
-            iterations=1,
+    with pytest.raises(OperationDomainValidationError):
+        compute_differential_operator_application(
+            DifferentialOperatorApplyRequest(
+                polynomial=boundary_source(11),
+                operator=_operator(variables, {(1,): 1}),
+                iterations=1,
+            )
         )
 
     # A coefficient-10 derivative scales the surviving height to 10^32768,
     # whose 32,769 digits also exceed the budget.
-    with polynomial_validation_error():
-        DifferentialOperatorApplyRequest(
-            polynomial=boundary_source(1),
-            operator=_operator(variables, {(1,): 10}),
-            iterations=1,
+    with pytest.raises(OperationDomainValidationError):
+        compute_differential_operator_application(
+            DifferentialOperatorApplyRequest(
+                polynomial=boundary_source(1),
+                operator=_operator(variables, {(1,): 10}),
+                iterations=1,
+            )
         )
 
 
@@ -616,11 +629,13 @@ def test_nonunit_scalar_growth_still_gates_at_the_coefficient_budget() -> None:
         ),
     )
 
-    with polynomial_validation_error():
-        DifferentialOperatorApplyRequest(
-            polynomial=source,
-            operator=_operator(variables, {(0,): 11}),
-            iterations=1,
+    with pytest.raises(OperationDomainValidationError):
+        compute_differential_operator_application(
+            DifferentialOperatorApplyRequest(
+                polynomial=source,
+                operator=_operator(variables, {(0,): 11}),
+                iterations=1,
+            )
         )
 
 
@@ -674,11 +689,13 @@ def test_multinomial_path_multiplicity_gates_the_coefficient_bound() -> None:
         ),
     )
 
-    with polynomial_validation_error():
-        DifferentialOperatorApplyRequest(
-            polynomial=source,
-            operator=operator,
-            iterations=140,
+    with pytest.raises(OperationDomainValidationError):
+        compute_differential_operator_application(
+            DifferentialOperatorApplyRequest(
+                polynomial=source,
+                operator=operator,
+                iterations=140,
+            )
         )
 
     result = compute_differential_operator_application(
@@ -865,14 +882,16 @@ def test_tall_source_coefficients_are_admitted_by_derived_growth() -> None:
     assert reviewer.output == _polynomial(variables, {(0,): 10**299})
     assert reviewer.matches_expected is True
 
-    with polynomial_validation_error():
-        DifferentialOperatorApplyRequest(
-            polynomial=_polynomial(
-                variables,
-                {(32_768,): 10**32_000},
-            ),
-            operator=_operator(variables, {(1,): 1}),
-            iterations=200,
+    with pytest.raises(OperationDomainValidationError):
+        compute_differential_operator_application(
+            DifferentialOperatorApplyRequest(
+                polynomial=_polynomial(
+                    variables,
+                    {(32_768,): 10**32_000},
+                ),
+                operator=_operator(variables, {(1,): 1}),
+                iterations=200,
+            )
         )
 
 
@@ -967,11 +986,13 @@ def test_degenerate_shortcuts_still_honor_the_retained_byte_budget() -> None:
     )
     assert admitted.is_zero is True
 
-    with polynomial_validation_error():
-        DifferentialOperatorApplyRequest(
-            polynomial=oversized_source(300),
-            operator=_operator(("x",), {}),
-            iterations=1,
+    with pytest.raises(OperationDomainValidationError):
+        compute_differential_operator_application(
+            DifferentialOperatorApplyRequest(
+                polynomial=oversized_source(300),
+                operator=_operator(("x",), {}),
+                iterations=1,
+            )
         )
     per_term_bytes = 32_768 + 1 + 3 + 2 + 96
     assert 280 * per_term_bytes <= MAX_APPLICATION_RESULT_BYTES
@@ -1032,12 +1053,14 @@ def test_expected_retention_still_honors_the_retained_byte_budget() -> None:
         ),
     )
 
-    with polynomial_validation_error():
-        DifferentialOperatorApplyRequest(
-            polynomial=_polynomial(("x",), {(1,): 1}),
-            operator=_operator(("x",), {(1,): 1}),
-            iterations=1,
-            expected=heavy_expected,
+    with pytest.raises(OperationDomainValidationError):
+        compute_differential_operator_application(
+            DifferentialOperatorApplyRequest(
+                polynomial=_polynomial(("x",), {(1,): 1}),
+                operator=_operator(("x",), {(1,): 1}),
+                iterations=1,
+                expected=heavy_expected,
+            )
         )
 
 
@@ -1205,14 +1228,16 @@ def test_dense_source_boundary_follows_the_candidate_support_budget() -> None:
         DifferentialOperatorApplyResult,
     )
 
-    with polynomial_validation_error():
-        DifferentialOperatorApplyRequest(
-            polynomial=_polynomial(
-                variables,
-                dict.fromkeys(((4 * index,) for index in range(1_100)), 1),
-            ),
-            operator=_operator(variables, {(3,): 1, (2,): 1, (1,): 1, (0,): 1}),
-            iterations=1,
+    with pytest.raises(OperationDomainValidationError):
+        compute_differential_operator_application(
+            DifferentialOperatorApplyRequest(
+                polynomial=_polynomial(
+                    variables,
+                    dict.fromkeys(((4 * index,) for index in range(1_100)), 1),
+                ),
+                operator=_operator(variables, {(3,): 1, (2,): 1, (1,): 1, (0,): 1}),
+                iterations=1,
+            )
         )
 
 
@@ -1289,11 +1314,13 @@ def test_full_width_operators_follow_the_shared_term_representation() -> None:
 def test_tall_order_growth_gates_on_the_coefficient_budget() -> None:
     edge = MAX_POLYNOMIAL_EXPONENT
 
-    with polynomial_validation_error():
-        DifferentialOperatorApplyRequest(
-            polynomial=_polynomial(("x",), {(edge,): 1}),
-            operator=_operator(("x",), {(edge,): 1}),
-            iterations=1,
+    with pytest.raises(OperationDomainValidationError):
+        compute_differential_operator_application(
+            DifferentialOperatorApplyRequest(
+                polynomial=_polynomial(("x",), {(edge,): 1}),
+                operator=_operator(("x",), {(edge,): 1}),
+                iterations=1,
+            )
         )
 
 
@@ -1312,11 +1339,13 @@ def test_sparse_power_work_boundary_is_admitted_then_rejected() -> None:
         DifferentialOperatorApplyResult,
     )
 
-    with polynomial_validation_error():
-        DifferentialOperatorApplyRequest(
-            polynomial=source,
-            operator=operator,
-            iterations=1_433,
+    with pytest.raises(OperationDomainValidationError):
+        compute_differential_operator_application(
+            DifferentialOperatorApplyRequest(
+                polynomial=source,
+                operator=operator,
+                iterations=1_433,
+            )
         )
 
 
@@ -1350,11 +1379,13 @@ def test_candidate_output_term_boundary_is_admitted_then_rejected() -> None:
     result = compute_differential_operator_application(accepted)
     assert result.output == _polynomial(variables, expected_terms)
 
-    with polynomial_validation_error():
-        DifferentialOperatorApplyRequest(
-            polynomial=source(1_025),
-            operator=operator,
-            iterations=3,
+    with pytest.raises(OperationDomainValidationError):
+        compute_differential_operator_application(
+            DifferentialOperatorApplyRequest(
+                polynomial=source(1_025),
+                operator=operator,
+                iterations=3,
+            )
         )
 
 
@@ -1428,11 +1459,13 @@ def test_widened_correlated_power_still_follows_the_work_budget() -> None:
     terms.update({(order, order): 1 for order in range(1_000)})
     terms[(1, 0)] = 1
 
-    with polynomial_validation_error():
-        DifferentialOperatorApplyRequest(
-            polynomial=_polynomial(variables, {(1, 0): 1, (0, 1): 1}),
-            operator=_operator(variables, terms),
-            iterations=2,
+    with pytest.raises(OperationDomainValidationError):
+        compute_differential_operator_application(
+            DifferentialOperatorApplyRequest(
+                polynomial=_polynomial(variables, {(1, 0): 1, (0, 1): 1}),
+                operator=_operator(variables, terms),
+                iterations=2,
+            )
         )
 
 
@@ -1505,11 +1538,13 @@ def test_scalar_on_source_regime_skips_unreachable_expansion() -> None:
     assert grown.output == _polynomial(variables, {(0,): 2**20})
     assert grown.matches_expected is True
 
-    with polynomial_validation_error():
-        DifferentialOperatorApplyRequest(
-            polynomial=_polynomial(variables, {(0,): 1}),
-            operator=growing,
-            iterations=200_000,
+    with pytest.raises(OperationDomainValidationError):
+        compute_differential_operator_application(
+            DifferentialOperatorApplyRequest(
+                polynomial=_polynomial(variables, {(0,): 1}),
+                operator=growing,
+                iterations=200_000,
+            )
         )
 
 
@@ -1646,11 +1681,13 @@ def test_weight_enumeration_aborts_before_huge_powers_materialize() -> None:
         ),
     )
 
-    with polynomial_validation_error():
-        DifferentialOperatorApplyRequest(
-            polynomial=source,
-            operator=operator,
-            iterations=400,
+    with pytest.raises(OperationDomainValidationError):
+        compute_differential_operator_application(
+            DifferentialOperatorApplyRequest(
+                polynomial=source,
+                operator=operator,
+                iterations=400,
+            )
         )
 
 
@@ -1695,11 +1732,13 @@ def test_rescale_scan_overflow_falls_back_to_expansion_gates() -> None:
         {(0,): 1, **dict.fromkeys(((j,) for j in range(2, 1_002)), 1)},
     )
 
-    with polynomial_validation_error():
-        DifferentialOperatorApplyRequest(
-            polynomial=source,
-            operator=operator,
-            iterations=1,
+    with pytest.raises(OperationDomainValidationError):
+        compute_differential_operator_application(
+            DifferentialOperatorApplyRequest(
+                polynomial=source,
+                operator=operator,
+                iterations=1,
+            )
         )
 
 
@@ -1787,11 +1826,13 @@ def test_wide_operator_weight_growth_gates_at_the_height_cap() -> None:
         ),
     )
 
-    with polynomial_validation_error():
-        DifferentialOperatorApplyRequest(
-            polynomial=source,
-            operator=operator,
-            iterations=400,
+    with pytest.raises(OperationDomainValidationError):
+        compute_differential_operator_application(
+            DifferentialOperatorApplyRequest(
+                polynomial=source,
+                operator=operator,
+                iterations=400,
+            )
         )
 
 
@@ -1874,11 +1915,13 @@ def test_falling_factorial_growth_is_measured_exactly() -> None:
     assert result.is_zero is False
     assert replayed == result
 
-    with polynomial_validation_error():
-        DifferentialOperatorApplyRequest(
-            polynomial=_polynomial(variables, {(8_501,): 10**32_000}),
-            operator=_operator(variables, {(8_501,): 1}),
-            iterations=1,
+    with pytest.raises(OperationDomainValidationError):
+        compute_differential_operator_application(
+            DifferentialOperatorApplyRequest(
+                polynomial=_polynomial(variables, {(8_501,): 10**32_000}),
+                operator=_operator(variables, {(8_501,): 1}),
+                iterations=1,
+            )
         )
 
 
@@ -2038,11 +2081,13 @@ def test_class_heights_keep_signed_cancellation() -> None:
     assert result.is_zero is False
     assert replayed == result
 
-    with polynomial_validation_error():
-        DifferentialOperatorApplyRequest(
-            polynomial=_polynomial(variables, {(1,): height, (0,): height}),
-            operator=_operator(variables, {(0,): 1, (1,): 1}),
-            iterations=1,
+    with pytest.raises(OperationDomainValidationError):
+        compute_differential_operator_application(
+            DifferentialOperatorApplyRequest(
+                polynomial=_polynomial(variables, {(1,): height, (0,): height}),
+                operator=_operator(variables, {(0,): 1, (1,): 1}),
+                iterations=1,
+            )
         )
 
 
@@ -2078,11 +2123,13 @@ def test_coefficient_growth_boundary_is_admitted_then_rejected() -> None:
         <= MAX_APPLICATION_RESULT_BYTES
     )
 
-    with polynomial_validation_error():
-        DifferentialOperatorApplyRequest(
-            polynomial=source,
-            operator=operator,
-            iterations=129,
+    with pytest.raises(OperationDomainValidationError):
+        compute_differential_operator_application(
+            DifferentialOperatorApplyRequest(
+                polynomial=source,
+                operator=operator,
+                iterations=129,
+            )
         )
 
 

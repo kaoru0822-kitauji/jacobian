@@ -8,10 +8,6 @@ from pydantic import Field, StrictBool, StrictInt, model_validator
 from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
-from jacobian.math.polynomials.differential_operators._bounds import (
-    ApplicationEnvelope,
-    validate_application_envelope,
-)
 from jacobian.math.polynomials.differential_operators.values import (
     ConstantCoefficientDifferentialOperator,
 )
@@ -20,20 +16,6 @@ from jacobian.math.polynomials.values import RationalPolynomial
 
 def _validation_error(reason: str, message: str) -> PydanticCustomError:
     return PydanticCustomError(f"polynomial.differential_operator_{reason}", message)
-
-
-def _application_envelope(
-    polynomial: RationalPolynomial,
-    operator: ConstantCoefficientDifferentialOperator,
-    iterations: int,
-    expected: RationalPolynomial | None,
-) -> ApplicationEnvelope:
-    """Project owner-local admission failures through the model contract."""
-
-    try:
-        return validate_application_envelope(polynomial, operator, iterations, expected)
-    except (TypeError, ValueError) as error:
-        raise _validation_error("admission", str(error)) from error
 
 
 class DifferentialOperatorApplyRequest(StrictModel):
@@ -74,13 +56,20 @@ class DifferentialOperatorApplyRequest(StrictModel):
     )
 
     @model_validator(mode="after")
-    def require_bounded_application(self) -> Self:
-        _application_envelope(
-            self.polynomial,
-            self.operator,
-            self.iterations,
-            self.expected,
-        )
+    def require_compatible_axes(self) -> Self:
+        if self.polynomial.variables != self.operator.variables:
+            raise _validation_error(
+                "axis_mismatch",
+                "polynomial and operator must use the same ordered variable axis",
+            )
+        if (
+            self.expected is not None
+            and self.expected.variables != self.polynomial.variables
+        ):
+            raise _validation_error(
+                "expected_axis_mismatch",
+                "expected polynomial must use the same ordered variable axis",
+            )
         return self
 
 
