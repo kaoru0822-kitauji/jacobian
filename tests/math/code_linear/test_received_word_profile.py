@@ -27,7 +27,6 @@ from jacobian.math.code_linear._operations import (
     compute_puncture,
     compute_received_word_profile,
     compute_shorten,
-    verify_received_word_profile_result,
 )
 from jacobian.math.code_linear.values import PrimeFieldLinearEncoder
 
@@ -291,29 +290,6 @@ def test_small_binary_profiles_match_independent_set_enumeration() -> None:
                     )
                     expected[distance] += 1
                 assert result.distance_histogram == tuple(expected)
-
-
-def test_independently_supplied_result_claims_use_the_explicit_verifier() -> None:
-    request = ReceivedWordProfileRequest(
-        encoder=_encoder(((1, 1),)),
-        received_word=(1, 0),
-        threshold=_threshold("AGREEMENT", "GE", 1),
-        witness_mode="ALL",
-    )
-    result = compute_received_word_profile(request)
-    assert verify_received_word_profile_result(result)
-
-    wrong_source = result.model_dump()
-    wrong_source["source"]["received_word"] = (0, 0)
-    assert not verify_received_word_profile_result(
-        ReceivedWordProfileResult.model_validate(wrong_source)
-    )
-
-    wrong_witness = result.model_dump()
-    wrong_witness["witnesses"][0]["codeword"] = (1, 1)
-    assert not verify_received_word_profile_result(
-        ReceivedWordProfileResult.model_validate(wrong_witness)
-    )
 
 
 def test_encoder_rejects_ambiguous_or_invalid_presentations() -> None:

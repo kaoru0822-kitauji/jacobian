@@ -184,9 +184,8 @@ class ReceivedWordWitness(StrictModel):
 class ReceivedWordProfileResult(StrictModel):
     """A bounded received-word profile in the request's canonical coordinates.
 
-    Construction checks only the result's own shape and declared relations.
-    ``verify_received_word_profile_result`` performs the separately requested
-    bounded replay for a claim supplied independently of the owner kernel.
+    Construction checks only the result's own shape and declared relations;
+    the defining profile computation belongs to the producer operation.
     """
 
     source: ReceivedWordProfileRequest

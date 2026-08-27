@@ -153,48 +153,6 @@ def compute_deterministic_terminal_game(
     )
 
 
-def verify_best_response_result(
-    request: ZeroSumGameRequest, result: BestResponseResult
-) -> bool:
-    """Check one independently supplied maximin-row claim."""
-
-    matrix = _payoff_matrix(request)
-    if result.best_row >= len(matrix):
-        return False
-    value = result.value.as_fraction()
-    row_minima = tuple(min(row) for row in matrix)
-    return value == max(row_minima) and row_minima[result.best_row] == value
-
-
-def verify_nash_equilibrium_result(
-    request: NashEquilibriumRequest, result: NashEquilibriumResult
-) -> bool:
-    """Check a zero-sum equilibrium witness inside the admitted LP envelope."""
-
-    matrix = _payoff_matrix(request)
-    n_rows = len(matrix)
-    n_cols = len(matrix[0])
-    if len(result.row_strategy) != n_rows or len(result.col_strategy) != n_cols:
-        return False
-    row_strategy = tuple(weight.as_fraction() for weight in result.row_strategy)
-    col_strategy = tuple(weight.as_fraction() for weight in result.col_strategy)
-    value = result.value.as_fraction()
-    if (
-        sum(row_strategy) != 1
-        or sum(col_strategy) != 1
-        or any(weight < 0 for weight in (*row_strategy, *col_strategy))
-    ):
-        return False
-    return all(
-        sum(row_strategy[row] * matrix[row][column] for row in range(n_rows)) >= value
-        for column in range(n_cols)
-    ) and all(
-        sum(matrix[row][column] * col_strategy[column] for column in range(n_cols))
-        <= value
-        for row in range(n_rows)
-    )
-
-
 def verify_deterministic_terminal_game_solution(
     result: DeterministicTerminalGameSolution,
 ) -> bool:
@@ -216,7 +174,5 @@ __all__ = [
     "compute_best_response",
     "compute_deterministic_terminal_game",
     "compute_nash_equilibrium",
-    "verify_best_response_result",
     "verify_deterministic_terminal_game_solution",
-    "verify_nash_equilibrium_result",
 ]

@@ -19,8 +19,6 @@ from jacobian.math.hochschild_complexes._models import (
 from jacobian.math.hochschild_complexes._operations import (
     compute_hochschild_chain_complex,
     compute_hochschild_homology,
-    verify_hochschild_chain_complex_result,
-    verify_hochschild_homology_result,
 )
 
 
@@ -277,7 +275,7 @@ class TestChainComplexSourceBinding:
             augmentation=(1, 1),
         )
 
-    def test_result_retains_and_replays_source(self) -> None:
+    def test_result_retains_its_source(self) -> None:
         algebra = self._swap_algebra()
         result = compute_hochschild_chain_complex(
             HochschildChainComplexRequest(algebra=algebra, max_degree=3)
@@ -285,7 +283,6 @@ class TestChainComplexSourceBinding:
         assert result.algebra == algebra
         assert result.algebra_dimension == 2
         assert result.group_dimensions == (1, 2, 4, 8)
-        assert verify_hochschild_chain_complex_result(result)
         HochschildChainComplexResult.model_validate(result.model_dump())
 
     def test_authored_payload_rejected(self) -> None:
@@ -307,17 +304,6 @@ class TestChainComplexSourceBinding:
                     "prime": 5,
                 }
             )
-
-    def test_tampered_differential_entry_requires_explicit_verifier(self) -> None:
-        algebra = self._swap_algebra()
-        result = compute_hochschild_chain_complex(
-            HochschildChainComplexRequest(algebra=algebra, max_degree=2)
-        )
-        payload = result.model_dump(mode="json")
-        original = payload["differentials"][1]["matrix"]["entries"][0][0]
-        payload["differentials"][1]["matrix"]["entries"][0][0] = (original + 1) % 7
-        supplied = HochschildChainComplexResult.model_validate(payload)
-        assert not verify_hochschild_chain_complex_result(supplied)
 
     def test_inconsistent_group_dimensions_rejected(self) -> None:
         algebra = self._swap_algebra()
@@ -390,22 +376,6 @@ class TestChainComplexSourceBinding:
 
 
 class TestHomologySourceBinding:
-    def test_forged_groups_require_explicit_verifier(self) -> None:
-        alg = AlgebraStructure(
-            prime=5,
-            dimension=1,
-            structure_constants=(((1,),),),
-            augmentation=(1,),
-        )
-        genuine = compute_hochschild_homology(
-            HochschildHomologyRequest(algebra=alg, max_degree=2)
-        )
-        assert verify_hochschild_homology_result(genuine)
-        payload = genuine.model_dump()
-        payload["groups"][1]["betti"] = 1
-        supplied = HochschildHomologyResult.model_validate(payload)
-        assert not verify_hochschild_homology_result(supplied)
-
     def test_prime_mismatch_rejected(self) -> None:
         alg = AlgebraStructure(
             prime=5,
@@ -538,18 +508,3 @@ class TestAugmentationEndpointFaces:
                 structure_constants=dual.structure_constants,
                 augmentation=(1,),
             )
-
-    def test_result_verifier_uses_retained_augmentation(self) -> None:
-        """Tampering with the retained augmentation invalidates entries."""
-        from jacobian.math.hochschild_complexes._models import (
-            HochschildChainComplexResult,
-        )
-
-        algebra = _dual_numbers(5)
-        result = compute_hochschild_chain_complex(
-            HochschildChainComplexRequest(algebra=algebra, max_degree=2)
-        )
-        payload = result.model_dump()
-        payload["algebra"]["augmentation"] = [0, 0]
-        supplied = HochschildChainComplexResult.model_validate(payload)
-        assert not verify_hochschild_chain_complex_result(supplied)

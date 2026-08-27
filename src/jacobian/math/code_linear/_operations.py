@@ -142,20 +142,6 @@ def compute_received_word_profile(
     )
 
 
-def verify_received_word_profile_result(result: ReceivedWordProfileResult) -> bool:
-    """Replay an independently supplied profile inside its admitted envelope."""
-
-    expected = _received_word_profile_data(result.source)
-    return (
-        result.distance_histogram == expected.distance_histogram
-        and result.codeword_count == expected.codeword_count
-        and result.minimum_distance == expected.minimum_distance
-        and result.maximum_agreement == expected.maximum_agreement
-        and result.threshold_match_count == expected.threshold_match_count
-        and result.witnesses == expected.witnesses
-    )
-
-
 def _rref(matrix: list[list[int]], field_order: int) -> tuple[list[list[int]], int]:
     """Reduced row echelon form and rank over a prime field."""
     shared_matrix = PrimeFieldMatrix(
