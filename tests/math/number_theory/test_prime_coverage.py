@@ -10,7 +10,6 @@ from jacobian.math.number_theory._binomial_valuation_operations import (
     compute_binomial_valuation_profile,
 )
 from jacobian.math.number_theory._prime_coverage_models import (
-    MAX_COVERAGE_WIDTH,
     PrimeCoverageProfileRequest,
 )
 from jacobian.math.number_theory._prime_coverage_operations import (
@@ -38,17 +37,51 @@ def test_prime_coverage_primes() -> None:
             assert row.distinct_prime_count == 1
 
 
+def test_prime_coverage_admits_narrow_high_interval() -> None:
+    request = PrimeCoverageProfileRequest(
+        lower_bound=10_000_001,
+        upper_bound=10_000_001,
+    )
+    result = compute_prime_coverage_profile(request)
+
+    assert [(row.n, row.distinct_prime_count) for row in result.rows] == [
+        (10_000_001, 2)
+    ]
+
+
 def test_prime_coverage_rejects_result_over_canonical_output_budget() -> None:
     with pytest.raises(ValueError, match="canonical output budget"):
         PrimeCoverageProfileRequest(
             lower_bound=1,
-            upper_bound=MAX_COVERAGE_WIDTH - 1,
+            upper_bound=1_000_000,
         )
+
+
+def test_prime_coverage_rejects_square_root_work_budget() -> None:
+    with pytest.raises(ValueError, match="segmented prime-coverage work budget"):
+        PrimeCoverageProfileRequest(lower_bound=10**13, upper_bound=10**13)
 
 
 def test_binomial_valuation_rejects_composite_base() -> None:
     with pytest.raises(ValidationError, match="prime must be a prime number"):
         BinomialValuationProfileRequest(n=4, prime=4)
+
+
+def test_binomial_valuation_admits_output_bound_n_and_large_prime() -> None:
+    result = compute_binomial_valuation_profile(
+        BinomialValuationProfileRequest(n=1001, prime=2)
+    )
+    assert len(result.rows) == 1002
+
+    large_base_result = compute_binomial_valuation_profile(
+        BinomialValuationProfileRequest(n=10, prime=10_007)
+    )
+    assert [row.valuation for row in large_base_result.rows] == [0] * 11
+
+
+def test_binomial_valuation_rejects_digitwise_work_budget() -> None:
+    with pytest.raises(ValueError, match="digitwise work budget"):
+        BinomialValuationProfileRequest(n=120_000, prime=2)
 
 
 def test_binomial_valuation_basic() -> None:

@@ -23,29 +23,41 @@ def _simple_sieve(limit: int) -> list[int]:
     return [i for i in range(2, limit + 1) if is_prime[i]]
 
 
+def _segmented_omega(lower_bound: int, upper_bound: int) -> list[int]:
+    """Return omega for one interval using a square-root base sieve."""
+
+    width = upper_bound - lower_bound + 1
+    residuals = list(range(lower_bound, upper_bound + 1))
+    counts = bytearray(width)
+    for prime in _simple_sieve(math.isqrt(upper_bound)):
+        first = max(
+            prime * prime,
+            ((lower_bound + prime - 1) // prime) * prime,
+        )
+        for multiple in range(first, upper_bound + 1, prime):
+            index = multiple - lower_bound
+            residual = residuals[index]
+            if residual % prime:
+                continue
+            counts[index] += 1
+            while residual % prime == 0:
+                residual //= prime
+            residuals[index] = residual
+    for index, residual in enumerate(residuals):
+        if residual > 1:
+            counts[index] += 1
+    return list(counts)
+
+
 def compute_prime_coverage_profile(
     request: PrimeCoverageProfileRequest,
 ) -> PrimeCoverageProfileResult:
     """Compute omega(n) (distinct prime factor count) for every n in [L, U]."""
     lo = request.lower_bound
     hi = request.upper_bound
-    primes = _simple_sieve(hi)
+    omegas = _segmented_omega(lo, hi)
     rows = []
-    for n in range(lo, hi + 1):
-        if n == 1:
-            rows.append(PrimeCoverageProfileRow(n=1, distinct_prime_count=0))
-            continue
-        m = n
-        omega = 0
-        for p in primes:
-            if p * p > m:
-                break
-            if m % p == 0:
-                omega += 1
-                while m % p == 0:
-                    m //= p
-        if m > 1:
-            omega += 1
+    for n, omega in zip(range(lo, hi + 1), omegas, strict=True):
         rows.append(PrimeCoverageProfileRow(n=n, distinct_prime_count=omega))
     return PrimeCoverageProfileResult(lower_bound=lo, upper_bound=hi, rows=rows)
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Self
 
 from pydantic import Field, model_validator
@@ -13,10 +14,30 @@ from jacobian.canonical import (
     strict_json_object_size,
 )
 
-MAX_COVERAGE_UPPER: int = 10_000_000
-MAX_COVERAGE_WIDTH: int = 1_000_000
+# Coverage rows use JSON integers, so this is a transport-derived source
+# boundary rather than a sieve boundary. Actual execution is admitted by the
+# square-root work estimate below.
+MAX_COVERAGE_UPPER: int = (1 << 53) - 1
 MAX_COVERAGE_RESULT_BYTES: int = CanonicalLimits().max_output_bytes
-_MAX_DISTINCT_PRIME_COUNT = 8
+MAX_COVERAGE_WORK: int = 50_000_000
+_MAX_DISTINCT_PRIME_COUNT = 14
+
+
+def _coverage_work_upper_bound(lower_bound: int, upper_bound: int) -> int:
+    """Bound segmented-sieve work without materializing a prefix through U.
+
+    The base sieve costs at most ``sqrt(U) * (log2(sqrt(U)) + 1)`` simple
+    steps. For each base prime, the segment contains at most one first-hit
+    step plus ``width / p`` hits; summing over all integers gives the
+    conservative harmonic bound below.
+    """
+
+    width = upper_bound - lower_bound + 1
+    root = math.isqrt(upper_bound)
+    if root < 2:
+        return width
+    digit_bound = root.bit_length()
+    return root * (digit_bound + 1) + root + width * digit_bound
 
 
 def _json_array_size(item_size: int, count: int) -> int:
@@ -27,7 +48,7 @@ def _coverage_result_upper_bound_bytes(lower_bound: int, upper_bound: int) -> in
     """Bound the exact canonical size of one complete coverage result.
 
     Every emitted ``n`` is at most ``upper_bound`` and the kernel can produce
-    at most eight distinct prime factors for values up to ``MAX_COVERAGE_UPPER``.
+    at most fourteen distinct prime factors for values up to ``MAX_COVERAGE_UPPER``.
     The field and array sizes are calculated with the same canonical encoder
     used by the final result boundary, so accepted requests cannot fail only
     during dispatch serialization.
@@ -63,8 +84,6 @@ class PrimeCoverageProfileRequest(StrictModel):
     def require_valid_interval(self) -> Self:
         if self.upper_bound < self.lower_bound:
             raise ValueError("upper_bound must be >= lower_bound")
-        if self.upper_bound - self.lower_bound + 1 > MAX_COVERAGE_WIDTH:
-            raise ValueError("interval width exceeds maximum supported width")
         predicted = _coverage_result_upper_bound_bytes(
             self.lower_bound, self.upper_bound
         )
@@ -72,6 +91,12 @@ class PrimeCoverageProfileRequest(StrictModel):
             raise ValueError(
                 "interval result exceeds the canonical output budget of "
                 f"{MAX_COVERAGE_RESULT_BYTES} bytes"
+            )
+        work = _coverage_work_upper_bound(self.lower_bound, self.upper_bound)
+        if work > MAX_COVERAGE_WORK:
+            raise ValueError(
+                "interval exceeds the segmented prime-coverage work budget of "
+                f"{MAX_COVERAGE_WORK} steps"
             )
         return self
 
@@ -94,7 +119,7 @@ class PrimeCoverageProfileResult(StrictModel):
 __all__ = [
     "MAX_COVERAGE_RESULT_BYTES",
     "MAX_COVERAGE_UPPER",
-    "MAX_COVERAGE_WIDTH",
+    "MAX_COVERAGE_WORK",
     "PrimeCoverageProfileRequest",
     "PrimeCoverageProfileResult",
     "PrimeCoverageProfileRow",
