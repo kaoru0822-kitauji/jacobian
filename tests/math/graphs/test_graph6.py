@@ -4,7 +4,6 @@ from random import Random
 
 import networkx as nx
 import pytest
-from pydantic import ValidationError
 
 from jacobian.math.graphs.graph6 import decode_graph6
 
@@ -54,13 +53,13 @@ def test_decode_graph6_agrees_with_networkx_for_small_orders() -> None:
         assert decoded.degrees == tuple(graph.degree(vertex) for vertex in range(order))
 
 
-def test_graph6_decode_request_rejects_malformed_payloads() -> None:
-    """Malformed graph6 strings should be rejected at the request boundary."""
-    from jacobian.math.graphs._tools import Graph6DecodeRequest
+def test_graph6_decode_operation_rejects_malformed_payloads() -> None:
+    from jacobian.math.graphs._tools import Graph6DecodeRequest, _decode
 
     for malformed in ("0", "a", ":", "&"):
-        with pytest.raises(ValidationError):
-            Graph6DecodeRequest.model_validate({"graph6": malformed})
+        request = Graph6DecodeRequest.model_validate({"graph6": malformed})
+        with pytest.raises(ValueError):
+            _decode(request)
 
 
 def test_graph6_decode_request_accepts_valid_payload() -> None:
