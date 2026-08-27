@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from fractions import Fraction
 from typing import Any, Literal, Self
 
 from pydantic import Field, StrictInt, model_validator
@@ -15,7 +14,6 @@ from jacobian.math.polynomials.maps.values import (
     MAX_MAP_INPUTS,
     MAX_MAP_OUTPUTS,
     RationalPolynomialMap,
-    require_map_polynomial,
 )
 from jacobian.math.polynomials.values import (
     MAX_POLYNOMIAL_EXPONENT,
@@ -84,22 +82,6 @@ class EvalRequest(StrictModel):
     polynomial: RationalPolynomial
     point: VariablePoint
 
-    @model_validator(mode="after")
-    def require_complete_ordered_point(self) -> Self:
-        require_map_polynomial(self.polynomial, label="evaluation polynomial")
-        if self.point.variables != self.polynomial.variables:
-            raise _validation_error(
-                "evaluation point must use the polynomial's complete ordered axis"
-            )
-        value = Fraction(0)
-        coordinates = tuple(item.as_fraction() for item in self.point.values)
-        for term in self.polynomial.polynomial.terms:
-            monomial = term.coefficient.as_fraction()
-            for coordinate, exponent in zip(coordinates, term.exponents, strict=True):
-                monomial *= coordinate**exponent
-            value += monomial
-        CanonicalRational.from_fraction(value)
-        return self
 
 
 class EvalResult(StrictModel):
@@ -136,25 +118,6 @@ class CompositionRequest(StrictModel):
     inner_variable: PolynomialVariable
     outer_variable: PolynomialVariable
 
-    @model_validator(mode="after")
-    def require_univariate_bounded_composition(self) -> Self:
-        require_map_polynomial(self.outer, label="outer polynomial")
-        require_map_polynomial(self.inner, label="inner polynomial")
-        if self.outer.variables != (self.outer_variable,):
-            raise _validation_error("outer polynomial must use exactly outer_variable")
-        if self.inner.variables != (self.inner_variable,):
-            raise _validation_error("inner polynomial must use exactly inner_variable")
-        outer_degree = max(
-            (term.exponents[0] for term in self.outer.polynomial.terms), default=0
-        )
-        inner_degree = max(
-            (term.exponents[0] for term in self.inner.polynomial.terms), default=0
-        )
-        if outer_degree * inner_degree > _MAX_COMPOSITION_DEGREE:
-            raise _validation_error(
-                f"composition exceeds degree {_MAX_COMPOSITION_DEGREE}"
-            )
-        return self
 
 
 class CompositionResult(StrictModel):
@@ -201,65 +164,6 @@ class GenericDegreeRequest(StrictModel):
         default_factory=GenericDegreeComputationBudget
     )
 
-    @model_validator(mode="after")
-    def require_generic_fiber_envelope(self) -> Self:
-        _require_generic_degree_map_budget(self.polynomial_map)
-        return self
-
-
-def _require_generic_degree_map_budget(polynomial_map: RationalPolynomialMap) -> None:
-    source_count = len(polynomial_map.input_variables)
-    target_count = len(polynomial_map.output_polynomials)
-    if source_count > MAX_GENERIC_DEGREE_SOURCE_VARIABLES:
-        raise _validation_error(
-            "generic-degree source exceeds the 3-variable operation budget"
-        )
-    if target_count > MAX_GENERIC_DEGREE_TARGET_VARIABLES:
-        raise _validation_error(
-            "generic-degree target exceeds the 3-component operation budget"
-        )
-    aggregate_terms = sum(
-        len(polynomial.polynomial.terms)
-        for polynomial in polynomial_map.output_polynomials
-    )
-    if aggregate_terms > MAX_GENERIC_DEGREE_AGGREGATE_TERMS:
-        raise _validation_error(
-            "generic-degree map exceeds the 96-term aggregate input budget"
-        )
-    if (
-        len(polynomial_map.model_dump_json().encode("utf-8"))
-        > MAX_GENERIC_DEGREE_ENCODED_MAP_BYTES
-    ):
-        raise _validation_error(
-            "generic-degree map exceeds the 65536-byte input budget"
-        )
-    degrees: list[int] = []
-    for polynomial in polynomial_map.output_polynomials:
-        if len(polynomial.polynomial.terms) > MAX_GENERIC_DEGREE_COMPONENT_TERMS:
-            raise _validation_error(
-                "generic-degree component exceeds the 48-term input budget"
-            )
-        degree = _total_degree(polynomial)
-        degrees.append(degree)
-        if degree > MAX_GENERIC_DEGREE_TOTAL_DEGREE:
-            raise _validation_error("generic-degree component exceeds total degree 8")
-        for term in polynomial.polynomial.terms:
-            if (
-                len(term.coefficient.num.lstrip("-"))
-                > MAX_GENERIC_DEGREE_COEFFICIENT_DIGITS
-                or len(term.coefficient.den) > MAX_GENERIC_DEGREE_COEFFICIENT_DIGITS
-            ):
-                raise _validation_error(
-                    "generic-degree coefficient exceeds the 64-digit input budget"
-                )
-    if target_count >= source_count:
-        bezout_bound = 1
-        for degree in sorted(degrees)[:source_count]:
-            bezout_bound *= max(1, degree)
-        if bezout_bound > MAX_GENERIC_DEGREE_BEZOUT_BOUND:
-            raise _validation_error(
-                "generic-degree finite-fiber Bezout bound exceeds 512"
-            )
 
 
 class GenericFiberTerm(StrictModel):

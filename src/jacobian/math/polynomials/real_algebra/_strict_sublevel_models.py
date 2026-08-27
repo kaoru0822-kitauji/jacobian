@@ -14,7 +14,6 @@ from jacobian._models import StrictModel, canonicalize_json_containers
 from jacobian.math.polynomials.values import (
     RationalPolynomial,
     RationalPolynomialTerm,
-    require_polynomial_budget,
 )
 
 # SymPy clears QQ denominators before its Vincent-Akritas-Strzebonski exact
@@ -230,80 +229,6 @@ class StrictSublevelMeasureRequest(StrictModel):
                 label=label,
             )
         return prepared
-
-    @model_validator(mode="after")
-    def require_complete_root_isolation_budget(self) -> Self:
-        if len(self.polynomial.variables) != 1:
-            raise _validation_error(
-                "variable_count",
-                "strict sublevel measure requires one polynomial variable",
-            )
-        require_polynomial_budget(
-            self.polynomial,
-            maximum_terms=MAX_STRICT_SUBLEVEL_TERMS,
-            maximum_exponent=MAX_STRICT_SUBLEVEL_DEGREE,
-            maximum_coefficient_digits=MAX_STRICT_SUBLEVEL_INPUT_DIGITS,
-            label="strict sublevel polynomial",
-        )
-        for value, label in (
-            (self.threshold, "strict sublevel threshold"),
-            (self.lower, "strict sublevel lower scope endpoint"),
-            (self.upper, "strict sublevel upper scope endpoint"),
-        ):
-            require_bounded_rational(
-                value,
-                max_digits=MAX_STRICT_SUBLEVEL_INPUT_DIGITS,
-                label=label,
-            )
-        if self.threshold.as_fraction() < 0:
-            raise _validation_error(
-                "negative_threshold", "strict sublevel threshold must be nonnegative"
-            )
-        if self.lower.as_fraction() > self.upper.as_fraction():
-            raise _validation_error(
-                "scope_order", "strict sublevel lower endpoint must not exceed upper"
-            )
-
-        # These cases require no root isolation: t=0 is empty, constants are
-        # decided by one exact comparison, and a singleton scope has zero
-        # measure with membership decided by one exact evaluation.
-        if (
-            self.threshold.as_fraction() == 0
-            or _polynomial_degree(self.polynomial) == 0
-            or self.lower == self.upper
-        ):
-            return self
-
-        boundary_heights = []
-        for subtract_threshold, label in (
-            (True, "f-threshold"),
-            (False, "f+threshold"),
-        ):
-            height_digits = _level_polynomial_height_digits(
-                self.polynomial,
-                self.threshold,
-                subtract_threshold=subtract_threshold,
-            )
-            if height_digits > MAX_STRICT_SUBLEVEL_BOUNDARY_HEIGHT_DIGITS:
-                raise _validation_error(
-                    "boundary_height",
-                    f"primitive {label} height exceeds the "
-                    f"{MAX_STRICT_SUBLEVEL_BOUNDARY_HEIGHT_DIGITS}-digit "
-                    "root-isolation bound",
-                )
-            boundary_heights.append(height_digits)
-        degree = _polynomial_degree(self.polynomial)
-        isolation_work = degree**5 * sum(boundary_heights)
-        if isolation_work > MAX_STRICT_SUBLEVEL_ISOLATION_WORK:
-            raise _validation_error(
-                "isolation_work",
-                "strict sublevel exact-root isolation exceeds the work bound "
-                f"(degree^5*level-height-sum={isolation_work} > "
-                f"{MAX_STRICT_SUBLEVEL_ISOLATION_WORK}); reduce degree or "
-                "coefficient/threshold height",
-            )
-        return self
-
 
 class LevelRootReference(StrictModel):
     """One distinct real root of a retained level polynomial.
