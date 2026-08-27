@@ -8,7 +8,6 @@ from jacobian.math.cluster_algebras._models import (
     GVectorResult,
     SeedMutationRequest,
     SeedMutationResult,
-    _identity_matrix,
     encoded_entries,
     parsed_entries,
 )
@@ -74,25 +73,7 @@ def compute_g_vectors(request: GVectorRequest) -> GVectorResult:
     return GVectorResult._from_kernel(request)
 
 
-def verify_seed_mutation_result(result: SeedMutationResult) -> bool:
-    """Verify an independently supplied mutation claim within its input bound."""
-
-    if result.mutation_index >= result.source_exchange_matrix.n:
-        return False
-    return result.exchange_matrix == _mutation_of(
-        result.source_exchange_matrix, result.mutation_index
-    )
-
-
-def verify_g_vector_result(result: GVectorResult) -> bool:
-    """Verify the fixed initial-seed g-vector convention."""
-
-    return result.g_matrix == _identity_matrix(result.exchange_matrix.n)
-
-
 __all__ = [
     "compute_g_vectors",
     "mutate_seed",
-    "verify_g_vector_result",
-    "verify_seed_mutation_result",
 ]

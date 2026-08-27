@@ -18,8 +18,6 @@ from jacobian.math.cluster_algebras._models import (
 from jacobian.math.cluster_algebras._operations import (
     compute_g_vectors,
     mutate_seed,
-    verify_g_vector_result,
-    verify_seed_mutation_result,
 )
 
 
@@ -265,15 +263,6 @@ class TestGVectorBinding:
         assert result.convention == "FOMIN_ZELEVINSKY"
         GVectorResult.model_validate(result.model_dump())
 
-    def test_result_model_accepts_structural_non_identity_matrix(self) -> None:
-        b = em(2, ((str(0), str(1)), (str(-1), str(0))), (str(1), str(1)))
-        result = GVectorResult(
-            exchange_matrix=b,
-            g_matrix=((1, 1), (0, 1)),
-            convention="FOMIN_ZELEVINSKY",
-        )
-        assert not verify_g_vector_result(result)
-
     def test_result_rejects_dimension_mismatch(self) -> None:
         b = em(2, ((str(0), str(1)), (str(-1), str(0))), (str(1), str(1)))
         with pytest.raises(ValidationError) as exc_info:
@@ -309,15 +298,6 @@ class TestGVectorBinding:
             GVectorResult.model_validate(
                 {"exchange_matrix": b, "g_matrix": (), "convention": "anything"}
             )
-
-    def test_mutation_verifier_rejects_a_structurally_valid_forgery(self) -> None:
-        b = em(2, ((str(0), str(1)), (str(-1), str(0))), (str(1), str(1)))
-        forged = SeedMutationResult(
-            source_exchange_matrix=b,
-            exchange_matrix=b,
-            mutation_index=0,
-        )
-        assert not verify_seed_mutation_result(forged)
 
 
 class TestGVector:
