@@ -119,34 +119,70 @@ typed-failure rules live in the [mathematical backend contract](../reference/mat
 
 ## Package organization and family folding
 
-A domain is a top-level `jacobian.math.<family>` package when it owns a
-distinct canonical value type and imports no other family's `values`. A domain
-that consumes a family's canonical value type is a subpackage of that family,
-not a top-level package. This keeps the top level free of ticket-shaped feature
-packages while each capability keeps its own values, models, backends, and
-tests.
+A top-level `jacobian.math.<family>` package names a concrete, recognizable
+mathematical subject with coherent canonical values and operations. Prefer
+subjects such as matrices, graphs, polynomials, probability, and number theory
+over vague umbrellas that would contain much of the library. Keep the top level
+free of ticket-shaped feature packages, backend names, and workflow groupings.
 
 Decide by evidence, in this order:
 
-1. Shared value type. A domain that imports a family's `values` module (for
-   example `matrices.values.RationalMatrix`) belongs to that family.
-2. Operation-ID domain prefix. The first segment of an operation ID
-   (`graph.*`, `matrix.*`, `polynomial.*`, `formal_series.*`) names the
-   mathematical family even when the package name does not. The prefix is a
-   discovery value: never rename operation IDs to follow a package move.
-3. Self-containment. A domain with its own value type and no import of another
-   family's `values` remains top-level (for example `formal_power_series`,
-   `root_isolation`, `electrical_networks`).
+1. **Canonical value ownership.** Each mathematical value has one package that
+   owns its meaning, invariants, and public type. Producers and consumers reuse
+   that type unchanged.
+2. **Operation ownership.** Place an operation with the mathematical subject
+   that owns its principal source and postcondition. Returning or accepting
+   another family's canonical value does not by itself move the operation into
+   that family. For example, a graph characteristic-polynomial operation
+   remains graph-owned while returning the polynomial owner's canonical value;
+   a chip-firing critical-group operation remains graph-owned while returning
+   the group owner's canonical value.
+3. **Mathematical subdivision.** Nest a capability when it is recognizably a
+   subdivision of its parent, such as `graphs/chip_firing`,
+   `graphs/coloring`, or `polynomials/interpolation`. A cross-domain type import
+   alone is not evidence for nesting.
+4. **Self-contained subject.** Keep a capability top-level when it owns a
+   coherent independently recognizable subject rather than specializing an
+   existing family.
 
-Nest into a subpackage when the capability has its own
-values/models/operations/tools/tests, and into a module when it is a lone
-native capability. Drop a now-redundant family prefix when nesting
-(`matrix_analysis` -> `matrices/analysis`, `graph_coloring_ops` ->
-`graphs/coloring`), and keep descriptive names otherwise.
+The first segment of an operation ID (`graph.*`, `matrix.*`, `polynomial.*`,
+`formal_series.*`) names the mathematical discovery family even when the
+package name does not. It is useful evidence but not sole ownership authority:
+never rename operation IDs merely to follow a package move.
+
+Package depth follows mathematical cohesion and implementation complexity, not
+a mandatory file template. A small owner may keep its canonical values, native
+functions, wire models, and declarations in a few modules. A large owner may
+split into mathematical subpackages, each with the private models, bounds,
+kernels, backend adapters, declarations, and tests it actually needs. Do not
+create empty or pass-through `_bounds.py`, `_operations.py`, `_flint.py`, or
+similar files merely to make owners look uniform.
+
+```text
+small owner                    large owner
+  number_theory/                polynomials/
+    __init__.py                    __init__.py
+    values.py                      values.py
+    operations.py                  ideals/
+    _models.py                     interpolation/
+    _tools.py                      formal_series/
+```
+
+Nest into a subpackage when a cohesive mathematical slice needs its own values,
+models, operations, declarations, tests, or substantial private implementation;
+use a module for one lone capability. Backend modules such as `_flint.py` or
+`_singular.py` live at the narrowest mathematical owner whose conversion,
+normalization, context, or failure policy they implement. Drop a now-redundant
+family prefix when nesting (`matrix_analysis` -> `matrices/analysis`,
+`graph_coloring_ops` -> `graphs/coloring`), and keep descriptive names
+otherwise.
 
 A fold preserves operation IDs and request/result schemas, keeps one math
-owner per tool (request, result, and run share the first path segment), deletes
-the old path in the same change, and lands as one family per change.
+owner per tool, preserves cross-domain canonical values unchanged, deletes the
+old path in the same change, and lands as one family per change. A proposed
+repository-wide taxonomy remains a migration plan until each fold establishes
+its value owner, operation owner, and mathematical-subdivision relationship; do
+not document an aspirational directory tree as current behavior.
 
 Logic follows the same rule. CNF canonicalization and assignment checks are
 pure direct operations. SAT and bounded QF SMT-LIB solving use the maintained
