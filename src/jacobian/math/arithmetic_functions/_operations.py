@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from fractions import Fraction
 
-from jacobian._exact import CanonicalRational
+from jacobian._exact import MAX_CANONICAL_RATIONAL_DIGITS, CanonicalRational
 from jacobian.canonical import format_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
+from jacobian.math._rational_height import RationalHeight, sum_heights
 from jacobian.math.arithmetic_functions._models import (
     DirichletConvolutionRequest,
     DirichletConvolutionResult,
@@ -41,6 +43,55 @@ def _divisors(n: int) -> list[int]:
                 large.append(n // i)
         i += 1
     return small + large[::-1]
+
+
+def _heights(values: tuple[CanonicalRational, ...]) -> tuple[RationalHeight, ...]:
+    return tuple(RationalHeight.from_canonical(value) for value in values)
+
+
+def _require_result_height(height: RationalHeight, operation: str) -> None:
+    if height.exceeds(MAX_CANONICAL_RATIONAL_DIGITS):
+        raise OperationDomainValidationError(
+            location=("values",),
+            code="arithmetic_functions.result_height_exceeded",
+            message=(
+                f"{operation} rational height exceeds the "
+                f"{MAX_CANONICAL_RATIONAL_DIGITS}-digit result bound"
+            ),
+        )
+
+
+def _admit_convolution(request: DirichletConvolutionRequest) -> None:
+    left = _heights(request.f)
+    right = _heights(request.g)
+    for index in range(1, len(left) + 1):
+        terms = (
+            left[divisor - 1].product(right[index // divisor - 1])
+            for divisor in _divisors(index)
+        )
+        _require_result_height(sum_heights(terms), "Dirichlet convolution")
+
+
+def _admit_mobius(request: MobiusTransformRequest) -> None:
+    heights = _heights(request.values)
+    for index in range(1, len(heights) + 1):
+        terms = (heights[index // divisor - 1] for divisor in _divisors(index))
+        _require_result_height(sum_heights(terms), "Möbius transform")
+
+
+def _admit_inverse(request: DirichletInverseRequest) -> None:
+    source = _heights(request.values)
+    inverse = [RationalHeight(1, 1).quotient(source[0])]
+    _require_result_height(inverse[0], "Dirichlet inverse")
+    for index in range(2, len(source) + 1):
+        terms = (
+            source[divisor - 1].product(inverse[index // divisor - 1])
+            for divisor in _divisors(index)
+            if divisor > 1
+        )
+        height = sum_heights(terms).quotient(source[0])
+        _require_result_height(height, "Dirichlet inverse")
+        inverse.append(height)
 
 
 def _mobius_sieve(n: int) -> list[int]:
@@ -79,6 +130,7 @@ def compute_dirichlet_convolution(
     request: DirichletConvolutionRequest,
 ) -> DirichletConvolutionResult:
     """Compute ``h = f * g`` where ``h(K) = sum_{d|K} f(d) * g(K/d)``."""
+    _admit_convolution(request)
     n = len(request.f)
     f = [v.as_fraction() for v in request.f]
     g = [v.as_fraction() for v in request.g]
@@ -109,6 +161,7 @@ def compute_mobius_transform(
     The two operations are mutually inverse: forward then inverse (or vice
     versa) recovers the original function.
     """
+    _admit_mobius(request)
     n = len(request.values)
     values = [v.as_fraction() for v in request.values]
     result_values: list[Fraction] = [Fraction(0)] * n
@@ -140,6 +193,9 @@ def compute_summatory_function(
     request: SummatoryFunctionRequest,
 ) -> SummatoryFunctionResult:
     """Compute ``S(K) = sum_{i=1}^{K} f(i)`` for K = 1..n."""
+    _require_result_height(
+        sum_heights(_heights(request.values)), "summatory function"
+    )
     n = len(request.values)
     values = [v.as_fraction() for v in request.values]
     result_values: list[Fraction] = [Fraction(0)] * n
@@ -164,6 +220,7 @@ def compute_dirichlet_inverse(
 
     The first element of ``f`` (i.e. ``f(1)``) must be non-zero.
     """
+    _admit_inverse(request)
     f = [v.as_fraction() for v in request.values]
     n = len(request.values)
     g: list[Fraction] = [Fraction(0)] * n
