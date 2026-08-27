@@ -311,24 +311,6 @@ class PeriodicCongruenceUnionRequest(StrictModel):
         normalized_data["subsets"] = tuple(normalized_subsets)
         return normalized_data
 
-    @model_validator(mode="after")
-    def require_bounded_exact_execution(self) -> Self:
-        raw_rows = sum(len(subset.residues) for subset in self.subsets)
-        if raw_rows > MAX_PERIODIC_SOURCE_ROWS:
-            raise _validation_error(
-                "f_source_exceeds_the_max_periodic_source_rows",
-                f"source exceeds the {MAX_PERIODIC_SOURCE_ROWS}-residue-row bound",
-            )
-        from jacobian.math.number_theory._periodic_kernel import (
-            require_admitted_periodic_source,
-        )
-
-        try:
-            require_admitted_periodic_source(self.normalized_source())
-        except ValueError as error:
-            raise _validation_error("backend_admission", str(error)) from error
-        return self
-
     def normalized_source(self) -> PeriodicCongruenceUnionSource:
         """Return the canonical union source represented by this request."""
 

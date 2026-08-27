@@ -121,15 +121,6 @@ class FriableCountRequest(StrictModel):
         examples=["5"],
     )
 
-    @model_validator(mode="after")
-    def require_admitted_exact_count(self) -> Self:
-        _plan_friable_count(
-            parse_canonical_integer(self.x),
-            parse_canonical_integer(self.y),
-        )
-        return self
-
-
 class FriableCountResult(StrictModel):
     """An exact friable count bound to its complete source pair."""
 

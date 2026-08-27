@@ -343,8 +343,10 @@ def test_sparse_lift_work_boundary_is_exact() -> None:
     assert prime_sum * admitted_scale <= MAX_SPARSE_LIFTED_ROWS
     assert len(admitted.occupied_residues) == 424 * admitted_scale
 
-    with expect_validation("number_theory."):
-        PeriodicCongruenceUnionRequest.model_validate(payload(rejected_scale))
+    with pytest.raises(ValueError, match="exceeds all exact execution regimes"):
+        compute_periodic_congruence_union_measure(
+            PeriodicCongruenceUnionRequest.model_validate(payload(rejected_scale))
+        )
 
 
 def test_small_profiles_match_exhaustive_membership_replay() -> None:
@@ -550,14 +552,16 @@ def test_rejects_integer_and_lcm_above_exact_result_digit_bound() -> None:
             }
         )
 
-    with expect_validation("number_theory."):
-        PeriodicCongruenceUnionRequest.model_validate(
-            {
-                "subsets": [
-                    {"modulus": "1" + "0" * 199, "residues": []},
-                    {"modulus": "3" * 200, "residues": []},
-                ]
-            }
+    with pytest.raises(ValueError, match="common period exceeds"):
+        compute_periodic_congruence_union_measure(
+            PeriodicCongruenceUnionRequest.model_validate(
+                {
+                    "subsets": [
+                        {"modulus": "1" + "0" * 199, "residues": []},
+                        {"modulus": "3" * 200, "residues": []},
+                    ]
+                }
+            )
         )
 
 
@@ -803,8 +807,10 @@ def test_compressed_intersection_work_boundary_rejects_before_backend() -> None:
 
     rejected_payload = copy.deepcopy(boundary_payload)
     rejected_payload["subsets"].append({"modulus": str(primes[-1]), "residues": ["0"]})
-    with expect_validation("number_theory."):
-        PeriodicCongruenceUnionRequest.model_validate(rejected_payload)
+    with pytest.raises(ValueError, match="exceeds all exact execution regimes"):
+        compute_periodic_congruence_union_measure(
+            PeriodicCongruenceUnionRequest.model_validate(rejected_payload)
+        )
 
 
 def test_non_coprime_generalized_crt_replays_scaled_union() -> None:

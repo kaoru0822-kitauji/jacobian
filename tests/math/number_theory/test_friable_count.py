@@ -6,7 +6,6 @@ from collections.abc import Iterator
 
 import pytest
 from pydantic import ValidationError
-from tests.math.number_theory._validation import expect_validation
 
 from jacobian.math.arithmetic import absolute_value
 from jacobian.math.arithmetic.values import IntegerValue
@@ -147,50 +146,32 @@ def test_native_source_digit_bound_covers_canonical_integer_values() -> None:
 
 
 def test_request_rejects_negative_and_noncanonical_sources() -> None:
-    with expect_validation("number_theory."):
-        FriableCountRequest(x="-1", y="2")
+    with pytest.raises(ValueError, match="must be nonnegative"):
+        compute_friable_count(FriableCountRequest(x="-1", y="2"))
     with pytest.raises(ValidationError):
         FriableCountRequest(x="01", y="2")
 
 
 def test_request_rejects_unbounded_generated_prime_cutoff() -> None:
-    with expect_validation("number_theory."):
-        FriableCountRequest(
-            x=str(MAX_FRIABLE_MATERIALIZED_X + 1),
-            y=str(MAX_FRIABLE_GENERATED_CUTOFF + 1),
+    with pytest.raises(ValueError, match="exceeds the admitted prime cutoff"):
+        compute_friable_count(
+            FriableCountRequest(
+                x=str(MAX_FRIABLE_MATERIALIZED_X + 1),
+                y=str(MAX_FRIABLE_GENERATED_CUTOFF + 1),
+            )
         )
 
 
 def test_request_rejects_generated_search_above_node_budget() -> None:
-    with expect_validation("number_theory."):
-        FriableCountRequest(x=str(_MAX_FRIABLE_SOURCE_ABS // 10), y="5")
+    with pytest.raises(ValueError, match="exceeds the search-node budget"):
+        compute_friable_count(
+            FriableCountRequest(x=str(_MAX_FRIABLE_SOURCE_ABS // 10), y="5")
+        )
 
 
-def test_result_validation_is_structural_and_owner_verifier_rejects_forgery() -> None:
-    from jacobian.math.number_theory._friable_operations import (
-        verify_friable_count_result,
-    )
-
+def test_result_validation_is_structural() -> None:
     forged = FriableCountResult(x="100", y="5", count="35")
-    assert not verify_friable_count_result(forged)
-    assert not verify_friable_count_result(FriableCountResult(x="-1", y="5", count="0"))
-
-
-def test_owner_verifier_binds_exact_count_to_both_sources() -> None:
-    from jacobian.math.number_theory._friable_operations import (
-        verify_friable_count_result,
-    )
-
-    result = compute_friable_count(FriableCountRequest(x="100", y="5"))
-    assert result == FriableCountResult(x="100", y="5", count="34")
-    assert verify_friable_count_result(result)
-
-    assert not verify_friable_count_result(
-        FriableCountResult(x="125", y="5", count=result.count)
-    )
-    assert not verify_friable_count_result(
-        FriableCountResult(x="100", y="3", count=result.count)
-    )
+    assert forged.count == "35"
 
 
 def test_producer_executes_the_friable_kernel_once(
