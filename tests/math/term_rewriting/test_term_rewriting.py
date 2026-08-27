@@ -9,6 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian.canonical import encode_strict_json
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math import term_rewriting
 from jacobian.math.term_rewriting import _kernel as operations_module
 from jacobian.math.term_rewriting._kernel import (
@@ -89,13 +90,21 @@ class _SubstitutionRequestWire(TypedDict):
 def _validation_error(code: str) -> Iterator[None]:
     """Assert a structured owner-local Pydantic validation code."""
 
-    with pytest.raises(ValidationError) as caught:
+    with pytest.raises((ValidationError, OperationDomainValidationError)) as caught:
         yield
     assert caught.value.errors()[0]["type"] == code
 
 
 def _signature(*arities: int) -> RankedSignature:
     return RankedSignature(arities=arities)
+
+
+def _run_critical_pairs(
+    *, signature: RankedSignature, rules: tuple[RewriteRule, ...]
+) -> CriticalPairsResult:
+    return compute_critical_pairs(
+        CriticalPairsRequest(signature=signature, rules=rules)
+    )
 
 
 def _signature_wire(*arities: int) -> _SignatureWire:
@@ -562,7 +571,7 @@ class TestCriticalPairs:
         signature = RankedSignature(arities=(1, 1, 0, 0))
         native = critical_pairs(signature, rules)
         result = compute_critical_pairs(
-            CriticalPairsRequest(signature=signature, rules=rules)
+            _run_critical_pairs(signature=signature, rules=rules)
         )
 
         assert len(native.pairs) == 1
@@ -658,7 +667,7 @@ class TestCriticalPairs:
         assert _term_node_count(rule.rhs) > MAX_CRITICAL_PAIR_RESULT_NODES
         assert len(_nonvariable_positions(rule.lhs)) == 1
         with _validation_error("term_rewriting.critical_pair_source"):
-            CriticalPairsRequest(signature=signature, rules=(rule,))
+            _run_critical_pairs(signature=signature, rules=(rule,))
         with pytest.raises(ValueError, match="result nodes"):
             critical_pairs(signature, (rule,))
 
@@ -688,7 +697,7 @@ class TestCriticalPairs:
             rhs=_complete_tree(1, _var(0), 16, 4),
         )
         with _validation_error("term_rewriting.critical_pair_source"):
-            CriticalPairsRequest(signature=signature, rules=(rule, rule))
+            _run_critical_pairs(signature=signature, rules=(rule, rule))
         with pytest.raises(ValueError, match="result nodes"):
             critical_pairs(signature, (rule, rule))
 
@@ -696,7 +705,7 @@ class TestCriticalPairs:
         first = RewriteRule(lhs=_app(0, _var(7)), rhs=_var(7))
         alpha_equivalent = RewriteRule(lhs=_app(0, _var(12)), rhs=_var(12))
         with _validation_error("term_rewriting.critical_pair_source"):
-            CriticalPairsRequest(
+            _run_critical_pairs(
                 signature=_signature(1), rules=(first, alpha_equivalent)
             )
 
@@ -712,7 +721,7 @@ class TestCriticalPairs:
             for index in range(7)
         )
         with _validation_error("term_rewriting.critical_pair_source"):
-            CriticalPairsRequest(signature=_signature(1), rules=rules)
+            _run_critical_pairs(signature=_signature(1), rules=rules)
 
     def test_exact_candidate_boundary_has_bounded_complete_output(self) -> None:
         def unary_chain(variable: int, length: int) -> Term:
@@ -758,7 +767,7 @@ class TestCriticalPairs:
         for _ in range(64):
             lhs = _app(0, lhs)
         with _validation_error("term_rewriting.critical_pair_source"):
-            CriticalPairsRequest(
+            _run_critical_pairs(
                 signature=_signature(1),
                 rules=(RewriteRule(lhs=lhs, rhs=_var(0)),),
             )
@@ -791,7 +800,7 @@ class TestCriticalPairs:
             tracemalloc.stop()
         assert peak < 8 * 1024 * 1024
         with _validation_error("term_rewriting.critical_pair_source"):
-            CriticalPairsRequest(signature=signature, rules=(rule,))
+            _run_critical_pairs(signature=signature, rules=(rule,))
 
     def test_root_overlap_composed_reduct_depth_is_admission_bounded(self) -> None:
         # Two individually transport-safe rules overlap at the root: the
@@ -811,7 +820,7 @@ class TestCriticalPairs:
         )
         signature = RankedSignature(arities=(1, 1, 1))
         with _validation_error("term_rewriting.critical_pair_source"):
-            CriticalPairsRequest(signature=signature, rules=rules)
+            _run_critical_pairs(signature=signature, rules=rules)
         with pytest.raises(ValueError, match="result depth"):
             critical_pairs(signature, rules)
 
@@ -862,7 +871,7 @@ class TestCriticalPairs:
             RewriteRule(lhs=_app(0, unary(1, _var(1), 13)), rhs=_var(1)),
         )
         with _validation_error("term_rewriting.critical_pair_source"):
-            CriticalPairsRequest(
+            _run_critical_pairs(
                 signature=RankedSignature(arities=(1, 1, 1)), rules=rules
             )
 
@@ -891,7 +900,7 @@ class TestCriticalPairs:
         with pytest.raises(ValueError, match="result nodes"):
             critical_pairs(signature, rules)
         with _validation_error("term_rewriting.critical_pair_source"):
-            CriticalPairsRequest(signature=signature, rules=rules)
+            _run_critical_pairs(signature=signature, rules=rules)
 
     def test_failed_overlap_family_within_budget_still_admits(self) -> None:
         signature, outer_rule, inner_rule = _failed_overlap_witness(7)
@@ -946,7 +955,7 @@ class TestCriticalPairs:
         )
         widest = MAX_VARIABLE_LABEL
         with _validation_error("term_rewriting.critical_pair_source"):
-            CriticalPairsRequest(signature=signature, rules=wide_bush(widest))
+            _run_critical_pairs(signature=signature, rules=wide_bush(widest))
         with pytest.raises(ValueError, match="result bytes"):
             critical_pairs(signature, wide_bush(widest))
 
@@ -957,7 +966,7 @@ class TestCriticalPairs:
         signature, outer_rule, inner_rule = _chained_overlap_witness(depth)
         rules = (outer_rule, inner_rule)
         result = compute_critical_pairs(
-            CriticalPairsRequest(signature=signature, rules=rules)
+            _run_critical_pairs(signature=signature, rules=rules)
         )
         materialized_nodes = sum(
             _term_node_count(term)
@@ -1004,7 +1013,7 @@ class TestCriticalPairs:
         ) - len(rules)
         assert 0 < candidates <= MAX_CRITICAL_PAIR_CANDIDATES
         with _validation_error("term_rewriting.critical_pair_source"):
-            CriticalPairsRequest(signature=signature, rules=rules)
+            _run_critical_pairs(signature=signature, rules=rules)
         with pytest.raises(ValueError, match="result nodes"):
             critical_pairs(signature, rules)
 
@@ -1016,7 +1025,7 @@ class TestCriticalPairs:
         ) - len(rules)
         assert 0 < candidates <= MAX_CRITICAL_PAIR_CANDIDATES
         with _validation_error("term_rewriting.critical_pair_source"):
-            CriticalPairsRequest(signature=signature, rules=rules)
+            _run_critical_pairs(signature=signature, rules=rules)
         with pytest.raises(ValueError, match="result nodes"):
             critical_pairs(signature, rules)
 
@@ -1032,7 +1041,7 @@ class TestCriticalPairs:
         ) - len(rules)
         assert 0 < candidates <= MAX_CRITICAL_PAIR_CANDIDATES
         with _validation_error("term_rewriting.critical_pair_source"):
-            CriticalPairsRequest(signature=signature, rules=rules)
+            _run_critical_pairs(signature=signature, rules=rules)
         with pytest.raises(ValueError, match="result nodes"):
             critical_pairs(signature, rules)
 
@@ -1108,7 +1117,7 @@ class TestCriticalPairs:
             tracemalloc.stop()
         assert peak < 8 * 1024 * 1024
         with _validation_error("term_rewriting.critical_pair_source"):
-            CriticalPairsRequest(signature=signature, rules=rules)
+            _run_critical_pairs(signature=signature, rules=rules)
 
     def test_failed_overlaps_rename_only_the_terms_unification_inspects(
         self, monkeypatch: pytest.MonkeyPatch
@@ -1168,7 +1177,7 @@ class TestCriticalPairs:
             tracemalloc.stop()
         assert peak < 8 * 1024 * 1024
         with _validation_error("term_rewriting.critical_pair_source"):
-            CriticalPairsRequest(signature=signature, rules=rules)
+            _run_critical_pairs(signature=signature, rules=rules)
 
     def test_budgeted_unification_charges_exactly_the_materialized_sizes(self) -> None:
         for depth in range(1, 6):
@@ -1305,7 +1314,7 @@ class TestDeepTermTraversal:
         assert profile.candidates == ()
         assert profile.pairs == ()
         with _validation_error("term_rewriting.transport_depth"):
-            CriticalPairsRequest(signature=_signature(1), rules=(rule,))
+            _run_critical_pairs(signature=_signature(1), rules=(rule,))
 
     def test_transport_depth_boundary_rejects_one_deeper_node_typed(self) -> None:
         # One more unary node exceeds MAX_TERM_DEPTH; direct model
@@ -1319,16 +1328,18 @@ class TestDeepTermTraversal:
 
         lhs = unary_chain(MAX_TERM_DEPTH)
         with _validation_error("term_rewriting.critical_pair_source"):
-            CriticalPairsRequest.model_validate(
-                {
-                    "signature": {"arities": [1]},
-                    "rules": [
-                        {
-                            "lhs": lhs.model_dump(),
-                            "rhs": {"is_variable": True, "symbol": 0},
-                        }
-                    ],
-                }
+            compute_critical_pairs(
+                CriticalPairsRequest.model_validate(
+                    {
+                        "signature": {"arities": [1]},
+                        "rules": [
+                            {
+                                "lhs": lhs.model_dump(),
+                                "rhs": {"is_variable": True, "symbol": 0},
+                            }
+                        ],
+                    }
+                )
             )
         request = CriticalPairsRequest(
             signature=_signature(1),
@@ -1369,10 +1380,12 @@ class TestDeepTermTraversal:
 
         signature = _signature(1, 0)
         with _validation_error("term_rewriting.transport_depth"):
-            SubstitutionRequest(
-                signature=signature,
-                term=unary_chain(30, _var(0)),
-                substitution=_substitution({0: unary_chain(30, _app(1))}),
+            compute_substitution(
+                SubstitutionRequest(
+                    signature=signature,
+                    term=unary_chain(30, _var(0)),
+                    substitution=_substitution({0: unary_chain(30, _app(1))}),
+                )
             )
         boundary = SubstitutionRequest(
             signature=signature,
@@ -1412,14 +1425,18 @@ class TestDeepTermTraversal:
         rules = (RewriteRule(lhs=_app(1, _var(3)), rhs=_chain_unary(0, 30, _var(3))),)
         term = _app(0, _chain_unary(1, 15, _var(0)))
         with _validation_error("term_rewriting.transport_depth"):
-            RewriteStepRequest(
-                signature=_signature(1, 1),
-                term=term,
-                rules=rules,
-                selection=_selection((0,), 0),
+            compute_rewrite_step(
+                RewriteStepRequest(
+                    signature=_signature(1, 1),
+                    term=term,
+                    rules=rules,
+                    selection=_selection((0,), 0),
+                )
             )
         with _validation_error("term_rewriting.transport_depth"):
-            RewriteStepRequest(signature=_signature(1, 1), term=term, rules=rules)
+            compute_rewrite_step(
+                RewriteStepRequest(signature=_signature(1, 1), term=term, rules=rules)
+            )
 
     def test_boundary_spliced_rewrite_step_admits_and_transports(self) -> None:
         # The same shape with f^14 instead of f^30 composes a 30-node term,
@@ -1446,12 +1463,14 @@ class TestDeepTermTraversal:
         # reject typedly before the operation runs.
         rules = (RewriteRule(lhs=_app(1, _var(3)), rhs=_chain_unary(0, 30, _var(3))),)
         with _validation_error("term_rewriting.transport_depth"):
-            NormalFormRequest(
-                signature=_signature(1, 1),
-                term=_app(0, _chain_unary(1, 15, _var(0))),
-                rules=rules,
-                strategy="LEFTMOST_OUTERMOST_RULE_ORDER",
-                max_steps=1,
+            compute_normal_form(
+                NormalFormRequest(
+                    signature=_signature(1, 1),
+                    term=_app(0, _chain_unary(1, 15, _var(0))),
+                    rules=rules,
+                    strategy="LEFTMOST_OUTERMOST_RULE_ORDER",
+                    max_steps=1,
+                )
             )
 
     def test_normal_form_step_limit_within_depth_admits_and_transports(self) -> None:
@@ -1491,7 +1510,11 @@ class TestDeepTermTraversal:
         assert _term_depth(mgu[1]) == MAX_TERM_DEPTH - 14
         assert _term_depth(mgu[0]) == 2 * MAX_TERM_DEPTH - 29
         with _validation_error("term_rewriting.transport_depth"):
-            UnificationRequest(signature=_signature(2, 1, 0), left=left, right=right)
+            compute_unification(
+                UnificationRequest(
+                    signature=_signature(2, 1, 0), left=left, right=right
+                )
+            )
         payload = {
             "signature": {"arities": [2, 1, 0]},
             "left": left.model_dump(mode="json"),
@@ -1499,7 +1522,7 @@ class TestDeepTermTraversal:
         }
         encoded = encode_strict_json(payload)
         with _validation_error("term_rewriting.transport_depth"):
-            UnificationRequest.model_validate_json(encoded)
+            compute_unification(UnificationRequest.model_validate_json(encoded))
         with _validation_error("term_rewriting.transport_depth"):
             UnificationResult(
                 signature=_signature(2, 1, 0),
@@ -1545,7 +1568,9 @@ class TestDeepTermTraversal:
         with pytest.raises(ValueError, match="result nodes"):
             _bounded_unify(left, right)
         with _validation_error("term_rewriting.unification_bound"):
-            UnificationRequest(signature=signature, left=left, right=right)
+            compute_unification(
+                UnificationRequest(signature=signature, left=left, right=right)
+            )
 
     def test_deep_unification_and_matching_stay_typed(self) -> None:
         def chain(length: int) -> Term:
@@ -1576,10 +1601,12 @@ class TestDeepTermTraversal:
 class TestValidation:
     def test_public_terms_must_use_one_ranked_signature(self) -> None:
         with _validation_error("term_rewriting.signature_arity"):
-            UnificationRequest(
-                signature=_signature(1),
-                left=_app(0, _var(0)),
-                right=_app(0, _var(0), _var(1)),
+            compute_unification(
+                UnificationRequest(
+                    signature=_signature(1),
+                    left=_app(0, _var(0)),
+                    right=_app(0, _var(0), _var(1)),
+                )
             )
 
     def test_variable_with_children_rejected(self) -> None:
@@ -1596,9 +1623,11 @@ class TestValidation:
 
     def test_selected_position_must_exist(self) -> None:
         with _validation_error("term_rewriting.selection_position"):
-            RewriteStepRequest(
-                signature=_signature(0, 0),
-                term=_app(0),
-                rules=(RewriteRule(lhs=_app(0), rhs=_app(1)),),
-                selection=_selection((0,), 0),
+            compute_rewrite_step(
+                RewriteStepRequest(
+                    signature=_signature(0, 0),
+                    term=_app(0),
+                    rules=(RewriteRule(lhs=_app(0), rhs=_app(1)),),
+                    selection=_selection((0,), 0),
+                )
             )

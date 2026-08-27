@@ -8,15 +8,6 @@ from pydantic import Field, model_validator
 from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
-from jacobian.math.term_rewriting._kernel import (
-    _bounded_unify,
-    _validate_critical_pair_source,
-    apply_substitution,
-    normal_form,
-    rewrite_steps,
-    selected_rewrite_step,
-    term_at_position,
-)
 from jacobian.math.term_rewriting.values import (
     MAX_CRITICAL_PAIR_RULES,
     MAX_RULES,
@@ -66,18 +57,6 @@ class SubstitutionRequest(StrictModel):
     term: Term
     substitution: Substitution
 
-    @model_validator(mode="after")
-    def require_signature(self) -> Self:
-        self.signature.validate_term(self.term)
-        for replacement in self.substitution.mapping.values():
-            self.signature.validate_term(replacement)
-        _require_transport_safe_depth(
-            self.term,
-            *self.substitution.mapping.values(),
-            apply_substitution(self.term, self.substitution.mapping),
-        )
-        return self
-
 
 class SubstitutionResult(SubstitutionRequest):
     """The term after substitution."""
@@ -86,8 +65,13 @@ class SubstitutionResult(SubstitutionRequest):
 
     @model_validator(mode="after")
     def bind_substitution(self) -> Self:
+        self.signature.validate_term(self.term)
+        for replacement in self.substitution.mapping.values():
+            self.signature.validate_term(replacement)
         self.signature.validate_term(self.result)
-        _require_transport_safe_depth(self.result)
+        _require_transport_safe_depth(
+            self.term, *self.substitution.mapping.values(), self.result
+        )
         return self
 
     @classmethod
@@ -102,13 +86,6 @@ class MatchingRequest(StrictModel):
     pattern: Term
     subject: Term
 
-    @model_validator(mode="after")
-    def require_signature(self) -> Self:
-        self.signature.validate_term(self.pattern)
-        self.signature.validate_term(self.subject)
-        _require_transport_safe_depth(self.pattern, self.subject)
-        return self
-
 
 class MatchingResult(MatchingRequest):
     """Result of one-way matching."""
@@ -118,13 +95,17 @@ class MatchingResult(MatchingRequest):
 
     @model_validator(mode="after")
     def bind_matching(self) -> Self:
+        self.signature.validate_term(self.pattern)
+        self.signature.validate_term(self.subject)
         if not self.matched and self.substitution:
             raise _validation_error(
                 "matching_result", "an unmatched result cannot include a substitution"
             )
         for replacement in self.substitution.values():
             self.signature.validate_term(replacement)
-        _require_transport_safe_depth(*self.substitution.values())
+        _require_transport_safe_depth(
+            self.pattern, self.subject, *self.substitution.values()
+        )
         return self
 
     @classmethod
@@ -141,19 +122,6 @@ class UnificationRequest(StrictModel):
     left: Term
     right: Term
 
-    @model_validator(mode="after")
-    def require_signature(self) -> Self:
-        self.signature.validate_term(self.left)
-        self.signature.validate_term(self.right)
-        _require_transport_safe_depth(self.left, self.right)
-        try:
-            expected = _bounded_unify(self.left, self.right)
-        except ValueError as error:
-            raise _validation_error("unification_bound", str(error)) from error
-        if expected is not None:
-            _require_transport_safe_depth(*expected.values())
-        return self
-
 
 class UnificationResult(UnificationRequest):
     """Result of unification."""
@@ -163,13 +131,17 @@ class UnificationResult(UnificationRequest):
 
     @model_validator(mode="after")
     def require_exact_unifier(self) -> Self:
+        self.signature.validate_term(self.left)
+        self.signature.validate_term(self.right)
         if not self.unified and self.substitution:
             raise _validation_error(
                 "failed_unification", "failed unification must not claim a substitution"
             )
         for replacement in self.substitution.values():
             self.signature.validate_term(replacement)
-        _require_transport_safe_depth(*self.substitution.values())
+        _require_transport_safe_depth(
+            self.left, self.right, *self.substitution.values()
+        )
         return self
 
     @classmethod
@@ -201,38 +173,6 @@ class RewriteStepRequest(StrictModel):
     term: Term
     rules: tuple[RewriteRule, ...] = Field(min_length=1, max_length=MAX_RULES)
     selection: RewriteStepSelection | None = None
-
-    @model_validator(mode="after")
-    def require_valid_selection(self) -> Self:
-        self.signature.validate_term(self.term)
-        for rule in self.rules:
-            self.signature.validate_term(rule.lhs)
-            self.signature.validate_term(rule.rhs)
-        _require_transport_safe_depth(
-            self.term, *(side for rule in self.rules for side in (rule.lhs, rule.rhs))
-        )
-        if self.selection is None:
-            applications = rewrite_steps(self.term, self.rules)
-        else:
-            if self.selection.rule_index >= len(self.rules):
-                raise _validation_error(
-                    "selection_rule_index", "selected rule_index is out of range"
-                )
-            try:
-                term_at_position(self.term, self.selection.position)
-                application = selected_rewrite_step(
-                    self.term,
-                    self.rules,
-                    self.selection.position,
-                    self.selection.rule_index,
-                )
-            except ValueError as error:
-                raise _validation_error("selection_position", str(error)) from error
-            applications = () if application is None else (application,)
-        _require_transport_safe_depth(
-            *(application.term for application in applications)
-        )
-        return self
 
 
 class RewriteStepResult(StrictModel):
@@ -292,22 +232,6 @@ class NormalFormRequest(StrictModel):
     rules: tuple[RewriteRule, ...] = Field(min_length=1, max_length=MAX_RULES)
     strategy: Literal["LEFTMOST_OUTERMOST_RULE_ORDER"]
     max_steps: int = Field(default=1000, ge=1, le=1000)
-
-    @model_validator(mode="after")
-    def require_signature(self) -> Self:
-        self.signature.validate_term(self.term)
-        for rule in self.rules:
-            self.signature.validate_term(rule.lhs)
-            self.signature.validate_term(rule.rhs)
-        _require_transport_safe_depth(
-            self.term, *(side for rule in self.rules for side in (rule.lhs, rule.rhs))
-        )
-        normalized, _, _, next_step = normal_form(self.term, self.rules, self.max_steps)
-        observed = [normalized]
-        if next_step is not None:
-            observed.append(next_step.term)
-        _require_transport_safe_depth(*observed)
-        return self
 
 
 class NormalFormResult(StrictModel):
@@ -400,17 +324,6 @@ class CriticalPairsRequest(StrictModel):
             }
         },
     )
-
-    @model_validator(mode="after")
-    def require_bounded_critical_pair_source(self) -> Self:
-        try:
-            _validate_critical_pair_source(self.signature, self.rules)
-        except ValueError as error:
-            raise _validation_error("critical_pair_source", str(error)) from error
-        _require_transport_safe_depth(
-            *(side for rule in self.rules for side in (rule.lhs, rule.rhs))
-        )
-        return self
 
 
 class CriticalPairsResult(CriticalPairsRequest):
