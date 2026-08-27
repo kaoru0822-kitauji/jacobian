@@ -13,7 +13,6 @@ from jacobian._models import StrictModel
 from jacobian.math.probability._models import (
     MAX_INPUT_RATIONAL_DIGITS,
     MAX_RESULT_RATIONAL_DIGITS,
-    _require_bounded_fraction,
     _require_strictly_increasing,
     _validation_error,
 )
@@ -113,12 +112,6 @@ class FiniteRawMomentRequest(StrictModel):
     )
     order: StrictInt = Field(ge=0, le=128)
 
-    @model_validator(mode="after")
-    def require_probability_distribution(self) -> Self:
-        require_input_distribution(self.atoms, require_canonical=False)
-        return self
-
-
 class FiniteRawMomentContribution(StrictModel):
     value: CanonicalRational
     probability: CanonicalRational
@@ -158,63 +151,8 @@ class FiniteEventRequest(StrictModel):
         max_length=MAX_FINITE_DISTRIBUTION_ATOMS
     )
 
-    @model_validator(mode="after")
-    def require_explicit_support_subset(self) -> Self:
-        support = set(
-            require_input_distribution(
-                self.distribution.atoms,
-                require_canonical=True,
-            )
-        )
-        event = _require_strictly_increasing(
-            self.event_values,
-            label="finite event values",
-        )
-        for value in self.event_values:
-            require_bounded_rational(
-                value,
-                max_digits=MAX_INPUT_RATIONAL_DIGITS,
-                label="finite event value",
-            )
-        if not set(event).issubset(support):
-            raise _validation_error(
-                "finite event values must belong to the distribution"
-            )
-        event_mass = sum(
-            (
-                atom.probability.as_fraction()
-                for atom in self.distribution.atoms
-                if atom.value.as_fraction() in set(event)
-            ),
-            start=Fraction(),
-        )
-        _require_bounded_fraction(
-            event_mass,
-            max_digits=MAX_RESULT_RATIONAL_DIGITS,
-            label="finite event probability",
-        )
-        return self
-
-
 class FiniteConditionRequest(FiniteEventRequest):
     """A finite event known to have positive exact probability."""
-
-    @model_validator(mode="after")
-    def require_positive_event_mass(self) -> Self:
-        selected = {value.as_fraction() for value in self.event_values}
-        mass = sum(
-            (
-                atom.probability.as_fraction()
-                for atom in self.distribution.atoms
-                if atom.value.as_fraction() in selected
-            ),
-            start=Fraction(),
-        )
-        if mass <= 0:
-            raise _validation_error(
-                "conditioning requires a positive-mass finite event"
-            )
-        return self
 
 
 class FiniteEventProbabilityResult(StrictModel):
@@ -323,47 +261,6 @@ class FinitePushforwardRequest(StrictModel):
         max_length=MAX_FINITE_DISTRIBUTION_ATOMS,
     )
 
-    @model_validator(mode="after")
-    def require_total_canonical_lookup(self) -> Self:
-        source_values = require_input_distribution(
-            self.distribution.atoms,
-            require_canonical=True,
-        )
-        mapping_sources = tuple(item.source.as_fraction() for item in self.mapping)
-        if mapping_sources != source_values:
-            raise _validation_error(
-                "pushforward mapping must cover each source atom in canonical order"
-            )
-        aggregated: dict[Fraction, Fraction] = {}
-        for atom, item in zip(self.distribution.atoms, self.mapping, strict=True):
-            require_bounded_rational(
-                item.source,
-                max_digits=MAX_INPUT_RATIONAL_DIGITS,
-                label="pushforward source",
-            )
-            require_bounded_rational(
-                item.target,
-                max_digits=MAX_INPUT_RATIONAL_DIGITS,
-                label="pushforward target",
-            )
-            target = item.target.as_fraction()
-            aggregated[target] = (
-                aggregated.get(target, Fraction()) + atom.probability.as_fraction()
-            )
-        for target, probability in aggregated.items():
-            _require_bounded_fraction(
-                target,
-                max_digits=MAX_RESULT_RATIONAL_DIGITS,
-                label="pushforward target",
-            )
-            _require_bounded_fraction(
-                probability,
-                max_digits=MAX_RESULT_RATIONAL_DIGITS,
-                label="pushforward probability",
-            )
-        return self
-
-
 class FinitePushforwardContribution(StrictModel):
     source: CanonicalRational
     target: CanonicalRational
@@ -419,43 +316,6 @@ class FinitePushforwardResult(StrictModel):
 class FiniteConvolutionRequest(StrictModel):
     left: FiniteRationalDistribution
     right: FiniteRationalDistribution
-
-    @model_validator(mode="after")
-    def require_bounded_pair_product(self) -> Self:
-        require_input_distribution(self.left.atoms, require_canonical=True)
-        require_input_distribution(self.right.atoms, require_canonical=True)
-        pair_count = len(self.left.atoms) * len(self.right.atoms)
-        if pair_count > MAX_FINITE_CONVOLUTION_PAIRS:
-            raise _validation_error(
-                "finite convolution exceeds the "
-                f"{MAX_FINITE_CONVOLUTION_PAIRS}-pair bound"
-            )
-        aggregated: dict[Fraction, Fraction] = {}
-        for left in self.left.atoms:
-            for right in self.right.atoms:
-                value = left.value.as_fraction() + right.value.as_fraction()
-                probability = (
-                    left.probability.as_fraction() * right.probability.as_fraction()
-                )
-                aggregated[value] = aggregated.get(value, Fraction()) + probability
-        if len(aggregated) > MAX_FINITE_DISTRIBUTION_ATOMS:
-            raise _validation_error(
-                "finite convolution exceeds the "
-                f"{MAX_FINITE_DISTRIBUTION_ATOMS}-atom output bound"
-            )
-        for value, probability in aggregated.items():
-            _require_bounded_fraction(
-                value,
-                max_digits=MAX_RESULT_RATIONAL_DIGITS,
-                label="convolution atom",
-            )
-            _require_bounded_fraction(
-                probability,
-                max_digits=MAX_RESULT_RATIONAL_DIGITS,
-                label="convolution probability",
-            )
-        return self
-
 
 class FiniteConvolutionContribution(StrictModel):
     left_value: CanonicalRational

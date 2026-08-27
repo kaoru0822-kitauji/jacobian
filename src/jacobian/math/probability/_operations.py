@@ -5,14 +5,16 @@ from __future__ import annotations
 from fractions import Fraction
 from typing import Any
 
-from jacobian._exact import CanonicalRational
+from jacobian._exact import CanonicalRational, require_bounded_rational
 from jacobian.canonical import format_canonical_integer
 from jacobian.catalog._examples import example
-from jacobian.catalog.models import MathTool, MathTools
+from jacobian.catalog.models import MathTool, MathTools, OperationDomainValidationError
 from jacobian.math.probability._directed_bond_reliability import (
     DIRECTED_BOND_CONNECTION_PROBABILITY_OPERATION,
 )
 from jacobian.math.probability._distribution import (
+    MAX_FINITE_CONVOLUTION_PAIRS,
+    MAX_FINITE_DISTRIBUTION_ATOMS,
     FiniteConditionalContribution,
     FiniteConditionRequest,
     FiniteConditionResult,
@@ -29,6 +31,7 @@ from jacobian.math.probability._distribution import (
     FiniteRawMomentContribution,
     FiniteRawMomentRequest,
     FiniteRawMomentResult,
+    require_input_distribution,
 )
 from jacobian.math.probability._gaussian import (
     ExactComplexRational,
@@ -42,6 +45,12 @@ from jacobian.math.probability._gaussian_inputs import (
 from jacobian.math.probability._gaussian_moments import gaussian_univariate_moment
 from jacobian.math.probability._graph_connection_probability import (
     GRAPH_CONNECTION_PROBABILITY_OPERATION,
+)
+from jacobian.math.probability._models import (
+    MAX_INPUT_RATIONAL_DIGITS,
+    MAX_RESULT_RATIONAL_DIGITS,
+    _require_bounded_fraction,
+    _require_strictly_increasing,
 )
 
 
@@ -61,6 +70,121 @@ def _fmpq(value: CanonicalRational) -> Any:
 
 def _complex_wire(value: tuple[Any, Any]) -> ExactComplexRational:
     return ExactComplexRational(real=_wire(value[0]), imaginary=_wire(value[1]))
+
+
+def _admit_distribution(
+    atoms: tuple[FiniteDistributionAtom, ...], *, require_canonical: bool
+) -> tuple[Fraction, ...]:
+    try:
+        return require_input_distribution(atoms, require_canonical=require_canonical)
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=("atoms",),
+            code="probability.distribution.admission",
+            message=str(exc),
+        ) from exc
+
+
+def _admit_event(request: FiniteEventRequest, *, require_positive: bool) -> None:
+    support = set(
+        _admit_distribution(request.distribution.atoms, require_canonical=True)
+    )
+    try:
+        event = _require_strictly_increasing(request.event_values, label="finite event values")
+        for value in request.event_values:
+            require_bounded_rational(
+                value,
+                max_digits=MAX_INPUT_RATIONAL_DIGITS,
+                label="finite event value",
+            )
+        if not set(event).issubset(support):
+            raise ValueError("finite event values must belong to the distribution")
+        selected = set(event)
+        event_mass = sum(
+            (
+                atom.probability.as_fraction()
+                for atom in request.distribution.atoms
+                if atom.value.as_fraction() in selected
+            ),
+            start=Fraction(),
+        )
+        _require_bounded_fraction(
+            event_mass,
+            max_digits=MAX_RESULT_RATIONAL_DIGITS,
+            label="finite event probability",
+        )
+        if require_positive and event_mass <= 0:
+            raise ValueError("conditioning requires a positive-mass finite event")
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=("event_values",),
+            code="probability.event.admission",
+            message=str(exc),
+        ) from exc
+
+
+def _admit_pushforward(request: FinitePushforwardRequest) -> None:
+    source_values = _admit_distribution(
+        request.distribution.atoms, require_canonical=True
+    )
+    try:
+        mapping_sources = tuple(item.source.as_fraction() for item in request.mapping)
+        if mapping_sources != source_values:
+            raise ValueError(
+                "pushforward mapping must cover each source atom in canonical order"
+            )
+        aggregated: dict[Fraction, Fraction] = {}
+        for atom, item in zip(request.distribution.atoms, request.mapping, strict=True):
+            require_bounded_rational(
+                item.source, max_digits=MAX_INPUT_RATIONAL_DIGITS, label="pushforward source"
+            )
+            require_bounded_rational(
+                item.target, max_digits=MAX_INPUT_RATIONAL_DIGITS, label="pushforward target"
+            )
+            target = item.target.as_fraction()
+            aggregated[target] = aggregated.get(target, Fraction()) + atom.probability.as_fraction()
+        for target, probability in aggregated.items():
+            _require_bounded_fraction(target, max_digits=MAX_RESULT_RATIONAL_DIGITS, label="pushforward target")
+            _require_bounded_fraction(probability, max_digits=MAX_RESULT_RATIONAL_DIGITS, label="pushforward probability")
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=("mapping",),
+            code="probability.pushforward.admission",
+            message=str(exc),
+        ) from exc
+
+
+def _admit_convolution(request: FiniteConvolutionRequest) -> None:
+    _admit_distribution(request.left.atoms, require_canonical=True)
+    _admit_distribution(request.right.atoms, require_canonical=True)
+    if len(request.left.atoms) * len(request.right.atoms) > MAX_FINITE_CONVOLUTION_PAIRS:
+        raise OperationDomainValidationError(
+            location=("left", "right"),
+            code="probability.convolution.pair_bound",
+            message=(
+                f"finite convolution exceeds the {MAX_FINITE_CONVOLUTION_PAIRS}-pair bound"
+            ),
+        )
+    try:
+        aggregated: dict[Fraction, Fraction] = {}
+        for left in request.left.atoms:
+            for right in request.right.atoms:
+                value = left.value.as_fraction() + right.value.as_fraction()
+                probability = left.probability.as_fraction() * right.probability.as_fraction()
+                aggregated[value] = aggregated.get(value, Fraction()) + probability
+        if len(aggregated) > MAX_FINITE_DISTRIBUTION_ATOMS:
+            raise ValueError(
+                f"finite convolution exceeds the {MAX_FINITE_DISTRIBUTION_ATOMS}-atom output bound"
+            )
+        for value, probability in aggregated.items():
+            _require_bounded_fraction(value, max_digits=MAX_RESULT_RATIONAL_DIGITS, label="convolution atom")
+            _require_bounded_fraction(probability, max_digits=MAX_RESULT_RATIONAL_DIGITS, label="convolution probability")
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=("left", "right"),
+            code="probability.convolution.output_bound",
+            message=str(exc),
+        ) from exc
 
 
 def _distribution(values: dict[Fraction, Any]) -> FiniteRationalDistribution:
@@ -83,6 +207,7 @@ def _raw_moment(
 ) -> FiniteRawMomentResult:
     from flint import fmpq
 
+    _admit_distribution(request.atoms, require_canonical=False)
     contributions: list[FiniteRawMomentContribution] = []
     total = fmpq(0)
     for atom in request.atoms:
@@ -111,6 +236,7 @@ def _event_probability(
 ) -> FiniteEventProbabilityResult:
     from flint import fmpq
 
+    _admit_event(request, require_positive=False)
     selected_values = {value.as_fraction() for value in request.event_values}
     selected = tuple(
         atom
@@ -131,6 +257,7 @@ def _condition(
 ) -> FiniteConditionResult:
     from flint import fmpq
 
+    _admit_event(request, require_positive=True)
     selected_values = {value.as_fraction() for value in request.event_values}
     selected = tuple(
         atom
@@ -168,6 +295,7 @@ def _pushforward(
 ) -> FinitePushforwardResult:
     from flint import fmpq
 
+    _admit_pushforward(request)
     aggregated: dict[Fraction, Any] = {}
     contributions: list[FinitePushforwardContribution] = []
     for atom, mapping in zip(
@@ -196,6 +324,7 @@ def _convolution(
 ) -> FiniteConvolutionResult:
     from flint import fmpq
 
+    _admit_convolution(request)
     aggregated: dict[Fraction, Any] = {}
     contributions: list[FiniteConvolutionContribution] = []
     for left in request.left.atoms:
