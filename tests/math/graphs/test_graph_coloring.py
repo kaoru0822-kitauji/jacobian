@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import NoReturn
+
 import pytest
 from pydantic import ValidationError
 
@@ -173,6 +175,31 @@ def test_coloring_worker_failure_is_typed_inconclusive_without_a_math_claim(
 
     assert result.status == "EXECUTION_FAILED"
     assert result.colorable is None
+
+
+def test_edgeless_vertex_coloring_bypasses_the_worker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A worker failure cannot obscure the trivial edgeless decision."""
+
+    def worker_must_not_start(*_args: object, **_kwargs: object) -> NoReturn:
+        raise AssertionError("edgeless vertex coloring must not start a worker")
+
+    monkeypatch.setattr(
+        coloring_operations, "run_bounded_process", worker_must_not_start
+    )
+    from jacobian.math.graphs.coloring._models import KColorabilityRequest
+    from jacobian.math.graphs.coloring._operations import compute_k_colorability
+
+    result = compute_k_colorability(
+        KColorabilityRequest.model_validate(
+            {"graph": {"vertex_count": 2, "edges": []}, "colors": 1}
+        )
+    )
+
+    assert result.status == "DECIDED"
+    assert result.colorable is True
+    assert result.coloring == (0, 0)
 
 
 class TestEdgeKColorability:

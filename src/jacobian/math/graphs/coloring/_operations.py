@@ -238,6 +238,15 @@ def compute_k_colorability(request: KColorabilityRequest) -> KColorabilityResult
     separately supplied negative or incomplete claims may be replayed through
     the explicit verifier.
     """
+    if not request.graph.edges:
+        return KColorabilityResult._from_kernel(
+            graph=request.graph,
+            colors=request.colors,
+            solver_conflicts=request.solver_conflicts,
+            status="DECIDED",
+            colorable=True,
+            coloring=(0,) * request.graph.vertex_count,
+        )
     outcome, coloring = _run_coloring_worker(
         "vertex", request.graph, request.colors, request.solver_conflicts
     )
