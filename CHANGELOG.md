@@ -3,6 +3,15 @@
 ## [0.15.1](https://github.com/morluto/jacobian/compare/jacobian-v0.15.0...jacobian-v0.15.1) (2026-08-27)
 
 
+### Features
+
+* add exact Poisson-binomial count distributions ([8fe02cc](https://github.com/morluto/jacobian/commit/8fe02ccafd6e5507582f387a14aefd2970dd6e34))
+* add affine-plane, hypercube, Keller, triangle, and three-term progression constructors ([a0ccbb5](https://github.com/morluto/jacobian/commit/a0ccbb571c35ce16f6a8a8242c70713be818fb55), [839f931](https://github.com/morluto/jacobian/commit/839f93161a8a33297d3ab8315adecfd345eba1f8), [8cdf266](https://github.com/morluto/jacobian/commit/8cdf26622624bdedee8ceb4d1afa01b920dc6f14))
+* add gcd-quotient, product-divisibility, and fixed-length path profiles ([41797fe](https://github.com/morluto/jacobian/commit/41797feb6593713e6fd078e480418713495fbb68))
+* add hypergraph induced-type, transversal, matching, Sidon-extension, and divisibility-incidence profiles ([c2632b6](https://github.com/morluto/jacobian/commit/c2632b678cc20220c3b9015f9c4915057b19417e), [6dfd7ff](https://github.com/morluto/jacobian/commit/6dfd7ff616d426906d29020c8a50522e7ca71b5c), [7427f38](https://github.com/morluto/jacobian/commit/7427f38ee73ad2ff162128cb4bef091fbefd3f10))
+* add polynomial multiplication and number-theory profiles for interval, translated-prime, prime-coverage, and binomial-valuation representations ([7427f38](https://github.com/morluto/jacobian/commit/7427f38ee73ad2ff162128cb4bef091fbefd3f10), [ca20243](https://github.com/morluto/jacobian/commit/ca20243d40efd6736c2f4bd8e62aebcfc773f259), [ce73f7a](https://github.com/morluto/jacobian/commit/ce73f7a33d2936f461720037192730bda33bebea), [2c861fb](https://github.com/morluto/jacobian/commit/2c861fb555c1b966d153a3dad17dfa60a8a78fa3), [10b6e43](https://github.com/morluto/jacobian/commit/10b6e4339fc8156256a0b18f629347578109ce0f))
+
+
 ### Bug Fixes
 
 * bound and compose Poisson-binomial results ([bfedfd3](https://github.com/morluto/jacobian/commit/bfedfd321f51c5b3e0e9ea672fc8271bf2558e15))
