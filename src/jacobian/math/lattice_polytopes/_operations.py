@@ -496,23 +496,3 @@ def count_lattice_points(
         point_count=count,
         representation=representation,
     )
-
-
-def verify_enumerate_lattice_points_result(
-    request: LatticePolytopeRequest,
-    result: EnumerateLatticePointsResult,
-) -> bool:
-    """Verify an independently supplied enumeration under request admission.
-
-    This explicit path intentionally performs one bounded scan.  Kernel
-    construction does not replay its own result model validation.
-    """
-    return enumerate_lattice_points(request) == result
-
-
-def verify_count_lattice_points_result(
-    request: LatticePolytopeRequest,
-    result: CountLatticePointsResult,
-) -> bool:
-    """Verify an independently supplied exact count under request admission."""
-    return count_lattice_points(request) == result
