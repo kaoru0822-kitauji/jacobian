@@ -1,9 +1,9 @@
 """Tests for quiver operations."""
 
 import pytest
-from pydantic import ValidationError
 
 from jacobian.canonical import encode_strict_json
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.quivers._models import (
     AdjacencyMatricesRequest,
     FiniteQuiver,
@@ -78,10 +78,11 @@ def test_fixed_length_paths_admits_transportable_count_boundary() -> None:
 
 def test_fixed_length_paths_rejects_untransportable_count_before_kernel() -> None:
     """The next power would produce raw JSON integers above 2**53 - 1."""
-    with pytest.raises(ValidationError) as exc_info:
-        FixedLengthPathsRequest(
+    request = FixedLengthPathsRequest(
             quiver=FiniteQuiver(vertex_count=1, arrows=((0, 0),) * 8), length=18
         )
+    with pytest.raises(OperationDomainValidationError) as exc_info:
+        compute_fixed_length_paths(request)
 
     assert exc_info.value.errors()[0]["type"] == (
         "quiver.fixed_length_paths_exceeds_envelope"
@@ -90,7 +91,8 @@ def test_fixed_length_paths_rejects_untransportable_count_before_kernel() -> Non
 
 def test_fixed_length_paths_rejects_parallel_loop_explosion_before_kernel() -> None:
     """The reported 32-loop, length-32 request is rejected at admission."""
-    with pytest.raises(ValidationError):
-        FixedLengthPathsRequest(
+    request = FixedLengthPathsRequest(
             quiver=FiniteQuiver(vertex_count=1, arrows=((0, 0),) * 32), length=32
         )
+    with pytest.raises(OperationDomainValidationError):
+        compute_fixed_length_paths(request)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.quivers._models import (
     AdjacencyMatricesRequest,
     AdjacencyMatricesResult,
@@ -10,6 +11,7 @@ from jacobian.math.quivers._models import (
     VertexProfilesRequest,
     VertexProfilesResult,
 )
+from jacobian.math.quivers._path_bounds import fixed_length_paths_envelope
 
 
 def compute_adjacency_matrices(
@@ -50,6 +52,18 @@ def compute_fixed_length_paths(
     request: FixedLengthPathsRequest,
 ) -> FixedLengthPathsResult:
     """Count paths of fixed length between all vertex pairs using matrix powers."""
+    try:
+        fixed_length_paths_envelope(
+            vertex_count=request.quiver.vertex_count,
+            arrow_count=len(request.quiver.arrows),
+            length=request.length,
+        )
+    except ValueError as error:
+        raise OperationDomainValidationError(
+            location=("quiver", "length"),
+            code="quiver.fixed_length_paths_exceeds_envelope",
+            message=str(error),
+        ) from error
     n = request.quiver.vertex_count
     matrix = [[0] * n for _ in range(n)]
     for source, target in request.quiver.arrows:
