@@ -24,10 +24,8 @@ from jacobian.math.probability.all_terminal_reliability import (
     MAX_ALL_TERMINAL_RELIABILITY_INPUT_DIGITS,
     MAX_ALL_TERMINAL_RELIABILITY_RESULT_DIGITS,
     MAX_ALL_TERMINAL_RELIABILITY_STATES,
-    AllTerminalReliabilityResult,
     _compute_all_terminal_reliability,
     _require_bounded_problem,
-    verify_all_terminal_reliability_result,
 )
 
 
@@ -198,36 +196,6 @@ class AllTerminalReliabilityWireResult(StrictModel):
             visited_states=visited_states,
             event="ALL_VERTICES_CONNECTED",
         )
-
-
-def verify_all_terminal_reliability_wire_result(
-    result: AllTerminalReliabilityWireResult,
-) -> bool:
-    """Replay one bounded independently supplied wire claim."""
-
-    try:
-        native_result = _result_to_native(result)
-    except (TypeError, ValueError):
-        return False
-    return verify_all_terminal_reliability_result(native_result)
-
-
-def _result_to_native(
-    result: AllTerminalReliabilityWireResult,
-) -> AllTerminalReliabilityResult:
-    """Convert a structurally admitted wire value for explicit verification."""
-
-    return AllTerminalReliabilityResult(
-        graph=result.graph,
-        open_probability=result.open_probability.as_fraction(),
-        connected_spanning_subgraph_counts=tuple(
-            parse_canonical_integer(value)
-            for value in result.connected_spanning_subgraph_counts
-        ),
-        reliability_probability=result.reliability_probability.as_fraction(),
-        visited_states=result.visited_states,
-        event=result.event,
-    )
 
 
 def compute_all_terminal_reliability(

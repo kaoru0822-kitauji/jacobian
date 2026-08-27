@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from copy import deepcopy
 from fractions import Fraction
 from importlib import import_module
 from itertools import combinations
-from typing import Any, cast
+from typing import cast
 
 import pytest
 from pydantic import ValidationError
@@ -18,7 +17,6 @@ from jacobian.math.probability._all_terminal_reliability import (
     AllTerminalReliabilityRequest,
     AllTerminalReliabilityWireResult,
     compute_all_terminal_reliability,
-    verify_all_terminal_reliability_wire_result,
 )
 from jacobian.math.probability._graph_connection_probability import (
     GraphConnectionProbabilityRequest,
@@ -27,9 +25,7 @@ from jacobian.math.probability._graph_connection_probability import (
 )
 from jacobian.math.probability.all_terminal_reliability import (
     MAX_ALL_TERMINAL_RELIABILITY_EDGES,
-    AllTerminalReliabilityResult,
     all_terminal_reliability,
-    verify_all_terminal_reliability_result,
 )
 
 
@@ -147,23 +143,6 @@ def test_rosenstock_canale_nine_vertex_profile() -> None:
     assert result.reliability_probability == Fraction(66329, 131072)
 
 
-def test_native_result_requires_explicit_verification_for_replay() -> None:
-    graph = _graph(
-        ("a", "b", "c"),
-        (("a", "b"), ("a", "c"), ("b", "c")),
-    )
-
-    claim = AllTerminalReliabilityResult(
-        graph=graph,
-        open_probability=Fraction(1, 2),
-        connected_spanning_subgraph_counts=(0, 0, 2, 1),
-        reliability_probability=Fraction(1, 2),
-        visited_states=8,
-    )
-
-    assert not verify_all_terminal_reliability_result(claim)
-
-
 def test_all_terminal_event_differs_from_two_terminal_connectivity() -> None:
     graph = _graph(
         ("a", "b", "c"),
@@ -245,68 +224,6 @@ def test_degenerate_and_boundary_conventions(
 
     assert result.connected_spanning_subgraph_counts == counts
     assert result.reliability_probability == reliability
-
-
-@pytest.mark.parametrize(
-    ("mutation", "message"),
-    (
-        (
-            lambda value: value["connected_spanning_subgraph_counts"].__setitem__(
-                2, "2"
-            ),
-            "counts do not match the source graph",
-        ),
-        (
-            lambda value: value.__setitem__(
-                "reliability_probability", {"num": "5", "den": "8"}
-            ),
-            "probability does not match its sources",
-        ),
-        (
-            lambda value: value.__setitem__("visited_states", 4),
-            "visited_states does not match",
-        ),
-        (
-            lambda value: value.__setitem__(
-                "open_probability", {"num": "1", "den": "3"}
-            ),
-            "probability does not match its sources",
-        ),
-        (
-            lambda value: value.__setitem__(
-                "graph",
-                {
-                    "vertices": ["a", "b", "c", "d"],
-                    "edges": [["a", "b"], ["b", "c"], ["c", "d"]],
-                },
-            ),
-            "connected spanning subgraph has at least n-1 edges",
-        ),
-    ),
-    ids=(
-        "coefficient",
-        "probability",
-        "state-count",
-        "source-probability",
-        "source-graph",
-    ),
-)
-def test_explicit_result_verifier_rejects_independent_mutations(
-    mutation: Callable[[dict[str, Any]], None],
-    message: str,
-) -> None:
-    candidate = deepcopy(_triangle_result().model_dump(mode="json"))
-    mutation(candidate)
-
-    if message in {
-        "visited_states does not match",
-        "connected spanning subgraph has at least n-1 edges",
-    }:
-        with pytest.raises(ValidationError):
-            AllTerminalReliabilityWireResult.model_validate(candidate)
-    else:
-        claim = AllTerminalReliabilityWireResult.model_validate(candidate)
-        assert not verify_all_terminal_reliability_wire_result(claim)
 
 
 @pytest.mark.parametrize("wire", (False, True), ids=("native", "wire"))

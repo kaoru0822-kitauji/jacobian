@@ -145,69 +145,6 @@ def _evaluate_reliability(
     )
 
 
-def _require_source_bound_result(
-    graph: SimpleUndirectedGraph,
-    open_probability: Fraction,
-    counts: tuple[int, ...],
-    reliability_probability: Fraction,
-    visited_states: int,
-) -> None:
-    _require_bounded_problem(graph, open_probability)
-    if (
-        abs(reliability_probability.numerator)
-        >= _MAX_ALL_TERMINAL_RELIABILITY_RESULT_ABS
-        or reliability_probability.denominator
-        >= _MAX_ALL_TERMINAL_RELIABILITY_RESULT_ABS
-    ):
-        raise ValueError(
-            "all-terminal reliability result probability exceeds the "
-            f"{MAX_ALL_TERMINAL_RELIABILITY_RESULT_DIGITS}-digit bound"
-        )
-    edge_count = len(graph.edges)
-    if len(counts) != edge_count + 1:
-        raise ValueError(
-            "connected-spanning-subgraph counts must cover edge counts 0..m"
-        )
-    for open_edges, count in enumerate(counts):
-        if not 0 <= count <= comb(edge_count, open_edges):
-            raise ValueError(
-                "connected-spanning-subgraph count lies outside its subset class"
-            )
-        if open_edges < len(graph.vertices) - 1 and count:
-            raise ValueError("a connected spanning subgraph has at least n-1 edges")
-
-    expected_counts = _connected_spanning_subgraph_counts(graph)
-    if counts != expected_counts:
-        raise ValueError(
-            "connected-spanning-subgraph counts do not match the source graph"
-        )
-    expected_probability = _evaluate_reliability(expected_counts, open_probability)
-    if reliability_probability != expected_probability:
-        raise ValueError(
-            "all-terminal reliability probability does not match its sources"
-        )
-    if visited_states != 1 << edge_count:
-        raise ValueError("visited_states does not match the complete edge powerset")
-
-
-def verify_all_terminal_reliability_result(
-    result: AllTerminalReliabilityResult,
-) -> bool:
-    """Replay one bounded independently supplied all-terminal claim."""
-
-    try:
-        _require_source_bound_result(
-            result.graph,
-            result.open_probability,
-            result.connected_spanning_subgraph_counts,
-            result.reliability_probability,
-            result.visited_states,
-        )
-    except (TypeError, ValueError):
-        return False
-    return True
-
-
 @dataclass(frozen=True, slots=True)
 class AllTerminalReliabilityResult:
     """A graph-bound exact reliability value and its coefficient profile."""
@@ -321,5 +258,4 @@ def all_terminal_reliability(
 __all__ = [
     "AllTerminalReliabilityResult",
     "all_terminal_reliability",
-    "verify_all_terminal_reliability_result",
 ]
