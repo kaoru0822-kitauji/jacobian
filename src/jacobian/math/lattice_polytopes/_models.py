@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal, Self
 
-from pydantic import Field, PrivateAttr, model_validator
+from pydantic import Field, model_validator
 from pydantic_core import PydanticCustomError
 
 from jacobian._exact import (
@@ -14,9 +14,6 @@ from jacobian._exact import (
 from jacobian._models import StrictModel
 from jacobian.math.polytope.values import Halfspace as RationalHalfspace
 from jacobian.math.polytope.values import Vertex as RationalVertex
-
-AdmittedGeometry = tuple[list[tuple[tuple[int, ...], int]], list[int], list[int], int]
-"""Trusted exact geometry retained on an admitted request."""
 
 MAX_DIMENSION = 4
 """Absolute upper bound on the ambient dimension of a polytope.
@@ -87,8 +84,6 @@ def _validation_error(reason: str, message: str) -> PydanticCustomError:
 
 class LatticePolytopeRequest(StrictModel):
     """A bounded rational polytope in exactly one representation."""
-
-    _geometry: AdmittedGeometry | None = PrivateAttr(default=None)
 
     vertices: tuple[RationalVertex, ...] | None = Field(
         default=None,
@@ -172,56 +167,6 @@ class LatticePolytopeRequest(StrictModel):
                     "vertices_dimension_mismatch",
                     "all vertices must share one dimension",
                 )
-        self._validate_vertex_geometry()
-
-    def _validate_vertex_geometry(self) -> None:
-        """Admit the vertex geometry before any enumeration work.
-
-        The admitted integer geometry is computed exactly once (the
-        facet-combination budget, full dimensionality, and bounding-box
-        scan budgets fail closed inside it) and memoized for admission
-        and execution, so one accepted request never repeats the bounded
-        facet-enumeration work.
-        """
-        try:
-            membership_work = self._membership_work()
-        except ValueError as exc:
-            raise _validation_error("geometry_invalid", str(exc)) from exc
-        if membership_work > MAX_FACET_TESTS:
-            raise _validation_error(
-                "geometry_work_exceeds_bound",
-                "the vertex-hull scan evaluates up to total-scan times "
-                "facet-count inequalities and exceeds the "
-                f"{MAX_FACET_TESTS}-test budget; reduce point count or "
-                "bounding-box size",
-            )
-
-    def admitted_geometry(self) -> AdmittedGeometry:
-        """Return the admitted integer geometry, computing it once per request.
-
-        Validation, artifact admission, and execution all need the exact
-        facet inequalities and the integer bounding box; the first call
-        computes them once and memoizes them on this request instance so
-        no accepted request repeats the bounded facet-enumeration work.
-        """
-        geometry = self._geometry
-        if geometry is None:
-            from jacobian.math.lattice_polytopes._geometry_admission import (
-                admitted_geometry,
-            )
-
-            geometry = admitted_geometry(self)
-            self._geometry = geometry
-        return geometry
-
-    def _membership_work(self) -> int:
-        """Return the admitted scan-times-facet-count membership bound."""
-        facets, lo, hi, _dim = self.admitted_geometry()
-        total_scan = 1
-        for k in range(len(lo)):
-            total_scan *= hi[k] - lo[k] + 1
-        return total_scan * len(facets)
-
     def _validate_halfspaces(self) -> None:
         assert self.halfspaces is not None  # for type checkers
         if len(self.halfspaces) < 1:
@@ -265,28 +210,6 @@ class LatticePolytopeRequest(StrictModel):
                     "halfspaces_dimension_mismatch",
                     "all half-spaces must share one dimension",
                 )
-        self._validate_halfspace_geometry()
-
-    def _validate_halfspace_geometry(self) -> None:
-        """Admit the half-space geometry before any enumeration work.
-
-        Bounded-ness is decided exactly inside the shared geometry
-        computation, and membership work is bounded by distinct-facet
-        count times bounding-box scan, so an accepted request always
-        describes a bounded, possibly empty polytope whose scan stays
-        inside the admitted work budget.
-        """
-        try:
-            membership_work = self._membership_work()
-        except ValueError as exc:
-            raise _validation_error("geometry_invalid", str(exc)) from exc
-        if membership_work > MAX_FACET_TESTS:
-            raise _validation_error(
-                "geometry_work_exceeds_bound",
-                "the scan evaluates up to total-scan times facet-count "
-                f"inequalities and exceeds the {MAX_FACET_TESTS}-test budget",
-            )
-
     def dimension(self) -> int:
         """Return the ambient dimension implied by the chosen representation."""
         if self.vertices is not None:
@@ -394,25 +317,7 @@ class CountLatticePointsResult(StrictModel):
 
 
 class EnumerateLatticePointsRequest(LatticePolytopeRequest):
-    """Enumeration admission: the serialized result must fit the output limits.
-
-    The exact lattice-point count is computed during request validation
-    (bounded by the admitted scan budget); an accepted enumerate request
-    therefore always materializes within the point cap and the 10 MiB
-    canonical JSON output limit instead of failing after acceptance.
-    """
-
-    @model_validator(mode="after")
-    def require_enumeration_artifact_fits(self) -> Self:
-        from jacobian.math.lattice_polytopes._geometry_admission import (
-            enumeration_output_admission,
-        )
-
-        try:
-            enumeration_output_admission(self)
-        except ValueError as exc:
-            raise _validation_error("enumeration_artifact_invalid", str(exc)) from exc
-        return self
+    """Wire request for enumeration; execution admission happens in the operation."""
 
 
 __all__ = [

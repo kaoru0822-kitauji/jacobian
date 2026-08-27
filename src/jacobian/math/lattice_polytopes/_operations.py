@@ -42,6 +42,7 @@ from sympy import Matrix, Rational
 from jacobian.canonical import format_canonical_integer
 from jacobian.math.lattice_polytopes._models import (
     MAX_BOUND_SPAN,
+    MAX_FACET_TESTS,
     MAX_LATTICE_POINTS,
     CountLatticePointsResult,
     EnumerateLatticePointsResult,
@@ -367,6 +368,11 @@ def _facets_and_box(  # noqa: C901
             raise LatticePointBudgetError(
                 "integer bounding box total scan exceeds the 10M-point budget"
             )
+    if total_scan * len(facets) > MAX_FACET_TESTS:
+        raise LatticePointBudgetError(
+            "the lattice-point scan exceeds the exact facet-membership work "
+            f"budget of {MAX_FACET_TESTS} tests"
+        )
     return facets, lo, hi, d
 
 
@@ -420,24 +426,17 @@ def _scan_box(
 _MAX_OUTPUT_BYTES = 10 * 1024 * 1024
 
 
-def enumeration_output_admission(
-    request: LatticePolytopeRequest,
+def _require_enumeration_output_budget(
+    *, lo: list[int], hi: list[int], d: int, count: int
 ) -> None:
-    """Reject enumerations whose serialized artifact cannot fit the output limits.
+    """Check the transport envelope after the one collecting scan.
 
-    Runs the exact count pass (bounded by the admitted scan budget) and
-    checks both the materialization cap and the conservative canonical
-    JSON size estimate.  Reuses the geometry computed once during request
-    validation instead of repeating the facet enumeration.  Raises
-    ``ValueError`` so the enumerate-specific request boundary turns
-    oversize artifacts into invalid requests instead of internal
-    operation failures.
+    Enumeration uses the same scan that constructs its result.  The point
+    cap is enforced while collecting; this final arithmetic check prices the
+    already-known count without running a second mathematical scan.
     """
-
-    facets, lo, hi, d = request.admitted_geometry()
-    _, count = _scan_box(facets, lo, hi, d, collect=False)
     if count > MAX_LATTICE_POINTS:
-        raise ValueError(
+        raise LatticePointBudgetError(
             "lattice-point enumeration exceeds the "
             f"{MAX_LATTICE_POINTS}-point budget bound"
         )
@@ -456,7 +455,7 @@ def enumeration_output_admission(
     base_overhead = 80
     estimated = base_overhead + count * per_point
     if estimated > _MAX_OUTPUT_BYTES:
-        raise ValueError(
+        raise LatticePointBudgetError(
             "lattice-point enumeration would exceed the 10 MiB canonical JSON output limit"
         )
 
@@ -466,15 +465,16 @@ def enumerate_lattice_points(
 ) -> EnumerateLatticePointsResult:
     """Enumerate every lattice point inside a bounded rational polytope.
 
-    The admitted geometry (exact facet inequalities and integer bounding
-    box) was computed once during request validation and is reused here,
-    so execution performs only the collecting scan.
+    Geometry admission and result-envelope checks happen at this execution
+    boundary.  The collecting scan is the only mathematical pass used to
+    produce the enumeration; request parsing remains structural.
     """
     representation: Literal["vertices", "halfspaces"] = (
         "vertices" if request.vertices is not None else "halfspaces"
     )
-    facets, lo, hi, d = request.admitted_geometry()
-    points, _count = _scan_box(facets, lo, hi, d, collect=True)
+    facets, lo, hi, d = _facets_and_box(request)
+    points, count = _scan_box(facets, lo, hi, d, collect=True)
+    _require_enumeration_output_budget(lo=lo, hi=hi, d=d, count=count)
     return EnumerateLatticePointsResult._from_kernel(
         dimension=d,
         points=tuple(points),
@@ -489,7 +489,7 @@ def count_lattice_points(
     representation: Literal["vertices", "halfspaces"] = (
         "vertices" if request.vertices is not None else "halfspaces"
     )
-    facets, lo, hi, d = request.admitted_geometry()
+    facets, lo, hi, d = _facets_and_box(request)
     _points, count = _scan_box(facets, lo, hi, d, collect=False)
     return CountLatticePointsResult._from_kernel(
         dimension=d,
