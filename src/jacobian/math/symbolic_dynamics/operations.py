@@ -14,6 +14,7 @@ from jacobian.math.polynomials._conversions import (
 )
 from jacobian.math.polynomials.values import RationalFunction, RationalPolynomial
 from jacobian.math.symbolic_dynamics._bounds import (
+    MAX_PERIODIC_PROFILE_DIGITS,
     enumeration_size,
     normalize_forbidden_blocks,
     presentation_memory,
@@ -23,6 +24,7 @@ from jacobian.math.symbolic_dynamics._bounds import (
 )
 from jacobian.math.symbolic_dynamics.values import (
     MAX_ADJACENCY_STATES,
+    MAX_PERIOD,
     AdjacencyShift,
     BlockPresentation,
     ForbiddenBlockShift,
@@ -238,7 +240,7 @@ def _mobius(value: int) -> int:
 def periodic_point_profile(
     shift: AdjacencyShift, max_period: int
 ) -> tuple[tuple[int, ...], tuple[int, ...], tuple[int, ...]]:
-    if not 1 <= max_period <= 50:
+    if not 1 <= max_period <= MAX_PERIOD:
         raise ValueError("max period is outside the supported bounds")
     matrix = shift.matrix
     states = len(matrix)
@@ -247,7 +249,7 @@ def periodic_point_profile(
     maximum_row_sum = max(sum(row) for row in matrix)
     count_bound = states * max(1, maximum_row_sum) ** max_period
     aggregate_digits = 3 * max_period * len(str(count_bound))
-    if aggregate_digits > 100_000:
+    if aggregate_digits > MAX_PERIODIC_PROFILE_DIGITS:
         raise ValueError("periodic-point profile exceeds the output digit bound")
     power = matrix
     fixed: list[int] = []

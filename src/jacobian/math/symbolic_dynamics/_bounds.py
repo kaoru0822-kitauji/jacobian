@@ -14,6 +14,7 @@ MAX_ZETA_REPLAY_PERIOD = MAX_PERIOD
 MAX_ZETA_COEFFICIENT_DIGITS = 128
 MAX_ZETA_RESULT_DIGITS = 100_000
 MAX_ZETA_WORK = 13_000_000
+MAX_PERIODIC_PROFILE_DIGITS = 100_000
 
 
 def enumeration_size(alphabet_size: int, block_length: int) -> int:
@@ -102,6 +103,7 @@ def require_zeta_budget(shift: AdjacencyShift, replay_period: int) -> None:
 
 
 __all__ = [
+    "MAX_PERIODIC_PROFILE_DIGITS",
     "MAX_ZETA_REPLAY_PERIOD",
     "enumeration_size",
     "normalize_forbidden_blocks",

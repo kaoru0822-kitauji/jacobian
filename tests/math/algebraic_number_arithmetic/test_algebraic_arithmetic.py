@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.algebraic_number_arithmetic._models import (
     _MAX_RESULT_DIGITS,
     AlgebraicAdditionRequest,
@@ -203,11 +204,12 @@ def test_multiplication_admits_representable_products_with_overflowing_sums() ->
 def test_multiplication_still_rejects_unrepresentable_products() -> None:
     # (10**200)^2 exceeds the 256-digit result bound for multiply...
     big = 10**200
-    with pytest.raises(ValidationError) as exc_info:
-        AlgebraicMultiplicationRequest(
+    request = AlgebraicMultiplicationRequest(
             left=_element(big, 0, 2),
             right=_element(big, 0, 2),
         )
+    with pytest.raises(OperationDomainValidationError) as exc_info:
+        compute_algebraic_multiply(request)
     assert exc_info.value.errors()[0]["type"] == (
         "algebraic_number_arithmetic.multiplication_result_exceeds_bound"
     )
@@ -219,11 +221,12 @@ def test_addition_still_rejects_unrepresentable_sums() -> None:
     # Two maximal 256-digit rational parts sum to a 257-digit value
     # beyond the result bound.
     huge = 10**256 - 1
-    with pytest.raises(ValidationError) as exc_info:
-        AlgebraicAdditionRequest(
+    request = AlgebraicAdditionRequest(
             left=_element(huge, 0, 2),
             right=_element(huge, 0, 2),
         )
+    with pytest.raises(OperationDomainValidationError) as exc_info:
+        compute_algebraic_add(request)
     assert exc_info.value.errors()[0]["type"] == (
         "algebraic_number_arithmetic.addition_result_exceeds_bound"
     )
