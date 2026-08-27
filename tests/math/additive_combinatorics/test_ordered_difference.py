@@ -271,6 +271,7 @@ class TestOrderedDifferenceProfile:
                 {"vectors": {"vectors": vectors}}
             )
 
+    @pytest.mark.scale
     def test_worst_case_profile_stays_within_result_budget(self) -> None:
         """A maximal Sidon family has n*(n-1) distinct difference entries,
         which is the worst-case serialized shape for the bound."""

@@ -86,6 +86,7 @@ def test_mixed_sign_profile_is_sorted_and_complete() -> None:
     assert all(entry.multiplicity == "1" for entry in result.entries)
 
 
+@pytest.mark.exhaustive
 def test_small_profiles_match_independent_bitmask_enumeration() -> None:
     for length in range(5):
         for items in product(range(-2, 3), repeat=length):
@@ -192,6 +193,7 @@ def test_profile_work_above_bound_is_rejected_by_owner_execution() -> None:
         compute_subset_sum_profile(_request(*items))
 
 
+@pytest.mark.scale
 def test_profile_result_above_bound_is_rejected_by_owner_execution() -> None:
     offset = 10 ** (MAX_SUBSET_SUM_ITEM_DIGITS - 1)
     items = tuple(offset + (1 << exponent) for exponent in range(15))
@@ -200,6 +202,7 @@ def test_profile_result_above_bound_is_rejected_by_owner_execution() -> None:
         compute_subset_sum_profile(_request(*items))
 
 
+@pytest.mark.scale
 def test_large_accepted_profile_stays_inside_declared_result_budget() -> None:
     offset = 10 ** (MAX_SUBSET_SUM_ITEM_DIGITS - 1)
     source = tuple(offset + (1 << exponent) for exponent in range(6))

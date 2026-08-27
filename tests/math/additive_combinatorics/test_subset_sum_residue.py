@@ -178,6 +178,7 @@ def test_translation_by_modulus_multiples_preserves_profile() -> None:
     assert translated.residue_counts == base.residue_counts
 
 
+@pytest.mark.exhaustive
 def test_all_small_profiles_match_complete_bitmask_enumeration() -> None:
     for item_count in range(5):
         for values in product(range(-2, 3), repeat=item_count):
@@ -372,6 +373,7 @@ def test_single_integer_beyond_legacy_digit_cap_is_admitted() -> None:
     )
 
 
+@pytest.mark.scale
 def test_exact_dp_cell_boundary_is_complete_and_serializable() -> None:
     item_count = 200
     modulus = MAX_RESIDUE_PROFILE_DP_CELLS // item_count

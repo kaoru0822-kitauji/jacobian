@@ -378,6 +378,7 @@ class TestFacetIncidence:
             {index for facet in result.facets for index in facet.source_vertex_indices}
         ) == list(range(8))
 
+    @pytest.mark.scale
     def test_cyclic_profile_beyond_the_facet_cap_is_rejected_at_request_admission(
         self,
     ) -> None:
@@ -493,6 +494,7 @@ class TestFacetIncidence:
         assert result.facets[2].source_vertex_indices == (2, 3)
         assert result.facets[3].source_vertex_indices == (1, 2)
 
+    @pytest.mark.scale
     def test_seven_dimensional_counterexample_has_136_simplicial_facets(self) -> None:
         rows = (
             "0010110",
@@ -736,6 +738,7 @@ class TestRejection:
             "representation",
         }
 
+    @pytest.mark.scale
     def test_coordinates_whose_volume_leaves_the_canonical_bound_rejected(self) -> None:
         """The triangle (0,0),(10^20000,0),(0,10^20000) has a 40,000-digit
         area numerator; admission rejects it instead of failing result
@@ -761,6 +764,7 @@ class TestRejection:
                 )
             )
 
+    @pytest.mark.scale
     def test_large_but_representable_triangle_is_returned(self) -> None:
         """A triangle whose 20,000-digit area still fits is computed."""
         big = format_canonical_integer(10**10000)
@@ -873,6 +877,7 @@ class TestDimensionOne:
         )
         assert result.volume == CanonicalRational(num="8", den="1")
 
+    @pytest.mark.scale
     def test_endpoint_denominator_product_beyond_the_bound_rejected(self) -> None:
         """Endpoints 1/A and 1/(A+1) at ~16,401-digit denominators have a
         reduced volume denominator of ~32,802 digits; the product bound
@@ -889,6 +894,7 @@ class TestDimensionOne:
         with pytest.raises(ValueError, match="result bound"):
             PolytopeVolumeRequest(vertices=(endpoint(big), endpoint(big + 1)))
 
+    @pytest.mark.scale
     def test_representable_large_denominator_interval_computed(self) -> None:
         """Coprime ~10,001-digit endpoint denominators multiply to a
         20,001-digit volume denominator that fits and must be returned."""
@@ -908,6 +914,7 @@ class TestDimensionOne:
         assert result.dimension == 1
         assert len(result.volume.den) == 20_001
 
+    @pytest.mark.scale
     def test_degenerate_singleton_at_the_coordinate_bound_is_admitted(self) -> None:
         """A single vertex at ``1/10^32767`` satisfies the coordinate
         bound; fewer than two distinct coordinates is a degenerate hull of
@@ -925,6 +932,7 @@ class TestDimensionOne:
         assert result.volume == CanonicalRational(num="0", den="1")
         assert result.dimension == 1
 
+    @pytest.mark.scale
     def test_duplicated_singleton_interval_is_admitted_with_zero_volume(self) -> None:
         """Two identical huge-denominator endpoints still describe one
         distinct coordinate; the kernel returns exact zero."""
@@ -932,6 +940,7 @@ class TestDimensionOne:
         result = compute_polytope_volume(PolytopeVolumeRequest(vertices=(point, point)))
         assert result.volume == CanonicalRational(num="0", den="1")
 
+    @pytest.mark.scale
     def test_bounded_halfspace_singleton_is_admitted_with_zero_volume(self) -> None:
         """``x <= c`` with ``-x <= -c`` derives the single vertex ``c``
         whose hull volume is exact zero even at the coordinate bound."""
@@ -951,6 +960,7 @@ class TestDimensionOne:
         assert result.volume == CanonicalRational(num="0", den="1")
         assert result.dimension == 1
 
+    @pytest.mark.scale
     def test_two_distinct_endpoints_beyond_the_bound_still_rejected(self) -> None:
         """Deduplication must not over-admit: endpoints at
         ``+/- (10^32768 - 1)`` are two distinct coordinates whose reduced
@@ -966,6 +976,7 @@ class TestDimensionOne:
 
 
 class TestDenominatorGrowth:
+    @pytest.mark.scale
     def test_denominator_products_beyond_the_result_bound_rejected(self) -> None:
         """Vertices (1/p,1/q),(1/r,1/s) with ~8,500-digit denominators
         produce a reduced area denominator near 34,000 digits; admission
@@ -1044,6 +1055,7 @@ class TestNativeApi:
 
 
 class TestTriangulationWideDenominatorBound:
+    @pytest.mark.scale
     def test_eight_prime_polygon_denominator_sum_rejected(self) -> None:
         """An eight-vertex convex polygon on distinct ~5000-digit prime
         denominators passes any per-vertex estimate but its shoelace sum
@@ -1080,6 +1092,7 @@ class TestTriangulationWideDenominatorBound:
 
 
 class TestDuplicateVertexAdmission:
+    @pytest.mark.scale
     def test_duplicated_corners_cannot_bypass_the_result_bound(self) -> None:
         """Duplicating each corner of the 40,000-digit triangle must not
         let an empty triangulation skip result-size admission; the
@@ -1158,6 +1171,7 @@ class TestNativeApiAdmission:
         with pytest.raises(ValueError, match="dimension"):
             convex_hull_volume((origin, *axes))
 
+    @pytest.mark.scale
     def test_native_rejects_unrepresentable_result_growth(self) -> None:
         """The native call on a 40,000-digit triangle must be rejected at
         admission instead of leaking a canonical-validation exception."""
@@ -1173,6 +1187,7 @@ class TestNativeApiAdmission:
                 )
             )
 
+    @pytest.mark.scale
     def test_native_still_returns_representable_volumes(self) -> None:
         from jacobian.math.polytope import convex_hull_volume
 
@@ -1204,6 +1219,7 @@ class TestNativeApiAdmission:
         value = convex_hull_volume(tuple((Fraction(0),) * 6 for _ in range(64)))
         assert value == CanonicalRational(num="0", den="1")
 
+    @pytest.mark.scale
     def test_native_admits_degenerate_singleton_at_the_coordinate_bound(self) -> None:
         """A single ``1/10^32767`` coordinate is a degenerate one-point
         hull of exact zero volume; admission must not apply the interval

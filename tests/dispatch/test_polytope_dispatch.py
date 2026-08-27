@@ -62,6 +62,7 @@ def test_dispatch_computes_the_unit_square_facet_profile() -> None:
     assert len(result.output["facets"]) == 4
 
 
+@pytest.mark.scale
 def test_dispatch_rejects_a_profile_beyond_the_facet_cap_as_invalid_request() -> None:
     """A moment-curve hull is a cyclic polytope, so its facet count is the
     upper-bound-theorem maximum for its vertex count; the payload size is

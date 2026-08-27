@@ -1021,6 +1021,7 @@ class TestLeafWorkBoundedBySearchBudget:
     graph with no nowhere-zero Z/2 flow exhausts its full 2^d search tree
     within the default state budget (review thread: 128-edge worst case)."""
 
+    @pytest.mark.scale
     def test_bridge_over_z2_exhausts_within_default_budget(self) -> None:
         # Two 9-cycles joined by a bridge: 19 edges, so the nowhere-zero
         # Z/2 search visits exactly 2^20 - 2 charged states and every
@@ -1073,6 +1074,7 @@ class TestAggregateSearchBudgetAcrossValidation:
         edges.append(MultigraphEdge(edge_id="br", left=0, right=9))
         return LooplessMultigraph(vertex_count=18, edges=tuple(edges))
 
+    @pytest.mark.scale
     def test_construction_and_revalidation_charge_one_search(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:

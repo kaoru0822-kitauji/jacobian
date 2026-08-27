@@ -145,6 +145,7 @@ class TestRationalWeightTriangulation:
         (3, 5),
     )
 
+    @pytest.mark.scale
     def test_boundary_ledger_overflow_is_rejected_at_request_validation(self) -> None:
         weights = self._weights(
             self._PENTAGON_DIAGONALS,
@@ -161,6 +162,7 @@ class TestRationalWeightTriangulation:
                 diagonal_weights=weights,
             )
 
+    @pytest.mark.scale
     def test_single_large_weight_remains_admitted(self) -> None:
         denominator = 10**30000 + 3
         weights = self._weights(
@@ -187,6 +189,7 @@ class TestRationalWeightTriangulation:
             edge.weight for edge in result.diagonals
         )
 
+    @pytest.mark.scale
     def test_crossing_large_weights_remain_admitted(self) -> None:
         # (0,2) and (1,3) cross, so no triangulation - and therefore no
         # split-table ledger sum - can contain both 20,001-digit
@@ -216,6 +219,7 @@ class TestRationalWeightTriangulation:
         )
         assert validated.optimum.as_fraction() == 0
 
+    @pytest.mark.scale
     def test_shared_denominator_weights_stay_admitted_with_ledger_invariant(
         self,
     ) -> None:
@@ -238,6 +242,7 @@ class TestRationalWeightTriangulation:
         for entry in result.split_table:
             assert len(entry.optimum.den) == 20001
 
+    @pytest.mark.scale
     def test_noncrossing_large_weight_pair_is_still_rejected(self) -> None:
         # Distinct large denominators on the noncrossing pair ((0,2), (0,3))
         # are forced into one retained ledger sum by w(1,3)=1, so their
@@ -257,6 +262,7 @@ class TestRationalWeightTriangulation:
                 diagonal_weights=weights,
             )
 
+    @pytest.mark.scale
     def test_boundary_height_pair_stays_admitted_with_ledger_invariant(self) -> None:
         small = 10**16383 + 1
         large = 10**16383 + 7
@@ -283,6 +289,7 @@ class TestRationalWeightTriangulation:
         assert len(entry.optimum.den) <= 32_768
         assert result.optimum.as_fraction() == 0
 
+    @pytest.mark.scale
     def test_cap_crossing_forced_sum_is_rejected_at_request_validation(self) -> None:
         # w(1,3)=1 forces the (0,3) ledger optimum onto the sum of two
         # 16,385-digit denominators whose reduced product has 32,769 digits.
@@ -301,6 +308,7 @@ class TestRationalWeightTriangulation:
                 diagonal_weights=weights,
             )
 
+    @pytest.mark.scale
     def test_boundary_height_pair_stays_admitted_at_the_exact_cap(self) -> None:
         # The same forced shape one digit below the cap stays admitted: the
         # retained (0,3) optimum is the exact two-term sum, still representable.
@@ -352,6 +360,7 @@ class TestRationalWeightTriangulation:
             for first, second in TestRationalWeightTriangulation._REVIEW_PENTAGON_DIAGONALS
         )
 
+    @pytest.mark.scale
     def test_complementary_region_coexistence_is_rejected_at_request_validation(
         self,
     ) -> None:
@@ -365,6 +374,7 @@ class TestRationalWeightTriangulation:
                 diagonal_weights=self._mixed_extreme_weights(10**20000),
             )
 
+    @pytest.mark.scale
     def test_complementary_region_coexistence_stays_admitted_below_the_cap(
         self,
     ) -> None:
@@ -418,6 +428,7 @@ class TestRationalWeightTriangulation:
                 diagonal_weights=weights,
             )
 
+    @pytest.mark.scale
     def test_uniform_ring_with_fitting_aggregate_stays_certified(self) -> None:
         # The same uniform ring with materially lighter weights keeps the
         # per-entry bound times the entry count inside the published budget,
@@ -440,6 +451,7 @@ class TestRationalWeightTriangulation:
         encoded = encode_strict_json(result.model_dump(mode="json"))
         assert len(encoded) <= MAX_TRIANGULATION_OUTPUT_CHARS
 
+    @pytest.mark.scale
     def test_lone_heavy_weight_ring_aggregate_is_measured_exactly(self) -> None:
         # Regression: charging every retained state and echoed diagonal at
         # the largest component height estimated ~29.7 MB here, although
