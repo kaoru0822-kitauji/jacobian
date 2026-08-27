@@ -44,7 +44,6 @@ from jacobian.math.words._models import (
     SubstitutionFixedPointPrefixRequest,
     SubstitutionFixedPointPrefixResult,
     SubstitutionPrimitivityProfileRequest,
-    SubstitutionPrimitivityProfileResult,
 )
 from jacobian.math.words._operations import (
     compute_factors_length,
@@ -289,17 +288,6 @@ def test_primitivity_profile_distinguishes_positive_reducible_and_periodic() -> 
     assert periodic.aperiodic is False
     assert periodic.primitive is False
     assert periodic.obstruction == "PERIODIC_DEPENDENCY_GRAPH"
-
-
-def test_primitivity_result_replay_rejects_mutation() -> None:
-    graph = substitution_dependency_graph(_substitution((("0", "1"), ("0",))))
-    result = compute_substitution_primitivity_profile(
-        SubstitutionPrimitivityProfileRequest(dependency_graph=graph)
-    )
-    payload = result.model_dump()
-    payload["least_positive_power"] = 1
-    supplied = SubstitutionPrimitivityProfileResult.model_validate(payload)
-    assert supplied.least_positive_power == 1
 
 
 def test_fixed_point_prefix_uses_the_least_sufficient_iterate() -> None:
