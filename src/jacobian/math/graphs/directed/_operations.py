@@ -6,7 +6,10 @@ from typing import Any
 
 import networkx as nx
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.directed._models import (
+    MAX_DIRECTED_OPERATION_EDGES,
+    MAX_DIRECTED_OPERATION_VERTICES,
     AcyclicOrderRequest,
     AcyclicOrderResult,
     CondensationEdge,
@@ -30,12 +33,40 @@ def _build_digraph(graph: DirectedGraph) -> nx.DiGraph[int]:
     return g
 
 
+def _admit_directed_graph(graph: DirectedGraph) -> None:
+    if graph.vertex_count > MAX_DIRECTED_OPERATION_VERTICES:
+        raise OperationDomainValidationError(
+            location=("graph", "vertex_count"),
+            code="graph.directed_vertex_budget_exceeded",
+            message=(
+                "directed graph operation supports at most "
+                f"{MAX_DIRECTED_OPERATION_VERTICES} vertices"
+            ),
+        )
+    if len(graph.edges) > MAX_DIRECTED_OPERATION_EDGES:
+        raise OperationDomainValidationError(
+            location=("graph", "edges"),
+            code="graph.directed_edge_budget_exceeded",
+            message=(
+                "directed graph operation supports at most "
+                f"{MAX_DIRECTED_OPERATION_EDGES} edges"
+            ),
+        )
+
+
 def compute_reachability(request: ReachabilityRequest) -> ReachabilityResult:
     """Determine which vertices are reachable from the source vertex.
 
     A vertex is reachable if there is a directed path from source to that
     vertex. The source itself is always considered reachable.
     """
+    _admit_directed_graph(request.graph)
+    if not 0 <= request.source < request.graph.vertex_count:
+        raise OperationDomainValidationError(
+            location=("source",),
+            code="graph.source_must_be_in_0_graph_vertex_count_1",
+            message="source must be in 0..graph.vertex_count-1",
+        )
     g = _build_digraph(request.graph)
     descendants = nx.descendants(g, request.source)
     reachable = frozenset(descendants) | {request.source}
@@ -55,6 +86,7 @@ def compute_strongly_connected_components(
     Components are returned in the order NetworkX yields them; each
     component's vertices are sorted for determinism.
     """
+    _admit_directed_graph(request.graph)
     g = _build_digraph(request.graph)
     sccs = list(nx.strongly_connected_components(g))
     components = tuple(tuple(sorted(component)) for component in sccs)
@@ -72,6 +104,7 @@ def compute_condensation(request: CondensationRequest) -> CondensationResult:
     the ``i``-th strongly connected component returned by NetworkX (and
     reported in the ``components`` field).
     """
+    _admit_directed_graph(request.graph)
     g = _build_digraph(request.graph)
     sccs = list(nx.strongly_connected_components(g))
     condensation = nx.condensation(g, sccs)
@@ -95,6 +128,7 @@ def compute_acyclic_order(request: AcyclicOrderRequest) -> AcyclicOrderResult:
 
     A cyclic graph is a typed ``acyclic=false`` outcome, not a host failure.
     """
+    _admit_directed_graph(request.graph)
     g = _build_digraph(request.graph)
     if not nx.is_directed_acyclic_graph(g):
         return AcyclicOrderResult(acyclic=False, order=())
@@ -109,6 +143,7 @@ def compute_dag_longest_path(request: DagLongestPathRequest) -> DagLongestPathRe
     witness are returned.  Ties between maximizers are broken by choosing
     the lexicographically least path vertex sequence.
     """
+    _admit_directed_graph(request.graph)
     g = _build_digraph(request.graph)
     if not nx.is_directed_acyclic_graph(g):
         return DagLongestPathResult(

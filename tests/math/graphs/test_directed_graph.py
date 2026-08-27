@@ -8,6 +8,7 @@ import networkx as nx
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.directed._models import (
     MAX_DIRECTED_GRAPH_PARSE_EDGES,
     MAX_DIRECTED_OPERATION_EDGES,
@@ -148,23 +149,26 @@ class TestReachabilityContract:
             )
 
     def test_rejects_out_of_range_source(self) -> None:
-        with pytest.raises(ValidationError):
-            ReachabilityRequest.model_validate(
-                {"graph": {"vertex_count": 2, "edges": [[0, 1]]}, "source": 5}
-            )
+        request = ReachabilityRequest.model_validate(
+            {"graph": {"vertex_count": 2, "edges": [[0, 1]]}, "source": 5}
+        )
+        with pytest.raises(OperationDomainValidationError):
+            compute_reachability(request)
 
     def test_rejects_vertex_count_above_the_conservative_fallback(self) -> None:
         graph = DirectedGraph(vertex_count=257, edges=())
         assert graph.vertex_count == 257
 
-        with pytest.raises(ValidationError):
-            ReachabilityRequest(graph=graph, source=0)
-        with pytest.raises(ValidationError):
-            StronglyConnectedComponentsRequest(graph=graph)
-        with pytest.raises(ValidationError):
-            CondensationRequest(graph=graph)
-        with pytest.raises(ValidationError):
-            AcyclicOrderRequest(graph=graph)
+        with pytest.raises(OperationDomainValidationError):
+            compute_reachability(ReachabilityRequest(graph=graph, source=0))
+        with pytest.raises(OperationDomainValidationError):
+            compute_strongly_connected_components(
+                StronglyConnectedComponentsRequest(graph=graph)
+            )
+        with pytest.raises(OperationDomainValidationError):
+            compute_condensation(CondensationRequest(graph=graph))
+        with pytest.raises(OperationDomainValidationError):
+            compute_acyclic_order(AcyclicOrderRequest(graph=graph))
 
 
 # ---------------------------------------------------------------------------
@@ -390,14 +394,18 @@ class TestDirectOperationEnvelope:
             },
         ]
         for request in beyond_envelope:
-            with pytest.raises(ValidationError):
-                ReachabilityRequest.model_validate({**request, "source": 0})
-            with pytest.raises(ValidationError):
-                StronglyConnectedComponentsRequest.model_validate(request)
-            with pytest.raises(ValidationError):
-                CondensationRequest.model_validate(request)
-            with pytest.raises(ValidationError):
-                AcyclicOrderRequest.model_validate(request)
+            with pytest.raises(OperationDomainValidationError):
+                compute_reachability(
+                    ReachabilityRequest.model_validate({**request, "source": 0})
+                )
+            with pytest.raises(OperationDomainValidationError):
+                compute_strongly_connected_components(
+                    StronglyConnectedComponentsRequest.model_validate(request)
+                )
+            with pytest.raises(OperationDomainValidationError):
+                compute_condensation(CondensationRequest.model_validate(request))
+            with pytest.raises(OperationDomainValidationError):
+                compute_acyclic_order(AcyclicOrderRequest.model_validate(request))
 
     def test_reachability_source_schema_matches_the_vertex_envelope(self) -> None:
         """The published source field keeps the operation-wide vertex maximum."""
@@ -424,10 +432,14 @@ class TestDirectOperationEnvelope:
         """source < vertex_count stays enforced inside the advertised range."""
 
         small_graph = {"graph": {"vertex_count": 4, "edges": []}}
-        with pytest.raises(ValidationError):
-            ReachabilityRequest.model_validate({**small_graph, "source": 4})
-        with pytest.raises(ValidationError):
-            ReachabilityRequest.model_validate({**small_graph, "source": 255})
+        with pytest.raises(OperationDomainValidationError):
+            compute_reachability(
+                ReachabilityRequest.model_validate({**small_graph, "source": 4})
+            )
+        with pytest.raises(OperationDomainValidationError):
+            compute_reachability(
+                ReachabilityRequest.model_validate({**small_graph, "source": 255})
+            )
 
 
 class TestCarrierParseEnvelope:
@@ -496,12 +508,13 @@ class TestCarrierParseEnvelope:
 
     def test_operation_admission_still_rejects_below_the_parse_envelope(self) -> None:
         edges = _directed_pairs(MAX_DIRECTED_OPERATION_EDGES + 1)
-        with pytest.raises(ValidationError) as excinfo:
-            StronglyConnectedComponentsRequest.model_validate(
-                {"graph": {"vertex_count": 33, "edges": edges}}
-            )
+        request = StronglyConnectedComponentsRequest.model_validate(
+            {"graph": {"vertex_count": 33, "edges": edges}}
+        )
+        with pytest.raises(OperationDomainValidationError) as excinfo:
+            compute_strongly_connected_components(request)
         message = str(excinfo.value)
-        assert "directed_edge_budget_exceeded" in message
+        assert "supports at most 512 edges" in message
         assert "parse-safety envelope" not in message
 
     def test_envelope_dwarfs_the_direct_operation_admission(self) -> None:
