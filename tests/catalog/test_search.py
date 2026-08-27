@@ -132,3 +132,13 @@ def test_t_codegree_discovery_terms_route_to_incidence_containment_profiles() ->
             positions["incidence.containment_profiles.compute"]
             < positions["hypergraph.parameters.compute"]
         )
+
+
+def test_containment_profile_example_names_complete_pair_codegrees() -> None:
+    operation = Catalog.open().operation("incidence.containment_profiles.compute")
+
+    assert operation is not None
+    assert operation.examples[0].name == "triangle_pair_codegrees"
+    assert operation.examples[0].input["t"] == 2
+    assert "all pairs" in operation.examples[0].description
+    assert "zero codegree" in operation.examples[0].description
