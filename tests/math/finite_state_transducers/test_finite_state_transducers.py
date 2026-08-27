@@ -3,6 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.finite_state_transducers import (
     RationalEdge,
     RationalTransducer,
@@ -145,12 +146,12 @@ class TestComposition:
 
     def test_product_state_bound_is_rejected_before_composition(self) -> None:
         large = _flip().model_copy(update={"state_count": 9})
+        request = ComposeRequest(first=large, second=large)
 
-        with pytest.raises(ValidationError) as error:
-            ComposeRequest(first=large, second=large)
-        assert (
-            error.value.errors()[0]["type"]
-            == "finite_state_transducer.composition_state_bound_exceeded"
+        with pytest.raises(OperationDomainValidationError) as error:
+            compute_compose(request)
+        assert error.value.errors()[0]["type"] == (
+            "finite_state_transducer.composition_state_bound_exceeded"
         )
 
     def test_adapter_binds_both_operands(self) -> None:
@@ -265,10 +266,12 @@ class TestValueValidation:
         )
 
     def test_replay_must_select_a_declared_initial_state(self) -> None:
-        with pytest.raises(ValidationError) as error:
-            RelationPathReplayRequest(
-                transducer=_relation(), initial_state=1, edge_path=()
-            )
+        request = RelationPathReplayRequest(
+            transducer=_relation(), initial_state=1, edge_path=()
+        )
+
+        with pytest.raises(OperationDomainValidationError) as error:
+            compute_relation_path_replay(request)
         assert (
             error.value.errors()[0]["type"]
             == "finite_state_transducer.initial_state_not_declared"
