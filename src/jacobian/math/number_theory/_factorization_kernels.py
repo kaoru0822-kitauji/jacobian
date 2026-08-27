@@ -5,8 +5,11 @@ from __future__ import annotations
 import json
 import math
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from time import monotonic
+from typing import Literal
 
 from jacobian.canonical import format_canonical_integer, parse_canonical_integer
 from jacobian.math.number_theory._certification_models import (
@@ -43,6 +46,39 @@ _DIRECT_FACTORIZATION_WORKER = (
 _FACTORIZATION_WORKER_TIMEOUT_SECONDS = 60.0
 _FACTORIZATION_WORKER_ADDRESS_SPACE_BYTES = 1024 * 1024 * 1024
 _FACTORIZATION_WORKER_FILE_SIZE_BYTES = 1024 * 1024
+
+BoundedFactorizationFailureKind = Literal[
+    "WORKER_START_FAILED",
+    "WORKER_TIMEOUT",
+    "WORKER_CANCELLED",
+    "STDOUT_LIMIT_EXCEEDED",
+    "STDERR_LIMIT_EXCEEDED",
+    "WORKER_RESOURCE_LIMIT",
+    "WORKER_EXITED",
+    "MALFORMED_OUTPUT",
+    "REQUEST_DEADLINE_EXPIRED",
+]
+BoundedFactorizationTimeoutLayer = Literal[
+    "WORKER_START",
+    "WORKER_WALL",
+    "REQUEST_CANCELLATION",
+    "OUTPUT_LIMIT",
+    "PROCESS_RESOURCE",
+    "WORKER_EXIT",
+    "RESULT_VALIDATION",
+    "REQUEST_DEADLINE",
+]
+
+
+@dataclass(frozen=True, slots=True)
+class BoundedFactorizationFailure:
+    """Bounded evidence for one unsuccessful isolated factorization attempt."""
+
+    kind: BoundedFactorizationFailureKind
+    timeout_layer: BoundedFactorizationTimeoutLayer
+    elapsed_seconds: float
+    timeout_seconds: float
+    returncode: int | None = None
 
 
 def _build_pratt_certificate(prime: int) -> PrattCertificateNode:
@@ -193,7 +229,12 @@ def factorize_certified(
 # ---------------------------------------------------------------------------
 
 
-def _bounded_direct_factorization(value: int) -> tuple[PrimePower, ...] | None:
+def _bounded_direct_factorization(
+    value: int,
+    *,
+    timeout_seconds: float = _FACTORIZATION_WORKER_TIMEOUT_SECONDS,
+    failure: list[BoundedFactorizationFailure] | None = None,
+) -> tuple[PrimePower, ...] | None:
     """Factor one admitted nonzero integer in a killable worker.
 
     ``None`` is an operational non-conclusion, never a factor claim.  The
@@ -206,6 +247,24 @@ def _bounded_direct_factorization(value: int) -> tuple[PrimePower, ...] | None:
         worker_environment,
     )
 
+    started = monotonic()
+
+    def failed(
+        kind: BoundedFactorizationFailureKind,
+        timeout_layer: BoundedFactorizationTimeoutLayer,
+        returncode: int | None = None,
+    ) -> None:
+        if failure is not None:
+            failure.append(
+                BoundedFactorizationFailure(
+                    kind=kind,
+                    timeout_layer=timeout_layer,
+                    elapsed_seconds=max(0.0, monotonic() - started),
+                    timeout_seconds=timeout_seconds,
+                    returncode=returncode,
+                )
+            )
+
     try:
         with TemporaryDirectory(prefix="jacobian-direct-factor-") as worker_directory:
             completed = run_bounded_process(
@@ -213,26 +272,37 @@ def _bounded_direct_factorization(value: int) -> tuple[PrimePower, ...] | None:
                 input_bytes=json.dumps(
                     {"value": str(value)}, separators=(",", ":")
                 ).encode(),
-                timeout_seconds=_FACTORIZATION_WORKER_TIMEOUT_SECONDS,
+                timeout_seconds=timeout_seconds,
                 environment=worker_environment(locale="C.UTF-8"),
                 stdout_limit=64 * 1024,
                 stderr_limit=64 * 1024,
                 resource_limits=ProcessResourceLimits(
-                    cpu_seconds=math.ceil(_FACTORIZATION_WORKER_TIMEOUT_SECONDS),
+                    cpu_seconds=math.ceil(timeout_seconds),
                     address_space_bytes=_FACTORIZATION_WORKER_ADDRESS_SPACE_BYTES,
                     file_size_bytes=_FACTORIZATION_WORKER_FILE_SIZE_BYTES,
                 ),
                 cwd=worker_directory,
             )
     except OSError:
+        failed("WORKER_START_FAILED", "WORKER_START")
         return None
-    if (
-        completed.timed_out
-        or completed.cancelled
-        or completed.stdout_exceeded
-        or completed.stderr_exceeded
-        or completed.returncode != 0
-    ):
+    if completed.cancelled:
+        failed("WORKER_CANCELLED", "REQUEST_CANCELLATION", completed.returncode)
+        return None
+    if completed.timed_out:
+        failed("WORKER_TIMEOUT", "WORKER_WALL", completed.returncode)
+        return None
+    if completed.stdout_exceeded:
+        failed("STDOUT_LIMIT_EXCEEDED", "OUTPUT_LIMIT", completed.returncode)
+        return None
+    if completed.stderr_exceeded:
+        failed("STDERR_LIMIT_EXCEEDED", "OUTPUT_LIMIT", completed.returncode)
+        return None
+    if completed.returncode != 0:
+        if completed.returncode is not None and completed.returncode < 0:
+            failed("WORKER_RESOURCE_LIMIT", "PROCESS_RESOURCE", completed.returncode)
+        else:
+            failed("WORKER_EXITED", "WORKER_EXIT", completed.returncode)
         return None
     try:
         response = json.loads(completed.stdout.decode("utf-8"))
@@ -264,6 +334,7 @@ def _bounded_direct_factorization(value: int) -> tuple[PrimePower, ...] | None:
         UnicodeDecodeError,
         json.JSONDecodeError,
     ):
+        failed("MALFORMED_OUTPUT", "RESULT_VALIDATION", completed.returncode)
         return None
 
 
