@@ -26,7 +26,6 @@ from jacobian.math.graphs.symmetry._models import (
 )
 from jacobian.math.graphs.symmetry._operations import (
     _generator_orbits,
-    verify_graph_symmetry_orbit_result,
 )
 from jacobian.math.graphs.values import SimpleUndirectedGraph
 
@@ -561,7 +560,6 @@ def test_graph_symmetry_operation_produces_source_bound_result() -> None:
     assert tuple(orbit.members for orbit in result.edge_orbits) == (
         (("a", "b"), ("b", "c")),
     )
-    assert verify_graph_symmetry_orbit_result(result)
 
 
 def test_graph_symmetry_retained_source_action_is_deeply_immutable() -> None:
@@ -601,40 +599,6 @@ def test_graph_symmetry_den_num_identity_generator_canonicalizes() -> None:
 
     encoded = canonicalize_json(result.model_dump(mode="json"))
     assert b"vertex_orbit_count" in encoded
-
-
-def test_graph_symmetry_verifier_rejects_singletons_contradicting_reflection() -> None:
-    payload = _reflection_path_result_payload()
-    payload["vertex_orbits"] = [
-        {"orbit_index": index, "representative": vertex, "members": [vertex]}
-        for index, vertex in enumerate(("a", "b", "c"))
-    ]
-    payload["vertex_orbit_count"] = 3
-
-    assert not verify_graph_symmetry_orbit_result(
-        GraphSymmetryOrbitResult.model_validate(payload)
-    )
-
-
-def test_graph_symmetry_verifier_rejects_edge_split_contradicting_generators() -> None:
-    payload = _reflection_path_result_payload()
-    payload["edge_orbits"] = [
-        {
-            "orbit_index": 0,
-            "representative": ["a", "b"],
-            "members": [["a", "b"]],
-        },
-        {
-            "orbit_index": 1,
-            "representative": ["b", "c"],
-            "members": [["b", "c"]],
-        },
-    ]
-    payload["edge_orbit_count"] = 2
-
-    assert not verify_graph_symmetry_orbit_result(
-        GraphSymmetryOrbitResult.model_validate(payload)
-    )
 
 
 def test_graph_symmetry_result_rejects_generator_ids_not_matching_source() -> None:

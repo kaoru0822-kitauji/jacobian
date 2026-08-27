@@ -315,9 +315,7 @@ class GraphSymmetryOrbitResult(StrictModel):
     The result retains its complete declared source action - the canonical
     graph, the generator mappings, and the declared colors - through the
     domain-owned request value. Validation checks its canonical structure and
-    source binding. The trusted kernel constructs exact partitions; an
-    independently supplied partition can be checked by the explicit bounded
-    verifier in ``_operations``.
+    source binding. The trusted kernel constructs exact partitions.
     """
 
     source: GraphSymmetryOrbitRequest

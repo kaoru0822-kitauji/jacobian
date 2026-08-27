@@ -131,20 +131,6 @@ def _generator_orbits(
     )
 
 
-def verify_graph_symmetry_orbit_result(result: GraphSymmetryOrbitResult) -> bool:
-    """Independently verify a bounded source-bound orbit-partition claim."""
-
-    expected_vertex_members, expected_edge_members = _declared_orbit_partitions(
-        result.source
-    )
-    return (
-        tuple(orbit.members for orbit in result.vertex_orbits)
-        == expected_vertex_members
-        and tuple(orbit.members for orbit in result.edge_orbits)
-        == expected_edge_members
-    )
-
-
 GRAPH_SYMMETRY_OPERATIONS: MathTools = (
     MathTool(
         operation_id="graph.symmetry.generator_orbits.compute",
