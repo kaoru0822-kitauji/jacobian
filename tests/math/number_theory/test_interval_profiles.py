@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import pytest
-from pydantic import ValidationError
 from sympy import factorint, isprime
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.number_theory._interval_profile_models import (
     MAX_INTERVAL_WIDTH,
     MAX_PROFILE_RESULT_BYTES,
@@ -103,8 +103,11 @@ class TestSquarefreeProfile:
         assert list(result.nonsquarefree_values) == expected_nsf
 
     def test_request_rejects_reversed_interval(self) -> None:
-        with pytest.raises(ValidationError, match="upper_bound must be >= lower_bound"):
-            IntervalProfileRequest(lower_bound=2, upper_bound=1)
+        request = IntervalProfileRequest(lower_bound=2, upper_bound=1)
+        with pytest.raises(
+            OperationDomainValidationError, match="upper_bound must be >= lower_bound"
+        ):
+            _admit_interval(request)
 
     def test_request_rejects_overwide_interval(self) -> None:
         request = IntervalProfileRequest(

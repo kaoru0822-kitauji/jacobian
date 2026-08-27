@@ -5,9 +5,9 @@ from __future__ import annotations
 import math
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import ClassVar, Self
+from typing import ClassVar
 
-from pydantic import ConfigDict, Field, StrictInt, model_validator
+from pydantic import ConfigDict, Field, StrictInt
 
 from jacobian._models import StrictModel
 from jacobian.canonical import CanonicalLimits
@@ -183,12 +183,6 @@ class IntervalProfileRequest(StrictModel):
     )
     _work_estimator: ClassVar[_WORK_ESTIMATOR] = _estimate_factor_profile_work
     _max_width: ClassVar[int | None] = MAX_INTERVAL_WIDTH
-
-    @model_validator(mode="after")
-    def require_ordered_interval(self) -> Self:
-        if self.upper_bound < self.lower_bound:
-            raise ValueError("upper_bound must be >= lower_bound")
-        return self
 
     def width(self) -> int:
         return self.upper_bound - self.lower_bound + 1

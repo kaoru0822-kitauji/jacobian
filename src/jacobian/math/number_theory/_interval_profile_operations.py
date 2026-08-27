@@ -47,6 +47,12 @@ from jacobian.math.number_theory._interval_profile_models import (
 
 def _admit_interval(request: IntervalProfileRequest) -> IntervalAdmission:
     """Build one operation-local execution envelope after wire parsing."""
+    if request.upper_bound < request.lower_bound:
+        raise OperationDomainValidationError(
+            location=("upper_bound",),
+            code="number_theory.interval.order_bound",
+            message="upper_bound must be >= lower_bound",
+        )
     max_width = type(request)._max_width
     width = request.width()
     if max_width is not None and width > max_width:
