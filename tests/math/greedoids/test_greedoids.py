@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math import greedoids
 from jacobian.math.greedoids import FiniteFeasibleSetSystem
 from jacobian.math.greedoids._models import (
@@ -110,7 +111,7 @@ def test_catalog_contains_only_audited_agent_outcomes() -> None:
 
 
 def test_recognition_rejects_a_ground_label_outside_utf8_budget() -> None:
-    with pytest.raises(ValidationError, match="ground_label_exceeds_budget"):
+    with pytest.raises(OperationDomainValidationError, match="ground label exceeds"):
         compute_recognize(
             RecognizeRequest(
                 system=FiniteFeasibleSetSystem(
@@ -324,16 +325,18 @@ class TestValidation:
         )
         assert isinstance(system, FiniteFeasibleSetSystem)
 
-        builders = (
-            lambda s: RecognizeRequest(system=s),
-            lambda s: RankRequest(system=s),
-            lambda s: BasesRequest(system=s),
-            lambda s: BasicWordProfileRequest(system=s, word=(0,)),
-            lambda s: ConvexGeometryRequest(system=s),
+        operations = (
+            lambda s: compute_recognize(RecognizeRequest(system=s)),
+            lambda s: compute_rank(RankRequest(system=s)),
+            lambda s: compute_bases(BasesRequest(system=s)),
+            lambda s: compute_basic_word_profile(
+                BasicWordProfileRequest(system=s, word=(0,))
+            ),
+            lambda s: compute_convex_geometry(ConvexGeometryRequest(system=s)),
         )
-        for build in builders:
-            with pytest.raises(ValidationError) as error:
-                build(system)
+        for operation in operations:
+            with pytest.raises(OperationDomainValidationError) as error:
+                operation(system)
             assert (
                 error.value.errors()[0]["type"] == "greedoid.ground_size_exceeds_budget"
             )
@@ -347,8 +350,8 @@ class TestValidation:
             feasible=tuple(feasible),
         )
 
-        with pytest.raises(ValidationError) as error:
-            RecognizeRequest(system=system)
+        with pytest.raises(OperationDomainValidationError) as error:
+            compute_recognize(RecognizeRequest(system=system))
         assert (
             error.value.errors()[0]["type"] == "greedoid.feasible_count_exceeds_budget"
         )

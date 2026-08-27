@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.greedoids._models import (
     BasesRequest,
     BasesResult,
@@ -11,10 +12,12 @@ from jacobian.math.greedoids._models import (
     BasicWordProfileResult,
     ConvexGeometryRequest,
     ConvexGeometryResult,
+    GreedoidAdmissionError,
     RankRequest,
     RankResult,
     RecognizeRequest,
     RecognizeResult,
+    require_bounded_carrier,
 )
 from jacobian.math.greedoids.operations import (
     _antimatroid_to_convex_geometry_unchecked,
@@ -33,7 +36,40 @@ __all__ = [
 ]
 
 
+def _reject(reason: str, message: str, *location: str) -> None:
+    raise OperationDomainValidationError(
+        location=location,
+        code=f"greedoid.{reason}",
+        message=message,
+    )
+
+
+def _admit_system(
+    request: RecognizeRequest | BasicWordProfileRequest | ConvexGeometryRequest,
+) -> None:
+    try:
+        require_bounded_carrier(request.system)
+    except GreedoidAdmissionError as exc:
+        _reject(exc.reason, str(exc), "system")
+
+
+def _admit_subset(request: RankRequest | BasesRequest) -> None:
+    try:
+        require_bounded_carrier(request.system)
+    except GreedoidAdmissionError as exc:
+        _reject(exc.reason, str(exc), "system")
+    if request.subset is None:
+        return
+    if len(set(request.subset)) != len(request.subset):
+        _reject("subset_duplicate", "subset must not contain duplicates", "subset")
+    if any(not 0 <= index < len(request.system.ground) for index in request.subset):
+        _reject(
+            "subset_index_out_of_range", "subset indices must be in range", "subset"
+        )
+
+
 def compute_recognize(request: RecognizeRequest) -> RecognizeResult:
+    _admit_system(request)
     result: dict[str, Any] = recognize(request.system)
     if result["status"] == "GREEDOID":
         return RecognizeResult(
@@ -52,6 +88,7 @@ def compute_recognize(request: RecognizeRequest) -> RecognizeResult:
 
 
 def compute_rank(request: RankRequest) -> RankResult:
+    _admit_subset(request)
     recognized = recognize(request.system)
     if recognized["status"] != "GREEDOID":
         return RankResult(
@@ -67,6 +104,7 @@ def compute_rank(request: RankRequest) -> RankResult:
 
 
 def compute_bases(request: BasesRequest) -> BasesResult:
+    _admit_subset(request)
     recognized = recognize(request.system)
     if recognized["status"] != "GREEDOID":
         return BasesResult(
@@ -87,6 +125,7 @@ def compute_bases(request: BasesRequest) -> BasesResult:
 def compute_basic_word_profile(
     request: BasicWordProfileRequest,
 ) -> BasicWordProfileResult:
+    _admit_system(request)
     recognized = recognize(request.system)
     if recognized["status"] != "GREEDOID":
         return BasicWordProfileResult(
@@ -112,6 +151,7 @@ def compute_basic_word_profile(
 def compute_convex_geometry(
     request: ConvexGeometryRequest,
 ) -> ConvexGeometryResult:
+    _admit_system(request)
     recognized = recognize(request.system)
     if recognized["status"] != "GREEDOID":
         return ConvexGeometryResult(
