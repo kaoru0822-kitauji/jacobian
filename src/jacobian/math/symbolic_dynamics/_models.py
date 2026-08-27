@@ -13,10 +13,8 @@ from jacobian.canonical import format_canonical_integer
 from jacobian.math.polynomials.values import RationalFunction, RationalPolynomial
 from jacobian.math.symbolic_dynamics._bounds import (
     MAX_ZETA_REPLAY_PERIOD,
-    enumeration_size,
     presentation_memory,
     require_bounded_presentation,
-    require_bounded_support,
     require_zeta_budget,
 )
 from jacobian.math.symbolic_dynamics.values import (
@@ -59,15 +57,6 @@ class FiniteTypeShiftResult(FiniteTypeShiftRequest):
 class BlockLanguageRequest(StrictModel):
     shift: ForbiddenBlockShift
     block_length: int = Field(ge=0, le=MAX_FORBIDDEN_BLOCK_LENGTH)
-
-    @model_validator(mode="after")
-    def require_bounded_enumeration(self) -> Self:
-        try:
-            enumeration_size(len(self.shift.alphabet), self.block_length)
-            require_bounded_support(self.shift)
-        except ValueError as error:
-            raise _validation_error_from_message(error) from error
-        return self
 
 
 class BlockLanguageResult(BlockLanguageRequest):

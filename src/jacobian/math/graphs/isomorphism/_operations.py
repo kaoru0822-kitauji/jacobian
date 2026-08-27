@@ -11,6 +11,9 @@ from tempfile import TemporaryDirectory
 from jacobian.math.graphs.isomorphism._canonicalization import (
     canonicalize_colored_graph_data,
 )
+from jacobian.math.graphs.isomorphism._canonicalization_bounds import (
+    require_admitted_colored_graph_canonicalization,
+)
 from jacobian.math.graphs.isomorphism._models import (
     ColoredGraphCanonicalizationRequest,
     ColoredGraphCanonicalizationResult,
@@ -163,6 +166,7 @@ def canonicalize_colored_graph_kernel(
 ) -> ColoredGraphCanonicalizationResult:
     """Construct the exact canonical value from one admitted graph value."""
 
+    require_admitted_colored_graph_canonicalization(graph)
     canonical_graph, relabeling = canonicalize_colored_graph_data(graph)
     return ColoredGraphCanonicalizationResult._from_kernel(
         source_graph=graph,

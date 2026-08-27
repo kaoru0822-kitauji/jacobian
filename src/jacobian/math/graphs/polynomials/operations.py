@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 from jacobian._exact import CanonicalRational
-from jacobian.canonical import format_canonical_integer
-from jacobian.math.graphs.polynomials._models import _admitted_tree_profile
+from jacobian.canonical import CanonicalLimits, format_canonical_integer
+from jacobian.math.graphs.polynomials._models import (
+    _admitted_tree_profile,
+    _maximum_independence_result_bytes,
+)
 from jacobian.math.graphs.values import SimpleUndirectedGraph
 from jacobian.math.polynomials.values import (
     RationalPolynomial,
@@ -42,6 +45,15 @@ def independence_polynomial_coefficients(
     """
 
     profile = _admitted_tree_profile(graph)
+    output_limit = CanonicalLimits().max_output_bytes
+    if (
+        _maximum_independence_result_bytes(graph, profile.independence_degree)
+        > output_limit
+    ):
+        raise ValueError(
+            "tree independence polynomial would exceed the canonical output "
+            "limit after retaining its source; shorten vertex labels"
+        )
     states: dict[str, tuple[tuple[int, ...], tuple[int, ...]]] = {}
     for vertex in profile.postorder:
         excluded: tuple[int, ...] = (1,)

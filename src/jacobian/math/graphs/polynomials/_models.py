@@ -294,26 +294,6 @@ class TreeIndependencePolynomialRequest(StrictModel):
         )
     )
 
-    @model_validator(mode="after")
-    def require_admitted_tree_and_output(self) -> Self:
-        profile = _admitted_tree_profile(self.graph)
-        output_limit = CanonicalLimits().max_output_bytes
-        if (
-            _maximum_independence_result_bytes(
-                self.graph,
-                profile.independence_degree,
-            )
-            > output_limit
-        ):
-            raise PydanticCustomError(
-                "graph.tree_independence_polynomial_would_exceed_output_limit",
-                "tree independence polynomial would exceed the "
-                f"{output_limit}-byte canonical output limit after retaining "
-                "its source; shorten vertex labels",
-            )
-        return self
-
-
 class TreeIndependencePolynomialResult(StrictModel):
     """One source-bound exact independence polynomial and its defining values.
 

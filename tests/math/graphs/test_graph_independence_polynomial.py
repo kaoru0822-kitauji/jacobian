@@ -193,8 +193,9 @@ def test_serialized_polynomial_feeds_exact_evaluation_unchanged(
 def test_request_rejects_empty_disconnected_and_cyclic_graphs(
     graph: SimpleUndirectedGraph,
 ) -> None:
-    with pytest.raises(ValidationError):
-        TreeIndependencePolynomialRequest(graph=graph)
+    request = TreeIndependencePolynomialRequest(graph=graph)
+    with pytest.raises(ValueError):
+        compute_independence_polynomial(request)
 
 
 def test_star_beyond_the_old_consumer_degree_cap_is_admitted_exactly() -> None:
@@ -237,8 +238,9 @@ def test_request_reserves_output_headroom_for_the_retained_source() -> None:
     encoded_request = encode_strict_json({"graph": graph.model_dump(mode="json")})
 
     assert len(encoded_request) <= output_limit
-    with pytest.raises(ValidationError):
-        TreeIndependencePolynomialRequest(graph=graph)
+    request = TreeIndependencePolynomialRequest(graph=graph)
+    with pytest.raises(ValueError, match="output limit"):
+        compute_independence_polynomial(request)
 
 
 def test_request_schema_exposes_tree_and_work_preconditions() -> None:

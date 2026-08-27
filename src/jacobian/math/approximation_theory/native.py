@@ -7,7 +7,6 @@ from collections.abc import Sequence
 from jacobian._exact import CanonicalRational
 from jacobian.math.approximation_theory._models import (
     RationalNodeSet,
-    admit_interpolation_values,
 )
 from jacobian.math.approximation_theory._operations import (
     _interpolate,
@@ -29,5 +28,4 @@ def lagrange_interpolate(
     """
     node_set = RationalNodeSet(nodes=tuple(nodes))
     canonical_values = tuple(values)
-    admit_interpolation_values(node_set, canonical_values)
     return _interpolate(node_set, canonical_values).polynomial

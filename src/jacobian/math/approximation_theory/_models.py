@@ -173,11 +173,6 @@ class LagrangeInterpolationRequest(StrictModel):
     nodes: RationalNodeSet
     values: tuple[CanonicalRational, ...] = Field(min_length=1, max_length=32)
 
-    @model_validator(mode="after")
-    def require_matching_lengths(self) -> Self:
-        admit_interpolation_values(self.nodes, self.values)
-        return self
-
 
 def admit_interpolation_values(
     nodes: RationalNodeSet, values: tuple[CanonicalRational, ...]

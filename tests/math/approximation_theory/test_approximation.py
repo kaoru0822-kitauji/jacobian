@@ -209,11 +209,12 @@ class TestLagrangeInterpolation:
     def test_mismatched_lengths_rejected(self) -> None:
         """Values length must match nodes length."""
         nodes = _node_set(_node("0"), _node("1"))
+        request = LagrangeInterpolationRequest(
+            nodes=nodes,
+            values=_canonical_values(_node("1"), _node("2"), _node("3")),
+        )
         with pytest.raises(ValueError, match="same length"):
-            LagrangeInterpolationRequest(
-                nodes=nodes,
-                values=_canonical_values(_node("1"), _node("2"), _node("3")),
-            )
+            compute_lagrange_interpolation(request)
 
 
 class TestLagrangeInterpolationAxisBinding:

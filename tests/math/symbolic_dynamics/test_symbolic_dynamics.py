@@ -315,12 +315,9 @@ def test_complete_block_language_includes_empty_word_convention() -> None:
 def test_oversized_enumerations_fail_before_computation() -> None:
     alphabet = tuple(chr(ord("a") + index) for index in range(16))
     shift = ForbiddenBlockShift(alphabet=alphabet, forbidden_blocks=())
-    with pytest.raises(ValidationError) as exc_info:
-        BlockLanguageRequest(shift=shift, block_length=5)
-    assert (
-        exc_info.value.errors()[0]["type"]
-        == "symbolic_dynamics.block_language_work_bound"
-    )
+    request = BlockLanguageRequest(shift=shift, block_length=5)
+    with pytest.raises(ValueError, match="requested block enumeration"):
+        compute_block_language(request)
     with pytest.raises(ValueError, match="requested block enumeration"):
         construct_finite_type_shift(
             FiniteTypeShiftRequest(
@@ -356,12 +353,9 @@ def test_oversized_enumerations_fail_before_computation() -> None:
         alphabet=alphabet,
         forbidden_blocks=(("a",) * 20,),
     )
-    with pytest.raises(ValidationError) as exc_info:
-        BlockLanguageRequest(shift=oversized_support, block_length=1)
-    assert (
-        exc_info.value.errors()[0]["type"]
-        == "symbolic_dynamics.block_language_work_bound"
-    )
+    request = BlockLanguageRequest(shift=oversized_support, block_length=1)
+    with pytest.raises(ValueError, match="work bound"):
+        compute_block_language(request)
     with pytest.raises(ValueError, match="work bound"):
         block_language(oversized_support, 1)
 

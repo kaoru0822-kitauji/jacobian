@@ -12,6 +12,7 @@ from jacobian.math.approximation_theory._models import (
     LagrangeInterpolationRequest,
     LagrangeInterpolationResult,
     RationalNodeSet,
+    admit_interpolation_values,
 )
 from jacobian.math.polynomials.values import (
     RationalPolynomial,
@@ -132,6 +133,8 @@ def _interpolate(
     node_set: RationalNodeSet, values: tuple[CanonicalRational, ...]
 ) -> LagrangeInterpolationResult:
     """Compute from admitted canonical values shared by native and wire paths."""
+
+    admit_interpolation_values(node_set, values)
 
     nodes = [node.as_fraction() for node in node_set.nodes]
     interpolation_values = [value.as_fraction() for value in values]

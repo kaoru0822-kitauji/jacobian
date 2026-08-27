@@ -5,9 +5,6 @@ from __future__ import annotations
 from pydantic import ValidationError
 from pydantic_core import PydanticCustomError
 
-from jacobian.math.graphs.isomorphism._canonicalization_bounds import (
-    require_admitted_colored_graph_canonicalization,
-)
 from jacobian.math.graphs.isomorphism._models import ColoredGraphCanonicalizationResult
 from jacobian.math.graphs.isomorphism._operations import (
     canonicalize_colored_graph_kernel,
@@ -26,13 +23,12 @@ def canonicalize_colored_graph(
     """
 
     try:
-        require_admitted_colored_graph_canonicalization(graph)
+        return canonicalize_colored_graph_kernel(graph)
     except PydanticCustomError as error:
         raise ValidationError.from_exception_data(
             title="canonicalize_colored_graph",
             line_errors=[{"type": error, "input": graph}],
         ) from error
-    return canonicalize_colored_graph_kernel(graph)
 
 
 __all__ = ["canonicalize_colored_graph"]

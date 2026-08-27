@@ -8,9 +8,6 @@ from pydantic import ConfigDict, Field, model_validator
 from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
-from jacobian.math.graphs.isomorphism._canonicalization_bounds import (
-    require_admitted_colored_graph_canonicalization,
-)
 from jacobian.math.graphs.values import ColoredUndirectedGraph, GraphVertexLabel
 
 
@@ -134,12 +131,6 @@ class ColoredGraphCanonicalizationRequest(StrictModel):
             "aligned with the embedded graph's authoritative vertex and edge axes."
         )
     )
-
-    @model_validator(mode="after")
-    def require_bounded_canonicalization(self) -> Self:
-        require_admitted_colored_graph_canonicalization(self.colored_graph)
-        return self
-
 
 class GraphRelabelingPair(StrictModel):
     """One source vertex and its canonical vertex label."""
