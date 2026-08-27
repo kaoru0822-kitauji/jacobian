@@ -13,18 +13,12 @@ from jacobian.canonical import (
     CanonicalLimits,
     encode_strict_json,
 )
-from jacobian.math.formal_concept_analysis._concepts import (
-    attribute_derivation,
-    object_derivation,
-)
 from jacobian.math.formal_concept_analysis.values import (
     MAX_IMPLICATION_MEMBERSHIPS,
     MAX_IMPLICATIONS,
     MAX_OBJECTS,
-    AttributeImplication,
     FiniteAttributeImplicationSystem,
     FormalContext,
-    _canonical_implication_closure_work,
 )
 
 # Admission bounds three operation-specific quantities instead of a coarse
@@ -514,153 +508,6 @@ class CanonicalImplicationBasisResult(StrictModel):
         """Build a result emitted by the owner-local exhaustive kernel."""
 
         return cls.model_validate(payload)
-
-    def _verify_complete_canonical_basis(self) -> None:
-
-        attribute_count = len(self.context.attributes)
-        plan = _admit_duquenne_guigues_basis(self.context)
-        states = plan.states
-        source_indices = tuple(range(attribute_count))
-        if self.source_attribute_indices != source_indices:
-            raise ValueError(
-                "source attribute indices do not bind basis coordinates to context"
-            )
-        if self.basis.attributes != _basis_attribute_labels(attribute_count):
-            raise ValueError(
-                "basis carrier labels do not match the source-index coordinates"
-            )
-        if self.lectic_order != "BINARY_LECTIC_BY_MAXIMUM_DIFFERENCE":
-            raise ValueError("unsupported lectic enumeration metadata")
-        if len(self.closure_matrix) != states:
-            raise ValueError("closure matrix must contain every candidate state")
-
-        incidence_count = len(self.context.incidence)
-        closure_masks: list[int] = []
-        for state, row in enumerate(self.closure_matrix):
-            expected_subset = _subset_for_state(state, attribute_count)
-            _require_dg_subset("closure-matrix subset", row.subset, attribute_count)
-            _require_dg_subset("closure-matrix closure", row.closure, attribute_count)
-            if row.candidate_state != state or row.subset != expected_subset:
-                raise ValueError(
-                    "closure matrix is not in complete binary lectic state order"
-                )
-            subset = frozenset(expected_subset)
-            extent = attribute_derivation(self.context, subset)
-            expected_context_closure = tuple(
-                sorted(object_derivation(self.context, extent))
-            )
-            if row.closure != expected_context_closure:
-                raise ValueError(
-                    "closure matrix does not match the retained formal context"
-                )
-            closure_masks.append(_state_for_subset(expected_context_closure))
-
-        expected_pairs, _, _ = _enumerate_pseudo_intents(tuple(closure_masks))
-        expected_implications = tuple(
-            AttributeImplication(
-                premise=_subset_for_state(state, attribute_count),
-                conclusion=_subset_for_state(closure & ~state, attribute_count),
-            )
-            for state, closure in expected_pairs
-        )
-        expected_basis = FiniteAttributeImplicationSystem(
-            attributes=_basis_attribute_labels(attribute_count),
-            implications=expected_implications,
-        )
-        if self.basis != expected_basis:
-            raise ValueError(
-                "basis is not the canonical implication family of the context"
-            )
-        implication_indices = {
-            implication.premise: index
-            for index, implication in enumerate(expected_basis.implications)
-        }
-        expected_pseudo_intents = tuple(
-            PseudoIntent(
-                candidate_state=state,
-                premise=_subset_for_state(state, attribute_count),
-                closure=_subset_for_state(closure, attribute_count),
-                basis_implication_index=implication_indices[
-                    _subset_for_state(state, attribute_count)
-                ],
-            )
-            for state, closure in expected_pairs
-        )
-        if self.pseudo_intents != expected_pseudo_intents:
-            raise ValueError(
-                "pseudo-intent rows do not match exhaustive recursive enumeration"
-            )
-
-        basis_closure_work = 0
-        for state, expected_closure_mask in enumerate(closure_masks):
-            closure, closure_work = _canonical_implication_closure_work(
-                self.basis,
-                frozenset(_subset_for_state(state, attribute_count)),
-            )
-            if _state_for_subset(closure) != expected_closure_mask:
-                raise ValueError(
-                    "basis closure does not equal context closure for every subset"
-                )
-            basis_closure_work += closure_work
-
-        closure_matrix_memberships = sum(
-            len(row.subset) + len(row.closure) for row in self.closure_matrix
-        )
-        pseudo_intent_memberships = sum(
-            len(row.premise) + len(row.closure) for row in self.pseudo_intents
-        )
-        implication_memberships = self.basis.total_memberships
-        expected_accounted_work = (
-            states * len(self.context.objects)
-            + incidence_count
-            + plan.row_intersections
-            + plan.subset_comparisons
-            + plan.closure_comparisons
-            + basis_closure_work
-            + closure_matrix_memberships
-            + pseudo_intent_memberships
-            + implication_memberships
-        )
-        expected_fields = {
-            "candidate_states": states,
-            "context_closure_queries": states,
-            "context_object_row_checks": states * len(self.context.objects),
-            "context_incidence_loads": incidence_count,
-            "context_row_intersections": plan.row_intersections,
-            "pseudo_intent_subset_comparisons": plan.subset_comparisons,
-            "pseudo_intent_closure_comparisons": plan.closure_comparisons,
-            "basis_closure_queries": states,
-            "basis_closure_work": basis_closure_work,
-            "closure_matrix_memberships": closure_matrix_memberships,
-            "pseudo_intent_memberships": pseudo_intent_memberships,
-            "implication_count": len(self.basis.implications),
-            "implication_memberships": implication_memberships,
-            "accounted_logical_work": expected_accounted_work,
-            "reserved_logical_work": plan.reserved_logical_work,
-            "reserved_result_bytes": plan.reserved_result_bytes,
-        }
-        work_payload = self.work.model_dump()
-        for field, expected in expected_fields.items():
-            if work_payload[field] != expected:
-                raise ValueError(
-                    "work accounting does not match independent exhaustive verification"
-                )
-
-        actual_bytes = len(encode_strict_json(self.model_dump(mode="json")))
-        if self.work.serialized_result_bytes != actual_bytes:
-            raise ValueError(
-                "serialized-result byte accounting does not match the exact result"
-            )
-        return None
-
-
-def _verify_canonical_implication_basis_result(
-    result: CanonicalImplicationBasisResult,
-) -> None:
-    """Verify a supplied complete basis within the admitted owner-local bound."""
-
-    result._verify_complete_canonical_basis()
-
 
 __all__ = [
     "MAX_DG_ATTRIBUTES",

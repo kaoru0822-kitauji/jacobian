@@ -406,59 +406,6 @@ class ImplicationClosureResult(StrictModel):
         )
 
 
-def _verify_implication_closure_result(result: ImplicationClosureResult) -> None:
-    """Independently replay one supplied closure claim within its carrier bound."""
-
-    for name in ("seed", "closure", "added"):
-        _require_canonical_carrier_subset(
-            name,
-            getattr(result, name),
-            len(result.system.attributes),
-        )
-
-    seed = set(result.seed)
-    closure = set(result.closure)
-    if not seed.issubset(closure):
-        raise PydanticCustomError(
-            "formal_concept_analysis.closure_missing_seed",
-            "closure must contain every seed attribute",
-        )
-    if set(result.added) != closure - seed:
-        raise PydanticCustomError(
-            "formal_concept_analysis.added_attributes_mismatch",
-            "added attributes are not bound to the seed and closure",
-        )
-    if len(result.lineage) != len(result.added):
-        raise PydanticCustomError(
-            "formal_concept_analysis.lineage_length_mismatch",
-            "lineage must justify every added attribute exactly once",
-        )
-    if result.lineage != tuple(
-        sorted(
-            result.lineage,
-            key=lambda step: (step.activation_round, step.attribute),
-        )
-    ):
-        raise PydanticCustomError(
-            "formal_concept_analysis.lineage_not_ordered",
-            "lineage must be ordered by activation round and attribute",
-        )
-    expected_implication_checks, expected_membership_checks = (
-        _replay_implication_lineage(
-            result.system,
-            seed,
-            closure,
-            result.lineage,
-            result.work.productive_rounds,
-        )
-    )
-    _require_exact_implication_work(
-        expected_implication_checks,
-        expected_membership_checks,
-        result.work,
-    )
-
-
 class FormalContext(StrictModel):
     """An immutable finite formal context K = (G, M, I).
 

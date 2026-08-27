@@ -23,7 +23,6 @@ from jacobian.math.formal_concept_analysis.values import (
     MAX_IMPLICATION_MEMBERSHIPS,
     MAX_IMPLICATIONS,
     ImplicationClosureResult,
-    _verify_implication_closure_result,
 )
 
 
@@ -57,10 +56,6 @@ def _brute_force_closure(
                 closed_supersets.append(candidate)
     closure = set.intersection(*closed_supersets)
     return tuple(sorted(closure))
-
-
-def _verify_payload(payload: dict[str, object]) -> None:
-    _verify_implication_closure_result(ImplicationClosureResult.model_validate(payload))
 
 
 def test_multi_round_closure_has_replayable_first_lineage() -> None:
@@ -173,112 +168,6 @@ def test_exhaustive_small_closures_match_intersection_of_closed_supersets() -> N
                 assert implication_closure(system, seed).closure == (
                     _brute_force_closure(system, seed)
                 )
-
-
-@pytest.mark.parametrize(
-    ("field", "replacement", "message"),
-    [
-        ("closure", [0, 1], "added attributes"),
-        ("closure", [0, 1, 2, 3], "added attributes"),
-        (
-            "lineage",
-            [
-                {"attribute": 1, "implication_index": 1, "activation_round": 1},
-                {"attribute": 2, "implication_index": 1, "activation_round": 2},
-            ],
-            "lineage",
-        ),
-    ],
-)
-def test_result_validation_rejects_forged_conclusions(
-    field: str,
-    replacement: object,
-    message: str,
-) -> None:
-    result = implication_closure(_chain_system(), frozenset({0}))
-    payload = result.model_dump()
-    payload[field] = replacement
-
-    with pytest.raises(ValueError):
-        _verify_payload(payload)
-
-
-def test_closed_nonleast_superset_is_rejected_by_lineage_replay() -> None:
-    result = implication_closure(_chain_system(), frozenset({0}))
-    payload = result.model_dump()
-    payload["closure"] = [0, 1, 2, 3]
-    payload["added"] = [1, 2, 3]
-    payload["lineage"] = [
-        {"attribute": 1, "implication_index": 0, "activation_round": 1},
-        {"attribute": 3, "implication_index": 2, "activation_round": 1},
-        {"attribute": 2, "implication_index": 1, "activation_round": 2},
-    ]
-
-    with pytest.raises(ValueError):
-        _verify_payload(payload)
-
-
-def test_coherently_omitted_consequence_is_rejected_as_not_closed() -> None:
-    result = implication_closure(_chain_system(), frozenset({0}))
-    payload = result.model_dump()
-    payload["closure"] = [0, 1]
-    payload["added"] = [1]
-    payload["lineage"] = payload["lineage"][:1]
-    payload["work"] = {
-        "productive_rounds": 1,
-        "canonical_implication_checks": 6,
-        "canonical_membership_checks": 9,
-        "canonical_replay_work": 15,
-    }
-
-    with pytest.raises(ValueError):
-        _verify_payload(payload)
-
-
-def test_lineage_cannot_delay_an_already_enabled_derivation() -> None:
-    system = FiniteAttributeImplicationSystem(
-        attributes=("a", "b", "c"),
-        implications=(
-            AttributeImplication(premise=(0,), conclusion=(1,)),
-            AttributeImplication(premise=(0,), conclusion=(2,)),
-        ),
-    )
-    result = implication_closure(system, frozenset({0}))
-    payload = result.model_dump()
-    payload["lineage"][1]["activation_round"] = 2
-    payload["work"]["productive_rounds"] = 2
-
-    with pytest.raises(ValueError):
-        _verify_payload(payload)
-
-
-def test_work_cannot_append_a_nonproductive_round() -> None:
-    result = implication_closure(_chain_system(), frozenset({0}))
-    payload = result.model_dump()
-    payload["work"]["productive_rounds"] += 1
-
-    with pytest.raises(ValueError):
-        _verify_payload(payload)
-
-
-def test_result_validation_rejects_source_and_work_mutations() -> None:
-    result = implication_closure(_chain_system(), frozenset({0}))
-
-    seed_payload = result.model_dump()
-    seed_payload["seed"] = [0, 3]
-    with pytest.raises(ValueError):
-        _verify_payload(seed_payload)
-
-    system_payload = result.model_dump()
-    system_payload["system"]["implications"][0]["conclusion"] = [3]
-    with pytest.raises(ValueError):
-        _verify_payload(system_payload)
-
-    work_payload = result.model_dump()
-    work_payload["work"]["canonical_implication_checks"] += 1
-    work_payload["work"]["canonical_replay_work"] += 1
-    with pytest.raises(ValueError):
-        _verify_payload(work_payload)
 
 
 def test_request_rejects_duplicate_or_foreign_seed_indices() -> None:

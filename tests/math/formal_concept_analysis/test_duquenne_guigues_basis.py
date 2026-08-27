@@ -24,7 +24,6 @@ from jacobian.math.formal_concept_analysis.basis import (
     MAX_DG_LOGICAL_WORK,
     MAX_DG_RESULT_BYTES,
     _require_dg_canonical_carrier_fit,
-    _verify_canonical_implication_basis_result,
 )
 from jacobian.math.formal_concept_analysis.values import MAX_IMPLICATIONS
 
@@ -251,43 +250,6 @@ def test_object_order_attribute_permutation_and_relabeling_are_coherent() -> Non
     assert tuple(
         (row.premise, row.closure) for row in relabeled_result.pseudo_intents
     ) == tuple((row.premise, row.closure) for row in original_result.pseudo_intents)
-
-
-@pytest.mark.parametrize(
-    ("mutation", "message"),
-    (
-        ("omit_pseudo_intent", "pseudo-intent"),
-        ("invalid_premise", "pseudo-intent"),
-        ("weaken_conclusion", "basis"),
-        ("change_source", "closure matrix"),
-        ("change_closure", "closure matrix"),
-        ("change_work", "work accounting"),
-    ),
-)
-def test_result_validator_rejects_corrupted_source_family_basis_matrix_and_work(
-    mutation: str,
-    message: str,
-) -> None:
-    result = duquenne_guigues_basis(_context(((0, 3), (0, 2), (1, 2), (1, 2, 3)), 4))
-    payload = result.model_dump()
-    if mutation == "omit_pseudo_intent":
-        payload["pseudo_intents"] = payload["pseudo_intents"][:-1]
-    elif mutation == "invalid_premise":
-        payload["pseudo_intents"][0]["premise"] = [0]
-    elif mutation == "weaken_conclusion":
-        payload["basis"]["implications"][0]["conclusion"] = []
-    elif mutation == "change_source":
-        payload["context"]["incidence"] = payload["context"]["incidence"][:-1]
-    elif mutation == "change_closure":
-        payload["closure_matrix"][0]["closure"] = [0]
-    else:
-        payload["work"]["context_object_row_checks"] += 1
-        payload["work"]["accounted_logical_work"] += 1
-
-    with pytest.raises(ValueError):
-        _verify_canonical_implication_basis_result(
-            CanonicalImplicationBasisResult.model_validate(payload)
-        )
 
 
 def test_coordinate_map_preserves_unrestricted_source_labels() -> None:
