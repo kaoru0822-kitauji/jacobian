@@ -572,13 +572,14 @@ def test_expression_and_box_must_share_one_complete_named_axis(
 
 
 def test_named_variables_are_not_accepted_by_the_point_expression_contract() -> None:
-    with analysis_validation_error():
-        IntervalExpressionEnclosureRequest.model_validate(
-            {
-                "expression": _var("x"),
-                "argument": _q(0),
-            }
-        )
+    request = IntervalExpressionEnclosureRequest.model_validate(
+        {
+            "expression": _var("x"),
+            "argument": _q(0),
+        }
+    )
+    with pytest.raises(OperationDomainValidationError, match="anonymous"):
+        _expression_enclosure(request)
 
 
 def test_box_interval_endpoints_are_ordered_and_bounded() -> None:
