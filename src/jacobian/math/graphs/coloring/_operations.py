@@ -266,9 +266,7 @@ def compute_k_colorability(request: KColorabilityRequest) -> KColorabilityResult
     decision.  Non-colorability is claimed only on an explicit
     unsatisfiable outcome; an exhausted budget yields the typed
     ``SOLVER_BUDGET_EXCEEDED`` outcome instead of an unbounded wait.  The
-    conflict budget bounds the SAT search after owner-local formula admission;
-    separately supplied negative or incomplete claims may be replayed through
-    the explicit verifier.
+    conflict budget bounds the SAT search after owner-local formula admission.
     """
     _admit_k_colorability(request)
     if not request.graph.edges:
@@ -319,21 +317,6 @@ def compute_k_colorability(request: KColorabilityRequest) -> KColorabilityResult
     )
 
 
-def verify_k_colorability_result(result: KColorabilityResult) -> bool:
-    """Replay only a separately supplied negative or incomplete SAT claim."""
-
-    if result.status == "DECIDED" and result.colorable is True:
-        return True
-    outcome, _coloring = _run_coloring_worker(
-        "vertex", result.graph, result.colors, result.solver_conflicts
-    )
-    if result.status == "SOLVER_BUDGET_EXCEEDED":
-        return outcome == "budget_exceeded"
-    if result.status == "EXECUTION_FAILED":
-        return False
-    return outcome == "unsat"
-
-
 def compute_maximal_independent_set_decision(
     request: MaximalIndependentSetRequest,
 ) -> MaximalIndependentSetResult:
@@ -372,9 +355,7 @@ def compute_edge_k_colorability(
     ``graph.edge_coloring.check``.  Non-colorability is claimed only on an
     explicit unsatisfiable outcome; an exhausted budget yields the typed
     ``SOLVER_BUDGET_EXCEEDED`` outcome instead of an unbounded wait.  The
-    conflict budget bounds the SAT search after owner-local formula admission;
-    separately supplied negative or incomplete claims may be replayed through
-    the explicit verifier.
+    conflict budget bounds the SAT search after owner-local formula admission.
     """
     _admit_edge_k_colorability(request)
     edges = request.graph.edges
@@ -425,21 +406,6 @@ def compute_edge_k_colorability(
         colorable=None,
         coloring=None,
     )
-
-
-def verify_edge_k_colorability_result(result: EdgeKColorabilityResult) -> bool:
-    """Replay only a separately supplied negative or incomplete SAT claim."""
-
-    if result.status == "DECIDED" and result.colorable is True:
-        return True
-    outcome, _coloring = _run_coloring_worker(
-        "edge", result.graph, result.colors, result.solver_conflicts
-    )
-    if result.status == "SOLVER_BUDGET_EXCEEDED":
-        return outcome == "budget_exceeded"
-    if result.status == "EXECUTION_FAILED":
-        return False
-    return outcome == "unsat"
 
 
 def compute_edge_coloring_check(

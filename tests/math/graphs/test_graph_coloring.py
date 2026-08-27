@@ -594,24 +594,6 @@ class TestSolverConflictBudget:
         assert result.coloring is None
         assert EdgeKColorabilityResult.model_validate(result.model_dump()) == result
 
-    def test_forged_budget_exceeded_requires_explicit_verification(self) -> None:
-        """An authored budget-exceeded label needs explicit verification."""
-        from jacobian.math.graphs.coloring._operations import (
-            verify_edge_k_colorability_result,
-        )
-        from jacobian.math.graphs.values import SimpleUndirectedGraph
-
-        forged = EdgeKColorabilityResult(
-            graph=SimpleUndirectedGraph(vertices=("a", "b"), edges=(("a", "b"),)),
-            colors=2,
-            solver_conflicts=1000,
-            status="SOLVER_BUDGET_EXCEEDED",
-            colorable=None,
-            coloring=None,
-            edge_count=1,
-        )
-        assert verify_edge_k_colorability_result(forged) is False
-
     def test_budget_exceeded_cannot_claim_colorable(self) -> None:
         petersen = _petersen_graph()
         with pytest.raises(ValidationError):
@@ -624,30 +606,6 @@ class TestSolverConflictBudget:
                 coloring=None,
                 edge_count=len(petersen.edges),
             )
-
-    def test_negative_claim_requires_explicit_unsat_within_budget(self) -> None:
-        """A non-colorable claim replayed under a too-small budget (which
-        returns unknown) must not validate: negatives need explicit unsat."""
-        petersen = _petersen_graph()
-        payload = {
-            "graph": petersen.model_dump(),
-            "colors": 3,
-            "solver_conflicts": 1,
-            "status": "DECIDED",
-            "colorable": False,
-            "coloring": None,
-            "edge_count": len(petersen.edges),
-        }
-        from jacobian.math.graphs.coloring._operations import (
-            verify_edge_k_colorability_result,
-        )
-
-        assert (
-            verify_edge_k_colorability_result(
-                EdgeKColorabilityResult.model_validate(payload)
-            )
-            is False
-        )
 
     def test_default_budget_still_decides_petersen_negative(self) -> None:
         from jacobian.math.graphs.coloring._models import EdgeKColorabilityRequest
@@ -766,27 +724,6 @@ class TestVertexKColorability:
         assert result.coloring is None
         assert KColorabilityResult.model_validate(result.model_dump()) == result
 
-    def test_forged_budget_exceeded_requires_explicit_verification(self) -> None:
-        """An authored budget-exceeded label needs explicit verification."""
-        from jacobian.math.graphs.coloring._models import (
-            KColorabilityResult,
-        )
-        from jacobian.math.graphs.coloring._operations import (
-            verify_k_colorability_result,
-        )
-        from jacobian.math.graphs.values import IndexedSimpleUndirectedGraph
-
-        forged = KColorabilityResult(
-            graph=IndexedSimpleUndirectedGraph(vertex_count=2, edges=((0, 1),)),
-            colors=2,
-            solver_conflicts=1000,
-            status="SOLVER_BUDGET_EXCEEDED",
-            colorable=None,
-            coloring=None,
-            vertex_count=2,
-        )
-        assert verify_k_colorability_result(forged) is False
-
     def test_budget_exceeded_cannot_claim_colorable(self) -> None:
         from jacobian.math.graphs.coloring._models import KColorabilityResult
 
@@ -801,30 +738,6 @@ class TestVertexKColorability:
                 coloring=None,
                 vertex_count=4,
             )
-
-    def test_negative_claim_requires_explicit_unsat_within_budget(self) -> None:
-        """A non-colorable claim replayed under a too-small budget (which
-        returns unknown) must not validate: negatives need explicit unsat."""
-        from jacobian.math.graphs.coloring._models import KColorabilityResult
-
-        k4 = self._k4()
-        payload = {
-            "graph": k4.model_dump(),
-            "colors": 3,
-            "solver_conflicts": 1,
-            "status": "DECIDED",
-            "colorable": False,
-            "coloring": None,
-            "vertex_count": 4,
-        }
-        from jacobian.math.graphs.coloring._operations import (
-            verify_k_colorability_result,
-        )
-
-        assert (
-            verify_k_colorability_result(KColorabilityResult.model_validate(payload))
-            is False
-        )
 
     def test_default_budget_still_decides_k4_negative(self) -> None:
         from jacobian.math.graphs.coloring._models import KColorabilityRequest
