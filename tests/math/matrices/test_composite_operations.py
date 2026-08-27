@@ -6,6 +6,7 @@ import pytest
 from tests.support.rationals import rational_payload as q
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.matrices._operation_models import (
     MatrixKroneckerProductRequest,
     MatrixKroneckerProductResult,
@@ -75,10 +76,11 @@ def test_matrix_permanent_of_rationals() -> None:
 
 
 def test_matrix_permanent_requires_square() -> None:
-    from pydantic import ValidationError
-
-    with pytest.raises(ValidationError):
-        MatrixPermanentRequest.model_validate({"matrix": {"entries": [[q(1), q(2)]]}})
+    request = MatrixPermanentRequest.model_validate(
+        {"matrix": {"entries": [[q(1), q(2)]]}}
+    )
+    with pytest.raises(OperationDomainValidationError):
+        compute_permanent(request)
 
 
 def test_permanent_request_rejects_order_above_the_ryser_work_budget() -> None:
@@ -114,15 +116,14 @@ def test_kronecker_request_rejects_operands_above_the_computation_dimension() ->
 
 
 def test_kronecker_request_rejects_products_beyond_the_operation_axis_budget() -> None:
-    from pydantic import ValidationError
-
     from jacobian.math.matrices._operation_models import (
         MAX_KRONECKER_PRODUCT_AXIS,
     )
 
     factor = RationalMatrix(entries=_identity_entries(8))
-    with pytest.raises(ValidationError) as excinfo:
-        MatrixKroneckerProductRequest(left=factor, right=factor)
+    request = MatrixKroneckerProductRequest(left=factor, right=factor)
+    with pytest.raises(OperationDomainValidationError) as excinfo:
+        compute_kronecker_product(request)
     assert excinfo.value.errors()[0]["type"] == "matrix.budget_exceeded"
     assert MAX_KRONECKER_PRODUCT_AXIS < 8 * 8 <= MAX_RATIONAL_MATRIX_ORDER
 
@@ -249,22 +250,24 @@ def test_partial_trace_of_full_two_by_two_factors() -> None:
 
 
 def test_partial_trace_rejects_non_composite_shape() -> None:
-    with pytest.raises(ValueError):
-        MatrixPartialTraceRequest.model_validate(
-            {
-                "matrix": {"entries": [[q(1), q(0)], [q(0), q(1)]]},
-                "traced_dimension": 2,
-                "kept_dimension": 2,
-            }
-        )
+    request = MatrixPartialTraceRequest.model_validate(
+        {
+            "matrix": {"entries": [[q(1), q(0)], [q(0), q(1)]]},
+            "traced_dimension": 2,
+            "kept_dimension": 2,
+        }
+    )
+    with pytest.raises(OperationDomainValidationError):
+        compute_partial_trace(request)
 
 
 def test_partial_trace_rejects_non_square_composite() -> None:
-    with pytest.raises(ValueError):
-        MatrixPartialTraceRequest.model_validate(
-            {
-                "matrix": {"entries": [[q(1), q(0), q(0), q(0)]]},
-                "traced_dimension": 2,
-                "kept_dimension": 2,
-            }
-        )
+    request = MatrixPartialTraceRequest.model_validate(
+        {
+            "matrix": {"entries": [[q(1), q(0), q(0), q(0)]]},
+            "traced_dimension": 2,
+            "kept_dimension": 2,
+        }
+    )
+    with pytest.raises(OperationDomainValidationError):
+        compute_partial_trace(request)

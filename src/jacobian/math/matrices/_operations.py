@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+from pydantic_core import PydanticCustomError
+
 from jacobian._exact import CanonicalRational
 from jacobian.canonical import format_canonical_integer
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math import matrices
 from jacobian.math.matrices import _conversions as conversions
 from jacobian.math.matrices._operation_models import (
+    MAX_DETERMINANT_MATRIX_DIMENSION,
+    MAX_INPUT_SCALAR_DIGITS,
+    MAX_KRONECKER_PRODUCT_AXIS,
+    MAX_PERMANENT_RYSER_SUBSETS,
     CharacteristicPolynomialResult,
     IntegerMatrixRequest,
     MatrixAdjugateResult,
@@ -33,14 +39,128 @@ from jacobian.math.matrices._operation_models import (
     RrefResult,
     SquareIntegerMatrixRequest,
     SquareRationalMatrixRequest,
+    _require_computation_dimensions,
+    _require_square_system_admission,
+    _validation_error,
 )
 from jacobian.math.matrices.operations import MatrixSingularError
-from jacobian.math.matrices.values import SmithNormalForm
+from jacobian.math.matrices.values import RationalMatrix, SmithNormalForm
+
+
+def _admit(request: object, check: object) -> None:
+    try:
+        check(request)  # type: ignore[operator]
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=("request",), code=exc.type, message=exc.message()
+        ) from exc
+
+
+def _admit_rational_matrix(matrix: RationalMatrix) -> None:
+    _require_computation_dimensions(matrix.entries)
+    from jacobian.math.matrices.values import require_matrix_scalar_digits
+
+    require_matrix_scalar_digits(
+        matrix.entries, maximum=MAX_INPUT_SCALAR_DIGITS, label="matrix input"
+    )
+
+
+def _admit_rational(request: RationalMatrixRequest | MatrixRankRequest) -> None:
+    _admit_rational_matrix(request.matrix)
+
+
+def _admit_square_rational(request: object) -> None:
+    matrix = request.matrix  # type: ignore[attr-defined]
+    _admit_rational_matrix(matrix)
+    if len(matrix.entries) != len(matrix.entries[0]):
+        raise _validation_error("budget_exceeded", "operation requires a square matrix")
+
+
+def _admit_integer(request: object) -> None:
+    from jacobian.math.matrices.values import require_matrix_scalar_digits
+
+    require_matrix_scalar_digits(
+        request.matrix.entries,  # type: ignore[attr-defined]
+        maximum=MAX_INPUT_SCALAR_DIGITS,
+        label="matrix input",
+    )
+
+
+def _admit_square_integer(request: object) -> None:
+    _admit_integer(request)
+    matrix = request.matrix  # type: ignore[attr-defined]
+    rows = len(matrix.entries)
+    if rows == 0 or rows != len(matrix.entries[0]):
+        raise _validation_error("budget_exceeded", "operation requires a square integer matrix")
+
+
+def _admit_permanent(request: object) -> None:
+    _admit_integer(request)
+    matrix = request.matrix  # type: ignore[attr-defined]
+    order = len(matrix.entries)
+    if order != len(matrix.entries[0]):
+        raise _validation_error("budget_exceeded", "permanent computation requires a square matrix")
+    if (1 << order) > MAX_PERMANENT_RYSER_SUBSETS:
+        raise _validation_error(
+            "budget_exceeded",
+            "permanent computation exceeds the "
+            f"{MAX_PERMANENT_RYSER_SUBSETS}-subset Ryser work budget",
+        )
+
+
+def _admit_product(request: object) -> None:
+    left = request.left  # type: ignore[attr-defined]
+    right = request.right  # type: ignore[attr-defined]
+    if len(left.entries[0]) != len(right.entries):
+        raise _validation_error(
+            "budget_exceeded",
+            "matrix multiplication requires the left column count to equal the right row count",
+        )
+    _admit_rational_matrix(left)
+    _admit_rational_matrix(right)
+
+
+def _admit_kronecker(request: object) -> None:
+    left = request.left  # type: ignore[attr-defined]
+    right = request.right  # type: ignore[attr-defined]
+    _admit_rational_matrix(left)
+    _admit_rational_matrix(right)
+    if (
+        len(left.entries) * len(right.entries) > MAX_KRONECKER_PRODUCT_AXIS
+        or len(left.entries[0]) * len(right.entries[0]) > MAX_KRONECKER_PRODUCT_AXIS
+    ):
+        raise _validation_error(
+            "budget_exceeded",
+            "kronecker products must fit within "
+            f"{MAX_KRONECKER_PRODUCT_AXIS} rows and columns",
+        )
+
+
+def _admit_partial_trace(request: object) -> None:
+    matrix = request.matrix  # type: ignore[attr-defined]
+    _admit_rational_matrix(matrix)
+    total = request.traced_dimension * request.kept_dimension  # type: ignore[attr-defined]
+    if len(matrix.entries) != total or len(matrix.entries[0]) != total:
+        raise _validation_error(
+            "budget_exceeded",
+            "composite matrix must be square of order traced_dimension * kept_dimension",
+        )
+
+
+def _admit_determinant(request: object) -> None:
+    _admit_square_rational(request)
+    if len(request.matrix.entries) > MAX_DETERMINANT_MATRIX_DIMENSION:  # type: ignore[attr-defined]
+        raise _validation_error("budget_exceeded", "determinant matrices are limited to order 64")
+
+
+def _admit_linear_solve(request: RationalLinearSolveRequest) -> None:
+    _require_square_system_admission(request.matrix, request.rhs)
 
 
 def compute_determinant(
     request: MatrixDeterminantRequest,
 ) -> MatrixDeterminantResult:
+    _admit(request, _admit_determinant)
     determinant = matrices.determinant(
         conversions.rational_matrix_to_sympy(request.matrix)
     )
@@ -50,6 +170,7 @@ def compute_determinant(
 
 
 def compute_rank(request: MatrixRankRequest) -> MatrixRankResult:
+    _admit(request, _admit_rational)
     rank, pivot_columns = matrices.rank(
         conversions.rational_matrix_to_sympy(request.matrix)
     )
@@ -61,6 +182,7 @@ def compute_rank(request: MatrixRankRequest) -> MatrixRankResult:
 
 
 def compute_rref(request: RationalMatrixRequest) -> RrefResult:
+    _admit(request, _admit_rational)
     reduced, pivots = matrices.rref(
         conversions.rational_matrix_to_sympy(request.matrix)
     )
@@ -78,6 +200,7 @@ def compute_rref(request: RationalMatrixRequest) -> RrefResult:
 
 
 def compute_nullspace(request: RationalMatrixRequest) -> NullspaceResult:
+    _admit(request, _admit_rational)
     import sympy
 
     matrix = conversions.rational_matrix_to_sympy(request.matrix)
@@ -109,6 +232,7 @@ def compute_nullspace(request: RationalMatrixRequest) -> NullspaceResult:
 def compute_characteristic_polynomial(
     request: SquareRationalMatrixRequest,
 ) -> CharacteristicPolynomialResult:
+    _admit(request, _admit_square_rational)
     polynomial = matrices.characteristic_polynomial(
         conversions.rational_matrix_to_sympy(request.matrix), "lambda"
     )
@@ -124,6 +248,7 @@ def compute_characteristic_polynomial(
 def compute_smith_normal_form(
     request: IntegerMatrixRequest,
 ) -> SmithNormalForm:
+    _admit(request, _admit_integer)
     raw = matrices.smith_normal_form(
         conversions.integer_matrix_to_sympy(request.matrix)
     )
@@ -131,6 +256,7 @@ def compute_smith_normal_form(
 
 
 def compute_inverse(request: NonsingularIntegerMatrixRequest) -> MatrixInverseResult:
+    _admit(request, _admit_square_integer)
     try:
         inverse = matrices.inverse(conversions.integer_matrix_to_sympy(request.matrix))
     except MatrixSingularError as exc:
@@ -143,6 +269,7 @@ def compute_inverse(request: NonsingularIntegerMatrixRequest) -> MatrixInverseRe
 
 
 def compute_trace(request: SquareIntegerMatrixRequest) -> MatrixTraceResult:
+    _admit(request, _admit_square_integer)
     return MatrixTraceResult(
         trace=format_canonical_integer(
             matrices.trace(conversions.integer_matrix_to_sympy(request.matrix))
@@ -151,6 +278,7 @@ def compute_trace(request: SquareIntegerMatrixRequest) -> MatrixTraceResult:
 
 
 def compute_product(request: RationalMatrixProductRequest) -> MatrixProductResult:
+    _admit(request, _admit_product)
     left = conversions.rational_matrix_to_sympy(request.left)
     right = conversions.rational_matrix_to_sympy(request.right)
     product = matrices.multiply(left, right)
@@ -165,6 +293,7 @@ def compute_product(request: RationalMatrixProductRequest) -> MatrixProductResul
 def compute_rational_linear_solve(
     request: RationalLinearSolveRequest,
 ) -> RationalLinearSolveResult:
+    _admit(request, _admit_linear_solve)
     import sympy
 
     source = conversions.rational_matrix_to_sympy(request.matrix)
@@ -192,6 +321,7 @@ def compute_rational_linear_solve(
 
 
 def compute_adjugate(request: SquareIntegerMatrixRequest) -> MatrixAdjugateResult:
+    _admit(request, _admit_square_integer)
     adjugate = matrices.adjugate(conversions.integer_matrix_to_sympy(request.matrix))
     return MatrixAdjugateResult(
         adjugate=conversions.integer_matrix_from_sympy(adjugate)
@@ -199,6 +329,7 @@ def compute_adjugate(request: SquareIntegerMatrixRequest) -> MatrixAdjugateResul
 
 
 def compute_permanent(request: MatrixPermanentRequest) -> MatrixPermanentResult:
+    _admit(request, _admit_permanent)
     value = matrices.permanent(conversions.rational_matrix_to_sympy(request.matrix))
     return MatrixPermanentResult(
         permanent=conversions.rational_from_sympy(value),
@@ -208,6 +339,7 @@ def compute_permanent(request: MatrixPermanentRequest) -> MatrixPermanentResult:
 def compute_kronecker_product(
     request: MatrixKroneckerProductRequest,
 ) -> MatrixKroneckerProductResult:
+    _admit(request, _admit_kronecker)
     left = conversions.rational_matrix_to_sympy(request.left)
     right = conversions.rational_matrix_to_sympy(request.right)
     product = matrices.kronecker_product(left, right)
@@ -223,6 +355,7 @@ def compute_kronecker_product(
 def compute_partial_trace(
     request: MatrixPartialTraceRequest,
 ) -> MatrixPartialTraceResult:
+    _admit(request, _admit_partial_trace)
     matrix = conversions.rational_matrix_to_sympy(request.matrix)
     reduced = matrices.partial_trace(
         matrix,

@@ -161,14 +161,6 @@ def _require_square_system_admission(
 class RationalMatrixRequest(_MatrixRequest):
     matrix: RationalMatrix
 
-    @model_validator(mode="after")
-    def require_rref_input_budget(self) -> Self:
-        _require_computation_dimensions(self.matrix.entries)
-        require_matrix_scalar_digits(
-            self.matrix.entries, maximum=MAX_INPUT_SCALAR_DIGITS, label="matrix input"
-        )
-        return self
-
 
 class RationalMatrixProductRequest(_MatrixRequest):
     """Two compatible bounded matrices over the exact rational domain."""
@@ -176,39 +168,11 @@ class RationalMatrixProductRequest(_MatrixRequest):
     left: RationalMatrix
     right: RationalMatrix
 
-    @model_validator(mode="after")
-    def require_compatible_shapes(self) -> Self:
-        if len(self.left.entries[0]) != len(self.right.entries):
-            raise _validation_error(
-                "budget_exceeded",
-                "matrix multiplication requires the left column count to equal "
-                "the right row count",
-            )
-        _require_computation_dimensions(self.left.entries)
-        _require_computation_dimensions(self.right.entries)
-        require_matrix_scalar_digits(
-            self.left.entries, maximum=MAX_INPUT_SCALAR_DIGITS, label="matrix input"
-        )
-        require_matrix_scalar_digits(
-            self.right.entries, maximum=MAX_INPUT_SCALAR_DIGITS, label="matrix input"
-        )
-        return self
 
 
 class SquareRationalMatrixRequest(_MatrixRequest):
     matrix: RationalMatrix
 
-    @model_validator(mode="after")
-    def require_square(self) -> Self:
-        if len(self.matrix.entries) != len(self.matrix.entries[0]):
-            raise _validation_error(
-                "budget_exceeded", "characteristic polynomial requires a square matrix"
-            )
-        _require_computation_dimensions(self.matrix.entries)
-        require_matrix_scalar_digits(
-            self.matrix.entries, maximum=MAX_INPUT_SCALAR_DIGITS, label="matrix input"
-        )
-        return self
 
 
 class MatrixPermanentRequest(_MatrixRequest):
@@ -217,25 +181,6 @@ class MatrixPermanentRequest(_MatrixRequest):
     matrix: RationalMatrix
     _raw_matrix_axis_limit: ClassVar[int] = MAX_PERMANENT_MATRIX_ORDER
 
-    @model_validator(mode="after")
-    def require_ryser_envelope(self) -> Self:
-        order = len(self.matrix.entries)
-        if order != len(self.matrix.entries[0]):
-            raise _validation_error(
-                "budget_exceeded", "permanent computation requires a square matrix"
-            )
-        if (1 << order) > MAX_PERMANENT_RYSER_SUBSETS:
-            raise _validation_error(
-                "budget_exceeded",
-                "permanent computation exceeds the "
-                f"{MAX_PERMANENT_RYSER_SUBSETS}-subset Ryser work budget",
-            )
-        require_matrix_scalar_digits(
-            self.matrix.entries,
-            maximum=MAX_INPUT_SCALAR_DIGITS,
-            label="permanent input",
-        )
-        return self
 
 
 class MatrixDeterminantRequest(_MatrixRequest):
@@ -244,23 +189,6 @@ class MatrixDeterminantRequest(_MatrixRequest):
     matrix: RationalMatrix
     _raw_matrix_axis_limit: ClassVar[int] = MAX_DETERMINANT_MATRIX_DIMENSION
 
-    @model_validator(mode="after")
-    def require_square(self) -> Self:
-        order = len(self.matrix.entries)
-        if order != len(self.matrix.entries[0]):
-            raise _validation_error(
-                "budget_exceeded", "determinant computation requires a square matrix"
-            )
-        if order > MAX_DETERMINANT_MATRIX_DIMENSION:
-            raise _validation_error(
-                "budget_exceeded", "determinant matrices are limited to order 64"
-            )
-        require_matrix_scalar_digits(
-            self.matrix.entries,
-            maximum=MAX_INPUT_SCALAR_DIGITS,
-            label="determinant input",
-        )
-        return self
 
 
 class MatrixRankRequest(_MatrixRequest):
@@ -268,26 +196,11 @@ class MatrixRankRequest(_MatrixRequest):
 
     matrix: RationalMatrix
 
-    @model_validator(mode="after")
-    def require_input_budget(self) -> Self:
-        _require_computation_dimensions(self.matrix.entries)
-        require_matrix_scalar_digits(
-            self.matrix.entries,
-            maximum=MAX_INPUT_SCALAR_DIGITS,
-            label="rank input",
-        )
-        return self
 
 
 class IntegerMatrixRequest(_MatrixRequest):
     matrix: IntegerMatrix
 
-    @model_validator(mode="after")
-    def require_integer_input_budget(self) -> Self:
-        require_matrix_scalar_digits(
-            self.matrix.entries, maximum=MAX_INPUT_SCALAR_DIGITS, label="matrix input"
-        )
-        return self
 
 
 class NonsingularIntegerMatrixRequest(_MatrixRequest):
@@ -295,32 +208,11 @@ class NonsingularIntegerMatrixRequest(_MatrixRequest):
 
     matrix: IntegerMatrix
 
-    @model_validator(mode="after")
-    def require_square(self) -> Self:
-        rows = len(self.matrix.entries)
-        if rows == 0 or rows != len(self.matrix.entries[0]):
-            raise _validation_error(
-                "budget_exceeded", "operation requires a square integer matrix"
-            )
-        require_matrix_scalar_digits(
-            self.matrix.entries, maximum=MAX_INPUT_SCALAR_DIGITS, label="matrix input"
-        )
-        return self
 
 
 class SquareIntegerMatrixRequest(_MatrixRequest):
     matrix: IntegerMatrix
 
-    @model_validator(mode="after")
-    def require_square(self) -> Self:
-        if len(self.matrix.entries) != len(self.matrix.entries[0]):
-            raise _validation_error(
-                "budget_exceeded", "operation requires a square integer matrix"
-            )
-        require_matrix_scalar_digits(
-            self.matrix.entries, maximum=MAX_INPUT_SCALAR_DIGITS, label="matrix input"
-        )
-        return self
 
 
 class RationalLinearSolveRequest(_MatrixRequest):
@@ -330,10 +222,6 @@ class RationalLinearSolveRequest(_MatrixRequest):
         max_length=MAX_MATRIX_DIMENSION,
     )
 
-    @model_validator(mode="after")
-    def require_square_system(self) -> Self:
-        _require_square_system_admission(self.matrix, self.rhs)
-        return self
 
 
 class RrefResult(StrictModel):
@@ -353,7 +241,7 @@ class RrefResult(StrictModel):
 
     @classmethod
     def _from_kernel(cls, **values: Any) -> Self:
-        return cls(**values)
+        return cls.model_construct(**values)
 
     @model_validator(mode="after")
     def require_source_bound(self) -> Self:
@@ -407,7 +295,7 @@ class MatrixRankResult(StrictModel):
 
     @classmethod
     def _from_kernel(cls, **values: Any) -> Self:
-        return cls(**values)
+        return cls.model_construct(**values)
 
     @model_validator(mode="after")
     def require_source_bound(self) -> Self:
@@ -449,7 +337,7 @@ class NullspaceResult(StrictModel):
 
     @classmethod
     def _from_kernel(cls, **values: Any) -> Self:
-        return cls(**values)
+        return cls.model_construct(**values)
 
     @model_validator(mode="after")
     def require_basis_shape(self) -> Self:
@@ -577,7 +465,7 @@ class RationalLinearSolveResult(StrictModel):
 
     @classmethod
     def _from_kernel(cls, **values: Any) -> Self:
-        return cls(**values)
+        return cls.model_construct(**values)
 
     @model_validator(mode="after")
     def require_source_bound_classification(self) -> Self:
@@ -627,29 +515,6 @@ class MatrixKroneckerProductRequest(_MatrixRequest):
     left: RationalMatrix
     right: RationalMatrix
 
-    @model_validator(mode="after")
-    def require_input_budget(self) -> Self:
-        _require_computation_dimensions(self.left.entries)
-        _require_computation_dimensions(self.right.entries)
-        if len(self.left.entries) * len(self.right.entries) > (
-            MAX_KRONECKER_PRODUCT_AXIS
-        ) or len(self.left.entries[0]) * len(self.right.entries[0]) > (
-            MAX_KRONECKER_PRODUCT_AXIS
-        ):
-            raise _validation_error(
-                "budget_exceeded",
-                "kronecker products must fit within "
-                f"{MAX_KRONECKER_PRODUCT_AXIS} rows and columns",
-            )
-        require_matrix_scalar_digits(
-            self.left.entries, maximum=MAX_INPUT_SCALAR_DIGITS, label="matrix input"
-        )
-        require_matrix_scalar_digits(
-            self.right.entries,
-            maximum=MAX_INPUT_SCALAR_DIGITS,
-            label="matrix input",
-        )
-        return self
 
 
 class MatrixKroneckerProductResult(StrictModel):
@@ -686,24 +551,6 @@ class MatrixPartialTraceRequest(_MatrixRequest):
     traced_dimension: int = Field(ge=1, le=MAX_MATRIX_DIMENSION)
     kept_dimension: int = Field(ge=1, le=MAX_MATRIX_DIMENSION)
 
-    @model_validator(mode="after")
-    def require_composite_shape(self) -> Self:
-        total = self.traced_dimension * self.kept_dimension
-        if len(self.matrix.entries) != total:
-            raise _validation_error(
-                "budget_exceeded",
-                "composite matrix row count must equal traced_dimension * kept_dimension",
-            )
-        if len(self.matrix.entries[0]) != total:
-            raise _validation_error(
-                "budget_exceeded",
-                "composite matrix must be square: traced_dimension * kept_dimension",
-            )
-        _require_computation_dimensions(self.matrix.entries)
-        require_matrix_scalar_digits(
-            self.matrix.entries, maximum=MAX_INPUT_SCALAR_DIGITS, label="matrix input"
-        )
-        return self
 
 
 class MatrixPartialTraceResult(StrictModel):
