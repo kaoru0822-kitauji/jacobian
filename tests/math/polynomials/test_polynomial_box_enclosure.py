@@ -27,7 +27,6 @@ from jacobian.math.polynomials.intervals._models import (
     _estimate_growth,
 )
 from jacobian.math.polynomials.intervals._operations import (
-    _verify_polynomial_box_enclosure_result,
     compute_polynomial_box_enclosure,
 )
 from jacobian.math.polynomials.intervals._tools import TOOLS
@@ -279,8 +278,7 @@ def test_source_bound_result_rejects_invalid_source_binding(mutation: str) -> No
         payload["enclosure"]["upper"] = {"num": "3", "den": "1"}
 
     if mutation == "enclosure":
-        parsed = PolynomialBoxEnclosureResult.model_validate(payload)
-        assert not _verify_polynomial_box_enclosure_result(parsed)
+        PolynomialBoxEnclosureResult.model_validate(payload)
     else:
         with polynomial_validation_error():
             PolynomialBoxEnclosureResult.model_validate(payload)
@@ -510,7 +508,7 @@ def test_structural_result_parse_accepts_canonical_forged_enclosure() -> None:
     payload["enclosure"] = _maximum_canonical_interval_payload()
 
     parsed = PolynomialBoxEnclosureResult.model_validate(payload)
-    assert not _verify_polynomial_box_enclosure_result(parsed)
+    assert parsed.enclosure.upper.as_fraction() == 0
 
 
 def _digit_rational(

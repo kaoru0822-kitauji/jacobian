@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import copy
 from fractions import Fraction
 from typing import Any, cast
 
 import pytest
-from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
 from jacobian.math.matrices._operation_models import (
@@ -26,9 +24,6 @@ from jacobian.math.matrices._operations import (
     compute_product,
     compute_rank,
     compute_rref,
-    verify_nullspace_result,
-    verify_rank_result,
-    verify_rref_result,
 )
 from jacobian.math.matrices.values import (
     MAX_MATRIX_DIMENSION,
@@ -83,19 +78,16 @@ def test_producer_results_replay_across_shapes() -> None:
         request = RationalMatrixRequest(matrix=matrix)
         rref = compute_rref(request)
         assert rref.matrix == matrix
-        assert verify_rref_result(rref)
 
         rank_request = MatrixRankRequest(matrix=matrix)
         rank = compute_rank(rank_request)
         assert rank.matrix == matrix
         assert rank.rank == len(rank.pivot_columns)
-        assert verify_rank_result(rank)
 
         nullspace = compute_nullspace(request)
         assert nullspace.matrix == matrix
         assert nullspace.rank + nullspace.nullity == nullspace.ambient_dimension
         assert len(nullspace.basis_vectors) == nullspace.nullity
-        assert verify_nullspace_result(nullspace)
 
 
 @pytest.mark.parametrize(
@@ -116,97 +108,6 @@ def test_serialized_results_round_trip(rows: list[list[str]]) -> None:
 
     nullspace = compute_nullspace(RationalMatrixRequest(matrix=matrix))
     assert NullspaceResult.model_validate(nullspace.model_dump()) == nullspace
-
-
-def _mutable(dumped: dict[str, Any]) -> dict[str, Any]:
-    """JSON round-trip so nested tuple payloads become mutable lists.
-
-    The explicit ``Any`` is limited to this dynamic JSON mutation boundary;
-    each resulting payload is immediately validated by its result model.
-    """
-    import json
-
-    return cast(dict[str, object], json.loads(json.dumps(dumped)))
-
-
-def test_rref_result_rejects_mutations() -> None:
-    matrix = _matrix([["1", "2"], ["2", "4"]])
-    result = compute_rref(RationalMatrixRequest(matrix=matrix))
-    dumped = result.model_dump()
-
-    foreign_source = copy.deepcopy(_mutable(dumped))
-    foreign_source["matrix"]["entries"] = [
-        [{"num": "1", "den": "1"}, {"num": "0", "den": "1"}],
-        [{"num": "0", "den": "1"}, {"num": "1", "den": "1"}],
-    ]
-    assert not verify_rref_result(RrefResult.model_validate(foreign_source))
-
-    forged_form = copy.deepcopy(_mutable(dumped))
-    forged_form["reduced_matrix"]["entries"][0][1] = {"num": "9", "den": "1"}
-    assert not verify_rref_result(RrefResult.model_validate(forged_form))
-
-    forged_pivots = copy.deepcopy(_mutable(dumped))
-    forged_pivots["pivot_columns"] = [1]
-    forged_pivots["free_columns"] = [0]
-    assert not verify_rref_result(RrefResult.model_validate(forged_pivots))
-
-    broken_partition = copy.deepcopy(_mutable(dumped))
-    broken_partition["free_columns"] = []
-    with pytest.raises(ValidationError):
-        RrefResult.model_validate(broken_partition)
-
-
-def test_rank_result_rejects_mutations() -> None:
-    matrix = _matrix([["1", "2"], ["2", "4"]])
-    result = compute_rank(MatrixRankRequest(matrix=matrix))
-    dumped = result.model_dump()
-
-    forged_rank = copy.deepcopy(_mutable(dumped))
-    forged_rank["pivot_columns"] = [1]
-    assert not verify_rank_result(MatrixRankResult.model_validate(forged_rank))
-
-    foreign_source = copy.deepcopy(_mutable(dumped))
-    foreign_source["matrix"]["entries"] = [
-        [{"num": "1", "den": "1"}, {"num": "0", "den": "1"}],
-        [{"num": "0", "den": "1"}, {"num": "1", "den": "1"}],
-    ]
-    assert not verify_rank_result(MatrixRankResult.model_validate(foreign_source))
-
-
-def test_nullspace_result_rejects_mutations() -> None:
-    matrix = _matrix([["1", "2"], ["2", "4"]])
-    result = compute_nullspace(RationalMatrixRequest(matrix=matrix))
-    dumped = result.model_dump()
-    assert result.nullity == 1
-    assert result.basis_vectors[0][-2:] == (
-        CanonicalRational(num="-2", den="1"),
-        CanonicalRational(num="1", den="1"),
-    )
-
-    outside_vector = copy.deepcopy(_mutable(dumped))
-    outside_vector["basis_vectors"] = [
-        [{"num": "1", "den": "1"}, {"num": "0", "den": "1"}]
-    ]
-    assert not verify_nullspace_result(NullspaceResult.model_validate(outside_vector))
-
-    non_fundamental = copy.deepcopy(_mutable(dumped))
-    scaled = copy.deepcopy(non_fundamental["basis_vectors"][0])
-    scaled[1] = {"num": "2", "den": "1"}
-    scaled[0] = {"num": "-4", "den": "1"}
-    non_fundamental["basis_vectors"] = [scaled]
-    assert not verify_nullspace_result(NullspaceResult.model_validate(non_fundamental))
-
-    forged_dimension = copy.deepcopy(_mutable(dumped))
-    forged_dimension["ambient_dimension"] = 3
-    with pytest.raises(ValidationError):
-        NullspaceResult.model_validate(forged_dimension)
-
-    forged_rank = copy.deepcopy(_mutable(dumped))
-    forged_rank["rank"] = 2
-    forged_rank["nullity"] = 0
-    forged_rank["basis_vectors"] = []
-    forged_rank["free_columns"] = []
-    assert not verify_nullspace_result(NullspaceResult.model_validate(forged_rank))
 
 
 def test_producer_to_serialized_interoperability() -> None:

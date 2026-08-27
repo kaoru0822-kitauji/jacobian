@@ -30,7 +30,6 @@ from jacobian.math.polynomials.interpolation._models import (
     HermiteInterpolationRequest,
 )
 from jacobian.math.polynomials.interpolation._operations import (
-    _verify_hermite_interpolation_result,
     compute_hermite_interpolation,
 )
 
@@ -279,45 +278,6 @@ def test_duplicate_nodes_and_incomplete_prefixes_are_rejected() -> None:
             node=_q(0),
             derivatives=(_derivative(1, 1),),
         )
-
-
-def test_forged_claims_round_trip_structurally_and_fail_explicit_verification() -> None:
-    result = hermite_interpolation(
-        _table(_jet(0, (0, 1), (0, 1)), _jet(1, (1, 1), (2, 1)))
-    )
-
-    forged_replay = result.model_dump(mode="json")
-    forged_replay["replay"][0]["computed"] = {"num": "1", "den": "1"}
-    parsed_replay = HermiteInterpolationResult.model_validate(forged_replay)
-    assert not _verify_hermite_interpolation_result(parsed_replay)
-
-    forged_source = result.model_dump(mode="json")
-    forged_source["source"]["jets"][0]["derivatives"][0]["value"] = {
-        "num": "1",
-        "den": "1",
-    }
-    forged_source["replay"][0]["expected"] = {"num": "1", "den": "1"}
-    parsed_source = HermiteInterpolationResult.model_validate(forged_source)
-    assert not _verify_hermite_interpolation_result(parsed_source)
-
-
-def test_forged_polynomial_fails_explicit_verification_but_bad_summaries_do_not_parse() -> (
-    None
-):
-    result = hermite_interpolation(_table(_jet(0, (1, 1), (1, 1))))
-
-    forged_polynomial = result.model_dump(mode="json")
-    forged_polynomial["polynomial"]["polynomial"]["terms"][1]["coefficient"] = {
-        "num": "2",
-        "den": "1",
-    }
-    parsed_polynomial = HermiteInterpolationResult.model_validate(forged_polynomial)
-    assert not _verify_hermite_interpolation_result(parsed_polynomial)
-
-    forged_summary = result.model_dump(mode="json")
-    forged_summary["leading_coefficient"] = {"num": "2", "den": "1"}
-    with pytest.raises(ValidationError):
-        HermiteInterpolationResult.model_validate(forged_summary)
 
 
 def test_total_multiplicity_and_linear_work_boundaries() -> None:

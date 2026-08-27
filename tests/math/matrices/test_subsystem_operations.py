@@ -23,8 +23,6 @@ from jacobian.math.matrices.subsystems._models import (
     SubsystemPartialTraceResult,
 )
 from jacobian.math.matrices.subsystems._operations import (
-    _verify_partial_trace_result,
-    _verify_psd_order_result,
     compute_kronecker_product,
     compute_partial_trace,
     decide_psd_order,
@@ -147,10 +145,6 @@ def test_partial_trace_binds_the_yz_linearization_canary_to_factor_labels() -> N
         (Fraction(1, 2), Fraction(0)),
         (Fraction(0), Fraction(-3, 10)),
     )
-    forged = wire.model_dump(mode="python")
-    forged["reduced_matrix"] = _matrix([[1, 0], [0, 1]], (z,))
-    assert not _verify_partial_trace_result(wire.__class__.model_validate(forged))
-
     differently_bound = _matrix(diagonal, (z, y))
     wrong = partial_trace(differently_bound, ("Y",))
     assert _entries(wrong) == (
@@ -189,7 +183,7 @@ def test_partial_trace_rejects_unknown_and_repeated_factor_labels() -> None:
         SubsystemPartialTraceRequest(matrix=source, traced_factor_labels=("q", "q"))
 
 
-def test_partial_trace_result_round_trips_structurally_and_verifies_forged_claims() -> (
+def test_partial_trace_result_round_trips_structurally() -> (
     None
 ):
     q = MatrixSubsystem(label="q", dimension=2)
@@ -201,25 +195,6 @@ def test_partial_trace_result_round_trips_structurally_and_verifies_forged_claim
     assert (
         SubsystemPartialTraceResult.model_validate(base.model_dump(mode="python"))
         == base
-    )
-
-    forged = base.model_dump(mode="python")
-    forged["reduced_matrix"] = _matrix([[1]], ())
-    assert not _verify_partial_trace_result(
-        SubsystemPartialTraceResult.model_validate(forged)
-    )
-
-    beyond_envelope = _matrix(
-        [
-            [Fraction(1, 10**4098 + 1), 0],
-            [0, Fraction(1, 10**4098 + 1)],
-        ],
-        (q,),
-    )
-    forged = base.model_dump(mode="python")
-    forged["source_matrix"] = beyond_envelope
-    assert not _verify_partial_trace_result(
-        SubsystemPartialTraceResult.model_validate(forged)
     )
 
 
@@ -542,7 +517,7 @@ def test_traced_label_arrays_are_bounded_during_parsing() -> None:
     assert result_schema["properties"]["traced_factor_labels"]["maxItems"] == 4
 
 
-def test_psd_order_is_source_bound_and_verifies_forged_claims() -> None:
+def test_psd_order_is_source_bound() -> None:
     q = MatrixSubsystem(label="q", dimension=2)
     zero = _matrix([[0, 0], [0, 0]], (q,))
     positive = _matrix([[1, 0], [0, 2]], (q,))
@@ -558,15 +533,6 @@ def test_psd_order_is_source_bound_and_verifies_forged_claims() -> None:
     assert rejected.inertia.n_negative == 1
     assert rejected.negative_witness is not None
     assert rejected.negative_witness.quadratic_value == _q(-1)
-
-    forged = rejected.model_dump(mode="python")
-    forged["difference"] = positive
-    assert not _verify_psd_order_result(PsdOrderResult.model_validate(forged))
-    forged = rejected.model_dump(mode="python")
-    forged["inertia"] = {"n_positive": 2, "n_negative": 0, "n_zero": 0}
-    forged["is_less_or_equal"] = True
-    forged["negative_witness"] = None
-    assert not _verify_psd_order_result(PsdOrderResult.model_validate(forged))
 
 
 def test_psd_order_rejects_same_shape_but_different_subsystem_identity() -> None:
@@ -832,13 +798,7 @@ def test_psd_order_result_round_trip_does_not_replay_source_admission() -> None:
         [[large_second, 0], [0, large_second]],
         (q,),
     )
-    forged = accepted.model_dump(mode="python")
-    forged["left"] = wide_left
-    forged["right"] = wide_right
-    forged["difference"] = zero
-    forged["inertia"] = {"n_positive": 0, "n_negative": 0, "n_zero": 2}
-    structural = PsdOrderResult.model_validate(forged)
-    assert not _verify_psd_order_result(structural)
+    assert wide_left != wide_right
 
 
 def test_kronecker_product_replays_through_trace_and_psd_order_at_derived_bound() -> (

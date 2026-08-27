@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import copy
-from typing import Any, cast
-
 import pytest
 import sympy
 from pydantic import ValidationError
@@ -16,7 +13,6 @@ from jacobian.math.matrices._operation_models import (
 from jacobian.math.matrices._operations import (
     compute_inverse,
     compute_rational_linear_solve,
-    verify_rational_linear_solve_result,
 )
 
 
@@ -110,13 +106,6 @@ def test_singular_inverse_rejected_by_the_exact_kernel() -> None:
         compute_inverse(request)
 
 
-def _mutable(dumped: dict[str, Any]) -> dict[str, Any]:
-    """JSON round-trip so nested tuple payloads become mutable lists."""
-    import json
-
-    return cast(dict[str, Any], json.loads(json.dumps(dumped)))
-
-
 def test_results_retain_their_source_system() -> None:
     """Every outcome retains the exact coefficient matrix and right-hand side."""
 
@@ -133,127 +122,10 @@ def test_results_retain_their_source_system() -> None:
         assert result.outcome == outcome
         assert result.matrix == request.matrix
         assert result.rhs == request.rhs
-        assert verify_rational_linear_solve_result(result)
         assert (
             RationalLinearSolveResult.model_validate_json(result.model_dump_json())
             == result
         )
-
-
-def test_unique_result_rejects_forged_solution_mutations() -> None:
-    """A mutated solution coordinate fails the A x = b replay."""
-
-    request = RationalLinearSolveRequest.model_validate(
-        {
-            "matrix": {"entries": _matrix([["2", "0"], ["0", "3"]])},
-            "rhs": _rhs("2", "3"),
-        }
-    )
-    dumped = _mutable(compute_rational_linear_solve(request).model_dump())
-
-    forged_coordinate = copy.deepcopy(dumped)
-    forged_coordinate["solution"][1] = {"num": "4", "den": "1"}
-    assert not verify_rational_linear_solve_result(
-        RationalLinearSolveResult.model_validate(forged_coordinate)
-    )
-
-    forged_length = copy.deepcopy(dumped)
-    forged_length["solution"] = [
-        {"num": "1", "den": "1"},
-        {"num": "1", "den": "1"},
-        {"num": "1", "den": "1"},
-    ]
-    with pytest.raises(ValidationError):
-        RationalLinearSolveResult.model_validate(forged_length)
-
-    missing_solution = copy.deepcopy(dumped)
-    missing_solution["solution"] = None
-    with pytest.raises(ValidationError):
-        RationalLinearSolveResult.model_validate(missing_solution)
-
-
-def test_results_reject_outcome_and_source_mutations() -> None:
-    """Outcome flips and source edits fail the classification replay."""
-
-    inconsistent_request = RationalLinearSolveRequest.model_validate(
-        {
-            "matrix": {"entries": _matrix([["1", "1"], ["1", "1"]])},
-            "rhs": _rhs("0", "1"),
-        }
-    )
-    inconsistent = _mutable(
-        compute_rational_linear_solve(inconsistent_request).model_dump()
-    )
-
-    flipped_non_unique = copy.deepcopy(inconsistent)
-    flipped_non_unique["outcome"] = "NON_UNIQUE"
-    assert not verify_rational_linear_solve_result(
-        RationalLinearSolveResult.model_validate(flipped_non_unique)
-    )
-
-    flipped_unique = copy.deepcopy(inconsistent)
-    flipped_unique["outcome"] = "UNIQUE"
-    with pytest.raises(ValidationError):
-        RationalLinearSolveResult.model_validate(flipped_unique)
-
-    feasible_source = copy.deepcopy(inconsistent)
-    feasible_source["rhs"] = _rhs("0", "0")
-    assert not verify_rational_linear_solve_result(
-        RationalLinearSolveResult.model_validate(feasible_source)
-    )
-
-    nonsingular_source = copy.deepcopy(inconsistent)
-    nonsingular_source["matrix"]["entries"] = _matrix([["1", "0"], ["0", "1"]])
-    assert not verify_rational_linear_solve_result(
-        RationalLinearSolveResult.model_validate(nonsingular_source)
-    )
-
-    nonunique_request = RationalLinearSolveRequest.model_validate(
-        {
-            "matrix": {"entries": _matrix([["1", "1"], ["1", "1"]])},
-            "rhs": _rhs("1", "1"),
-        }
-    )
-    non_unique = _mutable(compute_rational_linear_solve(nonunique_request).model_dump())
-
-    flipped_inconsistent = copy.deepcopy(non_unique)
-    flipped_inconsistent["outcome"] = "INCONSISTENT"
-    assert not verify_rational_linear_solve_result(
-        RationalLinearSolveResult.model_validate(flipped_inconsistent)
-    )
-
-    singular_to_nonsingular = copy.deepcopy(non_unique)
-    singular_to_nonsingular["matrix"]["entries"] = _matrix([["1", "0"], ["0", "1"]])
-    singular_to_nonsingular["rhs"] = _rhs("1", "1")
-    assert not verify_rational_linear_solve_result(
-        RationalLinearSolveResult.model_validate(singular_to_nonsingular)
-    )
-
-    unique_request = RationalLinearSolveRequest.model_validate(
-        {
-            "matrix": {"entries": _matrix([["2", "0"], ["0", "3"]])},
-            "rhs": _rhs("2", "3"),
-        }
-    )
-    unique = _mutable(compute_rational_linear_solve(unique_request).model_dump())
-
-    foreign_rhs = copy.deepcopy(unique)
-    foreign_rhs["rhs"] = _rhs("2", "4")
-    assert not verify_rational_linear_solve_result(
-        RationalLinearSolveResult.model_validate(foreign_rhs)
-    )
-
-    # A singular source whose claimed solution still satisfies A x = b
-    # exactly: only the nonsingularity replay can reject this forgery.
-    singular_source = {
-        "matrix": {"entries": _matrix([["1", "1"], ["2", "2"]])},
-        "rhs": _rhs("2", "4"),
-        "outcome": "UNIQUE",
-        "solution": [{"num": "1", "den": "1"}, {"num": "1", "den": "1"}],
-    }
-    assert not verify_rational_linear_solve_result(
-        RationalLinearSolveResult.model_validate(singular_source)
-    )
 
 
 def test_serialized_results_round_trip_through_the_wire_shape() -> None:

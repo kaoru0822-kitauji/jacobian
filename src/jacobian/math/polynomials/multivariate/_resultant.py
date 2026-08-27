@@ -233,20 +233,6 @@ class MultivariateResultantResult(StrictModel):
         )
 
 
-def _verify_multivariate_resultant(result: MultivariateResultantResult) -> bool:
-    """Check an independently supplied source-bound resultant claim."""
-
-    try:
-        request = MultivariateResultantRequest(
-            left=result.left,
-            right=result.right,
-            elimination_variable=result.elimination_variable,
-        )
-        return result.resultant == _sylvester_resultant_value(request)
-    except ValueError:
-        return False
-
-
 __all__ = [
     "MultivariateInvariantValue",
     "MultivariatePolynomialValue",

@@ -9,7 +9,6 @@ from tests.math._real_algebraic_support import real_algebraic_validation_error
 from jacobian.math.real_algebraic import (
     RealAlgebraicOrderValue,
     RealAlgebraicValue,
-    _verify_real_algebraic_order_value,
     compare_real_algebraic,
     isolate_real_algebraic,
 )
@@ -82,28 +81,6 @@ def test_degree_and_coefficient_boundaries_are_closed() -> None:
         _value(("1",) + ("0",) * 8 + ("-2",), 1)
     with real_algebraic_validation_error():
         _value(("1" + "0" * 1_000, "1"), 0)
-
-
-def test_order_result_is_structural_until_owner_verification() -> None:
-    result = compare_real_algebraic(
-        _value(("1", "0", "-2"), 1),
-        _value(("1", "0", "-3"), 1),
-    )
-    forged_order = result.model_dump()
-    forged_order["order"] = "GT"
-    assert not _verify_real_algebraic_order_value(
-        RealAlgebraicOrderValue.model_validate(forged_order)
-    )
-
-    forged_interval = result.model_dump()
-    forged_interval["left_isolating_interval"]["lower"] = {
-        "num": "0",
-        "den": "1",
-    }
-    assert not _verify_real_algebraic_order_value(
-        RealAlgebraicOrderValue.model_validate(forged_interval)
-    )
-    assert _verify_real_algebraic_order_value(result)
 
 
 def test_value_round_trips_without_backend_expressions() -> None:

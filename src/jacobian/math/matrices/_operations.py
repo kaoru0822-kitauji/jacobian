@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from jacobian._exact import CanonicalRational
 from jacobian.canonical import format_canonical_integer
 from jacobian.catalog.models import OperationDomainValidationError
@@ -37,7 +35,7 @@ from jacobian.math.matrices._operation_models import (
     SquareRationalMatrixRequest,
 )
 from jacobian.math.matrices.operations import MatrixSingularError
-from jacobian.math.matrices.values import RationalMatrix, SmithNormalForm
+from jacobian.math.matrices.values import SmithNormalForm
 
 
 def compute_determinant(
@@ -49,31 +47,6 @@ def compute_determinant(
     return MatrixDeterminantResult(
         determinant=conversions.rational_from_sympy(determinant)
     )
-
-
-def _rref_replay(matrix: RationalMatrix) -> tuple[Any, tuple[int, ...]]:
-    """Return the exact RREF and pivot columns of a retained source matrix."""
-    reduced, pivots = matrices.rref(conversions.rational_matrix_to_sympy(matrix))
-    return reduced, tuple(int(pivot) for pivot in pivots)
-
-
-def _rank_replay(matrix: RationalMatrix) -> tuple[int, tuple[int, ...]]:
-    """Return the exact rank and RREF pivot columns of a retained source matrix."""
-    rank, pivots = matrices.rank(conversions.rational_matrix_to_sympy(matrix))
-    return int(rank), tuple(int(pivot) for pivot in pivots)
-
-
-def _system_rank_replay(
-    matrix: RationalMatrix, rhs: tuple[CanonicalRational, ...]
-) -> tuple[int, int]:
-    """Return the exact coefficient and augmented ranks of a retained system."""
-    import sympy
-
-    source = conversions.rational_matrix_to_sympy(matrix)
-    column = sympy.Matrix([sympy.Rational(value.as_fraction()) for value in rhs])
-    coefficient_rank, _pivots = matrices.rank(source)
-    augmented_rank, _augmented_pivots = matrices.rank(source.row_join(column))
-    return coefficient_rank, augmented_rank
 
 
 def compute_rank(request: MatrixRankRequest) -> MatrixRankResult:
@@ -260,79 +233,4 @@ def compute_partial_trace(
         reduced_matrix=conversions.rational_matrix_from_sympy(reduced),
         traced_dimension=request.traced_dimension,
         kept_dimension=request.kept_dimension,
-    )
-
-
-def verify_rref_result(result: RrefResult) -> bool:
-    """Independently replay one bounded RREF claim from its retained source."""
-
-    expected, pivots = _rref_replay(result.matrix)
-    return tuple(int(pivot) for pivot in pivots) == result.pivot_columns and (
-        conversions.rational_matrix_to_sympy(result.reduced_matrix) == expected
-    )
-
-
-def verify_rank_result(result: MatrixRankResult) -> bool:
-    """Independently replay one bounded rank and pivot claim."""
-
-    rank, pivots = _rank_replay(result.matrix)
-    return rank == result.rank and pivots == result.pivot_columns
-
-
-def verify_nullspace_result(result: NullspaceResult) -> bool:
-    """Check a bounded fundamental nullspace basis against its source."""
-
-    matrix = conversions.rational_matrix_to_sympy(result.matrix)
-    _reduced, pivots = matrices.rref(matrix)
-    pivot_columns = tuple(int(column) for column in pivots)
-    free_columns = tuple(
-        column for column in range(matrix.cols) if column not in pivot_columns
-    )
-    if (
-        result.rank != len(pivot_columns)
-        or result.free_columns != free_columns
-        or result.nullity != len(free_columns)
-    ):
-        return False
-    for index, vector in enumerate(result.basis_vectors):
-        components = [value.as_fraction() for value in vector]
-        if any(
-            sum(
-                coefficient.as_fraction() * component
-                for coefficient, component in zip(row, components, strict=True)
-            )
-            != 0
-            for row in result.matrix.entries
-        ):
-            return False
-        own = free_columns[index]
-        if components[own] != 1 or any(
-            components[column] != 0 for column in free_columns if column != own
-        ):
-            return False
-    return True
-
-
-def verify_rational_linear_solve_result(result: RationalLinearSolveResult) -> bool:
-    """Replay one bounded linear-system outcome and optional exact witness."""
-
-    coefficient_rank, augmented_rank = _system_rank_replay(result.matrix, result.rhs)
-    columns = len(result.matrix.entries[0])
-    if result.outcome == "UNIQUE":
-        if result.solution is None or coefficient_rank != columns:
-            return False
-        return all(
-            sum(
-                coefficient.as_fraction() * component.as_fraction()
-                for coefficient, component in zip(row, result.solution, strict=True)
-            )
-            == bound.as_fraction()
-            for row, bound in zip(result.matrix.entries, result.rhs, strict=True)
-        )
-    if result.outcome == "INCONSISTENT":
-        return result.solution is None and coefficient_rank < augmented_rank
-    return (
-        result.solution is None
-        and coefficient_rank < columns
-        and coefficient_rank == augmented_rank
     )

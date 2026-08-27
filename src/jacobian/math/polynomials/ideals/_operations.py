@@ -570,26 +570,6 @@ def compute_ideal_minimal_primes(
     )
 
 
-def _verify_ideal_minimal_primes_result(result: IdealMinimalPrimesResult) -> bool:
-    """Independently verify a supplied computed minimal-prime family.
-
-    Result construction deliberately performs only structural checks.  This
-    explicit verifier owns the second bounded Singular pass for callers that
-    need to establish the defining minimal-prime invariants of supplied data.
-    """
-
-    if result.outcome != "COMPUTED" or result.components is None:
-        return False
-    return (
-        run_singular_minimal_primes_verification(
-            result.request.ideal,
-            result.components,
-            result.request.resource_budget,
-        )
-        == "VERIFIED"
-    )
-
-
 def compute_ideal_radical_membership(
     request: IdealRadicalMembershipRequest,
 ) -> IdealRadicalMembershipResult:

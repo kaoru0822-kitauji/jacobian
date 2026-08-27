@@ -121,18 +121,6 @@ def hermite_interpolation(
     )
 
 
-def _verify_hermite_interpolation_result(result: HermiteInterpolationResult) -> bool:
-    """Recompute an independently supplied Hermite claim inside its admission envelope."""
-
-    try:
-        request = HermiteInterpolationRequest.model_validate(
-            {"table": result.source.model_dump(mode="json")}
-        )
-        return hermite_interpolation(request.table) == result
-    except ValueError:
-        return False
-
-
 def compute_hermite_interpolation(
     request: HermiteInterpolationRequest,
 ) -> HermiteInterpolationResult:

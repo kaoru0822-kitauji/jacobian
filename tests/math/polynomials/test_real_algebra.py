@@ -13,7 +13,6 @@ from jacobian.math.polynomials.real_algebra._models import (
     UnivariatePolynomial,
 )
 from jacobian.math.polynomials.real_algebra._operations import (
-    _verify_root_count_result,
     compute_root_count,
     compute_sturm_chain,
 )
@@ -83,8 +82,6 @@ def test_root_count_cubic_has_one_real_root() -> None:
     assert result.source_polynomial == poly
     assert result.root_count == 1
     assert result.method == "STURM_THEOREM"
-    assert _verify_root_count_result(result)
-    assert not _verify_root_count_result(result.model_copy(update={"root_count": 2}))
 
 
 def test_root_count_x_squared_minus_2() -> None:

@@ -26,12 +26,10 @@ from jacobian.math.polynomials.multivariate._operations import (
 from jacobian.math.polynomials.multivariate._resultant import (
     MultivariateResultantRequest,
     MultivariateResultantResult,
-    _verify_multivariate_resultant,
 )
 from jacobian.math.polynomials.multivariate._subresultants import (
     MultivariateSubresultantSequenceRequest,
     MultivariateSubresultantSequenceResult,
-    _verify_multivariate_subresultant_sequence,
 )
 from jacobian.math.polynomials.values import RationalPolynomial
 
@@ -523,40 +521,6 @@ class TestMultivariateResultant:
                 for t in result.resultant.value.polynomial.terms
             )
             assert together(expected - claimed) == 0
-
-    def test_resultant_parsing_is_structural_and_verification_is_deliberate(
-        self,
-    ) -> None:
-        """Deserialization does not replay the determinant of retained sources."""
-
-        left = _poly(("x", "y"), (("1/1", (1, 1)), ("-1/1", (0, 0))))
-        right = _poly(("x", "y"), (("1/1", (2, 0)), ("-1/1", (0, 0))))
-        request = MultivariateResultantRequest(
-            left=left, right=right, elimination_variable="x"
-        )
-        result = compute_multivariate_resultant(request)
-        dumped = result.model_dump()
-        assert MultivariateResultantResult.model_validate(dumped) == result
-        assert _verify_multivariate_resultant(result)
-
-        forged = copy.deepcopy(dumped)
-        forged["resultant"]["value"]["polynomial"]["terms"] = [
-            {"coefficient": {"num": "9999", "den": "1"}, "exponents": [0]}
-        ]
-        forged_result = MultivariateResultantResult.model_validate(forged)
-        assert not _verify_multivariate_resultant(forged_result)
-
-        swapped = copy.deepcopy(dumped)
-        swapped["left"] = dumped["right"]
-        swapped_result = MultivariateResultantResult.model_validate(swapped)
-        assert not _verify_multivariate_resultant(swapped_result)
-
-        out_of_envelope = copy.deepcopy(dumped)
-        out_of_envelope["left"]["polynomial"]["terms"][0]["exponents"] = (100, 1)
-        parsed_out_of_envelope = MultivariateResultantResult.model_validate(
-            out_of_envelope
-        )
-        assert not _verify_multivariate_resultant(parsed_out_of_envelope)
 
     def test_resultant_rejects_univariate(self) -> None:
         """Univariate polynomials are rejected for multivariate operations."""
@@ -1237,88 +1201,3 @@ class TestMultivariateSubresultantSequence:
                 right=right,
                 main_variable="x",
             )
-
-    def test_result_parsing_is_structural_and_verification_rejects_forgery(
-        self,
-    ) -> None:
-        left = _poly(
-            ("x", "y"),
-            (("1/1", (2, 0)), ("-1/1", (0, 1))),
-        )
-        right = _poly(
-            ("x", "y"),
-            (("1/1", (1, 0)), ("-1/1", (0, 1))),
-        )
-        result = compute_multivariate_subresultant_sequence(
-            MultivariateSubresultantSequenceRequest(
-                left=left,
-                right=right,
-                main_variable="x",
-            )
-        )
-        original: dict[str, Any] = result.model_dump(mode="json")
-        structural_errors: list[dict[str, Any]] = []
-        forged_claims: list[dict[str, Any]] = []
-
-        payload = deepcopy(original)
-        payload["members"][-1]["polynomial"] = _scalar(
-            ("x", "y"),
-            "1",
-        ).model_dump(mode="json")
-        forged_claims.append(payload)
-
-        payload = deepcopy(original)
-        payload["members"][-1]["degree_in_main_variable"] = 1
-        structural_errors.append(payload)
-
-        payload = deepcopy(original)
-        payload["left"]["polynomial"]["terms"][-1]["coefficient"]["num"] = "-2"
-        forged_claims.append(payload)
-
-        payload = deepcopy(original)
-        payload["left"]["polynomial"]["terms"][0]["exponents"][0] = 100
-        forged_claims.append(payload)
-
-        payload = deepcopy(original)
-        payload["source_order"] = "RIGHT_LEFT"
-        forged_claims.append(payload)
-
-        payload = deepcopy(original)
-        payload["skipped_member_degrees"] = [1]
-        structural_errors.append(payload)
-
-        payload = deepcopy(original)
-        payload["principal_subresultant_coefficients"][0]["coefficient"] = _scalar(
-            ("y",), "1"
-        ).model_dump(mode="json")
-        forged_claims.append(payload)
-
-        payload = deepcopy(original)
-        payload["resultant"] = _scalar(("y",), "1").model_dump(mode="json")
-        forged_claims.append(payload)
-
-        payload = deepcopy(original)
-        payload["resultant_sign_from_sequence_order"] = -1
-        forged_claims.append(payload)
-
-        payload = deepcopy(original)
-        payload["gcd_member_index"] = 1
-        structural_errors.append(payload)
-
-        payload = deepcopy(original)
-        payload["gcd_degree_in_main_variable"] = 1
-        structural_errors.append(payload)
-
-        payload = deepcopy(original)
-        payload["gcd_member_leading_coefficient"] = _scalar(("y",), "1").model_dump(
-            mode="json"
-        )
-        forged_claims.append(payload)
-
-        assert _verify_multivariate_subresultant_sequence(result)
-        for corrupted in structural_errors:
-            with pytest.raises(ValueError):
-                MultivariateSubresultantSequenceResult.model_validate(corrupted)
-        for forged in forged_claims:
-            parsed = MultivariateSubresultantSequenceResult.model_validate(forged)
-            assert not _verify_multivariate_subresultant_sequence(parsed)

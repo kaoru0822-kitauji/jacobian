@@ -15,7 +15,6 @@ from jacobian.math.polynomials.multivariate._factor_models import (
     MultivariateIrreducibleFactor,
 )
 from jacobian.math.polynomials.multivariate._operations import (
-    _verify_multivariate_factor_result,
     multivariate_factor,
 )
 from jacobian.math.polynomials.values import (

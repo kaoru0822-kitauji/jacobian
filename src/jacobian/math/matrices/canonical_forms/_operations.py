@@ -16,7 +16,6 @@ from jacobian.math.matrices.canonical_forms._models import (
     RationalCanonicalFormResult,
     SquareMatrixRequest,
 )
-from jacobian.math.matrices.canonical_forms._replay import _matrix_entries
 from jacobian.math.matrices.canonical_forms.operations import (
     _evaluate_polynomial,
     characteristic_polynomial,
@@ -25,6 +24,12 @@ from jacobian.math.matrices.canonical_forms.operations import (
     primary_decomposition,
 )
 from jacobian.math.matrices.values import RationalMatrix, rational_matrix_from_fractions
+
+
+def _matrix_entries(
+    matrix: RationalMatrix,
+) -> tuple[tuple[Fraction, ...], ...]:
+    return tuple(tuple(value.as_fraction() for value in row) for row in matrix.entries)
 
 
 def _to_monic_polynomial(coefficients: Sequence[Fraction]) -> MonicPolynomial:
@@ -117,59 +122,3 @@ def compute_primary_decomposition(
         ),
         minimal_polynomial=_to_monic_polynomial(minimal),
     )
-
-
-def verify_matrix_polynomial_evaluation_result(
-    result: MatrixPolynomialEvaluationResult,
-) -> bool:
-    """Replay a separately supplied matrix-polynomial claim in its admitted envelope."""
-
-    request = MatrixPolynomialEvaluationRequest(
-        matrix=result.source_matrix,
-        polynomial=result.polynomial,
-    )
-    return result.value == evaluate_matrix_polynomial_value(request)
-
-
-def verify_minimal_polynomial_result(result: MinimalPolynomialResult) -> bool:
-    """Check a separately supplied minimal-polynomial claim against its source."""
-
-    from jacobian.math.matrices.canonical_forms._replay import _coefficients_of
-
-    entries = _matrix_entries(result.matrix.matrix)
-    return _coefficients_of(result.minimal_polynomial) == tuple(
-        minimal_polynomial(entries)
-    ) and _coefficients_of(result.characteristic_polynomial) == tuple(
-        characteristic_polynomial(entries)
-    )
-
-
-def verify_rational_canonical_form_result(
-    result: RationalCanonicalFormResult,
-) -> bool:
-    """Check a separately supplied invariant-factor claim against its source."""
-
-    from jacobian.math.matrices.canonical_forms._replay import _coefficients_of
-
-    entries = _matrix_entries(result.matrix.matrix)
-    return (
-        tuple(_coefficients_of(entry.factor) for entry in result.invariant_factors)
-        == tuple(invariant_factors(entries))
-        and _coefficients_of(result.minimal_polynomial)
-        == tuple(minimal_polynomial(entries))
-        and _coefficients_of(result.characteristic_polynomial)
-        == tuple(characteristic_polynomial(entries))
-    )
-
-
-def verify_primary_decomposition_result(result: PrimaryDecompositionResult) -> bool:
-    """Check a separately supplied primary-decomposition claim against its source."""
-
-    from jacobian.math.matrices.canonical_forms._replay import _coefficients_of
-
-    entries = _matrix_entries(result.matrix.matrix)
-    return tuple(
-        _coefficients_of(component) for component in result.components
-    ) == tuple(primary_decomposition(entries)) and _coefficients_of(
-        result.minimal_polynomial
-    ) == tuple(minimal_polynomial(entries))

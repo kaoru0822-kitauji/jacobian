@@ -259,15 +259,6 @@ def compare_real_algebraic(
     )
 
 
-def _verify_real_algebraic_order_value(result: RealAlgebraicOrderValue) -> bool:
-    """Recompute one independently supplied exact ordering claim."""
-
-    try:
-        return result == compare_real_algebraic(result.left, result.right)
-    except ValueError:
-        return False
-
-
 __all__ = [
     "MAX_REAL_ALGEBRAIC_COEFFICIENT_DIGITS",
     "MAX_REAL_ALGEBRAIC_DEGREE",

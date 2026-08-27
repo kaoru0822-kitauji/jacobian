@@ -25,9 +25,6 @@ from jacobian.math.matrices.canonical_forms._operations import (
     compute_minimal_polynomial,
     compute_primary_decomposition,
     compute_rational_canonical_form,
-    verify_minimal_polynomial_result,
-    verify_primary_decomposition_result,
-    verify_rational_canonical_form_result,
 )
 from jacobian.math.matrices.values import RationalMatrix
 
@@ -484,53 +481,6 @@ def test_noncyclic_components_multiply_to_minimal_not_characteristic() -> None:
     assert len(characteristic) == 5  # t^4: degree four, distinct from minpoly
 
 
-def test_minimal_polynomial_rejects_annihilating_but_nonminimal() -> None:
-    """t^3 annihilates the J2 source but must not be accepted as its minimal poly."""
-    req = _mat(
-        (_pair("0", "1"), _pair("1", "1")),
-        (_pair("0", "1"), _pair("0", "1")),
-    )
-    assert not verify_minimal_polynomial_result(
-        MinimalPolynomialResult(
-            matrix=req,
-            minimal_polynomial=_mono(0, 0, 0, 1),
-            characteristic_polynomial=_mono(0, 0, 1),
-            degree=3,
-        )
-    )
-
-
-def test_minimal_polynomial_rejects_field_and_source_mutations() -> None:
-    req = _mat(
-        (_pair("0", "1"), _pair("1", "1")),
-        (_pair("0", "1"), _pair("0", "1")),
-    )
-    result = compute_minimal_polynomial(req)
-    with pytest.raises(ValidationError):
-        MinimalPolynomialResult(
-            matrix=result.matrix,
-            minimal_polynomial=result.minimal_polynomial,
-            characteristic_polynomial=result.characteristic_polynomial,
-            degree=1,
-        )
-    assert not verify_minimal_polynomial_result(
-        MinimalPolynomialResult(
-            matrix=result.matrix,
-            minimal_polynomial=result.minimal_polynomial,
-            characteristic_polynomial=_mono(6, -5, 1),
-            degree=result.degree,
-        )
-    )
-    assert not verify_minimal_polynomial_result(
-        MinimalPolynomialResult(
-            matrix=_diagonal("2", "3"),
-            minimal_polynomial=result.minimal_polynomial,
-            characteristic_polynomial=result.characteristic_polynomial,
-            degree=result.degree,
-        )
-    )
-
-
 def test_rational_canonical_form_rejects_structural_mutations() -> None:
     req = _diagonal("2", "3")
     result = compute_rational_canonical_form(req)
@@ -582,42 +532,6 @@ def test_rational_canonical_form_rejects_divisibility_break() -> None:
         )
 
 
-def test_rational_canonical_form_rejects_polynomial_mutations() -> None:
-    req = _diagonal("2", "3")
-    result = compute_rational_canonical_form(req)
-    assert not verify_rational_canonical_form_result(
-        RationalCanonicalFormResult(
-            matrix=result.matrix,
-            invariant_factors=result.invariant_factors,
-            characteristic_polynomial=_mono(0, 0, 1),
-            minimal_polynomial=result.minimal_polynomial,
-            total_block_size=result.total_block_size,
-        )
-    )
-    with pytest.raises(ValidationError):
-        RationalCanonicalFormResult(
-            matrix=result.matrix,
-            invariant_factors=result.invariant_factors,
-            characteristic_polynomial=result.characteristic_polynomial,
-            minimal_polynomial=_mono(0, 0, 1),
-            total_block_size=result.total_block_size,
-        )
-
-
-def test_rational_canonical_form_rejects_source_mutation() -> None:
-    req = _diagonal("2", "3")
-    result = compute_rational_canonical_form(req)
-    assert not verify_rational_canonical_form_result(
-        RationalCanonicalFormResult(
-            matrix=_diagonal("2", "5"),
-            invariant_factors=result.invariant_factors,
-            characteristic_polynomial=result.characteristic_polynomial,
-            minimal_polynomial=result.minimal_polynomial,
-            total_block_size=result.total_block_size,
-        )
-    )
-
-
 def _nilpotent_jordan_blocks(block_size: int) -> SquareMatrixRequest:
     """Direct sum of two nilpotent Jordan blocks J_block_size(0)."""
     dimension = 2 * block_size
@@ -651,78 +565,6 @@ def test_rational_canonical_form_j3_plus_j3_has_two_x_cubed_factors() -> None:
     assert _coeffs(result.characteristic_polynomial) == [Fraction(0)] * 6 + [
         Fraction(1)
     ]
-
-
-def test_rational_canonical_form_rejects_relationally_consistent_tuple() -> None:
-    """(x, x^2, x^3) satisfies degree, divisibility, product, and
-    last-factor checks against J3(0) + J3(0) yet is not the exact
-    invariant-factor tuple (x^3, x^3); validation must bind the tuple."""
-    result = compute_rational_canonical_form(_nilpotent_jordan_blocks(3))
-    forged = (
-        InvariantFactorEntry(factor=_mono(0, 1), block_size=1),
-        InvariantFactorEntry(factor=_mono(0, 0, 1), block_size=2),
-        InvariantFactorEntry(factor=_mono(0, 0, 0, 1), block_size=3),
-    )
-    assert not verify_rational_canonical_form_result(
-        RationalCanonicalFormResult(
-            matrix=result.matrix,
-            invariant_factors=forged,
-            characteristic_polynomial=result.characteristic_polynomial,
-            minimal_polynomial=result.minimal_polynomial,
-            total_block_size=6,
-        )
-    )
-
-
-def test_primary_decomposition_rejects_reducible_component() -> None:
-    """t^2 - t factors over QQ, so it is not one irreducible-power component."""
-    req = _diagonal("0", "1")
-    result = compute_primary_decomposition(req)
-    assert not verify_primary_decomposition_result(
-        PrimaryDecompositionResult(
-            matrix=result.matrix,
-            components=(_mono(0, -1, 1),),
-            minimal_polynomial=result.minimal_polynomial,
-        )
-    )
-
-
-def test_primary_decomposition_rejects_duplicate_prime_components() -> None:
-    """[t, t] has lcm t^2 yet shares the prime t; only [t^2] reconstructs t^2."""
-    req = _mat(
-        (_pair("0", "1"), _pair("1", "1")),
-        (_pair("0", "1"), _pair("0", "1")),
-    )
-    result = compute_primary_decomposition(req)
-    assert not verify_primary_decomposition_result(
-        PrimaryDecompositionResult(
-            matrix=result.matrix,
-            components=(_mono(0, 1), _mono(0, 1)),
-            minimal_polynomial=result.minimal_polynomial,
-        )
-    )
-
-
-def test_primary_decomposition_rejects_product_and_source_mutations() -> None:
-    req = _mat(
-        (_pair("0", "1"), _pair("1", "1")),
-        (_pair("0", "1"), _pair("0", "1")),
-    )
-    result = compute_primary_decomposition(req)
-    assert not verify_primary_decomposition_result(
-        PrimaryDecompositionResult(
-            matrix=result.matrix,
-            components=(_mono(0, 1),),
-            minimal_polynomial=result.minimal_polynomial,
-        )
-    )
-    assert not verify_primary_decomposition_result(
-        PrimaryDecompositionResult(
-            matrix=_diagonal("2", "3"),
-            components=result.components,
-            minimal_polynomial=result.minimal_polynomial,
-        )
-    )
 
 
 def test_results_are_similarity_invariant_under_rational_change_of_basis() -> None:

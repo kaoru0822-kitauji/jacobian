@@ -14,7 +14,6 @@ from jacobian.math.matrices.symbolic._models import (
 )
 from jacobian.math.matrices.symbolic._operations import (
     compute_symbolic_linear_system,
-    verify_symbolic_linear_system_result,
 )
 from jacobian.math.matrices.symbolic.operations import SystemClassification
 from jacobian.math.polynomials.values import RationalFunction
@@ -82,7 +81,6 @@ class TestSymbolicLinearSystem:
         assert result.classification == "UNIQUE"
         assert result.solution is not None
         assert len(result.solution) == 1
-        assert verify_symbolic_linear_system_result(result)
 
     def test_unique_solution_identity_2x2(self) -> None:
         """Solve [[1, a], [b, 1]] * x = [1, 1] for a symbolic 2x2 system."""
@@ -132,7 +130,6 @@ class TestSymbolicLinearSystem:
         assert result.classification == "INCONSISTENT"
         assert result.solution is None
         assert result.particular_solution is None
-        assert verify_symbolic_linear_system_result(result)
 
     def test_orthocenter_system(self) -> None:
         """Solve a 2x2 symbolic system from the orthocenter derivation."""
@@ -413,32 +410,6 @@ class TestSourceBoundResult:
         revalidated = SymbolicLinearSystemResult.model_validate(result.model_dump())
         assert revalidated.classification == "UNIQUE"
         assert revalidated.solution == result.solution
-        assert verify_symbolic_linear_system_result(revalidated)
-
-    def test_forged_solution_for_other_system_fails_explicit_verification(self) -> None:
-        result = compute_symbolic_linear_system(self._request())
-        payload = _payload(result.model_dump())
-        vars_: tuple[str, ...] = ()
-        three = _rf(vars_, (3, ()))
-        payload["system"] = {
-            "matrix": {"variables": [], "entries": ((three,),)},
-            "rhs": (_rf(vars_, (7, ())),),
-        }
-        # Same shape as the foreign 1x1 system so only explicit source-bound
-        # verification, rather than transport-shape validation, rejects it.
-        payload["solution"] = (three,)
-        assert not verify_symbolic_linear_system_result(
-            SymbolicLinearSystemResult.model_validate(payload)
-        )
-
-    def test_wrong_solution_vector_fails_explicit_verification(self) -> None:
-        result = compute_symbolic_linear_system(self._request())
-        payload = _payload(result.model_dump())
-        wrong = _rf(("a", "b"), (5, (1, 1)))
-        payload["solution"] = (wrong, wrong)
-        assert not verify_symbolic_linear_system_result(
-            SymbolicLinearSystemResult.model_validate(payload)
-        )
 
 
 class TestNativeSystemAdmission:
@@ -551,41 +522,6 @@ class TestNonUniqueWitnessEquivalence:
         payload["nullspace_basis"] = [basis_vector]
         revalidated = SymbolicLinearSystemResult.model_validate(payload)
         assert revalidated.classification == "NON_UNIQUE"
-        assert verify_symbolic_linear_system_result(revalidated)
-
-    def test_wrong_particular_solution_fails_explicit_verification(self) -> None:
-        zero = _rf(("t",))
-        wrong = _rf(("t",), (8, (0,)))
-        payload = _payload(self._non_unique_result().model_dump())
-        payload["particular_solution"] = [wrong.model_dump(), zero.model_dump()]
-        assert not verify_symbolic_linear_system_result(
-            SymbolicLinearSystemResult.model_validate(payload)
-        )
-
-    def test_non_kernel_basis_vector_fails_explicit_verification(self) -> None:
-        one_one = _rf(("t",), (1, (1,)), (1, (0,)))
-        zero = _rf(("t",))
-        payload = _payload(self._non_unique_result().model_dump())
-        payload["nullspace_basis"] = [[one_one.model_dump(), zero.model_dump()]]
-        assert not verify_symbolic_linear_system_result(
-            SymbolicLinearSystemResult.model_validate(payload)
-        )
-
-    def test_incomplete_or_degenerate_basis_fails_explicit_verification(self) -> None:
-        """Duplicated vectors cannot satisfy the verifier's basis invariant."""
-        zero = _rf(("t",))
-        one = _rf(("t",), (1, (0,)))
-        two = _rf(("t",), (2, (0,)))
-        payload = _payload(self._non_unique_result().model_dump())
-        # Both vectors lie in the kernel line but are dependent and exceed
-        # the kernel dimension.
-        payload["nullspace_basis"] = [
-            [zero.model_dump(), one.model_dump()],
-            [zero.model_dump(), two.model_dump()],
-        ]
-        assert not verify_symbolic_linear_system_result(
-            SymbolicLinearSystemResult.model_validate(payload)
-        )
 
 
 class TestWitnessDeserializationHardening:

@@ -184,40 +184,6 @@ def polynomial_factorization(
     )
 
 
-def _verify_square_free_decomposition_result(
-    result: PolynomialSquareFreeDecompositionResult,
-) -> bool:
-    """Deliberately recompute one independently supplied square-free claim."""
-
-    try:
-        expected = polynomial_square_free_decomposition(
-            PolynomialSquareFreeRequest(polynomial=result.polynomial)
-        )
-    except (TypeError, ValueError):
-        return False
-    return (
-        result.coefficient == expected.coefficient
-        and result.factors == expected.factors
-        and result.reconstructed == expected.reconstructed
-    )
-
-
-def _verify_factorization_result(result: PolynomialFactorizationResult) -> bool:
-    """Deliberately recompute one independently supplied factorization claim."""
-
-    try:
-        expected = polynomial_factorization(
-            PolynomialFactorRequest(polynomial=result.polynomial)
-        )
-    except (TypeError, ValueError):
-        return False
-    return (
-        result.coefficient == expected.coefficient
-        and result.factors == expected.factors
-        and result.reconstructed == expected.reconstructed
-    )
-
-
 def polynomial_groebner_basis(
     request: PolynomialGroebnerBasisRequest,
 ) -> PolynomialGroebnerBasisResult:

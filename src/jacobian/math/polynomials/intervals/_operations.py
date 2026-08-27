@@ -18,22 +18,4 @@ def compute_polynomial_box_enclosure(
     )
 
 
-def _verify_polynomial_box_enclosure_result(
-    result: PolynomialBoxEnclosureResult,
-) -> bool:
-    """Check an independently supplied enclosure inside the owner envelope."""
-
-    parsed = PolynomialBoxEnclosureResult.model_validate(
-        result.model_dump(mode="json"),
-    )
-    request = PolynomialBoxEnclosureRequest(
-        polynomial=parsed.polynomial,
-        box=parsed.box,
-    )
-    return parsed.enclosure == natural_interval_extension(
-        request.polynomial,
-        request.box,
-    )
-
-
 __all__ = ["compute_polynomial_box_enclosure"]

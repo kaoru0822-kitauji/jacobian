@@ -258,69 +258,6 @@ def _sympy_factor_key(poly: Any) -> _SympyFactorKey:
     )
 
 
-def _verify_multivariate_factor_result(result: MultivariateFactorResult) -> bool:
-    """Verify an independently supplied factorization claim once, boundedly.
-
-    Construction of a kernel result never re-enters the worker that produced
-    it.  This verifier is deliberately separate for consumers that need to
-    authenticate a deserialized ``FACTORIZED`` or ``OUTPUT_BUDGET_EXCEEDED``
-    claim.  ``EXECUTION_FAILED`` is a retryable process condition rather than
-    a mathematical certificate and therefore has no positive verifier verdict.
-    """
-
-    if result.status == "EXECUTION_FAILED":
-        return False
-    try:
-        decomposition = _factor_backend.run_bounded_factorization(
-            result.reconstructed,
-            wall_seconds=_factor_backend.FACTOR_VERIFY_WALL_SECONDS,
-        )
-    except FactorBackendExhaustedError:
-        return result.status == "OUTPUT_BUDGET_EXCEEDED"
-    except (FactorBackendInterruptedError, FactorBackendFailureError):
-        return False
-    except Exception:  # pragma: no cover - defensive worker boundary
-        return False
-
-    if result.status == "OUTPUT_BUDGET_EXCEEDED":
-        try:
-            for factor, _multiplicity in decomposition[1]:
-                _result_polynomial(
-                    factor,
-                    result.reconstructed.variables,
-                    maximum_terms=_MAX_FACTOR_OUTPUT_TERMS,
-                )
-        except MultivariateOutputBudgetError:
-            return True
-        return False
-
-    try:
-        from jacobian.math.polynomials._sympy import _monic_decomposition
-
-        source = rational_polynomial_to_sympy(result.reconstructed)
-        content, raw_factors, _ = _monic_decomposition(
-            source,
-            decomposition,
-            label="multivariate factorization verification",
-        )
-        claimed = {
-            _sympy_factor_key(
-                rational_polynomial_to_sympy(record.factor)
-            ): record.multiplicity
-            for record in result.factors
-        }
-        replayed = {
-            _sympy_factor_key(factor): multiplicity
-            for factor, multiplicity in raw_factors
-        }
-        return (
-            _monic_content_fraction(content) == result.coefficient.as_fraction()
-            and claimed == replayed
-        )
-    except Exception:  # pragma: no cover - defensive verifier boundary
-        return False
-
-
 def multivariate_factor(request: MultivariateFactorRequest) -> MultivariateFactorResult:
     """Exact factorization over ``QQ[variables]`` via SymPy's ``factor_list``.
 

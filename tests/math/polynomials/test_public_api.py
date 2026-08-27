@@ -162,41 +162,6 @@ def test_factor_producers_compute_once_and_round_trip_structurally(
     )
 
 
-def test_factor_results_parse_structurally_and_private_verifiers_reject_forgery() -> (
-    None
-):
-    from jacobian.math.polynomials._models import (
-        PolynomialFactorizationResult,
-        PolynomialFactorRequest,
-        PolynomialSquareFreeDecompositionResult,
-        PolynomialSquareFreeRequest,
-    )
-    from jacobian.math.polynomials._operations import (
-        _verify_factorization_result,
-        _verify_square_free_decomposition_result,
-        polynomial_factorization,
-        polynomial_square_free_decomposition,
-    )
-
-    source = _univariate("x", {2: "1", 0: "-1"})
-    factorization = polynomial_factorization(PolynomialFactorRequest(polynomial=source))
-    square_free = polynomial_square_free_decomposition(
-        PolynomialSquareFreeRequest(polynomial=source)
-    )
-    assert _verify_factorization_result(factorization)
-    assert _verify_square_free_decomposition_result(square_free)
-    forged_factorization = factorization.model_dump()
-    forged_factorization["coefficient"] = {"num": "2", "den": "1"}
-    assert not _verify_factorization_result(
-        PolynomialFactorizationResult.model_validate(forged_factorization)
-    )
-    forged_square_free = square_free.model_dump()
-    forged_square_free["coefficient"] = {"num": "2", "den": "1"}
-    assert not _verify_square_free_decomposition_result(
-        PolynomialSquareFreeDecompositionResult.model_validate(forged_square_free)
-    )
-
-
 def test_factor_results_keep_structural_ring_and_order_checks() -> None:
     from jacobian.math.polynomials._models import (
         PolynomialFactorizationResult,
