@@ -52,6 +52,7 @@ class PrimeTupleResidueWheelRequest(StrictModel):
         ),
     )
 
+
 class PrimeTupleWheelResidueRow(StrictModel):
     residue: CompactWheelScalar
     components: tuple[StrictInt, ...] = Field(max_length=MAX_WHEEL_PRIMES)
@@ -96,6 +97,7 @@ class PrimeTupleResidueWheelEnumerationRequest(StrictModel):
     """Materialize every residue of a supplied compact wheel under strict bounds."""
 
     wheel: PrimeTupleResidueWheel
+
 
 class PrimeTupleResidueWheelEnumeration(StrictModel):
     """Complete explicit residue realization of one compact CRT wheel."""
@@ -153,6 +155,7 @@ class PrimeTupleWheelMembershipRequest(StrictModel):
     wheel: PrimeTupleResidueWheel
     value: AffineComponentInteger
 
+
 class PrimeTupleWheelMembershipResult(StrictModel):
     wheel: PrimeTupleResidueWheel
     value: AffineComponentInteger
@@ -204,6 +207,7 @@ class PrimeTupleIntervalResidueProfileRequest(StrictModel):
     wheel: PrimeTupleResidueWheel
     lower: IntervalEndpointInteger
     upper: IntervalEndpointInteger
+
 
 class PrimeTupleIntervalResidueProfileResult(StrictModel):
     """Exact local survivors; this value does not assert actual primality."""

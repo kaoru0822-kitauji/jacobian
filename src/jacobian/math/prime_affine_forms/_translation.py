@@ -27,6 +27,7 @@ class PrimeAffineTranslationRequest(StrictModel):
     source: PrimeAffineTuple
     shift: IntervalEndpointInteger
 
+
 def _admit_translation(request: PrimeAffineTranslationRequest) -> int:
     require_bounded_affine_endpoints(request.source, request.shift, label="translation")
     shift = parse_canonical_integer(request.shift)

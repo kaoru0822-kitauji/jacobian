@@ -91,6 +91,7 @@ def _admit_local_factor(request: PrimeTupleLocalFactorRequest) -> None:
             f"exceeding {MAX_LOCAL_PROFILE_WORK}"
         )
 
+
 class PrimeTupleLocalFactorResult(StrictModel):
     """Source-bound complete partition modulo one prime and its local factor."""
 
@@ -167,6 +168,7 @@ class PrimeTupleLocalFactorsRequest(StrictModel):
             "and exact rational-output bounds are admitted at execution time."
         ),
     )
+
 
 def _admit_local_factors(request: PrimeTupleLocalFactorsRequest) -> None:
     _require_prime_set(request.primes, maximum=MAX_BATCH_PRIME)

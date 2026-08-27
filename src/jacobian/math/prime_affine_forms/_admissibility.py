@@ -30,6 +30,7 @@ class PrimeTupleAdmissibilityRequest(StrictModel):
 
     source: PrimeAffineTuple
 
+
 def _admit_local_admissibility(source: PrimeAffineTuple) -> None:
     cutoff = source.form_count
     prime_rows = int(primepi(cutoff))
@@ -90,7 +91,9 @@ class PrimeTupleAdmissibilityResult(StrictModel):
         )
         expected_status = "LOCALLY_OBSTRUCTED" if obstructing else "LOCALLY_ADMISSIBLE"
         if self.status != expected_status:
-            raise _validation_error("admissibility status does not match the local rows")
+            raise _validation_error(
+                "admissibility status does not match the local rows"
+            )
         expected_first = obstructing[0] if obstructing else None
         if self.least_obstructing_prime != expected_first:
             raise _validation_error(

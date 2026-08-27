@@ -41,6 +41,7 @@ def _run_admission[ResultT](admission: Callable[[], ResultT]) -> ResultT:
             location=(), code=exc.type, message=exc.message()
         ) from exc
 
+
 CompactPrime = Annotated[
     StrictInt,
     Field(

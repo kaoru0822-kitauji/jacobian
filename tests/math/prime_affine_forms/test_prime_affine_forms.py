@@ -186,9 +186,7 @@ def test_local_factor_agrees_with_direct_residue_oracle(prime: int) -> None:
     assert result.factor.as_fraction() == expected_factor
 
 
-def test_local_factor_result_round_trips_structurally() -> (
-    None
-):
+def test_local_factor_result_round_trips_structurally() -> None:
     result = compute_local_factor(
         PrimeTupleLocalFactorRequest(source=TWIN_PRIMES, prime=3)
     )
@@ -327,7 +325,9 @@ def test_translation_rejects_translated_tuple_exceeding_aggregate_digit_bound() 
         *(_form(f"f{index:03d}", 10**127 + index, 1) for index in range(512))
     )
     with pytest.raises(OperationDomainValidationError):
-        compute_translation(PrimeAffineTranslationRequest(source=source, shift=str(10**63)))
+        compute_translation(
+            PrimeAffineTranslationRequest(source=source, shift=str(10**63))
+        )
 
 
 def test_translation_admits_translated_tuple_at_the_aggregate_digit_bound() -> None:
@@ -363,7 +363,9 @@ def test_interval_preflights_oversized_endpoints_before_integer_parsing(
 
     monkeypatch.setattr(interval_contracts, "parse_canonical_integer", fail_parse)
 
-    with pytest.raises(OperationDomainValidationError, match="source-sensitive pre-parse"):
+    with pytest.raises(
+        OperationDomainValidationError, match="source-sensitive pre-parse"
+    ):
         compute_interval_count(
             PrimeAffineIntervalCountRequest(
                 source=TWIN_PRIMES,
@@ -385,7 +387,9 @@ def test_residue_profile_preflights_oversized_endpoints_before_integer_parsing(
 
     monkeypatch.setattr(interval_contracts, "parse_canonical_integer", fail_parse)
 
-    with pytest.raises(OperationDomainValidationError, match="source-sensitive pre-parse"):
+    with pytest.raises(
+        OperationDomainValidationError, match="source-sensitive pre-parse"
+    ):
         compute_interval_residue_profile(
             PrimeTupleIntervalResidueProfileRequest(
                 wheel=wheel,
@@ -403,7 +407,9 @@ def test_translation_preflights_oversized_shift_before_integer_parsing(
 
     monkeypatch.setattr(translation_contracts, "parse_canonical_integer", fail_parse)
 
-    with pytest.raises(OperationDomainValidationError, match="source-sensitive pre-parse"):
+    with pytest.raises(
+        OperationDomainValidationError, match="source-sensitive pre-parse"
+    ):
         compute_translation(
             PrimeAffineTranslationRequest(source=TWIN_PRIMES, shift="9" * 258)
         )
@@ -489,7 +495,9 @@ def test_wheel_result_rejects_component_and_source_mutations() -> None:
     )
     wrong_component = enumeration.model_dump(mode="json")
     wrong_component["residues"][0]["components"] = [0, 2]
-    forged_enumeration = PrimeTupleResidueWheelEnumeration.model_validate(wrong_component)
+    forged_enumeration = PrimeTupleResidueWheelEnumeration.model_validate(
+        wrong_component
+    )
     assert forged_enumeration != enumeration
 
     oversized_scalar = deepcopy(payload)
@@ -620,11 +628,17 @@ def test_wheel_survival_is_not_mislabelled_as_primality() -> None:
 def test_request_boundaries_reject_before_expansion() -> None:
     identity_form = _tuple(_form("n", 1, 0))
 
-    compute_local_factor(PrimeTupleLocalFactorRequest(source=identity_form, prime=8_191))
+    compute_local_factor(
+        PrimeTupleLocalFactorRequest(source=identity_form, prime=8_191)
+    )
     with pytest.raises(OperationDomainValidationError):
-        compute_local_factor(PrimeTupleLocalFactorRequest(source=identity_form, prime=8_209))
+        compute_local_factor(
+            PrimeTupleLocalFactorRequest(source=identity_form, prime=8_209)
+        )
     with pytest.raises(OperationDomainValidationError):
-        compute_local_factor(PrimeTupleLocalFactorRequest(source=identity_form, prime=15))
+        compute_local_factor(
+            PrimeTupleLocalFactorRequest(source=identity_form, prime=15)
+        )
     with pytest.raises(ValidationError):
         PrimeTupleLocalSummary(
             prime=15,
@@ -646,7 +660,9 @@ def test_request_boundaries_reject_before_expansion() -> None:
     )
     with pytest.raises(OperationDomainValidationError):
         compute_interval_count(
-            PrimeAffineIntervalCountRequest(source=identity_form, lower="0", upper="100000")
+            PrimeAffineIntervalCountRequest(
+                source=identity_form, lower="0", upper="100000"
+            )
         )
 
     # A 65-digit endpoint is harmless when its affine values cancel to the
@@ -673,7 +689,9 @@ def test_request_boundaries_reject_before_expansion() -> None:
     assert cancelled_enumeration.matches == ()
 
     compute_interval_enumerate(
-        PrimeAffineIntervalEnumerateRequest(source=identity_form, lower="0", upper="32767")
+        PrimeAffineIntervalEnumerateRequest(
+            source=identity_form, lower="0", upper="32767"
+        )
     )
     with pytest.raises(OperationDomainValidationError):
         compute_interval_enumerate(
@@ -706,7 +724,9 @@ def test_request_boundaries_reject_before_expansion() -> None:
 
     large_machine_prime = 4_294_967_291
     compute_local_factors(
-        PrimeTupleLocalFactorsRequest(source=identity_form, primes=(large_machine_prime,))
+        PrimeTupleLocalFactorsRequest(
+            source=identity_form, primes=(large_machine_prime,)
+        )
     )
     machine_prime_wheel = compute_residue_wheel(
         PrimeTupleResidueWheelRequest(

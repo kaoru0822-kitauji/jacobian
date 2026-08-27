@@ -74,7 +74,9 @@ def _admit_residue_wheel(request: PrimeTupleResidueWheelRequest) -> None:
         + 128
     )
     if estimated_characters > MAX_RESULT_CHARACTER_BUDGET:
-        raise _validation_error("compact wheel exceeds the conservative serialized bound")
+        raise _validation_error(
+            "compact wheel exceeds the conservative serialized bound"
+        )
 
 
 def _admit_verified_wheel(wheel: PrimeTupleResidueWheel) -> None:
@@ -83,7 +85,9 @@ def _admit_verified_wheel(wheel: PrimeTupleResidueWheel) -> None:
     expected_modulus = wheel_modulus(wheel.primes)
     expected_valid_count = prod((row.valid_count for row in expected_rows), start=1)
     if wheel.local_rows != expected_rows:
-        raise _validation_error("wheel must equal the compact wheel for its source and primes")
+        raise _validation_error(
+            "wheel must equal the compact wheel for its source and primes"
+        )
     if parse_canonical_integer(wheel.modulus) != expected_modulus:
         raise _validation_error("wheel modulus does not match its canonical prime set")
     if parse_canonical_integer(wheel.valid_count) != expected_valid_count:
@@ -109,7 +113,9 @@ def _admit_wheel_enumeration(request: PrimeTupleResidueWheelEnumerationRequest) 
             f"wheel result needs {result_cells} cells, exceeding {MAX_WHEEL_RESULT_CELLS}"
         )
     root_cells = request.wheel.source.form_count * len(request.wheel.primes)
-    enumeration_work = result_count * len(request.wheel.primes) + local_residue_rows + root_cells
+    enumeration_work = (
+        result_count * len(request.wheel.primes) + local_residue_rows + root_cells
+    )
     if enumeration_work > MAX_WHEEL_ENUMERATION_WORK:
         raise _validation_error(
             f"wheel enumeration needs {enumeration_work} bounded steps, exceeding "
@@ -119,11 +125,14 @@ def _admit_wheel_enumeration(request: PrimeTupleResidueWheelEnumerationRequest) 
     component_digits = sum(_digits(prime) for prime in request.wheel.primes)
     serialized_characters = (
         len(request.wheel.model_dump_json())
-        + result_count * (modulus_digits + component_digits + 4 * len(request.wheel.primes) + 64)
+        + result_count
+        * (modulus_digits + component_digits + 4 * len(request.wheel.primes) + 64)
         + 128
     )
     if serialized_characters > MAX_RESULT_CHARACTER_BUDGET:
-        raise _validation_error("wheel enumeration exceeds the conservative serialized bound")
+        raise _validation_error(
+            "wheel enumeration exceeds the conservative serialized bound"
+        )
 
 
 def _admit_wheel_membership(request: PrimeTupleWheelMembershipRequest) -> None:
@@ -141,7 +150,9 @@ def _admit_wheel_membership(request: PrimeTupleWheelMembershipRequest) -> None:
         + 256
     )
     if result_characters > MAX_RESULT_CHARACTER_BUDGET:
-        raise _validation_error("wheel membership result exceeds the conservative serialized bound")
+        raise _validation_error(
+            "wheel membership result exceeds the conservative serialized bound"
+        )
 
 
 def _admit_interval_residue_profile(
@@ -164,10 +175,14 @@ def _admit_interval_residue_profile(
         )
     endpoint_digits = max(_digits(request.lower), _digits(request.upper))
     result_characters = (
-        len(request.wheel.model_dump_json()) + interval_size * (endpoint_digits + 4) + 192
+        len(request.wheel.model_dump_json())
+        + interval_size * (endpoint_digits + 4)
+        + 192
     )
     if result_characters > MAX_RESULT_CHARACTER_BUDGET:
-        raise _validation_error("wheel interval profile exceeds the conservative serialized bound")
+        raise _validation_error(
+            "wheel interval profile exceeds the conservative serialized bound"
+        )
     return lower, upper
 
 

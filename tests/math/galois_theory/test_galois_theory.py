@@ -241,12 +241,10 @@ def test_galois_group_returns_composable_generators() -> None:
     assert _group_from_result(result).order() == result.order
 
 
-
 def test_solvable_quintic_returns_the_group_certificate() -> None:
     result = compute_solvable(SolvableRequest(coefficients=(-2, 0, 0, 0, 0, 1)))
     assert result.solvable_by_radicals is True
     assert _group_from_result(result).order() == 20
-
 
 
 def test_unsolvable_quintic_uses_actual_group() -> None:
