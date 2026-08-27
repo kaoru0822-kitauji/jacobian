@@ -19,11 +19,6 @@ from jacobian.canonical import (
 )
 from jacobian.math.graphs.values import SimpleUndirectedGraph
 
-# One accepted request performs the exact count once.  Independently supplied
-# claims may be checked separately by the owner-local verifier, rather than
-# causing result construction to replay NetworkX.
-COUNT_PASSES = 1
-
 # The subset count separately bounds explicit candidate construction. The
 # total work budget below additionally charges exact isomorphism search. These
 # are conservative limits for the current pure-Python NetworkX envelope, not
@@ -149,7 +144,7 @@ def _require_bounded_request(
         + len(pattern.vertices)
         + len(pattern.edges)
     )
-    total_work = COUNT_PASSES * (
+    total_work = (
         source_bytes
         + result_bytes
         + graph_records
@@ -205,18 +200,11 @@ class InducedVertexSubsetPatternCountRequest(StrictModel):
         )
     )
 
-    @model_validator(mode="after")
-    def require_complete_exact_count_bounded(self) -> Self:
-        _require_bounded_request(self.host, self.pattern)
-        return self
-
 
 class InducedVertexSubsetPatternCountResult(StrictModel):
     """Exact induced-pattern subset count bound to both source graphs.
 
-    The trusted count kernel constructs this value.  The explicit owner
-    verifier replays the bounded count only for an independently supplied
-    claim.
+    The trusted count kernel constructs this value.
     """
 
     host: SimpleUndirectedGraph
@@ -232,7 +220,6 @@ class InducedVertexSubsetPatternCountResult(StrictModel):
 
     @model_validator(mode="after")
     def require_structural_shape(self) -> Self:
-        _require_bounded_request(self.host, self.pattern)
         claimed = parse_canonical_integer(self.occurrence_count)
         if claimed < 0:
             raise PydanticCustomError(

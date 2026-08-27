@@ -12,16 +12,15 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian.canonical import CanonicalLimits, encode_strict_json
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs import explicit_graph
 from jacobian.math.graphs.patterns._models import (
     MAX_INDUCED_PATTERN_SUBSETS_PER_PASS,
     MAX_INDUCED_PATTERN_TOTAL_WORK_UNITS,
     InducedVertexSubsetPatternCountRequest,
-    InducedVertexSubsetPatternCountResult,
 )
 from jacobian.math.graphs.patterns._operations import (
     compute_induced_vertex_subset_pattern_count,
-    verify_induced_vertex_subset_pattern_count_result,
 )
 from jacobian.math.graphs.patterns._tools import TOOLS
 from jacobian.math.graphs.values import SimpleUndirectedGraph
@@ -238,40 +237,6 @@ def test_small_random_graphs_match_independent_subset_and_permutation_oracle() -
             assert int(_count(host, pattern)) == _brute_force_count(host, pattern)
 
 
-def test_explicit_verifier_rejects_forged_counts_and_source_mutations() -> None:
-    host = _path(5, "h")
-    pattern = _path(4, "p")
-
-    assert not verify_induced_vertex_subset_pattern_count_result(
-        InducedVertexSubsetPatternCountResult(
-            host=host,
-            pattern=pattern,
-            occurrence_count="0",
-        )
-    )
-    assert not verify_induced_vertex_subset_pattern_count_result(
-        InducedVertexSubsetPatternCountResult(
-            host=host,
-            pattern=pattern,
-            occurrence_count="3",
-        )
-    )
-    assert not verify_induced_vertex_subset_pattern_count_result(
-        InducedVertexSubsetPatternCountResult(
-            host=_cycle(4, "c"),
-            pattern=pattern,
-            occurrence_count="2",
-        )
-    )
-    assert not verify_induced_vertex_subset_pattern_count_result(
-        InducedVertexSubsetPatternCountResult(
-            host=host,
-            pattern=_cycle(4, "q"),
-            occurrence_count="2",
-        )
-    )
-
-
 def test_request_accepts_useful_case_near_subset_bound() -> None:
     # C(20, 4) = 4,845, just below the 5,000-subset per-pass limit.
     request = InducedVertexSubsetPatternCountRequest(
@@ -307,22 +272,24 @@ def test_dense_host_at_subset_bound_avoids_host_filtered_views(
 
 def test_request_rejects_next_graph_order_above_subset_bound() -> None:
     # C(21, 4) = 5,985, so rejection happens before enumeration.
-    with pytest.raises(ValidationError):
-        InducedVertexSubsetPatternCountRequest(
-            host=_empty(21, "h"),
-            pattern=_complete(4, "p"),
-        )
+    request = InducedVertexSubsetPatternCountRequest(
+        host=_empty(21, "h"),
+        pattern=_complete(4, "p"),
+    )
+    with pytest.raises(OperationDomainValidationError):
+        compute_induced_vertex_subset_pattern_count(request)
 
 
 def test_request_bounds_per_subset_isomorphism_work() -> None:
     # A single order-eight comparison fits; the next order still has one
     # subset but exceeds the conservative VF2++ partial-injection work bound.
     assert _count(_empty(8, "h"), _empty(8, "p")) == "1"
-    with pytest.raises(ValidationError):
-        InducedVertexSubsetPatternCountRequest(
-            host=_empty(9, "h"),
-            pattern=_empty(9, "p"),
-        )
+    request = InducedVertexSubsetPatternCountRequest(
+        host=_empty(9, "h"),
+        pattern=_empty(9, "p"),
+    )
+    with pytest.raises(OperationDomainValidationError):
+        compute_induced_vertex_subset_pattern_count(request)
 
 
 def test_canonical_graph_size_bound_rejects_257_vertices() -> None:
@@ -355,8 +322,9 @@ def test_request_reserves_exact_output_headroom_for_retained_sources() -> None:
     }
     assert len(encode_strict_json(request_payload)) == limits.max_input_bytes
 
-    with pytest.raises(ValidationError):
-        InducedVertexSubsetPatternCountRequest(host=host, pattern=pattern)
+    request = InducedVertexSubsetPatternCountRequest(host=host, pattern=pattern)
+    with pytest.raises(OperationDomainValidationError):
+        compute_induced_vertex_subset_pattern_count(request)
 
 
 def test_numeric_admission_caps_are_visible_in_schema_and_tool_description() -> None:
