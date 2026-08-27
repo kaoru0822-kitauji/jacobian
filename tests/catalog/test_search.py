@@ -74,6 +74,7 @@ def test_standard_det_abbreviation_ranks_determinants_before_charpolys() -> None
         for characteristic_polynomial_id in characteristic_polynomial_ids
     )
 
+
 def test_discovery_normalizes_only_audited_ordinary_plural_forms() -> None:
     assert normalized_discovery_terms("subset sums and repeated representations") == {
         "subset",
