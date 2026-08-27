@@ -17,9 +17,6 @@ from jacobian.math.polynomials._conversions import (
 )
 from jacobian.math.polynomials.multivariate._models import (
     _MAX_ELIMINATION_DEGREE_SUM,
-    _MAX_MULTIVARIATE_COEFFICIENT_DIGITS,
-    _MAX_MULTIVARIATE_EXPONENT,
-    _MAX_MULTIVARIATE_TERMS,
     _degree_in_variable,
     _maximum_coefficient_support,
     _remaining_total_degree,
@@ -29,7 +26,6 @@ from jacobian.math.polynomials.multivariate._models import (
 from jacobian.math.polynomials.values import (
     PolynomialVariable,
     RationalPolynomial,
-    require_polynomial_budget,
 )
 
 SubresultantSourceOrder = Literal["LEFT_RIGHT", "RIGHT_LEFT"]
@@ -256,72 +252,6 @@ class MultivariateSubresultantSequenceRequest(StrictModel):
         ),
         examples=["x"],
     )
-
-    @model_validator(mode="after")
-    def require_bounded_subresultant_envelope(self) -> Self:
-        _validate_multivariate_pair(self.left, self.right)
-        if self.main_variable not in self.left.variables:
-            raise _validation_error("main variable must belong to the declared ring")
-        for polynomial, label in ((self.left, "left"), (self.right, "right")):
-            require_polynomial_budget(
-                polynomial,
-                maximum_terms=_MAX_MULTIVARIATE_TERMS,
-                maximum_exponent=_MAX_MULTIVARIATE_EXPONENT,
-                maximum_coefficient_digits=_MAX_MULTIVARIATE_COEFFICIENT_DIGITS,
-                label=f"{label} polynomial",
-            )
-        variable_index = self.left.variables.index(self.main_variable)
-        degrees = (
-            _degree_in_variable(self.left, variable_index),
-            _degree_in_variable(self.right, variable_index),
-        )
-        if any(degree == 0 for degree in degrees):
-            raise _validation_error(
-                "both polynomials must have positive main-variable degree"
-            )
-        if sum(degrees) > _MAX_ELIMINATION_DEGREE_SUM:
-            raise _validation_error(
-                "Sylvester order exceeds the subresultant backend budget"
-            )
-
-        envelope = _subresultant_envelope(self.left, self.right, variable_index)
-        if envelope.aggregate_terms > _MAX_SUBRESULTANT_SEQUENCE_TERMS:
-            raise _validation_error(
-                "formal subresultant sequence support exceeds the aggregate "
-                "result-term budget"
-            )
-        if envelope.maximum_coefficient_support > _MAX_SUBRESULTANT_COEFFICIENT_SUPPORT:
-            raise _validation_error(
-                "subresultant coefficient support exceeds the intermediate "
-                "polynomial-term budget"
-            )
-        if envelope.arithmetic_term_pairs > _MAX_SUBRESULTANT_ARITHMETIC_TERM_PAIRS:
-            raise _validation_error(
-                "subresultant pseudo-remainder arithmetic exceeds the term-pair "
-                "work budget"
-            )
-        if envelope.coefficient_bits > _MAX_SUBRESULTANT_COEFFICIENT_BITS:
-            raise _validation_error(
-                "subresultant determinant coefficient height exceeds the exact "
-                "coefficient-bit budget"
-            )
-        if (
-            envelope.intermediate_coefficient_bits
-            > _MAX_SUBRESULTANT_INTERMEDIATE_COEFFICIENT_BITS
-        ):
-            raise _validation_error(
-                "Brown pseudo-remainder intermediate coefficient height exceeds "
-                "the exact coefficient-bit budget"
-            )
-        if (
-            envelope.serialized_coefficient_bits
-            > _MAX_SUBRESULTANT_SERIALIZED_COEFFICIENT_BITS
-        ):
-            raise _validation_error(
-                "subresultant sequence exceeds the aggregate exact-output budget"
-            )
-        return self
-
 
 class MultivariateSubresultantMember(StrictModel):
     """One nonzero member of the source-bound subresultant PRS."""

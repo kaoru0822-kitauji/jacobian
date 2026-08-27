@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+from pydantic_core import PydanticCustomError
+
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.polynomials._conversions import (
     rational_polynomial_from_sympy,
     rational_polynomial_to_sympy,
@@ -29,20 +32,136 @@ from jacobian.math.polynomials.multivariate._gcd import (
     MultivariateGcdRequest,
     MultivariateGcdResult,
 )
-from jacobian.math.polynomials.multivariate._models import _degree_in_variable
+from jacobian.math.polynomials.multivariate._models import (
+    _MAX_ELIMINATION_DEGREE_SUM,
+    _MAX_MULTIVARIATE_COEFFICIENT_DIGITS,
+    _MAX_MULTIVARIATE_EXPONENT,
+    _MAX_MULTIVARIATE_TERMS,
+    _MULTIVARIATE_MIN_VARIABLES,
+    _degree_in_variable,
+    _validate_multivariate_pair,
+    _validation_error,
+)
 from jacobian.math.polynomials.multivariate._resultant import (
+    _MAX_RESULTANT_TERMS,
     MultivariateResultantRequest,
     MultivariateResultantResult,
+    _resultant_support_bound,
     _sylvester_resultant_value,
 )
 from jacobian.math.polynomials.multivariate._subresultants import (
+    _MAX_SUBRESULTANT_ARITHMETIC_TERM_PAIRS,
+    _MAX_SUBRESULTANT_COEFFICIENT_BITS,
+    _MAX_SUBRESULTANT_COEFFICIENT_SUPPORT,
+    _MAX_SUBRESULTANT_INTERMEDIATE_COEFFICIENT_BITS,
     _MAX_SUBRESULTANT_SEQUENCE_TERMS,
+    _MAX_SUBRESULTANT_SERIALIZED_COEFFICIENT_BITS,
     MultivariatePrincipalSubresultantCoefficient,
     MultivariateSubresultantMember,
     MultivariateSubresultantSequenceRequest,
     MultivariateSubresultantSequenceResult,
+    _subresultant_envelope,
 )
-from jacobian.math.polynomials.values import RationalPolynomial
+from jacobian.math.polynomials.values import (
+    RationalPolynomial,
+    require_polynomial_budget,
+)
+
+
+def _run_admission(admission: Any) -> None:
+    try:
+        admission()
+    except OperationDomainValidationError:
+        raise
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=(), code=exc.type, message=exc.message()
+        ) from exc
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=(), code="polynomial.multivariate_admission", message=str(exc)
+        ) from exc
+
+
+def _admit_pair(left: RationalPolynomial, right: RationalPolynomial) -> None:
+    _validate_multivariate_pair(left, right)
+    for polynomial in (left, right):
+        require_polynomial_budget(
+            polynomial,
+            maximum_terms=_MAX_MULTIVARIATE_TERMS,
+            maximum_exponent=_MAX_MULTIVARIATE_EXPONENT,
+            maximum_coefficient_digits=_MAX_MULTIVARIATE_COEFFICIENT_DIGITS,
+        )
+
+
+def _admit_gcd(request: MultivariateGcdRequest) -> None:
+    _admit_pair(request.left, request.right)
+
+
+def _admit_division(request: MultivariateDivisionRequest) -> None:
+    _admit_pair(request.left, request.right)
+    if not request.right.polynomial.terms:
+        raise _validation_error("divisor polynomial must be nonzero")
+
+
+def _admit_factor(request: MultivariateFactorRequest) -> None:
+    if len(request.polynomial.variables) < _MULTIVARIATE_MIN_VARIABLES:
+        raise _validation_error(
+            "multivariate factorization requires at least two variables; "
+            "univariate polynomials are handled by polynomial.factor.compute"
+        )
+    if not request.polynomial.polynomial.terms:
+        raise _validation_error("zero polynomial has no factorization")
+    require_polynomial_budget(
+        request.polynomial,
+        maximum_terms=_MAX_MULTIVARIATE_TERMS,
+        maximum_exponent=_MAX_MULTIVARIATE_EXPONENT,
+        maximum_coefficient_digits=_MAX_MULTIVARIATE_COEFFICIENT_DIGITS,
+    )
+    from jacobian.math.polynomials.multivariate._factor_models import (
+        _require_representable_content,
+    )
+
+    _require_representable_content(request.polynomial)
+
+
+def _admit_resultant(request: MultivariateResultantRequest) -> None:
+    _admit_pair(request.left, request.right)
+    if request.elimination_variable not in request.left.variables:
+        raise _validation_error("elimination variable must belong to the declared ring")
+    index = request.left.variables.index(request.elimination_variable)
+    if _degree_in_variable(request.left, index) + _degree_in_variable(request.right, index) > _MAX_ELIMINATION_DEGREE_SUM:
+        raise _validation_error("Sylvester degree exceeds the resultant budget")
+    if _resultant_support_bound(request.left, request.right, index) > _MAX_RESULTANT_TERMS:
+        raise _validation_error("resultant output exceeds the term budget")
+
+
+def _admit_subresultants(request: MultivariateSubresultantSequenceRequest) -> None:
+    _admit_pair(request.left, request.right)
+    if request.main_variable not in request.left.variables:
+        raise _validation_error("main variable must belong to the declared ring")
+    index = request.left.variables.index(request.main_variable)
+    degrees = (
+        _degree_in_variable(request.left, index),
+        _degree_in_variable(request.right, index),
+    )
+    if any(degree == 0 for degree in degrees):
+        raise _validation_error("both polynomials must have positive main-variable degree")
+    if sum(degrees) > _MAX_ELIMINATION_DEGREE_SUM:
+        raise _validation_error("Sylvester order exceeds the subresultant backend budget")
+    envelope = _subresultant_envelope(request.left, request.right, index)
+    if envelope.aggregate_terms > _MAX_SUBRESULTANT_SEQUENCE_TERMS:
+        raise _validation_error("formal subresultant sequence support exceeds the aggregate result-term budget")
+    if envelope.maximum_coefficient_support > _MAX_SUBRESULTANT_COEFFICIENT_SUPPORT:
+        raise _validation_error("subresultant coefficient support exceeds the intermediate polynomial-term budget")
+    if envelope.arithmetic_term_pairs > _MAX_SUBRESULTANT_ARITHMETIC_TERM_PAIRS:
+        raise _validation_error("subresultant pseudo-remainder arithmetic exceeds the term-pair work budget")
+    if envelope.coefficient_bits > _MAX_SUBRESULTANT_COEFFICIENT_BITS:
+        raise _validation_error("subresultant determinant coefficient height exceeds the exact coefficient-bit budget")
+    if envelope.intermediate_coefficient_bits > _MAX_SUBRESULTANT_INTERMEDIATE_COEFFICIENT_BITS:
+        raise _validation_error("Brown pseudo-remainder intermediate coefficient height exceeds the exact coefficient-bit budget")
+    if envelope.serialized_coefficient_bits > _MAX_SUBRESULTANT_SERIALIZED_COEFFICIENT_BITS:
+        raise _validation_error("subresultant sequence exceeds the aggregate exact-output budget")
 
 
 class MultivariateOutputBudgetError(RuntimeError):
@@ -72,6 +191,8 @@ def _result_polynomial(
 def compute_multivariate_gcd(request: MultivariateGcdRequest) -> MultivariateGcdResult:
     """Compute the GCD of two multivariate polynomials over ``QQ``."""
 
+    _run_admission(lambda: _admit_gcd(request))
+
     left = rational_polynomial_to_sympy(request.left)
     right = rational_polynomial_to_sympy(request.right)
     gcd = left.gcd(right)
@@ -84,6 +205,8 @@ def compute_multivariate_division(
     request: MultivariateDivisionRequest,
 ) -> MultivariateDivisionResult:
     """Divide one multivariate polynomial by another with a declared monomial order."""
+
+    _run_admission(lambda: _admit_division(request))
 
     variables = request.left.variables
     symbols = symbols_for_variables(variables)
@@ -131,6 +254,7 @@ def compute_multivariate_resultant(
     request: MultivariateResultantRequest,
 ) -> MultivariateResultantResult:
     """Compute the resultant of two multivariate polynomials w.r.t. one variable."""
+    _run_admission(lambda: _admit_resultant(request))
     return MultivariateResultantResult._from_kernel(
         request,
         resultant=_sylvester_resultant_value(request),
@@ -141,6 +265,8 @@ def compute_multivariate_subresultant_sequence(
     request: MultivariateSubresultantSequenceRequest,
 ) -> MultivariateSubresultantSequenceResult:
     """Return the exact nonzero Brown PRS in one declared main variable."""
+
+    _run_admission(lambda: _admit_subresultants(request))
 
     from jacobian.math.polynomials.multivariate._subresultants import (
         polynomial_leading_coefficient_in_remaining_ring,
@@ -273,6 +399,8 @@ def multivariate_factor(request: MultivariateFactorRequest) -> MultivariateFacto
     it returns the distinct non-mathematical ``EXECUTION_FAILED`` outcome
     instead.
     """
+
+    _run_admission(lambda: _admit_factor(request))
 
     from jacobian._exact import CanonicalRational
 

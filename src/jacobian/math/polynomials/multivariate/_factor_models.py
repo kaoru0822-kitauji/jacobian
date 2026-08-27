@@ -15,7 +15,6 @@ from jacobian.math.polynomials.multivariate._models import (
     _MAX_MULTIVARIATE_COEFFICIENT_DIGITS,
     _MAX_MULTIVARIATE_EXPONENT,
     _MAX_MULTIVARIATE_TERMS,
-    _MULTIVARIATE_MIN_VARIABLES,
     _validation_error,
 )
 from jacobian.math.polynomials.values import (
@@ -38,25 +37,6 @@ class MultivariateFactorRequest(StrictModel):
             "must respect the operation's exact budget."
         )
     )
-
-    @model_validator(mode="after")
-    def require_factor_budget(self) -> Self:
-        if len(self.polynomial.variables) < _MULTIVARIATE_MIN_VARIABLES:
-            raise _validation_error(
-                f"multivariate factorization requires at least {_MULTIVARIATE_MIN_VARIABLES} variables; "
-                "univariate polynomials are handled by polynomial.factor.compute"
-            )
-        if not self.polynomial.polynomial.terms:
-            raise _validation_error("zero polynomial has no factorization")
-        require_polynomial_budget(
-            self.polynomial,
-            maximum_terms=_MAX_MULTIVARIATE_TERMS,
-            maximum_exponent=_MAX_MULTIVARIATE_EXPONENT,
-            maximum_coefficient_digits=_MAX_MULTIVARIATE_COEFFICIENT_DIGITS,
-        )
-        _require_representable_content(self.polynomial)
-        return self
-
 
 def _require_representable_content(polynomial: RationalPolynomial) -> None:
     """Bound aggregate rational content before the factor backend expands it."""

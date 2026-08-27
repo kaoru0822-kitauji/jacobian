@@ -13,17 +13,9 @@ from jacobian.math.polynomials._conversions import (
     rational_polynomial_to_sympy,
     symbols_for_variables,
 )
-from jacobian.math.polynomials.values import (
-    PolynomialVariable,
-    RationalPolynomial,
-    require_polynomial_budget,
-)
+from jacobian.math.polynomials.values import PolynomialVariable, RationalPolynomial
 
 from ._models import (
-    _MAX_ELIMINATION_DEGREE_SUM,
-    _MAX_MULTIVARIATE_COEFFICIENT_DIGITS,
-    _MAX_MULTIVARIATE_EXPONENT,
-    _MAX_MULTIVARIATE_TERMS,
     _validate_multivariate_pair,
     _validation_error,
 )
@@ -98,36 +90,6 @@ class MultivariateResultantRequest(StrictModel):
         description="Variable eliminated by the Sylvester resultant.",
     )
 
-    @model_validator(mode="after")
-    def require_multivariate_ring(self) -> Self:
-        _validate_multivariate_pair(self.left, self.right)
-        if self.elimination_variable not in self.left.variables:
-            raise _validation_error(
-                "elimination variable must belong to the declared ring"
-            )
-        for polynomial in (self.left, self.right):
-            require_polynomial_budget(
-                polynomial,
-                maximum_terms=_MAX_MULTIVARIATE_TERMS,
-                maximum_exponent=_MAX_MULTIVARIATE_EXPONENT,
-                maximum_coefficient_digits=_MAX_MULTIVARIATE_COEFFICIENT_DIGITS,
-            )
-        variable_index = self.left.variables.index(self.elimination_variable)
-        degree_sum = max(
-            (term.exponents[variable_index] for term in self.left.polynomial.terms),
-            default=0,
-        ) + max(
-            (term.exponents[variable_index] for term in self.right.polynomial.terms),
-            default=0,
-        )
-        if degree_sum > _MAX_ELIMINATION_DEGREE_SUM:
-            raise _validation_error("Sylvester degree exceeds the resultant budget")
-        if (
-            _resultant_support_bound(self.left, self.right, variable_index)
-            > _MAX_RESULTANT_TERMS
-        ):
-            raise _validation_error("resultant output exceeds the term budget")
-        return self
 
 
 class MultivariateScalarValue(StrictModel):
