@@ -6,6 +6,8 @@ from fractions import Fraction
 from math import comb
 from typing import cast
 
+from pydantic_core import PydanticCustomError
+
 from jacobian.canonical import format_canonical_integer
 from jacobian.catalog._examples import example
 from jacobian.catalog.models import MathTool, OperationDomainValidationError
@@ -61,11 +63,17 @@ def compute_projective_line_flats(
 
     try:
         _admit_projective_line_arrangement(request)
-    except ValueError as exc:
+    except (PydanticCustomError, ValueError) as exc:
+        if isinstance(exc, PydanticCustomError):
+            code = exc.type
+            message = exc.message()
+        else:
+            code = "geometry.projective_line_arrangement_invalid"
+            message = str(exc)
         raise OperationDomainValidationError(
             location=("lines",),
-            code="geometry.projective_line_arrangement_invalid",
-            message=str(exc),
+            code=code,
+            message=message,
         ) from exc
     normalized = tuple(
         sorted(
