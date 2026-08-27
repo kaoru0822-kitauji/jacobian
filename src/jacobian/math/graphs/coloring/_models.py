@@ -218,12 +218,6 @@ class KColorabilityRequest(StrictModel):
         ),
     )
 
-    @model_validator(mode="after")
-    def require_admitted_graph(self) -> Self:
-        _require_indexed_coloring_graph(self.graph)
-        return self
-
-
 class KColorabilityResult(StrictModel):
     """Whether a proper ``k``-coloring exists, with one coloring witness."""
 
@@ -513,12 +507,6 @@ class EdgeKColorabilityRequest(StrictModel):
             "separately without a mathematical conclusion."
         ),
     )
-
-    @model_validator(mode="after")
-    def require_bounded_graph(self) -> Self:
-        _require_edge_coloring_graph_bound(self.graph)
-        return self
-
 
 class EdgeKColorabilityResult(StrictModel):
     """Whether a proper ``k``-edge-coloring exists, with one coloring witness."""

@@ -351,17 +351,22 @@ class TestEdgeColoringRequestSchema:
     def test_vertex_coloring_rejects_only_the_retained_formula_edge_envelope(
         self,
     ) -> None:
+        from jacobian.catalog.models import OperationDomainValidationError
         from jacobian.math.graphs.coloring._models import KColorabilityRequest
+        from jacobian.math.graphs.coloring._operations import compute_k_colorability
         from jacobian.math.graphs.values import IndexedSimpleUndirectedGraph
 
         edges = tuple(
             (left, right) for left in range(65) for right in range(left + 1, 65)
         )[:2017]
-        with pytest.raises(ValidationError, match="2016 adjacency constraints"):
-            KColorabilityRequest(
-                graph=IndexedSimpleUndirectedGraph(vertex_count=65, edges=edges),
-                colors=3,
-            )
+        request = KColorabilityRequest(
+            graph=IndexedSimpleUndirectedGraph(vertex_count=65, edges=edges),
+            colors=3,
+        )
+        with pytest.raises(
+            OperationDomainValidationError, match="2016 adjacency constraints"
+        ):
+            compute_k_colorability(request)
 
     def test_65_vertex_boundary_request_is_admitted(self) -> None:
         from jacobian.math.graphs.coloring._models import (

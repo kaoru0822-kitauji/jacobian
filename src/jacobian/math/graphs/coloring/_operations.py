@@ -8,6 +8,9 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Literal
 
+from pydantic_core import PydanticCustomError
+
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.coloring._chromatic_number_models import (
     ChromaticNumberCertificateCheckRequest,
     ChromaticNumberCertificateCheckResult,
@@ -24,6 +27,8 @@ from jacobian.math.graphs.coloring._models import (
     MaximalIndependentSetRequest,
     MaximalIndependentSetResult,
     _incident_edge_index_pairs_for_canonical_graph,
+    _require_edge_coloring_graph_bound,
+    _require_indexed_coloring_graph,
 )
 from jacobian.math.graphs.values import (
     IndexedSimpleUndirectedGraph,
@@ -46,6 +51,24 @@ _WORKER_ERROR_BYTES = 16_384
 _WORKER_ADDRESS_SPACE_BYTES = 1_536 * 1024 * 1024
 _WORKER_FILE_SIZE_BYTES = 1_024 * 1_024
 _ColoringWorkerOutcome = Literal["sat", "unsat", "budget_exceeded", "execution_failed"]
+
+
+def _admit_k_colorability(request: KColorabilityRequest) -> None:
+    try:
+        _require_indexed_coloring_graph(request.graph)
+    except PydanticCustomError as error:
+        raise OperationDomainValidationError(
+            location=("graph",), code=error.type, message=str(error)
+        ) from error
+
+
+def _admit_edge_k_colorability(request: EdgeKColorabilityRequest) -> None:
+    try:
+        _require_edge_coloring_graph_bound(request.graph)
+    except PydanticCustomError as error:
+        raise OperationDomainValidationError(
+            location=("graph",), code=error.type, message=str(error)
+        ) from error
 
 
 def _run_k_colorability_solver_kernel(
@@ -247,6 +270,7 @@ def compute_k_colorability(request: KColorabilityRequest) -> KColorabilityResult
     separately supplied negative or incomplete claims may be replayed through
     the explicit verifier.
     """
+    _admit_k_colorability(request)
     if not request.graph.edges:
         return KColorabilityResult._from_kernel(
             graph=request.graph,
@@ -352,6 +376,7 @@ def compute_edge_k_colorability(
     separately supplied negative or incomplete claims may be replayed through
     the explicit verifier.
     """
+    _admit_edge_k_colorability(request)
     edges = request.graph.edges
 
     def _colorable_result(witness: tuple[int, ...]) -> EdgeKColorabilityResult:
