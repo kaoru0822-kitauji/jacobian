@@ -29,11 +29,10 @@ _MAX_DISCOVERY_TERM_LENGTH = 96
 class OperationDomainValidationError(ValueError):
     """One owner-declared semantic rejection discovered during execution.
 
-    Request models establish structural and bounded domains before a kernel is
-    called. A small number of mathematical preconditions, such as matrix
-    nonsingularity, are established by the bounded exact kernel itself. An
-    owner raises this type only for such documented, expected outcomes; MCP
-    projects it through the same typed invalid-parameter channel as request
+    Request models establish the structural wire shape. Domain operations use
+    this error for documented mathematical or resource-admission failures
+    discovered after parsing and before or during their bounded exact kernel.
+    MCP projects it through the same typed invalid-parameter channel as request
     validation. It is deliberately not a catch-all for backend exceptions.
     """
 
