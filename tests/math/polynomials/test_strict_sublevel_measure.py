@@ -10,6 +10,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.polynomials._conversions import rational_polynomial_to_sympy
 from jacobian.math.polynomials.real_algebra._operations import (
     compute_strict_sublevel_measure,
@@ -265,22 +266,24 @@ def test_singleton_scope_preserves_membership_while_measure_stays_zero() -> None
 
 
 def test_request_rejects_outside_domain_and_work_bounds() -> None:
+    # Raw preflight keeps this cheap structural axis check before nested parsing.
     with pytest.raises(ValidationError):
         _request(_polynomial((1, 1), variables=("x", "y")))
-    with pytest.raises(ValidationError):
-        StrictSublevelMeasureRequest(
+    with pytest.raises(OperationDomainValidationError):
+        compute_strict_sublevel_measure(StrictSublevelMeasureRequest(
             polynomial=_polynomial((1, 1)),
             threshold=_rational(-1),
             lower=_rational(-1),
             upper=_rational(1),
-        )
-    with pytest.raises(ValidationError):
-        _request(_polynomial((1, 1)), lower=2, upper=-2)
-    with pytest.raises(ValidationError):
-        _request(_polynomial((1, 17)))
+        ))
+    with pytest.raises(OperationDomainValidationError):
+        compute_strict_sublevel_measure(_request(_polynomial((1, 1)), lower=2, upper=-2))
+    with pytest.raises(OperationDomainValidationError):
+        compute_strict_sublevel_measure(_request(_polynomial((1, 17))))
     _request(_polynomial((1, 16)))
 
     oversized_coefficient = Fraction(int("9" * 65), 1)
+    # Raw preflight bounds decimal input before canonical request construction.
     with pytest.raises(ValidationError):
         _request(_polynomial((oversized_coefficient, 1)))
 
@@ -359,8 +362,8 @@ def test_request_preflights_cleared_level_polynomial_height() -> None:
         )
     )
 
-    with pytest.raises(ValidationError):
-        _request(polynomial)
+    with pytest.raises(OperationDomainValidationError):
+        compute_strict_sublevel_measure(_request(polynomial))
 
     # No root work is needed for the strict t=0 set, so result-sensitive
     # admission accepts the same source and returns the exact empty set.
@@ -377,8 +380,8 @@ def test_request_jointly_bounds_level_root_isolation_degree_and_height() -> None
         (-1, 0),
     )
 
-    with pytest.raises(ValidationError):
-        _request(close_root_polynomial)
+    with pytest.raises(OperationDomainValidationError):
+        compute_strict_sublevel_measure(_request(close_root_polynomial))
 
 
 @pytest.mark.exhaustive

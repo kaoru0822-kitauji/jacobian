@@ -12,6 +12,7 @@ import sympy
 from tests.math.polynomials._support import polynomial_validation_error
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.polynomials.maps import (
     RationalPolynomialMap,
     _generic_degree,
@@ -198,15 +199,15 @@ def test_missing_backend_is_operational_unavailability(
 
 
 def test_request_rejects_unproved_dimension_degree_and_height() -> None:
-    with polynomial_validation_error():
-        GenericDegreeRequest(
+    with pytest.raises(OperationDomainValidationError):
+        compute_generic_degree(GenericDegreeRequest(
             polynomial_map=_map(
                 ("w", "x", "y", "z"),
                 {(1, 0, 0, 0): 1},
             )
-        )
-    with polynomial_validation_error():
-        GenericDegreeRequest(
+        ))
+    with pytest.raises(OperationDomainValidationError):
+        compute_generic_degree(GenericDegreeRequest(
             polynomial_map=_map(
                 ("x",),
                 {(1,): 1},
@@ -214,26 +215,26 @@ def test_request_rejects_unproved_dimension_degree_and_height() -> None:
                 {(1,): 3},
                 {(1,): 4},
             )
-        )
-    with polynomial_validation_error():
-        GenericDegreeRequest(polynomial_map=_map(("x",), {(9,): 1}))
-    with polynomial_validation_error():
-        GenericDegreeRequest(polynomial_map=_map(("x",), {(1,): int("1" * 65)}))
+        ))
+    with pytest.raises(OperationDomainValidationError):
+        compute_generic_degree(GenericDegreeRequest(polynomial_map=_map(("x",), {(9,): 1})))
+    with pytest.raises(OperationDomainValidationError):
+        compute_generic_degree(GenericDegreeRequest(polynomial_map=_map(("x",), {(1,): int("1" * 65)})))
 
 
 def test_request_bounds_component_and_aggregate_support() -> None:
     monomials = [
         (a, b, c) for a in range(9) for b in range(9 - a) for c in range(9 - a - b)
     ]
-    with polynomial_validation_error():
-        GenericDegreeRequest(
+    with pytest.raises(OperationDomainValidationError):
+        compute_generic_degree(GenericDegreeRequest(
             polynomial_map=_map(
                 ("x", "y", "z"),
                 dict.fromkeys(monomials[:49], 1),
             )
-        )
-    with polynomial_validation_error():
-        GenericDegreeRequest(
+        ))
+    with pytest.raises(OperationDomainValidationError):
+        compute_generic_degree(GenericDegreeRequest(
             polynomial_map=_map(
                 ("x", "y", "z"),
                 *(
@@ -244,7 +245,7 @@ def test_request_bounds_component_and_aggregate_support() -> None:
                     for offset in (0, 33, 66)
                 ),
             )
-        )
+        ))
 
 
 def test_request_accepts_the_exact_degree_and_bezout_boundary() -> None:

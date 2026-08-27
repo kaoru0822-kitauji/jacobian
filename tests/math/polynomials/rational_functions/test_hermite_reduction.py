@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import pytest
-from pydantic import ValidationError
 from sympy import Symbol, cancel, diff
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math import polynomials
 from jacobian.math.polynomials._conversions import (
     rational_function_from_sympy,
@@ -155,8 +155,9 @@ def test_request_rejects_above_conservative_work_envelope(
     expression: object,
     message: str,
 ) -> None:
-    with pytest.raises(ValidationError):
-        _request(expression)
+    request = _request(expression)
+    with pytest.raises(OperationDomainValidationError):
+        compute_hermite_reduction(request)
 
 
 def test_native_api_rejects_before_backend_result_growth() -> None:
@@ -171,8 +172,9 @@ def test_request_rejects_multivariate_function() -> None:
     y = Symbol("y")
     function = rational_function_from_sympy(x + y, ("x", "y"))
 
-    with pytest.raises(ValidationError):
-        HermiteReductionRequest(function=function)
+    request = HermiteReductionRequest(function=function)
+    with pytest.raises(OperationDomainValidationError):
+        compute_hermite_reduction(request)
 
 
 def test_example_description_states_input_preconditions() -> None:

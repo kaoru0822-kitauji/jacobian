@@ -1,9 +1,9 @@
 """Tests for rational polynomial multiplication."""
 
 import pytest
-from pydantic import ValidationError
 
 from jacobian._exact import MAX_CANONICAL_RATIONAL_DIGITS
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.polynomials._multiply_models import RationalPolynomialMultiplyRequest
 from jacobian.math.polynomials._multiply_operations import rational_polynomial_multiply
 
@@ -51,8 +51,9 @@ def test_rejects_product_support_budget() -> None:
         "polynomial": {"terms": right_terms},
     }
 
-    with pytest.raises(ValidationError, match="canonical term limit"):
-        RationalPolynomialMultiplyRequest.model_validate({"left": left, "right": right})
+    request = RationalPolynomialMultiplyRequest.model_validate({"left": left, "right": right})
+    with pytest.raises(OperationDomainValidationError, match="canonical term limit"):
+        rational_polynomial_multiply(request)
 
 
 def test_accepts_dense_univariate_product_with_compact_support() -> None:
@@ -85,10 +86,11 @@ def test_rejects_excessive_convolution_work() -> None:
         "polynomial": {"terms": terms},
     }
 
-    with pytest.raises(ValidationError, match="convolution work limit"):
-        RationalPolynomialMultiplyRequest.model_validate(
-            {"left": polynomial, "right": polynomial}
-        )
+    request = RationalPolynomialMultiplyRequest.model_validate(
+        {"left": polynomial, "right": polynomial}
+    )
+    with pytest.raises(OperationDomainValidationError, match="convolution work limit"):
+        rational_polynomial_multiply(request)
 
 
 def test_rejects_accumulated_coefficient_growth() -> None:
@@ -103,10 +105,11 @@ def test_rejects_accumulated_coefficient_growth() -> None:
         "polynomial": {"terms": terms},
     }
 
-    with pytest.raises(ValidationError, match="coefficient digit limit"):
-        RationalPolynomialMultiplyRequest.model_validate(
-            {"left": polynomial, "right": polynomial}
-        )
+    request = RationalPolynomialMultiplyRequest.model_validate(
+        {"left": polynomial, "right": polynomial}
+    )
+    with pytest.raises(OperationDomainValidationError, match="coefficient digit limit"):
+        rational_polynomial_multiply(request)
 
 
 def test_rejects_serialized_result_budget() -> None:
@@ -131,8 +134,9 @@ def test_rejects_serialized_result_budget() -> None:
         "polynomial": {"terms": right_terms},
     }
 
-    with pytest.raises(ValidationError, match="serialized result size"):
-        RationalPolynomialMultiplyRequest.model_validate({"left": left, "right": right})
+    request = RationalPolynomialMultiplyRequest.model_validate({"left": left, "right": right})
+    with pytest.raises(OperationDomainValidationError, match="serialized result size"):
+        rational_polynomial_multiply(request)
 
 
 def test_accepts_product_sensitive_operand_budgets() -> None:
@@ -240,7 +244,8 @@ def test_rejects_product_exponent_overflow() -> None:
         },
     }
 
-    with pytest.raises(ValidationError, match="canonical exponent limit"):
-        RationalPolynomialMultiplyRequest.model_validate(
-            {"left": polynomial, "right": polynomial}
-        )
+    request = RationalPolynomialMultiplyRequest.model_validate(
+        {"left": polynomial, "right": polynomial}
+    )
+    with pytest.raises(OperationDomainValidationError, match="canonical exponent limit"):
+        rational_polynomial_multiply(request)
