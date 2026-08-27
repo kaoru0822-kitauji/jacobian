@@ -56,6 +56,7 @@ theorem-specific lift:
 source representation:
 established technique:
 stable reusable postcondition:
+degenerate or closure cases:
 discovery vocabulary:
 technique disposition:
 evidence and fixture:
@@ -67,6 +68,13 @@ or temporary data structure. Also reject the opposite boundary when it bundles
 the motivating theorem, search strategy, interpretation, and stopping rule.
 Look for one postcondition that remains meaningful if the surrounding paper or
 conjecture disappears.
+
+Resolve the result's closure cases before calling it a complete finite value.
+Record the empty, zero, identity, repeated-root, singular, boundary, or
+continuum-locus case that applies to the proposed carrier.  A result whose
+maximizers can be all points of a curve, for example, needs an exact locus
+variant rather than a fictitious complete finite witness list.  This is part
+of the postcondition, not an implementation footnote.
 
 Classify an established technique as a public-operation candidate, native-only
 function, private kernel, invariant or fixture, or caller reasoning. Technique

@@ -86,6 +86,14 @@ and no existing owner. Lead the issue with the user or mathematical need, keep
 confirmed facts separate from hypotheses, and leave admission or implementation
 details open unless the evidence settles them.
 
+When external issue creation is authorized, make the issue implementable rather
+than merely descriptive.  Include the smallest discriminating exact fixture,
+the defining invariant or an independent oracle, the relevant degenerate or
+adversarial case, the preflight quantities that bound work and exact output,
+and explicit non-goals.  For a repair, also state the existing owner and the
+smallest producer-consumer or public-contract regression.  Do not invent a
+backend prescription when the evidence establishes only the postcondition.
+
 Do not file a new operation solely because an existing operation rejects a
 large input. First determine whether predicted work, intermediate growth, and
 exact output remain small; whether a sparse, factored, modular, symbolic, or

@@ -35,6 +35,8 @@ For every decisive claim, record its scope separately from its evidence kind.
 Useful evidence kinds include:
 
 - a source-backed theorem with its exact hypotheses and publication status;
+- a discussion-thread claim, unpublished manuscript, preprint, or
+  peer-reviewed result, each recorded with its distinct status;
 - an exact symbolic identity or derivation, including domains and excluded
   branches;
 - an exact bounded computation or exhaustive finite search, including the
