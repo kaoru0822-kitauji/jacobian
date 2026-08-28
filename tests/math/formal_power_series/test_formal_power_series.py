@@ -58,7 +58,7 @@ def test_derivative_of_order_one_is_zero() -> None:
     assert result.result.coefficients[0].as_fraction() == 0
 
 
-def test_native_projection_aliases_call_the_shared_typed_kernels() -> None:
+def test_native_exports_call_the_shared_typed_kernels() -> None:
     series = TruncatedSeries(
         variable="x",
         truncation_order=2,

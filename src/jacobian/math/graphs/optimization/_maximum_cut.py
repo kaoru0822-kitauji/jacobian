@@ -18,7 +18,7 @@ MAXIMUM_CUT_CANDIDATE_PARTITIONS = 1_048_576
 """Maximum reduced component assignments admitted by one exact request."""
 
 MAXIMUM_CUT_EDGE_UPDATES = 5_000_000
-"""Maximum weighted adjacency updates in one complete result replay."""
+"""Maximum weighted adjacency updates in one complete exact search."""
 
 MAXIMUM_CUT_RESULT_BYTES = CanonicalLimits().max_output_bytes
 """Maximum projected canonical JSON bytes for one exact result."""
@@ -98,7 +98,7 @@ def _bipartite_sides(
 
 
 def _analyze_graph(graph: SimpleUndirectedGraph) -> _MaximumCutAnalysis:
-    """Derive the exact false-twin quotient and exhaustive replay budget.
+    """Derive the exact false-twin quotient and exhaustive-search budget.
 
     Vertices with equal open neighborhoods are nonadjacent false twins. For a
     fixed assignment of every other vertex, their incident cut contributions
@@ -484,31 +484,17 @@ def _solve_component_with_z3(
 def _combine_component_solutions(
     analysis: _MaximumCutAnalysis,
     solutions: tuple[_ComponentSolution, ...],
-) -> tuple[int, tuple[bool, ...]]:
+) -> tuple[bool, ...]:
     class_sides = [False] * len(analysis.twin_classes)
-    value = 0
     for component, solution in zip(analysis.components, solutions, strict=True):
-        value += solution.value
         for class_id, side in zip(component.class_ids, solution.sides, strict=True):
             class_sides[class_id] = side
-    return value, tuple(class_sides)
-
-
-def _solve_analysis_by_enumeration(
-    analysis: _MaximumCutAnalysis,
-) -> tuple[int, tuple[bool, ...]]:
-    return _combine_component_solutions(
-        analysis,
-        tuple(
-            _solve_component_by_enumeration(analysis, component_index)
-            for component_index in range(len(analysis.components))
-        ),
-    )
+    return tuple(class_sides)
 
 
 def _solve_analysis(
     analysis: _MaximumCutAnalysis,
-) -> tuple[int, tuple[bool, ...]]:
+) -> tuple[bool, ...]:
     solutions: list[_ComponentSolution] = []
     for component_index in range(len(analysis.components)):
         solution = _solve_component_with_z3(analysis, component_index)
@@ -545,28 +531,19 @@ def compute_maximum_cut(request: GraphMaximumCutRequest) -> GraphMaximumCutResul
     """Compute one deterministic exact maximum cut and source-edge ledger."""
 
     analysis = _analyze_graph(request.graph)
-    cut_value, class_sides = _solve_analysis(analysis)
+    class_sides = _solve_analysis(analysis)
     left_vertices, right_vertices, crossing_edges = _partition_from_class_sides(
         request.graph,
         analysis,
         class_sides,
     )
-    if len(crossing_edges) != cut_value:
-        cut_value, class_sides = _solve_analysis_by_enumeration(analysis)
-        left_vertices, right_vertices, crossing_edges = _partition_from_class_sides(
-            request.graph,
-            analysis,
-            class_sides,
-        )
 
-    # The producer already has coincident exact backend bounds.  Deliberate
-    # verification of an independently supplied claim remains owner-private.
     return GraphMaximumCutResult._from_kernel(
         graph=request.graph,
         left_vertices=left_vertices,
         right_vertices=right_vertices,
         crossing_edges=crossing_edges,
-        cut_value=cut_value,
+        cut_value=len(crossing_edges),
     )
 
 

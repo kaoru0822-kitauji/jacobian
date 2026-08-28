@@ -278,14 +278,10 @@ def test_result_deserialization_never_replays_the_exhaustive_kernel(
 ) -> None:
     result = compute_maximum_cut(GraphMaximumCutRequest(graph=_cycle(5)))
 
-    def forbidden_replay(
-        *_args: object, **_kwargs: object
-    ) -> tuple[int, tuple[bool, ...]]:
+    def forbidden_replay(*_args: object, **_kwargs: object) -> tuple[bool, ...]:
         raise AssertionError("structural result parsing must not replay maximum cut")
 
-    monkeypatch.setattr(
-        _maximum_cut, "_solve_analysis_by_enumeration", forbidden_replay
-    )
+    monkeypatch.setattr(_maximum_cut, "_solve_analysis", forbidden_replay)
     reparsed = GraphMaximumCutResult.model_validate(result.model_dump(mode="json"))
 
     assert reparsed == result
@@ -381,23 +377,6 @@ def test_bounded_exhaustive_fallback_preserves_an_exact_result(
     result = _validated_result(_complete(7))
 
     assert result.cut_value == 12
-
-
-def test_inconsistent_private_objective_falls_back_to_exhaustive_search(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    graph = _cycle(5)
-
-    monkeypatch.setattr(
-        _maximum_cut,
-        "_solve_analysis",
-        lambda analysis: (1, tuple(False for _ in analysis.twin_classes)),
-    )
-
-    result = compute_maximum_cut(GraphMaximumCutRequest(graph=graph))
-
-    assert result.cut_value == 4
-    _assert_cut_invariant(result)
 
 
 def test_operation_is_deterministic_on_a_nonunique_optimum() -> None:

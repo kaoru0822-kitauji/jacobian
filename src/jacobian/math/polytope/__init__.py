@@ -27,8 +27,8 @@ def polytope_support(
     Both arguments are canonical values from this domain. The V-polytope
     retains an ordered labelled coordinate axis and its complete irredundant
     full-dimensional vertex family, so the covector cannot be paired against
-    an unrelated coordinate order. The returned source-bound result replays
-    the maximum across every retained vertex.
+    an unrelated coordinate order. The returned result retains that source
+    together with the exact maximum and complete exposed face.
 
     Applies the operation's smaller construction envelope before invoking
     the kernel: every vertex coordinate and covector component must carry at

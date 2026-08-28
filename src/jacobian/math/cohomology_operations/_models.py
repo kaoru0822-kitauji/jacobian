@@ -47,7 +47,7 @@ MAX_COEFFICIENT_DIGITS = 6
 """Bound on decimal digits per coefficient before modular reduction.
 
 Coefficients are reduced modulo 2 (Steenrod) or prime (Bockstein), but the
-retained source stores the original integers for result replay. Bounding
+retained source stores the original integers for source binding. Bounding
 each coefficient to 6 digits keeps retained-source size, hashing, and
 sorting bounded while still admitting every residue class via bounded
 representatives (``-999999..999999`` covers all residues for the admitted

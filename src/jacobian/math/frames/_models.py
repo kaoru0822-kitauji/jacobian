@@ -48,7 +48,7 @@ class FiniteFrameRequest(VectorFamilyRequest):
 
 
 class CoherenceRequest(FiniteFrameRequest):
-    pass
+    """A finite frame whose normalized pairwise coherence is requested."""
 
 
 class GramResult(VectorFamilyRequest):

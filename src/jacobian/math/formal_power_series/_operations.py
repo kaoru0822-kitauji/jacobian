@@ -208,27 +208,34 @@ def compute_power(series: TruncatedSeries, exponent: int) -> SeriesPowerResult:
 # ---------------------------------------------------------------------------
 
 
-def compute_inverse(
-    series: TruncatedSeries, *, _admitted: bool = False
-) -> SeriesInverseResult:
+def _inverse_coefficients(series: TruncatedSeries) -> list[Fraction]:
+    """Return inverse coefficients after the caller admits the operation."""
+
+    n = series.truncation_order
+    a = _series_fractions(series)
+    if a[0] == 0:
+        raise ValueError("series with zero constant term is not a unit")
+    inverse = [Fraction(0)] * n
+    inverse[0] = Fraction(1) / a[0]
+    for degree in range(1, n):
+        recurrence_sum = sum(
+            (a[index] * inverse[degree - index] for index in range(1, degree + 1)),
+            start=Fraction(),
+        )
+        inverse[degree] = -inverse[0] * recurrence_sum
+    return inverse
+
+
+def compute_inverse(series: TruncatedSeries) -> SeriesInverseResult:
     """Compute the multiplicative inverse of a series modulo x^N.
 
     Requires a_0 != 0.  Computes B such that A*B = 1 (mod x^N) via the
     standard recurrence: b_0 = 1/a_0; b_n = -(1/a_0) * sum_{i=1}^{n} a_i b_{n-i}.
     """
-    if not _admitted:
-        _run_admission(lambda: admit_native_inverse(series))
+    _run_admission(lambda: admit_native_inverse(series))
     n = series.truncation_order
     a = _series_fractions(series)
-    if a[0] == 0:
-        raise ValueError("series with zero constant term is not a unit")
-    inv = [Fraction(0)] * n
-    inv[0] = Fraction(1) / a[0]
-    for k in range(1, n):
-        s = Fraction(0)
-        for i in range(1, k + 1):
-            s += a[i] * inv[k - i]
-        inv[k] = -inv[0] * s
+    inv = _inverse_coefficients(series)
     # Compute residual A*B - 1
     product = _cauchy_convolve(a, inv, n)
     product[0] -= Fraction(1)
@@ -256,8 +263,7 @@ def compute_divide(
     a = _series_fractions(numerator)
     b = _series_fractions(denominator)
 
-    inv = compute_inverse(denominator, _admitted=True)
-    b_inv = _series_fractions(inv.result)
+    b_inv = _inverse_coefficients(denominator)
     q = _cauchy_convolve(a, b_inv, n)
     bq = _cauchy_convolve(b, q, n)
     residual = [bq[i] - a[i] for i in range(n)]
@@ -274,32 +280,44 @@ def compute_divide(
 # ---------------------------------------------------------------------------
 
 
-def compute_compose(
-    outer: TruncatedSeries, inner: TruncatedSeries, *, _admitted: bool = False
-) -> SeriesComposeResult:
-    """Compute F(G(x)) mod x^N where G(0) = 0.
+def _compose_coefficients(
+    outer: TruncatedSeries, inner: TruncatedSeries
+) -> list[Fraction]:
+    """Return composition coefficients after the caller admits the operation."""
 
-    Composes by iteratively computing G^k (powers) and multiplying by f_k:
-    F(G) = sum_{k=0}^{N-1} f_k * G^k mod x^N.
-    """
-    if not _admitted:
-        _run_admission(lambda: admit_native_compose(outer, inner))
     _require_matching(outer, inner, "outer and inner series")
     if inner.coefficients[0].as_fraction() != 0:
         raise ValueError(
             "inner series must have zero constant term for composition with a finite prefix"
         )
     n = outer.truncation_order
-    f = _series_fractions(outer)
-    g = _series_fractions(inner)
+    outer_coefficients = _series_fractions(outer)
+    inner_coefficients = _series_fractions(inner)
+    inner_power = [Fraction(1)] + [Fraction(0)] * (n - 1)
+    result = [outer_coefficients[0] * value for value in inner_power]
+    for outer_degree in range(1, n):
+        inner_power = _cauchy_convolve(inner_power, inner_coefficients, n)
+        for degree in range(n):
+            result[degree] += outer_coefficients[outer_degree] * inner_power[degree]
+    return result
 
-    g_power = [Fraction(1)] + [Fraction(0)] * (n - 1)  # G^0 = 1
-    result = [f[0] * g_power[i] for i in range(n)]
-    for k in range(1, n):
-        g_power = _cauchy_convolve(g_power, g, n)  # G^k
-        for i in range(n):
-            result[i] += f[k] * g_power[i]
-    return SeriesComposeResult(result=_series_result(outer.variable, n, result))
+
+def compute_compose(
+    outer: TruncatedSeries, inner: TruncatedSeries
+) -> SeriesComposeResult:
+    """Compute F(G(x)) mod x^N where G(0) = 0.
+
+    Composes by iteratively computing G^k (powers) and multiplying by f_k:
+    F(G) = sum_{k=0}^{N-1} f_k * G^k mod x^N.
+    """
+    _run_admission(lambda: admit_native_compose(outer, inner))
+    return SeriesComposeResult(
+        result=_series_result(
+            outer.variable,
+            outer.truncation_order,
+            _compose_coefficients(outer, inner),
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -354,29 +372,21 @@ def compute_reversion(series: TruncatedSeries) -> SeriesReversionResult:
         g[k] = (target - known) / f[1]
 
     # Compute residuals F(G) and G(F)
-    fg = compute_compose(
-        _series_result(series.variable, n, f),
-        _series_result(series.variable, n, g),
-        _admitted=True,
-    )
-    fg_coeffs = _series_fractions(fg.result)
+    source = _series_result(series.variable, n, f)
+    inverse = _series_result(series.variable, n, g)
+    fg_coeffs = _compose_coefficients(source, inverse)
     left_residual = [
         fg_coeffs[i] - (Fraction(1) if i == 1 else Fraction(0)) for i in range(n)
     ]
 
-    gf = compute_compose(
-        _series_result(series.variable, n, g),
-        _series_result(series.variable, n, f),
-        _admitted=True,
-    )
-    gf_coeffs = _series_fractions(gf.result)
+    gf_coeffs = _compose_coefficients(inverse, source)
     right_residual = [
         gf_coeffs[i] - (Fraction(1) if i == 1 else Fraction(0)) for i in range(n)
     ]
 
     return SeriesReversionResult._from_kernel(
         source=series,
-        result=_series_result(series.variable, n, g),
+        result=inverse,
         left_residual=tuple(_wire(c) for c in left_residual),
         right_residual=tuple(_wire(c) for c in right_residual),
     )

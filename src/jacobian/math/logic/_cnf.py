@@ -195,7 +195,7 @@ def check_sat_assignment(
 
 
 class _TautologicalClauseError(Exception):
-    pass
+    """A clause contains both polarities of one variable."""
 
 
 def _canonical_clause(clause: tuple[int, ...], variable_count: int) -> tuple[int, ...]:

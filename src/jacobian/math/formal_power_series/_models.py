@@ -526,11 +526,11 @@ class _SeriesPairRequest(StrictModel):
 
 
 class _SeriesAddSubtractRequest(_SeriesPairRequest):
-    pass
+    """Pair request admitted through coefficientwise arithmetic bounds."""
 
 
 class _SeriesMultiplyRequest(_SeriesPairRequest):
-    pass
+    """Pair request admitted through Cauchy-product growth bounds."""
 
 
 class _SeriesIdentityCheckRequest(_SeriesPairRequest):

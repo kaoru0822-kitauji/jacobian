@@ -128,8 +128,7 @@ POLYTOPE_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
         "rejects d = 7 rows. Request admission materializes the complete "
         "bounded enumeration, enforcing the published facet and incidence "
         "result limits before a request is accepted; the exact bounded "
-        "SymPy kernel then computes that profile and the source-bound "
-        "result replays it.",
+        "SymPy kernel then computes that source-bound profile.",
         FacetIncidenceRequest,
         FacetIncidenceResult,
         compute_facet_incidence,
