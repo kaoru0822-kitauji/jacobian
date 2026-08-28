@@ -36,13 +36,7 @@ __all__ = [
 
 
 def compute_width(request: WidthRequest) -> WidthResult:
-    result = width(request.decomposition)
-    return WidthResult(
-        bag_sizes=result["bag_sizes"],
-        max_bag_cardinality=result["max_bag_cardinality"],
-        width=result["width"],
-        maximum_bag_nodes=result["maximum_bag_nodes"],
-    )
+    return width(request.decomposition)
 
 
 def compute_vertex_occurrences(
@@ -64,14 +58,7 @@ def compute_adhesions(request: AdhesionsRequest) -> AdhesionsResult:
 
 
 def compute_reroot(request: RerootRequest) -> RerootResult:
-    result = reroot(request.decomposition, request.root)
-    return RerootResult(
-        root=result["root"],
-        parent=result["parent"],
-        children=result["children"],
-        depth=result["depth"],
-        paths=result["paths"],
-    )
+    return reroot(request.decomposition, request.root)
 
 
 def compute_restrict(request: RestrictRequest) -> RestrictResult:

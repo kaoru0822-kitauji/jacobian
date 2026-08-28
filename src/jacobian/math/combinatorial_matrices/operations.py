@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TypedDict
 
+from ._models import DeterminantProfileResult, GramProfileResult, SignProfileResult
 from .values import MAX_MATRIX_ORDER, HadamardMatrix, SignMatrix
 
 __all__ = [
@@ -16,35 +17,10 @@ __all__ = [
 ]
 
 
-class _SignProfile(TypedDict):
-    row_count: int
-    column_count: int
-    plus_one_count: int
-    minus_one_count: int
-    row_sums: tuple[int, ...]
-    column_sums: tuple[int, ...]
-    is_square: bool
-
-
-class _GramProfile(TypedDict):
-    order: int
-    gram: tuple[tuple[int, ...], ...]
-    diagonal_residuals: tuple[int, ...]
-    nonzero_off_diagonal: tuple[tuple[int, int, int], ...]
-    is_hadamard: bool
-
-
 class _NormalizedMatrix(TypedDict):
     normalized: tuple[tuple[int, ...], ...]
     row_switches: tuple[int, ...]
     column_switches: tuple[int, ...]
-
-
-class _DeterminantProfile(TypedDict):
-    order: int
-    determinant_magnitude: int
-    gram_determinant: int
-    identity: str
 
 
 class _KroneckerProduct(TypedDict):
@@ -59,7 +35,7 @@ class _SylvesterMatrix(TypedDict):
     order: int
 
 
-def sign_profile(matrix: SignMatrix) -> _SignProfile:
+def sign_profile(matrix: SignMatrix) -> SignProfileResult:
     """Return dimensions, entry counts, row/column sums, and first/all
     non-sign entries for a general integer matrix."""
     row_count = len(matrix.rows)
@@ -70,18 +46,18 @@ def sign_profile(matrix: SignMatrix) -> _SignProfile:
     ]
     plus_one = sum(1 for row in matrix.rows for entry in row if entry == 1)
     minus_one = sum(1 for row in matrix.rows for entry in row if entry == -1)
-    return {
-        "row_count": row_count,
-        "column_count": col_count,
-        "plus_one_count": plus_one,
-        "minus_one_count": minus_one,
-        "row_sums": tuple(row_sums),
-        "column_sums": tuple(col_sums),
-        "is_square": row_count == col_count,
-    }
+    return SignProfileResult(
+        row_count=row_count,
+        column_count=col_count,
+        plus_one_count=plus_one,
+        minus_one_count=minus_one,
+        row_sums=tuple(row_sums),
+        column_sums=tuple(col_sums),
+        is_square=row_count == col_count,
+    )
 
 
-def gram_profile(matrix: SignMatrix) -> _GramProfile:
+def gram_profile(matrix: SignMatrix) -> GramProfileResult:
     """Return order, exact ``H H^T``, diagonal residuals from n, all nonzero
     off-diagonal inner products, and ``is_hadamard``."""
     rows = matrix.rows
@@ -100,13 +76,13 @@ def gram_profile(matrix: SignMatrix) -> _GramProfile:
     nonzero_off = tuple(
         (i, j, gram[i][j]) for i in range(n) for j in range(i + 1, n) if gram[i][j] != 0
     )
-    return {
-        "order": n,
-        "gram": tuple(tuple(row) for row in gram),
-        "diagonal_residuals": residuals,
-        "nonzero_off_diagonal": nonzero_off,
-        "is_hadamard": is_hadamard,
-    }
+    return GramProfileResult(
+        order=n,
+        gram=tuple(tuple(row) for row in gram),
+        diagonal_residuals=residuals,
+        nonzero_off_diagonal=nonzero_off,
+        is_hadamard=is_hadamard,
+    )
 
 
 def normalize(matrix: HadamardMatrix | SignMatrix) -> _NormalizedMatrix:
@@ -133,7 +109,7 @@ def normalize(matrix: HadamardMatrix | SignMatrix) -> _NormalizedMatrix:
     }
 
 
-def determinant_profile(hadamard: HadamardMatrix) -> _DeterminantProfile:
+def determinant_profile(hadamard: HadamardMatrix) -> DeterminantProfileResult:
     """For a constructed Hadamard matrix of order n, return |det H| = n^(n/2)
     and the Gram determinant = n^n."""
     n = len(hadamard.rows)
@@ -141,12 +117,12 @@ def determinant_profile(hadamard: HadamardMatrix) -> _DeterminantProfile:
         raise ValueError("Hadamard matrices have even order (except order 1)")
     magnitude = n ** (n // 2)
     gram_determinant = n**n
-    return {
-        "order": n,
-        "determinant_magnitude": magnitude,
-        "gram_determinant": gram_determinant,
-        "identity": "det(H)^2 = det(H H^T)",
-    }
+    return DeterminantProfileResult(
+        order=n,
+        determinant_magnitude=magnitude,
+        gram_determinant=gram_determinant,
+        identity="det(H)^2 = det(H H^T)",
+    )
 
 
 def kronecker(left: HadamardMatrix, right: HadamardMatrix) -> _KroneckerProduct:

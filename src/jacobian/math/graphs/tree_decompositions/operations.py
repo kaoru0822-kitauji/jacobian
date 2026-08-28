@@ -8,6 +8,7 @@ from __future__ import annotations
 from collections import deque
 from typing import TypedDict
 
+from ._models import RerootResult, WidthResult
 from .values import TreeDecomposition
 
 __all__ = [
@@ -18,13 +19,6 @@ __all__ = [
     "vertex_occurrences",
     "width",
 ]
-
-
-class _WidthProfile(TypedDict):
-    bag_sizes: tuple[int, ...]
-    max_bag_cardinality: int
-    width: int
-    maximum_bag_nodes: tuple[str, ...]
 
 
 class _OccurrenceSubtree(TypedDict):
@@ -44,14 +38,6 @@ class _AdhesionProfile(TypedDict):
     edges: tuple[_Adhesion, ...]
     max_adhesion: int
     size_profile: tuple[int, ...]
-
-
-class _RerootedTree(TypedDict):
-    root: str
-    parent: dict[str, str | None]
-    children: dict[str, tuple[str, ...]]
-    depth: dict[str, int]
-    paths: dict[str, list[str]]
 
 
 class _InducedGraph(TypedDict):
@@ -86,18 +72,18 @@ def _int_edges(td: TreeDecomposition) -> list[tuple[int, int]]:
     return [(idx[a], idx[b]) for a, b in td.tree_edges]
 
 
-def width(td: TreeDecomposition) -> _WidthProfile:
+def width(td: TreeDecomposition) -> WidthResult:
     """Return bag cardinality per tree node, maximum bag cardinality, width
     (max bag cardinality minus 1), and the maximum-bag node labels."""
     bag_sizes = [len(bag) for bag in td.bags]
     max_size = max(bag_sizes)
     max_nodes = [td.tree_nodes[i] for i, s in enumerate(bag_sizes) if s == max_size]
-    return {
-        "bag_sizes": tuple(bag_sizes),
-        "max_bag_cardinality": max_size,
-        "width": max_size - 1,
-        "maximum_bag_nodes": tuple(max_nodes),
-    }
+    return WidthResult(
+        bag_sizes=tuple(bag_sizes),
+        max_bag_cardinality=max_size,
+        width=max_size - 1,
+        maximum_bag_nodes=tuple(max_nodes),
+    )
 
 
 def _occurrence_subtree(
@@ -233,7 +219,7 @@ def _root_to_node_paths(
     return paths
 
 
-def reroot(td: TreeDecomposition, root: str) -> _RerootedTree:
+def reroot(td: TreeDecomposition, root: str) -> RerootResult:
     """Return the same underlying decomposition rerooted at the selected tree
     node. Changing the root does not change the width, bags, or unrooted
     tree."""
@@ -262,13 +248,13 @@ def reroot(td: TreeDecomposition, root: str) -> _RerootedTree:
                 td.tree_nodes[child],
             )
     paths = _root_to_node_paths(adjacency, td, parent, root_index, root)
-    return {
-        "root": root,
-        "parent": parent_map,
-        "children": children_map,
-        "depth": {td.tree_nodes[i]: depth[i] for i in depth},
-        "paths": paths,
-    }
+    return RerootResult(
+        root=root,
+        parent=parent_map,
+        children=children_map,
+        depth={td.tree_nodes[i]: depth[i] for i in depth},
+        paths=paths,
+    )
 
 
 def _prune_redundant_leaves(

@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from itertools import product as iproduct
-from typing import Literal, NotRequired, TypedDict
+from typing import NotRequired, TypedDict
 
+from ._models import EquationCounterexample, EquationProfileResult, SubalgebraResult
 from .values import (
     ApplicationTerm,
     FiniteAlgebra,
@@ -26,32 +27,6 @@ __all__ = [
     "homomorphism_profile",
     "quotient",
 ]
-
-
-class _EquationCounterassignment(TypedDict):
-    assignment: tuple[int, ...]
-    left_value: int
-    right_value: int
-
-
-class _EquationHolds(TypedDict):
-    status: Literal["HOLDS"]
-    satisfying_count: int
-
-
-class _EquationFails(TypedDict):
-    status: Literal["FAILS"]
-    satisfying_count: int
-    first_counterassignment: _EquationCounterassignment
-
-
-type _EquationProfile = _EquationHolds | _EquationFails
-
-
-class _GeneratedSubalgebra(TypedDict):
-    generated_carrier: tuple[int, ...]
-    rounds: int
-    is_closed: bool
 
 
 class _CongruenceProfile(TypedDict):
@@ -107,7 +82,7 @@ def evaluate_term(
 
 def equation_profile(
     algebra: FiniteAlgebra, left: FlatTerm, right: FlatTerm, variable_count: int
-) -> _EquationProfile:
+) -> EquationProfileResult:
     """Evaluate ``s = t`` over all assignments.
 
     Return ``HOLDS`` with the satisfying assignment count, or ``FAILS`` with
@@ -120,12 +95,12 @@ def equation_profile(
 
 def _equation_profile_unchecked(
     algebra: FiniteAlgebra, left: FlatTerm, right: FlatTerm, variable_count: int
-) -> _EquationProfile:
+) -> EquationProfileResult:
     """Profile an equation after source-bound term admission."""
 
     n = len(algebra.carrier)
     satisfying = 0
-    first_counterassignment: _EquationCounterassignment | None = None
+    first_counterassignment: EquationCounterexample | None = None
     for values in iproduct(range(n), repeat=variable_count):
         assignment = dict(enumerate(values))
         lv = _evaluate_term_unchecked(algebra, left, assignment)
@@ -134,24 +109,24 @@ def _equation_profile_unchecked(
             satisfying += 1
         else:
             if first_counterassignment is None:
-                first_counterassignment = {
-                    "assignment": tuple(values),
-                    "left_value": lv,
-                    "right_value": rv,
-                }
+                first_counterassignment = EquationCounterexample(
+                    assignment=tuple(values),
+                    left_value=lv,
+                    right_value=rv,
+                )
     if satisfying == n**variable_count:
-        return {"status": "HOLDS", "satisfying_count": satisfying}
+        return EquationProfileResult(status="HOLDS", satisfying_count=satisfying)
     assert first_counterassignment is not None
-    return {
-        "status": "FAILS",
-        "satisfying_count": satisfying,
-        "first_counterassignment": first_counterassignment,
-    }
+    return EquationProfileResult(
+        status="FAILS",
+        satisfying_count=satisfying,
+        first_counterassignment=first_counterassignment,
+    )
 
 
 def generated_subalgebra(
     algebra: FiniteAlgebra, generators: tuple[int, ...]
-) -> _GeneratedSubalgebra:
+) -> SubalgebraResult:
     """Return the least subalgebra containing the generating set by finite
     closure under all basic operations and nullary constants."""
     n = len(algebra.carrier)
@@ -177,11 +152,11 @@ def generated_subalgebra(
                     carrier_set.add(output)
                     changed = True
     sorted_carrier = sorted(carrier_set)
-    return {
-        "generated_carrier": tuple(sorted_carrier),
-        "rounds": rounds,
-        "is_closed": set(generators) == carrier_set if generators else True,
-    }
+    return SubalgebraResult(
+        generated_carrier=tuple(sorted_carrier),
+        rounds=rounds,
+        is_closed=set(generators) == carrier_set if generators else True,
+    )
 
 
 def homomorphism_profile(carrier_map: FiniteAlgebraCarrierMap) -> dict[str, object]:

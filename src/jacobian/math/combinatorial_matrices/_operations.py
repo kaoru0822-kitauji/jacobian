@@ -33,27 +33,11 @@ __all__ = [
 
 
 def compute_sign_profile(request: SignProfileRequest) -> SignProfileResult:
-    result = sign_profile(request.matrix)
-    return SignProfileResult(
-        row_count=result["row_count"],
-        column_count=result["column_count"],
-        plus_one_count=result["plus_one_count"],
-        minus_one_count=result["minus_one_count"],
-        row_sums=result["row_sums"],
-        column_sums=result["column_sums"],
-        is_square=result["is_square"],
-    )
+    return sign_profile(request.matrix)
 
 
 def compute_gram_profile(request: GramProfileRequest) -> GramProfileResult:
-    result = gram_profile(request.matrix)
-    return GramProfileResult(
-        order=result["order"],
-        gram=result["gram"],
-        diagonal_residuals=result["diagonal_residuals"],
-        nonzero_off_diagonal=result["nonzero_off_diagonal"],
-        is_hadamard=result["is_hadamard"],
-    )
+    return gram_profile(request.matrix)
 
 
 def compute_normalize(request: NormalizeRequest) -> NormalizeResult:
@@ -73,13 +57,7 @@ def compute_normalize(request: NormalizeRequest) -> NormalizeResult:
 def compute_determinant_profile(
     request: DeterminantProfileRequest,
 ) -> DeterminantProfileResult:
-    result = determinant_profile(request.matrix)
-    return DeterminantProfileResult(
-        order=result["order"],
-        determinant_magnitude=result["determinant_magnitude"],
-        gram_determinant=result["gram_determinant"],
-        identity=result["identity"],
-    )
+    return determinant_profile(request.matrix)
 
 
 def compute_sylvester(request: SylvesterRequest) -> SylvesterResult:

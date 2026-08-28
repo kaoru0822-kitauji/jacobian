@@ -12,7 +12,6 @@ from jacobian.math.universal_algebra._models import (
     MAX_ENUMERATION_WORK,
     CongruenceRequest,
     CongruenceResult,
-    EquationCounterexample,
     EquationProfileRequest,
     EquationProfileResult,
     EvaluateRequest,
@@ -151,28 +150,12 @@ def compute_equation_profile(request: EquationProfileRequest) -> EquationProfile
     result = _equation_profile_unchecked(
         request.algebra, request.left, request.right, request.variable_count
     )
-    if result["status"] == "HOLDS":
-        return EquationProfileResult(
-            status="HOLDS",
-            satisfying_count=result["satisfying_count"],
-        )
-    return EquationProfileResult(
-        status="FAILS",
-        satisfying_count=result["satisfying_count"],
-        first_counterassignment=EquationCounterexample.model_validate(
-            result["first_counterassignment"]
-        ),
-    )
+    return result
 
 
 def compute_generated_subalgebra(request: SubalgebraRequest) -> SubalgebraResult:
     _admit_subalgebra(request)
-    result = generated_subalgebra(request.algebra, request.generators)
-    return SubalgebraResult(
-        generated_carrier=result["generated_carrier"],
-        rounds=result["rounds"],
-        is_closed=result["is_closed"],
-    )
+    return generated_subalgebra(request.algebra, request.generators)
 
 
 def compute_homomorphism_profile(
