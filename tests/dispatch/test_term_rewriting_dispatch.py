@@ -6,11 +6,8 @@ import pytest
 from tests.dispatch._support import dispatch_validation_error
 
 from jacobian.catalog.catalog import Catalog
-from jacobian.dispatch import (
-    OperationRequestValidationError,
-    invoke_operation,
-    parse_operation_input,
-)
+from jacobian.catalog.models import OperationDomainValidationError
+from jacobian.dispatch import invoke_operation, parse_operation_input
 from jacobian.math.term_rewriting._models import (
     CriticalPairsRequest,
     CriticalPairsResult,
@@ -93,12 +90,12 @@ def test_variable_label_bound_is_the_interoperable_integer_maximum() -> None:
         )
 
 
-def test_composed_mgu_depth_rejects_typed_at_request_parsing() -> None:
+def test_composed_mgu_depth_rejects_at_operation_admission() -> None:
     # Unification composes binding depth: f(x, y) against f(u^16(y), u^16(c))
     # keeps every input path within the 31-node transport envelope, but its
     # idempotent MGU binds x to a 33-node chain. The rejection must surface
-    # as a typed request validation error during math.run input parsing
-    # instead of a canonicalization failure after the operation ran.
+    # as a typed domain error during operation admission instead of a
+    # canonicalization failure after the kernel ran.
     def unary_chain(length: int, leaf: Term) -> Term:
         term = leaf
         for _ in range(length):
@@ -114,9 +111,9 @@ def test_composed_mgu_depth_rejects_typed_at_request_parsing() -> None:
             unary_chain(16, _app(2)),
         ).model_dump(mode="json"),
     }
-    with pytest.raises(OperationRequestValidationError) as error:
+    with pytest.raises(OperationDomainValidationError) as error:
         invoke_operation("term_rewriting.unification.compute", payload, Catalog.open())
-    assert "transport-safe" in str(error.value.errors())
+    assert "transport-safe" in str(error.value)
 
 
 def test_boundary_composed_mgu_returns_a_typed_result() -> None:

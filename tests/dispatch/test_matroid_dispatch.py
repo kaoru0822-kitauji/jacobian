@@ -6,7 +6,8 @@ import pytest
 from jsonschema.validators import Draft202012Validator
 
 from jacobian.catalog.catalog import Catalog
-from jacobian.dispatch import OperationRequestValidationError, invoke_operation
+from jacobian.catalog.models import OperationDomainValidationError
+from jacobian.dispatch import invoke_operation
 from jacobian.math.matroids._models import MAX_GROUND_SIZE
 
 
@@ -36,6 +37,6 @@ def test_closure_schema_and_dispatch_share_subset_contract() -> None:
 
     duplicate_subset = {**advertised, "subset": [0, 0]}
     assert list(validator.iter_errors(duplicate_subset))
-    with pytest.raises(OperationRequestValidationError) as exc_info:
+    with pytest.raises(OperationDomainValidationError) as exc_info:
         invoke_operation("matroid.closure.compute", duplicate_subset, catalog)
     assert exc_info.value.errors()[0]["type"] == "matroid.subset.invalid"

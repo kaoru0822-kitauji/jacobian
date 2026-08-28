@@ -155,8 +155,15 @@ def _admit_partial_trace(request: Any) -> None:
 
 
 def _admit_determinant(request: Any) -> None:
-    _admit_square_rational(request)
-    if len(request.matrix.entries) > MAX_DETERMINANT_MATRIX_DIMENSION:
+    matrix = request.matrix
+    from jacobian.math.matrices.values import require_matrix_scalar_digits
+
+    require_matrix_scalar_digits(
+        matrix.entries, maximum=MAX_INPUT_SCALAR_DIGITS, label="matrix input"
+    )
+    if len(matrix.entries) != len(matrix.entries[0]):
+        raise _validation_error("budget_exceeded", "operation requires a square matrix")
+    if len(matrix.entries) > MAX_DETERMINANT_MATRIX_DIMENSION:
         raise _validation_error(
             "budget_exceeded",
             "determinant matrices are limited to order "
