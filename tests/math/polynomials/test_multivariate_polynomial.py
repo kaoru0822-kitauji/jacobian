@@ -6,8 +6,8 @@ from fractions import Fraction
 from typing import Any
 
 import pytest
-from tests.math.polynomials._support import polynomial_validation_error
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.polynomials.multivariate._division import (
     MultivariateDivisionRequest,
 )
@@ -151,16 +151,16 @@ class TestMultivariateGcd:
 
         left = _poly(("x",), (("1/1", (1,)),))
         right = _poly(("x",), (("1/1", (0,)),))
-        with pytest.raises(ValueError, match="at least two variables"):
-            MultivariateGcdRequest(left=left, right=right)
+        with pytest.raises(OperationDomainValidationError, match="at least two variables"):
+            compute_multivariate_gcd(MultivariateGcdRequest(left=left, right=right))
 
     def test_gcd_rejects_mismatched_variables(self) -> None:
         """Polynomials must share the same ordered variable list."""
 
         left = _poly(("x", "y"), (("1/1", (1, 1)),))
         right = _poly(("x", "z"), (("1/1", (1, 1)),))
-        with pytest.raises(ValueError, match="same ordered variables"):
-            MultivariateGcdRequest(left=left, right=right)
+        with pytest.raises(OperationDomainValidationError, match="same ordered variables"):
+            compute_multivariate_gcd(MultivariateGcdRequest(left=left, right=right))
 
     def test_gcd_rejects_oversized_terms(self) -> None:
         """Operations fail closed on oversized inputs."""
@@ -169,8 +169,8 @@ class TestMultivariateGcd:
         terms = tuple((f"{i + 1}/1", (i, 0)) for i in range(599, -1, -1))
         left = _poly(("x", "y"), terms[:600])
         right = _poly(("x", "y"), (("1/1", (0, 0)),))
-        with pytest.raises(ValueError, match="term operation budget"):
-            MultivariateGcdRequest(left=left, right=right)
+        with pytest.raises(OperationDomainValidationError, match="term operation budget"):
+            compute_multivariate_gcd(MultivariateGcdRequest(left=left, right=right))
 
 
 # --------------------------------------------------------------------------- #
@@ -185,8 +185,8 @@ class TestMultivariateDivision:
 
         left = _poly(("x", "y"), (("1/1", (1, 0)),))
         right = _poly(("x", "y"), ())
-        with polynomial_validation_error():
-            MultivariateDivisionRequest(left=left, right=right)
+        with pytest.raises(OperationDomainValidationError, match="divisor polynomial"):
+            compute_multivariate_division(MultivariateDivisionRequest(left=left, right=right))
 
     def test_division_exact(self) -> None:
         """x^2*y / (x*y) = x, remainder 0."""
@@ -263,16 +263,16 @@ class TestMultivariateDivision:
 
         left = _poly(("x",), (("1/1", (2,)),))
         right = _poly(("x",), (("1/1", (1,)),))
-        with pytest.raises(ValueError, match="at least two variables"):
-            MultivariateDivisionRequest(left=left, right=right)
+        with pytest.raises(OperationDomainValidationError, match="at least two variables"):
+            compute_multivariate_division(MultivariateDivisionRequest(left=left, right=right))
 
     def test_division_rejects_mismatched_variables(self) -> None:
         """Polynomials must share the same ordered variable list."""
 
         left = _poly(("x", "y"), (("1/1", (1, 1)),))
         right = _poly(("a", "b"), (("1/1", (1, 1)),))
-        with pytest.raises(ValueError, match="same ordered variables"):
-            MultivariateDivisionRequest(left=left, right=right)
+        with pytest.raises(OperationDomainValidationError, match="same ordered variables"):
+            compute_multivariate_division(MultivariateDivisionRequest(left=left, right=right))
 
 
 # --------------------------------------------------------------------------- #
@@ -524,9 +524,11 @@ class TestMultivariateResultant:
 
         left = _poly(("x",), (("1/1", (2,)), ("-1/1", (0,))))
         right = _poly(("x",), (("1/1", (1,)), ("-2/1", (0,))))
-        with pytest.raises(ValueError, match="at least two variables"):
-            MultivariateResultantRequest(
-                left=left, right=right, elimination_variable="x"
+        with pytest.raises(OperationDomainValidationError, match="at least two variables"):
+            compute_multivariate_resultant(
+                MultivariateResultantRequest(
+                    left=left, right=right, elimination_variable="x"
+                )
             )
 
     def test_resultant_rejects_variable_not_in_ring(self) -> None:
@@ -534,9 +536,13 @@ class TestMultivariateResultant:
 
         left = _poly(("x", "y"), (("1/1", (1, 1)),))
         right = _poly(("x", "y"), (("1/1", (2, 0)),))
-        with pytest.raises(ValueError, match="must belong to the declared ring"):
-            MultivariateResultantRequest(
-                left=left, right=right, elimination_variable="z"
+        with pytest.raises(
+            OperationDomainValidationError, match="must belong to the declared ring"
+        ):
+            compute_multivariate_resultant(
+                MultivariateResultantRequest(
+                    left=left, right=right, elimination_variable="z"
+                )
             )
 
     def test_resultant_rejects_oversized_degree(self) -> None:
@@ -548,9 +554,11 @@ class TestMultivariateResultant:
         terms_right = tuple(("1/1", (i, 0)) for i in range(39, -1, -1))
         left = _poly(("x", "y"), terms_left)
         right = _poly(("x", "y"), terms_right)
-        with pytest.raises(ValueError, match="Sylvester degree"):
-            MultivariateResultantRequest(
-                left=left, right=right, elimination_variable="x"
+        with pytest.raises(OperationDomainValidationError, match="Sylvester degree"):
+            compute_multivariate_resultant(
+                MultivariateResultantRequest(
+                    left=left, right=right, elimination_variable="x"
+                )
             )
 
     def test_resultant_rejects_unbounded_remaining_variable_expansion(self) -> None:
@@ -566,9 +574,11 @@ class TestMultivariateResultant:
         right_terms = [("1/1", (31, *zeroes[1:])), ("-1/1", zeroes)]
         left = _poly(variables, tuple(left_terms))
         right = _poly(variables, tuple(right_terms))
-        with pytest.raises(ValueError, match="resultant output"):
-            MultivariateResultantRequest(
-                left=left, right=right, elimination_variable="x"
+        with pytest.raises(OperationDomainValidationError, match="resultant output"):
+            compute_multivariate_resultant(
+                MultivariateResultantRequest(
+                    left=left, right=right, elimination_variable="x"
+                )
             )
 
     def test_resultant_preserves_unequal_degree_source_orientation(self) -> None:
@@ -918,22 +928,28 @@ class TestMultivariateSubresultantSequence:
             (("1/1", (1, 0)), ("1/1", (0, 0))),
         )
 
-        with pytest.raises(ValueError, match="positive main-variable degree"):
-            MultivariateSubresultantSequenceRequest(
-                left=constant_in_x,
-                right=positive_degree,
-                main_variable="x",
+        with pytest.raises(
+            OperationDomainValidationError, match="positive main-variable degree"
+        ):
+            compute_multivariate_subresultant_sequence(
+                MultivariateSubresultantSequenceRequest(
+                    left=constant_in_x,
+                    right=positive_degree,
+                    main_variable="x",
+                )
             )
 
     def test_rejects_mismatched_ordered_coefficient_rings(self) -> None:
         left = _poly(("x", "y"), (("1/1", (1, 0)),))
         right = _poly(("x", "z"), (("1/1", (1, 0)),))
 
-        with pytest.raises(ValueError, match="same ordered variables"):
-            MultivariateSubresultantSequenceRequest(
-                left=left,
-                right=right,
-                main_variable="x",
+        with pytest.raises(OperationDomainValidationError, match="same ordered variables"):
+            compute_multivariate_subresultant_sequence(
+                MultivariateSubresultantSequenceRequest(
+                    left=left,
+                    right=right,
+                    main_variable="x",
+                )
             )
 
     def test_accepts_exact_input_coefficient_boundary(self) -> None:
@@ -967,12 +983,15 @@ class TestMultivariateSubresultantSequence:
             ),
         )
         with pytest.raises(
-            ValueError, match=rf"{_MAX_MULTIVARIATE_COEFFICIENT_DIGITS}-digit bound"
+            OperationDomainValidationError,
+            match=rf"{_MAX_MULTIVARIATE_COEFFICIENT_DIGITS}-digit bound",
         ):
-            MultivariateSubresultantSequenceRequest(
-                left=beyond,
-                right=right,
-                main_variable="x",
+            compute_multivariate_subresultant_sequence(
+                MultivariateSubresultantSequenceRequest(
+                    left=beyond,
+                    right=right,
+                    main_variable="x",
+                )
             )
 
     def test_admits_through_derived_brown_intermediate_boundary(self) -> None:
@@ -999,11 +1018,15 @@ class TestMultivariateSubresultantSequence:
             ("x", "y"),
             (("1/1", (19, 0)), ("1/1", (0, 0))),
         )
-        with pytest.raises(ValueError, match="Brown pseudo-remainder intermediate"):
-            MultivariateSubresultantSequenceRequest(
-                left=beyond,
-                right=boundary_right,
-                main_variable="x",
+        with pytest.raises(
+            OperationDomainValidationError, match="Brown pseudo-remainder intermediate"
+        ):
+            compute_multivariate_subresultant_sequence(
+                MultivariateSubresultantSequenceRequest(
+                    left=beyond,
+                    right=boundary_right,
+                    main_variable="x",
+                )
             )
 
     def test_rejects_request_beyond_fixed_sylvester_fallback(self) -> None:
@@ -1016,11 +1039,13 @@ class TestMultivariateSubresultantSequence:
             (("1/1", (32, 0)), ("2/1", (0, 0))),
         )
 
-        with pytest.raises(ValueError, match="Sylvester order"):
-            MultivariateSubresultantSequenceRequest(
-                left=left,
-                right=right,
-                main_variable="x",
+        with pytest.raises(OperationDomainValidationError, match="Sylvester order"):
+            compute_multivariate_subresultant_sequence(
+                MultivariateSubresultantSequenceRequest(
+                    left=left,
+                    right=right,
+                    main_variable="x",
+                )
             )
 
     def test_bounds_abnormal_pseudo_remainder_coefficient_growth(self) -> None:
@@ -1064,13 +1089,15 @@ class TestMultivariateSubresultantSequence:
         for exponent in (38, 250):
             beyond_left, beyond_right = scaled_pair(exponent)
             with pytest.raises(
-                ValueError,
+                OperationDomainValidationError,
                 match="Brown pseudo-remainder intermediate",
             ):
-                MultivariateSubresultantSequenceRequest(
-                    left=beyond_left,
-                    right=beyond_right,
-                    main_variable="x",
+                compute_multivariate_subresultant_sequence(
+                    MultivariateSubresultantSequenceRequest(
+                        left=beyond_left,
+                        right=beyond_right,
+                        main_variable="x",
+                    )
                 )
 
     def test_rejects_unbounded_nonscalar_scaling_powers(self) -> None:
@@ -1097,11 +1124,13 @@ class TestMultivariateSubresultantSequence:
             ),
         )
 
-        with pytest.raises(ValueError, match="term-pair work budget"):
-            MultivariateSubresultantSequenceRequest(
-                left=left,
-                right=right,
-                main_variable="x",
+        with pytest.raises(OperationDomainValidationError, match="term-pair work budget"):
+            compute_multivariate_subresultant_sequence(
+                MultivariateSubresultantSequenceRequest(
+                    left=left,
+                    right=right,
+                    main_variable="x",
+                )
             )
 
     def test_admits_abnormal_drop_with_bounded_nonscalar_scaling(self) -> None:
@@ -1171,11 +1200,15 @@ class TestMultivariateSubresultantSequence:
         left = _poly(("x", "y"), (("1/1", (7, 0)), ("1/1", (0, 1))))
         right = _poly(("x", "y"), (("1/1", (6, 20)),))
 
-        with pytest.raises(ValueError, match="intermediate polynomial-term budget"):
-            MultivariateSubresultantSequenceRequest(
-                left=left,
-                right=right,
-                main_variable="x",
+        with pytest.raises(
+            OperationDomainValidationError, match="intermediate polynomial-term budget"
+        ):
+            compute_multivariate_subresultant_sequence(
+                MultivariateSubresultantSequenceRequest(
+                    left=left,
+                    right=right,
+                    main_variable="x",
+                )
             )
 
     def test_rejects_unbounded_aggregate_sequence_support(self) -> None:
@@ -1192,9 +1225,13 @@ class TestMultivariateSubresultantSequence:
             (("1/1", (31, *zeroes[1:])), ("-1/1", zeroes)),
         )
 
-        with pytest.raises(ValueError, match="subresultant sequence support"):
-            MultivariateSubresultantSequenceRequest(
-                left=left,
-                right=right,
-                main_variable="x",
+        with pytest.raises(
+            OperationDomainValidationError, match="subresultant sequence support"
+        ):
+            compute_multivariate_subresultant_sequence(
+                MultivariateSubresultantSequenceRequest(
+                    left=left,
+                    right=right,
+                    main_variable="x",
+                )
             )
