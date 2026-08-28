@@ -44,7 +44,7 @@ def _complete_rows(vertices: list[str]) -> list[GraphDistanceRow]:
 
 def test_numeric_looking_labels_stay_lexicographic_and_bound_to_rows() -> None:
     result = compute_distance_matrix(
-        _request(["1", "2", "10"], [["1", "2"], ["2", "10"]])
+        _request(["1", "2", "10"], [["1", "2"], ["10", "2"]])
     )
 
     assert "semantics_version" not in result.model_dump(mode="json")
@@ -129,7 +129,7 @@ def test_operation_example_runs_through_the_catalog_wrapper() -> None:
 
 def test_producer_payload_revalidates_with_rows_bound_to_the_same_order() -> None:
     result = compute_distance_matrix(
-        _request(["1", "2", "10"], [["1", "2"], ["2", "10"]])
+        _request(["1", "2", "10"], [["1", "2"], ["10", "2"]])
     )
     rebound = GraphDistanceMatrixResult.model_validate(result.model_dump())
 

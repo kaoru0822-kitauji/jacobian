@@ -20,7 +20,6 @@ from jacobian.math.graphs.optimization import (
     _invariants,
 )
 from jacobian.math.graphs.optimization._coloring_models import (
-    ChromaticGraph,
     GraphChromaticNumberRequest,
 )
 from jacobian.math.graphs.optimization._models import (
@@ -33,8 +32,10 @@ from jacobian.math.graphs.values import SimpleUndirectedGraph
 from jacobian.process import BoundedProcessResult, ProcessResourceLimits
 
 
-def _graph() -> ChromaticGraph:
-    return ChromaticGraph(vertices=("a", "b", "c"), edges=(("a", "b"), ("b", "c")))
+def _graph() -> SimpleUndirectedGraph:
+    return SimpleUndirectedGraph(
+        vertices=("a", "b", "c"), edges=(("a", "b"), ("b", "c"))
+    )
 
 
 def _expired(monkeypatch: pytest.MonkeyPatch, entry_module: Any) -> None:

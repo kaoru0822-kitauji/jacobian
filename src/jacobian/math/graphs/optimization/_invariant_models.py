@@ -10,29 +10,22 @@ from pydantic_core import PydanticCustomError
 from jacobian._models import StrictModel
 from jacobian.math.graphs.optimization._coloring_models import (
     ChromaticGraph,
-    GraphVertex,
-    PolynomialTimeGraph,
 )
 from jacobian.math.graphs.optimization._models import (
     OptimizationSearchStep,
     OptimizationStatus,
     OptimizationTermination,
 )
+from jacobian.math.graphs.values import GraphVertexLabel as GraphVertex
+from jacobian.math.graphs.values import SimpleUndirectedGraph
 
 
 class GraphInvariantRequest(StrictModel):
-    graph: PolynomialTimeGraph
-
-
-class GraphMaximumMatchingGraph(PolynomialTimeGraph):
-    """A simple graph bounded for the polynomial-time matching operation."""
-
-    vertices: tuple[GraphVertex, ...] = Field(max_length=256)
-    edges: tuple[tuple[GraphVertex, GraphVertex], ...] = Field(max_length=32640)
+    graph: SimpleUndirectedGraph
 
 
 class GraphMaximumMatchingRequest(StrictModel):
-    graph: GraphMaximumMatchingGraph
+    graph: SimpleUndirectedGraph
 
 
 class GraphGirthResult(StrictModel):

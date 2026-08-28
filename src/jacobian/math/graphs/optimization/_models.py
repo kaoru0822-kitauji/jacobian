@@ -9,10 +9,8 @@ from pydantic_core import PydanticCustomError
 
 from jacobian._exact import CanonicalRational, require_bounded_rational
 from jacobian._models import StrictModel
-from jacobian.math.graphs.optimization._coloring_models import (
-    ChromaticGraph,
-    GraphVertex,
-)
+from jacobian.math.graphs.optimization._coloring_models import ChromaticGraph
+from jacobian.math.graphs.values import GraphVertexLabel as GraphVertex
 
 OptimizationStatus = Literal["EXACT", "UNKNOWN"]
 OptimizationTermination = Literal[

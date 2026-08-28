@@ -4,50 +4,32 @@ from __future__ import annotations
 
 from typing import Annotated, Literal, Self
 
-from pydantic import Field, StrictInt, StringConstraints, model_validator
+from pydantic import (
+    AfterValidator,
+    Field,
+    StrictInt,
+    model_validator,
+)
 from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
-from jacobian.math.graphs.optimization._graph_validation import (
-    require_simple_undirected_graph,
-)
+from jacobian.math.graphs.values import GraphVertexLabel as GraphVertex
+from jacobian.math.graphs.values import SimpleUndirectedGraph
 
-GraphVertex = Annotated[
-    str,
-    StringConstraints(min_length=1, max_length=256, strict=True),
+
+def _require_chromatic_graph(graph: SimpleUndirectedGraph) -> SimpleUndirectedGraph:
+    if len(graph.vertices) > 32:
+        raise PydanticCustomError(
+            "graph.chromatic_vertex_bound",
+            "chromatic-number search supports at most 32 vertices",
+        )
+    return graph
+
+
+ChromaticGraph = Annotated[
+    SimpleUndirectedGraph,
+    AfterValidator(_require_chromatic_graph),
 ]
-
-
-class ChromaticGraph(StrictModel):
-    """A bounded simple undirected graph, accepting either edge orientation."""
-
-    vertices: tuple[GraphVertex, ...] = Field(max_length=32)
-    edges: tuple[tuple[GraphVertex, GraphVertex], ...] = Field(max_length=496)
-
-    @model_validator(mode="after")
-    def require_simple_graph(self) -> Self:
-        require_simple_undirected_graph(self.vertices, self.edges)
-        return self
-
-
-class PolynomialTimeGraph(StrictModel):
-    """A bounded simple undirected graph for polynomial-time invariants.
-
-    Mirrors :class:`ChromaticGraph` validation but with a larger envelope
-    (256 vertices, 32640 edges = 256*255/2) suitable for NetworkX
-    polynomial-time operations such as girth, edge/vertex connectivity,
-    Eulerian check, spanning-tree count, maximum matching, k-core, and
-    distance matrix. NP-hard Z3 operations continue to use
-    :class:`ChromaticGraph` (32 vertices) or their own tighter budgets.
-    """
-
-    vertices: tuple[GraphVertex, ...] = Field(max_length=256)
-    edges: tuple[tuple[GraphVertex, GraphVertex], ...] = Field(max_length=32640)
-
-    @model_validator(mode="after")
-    def require_simple_graph(self) -> Self:
-        require_simple_undirected_graph(self.vertices, self.edges)
-        return self
 
 
 class ChromaticNumberBudget(StrictModel):

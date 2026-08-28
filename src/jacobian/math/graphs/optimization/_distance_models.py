@@ -8,31 +8,18 @@ from pydantic import Field, StrictBool, StrictInt, model_validator
 from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
-from jacobian.math.graphs.optimization._coloring_models import (
-    GraphVertex,
-    PolynomialTimeGraph,
-)
+from jacobian.math.graphs.values import GraphVertexLabel as GraphVertex
+from jacobian.math.graphs.values import SimpleUndirectedGraph
 
 MAX_GRAPH_DISTANCE_MATRIX_ORDER = 256
 MAX_GRAPH_DISTANCE_MATRIX_EDGES = 32_640
 MAX_GRAPH_DISTANCE = MAX_GRAPH_DISTANCE_MATRIX_ORDER - 1
 
 
-class GraphDistanceMatrixGraph(PolynomialTimeGraph):
-    """A simple graph bounded for polynomial-time all-source BFS replay."""
-
-    vertices: tuple[GraphVertex, ...] = Field(
-        max_length=MAX_GRAPH_DISTANCE_MATRIX_ORDER
-    )
-    edges: tuple[tuple[GraphVertex, GraphVertex], ...] = Field(
-        max_length=MAX_GRAPH_DISTANCE_MATRIX_EDGES
-    )
-
-
 class GraphDistanceMatrixRequest(StrictModel):
     """One complete graph input for an exact distance matrix."""
 
-    graph: GraphDistanceMatrixGraph
+    graph: SimpleUndirectedGraph
 
 
 GraphDistance = (
@@ -180,7 +167,6 @@ __all__ = [
     "MAX_GRAPH_DISTANCE_MATRIX_EDGES",
     "MAX_GRAPH_DISTANCE_MATRIX_ORDER",
     "GraphDistance",
-    "GraphDistanceMatrixGraph",
     "GraphDistanceMatrixRequest",
     "GraphDistanceMatrixResult",
     "GraphDistanceRow",

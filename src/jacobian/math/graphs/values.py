@@ -55,8 +55,10 @@ def _require_canonical_text(value: str, *, kind: str, max_bytes: int) -> None:
 class SimpleUndirectedGraph(StrictModel):
     """Immutable canonical value for a finite simple undirected graph."""
 
-    vertices: tuple[str, ...] = Field(max_length=256)
-    edges: tuple[tuple[str, str], ...] = Field(max_length=32640)
+    vertices: tuple[str, ...] = Field(max_length=MAX_INDEXED_SIMPLE_GRAPH_VERTICES)
+    edges: tuple[tuple[str, str], ...] = Field(
+        max_length=MAX_INDEXED_SIMPLE_GRAPH_EDGES
+    )
 
     @model_validator(mode="after")
     def require_canonical_simple_graph(self) -> Self:

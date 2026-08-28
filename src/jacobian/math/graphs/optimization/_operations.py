@@ -9,11 +9,11 @@ from jacobian.math.graphs.optimization._coloring_models import (
     ChromaticGraph,
     ChromaticSearchStep,
     GraphChromaticNumberOutput,
-    PolynomialTimeGraph,
 )
+from jacobian.math.graphs.values import SimpleUndirectedGraph
 
 
-def canonical_graph(graph: ChromaticGraph) -> ChromaticGraph:
+def canonical_graph(graph: SimpleUndirectedGraph) -> SimpleUndirectedGraph:
     """Normalize vertex and undirected edge order for solver input."""
 
     edges = tuple(
@@ -22,7 +22,7 @@ def canonical_graph(graph: ChromaticGraph) -> ChromaticGraph:
             for edge_left, edge_right in graph.edges
         )
     )
-    return ChromaticGraph(vertices=tuple(sorted(graph.vertices)), edges=edges)
+    return SimpleUndirectedGraph(vertices=tuple(sorted(graph.vertices)), edges=edges)
 
 
 def coloring_cnf(
@@ -60,14 +60,11 @@ def coloring_cnf(
     return variable_names, tuple(clauses)
 
 
-def build_simple_graph(graph: ChromaticGraph | PolynomialTimeGraph) -> Any:
+def build_simple_graph(graph: SimpleUndirectedGraph) -> Any:
     """Build a networkx Graph from a validated graph.
 
-    Accepts either :class:`ChromaticGraph` (NP-hard, 32 vertices) or
-    :class:`PolynomialTimeGraph` (256 vertices) - both have already enforced
-    uniqueness, no self-loops, and edge endpoints within the vertex set, so
-    this is a thin structural projection.  It raises only on a contract-
-    internal inconsistency.
+    The canonical value has already enforced uniqueness, canonical edge
+    orientation, no self-loops, and declared endpoints.
     """
 
     import networkx as nx
