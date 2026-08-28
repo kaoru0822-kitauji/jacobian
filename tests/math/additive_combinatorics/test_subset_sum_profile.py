@@ -25,12 +25,13 @@ from jacobian.math.additive_combinatorics._operations import (
     compute_subset_sum_profile,
     verify_subset_sum_profile,
 )
-from jacobian.math.additive_combinatorics.operations import (
+from jacobian.math.additive_combinatorics._subset_sum_profile import (
     MAX_SUBSET_SUM_DP_TRANSITIONS,
     MAX_SUBSET_SUM_PROFILE_RESULT_BYTES,
-    _subset_sum_profile_envelope,
+    subset_sum_profile_envelope,
 )
 from jacobian.math.additive_combinatorics.values import (
+    MAX_INDEXED_INTEGER_SEQUENCE_ITEMS,
     MAX_SUBSET_SUM_ITEM_DIGITS,
     MAX_SUBSET_SUM_ITEMS,
     MAX_SUBSET_SUM_SUM_DIGITS,
@@ -240,14 +241,14 @@ def test_source_item_count_bound_is_enforced_by_admission() -> None:
         SubsetSumProfileRequest(source=widened)
 
     with pytest.raises(ValidationError):
-        IndexedIntegerSequence(items=("0",) * (500_000 + 1))
+        IndexedIntegerSequence(items=("0",) * (MAX_INDEXED_INTEGER_SEQUENCE_ITEMS + 1))
 
 
 def test_profile_envelope_rejects_oversized_sources_before_integer_conversion() -> None:
     widened = IndexedIntegerSequence(items=("0",) * (MAX_SUBSET_SUM_ITEMS + 1))
 
     with pytest.raises(ValueError):
-        _subset_sum_profile_envelope(widened)
+        subset_sum_profile_envelope(widened)
 
 
 def test_raw_item_count_bound_is_enforced_before_nested_parsing() -> None:

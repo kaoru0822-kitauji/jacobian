@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from itertools import product as iproduct
 
-from sympy.combinatorics import Permutation, PermutationGroup
+from sympy.combinatorics import Permutation
+from sympy.combinatorics import PermutationGroup as SympyPermutationGroup
 
-from jacobian.math.group._models import PermutationGroupRequest
+from jacobian.math.group._models import PermutationGroup
 from jacobian.math.group_cohomology._models import (
     MAX_BAR_MATRIX_CELLS,
     MAX_COCHAIN_DEGREE,
@@ -18,9 +19,9 @@ from jacobian.math.group_cohomology._models import (
 )
 
 
-def _enumerated_group_order(group: PermutationGroupRequest) -> int:
+def _enumerated_group_order(group: PermutationGroup) -> int:
     return int(
-        PermutationGroup(*(Permutation(list(g)) for g in group.generators)).order()
+        SympyPermutationGroup(*(Permutation(list(g)) for g in group.generators)).order()
     )
 
 
@@ -55,22 +56,17 @@ def _require_admitted_request(request: GroupCohomologyRequest) -> int:
     return order
 
 
-def _enumerate_group_elements(group: PermutationGroupRequest) -> list[tuple[int, ...]]:
+def _enumerate_group_elements(group: PermutationGroup) -> list[tuple[int, ...]]:
     """Enumerate all elements of a permutation group."""
-    from sympy.combinatorics import Permutation, PermutationGroup
-
     perms = [Permutation(list(g)) for g in group.generators]
-    pg = PermutationGroup(perms)
+    pg = SympyPermutationGroup(perms)
     return [tuple(p.array_form) for p in pg.elements]
 
 
 def _cayley_table(elements: list[tuple[int, ...]]) -> list[list[int]]:
     """Index the group multiplication over the enumerated elements."""
-    from sympy.combinatorics import Permutation, PermutationGroup
-
     index = {element: i for i, element in enumerate(elements)}
     perms = [Permutation(list(e)) for e in elements]
-    PermutationGroup(perms)
     table = [[0] * len(elements) for _ in elements]
     for i, a in enumerate(perms):
         for j, b in enumerate(perms):

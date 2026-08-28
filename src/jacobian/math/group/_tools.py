@@ -18,7 +18,7 @@ from jacobian.math.group._models import (
     GroupStabilizerResult,
     GroupSubgroupLatticeRequest,
     GroupSubgroupLatticeResult,
-    PermutationGroupRequest,
+    PermutationGroup,
 )
 from jacobian.math.group._operations import (
     compute_element_order,
@@ -66,7 +66,7 @@ GROUP_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
         "group.order.compute",
         "Compute the exact order of a finite permutation group",
         "Compute the exact order of a permutation group given by generators via SymPy's Schreier-Sims algorithm.",
-        PermutationGroupRequest,
+        PermutationGroup,
         GroupOrderResult,
         compute_group_order,
         "group",

@@ -10,7 +10,7 @@ from jacobian.math.group import group_orbit, group_order, group_stabilizer
 from jacobian.math.group._models import (
     GroupOrbitRequest,
     GroupStabilizerRequest,
-    PermutationGroupRequest,
+    PermutationGroup,
 )
 from jacobian.math.group._operations import (
     compute_group_orbit,
@@ -29,7 +29,7 @@ def _group_error(code: str) -> Iterator[None]:
 
 
 def test_group_orbit_contract_binds_the_point_to_the_declared_degree() -> None:
-    group = PermutationGroupRequest(degree=2, generators=((1, 0),))
+    group = PermutationGroup(degree=2, generators=((1, 0),))
     with _group_error("group.point_out_of_range"):
         GroupOrbitRequest(group=group, point=3)
 
@@ -37,7 +37,7 @@ def test_group_orbit_contract_binds_the_point_to_the_declared_degree() -> None:
 def test_group_orbit_request_accepts_stabilizer_value_unchanged() -> None:
     """The advertised chaining shape: a stabilizer result's canonical
     subgroup value feeds the orbit request without reshaping."""
-    stabilizer_value = PermutationGroupRequest(degree=4, generators=((0, 1, 2, 3),))
+    stabilizer_value = PermutationGroup(degree=4, generators=((0, 1, 2, 3),))
     request = GroupOrbitRequest(group=stabilizer_value, point=0)
     assert request.group == stabilizer_value
     result = compute_group_orbit(request)
@@ -74,7 +74,7 @@ def test_group_conjugacy_classes_abelian_group_is_singletons() -> None:
     """In an abelian group every element is its own conjugacy class."""
     from jacobian.math.group._models import (
         GroupConjugacyClassesRequest,
-        PermutationGroupRequest,
+        PermutationGroup,
     )
     from jacobian.math.group._operations import (
         compute_group_conjugacy_classes,
@@ -86,9 +86,7 @@ def test_group_conjugacy_classes_abelian_group_is_singletons() -> None:
     result = compute_group_conjugacy_classes(
         GroupConjugacyClassesRequest(degree=3, generators=gens),
     )
-    order = int(
-        compute_group_order(PermutationGroupRequest(degree=3, generators=gens)).order
-    )
+    order = int(compute_group_order(PermutationGroup(degree=3, generators=gens)).order)
     assert order == 3
     assert len(result.classes) == 3
     for cls in result.classes:
@@ -238,7 +236,7 @@ def test_group_conjugacy_classes_result_round_trips_through_model_dump() -> None
 
 
 def test_group_stabilizer_request_takes_the_canonical_group_value() -> None:
-    group = PermutationGroupRequest(degree=3, generators=S3_GENERATORS)
+    group = PermutationGroup(degree=3, generators=S3_GENERATORS)
     request = GroupStabilizerRequest(group=group, point=0)
     assert request.group == group
 
@@ -252,7 +250,7 @@ def test_group_stabilizer_request_takes_the_canonical_group_value() -> None:
 
 def test_group_stabilizer_chains_its_own_result_unchanged() -> None:
     """A stabilizer chain feeds each result's subgroup back as ``group``."""
-    group = PermutationGroupRequest(
+    group = PermutationGroup(
         degree=6,
         generators=((1, 2, 3, 0, 4, 5), (0, 2, 1, 3, 5, 4)),
     )
@@ -280,7 +278,7 @@ def test_group_stabilizer_chains_its_own_result_unchanged() -> None:
 
 def test_group_stabilizer_result_serializes_into_the_next_request() -> None:
     """The serialized nested subgroup drops into the next wire request."""
-    group = PermutationGroupRequest(degree=4, generators=((1, 2, 3, 0),))
+    group = PermutationGroup(degree=4, generators=((1, 2, 3, 0),))
     result = compute_group_stabilizer(GroupStabilizerRequest(group=group, point=0))
     chained = GroupStabilizerRequest.model_validate(
         {"group": result.stabilizer.model_dump(), "point": 0}
@@ -289,12 +287,12 @@ def test_group_stabilizer_result_serializes_into_the_next_request() -> None:
 
 
 def test_native_stabilizer_returns_canonical_group_value_consumers_accept() -> None:
-    group = PermutationGroupRequest(
+    group = PermutationGroup(
         degree=4,
         generators=((1, 2, 3, 0), (0, 3, 2, 1)),
     )
     stab = group_stabilizer(group, 0)
-    assert isinstance(stab, PermutationGroupRequest)
+    assert isinstance(stab, PermutationGroup)
     assert stab.degree == group.degree
     assert all(generator[0] == 0 for generator in stab.generators)
 
@@ -310,7 +308,7 @@ def test_native_stabilizer_returns_canonical_group_value_consumers_accept() -> N
 
 def test_group_stabilizer_orbit_stabilizer_theorem() -> None:
     """|G| = |orbit(point)| * |stabilizer(point)| for S3."""
-    group = PermutationGroupRequest(degree=3, generators=S3_GENERATORS)
+    group = PermutationGroup(degree=3, generators=S3_GENERATORS)
     order = int(compute_group_order(group).order)
     orbit = compute_group_orbit(GroupOrbitRequest(group=group, point=0)).orbit
     stab = compute_group_stabilizer(GroupStabilizerRequest(group=group, point=0))
@@ -328,7 +326,7 @@ def test_group_stabilizer_orbit_stabilizer_theorem() -> None:
 
 def test_group_stabilizer_trivial_is_identity_and_consumer_compatible() -> None:
     """Trivial stabilizer must be consumable without reshaping."""
-    group = PermutationGroupRequest(degree=4, generators=((1, 2, 3, 0),))
+    group = PermutationGroup(degree=4, generators=((1, 2, 3, 0),))
     stab = group_stabilizer(group, 0)
     assert stab.generators == ((0, 1, 2, 3),)
     assert group_order(stab) == 1
@@ -340,7 +338,7 @@ def test_group_stabilizer_trivial_is_identity_and_consumer_compatible() -> None:
 
 
 def test_group_stabilizer_degree_one_boundary() -> None:
-    group = PermutationGroupRequest(degree=1, generators=((0,),))
+    group = PermutationGroup(degree=1, generators=((0,),))
     stab = group_stabilizer(group, 0)
     assert stab.generators == ((0,),)
     assert group_order(stab) == 1
@@ -349,7 +347,7 @@ def test_group_stabilizer_degree_one_boundary() -> None:
 
 
 def test_group_stabilizer_rejects_invalid_point() -> None:
-    group = PermutationGroupRequest(degree=2, generators=((1, 0),))
+    group = PermutationGroup(degree=2, generators=((1, 0),))
     with _group_error("group.point_out_of_range"):
         GroupStabilizerRequest(group=group, point=5)
     with pytest.raises(ValueError, match="point"):
@@ -363,11 +361,11 @@ def test_group_subgroup_lattice_serialization_is_hash_seed_independent() -> None
     import sys
 
     script = (
-        "from jacobian.math.group._models import PermutationGroupRequest;"
+        "from jacobian.math.group._models import PermutationGroup;"
         "from jacobian.math.group.operations import subgroup_lattice;"
         "import json;"
         "print(json.dumps([entry.model_dump(mode='json') for entry in "
-        "subgroup_lattice(PermutationGroupRequest(degree=4, generators=((1, 2, 3, 0),)))]))"
+        "subgroup_lattice(PermutationGroup(degree=4, generators=((1, 2, 3, 0),)))]))"
     )
     outputs = set()
     for seed in ("0", "1", "424242"):

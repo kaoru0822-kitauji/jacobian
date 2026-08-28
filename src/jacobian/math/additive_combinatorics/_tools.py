@@ -31,6 +31,10 @@ from jacobian.math.additive_combinatorics._operations import (
     compute_sumset_cardinality,
     decide_direct_sum_predicate,
 )
+from jacobian.math.additive_combinatorics._subset_sum_profile import (
+    MAX_SUBSET_SUM_DP_TRANSITIONS,
+    MAX_SUBSET_SUM_PROFILE_RESULT_BYTES,
+)
 from jacobian.math.additive_combinatorics._subset_sum_residue import (
     MAX_RESIDUE_PROFILE_DP_CELLS,
     MAX_RESIDUE_PROFILE_MODULUS,
@@ -44,10 +48,6 @@ from jacobian.math.additive_combinatorics._subset_sum_target import (
     SubsetSumTargetRequest,
     SubsetSumTargetResult,
     solve_subset_sum_target_request,
-)
-from jacobian.math.additive_combinatorics.operations import (
-    MAX_SUBSET_SUM_DP_TRANSITIONS,
-    MAX_SUBSET_SUM_PROFILE_RESULT_BYTES,
 )
 from jacobian.math.additive_combinatorics.values import (
     MAX_SUBSET_SUM_ITEM_DIGITS,

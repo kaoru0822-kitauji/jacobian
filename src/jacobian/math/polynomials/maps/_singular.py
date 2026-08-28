@@ -25,6 +25,7 @@ from jacobian.math.polynomials.maps._models import (
     MAX_GENERIC_FIBER_CERTIFICATE_SOURCE_EXPONENT,
     MAX_GENERIC_FIBER_CERTIFICATE_TERMS,
     MAX_GENERIC_FIBER_COEFFICIENT_TERMS,
+    MAX_GENERIC_FIBER_PARAMETER_TERMS,
     MAX_GENERIC_FIBER_POLYNOMIAL_TERMS,
     GenericDegreeComputationBudget,
     GenericFiberCertificate,
@@ -221,7 +222,7 @@ def _parse_parameter_polynomial(
         if exponent_tuple in terms:
             raise ValueError("Singular returned duplicate parameter monomials")
         terms[exponent_tuple] = sign * coefficient
-    if len(terms) > 256:
+    if len(terms) > MAX_GENERIC_FIBER_PARAMETER_TERMS:
         raise _ResultLimitExceededError(
             "Singular parameter support exceeds the exact-result limit"
         )

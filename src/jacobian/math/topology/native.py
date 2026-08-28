@@ -9,18 +9,9 @@ __all__ = ["simplicial_chain_complex_value"]
 
 
 def simplicial_chain_complex_value(result: ChainComplexResult) -> ChainComplexValue:
-    """The canonical chain-complex value of one simplicial chain complex.
-
-    Accepts the producer's ``ChainComplexResult`` unchanged and returns
-    the domain-owned ``ChainComplexValue`` consumed by homology, tensor,
-    map, and cone operations. Producer results already carry this value
-    as ``canonical_value``; this wrapper serves callers holding an older
-    deserialized result.
-    """
+    """Return the canonical value carried by a simplicial chain result."""
     from jacobian.math.topology._operations import (
         _canonical_chain_complex_value,
     )
 
-    if result.canonical_value is not None:
-        return result.canonical_value
     return _canonical_chain_complex_value(result)

@@ -36,6 +36,7 @@ MAX_GENERIC_FIBER_BASIS_POLYNOMIALS = 32
 MAX_GENERIC_FIBER_POLYNOMIAL_TERMS = 4_096
 MAX_GENERIC_FIBER_CERTIFICATE_TERMS = 4_096
 MAX_GENERIC_FIBER_COEFFICIENT_TERMS = 16_384
+MAX_GENERIC_FIBER_PARAMETER_TERMS = 256
 MAX_GENERIC_FIBER_STANDARD_MONOMIALS = 512
 MAX_GENERIC_FIBER_CERTIFICATE_SOURCE_EXPONENT = MAX_POLYNOMIAL_EXPONENT
 MAX_GENERIC_FIBER_STANDARD_MONOMIAL_EXPONENT = MAX_GENERIC_FIBER_STANDARD_MONOMIALS - 1
@@ -94,7 +95,9 @@ class JacobianResult(StrictModel):
 
     n_inputs: int = Field(ge=1, le=MAX_MAP_INPUTS)
     n_outputs: int = Field(ge=1, le=MAX_MAP_OUTPUTS)
-    entries: tuple[RationalPolynomial, ...] = Field(max_length=160)
+    entries: tuple[RationalPolynomial, ...] = Field(
+        max_length=MAX_MAP_INPUTS * MAX_MAP_OUTPUTS
+    )
 
     @model_validator(mode="after")
     def require_matrix_shape(self) -> Self:

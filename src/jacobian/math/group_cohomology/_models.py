@@ -8,7 +8,7 @@ from pydantic import Field, model_validator
 from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
-from jacobian.math.group._models import PermutationGroupRequest
+from jacobian.math.group._models import PermutationGroup
 
 MAX_GROUP_ORDER = 64
 # Degree n allocates an ``order**(n+1)``-element cochain space C^n and a dense
@@ -64,7 +64,7 @@ class GroupCohomologyRequest(StrictModel):
     or the conservative fallback ceiling for the degenerate order-1 group.
     """
 
-    group: PermutationGroupRequest = Field(
+    group: PermutationGroup = Field(
         description=(
             "Permutation group as the canonical group-domain value "
             "(degree + generators); pass a previous stabilizer result's "

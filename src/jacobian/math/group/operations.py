@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from jacobian.math.group._models import PermutationGroupRequest, SubgroupEntry
+from jacobian.math.group._models import PermutationGroup, SubgroupEntry
 
 __all__ = [
     "element_order",
@@ -16,7 +16,7 @@ __all__ = [
 ]
 
 
-def _backend_group(group: PermutationGroupRequest) -> Any:
+def _backend_group(group: PermutationGroup) -> Any:
     from sympy.combinatorics import Permutation, PermutationGroup
 
     return PermutationGroup(
@@ -24,7 +24,7 @@ def _backend_group(group: PermutationGroupRequest) -> Any:
     )
 
 
-def group_order(group: PermutationGroupRequest) -> int:
+def group_order(group: PermutationGroup) -> int:
     """Return the exact order of a permutation group via Schreier-Sims."""
     return int(_backend_group(group).order())
 
@@ -38,7 +38,7 @@ def element_order(degree: int, generator: list[int]) -> int:
     return int(Permutation(list(generator)).order())
 
 
-def group_orbit(group: PermutationGroupRequest, point: int) -> list[int]:
+def group_orbit(group: PermutationGroup, point: int) -> list[int]:
     """Return the sorted orbit of a point under a permutation group."""
     if not 0 <= point < group.degree:
         raise ValueError("point must be in 0..n-1")
@@ -95,9 +95,7 @@ def group_conjugacy_classes(
     return canonical
 
 
-def group_stabilizer(
-    group: PermutationGroupRequest, point: int
-) -> PermutationGroupRequest:
+def group_stabilizer(group: PermutationGroup, point: int) -> PermutationGroup:
     """Return the point stabilizer as the canonical permutation-group value.
 
     The stabilizer of ``point`` is the subgroup of elements fixing ``point``.
@@ -117,7 +115,7 @@ def group_stabilizer(
     # trivial stabilizer by the identity permutation.
     if not generators:
         generators = (tuple(range(group.degree)),)
-    return PermutationGroupRequest(degree=group.degree, generators=generators)
+    return PermutationGroup(degree=group.degree, generators=generators)
 
 
 class SubgroupLatticeBudgetExceededError(ValueError):
@@ -132,7 +130,7 @@ class SubgroupLatticeBudgetExceededError(ValueError):
 MAX_SUBGROUP_LATTICE_CLOSURES = 200_000
 
 
-def _require_admitted_lattice_source(group: PermutationGroupRequest) -> Any:
+def _require_admitted_lattice_source(group: PermutationGroup) -> Any:
     """Return the bounded backend permutation group for an admitted source."""
     from jacobian.math.group._models import MAX_SUBGROUP_LATTICE_GROUP_ORDER
 
@@ -195,7 +193,7 @@ def _extend_by_element(
     return seen, generated
 
 
-def subgroup_lattice(group: PermutationGroupRequest) -> list[SubgroupEntry]:
+def subgroup_lattice(group: PermutationGroup) -> list[SubgroupEntry]:
     """Return every subgroup of a permutation group as canonical entries.
 
     Each entry retains its subgroup as the canonical permutation-group value
@@ -257,7 +255,7 @@ def subgroup_lattice(group: PermutationGroupRequest) -> list[SubgroupEntry]:
     lattice.sort(key=lambda entry: (entry[1], entry[0]))
     return [
         SubgroupEntry(
-            group=PermutationGroupRequest(degree=degree, generators=generators),
+            group=PermutationGroup(degree=degree, generators=generators),
             order=order,
         )
         for generators, order in lattice

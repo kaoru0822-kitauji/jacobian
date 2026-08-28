@@ -21,6 +21,7 @@ from jacobian.math.additive_combinatorics._subset_sum_target import (
     MAX_SUBSET_SUM_COMPLETE_CALL_PASSES,
     MAX_SUBSET_SUM_INTEGER_DIGITS,
     MAX_SUBSET_SUM_RECONSTRUCTED_DIGITS,
+    MAX_SUBSET_SUM_SOURCE_WIRE_BYTES,
     MAX_SUBSET_SUM_TOTAL_TRANSITIONS,
     MAX_SUBSET_SUM_TRANSITIONS_PER_PASS,
     SubsetSumTargetRequest,
@@ -33,7 +34,10 @@ from jacobian.math.additive_combinatorics._subset_sum_target_kernel import (
 from jacobian.math.additive_combinatorics._tools import (
     ADDITIVE_COMBINATORICS_OPERATIONS,
 )
-from jacobian.math.additive_combinatorics.values import MAX_SUBSET_SUM_ITEMS
+from jacobian.math.additive_combinatorics.values import (
+    MAX_INDEXED_INTEGER_SEQUENCE_ITEMS,
+    MAX_SUBSET_SUM_ITEMS,
+)
 
 
 def _operation() -> MathTool[SubsetSumTargetRequest, SubsetSumTargetResult]:
@@ -188,7 +192,10 @@ def test_result_bounds_raw_witness_and_sum() -> None:
         SubsetSumTargetResult.model_validate({**payload, "witness": {"indices": [3]}})
     with pytest.raises(ValidationError):
         SubsetSumTargetResult.model_validate(
-            {**payload, "reconstructed_sum": "9" * 263}
+            {
+                **payload,
+                "reconstructed_sum": "9" * (MAX_SUBSET_SUM_RECONSTRUCTED_DIGITS + 1),
+            }
         )
 
 
@@ -199,7 +206,7 @@ def test_request_admits_large_low_state_and_exact_digit_and_state_boundaries() -
     many_zeros = _operation().run(_request((0,) * 256, 0, allow_empty_subset=True))
     assert many_zeros.witness == IndexSubset(indices=())
 
-    widest = "9" * 256
+    widest = "9" * MAX_SUBSET_SUM_INTEGER_DIGITS
     wide_result = _operation().run(
         SubsetSumTargetRequest(
             source=IndexedIntegerSequence(items=(widest,)),
@@ -220,28 +227,28 @@ def test_request_rejects_immediately_above_each_search_bound() -> None:
     with pytest.raises(ValueError):
         _operation().run(
             SubsetSumTargetRequest(
-                source={"items": ["1" + "0" * 256]},  # type: ignore[arg-type]
+                source={"items": ["1" + "0" * MAX_SUBSET_SUM_INTEGER_DIGITS]},  # type: ignore[arg-type]
                 target="0",
                 allow_empty_subset=False,
             )
         )
     with pytest.raises(ValidationError):
         SubsetSumTargetRequest(
-            source={"items": ["-" + "9" * 256]},  # type: ignore[arg-type]
-            target="-" + "9" * 263,
+            source={"items": ["-" + "9" * MAX_SUBSET_SUM_INTEGER_DIGITS]},  # type: ignore[arg-type]
+            target="-" + "9" * (MAX_SUBSET_SUM_RECONSTRUCTED_DIGITS + 1),
             allow_empty_subset=True,
         )
     with pytest.raises(ValueError):
         _operation().run(
             SubsetSumTargetRequest(
-                source={"items": ["-" + "9" * 256]},  # type: ignore[arg-type]
-                target="9" * 263,
+                source={"items": ["-" + "9" * MAX_SUBSET_SUM_INTEGER_DIGITS]},  # type: ignore[arg-type]
+                target="9" * (MAX_SUBSET_SUM_RECONSTRUCTED_DIGITS + 1),
                 allow_empty_subset=True,
             )
         )
 
-    widest = "9" * 256
-    above_wire_count = (4 * 1024 * 1024 - 64) // (len(widest) + 4) + 1
+    widest = "9" * MAX_SUBSET_SUM_INTEGER_DIGITS
+    above_wire_count = (MAX_SUBSET_SUM_SOURCE_WIRE_BYTES - 64) // (len(widest) + 4) + 1
     with pytest.raises(ValidationError):
         SubsetSumTargetRequest(
             source={"items": [widest] * above_wire_count},  # type: ignore[arg-type]
@@ -252,7 +259,10 @@ def test_request_rejects_immediately_above_each_search_bound() -> None:
     with pytest.raises(ValidationError):
         SubsetSumTargetRequest.model_validate(
             {
-                "source": {"items": ["not-an-integer"] * (500_000 + 1)},
+                "source": {
+                    "items": ["not-an-integer"]
+                    * (MAX_INDEXED_INTEGER_SEQUENCE_ITEMS + 1)
+                },
                 "target": "0",
                 "allow_empty_subset": True,
             }
@@ -390,9 +400,9 @@ def test_request_admits_sources_at_the_profile_item_ceiling() -> None:
 
 
 def test_request_accepts_targets_at_the_derived_subset_sum_width() -> None:
-    widest = "9" * 256
+    widest = "9" * MAX_SUBSET_SUM_INTEGER_DIGITS
     attained_total = str(2 * int(widest))
-    assert len(attained_total) == 257
+    assert len(attained_total) == MAX_SUBSET_SUM_INTEGER_DIGITS + 1
 
     attained = _operation().run(
         SubsetSumTargetRequest(
@@ -442,7 +452,7 @@ def test_request_resolves_targets_beyond_the_derived_subset_sum_width() -> None:
     wide = _operation().run(
         SubsetSumTargetRequest(
             source={"items": []},  # type: ignore[arg-type]
-            target="1" + "0" * 256,
+            target="1" + "0" * MAX_SUBSET_SUM_INTEGER_DIGITS,
             allow_empty_subset=False,
         )
     )
@@ -588,7 +598,7 @@ def test_schema_publishes_enforced_target_and_source_bounds() -> None:
     )
 
     items_schema = schema["properties"]["source"]["properties"]["items"]
-    assert items_schema["maxItems"] == 500_000
+    assert items_schema["maxItems"] == MAX_INDEXED_INTEGER_SEQUENCE_ITEMS
     description = items_schema["description"]
     assert f"{MAX_SUBSET_SUM_INTEGER_DIGITS} decimal digits" in description
     item_schema = items_schema["items"]
@@ -617,8 +627,8 @@ def test_published_item_pattern_matches_the_enforced_digit_boundary() -> None:
     assert pattern.fullmatch(at_ceiling)
     assert not pattern.fullmatch(beyond)
 
-    # The same 257-digit item the published pattern rejects is rejected by
-    # typed request validation with the enforced bound named.
+    # The same above-bound item rejected by the published pattern is rejected
+    # by typed request validation.
     with pytest.raises(ValidationError):
         SubsetSumTargetRequest.model_validate(
             {
@@ -632,15 +642,16 @@ def test_published_item_pattern_matches_the_enforced_digit_boundary() -> None:
 def test_target_scalar_pattern_encodes_the_absolute_digit_ceiling() -> None:
     adapter = TypeAdapter(_SubsetSumTargetScalar)
 
-    assert adapter.validate_python("9" * 262) == "9" * 262
-    # Only a negative 262-digit value needs the extra sign character.
-    assert adapter.validate_python("-" + "9" * 262) == "-" + "9" * 262
+    ceiling = "9" * MAX_SUBSET_SUM_RECONSTRUCTED_DIGITS
+    assert adapter.validate_python(ceiling) == ceiling
+    # Only a negative ceiling-width value needs the extra sign character.
+    assert adapter.validate_python("-" + ceiling) == "-" + ceiling
 
     with pytest.raises(ValidationError):
-        adapter.validate_python("9" * 263)
+        adapter.validate_python("9" * (MAX_SUBSET_SUM_RECONSTRUCTED_DIGITS + 1))
     with pytest.raises(ValidationError):
-        adapter.validate_python("-" + "9" * 263)
+        adapter.validate_python("-" + "9" * (MAX_SUBSET_SUM_RECONSTRUCTED_DIGITS + 1))
     with pytest.raises(ValidationError):
-        adapter.validate_python("0" * 262)
+        adapter.validate_python("0" * MAX_SUBSET_SUM_RECONSTRUCTED_DIGITS)
     with pytest.raises(ValidationError):
-        adapter.validate_python("0" + "9" * 261)
+        adapter.validate_python("0" + "9" * (MAX_SUBSET_SUM_RECONSTRUCTED_DIGITS - 1))

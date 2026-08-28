@@ -11,8 +11,6 @@ from jacobian.canonical import format_canonical_integer, parse_canonical_integer
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.additive_combinatorics import _multiset_sum
 from jacobian.math.additive_combinatorics._models import (
-    _MAX_MULTISET_SUM_ENUMERATION_WORK,
-    _MAX_MULTISET_SUM_SUPPORT_SIZE,
     AdditiveEnergyRequest,
     AdditiveEnergyResult,
     DirectSumPredicateRequest,
@@ -35,7 +33,11 @@ from jacobian.math.additive_combinatorics._models import (
     _require_direct_sum_result_transport_bound,
     _vector_from_ints,
 )
-from jacobian.math.additive_combinatorics._multiset_sum import count_sums
+from jacobian.math.additive_combinatorics._multiset_sum import (
+    MAX_ENUMERATION_WORK,
+    MAX_SUPPORT_SIZE,
+    count_sums,
+)
 from jacobian.math.additive_combinatorics._subset_sum_profile import (
     subset_sum_profile_counts,
     subset_sum_profile_envelope,
@@ -142,25 +144,25 @@ def _admit_multiset_sum_profile(
     work = _multiset_sum.enumeration_work(
         values, request.arity, bounds, candidate_count
     )
-    if work > _MAX_MULTISET_SUM_ENUMERATION_WORK:
+    if work > MAX_ENUMERATION_WORK:
         raise OperationDomainValidationError(
             location=("arity",),
             code="additive_combinatorics.multiset_sum.work_bound",
             message=(
                 f"multiset-sum enumeration requires {work} coordinate steps, "
-                f"exceeding the {_MAX_MULTISET_SUM_ENUMERATION_WORK}-step bound"
+                f"exceeding the {MAX_ENUMERATION_WORK}-step bound"
             ),
         )
     support_bound = _multiset_sum.support_bound(
         values, request.arity, bounds, candidate_count
     )
-    if support_bound > _MAX_MULTISET_SUM_SUPPORT_SIZE:
+    if support_bound > MAX_SUPPORT_SIZE:
         raise OperationDomainValidationError(
             location=("arity",),
             code="additive_combinatorics.multiset_sum.support_bound",
             message=(
                 f"multiset-sum profile may contain {support_bound} rows, exceeding "
-                f"the {_MAX_MULTISET_SUM_SUPPORT_SIZE}-row result bound; supply a "
+                f"the {MAX_SUPPORT_SIZE}-row result bound; supply a "
                 "narrower closed sum window"
             ),
         )

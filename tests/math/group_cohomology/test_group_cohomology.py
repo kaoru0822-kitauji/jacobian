@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from jacobian.math.group._models import PermutationGroupRequest as PermutationGroup
+from jacobian.math.group._models import PermutationGroup
 from jacobian.math.group_cohomology._models import (
     MAX_COCHAIN_DEGREE,
     CohomologyGroup,
@@ -264,11 +264,11 @@ class TestExactBarComplex:
         assert {g.degree: g.betti for g in result.groups} == dict.fromkeys(range(8), 1)
 
     def test_reuses_canonical_permutation_group_value(self) -> None:
-        """GroupCohomologyRequest reuses PermutationGroupRequest so native
+        """GroupCohomologyRequest reuses PermutationGroup so native
         composition such as GroupCohomologyRequest(group=result.stabilizer)
         and result.request.group -> group consumer works unchanged."""
         from jacobian.math.group._models import (
-            PermutationGroupRequest as CanonicalGroup,
+            PermutationGroup as CanonicalGroup,
         )
         from jacobian.math.group.operations import group_order, group_stabilizer
 

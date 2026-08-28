@@ -18,7 +18,14 @@ from jacobian.canonical import (
     parse_canonical_integer,
     strict_json_object_size,
 )
-from jacobian.math.additive_combinatorics import _multiset_sum
+from jacobian.math.additive_combinatorics._multiset_sum import (
+    MAX_ARITY,
+    MAX_ARITY_DIGITS,
+    MAX_ELEMENT_DIGITS,
+    MAX_INTEGER_LENGTH,
+    MAX_RESULT_DIGITS,
+    MAX_SUPPORT_SIZE,
+)
 from jacobian.math.additive_combinatorics._subset_sum_profile import (
     MAX_SUBSET_SUM_DP_TRANSITIONS,
     MAX_SUBSET_SUM_PROFILE_RESULT_BYTES,
@@ -39,12 +46,6 @@ _MAX_CARTESIAN_PAIR_COUNT = 256 * 256
 _MAX_RESULT_SIZE = _MAX_SET_SIZE * _MAX_SET_SIZE
 _MAX_DIMENSION = 8
 _MAX_COORDINATE_DIGITS = 6
-_MAX_MULTISET_SUM_ELEMENT_DIGITS = _multiset_sum.MAX_ELEMENT_DIGITS
-_MAX_MULTISET_SUM_ARITY = _multiset_sum.MAX_ARITY
-_MAX_MULTISET_SUM_ENUMERATION_WORK = _multiset_sum.MAX_ENUMERATION_WORK
-_MAX_MULTISET_SUM_INTEGER_LENGTH = _multiset_sum.MAX_INTEGER_LENGTH
-_MAX_MULTISET_SUM_RESULT_DIGITS = _multiset_sum.MAX_RESULT_DIGITS
-_MAX_MULTISET_SUM_SUPPORT_SIZE = _multiset_sum.MAX_SUPPORT_SIZE
 
 # ``direct_sum_predicate`` returns a complete partition of Z_n: every residue
 # occurs exactly once in either ``representatives`` or ``missing``.  Collisions
@@ -92,7 +93,7 @@ CanonicalMultisetSumBound = Annotated[
     str,
     StringConstraints(
         pattern=r"^(?:0|-?[1-9][0-9]*)$",
-        max_length=_MAX_MULTISET_SUM_INTEGER_LENGTH,
+        max_length=MAX_INTEGER_LENGTH,
         strict=True,
     ),
 ]
@@ -503,14 +504,14 @@ class MultisetSumWindow(StrictModel):
     lower: CanonicalMultisetSumBound = Field(
         description=(
             "Canonical lower endpoint of the closed sum window, carrying at "
-            f"most {_MAX_MULTISET_SUM_RESULT_DIGITS} digits plus an optional sign."
+            f"most {MAX_RESULT_DIGITS} digits plus an optional sign."
         ),
         examples=["0"],
     )
     upper: CanonicalMultisetSumBound = Field(
         description=(
             "Canonical upper endpoint of the closed sum window, carrying at "
-            f"most {_MAX_MULTISET_SUM_RESULT_DIGITS} digits plus an optional sign; "
+            f"most {MAX_RESULT_DIGITS} digits plus an optional sign; "
             "it must be at least lower."
         ),
         examples=["10"],
@@ -519,13 +520,12 @@ class MultisetSumWindow(StrictModel):
     @model_validator(mode="after")
     def require_nondecreasing_endpoints(self) -> Self:
         if any(
-            len(endpoint.lstrip("-")) > _MAX_MULTISET_SUM_RESULT_DIGITS
+            len(endpoint.lstrip("-")) > MAX_RESULT_DIGITS
             for endpoint in (self.lower, self.upper)
         ):
             raise _validation_error(
                 "require_nondecreasing_endpoints",
-                "sum window endpoints must carry at most "
-                f"{_MAX_MULTISET_SUM_RESULT_DIGITS} digits",
+                f"sum window endpoints must carry at most {MAX_RESULT_DIGITS} digits",
             )
         lower, upper = self.as_integer_bounds()
         if lower > upper:
@@ -544,11 +544,11 @@ class MultisetSumWindow(StrictModel):
 
 def _multiset_sum_source_values(source: FiniteIntegerSet) -> tuple[int, ...]:
     for element in source.elements:
-        if len(element.lstrip("-")) > _MAX_MULTISET_SUM_ELEMENT_DIGITS:
+        if len(element.lstrip("-")) > MAX_ELEMENT_DIGITS:
             raise _validation_error(
                 "_multiset_sum_source_values",
                 "multiset-sum source elements must carry at most "
-                f"{_MAX_MULTISET_SUM_ELEMENT_DIGITS} digits",
+                f"{MAX_ELEMENT_DIGITS} digits",
             )
     values = tuple(parse_canonical_integer(element) for element in source.elements)
     if values != tuple(sorted(values)):
@@ -562,7 +562,7 @@ def _multiset_sum_source_values(source: FiniteIntegerSet) -> tuple[int, ...]:
 _MULTISET_SUM_SOURCE_DESCRIPTION = (
     "A materialized finite set of distinct canonical integers in strictly "
     "increasing numeric order; each element carries at "
-    f"most {_MAX_MULTISET_SUM_ELEMENT_DIGITS} digits."
+    f"most {MAX_ELEMENT_DIGITS} digits."
 )
 
 
@@ -583,10 +583,10 @@ class MultisetSumRepresentationProfileRequest(StrictModel):
     )
     arity: int = Field(
         ge=0,
-        le=_MAX_MULTISET_SUM_ARITY,
+        le=MAX_ARITY,
         description=(
             f"Nonnegative multiset arity carrying at most "
-            f"{_multiset_sum.MAX_ARITY_DIGITS} decimal digits. Arity zero has "
+            f"{MAX_ARITY_DIGITS} decimal digits. Arity zero has "
             "one empty multiset with sum zero, including when the source is "
             "empty; admission derives the accepted envelope from candidate "
             "work and predicted support rather than from this magnitude."
@@ -613,10 +613,10 @@ class MultisetSumRepresentationProfileResult(StrictModel):
     """
 
     source: FiniteIntegerSet = Field(description=_MULTISET_SUM_SOURCE_DESCRIPTION)
-    arity: int = Field(ge=0, le=_MAX_MULTISET_SUM_ARITY)
+    arity: int = Field(ge=0, le=MAX_ARITY)
     window: MultisetSumWindow | None = None
     entries: tuple[RepresentationProfileEntry, ...] = Field(
-        default=(), max_length=_MAX_MULTISET_SUM_SUPPORT_SIZE
+        default=(), max_length=MAX_SUPPORT_SIZE
     )
 
     @model_validator(mode="after")

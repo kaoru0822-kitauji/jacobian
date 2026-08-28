@@ -56,7 +56,7 @@ def _require_bounded_group_order(
         )
 
 
-class PermutationGroupRequest(StrictModel):
+class PermutationGroup(StrictModel):
     """A finite permutation group given by generator permutations on {0,...,n-1}."""
 
     degree: int = Field(ge=1, le=MAX_GROUP_DEGREE)
@@ -78,11 +78,6 @@ class PermutationGroupRequest(StrictModel):
                     "each generator must be a permutation of 0..n-1",
                 )
         return self
-
-
-# ``PermutationGroup`` is the native canonical value.  The request-shaped
-# class name remains private because operation schemas retain it unchanged.
-PermutationGroup = PermutationGroupRequest
 
 
 class GroupOrderResult(StrictModel):
@@ -126,7 +121,7 @@ class GroupOrbitRequest(StrictModel):
     unchanged instead of being unpacked into parallel top-level fields.
     """
 
-    group: PermutationGroupRequest = Field(
+    group: PermutationGroup = Field(
         description=(
             "Permutation group acting on {0,...,degree-1} as the canonical "
             "value; pass a previous stabilizer or order request's group "
@@ -362,7 +357,7 @@ class GroupStabilizerRequest(StrictModel):
     passes a previous result's ``stabilizer`` subgroup unchanged as ``group``.
     """
 
-    group: PermutationGroupRequest = Field(
+    group: PermutationGroup = Field(
         description=(
             "Permutation group acting on {0,...,degree-1} as the canonical "
             "value; pass a previous stabilizer result's `stabilizer` subgroup "
@@ -453,7 +448,7 @@ class GroupStabilizerResult(StrictModel):
     """Point stabilizer as a canonical permutation-group value bound to its source.
 
     The result retains the source group and the stabilizer subgroup as nested
-    canonical :class:`PermutationGroupRequest` values (``degree`` + ``generators``)
+    canonical :class:`PermutationGroup` values (``degree`` + ``generators``)
     so the stabilizer can be passed unchanged to ``group.order.compute`` or any
     other permutation-group consumer without reshaping. The trivial stabilizer
     is represented by the identity permutation ``[0,...,degree-1]`` (the
@@ -466,10 +461,10 @@ class GroupStabilizerResult(StrictModel):
         le=MAX_GROUP_DEGREE - 1,
         description="Point whose stabilizer is computed; must satisfy 0 <= point < source.degree == stabilizer.degree.",
     )
-    source: PermutationGroupRequest = Field(
+    source: PermutationGroup = Field(
         description="Source permutation group as the canonical value (degree + generators)."
     )
-    stabilizer: PermutationGroupRequest = Field(
+    stabilizer: PermutationGroup = Field(
         description=(
             "Stabilizer subgroup as a canonical permutation-group value on the same "
             "degree; trivial stabilizer is represented by the identity permutation "
@@ -495,8 +490,8 @@ class GroupStabilizerResult(StrictModel):
     def _from_kernel(
         cls,
         point: int,
-        source: PermutationGroupRequest,
-        stabilizer: PermutationGroupRequest,
+        source: PermutationGroup,
+        stabilizer: PermutationGroup,
     ) -> Self:
         """Construct a stabilizer result emitted by the owner-local kernel."""
 
@@ -534,12 +529,12 @@ class GroupSubgroupLatticeRequest(StrictModel):
 class SubgroupEntry(StrictModel):
     """One subgroup as the canonical permutation-group value plus its order.
 
-    Carrying ``group: PermutationGroupRequest`` lets callers chain an
+    Carrying ``group: PermutationGroup`` lets callers chain an
     enumerated subgroup into ``group.order.compute``, ``group.orbit.compute``,
     or any other permutation-group consumer unchanged.
     """
 
-    group: PermutationGroupRequest
+    group: PermutationGroup
     order: int = Field(ge=1, le=MAX_SUBGROUP_LATTICE_GROUP_ORDER)
 
 

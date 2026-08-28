@@ -216,11 +216,6 @@ class HomomorphismCheckResult(StrictModel):
 # length so every accepted request terminates inside a tested bound.
 MAX_CYCLE_SEARCH_PATHS = 10_000_000
 
-# The kernel performs at most one exhaustive pass.  Result parsing is purely
-# structural; an independently supplied negative claim may instead be checked
-# through the explicit bounded verifier in ``_operations``.
-_MAX_SEARCH_PATHS_PER_PASS = MAX_CYCLE_SEARCH_PATHS
-
 
 def _canonical_max_degree(graph: SimpleUndirectedGraph) -> int:
     degree: dict[str, int] = dict.fromkeys(graph.vertices, 0)
@@ -273,12 +268,11 @@ class FixedLengthCycleRequest(StrictModel):
         # Conservative worst-case path-count bound: n * d^(length-1).
         d_max = _canonical_max_degree(self.graph)
         work = n * (d_max ** (self.length - 1))
-        if work > _MAX_SEARCH_PATHS_PER_PASS:
+        if work > MAX_CYCLE_SEARCH_PATHS:
             raise PydanticCustomError(
                 "graph.fixed_length_cycle_search_exceeds_max_search",
                 "fixed-length cycle search exceeds the "
-                f"{_MAX_SEARCH_PATHS_PER_PASS}-path per-pass budget "
-                f"({MAX_CYCLE_SEARCH_PATHS}-path work budget)",
+                f"{MAX_CYCLE_SEARCH_PATHS}-path work budget",
             )
         # The result echoes its source graph; reserve output headroom for
         # the envelope and witness labels beyond that echo.
@@ -357,12 +351,12 @@ def _require_negative_cycle_domain(graph: SimpleUndirectedGraph, length: int) ->
         )
     d_max = _canonical_max_degree(graph)
     work = n * (d_max ** (length - 1))
-    if work > _MAX_SEARCH_PATHS_PER_PASS:
+    if work > MAX_CYCLE_SEARCH_PATHS:
         raise PydanticCustomError(
             "graph.does_exist_decision_requires_retained_source_satisfy",
             "a DOES_NOT_EXIST decision requires the retained source "
             f"to satisfy the {MORPHISM_MAX_VERTICES}-vertex "
-            f"{_MAX_SEARCH_PATHS_PER_PASS}-path request budget",
+            f"{MAX_CYCLE_SEARCH_PATHS}-path request budget",
         )
 
 
@@ -474,12 +468,11 @@ class SubgraphPatternFindRequest(StrictModel):
         assignments = 1
         for step in range(k):
             assignments *= n - step
-            if assignments > _MAX_SEARCH_PATHS_PER_PASS:
+            if assignments > MAX_CYCLE_SEARCH_PATHS:
                 raise PydanticCustomError(
                     "graph.subgraph_pattern_search_exceeds_max_search_paths",
                     "subgraph-pattern search exceeds the "
-                    f"{_MAX_SEARCH_PATHS_PER_PASS}-assignment per-pass budget "
-                    f"({MAX_CYCLE_SEARCH_PATHS}-assignment work budget)",
+                    f"{MAX_CYCLE_SEARCH_PATHS}-assignment work budget",
                 )
 
         # The result echoes both source graphs; reserve output headroom for
@@ -543,18 +536,14 @@ def _require_negative_embedding_domain(
     assignments = 1
     for step in range(p_n):
         assignments *= h_n - step
-        if assignments > _MAX_SEARCH_PATHS_PER_PASS:
+        if assignments > MAX_CYCLE_SEARCH_PATHS:
             break
-    if (
-        p_n > MORPHISM_MAX_VERTICES
-        or p_n > h_n
-        or assignments > _MAX_SEARCH_PATHS_PER_PASS
-    ):
+    if p_n > MORPHISM_MAX_VERTICES or p_n > h_n or assignments > MAX_CYCLE_SEARCH_PATHS:
         raise PydanticCustomError(
             "graph.does_exist_decision_requires_retained_sources_satisfy",
             "a DOES_NOT_EXIST decision requires the retained sources "
             f"to satisfy the {MORPHISM_MAX_VERTICES}-vertex "
-            f"{_MAX_SEARCH_PATHS_PER_PASS}-assignment request budget",
+            f"{MAX_CYCLE_SEARCH_PATHS}-assignment request budget",
         )
 
 

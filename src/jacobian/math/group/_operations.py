@@ -28,12 +28,12 @@ from jacobian.math.group._models import (
     GroupStabilizerResult,
     GroupSubgroupLatticeRequest,
     GroupSubgroupLatticeResult,
-    PermutationGroupRequest,
+    PermutationGroup,
     _require_bounded_group_order,
 )
 
 
-def compute_group_order(request: PermutationGroupRequest) -> GroupOrderResult:
+def compute_group_order(request: PermutationGroup) -> GroupOrderResult:
     order = group_order(request)
     return GroupOrderResult(order=format_canonical_integer(order))
 
@@ -96,9 +96,7 @@ def compute_subgroup_lattice(
             location=("generators",), code=error.type, message=str(error)
         ) from error
 
-    source = PermutationGroupRequest(
-        degree=request.degree, generators=request.generators
-    )
+    source = PermutationGroup(degree=request.degree, generators=request.generators)
     try:
         subgroups = subgroup_lattice(source)
     except SubgroupLatticeBudgetExceededError as error:

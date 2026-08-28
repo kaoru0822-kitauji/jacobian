@@ -313,12 +313,6 @@ def _chain_result(
     )
 
 
-def _chain(
-    request: ChainComplexRequest,
-) -> ChainComplexResult:
-    return _chain_result(request)
-
-
 def _canonical_chain_complex_value(result: ChainComplexResult) -> ChainComplexValue:
     """The canonical chain-complex value carried by one chain result."""
     if result.canonical_value is None:
@@ -655,7 +649,7 @@ TOPOLOGY_OPERATIONS: tuple[TopologyOperation, ...] = (
         ),
         request_type=ChainComplexRequest,
         result_type=ChainComplexResult,
-        run=_chain,
+        run=_chain_result,
         tags=(
             "topology",
             "simplicial-complex",

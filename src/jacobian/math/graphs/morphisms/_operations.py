@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from jacobian.math.graphs.morphisms._models import (
-    _MAX_SEARCH_PATHS_PER_PASS,
+    MAX_CYCLE_SEARCH_PATHS,
     FixedLengthCycleRequest,
     FixedLengthCycleResult,
     GraphHomomorphism,
@@ -270,7 +270,7 @@ def compute_subgraph_pattern_find(
             request.pattern.edges,
             request.host.vertices,
             request.host.edges,
-            max_candidate_checks=_MAX_SEARCH_PATHS_PER_PASS,
+            max_candidate_checks=MAX_CYCLE_SEARCH_PATHS,
         )
     except SearchBudgetExceededError:
         # A search stopped at its budget establishes nothing either way.

@@ -10,12 +10,6 @@ from sympy import primerange
 
 from jacobian.canonical import CanonicalLimits, canonicalize_json
 from jacobian.math.additive_combinatorics._models import (
-    _MAX_MULTISET_SUM_ARITY,
-    _MAX_MULTISET_SUM_ELEMENT_DIGITS,
-    _MAX_MULTISET_SUM_ENUMERATION_WORK,
-    _MAX_MULTISET_SUM_INTEGER_LENGTH,
-    _MAX_MULTISET_SUM_RESULT_DIGITS,
-    _MAX_MULTISET_SUM_SUPPORT_SIZE,
     _MAX_SET_SIZE,
     FiniteIntegerSet,
     MultisetSumRepresentationProfileRequest,
@@ -24,6 +18,11 @@ from jacobian.math.additive_combinatorics._models import (
 )
 from jacobian.math.additive_combinatorics._multiset_sum import (
     MAX_ARITY,
+    MAX_ELEMENT_DIGITS,
+    MAX_ENUMERATION_WORK,
+    MAX_INTEGER_LENGTH,
+    MAX_RESULT_DIGITS,
+    MAX_SUPPORT_SIZE,
     RESULT_BUDGET_BYTES,
     _bar_position_tuples,
 )
@@ -179,7 +178,7 @@ def test_request_requires_canonical_source_order() -> None:
 
 
 def test_request_rejects_oversized_source_integer_before_parsing() -> None:
-    oversized = "9" * (_MAX_MULTISET_SUM_ELEMENT_DIGITS + 1)
+    oversized = "9" * (MAX_ELEMENT_DIGITS + 1)
     with pytest.raises(ValueError):
         _profile((int(oversized),), 2)
 
@@ -188,21 +187,18 @@ def test_request_schema_exposes_collection_and_scalar_bounds() -> None:
     schema = MultisetSumRepresentationProfileRequest.model_json_schema()
     source_schema = schema["$defs"]["FiniteIntegerSet"]
     assert source_schema["properties"]["elements"]["maxItems"] == 50_000
-    assert schema["properties"]["arity"]["maximum"] == _MAX_MULTISET_SUM_ARITY
+    assert schema["properties"]["arity"]["maximum"] == MAX_ARITY
     window_schema = schema["$defs"]["MultisetSumWindow"]
-    assert (
-        window_schema["properties"]["lower"]["maxLength"]
-        == _MAX_MULTISET_SUM_INTEGER_LENGTH
-    )
+    assert window_schema["properties"]["lower"]["maxLength"] == MAX_INTEGER_LENGTH
 
 
 def test_singleton_source_admits_maximum_arity_without_tuple_expansion() -> None:
-    assert _profile((2,), _MAX_MULTISET_SUM_ARITY) == {2 * _MAX_MULTISET_SUM_ARITY: 1}
+    assert _profile((2,), MAX_ARITY) == {2 * MAX_ARITY: 1}
 
 
 def test_arity_above_schema_bound_is_rejected() -> None:
     with pytest.raises(ValidationError):
-        _request((2,), _MAX_MULTISET_SUM_ARITY + 1)
+        _request((2,), MAX_ARITY + 1)
 
 
 @pytest.mark.scale
@@ -218,13 +214,13 @@ def test_empty_source_admits_large_arity_with_zero_candidates() -> None:
 
 
 def test_singleton_sum_digits_stay_within_the_derived_result_bound() -> None:
-    value = 10 ** (_MAX_MULTISET_SUM_ELEMENT_DIGITS - 1) + 19
+    value = 10 ** (MAX_ELEMENT_DIGITS - 1) + 19
     entries = _profile((value,), MAX_ARITY)
     assert len(entries) == 1
     ((sum_value, multiplicity),) = entries.items()
     assert multiplicity == 1
     assert sum_value == value * MAX_ARITY
-    assert len(str(sum_value)) <= _MAX_MULTISET_SUM_RESULT_DIGITS
+    assert len(str(sum_value)) <= MAX_RESULT_DIGITS
 
 
 def test_costly_large_arity_is_rejected_by_work_not_by_an_arity_cap() -> None:
@@ -245,7 +241,7 @@ def test_large_slot_pool_is_never_materialized_during_iteration() -> None:
     # Before the lazy iterator, combinations(range(slots), bars) snapshotted
     # the whole admitted slot range into memory (about 400 MB at the work
     # boundary) before yielding a single candidate.
-    slots = _MAX_MULTISET_SUM_ENUMERATION_WORK // 2 + 1
+    slots = MAX_ENUMERATION_WORK // 2 + 1
     tracemalloc.start()
     try:
         positions = _bar_position_tuples(slots, 2)
@@ -268,7 +264,7 @@ def test_disjoint_window_over_admitted_two_element_source_is_exactly_empty(
     # Reported failure mode: an admitted two-element request whose window
     # misses every attainable sum must return the exact empty profile without
     # enumerating the candidate family.
-    arity = _MAX_MULTISET_SUM_ENUMERATION_WORK // 2 - 1
+    arity = MAX_ENUMERATION_WORK // 2 - 1
     assert _profile((0, 1), arity, window) == {}
 
 
@@ -326,12 +322,12 @@ def test_reversed_sum_window_is_rejected() -> None:
 
 def test_sum_window_endpoint_digit_bound_is_enforced() -> None:
     with pytest.raises(ValidationError):
-        _request((0, 1), 2, (0, int("9" * (_MAX_MULTISET_SUM_RESULT_DIGITS + 1))))
+        _request((0, 1), 2, (0, int("9" * (MAX_RESULT_DIGITS + 1))))
 
 
 def test_full_profile_rejects_worst_case_support_above_result_bound() -> None:
     source_size = 361
-    assert source_size * (source_size + 1) // 2 > _MAX_MULTISET_SUM_SUPPORT_SIZE
+    assert source_size * (source_size + 1) // 2 > MAX_SUPPORT_SIZE
     spacing = 2 * source_size * source_size
     offset = 10**63
     source = tuple(offset + spacing * i + i * i for i in range(source_size))

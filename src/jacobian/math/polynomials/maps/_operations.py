@@ -38,6 +38,7 @@ from jacobian.math.polynomials.maps._models import (
 )
 from jacobian.math.polynomials.maps._singular import run_singular_generic_fiber
 from jacobian.math.polynomials.maps.values import (
+    MAX_MAP_POLYNOMIAL_TERMS,
     RationalPolynomialMap,
     require_map_polynomial,
 )
@@ -237,7 +238,7 @@ def compute_jacobian(request: RationalPolynomialMap) -> JacobianResult:
         rational_polynomial_from_sympy(
             sympy.Poly(sympy.diff(output, variable), *variables, domain=sympy.QQ),
             request.input_variables,
-            maximum_terms=256,
+            maximum_terms=MAX_MAP_POLYNOMIAL_TERMS,
         )
         for output in outputs
         for variable in variables
@@ -266,7 +267,7 @@ def compose_polynomials(request: CompositionRequest) -> CompositionResult:
         polynomial=rational_polynomial_from_sympy(
             composition,
             request.inner.variables,
-            maximum_terms=256,
+            maximum_terms=MAX_MAP_POLYNOMIAL_TERMS,
         )
     )
 

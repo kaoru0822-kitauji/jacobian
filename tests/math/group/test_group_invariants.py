@@ -14,7 +14,7 @@ from jacobian.math.group._models import (
     GroupConjugacyClassesRequest,
     GroupSubgroupLatticeRequest,
     GroupSubgroupLatticeResult,
-    PermutationGroupRequest,
+    PermutationGroup,
 )
 from jacobian.math.group._operations import (
     compute_subgroup_lattice,
@@ -74,8 +74,8 @@ class TestNativeSubgroupLattice:
     """The exported native lattice composes with canonical group values."""
 
     @staticmethod
-    def _s3() -> PermutationGroupRequest:
-        return PermutationGroupRequest(degree=3, generators=((1, 0, 2), (0, 2, 1)))
+    def _s3() -> PermutationGroup:
+        return PermutationGroup(degree=3, generators=((1, 0, 2), (0, 2, 1)))
 
     def test_stabilizer_result_feeds_lattice_unchanged(self) -> None:
         """A ``group_stabilizer`` value passes to the lattice directly."""
@@ -114,9 +114,7 @@ class TestNativeSubgroupLattice:
         """The native function enforces its own enumerated-order bound."""
         from jacobian.math.group.operations import subgroup_lattice
 
-        s5 = PermutationGroupRequest(
-            degree=5, generators=((1, 0, 2, 3, 4), (1, 2, 3, 4, 0))
-        )
+        s5 = PermutationGroup(degree=5, generators=((1, 0, 2, 3, 4), (1, 2, 3, 4, 0)))
         with pytest.raises(ValueError, match="bounded to groups of order"):
             subgroup_lattice(s5)
 
@@ -312,7 +310,7 @@ class TestExceededOutcomeSourceBinding:
             self._exceeded(degree=2, generators=((999,),))
 
     def test_entries_chain_into_permutation_group_consumers(self) -> None:
-        from jacobian.math.group._models import PermutationGroupRequest
+        from jacobian.math.group._models import PermutationGroup
         from jacobian.math.group._operations import compute_group_order
 
         result = compute_subgroup_lattice(
@@ -324,7 +322,7 @@ class TestExceededOutcomeSourceBinding:
         assert (
             str(
                 compute_group_order(
-                    PermutationGroupRequest.model_validate(order_two.group.model_dump())
+                    PermutationGroup.model_validate(order_two.group.model_dump())
                 ).order
             )
             == "2"
