@@ -2,12 +2,212 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
+from pydantic_core import PydanticCustomError
+
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.topology.cohomology.operations._models import (
+    MAX_AMBIENT_SIMPLEX_VERTICES,
+    MAX_RESULT_COCHAIN_DEGREE,
     BocksteinRequest,
     BocksteinResult,
     SteenrodSquareRequest,
     SteenrodSquareResult,
+    _effective_ambient,
+    _validate_simplex_entries,
+    _validation_error,
 )
+
+
+def _run_admission(admission: Callable[[], None]) -> None:
+    """Expose owner admission as a typed native-domain failure."""
+
+    try:
+        admission()
+    except OperationDomainValidationError:
+        raise
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=("request",), code=exc.type, message=exc.message()
+        ) from exc
+
+
+def _require_downward_closed(simplices: tuple[tuple[int, ...], ...]) -> None:
+    """Require every codimension-one face of each ambient simplex."""
+
+    known = set(simplices)
+    for simplex in simplices:
+        for index in range(len(simplex)):
+            face = simplex[:index] + simplex[index + 1 :]
+            if face and face not in known:
+                raise _validation_error(
+                    "ambient_not_downward_closed",
+                    "ambient_simplices must be downward closed: the face "
+                    f"{face} of {simplex} is absent",
+                )
+
+
+def _require_cocycle(
+    cochain_degree: int,
+    simplex_values: tuple[tuple[int, ...], ...],
+    simplex_coefficients: tuple[int, ...],
+    ambient_simplices: tuple[tuple[int, ...], ...],
+) -> None:
+    """Require the GF(2) coboundary to vanish on ambient simplices."""
+
+    values_by_face: dict[tuple[int, ...], int] = {}
+    for simplex, coefficient in zip(simplex_values, simplex_coefficients, strict=True):
+        key = tuple(simplex)
+        values_by_face[key] = (values_by_face.get(key, 0) + coefficient) % 2
+    for sigma in ambient_simplices:
+        if len(sigma) != cochain_degree + 2:
+            continue
+        coboundary = 0
+        for index in range(len(sigma)):
+            face = sigma[:index] + sigma[index + 1 :]
+            coboundary = (coboundary + values_by_face.get(face, 0)) % 2
+        if coboundary:
+            raise _validation_error(
+                "not_cocycle",
+                "the supplied cochain is not a cocycle: its coboundary does not "
+                "vanish on the ambient complex",
+            )
+
+
+def _validate_ambient_complex(
+    cochain_degree: int,
+    support: tuple[tuple[int, ...], ...],
+    coefficients: tuple[int, ...],
+    ambient: tuple[tuple[int, ...], ...],
+) -> None:
+    """Verify ambient shape, support containment, closure, and cocyclicity."""
+
+    _validate_simplex_entries(ambient, "ambient simplex")
+    if any(len(simplex) > MAX_AMBIENT_SIMPLEX_VERTICES for simplex in ambient):
+        raise _validation_error(
+            "ambient_simplex_bound",
+            "each ambient simplex may carry at most "
+            f"{MAX_AMBIENT_SIMPLEX_VERTICES} vertices",
+        )
+    known = set(ambient)
+    for simplex in support:
+        if simplex not in known:
+            raise _validation_error(
+                "support_outside_ambient",
+                "cochain support must lie inside the ambient complex",
+            )
+    _require_downward_closed(ambient)
+    _require_cocycle(cochain_degree, support, coefficients, ambient)
+
+
+def _is_zero_mod2_cochain(
+    simplex_values: tuple[tuple[int, ...], ...],
+    simplex_coefficients: tuple[int, ...],
+) -> bool:
+    """Return whether the GF(2) cochain represented by sparse support is zero."""
+
+    merged: dict[tuple[int, ...], int] = {}
+    for simplex, coefficient in zip(simplex_values, simplex_coefficients, strict=True):
+        key = tuple(simplex)
+        merged[key] = (merged.get(key, 0) + coefficient) % 2
+    return not any(value != 0 for value in merged.values())
+
+
+def _is_zero_mod_prime_cochain(
+    simplex_values: tuple[tuple[int, ...], ...],
+    simplex_coefficients: tuple[int, ...],
+    prime: int,
+) -> bool:
+    """Return whether the Z/p cochain represented by sparse support is zero."""
+
+    merged: dict[tuple[int, ...], int] = {}
+    for simplex, coefficient in zip(simplex_values, simplex_coefficients, strict=True):
+        key = tuple(simplex)
+        merged[key] = (merged.get(key, 0) + coefficient) % prime
+    return not any(value != 0 for value in merged.values())
+
+
+def _admit_steenrod_square(request: SteenrodSquareRequest) -> None:
+    """Admit one exact Steenrod-square invocation and verify its cocycle."""
+
+    def admission() -> None:
+        result_degree = request.cochain_degree + request.square_degree
+        if result_degree > MAX_RESULT_COCHAIN_DEGREE:
+            raise _validation_error(
+                "result_degree_bound",
+                f"Sq^{request.square_degree} of a degree-{request.cochain_degree} "
+                f"cochain returns degree {result_degree}, above the "
+                f"{MAX_RESULT_COCHAIN_DEGREE}-degree exact-result budget",
+            )
+        if 0 < request.square_degree < request.cochain_degree:
+            raise _validation_error(
+                "intermediate_square_unsupported",
+                "intermediate Steenrod squares 0<k<deg require cup-i products "
+                "and are not supported",
+            )
+        effective_ambient = _effective_ambient_for_request(request)
+        if (
+            not _is_zero_mod2_cochain(
+                request.simplex_values, request.simplex_coefficients
+            )
+            and not effective_ambient
+        ):
+            raise _validation_error(
+                "ambient_required_for_nonzero",
+                "Steenrod squares are cohomology operations: the supplied cochain "
+                "must be verified as a cocycle against an ambient simplicial "
+                "complex; supply ambient_simplices or ambient_complex",
+            )
+        if (
+            request.square_degree == request.cochain_degree
+            and request.cochain_degree >= 1
+            and not effective_ambient
+        ):
+            raise _validation_error(
+                "ambient_required_for_top_square",
+                "the top Steenrod square requires the ambient simplicial complex; "
+                "supply ambient_simplices or ambient_complex",
+            )
+        if effective_ambient:
+            _validate_ambient_complex(
+                request.cochain_degree,
+                request.simplex_values,
+                request.simplex_coefficients,
+                effective_ambient,
+            )
+
+    _run_admission(admission)
+
+
+def _admit_bockstein(request: BocksteinRequest) -> None:
+    """Admit the supported zero-cocycle Bockstein branch."""
+
+    def admission() -> None:
+        from sympy import isprime
+
+        if not isprime(request.prime):
+            raise _validation_error("prime_not_prime", "prime must be a prime integer")
+        if not _is_zero_mod_prime_cochain(
+            request.simplex_values,
+            request.simplex_coefficients,
+            request.prime,
+        ):
+            raise _validation_error(
+                "nonzero_bockstein_unsupported",
+                "non-zero Bockstein requires the ambient simplicial complex; "
+                "unsupported in this bounded operation",
+            )
+        effective_ambient = _effective_ambient_for_request(request)
+        if effective_ambient:
+            _validate_ambient_complex(
+                request.cochain_degree,
+                request.simplex_values,
+                request.simplex_coefficients,
+                effective_ambient,
+            )
+
+    _run_admission(admission)
 
 
 def _reduce_support(
@@ -171,7 +371,6 @@ def _effective_ambient_for_request(
 ) -> tuple[tuple[int, ...], ...]:
     """Return the integer ambient set for a request."""
     # Import here to avoid circular import at module load.
-    from jacobian.math.topology.cohomology.operations._models import _effective_ambient
 
     return _effective_ambient(request.ambient_simplices, request.ambient_complex)
 
@@ -190,6 +389,7 @@ def compute_steenrod_square(request: SteenrodSquareRequest) -> SteenrodSquareRes
     - Sq^k(x) = 0 for k > n (instability)
     - Sq^k(x) for 0 < k < n requires the cup-i product structure
     """
+    _admit_steenrod_square(request)
     effective = _effective_ambient_for_request(request)
     (
         result_degree,
@@ -255,6 +455,7 @@ def compute_bockstein(request: BocksteinRequest) -> BocksteinResult:
     the Bockstein is provably zero. Non-zero inputs are rejected at the
     request boundary as unsupported.
     """
+    _admit_bockstein(request)
     (
         result_degree,
         result_simplex_values,

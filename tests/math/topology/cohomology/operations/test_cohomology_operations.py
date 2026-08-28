@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.topology.cohomology.operations._models import (
     BocksteinRequest,
     BocksteinResult,
@@ -18,6 +19,12 @@ from jacobian.math.topology.cohomology.operations._operations import (
 
 def _assert_error_code(
     excinfo: pytest.ExceptionInfo[ValidationError], code: str
+) -> None:
+    assert any(error["type"] == code for error in excinfo.value.errors())
+
+
+def _assert_operation_error(
+    excinfo: pytest.ExceptionInfo[OperationDomainValidationError], code: str
 ) -> None:
     assert any(error["type"] == code for error in excinfo.value.errors())
 
@@ -90,14 +97,18 @@ class TestSteenrodSquare:
         """Edges [0,1],[1,2] of a graph emit no absent triangle [0,1,2]."""
         import pytest
 
-        with pytest.raises(ValidationError) as excinfo:
-            SteenrodSquareRequest(
-                cochain_degree=1,
-                simplex_values=((0, 1), (1, 2)),
-                simplex_coefficients=(1, 1),
-                square_degree=1,
+        with pytest.raises(OperationDomainValidationError) as excinfo:
+            compute_steenrod_square(
+                SteenrodSquareRequest(
+                    cochain_degree=1,
+                    simplex_values=((0, 1), (1, 2)),
+                    simplex_coefficients=(1, 1),
+                    square_degree=1,
+                )
             )
-        _assert_error_code(excinfo, "cohomology_operation.ambient_required_for_nonzero")
+        _assert_operation_error(
+            excinfo, "cohomology_operation.ambient_required_for_nonzero"
+        )
         # With the triangle absent from the complex, the square is zero.
         result = compute_steenrod_square(
             SteenrodSquareRequest(
@@ -112,15 +123,17 @@ class TestSteenrodSquare:
         assert result.result_simplex_values == ()
 
     def test_support_must_lie_in_ambient_complex(self) -> None:
-        with pytest.raises(ValidationError) as excinfo:
-            SteenrodSquareRequest(
-                cochain_degree=1,
-                simplex_values=((5, 6),),
-                simplex_coefficients=(1,),
-                square_degree=1,
-                ambient_simplices=((0,), (1,), (0, 1)),
+        with pytest.raises(OperationDomainValidationError) as excinfo:
+            compute_steenrod_square(
+                SteenrodSquareRequest(
+                    cochain_degree=1,
+                    simplex_values=((5, 6),),
+                    simplex_coefficients=(1,),
+                    square_degree=1,
+                    ambient_simplices=((0,), (1,), (0, 1)),
+                )
             )
-        _assert_error_code(excinfo, "cohomology_operation.support_outside_ambient")
+        _assert_operation_error(excinfo, "cohomology_operation.support_outside_ambient")
 
     # Cups that don't share the middle vertex should not contribute
     def test_disjoint_edges_do_not_contribute(self) -> None:
@@ -274,14 +287,16 @@ class TestBockstein:
 
     def test_nonzero_cocycle(self) -> None:
         """Bockstein of a non-zero cocycle is unsupported without the complex."""
-        with pytest.raises(ValidationError) as excinfo:
-            BocksteinRequest(
-                prime=2,
-                cochain_degree=1,
-                simplex_values=((0, 1),),
-                simplex_coefficients=(1,),
+        with pytest.raises(OperationDomainValidationError) as excinfo:
+            compute_bockstein(
+                BocksteinRequest(
+                    prime=2,
+                    cochain_degree=1,
+                    simplex_values=((0, 1),),
+                    simplex_coefficients=(1,),
+                )
             )
-        _assert_error_code(
+        _assert_operation_error(
             excinfo, "cohomology_operation.nonzero_bockstein_unsupported"
         )
 
@@ -289,14 +304,16 @@ class TestBockstein:
         """Bockstein with a different prime still requires zero cocycle."""
         import pytest
 
-        with pytest.raises(ValidationError) as excinfo:
-            BocksteinRequest(
-                prime=5,
-                cochain_degree=2,
-                simplex_values=((0, 1, 2),),
-                simplex_coefficients=(3,),
+        with pytest.raises(OperationDomainValidationError) as excinfo:
+            compute_bockstein(
+                BocksteinRequest(
+                    prime=5,
+                    cochain_degree=2,
+                    simplex_values=((0, 1, 2),),
+                    simplex_coefficients=(3,),
+                )
             )
-        _assert_error_code(
+        _assert_operation_error(
             excinfo, "cohomology_operation.nonzero_bockstein_unsupported"
         )
 
@@ -304,15 +321,25 @@ class TestBockstein:
 class TestCocycleAdmission:
     def test_non_cocycle_rejected(self) -> None:
         """A degree-1 cochain on one edge of the triangle is not a cocycle."""
-        with pytest.raises(ValidationError) as excinfo:
-            SteenrodSquareRequest(
-                cochain_degree=1,
-                simplex_values=((0, 1),),
-                simplex_coefficients=(1,),
-                square_degree=1,
-                ambient_simplices=((0,), (1,), (2,), (0, 1), (1, 2), (0, 2), (0, 1, 2)),
+        with pytest.raises(OperationDomainValidationError) as excinfo:
+            compute_steenrod_square(
+                SteenrodSquareRequest(
+                    cochain_degree=1,
+                    simplex_values=((0, 1),),
+                    simplex_coefficients=(1,),
+                    square_degree=1,
+                    ambient_simplices=(
+                        (0,),
+                        (1,),
+                        (2,),
+                        (0, 1),
+                        (1, 2),
+                        (0, 2),
+                        (0, 1, 2),
+                    ),
+                )
             )
-        _assert_error_code(excinfo, "cohomology_operation.not_cocycle")
+        _assert_operation_error(excinfo, "cohomology_operation.not_cocycle")
 
     def test_genuine_cocycle_admitted(self) -> None:
         result = compute_steenrod_square(
@@ -353,28 +380,34 @@ class TestAmbientComplexClosure:
 
     def test_non_closed_complex_rejected(self) -> None:
         """A tetrahedron entry implies faces that are not listed here."""
-        with pytest.raises(ValidationError) as excinfo:
-            SteenrodSquareRequest(
-                cochain_degree=1,
-                simplex_values=((0, 1),),
-                simplex_coefficients=(1,),
-                square_degree=1,
-                ambient_simplices=((0, 1), (0, 1, 2, 3)),
+        with pytest.raises(OperationDomainValidationError) as excinfo:
+            compute_steenrod_square(
+                SteenrodSquareRequest(
+                    cochain_degree=1,
+                    simplex_values=((0, 1),),
+                    simplex_coefficients=(1,),
+                    square_degree=1,
+                    ambient_simplices=((0, 1), (0, 1, 2, 3)),
+                )
             )
-        _assert_error_code(excinfo, "cohomology_operation.ambient_not_downward_closed")
+        _assert_operation_error(
+            excinfo, "cohomology_operation.ambient_not_downward_closed"
+        )
 
     def test_implied_triangle_enforces_cocycle(self) -> None:
         """On the closed tetrahedron the triangle (0,1,2) exists, so an edge
         (0,1)-supported cochain has nonzero coboundary and cannot pass."""
-        with pytest.raises(ValidationError) as excinfo:
-            SteenrodSquareRequest(
-                cochain_degree=1,
-                simplex_values=((0, 1),),
-                simplex_coefficients=(1,),
-                square_degree=1,
-                ambient_simplices=_TETRAHEDRON,
+        with pytest.raises(OperationDomainValidationError) as excinfo:
+            compute_steenrod_square(
+                SteenrodSquareRequest(
+                    cochain_degree=1,
+                    simplex_values=((0, 1),),
+                    simplex_coefficients=(1,),
+                    square_degree=1,
+                    ambient_simplices=_TETRAHEDRON,
+                )
             )
-        _assert_error_code(excinfo, "cohomology_operation.not_cocycle")
+        _assert_operation_error(excinfo, "cohomology_operation.not_cocycle")
 
     def test_coboundary_of_vertex_on_closed_tetrahedron_admitted(self) -> None:
         """d(vertex 0) is a genuine cocycle of the closed tetrahedron."""
@@ -481,14 +514,16 @@ class TestInstabilityDegreeAdmission:
         assert edge.is_zero
         assert edge.result_degree == 128
 
-        with pytest.raises(ValidationError) as excinfo:
-            SteenrodSquareRequest(
-                cochain_degree=16,
-                simplex_values=(),
-                simplex_coefficients=(),
-                square_degree=113,
+        with pytest.raises(OperationDomainValidationError) as excinfo:
+            compute_steenrod_square(
+                SteenrodSquareRequest(
+                    cochain_degree=16,
+                    simplex_values=(),
+                    simplex_coefficients=(),
+                    square_degree=113,
+                )
             )
-        _assert_error_code(excinfo, "cohomology_operation.result_degree_bound")
+        _assert_operation_error(excinfo, "cohomology_operation.result_degree_bound")
 
     def test_nonzero_cocycle_instability_square_above_old_ceiling(self) -> None:
         """A genuine cocycle admits large trivial squares too."""
@@ -524,25 +559,29 @@ class TestInstabilityDegreeAdmission:
     def test_top_and_intermediate_squares_keep_prior_boundaries(self) -> None:
         """k <= n envelopes are unchanged by the output-sensitive bound."""
         # Top square still requires ambient targets.
-        with pytest.raises(ValidationError) as excinfo:
-            SteenrodSquareRequest(
-                cochain_degree=16,
-                simplex_values=(),
-                simplex_coefficients=(),
-                square_degree=16,
+        with pytest.raises(OperationDomainValidationError) as excinfo:
+            compute_steenrod_square(
+                SteenrodSquareRequest(
+                    cochain_degree=16,
+                    simplex_values=(),
+                    simplex_coefficients=(),
+                    square_degree=16,
+                )
             )
-        _assert_error_code(
+        _assert_operation_error(
             excinfo, "cohomology_operation.ambient_required_for_top_square"
         )
         # Intermediate squares stay unsupported.
-        with pytest.raises(ValidationError) as excinfo:
-            SteenrodSquareRequest(
-                cochain_degree=2,
-                simplex_values=((0, 1, 2),),
-                simplex_coefficients=(1,),
-                square_degree=1,
+        with pytest.raises(OperationDomainValidationError) as excinfo:
+            compute_steenrod_square(
+                SteenrodSquareRequest(
+                    cochain_degree=2,
+                    simplex_values=((0, 1, 2),),
+                    simplex_coefficients=(1,),
+                    square_degree=1,
+                )
             )
-        _assert_error_code(
+        _assert_operation_error(
             excinfo, "cohomology_operation.intermediate_square_unsupported"
         )
 

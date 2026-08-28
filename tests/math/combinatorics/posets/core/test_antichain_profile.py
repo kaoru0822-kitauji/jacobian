@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.combinatorics.posets.core._models import (
     MAX_ANTICHAIN_PROFILE_CANDIDATES,
     AntichainProfileRequest,
@@ -57,5 +57,5 @@ def test_antichain_profile_executes_the_admitted_fourteen_element_chain() -> Non
 
 
 def test_antichain_profile_rejects_the_next_exponential_envelope() -> None:
-    with pytest.raises(ValidationError, match="candidate subsets"):
-        AntichainProfileRequest(poset=_chain(15))
+    with pytest.raises(OperationDomainValidationError, match="candidate subsets"):
+        _antichain_profile(AntichainProfileRequest(poset=_chain(15)))

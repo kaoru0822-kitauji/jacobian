@@ -253,16 +253,6 @@ class FinitePosetRequest(StrictModel):
     interpretation: RelationInterpretation
     reflexive_pairs: ReflexivePairPolicy = ReflexivePairPolicy.FORBIDDEN
 
-    @model_validator(mode="after")
-    def require_finite_partial_order(self) -> Self:
-        _validated_presentation(
-            self.elements,
-            self.relation,
-            self.interpretation,
-            self.reflexive_pairs,
-        )
-        return self
-
 
 def finite_poset_digest(
     *,
@@ -797,17 +787,6 @@ class AntichainProfileRequest(StrictModel):
     """Request an exact profile within its bounded subset-enumeration envelope."""
 
     poset: FinitePoset
-
-    @model_validator(mode="after")
-    def require_bounded_subset_enumeration(self) -> Self:
-        if len(self.poset.elements) > MAX_ANTICHAIN_PROFILE_ELEMENTS:
-            raise _validation_error(
-                "antichain_profile_elements",
-                "antichain profiles enumerate every subset and accept at most "
-                f"{MAX_ANTICHAIN_PROFILE_ELEMENTS} elements "
-                f"({MAX_ANTICHAIN_PROFILE_CANDIDATES} candidate subsets)",
-            )
-        return self
 
 
 class AntichainProfileResult(PosetExactResult):

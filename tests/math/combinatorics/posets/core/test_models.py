@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.combinatorics.posets.core._models import (
     FinitePoset,
     FinitePosetMaterializationResult,
@@ -10,6 +11,7 @@ from jacobian.math.combinatorics.posets.core._models import (
     LinearExtensionRequest,
     MobiusFunctionRequest,
 )
+from jacobian.math.combinatorics.posets.core._operations import _materialized_poset
 from jacobian.math.combinatorics.posets.core._tools import TOOLS
 
 
@@ -38,60 +40,74 @@ def _assert_code(exc: pytest.ExceptionInfo[ValidationError], code: str) -> None:
     assert exc.value.errors()[0]["type"] == code
 
 
+def _assert_operation_code(
+    exc: pytest.ExceptionInfo[OperationDomainValidationError], code: str
+) -> None:
+    assert exc.value.errors()[0]["type"] == code
+
+
 def test_cover_relation_rejects_cycles_and_redundant_edges() -> None:
-    with pytest.raises(ValidationError) as exc:
-        FinitePosetRequest.model_validate(
-            {
-                "elements": ["a", "b"],
-                "relation": [
-                    {"lower": "a", "upper": "b"},
-                    {"lower": "b", "upper": "a"},
-                ],
-                "interpretation": "COVER_EDGES",
-            }
+    with pytest.raises(OperationDomainValidationError) as exc:
+        _materialized_poset(
+            FinitePosetRequest.model_validate(
+                {
+                    "elements": ["a", "b"],
+                    "relation": [
+                        {"lower": "a", "upper": "b"},
+                        {"lower": "b", "upper": "a"},
+                    ],
+                    "interpretation": "COVER_EDGES",
+                }
+            )
         )
-    _assert_code(exc, "poset.relation_antisymmetric")
-    with pytest.raises(ValidationError) as exc:
-        FinitePosetRequest.model_validate(
-            {
-                "elements": ["a", "b", "c"],
-                "relation": [
-                    {"lower": "a", "upper": "b"},
-                    {"lower": "b", "upper": "c"},
-                    {"lower": "a", "upper": "c"},
-                ],
-                "interpretation": "COVER_EDGES",
-            }
+    _assert_operation_code(exc, "poset.relation_antisymmetric")
+    with pytest.raises(OperationDomainValidationError) as exc:
+        _materialized_poset(
+            FinitePosetRequest.model_validate(
+                {
+                    "elements": ["a", "b", "c"],
+                    "relation": [
+                        {"lower": "a", "upper": "b"},
+                        {"lower": "b", "upper": "c"},
+                        {"lower": "a", "upper": "c"},
+                    ],
+                    "interpretation": "COVER_EDGES",
+                }
+            )
         )
-    _assert_code(exc, "poset.cover_edges_transitive_redundancy")
+    _assert_operation_code(exc, "poset.cover_edges_transitive_redundancy")
 
 
 def test_comparable_pairs_require_complete_transitive_relation() -> None:
-    with pytest.raises(ValidationError) as exc:
-        FinitePosetRequest.model_validate(
-            {
-                "elements": ["a", "b", "c"],
-                "relation": [
-                    {"lower": "a", "upper": "b"},
-                    {"lower": "b", "upper": "c"},
-                ],
-                "interpretation": "COMPARABLE_PAIRS",
-            }
+    with pytest.raises(OperationDomainValidationError) as exc:
+        _materialized_poset(
+            FinitePosetRequest.model_validate(
+                {
+                    "elements": ["a", "b", "c"],
+                    "relation": [
+                        {"lower": "a", "upper": "b"},
+                        {"lower": "b", "upper": "c"},
+                    ],
+                    "interpretation": "COMPARABLE_PAIRS",
+                }
+            )
         )
-    _assert_code(exc, "poset.comparable_pairs_complete")
+    _assert_operation_code(exc, "poset.comparable_pairs_complete")
 
 
 def test_required_reflexive_policy_binds_the_entire_diagonal() -> None:
-    with pytest.raises(ValidationError) as exc:
-        FinitePosetRequest.model_validate(
-            {
-                "elements": ["a", "b"],
-                "relation": [{"lower": "a", "upper": "a"}],
-                "interpretation": "COMPARABLE_PAIRS",
-                "reflexive_pairs": "REQUIRED",
-            }
+    with pytest.raises(OperationDomainValidationError) as exc:
+        _materialized_poset(
+            FinitePosetRequest.model_validate(
+                {
+                    "elements": ["a", "b"],
+                    "relation": [{"lower": "a", "upper": "a"}],
+                    "interpretation": "COMPARABLE_PAIRS",
+                    "reflexive_pairs": "REQUIRED",
+                }
+            )
         )
-    _assert_code(exc, "poset.required_reflexive_full_carrier")
+    _assert_operation_code(exc, "poset.required_reflexive_full_carrier")
 
 
 def test_linear_extension_contract_has_a_separate_exponential_bound() -> None:

@@ -5,9 +5,17 @@ from __future__ import annotations
 import importlib
 from typing import Any
 
+from pydantic_core import PydanticCustomError
+
 from jacobian.catalog._examples import example
-from jacobian.catalog.models import MathTool, MathTools
+from jacobian.catalog.models import (
+    MathTool,
+    MathTools,
+    OperationDomainValidationError,
+)
 from jacobian.math.combinatorics.posets.core._models import (
+    MAX_ANTICHAIN_PROFILE_CANDIDATES,
+    MAX_ANTICHAIN_PROFILE_ELEMENTS,
     AntichainProfileRequest,
     AntichainProfileResult,
     FinitePoset,
@@ -36,9 +44,51 @@ from jacobian.math.combinatorics.posets.core._models import (
     RelationInterpretation,
     ZetaTransformRequest,
     ZetaTransformResult,
+    _validated_presentation,
     canonical_poset_ranks,
     finite_poset_digest,
 )
+
+
+def _run_admission(admission: Any) -> None:
+    """Expose owner admission as a typed native-domain failure."""
+
+    try:
+        admission()
+    except OperationDomainValidationError:
+        raise
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=("request",), code=exc.type, message=exc.message()
+        ) from exc
+
+
+def _admit_finite_poset(request: FinitePosetRequest) -> None:
+    """Verify that a presentation describes a finite partial order."""
+
+    _run_admission(
+        lambda: _validated_presentation(
+            request.elements,
+            request.relation,
+            request.interpretation,
+            request.reflexive_pairs,
+        )
+    )
+
+
+def _admit_antichain_profile(request: AntichainProfileRequest) -> None:
+    """Admit the complete subset enumeration used by the profile kernel."""
+
+    if len(request.poset.elements) > MAX_ANTICHAIN_PROFILE_ELEMENTS:
+        raise OperationDomainValidationError(
+            location=("poset", "elements"),
+            code="poset.antichain_profile_elements",
+            message=(
+                "antichain profiles enumerate every subset and accept at most "
+                f"{MAX_ANTICHAIN_PROFILE_ELEMENTS} elements "
+                f"({MAX_ANTICHAIN_PROFILE_CANDIDATES} candidate subsets)"
+            ),
+        )
 
 
 def _networkx() -> Any:
@@ -59,6 +109,7 @@ def _presentation_graph(request: FinitePosetRequest, nx: Any) -> Any:
 
 
 def _materialized_poset(request: FinitePosetRequest) -> FinitePoset:
+    _admit_finite_poset(request)
     nx = _networkx()
     graph = _presentation_graph(request, nx)
     if request.interpretation is RelationInterpretation.COVER_EDGES:
@@ -463,6 +514,7 @@ def _incidence_convolution(
 def _antichain_profile(
     request: AntichainProfileRequest,
 ) -> AntichainProfileResult:
+    _admit_antichain_profile(request)
     poset = request.poset
     elements = poset.elements
     comparable = {(p.lower, p.upper) for p in poset.strict_order_pairs}
