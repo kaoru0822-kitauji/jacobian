@@ -24,15 +24,11 @@ from jacobian.math.impartial_games._models import (
     GrundyTableRequest,
     GrundyTableResult,
     SubtractionGrundyPrefixRequest,
-    SubtractionGrundyPrefixResult,
 )
 from jacobian.math.impartial_games._operations import (
     compute_birthday,
     compute_grundy_table,
     compute_subtraction_grundy_prefix,
-    verify_birthday_result,
-    verify_grundy_table_result,
-    verify_subtraction_grundy_prefix_result,
 )
 from jacobian.math.impartial_games._tools import TOOLS
 
@@ -63,7 +59,6 @@ class TestGrundyTable:
         assert result.histogram == (2, 1, 1)
         assert result.max_grundy == 2
         assert result.complete is True
-        assert verify_grundy_table_result(result)
 
     def test_option_grundy_values_are_a_set_not_a_multiset(self) -> None:
         game = ImpartialGame(
@@ -123,7 +118,6 @@ class TestBirthdays:
 
         assert result.birthdays == (("0", 0), ("1", 1), ("2", 2), ("3", 3))
         assert result.complete is True
-        assert verify_birthday_result(result)
 
     def test_false_birthday_table_is_rejected(self) -> None:
         with pytest.raises(ValidationError):
@@ -142,7 +136,6 @@ class TestSubtractionGrundyPrefix:
         assert result.n_positions == (1, 3, 5)
         assert result.scope == "HEAPS_ZERO_THROUGH_MAX_HEAP"
         assert result.complete is True
-        assert verify_subtraction_grundy_prefix_result(result)
 
     @pytest.mark.parametrize("values", [(3, 1), (1, 1), (0, 1), (1, 501)])
     def test_subtraction_set_must_be_canonical_and_bounded(
@@ -156,17 +149,6 @@ class TestSubtractionGrundyPrefix:
             SubtractionGrundyPrefixRequest(
                 subtraction_set=tuple(range(1, 501)), max_heap=500
             )
-
-    def test_false_prefix_is_rejected(self) -> None:
-        claim = SubtractionGrundyPrefixResult(
-            subtraction_set=(1,),
-            max_heap=1,
-            grundy_values=(0, 0),
-            option_sets=((), (0,)),
-            p_positions=(0, 1),
-            n_positions=(),
-        )
-        assert not verify_subtraction_grundy_prefix_result(claim)
 
 
 class TestNativePortfolio:

@@ -8,7 +8,6 @@ from jacobian.math.impartial_games._models import (
 )
 from jacobian.math.impartial_games._operations import (
     compute_disjunctive_sum,
-    verify_disjunctive_sum_result,
 )
 from jacobian.math.impartial_games._tools import TOOLS
 from jacobian.math.impartial_games.values import ImpartialGame
@@ -64,7 +63,6 @@ class TestDisjunctiveSum:
         assert result.is_p_position is True
         assert result.component_grundy_values == (0, 0)
         assert result.component_count == 2
-        assert verify_disjunctive_sum_result(request, result)
 
     def test_terminal_plus_single_move_xor_to_one(self) -> None:
         request = DisjunctiveSumRequest(

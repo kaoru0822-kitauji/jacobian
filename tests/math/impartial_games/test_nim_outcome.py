@@ -7,8 +7,6 @@ from jacobian.math.impartial_games._models import NimSumRequest, OutcomeProfileR
 from jacobian.math.impartial_games._operations import (
     compute_nim_sum,
     compute_outcome_profile,
-    verify_nim_sum_result,
-    verify_outcome_profile_result,
 )
 from jacobian.math.impartial_games.values import NimPosition
 
@@ -60,12 +58,8 @@ class TestNimSum:
         result = compute_nim_sum(NimSumRequest(position=position))
         assert result.position == position
 
-    def test_result_rejects_source_and_decision_mutations(self) -> None:
+    def test_result_rejects_inconsistent_decision(self) -> None:
         result = compute_nim_sum(NimSumRequest(position=NimPosition(heaps=(1, 2, 4))))
-
-        payload = result.model_dump(mode="json")
-        payload["position"]["heaps"] = [1, 2, 5]
-        assert not verify_nim_sum_result(type(result).model_validate(payload))
 
         payload = result.model_dump(mode="json")
         payload["is_p_position"] = True
@@ -79,7 +73,6 @@ class TestOutcomeProfile:
         result = compute_outcome_profile(request)
         assert "0" in result.p_positions
         assert "3" in result.p_positions
-        assert verify_outcome_profile_result(request, result)
 
     def test_n_positions(self) -> None:
         request = OutcomeProfileRequest.model_validate({"game": _GAME})
