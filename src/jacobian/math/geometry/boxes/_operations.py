@@ -21,6 +21,8 @@ from jacobian.math.geometry.boxes._models import (
 )
 from jacobian.math.geometry.boxes.values import RationalAxisAlignedBox
 
+_BOX_UNION_RESULT_FIXED_BYTES = 4_096
+
 
 def _validation_error(reason: str, message: str) -> PydanticCustomError:
     return PydanticCustomError(f"geometry.{reason}", message)
@@ -104,7 +106,7 @@ def _maximum_result_bytes(
     return (
         len(encode_strict_json(result_header))
         + candidate_count * (len(encode_strict_json(maximum_entry)) + 1)
-        + 4_096
+        + _BOX_UNION_RESULT_FIXED_BYTES
     )
 
 
