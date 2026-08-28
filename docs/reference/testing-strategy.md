@@ -189,6 +189,16 @@ work ledger rather than receiving independent wall budgets. Test caller-side
 timeouts separately in the MCP lane; their only conclusion is that transport
 aborted the request.
 
+Dispatch rejection tests must name the boundary they exercise. A malformed or
+structurally invalid payload raises `OperationRequestValidationError`. A
+structurally valid payload rejected by the native mathematical or resource
+admission raises `OperationDomainValidationError`; where practical, assert that
+native and dispatch calls preserve the same structured owner error code. MCP
+projects both validation classes as `INVALID_PARAMS`, while unexpected backend
+failures and timeouts remain operational errors. Do not update a semantic
+admission test to expect request-model validation merely because both failures
+appear as an invalid-parameter response over MCP.
+
 For an operation that uses a nontrivial backend, enumeration, solver, or
 certificate check, add the smallest owner-local regression that proves a
 successful producer performs that work once. If independently supplied claims

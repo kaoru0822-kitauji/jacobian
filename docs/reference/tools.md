@@ -46,9 +46,13 @@ Inspect an operation before constructing an unfamiliar payload. Start from one
 of its valid examples, when it has one, and adapt it to the mathematical input.
 Otherwise form the payload from the input schema and field descriptions. They
 state the required representation, including units, bounds, and canonical
-encodings or ordering where they matter. An error from `math.run` means the
-request did not meet that operation's contract; use its diagnostic to make the
-smallest correction before drawing a mathematical conclusion from any result.
+encodings or ordering where they matter. An `INVALID_PARAMS` response from
+`math.run` means either that the payload was structurally malformed or that the
+operation's mathematical or resource admission rejected an otherwise
+well-formed request. Use its structured diagnostic to make the smallest
+correction before drawing a mathematical conclusion. A timeout or backend
+failure is an operational error instead; it does not show that the request is
+mathematically inadmissible and establishes no mathematical conclusion.
 
 `browse` is recomputed from immutable declarations on every request, with a
 caller-supplied pagination cursor. The built-in MCP resource

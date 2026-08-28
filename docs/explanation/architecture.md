@@ -84,6 +84,20 @@ the payload once with that owner's request model, invoke that owner once, and
 project the typed result once. It does not contain domain admission, backend
 logic, result-specific replay, or workflow state.
 
+Rejections retain the phase that owns them:
+
+| Phase | Python boundary | MCP projection |
+| --- | --- | --- |
+| JSON canonicalization or structural Pydantic parsing | `OperationRequestValidationError` | `INVALID_PARAMS` |
+| Native mathematical or resource admission | `OperationDomainValidationError` | `INVALID_PARAMS` |
+| Unexpected backend or execution failure | Operational exception | Tool error |
+
+Dispatch does not turn native admission into structural request validation.
+MCP deliberately projects both validation classes through `INVALID_PARAMS`
+because both mean that the selected operation cannot accept the supplied
+payload; operational failures remain distinct and establish no mathematical
+conclusion.
+
 Jacobian is a typed, bounded tool layer over maintained mathematical libraries.
 The runtime ownership rule above keeps replay out of ordinary execution and
 deserialization; it remains an explicit trust-boundary operation.
@@ -121,10 +135,10 @@ Defining-invariant evidence belongs in the operation's tests; a full replay is
 not part of ordinary execution. An adapter may reject malformed backend data
 while converting it, but that is integration safety rather than a separate
 mathematical result stage.
-Dispatch and MCP project an already-admitted typed result into the final
-transport envelope; they must not discover a mathematical or work bound only
-after execution. Independently supplied result data uses an explicit, bounded
-replay verifier rather than ordinary result construction.
+After owner admission succeeds, dispatch and MCP project the typed result into
+the final transport envelope; they must not discover a mathematical or work
+bound only after execution. Independently supplied result data uses an
+explicit, bounded replay verifier rather than ordinary result construction.
 
 ## Bounded worker adapters
 
