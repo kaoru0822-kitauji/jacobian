@@ -129,19 +129,6 @@ def d_separation(
     return True
 
 
-def validate_variable_elimination_input(
-    factors: Sequence[Factor],
-    domain_sizes: tuple[int, ...],
-    elimination_order: tuple[int, ...],
-    query_variables: tuple[int, ...],
-) -> None:
-    """Validate the complete bounded elimination contract without arithmetic."""
-
-    _require_elimination_contract(
-        factors, domain_sizes, elimination_order, query_variables
-    )
-
-
 def _multiply_all(factors: Sequence[Factor]) -> Factor:
     if not factors:
         raise ValueError("at least one factor is required")

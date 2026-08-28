@@ -764,29 +764,6 @@ def _solve_linear_system(
     return [aug[i][n] / aug[i][i] for i in range(n)]
 
 
-def verify_hankel_moment_matrix(result: HankelMomentMatrix) -> bool:
-    """Verify an independently supplied bounded Hankel matrix claim."""
-    try:
-        side = result.order + 1
-        matrix = [[entry.as_fraction() for entry in row] for row in result.entries]
-        if len(matrix) != side or any(len(row) != side for row in matrix):
-            return False
-        if any(
-            matrix[i][j] != matrix[a][b]
-            for i in range(side)
-            for j in range(side)
-            for a in range(side)
-            for b in range(side)
-            if i + j == a + b
-        ):
-            return False
-        return result.determinant.as_fraction() == _rational_det(
-            matrix
-        ) and result.rank == _rational_rank(matrix)
-    except (TypeError, ValueError, ZeroDivisionError):
-        return False
-
-
 def verify_orthogonal_polynomial_family(family: OrthogonalPolynomialFamily) -> bool:
     """Check the bounded three-term and norm identities of a supplied family."""
     try:
@@ -861,6 +838,5 @@ __all__ = [
     "compute_shifted_hankel",
     "verify_christoffel_darboux_kernel",
     "verify_gaussian_quadrature_rule",
-    "verify_hankel_moment_matrix",
     "verify_orthogonal_polynomial_family",
 ]
