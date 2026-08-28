@@ -22,6 +22,7 @@ MAX_GAUSSIAN_TERM_DEGREE = 8
 MAX_GAUSSIAN_MOMENT_ORDER = 16
 MAX_GAUSSIAN_EXPANSION_PATHS = 65536
 MAX_GAUSSIAN_RESULT_RATIONAL_DIGITS = 4096
+GAUSSIAN_RESULT_DIGIT_SAFETY_MARGIN = 64
 
 
 def _validation_error(message: str) -> PydanticCustomError:
@@ -161,13 +162,28 @@ class GaussianPolynomialMomentResult(StrictModel):
         return self
 
     @classmethod
-    def _from_kernel(cls, **values: object) -> Self:
+    def _from_kernel(
+        cls,
+        *,
+        order: int,
+        moment: ExactComplexRational,
+        expansion_path_count: int,
+        expanded_monomial_count: int,
+        contractions: tuple[GaussianMomentContraction, ...],
+    ) -> Self:
         """Build the moment result after the expansion kernel completes."""
 
-        return cls.model_construct(**values)
+        return cls.model_construct(
+            order=order,
+            moment=moment,
+            expansion_path_count=expansion_path_count,
+            expanded_monomial_count=expanded_monomial_count,
+            contractions=contractions,
+        )
 
 
 __all__ = [
+    "GAUSSIAN_RESULT_DIGIT_SAFETY_MARGIN",
     "MAX_GAUSSIAN_EXPANSION_PATHS",
     "MAX_GAUSSIAN_MOMENT_ORDER",
     "MAX_GAUSSIAN_POLYNOMIAL_TERMS",

@@ -34,6 +34,7 @@ from jacobian.math.probability._distribution import (
     require_input_distribution,
 )
 from jacobian.math.probability._gaussian import (
+    GAUSSIAN_RESULT_DIGIT_SAFETY_MARGIN,
     MAX_GAUSSIAN_EXPANSION_PATHS,
     MAX_GAUSSIAN_RESULT_RATIONAL_DIGITS,
     ExactComplexRational,
@@ -193,7 +194,7 @@ def _admit_gaussian_polynomial_moment(
     request: GaussianPolynomialMomentRequest,
 ) -> int:
     """Admit the complete expansion and exact-result envelope."""
-    expansion_paths = len(request.polynomial.terms) ** request.order
+    expansion_paths: int = len(request.polynomial.terms) ** int(request.order)
     if expansion_paths > MAX_GAUSSIAN_EXPANSION_PATHS:
         raise ValueError(
             "Gaussian polynomial power exceeds the "
@@ -213,7 +214,7 @@ def _admit_gaussian_polynomial_moment(
     result_digit_bound = (
         request.order * (distinct_denominator_digits + maximum_numerator_digits)
         + len(str(max(1, expansion_paths)))
-        + 64
+        + GAUSSIAN_RESULT_DIGIT_SAFETY_MARGIN
     )
     if result_digit_bound > MAX_GAUSSIAN_RESULT_RATIONAL_DIGITS:
         raise ValueError(
