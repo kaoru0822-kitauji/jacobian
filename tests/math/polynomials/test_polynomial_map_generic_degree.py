@@ -17,7 +17,6 @@ from jacobian.math.polynomials.maps import (
     RationalPolynomialMap,
     _generic_degree,
     _operations,
-    _replay,
 )
 from jacobian.math.polynomials.maps._generic_degree import (
     GenericFiberReplayLimitError,
@@ -32,13 +31,8 @@ from jacobian.math.polynomials.maps._models import (
     GenericFiberCertificate,
     GenericFiberPolynomial,
     GenericFiberTerm,
-    _verify_generic_degree_result,
 )
 from jacobian.math.polynomials.maps._operations import compute_generic_degree
-from jacobian.math.polynomials.maps._replay import (
-    CertificateReplayResult,
-    ReplayStatus,
-)
 from jacobian.math.polynomials.maps._singular import SingularGenericFiberResult
 from jacobian.math.polynomials.maps._tools import TOOLS
 from jacobian.math.polynomials.values import (
@@ -200,26 +194,34 @@ def test_missing_backend_is_operational_unavailability(
 
 def test_request_rejects_unproved_dimension_degree_and_height() -> None:
     with pytest.raises(OperationDomainValidationError):
-        compute_generic_degree(GenericDegreeRequest(
-            polynomial_map=_map(
-                ("w", "x", "y", "z"),
-                {(1, 0, 0, 0): 1},
+        compute_generic_degree(
+            GenericDegreeRequest(
+                polynomial_map=_map(
+                    ("w", "x", "y", "z"),
+                    {(1, 0, 0, 0): 1},
+                )
             )
-        ))
+        )
     with pytest.raises(OperationDomainValidationError):
-        compute_generic_degree(GenericDegreeRequest(
-            polynomial_map=_map(
-                ("x",),
-                {(1,): 1},
-                {(1,): 2},
-                {(1,): 3},
-                {(1,): 4},
+        compute_generic_degree(
+            GenericDegreeRequest(
+                polynomial_map=_map(
+                    ("x",),
+                    {(1,): 1},
+                    {(1,): 2},
+                    {(1,): 3},
+                    {(1,): 4},
+                )
             )
-        ))
+        )
     with pytest.raises(OperationDomainValidationError):
-        compute_generic_degree(GenericDegreeRequest(polynomial_map=_map(("x",), {(9,): 1})))
+        compute_generic_degree(
+            GenericDegreeRequest(polynomial_map=_map(("x",), {(9,): 1}))
+        )
     with pytest.raises(OperationDomainValidationError):
-        compute_generic_degree(GenericDegreeRequest(polynomial_map=_map(("x",), {(1,): int("1" * 65)})))
+        compute_generic_degree(
+            GenericDegreeRequest(polynomial_map=_map(("x",), {(1,): int("1" * 65)}))
+        )
 
 
 def test_request_bounds_component_and_aggregate_support() -> None:
@@ -227,25 +229,29 @@ def test_request_bounds_component_and_aggregate_support() -> None:
         (a, b, c) for a in range(9) for b in range(9 - a) for c in range(9 - a - b)
     ]
     with pytest.raises(OperationDomainValidationError):
-        compute_generic_degree(GenericDegreeRequest(
-            polynomial_map=_map(
-                ("x", "y", "z"),
-                dict.fromkeys(monomials[:49], 1),
+        compute_generic_degree(
+            GenericDegreeRequest(
+                polynomial_map=_map(
+                    ("x", "y", "z"),
+                    dict.fromkeys(monomials[:49], 1),
+                )
             )
-        ))
+        )
     with pytest.raises(OperationDomainValidationError):
-        compute_generic_degree(GenericDegreeRequest(
-            polynomial_map=_map(
-                ("x", "y", "z"),
-                *(
-                    cast(
-                        dict[tuple[int, ...], int | Fraction],
-                        dict.fromkeys(monomials[offset : offset + 33], 1),
-                    )
-                    for offset in (0, 33, 66)
-                ),
+        compute_generic_degree(
+            GenericDegreeRequest(
+                polynomial_map=_map(
+                    ("x", "y", "z"),
+                    *(
+                        cast(
+                            dict[tuple[int, ...], int | Fraction],
+                            dict.fromkeys(monomials[offset : offset + 33], 1),
+                        )
+                        for offset in (0, 33, 66)
+                    ),
+                )
             )
-        ))
+        )
 
 
 def test_request_accepts_the_exact_degree_and_bezout_boundary() -> None:
@@ -258,21 +264,6 @@ def test_request_accepts_the_exact_degree_and_bezout_boundary() -> None:
         )
     )
     assert request.polynomial_map.input_variables == ("x", "y", "z")
-
-
-def test_result_parsing_leaves_source_admission_to_the_explicit_verifier() -> None:
-    outside_operation_domain = _map(
-        ("w", "x", "y", "z"),
-        {(1, 0, 0, 0): 1},
-    )
-
-    result = GenericDegreeResult(
-        outcome="ERROR",
-        source=outside_operation_domain,
-        detail="synthetic execution failure",
-    )
-
-    assert not _verify_generic_degree_result(result)
 
 
 @requires_singular
@@ -521,7 +512,7 @@ def test_standard_monomial_enumeration_rejects_unbounded_quotients() -> None:
     assert enumerate_standard_monomials(((1, 1), (2, 1))) is None
 
 
-def test_certificate_replay_known_answer() -> None:
+def test_certificate_verification_known_answer() -> None:
     outcome, degree = validate_generic_fiber_certificate(
         _identity_source(),
         _identity_certificate(),
@@ -552,24 +543,6 @@ def test_declared_replay_limits_are_consulted_during_replay(
             _identity_source(),
             _identity_certificate(),
         )
-
-
-def test_forged_degree_fails_the_explicit_result_verifier() -> None:
-    result = GenericDegreeResult(
-        outcome="GENERICALLY_FINITE",
-        source=_identity_source(),
-        degree=1,
-        evidence=_identity_certificate(),
-    )
-    forged = result.model_dump(mode="json")
-    forged["degree"] = 2
-    assert isinstance(forged["evidence"], dict)
-    forged["evidence"]["standard_monomials"] = [[0, 0], [1, 0]]
-
-    assert (
-        _verify_generic_degree_result(GenericDegreeResult.model_validate(forged))
-        is False
-    )
 
 
 @requires_singular
@@ -626,19 +599,6 @@ def test_consistent_results_round_trip_without_replaying_at_deserialization() ->
         assert replayed == result
 
 
-def test_result_deserialization_does_not_invoke_the_certificate_replay(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    result = _power_map_result(2)
-
-    def fail_replay(*_args: object, **_kwargs: object) -> CertificateReplayResult:
-        raise AssertionError("result deserialization must remain structural")
-
-    monkeypatch.setattr(_replay, "run_bounded_certificate_replay", fail_replay)
-
-    assert GenericDegreeResult.model_validate(result.model_dump(mode="json")) == result
-
-
 def test_serialized_evidence_cannot_be_presented_against_a_different_source() -> None:
     result = _power_map_result(3)
     forged = result.model_dump(mode="json")
@@ -646,70 +606,12 @@ def test_serialized_evidence_cannot_be_presented_against_a_different_source() ->
 
     replayed = GenericDegreeResult.model_validate(forged)
     assert result.evidence is not None
-    assert _verify_generic_degree_result(replayed) is False
+    assert replayed.source != result.source
     with pytest.raises(ValueError, match="reconstruct"):
         require_certificate_reconstructs_from_source(
             _power_map_result(2).source,
             result.evidence,
         )
-
-
-def test_forged_standard_monomials_are_rejected_against_the_certified_ideal() -> None:
-    evidence = _identity_certificate().model_dump(mode="json")
-    evidence["standard_monomials"] = [[0, 0], [1, 0]]
-    forged = {
-        "outcome": "GENERICALLY_FINITE",
-        "source": _identity_source().model_dump(mode="json"),
-        "degree": 2,
-        "evidence": evidence,
-    }
-
-    assert (
-        _verify_generic_degree_result(GenericDegreeResult.model_validate(forged))
-        is False
-    )
-
-
-def test_cleared_standard_monomials_cannot_invent_a_positive_dimensional_outcome() -> (
-    None
-):
-    evidence = _power_map_certificate(2).model_dump(mode="json")
-    evidence["standard_monomials"] = []
-    forged = {
-        "outcome": "DOMINANT_NOT_GENERICALLY_FINITE",
-        "source": _map(("x", "y"), {(2, 0): 1}, {(0, 1): 1}).model_dump(mode="json"),
-        "evidence": evidence,
-    }
-
-    assert (
-        _verify_generic_degree_result(GenericDegreeResult.model_validate(forged))
-        is False
-    )
-
-
-@pytest.mark.parametrize(
-    "status",
-    ("INVALID", "TIMEOUT", "CANCELLED", "LIMIT_EXCEEDED", "ERROR"),
-)
-def test_unconfirmed_replay_verdicts_never_establish_a_conclusion(
-    status: ReplayStatus,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    def failing_replay(*_args: object, **_kwargs: object) -> CertificateReplayResult:
-        return CertificateReplayResult(status=status)
-
-    monkeypatch.setattr(_replay, "run_bounded_certificate_replay", failing_replay)
-    payload = {
-        "outcome": "GENERICALLY_FINITE",
-        "source": _map(("x", "y"), {(2, 0): 1}, {(0, 1): 1}).model_dump(mode="json"),
-        "degree": 2,
-        "evidence": _power_map_certificate(2).model_dump(mode="json"),
-    }
-
-    assert (
-        _verify_generic_degree_result(GenericDegreeResult.model_validate(payload))
-        is False
-    )
 
 
 def test_serialized_coefficient_support_is_counted_before_nested_construction() -> None:

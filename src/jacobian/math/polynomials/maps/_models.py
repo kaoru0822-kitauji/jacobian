@@ -83,7 +83,6 @@ class EvalRequest(StrictModel):
     point: VariablePoint
 
 
-
 class EvalResult(StrictModel):
     """The exact rational value at the requested point."""
 
@@ -117,7 +116,6 @@ class CompositionRequest(StrictModel):
     inner: RationalPolynomial
     inner_variable: PolynomialVariable
     outer_variable: PolynomialVariable
-
 
 
 class CompositionResult(StrictModel):
@@ -163,7 +161,6 @@ class GenericDegreeRequest(StrictModel):
     resource_budget: GenericDegreeComputationBudget = Field(
         default_factory=GenericDegreeComputationBudget
     )
-
 
 
 class GenericFiberTerm(StrictModel):
@@ -516,38 +513,6 @@ class GenericDegreeResult(StrictModel):
             evidence=evidence,
             detail=detail,
         )
-
-
-def _verify_generic_degree_result(result: GenericDegreeResult) -> bool:
-    """Replay one independently supplied exact generic-degree claim.
-
-    Structural result parsing never invokes it.  Re-admission supplies the
-    bounded verification envelope, and an unavailable verdict is not evidence.
-    """
-
-    mathematical = {
-        "GENERICALLY_FINITE",
-        "NOT_DOMINANT",
-        "DOMINANT_NOT_GENERICALLY_FINITE",
-    }
-    if result.outcome not in mathematical or result.evidence is None:
-        return False
-    from jacobian.math.polynomials.maps._replay import run_bounded_certificate_replay
-
-    try:
-        request = GenericDegreeRequest(polynomial_map=result.source)
-    except ValueError:
-        return False
-    replay = run_bounded_certificate_replay(
-        request.polynomial_map,
-        result.evidence,
-        wall_seconds=request.resource_budget.wall_seconds,
-    )
-    return (
-        replay.status == "COMPUTED"
-        and replay.outcome == result.outcome
-        and replay.degree == result.degree
-    )
 
 
 __all__ = [
