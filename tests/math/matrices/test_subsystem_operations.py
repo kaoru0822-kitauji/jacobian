@@ -11,6 +11,7 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.matrices import subsystems
 from jacobian.math.matrices.subsystems._models import (
     MAX_KRONECKER_RESULT_COMPONENT_DIGITS,
@@ -120,8 +121,10 @@ def test_axis_bound_kronecker_product_concatenates_named_factors() -> None:
         (Fraction(0), Fraction(12)),
     )
 
-    with pytest.raises(ValidationError):
-        SubsystemKroneckerProductRequest(left=left, right=left)
+    with pytest.raises(OperationDomainValidationError):
+        compute_kronecker_product(
+            SubsystemKroneckerProductRequest(left=left, right=left)
+        )
 
 
 def test_partial_trace_binds_the_yz_linearization_canary_to_factor_labels() -> None:
@@ -223,14 +226,18 @@ def test_partial_trace_boundary_result_components_round_trip() -> None:
         SubsystemPartialTraceResult.model_validate(wire.model_dump(mode="python"))
         == wire
     )
-    with pytest.raises(ValidationError):
-        SubsystemPartialTraceRequest(matrix=over_source, traced_factor_labels=("q",))
+    with pytest.raises(OperationDomainValidationError):
+        compute_partial_trace(
+            SubsystemPartialTraceRequest(
+                matrix=over_source, traced_factor_labels=("q",)
+            )
+        )
 
 
 def test_kronecker_product_rejects_structural_bounds_before_operand_conversion(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from jacobian.math.matrices.subsystems import _models
+    from jacobian.math.matrices.subsystems import operations
 
     heavy = Fraction(1, 10**300 + 9)
 
@@ -244,20 +251,22 @@ def test_kronecker_product_rejects_structural_bounds_before_operand_conversion(
         )
 
     converted: list[object] = []
-    real_entry_fractions = _models._entry_fractions
+    real_entry_fractions = operations._entry_fractions
 
     def counted(matrix: object) -> object:
         converted.append(matrix)
         return real_entry_fractions(matrix)  # type: ignore[arg-type]
 
-    monkeypatch.setattr(_models, "_entry_fractions", counted)
+    monkeypatch.setattr(operations, "_entry_fractions", counted)
 
     wide_left = MatrixSubsystem(label="wide-left", dimension=5)
     wide_right = MatrixSubsystem(label="wide-right", dimension=4)
-    with pytest.raises(ValidationError):
-        SubsystemKroneckerProductRequest(
-            left=dense(5, wide_left),
-            right=dense(4, wide_right),
+    with pytest.raises(OperationDomainValidationError):
+        compute_kronecker_product(
+            SubsystemKroneckerProductRequest(
+                left=dense(5, wide_left),
+                right=dense(4, wide_right),
+            )
         )
 
     first = MatrixSubsystem(label="first", dimension=2)
@@ -269,10 +278,12 @@ def test_kronecker_product_rejects_structural_bounds_before_operand_conversion(
         [[heavy if row == column else 0 for column in range(4)] for row in range(4)],
         (first, second),
     )
-    with pytest.raises(ValidationError):
-        SubsystemKroneckerProductRequest(
-            left=crowded_left,
-            right=_matrix([[heavy]], (third, fourth, fifth)),
+    with pytest.raises(OperationDomainValidationError):
+        compute_kronecker_product(
+            SubsystemKroneckerProductRequest(
+                left=crowded_left,
+                right=_matrix([[heavy]], (third, fourth, fifth)),
+            )
         )
     assert converted == []
 
@@ -280,24 +291,26 @@ def test_kronecker_product_rejects_structural_bounds_before_operand_conversion(
 def test_kronecker_product_stops_the_digit_scan_after_the_first_excess_product(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from jacobian.math.matrices.subsystems import _models
+    from jacobian.math.matrices.subsystems import operations
 
     q = MatrixSubsystem(label="q", dimension=2)
     r = MatrixSubsystem(label="r", dimension=2)
     heavy = Fraction(1, 10**300 + 9)
     scanned: list[int] = []
-    real_digits = _models._fraction_component_digits
+    real_digits = operations._fraction_component_digits
 
     def counted(value: Fraction) -> tuple[int, int]:
         digits = real_digits(value)
         scanned.append(max(digits))
         return digits
 
-    monkeypatch.setattr(_models, "_fraction_component_digits", counted)
-    with pytest.raises(ValidationError):
-        SubsystemKroneckerProductRequest(
-            left=_matrix([[heavy, 0], [0, heavy]], (q,)),
-            right=_matrix([[1, 0], [0, 1]], (r,)),
+    monkeypatch.setattr(operations, "_fraction_component_digits", counted)
+    with pytest.raises(OperationDomainValidationError):
+        compute_kronecker_product(
+            SubsystemKroneckerProductRequest(
+                left=_matrix([[heavy, 0], [0, heavy]], (q,)),
+                right=_matrix([[1, 0], [0, 1]], (r,)),
+            )
         )
     assert scanned == [301]
 
@@ -315,10 +328,12 @@ def test_partial_trace_rejects_genuinely_growing_contractions() -> None:
         factors,
     )
 
-    with pytest.raises(ValidationError):
-        SubsystemPartialTraceRequest(
-            matrix=source,
-            traced_factor_labels=("p", "q", "r", "s"),
+    with pytest.raises(OperationDomainValidationError):
+        compute_partial_trace(
+            SubsystemPartialTraceRequest(
+                matrix=source,
+                traced_factor_labels=("p", "q", "r", "s"),
+            )
         )
 
 
@@ -415,8 +430,10 @@ def test_partial_trace_work_envelope_rejects_one_step_above_the_contracted_bound
     _, peak = partial_trace_measured_entries(source, ("q",))
     assert peak > MAX_PARTIAL_TRACE_WORK_COMPONENT_DIGITS
 
-    with pytest.raises(ValidationError):
-        SubsystemPartialTraceRequest(matrix=source, traced_factor_labels=("q",))
+    with pytest.raises(OperationDomainValidationError):
+        compute_partial_trace(
+            SubsystemPartialTraceRequest(matrix=source, traced_factor_labels=("q",))
+        )
 
 
 def test_partial_trace_admits_cancelling_pairs_and_rereads_its_emitted_factor() -> None:
@@ -538,8 +555,8 @@ def test_psd_order_rejects_same_shape_but_different_subsystem_identity() -> None
     r = MatrixSubsystem(label="r", dimension=2)
     left = _matrix([[0, 0], [0, 0]], (q,))
     right = _matrix([[1, 0], [0, 1]], (r,))
-    with pytest.raises(ValidationError):
-        PsdOrderRequest(left=left, right=right)
+    with pytest.raises(OperationDomainValidationError):
+        decide_psd_order(PsdOrderRequest(left=left, right=right))
 
 
 def test_psd_order_agrees_with_the_two_by_two_principal_minor_criterion() -> None:
@@ -573,8 +590,8 @@ def test_operation_input_digits_are_checked_before_exact_backend_work() -> None:
         [[second, 0], [0, second]],
         (q,),
     )
-    with pytest.raises(ValidationError):
-        PsdOrderRequest(left=source, right=other)
+    with pytest.raises(OperationDomainValidationError):
+        decide_psd_order(PsdOrderRequest(left=source, right=other))
 
 
 def test_psd_order_admits_identical_operands_before_witness_growth() -> None:
@@ -670,8 +687,8 @@ def test_psd_order_rejects_results_beyond_the_canonical_output_limit() -> None:
     request_bytes = 2 * len(encode_strict_json(operand.model_dump(mode="json")))
     assert request_bytes <= CanonicalLimits().max_input_bytes
 
-    with pytest.raises(ValidationError):
-        PsdOrderRequest(left=operand, right=operand)
+    with pytest.raises(OperationDomainValidationError):
+        decide_psd_order(PsdOrderRequest(left=operand, right=operand))
 
 
 @pytest.mark.scale
@@ -727,8 +744,10 @@ def test_partial_trace_rejects_results_beyond_the_canonical_output_limit() -> No
     with pytest.raises(CanonicalizationError):
         encode_strict_json(source.model_dump(mode="json"))
 
-    with pytest.raises(ValidationError):
-        SubsystemPartialTraceRequest(matrix=source, traced_factor_labels=("q",))
+    with pytest.raises(OperationDomainValidationError):
+        compute_partial_trace(
+            SubsystemPartialTraceRequest(matrix=source, traced_factor_labels=("q",))
+        )
 
 
 @pytest.mark.scale
@@ -772,10 +791,12 @@ def test_kronecker_product_admits_asymmetric_operand_digit_growth() -> None:
     product = kronecker_product(wide, compact)
     assert len(product.matrix.entries[0][0].den) == 200
 
-    with pytest.raises(ValidationError):
-        SubsystemKroneckerProductRequest(
-            left=_matrix([[heavy, 0], [0, 1]], (r,)),
-            right=wide,
+    with pytest.raises(OperationDomainValidationError):
+        compute_kronecker_product(
+            SubsystemKroneckerProductRequest(
+                left=_matrix([[heavy, 0], [0, 1]], (r,)),
+                right=wide,
+            )
         )
 
 
@@ -860,8 +881,8 @@ def test_psd_order_rejects_a_large_product_before_witness_expansion() -> None:
     ).product
     assert len(left_product.matrix.entries[0][0].den) == 255
 
-    with pytest.raises(ValidationError):
-        PsdOrderRequest(left=left_product, right=right_product)
+    with pytest.raises(OperationDomainValidationError):
+        decide_psd_order(PsdOrderRequest(left=left_product, right=right_product))
 
 
 def test_partial_trace_readmits_its_emitted_values_across_sequential_traces() -> None:
@@ -961,11 +982,11 @@ def test_native_functions_admit_through_one_typed_request_parse() -> None:
     left = _matrix([[1, 0], [0, 2]], (q,))
     right = _matrix([[3, 0], [0, 4]], (r,))
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(OperationDomainValidationError):
         kronecker_product(left, left)
-    with pytest.raises(ValidationError):
+    with pytest.raises(OperationDomainValidationError):
         partial_trace(left, ("missing",))
-    with pytest.raises(ValidationError):
+    with pytest.raises(OperationDomainValidationError):
         psd_order(left, right)
 
 

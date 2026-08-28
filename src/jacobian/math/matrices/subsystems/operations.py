@@ -4,19 +4,30 @@ from __future__ import annotations
 
 from fractions import Fraction
 
+from pydantic_core import PydanticCustomError
+
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math import matrices
 from jacobian.math._exact_linear_algebra import symmetric_inertia
 from jacobian.math.matrices import _conversions as conversions
 from jacobian.math.matrices.subsystems._models import (
+    MAX_KRONECKER_RESULT_COMPONENT_DIGITS,
     NegativeQuadraticWitness,
     PsdInertia,
-    PsdOrderRequest,
     PsdOrderResult,
-    SubsystemKroneckerProductRequest,
-    SubsystemPartialTraceRequest,
+    _entry_fractions,
+    _fraction_component_digits,
+    _require_psd_pair_admission,
+    _require_trace_result_envelope,
+    _require_trace_transport_envelope,
+    _require_trace_work_envelope,
+    _require_traceable_factors,
+    _validation_error,
 )
 from jacobian.math.matrices.subsystems.values import (
+    MAX_SUBSYSTEM_DIMENSION,
+    MAX_SUBSYSTEM_FACTORS,
     FactorizedHermitianMatrix,
     MatrixSubsystem,
     partial_trace_entries,
@@ -44,6 +55,78 @@ def _factorized(
     return FactorizedHermitianMatrix(
         matrix=rational_matrix_from_fractions(entries), factors=factors
     )
+
+
+def _admit_kronecker(
+    left: FactorizedHermitianMatrix,
+    right: FactorizedHermitianMatrix,
+) -> None:
+    product_dimension = len(left.matrix.entries) * len(right.matrix.entries)
+    if product_dimension > MAX_SUBSYSTEM_DIMENSION:
+        raise _validation_error(
+            "budget_exceeded",
+            "Kronecker product dimension exceeds the "
+            f"{MAX_SUBSYSTEM_DIMENSION} bound",
+        )
+    labels = (*left.factors, *right.factors)
+    if len(labels) > MAX_SUBSYSTEM_FACTORS:
+        raise _validation_error(
+            "budget_exceeded", "Kronecker product exceeds the subsystem-factor bound"
+        )
+    if len({factor.label for factor in labels}) != len(labels):
+        raise _validation_error(
+            "budget_exceeded",
+            "Kronecker product subsystem labels must remain unique",
+        )
+    left_entries = _entry_fractions(left)
+    right_entries = _entry_fractions(right)
+    for left_row in left_entries:
+        for left_entry in left_row:
+            for right_row in right_entries:
+                for right_entry in right_row:
+                    if (
+                        max(_fraction_component_digits(left_entry * right_entry))
+                        > MAX_KRONECKER_RESULT_COMPONENT_DIGITS
+                    ):
+                        raise _validation_error(
+                            "budget_exceeded",
+                            "Kronecker product coefficient growth exceeds the "
+                            f"{MAX_KRONECKER_RESULT_COMPONENT_DIGITS}-digit "
+                            "result bound",
+                        )
+
+
+def _admit_partial_trace(
+    matrix: FactorizedHermitianMatrix,
+    traced_factor_labels: tuple[str, ...],
+) -> None:
+    expected_entries = _require_trace_work_envelope(
+        matrix, traced_factor_labels
+    )
+    _require_trace_result_envelope(expected_entries)
+    _require_trace_transport_envelope(
+        matrix, traced_factor_labels, expected_entries
+    )
+
+
+def _admit_psd(
+    left: FactorizedHermitianMatrix,
+    right: FactorizedHermitianMatrix,
+) -> None:
+    _require_psd_pair_admission(left, right)
+
+
+def _admit(check: object, *args: object) -> None:
+    try:
+        check(*args)  # type: ignore[operator]
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=("request",), code=exc.type, message=exc.message()
+        ) from exc
+    except (ValueError, TypeError) as exc:
+        raise OperationDomainValidationError(
+            location=("request",), code="matrix.domain_invalid", message=str(exc)
+        ) from exc
 
 
 def _negative_direction(
@@ -119,8 +202,8 @@ def kronecker_product(
 ) -> FactorizedHermitianMatrix:
     """Compute one exact product while concatenating the ordered factors."""
 
-    request = SubsystemKroneckerProductRequest(left=left, right=right)
-    return _kronecker_product_kernel(request.left, request.right)
+    _admit(_admit_kronecker, left, right)
+    return _kronecker_product_kernel(left, right)
 
 
 def _kronecker_product_kernel(
@@ -144,11 +227,9 @@ def partial_trace(
 ) -> FactorizedHermitianMatrix:
     """Trace named factors from a product basis, retaining source factor order."""
 
-    request = SubsystemPartialTraceRequest(
-        matrix=matrix,
-        traced_factor_labels=traced_factor_labels,
-    )
-    return _partial_trace_kernel(request.matrix, request.traced_factor_labels)
+    _admit(_require_traceable_factors, matrix, traced_factor_labels)
+    _admit(_admit_partial_trace, matrix, traced_factor_labels)
+    return _partial_trace_kernel(matrix, traced_factor_labels)
 
 
 def _partial_trace_kernel(
@@ -172,8 +253,8 @@ def psd_order(
 ) -> PsdOrderResult:
     """Decide the exact rational Löwner order ``left <= right``."""
 
-    request = PsdOrderRequest(left=left, right=right)
-    return _psd_order_kernel(request.left, request.right)
+    _admit(_admit_psd, left, right)
+    return _psd_order_kernel(left, right)
 
 
 def _psd_order_kernel(

@@ -161,6 +161,28 @@ def _require_trace_transport_envelope(
         )
 
 
+def _require_traceable_factors(
+    matrix: FactorizedHermitianMatrix,
+    traced_factor_labels: tuple[str, ...],
+) -> None:
+    if len(set(traced_factor_labels)) != len(traced_factor_labels):
+        raise _validation_error("status_mismatch", "traced subsystem labels must be unique")
+    labels = tuple(factor.label for factor in matrix.factors)
+    if not set(traced_factor_labels) <= set(labels):
+        raise _validation_error(
+            "invariant_mismatch",
+            "each traced subsystem label must occur in matrix.factors",
+        )
+    expected_order = tuple(
+        label for label in labels if label in traced_factor_labels
+    )
+    if traced_factor_labels != expected_order:
+        raise _validation_error(
+            "invariant_mismatch",
+            "traced subsystem labels must follow source factor order",
+        )
+
+
 def _psd_witness_digit_bound(
     matrix: FactorizedHermitianMatrix,
     *,
@@ -296,47 +318,6 @@ class SubsystemKroneckerProductRequest(StrictModel):
         ),
     )
 
-    @model_validator(mode="after")
-    def require_product_envelope(self) -> Self:
-        product_dimension = len(self.left.matrix.entries) * len(
-            self.right.matrix.entries
-        )
-        if product_dimension > MAX_SUBSYSTEM_DIMENSION:
-            raise _validation_error(
-                "budget_exceeded",
-                "Kronecker product dimension exceeds the "
-                f"{MAX_SUBSYSTEM_DIMENSION} bound",
-            )
-        labels = (*self.left.factors, *self.right.factors)
-        if len(labels) > 4:
-            raise _validation_error(
-                "budget_exceeded",
-                "Kronecker product exceeds the subsystem-factor bound",
-            )
-        if len({factor.label for factor in labels}) != len(labels):
-            raise _validation_error(
-                "budget_exceeded",
-                "Kronecker product subsystem labels must remain unique",
-            )
-        left_entries = _entry_fractions(self.left)
-        right_entries = _entry_fractions(self.right)
-        for left_row in left_entries:
-            for left_entry in left_row:
-                for right_row in right_entries:
-                    for right_entry in right_row:
-                        if (
-                            max(_fraction_component_digits(left_entry * right_entry))
-                            > MAX_KRONECKER_RESULT_COMPONENT_DIGITS
-                        ):
-                            raise _validation_error(
-                                "budget_exceeded",
-                                "Kronecker product coefficient growth exceeds the "
-                                f"{MAX_KRONECKER_RESULT_COMPONENT_DIGITS}-digit "
-                                "result bound",
-                            )
-        return self
-
-
 class SubsystemKroneckerProductResult(StrictModel):
     """The factorized exact product of two rational Hermitian matrices."""
 
@@ -367,31 +348,7 @@ class SubsystemPartialTraceRequest(StrictModel):
 
     @model_validator(mode="after")
     def require_traceable_factors(self) -> Self:
-        if len(set(self.traced_factor_labels)) != len(self.traced_factor_labels):
-            raise _validation_error(
-                "status_mismatch", "traced subsystem labels must be unique"
-            )
-        labels = tuple(factor.label for factor in self.matrix.factors)
-        if not set(self.traced_factor_labels) <= set(labels):
-            raise _validation_error(
-                "invariant_mismatch",
-                "each traced subsystem label must occur in matrix.factors",
-            )
-        expected_order = tuple(
-            label for label in labels if label in self.traced_factor_labels
-        )
-        if self.traced_factor_labels != expected_order:
-            raise _validation_error(
-                "invariant_mismatch",
-                "traced subsystem labels must follow source factor order",
-            )
-        expected_entries = _require_trace_work_envelope(
-            self.matrix, self.traced_factor_labels
-        )
-        _require_trace_result_envelope(expected_entries)
-        _require_trace_transport_envelope(
-            self.matrix, self.traced_factor_labels, expected_entries
-        )
+        _require_traceable_factors(self.matrix, self.traced_factor_labels)
         return self
 
 
@@ -513,12 +470,6 @@ class PsdOrderRequest(StrictModel):
             "Identical operands measure the zero matrix and admit trivially."
         ),
     )
-
-    @model_validator(mode="after")
-    def require_common_axis_bound_source(self) -> Self:
-        _require_psd_pair_admission(self.left, self.right)
-        return self
-
 
 class PsdOrderResult(StrictModel):
     """A source-bound exact decision of whether ``right - left`` is PSD."""
