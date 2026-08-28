@@ -69,6 +69,27 @@ def test_simplicial_complex_admission_is_typed() -> None:
     )
 
 
+def test_symbolic_dynamics_enumeration_admission_is_typed() -> None:
+    operation_id = "symbolic_dynamics.block_language.compute"
+    payload = {
+        "shift": {
+            "alphabet": list("abcdefghijklmnop"),
+            "forbidden_blocks": [],
+            "two_sided": True,
+        },
+        "block_length": 5,
+    }
+
+    with pytest.raises(OperationDomainValidationError) as caught:
+        invoke_operation(operation_id, payload, Catalog.open())
+
+    assert caught.value.errors()[0]["loc"] == ("block_length",)
+    assert (
+        caught.value.errors()[0]["type"]
+        == "symbolic_dynamics.block_enumeration_not_admitted"
+    )
+
+
 def test_orthogonal_recurrence_admission_is_typed() -> None:
     operation_id = "orthogonal_polynomial.recurrence.compute"
     payload = _example_payload(operation_id)

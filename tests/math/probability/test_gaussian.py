@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.probability._gaussian import (
     MAX_GAUSSIAN_EXPANSION_PATHS,
     ExactComplexRational,
@@ -55,5 +56,5 @@ def test_expansion_bound_is_admitted_at_operation_time() -> None:
     request = CanonicalGaussianPolynomialMomentRequest(polynomial=polynomial, order=6)
 
     assert len(polynomial.terms) ** request.order > MAX_GAUSSIAN_EXPANSION_PATHS
-    with pytest.raises(ValueError, match="path expansion bound"):
+    with pytest.raises(OperationDomainValidationError, match="path expansion bound"):
         _operation().run(request)

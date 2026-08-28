@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import itertools
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import networkx as nx
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.dynamics.symbolic._bounds import (
     MAX_PERIODIC_PROFILE_DIGITS,
     MAX_PERIODIC_PROFILE_WORK,
@@ -34,16 +36,46 @@ from jacobian.math.polynomials._conversions import (
 from jacobian.math.polynomials.values import RationalFunction, RationalPolynomial
 
 
+def _admit[T](
+    admission: Callable[[], T],
+    *,
+    location: tuple[str | int, ...],
+    code: str,
+) -> T:
+    try:
+        return admission()
+    except OperationDomainValidationError:
+        raise
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=location,
+            code=code,
+            message=str(exc),
+        ) from exc
+
+
 def block_language(
     shift: ForbiddenBlockShift, block_length: int
 ) -> tuple[tuple[str, ...], ...]:
     if block_length < 0:
-        raise ValueError("block length must be nonnegative")
-    enumeration_size(len(shift.alphabet), block_length)
+        raise OperationDomainValidationError(
+            location=("block_length",),
+            code="symbolic_dynamics.block_length_negative",
+            message="block length must be nonnegative",
+        )
+    _admit(
+        lambda: enumeration_size(len(shift.alphabet), block_length),
+        location=("block_length",),
+        code="symbolic_dynamics.block_enumeration_not_admitted",
+    )
     forbidden = normalize_forbidden_blocks(shift)
     if () in forbidden:
         return ()
-    memory = require_bounded_support(shift)
+    memory = _admit(
+        lambda: require_bounded_support(shift),
+        location=("shift",),
+        code="symbolic_dynamics.shift_support_not_admitted",
+    )
     states, _, left_infinite, right_infinite = _presentation_support(shift, memory)
     if block_length == 0:
         return (
@@ -173,7 +205,11 @@ def _presentation_from_states_and_words(
 
 def finite_type_presentation(shift: ForbiddenBlockShift) -> BlockPresentation:
     memory = presentation_memory(shift)
-    require_bounded_presentation(shift, memory)
+    _admit(
+        lambda: require_bounded_presentation(shift, memory),
+        location=("shift",),
+        code="symbolic_dynamics.presentation_not_admitted",
+    )
     states = block_language(shift, memory)
     extensions = block_language(shift, memory + 1)
     return _presentation_from_states_and_words(shift, memory, states, extensions)
@@ -183,11 +219,23 @@ def higher_block_presentation(
     shift: ForbiddenBlockShift, block_length: int
 ) -> BlockPresentation:
     if block_length < 1:
-        raise ValueError("higher-block length must be positive")
+        raise OperationDomainValidationError(
+            location=("block_length",),
+            code="symbolic_dynamics.higher_block_length_nonpositive",
+            message="higher-block length must be positive",
+        )
     required_memory = presentation_memory(shift)
     if block_length < required_memory:
-        raise ValueError("higher-block length is below the presentation memory")
-    require_bounded_presentation(shift, block_length)
+        raise OperationDomainValidationError(
+            location=("block_length",),
+            code="symbolic_dynamics.higher_block_below_memory",
+            message="higher-block length is below the presentation memory",
+        )
+    _admit(
+        lambda: require_bounded_presentation(shift, block_length),
+        location=("shift", "block_length"),
+        code="symbolic_dynamics.presentation_not_admitted",
+    )
     states = block_language(shift, block_length)
     extensions = block_language(shift, block_length + 1)
     return _presentation_from_states_and_words(shift, block_length, states, extensions)
@@ -236,16 +284,28 @@ def periodic_point_profile(
     shift: AdjacencyShift, max_period: int
 ) -> tuple[tuple[int, ...], tuple[int, ...], tuple[int, ...]]:
     if not 1 <= max_period <= MAX_PERIOD:
-        raise ValueError("max period is outside the supported bounds")
+        raise OperationDomainValidationError(
+            location=("max_period",),
+            code="symbolic_dynamics.period_out_of_bounds",
+            message="max period is outside the supported bounds",
+        )
     matrix = shift.matrix
     states = len(matrix)
     if states**3 * max_period > MAX_PERIODIC_PROFILE_WORK:
-        raise ValueError("periodic-point matrix powering exceeds the work bound")
+        raise OperationDomainValidationError(
+            location=("shift", "max_period"),
+            code="symbolic_dynamics.periodic_profile_work_bound",
+            message="periodic-point matrix powering exceeds the work bound",
+        )
     maximum_row_sum = max(sum(row) for row in matrix)
     count_bound = states * max(1, maximum_row_sum) ** max_period
     aggregate_digits = 3 * max_period * len(str(count_bound))
     if aggregate_digits > MAX_PERIODIC_PROFILE_DIGITS:
-        raise ValueError("periodic-point profile exceeds the output digit bound")
+        raise OperationDomainValidationError(
+            location=("shift", "max_period"),
+            code="symbolic_dynamics.periodic_profile_output_bound",
+            message="periodic-point profile exceeds the output digit bound",
+        )
     power = matrix
     fixed: list[int] = []
     for period in range(1, max_period + 1):
@@ -282,7 +342,11 @@ def artin_mazur_zeta(
 ) -> tuple[RationalPolynomial, RationalFunction]:
     """Return ``det(I-tA)`` and ``1/det(I-tA)``."""
 
-    require_zeta_budget(shift)
+    _admit(
+        lambda: require_zeta_budget(shift),
+        location=("shift",),
+        code="symbolic_dynamics.zeta_not_admitted",
+    )
     from sympy import QQ, Poly, Symbol
 
     variable = Symbol("t")

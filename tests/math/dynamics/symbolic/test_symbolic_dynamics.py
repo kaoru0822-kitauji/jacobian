@@ -9,6 +9,7 @@ from fractions import Fraction
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.dynamics.symbolic import (
     AdjacencyShift,
     ForbiddenBlockShift,
@@ -143,7 +144,7 @@ def test_zeta_admission_bounds_coefficient_growth_before_backend() -> None:
     assert len(boundary.determinant_polynomial.polynomial.terms) == 51
 
     dense_large = (tuple((1_000_000,) * 50),) * 50
-    with pytest.raises(ValueError, match="coefficient digit bound"):
+    with pytest.raises(OperationDomainValidationError, match="coefficient digit bound"):
         compute_artin_mazur_zeta(
             ArtinMazurZetaRequest(shift=AdjacencyShift(matrix=dense_large))
         )
@@ -254,9 +255,13 @@ def test_oversized_enumerations_fail_before_computation() -> None:
     alphabet = tuple(chr(ord("a") + index) for index in range(16))
     shift = ForbiddenBlockShift(alphabet=alphabet, forbidden_blocks=())
     language_request = BlockLanguageRequest(shift=shift, block_length=5)
-    with pytest.raises(ValueError, match="requested block enumeration"):
+    with pytest.raises(
+        OperationDomainValidationError, match="requested block enumeration"
+    ):
         compute_block_language(language_request)
-    with pytest.raises(ValueError, match="requested block enumeration"):
+    with pytest.raises(
+        OperationDomainValidationError, match="requested block enumeration"
+    ):
         construct_finite_type_shift(
             FiniteTypeShiftRequest(
                 shift=ForbiddenBlockShift(
@@ -266,7 +271,7 @@ def test_oversized_enumerations_fail_before_computation() -> None:
             )
         )
     ten_symbols = alphabet[:10]
-    with pytest.raises(ValueError, match="presentation adjacency"):
+    with pytest.raises(OperationDomainValidationError, match="presentation adjacency"):
         construct_finite_type_shift(
             FiniteTypeShiftRequest(
                 shift=ForbiddenBlockShift(
@@ -282,14 +287,14 @@ def test_oversized_enumerations_fail_before_computation() -> None:
         ),
         block_length=4,
     )
-    with pytest.raises(ValueError, match="presentation adjacency"):
+    with pytest.raises(OperationDomainValidationError, match="presentation adjacency"):
         compute_higher_block(higher_block_request)
     oversized_support = ForbiddenBlockShift(
         alphabet=alphabet,
         forbidden_blocks=(("a",) * 20,),
     )
     support_request = BlockLanguageRequest(shift=oversized_support, block_length=1)
-    with pytest.raises(ValueError, match="work bound"):
+    with pytest.raises(OperationDomainValidationError, match="work bound"):
         compute_block_language(support_request)
     with pytest.raises(ValueError, match="work bound"):
         block_language(oversized_support, 1)
@@ -326,7 +331,9 @@ def test_higher_block_requires_enough_memory_for_exact_sft_presentation() -> Non
         alphabet=("0", "1"), forbidden_blocks=(("1", "0", "1", "0"),)
     )
     request = HigherBlockRequest(shift=shift, block_length=2)
-    with pytest.raises(ValueError, match="below the presentation memory"):
+    with pytest.raises(
+        OperationDomainValidationError, match="below the presentation memory"
+    ):
         compute_higher_block(request)
 
 

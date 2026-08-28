@@ -1,4 +1,4 @@
-"""Admission quantities shared by symbolic-dynamics wire contracts and kernels."""
+"""Request-scoped bounds used by symbolic-dynamics native operations."""
 
 from __future__ import annotations
 

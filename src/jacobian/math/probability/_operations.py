@@ -222,9 +222,13 @@ def _admit_gaussian_polynomial_moment(
     """Admit the complete expansion and exact-result envelope."""
     expansion_paths: int = len(request.polynomial.terms) ** int(request.order)
     if expansion_paths > MAX_GAUSSIAN_EXPANSION_PATHS:
-        raise ValueError(
-            "Gaussian polynomial power exceeds the "
-            f"{MAX_GAUSSIAN_EXPANSION_PATHS}-path expansion bound"
+        raise OperationDomainValidationError(
+            location=("polynomial", "order"),
+            code="probability.gaussian.expansion_path_bound",
+            message=(
+                "Gaussian polynomial power exceeds the "
+                f"{MAX_GAUSSIAN_EXPANSION_PATHS}-path expansion bound"
+            ),
         )
     components = tuple(
         component
@@ -243,9 +247,13 @@ def _admit_gaussian_polynomial_moment(
         + GAUSSIAN_RESULT_DIGIT_SAFETY_MARGIN
     )
     if result_digit_bound > MAX_GAUSSIAN_RESULT_RATIONAL_DIGITS:
-        raise ValueError(
-            "Gaussian polynomial coefficient denominators can exceed the "
-            f"{MAX_GAUSSIAN_RESULT_RATIONAL_DIGITS}-digit result bound"
+        raise OperationDomainValidationError(
+            location=("polynomial", "order"),
+            code="probability.gaussian.result_digit_bound",
+            message=(
+                "Gaussian polynomial coefficient denominators can exceed the "
+                f"{MAX_GAUSSIAN_RESULT_RATIONAL_DIGITS}-digit result bound"
+            ),
         )
     return expansion_paths
 
