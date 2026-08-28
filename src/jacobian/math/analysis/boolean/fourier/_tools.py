@@ -9,18 +9,12 @@ from jacobian.catalog.models import MathTool, OperationExample
 from jacobian.math.analysis.boolean.fourier._models import (
     ErasureNoiseRequest,
     ErasureNoiseResult,
-    FourierSpectrumRequest,
-    FourierSpectrumResult,
     MultilinearExtensionRequest,
     MultilinearExtensionResult,
-    TruthTableRequest,
-    TruthTableResult,
 )
 from jacobian.math.analysis.boolean.fourier._operations import (
     compute_erasure_noise,
-    compute_fourier_spectrum,
     compute_multilinear_extension,
-    compute_truth_table,
 )
 
 
@@ -54,44 +48,6 @@ def _z(n: str) -> dict[str, str]:
 
 
 TOOLS: tuple[MathTool[Any, Any], ...] = (
-    boolean_analysis_operation(
-        "boolean.truth_table.compute",
-        "Evaluate a Boolean function over all 2^n inputs",
-        "Given a truth table of 2^n 0/1 values, return it together with the variable count and ordering convention. Inputs are canonical rationals; the result echoes the table in canonical form.",
-        TruthTableRequest,
-        TruthTableResult,
-        compute_truth_table,
-        "boolean",
-        "truth-table",
-        "exact",
-        examples=(
-            example(
-                "single_variable",
-                "Return the truth table of a 1-variable Boolean function.",
-                {"truth_table": [_z("0"), _z("1")]},
-            ),
-        ),
-    ),
-    boolean_analysis_operation(
-        "boolean.fourier_spectrum.compute",
-        "Compute the Fourier/Walsh-Hadamard spectrum of a Boolean function",
-        "Compute the exact integer Walsh-Hadamard spectrum of a Boolean function from its complete truth table using the Fast Walsh-Hadamard Transform. No floating-point arithmetic is involved.",
-        FourierSpectrumRequest,
-        FourierSpectrumResult,
-        compute_fourier_spectrum,
-        "boolean",
-        "fourier",
-        "walsh",
-        "hadamard",
-        "exact-integer",
-        examples=(
-            example(
-                "and_function",
-                "Compute the Walsh spectrum of the 2-bit AND function.",
-                {"truth_table": [_z("0"), _z("0"), _z("0"), _z("1")]},
-            ),
-        ),
-    ),
     boolean_analysis_operation(
         "boolean.multilinear_extension.compute",
         "Compute the multilinear extension polynomial of a Boolean function",

@@ -30,14 +30,11 @@ from jacobian.math.number_theory.numerical_semigroups._global_invariant_models i
     CatenaryDegreeResult,
     DeltaSetRequest,
     DeltaSetResult,
-    ElasticityRequest,
-    ElasticityResult,
 )
 from jacobian.math.number_theory.numerical_semigroups._global_invariant_operations import (
     compute_betti_elements,
     compute_catenary_degree,
     compute_delta_set,
-    compute_elasticity,
 )
 from jacobian.math.number_theory.numerical_semigroups._models import MAX_GENERATOR
 from jacobian.math.number_theory.numerical_semigroups._presentation_models import (
@@ -296,27 +293,6 @@ TOOLS: tuple[MathTool[Any, Any], ...] = (
                 f"most {MAX_GENERATOR}, normalize to the minimal axis and the "
                 "value must be a positive member.",
                 {"generators": ["3", "5"], "value": "15"},
-            ),
-        ),
-    ),
-    _operation(
-        "number_theory.numerical_semigroup.elasticity.global_compute",
-        "Compute global elasticity",
-        "Compute the global elasticity of a numerical semigroup: the ratio "
-        "of the largest to smallest minimal generator, which is the "
-        "supremum of element elasticities.",
-        ElasticityRequest,
-        ElasticityResult,
-        compute_elasticity,
-        "number-theory",
-        "numerical-semigroup",
-        "exact",
-        examples=(
-            example(
-                "global_elasticity_3_5",
-                "Global elasticity of <3,5>; positive gcd-one general-path generators, each at "
-                f"most {MAX_GENERATOR}, normalize to the minimal axis.",
-                {"generators": ["3", "5"]},
             ),
         ),
     ),

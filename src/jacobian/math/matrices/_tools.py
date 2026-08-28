@@ -8,45 +8,34 @@ from jacobian.catalog.models import MathTool, OperationExample
 from jacobian.math.matrices._operation_models import (
     CharacteristicPolynomialResult,
     IntegerMatrixRequest,
-    MatrixAdjugateResult,
     MatrixDeterminantRequest,
     MatrixDeterminantResult,
     MatrixInverseResult,
-    MatrixKroneckerProductRequest,
-    MatrixKroneckerProductResult,
     MatrixPartialTraceRequest,
     MatrixPartialTraceResult,
     MatrixPermanentRequest,
     MatrixPermanentResult,
-    MatrixProductResult,
     MatrixRankRequest,
     MatrixRankResult,
-    MatrixTraceResult,
     NonsingularIntegerMatrixRequest,
     NullspaceResult,
     RationalLinearSolveRequest,
     RationalLinearSolveResult,
-    RationalMatrixProductRequest,
     RationalMatrixRequest,
     RrefResult,
-    SquareIntegerMatrixRequest,
     SquareRationalMatrixRequest,
 )
 from jacobian.math.matrices._operations import (
-    compute_adjugate,
     compute_characteristic_polynomial,
     compute_determinant,
     compute_inverse,
-    compute_kronecker_product,
     compute_nullspace,
     compute_partial_trace,
     compute_permanent,
-    compute_product,
     compute_rank,
     compute_rational_linear_solve,
     compute_rref,
     compute_smith_normal_form,
-    compute_trace,
 )
 from jacobian.math.matrices.values import SmithNormalForm
 
@@ -234,33 +223,6 @@ TOOLS = (
         ),
     ),
     matrix_operation(
-        "matrix.adjugate.compute",
-        "Compute an exact matrix adjugate",
-        "Compute the classical adjugate of a square integer matrix.",
-        SquareIntegerMatrixRequest,
-        MatrixAdjugateResult,
-        compute_adjugate,
-        "matrix",
-        "adjugate",
-        "exact-integer",
-        examples=(
-            example(
-                "adjugate_two_by_two",
-                "Compute the adjugate of a 2x2 integer matrix.",
-                {"matrix": {"entries": [["1", "2"], ["3", "4"]]}},
-            ),
-            example(
-                "adjugate_3x3_diagonal",
-                "Compute the adjugate of a 3x3 diagonal matrix; the matrix must be square.",
-                {
-                    "matrix": {
-                        "entries": [["2", "0", "0"], ["0", "3", "0"], ["0", "0", "4"]]
-                    }
-                },
-            ),
-        ),
-    ),
-    matrix_operation(
         "matrix.inverse.compute",
         "Compute the exact inverse of an integer matrix",
         "Compute the rational two-sided inverse of a nonsingular square matrix.",
@@ -283,109 +245,6 @@ TOOLS = (
                     "matrix": {
                         "entries": [["2", "0", "0"], ["0", "3", "0"], ["0", "0", "4"]]
                     }
-                },
-            ),
-        ),
-    ),
-    matrix_operation(
-        "matrix.trace.compute",
-        "Compute the exact trace of an integer matrix",
-        "Compute the sum of the diagonal entries of a square integer matrix.",
-        SquareIntegerMatrixRequest,
-        MatrixTraceResult,
-        compute_trace,
-        "matrix",
-        "trace",
-        "exact-integer",
-        examples=(
-            example(
-                "trace_two_by_two",
-                "Compute the trace of a 2x2 integer matrix.",
-                {"matrix": {"entries": [["1", "2"], ["3", "4"]]}},
-            ),
-            example(
-                "trace_diagonal_3x3",
-                "Compute the trace (6) of a 3x3 diagonal matrix; the matrix must be square.",
-                {
-                    "matrix": {
-                        "entries": [["1", "0", "0"], ["0", "2", "0"], ["0", "0", "3"]]
-                    }
-                },
-            ),
-        ),
-    ),
-    matrix_operation(
-        "matrix.multiply.compute",
-        "Multiply two exact rational matrices",
-        (
-            "Compute the standard row-by-column product of two compatible bounded "
-            "matrices over QQ, with the operand shapes bound in the result. Equal "
-            "operands give the exact self-product or matrix square."
-        ),
-        RationalMatrixProductRequest,
-        MatrixProductResult,
-        compute_product,
-        "matrix",
-        "matrix-multiplication",
-        "product",
-        "self-product",
-        "matrix-square",
-        "zero-matrix",
-        "matrix-identity",
-        "exact-rational",
-        examples=(
-            example(
-                "multiply_rectangular_matrices",
-                "Multiply a 2x3 matrix by a 3x2 matrix over QQ.",
-                {
-                    "left": {
-                        "entries": [
-                            [
-                                {"num": "1", "den": "1"},
-                                {"num": "2", "den": "1"},
-                                {"num": "0", "den": "1"},
-                            ],
-                            [
-                                {"num": "0", "den": "1"},
-                                {"num": "1", "den": "1"},
-                                {"num": "1", "den": "1"},
-                            ],
-                        ]
-                    },
-                    "right": {
-                        "entries": [
-                            [
-                                {"num": "1", "den": "1"},
-                                {"num": "0", "den": "1"},
-                            ],
-                            [
-                                {"num": "0", "den": "1"},
-                                {"num": "1", "den": "1"},
-                            ],
-                            [
-                                {"num": "1", "den": "1"},
-                                {"num": "1", "den": "1"},
-                            ],
-                        ]
-                    },
-                },
-            ),
-            example(
-                "multiply_square_matrices",
-                "Multiply two 2x2 matrices; the left column count must equal the right row count.",
-                {
-                    "left": {
-                        "entries": [
-                            [{"num": "1", "den": "1"}, {"num": "0", "den": "1"}],
-                            [{"num": "0", "den": "1"}, {"num": "1", "den": "1"}],
-                        ]
-                    },
-                    "right": {
-                        "entries": [
-                            [{"num": "2", "den": "1"}, {"num": "0", "den": "1"}],
-                            [{"num": "0", "den": "1"}, {"num": "2", "den": "1"}],
-                        ]
-                    },
                 },
             ),
         ),
@@ -578,50 +437,6 @@ TOOLS = (
                             ],
                         ]
                     }
-                },
-            ),
-        ),
-    ),
-    matrix_operation(
-        "matrix.kronecker_product.compute",
-        "Compute an exact Kronecker product",
-        "Compute the Kronecker (tensor) product of two bounded rational matrices over QQ.",
-        MatrixKroneckerProductRequest,
-        MatrixKroneckerProductResult,
-        compute_kronecker_product,
-        "matrix",
-        "kronecker-product",
-        "tensor-product",
-        "exact-rational",
-        examples=(
-            example(
-                "kronecker_two_by_two",
-                "Compute the Kronecker product of two 2x2 matrices.",
-                {
-                    "left": {
-                        "entries": [
-                            [
-                                {"num": "1", "den": "1"},
-                                {"num": "0", "den": "1"},
-                            ],
-                            [
-                                {"num": "0", "den": "1"},
-                                {"num": "1", "den": "1"},
-                            ],
-                        ]
-                    },
-                    "right": {
-                        "entries": [
-                            [
-                                {"num": "2", "den": "1"},
-                                {"num": "3", "den": "1"},
-                            ],
-                            [
-                                {"num": "4", "den": "1"},
-                                {"num": "5", "den": "1"},
-                            ],
-                        ]
-                    },
                 },
             ),
         ),

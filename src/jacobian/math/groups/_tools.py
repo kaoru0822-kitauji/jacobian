@@ -7,6 +7,7 @@ from jacobian._models import StrictModel
 from jacobian.catalog._examples import example
 from jacobian.catalog.models import MathTool, OperationExample
 from jacobian.math.groups._models import (
+    MAX_CONJUGACY_CLASSES_GROUP_ORDER,
     GroupConjugacyClassesRequest,
     GroupConjugacyClassesResult,
     GroupElementOrderRequest,
@@ -143,7 +144,8 @@ TOOLS: tuple[MathTool[Any, Any], ...] = (
         "representative; class sizes are orbit sizes under conjugation. "
         "Classes are canonically ordered (members sorted, classes sorted by "
         "smallest member), so the same group always yields an identical "
-        "result. The generated group must have order at most 5000; larger "
+        "result. The generated group must have order at most "
+        f"{MAX_CONJUGACY_CLASSES_GROUP_ORDER}; larger "
         "groups are rejected before enumeration.",
         GroupConjugacyClassesRequest,
         GroupConjugacyClassesResult,

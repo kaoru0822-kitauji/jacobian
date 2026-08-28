@@ -7,13 +7,10 @@ from jacobian._models import StrictModel
 from jacobian.catalog._examples import example
 from jacobian.catalog.models import MathTool, OperationExample
 from jacobian.math.topology.cohomology.operations._models import (
-    BocksteinRequest,
-    BocksteinResult,
     SteenrodSquareRequest,
     SteenrodSquareResult,
 )
 from jacobian.math.topology.cohomology.operations._operations import (
-    compute_bockstein,
     compute_steenrod_square,
 )
 
@@ -83,27 +80,6 @@ TOOLS: tuple[MathTool[Any, Any], ...] = (
                 "sq0_identity",
                 "Compute Sq^0(x)=x for the 1-cocycle d(vertex 0) on the triangle; nonzero cochains require ambient for cocycle verification.",
                 _SQ_EXAMPLE,
-            ),
-        ),
-    ),
-    cohomology_operation(
-        "cohomology.bockstein.compute",
-        "Compute the Bockstein homomorphism of the trivial cocycle over Z/p",
-        "Given a degree-n cochain over Z/p that is zero modulo p, return the "
-        "exact zero Bockstein beta(x) in H^{n+1}(Z/p). Nontrivial cocycles "
-        "require the ambient simplicial complex and are rejected as "
-        "unsupported by this bounded operation.",
-        BocksteinRequest,
-        BocksteinResult,
-        compute_bockstein,
-        "cohomology",
-        "bockstein",
-        "exact",
-        examples=(
-            example(
-                "bockstein_gf2",
-                "Compute the Bockstein of the trivial cocycle over GF(2).",
-                _BOCKSTEIN_EXAMPLE,
             ),
         ),
     ),

@@ -8,8 +8,6 @@ from jacobian.catalog._examples import example
 from jacobian.catalog.models import MathTool, OperationExample
 from jacobian.math.combinatorics.additive._models import (
     _MAX_VECTOR_SET_SIZE,
-    AdditiveEnergyRequest,
-    AdditiveEnergyResult,
     DirectSumPredicateRequest,
     DirectSumPredicateResult,
     MultisetSumRepresentationProfileRequest,
@@ -19,16 +17,12 @@ from jacobian.math.combinatorics.additive._models import (
     RepresentationProfileRequest,
     RepresentationProfileResult,
     SubsetSumProfileRequest,
-    SumsetCardinalityRequest,
-    SumsetCardinalityResult,
 )
 from jacobian.math.combinatorics.additive._operations import (
-    compute_additive_energy,
     compute_multiset_sum_representation_profile,
     compute_ordered_difference_profile,
     compute_representation_profile,
     compute_subset_sum_profile,
-    compute_sumset_cardinality,
     decide_direct_sum_predicate,
 )
 from jacobian.math.combinatorics.additive._subset_sum_profile import (
@@ -44,7 +38,7 @@ from jacobian.math.combinatorics.additive._subset_sum_residue import (
     compute_subset_sum_residue_profile,
 )
 from jacobian.math.combinatorics.additive._subset_sum_target import (
-    MAX_SUBSET_SUM_TOTAL_TRANSITIONS,
+    MAX_SUBSET_SUM_TRANSITIONS,
     SubsetSumTargetRequest,
     SubsetSumTargetResult,
     solve_subset_sum_target_request,
@@ -129,8 +123,8 @@ TOOLS: tuple[MathTool[Any, Any], ...] = (
             "For a bounded indexed integer sequence and one integer target, "
             "return the canonical attaining index subset or establish exact "
             "non-attainment after exhausting the admitted reachable-sum state space. "
-            "The complete call charges admission and computation, performing at most "
-            f"{MAX_SUBSET_SUM_TOTAL_TRANSITIONS:,} state transitions."
+            "The bounded kernel performs at most "
+            f"{MAX_SUBSET_SUM_TRANSITIONS:,} state transitions."
         ),
         SubsetSumTargetRequest,
         SubsetSumTargetResult,
@@ -184,7 +178,7 @@ TOOLS: tuple[MathTool[Any, Any], ...] = (
         "with repetition allowed. An optional closed sum window returns the "
         "complete profile only inside that interval. Admission bounds complete "
         "materialized enumeration and worst-case serialized support before "
-        "execution; the result retains and replays its source, arity, and scope.",
+        "execution; the result retains its source, arity, and scope.",
         MultisetSumRepresentationProfileRequest,
         MultisetSumRepresentationProfileResult,
         compute_multiset_sum_representation_profile,
@@ -237,47 +231,6 @@ TOOLS: tuple[MathTool[Any, Any], ...] = (
                     "profile bounds."
                 ),
                 _SUBSET_SUM_PROFILE_EXAMPLE,
-            ),
-        ),
-    ),
-    additive_combinatorics_operation(
-        "additive.energy.compute",
-        "Compute the additive energy of two integer sets",
-        "Given two finite integer sets A and B, compute E(A,B) = "
-        "sum_x r_{A+B}(x)^2 = #{(a,b,a',b') : a+b=a'+b'} exactly, "
-        "with the per-sum decomposition.",
-        AdditiveEnergyRequest,
-        AdditiveEnergyResult,
-        compute_additive_energy,
-        "additive-combinatorics",
-        "additive-energy",
-        "sumset",
-        "exact",
-        examples=(
-            example(
-                "two_by_two_energy",
-                "A={1,2}, B={3,4}: E(A,B)=1+4+1=6.",
-                _ADDITIVE_ENERGY_EXAMPLE,
-            ),
-        ),
-    ),
-    additive_combinatorics_operation(
-        "additive.sumset_cardinality.compute",
-        "Compute the cardinality of a sumset",
-        "Given two finite integer sets A and B, compute |A+B|, the support "
-        "cardinality of the representation profile, with the sorted support.",
-        SumsetCardinalityRequest,
-        SumsetCardinalityResult,
-        compute_sumset_cardinality,
-        "additive-combinatorics",
-        "sumset",
-        "cardinality",
-        "exact",
-        examples=(
-            example(
-                "three_plus_two_sumset",
-                ("A={0,1,2}, B={0,2}: A+B={0,1,2,3,4} and |A+B|=5."),
-                _SUMSET_CARDINALITY_EXAMPLE,
             ),
         ),
     ),

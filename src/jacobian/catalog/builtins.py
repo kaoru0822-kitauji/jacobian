@@ -1,59 +1,50 @@
-"""Deterministic discovery of owner-local built-in registrations."""
+"""Deterministic discovery of owner-local built-in tool manifests."""
 
 from __future__ import annotations
 
 import pkgutil
+from collections import Counter
 from importlib import import_module
+from typing import Any
 
 import jacobian.math
-from jacobian.catalog.admission import (
-    OperationAdmission,
-    OperationRegistration,
-    curate_public_tools,
-)
-from jacobian.catalog.models import MathTools
+from jacobian.catalog.models import MathTool, MathTools
 
 
-def _registration_module_names() -> tuple[str, ...]:
+def _tool_module_names() -> tuple[str, ...]:
     prefix = f"{jacobian.math.__name__}."
     return tuple(
         sorted(
             module.name
             for module in pkgutil.walk_packages(jacobian.math.__path__, prefix)
-            if module.name.endswith("._admission")
+            if module.name.endswith("._tools")
         )
     )
 
 
-def _load_registrations(
-    module_names: tuple[str, ...],
-) -> tuple[OperationRegistration, ...]:
-    registrations: list[OperationRegistration] = []
+def _load_tools(module_names: tuple[str, ...]) -> MathTools:
+    tools: list[MathTool[Any, Any]] = []
     for module_name in module_names:
         module = import_module(module_name)
-        registration = getattr(module, "REGISTRATION", None)
-        if not isinstance(registration, OperationRegistration):
+        manifest = getattr(module, "TOOLS", None)
+        if not isinstance(manifest, tuple) or not all(
+            isinstance(tool, MathTool) for tool in manifest
+        ):
             raise TypeError(
-                f"{module_name} must export an OperationRegistration as REGISTRATION"
+                f"{module_name} must export a tuple of MathTool values as TOOLS"
             )
-        registrations.append(registration)
-    return tuple(registrations)
+        tools.extend(manifest)
+
+    operation_id_counts = Counter(tool.operation_id for tool in tools)
+    duplicates = sorted(
+        operation_id for operation_id, count in operation_id_counts.items() if count > 1
+    )
+    if duplicates:
+        raise ValueError(f"built-in operation IDs must be unique: {duplicates}")
+    return tuple(sorted(tools, key=lambda tool: tool.operation_id))
 
 
-_BUILTIN_REGISTRATION_MODULES = _registration_module_names()
-_BUILTIN_REGISTRATIONS = _load_registrations(_BUILTIN_REGISTRATION_MODULES)
-_BUILTIN_CANDIDATES: MathTools = tuple(
-    tool for registration in _BUILTIN_REGISTRATIONS for tool in registration.candidates
-)
-_RAW_ADMISSIONS: tuple[OperationAdmission, ...] = tuple(
-    admission
-    for registration in _BUILTIN_REGISTRATIONS
-    for admission in registration.admissions
-)
-_ALL_ADMISSIONS: tuple[OperationAdmission, ...] = tuple(
-    sorted(_RAW_ADMISSIONS, key=lambda admission: admission.operation_id)
-)
-
-BUILTIN_TOOLS: MathTools = curate_public_tools(_BUILTIN_CANDIDATES, _ALL_ADMISSIONS)
+_BUILTIN_TOOL_MODULES = _tool_module_names()
+BUILTIN_TOOLS: MathTools = _load_tools(_BUILTIN_TOOL_MODULES)
 
 __all__ = ["BUILTIN_TOOLS"]

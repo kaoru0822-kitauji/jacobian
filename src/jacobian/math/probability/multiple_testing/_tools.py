@@ -9,12 +9,9 @@ from jacobian.catalog.models import MathTool, OperationExample
 from jacobian.math.probability.multiple_testing._models import (
     BHStepUpRequest,
     BHStepUpResult,
-    FDPRequest,
-    FDPResult,
 )
 from jacobian.math.probability.multiple_testing._operations import (
     compute_bh_step_up,
-    compute_fdp,
 )
 
 
@@ -68,26 +65,6 @@ TOOLS: tuple[MathTool[Any, Any], ...] = (
                     ],
                     "level": {"num": "1", "den": "20"},
                 },
-            ),
-        ),
-    ),
-    _op(
-        "probability.fdp.compute",
-        "False discovery proportion",
-        "Given rejected and true-null hypothesis IDs, compute the exact "
-        "false discovery proportion FDP = |rejected nulls| / |rejected|.",
-        FDPRequest,
-        FDPResult,
-        compute_fdp,
-        "probability",
-        "multiple-testing",
-        "fdp",
-        "exact",
-        examples=(
-            example(
-                "simple_fdp",
-                "2 rejections, 1 true null.",
-                {"rejected_ids": ["h1", "h2"], "true_null_ids": ["h2", "h3"]},
             ),
         ),
     ),

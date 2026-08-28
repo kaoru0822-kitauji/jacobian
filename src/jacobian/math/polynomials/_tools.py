@@ -3,7 +3,6 @@
 from jacobian.catalog.models import MathTools
 from jacobian.math.polynomials._elementary import (
     INTEGER_POLYNOMIAL_OPERATIONS,
-    RATIONAL_POLYNOMIAL_OPERATIONS,
 )
 from jacobian.math.polynomials._invariants import POLYNOMIAL_INVARIANT_OPERATIONS
 from jacobian.math.polynomials._jacobian_syzygy import (
@@ -19,6 +18,5 @@ TOOLS: MathTools = (
     GRADED_JACOBIAN_SYZYGY_OPERATION,
     JACOBIAN_SYZYGY_COEFFICIENT_LEDGER_OPERATION,
     *INTEGER_POLYNOMIAL_OPERATIONS,
-    *RATIONAL_POLYNOMIAL_OPERATIONS,
     POLYNOMIAL_MULTIPLY_OPERATION,
 )

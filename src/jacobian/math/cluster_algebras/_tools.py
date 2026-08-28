@@ -7,13 +7,10 @@ from jacobian._models import StrictModel
 from jacobian.catalog._examples import example
 from jacobian.catalog.models import MathTool, OperationExample
 from jacobian.math.cluster_algebras._models import (
-    GVectorRequest,
-    GVectorResult,
     SeedMutationRequest,
     SeedMutationResult,
 )
 from jacobian.math.cluster_algebras._operations import (
-    compute_g_vectors,
     mutate_seed,
 )
 
@@ -82,26 +79,6 @@ TOOLS: tuple[MathTool[Any, Any], ...] = (
                 "a2_mutation",
                 "Mutate the A2 cluster seed at index 0.",
                 _MUTATION_EXAMPLE,
-            ),
-        ),
-    ),
-    cluster_algebra_operation(
-        "cluster_algebra.g_vector.compute",
-        "Compute the g-vector matrix for principal coefficients",
-        "Compute the initial g-vector matrix (identity) for a cluster seed "
-        "with principal coefficients. The g-vectors index the cluster "
-        "variables as Laurent polynomials in the initial cluster.",
-        GVectorRequest,
-        GVectorResult,
-        compute_g_vectors,
-        "cluster-algebra",
-        "g-vector",
-        "exact",
-        examples=(
-            example(
-                "a2_g_vectors",
-                "Compute g-vectors for the A2 seed.",
-                _GVECTOR_EXAMPLE,
             ),
         ),
     ),

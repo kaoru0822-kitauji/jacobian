@@ -13,8 +13,6 @@ from jacobian.math.combinatorics.codes.nonlinear._models import (
     ConstantWeightResult,
     ExplicitProfileRequest,
     ExplicitProfileResult,
-    ToSetSystemRequest,
-    ToSetSystemResult,
     WordDistanceRequest,
     WordDistanceResult,
 )
@@ -22,7 +20,6 @@ from jacobian.math.combinatorics.codes.nonlinear._operations import (
     compute_constant_weight,
     compute_constant_weight_profile,
     compute_explicit_profile,
-    compute_to_set_system,
     compute_word_distance,
 )
 
@@ -127,29 +124,6 @@ TOOLS: tuple[MathTool[Any, Any], ...] = (
                     "code": {
                         "length": 4,
                         "codewords": [[1, 1, 0, 0], [1, 0, 1, 0]],
-                    }
-                },
-            ),
-        ),
-    ),
-    _op(
-        "code.binary.explicit.to_set_system.compute",
-        "Map codewords to support subsets",
-        "Map each canonical source codeword to its exact support block on the retained coordinate axis.",
-        ToSetSystemRequest,
-        ToSetSystemResult,
-        compute_to_set_system,
-        "code",
-        "set-system",
-        "exact",
-        examples=(
-            example(
-                "to_set_system_two",
-                "Convert two length-4 codewords to support blocks; the canonical source declares the coordinate-axis length.",
-                {
-                    "code": {
-                        "length": 4,
-                        "codewords": [[1, 0, 1, 0], [0, 1, 0, 1]],
                     }
                 },
             ),

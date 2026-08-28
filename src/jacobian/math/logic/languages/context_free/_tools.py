@@ -6,7 +6,7 @@ from typing import Any
 from jacobian._models import StrictModel
 from jacobian.catalog._examples import example
 from jacobian.catalog.models import MathTool, OperationExample
-from jacobian.math.logic.languages.context_free.context_free._models import (
+from jacobian.math.logic.languages.context_free._models import (
     DependencyGraphRequest,
     DependencyGraphResult,
     FirstSetsRequest,
@@ -14,7 +14,7 @@ from jacobian.math.logic.languages.context_free.context_free._models import (
     SymbolProfilesRequest,
     SymbolProfilesResult,
 )
-from jacobian.math.logic.languages.context_free.context_free._operations import (
+from jacobian.math.logic.languages.context_free._operations import (
     compute_dependency_graph,
     compute_first_sets,
     compute_symbol_profiles,

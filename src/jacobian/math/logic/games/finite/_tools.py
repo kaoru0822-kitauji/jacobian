@@ -8,14 +8,11 @@ from jacobian.catalog._examples import example
 from jacobian.catalog.models import MathTool, OperationExample
 from jacobian.math.logic.games.finite._models import (
     MAX_EXACT_EQUILIBRIUM_WORK,
-    BestResponseResult,
     DeterministicTerminalGameRequest,
     NashEquilibriumRequest,
     NashEquilibriumResult,
-    ZeroSumGameRequest,
 )
 from jacobian.math.logic.games.finite._operations import (
-    compute_best_response,
     compute_deterministic_terminal_game,
     compute_nash_equilibrium,
 )
@@ -90,26 +87,6 @@ DETERMINISTIC_TERMINAL_GAME_EXAMPLE = {
 
 
 TOOLS: tuple[MathTool[Any, Any], ...] = (
-    _op(
-        "game_theory.best_response.compute",
-        "Compute best response in a zero-sum game",
-        "Compute the maximin value and best row for the row player in a "
-        "2-player zero-sum game using exact rational arithmetic.",
-        ZeroSumGameRequest,
-        BestResponseResult,
-        compute_best_response,
-        "game-theory",
-        "best-response",
-        "zero-sum",
-        "exact",
-        examples=(
-            example(
-                "simple_2x2",
-                "Best response in a 2x2 zero-sum game.",
-                GAME_EXAMPLE,
-            ),
-        ),
-    ),
     _op(
         "game_theory.nash_equilibrium.compute",
         "Compute Nash equilibrium of a zero-sum game",

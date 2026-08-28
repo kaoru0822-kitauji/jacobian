@@ -7,8 +7,6 @@ from jacobian._models import StrictModel
 from jacobian.catalog._examples import example
 from jacobian.catalog.models import MathTool, OperationExample
 from jacobian.math.logic.languages.regular._models import (
-    ComplementRequest,
-    ComplementResult,
     CountRequest,
     CountResult,
     RunRequest,
@@ -16,7 +14,6 @@ from jacobian.math.logic.languages.regular._models import (
     TransitionParikhProfileRequest,
 )
 from jacobian.math.logic.languages.regular._operations import (
-    compute_complement,
     compute_count,
     compute_run,
     compute_transition_parikh_profile,
@@ -136,24 +133,6 @@ TOOLS: tuple[MathTool[Any, Any], ...] = (
                 "binary_ends_in_1",
                 "Count binary strings of length 3 ending in 1: 4 words.",
                 {"dfa": _DFA_EXAMPLE["dfa"], "word_length": 3},
-            ),
-        ),
-    ),
-    rl_operation(
-        "regular_language.complement.compute",
-        "Compute the complement of a DFA's language",
-        "Compute the complement DFA by flipping the set of accepting states.",
-        ComplementRequest,
-        ComplementResult,
-        compute_complement,
-        "automata",
-        "complement",
-        "exact",
-        examples=(
-            example(
-                "binary_ends_in_1",
-                "Complement of DFA accepting strings ending in 1.",
-                {"dfa": _DFA_EXAMPLE["dfa"]},
             ),
         ),
     ),
