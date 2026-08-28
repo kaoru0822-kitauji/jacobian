@@ -14,6 +14,9 @@ from jacobian.math.combinatorics._recurrence_models import (
 )
 
 _LOG10_2 = math.log10(2)
+_FRACTION_WIRE_FIXED_BYTES = 20
+_RESIDUAL_WIRE_FIXED_BYTES = 32
+_RESULT_WIRE_FIXED_BYTES = 1_024
 
 
 def _lower_decimal_digits(value: int) -> int:
@@ -33,7 +36,7 @@ def _minimum_fraction_wire_bytes(value: Fraction) -> int:
     return (
         _lower_decimal_digits(value.numerator)
         + _lower_decimal_digits(value.denominator)
-        + 20
+        + _FRACTION_WIRE_FIXED_BYTES
     )
 
 
@@ -75,7 +78,7 @@ def _admit_linear_recurrence(
     minimum_size += sum(
         _minimum_fraction_wire_bytes(replay[index]) for index in requested_indices
     )
-    if minimum_size + 1_024 > MAX_COMBINATORICS_RESULT_ARTIFACT_BYTES:
+    if minimum_size + _RESULT_WIRE_FIXED_BYTES > MAX_COMBINATORICS_RESULT_ARTIFACT_BYTES:
         raise ValueError("the exact combinatorics result exceeds the bounded result limit")
     for value in replay:
         _require_bounded_fraction(value, label="recurrence result")
@@ -125,7 +128,7 @@ def _admit_p_recursive_recurrence(
     end = requested_indices[-1]
     replay = [value.as_fraction() for value in initial_values[: end + 1]]
     requested_index_set = set(requested_indices)
-    minimum_size = 1_024 + sum(
+    minimum_size = _RESULT_WIRE_FIXED_BYTES + sum(
         _minimum_fraction_wire_bytes(value) * (1 + (index in requested_index_set))
         for index, value in enumerate(replay)
     )
@@ -154,7 +157,7 @@ def _admit_p_recursive_recurrence(
         minimum_size += _minimum_fraction_wire_bytes(next_value) * (
             1 + (index in requested_index_set)
         )
-        minimum_size += 32
+        minimum_size += _RESIDUAL_WIRE_FIXED_BYTES
         if minimum_size > MAX_COMBINATORICS_RESULT_ARTIFACT_BYTES:
             raise ValueError("the exact combinatorics result exceeds the bounded result limit")
         replay.append(next_value)
@@ -222,7 +225,7 @@ def _admit_series(
         coefficients.append(coefficient)
     minimum_size = sum(_minimum_fraction_wire_bytes(value) for value in coefficients)
     minimum_size += truncation_order * _minimum_fraction_wire_bytes(Fraction())
-    if minimum_size + 1_024 > MAX_COMBINATORICS_RESULT_ARTIFACT_BYTES:
+    if minimum_size + _RESULT_WIRE_FIXED_BYTES > MAX_COMBINATORICS_RESULT_ARTIFACT_BYTES:
         raise ValueError("the exact combinatorics result exceeds the bounded result limit")
     _validate_result_inline_size(
         {
