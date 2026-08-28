@@ -5,7 +5,7 @@ from typing import Any, Literal, overload
 import pytest
 from pydantic import ValidationError
 
-from jacobian.catalog.models import MathTool
+from jacobian.catalog.models import MathTool, OperationDomainValidationError
 from jacobian.math.topology._homology import (
     IntegralSimplicialHomologyRequest,
     IntegralSimplicialHomologyResult,
@@ -63,17 +63,17 @@ def _canonical_complex(
 def test_facet_request_rejects_duplicates_nonmaximal_faces_and_hidden_isolates() -> (
     None
 ):
-    with pytest.raises(ValueError):
+    with pytest.raises(OperationDomainValidationError):
         _operation("topology.simplicial_complex.canonicalize").run(
             SimplicialComplexRequest(
                 vertices=("a", "b"), facets=(("a", "b"), ("b", "a"))
             )
         )
-    with pytest.raises(ValueError):
+    with pytest.raises(OperationDomainValidationError):
         _operation("topology.simplicial_complex.canonicalize").run(
             SimplicialComplexRequest(vertices=("a", "b"), facets=(("a",), ("a", "b")))
         )
-    with pytest.raises(ValueError):
+    with pytest.raises(OperationDomainValidationError):
         _operation("topology.simplicial_complex.canonicalize").run(
             SimplicialComplexRequest(
                 vertices=("a", "b", "isolated"), facets=(("a", "b"),)
@@ -84,7 +84,7 @@ def test_facet_request_rejects_duplicates_nonmaximal_faces_and_hidden_isolates()
 def test_chain_and_homology_requests_validate_prime_semantics() -> None:
     complex_ = _canonical_complex(("a", "b"), (("a", "b"),))
 
-    with pytest.raises(ValueError):
+    with pytest.raises(OperationDomainValidationError):
         _operation("topology.simplicial_complex.chain_complex.compute").run(
             ChainComplexRequest(
                 complex=complex_,
@@ -92,7 +92,7 @@ def test_chain_and_homology_requests_validate_prime_semantics() -> None:
                 prime=2,
             )
         )
-    with pytest.raises(ValueError):
+    with pytest.raises(OperationDomainValidationError):
         _operation("topology.simplicial_complex.chain_complex.compute").run(
             ChainComplexRequest(
                 complex=complex_,
@@ -100,7 +100,7 @@ def test_chain_and_homology_requests_validate_prime_semantics() -> None:
                 prime=9,
             )
         )
-    with pytest.raises(ValueError):
+    with pytest.raises(OperationDomainValidationError):
         _operation("topology.simplicial_homology.compute").run(
             SimplicialHomologyRequest(complex=complex_, prime=15)
         )

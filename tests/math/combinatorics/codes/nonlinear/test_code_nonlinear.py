@@ -10,6 +10,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian.canonical import encode_strict_json
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.combinatorics.codes.nonlinear import (
     ExplicitBinaryCode,
     to_set_system,
@@ -229,7 +230,7 @@ class TestWordDistance:
         left = [0] * MAX_EXPLICIT_CODE_LENGTH
         right = [1] * MAX_EXPLICIT_CODE_LENGTH
         request = WordDistanceRequest.model_validate({"word1": left, "word2": right})
-        with pytest.raises(ValueError, match="result can use"):
+        with pytest.raises(OperationDomainValidationError, match="result can use"):
             compute_word_distance(request)
 
     def test_differing_coordinate_wire_size_tracks_actual_difference_positions(
@@ -250,7 +251,7 @@ class TestWordDistance:
         ):
             high[index] = 1
         request = WordDistanceRequest.model_validate({"word1": left, "word2": high})
-        with pytest.raises(ValueError, match="result can use"):
+        with pytest.raises(OperationDomainValidationError, match="result can use"):
             compute_word_distance(request)
 
 
@@ -515,7 +516,7 @@ class TestDerivedAdmissionBoundaries:
         request = ExplicitProfileRequest(
             code=ExplicitBinaryCode(length=12, codewords=_binary_words(12, 3_163))
         )
-        with pytest.raises(ValueError, match="unordered pairs"):
+        with pytest.raises(OperationDomainValidationError, match="unordered pairs"):
             compute_explicit_profile(request)
 
     def test_bitset_chunk_work_immediate_boundary(self) -> None:
@@ -529,7 +530,9 @@ class TestDerivedAdmissionBoundaries:
         request = ExplicitProfileRequest(
             code=ExplicitBinaryCode(length=90, codewords=_binary_words(90, 2_583))
         )
-        with pytest.raises(ValueError, match="pair-by-bitset-chunk"):
+        with pytest.raises(
+            OperationDomainValidationError, match="pair-by-bitset-chunk"
+        ):
             compute_explicit_profile(request)
 
     def test_profile_output_size_immediate_boundary(self) -> None:
@@ -552,7 +555,9 @@ class TestDerivedAdmissionBoundaries:
                 length=accepted_length + 1,
             )
         )
-        with pytest.raises(ValueError, match="canonical JSON bytes"):
+        with pytest.raises(
+            OperationDomainValidationError, match="canonical JSON bytes"
+        ):
             compute_explicit_profile(request)
 
     @pytest.mark.parametrize("length", [200_000, MAX_EXPLICIT_CODE_LENGTH])
@@ -596,7 +601,9 @@ class TestDerivedAdmissionBoundaries:
         request = ToSetSystemRequest(
             code=_code((1,) * (accepted_length + 1), length=accepted_length + 1)
         )
-        with pytest.raises(ValueError, match="canonical JSON bytes"):
+        with pytest.raises(
+            OperationDomainValidationError, match="canonical JSON bytes"
+        ):
             compute_to_set_system(request)
 
     @pytest.mark.parametrize(

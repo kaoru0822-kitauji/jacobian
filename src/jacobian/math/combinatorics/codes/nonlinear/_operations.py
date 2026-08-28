@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from itertools import combinations
 
@@ -49,6 +50,22 @@ class _ConstantWeightProfileData:
     intersection_histogram: tuple[int, ...]
     minimum_distance_witness: BinaryCodeDistanceWitness | None
     maximum_distance_witness: BinaryCodeDistanceWitness | None
+
+
+def _admit[T](
+    admission: Callable[[], T],
+    *,
+    location: tuple[str | int, ...],
+    code: str,
+) -> T:
+    try:
+        return admission()
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=location,
+            code=code,
+            message=str(exc),
+        ) from exc
 
 
 def _word_to_bitset(word: BinaryWord) -> int:
@@ -219,7 +236,11 @@ def compute_constant_weight(request: ConstantWeightRequest) -> ConstantWeightRes
 
 def compute_word_distance(request: WordDistanceRequest) -> WordDistanceResult:
     """Compute the exact Hamming relation between two words."""
-    require_word_distance_output_bound(request.word1, request.word2)
+    _admit(
+        lambda: require_word_distance_output_bound(request.word1, request.word2),
+        location=("word1", "word2"),
+        code="nonlinear_code.word_distance_not_admitted",
+    )
     distance, differing, weight1, weight2, intersection = _word_distance_data(
         request.word1, request.word2
     )
@@ -237,7 +258,11 @@ def compute_word_distance(request: WordDistanceRequest) -> WordDistanceResult:
 def compute_explicit_profile(request: ExplicitProfileRequest) -> ExplicitProfileResult:
     """Compute the complete compact profile of an explicit binary code."""
     code = request.code
-    plan = require_profile_admission(code)
+    plan = _admit(
+        lambda: require_profile_admission(code),
+        location=("code",),
+        code="nonlinear_code.profile_not_admitted",
+    )
     profile = _explicit_profile_data(code)
     return ExplicitProfileResult._from_kernel(
         source=code,
@@ -258,7 +283,11 @@ def compute_constant_weight_profile(
 ) -> ConstantWeightProfileResult:
     """Compute distance and intersection profiles of a constant-weight code."""
     code = request.code
-    plan = require_profile_admission(code)
+    plan = _admit(
+        lambda: require_profile_admission(code),
+        location=("code",),
+        code="nonlinear_code.profile_not_admitted",
+    )
     try:
         weight = _constant_weight(code)
     except ValueError as exc:
@@ -286,7 +315,11 @@ def compute_constant_weight_profile(
 def compute_to_set_system(request: ToSetSystemRequest) -> ToSetSystemResult:
     """Map each source word to its coordinate support."""
     code = request.code
-    require_set_system_output_bound(code)
+    _admit(
+        lambda: require_set_system_output_bound(code),
+        location=("code",),
+        code="nonlinear_code.set_system_not_admitted",
+    )
     return ToSetSystemResult._from_kernel(
         source=code,
         length=code.length,

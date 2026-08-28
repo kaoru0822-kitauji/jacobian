@@ -7,7 +7,7 @@ from typing import Any, Literal, overload
 
 import pytest
 
-from jacobian.catalog.models import MathTool
+from jacobian.catalog.models import MathTool, OperationDomainValidationError
 from jacobian.math.topology._homology import (
     SimplicialHomologyRequest,
     SimplicialHomologyResult,
@@ -195,7 +195,7 @@ def test_oversized_simplicial_groups_stay_outside_the_canonical_domain() -> None
     big = _operation("topology.simplicial_complex.canonicalize").run(
         SimplicialComplexRequest(vertices=labels, facets=facets)
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(OperationDomainValidationError):
         _operation("topology.simplicial_complex.chain_complex.compute").run(
             ChainComplexRequest(
                 complex=big.complex,
@@ -218,7 +218,7 @@ def test_aggregate_canonical_cell_bound_is_enforced() -> None:
         .complex
     )
     assert complex_.f_vector == (40, 60, 40, 10)
-    with pytest.raises(ValueError):
+    with pytest.raises(OperationDomainValidationError):
         _operation("topology.simplicial_complex.chain_complex.compute").run(
             ChainComplexRequest(
                 complex=complex_,

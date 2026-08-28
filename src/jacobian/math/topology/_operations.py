@@ -66,7 +66,10 @@ from jacobian.math.topology._pseudomanifold import (
     PseudomanifoldResult,
     pseudomanifold_decision,
 )
-from jacobian.math.topology._request_admission import require_complex_admission
+from jacobian.math.topology._request_admission import (
+    require_complex_admission,
+    run_topology_admission,
+)
 from jacobian.math.topology._shelling import evaluate_shelling
 from jacobian.math.topology.chain_complexes.values import ChainComplexValue
 
@@ -250,7 +253,9 @@ def _chain_result(
     request: ChainComplexRequest, *, admitted: bool = False
 ) -> ChainComplexResult:
     if not admitted:
-        _admit_chain_request(request)
+        run_topology_admission(
+            lambda: _admit_chain_request(request), location=("complex",)
+        )
     complex_ = request.complex
     bases = tuple(
         SimplexBasis(dimension=item.dimension, simplices=item.faces)
@@ -346,7 +351,9 @@ def _vector_rank(vectors: Sequence[Sequence[int]], *, prime: int) -> int:
 def _homology(
     request: SimplicialHomologyRequest,
 ) -> SimplicialHomologyResult:
-    _admit_homology_request(request)
+    run_topology_admission(
+        lambda: _admit_homology_request(request), location=("complex",)
+    )
     chain = _chain_result(
         ChainComplexRequest(
             complex=request.complex,
@@ -450,7 +457,9 @@ def _integral_vector(values: list[int]) -> IntegralVector:
 def _integral_homology(
     request: IntegralSimplicialHomologyRequest,
 ) -> IntegralSimplicialHomologyResult:
-    _admit_integral_homology_request(request)
+    run_topology_admission(
+        lambda: _admit_integral_homology_request(request), location=("complex",)
+    )
     chain = _chain_result(
         ChainComplexRequest(
             complex=request.complex,

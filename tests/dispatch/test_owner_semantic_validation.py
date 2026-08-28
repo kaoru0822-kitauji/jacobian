@@ -47,6 +47,28 @@ def test_edge_path_continuity_admission_is_typed() -> None:
     assert caught.value.errors()[0]["type"] == "topology.edge_path.path_continuity"
 
 
+def test_simplicial_complex_admission_is_typed() -> None:
+    operation_id = "topology.simplicial_complex.canonicalize"
+    payload = {
+        "vertices": ["a", "b", "isolated"],
+        "facets": [["a", "b"]],
+    }
+
+    with pytest.raises(OperationDomainValidationError) as caught:
+        invoke_operation(operation_id, payload, Catalog.open())
+
+    assert caught.value.errors() == (
+        {
+            "loc": ("facets",),
+            "type": "topology.require_request_complex_5",
+            "msg": (
+                "every vertex must occur in a facet; use a singleton facet for an "
+                "isolated vertex"
+            ),
+        },
+    )
+
+
 def test_orthogonal_recurrence_admission_is_typed() -> None:
     operation_id = "orthogonal_polynomial.recurrence.compute"
     payload = _example_payload(operation_id)

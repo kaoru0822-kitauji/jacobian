@@ -11,6 +11,7 @@ from contextlib import contextmanager
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.logic.languages.words import (
     FiniteWord,
     ProlongableSubstitution,
@@ -247,13 +248,13 @@ def test_dependency_graph_output_budget_is_admitted_before_enumeration() -> None
 
     above_limit = _substitution((("0",) * 5_001, ("1",) * 5_000))
     request = SubstitutionDependencyGraphRequest(substitution=above_limit)
-    with pytest.raises(ValueError, match="aggregate bound"):
+    with pytest.raises(OperationDomainValidationError, match="aggregate bound"):
         compute_substitution_dependency_graph(request)
     graph = SubstitutionDependencyGraph(substitution=above_limit, edges=())
     with pytest.raises(ValueError, match="aggregate bound"):
         substitution_dependency_graph(above_limit)
     profile_request = SubstitutionPrimitivityProfileRequest(dependency_graph=graph)
-    with pytest.raises(ValueError, match="aggregate bound"):
+    with pytest.raises(OperationDomainValidationError, match="aggregate bound"):
         compute_substitution_primitivity_profile(profile_request)
     with pytest.raises(ValueError, match="aggregate bound"):
         substitution_primitivity_profile(graph)
@@ -389,7 +390,7 @@ def test_fixed_point_source_and_result_envelopes_cover_exact_boundaries() -> Non
         substitution=_substitution(((rejected_symbol,) * 10_000,), (rejected_symbol,)),
         seed=rejected_symbol,
     )
-    with pytest.raises(ValueError, match="byte bound"):
+    with pytest.raises(OperationDomainValidationError, match="byte bound"):
         compute_substitution_fixed_point_prefix(
             SubstitutionFixedPointPrefixRequest(source=byte_above, prefix_length=500)
         )

@@ -26,7 +26,10 @@ from jacobian.math.topology._models import (
     _validation_error,
     canonical_complex,
 )
-from jacobian.math.topology._request_admission import require_complex_admission
+from jacobian.math.topology._request_admission import (
+    require_complex_admission,
+    run_topology_admission,
+)
 
 
 def _all_nonempty_faces(facets: tuple[Simplex, ...]) -> set[Simplex]:
@@ -534,7 +537,10 @@ def compute_f_vector(request: FVectorRequest) -> FVectorResult:
 
 def compute_link(request: LinkRequest) -> LinkResult:
     require_complex_admission(request.complex)
-    _require_simplex_in_complex(request.complex, request.simplex)
+    run_topology_admission(
+        lambda: _require_simplex_in_complex(request.complex, request.simplex),
+        location=("simplex",),
+    )
     target = frozenset(request.simplex)
     facets = _maximal_faces(
         tuple(sorted(frozenset(facet) - target))
@@ -548,7 +554,10 @@ def compute_link(request: LinkRequest) -> LinkResult:
 
 def compute_star(request: StarRequest) -> StarResult:
     require_complex_admission(request.complex)
-    _require_simplex_in_complex(request.complex, request.simplex)
+    run_topology_admission(
+        lambda: _require_simplex_in_complex(request.complex, request.simplex),
+        location=("simplex",),
+    )
     target = frozenset(request.simplex)
     facets = tuple(
         tuple(sorted(facet))
@@ -573,7 +582,10 @@ def compute_star(request: StarRequest) -> StarResult:
 
 def compute_vertex_deletion(request: VertexDeletionRequest) -> VertexDeletionResult:
     require_complex_admission(request.complex)
-    _require_deletion(request.complex, request.vertices_to_delete)
+    run_topology_admission(
+        lambda: _require_deletion(request.complex, request.vertices_to_delete),
+        location=("vertices_to_delete",),
+    )
     deleted = set(request.vertices_to_delete)
     facets = _maximal_faces(
         face
@@ -610,7 +622,10 @@ def compute_skeleton(request: SkeletonRequest) -> SkeletonResult:
 def compute_join(request: JoinRequest) -> JoinResult:
     require_complex_admission(request.complex_a)
     require_complex_admission(request.complex_b)
-    _require_join_admission(request.complex_a, request.complex_b)
+    run_topology_admission(
+        lambda: _require_join_admission(request.complex_a, request.complex_b),
+        location=("complex_b",),
+    )
     facets = join_maximal_facets(request.complex_a.facets, request.complex_b.facets)
     vertices = tuple(
         sorted(set(request.complex_a.vertices) | set(request.complex_b.vertices))
@@ -630,7 +645,10 @@ def compute_elementary_collapse(
     request: ElementaryCollapseRequest,
 ) -> ElementaryCollapseResult:
     require_complex_admission(request.complex)
-    _require_collapse(request.complex, request.free_face, request.coface)
+    run_topology_admission(
+        lambda: _require_collapse(request.complex, request.free_face, request.coface),
+        location=("free_face", "coface"),
+    )
     free_face, coface = tuple(sorted(request.free_face)), tuple(sorted(request.coface))
     facets = collapse_remaining_facets(request.complex.facets, free_face, coface)
     is_free = facets is not None

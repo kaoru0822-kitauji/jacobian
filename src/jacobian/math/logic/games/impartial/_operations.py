@@ -1,5 +1,6 @@
 """Wire adapters for exact bounded impartial-game operations."""
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.logic.games.impartial._models import (
     BirthdayRequest,
     BirthdayResult,
@@ -88,7 +89,14 @@ def compute_nim_options(
 ) -> NimOptionsResult:
     """Enumerate the complete deduplicated option family of a Nim position."""
 
-    options = nim_options(request.position)
+    try:
+        options = nim_options(request.position)
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=("position",),
+            code="impartial_game.nim_options_not_admitted",
+            message=str(exc),
+        ) from exc
     return NimOptionsResult._from_kernel(
         request, options, sum(request.position.heaps), len(options)
     )

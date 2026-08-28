@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.logic.languages.words._models import (
     FactorsLengthRequest,
     FactorsLengthResult,
@@ -24,6 +27,22 @@ from jacobian.math.logic.languages.words.operations import (
     substitution_dependency_graph,
     substitution_primitivity_profile,
 )
+
+
+def _admit[T](
+    admission: Callable[[], T],
+    *,
+    location: tuple[str | int, ...],
+    code: str,
+) -> T:
+    try:
+        return admission()
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=location,
+            code=code,
+            message=str(exc),
+        ) from exc
 
 
 def compute_factors_length(request: FactorsLengthRequest) -> FactorsLengthResult:
@@ -54,15 +73,22 @@ def compute_incidence_matrix(
 def compute_substitution_dependency_graph(
     request: SubstitutionDependencyGraphRequest,
 ) -> SubstitutionDependencyGraphResult:
-    return SubstitutionDependencyGraphResult._from_kernel(
-        request, substitution_dependency_graph(request.substitution)
+    graph = _admit(
+        lambda: substitution_dependency_graph(request.substitution),
+        location=("substitution",),
+        code="words.substitution_dependency_graph_not_admitted",
     )
+    return SubstitutionDependencyGraphResult._from_kernel(request, graph)
 
 
 def compute_substitution_primitivity_profile(
     request: SubstitutionPrimitivityProfileRequest,
 ) -> SubstitutionPrimitivityProfileResult:
-    analysis = substitution_primitivity_profile(request.dependency_graph)
+    analysis = _admit(
+        lambda: substitution_primitivity_profile(request.dependency_graph),
+        location=("dependency_graph",),
+        code="words.substitution_primitivity_not_admitted",
+    )
     return SubstitutionPrimitivityProfileResult._from_kernel(
         request,
         strongly_connected_components=analysis.strongly_connected_components,
@@ -78,7 +104,11 @@ def compute_substitution_primitivity_profile(
 def compute_substitution_fixed_point_prefix(
     request: SubstitutionFixedPointPrefixRequest,
 ) -> SubstitutionFixedPointPrefixResult:
-    analysis = fixed_point_prefix(request.source, request.prefix_length)
+    analysis = _admit(
+        lambda: fixed_point_prefix(request.source, request.prefix_length),
+        location=("source", "prefix_length"),
+        code="words.fixed_point_prefix_not_admitted",
+    )
     return SubstitutionFixedPointPrefixResult._from_kernel(
         request,
         prefix=analysis.prefix,

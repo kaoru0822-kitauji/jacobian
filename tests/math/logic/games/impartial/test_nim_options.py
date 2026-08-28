@@ -10,6 +10,7 @@ from hypothesis import strategies as st
 from pydantic import ValidationError
 
 from jacobian.canonical import encode_strict_json
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.logic.games.impartial._models import (
     NimOptionsRequest,
     NimOptionsResult,
@@ -116,7 +117,7 @@ def test_nim_options_preflight_distinguishes_raw_and_distinct_counts() -> None:
     assert sum(set(exact_distinct)) == MAX_NIM_DISTINCT_OPTIONS
     NimOptionsRequest(position=NimPosition(heaps=exact_distinct))
 
-    with pytest.raises(ValueError):
+    with pytest.raises(OperationDomainValidationError):
         compute_nim_options(
             NimOptionsRequest(
                 position=NimPosition(heaps=(16, 9_995, 9_996, 9_997, 9_998, 9_999))
@@ -125,7 +126,7 @@ def test_nim_options_preflight_distinguishes_raw_and_distinct_counts() -> None:
 
 
 def test_nim_options_reject_result_bytes_before_option_expansion() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(OperationDomainValidationError):
         compute_nim_options(
             NimOptionsRequest(position=NimPosition(heaps=tuple(range(951, 1_001))))
         )
