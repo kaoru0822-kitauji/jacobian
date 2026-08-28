@@ -67,7 +67,14 @@ def compute_connected_components(
 def compute_continuity(request: ContinuityRequest) -> ContinuityResult:
     _admit_topology(request.domain, location=("domain",))
     _admit_topology(request.codomain, location=("codomain",))
-    analysis = continuity(request.domain, request.codomain, request.point_map)
+    try:
+        analysis = continuity(request.domain, request.codomain, request.point_map)
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=("point_map",),
+            code="finite_topology.map_carrier_mismatch",
+            message=str(exc),
+        ) from exc
     return ContinuityResult._from_kernel(
         request,
         is_continuous=analysis.is_continuous,
@@ -78,7 +85,14 @@ def compute_continuity(request: ContinuityRequest) -> ContinuityResult:
 
 def compute_beat_points(request: BeatPointsRequest) -> BeatPointsResult:
     _admit_topology(request.topology, location=("topology",))
-    analysis = beat_points(request.topology)
+    try:
+        analysis = beat_points(request.topology)
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=("topology",),
+            code="finite_topology.beat_points_require_t0",
+            message=str(exc),
+        ) from exc
     return BeatPointsResult._from_kernel(
         request,
         down_beat_points=analysis.down_beat_points,

@@ -6,6 +6,7 @@ from fractions import Fraction
 from typing import Any
 
 from jacobian._exact import format_canonical_rational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.analysis.convex._models import (
     AffinePiece,
     MaxAffineEvalRequest,
@@ -13,6 +14,18 @@ from jacobian.math.analysis.convex._models import (
     MaxAffineSubdifferentialRequest,
     MaxAffineSubdifferentialResult,
 )
+
+
+def _admit_point(
+    request: MaxAffineEvalRequest | MaxAffineSubdifferentialRequest,
+) -> None:
+    dimension = len(request.function.pieces[0].coefficients)
+    if len(request.point.coordinates) != dimension:
+        raise OperationDomainValidationError(
+            location=("point",),
+            code="convex_analysis.point_dimension_mismatch",
+            message="point dimension must match function dimension",
+        )
 
 
 def _evaluate_piece(piece: AffinePiece, point_coords: Any) -> Fraction:
@@ -27,6 +40,7 @@ def compute_max_affine_evaluation(
     request: MaxAffineEvalRequest,
 ) -> MaxAffineEvalResult:
     """Evaluate f(x) = max_i { <a_i, x> + b_i } and identify active pieces."""
+    _admit_point(request)
     point_coords = request.point.coordinates
     values = []
     active_pieces = []
@@ -59,6 +73,7 @@ def compute_subdifferential(
     of the gradients of all active pieces. Here we return the gradients
     (coefficient vectors) of all active pieces.
     """
+    _admit_point(request)
     point_coords = request.point.coordinates
     max_value = None
     active_gradients = []

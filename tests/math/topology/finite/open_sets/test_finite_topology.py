@@ -7,6 +7,7 @@ import itertools
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.topology.finite.open_sets import (
     FiniteTopology,
     PointMap,
@@ -106,7 +107,7 @@ def test_carriers_are_structural_while_wire_requests_own_operation_bounds() -> N
     assert "maximum" not in value_schema["properties"]["point_count"]
     assert "maxItems" not in value_schema["properties"]["open_sets"]
 
-    with pytest.raises(ValueError, match="at most 32 points"):
+    with pytest.raises(OperationDomainValidationError, match="at most 32 points"):
         compute_specialization_preorder(
             SpecializationPreorderRequest(topology=topology)
         )
@@ -177,17 +178,14 @@ def test_continuity_returns_an_exact_counterexample() -> None:
 
 
 def test_continuity_request_binds_map_carrier_sizes() -> None:
-    with pytest.raises(ValidationError) as exc_info:
-        ContinuityRequest(
-            domain=_sierpinski(),
-            codomain=_sierpinski(),
-            point_map=PointMap(
-                domain_point_count=1, codomain_point_count=2, values=(0,)
-            ),
-        )
-    assert (
-        exc_info.value.errors()[0]["type"] == "finite_topology.map_domain_size_mismatch"
+    request = ContinuityRequest(
+        domain=_sierpinski(),
+        codomain=_sierpinski(),
+        point_map=PointMap(domain_point_count=1, codomain_point_count=2, values=(0,)),
     )
+    with pytest.raises(OperationDomainValidationError) as exc_info:
+        compute_continuity(request)
+    assert exc_info.value.errors()[0]["type"] == "finite_topology.map_carrier_mismatch"
 
 
 def test_beat_points_use_strict_t0_order_and_return_witnesses() -> None:
@@ -202,7 +200,7 @@ def test_beat_points_use_strict_t0_order_and_return_witnesses() -> None:
 
 def test_non_t0_beat_point_request_fails_closed() -> None:
     assert is_t0(_indiscrete(2)) is False
-    with pytest.raises(ValueError, match="T0"):
+    with pytest.raises(OperationDomainValidationError, match="T0"):
         compute_beat_points(BeatPointsRequest(topology=_indiscrete(2)))
 
 

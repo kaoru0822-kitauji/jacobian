@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.topology.finite.spaces import (
     FiniteTopologicalMap,
     FiniteTopologicalSpace,
@@ -167,6 +168,22 @@ class TestContinuityCheck:
 
 
 class TestValidation:
+    @pytest.mark.parametrize(
+        "operation",
+        (compute_interior, compute_closure, compute_boundary),
+    )
+    def test_subset_admission_rejects_out_of_range_indices(self, operation) -> None:
+        request = SubsetRequest(space=_sierpinski(), subset=(2,))
+
+        with pytest.raises(OperationDomainValidationError) as error:
+            operation(request)
+
+        assert error.value.errors()[0]["loc"] == ("subset",)
+        assert (
+            error.value.errors()[0]["type"]
+            == "finite_topology_space.subset_index_out_of_range"
+        )
+
     def test_duplicate_point_labels_rejected(self) -> None:
         with pytest.raises(ValidationError) as error:
             FiniteTopologicalSpace(

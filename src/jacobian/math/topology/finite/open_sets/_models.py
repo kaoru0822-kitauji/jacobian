@@ -171,20 +171,6 @@ class ContinuityRequest(StrictModel):
     codomain: TopologyOperationInput
     point_map: TopologyOperationPointMap
 
-    @model_validator(mode="after")
-    def bind_map_carriers(self) -> Self:
-        if self.point_map.domain_point_count != self.domain.point_count:
-            raise _validation_error(
-                "map_domain_size_mismatch",
-                "map domain size must match the domain topology",
-            )
-        if self.point_map.codomain_point_count != self.codomain.point_count:
-            raise _validation_error(
-                "map_codomain_size_mismatch",
-                "map codomain size must match the codomain topology",
-            )
-        return self
-
 
 class ContinuityResult(ContinuityRequest):
     is_continuous: bool

@@ -1,6 +1,9 @@
 """Tests for convex analysis operations."""
 
+import pytest
+
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.analysis.convex._models import (
     AffinePiece,
     MaxAffineEvalRequest,
@@ -113,27 +116,25 @@ class TestSubdifferential:
         assert result.active_gradients[0][0].as_fraction() in {1, -1}
 
     def test_rejects_mismatched_point_dimension(self) -> None:
-        import pytest
-        from pydantic import ValidationError
-
-        with pytest.raises(ValidationError) as exc_info:
-            MaxAffineSubdifferentialRequest.model_validate(
-                {
-                    "function": {
-                        "pieces": [
-                            {
-                                "piece_id": "p1",
-                                "coefficients": [
-                                    {"num": "1", "den": "1"},
-                                    {"num": "0", "den": "1"},
-                                ],
-                                "intercept": {"num": "0", "den": "1"},
-                            },
-                        ],
-                    },
-                    "point": {"coordinates": [{"num": "1", "den": "1"}]},
-                }
-            )
+        request = MaxAffineSubdifferentialRequest.model_validate(
+            {
+                "function": {
+                    "pieces": [
+                        {
+                            "piece_id": "p1",
+                            "coefficients": [
+                                {"num": "1", "den": "1"},
+                                {"num": "0", "den": "1"},
+                            ],
+                            "intercept": {"num": "0", "den": "1"},
+                        },
+                    ],
+                },
+                "point": {"coordinates": [{"num": "1", "den": "1"}]},
+            }
+        )
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_subdifferential(request)
         assert (
             exc_info.value.errors()[0]["type"]
             == "convex_analysis.point_dimension_mismatch"

@@ -83,16 +83,6 @@ class MaxAffineEvalRequest(StrictModel):
     function: MaxAffineFunction
     point: RationalPoint
 
-    @model_validator(mode="after")
-    def require_matching_dimension(self) -> Self:
-        dim = len(self.function.pieces[0].coefficients)
-        if len(self.point.coordinates) != dim:
-            raise _validation_error(
-                "point_dimension_mismatch",
-                "point dimension must match function dimension",
-            )
-        return self
-
 
 class MaxAffineEvalResult(StrictModel):
     """Result of max-affine evaluation: value and active pieces."""
@@ -107,16 +97,6 @@ class MaxAffineSubdifferentialRequest(StrictModel):
 
     function: MaxAffineFunction
     point: RationalPoint
-
-    @model_validator(mode="after")
-    def require_matching_dimension(self) -> Self:
-        dim = len(self.function.pieces[0].coefficients)
-        if len(self.point.coordinates) != dim:
-            raise _validation_error(
-                "point_dimension_mismatch",
-                "point dimension must match function dimension",
-            )
-        return self
 
 
 class MaxAffineSubdifferentialResult(StrictModel):
