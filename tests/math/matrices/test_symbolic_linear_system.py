@@ -7,6 +7,7 @@ from typing import cast
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.matrices.symbolic._models import (
     SymbolicLinearSystemRequest,
     SymbolicLinearSystemResult,
@@ -210,7 +211,6 @@ class TestSolutionGrowthAdmission:
         """[[1/t^64]] * x = [t^64] would solve to t^128, outside the result
         type; the request is rejected before the backend runs."""
         import pytest
-        from pydantic import ValidationError
 
         vars_ = ("t",)
         inv = RationalFunction.model_validate(
@@ -230,15 +230,16 @@ class TestSolutionGrowthAdmission:
         )
         matrix = _matrix(vars_, ((inv,),))
         rhs = (_rf(vars_, (1, (64,))),)
-        with pytest.raises(ValidationError):
-            SymbolicLinearSystemRequest(matrix=matrix, rhs=rhs)
+        with pytest.raises(OperationDomainValidationError):
+            compute_symbolic_linear_system(
+                SymbolicLinearSystemRequest(matrix=matrix, rhs=rhs)
+            )
 
     def test_rank_deficient_large_coefficients_rejected(self) -> None:
         """All work-size minors can be structurally zero while a smaller
         minor drives a large particular solution; lower-rank minors are
         included in the growth bound."""
         import pytest
-        from pydantic import ValidationError
 
         def rf(num: int, den: int) -> RationalFunction:
             terms = (
@@ -261,8 +262,10 @@ class TestSolutionGrowthAdmission:
         big = 10**127
         matrix = _matrix(("t",), ((rf(1, big), rf(0, 1)), (rf(0, 1), rf(0, 1))))
         rhs = (rf(big, 1), rf(0, 1))
-        with pytest.raises(ValidationError):
-            SymbolicLinearSystemRequest(matrix=matrix, rhs=rhs)
+        with pytest.raises(OperationDomainValidationError):
+            compute_symbolic_linear_system(
+                SymbolicLinearSystemRequest(matrix=matrix, rhs=rhs)
+            )
 
     def test_rank_deficient_particular_solution_is_bounded_by_small_minor(self) -> None:
         """The reviewer's rank-deficient shape with representable sizes:
@@ -355,7 +358,6 @@ class TestAdmissionWorkBounding:
         column support degrees force a closed-form bound of 8, which
         exceeds the coefficient budget; both verdicts stay typed."""
         import pytest
-        from pydantic import ValidationError
 
         from jacobian.math.matrices.symbolic import _models
 
@@ -371,21 +373,24 @@ class TestAdmissionWorkBounding:
         request = SymbolicLinearSystemRequest(matrix=matrix, rhs=(zero,) * 8)
         assert request.matrix.entries == entries
         monkeypatch.setattr(_models, "_EXPANSION_ENUMERATION_NODE_BUDGET", 0)
-        with pytest.raises(ValidationError):
-            SymbolicLinearSystemRequest(matrix=matrix, rhs=(zero,) * 8)
+        with pytest.raises(OperationDomainValidationError):
+            compute_symbolic_linear_system(
+                SymbolicLinearSystemRequest(matrix=matrix, rhs=(zero,) * 8)
+            )
 
     def test_dense_eight_by_eight_system_is_rejected_quickly(self) -> None:
         """A fully dense 8x8 unit system exceeds the derived term budget."""
         import time
 
         import pytest
-        from pydantic import ValidationError
 
         one = _rf((), (1, ()))
         matrix = _matrix((), ((one,) * 8,) * 8)
         started = time.perf_counter()
-        with pytest.raises(ValidationError):
-            SymbolicLinearSystemRequest(matrix=matrix, rhs=(one,) * 8)
+        with pytest.raises(OperationDomainValidationError):
+            compute_symbolic_linear_system(
+                SymbolicLinearSystemRequest(matrix=matrix, rhs=(one,) * 8)
+            )
         assert time.perf_counter() - started < 5.0
 
 

@@ -9,6 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.matrices.symbolic._models import (
     SquareSymbolicMatrixRequest,
     SymbolicCharacteristicPolynomialRequest,
@@ -123,6 +124,13 @@ def _characteristic_request(
     )
 
 
+def _assert_product_admission_rejected(
+    request: SymbolicMatrixProductRequest,
+) -> None:
+    with pytest.raises(OperationDomainValidationError):
+        compute_symbolic_matrix_product(request)
+
+
 def _generic_two_by_two() -> SymbolicDeterminantRequest:
     variables = ("a", "b", "c", "d")
     a, b, c, d = (_variable(variables, index) for index in range(4))
@@ -163,9 +171,11 @@ def test_determinant_request_rejects_unrepresentable_expansion() -> None:
         for row in range(8)
     )
 
-    with pytest.raises(ValidationError):
-        SymbolicDeterminantRequest(
-            matrix=SymbolicMatrix(variables=variables, entries=entries)
+    with pytest.raises(OperationDomainValidationError):
+        compute_symbolic_determinant(
+            SymbolicDeterminantRequest(
+                matrix=SymbolicMatrix(variables=variables, entries=entries)
+            )
         )
 
 
@@ -229,13 +239,15 @@ def test_symbolic_matrix_product_cancels_rational_function_entries() -> None:
 def test_symbolic_matrix_product_rejects_field_and_shape_mismatches() -> None:
     a = _variable(("a",), 0)
     b = _variable(("b",), 0)
-    with pytest.raises(ValidationError):
+    _assert_product_admission_rejected(
         SymbolicMatrixProductRequest(
             left=SymbolicMatrix(variables=("a",), entries=((a,),)),
             right=SymbolicMatrix(variables=("b",), entries=((b,),)),
         )
-    with pytest.raises(ValidationError):
+    )
+    _assert_product_admission_rejected(
         _product_request(((_constant(1), _constant(1)),), ((_constant(1),),), ())
+    )
 
 
 def test_symbolic_matrix_product_admits_expansion_that_collects_into_budget() -> None:
@@ -277,8 +289,9 @@ def test_symbolic_matrix_product_rejects_collected_support_over_result_budget(
     # The cell's 16 * 32 = 512 raw products fit the aggregate expansion
     # budget but collect onto 272 distinct monomials, which exceeds the
     # per-entry 256-term exact result budget.
-    with pytest.raises(ValidationError):
+    _assert_product_admission_rejected(
         _product_request(((row,),), ((column,),), variables)
+    )
 
 
 def test_symbolic_matrix_product_rejects_cancellation_coefficient_amplification(
@@ -316,8 +329,9 @@ def test_symbolic_matrix_product_rejects_cancellation_coefficient_amplification(
     # The unreduced expansion fits every budget, yet the reduced quotient of
     # the exact division would carry a 129-digit coefficient.
     assert max(len(str(abs(digits))) for digits in hidden) == 129
-    with pytest.raises(ValidationError):
+    _assert_product_admission_rejected(
         _product_request(((amplified,),), ((one_over_successor,),), variables)
+    )
 
 
 def test_symbolic_matrix_product_rejects_aggregate_expansion_before_kernel(
@@ -342,8 +356,7 @@ def test_symbolic_matrix_product_rejects_aggregate_expansion_before_kernel(
         raise AssertionError("symbolic multiplication kernel ran during admission")
 
     monkeypatch.setattr(symbolic, "symbolic_matrix_multiply", fail_if_called)
-    with pytest.raises(ValidationError):
-        _product_request(left, right, variables)
+    _assert_product_admission_rejected(_product_request(left, right, variables))
 
 
 def test_symbolic_matrix_product_rejects_aggregate_canonical_support_before_kernel(
@@ -374,8 +387,7 @@ def test_symbolic_matrix_product_rejects_aggregate_canonical_support_before_kern
     # The work accumulator charges exactly 512 scalar products, but every
     # canonical cell collects eight distinct monomials plus one unit
     # denominator, which the returned SymbolicMatrix would reject.
-    with pytest.raises(ValidationError):
-        _product_request(left, right, variables)
+    _assert_product_admission_rejected(_product_request(left, right, variables))
 
 
 def test_symbolic_matrix_product_admits_boundary_aggregate_canonical_support() -> None:
@@ -422,8 +434,9 @@ def test_symbolic_matrix_product_charges_retained_denominator_in_scalar_copy(
     monkeypatch.setattr(symbolic, "symbolic_matrix_multiply", fail_if_called)
     # Every scaled copy retains one numerator term plus all 64 denominator
     # terms, so eight cells carry 520 canonical result terms.
-    with pytest.raises(ValidationError):
+    _assert_product_admission_rejected(
         _product_request(((dense_inverse,),), ((two,) * 8,), variables)
+    )
 
 
 def test_symbolic_matrix_product_keeps_dense_denominator_under_scalar_copy() -> None:
@@ -466,16 +479,18 @@ def test_symbolic_matrix_product_ignores_unit_denominator_coefficient_digits() -
 def test_symbolic_matrix_product_rejects_coefficient_growth_before_kernel() -> None:
     digits = "9" * 65
     large = _rf((), (int(digits), 1, ()))
-    with pytest.raises(ValidationError):
+    _assert_product_admission_rejected(
         _product_request(((large,),), ((large,),), ())
+    )
 
 
 def test_symbolic_matrix_product_rejects_exponent_growth_before_kernel() -> None:
     variables = ("x",)
     x_to_64 = _rf(variables, (1, 1, (64,)))
     x = _rf(variables, (1, 1, (1,)))
-    with pytest.raises(ValidationError):
+    _assert_product_admission_rejected(
         _product_request(((x_to_64,),), ((x,),), variables)
+    )
 
 
 def test_symbolic_matrix_product_admits_scalar_identity_with_large_coefficients() -> (
@@ -542,8 +557,9 @@ def test_symbolic_matrix_product_still_charges_rational_collisions() -> None:
     variables = ("x",)
     scaled = _rf(variables, (10**63, 97, (1,)), (10**63, 97, (0,)))
     shifted = _rf(variables, (1, 1, (1,)), (1, 89, (0,)))
-    with pytest.raises(ValidationError):
+    _assert_product_admission_rejected(
         _product_request(((scaled,),), ((shifted,),), variables)
+    )
 
 
 def test_symbolic_matrix_product_admits_sparse_support_without_cancellation() -> None:
@@ -610,8 +626,9 @@ def test_symbolic_matrix_product_rejects_mixed_denominators_without_coefficient_
         raise AssertionError("symbolic multiplication kernel ran during admission")
 
     monkeypatch.setattr(symbolic, "symbolic_matrix_multiply", fail_if_called)
-    with pytest.raises(ValidationError):
+    _assert_product_admission_rejected(
         _product_request(((inverse_x, inverse_shifted_x),), ((one,), (one,)), variables)
+    )
 
 
 def test_symbolic_matrix_product_admits_shared_denominator_sums() -> None:
@@ -755,12 +772,13 @@ def test_symbolic_matrix_product_rejects_mismatched_pair_products(
     monkeypatch.setattr(symbolic, "symbolic_matrix_multiply", fail_if_called)
     # The pair products (x+1)(x+2) and (x+1)^2 differ, so no shared product
     # denominator fixes the canonical value.
-    with pytest.raises(ValidationError):
+    _assert_product_admission_rejected(
         _product_request(
             ((one, one),),
             ((inverse_successor,), (inverse_shifted,)),
             variables,
         )
+    )
 
 
 def test_symbolic_matrix_product_admits_shared_denominator_zero_sum() -> None:
@@ -796,8 +814,9 @@ def test_symbolic_matrix_product_rejects_shared_denominator_cancellation(
     monkeypatch.setattr(symbolic, "symbolic_matrix_multiply", fail_if_called)
     # The collected numerator (x + 1) shares the retained denominator's own
     # factor, so the reduced quotient again lacks a pre-execution bound.
-    with pytest.raises(ValidationError):
+    _assert_product_admission_rejected(
         _product_request(((forward, inverse),), ((one,), (one,)), variables)
+    )
 
 
 def test_symbolic_matrix_product_rejects_shared_denominators_without_result_budget() -> (
@@ -813,8 +832,9 @@ def test_symbolic_matrix_product_rejects_shared_denominators_without_result_budg
     )
     # The squared 17-term denominator needs up to 289 canonical terms, which
     # exceeds the 256-term exact result budget.
-    with pytest.raises(ValidationError):
+    _assert_product_admission_rejected(
         _product_request(((dense_inverse,),), ((dense_inverse,),), variables)
+    )
 
 
 def test_symbolic_matrix_product_rejects_aggregate_expansion_before_exact_fallback(
@@ -845,8 +865,7 @@ def test_symbolic_matrix_product_rejects_aggregate_expansion_before_exact_fallba
     monkeypatch.setattr(
         symbolic_models, "_shared_common_denominator_bounds", fail_if_called
     )
-    with pytest.raises(ValidationError):
-        _product_request(left, right, variables)
+    _assert_product_admission_rejected(_product_request(left, right, variables))
 
 
 def test_symbolic_matrix_product_admits_boundary_shared_projection() -> None:
@@ -890,12 +909,13 @@ def test_symbolic_matrix_product_rejects_projection_above_aggregate_boundary(
     )
     # The projected expansion charges 16*16 numerator products plus 16*17
     # pair denominator terms: 528 raw terms against the 512-term budget.
-    with pytest.raises(ValidationError):
+    _assert_product_admission_rejected(
         _product_request(
             ((_rf(variables, *x_numerator, denominator=y_denominator),),),
             ((_rf(variables, *x_numerator, denominator=long_y_denominator),),),
             variables,
         )
+    )
 
 
 def test_symbolic_matrix_product_admits_identity_times_rational_entry() -> None:
@@ -976,8 +996,9 @@ def test_symbolic_matrix_product_bounds_scalar_constant_coefficients() -> None:
     variables = ("x",)
     base = _rf(variables, (10**63, 1, (0,)))
     oversized_scalar = _rf(variables, (10**65, 1, (0,)))
-    with pytest.raises(ValidationError):
+    _assert_product_admission_rejected(
         _product_request(((base,),), ((oversized_scalar,),), variables)
+    )
 
 
 def test_rational_function_entries_use_the_advertised_field() -> None:

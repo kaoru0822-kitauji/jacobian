@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from typing import Literal, cast
+
+from pydantic_core import PydanticCustomError
 from sympy.matrices.exceptions import MatrixError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.matrices.symbolic import (
     symbolic_characteristic_polynomial,
     symbolic_determinant,
@@ -23,12 +27,44 @@ from jacobian.math.matrices.symbolic._models import (
     SymbolicMatrixProductRequest,
     SymbolicMatrixRequest,
     SymbolicRankResult,
+    _require_determinant_family_result_budget,
 )
+from jacobian.math.polynomials.values import RationalFunction
+
+
+def _domain_call(call: object, *args: object, **kwargs: object) -> object:
+    try:
+        return call(*args, **kwargs)  # type: ignore[operator]
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=("request",), code=exc.type, message=exc.message()
+        ) from exc
+    except (ValueError, TypeError) as exc:
+        raise OperationDomainValidationError(
+            location=("request",), code="matrix.domain_invalid", message=str(exc)
+        ) from exc
+
+
+def _admit_determinant(request: SymbolicDeterminantRequest) -> None:
+    _domain_call(
+        _require_determinant_family_result_budget,
+        request.matrix,
+        characteristic_polynomial=False,
+    )
+
+
+def _admit_characteristic(request: SymbolicCharacteristicPolynomialRequest) -> None:
+    _domain_call(
+        _require_determinant_family_result_budget,
+        request.matrix,
+        characteristic_polynomial=True,
+    )
 
 
 def compute_symbolic_determinant(
     request: SymbolicDeterminantRequest,
 ) -> SymbolicDeterminantResult:
+    _admit_determinant(request)
     determinant = symbolic_determinant(
         request.matrix.entries,
         request.matrix.variables,
@@ -51,12 +87,13 @@ def compute_symbolic_matrix_product(
 ) -> SymbolicMatrix:
     """Compute one exact symbolic matrix product."""
 
-    return symbolic_matrix_multiply(request.left, request.right)
+    return _domain_call(symbolic_matrix_multiply, request.left, request.right)  # type: ignore[return-value]
 
 
 def compute_symbolic_characteristic_polynomial(
     request: SymbolicCharacteristicPolynomialRequest,
 ) -> SymbolicCharacteristicPolynomialResult:
+    _admit_characteristic(request)
     degree, coeffs = symbolic_characteristic_polynomial(
         request.matrix.entries,
         request.matrix.variables,
@@ -70,6 +107,7 @@ def compute_symbolic_characteristic_polynomial(
 def compute_symbolic_eigenvalues(
     request: SymbolicCharacteristicPolynomialRequest,
 ) -> SymbolicEigenvaluesResult:
+    _admit_characteristic(request)
     entries = request.matrix.entries
     variables = request.matrix.variables
     try:
@@ -100,10 +138,19 @@ def compute_symbolic_linear_system(
         SymbolicLinearSystemResult,
     )
 
-    classification, solution, particular, nullspace = symbolic_linear_system_solve(
-        request.matrix.entries,
-        request.rhs,
-        request.matrix.variables,
+    classification, solution, particular, nullspace = cast(
+        tuple[
+            Literal["UNIQUE", "NON_UNIQUE", "INCONSISTENT"],
+            tuple[RationalFunction, ...] | None,
+            tuple[RationalFunction, ...] | None,
+            tuple[tuple[RationalFunction, ...], ...] | None,
+        ],
+        _domain_call(
+            symbolic_linear_system_solve,
+            request.matrix.entries,
+            request.rhs,
+            request.matrix.variables,
+        ),
     )
 
     return SymbolicLinearSystemResult._from_kernel(

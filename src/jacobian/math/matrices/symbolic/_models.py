@@ -848,21 +848,10 @@ class SymbolicMatrixProductRequest(StrictModel):
         )
     )
 
-    @model_validator(mode="after")
-    def require_bounded_exact_product(self) -> Self:
-        _require_symbolic_product_admission(self.left, self.right)
-        return self
-
-
 class SymbolicMatrixRequest(StrictModel):
     """A symbolic matrix over a declared variable list."""
 
     matrix: SymbolicMatrix
-
-    @model_validator(mode="after")
-    def require_request_consistency(self) -> Self:
-        return self
-
 
 class SquareSymbolicMatrixRequest(SymbolicMatrixRequest):
     """A square symbolic matrix for operations requiring square input.
@@ -896,15 +885,6 @@ class SymbolicDeterminantRequest(SquareSymbolicMatrixRequest):
         )
     )
 
-    @model_validator(mode="after")
-    def require_representable_determinant(self) -> Self:
-        _require_determinant_family_result_budget(
-            self.matrix,
-            characteristic_polynomial=False,
-        )
-        return self
-
-
 class SymbolicCharacteristicPolynomialRequest(SquareSymbolicMatrixRequest):
     """A square matrix whose characteristic polynomial fits the result type."""
 
@@ -916,15 +896,6 @@ class SymbolicCharacteristicPolynomialRequest(SquareSymbolicMatrixRequest):
             "256 terms, exponent 64, and 128-digit coefficient components."
         )
     )
-
-    @model_validator(mode="after")
-    def require_representable_characteristic_polynomial(self) -> Self:
-        _require_determinant_family_result_budget(
-            self.matrix,
-            characteristic_polynomial=True,
-        )
-        return self
-
 
 class SymbolicDeterminantResult(StrictModel):
     """The exact determinant in the matrix's rational-function field."""
@@ -1228,18 +1199,6 @@ def _solution_component_growth_bound(
     return terms_bound, exponent_bound, digits_bound
 
 
-def _require_linear_system_solution_budget(
-    request: SymbolicLinearSystemRequest,
-) -> None:
-    """Admit only systems whose derived solutions fit the result type.
-
-    Runs at request admission so no accepted request can fail inside the
-    backend conversion with a host exception instead of returning its
-    declared typed result.
-    """
-    _require_linear_system_growth_admission(request.matrix.entries, request.rhs)
-
-
 def _require_linear_system_growth_admission(
     entries: tuple[tuple[RationalFunction, ...], ...],
     rhs: tuple[RationalFunction, ...],
@@ -1299,10 +1258,6 @@ class SymbolicLinearSystemRequest(StrictModel):
                     "budget_exceeded",
                     "the right-hand side must use the declared ordered field",
                 )
-        # Derived-solution admission: bound exponent, term, and coefficient
-        # growth before the backend runs so every accepted system returns
-        # its declared typed result instead of failing inside conversion.
-        _require_linear_system_solution_budget(self)
         return self
 
 
@@ -1431,8 +1386,8 @@ class SymbolicLinearSystemResult(StrictModel):
 
     @model_validator(mode="after")
     def require_consistent_result(self) -> Self:
-        # Solution growth is bounded at request admission
-        # (_require_linear_system_solution_budget), before the backend runs:
+        # Solution growth is bounded at operation admission before the backend
+        # runs:
         # a parsed canonical RationalFunction already caps each side at
         # MAX_SYMBOLIC_RESULT_TERMS, so per-component term checks here would
         # be ineffective anyway.
