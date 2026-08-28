@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, NoReturn
 
 from jacobian._exact import CanonicalRational
 from jacobian.catalog.models import OperationDomainValidationError
@@ -43,7 +43,9 @@ from jacobian.math.arithmetic_dynamics.operations import (
 )
 
 
-def _domain_error(location: tuple[str | int, ...], code: str, message: str) -> None:
+def _domain_error(
+    location: tuple[str | int, ...], code: str, message: str
+) -> NoReturn:
     raise OperationDomainValidationError(
         location=location, code=f"arithmetic_dynamics.{code}", message=message
     )
@@ -60,7 +62,6 @@ def _polynomial(request: PolynomialCoefficientRequest) -> Any:
         return polynomial_from_coefficients(values)
     except ValueError as exc:
         _translate_value_error(exc, ("coefficients",))
-    raise AssertionError("unreachable")
 
 
 def _admit_iterate(request: MapIterateRequest) -> Any:
