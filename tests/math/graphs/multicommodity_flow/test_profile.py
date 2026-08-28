@@ -9,7 +9,9 @@ from fractions import Fraction
 import pytest
 from pydantic import ValidationError
 from tests.fixtures.accounting import assert_charged_work_parity
-from tests.math.multicommodity_flow._support import multicommodity_validation_error
+from tests.math.graphs.multicommodity_flow._support import (
+    multicommodity_validation_error,
+)
 
 from jacobian._exact import MAX_CANONICAL_RATIONAL_DIGITS, CanonicalRational
 from jacobian.canonical import format_canonical_integer

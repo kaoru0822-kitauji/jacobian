@@ -241,6 +241,29 @@ class TestRestrict:
                 subset=("a", "missing"),
             )
 
+    def test_prunes_against_the_contracted_tree(self) -> None:
+        decomposition = TreeDecomposition(
+            graph=SimpleUndirectedGraph(vertices=("a", "b", "c", "d"), edges=()),
+            tree_nodes=("left", "center", "deleted", "right"),
+            tree_edges=(
+                ("left", "center"),
+                ("center", "deleted"),
+                ("deleted", "right"),
+            ),
+            bags=(("a", "b"), ("a", "d"), ("d",), ("c", "d")),
+        )
+
+        result = compute_restrict(
+            RestrictRequest(
+                decomposition=decomposition,
+                subset=("a", "b", "c"),
+            )
+        )
+
+        assert result.tree_nodes == ("left", "center", "right")
+        assert result.tree_edges == (("center", "left"), ("center", "right"))
+        assert result.bags == (("a", "b"), ("a",), ("c",))
+
 
 # ---------------------------------------------------------------------------
 # Bag intersection graph
