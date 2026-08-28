@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from fractions import Fraction
 from typing import Annotated, Self
 
 from pydantic import ConfigDict, Field, StringConstraints, model_validator
@@ -11,10 +10,6 @@ from pydantic_core import PydanticCustomError
 from jacobian._exact import CanonicalRational
 from jacobian._models import StrictModel, canonicalize_json_containers
 from jacobian.canonical import encode_strict_json, format_canonical_integer
-from jacobian.math.geometry.exact._line_arithmetic import (
-    canonical_line_coefficients,
-    squared_point_line_distance,
-)
 
 
 def _validation_error(reason: str, message: str) -> PydanticCustomError:
@@ -545,138 +540,6 @@ def _count_line_ledger(line: object) -> tuple[int, int]:
     return 0, 0
 
 
-def _pinned_profile_source(
-    configuration: PinnedLineConfiguration,
-    anchor: tuple[PinnedBoundedRational, ...],
-    point_count: int,
-) -> tuple[list[tuple[Fraction, ...]], tuple[Fraction, ...]]:
-    _require_bounded_point_configuration(configuration, anchor)
-    if any(len(pt.coordinates) != 2 for pt in configuration.points):
-        raise _validation_error(
-            "retained_configuration_a_planar_configuration_two",
-            "retained configuration must be a planar configuration "
-            "(exactly two coordinates per point)",
-        )
-    if (
-        _maximum_pinned_profile_wire_bytes(configuration, anchor)
-        > MAX_PINNED_PROFILE_RESULT_BYTES
-    ):
-        raise _validation_error(
-            "complete_pinned_line_distance_profile_would",
-            "the complete pinned line-distance profile would exceed the "
-            f"{MAX_PINNED_PROFILE_RESULT_BYTES}-byte aggregate result "
-            "budget; reduce the point count or coordinate heights",
-        )
-    if len(configuration.points) != point_count:
-        raise _validation_error(
-            "point_count_retained_configuration",
-            "point_count must match the retained configuration",
-        )
-    coords = {
-        tuple(c.as_fraction() for c in pt.coordinates) for pt in configuration.points
-    }
-    if len(coords) != len(configuration.points):
-        raise _validation_error(
-            "retained_configuration_points_distinct_coordinates",
-            "retained configuration points must have distinct coordinates",
-        )
-    if point_count > MAX_POINTS:
-        raise _validation_error(
-            "point_count_exceeds_configuration_bound",
-            "point_count exceeds the configuration bound",
-        )
-    points = [
-        tuple(c.as_fraction() for c in pt.coordinates) for pt in configuration.points
-    ]
-    return points, tuple(c.as_fraction() for c in anchor)
-
-
-def _expected_pinned_profile_geometry(
-    points: list[tuple[Fraction, ...]],
-    anchor: tuple[Fraction, ...],
-    point_count: int,
-) -> tuple[
-    dict[tuple[Fraction, Fraction, Fraction], list[tuple[int, int]]],
-    dict[tuple[Fraction, Fraction, Fraction], Fraction],
-]:
-    from itertools import combinations
-
-    expected_lines: dict[
-        tuple[Fraction, Fraction, Fraction], list[tuple[int, int]]
-    ] = {}
-    expected_distances: dict[tuple[Fraction, Fraction, Fraction], Fraction] = {}
-    for i, j in combinations(range(point_count), 2):
-        coeffs = canonical_line_coefficients(points[i], points[j])
-        expected_lines.setdefault(coeffs, []).append((i, j))
-        if coeffs not in expected_distances:
-            expected_distances[coeffs] = squared_point_line_distance(
-                anchor, points[i], points[j]
-            )
-    return expected_lines, expected_distances
-
-
-def _validate_pinned_profile_entries(
-    lines: tuple[PinnedLineEntry, ...],
-    point_count: int,
-    expected_lines: dict[tuple[Fraction, Fraction, Fraction], list[tuple[int, int]]],
-    expected_distances: dict[tuple[Fraction, Fraction, Fraction], Fraction],
-) -> tuple[list[tuple[int, int]], dict[Fraction, int]]:
-    seen_pairs: list[tuple[int, int]] = []
-    seen_lines: set[tuple[Fraction, ...]] = set()
-    multiplicities: dict[Fraction, int] = {}
-    for entry in lines:
-        entry_coeffs = tuple(c.as_fraction() for c in entry.line_coefficients)
-        if entry_coeffs in seen_lines:
-            raise _validation_error(
-                "duplicate_lines_collapsed_entry",
-                "duplicate lines must be collapsed into one entry",
-            )
-        seen_lines.add(entry_coeffs)
-        if entry_coeffs not in expected_lines:
-            raise _validation_error(
-                "line_coefficients_do_any_source_pair",
-                "line coefficients do not match any source pair line",
-            )
-        if tuple(sorted(entry.pairs)) != tuple(sorted(expected_lines[entry_coeffs])):
-            raise _validation_error(
-                "source_pairs_do_line_s_geometry",
-                "source pairs do not match the line's geometry",
-            )
-        if entry.squared_distance.as_fraction() != expected_distances[entry_coeffs]:
-            raise _validation_error(
-                "squared_distance_source_geometry",
-                "squared distance does not match the source geometry",
-            )
-        for i, j in entry.pairs:
-            if not 0 <= i < j < point_count:
-                raise _validation_error(
-                    "source_pairs_reference_valid_point_indices",
-                    "source pairs must reference valid point indices",
-                )
-            seen_pairs.append((i, j))
-        distance = entry.squared_distance.as_fraction()
-        multiplicities[distance] = multiplicities.get(distance, 0) + 1
-    return seen_pairs, multiplicities
-
-
-def _validate_pinned_profile_order(
-    lines: tuple[PinnedLineEntry, ...],
-    expected_lines: dict[tuple[Fraction, Fraction, Fraction], list[tuple[int, int]]],
-    expected_distances: dict[tuple[Fraction, Fraction, Fraction], Fraction],
-) -> None:
-    ordered_coeffs = sorted(
-        expected_lines, key=lambda coeffs: (expected_distances[coeffs], coeffs)
-    )
-    actual_coeffs = [
-        tuple(c.as_fraction() for c in entry.line_coefficients) for entry in lines
-    ]
-    if actual_coeffs != ordered_coeffs:
-        raise _validation_error(
-            "lines_sorted_squared_distance_coefficients",
-            "lines must be sorted by (squared_distance, coefficients)",
-        )
-
-
 class PinnedLineDistanceResult(StrictModel):
     """Complete pinned line-distance profile for a point configuration.
 
@@ -858,47 +721,4 @@ class PinnedLineDistanceResult(StrictModel):
             point_count=len(request.configuration.points),
             lines=lines,
             distance_multiplicities=distance_multiplicities,
-        )
-
-
-def _verify_pinned_line_distance_claim(result: PinnedLineDistanceResult) -> None:
-    """Fail closed when an independently supplied profile needs verification."""
-
-    request = PinnedLineDistanceRequest(
-        configuration=result.configuration,
-        anchor=result.anchor,
-    )
-    points, anchor = _pinned_profile_source(
-        request.configuration, request.anchor, result.point_count
-    )
-    expected_lines, expected_distances = _expected_pinned_profile_geometry(
-        points, anchor, result.point_count
-    )
-    seen_pairs, multiplicities = _validate_pinned_profile_entries(
-        result.lines, result.point_count, expected_lines, expected_distances
-    )
-    expected_pairs = [
-        (first, second)
-        for first in range(result.point_count)
-        for second in range(first + 1, result.point_count)
-    ]
-    if sorted(seen_pairs) != expected_pairs or len(seen_pairs) != len(set(seen_pairs)):
-        raise _validation_error(
-            "lines_cover_set_source_pairs_once",
-            "lines must cover exactly the set of source pairs once",
-        )
-    if len(result.lines) != len(expected_lines):
-        raise _validation_error(
-            "lines_correspond_distinct_geometric_lines",
-            "lines must correspond to distinct geometric lines",
-        )
-    _validate_pinned_profile_order(result.lines, expected_lines, expected_distances)
-    reconstructed = tuple(
-        (CanonicalRational.from_fraction(distance), count)
-        for distance, count in sorted(multiplicities.items())
-    )
-    if reconstructed != result.distance_multiplicities:
-        raise _validation_error(
-            "distance_multiplicities_partition_lines_sorted",
-            "distance multiplicities must partition the lines and be sorted",
         )
