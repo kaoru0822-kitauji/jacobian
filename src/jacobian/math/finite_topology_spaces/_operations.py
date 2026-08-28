@@ -56,6 +56,6 @@ def compute_kolmogorov_quotient(
 ) -> KolmogorovQuotientResult:
     result = kolmogorov_quotient(request.space)
     return KolmogorovQuotientResult(
-        quotient_points=result["quotient_points"],  # type: ignore[arg-type]
-        quotient_preorder=result["quotient_preorder"],  # type: ignore[arg-type]
+        quotient_points=result["quotient_points"],
+        quotient_preorder=result["quotient_preorder"],
     )

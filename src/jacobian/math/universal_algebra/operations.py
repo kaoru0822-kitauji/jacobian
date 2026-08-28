@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from itertools import product as iproduct
+from typing import Literal, NotRequired, TypedDict
 
 from .values import (
     ApplicationTerm,
@@ -25,6 +26,40 @@ __all__ = [
     "homomorphism_profile",
     "quotient",
 ]
+
+
+class _EquationCounterassignment(TypedDict):
+    assignment: tuple[int, ...]
+    left_value: int
+    right_value: int
+
+
+class _EquationHolds(TypedDict):
+    status: Literal["HOLDS"]
+    satisfying_count: int
+
+
+class _EquationFails(TypedDict):
+    status: Literal["FAILS"]
+    satisfying_count: int
+    first_counterassignment: _EquationCounterassignment
+
+
+type _EquationProfile = _EquationHolds | _EquationFails
+
+
+class _GeneratedSubalgebra(TypedDict):
+    generated_carrier: tuple[int, ...]
+    rounds: int
+    is_closed: bool
+
+
+class _CongruenceProfile(TypedDict):
+    is_congruence: bool
+    obstruction: NotRequired[str]
+    operation: NotRequired[int]
+    x: NotRequired[tuple[int, ...]]
+    y: NotRequired[tuple[int, ...]]
 
 
 def _evaluate_node(
@@ -72,7 +107,7 @@ def evaluate_term(
 
 def equation_profile(
     algebra: FiniteAlgebra, left: FlatTerm, right: FlatTerm, variable_count: int
-) -> dict[str, object]:
+) -> _EquationProfile:
     """Evaluate ``s = t`` over all assignments.
 
     Return ``HOLDS`` with the satisfying assignment count, or ``FAILS`` with
@@ -85,12 +120,12 @@ def equation_profile(
 
 def _equation_profile_unchecked(
     algebra: FiniteAlgebra, left: FlatTerm, right: FlatTerm, variable_count: int
-) -> dict[str, object]:
+) -> _EquationProfile:
     """Profile an equation after source-bound term admission."""
 
     n = len(algebra.carrier)
     satisfying = 0
-    first_counterassignment = None
+    first_counterassignment: _EquationCounterassignment | None = None
     for values in iproduct(range(n), repeat=variable_count):
         assignment = dict(enumerate(values))
         lv = _evaluate_term_unchecked(algebra, left, assignment)
@@ -106,6 +141,7 @@ def _equation_profile_unchecked(
                 }
     if satisfying == n**variable_count:
         return {"status": "HOLDS", "satisfying_count": satisfying}
+    assert first_counterassignment is not None
     return {
         "status": "FAILS",
         "satisfying_count": satisfying,
@@ -115,7 +151,7 @@ def _equation_profile_unchecked(
 
 def generated_subalgebra(
     algebra: FiniteAlgebra, generators: tuple[int, ...]
-) -> dict[str, object]:
+) -> _GeneratedSubalgebra:
     """Return the least subalgebra containing the generating set by finite
     closure under all basic operations and nullary constants."""
     n = len(algebra.carrier)
@@ -132,8 +168,6 @@ def generated_subalgebra(
         for op_idx, symbol in enumerate(algebra.operations):
             if symbol.arity == 0:
                 continue
-            from itertools import product as iproduct
-
             for args in iproduct(carrier_set, repeat=symbol.arity):
                 cell_index = 0
                 for arg in args:
@@ -204,7 +238,7 @@ def _compatibility_violation(
     symbol: OperationSymbol,
     x: tuple[int, ...],
     y: tuple[int, ...],
-) -> dict[str, object] | None:
+) -> _CongruenceProfile | None:
     if not all(block_of[x[j]] == block_of[y[j]] for j in range(symbol.arity)):
         return None
     cell_x = 0
@@ -229,10 +263,8 @@ def _check_compatibility(
     algebra: FiniteAlgebra,
     block_of: dict[int, int],
     n: int,
-) -> dict[str, object] | None:
+) -> _CongruenceProfile | None:
     """Check congruence compatibility, returning an obstruction or None."""
-    from itertools import product as iproduct
-
     for op_idx, symbol in enumerate(algebra.operations):
         if symbol.arity == 0:
             continue
@@ -256,7 +288,7 @@ def _check_compatibility(
 
 def congruence_check(
     algebra: FiniteAlgebra, partition: tuple[tuple[int, ...], ...]
-) -> dict[str, object]:
+) -> _CongruenceProfile:
     """Check whether a carrier partition is a compatible equivalence
     relation (congruence).
 

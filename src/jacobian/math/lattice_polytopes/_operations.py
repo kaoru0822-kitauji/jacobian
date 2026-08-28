@@ -307,7 +307,8 @@ def _facets_and_box(  # noqa: C901
             return [], [0] * d, [-1] * d, d
     else:
         d = request.dimension()
-        vertex_models: tuple[Vertex, ...] = request.vertices  # type: ignore[assignment]
+        assert request.vertices is not None
+        vertex_models: tuple[Vertex, ...] = request.vertices
         verts = [[c.as_fraction() for c in v.coordinates] for v in vertex_models]
         # Facet-combination budget: C(n,d) subsets of vertices define candidate
         # hyperplanes. For n=64,d=4 this is 635k; larger would be unbounded work.

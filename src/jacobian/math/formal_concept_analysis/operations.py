@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TypedDict
+
 from jacobian.canonical import encode_strict_json
 
 from ._models import MAX_CONCEPTS
@@ -37,6 +39,19 @@ __all__ = [
     "object_closure",
     "object_derivation",
 ]
+
+
+class _Concept(TypedDict):
+    extent: frozenset[int]
+    intent: frozenset[int]
+
+
+class _ConceptLattice(TypedDict):
+    concepts: tuple[_Concept, ...]
+    order: tuple[tuple[int, int], ...]
+    covers: tuple[tuple[int, int], ...]
+    top: int | None
+    bottom: int | None
 
 
 def _require_implication_seed(
@@ -292,18 +307,14 @@ def attribute_closure(ctx: FormalContext, attributes: frozenset[int]) -> frozens
     return object_derivation(ctx, attribute_derivation(ctx, attributes))
 
 
-def concept_from_objects(
-    ctx: FormalContext, objects: frozenset[int]
-) -> dict[str, frozenset[int]]:
+def concept_from_objects(ctx: FormalContext, objects: frozenset[int]) -> _Concept:
     """Return the unique concept (A'', A')."""
     intent = object_derivation(ctx, objects)
     extent = attribute_derivation(ctx, intent)
     return {"extent": extent, "intent": intent}
 
 
-def concept_from_attributes(
-    ctx: FormalContext, attributes: frozenset[int]
-) -> dict[str, frozenset[int]]:
+def concept_from_attributes(ctx: FormalContext, attributes: frozenset[int]) -> _Concept:
     """Return the unique concept (B', B'')."""
     extent = attribute_derivation(ctx, attributes)
     intent = object_derivation(ctx, extent)
@@ -345,7 +356,7 @@ def _next_closure(
     return None
 
 
-def enumerate_concepts(ctx: FormalContext) -> list[dict[str, frozenset[int]]]:
+def enumerate_concepts(ctx: FormalContext) -> list[_Concept]:
     """Return every formal concept exactly once using Ganter's NextClosure
     algorithm over the declared attribute order.
 
@@ -357,7 +368,7 @@ def enumerate_concepts(ctx: FormalContext) -> list[dict[str, frozenset[int]]]:
     times n, not to 2^n.
     """
     n = len(ctx.attributes)
-    concepts: list[dict[str, frozenset[int]]] = []
+    concepts: list[_Concept] = []
 
     current: frozenset[int] | None = attribute_closure(ctx, frozenset())
     while current is not None:
@@ -395,7 +406,7 @@ def concept_family_size_capped(ctx: FormalContext, limit: int) -> int:
 
 
 def _inclusion_order(
-    concepts: list[dict[str, frozenset[int]]],
+    concepts: list[_Concept],
 ) -> list[tuple[int, int]]:
     order: list[tuple[int, int]] = []
     n = len(concepts)
@@ -423,7 +434,7 @@ def _cover_relation(order: list[tuple[int, int]], n: int) -> list[tuple[int, int
 
 def concept_lattice(
     ctx: FormalContext,
-) -> dict[str, object]:
+) -> _ConceptLattice:
     """Return the concept lattice: concepts, partial order by extent inclusion,
     cover relation, top and bottom concepts."""
     return _concept_lattice_from_concepts(enumerate_concepts(ctx))
@@ -431,7 +442,7 @@ def concept_lattice(
 
 def _concept_lattice_from_canonical_concepts(
     concepts: tuple[tuple[tuple[int, ...], tuple[int, ...]], ...],
-) -> dict[str, object]:
+) -> _ConceptLattice:
     """Derive one lattice from an already admitted canonical concept family."""
 
     return _concept_lattice_from_concepts(
@@ -443,8 +454,8 @@ def _concept_lattice_from_canonical_concepts(
 
 
 def _concept_lattice_from_concepts(
-    concepts: list[dict[str, frozenset[int]]],
-) -> dict[str, object]:
+    concepts: list[_Concept],
+) -> _ConceptLattice:
     """Derive one lattice from a complete exact concept family."""
 
     n = len(concepts)

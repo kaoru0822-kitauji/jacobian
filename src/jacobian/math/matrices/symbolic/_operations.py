@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal, cast
+from collections.abc import Callable
 
 from pydantic_core import PydanticCustomError
 from sympy.matrices.exceptions import MatrixError
@@ -29,12 +29,11 @@ from jacobian.math.matrices.symbolic._models import (
     SymbolicRankResult,
     _require_determinant_family_result_budget,
 )
-from jacobian.math.polynomials.values import RationalFunction
 
 
-def _domain_call(call: object, *args: object, **kwargs: object) -> object:
+def _domain_call[**P, R](call: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
     try:
-        return call(*args, **kwargs)  # type: ignore[operator]
+        return call(*args, **kwargs)
     except PydanticCustomError as exc:
         raise OperationDomainValidationError(
             location=("request",), code=exc.type, message=exc.message()
@@ -87,7 +86,7 @@ def compute_symbolic_matrix_product(
 ) -> SymbolicMatrix:
     """Compute one exact symbolic matrix product."""
 
-    return _domain_call(symbolic_matrix_multiply, request.left, request.right)  # type: ignore[return-value]
+    return _domain_call(symbolic_matrix_multiply, request.left, request.right)
 
 
 def compute_symbolic_characteristic_polynomial(
@@ -138,19 +137,11 @@ def compute_symbolic_linear_system(
         SymbolicLinearSystemResult,
     )
 
-    classification, solution, particular, nullspace = cast(
-        tuple[
-            Literal["UNIQUE", "NON_UNIQUE", "INCONSISTENT"],
-            tuple[RationalFunction, ...] | None,
-            tuple[RationalFunction, ...] | None,
-            tuple[tuple[RationalFunction, ...], ...] | None,
-        ],
-        _domain_call(
-            symbolic_linear_system_solve,
-            request.matrix.entries,
-            request.rhs,
-            request.matrix.variables,
-        ),
+    classification, solution, particular, nullspace = _domain_call(
+        symbolic_linear_system_solve,
+        request.matrix.entries,
+        request.rhs,
+        request.matrix.variables,
     )
 
     return SymbolicLinearSystemResult._from_kernel(

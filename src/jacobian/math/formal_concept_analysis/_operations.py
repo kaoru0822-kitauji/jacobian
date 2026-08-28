@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
-
 from jacobian.math.formal_concept_analysis._concepts import enumerate_concept_pairs
 from jacobian.math.formal_concept_analysis._models import (
     AttributeSubsetRequest,
@@ -124,13 +122,13 @@ def compute_concept_lattice(
     result = _concept_lattice_from_canonical_concepts(
         enumerate_concept_pairs(request.context)
     )
-    concepts = cast(list[Any], result["concepts"])
     return ConceptLatticeResult(
         concepts=tuple(
-            (tuple(sorted(c["extent"])), tuple(sorted(c["intent"]))) for c in concepts
+            (tuple(sorted(concept["extent"])), tuple(sorted(concept["intent"])))
+            for concept in result["concepts"]
         ),
-        order=result["order"],  # type: ignore[arg-type]
-        covers=result["covers"],  # type: ignore[arg-type]
-        top=result["top"],  # type: ignore[arg-type]
-        bottom=result["bottom"],  # type: ignore[arg-type]
+        order=result["order"],
+        covers=result["covers"],
+        top=result["top"],
+        bottom=result["bottom"],
     )

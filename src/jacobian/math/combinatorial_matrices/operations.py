@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TypedDict
+
 from .values import MAX_MATRIX_ORDER, HadamardMatrix, SignMatrix
 
 __all__ = [
@@ -14,7 +16,50 @@ __all__ = [
 ]
 
 
-def sign_profile(matrix: SignMatrix) -> dict[str, object]:
+class _SignProfile(TypedDict):
+    row_count: int
+    column_count: int
+    plus_one_count: int
+    minus_one_count: int
+    row_sums: tuple[int, ...]
+    column_sums: tuple[int, ...]
+    is_square: bool
+
+
+class _GramProfile(TypedDict):
+    order: int
+    gram: tuple[tuple[int, ...], ...]
+    diagonal_residuals: tuple[int, ...]
+    nonzero_off_diagonal: tuple[tuple[int, int, int], ...]
+    is_hadamard: bool
+
+
+class _NormalizedMatrix(TypedDict):
+    normalized: tuple[tuple[int, ...], ...]
+    row_switches: tuple[int, ...]
+    column_switches: tuple[int, ...]
+
+
+class _DeterminantProfile(TypedDict):
+    order: int
+    determinant_magnitude: int
+    gram_determinant: int
+    identity: str
+
+
+class _KroneckerProduct(TypedDict):
+    product: tuple[tuple[int, ...], ...]
+    row_map: tuple[tuple[int, int], ...]
+    column_map: tuple[tuple[int, int], ...]
+
+
+class _SylvesterMatrix(TypedDict):
+    matrix: tuple[tuple[int, ...], ...]
+    construction: str
+    order: int
+
+
+def sign_profile(matrix: SignMatrix) -> _SignProfile:
     """Return dimensions, entry counts, row/column sums, and first/all
     non-sign entries for a general integer matrix."""
     row_count = len(matrix.rows)
@@ -36,7 +81,7 @@ def sign_profile(matrix: SignMatrix) -> dict[str, object]:
     }
 
 
-def gram_profile(matrix: SignMatrix) -> dict[str, object]:
+def gram_profile(matrix: SignMatrix) -> _GramProfile:
     """Return order, exact ``H H^T``, diagonal residuals from n, all nonzero
     off-diagonal inner products, and ``is_hadamard``."""
     rows = matrix.rows
@@ -64,7 +109,7 @@ def gram_profile(matrix: SignMatrix) -> dict[str, object]:
     }
 
 
-def normalize(matrix: HadamardMatrix | SignMatrix) -> dict[str, object]:
+def normalize(matrix: HadamardMatrix | SignMatrix) -> _NormalizedMatrix:
     """Return a deterministically normalized sign matrix whose first row and
     first column are all ``+1``, plus the exact row/column sign switches
     used. Normalization must preserve the full matrix and be idempotent."""
@@ -88,7 +133,7 @@ def normalize(matrix: HadamardMatrix | SignMatrix) -> dict[str, object]:
     }
 
 
-def determinant_profile(hadamard: HadamardMatrix) -> dict[str, object]:
+def determinant_profile(hadamard: HadamardMatrix) -> _DeterminantProfile:
     """For a constructed Hadamard matrix of order n, return |det H| = n^(n/2)
     and the Gram determinant = n^n."""
     n = len(hadamard.rows)
@@ -104,7 +149,7 @@ def determinant_profile(hadamard: HadamardMatrix) -> dict[str, object]:
     }
 
 
-def kronecker(left: HadamardMatrix, right: HadamardMatrix) -> dict[str, object]:
+def kronecker(left: HadamardMatrix, right: HadamardMatrix) -> _KroneckerProduct:
     """Return the Kronecker product of two Hadamard matrices as a Hadamard
     matrix, factor-to-product row/column maps, and the exact Gram
     factorization."""
@@ -136,7 +181,7 @@ def kronecker(left: HadamardMatrix, right: HadamardMatrix) -> dict[str, object]:
     }
 
 
-def sylvester(k: int) -> dict[str, object]:
+def sylvester(k: int) -> _SylvesterMatrix:
     """For bounded ``k``, return the recursively defined order ``2^k``
     Hadamard matrix with construction ledger."""
     if k < 0 or k > 7:
@@ -148,7 +193,7 @@ def sylvester(k: int) -> dict[str, object]:
             "order": 1,
         }
     prev_result = sylvester(k - 1)
-    prev = [list(row) for row in prev_result["matrix"]]  # type: ignore[attr-defined]
+    prev = [list(row) for row in prev_result["matrix"]]
     n = len(prev)
     top = [prev[i] + prev[i] for i in range(n)]
     bottom = [prev[i] + [-prev[i][j] for j in range(n)] for i in range(n)]

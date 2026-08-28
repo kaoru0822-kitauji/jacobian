@@ -54,7 +54,7 @@ def _search_thresholds[WitnessT: (VertexWitness, EdgeWitness)](
     solve: Callable[[int, int], tuple[object, WitnessT]],
     started: float,
 ) -> _SearchResult[WitnessT]:
-    import z3  # type: ignore[import-untyped]
+    import z3
 
     incumbent_value = len(incumbent)
     relation: ThresholdRelation = "AT_MOST" if direction == "MINIMUM" else "AT_LEAST"

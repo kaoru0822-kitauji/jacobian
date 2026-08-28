@@ -35,24 +35,24 @@ __all__ = [
 def compute_sign_profile(request: SignProfileRequest) -> SignProfileResult:
     result = sign_profile(request.matrix)
     return SignProfileResult(
-        row_count=result["row_count"],  # type: ignore[arg-type]
-        column_count=result["column_count"],  # type: ignore[arg-type]
-        plus_one_count=result["plus_one_count"],  # type: ignore[arg-type]
-        minus_one_count=result["minus_one_count"],  # type: ignore[arg-type]
-        row_sums=result["row_sums"],  # type: ignore[arg-type]
-        column_sums=result["column_sums"],  # type: ignore[arg-type]
-        is_square=result["is_square"],  # type: ignore[arg-type]
+        row_count=result["row_count"],
+        column_count=result["column_count"],
+        plus_one_count=result["plus_one_count"],
+        minus_one_count=result["minus_one_count"],
+        row_sums=result["row_sums"],
+        column_sums=result["column_sums"],
+        is_square=result["is_square"],
     )
 
 
 def compute_gram_profile(request: GramProfileRequest) -> GramProfileResult:
     result = gram_profile(request.matrix)
     return GramProfileResult(
-        order=result["order"],  # type: ignore[arg-type]
-        gram=result["gram"],  # type: ignore[arg-type]
-        diagonal_residuals=result["diagonal_residuals"],  # type: ignore[arg-type]
-        nonzero_off_diagonal=result["nonzero_off_diagonal"],  # type: ignore[arg-type]
-        is_hadamard=result["is_hadamard"],  # type: ignore[arg-type]
+        order=result["order"],
+        gram=result["gram"],
+        diagonal_residuals=result["diagonal_residuals"],
+        nonzero_off_diagonal=result["nonzero_off_diagonal"],
+        is_hadamard=result["is_hadamard"],
     )
 
 
@@ -62,11 +62,11 @@ def compute_normalize(request: NormalizeRequest) -> NormalizeResult:
     value_type = (
         HadamardMatrix if isinstance(request.matrix, HadamardMatrix) else SignMatrix
     )
-    normalized = value_type(rows=rows)  # type: ignore[arg-type]
+    normalized = value_type(rows=rows)
     return NormalizeResult(
         normalized=normalized,
-        row_switches=result["row_switches"],  # type: ignore[arg-type]
-        column_switches=result["column_switches"],  # type: ignore[arg-type]
+        row_switches=result["row_switches"],
+        column_switches=result["column_switches"],
     )
 
 
@@ -75,17 +75,17 @@ def compute_determinant_profile(
 ) -> DeterminantProfileResult:
     result = determinant_profile(request.matrix)
     return DeterminantProfileResult(
-        order=result["order"],  # type: ignore[arg-type]
-        determinant_magnitude=result["determinant_magnitude"],  # type: ignore[arg-type]
-        gram_determinant=result["gram_determinant"],  # type: ignore[arg-type]
-        identity=result["identity"],  # type: ignore[arg-type]
+        order=result["order"],
+        determinant_magnitude=result["determinant_magnitude"],
+        gram_determinant=result["gram_determinant"],
+        identity=result["identity"],
     )
 
 
 def compute_sylvester(request: SylvesterRequest) -> SylvesterResult:
     result = sylvester(request.k)
     return SylvesterResult(
-        matrix=HadamardMatrix(rows=result["matrix"]),  # type: ignore[arg-type]
-        construction=result["construction"],  # type: ignore[arg-type]
-        order=result["order"],  # type: ignore[arg-type]
+        matrix=HadamardMatrix(rows=result["matrix"]),
+        construction=result["construction"],
+        order=result["order"],
     )

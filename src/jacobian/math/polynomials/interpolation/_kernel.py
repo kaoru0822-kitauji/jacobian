@@ -107,9 +107,7 @@ def hermite_interpolation_coefficients(
 
     matrix = fmpq_mat(multiplicity, multiplicity, matrix_entries)
     target = fmpq_mat(multiplicity, 1, right_hand_side)
-    # python-flint 0.9 documents and accepts the algorithm keyword, while its
-    # bundled type stub has not yet added that optional argument.
-    solution = matrix.solve(target, algorithm="fflu")  # type: ignore[call-arg]
+    solution = matrix.solve(target, "fflu")
     return tuple(
         Fraction(int(solution[index, 0].p), int(solution[index, 0].q))
         for index in range(multiplicity)

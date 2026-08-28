@@ -78,7 +78,7 @@ def _run_k_colorability_solver_kernel(
 ) -> tuple[_ColoringWorkerOutcome, tuple[int, ...] | None]:
     """Run the existing bounded vertex-coloring Z3 adapter once."""
 
-    import z3  # type: ignore[import-untyped]
+    import z3
 
     try:
         solver = z3.Solver()

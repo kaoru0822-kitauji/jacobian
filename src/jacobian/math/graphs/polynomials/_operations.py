@@ -28,7 +28,7 @@ from jacobian.math.graphs.polynomials.operations import (
 def _build_graph(
     request: GraphPolynomialRequest | MatchingPolynomialRequest,
 ) -> nx.Graph[int]:
-    g = nx.Graph()  # type: ignore[var-annotated]
+    g: nx.Graph[int] = nx.Graph()
     g.add_nodes_from(range(request.graph.vertex_count))
     for edge in request.graph.edges:
         g.add_edge(edge.u, edge.v)

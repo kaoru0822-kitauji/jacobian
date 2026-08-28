@@ -40,7 +40,7 @@ def _remaining_ms(started: float, wall_seconds: int) -> int:
 def _build_solver(
     source: FiniteHypergraph,
 ) -> tuple[Any, dict[str, Any], Any]:
-    import z3  # type: ignore[import-untyped]
+    import z3
 
     solver = z3.Solver()
     selected = {

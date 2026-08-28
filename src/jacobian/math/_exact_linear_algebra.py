@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from fractions import Fraction
 
 
 def symmetric_inertia(
-    matrix: Sequence[Sequence[int]],
+    matrix: Sequence[Sequence[int | Fraction]],
 ) -> tuple[int, int, int]:
     """Return positive, negative, and zero inertia of a symmetric matrix."""
     from sympy import Matrix, oo, symbols

@@ -257,7 +257,7 @@ def _clique_execute_kernel(
 ) -> GraphCliqueNumberResult:
     """Compute the clique number via bounded Z3 threshold search."""
 
-    import z3  # type: ignore[import-untyped]
+    import z3
 
     started = time.monotonic()
     graph = cast(Any, build_simple_graph(request.graph))

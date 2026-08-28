@@ -95,7 +95,7 @@ def solve_chromatic_number(
     tested k-colorability trace; it is never a negative conclusion.
     """
 
-    import z3  # type: ignore[import-untyped]
+    import z3
 
     n = len(vertices)
     if n == 0:

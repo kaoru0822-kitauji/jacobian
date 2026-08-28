@@ -449,7 +449,7 @@ def _feasibility_outcome(
         return "unsat"
 
     try:
-        import z3  # type: ignore[import-untyped]
+        import z3
     except (ImportError, OSError):
         return "unknown"
     try:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from math import gcd
-from typing import Literal, Self
+from typing import TYPE_CHECKING, Literal, Self
 
 from pydantic import Field, StrictInt, model_validator
 from pydantic_core import PydanticCustomError
@@ -12,6 +12,10 @@ from jacobian._exact import CanonicalInteger, CanonicalRational
 from jacobian._models import StrictModel
 from jacobian.canonical import format_canonical_integer, parse_canonical_integer
 from jacobian.math._root_isolation import strict_root_count
+
+if TYPE_CHECKING:
+    from sympy import Poly
+    from sympy.core.numbers import Rational as SympyRational
 
 # A degree-eight value covers every singular value of a 2 by 2 matrix over a
 # real quadratic field.  The coefficient budget also bounds exact comparison:
@@ -31,7 +35,7 @@ def _validation_error(reason: str, message: str) -> PydanticCustomError:
 RealAlgebraicOrder = Literal["LT", "EQ", "GT"]
 
 
-def _sympy_polynomial(value: RealAlgebraicValue):  # type: ignore[no-untyped-def]
+def _sympy_polynomial(value: RealAlgebraicValue) -> Poly:
     import sympy
 
     x = sympy.Symbol("x")
@@ -42,7 +46,7 @@ def _sympy_polynomial(value: RealAlgebraicValue):  # type: ignore[no-untyped-def
     )
 
 
-def _rational(value) -> CanonicalRational:  # type: ignore[no-untyped-def]
+def _rational(value: SympyRational) -> CanonicalRational:
     import sympy
 
     rational = sympy.Rational(value)
@@ -147,7 +151,7 @@ class RationalIsolatingInterval(StrictModel):
         return self
 
 
-def _interval(lower, upper) -> RationalIsolatingInterval:  # type: ignore[no-untyped-def]
+def _interval(lower: SympyRational, upper: SympyRational) -> RationalIsolatingInterval:
     return RationalIsolatingInterval(
         lower=_rational(lower),
         upper=_rational(upper),

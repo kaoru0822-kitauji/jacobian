@@ -449,7 +449,7 @@ def _solve_smt_kernel(
     """Run one complete Z3 lifecycle inside the owned worker process."""
 
     try:
-        import z3  # type: ignore[import-untyped]
+        import z3
     except (ImportError, OSError) as exc:
         return {
             "outcome": "UNKNOWN",

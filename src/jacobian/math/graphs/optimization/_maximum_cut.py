@@ -430,7 +430,7 @@ def _solve_component_with_z3(
             sides=component.bipartite_sides,
         )
 
-    import z3  # type: ignore[import-untyped]
+    import z3
 
     try:
         optimizer = z3.Optimize()

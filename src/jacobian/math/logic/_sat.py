@@ -427,7 +427,7 @@ def _solve_sat_kernel(*, cnf: CanonicalCnf, timeout_ms: int) -> dict[str, object
     """Run one complete Z3 SAT lifecycle inside the owned worker process."""
 
     try:
-        import z3  # type: ignore[import-untyped]
+        import z3
     except (ImportError, OSError) as exc:
         return {
             "outcome": "UNKNOWN",

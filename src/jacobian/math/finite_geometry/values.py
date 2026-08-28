@@ -130,24 +130,14 @@ class ProjectivePointSequence(StrictModel):
     def __len__(self) -> int:
         return len(self.coordinates)
 
-    def __iter__(self) -> Iterator[ProjectivePoint]:  # type: ignore[override]
-        """Iterate as typed projective points bound to ``space``.
-
-        Pydantic's ``BaseModel.__iter__`` yields ``(field, value)`` pairs;
-        this canonical value intentionally iterates its mathematical items
-        instead.
-        """
+    @property
+    def points(self) -> Iterator[ProjectivePoint]:
+        """Iterate the sequence as typed parent-bound projective points."""
 
         return (
             ProjectivePoint(space=self.space, coordinates=coordinates)
             for coordinates in self.coordinates
         )
-
-    @property
-    def points(self) -> Iterator[ProjectivePoint]:
-        """Iterate the sequence as typed parent-bound projective points."""
-
-        return iter(self)
 
 
 __all__ = [

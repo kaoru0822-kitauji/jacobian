@@ -154,11 +154,11 @@ def compute_equation_profile(request: EquationProfileRequest) -> EquationProfile
     if result["status"] == "HOLDS":
         return EquationProfileResult(
             status="HOLDS",
-            satisfying_count=result["satisfying_count"],  # type: ignore[arg-type]
+            satisfying_count=result["satisfying_count"],
         )
     return EquationProfileResult(
         status="FAILS",
-        satisfying_count=result["satisfying_count"],  # type: ignore[arg-type]
+        satisfying_count=result["satisfying_count"],
         first_counterassignment=EquationCounterexample.model_validate(
             result["first_counterassignment"]
         ),
@@ -169,9 +169,9 @@ def compute_generated_subalgebra(request: SubalgebraRequest) -> SubalgebraResult
     _admit_subalgebra(request)
     result = generated_subalgebra(request.algebra, request.generators)
     return SubalgebraResult(
-        generated_carrier=result["generated_carrier"],  # type: ignore[arg-type]
-        rounds=result["rounds"],  # type: ignore[arg-type]
-        is_closed=result["is_closed"],  # type: ignore[arg-type]
+        generated_carrier=result["generated_carrier"],
+        rounds=result["rounds"],
+        is_closed=result["is_closed"],
     )
 
 
@@ -188,8 +188,8 @@ def compute_congruence(request: CongruenceRequest) -> CongruenceResult:
     _admit_partition(request)
     result = congruence_check(request.algebra, request.partition)
     return CongruenceResult(
-        is_congruence=result["is_congruence"],  # type: ignore[arg-type]
-        obstruction=result.get("obstruction"),  # type: ignore[arg-type]
+        is_congruence=result["is_congruence"],
+        obstruction=result.get("obstruction"),
     )
 
 

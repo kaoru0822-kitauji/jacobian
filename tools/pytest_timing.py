@@ -19,6 +19,9 @@ class _TimingState:
     workers: dict[str, tuple[float, int]] = field(default_factory=dict)
 
 
+_TIMING_STATE = pytest.StashKey[_TimingState]()
+
+
 def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(
         "--jacobian-timing-json",
@@ -28,7 +31,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    config._jacobian_timing_state = _TimingState()  # type: ignore[attr-defined]
+    config.stash[_TIMING_STATE] = _TimingState()
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -37,7 +40,7 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[object]) 
     report: pytest.TestReport = outcome.get_result()
     if report.when != "call":
         return
-    state: _TimingState = item.config._jacobian_timing_state  # type: ignore[attr-defined]
+    state = item.config.stash[_TIMING_STATE]
     state.call_seconds += report.duration
     state.call_count += 1
 
@@ -45,7 +48,7 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[object]) 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     del exitstatus
     config = session.config
-    state: _TimingState = config._jacobian_timing_state  # type: ignore[attr-defined]
+    state = config.stash[_TIMING_STATE]
     workerinput: dict[str, Any] | None = getattr(config, "workerinput", None)
     if workerinput is not None:
         worker_config = cast(Any, config)
@@ -64,7 +67,7 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
 def pytest_testnodedown(node: Any, error: BaseException | None) -> None:
     del error
     config = node.config
-    state: _TimingState = config._jacobian_timing_state
+    state = config.stash[_TIMING_STATE]
     timing = node.workeroutput.get("jacobian_timing")
     if not isinstance(timing, dict):
         return

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TypedDict
+
 from .values import FiniteTopologicalMap, FiniteTopologicalSpace
 
 __all__ = [
@@ -14,6 +16,12 @@ __all__ = [
     "minimal_neighbourhoods",
     "specialization_preorder",
 ]
+
+
+class _KolmogorovQuotient(TypedDict):
+    quotient_points: tuple[tuple[str, ...], ...]
+    quotient_preorder: tuple[tuple[int, ...], ...]
+    class_map: dict[int, int]
 
 
 def from_preorder(
@@ -89,7 +97,7 @@ def continuous_check(map_: FiniteTopologicalMap) -> bool:
     return True
 
 
-def kolmogorov_quotient(space: FiniteTopologicalSpace) -> dict[str, object]:
+def kolmogorov_quotient(space: FiniteTopologicalSpace) -> _KolmogorovQuotient:
     """Return the T0 (Kolmogorov) quotient: identify points with the same
     minimal open neighbourhood."""
     nbhd_to_class: dict[tuple[int, ...], list[int]] = {}

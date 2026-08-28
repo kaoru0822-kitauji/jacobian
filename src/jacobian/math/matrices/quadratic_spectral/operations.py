@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from fractions import Fraction
 from math import gcd
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Literal
 
 from jacobian.canonical import format_canonical_integer
 from jacobian.math._root_isolation import strict_root_count
@@ -24,6 +24,12 @@ from jacobian.math.matrices.quadratic_spectral.values import (
 )
 from jacobian.math.matrices.values import RealQuadraticMatrix
 from jacobian.math.real_algebraic import RealAlgebraicValue
+from jacobian.math.real_quadratic import RealQuadraticValue
+
+if TYPE_CHECKING:
+    from flint import arb
+    from sympy import Poly
+    from sympy.core.numbers import Rational as SympyRational
 
 type Quadratic = tuple[Fraction, Fraction]
 type FractionPolynomial = tuple[Fraction, ...]
@@ -43,11 +49,11 @@ _ONE: Quadratic = (Fraction(1), Fraction(0))
 @dataclass(frozen=True, slots=True)
 class _RootData:
     value: RealAlgebraicValue
-    lower: Any
-    upper: Any
+    lower: SympyRational
+    upper: SympyRational
 
 
-def _entry(value) -> Quadratic:  # type: ignore[no-untyped-def]
+def _entry(value: RealQuadraticValue) -> Quadratic:
     return (
         value.rational_part.as_fraction(),
         value.radical_coefficient.as_fraction(),
@@ -167,13 +173,13 @@ def _polynomial_parts(
     return rational, radical, trace, determinant
 
 
-def _sympy_polynomial(coefficients: tuple[int, ...]):  # type: ignore[no-untyped-def]
+def _sympy_polynomial(coefficients: tuple[int, ...]) -> Poly:
     import sympy
 
     return sympy.Poly.from_list(coefficients, gens=sympy.Symbol("x"), domain=sympy.ZZ)
 
 
-def _canonical_factor(factor) -> tuple[str, ...]:  # type: ignore[no-untyped-def]
+def _canonical_factor(factor: Poly) -> tuple[str, ...]:
     coefficients = [int(coefficient) for coefficient in factor.all_coeffs()]
     content = 0
     for coefficient in coefficients:
@@ -184,7 +190,7 @@ def _canonical_factor(factor) -> tuple[str, ...]:  # type: ignore[no-untyped-def
     return tuple(format_canonical_integer(coefficient) for coefficient in coefficients)
 
 
-def _root_data(polynomial) -> tuple[_RootData, ...]:  # type: ignore[no-untyped-def]
+def _root_data(polynomial: Poly) -> tuple[_RootData, ...]:
     factors = polynomial.factor_list()[1]
     factor_indices = [0] * len(factors)
     rows: list[_RootData] = []
@@ -254,25 +260,25 @@ def _rational_branches(
     return result
 
 
-def _arb_fraction(value: Fraction):  # type: ignore[no-untyped-def]
+def _arb_fraction(value: Fraction) -> arb:
     from flint import arb
 
     return arb(value.numerator) / value.denominator
 
 
-def _arb_quadratic(value: Quadratic, radicand: int):  # type: ignore[no-untyped-def]
+def _arb_quadratic(value: Quadratic, radicand: int) -> arb:
     from flint import arb
 
     return _arb_fraction(value[0]) + _arb_fraction(value[1]) * arb(radicand).sqrt()
 
 
-def _arb_rational(value: Any) -> Any:
+def _arb_rational(value: SympyRational) -> arb:
     from flint import arb
 
     return arb(int(value.p)) / int(value.q)
 
 
-def _strictly_inside(ball, root: _RootData) -> bool:  # type: ignore[no-untyped-def]
+def _strictly_inside(ball: arb, root: _RootData) -> bool:
     if root.lower == root.upper:
         return False
     return bool(ball > _arb_rational(root.lower) and ball < _arb_rational(root.upper))
@@ -285,7 +291,7 @@ def _branch_balls(
     radicand: int,
     precision: int,
     repeated: bool,
-) -> dict[Branch, Any] | None:
+) -> dict[Branch, arb] | None:
     from flint import ctx
 
     with ctx.workprec(precision):
@@ -303,15 +309,16 @@ def _branch_balls(
             return None
         root = discriminant_ball.sqrt()
         upper = (trace_ball + root) / 2
-        lower = (trace_ball - root) / 2
+        lower_candidate = (trace_ball - root) / 2
+        lower_ball: arb | None = lower_candidate
         if spectrum_kind == "SINGULAR_VALUES":
             if not upper > 0:
                 return None
             upper = upper.sqrt()
-            lower = lower.sqrt() if lower > 0 else None
-        result: dict[Branch, Any] = {"UPPER": upper}
-        if lower is not None:
-            result["LOWER"] = lower
+            lower_ball = lower_candidate.sqrt() if lower_candidate > 0 else None
+        result: dict[Branch, arb] = {"UPPER": upper}
+        if lower_ball is not None:
+            result["LOWER"] = lower_ball
         return result
 
 

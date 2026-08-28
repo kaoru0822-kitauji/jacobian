@@ -324,7 +324,7 @@ def _validate_numerals(tokens: tuple[str, ...]) -> None:
 
 
 def _parse_assertions(smtlib: str, *, context: Any | None = None) -> tuple[Any, ...]:
-    import z3  # type: ignore[import-untyped]
+    import z3
 
     try:
         ctx = context if context is not None else z3.Context()

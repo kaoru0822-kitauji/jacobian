@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from fractions import Fraction
 
 from pydantic_core import PydanticCustomError
@@ -111,9 +112,9 @@ def _admit_psd(
     _require_psd_pair_admission(left, right)
 
 
-def _admit(check: object, *args: object) -> None:
+def _admit(check: Callable[..., object], *args: object) -> None:
     try:
-        check(*args)  # type: ignore[operator]
+        check(*args)
     except PydanticCustomError as exc:
         raise OperationDomainValidationError(
             location=("request",), code=exc.type, message=exc.message()
@@ -264,7 +265,7 @@ def _psd_order_kernel(
         for left_row, right_row in zip(_fractions(left), _fractions(right), strict=True)
     )
     difference = _factorized(difference_entries, factors=left.factors)
-    positive, negative, zero = symmetric_inertia(difference_entries)  # type: ignore[arg-type]
+    positive, negative, zero = symmetric_inertia(difference_entries)
     is_less_or_equal = negative == 0
     witness = None
     if not is_less_or_equal:

@@ -15,7 +15,7 @@ STRESS_COUNT ?= 3
 ORDERING_DEFAULT_SEED := --randomly-seed=17
 PYTEST_DIAGNOSTIC_ARGS ?= --durations=10
 ORDINARY_MARKER_EXPRESSION := not property and not exhaustive and not scale
-RUFF_PATHS := src tests benchmarks
+RUFF_PATHS := src tests benchmarks typings
 PYTEST_RUNNER := $(UV_RUN) python tools/pytest_lifecycle.py
 VALIDATION_LOCK := $(UV_RUN) python tools/with_validation_lock.py
 # Owner lanes cover every ordinary test root exactly once. CI runs
@@ -244,5 +244,5 @@ check-static: lint-full typecheck import-contracts architecture todo-check build
 clean: ## Remove local caches, build outputs, and coverage artifacts.
 	rm -rf .pytest_cache .mypy_cache .ruff_cache dist build htmlcov
 	rm -f .coverage .coverage.*
-	find src tests benchmarks -type d -name '__pycache__' -prune -exec rm -rf {} +
+	find src tests benchmarks typings -type d -name '__pycache__' -prune -exec rm -rf {} +
 	find . -maxdepth 2 -type d -name '*.egg-info' -prune -exec rm -rf {} +

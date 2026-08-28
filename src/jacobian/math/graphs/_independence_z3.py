@@ -39,7 +39,7 @@ _WORKER_FILE_SIZE_BYTES = 1_024 * 1_024
 
 
 def _integer_bound(value: Any, fallback: int) -> int:
-    import z3  # type: ignore[import-untyped]
+    import z3
 
     return value.as_long() if z3.is_int_value(value) else fallback
 

@@ -258,7 +258,7 @@ def compute_optimal_discrepancy(
 
     try:
         import numpy as np
-        from scipy.optimize import (  # type: ignore[import-untyped]
+        from scipy.optimize import (
             Bounds,
             LinearConstraint,
             milp,
