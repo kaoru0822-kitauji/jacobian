@@ -8,6 +8,7 @@ from pydantic import Field, StrictInt, model_validator
 
 from jacobian._models import StrictModel
 from jacobian.canonical import CanonicalLimits, encode_strict_json
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.values import (
     SimpleUndirectedGraph,
     simple_undirected_graph_wire_bytes,
@@ -49,11 +50,15 @@ def _require_output_headroom(source_bytes: int, witness_label_bytes: int) -> Non
     )
     output_limit = CanonicalLimits().max_output_bytes
     if estimated_result_bytes > output_limit:
-        raise ValueError(
-            "the independence-number result retains its source graph and "
-            "witness labels and would exceed the "
-            f"{output_limit}-byte canonical output limit; "
-            "shorten vertex labels or shrink the graph"
+        raise OperationDomainValidationError(
+            location=("graph",),
+            code="graph.independence_number.output_budget",
+            message=(
+                "the independence-number result retains its source graph and "
+                "witness labels and would exceed the "
+                f"{output_limit}-byte canonical output limit; "
+                "shorten vertex labels or shrink the graph"
+            ),
         )
 
 
@@ -74,9 +79,27 @@ def _require_supported_order(
 
     order = len(graph.vertices)
     if order > resource_budget.max_order:
-        raise ValueError("graph order exceeds the declared max_order budget")
+        raise OperationDomainValidationError(
+            location=("resource_budget", "max_order"),
+            code="graph.independence_number.max_order_budget",
+            message="graph order exceeds the declared max_order budget",
+        )
     if order > 128:
-        raise ValueError("independence-number search supports order at most 128")
+        raise OperationDomainValidationError(
+            location=("graph",),
+            code="graph.independence_number.order_bound",
+            message="independence-number search supports order at most 128",
+        )
+
+
+def _require_admitted_request(
+    graph: SimpleUndirectedGraph,
+    resource_budget: IndependenceNumberBudget,
+) -> None:
+    _require_supported_order(graph, resource_budget)
+    _require_output_headroom(
+        simple_undirected_graph_wire_bytes(graph), _label_wire_bytes(graph)
+    )
 
 
 class IndependenceNumberResult(StrictModel):
@@ -200,10 +223,7 @@ def independence_number(
     if not isinstance(graph, SimpleUndirectedGraph):
         raise TypeError("independence_number expects a SimpleUndirectedGraph")
     resource_budget = resource_budget or IndependenceNumberBudget()
-    _require_supported_order(graph, resource_budget)
-    _require_output_headroom(
-        simple_undirected_graph_wire_bytes(graph), _label_wire_bytes(graph)
-    )
+    _require_admitted_request(graph, resource_budget)
 
     from jacobian.math.graphs import _independence_z3
 

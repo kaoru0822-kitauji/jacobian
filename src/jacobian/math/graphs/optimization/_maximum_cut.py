@@ -11,7 +11,7 @@ from pydantic.json_schema import JsonSchemaValue
 from jacobian._models import StrictModel
 from jacobian.canonical import CanonicalLimits, encode_strict_json
 from jacobian.catalog._examples import example
-from jacobian.catalog.models import MathTool
+from jacobian.catalog.models import MathTool, OperationDomainValidationError
 from jacobian.math.graphs.values import SimpleUndirectedGraph
 
 MAXIMUM_CUT_CANDIDATE_PARTITIONS = 1_048_576
@@ -245,23 +245,35 @@ def _projected_result_bytes(graph: SimpleUndirectedGraph) -> int:
 def _require_graph_envelope(graph: SimpleUndirectedGraph) -> _MaximumCutAnalysis:
     analysis = _analyze_graph(graph)
     if analysis.candidate_partitions > MAXIMUM_CUT_CANDIDATE_PARTITIONS:
-        raise ValueError(
-            "maximum-cut exact preflight requires "
-            f"{analysis.candidate_partitions} candidate partitions; at most "
-            f"{MAXIMUM_CUT_CANDIDATE_PARTITIONS} are admitted"
+        raise OperationDomainValidationError(
+            location=("graph",),
+            code="graph.maximum_cut.candidate_partitions_exceed_bound",
+            message=(
+                "maximum-cut exact preflight requires "
+                f"{analysis.candidate_partitions} candidate partitions; at most "
+                f"{MAXIMUM_CUT_CANDIDATE_PARTITIONS} are admitted"
+            ),
         )
     if analysis.edge_updates > MAXIMUM_CUT_EDGE_UPDATES:
-        raise ValueError(
-            "maximum-cut exact preflight requires "
-            f"{analysis.edge_updates} incremental weighted edge contributions; at most "
-            f"{MAXIMUM_CUT_EDGE_UPDATES} are admitted"
+        raise OperationDomainValidationError(
+            location=("graph",),
+            code="graph.maximum_cut.edge_updates_exceed_bound",
+            message=(
+                "maximum-cut exact preflight requires "
+                f"{analysis.edge_updates} incremental weighted edge contributions; at most "
+                f"{MAXIMUM_CUT_EDGE_UPDATES} are admitted"
+            ),
         )
     projected_bytes = _projected_result_bytes(graph)
     if projected_bytes > MAXIMUM_CUT_RESULT_BYTES:
-        raise ValueError(
-            "maximum-cut projected exact result requires at most "
-            f"{projected_bytes} bytes; the admitted result bound is "
-            f"{MAXIMUM_CUT_RESULT_BYTES} bytes"
+        raise OperationDomainValidationError(
+            location=("graph",),
+            code="graph.maximum_cut.result_bytes_exceed_bound",
+            message=(
+                "maximum-cut projected exact result requires at most "
+                f"{projected_bytes} bytes; the admitted result bound is "
+                f"{MAXIMUM_CUT_RESULT_BYTES} bytes"
+            ),
         )
     return analysis
 
@@ -539,7 +551,7 @@ def _partition_from_class_sides(
 def compute_maximum_cut(request: GraphMaximumCutRequest) -> GraphMaximumCutResult:
     """Compute one deterministic exact maximum cut and source-edge ledger."""
 
-    analysis = _analyze_graph(request.graph)
+    analysis = _require_graph_envelope(request.graph)
     class_sides = _solve_analysis(analysis)
     left_vertices, right_vertices, crossing_edges = _partition_from_class_sides(
         request.graph,
@@ -561,6 +573,8 @@ def _compute_maximum_cut_without_z3(
 ) -> GraphMaximumCutResult:
     """Compute the same exact result through the admitted exhaustive fallback."""
 
+    # The isolated adapter performs the envelope check before entering this
+    # fallback, keeping admission separate from the kernel's retry path.
     analysis = _analyze_graph(request.graph)
     class_sides = _solve_analysis_by_enumeration(analysis)
     left_vertices, right_vertices, crossing_edges = _partition_from_class_sides(

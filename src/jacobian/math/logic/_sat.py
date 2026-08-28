@@ -23,6 +23,7 @@ from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
 from jacobian.canonical import canonicalize_json
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.logic._cnf import (
     _MAX_VARIABLES,
     CanonicalCnf,
@@ -418,6 +419,20 @@ def _validate_lpr_refutation(cnf: CanonicalCnf, refutation: SatLprRefutation) ->
         )
 
 
+def _admit_lpr_refutation(
+    cnf: CanonicalCnf,
+    refutation: SatLprRefutation,
+) -> None:
+    try:
+        _validate_lpr_refutation(cnf, refutation)
+    except PydanticCustomError as error:
+        raise OperationDomainValidationError(
+            location=("refutation",),
+            code=error.type,
+            message=error.message(),
+        ) from error
+
+
 def _solve_sat_kernel(*, cnf: CanonicalCnf, timeout_ms: int) -> dict[str, object]:
     """Run one complete Z3 SAT lifecycle inside the owned worker process."""
 
@@ -673,7 +688,7 @@ def check_sat_refutation(
 ) -> SatRefutationCheckResult:
     """Replay one typed LPR refutation through the pinned CakeML checker."""
 
-    _validate_lpr_refutation(request.cnf, request.refutation)
+    _admit_lpr_refutation(request.cnf, request.refutation)
 
     def unavailable(detail: str) -> SatRefutationCheckResult:
         return SatRefutationCheckResult(

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydantic_core import PydanticCustomError
+
 __all__ = [
     "adjacency_characteristic_polynomial",
     "adjacency_spectrum",
@@ -12,9 +14,23 @@ __all__ = [
 ]
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.spectra._models import _require_spectral_graph
 from jacobian.math.graphs.values import IndexedSimpleUndirectedGraph
 from jacobian.math.polynomials.values import RationalPolynomial
+
+
+def _require_admitted_spectral_graph(
+    graph: IndexedSimpleUndirectedGraph,
+) -> None:
+    try:
+        _require_spectral_graph(graph)
+    except PydanticCustomError as error:
+        raise OperationDomainValidationError(
+            location=("graph",),
+            code=error.type,
+            message=error.message(),
+        ) from error
 
 
 def _characteristic_polynomial_coeffs(
@@ -42,7 +58,7 @@ def _dense_to_canonical_polynomial(
 def _adjacency_matrix(graph: IndexedSimpleUndirectedGraph) -> Any:
     import sympy
 
-    _require_spectral_graph(graph)
+    _require_admitted_spectral_graph(graph)
     mat = sympy.zeros(graph.vertex_count)
     for u, v in graph.edges:
         mat[u, v] = 1
@@ -59,14 +75,12 @@ def _laplacian_matrix(graph: IndexedSimpleUndirectedGraph) -> Any:
 
 
 def adjacency_spectrum(graph: IndexedSimpleUndirectedGraph) -> list[tuple[str, int]]:
-    _require_spectral_graph(graph)
     mat = _adjacency_matrix(graph)
     eigenvals = mat.eigenvals()
     return [(str(val), int(mult)) for val, mult in eigenvals.items()]
 
 
 def laplacian_spectrum(graph: IndexedSimpleUndirectedGraph) -> list[tuple[str, int]]:
-    _require_spectral_graph(graph)
     eigenvals = _laplacian_matrix(graph).eigenvals()
     return [(str(val), int(mult)) for val, mult in eigenvals.items()]
 
