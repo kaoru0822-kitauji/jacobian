@@ -21,6 +21,10 @@ from jacobian.canonical import (
 )
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.matrices.analysis._models import (
+    _RATIONAL_SPECTRUM_CLAIM_BYTES,
+    _RATIONAL_SPECTRUM_MATRIX_ENTRY_BYTES,
+    _RATIONAL_SPECTRUM_RESULT_BASE_BYTES,
+    _RESULT_ENVELOPE_RESERVE_BYTES,
     MAX_RATIONAL_SPECTRUM_INPUT_DIGITS,
     MAX_RATIONAL_SPECTRUM_MINOR_DIGITS,
     MAX_RATIONAL_SPECTRUM_NONZERO_ENTRIES,
@@ -67,7 +71,14 @@ def _admit_rational_spectrum_claim(request: RationalSpectrumClaimRequest) -> Non
     minor_digits = order * order * shifted_digits + len(str(factorial(order))) + 1
     if minor_digits > MAX_RATIONAL_SPECTRUM_MINOR_DIGITS:
         raise _validation_error("budget_exceeded", "exact shifted-rank minors exceed the digit budget")
-    result_bytes = 2_048 + order * order * (2 * MAX_RATIONAL_SPECTRUM_INPUT_DIGITS + 96) + len(eigenvalues) * (4 * MAX_RATIONAL_SPECTRUM_INPUT_DIGITS + 256)
+    result_bytes = (
+        _RATIONAL_SPECTRUM_RESULT_BASE_BYTES
+        + order
+        * order
+        * (2 * MAX_RATIONAL_SPECTRUM_INPUT_DIGITS + _RATIONAL_SPECTRUM_MATRIX_ENTRY_BYTES)
+        + len(eigenvalues)
+        * (4 * MAX_RATIONAL_SPECTRUM_INPUT_DIGITS + _RATIONAL_SPECTRUM_CLAIM_BYTES)
+    )
     if result_bytes > MAX_RATIONAL_SPECTRUM_RESULT_BYTES:
         raise _validation_error("budget_exceeded", "rational spectrum ledger exceeds the result-size budget")
 
@@ -91,7 +102,7 @@ def _admit(request: Any) -> None:
                 retained_bytes = len(encode_strict_json(source.model_dump(mode="json")))
             except CanonicalizationError:
                 retained_bytes = output_limit + 1
-            if retained_bytes + 1_024 > output_limit:
+            if retained_bytes + _RESULT_ENVELOPE_RESERVE_BYTES > output_limit:
                 raise _validation_error("invariant_mismatch", "the inertia result retains its source matrix and would exceed the canonical output limit")
     except PydanticCustomError as exc:
         raise OperationDomainValidationError(location=("request",), code=exc.type, message=exc.message()) from exc
