@@ -127,14 +127,6 @@ def _admit_configuration(
             message=str(exc),
         )
 
-    keys = tuple((p.x.num, p.x.den, p.y.num, p.y.den) for p in points)
-    if len(keys) != len(set(keys)):
-        _reject_geometry_domain(
-            location=("points",),
-            code="geometry.point_set_coordinates_unique",
-            message="point-set coordinates must be unique",
-        )
-
     try:
         if output_bound:
             _require_circumradius_output_bound(points)
