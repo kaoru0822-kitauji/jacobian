@@ -4,8 +4,13 @@ from __future__ import annotations
 
 from fractions import Fraction
 
+import pytest
+
+from jacobian.math.graphs.values import SimpleUndirectedGraph
 from jacobian.math.probability._graph_connection_probability import (
     GRAPH_CONNECTION_PROBABILITY_OPERATION,
+    GraphConnectionProbabilityRequest,
+    GraphReliabilityEdgeProbability,
 )
 
 
@@ -25,3 +30,19 @@ def test_operation_preserves_the_complete_triangle_ledger() -> None:
     assert result.connection_probability.as_fraction() == Fraction(5, 8)
     assert result.visited_states == 8
     assert reparsed == result
+
+
+def test_probability_domain_is_admitted_at_operation_time() -> None:
+    graph = SimpleUndirectedGraph(vertices=("a", "b"), edges=(("a", "b"),))
+    request = GraphConnectionProbabilityRequest(
+        graph=graph,
+        edge_probabilities=(
+            GraphReliabilityEdgeProbability(
+                edge=("a", "b"), open_probability={"num": "2", "den": "1"}
+            ),
+        ),
+        terminals=("a", "b"),
+    )
+
+    with pytest.raises(ValueError, match=r"lie in \[0, 1\]"):
+        GRAPH_CONNECTION_PROBABILITY_OPERATION.run(request)

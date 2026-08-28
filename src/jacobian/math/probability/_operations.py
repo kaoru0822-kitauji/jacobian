@@ -34,6 +34,8 @@ from jacobian.math.probability._distribution import (
     require_input_distribution,
 )
 from jacobian.math.probability._gaussian import (
+    MAX_GAUSSIAN_EXPANSION_PATHS,
+    MAX_GAUSSIAN_RESULT_RATIONAL_DIGITS,
     ExactComplexRational,
     GaussianMomentContraction,
     GaussianPolynomialMomentRequest,
@@ -185,6 +187,40 @@ def _admit_convolution(request: FiniteConvolutionRequest) -> None:
             code="probability.convolution.output_bound",
             message=str(exc),
         ) from exc
+
+
+def _admit_gaussian_polynomial_moment(
+    request: GaussianPolynomialMomentRequest,
+) -> int:
+    """Admit the complete expansion and exact-result envelope."""
+    expansion_paths = len(request.polynomial.terms) ** request.order
+    if expansion_paths > MAX_GAUSSIAN_EXPANSION_PATHS:
+        raise ValueError(
+            "Gaussian polynomial power exceeds the "
+            f"{MAX_GAUSSIAN_EXPANSION_PATHS}-path expansion bound"
+        )
+    components = tuple(
+        component
+        for term in request.polynomial.terms
+        for component in (term.coefficient.real, term.coefficient.imaginary)
+    )
+    distinct_denominator_digits = sum(
+        len(denominator) for denominator in {component.den for component in components}
+    )
+    maximum_numerator_digits = max(
+        len(component.num.lstrip("-")) for component in components
+    )
+    result_digit_bound = (
+        request.order * (distinct_denominator_digits + maximum_numerator_digits)
+        + len(str(max(1, expansion_paths)))
+        + 64
+    )
+    if result_digit_bound > MAX_GAUSSIAN_RESULT_RATIONAL_DIGITS:
+        raise ValueError(
+            "Gaussian polynomial coefficient denominators can exceed the "
+            f"{MAX_GAUSSIAN_RESULT_RATIONAL_DIGITS}-digit result bound"
+        )
+    return expansion_paths
 
 
 def _distribution(values: dict[Fraction, Any]) -> FiniteRationalDistribution:
@@ -354,19 +390,10 @@ def _gaussian_polynomial_moment(
 ) -> GaussianPolynomialMomentResult:
     from flint import fmpq, fmpq_mpoly_ctx
 
+    expansion_paths = _admit_gaussian_polynomial_moment(request)
     zero = fmpq(0)
     one = fmpq(1)
     dimension = request.polynomial.variable_count
-    base = tuple(
-        (
-            term.exponents,
-            (
-                _fmpq(term.coefficient.real),
-                _fmpq(term.coefficient.imaginary),
-            ),
-        )
-        for term in request.polynomial.terms
-    )
 
     # Power the complex-coefficient polynomial via FLINT fmpq_mpoly binary
     # exponentiation.  A complex coefficient (a + b i) is represented as a
@@ -453,10 +480,10 @@ def _gaussian_polynomial_moment(
             )
         )
 
-    return GaussianPolynomialMomentResult(
+    return GaussianPolynomialMomentResult._from_kernel(
         order=request.order,
         moment=_complex_wire(total),
-        expansion_path_count=len(base) ** request.order,
+        expansion_path_count=expansion_paths,
         expanded_monomial_count=len(contractions),
         contractions=tuple(contractions),
     )
