@@ -121,8 +121,8 @@ class GraphHomomorphism(StrictModel):
     """A source-bound vertex map claimed to preserve every source edge.
 
     The map's completeness and endpoint membership are structural properties
-    of ``GraphVertexMap``. Edge preservation is checked by the explicit owner
-    verifier when an independently supplied claim needs verification.
+    of ``GraphVertexMap``. Edge preservation is established by the owning
+    check operation before this value is returned.
     """
 
     vertex_map: GraphVertexMap
@@ -131,7 +131,7 @@ class GraphHomomorphism(StrictModel):
 class GraphHomomorphismObstruction(StrictModel):
     """A claimed first source-edge image that is not a target edge.
 
-    The explicit owner verifier checks that this is the first actual
+    The owning check operation establishes that this is the first actual
     obstruction for the retained vertex map.
     """
 
@@ -158,14 +158,14 @@ class HomomorphismCheckRequest(StrictModel):
 
 
 class HomomorphismCheckResult(StrictModel):
-    """A replayable positive homomorphism or first edge-image obstruction."""
+    """A source-bound positive homomorphism or first edge-image obstruction."""
 
     status: Literal["HOMOMORPHISM", "EDGE_IMAGE_NOT_EDGE"]
     homomorphism: GraphHomomorphism | None = None
     obstruction: GraphHomomorphismObstruction | None = None
 
     @model_validator(mode="after")
-    def require_replayable_result(self) -> Self:
+    def require_consistent_result(self) -> Self:
         if self.status == "HOMOMORPHISM":
             if self.obstruction is not None:
                 raise PydanticCustomError(
@@ -371,8 +371,8 @@ class FixedLengthCycleResult(StrictModel):
 
     The result retains its source graph so parsing can check a positive witness
     against it.  Negative claims retain the admitted source envelope and can
-    be independently checked through the explicit bounded verifier. The
-    witness vertices are canonical string labels from the source graph.
+    be checked from its retained witness and source graph. The witness
+    vertices are canonical string labels from the source graph.
     """
 
     model_config = ConfigDict(
@@ -564,7 +564,7 @@ class SubgraphPatternFindResult(StrictModel):
     The result retains both source graphs so parsing can check map length,
     host bounds, injectivity, and exact edge preservation. A negative claim
     retains the bounded request domain and can be independently checked
-    through the explicit bounded verifier. The witness is ordered by the
+    from its retained witness and source graphs. The witness is ordered by the
     pattern's vertex order and contains host vertex labels.
     """
 

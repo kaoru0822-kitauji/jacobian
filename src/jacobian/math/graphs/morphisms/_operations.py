@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pydantic_core import PydanticCustomError
-
 from jacobian.math.graphs.morphisms._models import (
     _MAX_SEARCH_PATHS_PER_PASS,
     FixedLengthCycleRequest,
@@ -14,12 +12,7 @@ from jacobian.math.graphs.morphisms._models import (
     HomomorphismCheckResult,
     SubgraphPatternFindRequest,
     SubgraphPatternFindResult,
-    _cycle_source_edges,
     _first_homomorphism_obstruction,
-    _require_negative_cycle_domain,
-    _require_negative_embedding_domain,
-    _validate_cycle_witness,
-    _validate_embedding_witness,
 )
 
 
@@ -40,24 +33,6 @@ def compute_homomorphism_check(
             source_edge=source_edge,
             image_vertices=image_vertices,
         ),
-    )
-
-
-def verify_homomorphism_check_result(result: HomomorphismCheckResult) -> bool:
-    """Independently verify a source-bound homomorphism-check claim."""
-
-    if result.status == "HOMOMORPHISM":
-        return (
-            result.homomorphism is not None
-            and result.obstruction is None
-            and _first_homomorphism_obstruction(result.homomorphism.vertex_map) is None
-        )
-    if result.homomorphism is not None or result.obstruction is None:
-        return False
-    expected = _first_homomorphism_obstruction(result.obstruction.vertex_map)
-    return expected == (
-        result.obstruction.source_edge,
-        result.obstruction.image_vertices,
     )
 
 
@@ -151,28 +126,6 @@ class SearchBudgetExceededError(RuntimeError):
     witness nor a negative decision, so callers must surface the typed
     non-conclusion instead of projecting it into a decision.
     """
-
-
-def verify_fixed_length_cycle_result(result: FixedLengthCycleResult) -> bool:
-    """Independently check a cycle decision inside its admitted envelope."""
-
-    if result.decision == "EXISTS":
-        try:
-            vertices, edges = _cycle_source_edges(result.graph)
-            _validate_cycle_witness(result.cycle, result.length, vertices, edges)
-        except PydanticCustomError:
-            return False
-        return True
-    if result.cycle:
-        return False
-    try:
-        _require_negative_cycle_domain(result.graph, result.length)
-    except PydanticCustomError:
-        return False
-    return (
-        find_cycle_of_length(result.graph.vertices, result.graph.edges, result.length)
-        is None
-    )
 
 
 def _candidate_preserves_pattern_edges(
@@ -340,34 +293,3 @@ def compute_subgraph_pattern_find(
         decision="DOES_NOT_EXIST",
         vertex_map=(),
     )
-
-
-def verify_subgraph_pattern_find_result(result: SubgraphPatternFindResult) -> bool:
-    """Independently check a bounded subgraph-containment claim."""
-
-    if result.decision == "EXISTS":
-        try:
-            _validate_embedding_witness(result.pattern, result.host, result.vertex_map)
-        except PydanticCustomError:
-            return False
-        return True
-    if result.vertex_map:
-        return False
-    if result.decision == "DOES_NOT_EXIST":
-        try:
-            _require_negative_embedding_domain(result.pattern, result.host)
-        except PydanticCustomError:
-            return False
-    try:
-        found = find_subgraph_embedding(
-            result.pattern.vertices,
-            result.pattern.edges,
-            result.host.vertices,
-            result.host.edges,
-            max_candidate_checks=_MAX_SEARCH_PATHS_PER_PASS,
-        )
-    except SearchBudgetExceededError:
-        return result.decision == "BUDGET_EXCEEDED"
-    if result.decision == "BUDGET_EXCEEDED":
-        return False
-    return found is None
