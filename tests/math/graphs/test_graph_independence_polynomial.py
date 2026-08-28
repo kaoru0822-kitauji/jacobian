@@ -24,10 +24,7 @@ from jacobian.math.graphs.polynomials._models import (
     TreeIndependencePolynomialRequest,
     TreeIndependencePolynomialResult,
 )
-from jacobian.math.graphs.polynomials._operations import (
-    compute_independence_polynomial,
-    verify_tree_independence_polynomial_result,
-)
+from jacobian.math.graphs.polynomials._operations import compute_independence_polynomial
 from jacobian.math.graphs.values import SimpleUndirectedGraph
 from jacobian.math.polynomials._elementary_operations import (
     rational_polynomial_evaluate,
@@ -370,40 +367,6 @@ def test_result_rejects_negative_derived_values(
 
     with pytest.raises(ValidationError):
         TreeIndependencePolynomialResult.model_validate(valid)
-
-
-def test_explicit_verifier_rejects_a_structurally_consistent_forged_claim() -> None:
-    graph = _path(4)
-    forged = TreeIndependencePolynomialResult(
-        graph=graph,
-        coefficients=("1", "4", "2"),
-        polynomial=RationalPolynomial.model_validate(
-            {
-                "domain": "QQ",
-                "variables": ["x"],
-                "polynomial": {
-                    "terms": [
-                        {
-                            "coefficient": {"num": "2", "den": "1"},
-                            "exponents": [2],
-                        },
-                        {
-                            "coefficient": {"num": "4", "den": "1"},
-                            "exponents": [1],
-                        },
-                        {
-                            "coefficient": {"num": "1", "den": "1"},
-                            "exponents": [0],
-                        },
-                    ]
-                },
-            }
-        ),
-        independence_number=2,
-        independent_set_count="7",
-    )
-
-    assert not verify_tree_independence_polynomial_result(forged)
 
 
 def test_native_module_exports_canonical_value_and_dense_projection() -> None:

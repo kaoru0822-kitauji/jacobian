@@ -152,29 +152,10 @@ def compute_independence_polynomial(
     )
 
 
-def verify_tree_independence_polynomial_result(
-    result: TreeIndependencePolynomialResult,
-) -> bool:
-    """Verify an independently supplied exact tree-polynomial claim.
-
-    Construction trusts the already computed owner-local kernel output. This
-    separately callable path performs the one bounded coefficient replay for
-    a claim supplied through another boundary.
-    """
-
-    coefficients = independence_polynomial_coefficients(result.graph)
-    expected = TreeIndependencePolynomialResult._from_kernel(
-        graph=result.graph,
-        coefficients=coefficients,
-    )
-    return result == expected
-
-
 __all__ = [
     "compute_chromatic_polynomial",
     "compute_flow_polynomial",
     "compute_independence_polynomial",
     "compute_matching_polynomial",
     "compute_tutte_polynomial",
-    "verify_tree_independence_polynomial_result",
 ]
