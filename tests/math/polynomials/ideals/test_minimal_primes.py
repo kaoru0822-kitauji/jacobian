@@ -736,9 +736,7 @@ def test_coupling_generators_remove_infeasible_root_choices() -> None:
     partially_coupled = coupled_ideal(7, 2)
 
     with pytest.raises(OperationDomainValidationError):
-        compute_ideal_minimal_primes(
-            IdealMinimalPrimesRequest(ideal=partially_coupled)
-        )
+        compute_ideal_minimal_primes(IdealMinimalPrimesRequest(ideal=partially_coupled))
 
 
 def test_incompatible_extra_generators_block_certification_entirely() -> None:

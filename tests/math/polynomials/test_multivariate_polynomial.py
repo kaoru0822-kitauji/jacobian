@@ -151,7 +151,9 @@ class TestMultivariateGcd:
 
         left = _poly(("x",), (("1/1", (1,)),))
         right = _poly(("x",), (("1/1", (0,)),))
-        with pytest.raises(OperationDomainValidationError, match="at least two variables"):
+        with pytest.raises(
+            OperationDomainValidationError, match="at least two variables"
+        ):
             compute_multivariate_gcd(MultivariateGcdRequest(left=left, right=right))
 
     def test_gcd_rejects_mismatched_variables(self) -> None:
@@ -159,7 +161,9 @@ class TestMultivariateGcd:
 
         left = _poly(("x", "y"), (("1/1", (1, 1)),))
         right = _poly(("x", "z"), (("1/1", (1, 1)),))
-        with pytest.raises(OperationDomainValidationError, match="same ordered variables"):
+        with pytest.raises(
+            OperationDomainValidationError, match="same ordered variables"
+        ):
             compute_multivariate_gcd(MultivariateGcdRequest(left=left, right=right))
 
     def test_gcd_rejects_oversized_terms(self) -> None:
@@ -169,7 +173,9 @@ class TestMultivariateGcd:
         terms = tuple((f"{i + 1}/1", (i, 0)) for i in range(599, -1, -1))
         left = _poly(("x", "y"), terms[:600])
         right = _poly(("x", "y"), (("1/1", (0, 0)),))
-        with pytest.raises(OperationDomainValidationError, match="term operation budget"):
+        with pytest.raises(
+            OperationDomainValidationError, match="term operation budget"
+        ):
             compute_multivariate_gcd(MultivariateGcdRequest(left=left, right=right))
 
 
@@ -186,7 +192,9 @@ class TestMultivariateDivision:
         left = _poly(("x", "y"), (("1/1", (1, 0)),))
         right = _poly(("x", "y"), ())
         with pytest.raises(OperationDomainValidationError, match="divisor polynomial"):
-            compute_multivariate_division(MultivariateDivisionRequest(left=left, right=right))
+            compute_multivariate_division(
+                MultivariateDivisionRequest(left=left, right=right)
+            )
 
     def test_division_exact(self) -> None:
         """x^2*y / (x*y) = x, remainder 0."""
@@ -263,16 +271,24 @@ class TestMultivariateDivision:
 
         left = _poly(("x",), (("1/1", (2,)),))
         right = _poly(("x",), (("1/1", (1,)),))
-        with pytest.raises(OperationDomainValidationError, match="at least two variables"):
-            compute_multivariate_division(MultivariateDivisionRequest(left=left, right=right))
+        with pytest.raises(
+            OperationDomainValidationError, match="at least two variables"
+        ):
+            compute_multivariate_division(
+                MultivariateDivisionRequest(left=left, right=right)
+            )
 
     def test_division_rejects_mismatched_variables(self) -> None:
         """Polynomials must share the same ordered variable list."""
 
         left = _poly(("x", "y"), (("1/1", (1, 1)),))
         right = _poly(("a", "b"), (("1/1", (1, 1)),))
-        with pytest.raises(OperationDomainValidationError, match="same ordered variables"):
-            compute_multivariate_division(MultivariateDivisionRequest(left=left, right=right))
+        with pytest.raises(
+            OperationDomainValidationError, match="same ordered variables"
+        ):
+            compute_multivariate_division(
+                MultivariateDivisionRequest(left=left, right=right)
+            )
 
 
 # --------------------------------------------------------------------------- #
@@ -524,7 +540,9 @@ class TestMultivariateResultant:
 
         left = _poly(("x",), (("1/1", (2,)), ("-1/1", (0,))))
         right = _poly(("x",), (("1/1", (1,)), ("-2/1", (0,))))
-        with pytest.raises(OperationDomainValidationError, match="at least two variables"):
+        with pytest.raises(
+            OperationDomainValidationError, match="at least two variables"
+        ):
             compute_multivariate_resultant(
                 MultivariateResultantRequest(
                     left=left, right=right, elimination_variable="x"
@@ -943,7 +961,9 @@ class TestMultivariateSubresultantSequence:
         left = _poly(("x", "y"), (("1/1", (1, 0)),))
         right = _poly(("x", "z"), (("1/1", (1, 0)),))
 
-        with pytest.raises(OperationDomainValidationError, match="same ordered variables"):
+        with pytest.raises(
+            OperationDomainValidationError, match="same ordered variables"
+        ):
             compute_multivariate_subresultant_sequence(
                 MultivariateSubresultantSequenceRequest(
                     left=left,
@@ -1124,7 +1144,9 @@ class TestMultivariateSubresultantSequence:
             ),
         )
 
-        with pytest.raises(OperationDomainValidationError, match="term-pair work budget"):
+        with pytest.raises(
+            OperationDomainValidationError, match="term-pair work budget"
+        ):
             compute_multivariate_subresultant_sequence(
                 MultivariateSubresultantSequenceRequest(
                     left=left,

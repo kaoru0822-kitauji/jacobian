@@ -364,9 +364,7 @@ def test_threshold_work_is_admitted_and_rejected_before_solving() -> None:
         }
 
     admitted = DeterministicTerminalGame.model_validate(terminal_game(256))
-    compute_deterministic_terminal_game(
-        DeterministicTerminalGameRequest(game=admitted)
-    )
+    compute_deterministic_terminal_game(DeterministicTerminalGameRequest(game=admitted))
     rejected = DeterministicTerminalGame.model_validate(terminal_game(400))
     with pytest.raises(OperationDomainValidationError) as exc_info:
         compute_deterministic_terminal_game(
