@@ -247,8 +247,8 @@ class RationalConicParametrizationResult(StrictModel):
 
         The admitted line-pencil kernel establishes the parametrization
         identities. Parsing a serialized result must not reconstruct and replay
-        that computation; callers that deliberately receive an independently
-        supplied claim use the owner-private verifier instead.
+        that computation; independently supplied claims are outside this result
+        contract.
         """
         try:
             require_polynomial_budget(

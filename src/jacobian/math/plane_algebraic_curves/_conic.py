@@ -1,18 +1,17 @@
-"""Exact kernel and owner-private verification helpers for smooth rational conics."""
+"""Exact kernel and admission helpers for smooth rational conics."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from fractions import Fraction
 from math import gcd, lcm
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import sympy
 
 from jacobian._exact import require_bounded_rational
 from jacobian.math.polynomials._conversions import (
     rational_function_from_sympy,
-    rational_function_to_sympy,
     rational_polynomial_from_sympy,
     rational_polynomial_to_sympy,
 )
@@ -23,11 +22,6 @@ from jacobian.math.polynomials.values import (
     RationalPolynomial,
     require_polynomial_budget,
 )
-
-if TYPE_CHECKING:
-    from jacobian.math.plane_algebraic_curves._models import (
-        RationalConicParametrizationResult,
-    )
 
 MAX_CONIC_TERMS = 6
 MAX_CONIC_INPUT_DIGITS = 128
@@ -63,12 +57,6 @@ class _IntegerPolynomialHeight:
 class _ParametrizationHeightBounds:
     intermediate_digits: int
     result_coefficient_digits: int
-
-
-@dataclass(frozen=True, slots=True)
-class _ConicParametrizationDerivation:
-    data: ConicParametrizationData
-    projective_coordinates: tuple[Any, Any, Any]
 
 
 def _coefficient(polynomial: Any, exponents: tuple[int, int]) -> Any:
@@ -410,7 +398,7 @@ def _derive_rational_conic_parametrization(
     polynomial: RationalPolynomial,
     point: VariablePoint,
     parameter: PolynomialVariable,
-) -> _ConicParametrizationDerivation:
+) -> ConicParametrizationData:
     source, point_values, gradient, (a, b, c) = _source_data(polynomial, point)
     px, py = point_values
     fx, fy = gradient
@@ -467,13 +455,10 @@ def _derive_rational_conic_parametrization(
         maximum_coefficient_digits=MAX_CONIC_RESULT_DIGITS,
         label="finite-parameter denominator",
     )
-    return _ConicParametrizationDerivation(
-        data=ConicParametrizationData(
-            coordinates=(coordinate_x, coordinate_y),
-            inverse_parameter=inverse,
-            finite_parameter_denominator=denominator_value,
-        ),
-        projective_coordinates=(projective_x, projective_y, denominator),
+    return ConicParametrizationData(
+        coordinates=(coordinate_x, coordinate_y),
+        inverse_parameter=inverse,
+        finite_parameter_denominator=denominator_value,
     )
 
 
@@ -484,201 +469,7 @@ def derive_rational_conic_parametrization(
 ) -> ConicParametrizationData:
     """Construct the second intersection of a normalized line pencil."""
 
-    return _derive_rational_conic_parametrization(polynomial, point, parameter).data
-
-
-def _require_identity_mod_source(expression: Any, source: Any, *, label: str) -> None:
-    numerator_expression, _denominator_expression = sympy.fraction(
-        sympy.cancel(expression)
-    )
-    numerator = sympy.Poly(numerator_expression, *source.gens, domain=sympy.QQ)
-    _quotient, remainder = numerator.div(source)
-    if not remainder.is_zero:
-        raise ValueError(f"{label} must hold modulo the source conic")
-
-
-def _validate_inverse_chart(
-    source: Any,
-    point: VariablePoint,
-    parameter: PolynomialVariable,
-    data: ConicParametrizationData,
-) -> None:
-    source_symbols = source.gens
-    parameter_symbol = sympy.Symbol(parameter)
-    coordinate_expressions = tuple(
-        rational_function_to_sympy(coordinate) for coordinate in data.coordinates
-    )
-    inverse_expression = rational_function_to_sympy(data.inverse_parameter)
-    substitutions = dict(zip(source_symbols, coordinate_expressions, strict=True))
-    if (
-        sympy.cancel(
-            inverse_expression.subs(substitutions, simultaneous=True) - parameter_symbol
-        )
-        != 0
-    ):
-        raise ValueError("inverse chart does not recover the finite parameter")
-
-    for coordinate_expression, source_symbol in zip(
-        coordinate_expressions, source_symbols, strict=True
-    ):
-        _require_identity_mod_source(
-            coordinate_expression.subs(parameter_symbol, inverse_expression)
-            - source_symbol,
-            source,
-            label="parametrization after inverse",
-        )
-
-    px, py = _point_values(point)
-    substitutions_at_point = dict(zip(source_symbols, (px, py), strict=True))
-    fx, fy = (
-        source.diff(variable).eval(substitutions_at_point)
-        for variable in source_symbols
-    )
-    tangent = sympy.Poly(
-        fx * (source_symbols[0] - px) + fy * (source_symbols[1] - py),
-        *source_symbols,
-        domain=sympy.QQ,
-    )
-    _inverse_numerator, inverse_denominator_expression = sympy.fraction(
-        sympy.cancel(inverse_expression)
-    )
-    inverse_denominator = sympy.Poly(
-        inverse_denominator_expression, *source_symbols, domain=sympy.QQ
-    )
-    if inverse_denominator.monic() != tangent.monic():
-        raise ValueError("inverse denominator must be the tangent line at the point")
-
-    line_parameter = sympy.Dummy("line_parameter")
-    tangent_restriction = sympy.Poly(
-        sympy.expand(
-            source.as_expr().subs(
-                {
-                    source_symbols[0]: px - fy * line_parameter,
-                    source_symbols[1]: py + fx * line_parameter,
-                },
-                simultaneous=True,
-            )
-        ),
-        line_parameter,
-        domain=sympy.QQ,
-    )
-    if (
-        tangent_restriction.degree() != 2
-        or tangent_restriction.nth(0) != 0
-        or tangent_restriction.nth(1) != 0
-        or tangent_restriction.nth(2) == 0
-    ):
-        raise ValueError(
-            "inverse denominator must vanish on the conic only at the exceptional point"
-        )
-
-
-def _validate_projective_denominator_locus(
-    source: Any,
-    parameter: PolynomialVariable,
-    data: ConicParametrizationData,
-    projective_coordinates: tuple[Any, Any, Any],
-) -> None:
-    projective_x, projective_y, projective_z = projective_coordinates
-    reported_denominator = rational_polynomial_to_sympy(
-        data.finite_parameter_denominator
-    )
-    if reported_denominator != projective_z.monic():
-        raise ValueError(
-            "finite-parameter denominator must be the projective chart coordinate"
-        )
-
-    common_factor = projective_x.gcd(projective_y).gcd(projective_z)
-    if common_factor.degree() > 0:
-        raise ValueError("projective parametrization must have no finite base point")
-
-    projective_axis = sympy.Dummy("projective_axis")
-    projective_source = source.homogenize(projective_axis)
-    projective_substitution = {
-        source.gens[0]: projective_x.as_expr(),
-        source.gens[1]: projective_y.as_expr(),
-        projective_axis: projective_z.as_expr(),
-    }
-    if (
-        sympy.expand(
-            projective_source.as_expr().subs(projective_substitution, simultaneous=True)
-        )
-        != 0
-    ):
-        raise ValueError("projective parametrization must satisfy the source closure")
-
-    if tuple(str(generator) for generator in projective_z.gens) != (parameter,):
-        raise ValueError("projective chart coordinate must use the parameter axis")
-
-
-def _verify_rational_conic_parametrization_result(
-    result: RationalConicParametrizationResult,
-) -> None:
-    """Boundedly verify an independently supplied conic parametrization claim.
-
-    This owner-private path is deliberately separate from result parsing.  It
-    re-enters request admission before replaying the canonical construction and
-    its defining identities.
-    """
-
-    polynomial = result.source_polynomial
-    point = result.exceptional_point
-    parameter = result.parameter
-    data = ConicParametrizationData(
-        coordinates=result.coordinates,
-        inverse_parameter=result.inverse_parameter,
-        finite_parameter_denominator=result.finite_parameter_denominator,
-    )
-    validate_rational_conic_request(polynomial, point, parameter)
-
-    derivation = _derive_rational_conic_parametrization(polynomial, point, parameter)
-    if data != derivation.data:
-        raise ValueError(
-            "parametrization must match the gradient-normalized line pencil"
-        )
-
-    source = rational_polynomial_to_sympy(polynomial)
-    source_symbols = source.gens
-    parameter_symbol = sympy.Symbol(parameter)
-    coordinate_expressions = tuple(
-        rational_function_to_sympy(coordinate) for coordinate in data.coordinates
-    )
-    substituted = sympy.cancel(
-        source.as_expr().subs(
-            dict(zip(source_symbols, coordinate_expressions, strict=True)),
-            simultaneous=True,
-        )
-    )
-    if substituted != 0:
-        raise ValueError("parametrization does not satisfy the source conic identity")
-
-    _validate_inverse_chart(source, point, parameter, data)
-    _validate_projective_denominator_locus(
-        source,
-        parameter,
-        data,
-        derivation.projective_coordinates,
-    )
-
-    for coordinate_expression, exceptional_coordinate in zip(
-        coordinate_expressions,
-        _point_values(point),
-        strict=True,
-    ):
-        difference = sympy.cancel(coordinate_expression - exceptional_coordinate)
-        numerator, denominator = sympy.fraction(difference)
-        if numerator == 0:
-            continue
-        numerator_degree = sympy.Poly(
-            numerator, parameter_symbol, domain=sympy.QQ
-        ).degree()
-        denominator_degree = sympy.Poly(
-            denominator, parameter_symbol, domain=sympy.QQ
-        ).degree()
-        if numerator_degree >= denominator_degree:
-            raise ValueError(
-                "projective parameter infinity must map to the exceptional point"
-            )
+    return _derive_rational_conic_parametrization(polynomial, point, parameter)
 
 
 __all__ = [
