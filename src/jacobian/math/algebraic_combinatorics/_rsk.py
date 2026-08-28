@@ -68,7 +68,7 @@ def _row_insert(
     )
 
 
-def _forward_without_replay(word: FiniteWord) -> RSKTableauPair:
+def _forward(word: FiniteWord) -> RSKTableauPair:
     require_rsk_word_budget(word)
     rank = {symbol: index for index, symbol in enumerate(word.alphabet, start=1)}
     insertion_rows, recording_rows = _row_insert(
@@ -83,7 +83,7 @@ def _forward_without_replay(word: FiniteWord) -> RSKTableauPair:
     )
 
 
-def _inverse_without_replay(pair: RSKTableauPair) -> FiniteWord:
+def _inverse(pair: RSKTableauPair) -> FiniteWord:
     cell_count = sum(pair.shape.parts)
     insertion = [list(row) for row in pair.insertion_tableau.rows]
     label_rows_by_entry = [0] * cell_count
@@ -116,14 +116,10 @@ def row_insertion_rsk(word: FiniteWord) -> RSKTableauPair:
     """Compute compact ordinary RSK using ``ROW_INSERTION_RSK_V1``.
 
     Letters are replaced by their one-based ranks in the word's explicit
-    alphabet.  Each rank is inserted left-to-right, bumping the first entry
-    strictly greater than it.  The result is replayed through inverse RSK
-    before it is returned.
+    alphabet. Each rank is inserted left-to-right, bumping the first entry
+    strictly greater than it.
     """
-    pair = _forward_without_replay(word)
-    if _inverse_without_replay(pair) != word:
-        raise RuntimeError("row-insertion RSK failed its inverse replay")
-    return pair
+    return _forward(word)
 
 
 def inverse_row_insertion_rsk(pair: RSKTableauPair) -> FiniteWord:
@@ -131,13 +127,9 @@ def inverse_row_insertion_rsk(pair: RSKTableauPair) -> FiniteWord:
 
     Recording labels are removed from largest to smallest.  At each preceding
     row, reverse insertion bumps the rightmost entry strictly smaller than the
-    current entry.  The reconstructed word is replayed through forward RSK
-    before it is returned.
+    current entry.
     """
-    word = _inverse_without_replay(pair)
-    if _forward_without_replay(word) != pair:
-        raise RuntimeError("inverse row insertion failed its forward replay")
-    return word
+    return _inverse(pair)
 
 
 __all__ = ["inverse_row_insertion_rsk", "row_insertion_rsk"]

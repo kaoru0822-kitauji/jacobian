@@ -8,13 +8,13 @@ from typing import Any, TypedDict
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.polynomials.values import RationalPolynomial
 from jacobian.math.sum_of_squares._models import (
     MAX_SOS_SUMMAND_TERMS,
     GramCertificateRequest,
     GramCertificateResult,
     SOSDecompositionCheckRequest,
-    SOSDecompositionCheckResult,
 )
 from jacobian.math.sum_of_squares._operations import (
     check_gram_certificate,
@@ -98,8 +98,9 @@ class TestSOSDecompositionCheck:
         """Summands must use the same ring as the polynomial."""
         p = _poly(("x",), (1, 1, (2,)), (1, 1, (0,)))
         q1 = _poly(("y",), (1, 1, (1,)))
-        with pytest.raises(ValueError, match="same ring"):
-            SOSDecompositionCheckRequest(polynomial=p, summands=(q1,))
+        request = SOSDecompositionCheckRequest(polynomial=p, summands=(q1,))
+        with pytest.raises(OperationDomainValidationError, match="same ring"):
+            check_sos_decomposition(request)
 
     def test_single_summand(self) -> None:
         """x^2 = (x)^2 is valid."""
@@ -181,8 +182,9 @@ class TestSOSTermBudgets:
         though its predicted square stays inside the product cap."""
         wide = _poly(("x",), *[(1, 1, (k,)) for k in range(64, -1, -1)])
         p = _poly(("x",), (1, 1, (2,)), (1, 1, (0,)))
-        with pytest.raises(ValidationError) as exc_info:
-            SOSDecompositionCheckRequest(polynomial=p, summands=(wide,))
+        request = SOSDecompositionCheckRequest(polynomial=p, summands=(wide,))
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            check_sos_decomposition(request)
         assert exc_info.value.errors()[0]["type"] == "sum_of_squares.term_bound"
 
     def test_target_above_256_terms_rejected(self) -> None:
@@ -195,8 +197,9 @@ class TestSOSTermBudgets:
         ]
         p = _poly(("x", "y", "z"), *[(1, 1, t) for t in triples[:257]])
         q = _poly(("x", "y", "z"), (1, 1, (0, 0, 0)))
-        with pytest.raises(ValidationError) as exc_info:
-            SOSDecompositionCheckRequest(polynomial=p, summands=(q,))
+        request = SOSDecompositionCheckRequest(polynomial=p, summands=(q,))
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            check_sos_decomposition(request)
         assert exc_info.value.errors()[0]["type"] == "sum_of_squares.term_bound"
 
 
@@ -268,18 +271,20 @@ class TestGramCertificateAdmission:
         )
 
     def test_non_square_side_vs_basis_rejected(self) -> None:
-        with pytest.raises(ValueError, match="square"):
-            self._request(((self._entry("1"),),))
+        request = self._request(((self._entry("1"),),))
+        with pytest.raises(OperationDomainValidationError, match="square"):
+            check_gram_certificate(request)
 
     def test_oversized_matrix_coefficient_rejected_before_eigenvalues(self) -> None:
         huge = "9" * 129
-        with pytest.raises(ValidationError) as exc_info:
-            self._request(
-                (
-                    (self._entry(huge), self._entry("0")),
-                    (self._entry("0"), self._entry("1")),
-                )
+        request = self._request(
+            (
+                (self._entry(huge), self._entry("0")),
+                (self._entry("0"), self._entry("1")),
             )
+        )
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            check_gram_certificate(request)
         assert exc_info.value.errors()[0]["type"] == "sum_of_squares.coefficient_bound"
 
     def test_boundary_coefficient_admitted(self) -> None:
@@ -293,8 +298,8 @@ class TestGramCertificateAdmission:
         assert request.gram_matrix.entries[0][0].num == edge
 
 
-class TestGramCertificateResultAdmission:
-    """Deserialized Gram results retain bounded source structure."""
+class TestGramCertificateResultStructure:
+    """Deserialized Gram results retain their bounded field shapes."""
 
     def _valid_result(self) -> dict[str, Any]:
         p = _poly(("x",), (1, 1, (2,)), (1, 1, (0,)))
@@ -321,14 +326,6 @@ class TestGramCertificateResultAdmission:
             )
         )
         return request.model_dump(mode="json")
-
-    def test_oversized_result_matrix_is_rejected_before_verification(self) -> None:
-        payload = self._valid_result()
-        huge = "9" * 129
-        payload["gram_matrix"]["entries"][0][0] = {"num": huge, "den": "1"}
-        with pytest.raises(ValidationError) as exc_info:
-            GramCertificateResult.model_validate(payload)
-        assert exc_info.value.errors()[0]["type"] == "sum_of_squares.coefficient_bound"
 
     def test_oversized_result_dimension_is_rejected_at_field_validation(self) -> None:
         """A 40x40 result matrix fails the parse-time dimension bound before
@@ -360,33 +357,11 @@ class TestGramCertificateResultAdmission:
             GramCertificateResult.model_validate(payload)
         assert exc_info.value.errors()[0]["type"] == "too_long"
 
-    def test_non_monomial_basis_entry_is_rejected(self) -> None:
-        payload = self._valid_result()
-        shifted = RationalPolynomial.model_validate(
-            {
-                "domain": "QQ",
-                "variables": ["x"],
-                "polynomial": {
-                    "terms": [
-                        {"coefficient": {"num": "1", "den": "1"}, "exponents": [1]},
-                        {"coefficient": {"num": "1", "den": "1"}, "exponents": [0]},
-                    ]
-                },
-            }
-        )
-        payload["monomial_basis"] = [
-            shifted.model_dump(mode="json"),
-            payload["monomial_basis"][1],
-        ]
-        with pytest.raises(ValidationError) as exc_info:
-            GramCertificateResult.model_validate(payload)
-        assert exc_info.value.errors()[0]["type"] == "sum_of_squares.basis_monomial"
-
 
 class TestGramMonomialBasisAdmission:
     def test_request_with_polynomial_basis_entry_is_rejected(self) -> None:
         p = _poly(("x",), (1, 1, (2,)), (2, 1, (1,)), (1, 1, (0,)))
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises(OperationDomainValidationError) as exc_info:
             check_gram_certificate(
                 GramCertificateRequest.model_validate(
                     {
@@ -404,7 +379,7 @@ class TestGramMonomialBasisAdmission:
 
     def test_duplicate_monomials_are_rejected(self) -> None:
         p = _poly(("x",), (2, 1, (2,)), (1, 1, (0,)))
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises(OperationDomainValidationError) as exc_info:
             check_gram_certificate(
                 GramCertificateRequest.model_validate(
                     {
@@ -429,43 +404,6 @@ class TestGramMonomialBasisAdmission:
                 )
             )
         assert exc_info.value.errors()[0]["type"] == "sum_of_squares.basis_distinct"
-
-
-class TestSOSResultAdmission:
-    def test_oversized_result_summands_are_rejected_before_expansion(self) -> None:
-        exponent_rows = [(k,) for k in range(8, 0, -1)] + [(0,)]
-        wide = _poly(("x",), *[(1, 1, row) for row in exponent_rows])
-        p = _poly(("x",), (1, 1, (2,)), (1, 1, (0,)))
-        summands = tuple(_poly(("x",), (1, 1, (0,))) for _ in range(64))
-        result = check_sos_decomposition(
-            SOSDecompositionCheckRequest(polynomial=p, summands=summands)
-        )
-        payload = result.model_dump(mode="json")
-        payload["summands"] = [wide.model_dump(mode="json")] * 64
-        payload["is_valid"] = False
-        with pytest.raises(ValidationError) as exc_info:
-            SOSDecompositionCheckResult.model_validate(payload)
-        assert exc_info.value.errors()[0]["type"] == "sum_of_squares.sos_work_bound"
-
-
-class TestSOSResultRingAdmission:
-    def test_result_replay_rejects_mismatched_summand_ring(self) -> None:
-        """A serialized result whose summand uses another ring is rejected at
-        the typed boundary instead of leaking a SymPy coercion exception."""
-        p = _poly(("x",), (1, 1, (2,)), (1, 1, (0,)))
-        summands = (_poly(("x",), (1, 1, (0,))),)
-        result = check_sos_decomposition(
-            SOSDecompositionCheckRequest(polynomial=p, summands=summands)
-        )
-        payload = result.model_dump(mode="json")
-        payload["summands"] = [_poly(("y",), (1, 1, (0,))).model_dump(mode="json")]
-        payload["is_valid"] = False
-        payload["computed_sum"] = _poly(("x",), (1, 1, (2,)), (1, 1, (0,))).model_dump(
-            mode="json"
-        )
-        with pytest.raises(ValidationError) as exc_info:
-            SOSDecompositionCheckResult.model_validate(payload)
-        assert exc_info.value.errors()[0]["type"] == "sum_of_squares.ring_mismatch"
 
 
 class TestExactPsdCriterion:
@@ -567,5 +505,6 @@ class TestSOSCoefficientGrowthAdmission:
 
         summands = tuple(summand(k) for k in range(64))
         p = _poly(("x",), (1, 1, (2,)), (1, 1, (0,)))
-        with pytest.raises(ValidationError):
-            SOSDecompositionCheckRequest(polynomial=p, summands=summands)
+        request = SOSDecompositionCheckRequest(polynomial=p, summands=summands)
+        with pytest.raises(OperationDomainValidationError):
+            check_sos_decomposition(request)

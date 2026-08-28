@@ -232,7 +232,6 @@ ignore_imports = [
     "jacobian.math.polynomials.ideals._singular -> jacobian.process",
     # Exact multivariate factorization runs in a bounded killable worker.
     "jacobian.math.polynomials.multivariate._factor_backend -> jacobian.process",
-    # Generic-fiber certificate replay runs in a bounded killable worker.
 ]
 
 [[tool.importlinter.contracts]]

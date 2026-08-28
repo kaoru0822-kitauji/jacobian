@@ -90,7 +90,7 @@ class ConjugatePartitionResult(StrictModel):
 class RSKPermutationRequest(StrictModel):
     __doc__ = f"""One strict bounded permutation for ordinary row-insertion RSK.
 
-    Forward and replayed reverse insertion each perform at most
+    Forward insertion performs at most
     ``N(N-1)/2 <= {
         MAX_RSK_PERMUTATION_LENGTH * (MAX_RSK_PERMUTATION_LENGTH - 1) // 2
     }`` binary row searches, with at most
@@ -166,7 +166,7 @@ class RSKResult(StrictModel):
 class RSKWordRequest(StrictModel):
     __doc__ = f"""One bounded word under the ordinary row-insertion convention.
 
-    Forward and replayed reverse insertion each perform at most
+    Forward insertion performs at most
     ``N(N-1)/2 <= {MAX_RSK_WORD_LENGTH * (MAX_RSK_WORD_LENGTH - 1) // 2}``
     binary row searches, with at most
     {MAX_RSK_ROW_SEARCH_COMPARISONS} integer comparisons per search for

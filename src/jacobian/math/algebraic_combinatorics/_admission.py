@@ -31,12 +31,12 @@ ADMISSIONS: tuple[OperationAdmission, ...] = (
     OperationAdmission(
         "combinatorics.rsk.permutation.compute",
         AdmissionDecision.KEEP,
-        "source-bound strict permutation RSK with canonical standard tableaux, shape, and replayed LIS/LDS lengths",
+        "source-bound strict permutation RSK with canonical standard tableaux, shape, and derived LIS/LDS lengths",
     ),
     OperationAdmission(
         "tableau.rsk.word.compute",
         AdmissionDecision.KEEP,
-        "compact exact word RSK pair with an explicit alphabet and replayed row-insertion convention",
+        "compact exact word RSK pair with an explicit alphabet and row-insertion convention",
     ),
     OperationAdmission(
         "tableau.rsk.inverse_word.compute",

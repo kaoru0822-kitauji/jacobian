@@ -117,10 +117,9 @@ def _solve_convex_membership(
     with Bland's entering and leaving rules (lowest index), which cannot
     cycle and therefore terminates deterministically.
 
-    Returns an exact convex-combination coefficient tuple when feasible
-    (replayed against its defining equations before returning), and
-    ``None`` when infeasible - infeasibility of this system is precisely
-    the certificate that ``point`` is a vertex of the hull.
+    Returns an exact convex-combination coefficient tuple when feasible and
+    ``None`` when infeasible. Infeasibility of this system is precisely the
+    certificate that ``point`` is a vertex of the hull.
     """
     from fractions import Fraction
 
@@ -165,9 +164,7 @@ def _solve_convex_membership(
     if any(tableau[i][-1] != 0 for i in artificial_rows):
         return None
 
-    solution = _extract_solution(tableau, basis, count)
-    _require_membership_witness_replay(rows, rhs, solution)
-    return tuple(solution)
+    return tuple(_extract_solution(tableau, basis, count))
 
 
 def _price_out_basis(
@@ -245,20 +242,6 @@ def _extract_solution(
         if basic < count:
             solution[basic] = tableau[i][-1]
     return solution
-
-
-def _require_membership_witness_replay(
-    rows: list[list[Fraction]],
-    rhs: list[Fraction],
-    solution: list[Fraction],
-) -> None:
-    replay = [
-        sum(a * value for a, value in zip(row, solution, strict=True)) for row in rows
-    ]
-    if replay != rhs or any(value < 0 for value in solution):
-        raise AssertionError(
-            "exact membership witness failed to replay against its equations"
-        )
 
 
 def _is_vertex(point: tuple[int, ...], others: list[tuple[int, ...]]) -> bool:

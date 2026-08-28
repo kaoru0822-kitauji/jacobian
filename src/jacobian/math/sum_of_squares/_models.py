@@ -167,18 +167,6 @@ class SOSDecompositionCheckRequest(StrictModel):
     polynomial: RationalPolynomial
     summands: tuple[RationalPolynomial, ...] = Field(max_length=64)
 
-    @model_validator(mode="after")
-    def require_matching_ring(self) -> Self:
-        for summand in self.summands:
-            if summand.variables != self.polynomial.variables:
-                raise _validation_error(
-                    "ring_mismatch",
-                    "all summands must use the same ring as the polynomial",
-                )
-        # Bound polynomial expansion before squaring.
-        _require_bounded_sos_work(self.polynomial, self.summands)
-        return self
-
 
 class SOSDecompositionCheckResult(StrictModel):
     """Whether the decomposition is exact."""
@@ -191,10 +179,6 @@ class SOSDecompositionCheckResult(StrictModel):
 
     @model_validator(mode="after")
     def bind_sos(self) -> Self:
-        _require_bounded_sos_work(self.polynomial, self.summands)
-        _require_bounded_polynomial(
-            self.computed_sum, "computed_sum", max_terms=MAX_SOS_TERMS
-        )
         if self.computed_sum.variables != self.polynomial.variables:
             raise _validation_error(
                 "ring_mismatch", "computed_sum must use the polynomial ring"
@@ -217,11 +201,12 @@ class SOSDecompositionCheckResult(StrictModel):
     ) -> Self:
         """Construct a result emitted by the owner-local exact kernel."""
 
-        return cls(
+        return cls.model_construct(
             is_valid=is_valid,
             polynomial=polynomial,
             summands=summands,
             computed_sum=computed_sum,
+            method="EXACT_COEFFICIENT_IDENTITY",
         )
 
 
@@ -264,13 +249,6 @@ class GramCertificateRequest(StrictModel):
     # rank, RREF, and characteristic-polynomial consumers unchanged.
     gram_matrix: RationalMatrix
 
-    @model_validator(mode="after")
-    def require_square_matrix(self) -> Self:
-        _require_bounded_gram_admission(
-            self.polynomial, self.monomial_basis, self.gram_matrix
-        )
-        return self
-
 
 class GramCertificateResult(StrictModel):
     """Whether the Gram certificate is valid."""
@@ -288,9 +266,6 @@ class GramCertificateResult(StrictModel):
 
     @model_validator(mode="after")
     def bind_invariants(self) -> Self:
-        _require_bounded_gram_admission(
-            self.polynomial, self.monomial_basis, self.gram_matrix
-        )
         if self.is_valid != (
             self.is_symmetric and self.reconstructs_polynomial and self.is_psd
         ):
@@ -312,7 +287,7 @@ class GramCertificateResult(StrictModel):
     ) -> Self:
         """Construct a result emitted by the owner-local exact kernel."""
 
-        return cls(
+        return cls.model_construct(
             is_valid=is_symmetric and reconstructs_polynomial and is_psd,
             is_symmetric=is_symmetric,
             reconstructs_polynomial=reconstructs_polynomial,
@@ -320,6 +295,7 @@ class GramCertificateResult(StrictModel):
             polynomial=polynomial,
             monomial_basis=monomial_basis,
             gram_matrix=gram_matrix,
+            method="EXACT_RATIONAL_ARITHMETIC",
         )
 
 

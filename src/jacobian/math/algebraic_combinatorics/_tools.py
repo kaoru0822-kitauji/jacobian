@@ -118,7 +118,7 @@ ALGEBRAIC_COMBINATORICS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
         "Compute the Robinson-Schensted-Knuth correspondence for one "
         "strict permutation of 1..n, returning the exact source, canonical "
         "standard P/Q tableaux, canonical shape, and LIS/LDS lengths under "
-        "ROW_INSERTION_RSK_V1. The result independently replays row insertion.",
+        "ROW_INSERTION_RSK_V1.",
         RSKPermutationRequest,
         RSKResult,
         compute_rsk_permutation,
@@ -173,8 +173,7 @@ ALGEBRAIC_COMBINATORICS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
         "Reconstruct the unique bounded word from a compatible semistandard "
         "insertion tableau and standard recording tableau under "
         "ROW_INSERTION_RSK_V1. Tableau entries are one-based ranks in the "
-        "pair's exact ordered alphabet, and the reconstructed word is replayed "
-        "through forward RSK before it is returned as the canonical finite "
+        "pair's exact ordered alphabet; the result is the canonical finite "
         "word value.",
         RSKInverseWordRequest,
         FiniteWord,

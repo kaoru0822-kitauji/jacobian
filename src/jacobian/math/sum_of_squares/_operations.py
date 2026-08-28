@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import sympy
+from pydantic_core import PydanticCustomError
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.polynomials._conversions import (
     rational_polynomial_from_sympy,
     rational_polynomial_to_sympy,
@@ -15,14 +19,25 @@ from jacobian.math.sum_of_squares._models import (
     GramCertificateResult,
     SOSDecompositionCheckRequest,
     SOSDecompositionCheckResult,
+    _require_bounded_gram_admission,
+    _require_bounded_sos_work,
 )
 
 
-def _check_sos_invariants(
+def _admit(operation: Callable[[], None]) -> None:
+    try:
+        operation()
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=(), code=exc.type, message=exc.message()
+        ) from exc
+
+
+def _compute_sos_sum(
     polynomial: RationalPolynomial,
     summands: tuple[RationalPolynomial, ...],
 ) -> tuple[bool, RationalPolynomial]:
-    """Exact replay of SOS decomposition check."""
+    """Compute the exact sum and coefficient-identity outcome."""
     p_sympy = rational_polynomial_to_sympy(polynomial).as_expr()
     sum_expr = sympy.Integer(0)
     for summand in summands:
@@ -44,7 +59,8 @@ def check_sos_decomposition(
     request: SOSDecompositionCheckRequest,
 ) -> SOSDecompositionCheckResult:
     """Check that p = q_1^2 + ... + q_r^2 by exact coefficient identity."""
-    is_valid, computed_sum = _check_sos_invariants(request.polynomial, request.summands)
+    _admit(lambda: _require_bounded_sos_work(request.polynomial, request.summands))
+    is_valid, computed_sum = _compute_sos_sum(request.polynomial, request.summands)
     return SOSDecompositionCheckResult._from_kernel(
         is_valid=is_valid,
         polynomial=request.polynomial,
@@ -53,12 +69,12 @@ def check_sos_decomposition(
     )
 
 
-def _check_gram_invariants(
+def _compute_gram_checks(
     polynomial: RationalPolynomial,
     monomial_basis: tuple[RationalPolynomial, ...],
     gram_matrix: tuple[tuple[CanonicalRational, ...], ...],
 ) -> tuple[bool, bool, bool]:
-    """Exact replay of Gram certificate checks."""
+    """Compute the exact Gram-certificate checks."""
     matrix = sympy.Matrix(
         [[sympy.Rational(c.as_fraction()) for c in row] for row in gram_matrix]
     )
@@ -106,7 +122,12 @@ def check_gram_certificate(
     request: GramCertificateRequest,
 ) -> GramCertificateResult:
     """Check that p = z^T Q z with Q symmetric PSD over QQ."""
-    is_symmetric, reconstructs, is_psd = _check_gram_invariants(
+    _admit(
+        lambda: _require_bounded_gram_admission(
+            request.polynomial, request.monomial_basis, request.gram_matrix
+        )
+    )
+    is_symmetric, reconstructs, is_psd = _compute_gram_checks(
         request.polynomial, request.monomial_basis, request.gram_matrix.entries
     )
     return GramCertificateResult._from_kernel(

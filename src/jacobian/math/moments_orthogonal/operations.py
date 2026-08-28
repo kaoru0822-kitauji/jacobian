@@ -328,8 +328,8 @@ def orthogonal_polynomials_from_moments(
 ) -> OrthogonalPolynomialFamily:
     """Pure Gram-Schmidt kernel over one bounded moment sequence.
 
-    Shared by the MCP handler, the request admission replay, and the native
-    API so no caller performs the exact projection twice.
+    Shared by request admission, MCP execution, and the native API so no caller
+    performs the exact projection twice.
     """
 
     def inner(coeffs_a: list[Fraction], coeffs_b: list[Fraction]) -> Fraction:
@@ -524,7 +524,7 @@ def _kernel_coefficient_matrix(
 ) -> list[list[Fraction]]:
     """Exact bivariate coefficient matrix of K_m from p_0..p_m.
 
-    Shared by execution and the kernel value's defining-sum replay.
+    Shared by execution and the explicit kernel-value verifier.
     """
     size = m + 1
     coefficients = [[Fraction(0)] * size for _ in range(size)]

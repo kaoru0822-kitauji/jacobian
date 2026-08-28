@@ -76,12 +76,12 @@ def compute_rsk_permutation(request: RSKPermutationRequest) -> RSKResult:
 
 
 def compute_rsk_word(request: RSKWordRequest) -> RSKTableauPair:
-    """Compute and inverse-replay the compact ordinary-word RSK pair."""
+    """Compute the compact ordinary-word RSK pair."""
     return row_insertion_rsk(request.word)
 
 
 def compute_inverse_rsk_word(
     request: RSKInverseWordRequest,
 ) -> FiniteWord:
-    """Reverse-insert and forward-replay one ordinary-word RSK pair."""
+    """Reverse-insert one ordinary-word RSK pair."""
     return inverse_row_insertion_rsk(request.pair)

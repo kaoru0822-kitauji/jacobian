@@ -76,9 +76,8 @@ def symbolic_matrix_multiply(
 ) -> SymbolicMatrix:
     """Return the exact product of compatible symbolic matrices.
 
-    Native callers supply domain-owned ``SymbolicMatrix`` values. Their
-    complete work and result admission is replayed before the private SymPy
-    matrix multiplication runs.
+    Native callers supply domain-owned ``SymbolicMatrix`` values. The owner
+    admits complete work and result size before private SymPy multiplication.
     """
 
     _require_symbolic_product_admission(left, right)
