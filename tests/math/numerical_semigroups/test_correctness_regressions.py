@@ -5,7 +5,7 @@ from __future__ import annotations
 from itertools import combinations, pairwise
 from math import lcm
 
-from tests.math.numerical_semigroups._support import numerical_semigroup_error
+from tests.math.numerical_semigroups._support import operation_domain_error
 
 from jacobian.math.numerical_semigroups._element_invariant_models import (
     ElementCatenaryDegreeRequest,
@@ -14,10 +14,16 @@ from jacobian.math.numerical_semigroups._element_invariant_models import (
 )
 from jacobian.math.numerical_semigroups._element_invariant_operations import (
     compute_element_catenary_degree,
+    compute_element_delta_set,
+    compute_element_elasticity,
 )
 from jacobian.math.numerical_semigroups._factorization_models import (
     FactorizationComputeRequest,
     FactorizationGraphComputeRequest,
+)
+from jacobian.math.numerical_semigroups._factorization_operations import (
+    compute_factorization_graph,
+    compute_factorizations,
 )
 from jacobian.math.numerical_semigroups._global_invariant_models import (
     BettiElementsRequest,
@@ -299,24 +305,34 @@ def test_degenerate_free_semigroup_has_empty_relations_and_invariants() -> None:
 
 
 def test_nonmember_and_undefined_element_invariants_fail_closed() -> None:
-    with numerical_semigroup_error():
-        ElementDeltaSetRequest(generators=("3", "5"), value="7")
-    with numerical_semigroup_error():
-        ElementElasticityRequest(generators=("3", "5"), value="0")
-    with numerical_semigroup_error():
-        ElementCatenaryDegreeRequest(generators=("3", "5"), value="7")
+    with operation_domain_error():
+        compute_element_delta_set(
+            ElementDeltaSetRequest(generators=("3", "5"), value="7")
+        )
+    with operation_domain_error():
+        compute_element_elasticity(
+            ElementElasticityRequest(generators=("3", "5"), value="0")
+        )
+    with operation_domain_error():
+        compute_element_catenary_degree(
+            ElementCatenaryDegreeRequest(generators=("3", "5"), value="7")
+        )
 
 
 def test_completeness_boundaries_reject_unmaterializable_claims() -> None:
-    with numerical_semigroup_error():
-        FactorizationComputeRequest(
-            generators=("6", "7", "8", "9", "10", "11"), value="220"
+    with operation_domain_error():
+        compute_factorizations(
+            FactorizationComputeRequest(
+                generators=("6", "7", "8", "9", "10", "11"), value="220"
+            )
         )
-    with numerical_semigroup_error():
-        FactorizationGraphComputeRequest(
-            generators=("6", "7", "8", "9", "10", "11"), value="200"
+    with operation_domain_error():
+        compute_factorization_graph(
+            FactorizationGraphComputeRequest(
+                generators=("6", "7", "8", "9", "10", "11"), value="200"
+            )
         )
-    with numerical_semigroup_error():
-        BettiElementsRequest(generators=("499", "500"))
-    with numerical_semigroup_error():
-        DeltaSetRequest(generators=("10", "11", "34", "35"))
+    with operation_domain_error():
+        compute_betti_elements(BettiElementsRequest(generators=("499", "500")))
+    with operation_domain_error():
+        compute_delta_set(DeltaSetRequest(generators=("10", "11", "34", "35")))

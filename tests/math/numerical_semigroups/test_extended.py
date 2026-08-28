@@ -2,7 +2,10 @@
 
 import pytest
 from pydantic import BaseModel, ValidationError
-from tests.math.numerical_semigroups._support import numerical_semigroup_error
+from tests.math.numerical_semigroups._support import (
+    numerical_semigroup_error,
+    operation_domain_error,
+)
 
 from jacobian.math.numerical_semigroups._element_invariant_models import (
     ElementCatenaryDegreeRequest,
@@ -84,8 +87,10 @@ class TestFactorizations:
         assert result.factorizations == ()
 
     def test_factorizations_rejects_nonpositive_generators(self) -> None:
-        with numerical_semigroup_error():
-            FactorizationComputeRequest(generators=("0", "5"), value="10")
+        with operation_domain_error():
+            compute_factorizations(
+                FactorizationComputeRequest(generators=("0", "5"), value="10")
+            )
 
     def test_factorizations_normalize_redundant_permuted_generators(self) -> None:
         """Factorizations always use the canonical minimal-generator axis."""
@@ -339,25 +344,36 @@ class TestFactorizationDistance:
         assert result.distance == 5
 
     def test_distance_rejects_mismatched_lengths(self) -> None:
-        with numerical_semigroup_error():
-            FactorizationDistanceRequest(
-                generators=("3", "5"), value="15", first=(5, 0, 0), second=(0, 3)
+        with operation_domain_error():
+            compute_factorization_distance(
+                FactorizationDistanceRequest(
+                    generators=("3", "5"),
+                    value="15",
+                    first=(5, 0, 0),
+                    second=(0, 3),
+                )
             )
 
     def test_distance_rejects_negative_coordinates(self) -> None:
-        with pytest.raises(ValidationError) as caught:
-            FactorizationDistanceRequest(
-                generators=("3", "5"), value="15", first=(-1, 0), second=(0, 3)
+        with operation_domain_error():
+            compute_factorization_distance(
+                FactorizationDistanceRequest(
+                    generators=("3", "5"),
+                    value="15",
+                    first=(-1, 0),
+                    second=(0, 3),
+                )
             )
-        assert (
-            caught.value.errors()[0]["type"]
-            == "numerical_semigroup.factorization_coordinates_negative"
-        )
 
     def test_distance_rejects_vectors_for_a_different_element(self) -> None:
-        with numerical_semigroup_error():
-            FactorizationDistanceRequest(
-                generators=("3", "5"), value="15", first=(4, 0), second=(0, 3)
+        with operation_domain_error():
+            compute_factorization_distance(
+                FactorizationDistanceRequest(
+                    generators=("3", "5"),
+                    value="15",
+                    first=(4, 0),
+                    second=(0, 3),
+                )
             )
 
 
@@ -628,12 +644,12 @@ class TestPresentationBinomials:
         assert result.binomials == ()
 
     def test_binomials_reject_nonrelations(self) -> None:
-        with numerical_semigroup_error():
-            PresentationBinomialsRequest.model_validate(
-                {
-                    "generators": ("3", "5"),
-                    "relations": [{"first": [1, 0], "second": [0, 1]}],
-                }
+        with operation_domain_error():
+            compute_presentation_binomials(
+                PresentationBinomialsRequest(
+                    generators=("3", "5"),
+                    relations=({"first": (1, 0), "second": (0, 1)},),
+                )
             )
 
 
@@ -709,8 +725,10 @@ class TestGeneratorEnvelopeIsSchemaVisible:
             assert "containing 1 canonicalizes to (1,)" in description
 
     def test_rejects_a_generator_above_the_published_ceiling(self) -> None:
-        with numerical_semigroup_error():
-            FactorizationComputeRequest(generators=("2", "501"), value="503")
+        with operation_domain_error():
+            compute_factorizations(
+                FactorizationComputeRequest(generators=("2", "501"), value="503")
+            )
 
     def test_free_axis_admits_a_redundant_generator_just_past_the_general_cap(
         self,

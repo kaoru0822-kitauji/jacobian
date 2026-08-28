@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from jacobian.canonical import format_canonical_integer, parse_canonical_integer
-from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.numerical_semigroups._algorithms import apery_set, belongs
 from jacobian.math.numerical_semigroups._models import (
     _require_bounded_value,
     _require_minimal_generators,
+    _run_admission,
 )
 from jacobian.math.numerical_semigroups._summary_models import (
     NumericalSemigroupSummaryRequest,
@@ -88,14 +88,11 @@ def compute_summary(
 ) -> NumericalSemigroupSummaryResult:
     """Compute the exact summary on the canonical minimal generator axis."""
 
-    try:
-        generators = _require_minimal_generators(request.generators)
-    except ValueError as error:
-        raise OperationDomainValidationError(
-            location=("generators",),
-            code="numerical_semigroup.summary_admission",
-            message=str(error),
-        ) from error
+    generators = _run_admission(
+        "summary",
+        ("generators",),
+        lambda: _require_minimal_generators(request.generators),
+    )
     return _compute_summary(list(generators))
 
 
@@ -104,15 +101,16 @@ def compute_membership(
 ) -> SemigroupMembershipResult:
     """Check whether one admitted integer belongs to the generated semigroup."""
 
-    try:
-        generators = _require_minimal_generators(request.generators)
-        _require_bounded_value(generators, request.value)
-    except ValueError as error:
-        raise OperationDomainValidationError(
-            location=("generators",),
-            code="numerical_semigroup.membership_admission",
-            message=str(error),
-        ) from error
+    generators = _run_admission(
+        "membership",
+        ("generators",),
+        lambda: _require_minimal_generators(request.generators),
+    )
+    _run_admission(
+        "membership",
+        ("value",),
+        lambda: _require_bounded_value(generators, request.value),
+    )
     value = parse_canonical_integer(request.value)
     return SemigroupMembershipResult(
         value=request.value,

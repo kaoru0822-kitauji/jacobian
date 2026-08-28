@@ -27,6 +27,7 @@ from jacobian.math.numerical_semigroups._models import (
     _require_materializable_factorizations,
     _require_member,
     _require_minimal_generators,
+    _run_admission,
 )
 
 
@@ -35,9 +36,19 @@ def compute_element_delta_set(
 ) -> ElementDeltaSetResult:
     """Compute the complete factorization-length delta set of one element."""
 
-    atoms = _require_minimal_generators(request.generators)
-    value = _require_bounded_value(atoms, request.value)
-    _require_member(atoms, value)
+    atoms = _run_admission(
+        "element_delta_set",
+        ("generators",),
+        lambda: _require_minimal_generators(request.generators),
+    )
+    value = _run_admission(
+        "element_delta_set",
+        ("value",),
+        lambda: _require_bounded_value(atoms, request.value),
+    )
+    _run_admission(
+        "element_delta_set", ("value",), lambda: _require_member(atoms, value)
+    )
     lengths = factorization_lengths(atoms, value)
     return ElementDeltaSetResult._from_kernel(
         value=request.value,
@@ -52,11 +63,23 @@ def compute_element_elasticity(
 ) -> ElementElasticityResult:
     """Compute the exact factorization-length elasticity of one element."""
 
-    atoms = _require_minimal_generators(request.generators)
-    value = _require_bounded_value(atoms, request.value)
-    if value <= 0:
-        raise ValueError("elasticity is defined here only for positive elements")
-    _require_member(atoms, value)
+    atoms = _run_admission(
+        "element_elasticity",
+        ("generators",),
+        lambda: _require_minimal_generators(request.generators),
+    )
+    value = _run_admission(
+        "element_elasticity",
+        ("value",),
+        lambda: _require_bounded_value(atoms, request.value),
+    )
+
+    def admit_element() -> None:
+        if value <= 0:
+            raise ValueError("elasticity is defined here only for positive elements")
+        _require_member(atoms, value)
+
+    _run_admission("element_elasticity", ("value",), admit_element)
     minimum_length, maximum_length = factorization_length_extrema(atoms, value)
     return ElementElasticityResult._from_kernel(
         value=request.value,
@@ -72,10 +95,28 @@ def compute_element_catenary_degree(
 ) -> ElementCatenaryDegreeResult:
     """Compute the catenary degree from the complete factorization family."""
 
-    atoms = _require_minimal_generators(request.generators)
-    value = _require_bounded_value(atoms, request.value)
-    _require_member(atoms, value)
-    _require_materializable_factorizations(atoms, value, MAX_GRAPH_FACTORIZATIONS)
+    atoms = _run_admission(
+        "element_catenary_degree",
+        ("generators",),
+        lambda: _require_minimal_generators(request.generators),
+    )
+    value = _run_admission(
+        "element_catenary_degree",
+        ("value",),
+        lambda: _require_bounded_value(atoms, request.value),
+    )
+    _run_admission(
+        "element_catenary_degree",
+        ("value",),
+        lambda: _require_member(atoms, value),
+    )
+    _run_admission(
+        "element_catenary_degree",
+        ("value",),
+        lambda: _require_materializable_factorizations(
+            atoms, value, MAX_GRAPH_FACTORIZATIONS
+        ),
+    )
     family = factorizations(atoms, value)
     return ElementCatenaryDegreeResult._from_kernel(
         value=request.value,

@@ -29,6 +29,7 @@ from jacobian.math.numerical_semigroups._models import (
     _require_global_catenary_bound,
     _require_global_delta_bound,
     _require_minimal_generators,
+    _run_admission,
 )
 
 
@@ -43,8 +44,14 @@ def compute_betti_elements(
 ) -> BettiElementsResult:
     """Compute the complete Betti-element profile on the minimal atom axis."""
 
-    atoms = _require_minimal_generators(request.generators)
-    _require_global_betti_bound(atoms)
+    atoms = _run_admission(
+        "betti_elements",
+        ("generators",),
+        lambda: _require_minimal_generators(request.generators),
+    )
+    _run_admission(
+        "betti_elements", ("generators",), lambda: _require_global_betti_bound(atoms)
+    )
     apery, candidates, disconnected = betti_data(atoms)
     return BettiElementsResult._from_kernel(
         minimal_generators=tuple(format_canonical_integer(atom) for atom in atoms),
@@ -57,8 +64,14 @@ def compute_betti_elements(
 def compute_delta_set(request: DeltaSetRequest) -> DeltaSetResult:
     """Compute the complete global delta set through its periodicity bound."""
 
-    atoms = _require_minimal_generators(request.generators)
-    _require_global_delta_bound(atoms)
+    atoms = _run_admission(
+        "delta_set",
+        ("generators",),
+        lambda: _require_minimal_generators(request.generators),
+    )
+    _run_admission(
+        "delta_set", ("generators",), lambda: _require_global_delta_bound(atoms)
+    )
     periodicity_bound = delta_periodicity_bound(atoms)
     checked_through = periodicity_bound + atoms[-1] - 1
     all_deltas: set[int] = set()
@@ -85,7 +98,11 @@ def compute_delta_set(request: DeltaSetRequest) -> DeltaSetResult:
 def compute_elasticity(request: ElasticityRequest) -> ElasticityResult:
     """Compute the exact global elasticity from the minimal atom extrema."""
 
-    atoms = _require_minimal_generators(request.generators)
+    atoms = _run_admission(
+        "elasticity",
+        ("generators",),
+        lambda: _require_minimal_generators(request.generators),
+    )
     return ElasticityResult(
         elasticity=format_canonical_rational(Fraction(atoms[-1], atoms[0])),
         smallest_generator=format_canonical_integer(atoms[0]),
@@ -98,8 +115,16 @@ def compute_catenary_degree(
 ) -> CatenaryDegreeResult:
     """Compute the global catenary degree from its complete Betti witnesses."""
 
-    atoms = _require_minimal_generators(request.generators)
-    _require_global_catenary_bound(atoms)
+    atoms = _run_admission(
+        "catenary_degree",
+        ("generators",),
+        lambda: _require_minimal_generators(request.generators),
+    )
+    _run_admission(
+        "catenary_degree",
+        ("generators",),
+        lambda: _require_global_catenary_bound(atoms),
+    )
     _, _, disconnected = betti_data(atoms)
     degrees = tuple(
         BettiCatenaryDegree(

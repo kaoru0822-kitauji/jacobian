@@ -25,6 +25,7 @@ from jacobian.math.numerical_semigroups._models import (
     _require_bounded_value,
     _require_materializable_factorizations,
     _require_minimal_generators,
+    _run_admission,
 )
 
 
@@ -76,9 +77,23 @@ def compute_factorizations(
 ) -> FactorizationComputeResult:
     """Compute the complete admitted factorization family Z(s)."""
 
-    atoms = _require_minimal_generators(request.generators)
-    value = _require_bounded_value(atoms, request.value)
-    _require_materializable_factorizations(atoms, value, MAX_MATERIALIZED_FACTORIZATIONS)
+    atoms = _run_admission(
+        "factorizations",
+        ("generators",),
+        lambda: _require_minimal_generators(request.generators),
+    )
+    value = _run_admission(
+        "factorizations",
+        ("value",),
+        lambda: _require_bounded_value(atoms, request.value),
+    )
+    _run_admission(
+        "factorizations",
+        ("value",),
+        lambda: _require_materializable_factorizations(
+            atoms, value, MAX_MATERIALIZED_FACTORIZATIONS
+        ),
+    )
     generators = list(atoms)
     minimal_generators = tuple(
         format_canonical_integer(generator) for generator in generators
@@ -104,8 +119,16 @@ def compute_factorization_lengths(
 ) -> FactorizationLengthsComputeResult:
     """Compute the complete admitted factorization-length set."""
 
-    atoms = _require_minimal_generators(request.generators)
-    _require_bounded_value(atoms, request.value)
+    atoms = _run_admission(
+        "factorization_lengths",
+        ("generators",),
+        lambda: _require_minimal_generators(request.generators),
+    )
+    _run_admission(
+        "factorization_lengths",
+        ("value",),
+        lambda: _require_bounded_value(atoms, request.value),
+    )
     generators = list(atoms)
     value = parse_canonical_integer(request.value)
     minimal_generators = tuple(
@@ -132,14 +155,33 @@ def compute_factorization_distance(
 ) -> FactorizationDistanceResult:
     """Compute the standard distance between two admitted factorizations."""
 
-    generators = _require_minimal_generators(request.generators)
-    value = _require_bounded_value(generators, request.value)
-    if any(c < 0 for c in (*request.first, *request.second)):
-        raise ValueError("factorization coordinates must be non-negative")
-    if len(request.first) != len(generators) or len(request.second) != len(generators):
-        raise ValueError("factorization coordinates must match the minimal generating system")
-    if any(sum(c * g for c, g in zip(f, generators, strict=True)) != value for f in (request.first, request.second)):
-        raise ValueError("both factorizations must evaluate to the declared value")
+    generators = _run_admission(
+        "factorization_distance",
+        ("generators",),
+        lambda: _require_minimal_generators(request.generators),
+    )
+    value = _run_admission(
+        "factorization_distance",
+        ("value",),
+        lambda: _require_bounded_value(generators, request.value),
+    )
+
+    def admit_coordinates() -> None:
+        if any(c < 0 for c in (*request.first, *request.second)):
+            raise ValueError("factorization coordinates must be non-negative")
+        if len(request.first) != len(generators) or len(request.second) != len(
+            generators
+        ):
+            raise ValueError(
+                "factorization coordinates must match the minimal generating system"
+            )
+        if any(
+            sum(c * g for c, g in zip(f, generators, strict=True)) != value
+            for f in (request.first, request.second)
+        ):
+            raise ValueError("both factorizations must evaluate to the declared value")
+
+    _run_admission("factorization_distance", ("first", "second"), admit_coordinates)
     first = tuple(request.first)
     second = tuple(request.second)
     return FactorizationDistanceResult(
@@ -155,9 +197,23 @@ def compute_factorization_graph(
 ) -> FactorizationGraphComputeResult:
     """Compute the exact shared-support graph of an admitted family."""
 
-    atoms = _require_minimal_generators(request.generators)
-    value = _require_bounded_value(atoms, request.value)
-    _require_materializable_factorizations(atoms, value, MAX_GRAPH_FACTORIZATIONS)
+    atoms = _run_admission(
+        "factorization_graph",
+        ("generators",),
+        lambda: _require_minimal_generators(request.generators),
+    )
+    value = _run_admission(
+        "factorization_graph",
+        ("value",),
+        lambda: _require_bounded_value(atoms, request.value),
+    )
+    _run_admission(
+        "factorization_graph",
+        ("value",),
+        lambda: _require_materializable_factorizations(
+            atoms, value, MAX_GRAPH_FACTORIZATIONS
+        ),
+    )
     generators = list(atoms)
     minimal_generators = tuple(
         format_canonical_integer(generator) for generator in generators

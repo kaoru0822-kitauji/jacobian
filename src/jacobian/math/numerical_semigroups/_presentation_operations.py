@@ -11,6 +11,7 @@ from jacobian.math.numerical_semigroups._algorithms import (
 from jacobian.math.numerical_semigroups._models import (
     _require_global_betti_bound,
     _require_minimal_generators,
+    _run_admission,
 )
 from jacobian.math.numerical_semigroups._presentation_models import (
     MinimalPresentationRelation,
@@ -27,8 +28,16 @@ def compute_minimal_presentation(
 ) -> MinimalPresentationResult:
     """Build minimal spanning relations for every Betti fiber."""
 
-    generators = _require_minimal_generators(request.generators)
-    _require_global_betti_bound(generators)
+    generators = _run_admission(
+        "minimal_presentation",
+        ("generators",),
+        lambda: _require_minimal_generators(request.generators),
+    )
+    _run_admission(
+        "minimal_presentation",
+        ("generators",),
+        lambda: _require_global_betti_bound(generators),
+    )
     _, _, disconnected = betti_data(generators)
     predecessors = factorization_predecessors(generators, max(disconnected, default=0))
     relations: list[MinimalPresentationRelation] = []
@@ -64,14 +73,32 @@ def compute_presentation_binomials(
 ) -> PresentationBinomialsResult:
     """Project homogeneous presentation relations to sparse binomials."""
 
-    generators = _require_minimal_generators(request.generators)
-    for relation in request.relations:
-        if len(relation.first) != len(generators):
-            raise ValueError("relation coordinates must match the minimal generating system")
-        first_degree = sum(c * g for c, g in zip(relation.first, generators, strict=True))
-        second_degree = sum(c * g for c, g in zip(relation.second, generators, strict=True))
-        if first_degree != second_degree:
-            raise ValueError("relation factorizations must have the same semigroup degree")
+    generators = _run_admission(
+        "presentation_binomials",
+        ("generators",),
+        lambda: _require_minimal_generators(request.generators),
+    )
+
+    def admit_relations() -> None:
+        for relation in request.relations:
+            if len(relation.first) != len(generators) or len(relation.second) != len(
+                generators
+            ):
+                raise ValueError(
+                    "relation coordinates must match the minimal generating system"
+                )
+            first_degree = sum(
+                c * g for c, g in zip(relation.first, generators, strict=True)
+            )
+            second_degree = sum(
+                c * g for c, g in zip(relation.second, generators, strict=True)
+            )
+            if first_degree != second_degree:
+                raise ValueError(
+                    "relation factorizations must have the same semigroup degree"
+                )
+
+    _run_admission("presentation_binomials", ("relations",), admit_relations)
     return PresentationBinomialsResult(
         minimal_generators=tuple(
             format_canonical_integer(value) for value in generators

@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from pydantic import Field
 from pydantic_core import PydanticCustomError
 
 from jacobian._exact import CanonicalInteger
 from jacobian._models import StrictModel
 from jacobian.canonical import parse_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.numerical_semigroups._algorithms import (
     apery_set,
     belongs,
@@ -28,12 +31,33 @@ _GENERAL_GENERATOR_ENVELOPE = f"General-path generators are each at most {MAX_GE
 _GENERAL_ELEMENT_ENVELOPE = f"General-path elements are at most {MAX_ELEMENT}; on the free axis (1,), their exact results remain constant-cardinality."
 
 
+def _run_admission[T](
+    operation: str,
+    location: tuple[str | int, ...],
+    action: Callable[[], T],
+) -> T:
+    """Run owner admission and expose one typed native-operation failure."""
+
+    try:
+        return action()
+    except ValueError as error:
+        code = getattr(error, "type", None)
+        if not isinstance(code, str):
+            code = f"numerical_semigroup.{operation}_admission"
+        raise OperationDomainValidationError(
+            location=location,
+            code=code,
+            message=str(error),
+        ) from error
+
+
 class NumericalSemigroupRequest(StrictModel):
     """Canonical positive-generator presentation shared by semigroup owners."""
 
     generators: tuple[CanonicalInteger, ...] = Field(
         min_length=1, max_length=MAX_GENERATORS
     )
+
 
 def _validation_error(message: str) -> PydanticCustomError:
     """Build a stable owner-local error for a failed semigroup invariant."""
