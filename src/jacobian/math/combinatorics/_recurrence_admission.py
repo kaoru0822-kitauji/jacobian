@@ -15,7 +15,6 @@ from jacobian.math.combinatorics._recurrence_models import (
 
 _LOG10_2 = math.log10(2)
 _FRACTION_WIRE_FIXED_BYTES = 20
-_RESIDUAL_WIRE_FIXED_BYTES = 32
 _RESULT_WIRE_FIXED_BYTES = 1_024
 
 
@@ -60,23 +59,22 @@ def _admit_linear_recurrence(
 ) -> tuple[Fraction, ...]:
     """Prepare the recurrence prefix while checking its exact result envelope."""
 
-    replay = [
+    prefix = [
         value.as_fraction() for value in initial_values[: requested_indices[-1] + 1]
     ]
     coefficient_values = tuple(value.as_fraction() for value in coefficients)
-    while len(replay) <= requested_indices[-1]:
-        replay.append(
+    while len(prefix) <= requested_indices[-1]:
+        prefix.append(
             sum(
                 (
-                    coefficient * replay[len(replay) - offset]
+                    coefficient * prefix[len(prefix) - offset]
                     for offset, coefficient in enumerate(coefficient_values, start=1)
                 ),
                 start=Fraction(),
             )
         )
-    minimum_size = sum(_minimum_fraction_wire_bytes(value) for value in replay)
-    minimum_size += sum(
-        _minimum_fraction_wire_bytes(replay[index]) for index in requested_indices
+    minimum_size = sum(
+        _minimum_fraction_wire_bytes(prefix[index]) for index in requested_indices
     )
     if (
         minimum_size + _RESULT_WIRE_FIXED_BYTES
@@ -85,23 +83,21 @@ def _admit_linear_recurrence(
         raise ValueError(
             "the exact combinatorics result exceeds the bounded result limit"
         )
-    for value in replay:
+    for value in prefix:
         _require_bounded_fraction(value, label="recurrence result")
     _validate_result_inline_size(
         {
             "coefficient_convention": coefficient_convention,
             "determinism": "DETERMINISTIC",
             "exactness": "EXACT_RATIONAL",
-            "replay_prefix": [_fraction_wire(value) for value in replay],
-            "replay_scope_end": requested_indices[-1],
             "scope": scope,
             "values": [
-                {"index": index, "value": _fraction_wire(replay[index])}
+                {"index": index, "value": _fraction_wire(prefix[index])}
                 for index in requested_indices
             ],
         }
     )
-    return tuple(replay)
+    return tuple(prefix)
 
 
 def _admit_p_recursive_recurrence(
@@ -112,8 +108,8 @@ def _admit_p_recursive_recurrence(
     polynomial_convention: str,
     scope: str,
     requested_indices: tuple[int, ...],
-) -> tuple[tuple[Fraction, ...], tuple[tuple[int, Fraction], ...]]:
-    """Prepare a P-recursive prefix and its exact residual ledger."""
+) -> tuple[Fraction, ...]:
+    """Prepare a P-recursive prefix and check the projected result envelope."""
 
     polynomials = tuple(
         tuple(value.as_fraction() for value in polynomial)
@@ -131,15 +127,15 @@ def _admit_p_recursive_recurrence(
         )
 
     end = requested_indices[-1]
-    replay = [value.as_fraction() for value in initial_values[: end + 1]]
+    prefix = [value.as_fraction() for value in initial_values[: end + 1]]
     requested_index_set = set(requested_indices)
     minimum_size = _RESULT_WIRE_FIXED_BYTES + sum(
-        _minimum_fraction_wire_bytes(value) * (1 + (index in requested_index_set))
-        for index, value in enumerate(replay)
+        _minimum_fraction_wire_bytes(value)
+        for index, value in enumerate(prefix)
+        if index in requested_index_set
     )
-    residuals: list[tuple[int, Fraction]] = []
-    while len(replay) <= end:
-        index = len(replay)
+    while len(prefix) <= end:
+        index = len(prefix)
         coefficients = tuple(
             polynomial_value(polynomial, index) for polynomial in polynomials
         )
@@ -150,7 +146,7 @@ def _admit_p_recursive_recurrence(
         next_value = (
             -sum(
                 (
-                    coefficients[offset] * replay[index - offset]
+                    coefficients[offset] * prefix[index - offset]
                     for offset in range(1, order + 1)
                 ),
                 start=Fraction(),
@@ -161,27 +157,13 @@ def _admit_p_recursive_recurrence(
             next_value,
             label="polynomial-coefficient recurrence result",
         )
-        minimum_size += _minimum_fraction_wire_bytes(next_value) * (
-            1 + (index in requested_index_set)
-        )
-        minimum_size += _RESIDUAL_WIRE_FIXED_BYTES
+        if index in requested_index_set:
+            minimum_size += _minimum_fraction_wire_bytes(next_value)
         if minimum_size > MAX_COMBINATORICS_RESULT_ARTIFACT_BYTES:
             raise ValueError(
                 "the exact combinatorics result exceeds the bounded result limit"
             )
-        replay.append(next_value)
-        residuals.append(
-            (
-                index,
-                sum(
-                    (
-                        coefficients[offset] * replay[index - offset]
-                        for offset in range(order + 1)
-                    ),
-                    start=Fraction(),
-                ),
-            )
-        )
+        prefix.append(next_value)
     _validate_result_inline_size(
         {
             "coefficient_convention": coefficient_convention,
@@ -189,20 +171,14 @@ def _admit_p_recursive_recurrence(
             "determinism": "DETERMINISTIC",
             "exactness": "EXACT_RATIONAL",
             "recurrence_order": order,
-            "replay_prefix": [_fraction_wire(value) for value in replay],
-            "residuals": [
-                {"index": index, "value": _fraction_wire(value)}
-                for index, value in residuals
-            ],
-            "replay_scope_end": end,
             "scope": scope,
             "values": [
-                {"index": index, "value": _fraction_wire(replay[index])}
+                {"index": index, "value": _fraction_wire(prefix[index])}
                 for index in requested_indices
             ],
         }
     )
-    return tuple(replay), tuple(residuals)
+    return tuple(prefix)
 
 
 def _admit_series(

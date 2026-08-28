@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
-from copy import deepcopy
 
 import pytest
 from pydantic import ValidationError
@@ -42,9 +41,6 @@ def _result() -> dict[str, object]:
             {"index": index, "value": _q(value)}
             for index, value in enumerate((1, 1, 2, 3))
         ],
-        "replay_prefix": [_q(value) for value in (1, 1, 2, 3)],
-        "residuals": [{"index": index, "value": _q(0)} for index in range(2, 4)],
-        "replay_scope_end": 3,
         "exactness": "EXACT_RATIONAL",
         "determinism": "DETERMINISTIC",
     }
@@ -70,13 +66,6 @@ def _result() -> dict[str, object]:
             {"index": 1, "value": _q(1)},
             {"index": 3, "value": _q(3)},
         ],
-        [
-            {"index": 0, "value": _q(1)},
-            {"index": 1, "value": _q(1)},
-            {"index": 2, "value": _q(2)},
-            {"index": 3, "value": _q(3)},
-            {"index": 4, "value": _q(5)},
-        ],
     ],
 )
 def test_polynomial_recurrence_result_rejects_malformed_prefix_projection(
@@ -89,40 +78,10 @@ def test_polynomial_recurrence_result_rejects_malformed_prefix_projection(
         PolynomialCoefficientRecurrenceEvaluationResult.model_validate(result)
 
 
-@pytest.mark.parametrize(
-    "residuals",
-    [
-        [],
-        [{"index": 2, "value": _q(0)}],
-        [
-            {"index": 2, "value": _q(0)},
-            {"index": 2, "value": _q(0)},
-        ],
-        [
-            {"index": 2, "value": _q(0)},
-            {"index": 4, "value": _q(0)},
-        ],
-        [
-            {"index": 3, "value": _q(0)},
-            {"index": 2, "value": _q(0)},
-        ],
-    ],
-)
-def test_polynomial_recurrence_result_requires_exact_residual_range(
-    residuals: list[dict[str, object]],
-) -> None:
-    result = deepcopy(_result())
-    result["residuals"] = residuals
-
-    with raises_code("combinatorics.recurrence_invariant"):
-        PolynomialCoefficientRecurrenceEvaluationResult.model_validate(result)
-
-
-def test_polynomial_recurrence_result_accepts_complete_bound_replay() -> None:
+def test_polynomial_recurrence_result_accepts_canonical_projection() -> None:
     result = PolynomialCoefficientRecurrenceEvaluationResult.model_validate(_result())
 
     assert tuple(item.index for item in result.values) == (0, 1, 2, 3)
-    assert tuple(item.index for item in result.residuals) == (2, 3)
 
 
 def test_result_size_translation_preserves_owner_local_reason() -> None:

@@ -197,11 +197,6 @@ class LinearRecurrenceEvaluationResult(StrictModel):
         min_length=1,
         max_length=MAX_LINEAR_RECURRENCE_INDEX + 1,
     )
-    replay_prefix: tuple[CanonicalRational, ...] = Field(
-        min_length=1,
-        max_length=MAX_LINEAR_RECURRENCE_INDEX + 1,
-    )
-    replay_scope_end: StrictInt = Field(ge=0, le=MAX_LINEAR_RECURRENCE_INDEX)
     exactness: Literal["EXACT_RATIONAL"] = "EXACT_RATIONAL"
     determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
 
@@ -214,47 +209,23 @@ class LinearRecurrenceEvaluationResult(StrictModel):
         ],
         scope: Literal["PREFIX", "INDICES"],
         values: tuple[IndexedRationalValue, ...],
-        replay_prefix: tuple[CanonicalRational, ...],
-        replay_scope_end: int,
     ) -> Self:
         return cls.model_construct(
             coefficient_convention=coefficient_convention,
             scope=scope,
             values=values,
-            replay_prefix=replay_prefix,
-            replay_scope_end=replay_scope_end,
             exactness="EXACT_RATIONAL",
             determinism="DETERMINISTIC",
         )
 
     @model_validator(mode="after")
-    def require_complete_replay_prefix(self) -> Self:
-        if len(self.replay_prefix) != self.replay_scope_end + 1:
-            raise _recurrence_validation_error(
-                "replay_prefix must cover indices 0 through replay_scope_end"
-            )
-        for value in self.replay_prefix:
-            _require_bounded_rational(
-                value,
-                max_digits=MAX_COMBINATORICS_RESULT_RATIONAL_DIGITS,
-                label="recurrence replay value",
-            )
+    def require_canonical_projection(self) -> Self:
         indices = tuple(item.index for item in self.values)
         if any(left >= right for left, right in pairwise(indices)):
             raise _recurrence_validation_error(
                 "result indices must be strictly increasing"
             )
-        if indices[-1] != self.replay_scope_end:
-            raise _recurrence_validation_error(
-                "the greatest requested index must bind replay_scope_end"
-            )
-        if any(item.value != self.replay_prefix[item.index] for item in self.values):
-            raise _recurrence_validation_error(
-                "indexed values must match the recurrence replay prefix"
-            )
-        if self.scope == "PREFIX" and indices != tuple(
-            range(self.replay_scope_end + 1)
-        ):
+        if self.scope == "PREFIX" and indices != tuple(range(len(indices))):
             raise _recurrence_validation_error(
                 "PREFIX results must contain consecutive indices from zero"
             )
@@ -345,13 +316,6 @@ class PolynomialCoefficientRecurrenceEvaluationResult(StrictModel):
     values: tuple[IndexedRationalValue, ...] = Field(
         min_length=1, max_length=MAX_LINEAR_RECURRENCE_INDEX + 1
     )
-    replay_prefix: tuple[CanonicalRational, ...] = Field(
-        min_length=1, max_length=MAX_LINEAR_RECURRENCE_INDEX + 1
-    )
-    residuals: tuple[IndexedRationalValue, ...] = Field(
-        max_length=MAX_LINEAR_RECURRENCE_INDEX + 1
-    )
-    replay_scope_end: StrictInt = Field(ge=0, le=MAX_LINEAR_RECURRENCE_INDEX)
     exactness: Literal["EXACT_RATIONAL"] = "EXACT_RATIONAL"
     determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
 
@@ -366,9 +330,6 @@ class PolynomialCoefficientRecurrenceEvaluationResult(StrictModel):
         scope: Literal["PREFIX", "INDICES"],
         recurrence_order: int,
         values: tuple[IndexedRationalValue, ...],
-        replay_prefix: tuple[CanonicalRational, ...],
-        residuals: tuple[IndexedRationalValue, ...],
-        replay_scope_end: int,
     ) -> Self:
         return cls.model_construct(
             coefficient_convention=coefficient_convention,
@@ -376,52 +337,20 @@ class PolynomialCoefficientRecurrenceEvaluationResult(StrictModel):
             scope=scope,
             recurrence_order=recurrence_order,
             values=values,
-            replay_prefix=replay_prefix,
-            residuals=residuals,
-            replay_scope_end=replay_scope_end,
             exactness="EXACT_RATIONAL",
             determinism="DETERMINISTIC",
         )
 
     @model_validator(mode="after")
-    def require_complete_replay(self) -> Self:
-        if len(self.replay_prefix) != self.replay_scope_end + 1:
-            raise _recurrence_validation_error(
-                "replay_prefix must cover the complete bounded scope"
-            )
+    def require_canonical_projection(self) -> Self:
         indices = tuple(item.index for item in self.values)
         if any(left >= right for left, right in pairwise(indices)):
             raise _recurrence_validation_error(
                 "result indices must be strictly increasing"
             )
-        if indices[-1] != self.replay_scope_end:
-            raise _recurrence_validation_error(
-                "the greatest requested index must bind replay_scope_end"
-            )
-        if any(item.value != self.replay_prefix[item.index] for item in self.values):
-            raise _recurrence_validation_error(
-                "indexed values must match the recurrence replay prefix"
-            )
         if self.scope == "PREFIX" and indices != tuple(range(len(indices))):
             raise _recurrence_validation_error(
                 "PREFIX results must contain consecutive indices from zero"
-            )
-        for value in self.replay_prefix:
-            _require_bounded_rational(
-                value,
-                max_digits=MAX_COMBINATORICS_RESULT_RATIONAL_DIGITS,
-                label="polynomial-coefficient recurrence replay value",
-            )
-        residual_indices = tuple(item.index for item in self.residuals)
-        if residual_indices != tuple(
-            range(self.recurrence_order, self.replay_scope_end + 1)
-        ):
-            raise _recurrence_validation_error(
-                "residuals must cover every recurrence step through replay_scope_end"
-            )
-        if any(item.value.as_fraction() != 0 for item in self.residuals):
-            raise _recurrence_validation_error(
-                "every recurrence residual must be exactly zero"
             )
         return self
 

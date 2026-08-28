@@ -32,46 +32,41 @@ def _wire(value: Fraction) -> CanonicalRational:
 def evaluate_linear_recurrence(
     request: LinearRecurrenceEvaluationRequest,
 ) -> LinearRecurrenceEvaluationResult:
-    """Materialize the complete bounded replay prefix and requested projection."""
+    """Evaluate a bounded recurrence and return the requested projection."""
 
     requested_indices = (
         tuple(range(request.term_count))
         if request.scope == "PREFIX" and request.term_count is not None
         else request.indices
     )
-    replay_scope_end = requested_indices[-1]
-    replay = _admit_linear_recurrence(
+    prefix = _admit_linear_recurrence(
         coefficients=request.coefficients,
         initial_values=request.initial_values,
         coefficient_convention=request.coefficient_convention,
         scope=request.scope,
         requested_indices=requested_indices,
     )
-    replay_wire = tuple(_wire(item) for item in replay)
     return LinearRecurrenceEvaluationResult._from_kernel(
         coefficient_convention=request.coefficient_convention,
         scope=request.scope,
         values=tuple(
-            IndexedRationalValue(index=index, value=replay_wire[index])
+            IndexedRationalValue(index=index, value=_wire(prefix[index]))
             for index in requested_indices
         ),
-        replay_prefix=replay_wire,
-        replay_scope_end=replay_scope_end,
     )
 
 
 def evaluate_polynomial_coefficient_recurrence(
     request: PolynomialCoefficientRecurrenceEvaluationRequest,
 ) -> PolynomialCoefficientRecurrenceEvaluationResult:
-    """Evaluate and expose residuals for a bounded P-recursive relation."""
+    """Evaluate a bounded P-recursive relation at the requested indices."""
 
     requested_indices = (
         tuple(range(request.term_count))
         if request.scope == "PREFIX" and request.term_count is not None
         else request.indices
     )
-    end = requested_indices[-1]
-    replay, residual_pairs = _admit_p_recursive_recurrence(
+    prefix = _admit_p_recursive_recurrence(
         coefficient_polynomials=request.coefficient_polynomials,
         initial_values=request.initial_values,
         coefficient_convention=request.coefficient_convention,
@@ -80,23 +75,15 @@ def evaluate_polynomial_coefficient_recurrence(
         requested_indices=requested_indices,
     )
     order = len(request.coefficient_polynomials) - 1
-    residuals = tuple(
-        IndexedRationalValue(index=index, value=_wire(value))
-        for index, value in residual_pairs
-    )
-    replay_wire = tuple(_wire(item) for item in replay)
     return PolynomialCoefficientRecurrenceEvaluationResult._from_kernel(
         coefficient_convention=request.coefficient_convention,
         polynomial_convention=request.polynomial_convention,
         scope=request.scope,
         recurrence_order=order,
         values=tuple(
-            IndexedRationalValue(index=index, value=replay_wire[index])
+            IndexedRationalValue(index=index, value=_wire(prefix[index]))
             for index in requested_indices
         ),
-        replay_prefix=replay_wire,
-        residuals=residuals,
-        replay_scope_end=end,
     )
 
 

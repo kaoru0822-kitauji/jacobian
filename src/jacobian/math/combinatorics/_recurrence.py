@@ -97,8 +97,7 @@ RECURRENCE_OPERATIONS = (
         "Evaluate an exact linear recurrence",
         (
             "Evaluate requested terms of one bounded constant-coefficient rational "
-            "recurrence and preserve the complete replay prefix through the "
-            "greatest requested index."
+            "recurrence."
         ),
         LinearRecurrenceEvaluationRequest,
         LinearRecurrenceEvaluationResult,
@@ -134,8 +133,8 @@ RECURRENCE_OPERATIONS = (
         "combinatorics.recurrence.p_recursive.evaluate",
         "Evaluate an exact polynomial-coefficient recurrence",
         (
-            "Evaluate a bounded rational recurrence sum p_j(n)a_(n-j)=0, "
-            "preserving the complete replay prefix and exact residuals."
+            "Evaluate requested terms of a bounded rational recurrence "
+            "sum p_j(n)a_(n-j)=0."
         ),
         PolynomialCoefficientRecurrenceEvaluationRequest,
         PolynomialCoefficientRecurrenceEvaluationResult,
