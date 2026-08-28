@@ -7,6 +7,7 @@ from itertools import product as iproduct
 from sympy.combinatorics import Permutation
 from sympy.combinatorics import PermutationGroup as SympyPermutationGroup
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.groups._models import PermutationGroup
 from jacobian.math.groups.cohomology._models import (
     MAX_BAR_MATRIX_CELLS,
@@ -41,17 +42,30 @@ def _require_admitted_request(request: GroupCohomologyRequest) -> int:
     from sympy import isprime
 
     if not isprime(request.prime):
-        raise ValueError("prime must be a prime integer")
+        raise OperationDomainValidationError(
+            location=("prime",),
+            code="group_cohomology.prime_not_prime",
+            message="prime must be a prime integer",
+        )
     order = _enumerated_group_order(request.group)
     if order > MAX_GROUP_ORDER:
-        raise ValueError(
-            f"enumerated group order {order} exceeds the bounded maximum {MAX_GROUP_ORDER}"
+        raise OperationDomainValidationError(
+            location=("group",),
+            code="group_cohomology.group_order_exceeds_bound",
+            message=(
+                f"enumerated group order {order} exceeds the bounded maximum "
+                f"{MAX_GROUP_ORDER}"
+            ),
         )
     admitted_degree = _admitted_max_degree(order)
     if request.max_degree > admitted_degree:
-        raise ValueError(
-            f"max_degree {request.max_degree} exceeds the work-derived degree budget "
-            f"{admitted_degree} for enumerated group order {order}"
+        raise OperationDomainValidationError(
+            location=("max_degree",),
+            code="group_cohomology.max_degree_exceeds_work_budget",
+            message=(
+                f"max_degree {request.max_degree} exceeds the work-derived degree "
+                f"budget {admitted_degree} for enumerated group order {order}"
+            ),
         )
     return order
 

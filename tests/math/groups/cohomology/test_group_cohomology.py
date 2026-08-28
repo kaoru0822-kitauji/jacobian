@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.groups._models import PermutationGroup
 from jacobian.math.groups.cohomology._models import (
     MAX_COCHAIN_DEGREE,
@@ -155,30 +156,39 @@ class TestExactBarComplex:
         assert first.cochain_dimension == 2
 
     def test_composite_prime_rejected_by_operation(self) -> None:
-        with pytest.raises(ValueError, match="prime must be a prime integer"):
-            compute_group_cohomology(
-                GroupCohomologyRequest(
-                    group=PermutationGroup(degree=2, generators=((1, 0),)),
-                    prime=4,
-                    max_degree=2,
-                )
-            )
+        request = GroupCohomologyRequest(
+            group=PermutationGroup(degree=2, generators=((1, 0),)),
+            prime=4,
+            max_degree=2,
+        )
+        with pytest.raises(
+            OperationDomainValidationError, match="prime must be a prime integer"
+        ) as error:
+            compute_group_cohomology(request)
+        assert error.value.errors()[0]["loc"] == ("prime",)
+        assert error.value.errors()[0]["type"] == "group_cohomology.prime_not_prime"
 
     def test_oversized_enumerated_order_rejected(self) -> None:
         # The canonical permutation-group value allows degree up to 64 and
         # does not bound order itself; the cohomology outer request owns the
         # 64-element order budget.
-        with pytest.raises(ValueError, match="exceeds the bounded maximum"):
-            compute_group_cohomology(
-                GroupCohomologyRequest(
-                    group=PermutationGroup(
-                        degree=6,
-                        generators=((1, 0, 2, 3, 4, 5), (1, 2, 3, 4, 5, 0)),
-                    ),
-                    prime=2,
-                    max_degree=1,
-                )
-            )
+        request = GroupCohomologyRequest(
+            group=PermutationGroup(
+                degree=6,
+                generators=((1, 0, 2, 3, 4, 5), (1, 2, 3, 4, 5, 0)),
+            ),
+            prime=2,
+            max_degree=1,
+        )
+        with pytest.raises(
+            OperationDomainValidationError, match="exceeds the bounded maximum"
+        ) as error:
+            compute_group_cohomology(request)
+        assert error.value.errors()[0]["loc"] == ("group",)
+        assert (
+            error.value.errors()[0]["type"]
+            == "group_cohomology.group_order_exceeds_bound"
+        )
 
     def test_degree_above_sixteen_with_bounded_order_admitted(self) -> None:
         """The duplicate degree-16 cap is gone: a degree-20 action whose
@@ -192,29 +202,31 @@ class TestExactBarComplex:
     def test_cochain_budget_rejected(self) -> None:
         """Order 6 at max_degree 4 would need 6^5 cochain elements; the
         work-derived degree budget for order 6 is 2 and rejects it."""
-        with pytest.raises(ValueError, match="exceeds the work-derived degree budget"):
-            compute_group_cohomology(
-                GroupCohomologyRequest(
-                    group=PermutationGroup(
-                        degree=6, generators=((*tuple(range(1, 6)), 0),)
-                    ),
-                    prime=2,
-                    max_degree=4,
-                )
-            )
+        request = GroupCohomologyRequest(
+            group=PermutationGroup(degree=6, generators=((*tuple(range(1, 6)), 0),)),
+            prime=2,
+            max_degree=4,
+        )
+        with pytest.raises(
+            OperationDomainValidationError,
+            match="exceeds the work-derived degree budget",
+        ):
+            compute_group_cohomology(request)
 
     def test_dense_bar_matrix_budget_rejected(self) -> None:
         """Order 4 at max_degree 5 fits no derived envelope: its degree-5
         coboundary is a dense 4096x1024 matrix and the cell bound caps
         order 4 at degree 3."""
-        with pytest.raises(ValueError, match="exceeds the work-derived degree budget"):
-            compute_group_cohomology(
-                GroupCohomologyRequest(
-                    group=PermutationGroup(degree=4, generators=((1, 2, 3, 0),)),
-                    prime=2,
-                    max_degree=5,
-                )
-            )
+        request = GroupCohomologyRequest(
+            group=PermutationGroup(degree=4, generators=((1, 2, 3, 0),)),
+            prime=2,
+            max_degree=5,
+        )
+        with pytest.raises(
+            OperationDomainValidationError,
+            match="exceeds the work-derived degree budget",
+        ):
+            compute_group_cohomology(request)
 
     def test_dense_bar_matrix_budget_admits_bounded_requests(self) -> None:
         """C2 at the maximum degree and C4 at degree 3 stay inside the cells."""
@@ -233,14 +245,16 @@ class TestExactBarComplex:
         """Order 32 admits degree 1, but its degree-8 coboundary would be a
         dense 32^17-cell matrix; the work-derived budget rejects it during
         request validation, before any kernel expansion runs."""
-        with pytest.raises(ValueError, match="exceeds the work-derived degree budget"):
-            compute_group_cohomology(
-                GroupCohomologyRequest(
-                    group=PermutationGroup(degree=5, generators=((1, 2, 3, 4, 0),)),
-                    prime=2,
-                    max_degree=8,
-                )
-            )
+        request = GroupCohomologyRequest(
+            group=PermutationGroup(degree=5, generators=((1, 2, 3, 4, 0),)),
+            prime=2,
+            max_degree=8,
+        )
+        with pytest.raises(
+            OperationDomainValidationError,
+            match="exceeds the work-derived degree budget",
+        ):
+            compute_group_cohomology(request)
 
     def test_derived_budget_boundary_admitted(self) -> None:
         """Order 32 at its work-derived maximum degree 1 stays inside both

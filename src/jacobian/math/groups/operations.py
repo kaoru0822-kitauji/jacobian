@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.groups._models import PermutationGroup, SubgroupEntry
 
 __all__ = [
@@ -33,15 +34,29 @@ def element_order(degree: int, generator: list[int]) -> int:
     """Return the exact order of one permutation."""
     from sympy.combinatorics import Permutation
 
+    if not 1 <= degree <= 64:
+        raise OperationDomainValidationError(
+            location=("degree",),
+            code="group.degree_out_of_range",
+            message="group degree must be between 1 and 64",
+        )
     if len(generator) != degree or sorted(generator) != list(range(degree)):
-        raise ValueError("generator must be a permutation of 0..n-1")
+        raise OperationDomainValidationError(
+            location=("generator",),
+            code="group.generator_permutation",
+            message="generator must be a permutation of 0..n-1",
+        )
     return int(Permutation(list(generator)).order())
 
 
 def group_orbit(group: PermutationGroup, point: int) -> list[int]:
     """Return the sorted orbit of a point under a permutation group."""
     if not 0 <= point < group.degree:
-        raise ValueError("point must be in 0..n-1")
+        raise OperationDomainValidationError(
+            location=("point",),
+            code="group.point_out_of_range",
+            message="point must be in 0..n-1",
+        )
     return sorted(_backend_group(group).orbit(point))
 
 
@@ -69,13 +84,25 @@ def group_conjugacy_classes(
     from sympy.combinatorics import Permutation, PermutationGroup
 
     if not 1 <= degree <= 64:
-        raise ValueError("group degree must be between 1 and 64")
+        raise OperationDomainValidationError(
+            location=("degree",),
+            code="group.degree_out_of_range",
+            message="group degree must be between 1 and 64",
+        )
     if not generators:
-        raise ValueError("at least one generator is required")
+        raise OperationDomainValidationError(
+            location=("generators",),
+            code="group.generators_required",
+            message="at least one generator is required",
+        )
     perms = []
     for perm in generators:
         if len(perm) != degree or sorted(perm) != list(range(degree)):
-            raise ValueError("each generator must be a permutation of 0..n-1")
+            raise OperationDomainValidationError(
+                location=("generators",),
+                code="group.generator_permutation",
+                message="each generator must be a permutation of 0..n-1",
+            )
         perms.append(Permutation(list(perm)))
     group = PermutationGroup(perms)
     # Bound enumeration by group order before materializing all |G| elements.
@@ -84,10 +111,14 @@ def group_conjugacy_classes(
 
     order = int(group.order())
     if order > MAX_CONJUGACY_CLASSES_GROUP_ORDER:
-        raise ValueError(
-            f"group order {order} exceeds the bounded maximum "
-            f"{MAX_CONJUGACY_CLASSES_GROUP_ORDER} for conjugacy classes "
-            f"(would materialize |G|={order} elements)"
+        raise OperationDomainValidationError(
+            location=("generators",),
+            code="group.order_bound",
+            message=(
+                f"group order {order} exceeds the bounded maximum "
+                f"{MAX_CONJUGACY_CLASSES_GROUP_ORDER} for conjugacy classes "
+                f"(would materialize |G|={order} elements)"
+            ),
         )
     classes = group.conjugacy_classes()
     canonical = [sorted(list(p.array_form) for p in cls) for cls in classes]
@@ -106,7 +137,11 @@ def group_stabilizer(group: PermutationGroup, point: int) -> PermutationGroup:
     ``group_order`` and a chained stabilizer request.
     """
     if not 0 <= point < group.degree:
-        raise ValueError("point must be in 0..n-1")
+        raise OperationDomainValidationError(
+            location=("point",),
+            code="group.point_out_of_range",
+            message="point must be in 0..n-1",
+        )
     stabilizer = _backend_group(group).stabilizer(point)
     generators = tuple(
         _full_generator(generator, group.degree) for generator in stabilizer.generators
@@ -136,9 +171,13 @@ def _require_admitted_lattice_source(group: PermutationGroup) -> Any:
 
     backend_group = _backend_group(group)
     if int(backend_group.order()) > MAX_SUBGROUP_LATTICE_GROUP_ORDER:
-        raise ValueError(
-            "subgroup lattice computation is bounded to groups of order "
-            f"at most {MAX_SUBGROUP_LATTICE_GROUP_ORDER}"
+        raise OperationDomainValidationError(
+            location=("group",),
+            code="group.order_bound",
+            message=(
+                "subgroup lattice computation is bounded to groups of order "
+                f"at most {MAX_SUBGROUP_LATTICE_GROUP_ORDER}"
+            ),
         )
     return backend_group
 

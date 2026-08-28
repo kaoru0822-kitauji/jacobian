@@ -6,7 +6,13 @@ from contextlib import contextmanager
 import pytest
 from pydantic import ValidationError
 
-from jacobian.math.groups import group_orbit, group_order, group_stabilizer
+from jacobian.catalog.models import OperationDomainValidationError
+from jacobian.math.groups import (
+    element_order,
+    group_orbit,
+    group_order,
+    group_stabilizer,
+)
 from jacobian.math.groups._models import (
     GroupOrbitRequest,
     GroupStabilizerRequest,
@@ -327,8 +333,17 @@ def test_group_stabilizer_rejects_invalid_point() -> None:
     group = PermutationGroup(degree=2, generators=((1, 0),))
     with _group_error("group.point_out_of_range"):
         GroupStabilizerRequest(group=group, point=5)
-    with pytest.raises(ValueError, match="point"):
+    with pytest.raises(OperationDomainValidationError, match="point") as error:
         group_stabilizer(group, 7)
+    assert error.value.errors()[0]["loc"] == ("point",)
+    assert error.value.errors()[0]["type"] == "group.point_out_of_range"
+
+
+def test_element_order_rejects_invalid_generator() -> None:
+    with pytest.raises(OperationDomainValidationError, match="generator") as error:
+        element_order(3, [0, 0, 1])
+    assert error.value.errors()[0]["loc"] == ("generator",)
+    assert error.value.errors()[0]["type"] == "group.generator_permutation"
 
 
 def test_group_subgroup_lattice_serialization_is_hash_seed_independent() -> None:

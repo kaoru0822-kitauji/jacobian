@@ -115,8 +115,12 @@ class TestNativeSubgroupLattice:
         from jacobian.math.groups.operations import subgroup_lattice
 
         s5 = PermutationGroup(degree=5, generators=((1, 0, 2, 3, 4), (1, 2, 3, 4, 0)))
-        with pytest.raises(ValueError, match="bounded to groups of order"):
+        with pytest.raises(
+            OperationDomainValidationError, match="bounded to groups of order"
+        ) as error:
             subgroup_lattice(s5)
+        assert error.value.errors()[0]["loc"] == ("group",)
+        assert error.value.errors()[0]["type"] == "group.order_bound"
 
 
 class TestBoundedEnumeration:

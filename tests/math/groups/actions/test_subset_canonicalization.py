@@ -7,6 +7,7 @@ import pytest
 from pydantic import ValidationError
 from sympy.combinatorics import Permutation, PermutationGroup
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.groups.actions._models import (
     MAX_GROUP_ORDER,
     ActionBoundSubset,
@@ -231,8 +232,15 @@ def test_request_rejects_group_immediately_above_enumeration_bound() -> None:
     with pytest.raises(ValidationError) as exc_info:
         _request(symmetric_sn, (0,))
     _assert_error_type(exc_info.value, "finite_group_action.group_order_exceeds_bound")
-    with pytest.raises(ValueError, match=rf"group order exceeds.*{MAX_GROUP_ORDER}"):
+    with pytest.raises(
+        OperationDomainValidationError,
+        match=rf"group order exceeds.*{MAX_GROUP_ORDER}",
+    ) as error:
         _enumerate_group(symmetric_sn)
+    assert error.value.errors()[0]["loc"] == ("action",)
+    assert error.value.errors()[0]["type"] == (
+        "finite_group_action.group_order_exceeds_bound"
+    )
 
 
 def test_domain_and_subset_boundary_of_fifty_positions_is_accepted() -> None:

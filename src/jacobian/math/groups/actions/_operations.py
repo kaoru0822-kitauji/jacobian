@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.groups.actions._models import (
     MAX_GROUP_ORDER,
     ActionBoundSubset,
@@ -55,8 +56,13 @@ def _enumerate_group(
                     elements.append(composed)
                     new_frontier.append(composed)
                     if len(elements) > MAX_GROUP_ORDER:
-                        raise ValueError(
-                            f"group order exceeds the bounded maximum {MAX_GROUP_ORDER}"
+                        raise OperationDomainValidationError(
+                            location=("action",),
+                            code="finite_group_action.group_order_exceeds_bound",
+                            message=(
+                                "group order exceeds the bounded maximum "
+                                f"{MAX_GROUP_ORDER}"
+                            ),
                         )
         frontier = new_frontier
     return tuple(elements)
@@ -143,7 +149,11 @@ def _element_cycles_data(
 ]:
     group = _enumerate_group(action)
     if element < 0 or element >= len(group):
-        raise ValueError("element index is out of range for the group order")
+        raise OperationDomainValidationError(
+            location=("element",),
+            code="finite_group_action.element_out_of_range",
+            message="element index is out of range for the group order",
+        )
     perm = group[element]
     cycles, lengths, cycle_type, fixed = _cycle_decomposition(perm)
     support = _support(perm)
@@ -204,7 +214,11 @@ def _polya_inventory_data(
     group = _enumerate_group(action)
     degree = len(action.domain)
     if colors < 1:
-        raise ValueError("colors must be at least 1")
+        raise OperationDomainValidationError(
+            location=("colors",),
+            code="finite_group_action.colors_out_of_range",
+            message="colors must be at least 1",
+        )
     orbit_count: dict[tuple[int, ...], int] = {}
     for perm in group:
         cycles, _, _, _ = _cycle_decomposition(perm)

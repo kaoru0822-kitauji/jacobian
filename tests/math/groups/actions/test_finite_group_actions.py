@@ -5,6 +5,7 @@ import itertools
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.groups.actions._models import (
     BurnsideCountRequest,
     CycleIndexRequest,
@@ -483,8 +484,15 @@ class TestBounds:
 
     def test_element_index_out_of_range_rejected(self) -> None:
         action = _cyclic_c3()
-        with pytest.raises(ValueError, match="out of range"):
+        with pytest.raises(
+            OperationDomainValidationError, match="out of range"
+        ) as error:
             compute_element_cycles(ElementCyclesRequest(action=action, element=3))
+        assert error.value.errors()[0]["loc"] == ("element",)
+        assert (
+            error.value.errors()[0]["type"]
+            == "finite_group_action.element_out_of_range"
+        )
 
     def test_colors_zero_rejected(self) -> None:
         with pytest.raises(ValidationError):
@@ -497,8 +505,15 @@ class TestBounds:
             domain=tuple(f"p{i}" for i in range(8)),
             generators=((1, 2, 3, 4, 5, 6, 7, 0), (1, 0, 2, 3, 4, 5, 6, 7)),
         )
-        with pytest.raises(ValueError, match="exceeds the bounded maximum"):
+        with pytest.raises(
+            OperationDomainValidationError, match="exceeds the bounded maximum"
+        ) as error:
             compute_cycle_index(CycleIndexRequest(action=action))
+        assert error.value.errors()[0]["loc"] == ("action",)
+        assert (
+            error.value.errors()[0]["type"]
+            == "finite_group_action.group_order_exceeds_bound"
+        )
 
 
 # ---------------------------------------------------------------------------
