@@ -11,12 +11,15 @@ from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.combinatorics._difference_set_models import (
     CyclicDifferenceMultiplicity,
     CyclicDifferenceSetExtensionRequest,
+    CyclicDifferenceSetExtensionResult,
+    CyclicPerfectDifferenceSetRequest,
     CyclicPerfectDifferenceSetResult,
     IntegerSidonRequest,
     IntegerSidonResult,
 )
 from jacobian.math.combinatorics._difference_sets import (
     decide_cyclic_difference_set_extension,
+    decide_cyclic_perfect_difference_set,
 )
 
 
@@ -89,3 +92,24 @@ def test_pds_result_accepts_the_canonical_fano_profile() -> None:
         is_perfect=True,
     )
     assert result.is_perfect is True
+
+
+def test_pds_result_rejects_a_forged_complete_profile() -> None:
+    result = decide_cyclic_perfect_difference_set(
+        CyclicPerfectDifferenceSetRequest(modulus=7, residues=(0, 1, 3))
+    )
+    payload = result.model_dump(mode="json")
+    payload["difference_multiplicities"][0]["multiplicity"] = 0
+    with pytest.raises(ValidationError):
+        CyclicPerfectDifferenceSetResult.model_validate(payload)
+
+
+def test_extension_result_rejects_a_forged_witness() -> None:
+    result = decide_cyclic_difference_set_extension(
+        CyclicDifferenceSetExtensionRequest(base_elements=("0", "1"), target_order=3)
+    )
+    assert result.decision == "EXTENDS"
+    payload = result.model_dump(mode="json")
+    payload["extension"] = [0, 1, 2]
+    with pytest.raises(ValidationError):
+        CyclicDifferenceSetExtensionResult.model_validate(payload)

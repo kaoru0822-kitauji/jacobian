@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+from collections import Counter
 from typing import Annotated, Literal, Self
 
 from pydantic import Field, StrictBool, StrictInt, StringConstraints, model_validator
@@ -182,6 +184,48 @@ class CyclicPerfectDifferenceSetResult(StrictModel):
                 "combinatorics.difference_set_invariant",
                 "cyclic difference profile must cover every nonzero residue",
             )
+        counts = Counter(
+            (left - right) % self.modulus
+            for left in residues
+            for right in residues
+            if left != right
+        )
+        expected_profile = tuple(
+            counts.get(residue, 0) for residue in range(1, self.modulus)
+        )
+        if tuple(item.multiplicity for item in profile) != expected_profile:
+            raise _difference_set_validation_error(
+                "combinatorics.difference_set_invariant",
+                "cyclic difference profile must match the retained residue set",
+            )
+        expected_missing = tuple(
+            residue
+            for residue, multiplicity in enumerate(expected_profile, start=1)
+            if multiplicity == 0
+        )
+        expected_repeated = tuple(
+            residue
+            for residue, multiplicity in enumerate(expected_profile, start=1)
+            if multiplicity > 1
+        )
+        if (
+            self.missing_residues != expected_missing
+            or self.repeated_residues != expected_repeated
+        ):
+            raise _difference_set_validation_error(
+                "combinatorics.difference_set_invariant",
+                "cyclic difference exceptions must match the complete profile",
+            )
+        expected_perfect = (
+            self.modulus == self.expected_modulus
+            and not expected_missing
+            and not expected_repeated
+        )
+        if self.is_perfect != expected_perfect:
+            raise _difference_set_validation_error(
+                "combinatorics.difference_set_invariant",
+                "perfect-difference-set decision must match the complete profile",
+            )
         return self
 
     @classmethod
@@ -241,6 +285,55 @@ class CyclicDifferenceSetExtensionResult(StrictModel):
     coverage: Literal["WITNESS", "ALL_CANDIDATES"]
     exactness: Literal["EXACT_FINITE"] = "EXACT_FINITE"
     determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
+
+    @model_validator(mode="after")
+    def bind_extension_claim(self) -> Self:
+        expected_modulus = self.target_order * (self.target_order - 1) + 1
+        if self.modulus != expected_modulus:
+            raise _difference_set_validation_error(
+                "combinatorics.extension_invariant",
+                "extension modulus must equal k(k-1)+1",
+            )
+        if self.base_residues != tuple(sorted(set(self.base_residues))) or any(
+            residue < 0 or residue >= self.modulus for residue in self.base_residues
+        ):
+            raise _difference_set_validation_error(
+                "combinatorics.extension_invariant",
+                "extension base residues must be canonical",
+            )
+        additional = self.target_order - len(self.base_residues)
+        if additional < 0:
+            raise _difference_set_validation_error(
+                "combinatorics.extension_invariant",
+                "extension target order must contain the retained base",
+            )
+        expected_candidates = math.comb(
+            self.modulus - len(self.base_residues), additional
+        )
+        if self.candidate_space_size != expected_candidates:
+            raise _difference_set_validation_error(
+                "combinatorics.extension_invariant",
+                "extension candidate-space size must match the retained source",
+            )
+        from jacobian.math.combinatorics._difference_sets import _find_extension
+
+        witness = _find_extension(self.base_residues, self.target_order, self.modulus)
+        if self.decision == "EXTENDS":
+            if (
+                self.coverage != "WITNESS"
+                or witness is None
+                or self.extension != witness
+            ):
+                raise _difference_set_validation_error(
+                    "combinatorics.extension_invariant",
+                    "extension witness must be the canonical complete-search witness",
+                )
+        elif self.coverage != "ALL_CANDIDATES" or self.extension or witness is not None:
+            raise _difference_set_validation_error(
+                "combinatorics.extension_invariant",
+                "negative extension decision must bind a complete candidate search",
+            )
+        return self
 
     @classmethod
     def _from_kernel(

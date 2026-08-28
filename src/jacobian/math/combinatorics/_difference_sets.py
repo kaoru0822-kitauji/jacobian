@@ -70,7 +70,7 @@ def decide_cyclic_perfect_difference_set(
     repeated = tuple(item.residue for item in profile if item.multiplicity > 1)
     order = len(residues)
     expected_modulus = order * (order - 1) + 1
-    return CyclicPerfectDifferenceSetResult(
+    return CyclicPerfectDifferenceSetResult._from_kernel(
         modulus=request.modulus,
         normalized_residues=residues,
         order=order,
