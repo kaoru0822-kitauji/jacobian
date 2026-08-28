@@ -59,15 +59,17 @@ def _admit_crt(request: ChineseRemainderRequest) -> None:
         if not 2 <= modulus <= MAX_MODULUS:
             _domain_error(
                 ("moduli", index),
-                "every_modulus_must_be_between_2_and_1_000_000",
-                "every modulus must be between 2 and 1,000,000",
+                "modulus_out_of_range",
+                f"every modulus must be between 2 and {MAX_MODULUS:,}",
             )
         combined = combined // math.gcd(combined, modulus) * modulus
         if combined > MAX_CRT_COMBINED_MODULUS:
             _domain_error(
                 ("moduli", index),
-                "the_system_s_combined_modulus_must_have_at",
-                "the system's combined modulus must have at most 256 digits; split the congruence system into narrower subsystems",
+                "combined_modulus_exceeds_bound",
+                "the system's combined modulus must have fewer than "
+                f"{len(str(MAX_CRT_COMBINED_MODULUS))} digits; split the "
+                "congruence system into narrower subsystems",
             )
     for index, (residue, modulus) in enumerate(
         zip(request.residues, request.moduli, strict=True)
@@ -113,8 +115,9 @@ def _admit_residue_image(request: ModularPolynomialResidueImageRequest) -> None:
     if assignment_count > _MAX_RESIDUE_ASSIGNMENTS:
         _domain_error(
             ("variables",),
-            "declared_residue_domains_exceed_the_4_096_assignment_bound",
-            "declared residue domains exceed the 4,096-assignment bound",
+            "residue_assignment_count_exceeds_bound",
+            "declared residue domains exceed the "
+            f"{_MAX_RESIDUE_ASSIGNMENTS:,}-assignment bound",
         )
     if any(len(term.exponents) != len(request.variables) for term in request.terms):
         _domain_error(
