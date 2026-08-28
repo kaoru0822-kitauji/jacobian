@@ -342,9 +342,10 @@ Apply these adapter and request-boundary rules:
   uniqueness, irreducibility, or nondegeneracy, tests must cover each excluded
   class and prove the owner rejects it before backend execution.
 
-Before publication, record one owner-local admission decision in the
-mathematical domain's `_admission.py` module. `jacobian.catalog.admission` owns
-the shared policy types and fail-closed validation (see the
+Before publication, add the declaration to the mathematical owner's `_tools.py`
+manifest. Presence there is the publication decision; native-only functions
+remain ordinary package exports without a declaration. Catalog construction
+fails closed on malformed manifests and duplicate operation IDs (see the
 [public operation admission](public-operation-admission.md) contract).
 
 ### Domains, parents, and coercion
@@ -425,9 +426,9 @@ Backend integration follows the reusable
 Keep static policy limited to boundaries that syntax can identify reliably.
 The architecture checker forbids evaluator-capable parsing in the mathematical
 tree and confines process execution to explicit owners behind the shared
-supervisor. The fail-closed admission ledger and catalog conformance tests—not
-an approximation in the linter—prove that public declarations use the standard
-validation and execution path and do not expose backend values.
+supervisor. Owner-local tool manifests and catalog conformance tests prove that
+public declarations use the standard validation and execution path and do not
+expose backend values.
 
 Mathematical correctness, parent compatibility, reconstruction, and backend
 domain support require executable contract and property tests. Do not encode

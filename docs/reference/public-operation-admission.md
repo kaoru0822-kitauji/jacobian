@@ -8,20 +8,17 @@ the **request admission** or execution plan for an individual `math.run` call;
 those are owned by the mathematical domain and must account for work,
 intermediates, exact output, and transport representation.
 The [runtime ownership rule](../explanation/architecture.md#runtime-ownership-rule)
-defines how that per-call plan is computed and reused. An owner's
-`_admission.py` is the catalog decision ledger, not a required home for
-request-specific planning.
+defines how that per-call plan is computed and reused.
 
 - Status: Current catalog-maintenance contract
-- Shared admission policy: `src/jacobian/catalog/admission.py`
-- Owner-local decisions: `src/jacobian/math/**/_admission.py`
+- Owner-local manifests: `src/jacobian/math/**/_tools.py`
 
 The public `math.find` / `math.run` catalog is a curated basis of mathematical
 operations, not an inventory of every callable helper in `jacobian.math` or in
-an installed backend. Every candidate declaration must have exactly one
-owner-local admission decision before it can enter the catalog. Catalog
-construction fails closed when the candidate inventory and composed decision
-ledger disagree.
+an installed backend. A declaration in an owner's immutable `TOOLS` tuple is
+the publication decision. Useful native-only functions remain package exports
+without a `MathTool` declaration. Catalog construction discovers manifests
+directly and fails closed on malformed declarations or duplicate operation IDs.
 
 Before applying these gates, identify the reusable gap. Show why the current
 public operations and shared mathematical values do not cleanly provide the
@@ -150,31 +147,14 @@ admission.
 Passing schema validation, having tests, or wrapping a maintained library does
 not by itself satisfy these gates.
 
-## Decisions
+## Publication outcomes
 
-The ledger uses five decisions:
-
-| Decision | Catalog effect | Required disposition |
-| --- | --- | --- |
-| `KEEP` | Public | Preserve the operation ID and contract. |
-| `NATIVE_ONLY` | Excluded | Keep the useful deterministic helper under an explicit supported `jacobian.math` symbol. |
-| `SPLIT` | Excluded | Do not expose the aggregate; admit smaller outcomes only after independent evidence establishes their discovery intent and leverage. |
-| `DROP` | Excluded | Retain no supported public interface solely for compatibility or coverage. |
-| `CONTRACT_FIX` | Excluded | Repair the named correctness defect and add an adversarial regression, then reclassify the operation before publication. |
-
-Each mathematical domain's `_admission.py` module is the authority for its
-current decisions and exports one `REGISTRATION` binding its candidate `TOOLS`
-to those decisions. The packaged `_admission.py` path is the explicit
-publication marker; catalog construction discovers those owner modules in
-deterministic path order and does not load external entry points or plugins.
-`src/jacobian/catalog/admission.py` owns the shared policy types and fail-closed
-validation. A renamed or materially changed candidate needs a fresh decision;
-do not preserve a public operation solely because an earlier version was
-admitted.
-
-Consumers should discover against the current catalog. A `NATIVE_ONLY` row's
-`native_symbol` names its supported `jacobian.math` replacement; a `DROP` row
-has no compatibility operation.
+After review, publish the operation by adding one `MathTool` declaration to the
+owner's `_tools.py` manifest, keep a useful deterministic projection as a
+native package export only, split an aggregate into independently useful
+postconditions, or remove the unsupported candidate. Do not retain rejected
+candidates as dormant declarations or compatibility rows. The current catalog
+and public package exports are the authoritative inventories.
 
 ## Review procedure
 
@@ -186,17 +166,15 @@ For a catalog-changing pull request:
    limit follows from a named representation, work, intermediate-growth, or
    result-size budget; record the algorithm/backend regime and whether a
    sharper bound safely admits materially larger source-backed cases.
-3. Record one decision and a concrete mathematical rationale in the owning
-   domain's `_admission.py` module.
-4. For `NATIVE_ONLY`, name an importable callable whose containing public
-   module includes it in `__all__`.
-5. For bounded search, test both a complete result and the applicable
+3. Add a declaration to the owner's `_tools.py` only when the operation passes
+   the gates. Keep native-only functions in the owning public module's
+   `__all__` without a declaration.
+4. For bounded search, test both a complete result and the applicable
    incomplete or truncated path. Missing witnesses and exhausted budgets are
    never negative mathematical conclusions.
-6. Regenerate the schema snapshot and run the catalog, native-API, and owning
+5. Regenerate the schema snapshot and run the catalog, native-API, and owning
    mathematical tests.
 
-The owner-local decision ledger is source review data for constructing the
-immutable public catalog; it is not a runtime recommendation or execution
-planning layer. Do not place request-specific work admission in this catalog
-ledger, and do not call the two decisions by the same unqualified name.
+Publication review is not a runtime recommendation or execution-planning
+layer. Request admission remains inside the native operation and is computed
+once per invocation.

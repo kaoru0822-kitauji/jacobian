@@ -186,7 +186,7 @@ Only a genuine operation gap normally motivates a new public operation.
 Gap diagnosis and public-operation admission are separate decisions. A focused
 issue may record a reusable missing postcondition even when the available
 evidence does not yet establish enough leverage for the agent-visible catalog,
-or when the eventual disposition may be `NATIVE_ONLY`, `SPLIT`, or `DROP`.
+or when review may keep it native-only, split its postconditions, or remove it.
 Admission gates decide that later disposition; they should not suppress an
 evidence-backed gap record. Conversely, recording an operation gap does not
 pre-admit a catalog operation.

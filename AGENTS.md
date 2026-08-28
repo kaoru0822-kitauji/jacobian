@@ -63,11 +63,11 @@ semantics and types.
 - **Anti-regression:** keep the kernel stateless; the caller owns composition and
   durable state. Internal temporary state is request-scoped and exists only when
   one bounded external call genuinely requires it.
-- Built-in tools are explicit immutable `MathTool` tuples: discovery metadata
-  plus one direct typed domain function. Every catalog candidate requires an
-  owner-local admission decision in its mathematical domain's `_admission.py`
-  module; `jacobian.catalog.admission` owns the shared policy types and
-  fail-closed validation (see the
+- Built-in tools are explicit immutable `MathTool` tuples in owner-local
+  `_tools.py` manifests: discovery metadata plus one direct typed domain
+  function. Presence in that manifest is the publication decision. Catalog
+  construction discovers those manifests directly and fails closed on malformed
+  declarations or duplicate operation IDs (see the
   [public operation admission](docs/reference/public-operation-admission.md)
   contract).
 - Before adding a public operation, establish that the missing capability is an

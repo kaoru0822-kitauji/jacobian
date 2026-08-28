@@ -109,13 +109,15 @@ external isolation is required.
 
 Each mathematical owner keeps its public values and functions in ordinary
 semantic modules, private Pydantic wire models in `_models.py` where needed,
-and its immutable `TOOLS` tuple in `_tools.py`. Its `_admission.py` binds those
-tools and their decisions into one owner-local `REGISTRATION`. Catalog
-construction discovers only packaged `_admission.py` modules under
-`jacobian.math`, sorts their module paths, validates every registration, and
-then freezes the resulting built-in inventory. There is no central domain list
-and no external plugin discovery. `jacobian.catalog` owns declaration models,
-search, and immutable lookup; `jacobian.dispatch` owns strict invocation;
+and its immutable `TOOLS` tuple in `_tools.py`. That tuple is the owner-local
+publication manifest: declared tools are public, while useful native-only
+functions remain ordinary package exports without a `MathTool` declaration.
+Catalog construction discovers packaged `_tools.py` modules under
+`jacobian.math`, sorts their module paths, validates every manifest and
+operation ID, and freezes the resulting inventory. There is no parallel
+decision ledger, central domain list, or external plugin discovery.
+`jacobian.catalog` owns declaration models, search, and immutable lookup;
+`jacobian.dispatch` owns strict invocation;
 `jacobian.mcp` and the CLI are delivery boundaries. The private root model and
 exact-scalar helpers contain only behavior genuinely shared by unrelated
 owners.
@@ -127,7 +129,7 @@ canonical title and description, operation ID, request syntax, or mathematical
 claim. This keeps ordinary morphology in the shared lexical normalizer and
 domain terminology with the owner that can review its meaning.
 
-Catalog admission decides publication and is not runtime planning. The
+Catalog publication is not runtime planning. The
 mathematical owner decides request admission, builds a request-scoped execution
 plan when one is useful, owns the backend adapter, and constructs the canonical
 result.
@@ -244,8 +246,8 @@ Because Jacobian is pre-stable, a fold updates repository imports and public
 examples atomically and does not retain forwarding packages at the former path.
 Do not maintain parallel old and new import surfaces, migration registries, or
 hard-coded path aliases. Catalog discovery remains recursive and derives owner
-modules from packaged `_admission.py` files, so adding a mathematical nesting
-level must not require a central package inventory.
+modules from packaged `_tools.py` files, so adding a mathematical nesting level
+does not require a central package inventory.
 
 Logic follows the same rule. CNF canonicalization and assignment checks are
 pure direct operations. SAT and bounded QF SMT-LIB solving use the maintained
