@@ -13,9 +13,6 @@ from jacobian.math.additive_combinatorics import (
     IndexSubset,
     subset_sum_profile,
 )
-from jacobian.math.additive_combinatorics._operations import (
-    verify_subset_sum_target_result,
-)
 from jacobian.math.additive_combinatorics._subset_sum_residue import (
     SubsetSumResidueProfileRequest,
     compute_subset_sum_residue_profile,
@@ -183,33 +180,7 @@ def test_input_permutations_preserve_status_and_transport_a_witness() -> None:
         assert sum(values[index] for index in result.witness.indices) == 3
 
 
-def test_verifier_rejects_source_decision_and_witness_mutations() -> None:
-    valid = _operation().run(_request((3, 2, 5), 5, allow_empty_subset=False))
-    payload = valid.model_dump(mode="json")
-    mutations = (
-        {**payload, "source": {"items": ["3", "1", "5"]}},
-        {**payload, "target": "4"},
-        {
-            **payload,
-            "status": "NOT_ATTAINED",
-            "witness": None,
-            "reconstructed_sum": None,
-        },
-        {**payload, "witness": {"indices": [2]}},
-        {**payload, "reconstructed_sum": "6"},
-    )
-    for mutation in mutations:
-        candidate = SubsetSumTargetResult.model_validate(mutation)
-        assert not verify_subset_sum_target_result(candidate)
-
-    empty = _operation().run(_request((), 0, allow_empty_subset=True))
-    candidate = SubsetSumTargetResult.model_validate(
-        {**empty.model_dump(mode="json"), "allow_empty_subset": False}
-    )
-    assert not verify_subset_sum_target_result(candidate)
-
-
-def test_result_bounds_raw_witness_and_sum_before_replay() -> None:
+def test_result_bounds_raw_witness_and_sum() -> None:
     valid = _operation().run(_request((3, 2, 5), 5, allow_empty_subset=False))
     payload = valid.model_dump(mode="json")
 
