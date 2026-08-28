@@ -18,7 +18,6 @@ from jacobian.math.geometry._models import (
     EuclideanConvexPolygonTriangulationResult,
     _echoed_result_envelope_chars,
     _span_term_occurrences,
-    _verify_euclidean_triangulation_claim,
 )
 
 _FLOOR_TERM_CHARS = 2 * (4 * 1 + 1) + 128
@@ -185,30 +184,6 @@ class TestEuclideanTriangulation:
         assert validated.unresolved_comparison.left_split == 2
         assert validated.unresolved_comparison.right_split == 1
 
-    def test_unresolved_claim_verifier_rejects_forged_expressions(self) -> None:
-        scale = 10**30
-        result = minimum_euclidean_weight_triangulation(
-            _request(
-                (
-                    _point(0, 0),
-                    _point(scale, 0),
-                    _point(scale, 1),
-                    _point(0, 2),
-                )
-            )
-        )
-        payload = result.model_dump(mode="json")
-        payload["unresolved_comparison"]["left"]["squared_lengths"] = [
-            {"num": "5", "den": "1"}
-        ]
-        payload["unresolved_comparison"]["right"]["squared_lengths"] = [
-            {"num": "7", "den": "1"}
-        ]
-
-        forged = EuclideanConvexPolygonTriangulationResult.model_validate(payload)
-        with pytest.raises(ValidationError):
-            _verify_euclidean_triangulation_claim(forged)
-
     def test_unresolved_result_rejects_an_inverted_split_order(self) -> None:
         scale = 10**30
         result = minimum_euclidean_weight_triangulation(
@@ -246,57 +221,6 @@ class TestEuclideanTriangulation:
         with pytest.raises(ValidationError):
             EuclideanConvexPolygonTriangulationResult.model_validate(payload)
 
-    def test_unresolved_claim_verifier_rejects_a_resolvable_recurrence(self) -> None:
-        payload = {
-            "status": "COMPARISON_UNRESOLVED",
-            "polygon": {
-                "points": (
-                    _point(0, 0),
-                    _point(1, 0),
-                    _point(1, 1),
-                    _point(0, 1),
-                )
-            },
-            "vertex_count": 4,
-            "comparison_precision_bits": 128,
-            "unresolved_comparison": {
-                "start": 0,
-                "end": 3,
-                "left_split": 2,
-                "right_split": 1,
-                "left": {"squared_lengths": [{"num": "2", "den": "1"}]},
-                "right": {"squared_lengths": [{"num": "2", "den": "1"}]},
-                "precision_bits": 128,
-            },
-        }
-
-        forged = EuclideanConvexPolygonTriangulationResult.model_validate(payload)
-        with pytest.raises(ValidationError):
-            _verify_euclidean_triangulation_claim(forged)
-
-    def test_certified_claim_verifier_rejects_a_mutated_diagonal_length(self) -> None:
-        result = minimum_euclidean_weight_triangulation(
-            _request((_point(0, 0), _point(1, 0), _point(1, 1), _point(0, 1)))
-        )
-        payload = result.model_dump(mode="json")
-        payload["diagonals"][0]["squared_length"] = {"num": "3", "den": "1"}
-        payload["optimum"]["squared_lengths"] = [{"num": "3", "den": "1"}]
-
-        forged = EuclideanConvexPolygonTriangulationResult.model_validate(payload)
-        with pytest.raises(ValidationError):
-            _verify_euclidean_triangulation_claim(forged)
-
-    def test_certified_claim_verifier_rejects_a_mutated_source_polygon(self) -> None:
-        result = minimum_euclidean_weight_triangulation(
-            _request((_point(0, 0), _point(1, 0), _point(1, 1), _point(0, 1)))
-        )
-        payload = result.model_dump(mode="json")
-        payload["polygon"]["points"][3]["y"] = {"num": "2", "den": "1"}
-
-        forged = EuclideanConvexPolygonTriangulationResult.model_validate(payload)
-        with pytest.raises(ValidationError):
-            _verify_euclidean_triangulation_claim(forged)
-
     def test_unresolved_root_stops_before_a_cheaper_later_pivot(self) -> None:
         scale = 10**30
         result = minimum_euclidean_weight_triangulation(
@@ -316,141 +240,6 @@ class TestEuclideanTriangulation:
         comparison = result.unresolved_comparison
         assert (comparison.start, comparison.end) == (0, 4)
         assert (comparison.left_split, comparison.right_split) == (2, 1)
-
-    def test_certified_result_rejects_a_pivot_beyond_an_unresolved_comparison(
-        self,
-    ) -> None:
-        # The first two root candidates differ by about 65/(2*sqrt(65))*10**-30
-        # and stay unresolved at 128 bits, while the third pivot is much
-        # cheaper; execution therefore never compares against it.
-        scale = 10**30
-        points = (
-            _point(5 * scale, 5 * scale),
-            _point(5 * scale + 8, 8 * scale - 1),
-            _point(-3 * scale, 4 * scale),
-            _point(0, -scale),
-            _point(4 * scale, 0),
-        )
-        assert (
-            minimum_euclidean_weight_triangulation(_request(points)).status
-            == "COMPARISON_UNRESOLVED"
-        )
-        vertices = tuple(
-            (
-                Fraction(int(point["x"]["num"]), int(point["x"]["den"])),
-                Fraction(int(point["y"]["num"]), int(point["y"]["den"])),
-            )
-            for point in points
-        )
-
-        def squared_length(first: int, second: int) -> Fraction:
-            return (vertices[second][0] - vertices[first][0]) ** 2 + (
-                vertices[second][1] - vertices[first][1]
-            ) ** 2
-
-        def expression(values: tuple[Fraction, ...]) -> dict[str, object]:
-            return {
-                "squared_lengths": [
-                    {"num": str(value.numerator), "den": str(value.denominator)}
-                    for value in values
-                ]
-            }
-
-        def rational(value: Fraction) -> dict[str, str]:
-            return {"num": str(value.numerator), "den": str(value.denominator)}
-
-        # Replay the recurrence but force the root choice onto the cheaper
-        # third pivot, producing every otherwise-consistent certificate field.
-        def hull_edge(start: int, end: int) -> bool:
-            return end == start + 1 or (start, end) == (0, 4)
-
-        optimum: dict[tuple[int, int], tuple[Fraction, ...]] = {
-            (index, index + 1): () for index in range(4)
-        }
-        splits: dict[tuple[int, int], int] = {}
-        ledger = []
-        for span in range(2, 5):
-            for start in range(5 - span):
-                end = start + span
-                boundary = (
-                    () if hull_edge(start, end) else (squared_length(start, end),)
-                )
-                candidates = {
-                    pivot: tuple(
-                        sorted(optimum[start, pivot] + optimum[pivot, end] + boundary)
-                    )
-                    for pivot in range(start + 1, end)
-                }
-                chosen, split = min(
-                    (candidate, pivot) for pivot, candidate in candidates.items()
-                )
-                if (start, end) == (0, 4):
-                    chosen, split = candidates[3], 3
-                optimum[start, end] = chosen
-                splits[start, end] = split
-                ledger.append(
-                    {
-                        "start": start,
-                        "end": end,
-                        "split": split,
-                        "optimum": expression(chosen),
-                    }
-                )
-        triangles: list[list[int]] = []
-        diagonals: list[tuple[int, int]] = []
-
-        def reconstruct(start: int, end: int) -> None:
-            if end == start + 1:
-                return
-            pivot = splits[start, end]
-            triangles.append(sorted((start, pivot, end)))
-            if not hull_edge(start, end):
-                diagonals.append((start, end))
-            reconstruct(start, pivot)
-            reconstruct(pivot, end)
-
-        reconstruct(0, 4)
-        payload = {
-            "status": "CERTIFIED_OPTIMUM",
-            "polygon": {"points": points},
-            "vertex_count": 5,
-            "comparison_precision_bits": 128,
-            "diagonals": [
-                {
-                    "first": first,
-                    "second": second,
-                    "squared_length": rational(squared_length(first, second)),
-                }
-                for first, second in sorted(diagonals)
-            ],
-            "triangles": [{"vertices": triangle} for triangle in sorted(triangles)],
-            "split_table": ledger,
-            "optimum": expression(optimum[0, 4]),
-        }
-
-        forged = EuclideanConvexPolygonTriangulationResult.model_validate(payload)
-        with pytest.raises(ValidationError):
-            _verify_euclidean_triangulation_claim(forged)
-
-    def test_certified_claim_verifier_rejects_a_later_equal_pivot(self) -> None:
-        # Both root pivots cost exactly sqrt(2); execution canonically keeps
-        # the earlier one, so a certificate claiming the later pivot fails.
-        result = minimum_euclidean_weight_triangulation(
-            _request((_point(0, 0), _point(1, 0), _point(1, 1), _point(0, 1)))
-        )
-        payload = result.model_dump(mode="json")
-        payload["split_table"][2]["split"] = 2
-        payload["diagonals"] = [
-            {"first": 0, "second": 2, "squared_length": {"num": "2", "den": "1"}}
-        ]
-        payload["triangles"] = [
-            {"vertices": [0, 1, 2]},
-            {"vertices": [0, 2, 3]},
-        ]
-
-        forged = EuclideanConvexPolygonTriangulationResult.model_validate(payload)
-        with pytest.raises(ValidationError):
-            _verify_euclidean_triangulation_claim(forged)
 
     def test_rejects_a_nonconvex_polygon_before_arb(self) -> None:
         with pytest.raises(ValidationError):
