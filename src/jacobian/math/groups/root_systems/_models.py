@@ -8,7 +8,6 @@ from pydantic import Field, model_validator
 from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
-from jacobian.math.groups.root_systems._cartan import require_finite_type
 
 MAX_RANK = 8
 MAX_REFLECTION_COORDINATE = ((1 << 53) - 1) // (1 + 3 * MAX_RANK)
@@ -48,7 +47,6 @@ class CartanMatrixRequest(StrictModel):
             if self.matrix[i][i] != 2:
                 raise _validation_error("diagonal_entry", "diagonal entries must be 2")
         self._check_off_diagonal(n)
-        require_finite_type(self.matrix)
         return self
 
     def _check_off_diagonal(self, n: int) -> None:

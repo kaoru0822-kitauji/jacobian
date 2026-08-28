@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.groups.root_systems._cartan import (
     connected_components,
     simple_reflection,
@@ -22,14 +23,30 @@ from jacobian.math.groups.root_systems._models import (
 MAX_SIGNED_ROOT_ACTION_DEGREE = 240
 
 
+def _admit_cartan_finite_type(matrix: tuple[tuple[int, ...], ...]) -> None:
+    """Admit the finite-type Cartan domain before invoking a root kernel."""
+    from jacobian.math.groups.root_systems._cartan import require_finite_type
+
+    try:
+        require_finite_type(matrix)
+    except ValueError as error:
+        raise OperationDomainValidationError(
+            location=("matrix",),
+            code="root_system.finite_type",
+            message=str(error),
+        ) from error
+
+
 def compute_positive_roots(request: CartanMatrixRequest) -> PositiveRootsResult:
     """Compute all positive roots of a root system from its Cartan matrix."""
+    _admit_cartan_finite_type(request.matrix)
     all_positive = enumerate_positive_roots(request.matrix)
     return PositiveRootsResult._from_kernel(request, all_positive)
 
 
 def compute_root_system_data(request: CartanMatrixRequest) -> RootSystemDataResult:
     """Compute complete root system data from a Cartan matrix."""
+    _admit_cartan_finite_type(request.matrix)
     n = len(request.matrix)
     simple_roots = tuple(tuple(int(i == j) for j in range(n)) for i in range(n))
     roots = enumerate_positive_roots(request.matrix)
@@ -107,6 +124,7 @@ def compute_simple_reflection(
     request: SimpleReflectionRequest,
 ) -> SimpleReflectionResult:
     """Apply a simple reflection to a root lattice vector."""
+    _admit_cartan_finite_type(request.matrix)
     reflected = tuple(
         _apply_reflection(
             [list(row) for row in request.matrix],
@@ -119,6 +137,7 @@ def compute_simple_reflection(
 
 def compute_weyl_group_order(request: CartanMatrixRequest) -> WeylGroupOrderResult:
     """Compute the exact order of a finite Weyl group without enumeration."""
+    _admit_cartan_finite_type(request.matrix)
     return WeylGroupOrderResult._from_kernel(request, _weyl_group_order(request.matrix))
 
 

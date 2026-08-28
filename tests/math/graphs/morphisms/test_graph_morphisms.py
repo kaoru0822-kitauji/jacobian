@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian.canonical import CanonicalLimits
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.morphisms import _models as morphism_models
 from jacobian.math.graphs.morphisms._models import (
     GraphHomomorphism,
@@ -180,15 +181,20 @@ def test_homomorphism_check_preflights_retained_result_bytes(
 ) -> None:
     small_limit = CanonicalLimits(max_output_bytes=400)
     monkeypatch.setattr(morphism_models, "CanonicalLimits", lambda: small_limit)
+    monkeypatch.setattr(
+        "jacobian.math.graphs.morphisms._operations.CanonicalLimits",
+        lambda: small_limit,
+    )
 
-    with pytest.raises(ValidationError):
-        _vertex_map(
-            ("a" * 100,),
-            (),
-            ("b" * 100,),
-            (),
-            (("a" * 100, "b" * 100),),
-        )
+    vertex_map = _vertex_map(
+        ("a" * 100,),
+        (),
+        ("b" * 100,),
+        (),
+        (("a" * 100, "b" * 100),),
+    )
+    with pytest.raises(OperationDomainValidationError):
+        compute_homomorphism_check(HomomorphismCheckRequest(vertex_map=vertex_map))
 
 
 def _canonical_graph(
@@ -282,10 +288,14 @@ class TestFixedLengthCycle:
         import pytest
 
         from jacobian.math.graphs.morphisms._models import FixedLengthCycleRequest
+        from jacobian.math.graphs.morphisms._operations import (
+            compute_fixed_length_cycle,
+        )
 
         g = self._g(["a", "b", "c"], [["a", "b"], ["b", "c"], ["a", "c"]])
-        with pytest.raises(ValueError):
-            FixedLengthCycleRequest(graph=g, length=4)
+        request = FixedLengthCycleRequest(graph=g, length=4)
+        with pytest.raises(OperationDomainValidationError):
+            compute_fixed_length_cycle(request)
 
     def test_composes_with_canonical_graph(self) -> None:
         # Verify direct composition with graph API: explicit_graph output can be passed unchanged.
@@ -470,11 +480,15 @@ class TestSubgraphPatternFind:
         from jacobian.math.graphs.morphisms._models import (
             SubgraphPatternFindRequest,
         )
+        from jacobian.math.graphs.morphisms._operations import (
+            compute_subgraph_pattern_find,
+        )
 
         pat = self._g(["x", "y", "z"], [["x", "y"], ["y", "z"]])
         host = self._g(["a", "b"], [["a", "b"]])
-        with pytest.raises(ValueError):
-            SubgraphPatternFindRequest(pattern=pat, host=host)
+        request = SubgraphPatternFindRequest(pattern=pat, host=host)
+        with pytest.raises(OperationDomainValidationError):
+            compute_subgraph_pattern_find(request)
 
     def test_composes_with_canonical_graph(self) -> None:
         from jacobian.math.graphs.morphisms._models import SubgraphPatternFindRequest
@@ -510,6 +524,9 @@ class TestSubgraphPatternFind:
         import pytest
 
         from jacobian.math.graphs.morphisms._models import FixedLengthCycleRequest
+        from jacobian.math.graphs.morphisms._operations import (
+            compute_fixed_length_cycle,
+        )
 
         # An edgeless 20-vertex graph with one multi-megabyte NFC label fits
         # the canonical input limit, but the result echoes the graph and adds
@@ -517,8 +534,9 @@ class TestSubgraphPatternFind:
         huge = "v" * (6 * 1024 * 1024)
         labels = [huge] + [f"w{i}" for i in range(19)]
         g = self._g(labels, [])
-        with pytest.raises(ValueError):
-            FixedLengthCycleRequest(graph=g, length=3)
+        request = FixedLengthCycleRequest(graph=g, length=3)
+        with pytest.raises(OperationDomainValidationError):
+            compute_fixed_length_cycle(request)
 
     def test_negative_decision_is_structural_inside_request_domain(self) -> None:
         import pytest

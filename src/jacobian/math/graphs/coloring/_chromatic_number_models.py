@@ -462,16 +462,6 @@ class ChromaticNumberCertificateCheckRequest(StrictModel):
         ),
     )
 
-    @model_validator(mode="after")
-    def require_bounded_sources(self) -> Self:
-        _require_bounded_sources(
-            self.graph,
-            self.claimed_chromatic_number,
-            self.coloring,
-            self.weights,
-        )
-        return self
-
 
 class ChromaticNumberCertificateCheckResult(StrictModel):
     """Source-bound acceptance or concrete rejection of one optimum certificate."""

@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+from pydantic_core import PydanticCustomError
+
+from jacobian.canonical import CanonicalLimits, encode_strict_json
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.morphisms._models import (
+    _RESULT_ENVELOPE_RESERVE_BYTES,
     MAX_CYCLE_SEARCH_PATHS,
+    MORPHISM_MAX_VERTICES,
     FixedLengthCycleRequest,
     FixedLengthCycleResult,
     GraphHomomorphism,
@@ -12,13 +18,125 @@ from jacobian.math.graphs.morphisms._models import (
     HomomorphismCheckResult,
     SubgraphPatternFindRequest,
     SubgraphPatternFindResult,
+    _canonical_max_degree,
     _first_homomorphism_obstruction,
+    _label_wire_bytes,
+    _require_output_headroom,
 )
+from jacobian.math.graphs.values import simple_undirected_graph_wire_bytes
+
+
+def _admit_cycle_request(request: FixedLengthCycleRequest) -> None:
+    """Admit the cross-field search and retained-result envelope."""
+    n = len(request.graph.vertices)
+    if n > MORPHISM_MAX_VERTICES:
+        raise OperationDomainValidationError(
+            location=("graph",),
+            code="graph.cycle.vertex_bound",
+            message=f"graph must have at most {MORPHISM_MAX_VERTICES} vertices",
+        )
+    if request.length > n:
+        raise OperationDomainValidationError(
+            location=("length",),
+            code="graph.cycle.length_bound",
+            message="cycle length must not exceed the vertex count",
+        )
+    work = n * (_canonical_max_degree(request.graph) ** (request.length - 1))
+    if work > MAX_CYCLE_SEARCH_PATHS:
+        raise OperationDomainValidationError(
+            location=("length",),
+            code="graph.cycle.search_bound",
+            message=(
+                "fixed-length cycle search exceeds the "
+                f"{MAX_CYCLE_SEARCH_PATHS}-path work budget"
+            ),
+        )
+    try:
+        _require_output_headroom(
+            simple_undirected_graph_wire_bytes(request.graph),
+            _label_wire_bytes(request.graph.vertices),
+            "fixed-length cycle",
+        )
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=("graph",), code="graph.cycle.output_bound", message=str(exc)
+        ) from exc
+
+
+def _admit_homomorphism_request(request: HomomorphismCheckRequest) -> None:
+    """Admit the source-bound result envelope for a map check."""
+    vertex_map = request.vertex_map
+    max_label_bytes = max(
+        (
+            len(encode_strict_json(label))
+            for label in vertex_map.source_graph.vertices
+            + vertex_map.target_graph.vertices
+        ),
+        default=0,
+    )
+    estimated_result_bytes = (
+        len(encode_strict_json(vertex_map.model_dump(mode="json")))
+        + 4 * max_label_bytes
+        + _RESULT_ENVELOPE_RESERVE_BYTES
+    )
+    output_limit = CanonicalLimits().max_output_bytes
+    if estimated_result_bytes > output_limit:
+        raise OperationDomainValidationError(
+            location=("vertex_map",),
+            code="graph.homomorphism.output_bound",
+            message=(
+                "the source-bound graph-homomorphism result would exceed the "
+                f"{output_limit}-byte canonical output limit"
+            ),
+        )
+
+
+def _admit_subgraph_request(request: SubgraphPatternFindRequest) -> None:
+    """Admit the cross-field search and retained-result envelope."""
+    pattern_size = len(request.pattern.vertices)
+    if pattern_size > MORPHISM_MAX_VERTICES:
+        raise OperationDomainValidationError(
+            location=("pattern",),
+            code="graph.subgraph.pattern_vertex_bound",
+            message=f"pattern must have at most {MORPHISM_MAX_VERTICES} vertices",
+        )
+    if pattern_size > len(request.host.vertices):
+        raise OperationDomainValidationError(
+            location=("pattern",),
+            code="graph.subgraph.pattern_size_bound",
+            message="pattern must not have more vertices than the host",
+        )
+    assignments = 1
+    for step in range(pattern_size):
+        assignments *= len(request.host.vertices) - step
+        if assignments > MAX_CYCLE_SEARCH_PATHS:
+            raise OperationDomainValidationError(
+                location=("pattern", "host"),
+                code="graph.subgraph.search_bound",
+                message=(
+                    "subgraph-pattern search exceeds the "
+                    f"{MAX_CYCLE_SEARCH_PATHS}-assignment work budget"
+                ),
+            )
+    try:
+        _require_output_headroom(
+            simple_undirected_graph_wire_bytes(request.pattern)
+            + simple_undirected_graph_wire_bytes(request.host),
+            _label_wire_bytes(request.host.vertices),
+            "subgraph-pattern",
+        )
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=("pattern", "host"),
+            code="graph.subgraph.output_bound",
+            message=str(exc),
+        ) from exc
 
 
 def compute_homomorphism_check(
     request: HomomorphismCheckRequest,
 ) -> HomomorphismCheckResult:
+    _admit_homomorphism_request(request)
     obstruction = _first_homomorphism_obstruction(request.vertex_map)
     if obstruction is None:
         return HomomorphismCheckResult._from_kernel(
@@ -101,6 +219,7 @@ def compute_fixed_length_cycle(
     a subgraph and may have chords; this is distinct from girth (shortest
     cycle) and from Hamiltonicity (spanning).
     """
+    _admit_cycle_request(request)
     graph = request.graph
     k = request.length
     found = find_cycle_of_length(graph.vertices, graph.edges, k)
@@ -264,6 +383,7 @@ def compute_subgraph_pattern_find(
     Returns ``EXISTS`` with one witness vertex map (ordered by pattern vertex
     order) or ``DOES_NOT_EXIST`` after exhaustive bounded search.
     """
+    _admit_subgraph_request(request)
     try:
         found = find_subgraph_embedding(
             request.pattern.vertices,

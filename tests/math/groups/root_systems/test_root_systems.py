@@ -3,6 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.groups.root_systems._models import CartanMatrixRequest
 from jacobian.math.groups.root_systems._operations import compute_root_system_data
 
@@ -13,6 +14,7 @@ A3: CartanMatrix = ((2, -1, 0), (-1, 2, -1), (0, -1, 2))
 G2: CartanMatrix = ((2, -3), (-1, 2))
 B2: CartanMatrix = ((2, -2), (-1, 2))
 A1_X_A2: CartanMatrix = ((2, 0, 0), (0, 2, -1), (0, -1, 2))
+A2_AFFINE: CartanMatrix = ((2, -1, -1), (-1, 2, -1), (-1, -1, 2))
 D4: CartanMatrix = (
     (2, -1, 0, 0),
     (-1, 2, -1, -1),
@@ -52,6 +54,12 @@ class TestCartanMatrix:
         with pytest.raises(ValidationError) as exc_info:
             CartanMatrixRequest.model_validate({"matrix": [[2, 1], [-1, 2]]})
         assert exc_info.value.errors()[0]["type"] == "root_system.positive_off_diagonal"
+
+    def test_finite_type_is_admitted_by_the_owner_operation(self) -> None:
+        request = CartanMatrixRequest(matrix=A2_AFFINE)
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_root_system_data(request)
+        assert exc_info.value.errors()[0]["type"] == "root_system.finite_type"
 
 
 class TestRootSystemData:

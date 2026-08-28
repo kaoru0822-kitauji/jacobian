@@ -9,10 +9,7 @@ from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
 from jacobian.canonical import CanonicalLimits, encode_strict_json
-from jacobian.math.graphs.values import (
-    SimpleUndirectedGraph,
-    simple_undirected_graph_wire_bytes,
-)
+from jacobian.math.graphs.values import SimpleUndirectedGraph
 
 # Exhaustive backtracking search over graph morphisms is exponential in the
 # vertex count.  This dedicated bound keeps every search-based morphism
@@ -81,24 +78,6 @@ class GraphVertexMap(StrictModel):
                 "vertex-map targets must be declared target-graph vertices",
             )
 
-        max_obstruction_label_bytes = max(
-            (
-                len(encode_strict_json(label))
-                for label in self.source_graph.vertices + self.target_graph.vertices
-            ),
-            default=0,
-        )
-        estimated_result_bytes = (
-            len(encode_strict_json(self.model_dump(mode="json")))
-            + 4 * max_obstruction_label_bytes
-            + _RESULT_ENVELOPE_RESERVE_BYTES
-        )
-        if estimated_result_bytes > CanonicalLimits().max_output_bytes:
-            raise PydanticCustomError(
-                "graph.source_bound_homomorphism_result_would_exceed_canonicallimits",
-                "the source-bound graph-homomorphism result would exceed the "
-                f"{CanonicalLimits().max_output_bytes}-byte canonical output limit",
-            )
         return self
 
 
@@ -251,37 +230,6 @@ class FixedLengthCycleRequest(StrictModel):
         )
     )
     length: int = Field(ge=3, le=MORPHISM_MAX_VERTICES)
-
-    @model_validator(mode="after")
-    def require_length_within_graph(self) -> Self:
-        n = len(self.graph.vertices)
-        if n > MORPHISM_MAX_VERTICES:
-            raise PydanticCustomError(
-                "graph.have_at_most_morphism_max_vertices_vertices",
-                f"graph must have at most {MORPHISM_MAX_VERTICES} vertices",
-            )
-        if self.length > n:
-            raise PydanticCustomError(
-                "graph.cycle_length_must_not_exceed_the_vertex_count",
-                "cycle length must not exceed the vertex count",
-            )
-        # Conservative worst-case path-count bound: n * d^(length-1).
-        d_max = _canonical_max_degree(self.graph)
-        work = n * (d_max ** (self.length - 1))
-        if work > MAX_CYCLE_SEARCH_PATHS:
-            raise PydanticCustomError(
-                "graph.fixed_length_cycle_search_exceeds_max_search",
-                "fixed-length cycle search exceeds the "
-                f"{MAX_CYCLE_SEARCH_PATHS}-path work budget",
-            )
-        # The result echoes its source graph; reserve output headroom for
-        # the envelope and witness labels beyond that echo.
-        _require_output_headroom(
-            simple_undirected_graph_wire_bytes(self.graph),
-            _label_wire_bytes(self.graph.vertices),
-            "fixed-length cycle",
-        )
-        return self
 
 
 def _cycle_source_edges(
@@ -449,41 +397,6 @@ class SubgraphPatternFindRequest(StrictModel):
         description="Canonical pattern graph with at most 64 vertices."
     )
     host: SimpleUndirectedGraph = Field(description="Canonical host graph.")
-
-    @model_validator(mode="after")
-    def require_search_bounded(self) -> Self:
-        if len(self.pattern.vertices) > MORPHISM_MAX_VERTICES:
-            raise PydanticCustomError(
-                "graph.pattern_have_at_most_morphism_max_vertices",
-                f"pattern must have at most {MORPHISM_MAX_VERTICES} vertices",
-            )
-        if len(self.pattern.vertices) > len(self.host.vertices):
-            raise PydanticCustomError(
-                "graph.pattern_must_not_have_more_vertices_than_the_hos",
-                "pattern must not have more vertices than the host",
-            )
-        # Conservative worst-case assignment count: P(n, k) injective maps.
-        n = len(self.host.vertices)
-        k = len(self.pattern.vertices)
-        assignments = 1
-        for step in range(k):
-            assignments *= n - step
-            if assignments > MAX_CYCLE_SEARCH_PATHS:
-                raise PydanticCustomError(
-                    "graph.subgraph_pattern_search_exceeds_max_search_paths",
-                    "subgraph-pattern search exceeds the "
-                    f"{MAX_CYCLE_SEARCH_PATHS}-assignment work budget",
-                )
-
-        # The result echoes both source graphs; reserve output headroom for
-        # the envelope and witness labels beyond those echoes.
-        _require_output_headroom(
-            simple_undirected_graph_wire_bytes(self.pattern)
-            + simple_undirected_graph_wire_bytes(self.host),
-            _label_wire_bytes(self.host.vertices),
-            "subgraph-pattern",
-        )
-        return self
 
 
 def _validate_embedding_witness(

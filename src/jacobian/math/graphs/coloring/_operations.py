@@ -15,6 +15,7 @@ from jacobian.math.graphs.coloring._chromatic_number_models import (
     ChromaticNumberCertificateCheckRequest,
     ChromaticNumberCertificateCheckResult,
     _evaluate_chromatic_number_certificate,
+    _require_bounded_sources,
 )
 from jacobian.math.graphs.coloring._models import (
     EdgeColoringAssignment,
@@ -51,6 +52,23 @@ _WORKER_ERROR_BYTES = 16_384
 _WORKER_ADDRESS_SPACE_BYTES = 1_536 * 1024 * 1024
 _WORKER_FILE_SIZE_BYTES = 1_024 * 1_024
 _ColoringWorkerOutcome = Literal["sat", "unsat", "budget_exceeded", "execution_failed"]
+
+
+def _admit_chromatic_number_certificate(
+    request: ChromaticNumberCertificateCheckRequest,
+) -> None:
+    """Admit the exact replay and retained-result envelope."""
+    try:
+        _require_bounded_sources(
+            request.graph,
+            request.claimed_chromatic_number,
+            request.coloring,
+            request.weights,
+        )
+    except PydanticCustomError as error:
+        raise OperationDomainValidationError(
+            location=(), code=error.type, message=str(error)
+        ) from error
 
 
 def _admit_k_colorability(request: KColorabilityRequest) -> None:
@@ -200,6 +218,7 @@ def compute_chromatic_number_certificate_check(
     request: ChromaticNumberCertificateCheckRequest,
 ) -> ChromaticNumberCertificateCheckResult:
     """Check a proper coloring and exact fractional-clique lower certificate."""
+    _admit_chromatic_number_certificate(request)
     evaluation = _evaluate_chromatic_number_certificate(
         request.graph,
         request.claimed_chromatic_number,
