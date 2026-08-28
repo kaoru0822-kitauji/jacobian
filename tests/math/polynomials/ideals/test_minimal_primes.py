@@ -8,7 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
-from jacobian.catalog.models import OperationResult
+from jacobian.catalog.models import OperationDomainValidationError, OperationResult
 from jacobian.math.polynomials.ideals import _operations as operations_module
 from jacobian.math.polynomials.ideals._models import (
     MAX_OUTPUT_GENERATORS,
@@ -567,7 +567,7 @@ def test_certified_families_above_the_envelope_are_rejected_before_launch(
 
     for variable_count in (5, 6, 7):
         variables = tuple(f"x{index}" for index in range(1, variable_count + 1))
-        with pytest.raises(ValidationError):
+        with pytest.raises(OperationDomainValidationError):
             compute_ideal_minimal_primes(
                 IdealMinimalPrimesRequest(
                     ideal=_product_ideal(variables, (2,) * variable_count)
@@ -612,8 +612,10 @@ def test_negative_root_certificate_rejects_and_admits_at_the_boundary() -> None:
             ),
         )
 
-    with pytest.raises(ValidationError):
-        IdealMinimalPrimesRequest(ideal=unit_offset_ideal(5))
+    with pytest.raises(OperationDomainValidationError):
+        compute_ideal_minimal_primes(
+            IdealMinimalPrimesRequest(ideal=unit_offset_ideal(5))
+        )
 
     request = IdealMinimalPrimesRequest(ideal=unit_offset_ideal(4))
 
@@ -733,8 +735,10 @@ def test_coupling_generators_remove_infeasible_root_choices() -> None:
 
     partially_coupled = coupled_ideal(7, 2)
 
-    with pytest.raises(ValidationError):
-        IdealMinimalPrimesRequest(ideal=partially_coupled)
+    with pytest.raises(OperationDomainValidationError):
+        compute_ideal_minimal_primes(
+            IdealMinimalPrimesRequest(ideal=partially_coupled)
+        )
 
 
 def test_incompatible_extra_generators_block_certification_entirely() -> None:
@@ -1009,7 +1013,7 @@ def test_irreducible_constraint_overflow_is_rejected_before_launch(
     _forbid_verifier(monkeypatch)
 
     variables = tuple(f"x{index}" for index in range(1, 6))
-    with pytest.raises(ValidationError):
+    with pytest.raises(OperationDomainValidationError):
         compute_ideal_minimal_primes(
             IdealMinimalPrimesRequest(
                 ideal=_ideal(

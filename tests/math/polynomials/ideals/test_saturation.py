@@ -7,6 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.polynomials.ideals._models import IdealSaturationRequest
 from jacobian.math.polynomials.ideals._operations import compute_ideal_saturation
 from jacobian.math.polynomials.values import (
@@ -149,8 +150,9 @@ class TestIdealSaturation:
 
         ideal = _ideal(("x", "y"), {(1, 1): 1})
         denominator = _polynomial(("x", "y"), {})
-        with pytest.raises(ValidationError):
-            IdealSaturationRequest(ideal=ideal, denominator=denominator)
+        request = IdealSaturationRequest(ideal=ideal, denominator=denominator)
+        with pytest.raises(OperationDomainValidationError):
+            compute_ideal_saturation(request)
 
     def test_mismatched_rings_rejected(self) -> None:
         """Saturation operands must use the same ordered ring."""
@@ -164,8 +166,9 @@ class TestIdealSaturation:
 
         ideal = _ideal(("x",), {(2,): 1})
         denominator = _polynomial(("x",), {(21,): 1})
-        with pytest.raises(ValidationError):
-            IdealSaturationRequest(ideal=ideal, denominator=denominator)
+        request = IdealSaturationRequest(ideal=ideal, denominator=denominator)
+        with pytest.raises(OperationDomainValidationError):
+            compute_ideal_saturation(request)
 
     @requires_singular
     @pytest.mark.requires_backend("singular")
