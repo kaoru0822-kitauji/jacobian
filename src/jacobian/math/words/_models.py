@@ -101,7 +101,8 @@ class FactorsLengthResult(FactorsLengthRequest):
         occurrences: tuple[tuple[int, ...], ...],
     ) -> Self:
         return cls.model_construct(
-            **request.model_dump(),
+            word=request.word,
+            factor_length=request.factor_length,
             factors=factors,
             occurrences=occurrences,
             multiplicities=tuple(len(indices) for indices in occurrences),
@@ -159,7 +160,7 @@ class PeriodsResult(PeriodsRequest):
         is_primitive: bool,
     ) -> Self:
         return cls.model_construct(
-            **request.model_dump(),
+            word=request.word,
             periods=periods,
             least_period=least_period,
             is_primitive=is_primitive,
@@ -197,7 +198,7 @@ class IncidenceMatrixResult(IncidenceMatrixRequest):
     def _from_kernel(
         cls, request: IncidenceMatrixRequest, matrix: tuple[tuple[int, ...], ...]
     ) -> Self:
-        return cls.model_construct(**request.model_dump(), matrix=matrix)
+        return cls.model_construct(morphism=request.morphism, matrix=matrix)
 
 
 class SubstitutionDependencyGraphRequest(StrictModel):
@@ -224,7 +225,7 @@ class SubstitutionDependencyGraphResult(SubstitutionDependencyGraphRequest):
         request: SubstitutionDependencyGraphRequest,
         graph: SubstitutionDependencyGraph,
     ) -> Self:
-        return cls.model_construct(**request.model_dump(), graph=graph)
+        return cls.model_construct(substitution=request.substitution, graph=graph)
 
 
 class SubstitutionPrimitivityProfileRequest(StrictModel):
@@ -305,7 +306,7 @@ class SubstitutionPrimitivityProfileResult(SubstitutionPrimitivityProfileRequest
         ],
     ) -> Self:
         return cls.model_construct(
-            **request.model_dump(),
+            dependency_graph=request.dependency_graph,
             strongly_connected_components=strongly_connected_components,
             irreducible=irreducible,
             aperiodic=aperiodic,
@@ -378,7 +379,8 @@ class SubstitutionFixedPointPrefixResult(SubstitutionFixedPointPrefixRequest):
         retained_prefix_lengths: tuple[int, ...],
     ) -> Self:
         return cls.model_construct(
-            **request.model_dump(),
+            source=request.source,
+            prefix_length=request.prefix_length,
             prefix=prefix,
             least_iterate_depth=least_iterate_depth,
             retained_prefix_lengths=retained_prefix_lengths,
