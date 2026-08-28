@@ -13,6 +13,7 @@ MAX_ZETA_COEFFICIENT_DIGITS = 128
 MAX_ZETA_RESULT_DIGITS = 100_000
 MAX_ZETA_WORK = 13_000_000
 MAX_PERIODIC_PROFILE_DIGITS = 100_000
+MAX_PERIODIC_PROFILE_WORK = 10_000_000
 
 
 def enumeration_size(alphabet_size: int, block_length: int) -> int:
@@ -95,6 +96,7 @@ def require_zeta_budget(shift: AdjacencyShift) -> None:
 
 __all__ = [
     "MAX_PERIODIC_PROFILE_DIGITS",
+    "MAX_PERIODIC_PROFILE_WORK",
     "enumeration_size",
     "normalize_forbidden_blocks",
     "presentation_memory",

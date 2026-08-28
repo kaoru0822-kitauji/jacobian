@@ -15,6 +15,7 @@ from jacobian.math.polynomials._conversions import (
 from jacobian.math.polynomials.values import RationalFunction, RationalPolynomial
 from jacobian.math.symbolic_dynamics._bounds import (
     MAX_PERIODIC_PROFILE_DIGITS,
+    MAX_PERIODIC_PROFILE_WORK,
     enumeration_size,
     normalize_forbidden_blocks,
     presentation_memory,
@@ -244,7 +245,7 @@ def periodic_point_profile(
         raise ValueError("max period is outside the supported bounds")
     matrix = shift.matrix
     states = len(matrix)
-    if states**3 * max_period > 10_000_000:
+    if states**3 * max_period > MAX_PERIODIC_PROFILE_WORK:
         raise ValueError("periodic-point matrix powering exceeds the work bound")
     maximum_row_sum = max(sum(row) for row in matrix)
     count_bound = states * max(1, maximum_row_sum) ** max_period
