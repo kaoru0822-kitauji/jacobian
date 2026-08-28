@@ -1,11 +1,9 @@
-"""Typed contracts and bounded replay for finite difference-set operations."""
+"""Typed contracts for finite difference-set operations."""
 
 from __future__ import annotations
 
-import itertools
 import math
 from collections import Counter
-from collections.abc import Iterator
 from typing import Annotated, Literal, Self
 
 from pydantic import Field, StrictBool, StrictInt, StringConstraints, model_validator
@@ -93,31 +91,23 @@ class IntegerSidonResult(StrictModel):
                 "combinatorics.sidon_invariant",
                 "normalized Sidon elements must be sorted and unique",
             )
-        expected = tuple(
-            (left, right, left - right)
-            for left in values
-            for right in values
-            if left != right
-        )
-        actual = tuple(
-            (
-                int(record.minuend),
-                int(record.subtrahend),
-                int(record.difference),
-            )
-            for record in self.ordered_differences
-        )
-        if actual != expected:
-            raise _difference_set_validation_error(
-                "combinatorics.sidon_invariant",
-                "ordered differences must cover every distinct ordered pair canonically",
-            )
-        if self.is_sidon != (len({item[2] for item in expected}) == len(expected)):
-            raise _difference_set_validation_error(
-                "combinatorics.sidon_invariant",
-                "Sidon decision must match the ordered differences",
-            )
         return self
+
+    @classmethod
+    def _from_kernel(
+        cls,
+        *,
+        normalized_elements: tuple[AdditiveInteger, ...],
+        ordered_differences: tuple[OrderedIntegerDifference, ...],
+        is_sidon: bool,
+    ) -> Self:
+        return cls.model_construct(
+            normalized_elements=normalized_elements,
+            ordered_differences=ordered_differences,
+            is_sidon=is_sidon,
+            exactness="EXACT_INTEGER",
+            determinism="DETERMINISTIC",
+        )
 
 
 class CyclicPerfectDifferenceSetRequest(StrictModel):
@@ -231,28 +221,33 @@ class CyclicPerfectDifferenceSetResult(StrictModel):
                 "combinatorics.difference_set_invariant",
                 "cyclic difference profile must cover every nonzero residue",
             )
-        recomputed = _cyclic_difference_multiplicities(residues, self.modulus)
-        if any(item.multiplicity != recomputed[item.residue] for item in profile):
-            raise _difference_set_validation_error(
-                "combinatorics.difference_set_invariant",
-                "cyclic difference multiplicities must be derived from the residues",
-            )
-        missing = tuple(item.residue for item in profile if item.multiplicity == 0)
-        repeated = tuple(item.residue for item in profile if item.multiplicity > 1)
-        if self.missing_residues != missing or self.repeated_residues != repeated:
-            raise _difference_set_validation_error(
-                "combinatorics.invariant",
-                "missing and repeated residues must match the profile",
-            )
-        expected_perfect = (
-            self.modulus == self.expected_modulus and not missing and not repeated
-        )
-        if self.is_perfect != expected_perfect:
-            raise _difference_set_validation_error(
-                "combinatorics.difference_set_invariant",
-                "PDS decision must match the complete residue profile",
-            )
         return self
+
+    @classmethod
+    def _from_kernel(
+        cls,
+        *,
+        modulus: int,
+        normalized_residues: tuple[int, ...],
+        order: int,
+        expected_modulus: int,
+        difference_multiplicities: tuple[CyclicDifferenceMultiplicity, ...],
+        missing_residues: tuple[int, ...],
+        repeated_residues: tuple[int, ...],
+        is_perfect: bool,
+    ) -> Self:
+        return cls.model_construct(
+            modulus=modulus,
+            normalized_residues=normalized_residues,
+            order=order,
+            expected_modulus=expected_modulus,
+            difference_multiplicities=difference_multiplicities,
+            missing_residues=missing_residues,
+            repeated_residues=repeated_residues,
+            is_perfect=is_perfect,
+            exactness="EXACT_FINITE",
+            determinism="DETERMINISTIC",
+        )
 
 
 class CyclicDifferenceSetExtensionRequest(StrictModel):
@@ -267,30 +262,6 @@ class CyclicDifferenceSetExtensionRequest(StrictModel):
             raise _difference_set_validation_error(
                 "combinatorics.extension_invariant",
                 "extension base elements must be unique",
-            )
-        modulus = self.target_order * (self.target_order - 1) + 1
-        if modulus > MAX_CYCLIC_DIFFERENCE_SET_MODULUS:
-            raise _difference_set_validation_error(
-                "combinatorics.extension_invariant",
-                "derived extension modulus exceeds the supported bound",
-            )
-        base_residues = {int(value) % modulus for value in self.base_elements}
-        additional = self.target_order - len(base_residues)
-        if additional < 0:
-            raise _difference_set_validation_error(
-                "combinatorics.invariant",
-                "target_order is smaller than the reduced base set",
-            )
-        if additional > MAX_DIFFERENCE_SET_ADDITIONAL_ELEMENTS:
-            raise _difference_set_validation_error(
-                "combinatorics.extension_invariant",
-                "extension request requires too many added elements",
-            )
-        candidates = math.comb(modulus - len(base_residues), additional)
-        if candidates > MAX_DIFFERENCE_SET_EXTENSION_CANDIDATES:
-            raise _difference_set_validation_error(
-                "combinatorics.extension_invariant",
-                "extension candidate space exceeds the complete-search bound",
             )
         return self
 
@@ -363,35 +334,6 @@ def _require_positive_extension_shape(
         )
 
 
-def _enumerate_extension_candidates(
-    base_residues: tuple[int, ...],
-    target_order: int,
-    modulus: int,
-) -> Iterator[tuple[int, ...]]:
-    """Yield every target_order residue superset of the reduced base set."""
-
-    base_set = set(base_residues)
-    available = tuple(residue for residue in range(modulus) if residue not in base_set)
-    additional = target_order - len(base_residues)
-    for combination in itertools.combinations(available, additional):
-        yield tuple(sorted((*base_residues, *combination)))
-
-
-def _find_extension_witness(
-    base_residues: tuple[int, ...],
-    target_order: int,
-    modulus: int,
-) -> tuple[int, ...] | None:
-    """Return one perfect extension witness, or ``None`` if none exists."""
-
-    for candidate in _enumerate_extension_candidates(
-        base_residues, target_order, modulus
-    ):
-        if _is_perfect_difference_set(candidate, modulus):
-            return candidate
-    return None
-
-
 class CyclicDifferenceSetExtensionResult(StrictModel):
     """A witness or complete negative decision for one fixed PDS order."""
 
@@ -432,12 +374,26 @@ class CyclicDifferenceSetExtensionResult(StrictModel):
                 "combinatorics.extension_invariant",
                 "negative extension decisions require empty witness and full coverage",
             )
-        elif (
-            _find_extension_witness(self.base_residues, self.target_order, self.modulus)
-            is not None
-        ):
-            raise _difference_set_validation_error(
-                "combinatorics.extension_invariant",
-                "negative extension decision must match the exhaustive search",
-            )
         return self
+
+    @classmethod
+    def _from_kernel(
+        cls,
+        *,
+        target_order: int,
+        modulus: int,
+        base_residues: tuple[int, ...],
+        candidate_space_size: int,
+        extension: tuple[int, ...] | None,
+    ) -> Self:
+        return cls.model_construct(
+            target_order=target_order,
+            modulus=modulus,
+            base_residues=base_residues,
+            candidate_space_size=candidate_space_size,
+            decision="EXTENDS" if extension is not None else "DOES_NOT_EXTEND",
+            extension=extension or (),
+            coverage="WITNESS" if extension is not None else "ALL_CANDIDATES",
+            exactness="EXACT_FINITE",
+            determinism="DETERMINISTIC",
+        )

@@ -9,6 +9,7 @@ from typing import Any, cast
 from jacobian._exact import CanonicalRational
 from jacobian.canonical import format_canonical_integer
 from jacobian.math.geometry._models import (
+    INVERSION_ADMISSION_DIGITS,
     CircleInversionRequest,
     CircumcircleRequest,
     CircumradiusProfileRequest,
@@ -41,6 +42,10 @@ from jacobian.math.geometry._models import (
     SegmentIntersectionResult,
     SimplePolygonDecisionResult,
     SimplePolygonPointRequest,
+    _inverted_components_within_bound,
+    _require_circumradius_output_bound,
+    _require_general_position_work_bound,
+    _require_inversion_admission_bound,
 )
 from jacobian.math.geometry._predicates import are_collinear, determinant4
 
@@ -440,6 +445,20 @@ def circle_inversion(request: CircleInversionRequest) -> GeometryPointResult:
     center = request.center
     point = request.point
     power = request.power.as_fraction()
+    if power <= 0:
+        raise ValueError("inversion power must be a positive rational")
+    for value, label in (
+        (center.x, "inversion center x"),
+        (center.y, "inversion center y"),
+        (request.power, "inversion power"),
+        (point.x, "point x"),
+        (point.y, "point y"),
+    ):
+        _require_inversion_admission_bound(value, label)
+    if not _inverted_components_within_bound(
+        center, request.power, point, INVERSION_ADMISSION_DIGITS
+    ):
+        raise ValueError("circle inversion result exceeds the admission bound")
     dx = point.x.as_fraction() - center.x.as_fraction()
     dy = point.y.as_fraction() - center.y.as_fraction()
     norm_squared = dx * dx + dy * dy
@@ -468,6 +487,7 @@ def general_position_search(request: GeneralPositionRequest) -> GeneralPositionR
     """Find all collinear triples and concyclic quadruples in a point configuration."""
     from itertools import combinations
 
+    _require_general_position_work_bound(request.points)
     pts = _points_to_fractions(request.points)
     n = len(pts)
 
@@ -500,11 +520,8 @@ def general_position_search(request: GeneralPositionRequest) -> GeneralPositionR
         if determinant == 0:
             concyclic_quadruples.append(ConcyclicQuadrupleWitness(indices=(i, j, k, m)))
 
-    return GeneralPositionResult(
+    return GeneralPositionResult._from_kernel(
         points=request.points,
-        num_points=n,
-        has_collinear_triple=bool(collinear_triples),
-        has_concyclic_quadruple=bool(concyclic_quadruples),
         collinear_triples=tuple(collinear_triples),
         concyclic_quadruples=tuple(concyclic_quadruples),
     )
@@ -517,6 +534,7 @@ def circumradius_profile(
     from fractions import Fraction
     from itertools import combinations
 
+    _require_circumradius_output_bound(request.points)
     pts = _points_to_fractions(request.points)
     n = len(pts)
 
@@ -549,8 +567,7 @@ def circumradius_profile(
 
     # Ensure deterministic lexicographic order (combinations already yields sorted).
     entries.sort(key=lambda e: e.indices)
-    return CircumradiusProfileResult(
+    return CircumradiusProfileResult._from_kernel(
         points=request.points,
-        num_points=n,
         entries=tuple(entries),
     )

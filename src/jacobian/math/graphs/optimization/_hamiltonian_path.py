@@ -19,6 +19,10 @@ if TYPE_CHECKING:
 def decide_hamiltonian_path(
     request: GraphHamiltonianPathRequest,
 ) -> GraphHamiltonianPathResult:
+    if len(request.graph.vertices) > 18:
+        raise ValueError(
+            "Hamiltonian-path decision supports graphs of order at most 18"
+        )
     graph = cast("nx.Graph[str]", build_simple_graph(request.graph))
     vertices = tuple(sorted(graph))
     order = len(vertices)

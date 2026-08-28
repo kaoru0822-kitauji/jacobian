@@ -8,10 +8,8 @@ from typing import Any
 
 from jacobian.math.combinatorics.finite_structures.hypergraphs._independence_z3 import (
     _solve_independence_number_kernel,
-    _verify_upper_bound_kernel,
 )
 from jacobian.math.combinatorics.finite_structures.hypergraphs._models import (
-    FiniteHypergraph,
     HypergraphIndependenceRequest,
 )
 
@@ -39,20 +37,6 @@ def main() -> int:
                     ensure_ascii=False,
                 )
             )
-            return 0
-        if kind == "verify":
-            hypergraph = FiniteHypergraph.model_validate(payload["hypergraph"])
-            upper_bound = payload["upper_bound"]
-            wall_seconds = payload["wall_seconds"]
-            if (
-                isinstance(upper_bound, bool)
-                or not isinstance(upper_bound, int)
-                or isinstance(wall_seconds, bool)
-                or not isinstance(wall_seconds, int)
-            ):
-                raise ValueError("worker payload has invalid verification bounds")
-            verified = _verify_upper_bound_kernel(hypergraph, upper_bound, wall_seconds)
-            sys.stdout.write(json.dumps(verified))
             return 0
         raise ValueError("worker payload has invalid kind")
     except (KeyError, TypeError, ValueError, json.JSONDecodeError):

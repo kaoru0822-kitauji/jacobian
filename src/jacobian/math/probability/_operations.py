@@ -288,7 +288,7 @@ def _raw_moment(
                 contribution=_wire(contribution),
             )
         )
-    return FiniteRawMomentResult(
+    return FiniteRawMomentResult._from_kernel(
         order=request.order,
         moment=_wire(total),
         contributions=tuple(contributions),
@@ -310,7 +310,7 @@ def _event_probability(
     total = fmpq(0)
     for atom in selected:
         total += _fmpq(atom.probability)
-    return FiniteEventProbabilityResult(
+    return FiniteEventProbabilityResult._from_kernel(
         event_probability=_wire(total),
         selected_atoms=selected,
     )
@@ -339,7 +339,7 @@ def _condition(
         )
         for atom in selected
     )
-    return FiniteConditionResult(
+    return FiniteConditionResult._from_kernel(
         event_probability=_wire(event_probability),
         distribution=FiniteRationalDistribution(
             atoms=tuple(
@@ -377,7 +377,7 @@ def _pushforward(
                 probability=atom.probability,
             )
         )
-    return FinitePushforwardResult(
+    return FinitePushforwardResult._from_kernel(
         distribution=_distribution(aggregated),
         contributions=tuple(contributions),
     )
@@ -407,7 +407,7 @@ def _convolution(
                     probability=_wire(probability),
                 )
             )
-    return FiniteConvolutionResult(
+    return FiniteConvolutionResult._from_kernel(
         distribution=_distribution(aggregated),
         contributions=tuple(contributions),
     )

@@ -6,6 +6,7 @@ from collections.abc import Iterable
 
 import sympy
 
+from jacobian._exact import require_bounded_rational
 from jacobian.math.polynomials._conversions import (
     rational_polynomial_from_sympy,
     rational_polynomial_to_sympy,
@@ -13,13 +14,29 @@ from jacobian.math.polynomials._conversions import (
 )
 from jacobian.math.polynomials.values import RationalPolynomial
 from jacobian.math.polynomials.vector_calculus._models import (
+    _MAX_COEFFICIENT_DIGITS,
+    _MAX_TERMS,
     CurlRequest,
     DirectionalDerivativeRequest,
     ScalarFieldRequest,
     ScalarResult,
     VectorFieldRequest,
     VectorResult,
+    _require_field_polynomial,
 )
+
+
+def _admit_scalar_field(polynomial: RationalPolynomial) -> None:
+    _require_field_polynomial(polynomial, label="scalar field")
+    if len(polynomial.polynomial.terms) * len(polynomial.variables) > _MAX_TERMS:
+        raise ValueError("scalar-field derivatives exceed the result-term budget")
+
+
+def _admit_vector_field(components: tuple[RationalPolynomial, ...]) -> None:
+    for component in components:
+        _require_field_polynomial(component, label="vector-field component")
+    if sum(len(item.polynomial.terms) for item in components) > _MAX_TERMS:
+        raise ValueError("vector-field derivatives exceed the result-term budget")
 
 
 def _wire(expression: sympy.Expr, variables: tuple[str, ...]) -> RationalPolynomial:
@@ -39,6 +56,7 @@ def _expressions(
 
 
 def compute_gradient(request: ScalarFieldRequest) -> VectorResult:
+    _admit_scalar_field(request.polynomial)
     variables = request.polynomial.variables
     expression = rational_polynomial_to_sympy(request.polynomial).as_expr()
     return VectorResult(
@@ -51,6 +69,7 @@ def compute_gradient(request: ScalarFieldRequest) -> VectorResult:
 
 
 def compute_divergence(request: VectorFieldRequest) -> ScalarResult:
+    _admit_vector_field(request.components)
     variables = request.components[0].variables
     expression = sum(
         sympy.diff(component, variable)
@@ -69,6 +88,7 @@ def compute_divergence(request: VectorFieldRequest) -> ScalarResult:
 def compute_curl(request: CurlRequest) -> VectorResult:
     """Return the standard three-dimensional curl of a polynomial field."""
 
+    _admit_vector_field(request.components)
     variables = request.components[0].variables
     x, y, z = symbols_for_variables(variables)
     fx, fy, fz = _expressions(request.components)
@@ -83,6 +103,7 @@ def compute_curl(request: CurlRequest) -> VectorResult:
 
 
 def compute_laplacian(request: ScalarFieldRequest) -> ScalarResult:
+    _admit_scalar_field(request.polynomial)
     variables = request.polynomial.variables
     expression = rational_polynomial_to_sympy(request.polynomial).as_expr()
     laplacian = sum(
@@ -98,6 +119,13 @@ def compute_laplacian(request: ScalarFieldRequest) -> ScalarResult:
 def compute_directional_derivative(
     request: DirectionalDerivativeRequest,
 ) -> ScalarResult:
+    _admit_scalar_field(request.polynomial)
+    for coordinate in request.direction:
+        require_bounded_rational(
+            coordinate,
+            max_digits=_MAX_COEFFICIENT_DIGITS,
+            label="direction coordinate",
+        )
     variables = request.polynomial.variables
     expression = rational_polynomial_to_sympy(request.polynomial).as_expr()
     gradient = (

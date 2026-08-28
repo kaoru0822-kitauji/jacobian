@@ -49,11 +49,6 @@ class ModularPolynomialIdentityRequest(StrictModel):
     left: tuple[ModularPolynomialTerm, ...] = Field(default=(), max_length=_MAX_TERMS)
     right: tuple[ModularPolynomialTerm, ...] = Field(default=(), max_length=_MAX_TERMS)
 
-    @model_validator(mode="after")
-    def require_scope(self) -> Self:
-        _require_identity_admission(self.modulus, self.variables, self.left, self.right)
-        return self
-
 
 class NormalizedModularPolynomialTerm(StrictModel):
     coefficient: StrictInt = Field(ge=1, lt=_MAX_MODULUS)
@@ -93,12 +88,27 @@ class ModularPolynomialIdentityValue(StrictModel):
                 for term in terms
             ):
                 raise ValueError("normalized term is outside result scope")
-        expected = _subtract_normalized(
-            self.normalized_left, self.normalized_right, self.modulus
-        )
-        if self.residual != expected:
-            raise ValueError("residual must equal normalized modular difference")
         return self
+
+    @classmethod
+    def _from_kernel(
+        cls,
+        *,
+        modulus: int,
+        variable_order: tuple[str, ...],
+        normalized_left: tuple[NormalizedModularPolynomialTerm, ...],
+        normalized_right: tuple[NormalizedModularPolynomialTerm, ...],
+        residual: tuple[NormalizedModularPolynomialTerm, ...],
+    ) -> Self:
+        return cls.model_construct(
+            modulus=modulus,
+            variable_order=variable_order,
+            normalized_left=normalized_left,
+            normalized_right=normalized_right,
+            residual=residual,
+            identical=not residual,
+            comparison_scope="FORMAL_COEFFICIENTWISE_IDENTITY",
+        )
 
 
 def _normalize(
@@ -166,13 +176,12 @@ def _compute_modular_polynomial_identity(
     normalized_left = _normalize(left, modulus)
     normalized_right = _normalize(right, modulus)
     residual = _subtract_normalized(normalized_left, normalized_right, modulus)
-    return ModularPolynomialIdentityValue(
+    return ModularPolynomialIdentityValue._from_kernel(
         modulus=modulus,
         variable_order=variables,
         normalized_left=normalized_left,
         normalized_right=normalized_right,
         residual=residual,
-        identical=not residual,
     )
 
 
@@ -209,7 +218,7 @@ def _modular_polynomial_identity_request(
 ) -> ModularPolynomialIdentityValue:
     """Catalog adapter for the strict modular-polynomial identity request."""
 
-    return _compute_modular_polynomial_identity(
+    return modular_polynomial_identity(
         request.modulus, request.variables, request.left, request.right
     )
 

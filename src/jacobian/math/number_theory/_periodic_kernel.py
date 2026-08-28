@@ -277,7 +277,6 @@ def materialize_periodic_union(
 ) -> tuple[int, ...]:
     """Return every occupied representative in canonical increasing order."""
 
-    plan = require_materializable_periodic_source(source, plan)
     if plan.method == "FULL_UNION":
         return () if source.complement else tuple(range(plan.common_period))
     occupied = _sparse_union(source, plan.common_period)

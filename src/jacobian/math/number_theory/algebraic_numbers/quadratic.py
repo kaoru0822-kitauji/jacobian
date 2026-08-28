@@ -158,40 +158,40 @@ class RealQuadraticEmbeddingProfile(StrictModel):
 
     @model_validator(mode="after")
     def bind_profile_to_source(self) -> Self:
-        radical_coefficient = self.source.radical_coefficient.as_fraction()
-        conjugate = RealQuadraticValue(
-            rational_part=self.source.rational_part,
-            radical_coefficient=CanonicalRational.from_fraction(-radical_coefficient),
-            radicand=self.source.radicand,
-        )
-        expected_images = (
-            RealQuadraticEmbeddingImage(embedding="POSITIVE_ROOT", value=self.source),
-            RealQuadraticEmbeddingImage(embedding="NEGATIVE_ROOT", value=conjugate),
-        )
-        if self.images != expected_images:
+        if tuple(image.embedding for image in self.images) != (
+            "POSITIVE_ROOT",
+            "NEGATIVE_ROOT",
+        ) or any(image.value.radicand != self.source.radicand for image in self.images):
             raise _validation_error(
                 "embedding_images_mismatch",
-                "images must be the ordered positive-root and negative-root "
-                "embeddings of the retained source",
+                "images must use the ordered embeddings of the source field",
             )
-        expected_trace, expected_norm = _embedding_scalars(self.source)
-        expected_trace_value = CanonicalRational.from_fraction(expected_trace)
-        expected_norm_value = CanonicalRational.from_fraction(expected_norm)
-        for label, value in (
-            ("trace", expected_trace_value),
-            ("norm", expected_norm_value),
-        ):
+        for label, value in (("trace", self.trace), ("norm", self.norm)):
             _require_bounded_rational(
                 value,
                 max_digits=_MAX_EMBEDDING_PROFILE_RESULT_DIGITS,
                 label=f"real-quadratic embedding {label}",
             )
-        if self.trace != expected_trace_value or self.norm != expected_norm_value:
-            raise _validation_error(
-                "embedding_invariants_mismatch",
-                "trace and norm must be the exact trace and norm of the retained source",
-            )
         return self
+
+    @classmethod
+    def _from_kernel(
+        cls,
+        *,
+        source: RealQuadraticValue,
+        images: tuple[RealQuadraticEmbeddingImage, RealQuadraticEmbeddingImage],
+        trace: CanonicalRational,
+        norm: CanonicalRational,
+    ) -> Self:
+        return cls.model_construct(
+            source=source,
+            real_embedding_count=2,
+            complex_conjugate_pair_count=0,
+            images=images,
+            trace=trace,
+            norm=norm,
+            convention="REAL_QUADRATIC_ROOTS_V1",
+        )
 
 
 class RealQuadraticSignCertificate(StrictModel):
@@ -210,60 +210,35 @@ class RealQuadraticOrderValue(StrictModel):
 
     @model_validator(mode="after")
     def bind_exact_order(self) -> Self:
-        a = (
-            self.left.rational_part.as_fraction()
-            - self.right.rational_part.as_fraction()
-        )
-        b = (
-            self.left.radical_coefficient.as_fraction()
-            - self.right.radical_coefficient.as_fraction()
-        )
         if (
-            self.difference.radicand != self.left.radicand
-            or self.difference.rational_part.as_fraction() != a
-            or self.difference.radical_coefficient.as_fraction() != b
+            len({self.left.radicand, self.right.radicand, self.difference.radicand})
+            != 1
         ):
             raise _validation_error(
-                "difference_mismatch", "difference must equal left minus right"
-            )
-        expected_order = (
-            "LT"
-            if _sign(a, b, self.left.radicand) < 0
-            else "GT"
-            if _sign(a, b, self.left.radicand) > 0
-            else "EQ"
-        )
-        if self.order != expected_order:
-            raise _validation_error(
-                "order_mismatch", "order must match exact quadratic sign"
-            )
-        expected_basis: RealQuadraticSignBasis = (
-            "RATIONAL_ONLY"
-            if b == 0
-            else "RADICAL_ONLY"
-            if a == 0
-            else "SAME_SIGN"
-            if (a > 0) == (b > 0)
-            else "OPPOSING_SIGNS_SQUARED_MAGNITUDES"
-        )
-        if self.sign_basis != expected_basis:
-            raise _validation_error(
-                "sign_basis_mismatch", "sign basis does not match difference structure"
-            )
-        rational_square = a * a
-        radical_square = b * b * self.left.radicand
-        if (
-            self.sign_certificate.rational_part_squared.as_fraction() != rational_square
-            or self.sign_certificate.radical_part_squared.as_fraction()
-            != radical_square
-            or self.sign_certificate.magnitude_order
-            != _order(rational_square, radical_square)
-        ):
-            raise _validation_error(
-                "sign_certificate_mismatch",
-                "sign certificate does not match squared magnitudes",
+                "difference_field_mismatch",
+                "left, right, and difference must use one quadratic field",
             )
         return self
+
+    @classmethod
+    def _from_kernel(
+        cls,
+        *,
+        left: RealQuadraticValue,
+        right: RealQuadraticValue,
+        difference: RealQuadraticValue,
+        order: Literal["LT", "EQ", "GT"],
+        sign_basis: RealQuadraticSignBasis,
+        sign_certificate: RealQuadraticSignCertificate,
+    ) -> Self:
+        return cls.model_construct(
+            left=left,
+            right=right,
+            difference=difference,
+            order=order,
+            sign_basis=sign_basis,
+            sign_certificate=sign_certificate,
+        )
 
 
 def real_quadratic_order(
@@ -288,7 +263,7 @@ def real_quadratic_order(
     )
     rational_square = a * a
     radical_square = b * b * d
-    return RealQuadraticOrderValue(
+    return RealQuadraticOrderValue._from_kernel(
         left=left,
         right=right,
         difference=RealQuadraticValue(
@@ -312,9 +287,15 @@ def real_quadratic_embeddings(
     """Return both exact real embeddings, trace, and norm of one element."""
 
     source = element
-    radical_coefficient = source.radical_coefficient.as_fraction()
     trace, norm = _embedding_scalars(source)
-    return RealQuadraticEmbeddingProfile(
+    for label, value in (("trace", trace), ("norm", norm)):
+        _require_bounded_rational(
+            CanonicalRational.from_fraction(value),
+            max_digits=_MAX_EMBEDDING_PROFILE_RESULT_DIGITS,
+            label=f"real-quadratic embedding {label}",
+        )
+    radical_coefficient = source.radical_coefficient.as_fraction()
+    return RealQuadraticEmbeddingProfile._from_kernel(
         source=source,
         images=(
             RealQuadraticEmbeddingImage(embedding="POSITIVE_ROOT", value=source),

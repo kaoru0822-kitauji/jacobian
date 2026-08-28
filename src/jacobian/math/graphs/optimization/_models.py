@@ -299,29 +299,11 @@ class GraphOptimizationRequest(StrictModel):
         default_factory=GraphOptimizationBudget
     )
 
-    @model_validator(mode="after")
-    def enforce_order_budget(self) -> Self:
-        if len(self.graph.vertices) > self.resource_budget.max_order:
-            raise PydanticCustomError(
-                "graph.graph_order_exceeds_the_declared_max_order_budge",
-                "graph order exceeds the declared max_order budget",
-            )
-        return self
-
 
 class GraphHamiltonianPathRequest(StrictModel):
     """One finite simple graph inside the complete decision/checker scope."""
 
     graph: ChromaticGraph
-
-    @model_validator(mode="after")
-    def enforce_complete_decision_scope(self) -> Self:
-        if len(self.graph.vertices) > 18:
-            raise PydanticCustomError(
-                "graph.hamiltonian_path_decision_supports_graphs_order_at",
-                "Hamiltonian-path decision supports graphs of order at most 18",
-            )
-        return self
 
 
 class GraphHamiltonianPathResult(StrictModel):

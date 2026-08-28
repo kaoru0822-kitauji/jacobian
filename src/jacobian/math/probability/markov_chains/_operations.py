@@ -34,6 +34,23 @@ def _reject(location: tuple[str | int, ...], code: str, message: str) -> None:
     )
 
 
+def _admit_transition_matrix(request: TransitionMatrixRequest) -> None:
+    for row_index, row in enumerate(request.matrix):
+        values = tuple(value.as_fraction() for value in row)
+        if any(value < 0 for value in values):
+            _reject(
+                ("matrix", row_index),
+                "transition_probability_negative",
+                "transition probabilities must be nonnegative",
+            )
+        if sum(values) != 1:
+            _reject(
+                ("matrix", row_index),
+                "transition_row_not_stochastic",
+                "each transition row must sum to one",
+            )
+
+
 def _admit_stationary(request: StationaryDistributionRequest) -> None:
     dimension = len(request.matrix)
     row_bounds: list[int] = []
@@ -127,6 +144,7 @@ def _derive_communicating_classes(
 
 
 def compute_mixing_time(request: MixingTimeRequest) -> MixingTimeResult:
+    _admit_transition_matrix(request)
     _admit_mixing(request)
     matrix = tuple(
         tuple(value.as_fraction() for value in row) for row in request.matrix
@@ -161,6 +179,7 @@ def compute_mixing_time(request: MixingTimeRequest) -> MixingTimeResult:
 def compute_stationary_distribution(
     request: StationaryDistributionRequest,
 ) -> StationaryDistributionResult:
+    _admit_transition_matrix(request)
     _admit_stationary(request)
     matrix = tuple(
         tuple(value.as_fraction() for value in row) for row in request.matrix
@@ -185,6 +204,7 @@ def compute_stationary_distribution(
 
 
 def compute_ergodic_decision(request: TransitionMatrixRequest) -> ErgodicDecisionResult:
+    _admit_transition_matrix(request)
     matrix = tuple(
         tuple(value.as_fraction() for value in row) for row in request.matrix
     )
@@ -201,6 +221,7 @@ def compute_communicating_classes(
 ) -> CommunicatingClassesResult:
     """Decompose a Markov chain into communicating classes via SCC analysis."""
 
+    _admit_transition_matrix(request)
     matrix = request.matrix
     classes, state_class = _derive_communicating_classes(matrix)
     return CommunicatingClassesResult._from_kernel(

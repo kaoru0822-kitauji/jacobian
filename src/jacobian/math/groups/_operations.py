@@ -66,8 +66,8 @@ def compute_group_conjugacy_classes(
         request.degree,
         [list(g) for g in request.generators],
     )
-    return GroupConjugacyClassesResult(
-        classes=tuple(tuple(tuple(p) for p in cls) for cls in classes),
+    return GroupConjugacyClassesResult._from_kernel(
+        tuple(tuple(tuple(p) for p in cls) for cls in classes),
     )
 
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 from fractions import Fraction
 from math import comb
 from typing import Literal, Self
@@ -16,7 +15,6 @@ from jacobian._exact import (
     CanonicalRational,
 )
 from jacobian._models import StrictModel
-from jacobian.canonical import canonicalize_json
 from jacobian.math.geometry.projective.values import RationalProjectiveLine
 from jacobian.math.polynomials.values import (
     MAX_POLYNOMIAL_TERMS,
@@ -505,6 +503,37 @@ class GradedJacobianSyzygyResult(StrictModel):
             )
         return self
 
+    @classmethod
+    def _from_kernel(
+        cls,
+        *,
+        variables: tuple[PolynomialVariable, ...],
+        source_kind: Literal["EXPANDED_POLYNOMIAL", "LABELLED_LINEAR_FACTOR_PRODUCT"],
+        expanded_polynomial: RationalPolynomial,
+        homogeneous_degree: int,
+        searched_through_degree: int,
+        coefficient_map_detail: Literal["CERTIFICATES", "SPARSE_ENTRIES"],
+        partial_derivatives: tuple[RationalPolynomial, ...],
+        degree_maps: tuple[GradedJacobianCoefficientMap, ...],
+        status: Literal["FOUND", "NONE_THROUGH_BOUND"],
+        first_syzygy_degree: int | None,
+        kernel_witness: GradedJacobianKernelWitness | None,
+    ) -> Self:
+        return cls.model_construct(
+            variables=variables,
+            source_kind=source_kind,
+            expanded_polynomial=expanded_polynomial,
+            homogeneous_degree=homogeneous_degree,
+            searched_through_degree=searched_through_degree,
+            coefficient_map_detail=coefficient_map_detail,
+            partial_derivatives=partial_derivatives,
+            degree_maps=degree_maps,
+            status=status,
+            first_syzygy_degree=first_syzygy_degree,
+            kernel_witness=kernel_witness,
+            completion="COMPLETE_THROUGH_BOUND",
+        )
+
 
 def _validate_result_source_and_partials(result: GradedJacobianSyzygyResult) -> int:
     variable_count = len(result.variables)
@@ -529,17 +558,6 @@ def _validate_result_source_and_partials(result: GradedJacobianSyzygyResult) -> 
         raise _validation_error(
             "partial derivatives must retain the source variable order"
         )
-    expected_partials = tuple(
-        _partial_derivative_terms(source_terms, variable)
-        for variable in range(variable_count)
-    )
-    if any(
-        _polynomial_terms(partial) != expected
-        for partial, expected in zip(
-            result.partial_derivatives, expected_partials, strict=True
-        )
-    ):
-        raise _validation_error("partial derivatives must reconstruct from the source")
     return variable_count
 
 
@@ -552,14 +570,6 @@ def _validate_result_maps(
         raise _validation_error(
             "degree maps must cover every degree from zero in order"
         )
-    for item in result.degree_maps:
-        expected_target_basis = _homogeneous_basis(
-            variable_count, result.homogeneous_degree - 1 + item.multiplier_degree
-        )
-        if item.target_monomial_basis != expected_target_basis:
-            raise _validation_error(
-                "coefficient maps must use the source ring's exact bases"
-            )
     if result.coefficient_map_detail == "CERTIFICATES" and any(
         item.sparse_entries for item in result.degree_maps
     ):
@@ -568,97 +578,6 @@ def _validate_result_maps(
         not item.sparse_entries and item.rank > 0 for item in result.degree_maps
     ):
         raise _validation_error("sparse-entry detail must expose every nonzero map")
-    for item in result.degree_maps:
-        _replay_coefficient_map(result, item)
-
-
-def _replayed_matrix_digest(
-    *,
-    multiplier_degree: int,
-    source_basis: tuple[tuple[int, ...], ...],
-    target_basis: tuple[tuple[int, ...], ...],
-    entries: tuple[tuple[int, int, Fraction], ...],
-) -> str:
-    payload = {
-        "protocol": "jacobian.graded-jacobian-map.v1",
-        "multiplier_degree": multiplier_degree,
-        "source_monomial_basis": [list(item) for item in source_basis],
-        "target_monomial_basis": [list(item) for item in target_basis],
-        "entries": [
-            [row, column, f"{value.numerator}/{value.denominator}"]
-            for row, column, value in entries
-        ],
-    }
-    return f"sha256:{hashlib.sha256(canonicalize_json(payload)).hexdigest()}"
-
-
-def _replay_coefficient_map(
-    result: GradedJacobianSyzygyResult,
-    item: GradedJacobianCoefficientMap,
-) -> None:
-    """Replay one admitted exact map so rank proves the reported minimum."""
-
-    from sympy import Matrix, Rational
-
-    matrix = Matrix.zeros(item.row_count, item.column_count)
-    row_by_exponent = {
-        exponents: row for row, exponents in enumerate(item.target_monomial_basis)
-    }
-    block_size = len(item.source_monomial_basis)
-    for component, partial in enumerate(result.partial_derivatives):
-        for basis_index, multiplier_exponents in enumerate(item.source_monomial_basis):
-            column = component * block_size + basis_index
-            for partial_exponents, coefficient in _polynomial_terms(partial).items():
-                target_exponents = tuple(
-                    left + right
-                    for left, right in zip(
-                        multiplier_exponents, partial_exponents, strict=True
-                    )
-                )
-                matrix[row_by_exponent[target_exponents], column] += Rational(
-                    coefficient.numerator, coefficient.denominator
-                )
-    entries = tuple(
-        (row, column, Fraction(matrix[row, column]))
-        for row in range(matrix.rows)
-        for column in range(matrix.cols)
-        if matrix[row, column] != 0
-    )
-    if item.matrix_digest != _replayed_matrix_digest(
-        multiplier_degree=item.multiplier_degree,
-        source_basis=item.source_monomial_basis,
-        target_basis=item.target_monomial_basis,
-        entries=entries,
-    ):
-        raise _validation_error(
-            "coefficient-map digest must bind the reconstructed matrix"
-        )
-    if (
-        item.sparse_entries
-        and tuple(
-            (entry.row, entry.column, entry.coefficient.as_fraction())
-            for entry in item.sparse_entries
-        )
-        != entries
-    ):
-        raise _validation_error(
-            "sparse coefficient-map entries must reconstruct exactly"
-        )
-    _, pivot_columns = matrix.rref()
-    rank = len(pivot_columns)
-    if (
-        item.rank != rank
-        or item.pivot_columns != tuple(int(column) for column in pivot_columns)
-        or item.nullity != matrix.cols - rank
-        or item.injective != (rank == matrix.cols)
-    ):
-        raise _validation_error("coefficient-map rank certificate must replay exactly")
-    if item.rank_minor is not None:
-        minor = matrix.extract(
-            item.rank_minor.row_indices, item.rank_minor.column_indices
-        ).det()
-        if Fraction(minor) != item.rank_minor.determinant.as_fraction():
-            raise _validation_error("rank-minor determinant must replay exactly")
 
 
 def _validate_found_witness(
@@ -682,29 +601,6 @@ def _validate_found_witness(
         )
     ):
         raise _validation_error("FOUND must bind the first nonzero graded kernel")
-    basis = result.degree_maps[noninjective[0]].source_monomial_basis
-    expected_vector = tuple(
-        _polynomial_terms(multiplier).get(exponents, Fraction(0))
-        for multiplier in witness.multipliers
-        for exponents in basis
-    )
-    if (
-        tuple(value.as_fraction() for value in witness.coefficient_vector)
-        != expected_vector
-    ):
-        raise _validation_error("kernel vector must reconstruct its multipliers")
-    reconstructed: dict[tuple[int, ...], Fraction] = {}
-    for multiplier, partial in zip(
-        witness.multipliers, result.partial_derivatives, strict=True
-    ):
-        for exponents, coefficient in _multiply_terms(
-            _polynomial_terms(multiplier), _polynomial_terms(partial)
-        ).items():
-            reconstructed[exponents] = (
-                reconstructed.get(exponents, Fraction(0)) + coefficient
-            )
-    if any(reconstructed.values()):
-        raise _validation_error("kernel witness must reconstruct a Jacobian syzygy")
 
 
 __all__ = [

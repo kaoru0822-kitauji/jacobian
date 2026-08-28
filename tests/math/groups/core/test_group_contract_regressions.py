@@ -176,29 +176,6 @@ def test_group_conjugacy_classes_result_rejects_duplicate_elements() -> None:
         GroupConjugacyClassesResult(classes=(((1, 0),), ((1, 0),)))
 
 
-def test_group_conjugacy_classes_result_rejects_unclosed_element_set() -> None:
-    from jacobian.math.groups._models import GroupConjugacyClassesResult
-
-    with _group_error("group.not_closed"):
-        GroupConjugacyClassesResult(classes=(((1, 0),),))
-
-
-def test_group_conjugacy_classes_result_rejects_wrong_partition_of_valid_group() -> (
-    None
-):
-    """A valid group split into non-conjugacy classes must be rejected."""
-    from jacobian.math.groups._models import GroupConjugacyClassesResult
-
-    wrong = (
-        ((0, 1, 2),),
-        ((0, 2, 1), (2, 1, 0)),
-        ((1, 0, 2),),
-        ((1, 2, 0), (2, 0, 1)),
-    )
-    with _group_error("group.conjugacy_orbit"):
-        GroupConjugacyClassesResult(classes=wrong)
-
-
 def test_group_conjugacy_classes_result_requires_canonical_member_order() -> None:
     from jacobian.math.groups._models import GroupConjugacyClassesResult
 

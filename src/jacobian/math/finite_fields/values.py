@@ -535,13 +535,6 @@ class RankResult(StrictModel):
                 "finite_field.rank_linear_map_dimensions",
                 "rank is outside the linear-map dimensions",
             )
-        if self.rank != rank(self.linear_map.matrix):
-            raise _validation_error(
-                "finite_field.rank_match_bound_linear_map",
-                "rank must match the exact bound linear map",
-            )
-        from jacobian.math.finite_fields import _sympy
-
         if self.direction.presentation != self.subspace.presentation:
             raise _validation_error(
                 "finite_field.rank_direction_subspace_presentation",
@@ -552,12 +545,23 @@ class RankResult(StrictModel):
                 "finite_field.rank_direction_subspace_row_axis",
                 "rank direction must use the subspace row axis",
             )
-        if self.linear_map != _sympy.restrict_scalars(self.subspace, self.direction):
-            raise _validation_error(
-                "finite_field.rank_map_derived_subspace_direction",
-                "rank map must be derived from its subspace and direction",
-            )
         return self
+
+    @classmethod
+    def _from_kernel(
+        cls,
+        *,
+        subspace: FiniteDimensionalSubspace,
+        direction: ProjectivePoint,
+        linear_map: FiniteLinearMap,
+        rank: int,
+    ) -> Self:
+        return cls.model_construct(
+            subspace=subspace,
+            direction=direction,
+            linear_map=linear_map,
+            rank=rank,
+        )
 
     @property
     def digest(self) -> str:
@@ -818,28 +822,15 @@ class FiniteMapTable(StrictModel):
                 "finite_field.finite_map_table_outputs_codomain",
                 "finite map table outputs must use the exact codomain",
             )
-        work = (
-            len(self.entries)
-            * len(self.map.polynomial.coefficients)
-            * self.map.domain.degree
-        )
-        if work > _MAX_DERIVATION_WORK:
-            raise _validation_error(
-                "finite_field.finite_map_table_exceeds_derivation_work_budget",
-                "finite map table exceeds its derivation work budget",
-            )
-        from jacobian.math.finite_fields import _sympy
-
-        expected = _sympy.evaluate_polynomial_values(self.map.polynomial, inputs)
-        if any(
-            target.coordinates != coordinates
-            for (_, target), coordinates in zip(self.entries, expected, strict=True)
-        ):
-            raise _validation_error(
-                "finite_field.finite_map_table_targets_match_bound_polynomial",
-                "finite map table targets must match the bound polynomial",
-            )
         return self
+
+    @classmethod
+    def _from_kernel(
+        cls,
+        polynomial_map: FinitePolynomialMap,
+        entries: tuple[tuple[FiniteFieldElement, FiniteFieldElement], ...],
+    ) -> Self:
+        return cls.model_construct(map=polynomial_map, entries=entries)
 
     @property
     def digest(self) -> str:
@@ -877,16 +868,11 @@ class FiberPartition(StrictModel):
                 "finite_field.fiber_partition_nonempty_fibers",
                 "fiber partition requires nonempty fibers",
             )
-        if self.fibers != _fibers_for_table(self.table):
-            raise _validation_error(
-                "finite_field.fibers_partition_evaluated_table",
-                "fibers must partition the exact evaluated table",
-            )
         return self
 
     @classmethod
     def from_table(cls, table: FiniteMapTable) -> Self:
-        return cls(table=table, fibers=_fibers_for_table(table))
+        return cls.model_construct(table=table, fibers=_fibers_for_table(table))
 
     @property
     def digest(self) -> str:
@@ -930,16 +916,21 @@ class CollisionResult(StrictModel):
                 "finite_field.collision_inputs_distinct",
                 "collision inputs must be distinct",
             )
-        evaluated = {source.digest: target for source, target in self.table.entries}
-        if (
-            evaluated.get(self.left.digest) != self.image
-            or evaluated.get(self.right.digest) != self.image
-        ):
-            raise _validation_error(
-                "finite_field.collision_occur_in_bound_table",
-                "collision must occur in the exact bound table",
-            )
         return self
+
+    @classmethod
+    def _from_kernel(
+        cls,
+        *,
+        table: FiniteMapTable,
+        status: Literal["COLLISION", "INJECTIVE"],
+        left: FiniteFieldElement | None = None,
+        right: FiniteFieldElement | None = None,
+        image: FiniteFieldElement | None = None,
+    ) -> Self:
+        return cls.model_construct(
+            table=table, status=status, left=left, right=right, image=image
+        )
 
     @property
     def digest(self) -> str:
@@ -964,33 +955,26 @@ class PermutationResult(StrictModel):
 
     @model_validator(mode="after")
     def validate_permutation(self) -> Self:
-        injective = len({target.digest for _, target in self.table.entries}) == len(
-            self.table.entries
-        )
         if self.status == "NOT_PERMUTATION":
-            if injective or self.inverse_entries:
+            if self.inverse_entries:
                 raise _validation_error(
                     "finite_field.non_permutation_result_carry_inverse",
                     "a non-permutation result cannot carry an inverse",
                 )
             return self
-        if not injective:
-            raise _validation_error(
-                "finite_field.permutation_result_injective_table",
-                "a permutation result requires an injective table",
-            )
-        expected = tuple(
-            sorted(
-                ((target, source) for source, target in self.table.entries),
-                key=lambda entry: _encoded_coordinates(entry[0]),
-            )
-        )
-        if self.inverse_entries != expected:
-            raise _validation_error(
-                "finite_field.inverse_table_does_not_bind_permutation",
-                "inverse table does not bind the exact permutation",
-            )
         return self
+
+    @classmethod
+    def _from_kernel(
+        cls,
+        *,
+        table: FiniteMapTable,
+        status: Literal["PERMUTATION", "NOT_PERMUTATION"],
+        inverse_entries: tuple[tuple[FiniteFieldElement, FiniteFieldElement], ...] = (),
+    ) -> Self:
+        return cls.model_construct(
+            table=table, status=status, inverse_entries=inverse_entries
+        )
 
     @property
     def digest(self) -> str:

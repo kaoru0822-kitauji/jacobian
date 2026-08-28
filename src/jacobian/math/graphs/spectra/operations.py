@@ -76,6 +76,7 @@ def adjacency_characteristic_polynomial(
 ) -> RationalPolynomial:
     """Return det(xI - A) as the canonical sparse rational polynomial."""
 
+    _require_spectral_graph(graph)
     return _dense_to_canonical_polynomial(
         _characteristic_polynomial_coeffs(_adjacency_matrix(graph))
     )
@@ -86,6 +87,7 @@ def laplacian_characteristic_polynomial(
 ) -> RationalPolynomial:
     """Return det(xI - L) as the canonical sparse rational polynomial."""
 
+    _require_spectral_graph(graph)
     return _dense_to_canonical_polynomial(
         _characteristic_polynomial_coeffs(_laplacian_matrix(graph))
     )

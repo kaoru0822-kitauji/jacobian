@@ -9,6 +9,7 @@ from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math._rational_height import RationalHeight
 from jacobian.math.analysis.orthogonal_polynomials._jacobi import (
     jacobi_matrix_from_family,
+    require_jacobi_matrix_admission,
 )
 from jacobian.math.analysis.orthogonal_polynomials._models import (
     ChristoffelDarbouxRequest,
@@ -215,11 +216,13 @@ def hankel_matrix_from_prefix(
 
 def compute_hankel_matrix(request: HankelRequest) -> HankelMomentMatrix:
     """MCP adapter: parse one request, call the canonical-prefix kernel."""
+    require_hankel_matrix_admission(request.prefix, request.order, shifted=False)
     return hankel_matrix_from_prefix(request.prefix, request.order, shifted=False)
 
 
 def compute_shifted_hankel(request: ShiftedHankelRequest) -> HankelMomentMatrix:
     """MCP adapter: parse one request, call the canonical-prefix kernel."""
+    require_hankel_matrix_admission(request.prefix, request.order, shifted=True)
     return hankel_matrix_from_prefix(request.prefix, request.order, shifted=True)
 
 
@@ -425,6 +428,7 @@ def compute_orthogonal_polynomials(
     request: OrthogonalPolynomialRequest,
 ) -> OrthogonalPolynomialFamily:
     """MCP adapter: validate the wire request, then run the shared kernel."""
+    _require_gram_schmidt_admission(request.prefix, request.max_degree)
     moments = [_to_fraction(m) for m in request.prefix.moments]
     try:
         return orthogonal_polynomials_from_moments(
@@ -596,6 +600,7 @@ def compute_christoffel_darboux(
 
 def compute_jacobi_matrix(request: JacobiMatrixRequest) -> JacobiMatrix:
     """MCP adapter: parse one request, call the canonical-family kernel."""
+    require_jacobi_matrix_admission(request.family)
     return jacobi_matrix_from_family(request.family)
 
 
@@ -735,6 +740,7 @@ def compute_gaussian_quadrature(
 ) -> GaussianQuadratureRule:
     """MCP adapter: parse one request, call the canonical-prefix kernel."""
     try:
+        require_gaussian_quadrature_admission(request.prefix, request.order)
         return gaussian_quadrature_rule_from_prefix(request.prefix, request.order)
     except ValueError as exc:
         raise OperationDomainValidationError(

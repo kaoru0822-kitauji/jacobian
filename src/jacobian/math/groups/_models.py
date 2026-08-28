@@ -205,9 +205,8 @@ class GroupConjugacyClassesResult(StrictModel):
 
     ``classes`` is canonically ordered (members lexicographically sorted,
     classes sorted by smallest member) so equal groups serialize
-    identically. Validation replays the defining invariant: the listed
-    elements must form a group under composition and each class must be
-    exactly its representative's conjugation orbit in that group.
+    identically. The producing kernel establishes closure and the conjugacy
+    orbits; ordinary model parsing checks only the canonical partition shape.
     """
 
     classes: tuple[ConjugacyClass, ...] = Field(
@@ -218,33 +217,12 @@ class GroupConjugacyClassesResult(StrictModel):
 
     @model_validator(mode="after")
     def require_conjugacy_class_partition(self) -> Self:
-        elements = _require_canonical_partition(self.classes)
-
-        from sympy.combinatorics import Permutation, PermutationGroup
-
-        ordered_elements = sorted(elements)
-        backend_group = PermutationGroup(
-            [Permutation(list(p)) for p in ordered_elements]
-        )
-        # A finite subset of a symmetric group is a subgroup iff it is closed
-        # under composition; <S> equals S iff |<S>| == |S|.
-        if int(backend_group.order()) != len(ordered_elements):
-            raise _validation_error(
-                "group.not_closed",
-                "the listed elements must form a group under composition",
-            )
-
-        generators = _minimal_generator_subset(ordered_elements)
-        inverse_generators = [_invert_permutation(p) for p in generators]
-        for cls in self.classes:
-            orbit = _conjugation_orbit(cls[0], generators, inverse_generators)
-            if orbit != set(cls):
-                raise _validation_error(
-                    "group.conjugacy_orbit",
-                    "each class must equal the conjugation orbit of its "
-                    "representative in the reconstructed group",
-                )
+        _require_canonical_partition(self.classes)
         return self
+
+    @classmethod
+    def _from_kernel(cls, classes: tuple[ConjugacyClass, ...]) -> Self:
+        return cls.model_construct(classes=classes, method="SYMPY_CONJUGACY_CLASSES")
 
 
 def _require_canonical_partition(
@@ -295,59 +273,6 @@ def _require_canonical_partition(
             f"{MAX_CONJUGACY_CLASSES_GROUP_ORDER} elements",
         )
     return elements
-
-
-def _minimal_generator_subset(
-    elements: list[tuple[int, ...]],
-) -> list[tuple[int, ...]]:
-    from sympy.combinatorics import Permutation, PermutationGroup
-
-    total = len(elements)
-    generators: list[tuple[int, ...]] = []
-    generated_order = 1
-    for element in elements:
-        if generated_order == total:
-            break
-        candidate = [*generators, element]
-        candidate_order = int(
-            PermutationGroup([Permutation(list(p)) for p in candidate]).order()
-        )
-        if candidate_order > generated_order:
-            generators = candidate
-            generated_order = candidate_order
-    return generators
-
-
-def _conjugation_orbit(
-    representative: tuple[int, ...],
-    generators: list[tuple[int, ...]],
-    inverse_generators: list[tuple[int, ...]],
-) -> set[tuple[int, ...]]:
-    orbit = {representative}
-    stack = [representative]
-    while stack:
-        current = stack.pop()
-        for generator, inverse in zip(generators, inverse_generators, strict=True):
-            conjugate = _compose_permutation(
-                _compose_permutation(generator, current), inverse
-            )
-            if conjugate not in orbit:
-                orbit.add(conjugate)
-                stack.append(conjugate)
-    return orbit
-
-
-def _compose_permutation(
-    first: tuple[int, ...], second: tuple[int, ...]
-) -> tuple[int, ...]:
-    return tuple(first[i] for i in second)
-
-
-def _invert_permutation(permutation: tuple[int, ...]) -> tuple[int, ...]:
-    inverse = [0] * len(permutation)
-    for index, value in enumerate(permutation):
-        inverse[value] = index
-    return tuple(inverse)
 
 
 class GroupStabilizerRequest(StrictModel):

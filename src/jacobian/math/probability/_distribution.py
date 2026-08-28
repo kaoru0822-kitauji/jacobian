@@ -128,22 +128,17 @@ class FiniteRawMomentResult(StrictModel):
         max_length=MAX_FINITE_DISTRIBUTION_ATOMS,
     )
 
-    @model_validator(mode="after")
-    def bind_exact_contributions(self) -> Self:
-        total = Fraction()
-        for item in self.contributions:
-            expected_power = item.value.as_fraction() ** self.order
-            if item.powered_value.as_fraction() != expected_power:
-                raise _validation_error("moment powered value does not match its atom")
-            expected_contribution = item.probability.as_fraction() * expected_power
-            if item.contribution.as_fraction() != expected_contribution:
-                raise _validation_error("moment contribution does not match its atom")
-            total += expected_contribution
-        if self.moment.as_fraction() != total:
-            raise _validation_error(
-                "moment does not equal the sum of atom contributions"
-            )
-        return self
+    @classmethod
+    def _from_kernel(
+        cls,
+        *,
+        order: int,
+        moment: CanonicalRational,
+        contributions: tuple[FiniteRawMomentContribution, ...],
+    ) -> Self:
+        return cls.model_construct(
+            order=order, moment=moment, contributions=contributions
+        )
 
 
 class FiniteEventRequest(StrictModel):
@@ -163,21 +158,17 @@ class FiniteEventProbabilityResult(StrictModel):
         max_length=MAX_FINITE_DISTRIBUTION_ATOMS
     )
 
-    @model_validator(mode="after")
-    def bind_selected_atom_contributions(self) -> Self:
-        _require_strictly_increasing(
-            tuple(atom.value for atom in self.selected_atoms),
-            label="selected finite-event atoms",
+    @classmethod
+    def _from_kernel(
+        cls,
+        *,
+        event_probability: CanonicalRational,
+        selected_atoms: tuple[FiniteDistributionAtom, ...],
+    ) -> Self:
+        return cls.model_construct(
+            event_probability=event_probability,
+            selected_atoms=selected_atoms,
         )
-        total = sum(
-            (atom.probability.as_fraction() for atom in self.selected_atoms),
-            start=Fraction(),
-        )
-        if self.event_probability.as_fraction() != total:
-            raise _validation_error(
-                "event probability does not equal selected atom mass"
-            )
-        return self
 
 
 class FiniteConditionalContribution(StrictModel):
@@ -215,40 +206,19 @@ class FiniteConditionResult(StrictModel):
         max_length=MAX_FINITE_DISTRIBUTION_ATOMS,
     )
 
-    @model_validator(mode="after")
-    def bind_normalized_contributions(self) -> Self:
-        event_probability = self.event_probability.as_fraction()
-        if event_probability <= 0:
-            raise _validation_error(
-                "conditional distribution requires positive event mass"
-            )
-        values = tuple(item.value for item in self.contributions)
-        _require_strictly_increasing(
-            values,
-            label="conditional contribution values",
+    @classmethod
+    def _from_kernel(
+        cls,
+        *,
+        event_probability: CanonicalRational,
+        distribution: FiniteRationalDistribution,
+        contributions: tuple[FiniteConditionalContribution, ...],
+    ) -> Self:
+        return cls.model_construct(
+            event_probability=event_probability,
+            distribution=distribution,
+            contributions=contributions,
         )
-        expected_atoms: list[tuple[Fraction, Fraction]] = []
-        source_total = Fraction()
-        for item in self.contributions:
-            source = item.source_probability.as_fraction()
-            conditioned = item.conditioned_probability.as_fraction()
-            if source < 0 or conditioned != source / event_probability:
-                raise _validation_error(
-                    "conditioned probability does not match source mass"
-                )
-            source_total += source
-            expected_atoms.append((item.value.as_fraction(), conditioned))
-        if source_total != event_probability:
-            raise _validation_error("conditional contributions do not equal event mass")
-        actual_atoms = [
-            (atom.value.as_fraction(), atom.probability.as_fraction())
-            for atom in self.distribution.atoms
-        ]
-        if actual_atoms != expected_atoms:
-            raise _validation_error(
-                "conditional distribution does not match contributions"
-            )
-        return self
 
 
 class FinitePushforwardMapEntry(StrictModel):
@@ -293,27 +263,17 @@ class FinitePushforwardResult(StrictModel):
         max_length=MAX_FINITE_DISTRIBUTION_ATOMS,
     )
 
-    @model_validator(mode="after")
-    def bind_aggregated_pushforward(self) -> Self:
-        _require_strictly_increasing(
-            tuple(item.source for item in self.contributions),
-            label="pushforward contribution sources",
+    @classmethod
+    def _from_kernel(
+        cls,
+        *,
+        distribution: FiniteRationalDistribution,
+        contributions: tuple[FinitePushforwardContribution, ...],
+    ) -> Self:
+        return cls.model_construct(
+            distribution=distribution,
+            contributions=contributions,
         )
-        aggregated: dict[Fraction, Fraction] = {}
-        for item in self.contributions:
-            target = item.target.as_fraction()
-            probability = item.probability.as_fraction()
-            aggregated[target] = aggregated.get(target, Fraction()) + probability
-        expected = sorted(aggregated.items())
-        actual = [
-            (atom.value.as_fraction(), atom.probability.as_fraction())
-            for atom in self.distribution.atoms
-        ]
-        if actual != expected:
-            raise _validation_error(
-                "pushforward distribution does not match contributions"
-            )
-        return self
 
 
 class FiniteConvolutionRequest(StrictModel):
@@ -353,34 +313,18 @@ class FiniteConvolutionResult(StrictModel):
     )
     independence: Literal["PRODUCT_MEASURE"] = "PRODUCT_MEASURE"
 
-    @model_validator(mode="after")
-    def bind_aggregated_pairs(self) -> Self:
-        aggregated: dict[Fraction, Fraction] = {}
-        previous: tuple[Fraction, Fraction] | None = None
-        for item in self.contributions:
-            left = item.left_value.as_fraction()
-            right = item.right_value.as_fraction()
-            pair = (left, right)
-            if previous is not None and pair <= previous:
-                raise _validation_error(
-                    "convolution contributions must use canonical pair order"
-                )
-            previous = pair
-            value = item.sum_value.as_fraction()
-            if value != left + right:
-                raise _validation_error("convolution sum value does not match its pair")
-            probability = item.probability.as_fraction()
-            aggregated[value] = aggregated.get(value, Fraction()) + probability
-        expected = sorted(aggregated.items())
-        actual = [
-            (atom.value.as_fraction(), atom.probability.as_fraction())
-            for atom in self.distribution.atoms
-        ]
-        if actual != expected:
-            raise _validation_error(
-                "convolution distribution does not match pair contributions"
-            )
-        return self
+    @classmethod
+    def _from_kernel(
+        cls,
+        *,
+        distribution: FiniteRationalDistribution,
+        contributions: tuple[FiniteConvolutionContribution, ...],
+    ) -> Self:
+        return cls.model_construct(
+            distribution=distribution,
+            contributions=contributions,
+            independence="PRODUCT_MEASURE",
+        )
 
 
 __all__ = [

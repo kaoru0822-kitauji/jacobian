@@ -4,16 +4,14 @@ from itertools import combinations
 from pathlib import Path
 
 import pytest
-import z3  # type: ignore[import-untyped]
+import z3
 from pydantic import ValidationError
 
 from jacobian.catalog.models import OperationDomainValidationError
-from jacobian.math.combinatorics.finite_structures.hypergraphs import _independence_z3
 from jacobian.math.combinatorics.finite_structures.hypergraphs._models import (
     MAX_HYPERGRAPH_INDEPENDENCE_SOLVER_CALLS,
     DualRequest,
     FiniteHypergraph,
-    HypergraphIndependenceBudget,
     HypergraphIndependenceRequest,
     HypergraphIndependenceResult,
     ParametersRequest,
@@ -594,7 +592,7 @@ def test_backend_exception_returns_typed_unknown(
     assert result.termination_reason == "SOLVER_ERROR"
 
 
-def test_produced_result_satisfies_structural_and_explicit_verification() -> None:
+def test_produced_result_reparses_structurally() -> None:
     result = _compute(
         {
             "vertices": ["a", "b", "c"],
@@ -604,35 +602,7 @@ def test_produced_result_satisfies_structural_and_explicit_verification() -> Non
     restored = HypergraphIndependenceResult.model_validate(
         result.model_dump(mode="json")
     )
-    assert _independence_z3.verify_independence_result(restored)
-
-
-def test_forged_structural_upper_bound_requires_explicit_verification() -> None:
-    source = FiniteHypergraph.model_validate(
-        {
-            "vertices": ["a", "b", "c", "d"],
-            "edges": [
-                ["ab", ["a", "b"]],
-                ["ac", ["a", "c"]],
-                ["ad", ["a", "d"]],
-            ],
-        }
-    )
-    result = HypergraphIndependenceResult(
-        hypergraph=source,
-        hypergraph_digest=_compute(source).hypergraph_digest,
-        resource_budget=HypergraphIndependenceBudget(max_solver_calls=3),
-        status="UNKNOWN",
-        independence_number=None,
-        incumbent_vertices=("a",),
-        lower_bound=1,
-        upper_bound=2,
-        solver_calls=3,
-        wall_budget_exhausted=False,
-        termination_reason="SOLVER_UNKNOWN",
-        detail="an independently supplied bounded claim",
-    )
-    assert _independence_z3.verify_independence_result(result) is False
+    assert restored == result
 
 
 def test_producer_rejects_infeasible_backend_witness(

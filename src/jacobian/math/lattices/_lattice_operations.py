@@ -43,6 +43,7 @@ from jacobian.math.lattices._lattice_ops import (
     sublattice_index as _sublattice_index,
 )
 from jacobian.math.lattices._models import (
+    _MAX_LATTICE_INPUT_SCALAR_DIGITS,
     CanonicalBasisResult,
     DirectSumRequest,
     DirectSumResult,
@@ -64,6 +65,7 @@ from jacobian.math.lattices._models import (
 from jacobian.math.matrices.values import (
     IntegerMatrix,
     rational_matrix_from_fractions,
+    require_matrix_scalar_digits,
 )
 
 __all__ = [
@@ -167,6 +169,11 @@ def compute_saturation(lattice: IntegerLattice) -> SaturationResult:
 
 
 def compute_sublattice_index(request: SublatticeIndexRequest) -> SublatticeIndexResult:
+    require_matrix_scalar_digits(
+        request.embedding.entries,
+        maximum=_MAX_LATTICE_INPUT_SCALAR_DIGITS,
+        label="sublattice embedding",
+    )
     sub_basis = _require_full_row_rank(request.sublattice, label="sublattice")
     parent_basis = _require_full_row_rank(request.parent, label="parent")
     del sub_basis, parent_basis

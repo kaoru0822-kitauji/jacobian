@@ -7,13 +7,15 @@ from typing import Self
 from pydantic import Field, model_validator
 from pydantic_core import PydanticCustomError
 
-from jacobian._exact import CanonicalRational, require_bounded_rational
+from jacobian._exact import CanonicalRational
 from jacobian._models import StrictModel
 from jacobian.math.probability.stochastic_processes.values import (
     FiniteProbabilitySpace,
     FiniteRandomVariable,
     FiniteSigmaAlgebra,
 )
+
+MAX_STOCHASTIC_VALUE_DIGITS = 256
 
 
 def _validation_error(reason: str, message: str) -> PydanticCustomError:
@@ -67,12 +69,6 @@ class ConditionalExpectationRequest(StrictModel):
                 "conditional_expectation_space_mismatch",
                 "random variable and sigma algebra must share the same probability space",
             )
-        for value in self.rv.values:
-            require_bounded_rational(
-                value,
-                max_digits=256,
-                label="random-variable value",
-            )
         return self
 
 
@@ -105,12 +101,6 @@ class DoobMartingaleRequest(StrictModel):
         if len(self.payoff) != len(self.space.samples):
             raise _validation_error(
                 "payoff_length_mismatch", "payoff must have one entry per sample"
-            )
-        for value in self.payoff:
-            require_bounded_rational(
-                value,
-                max_digits=256,
-                label="payoff",
             )
         for obs in self.observations:
             if len(obs) != len(self.space.samples):

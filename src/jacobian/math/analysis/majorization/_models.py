@@ -180,11 +180,6 @@ class DoublyStochasticCheckRequest(StrictModel):
 
     matrix: RationalMatrix
 
-    @model_validator(mode="after")
-    def require_admitted_matrix(self) -> Self:
-        _require_majorization_matrix(self.matrix)
-        return self
-
 
 class DoublyStochasticCheckResult(StrictModel):
     """Result of a doubly stochastic check."""
@@ -208,34 +203,6 @@ class BirkhoffDecompositionRequest(StrictModel):
     """Compute a Birkhoff-von Neumann decomposition of a doubly stochastic matrix."""
 
     matrix: RationalMatrix
-
-    @model_validator(mode="after")
-    def require_doubly_stochastic(self) -> Self:
-        _require_majorization_matrix(self.matrix)
-        fracs = tuple(
-            tuple(value.as_fraction() for value in row) for row in self.matrix.entries
-        )
-        n = len(fracs)
-        for i in range(n):
-            for j in range(n):
-                if fracs[i][j] < 0:
-                    raise _validation_error(
-                        "birkhoff_negative_entry",
-                        "Birkhoff decomposition requires a nonnegative matrix",
-                    )
-        for i in range(n):
-            if sum(fracs[i][j] for j in range(n)) != Fraction(1):
-                raise _validation_error(
-                    "birkhoff_row_sum",
-                    "Birkhoff decomposition requires row sums equal to 1",
-                )
-        for j in range(n):
-            if sum(fracs[i][j] for i in range(n)) != Fraction(1):
-                raise _validation_error(
-                    "birkhoff_column_sum",
-                    "Birkhoff decomposition requires column sums equal to 1",
-                )
-        return self
 
 
 class BirkhoffDecompositionResult(StrictModel):
@@ -263,10 +230,6 @@ class SchurHornCheckRequest(StrictModel):
                 "schur_horn_dimension",
                 "eigenvalues and diagonal must have the same dimension",
             )
-        for i, v in enumerate(self.eigenvalues):
-            _bound_rational(v, f"eigenvalues[{i}]")
-        for i, v in enumerate(self.diagonal):
-            _bound_rational(v, f"diagonal[{i}]")
         return self
 
 

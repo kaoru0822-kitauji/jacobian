@@ -218,9 +218,8 @@ class RationalLinearSolveRequest(_MatrixRequest):
 class RrefResult(StrictModel):
     """A structurally bounded RREF outcome bound to its source matrix.
 
-    Kernel-produced values use :meth:`_from_kernel`.  An independently
-    supplied result can be checked by ``verify_rref_result`` in the operation
-    owner; parsing this public wire shape never executes a backend.
+    Kernel-produced values use :meth:`_from_kernel`; parsing this public wire
+    shape performs structural validation and never executes a backend.
     """
 
     matrix: RationalMatrix
@@ -312,8 +311,8 @@ class MatrixRankResult(StrictModel):
 class NullspaceResult(StrictModel):
     """A structurally bounded fundamental-nullspace outcome.
 
-    Exact kernel output uses :meth:`_from_kernel`; independently supplied
-    claims are checked by ``verify_nullspace_result`` in the operation owner.
+    Exact kernel output uses :meth:`_from_kernel`; ordinary parsing remains
+    structural and does not establish an independently supplied claim.
     """
 
     matrix: RationalMatrix
@@ -434,9 +433,8 @@ class MatrixProductResult(StrictModel):
 class RationalLinearSolveResult(StrictModel):
     """A structurally bounded square-system outcome over QQ.
 
-    Kernel output uses :meth:`_from_kernel`.  Classification and witness
-    semantics for independently supplied values live in the explicit bounded
-    ``verify_rational_linear_solve_result`` owner verifier.
+    Kernel output uses :meth:`_from_kernel`; ordinary parsing remains
+    structural and does not establish an independently supplied claim.
     """
 
     matrix: RationalMatrix

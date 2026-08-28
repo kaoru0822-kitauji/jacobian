@@ -159,22 +159,6 @@ class GraphPolynomialRequest(StrictModel):
 
     graph: IndexedSimpleUndirectedGraph
 
-    @model_validator(mode="after")
-    def require_deletion_contraction_budget(self) -> Self:
-        if self.graph.vertex_count > MAX_GRAPH_POLYNOMIAL_VERTICES:
-            raise PydanticCustomError(
-                "graph.tutte_chromatic_flow_polynomials_may_have_at",
-                "Tutte, chromatic, and flow polynomials may have at most "
-                f"{MAX_GRAPH_POLYNOMIAL_VERTICES} vertices",
-            )
-        if len(self.graph.edges) > MAX_GRAPH_POLYNOMIAL_EDGES:
-            raise PydanticCustomError(
-                "graph.tutte_chromatic_flow_polynomials_may_have_at",
-                "Tutte, chromatic, and flow polynomials may have at most "
-                f"{MAX_GRAPH_POLYNOMIAL_EDGES} edges",
-            )
-        return self
-
 
 MAX_MATCHING_VERTICES = 16
 MAX_MATCHING_EDGES = 48
@@ -184,20 +168,6 @@ class MatchingPolynomialRequest(StrictModel):
     """Request a matching polynomial on a graph this recurrence can exhaust."""
 
     graph: IndexedSimpleUndirectedGraph
-
-    @model_validator(mode="after")
-    def require_matching_budget(self) -> Self:
-        if self.graph.vertex_count > MAX_MATCHING_VERTICES:
-            raise PydanticCustomError(
-                "graph.matching_polynomial_graphs_may_have_at_most",
-                f"matching polynomial graphs may have at most {MAX_MATCHING_VERTICES} vertices",
-            )
-        if len(self.graph.edges) > MAX_MATCHING_EDGES:
-            raise PydanticCustomError(
-                "graph.matching_polynomial_graphs_may_have_at_most",
-                f"matching polynomial graphs may have at most {MAX_MATCHING_EDGES} edges",
-            )
-        return self
 
 
 def _maximum_independence_result_bytes(

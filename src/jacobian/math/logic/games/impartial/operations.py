@@ -7,10 +7,7 @@ from functools import reduce
 from heapq import heapify, heappop, heappush
 from operator import xor
 
-from jacobian.math.logic.games.impartial._nim_admission import (
-    heap_groups,
-    nim_option_plan,
-)
+from jacobian.math.logic.games.impartial._nim_admission import admit_nim_options
 from jacobian.math.logic.games.impartial.values import (
     MAX_HEAP_BOUND,
     MAX_MOVES,
@@ -116,9 +113,9 @@ def nim_sum(position: NimPosition) -> int:
 def nim_options(position: NimPosition) -> tuple[NimOption, ...]:
     """Return every distinct canonical one-move option and its source indices."""
 
-    plan = nim_option_plan(position)
+    groups = admit_nim_options(position)
     options: list[NimOption] = []
-    for source_size, source_indices in heap_groups(position):
+    for source_size, source_indices in groups:
         if source_size == 0:
             continue
         for replacement_size in range(source_size):
@@ -138,9 +135,10 @@ def nim_options(position: NimPosition) -> tuple[NimOption, ...]:
         sorted(options, key=lambda option: option.resulting_position.heaps)
     )
     distinct_results = {option.resulting_position.heaps for option in canonical_options}
+    expected_count = sum(heap for heap, _indices in groups)
     if (
-        len(canonical_options) != plan.distinct_option_count
-        or len(distinct_results) != plan.distinct_option_count
+        len(canonical_options) != expected_count
+        or len(distinct_results) != expected_count
     ):
         raise RuntimeError("Nim option preflight disagrees with exact enumeration")
     return canonical_options

@@ -142,16 +142,6 @@ class LinearRecurrenceEvaluationRequest(StrictModel):
             raise _recurrence_validation_error(
                 "initial_values length must equal the recurrence order"
             )
-        for label, values in (
-            ("recurrence coefficient", self.coefficients),
-            ("recurrence initial value", self.initial_values),
-        ):
-            for value in values:
-                _require_bounded_rational(
-                    value,
-                    max_digits=MAX_COMBINATORICS_INPUT_RATIONAL_DIGITS,
-                    label=label,
-                )
         if self.scope == "PREFIX":
             if self.term_count is None or self.indices:
                 raise _recurrence_validation_error(
@@ -265,23 +255,6 @@ class PolynomialCoefficientRecurrenceEvaluationRequest(StrictModel):
             raise _recurrence_validation_error(
                 "initial_values length must equal the recurrence order"
             )
-        for polynomial in self.coefficient_polynomials:
-            if (
-                not polynomial
-                or len(polynomial) > MAX_P_RECURSIVE_POLYNOMIAL_DEGREE + 1
-            ):
-                raise _recurrence_validation_error(
-                    "coefficient polynomial degree is outside the bound"
-                )
-            _require_canonical_polynomial(
-                polynomial, label="recurrence polynomial coefficient"
-            )
-        for value in self.initial_values:
-            _require_bounded_rational(
-                value,
-                max_digits=MAX_COMBINATORICS_INPUT_RATIONAL_DIGITS,
-                label="recurrence initial value",
-            )
         if self.scope == "PREFIX":
             if self.term_count is None or self.indices:
                 raise _recurrence_validation_error(
@@ -372,19 +345,6 @@ class RationalGeneratingFunctionCoefficientsRequest(StrictModel):
         ge=1,
         le=MAX_RATIONAL_SERIES_TRUNCATION_ORDER,
     )
-
-    @model_validator(mode="after")
-    def require_regular_canonical_input(self) -> Self:
-        _require_canonical_polynomial(self.numerator, label="numerator coefficient")
-        _require_canonical_polynomial(
-            self.denominator,
-            label="denominator coefficient",
-        )
-        if self.denominator[0].as_fraction() == 0:
-            raise _recurrence_validation_error(
-                "denominator constant coefficient must be nonzero"
-            )
-        return self
 
 
 class RationalGeneratingFunctionCoefficientsResult(StrictModel):

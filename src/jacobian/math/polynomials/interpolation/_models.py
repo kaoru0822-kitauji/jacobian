@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from fractions import Fraction
 from math import prod
 from typing import Literal, Self
 
@@ -368,19 +367,6 @@ class HermiteConstraintReplay(StrictModel):
     computed: CanonicalRational
 
 
-def _polynomial_coefficients(
-    polynomial: RationalPolynomial,
-    multiplicity: int,
-) -> tuple[Fraction, ...]:
-    coefficients = [Fraction(0)] * multiplicity
-    for term in polynomial.polynomial.terms:
-        exponent = term.exponents[0]
-        if exponent >= multiplicity:
-            raise _validation_error("Hermite polynomial degree must be less than M")
-        coefficients[exponent] = term.coefficient.as_fraction()
-    return tuple(coefficients)
-
-
 class HermiteInterpolationResult(StrictModel):
     """Unique degree-``< M`` interpolant with retained constraint evidence."""
 
@@ -441,44 +427,14 @@ class HermiteInterpolationResult(StrictModel):
                 max_digits=MAX_CANONICAL_RATIONAL_DIGITS,
                 label="Hermite polynomial coefficient",
             )
-        coefficients = _polynomial_coefficients(self.polynomial, multiplicity)
-        nonzero_degrees = tuple(
-            degree for degree, coefficient in enumerate(coefficients) if coefficient
+        actual_axis = tuple(
+            (item.node.as_fraction(), item.derivative_order) for item in self.replay
         )
-        expected_degree = max(nonzero_degrees) if nonzero_degrees else None
-        if self.degree != expected_degree:
-            raise _validation_error("degree must equal the exact polynomial degree")
-        expected_leading = (
-            Fraction(0) if expected_degree is None else coefficients[expected_degree]
-        )
-        if self.leading_coefficient.as_fraction() != expected_leading:
+        if len(actual_axis) != multiplicity or actual_axis != tuple(
+            sorted(actual_axis)
+        ):
             raise _validation_error(
-                "leading_coefficient must match the canonical polynomial"
-            )
-
-        expected_rows = tuple(
-            (
-                jet.node.as_fraction(),
-                derivative.derivative_order,
-                derivative.value.as_fraction(),
-            )
-            for jet in sorted(
-                self.source.jets, key=lambda item: item.node.as_fraction()
-            )
-            for derivative in jet.derivatives
-        )
-        actual_rows = tuple(
-            (
-                item.node.as_fraction(),
-                item.derivative_order,
-                item.expected.as_fraction(),
-            )
-            for item in self.replay
-        )
-        if actual_rows != expected_rows:
-            raise _validation_error(
-                "replay must cover every source derivative constraint in "
-                "canonical node/order order"
+                "replay rows must cover the declared multiplicity in canonical order"
             )
         if (
             len(encode_strict_json(self.model_dump(mode="json")))
@@ -502,7 +458,7 @@ class HermiteInterpolationResult(StrictModel):
     ) -> Self:
         """Build a result from the interpolation kernel's established facts."""
 
-        return cls(
+        return cls.model_construct(
             source=source,
             polynomial=polynomial,
             total_multiplicity=total_multiplicity,

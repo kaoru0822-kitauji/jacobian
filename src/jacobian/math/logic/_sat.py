@@ -267,11 +267,6 @@ class SatRefutationCheckRequest(StrictModel):
         )
     )
 
-    @model_validator(mode="after")
-    def require_source_bound_lpr_profile(self) -> Self:
-        _validate_lpr_refutation(self.cnf, self.refutation)
-        return self
-
 
 class SatRefutationCheckResult(StrictModel):
     """A source-bound LPR replay outcome; only VALID_REFUTATION proves UNSAT."""
@@ -677,6 +672,8 @@ def check_sat_refutation(
     request: SatRefutationCheckRequest,
 ) -> SatRefutationCheckResult:
     """Replay one typed LPR refutation through the pinned CakeML checker."""
+
+    _validate_lpr_refutation(request.cnf, request.refutation)
 
     def unavailable(detail: str) -> SatRefutationCheckResult:
         return SatRefutationCheckResult(

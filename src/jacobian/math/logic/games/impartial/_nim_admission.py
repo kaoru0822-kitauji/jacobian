@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from jacobian.canonical import strict_json_object_size
 from jacobian.math.logic.games.impartial.values import (
     MAX_NIM_DISTINCT_OPTIONS,
@@ -11,15 +9,6 @@ from jacobian.math.logic.games.impartial.values import (
     MAX_NIM_RAW_CANDIDATES,
     NimPosition,
 )
-
-
-@dataclass(frozen=True, slots=True)
-class NimOptionPlan:
-    """The exact bounded shape of one complete Nim option result."""
-
-    raw_candidate_count: int
-    distinct_option_count: int
-    serialized_result_bytes: int
 
 
 def heap_groups(position: NimPosition) -> tuple[tuple[int, tuple[int, ...]], ...]:
@@ -84,8 +73,10 @@ def _nim_option_result_size(
     )
 
 
-def nim_option_plan(position: NimPosition) -> NimOptionPlan:
-    """Bound complete indexed Nim options before materialization."""
+def admit_nim_options(
+    position: NimPosition,
+) -> tuple[tuple[int, tuple[int, ...]], ...]:
+    """Bound complete indexed Nim options and return prepared heap groups."""
 
     groups = heap_groups(position)
     raw_candidate_count = sum(position.heaps)
@@ -108,11 +99,7 @@ def nim_option_plan(position: NimPosition) -> NimOptionPlan:
             "canonical serialized result exceeds the Nim option bound of "
             f"{MAX_NIM_OPTION_RESULT_BYTES} bytes"
         )
-    return NimOptionPlan(
-        raw_candidate_count=raw_candidate_count,
-        distinct_option_count=distinct_option_count,
-        serialized_result_bytes=serialized_result_bytes,
-    )
+    return groups
 
 
-__all__ = ["NimOptionPlan", "heap_groups", "nim_option_plan"]
+__all__ = ["admit_nim_options", "heap_groups"]

@@ -290,11 +290,6 @@ class GraphMaximumCutRequest(StrictModel):
 
     graph: MaximumCutGraph
 
-    @model_validator(mode="after")
-    def require_complete_search_envelope(self) -> Self:
-        _require_graph_envelope(self.graph)
-        return self
-
 
 class GraphMaximumCutResult(StrictModel):
     """An exact maximum cut bound to its complete canonical source graph."""
@@ -587,6 +582,7 @@ def _compute_maximum_cut_isolated(
 ) -> GraphMaximumCutResult:
     """Run the Z3 acceleration in a bounded worker, never in the service host."""
 
+    _require_graph_envelope(request.graph)
     from jacobian.math.graphs.optimization._maximum_cut_process import (
         compute_maximum_cut_isolated,
     )

@@ -8,8 +8,12 @@ from fractions import Fraction
 from jacobian._exact import CanonicalRational
 from jacobian.canonical import format_canonical_integer
 from jacobian.math.combinatorics._recurrence_models import (
+    MAX_COMBINATORICS_INPUT_RATIONAL_DIGITS,
     MAX_COMBINATORICS_RESULT_ARTIFACT_BYTES,
     MAX_COMBINATORICS_RESULT_RATIONAL_DIGITS,
+    MAX_P_RECURSIVE_POLYNOMIAL_DEGREE,
+    _require_bounded_rational,
+    _require_canonical_polynomial,
     _validate_result_inline_size,
 )
 
@@ -59,6 +63,16 @@ def _admit_linear_recurrence(
 ) -> tuple[Fraction, ...]:
     """Prepare the recurrence prefix while checking its exact result envelope."""
 
+    for label, values in (
+        ("recurrence coefficient", coefficients),
+        ("recurrence initial value", initial_values),
+    ):
+        for rational_value in values:
+            _require_bounded_rational(
+                rational_value,
+                max_digits=MAX_COMBINATORICS_INPUT_RATIONAL_DIGITS,
+                label=label,
+            )
     prefix = [
         value.as_fraction() for value in initial_values[: requested_indices[-1] + 1]
     ]
@@ -83,8 +97,8 @@ def _admit_linear_recurrence(
         raise ValueError(
             "the exact combinatorics result exceeds the bounded result limit"
         )
-    for value in prefix:
-        _require_bounded_fraction(value, label="recurrence result")
+    for fraction_value in prefix:
+        _require_bounded_fraction(fraction_value, label="recurrence result")
     _validate_result_inline_size(
         {
             "coefficient_convention": coefficient_convention,
@@ -111,6 +125,18 @@ def _admit_p_recursive_recurrence(
 ) -> tuple[Fraction, ...]:
     """Prepare a P-recursive prefix and check the projected result envelope."""
 
+    for polynomial in coefficient_polynomials:
+        if not polynomial or len(polynomial) > MAX_P_RECURSIVE_POLYNOMIAL_DEGREE + 1:
+            raise ValueError("coefficient polynomial degree is outside the bound")
+        _require_canonical_polynomial(
+            polynomial, label="recurrence polynomial coefficient"
+        )
+    for value in initial_values:
+        _require_bounded_rational(
+            value,
+            max_digits=MAX_COMBINATORICS_INPUT_RATIONAL_DIGITS,
+            label="recurrence initial value",
+        )
     polynomials = tuple(
         tuple(value.as_fraction() for value in polynomial)
         for polynomial in coefficient_polynomials
@@ -191,6 +217,10 @@ def _admit_series(
 ) -> tuple[Fraction, ...]:
     """Prepare a rational-series prefix while checking its exact result envelope."""
 
+    _require_canonical_polynomial(numerator, label="numerator coefficient")
+    _require_canonical_polynomial(denominator, label="denominator coefficient")
+    if denominator[0].as_fraction() == 0:
+        raise ValueError("denominator constant coefficient must be nonzero")
     numerator_values = tuple(value.as_fraction() for value in numerator)
     denominator_values = tuple(value.as_fraction() for value in denominator)
     coefficients: list[Fraction] = []

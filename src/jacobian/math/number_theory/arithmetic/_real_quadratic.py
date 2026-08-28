@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Self
+from pydantic import Field
 
-from pydantic import Field, model_validator
-
-from jacobian._exact import CanonicalRational
 from jacobian._models import StrictModel
 from jacobian.catalog._examples import example
 from jacobian.math.number_theory.algebraic_numbers.quadratic import (
@@ -14,9 +11,6 @@ from jacobian.math.number_theory.algebraic_numbers.quadratic import (
     RealQuadraticEmbeddingProfile,
     RealQuadraticOrderValue,
     RealQuadraticValue,
-    _embedding_scalars,
-    _require_bounded_rational,
-    _require_order_admission,
     real_quadratic_embeddings,
     real_quadratic_order,
 )
@@ -34,28 +28,12 @@ class RealQuadraticEmbeddingsRequest(StrictModel):
         ),
     )
 
-    @model_validator(mode="after")
-    def require_profile_within_result_bound(self) -> Self:
-        trace, norm = _embedding_scalars(self.element)
-        for label, value in (("trace", trace), ("norm", norm)):
-            _require_bounded_rational(
-                CanonicalRational.from_fraction(value),
-                max_digits=_MAX_EMBEDDING_PROFILE_RESULT_DIGITS,
-                label=f"real-quadratic embedding {label}",
-            )
-        return self
-
 
 class RealQuadraticOrderRequest(StrictModel):
     """One bounded comparison in a shared real quadratic field."""
 
     left: RealQuadraticValue
     right: RealQuadraticValue
-
-    @model_validator(mode="after")
-    def require_shared_field(self) -> Self:
-        _require_order_admission(self.left, self.right)
-        return self
 
 
 def _compute_real_quadratic_embeddings(

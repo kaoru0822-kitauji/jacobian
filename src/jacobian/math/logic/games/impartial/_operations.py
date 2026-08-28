@@ -17,7 +17,6 @@ from jacobian.math.logic.games.impartial._models import (
     SubtractionGrundyPrefixRequest,
     SubtractionGrundyPrefixResult,
 )
-from jacobian.math.logic.games.impartial._nim_admission import nim_option_plan
 from jacobian.math.logic.games.impartial.operations import (
     birthdays,
     grundy_table,
@@ -90,9 +89,8 @@ def compute_nim_options(
     """Enumerate the complete deduplicated option family of a Nim position."""
 
     options = nim_options(request.position)
-    plan = nim_option_plan(request.position)
     return NimOptionsResult._from_kernel(
-        request, options, plan.raw_candidate_count, plan.distinct_option_count
+        request, options, sum(request.position.heaps), len(options)
     )
 
 

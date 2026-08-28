@@ -13,7 +13,6 @@ from jacobian.math.combinatorics._difference_set_models import (
     CyclicDifferenceSetExtensionResult,
     CyclicPerfectDifferenceSetResult,
     IntegerSidonRequest,
-    IntegerSidonResult,
 )
 
 
@@ -27,15 +26,6 @@ def raises_code(code: str) -> Iterator[None]:
 def test_sidon_request_rejects_duplicate_integer_elements() -> None:
     with raises_code("combinatorics.sidon_invariant"):
         IntegerSidonRequest(elements=("1", "2", "1"))
-
-
-def test_sidon_result_requires_the_complete_ordered_profile() -> None:
-    with raises_code("combinatorics.sidon_invariant"):
-        IntegerSidonResult(
-            normalized_elements=("1", "2", "4"),
-            ordered_differences=(),
-            is_sidon=True,
-        )
 
 
 def test_extension_request_rejects_an_unbounded_candidate_space() -> None:
@@ -69,32 +59,6 @@ def test_positive_extension_result_rejects_residue_outside_modulus() -> None:
             decision="EXTENDS",
             extension=(0, 1, 7),
             coverage="WITNESS",
-        )
-
-
-def test_pds_result_rejects_a_forged_self_consistent_profile() -> None:
-    """A producer regression cannot pass a forged multiplicity profile.
-
-    Residues ``(0, 1, 2)`` modulo 7 repeat differences 1 and 6 and omit 3 and
-    4, but a forged profile claiming multiplicity 1 for every nonzero residue
-    with empty missing/repeated lists and ``is_perfect=True`` is internally
-    self-consistent under the old shape-only validator. The authoritative
-    result model must recompute multiplicities from the residues.
-    """
-    forged_profile = tuple(
-        CyclicDifferenceMultiplicity(residue=residue, multiplicity=1)
-        for residue in range(1, 7)
-    )
-    with raises_code("combinatorics.difference_set_invariant"):
-        CyclicPerfectDifferenceSetResult(
-            modulus=7,
-            normalized_residues=(0, 1, 2),
-            order=3,
-            expected_modulus=7,
-            difference_multiplicities=forged_profile,
-            missing_residues=(),
-            repeated_residues=(),
-            is_perfect=True,
         )
 
 

@@ -29,15 +29,6 @@ class HermiteNormalFormRequest(StrictModel):
 
     matrix: IntegerMatrix
 
-    @model_validator(mode="after")
-    def require_hnf_input_budget(self) -> Self:
-        require_matrix_scalar_digits(
-            self.matrix.entries,
-            maximum=_MAX_LATTICE_INPUT_SCALAR_DIGITS,
-            label="Hermite normal form input",
-        )
-        return self
-
 
 class HermiteNormalFormResult(StrictModel):
     """Exact row HNF and its left unimodular transformation."""
@@ -67,15 +58,6 @@ class LatticeReductionRequest(StrictModel):
     """One bounded integer row basis for exact LLL reduction."""
 
     basis: IntegerMatrix
-
-    @model_validator(mode="after")
-    def require_lattice_input_budget(self) -> Self:
-        require_matrix_scalar_digits(
-            self.basis.entries,
-            maximum=_MAX_LATTICE_INPUT_SCALAR_DIGITS,
-            label="basis input",
-        )
-        return self
 
 
 class LatticeReductionResult(StrictModel):
@@ -196,15 +178,6 @@ class RankGramRequest(StrictModel):
 
     lattice: IntegerLattice
 
-    @model_validator(mode="after")
-    def require_budget(self) -> Self:
-        require_matrix_scalar_digits(
-            self.lattice.basis.entries,
-            maximum=_MAX_LATTICE_INPUT_SCALAR_DIGITS,
-            label="rank-gram input",
-        )
-        return self
-
 
 class RankGramResult(StrictModel):
     """Exact rank, labelled Gram matrix ``G = B B^T``, and squared covolume."""
@@ -235,15 +208,6 @@ class DualRequest(StrictModel):
     """One integer lattice for dual-basis computation."""
 
     lattice: IntegerLattice
-
-    @model_validator(mode="after")
-    def require_budget(self) -> Self:
-        require_matrix_scalar_digits(
-            self.lattice.basis.entries,
-            maximum=_MAX_LATTICE_INPUT_SCALAR_DIGITS,
-            label="dual input",
-        )
-        return self
 
 
 class DualResult(StrictModel):
@@ -299,11 +263,6 @@ class SublatticeIndexRequest(StrictModel):
                 "embedding_rows_mismatch",
                 "embedding rows must match sublattice basis rows",
             )
-        require_matrix_scalar_digits(
-            self.embedding.entries,
-            maximum=_MAX_LATTICE_INPUT_SCALAR_DIGITS,
-            label="sublattice embedding",
-        )
         return self
 
 
@@ -323,15 +282,6 @@ class DiscriminantGroupRequest(StrictModel):
 
     lattice: IntegerLattice
 
-    @model_validator(mode="after")
-    def require_budget(self) -> Self:
-        require_matrix_scalar_digits(
-            self.lattice.basis.entries,
-            maximum=_MAX_LATTICE_INPUT_SCALAR_DIGITS,
-            label="discriminant-group input",
-        )
-        return self
-
 
 class DiscriminantGroupResult(StrictModel):
     """Finite abelian group ``L^*/L`` and the discriminant order ``|det G|``."""
@@ -347,15 +297,6 @@ class OrthogonalComplementRequest(StrictModel):
     """One integer lattice whose orthogonal complement in ``QQ^n`` is sought."""
 
     lattice: IntegerLattice
-
-    @model_validator(mode="after")
-    def require_budget(self) -> Self:
-        require_matrix_scalar_digits(
-            self.lattice.basis.entries,
-            maximum=_MAX_LATTICE_INPUT_SCALAR_DIGITS,
-            label="orthogonal-complement input",
-        )
-        return self
 
 
 class OrthogonalComplementResult(StrictModel):
@@ -374,40 +315,12 @@ class DirectSumRequest(StrictModel):
     first: IntegerLattice
     second: IntegerLattice
 
-    @model_validator(mode="after")
-    def require_budget(self) -> Self:
-        require_matrix_scalar_digits(
-            self.first.basis.entries,
-            maximum=_MAX_LATTICE_INPUT_SCALAR_DIGITS,
-            label="direct-sum first operand",
-        )
-        require_matrix_scalar_digits(
-            self.second.basis.entries,
-            maximum=_MAX_LATTICE_INPUT_SCALAR_DIGITS,
-            label="direct-sum second operand",
-        )
-        return self
-
 
 class OrthogonalSumRequest(StrictModel):
     """Two integer lattices to orthogonally sum."""
 
     first: IntegerLattice
     second: IntegerLattice
-
-    @model_validator(mode="after")
-    def require_budget(self) -> Self:
-        require_matrix_scalar_digits(
-            self.first.basis.entries,
-            maximum=_MAX_LATTICE_INPUT_SCALAR_DIGITS,
-            label="orthogonal-sum first operand",
-        )
-        require_matrix_scalar_digits(
-            self.second.basis.entries,
-            maximum=_MAX_LATTICE_INPUT_SCALAR_DIGITS,
-            label="orthogonal-sum second operand",
-        )
-        return self
 
 
 class DirectSumResult(StrictModel):

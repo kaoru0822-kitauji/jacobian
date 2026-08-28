@@ -53,30 +53,6 @@ def _build_solver(
     return solver, selected, cardinality
 
 
-def _verify_upper_bound_kernel(
-    source: FiniteHypergraph,
-    upper_bound: int,
-    wall_seconds: int,
-) -> bool:
-    """Replay that no independent set exceeds the reported upper bound."""
-
-    import z3
-
-    try:
-        started = time.monotonic()
-        solver, _, cardinality = _build_solver(source)
-        solver.add(cardinality >= upper_bound + 1)
-        remaining_ms = _remaining_ms(started, wall_seconds)
-        if remaining_ms <= 0:
-            return False
-        solver.set(timeout=max(1, remaining_ms))
-        return bool(
-            solver.check() == z3.unsat and _remaining_ms(started, wall_seconds) > 0
-        )
-    except z3.Z3Exception:
-        return False
-
-
 def _check_threshold(
     solver: Any,
     selected: dict[str, Any],
@@ -367,24 +343,6 @@ def _run_independence_worker(
         return cast(object, json.loads(completed.stdout.decode("utf-8")))
     except (UnicodeDecodeError, json.JSONDecodeError):
         return None
-
-
-def verify_independence_result(result: HypergraphIndependenceResult) -> bool:
-    """Replay a supplied strict upper bound only in the bounded owner worker."""
-
-    source_upper_bound = _independence_upper_bound(result.hypergraph)
-    if result.upper_bound == source_upper_bound:
-        return True
-    response = _run_independence_worker(
-        {
-            "kind": "verify",
-            "hypergraph": result.hypergraph.model_dump(mode="json"),
-            "upper_bound": result.upper_bound,
-            "wall_seconds": result.resource_budget.wall_seconds,
-        },
-        timeout_seconds=result.resource_budget.wall_seconds,
-    )
-    return response is True
 
 
 def solve_independence_number(

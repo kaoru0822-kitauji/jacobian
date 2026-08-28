@@ -65,22 +65,6 @@ class IndependenceNumberRequest(StrictModel):
         default_factory=IndependenceNumberBudget
     )
 
-    @model_validator(mode="after")
-    def require_supported_order(self) -> Self:
-        _require_supported_order(self.graph, self.resource_budget)
-        return self
-
-    @model_validator(mode="after")
-    def require_transportable_result(self) -> Self:
-        # The result echoes the retained source graph and repeats up to
-        # every vertex identifier as the canonically sorted witness, so
-        # admission bounds that predicted serialization before any solve.
-        _require_output_headroom(
-            simple_undirected_graph_wire_bytes(self.graph),
-            _label_wire_bytes(self.graph),
-        )
-        return self
-
 
 def _require_supported_order(
     graph: SimpleUndirectedGraph,
@@ -197,12 +181,14 @@ def _compute_independence_number(
 ) -> IndependenceNumberResult:
     """Run the wire-request adapter retained for the catalog and MCP path."""
 
-    from jacobian.math.graphs import _independence_z3
-
-    return _independence_z3.solve_independence_number(request)
+    return independence_number(request.graph, resource_budget=request.resource_budget)
 
 
-def independence_number(graph: SimpleUndirectedGraph) -> IndependenceNumberResult:
+def independence_number(
+    graph: SimpleUndirectedGraph,
+    *,
+    resource_budget: IndependenceNumberBudget | None = None,
+) -> IndependenceNumberResult:
     """Return the bounded independence-number outcome of ``graph``.
 
     Native callers supply the canonical graph value directly.  The public
@@ -213,8 +199,11 @@ def independence_number(graph: SimpleUndirectedGraph) -> IndependenceNumberResul
 
     if not isinstance(graph, SimpleUndirectedGraph):
         raise TypeError("independence_number expects a SimpleUndirectedGraph")
-    resource_budget = IndependenceNumberBudget()
+    resource_budget = resource_budget or IndependenceNumberBudget()
     _require_supported_order(graph, resource_budget)
+    _require_output_headroom(
+        simple_undirected_graph_wire_bytes(graph), _label_wire_bytes(graph)
+    )
 
     from jacobian.math.graphs import _independence_z3
 

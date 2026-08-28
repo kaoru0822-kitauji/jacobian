@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from jacobian._exact import require_bounded_rational
 from jacobian.math.probability.stochastic_processes._models import (
+    MAX_STOCHASTIC_VALUE_DIGITS,
     ConditionalExpectationRequest,
     DoobMartingaleRequest,
     DoobMartingaleResult,
@@ -48,6 +50,12 @@ def compute_join(request: JoinRequest) -> FiniteSigmaAlgebra:
 def compute_conditional_expectation(
     request: ConditionalExpectationRequest,
 ) -> FiniteRandomVariable:
+    for value in request.rv.values:
+        require_bounded_rational(
+            value,
+            max_digits=MAX_STOCHASTIC_VALUE_DIGITS,
+            label="random-variable value",
+        )
     return conditional_expectation(request.rv, request.sigma)
 
 
@@ -59,5 +67,9 @@ def compute_filtration(request: FiltrationRequest) -> FiltrationResult:
 def compute_doob_martingale(
     request: DoobMartingaleRequest,
 ) -> DoobMartingaleResult:
+    for value in request.payoff:
+        require_bounded_rational(
+            value, max_digits=MAX_STOCHASTIC_VALUE_DIGITS, label="payoff"
+        )
     result = doob_martingale(request.space, request.observations, request.payoff)
     return DoobMartingaleResult(martingale=result)

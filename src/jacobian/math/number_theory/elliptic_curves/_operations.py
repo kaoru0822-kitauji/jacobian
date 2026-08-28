@@ -28,7 +28,7 @@ def compute_discriminant(request: EllipticCurveRequest) -> CurveDiscriminantResu
     a = request.curve.coefficient_a.as_fraction()
     b = request.curve.coefficient_b.as_fraction()
     disc = _curve_discriminant(a, b)
-    return CurveDiscriminantResult(
+    return CurveDiscriminantResult._from_kernel(
         request=request,
         discriminant=CanonicalRational.from_fraction(disc),
         is_nonsingular=disc != 0,
@@ -43,7 +43,7 @@ def check_point_on_curve(request: CurvePointRequest) -> PointOnCurveResult:
     y = request.point.y.as_fraction()
     lhs = y * y
     rhs = x * x * x + a * x + b
-    return PointOnCurveResult(request=request, on_curve=lhs == rhs)
+    return PointOnCurveResult._from_kernel(request=request, on_curve=lhs == rhs)
 
 
 def _point_add(

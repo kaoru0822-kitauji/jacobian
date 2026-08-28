@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from typing import Annotated, Literal, Self
 
 from pydantic import Field, StrictInt, StringConstraints, model_validator
@@ -155,14 +154,6 @@ class CertifiedFactorizationResult(StrictModel):
             raise _validation_error(
                 "complete_factorization_requires_factors",
                 "a complete factorization must carry at least one factor",
-            )
-        if math.prod(
-            parse_canonical_integer(item.prime) ** item.exponent
-            for item in self.factors
-        ) != parse_canonical_integer(self.value):
-            raise _validation_error(
-                "factor_components_must_multiply_to_the_requested_integer",
-                "factor components must multiply to the requested integer",
             )
         primes = [parse_canonical_integer(item.prime) for item in self.factors]
         if primes != sorted(primes):

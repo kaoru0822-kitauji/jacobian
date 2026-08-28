@@ -35,18 +35,6 @@ class TransitionMatrixRequest(StrictModel):
             raise _validation_error(
                 "transition_matrix_not_square", "transition matrix must be square"
             )
-        for row in self.matrix:
-            values = tuple(value.as_fraction() for value in row)
-            if any(value < 0 for value in values):
-                raise _validation_error(
-                    "transition_probability_negative",
-                    "transition probabilities must be nonnegative",
-                )
-            if sum(values) != 1:
-                raise _validation_error(
-                    "transition_row_not_stochastic",
-                    "each transition row must sum to one",
-                )
         return self
 
 
@@ -95,8 +83,11 @@ class StationaryDistributionResult(StrictModel):
 
     @model_validator(mode="after")
     def bind_stationary_family(self) -> Self:
-        TransitionMatrixRequest(matrix=self.transition_matrix)
         dimension = len(self.transition_matrix)
+        if any(len(row) != dimension for row in self.transition_matrix):
+            raise _validation_error(
+                "stationary_matrix_not_square", "transition matrix must be square"
+            )
         dimensions = {len(item.distribution) for item in self.extreme_distributions}
         if dimensions != {dimension}:
             raise _validation_error(
@@ -232,7 +223,6 @@ class CommunicatingClassesResult(StrictModel):
 
     @model_validator(mode="after")
     def require_partition_validity(self) -> Self:
-        TransitionMatrixRequest(matrix=self.transition_matrix)
         dimension = len(self.transition_matrix)
         if any(len(row) != dimension for row in self.transition_matrix):
             raise _validation_error(

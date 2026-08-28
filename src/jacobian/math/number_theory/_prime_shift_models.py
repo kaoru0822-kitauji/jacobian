@@ -78,11 +78,6 @@ class PrimeShiftProfileRequest(StrictModel):
     lower_bound: int = Field(ge=1)
     upper_bound: int = Field(ge=1)
 
-    @model_validator(mode="after")
-    def require_valid_interval(self) -> Self:
-        _validate_prime_shift_interval(self.lower_bound, self.upper_bound)
-        return self
-
 
 def require_prime_shift_profile_admission(
     lower_bound: int,

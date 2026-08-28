@@ -217,7 +217,7 @@ def linear_map_rank(
     from jacobian.math.finite_fields import _flint
 
     linear_map = restrict_scalars(subspace, direction)
-    return RankResult(
+    return RankResult._from_kernel(
         subspace=subspace,
         direction=direction,
         linear_map=linear_map,
@@ -326,9 +326,9 @@ def finite_map_table(polynomial_map: FinitePolynomialMap) -> FiniteMapTable:
         polynomial_map.polynomial.coefficients,
         sources,
     )
-    return FiniteMapTable(
-        map=polynomial_map,
-        entries=tuple(
+    return FiniteMapTable._from_kernel(
+        polynomial_map,
+        tuple(
             (source, element(polynomial_map.codomain, coordinates))
             for source, coordinates in zip(sources, targets, strict=True)
         ),
@@ -348,7 +348,7 @@ def analyze_collisions(table: FiniteMapTable) -> CollisionResult:
     for source, target in table.entries:
         previous = seen.get(target.digest)
         if previous is not None:
-            return CollisionResult(
+            return CollisionResult._from_kernel(
                 table=table,
                 status="COLLISION",
                 left=previous[0],
@@ -356,7 +356,7 @@ def analyze_collisions(table: FiniteMapTable) -> CollisionResult:
                 image=target,
             )
         seen[target.digest] = (source, target)
-    return CollisionResult(table=table, status="INJECTIVE")
+    return CollisionResult._from_kernel(table=table, status="INJECTIVE")
 
 
 def analyze_permutation(table: FiniteMapTable) -> PermutationResult:
@@ -372,7 +372,7 @@ def analyze_permutation(table: FiniteMapTable) -> PermutationResult:
         )
     )
     if len({target.digest for _, target in table.entries}) != len(table.entries):
-        return PermutationResult(table=table, status="NOT_PERMUTATION")
-    return PermutationResult(
+        return PermutationResult._from_kernel(table=table, status="NOT_PERMUTATION")
+    return PermutationResult._from_kernel(
         table=table, status="PERMUTATION", inverse_entries=inverse_entries
     )

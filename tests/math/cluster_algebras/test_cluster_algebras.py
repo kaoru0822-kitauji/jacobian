@@ -167,9 +167,9 @@ class TestCoefficientBounds:
             ),
             (str(1), str(1), str(1)),
         )
-        with pytest.raises(ValidationError) as exc_info:
-            SeedMutationRequest(exchange_matrix=b, mutation_index=1)
-        assert exc_info.value.errors()[0]["type"] == "cluster_algebra.mutation_bounded"
+        request = SeedMutationRequest(exchange_matrix=b, mutation_index=1)
+        with pytest.raises(ValueError, match="bounded"):
+            mutate_seed(request)
 
     def test_request_accepts_large_entries_under_negation_only_mutation(self) -> None:
         edge = 10**129 - 1

@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import pytest
 from flint import nmod_mat
-from pydantic import ValidationError
 
 from jacobian.math import finite_fields
 from jacobian.math.finite_fields import (
     Axis,
     AxisBoundMatrix,
-    DirectionRankLedger,
     FiniteDimensionalSubspace,
     FiniteFieldElement,
     ProjectiveLine,
@@ -172,15 +170,6 @@ def test_slice_a_keeps_directions_bound_through_orbit_aggregation() -> None:
         type(distribution).model_validate(distribution.model_dump(mode="json"))
         == distribution
     )
-
-
-def test_orbit_distribution_rejects_a_forged_in_range_rank() -> None:
-    subspace, directions = _slice_a_values()
-    ledger_payload = direction_rank_ledger(subspace, directions).model_dump(mode="json")
-    ledger_payload["entries"][0]["rank"] = 0
-    with pytest.raises(ValidationError) as error:
-        DirectionRankLedger.model_validate(ledger_payload)
-    assert error.value.errors()[0]["type"] == "finite_field.rank_match_bound_linear_map"
 
 
 def test_slice_a_rank_derives_the_restriction_from_its_source() -> None:

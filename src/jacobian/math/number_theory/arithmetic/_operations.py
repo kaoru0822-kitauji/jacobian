@@ -209,7 +209,7 @@ def continued_fraction(
 
     value = _fraction(request.value)
     terms = sympy_continued_fraction(SympyRational(value.numerator, value.denominator))
-    return RationalContinuedFractionResult(
+    return RationalContinuedFractionResult._from_kernel(
         value=request.value,
         terms=tuple(format_canonical_integer(int(term)) for term in terms),
     )

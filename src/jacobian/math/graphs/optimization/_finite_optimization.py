@@ -178,6 +178,8 @@ def _execute[ResultT: StrictModel](
 ) -> ResultT:
     """Run one complete graph Z3 operation in its bounded owner worker."""
 
+    if len(request.graph.vertices) > request.resource_budget.max_order:
+        raise ValueError("graph order exceeds the declared max_order budget")
     graph = cast(Any, build_simple_graph(request.graph))
     deadline = time.monotonic() + request.resource_budget.wall_seconds
     try:

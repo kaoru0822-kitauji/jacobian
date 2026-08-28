@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Self
-
-from pydantic import Field, model_validator
+from pydantic import Field
 from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
@@ -44,24 +42,13 @@ class NewtonPolytopeRequest(StrictModel):
         )
     )
 
-    @model_validator(mode="after")
-    def require_feasible_hull_work(self) -> Self:
-        # Exact extremality testing solves one bounded rational LP per
-        # support point against all others; keep the admitted quadratic-ish
-        # work conservatively small instead of admitting the full canonical
-        # term budget.
-        if len(self.polynomial.polynomial.terms) > MAX_NEWTON_TERMS:
-            raise _validation_error(
-                "newton_term_count_exceeded",
-                (f"Newton polytope requests are limited to {MAX_NEWTON_TERMS} terms"),
-            )
-        return self
-
 
 # Derived weights are sums of weight*exponent products; capping each
 # component at 2^31 keeps every derived integer inside the interoperable
 # JSON range (len(weight) <= 8, exponents <= 32768).
 MAX_WEIGHT_COMPONENT_MAGNITUDE = 2**31
+MAX_WEIGHTED_POLYNOMIAL_TERMS = 1024
+MAX_WEIGHTED_COEFFICIENT_DIGITS = 512
 
 
 def _require_transportable_weight(
@@ -102,36 +89,6 @@ class WeightProfileRequest(StrictModel):
         ),
     )
 
-    @model_validator(mode="after")
-    def require_matching_dimensions(self) -> Self:
-        _require_transportable_weight(self.weight, self.polynomial.variables)
-        # The empty support has no minimum weight; admit only polynomials
-        # whose weight profile exists.
-        if not self.polynomial.polynomial.terms:
-            raise _validation_error(
-                "zero_weight_profile",
-                (
-                    "the zero polynomial has no weight profile; supply a nonzero polynomial"
-                ),
-            )
-        # A degenerate weight repeats every exponent in the minimizing list
-        # and again inside the single layer; cap the serialized profile so
-        # it stays well inside the canonical output envelope.
-        terms = self.polynomial.polynomial.terms
-        if len(terms) > 1024:
-            raise _validation_error(
-                "weight_profile_term_count_exceeded",
-                "weight-profile requests are limited to 1024 terms",
-            )
-        for term in terms:
-            for component in (term.coefficient.num, term.coefficient.den):
-                if len(component.lstrip("-")) > 512:
-                    raise _validation_error(
-                        "weight_profile_coefficient_too_large",
-                        ("weight-profile coefficients are limited to 512 digits"),
-                    )
-        return self
-
 
 class InitialFormRequest(StrictModel):
     """Request the initial form of a polynomial."""
@@ -153,34 +110,6 @@ class InitialFormRequest(StrictModel):
             "weights stay inside the interoperable JSON integer range."
         ),
     )
-
-    @model_validator(mode="after")
-    def require_matching_dimensions(self) -> Self:
-        _require_transportable_weight(self.weight, self.polynomial.variables)
-        if not self.polynomial.polynomial.terms:
-            raise _validation_error(
-                "zero_initial_form",
-                (
-                    "the zero polynomial has no initial form; supply a nonzero polynomial"
-                ),
-            )
-        # A degenerate weight can make every term minimal, serializing the
-        # whole polynomial twice (source + face); admit only sources whose
-        # doubled serialization stays comfortably inside the envelope.
-        terms = self.polynomial.polynomial.terms
-        if len(terms) > 1024:
-            raise _validation_error(
-                "initial_form_term_count_exceeded",
-                "initial-form requests are limited to 1024 terms",
-            )
-        for term in terms:
-            for component in (term.coefficient.num, term.coefficient.den):
-                if len(component.lstrip("-")) > 512:
-                    raise _validation_error(
-                        "initial_form_coefficient_too_large",
-                        ("initial-form coefficients are limited to 512 digits"),
-                    )
-        return self
 
 
 __all__ = [

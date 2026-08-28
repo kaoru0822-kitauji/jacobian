@@ -233,11 +233,6 @@ class GeneralizedExactCoverRequest(StrictModel):
         ),
     )
 
-    @model_validator(mode="after")
-    def reserve_result_space(self) -> Self:
-        _require_output_headroom(self.instance)
-        return self
-
 
 class ExactCoverItemMultiplicity(StrictModel):
     """One item's reconstructed multiplicity in a selected-row family."""
@@ -437,7 +432,9 @@ def _find_generalized_exact_cover_request(
 ) -> GeneralizedExactCoverResult:
     """Catalog adapter for the strict generalized-exact-cover wire request."""
 
-    return _solve_generalized_exact_cover(request.instance, request.search_node_limit)
+    return find_generalized_exact_cover(
+        request.instance, search_node_limit=request.search_node_limit
+    )
 
 
 __all__ = [

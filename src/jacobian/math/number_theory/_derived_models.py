@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Literal, Self
+from typing import Literal
 
-from pydantic import Field, StrictInt, model_validator
+from pydantic import Field, StrictInt
 
 from jacobian._models import StrictModel
-from jacobian.math.number_theory._models import _validation_error
 
 MAX_FACTORIAL_ARGUMENT = 100_000
 MAX_FACTORIAL_BASE = 1_000_000
@@ -47,15 +46,6 @@ class LegendreSymbolRequest(StrictModel):
 
     a: StrictInt = Field(ge=-(2**53 - 1), le=2**53 - 1)
     prime: StrictInt = Field(ge=3, le=MAX_LEGENDRE_PRIME)
-
-    @model_validator(mode="after")
-    def require_prime_denominator(self) -> Self:
-        if not _is_bounded_prime(self.prime):
-            raise _validation_error(
-                "legendre_denominator_must_be_prime",
-                "Legendre denominator must be prime",
-            )
-        return self
 
 
 class LegendreSymbolResult(StrictModel):

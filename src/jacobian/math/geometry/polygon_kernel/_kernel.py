@@ -173,12 +173,10 @@ class KernelData:
 def compute_kernel_data(
     polygon: KernelPolygon,
     *,
-    half_planes: tuple[OrientedEdgeHalfPlane, ...] | None = None,
+    half_planes: tuple[OrientedEdgeHalfPlane, ...],
 ) -> KernelData:
     """Compute the complete canonical kernel data for one admitted polygon."""
 
-    if half_planes is None:
-        half_planes = oriented_half_planes(polygon)
     candidates = _feasible_boundary_intersections(half_planes)
     kernel_points = _canonical_hull(candidates)
     dimension: Literal["EMPTY", "POINT", "SEGMENT", "POLYGON"] = (

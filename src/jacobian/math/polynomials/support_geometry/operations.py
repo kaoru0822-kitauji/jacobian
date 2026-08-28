@@ -6,10 +6,13 @@ from fractions import Fraction
 
 from jacobian._exact import CanonicalRational
 from jacobian.math.polynomials.support_geometry._models import (
+    MAX_WEIGHTED_COEFFICIENT_DIGITS,
+    MAX_WEIGHTED_POLYNOMIAL_TERMS,
     InitialFormRequest,
     NewtonPolytopeRequest,
     SupportRequest,
     WeightProfileRequest,
+    _require_transportable_weight,
 )
 from jacobian.math.polynomials.support_geometry.values import (
     MAX_NEWTON_TERMS,
@@ -60,6 +63,27 @@ def _require_weighted_polynomial_domain(
     if all(term.coefficient.as_fraction() == 0 for term in polynomial.polynomial.terms):
         raise ValueError(
             "the zero polynomial has no weight profile; supply a nonzero polynomial"
+        )
+
+
+def _admit_weighted_polynomial(
+    polynomial: RationalPolynomial, weight: tuple[int, ...], *, label: str
+) -> None:
+    _require_transportable_weight(weight, polynomial.variables)
+    _require_weighted_polynomial_domain(polynomial, weight)
+    terms = polynomial.polynomial.terms
+    if len(terms) > MAX_WEIGHTED_POLYNOMIAL_TERMS:
+        raise ValueError(
+            f"{label} requests are limited to {MAX_WEIGHTED_POLYNOMIAL_TERMS} terms"
+        )
+    if any(
+        len(component.lstrip("-")) > MAX_WEIGHTED_COEFFICIENT_DIGITS
+        for term in terms
+        for component in (term.coefficient.num, term.coefficient.den)
+    ):
+        raise ValueError(
+            f"{label} coefficients are limited to "
+            f"{MAX_WEIGHTED_COEFFICIENT_DIGITS} digits"
         )
 
 
@@ -402,6 +426,9 @@ def compute_newton_polytope(request: NewtonPolytopeRequest) -> NewtonPolytope:
 
 def compute_weight_profile(request: WeightProfileRequest) -> PolynomialWeightProfile:
     """Compute the weight profile of a polynomial's support."""
+    _admit_weighted_polynomial(
+        request.polynomial, request.weight, label="weight-profile"
+    )
     minimum_weight, minimizing, weight_layers = _compute_weight_layers(
         request.polynomial, request.weight
     )
@@ -417,6 +444,7 @@ def compute_weight_profile(request: WeightProfileRequest) -> PolynomialWeightPro
 def compute_initial_form(request: InitialFormRequest) -> PolynomialFaceData:
     """Compute the initial form of a polynomial under a weight vector."""
     source = request.polynomial
+    _admit_weighted_polynomial(source, request.weight, label="initial-form")
     face_terms = _initial_form_terms(source, request.weight)
 
     initial_form = RationalPolynomial(

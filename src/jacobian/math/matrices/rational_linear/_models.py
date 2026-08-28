@@ -82,10 +82,8 @@ class LinearRationalSolutionFindRequest(StrictModel):
 class LinearRationalSolutionResult(StrictModel):
     """One exact solution outcome bound to its declared source system.
 
-    An independently supplied solution carries one coordinate per declared
-    variable and satisfies ``A x = b`` exactly over QQ. A negative outcome
-    carries no witness to replay and is constructed by the bounded owner
-    kernel rather than by re-entering a matrix operation during validation.
+    A solution carries one coordinate per declared variable. The bounded owner
+    kernel establishes ``A x = b`` exactly over QQ.
     """
 
     system: LinearRationalSystem
@@ -111,20 +109,6 @@ class LinearRationalSolutionResult(StrictModel):
                 "budget_exceeded",
                 "solution length must equal the source variable count",
             )
-        components = [value.as_fraction() for value in self.values]
-        for row, bound in zip(
-            self.system.coefficients.entries,
-            self.system.rhs,
-            strict=True,
-        ):
-            residual = sum(
-                coefficient.as_fraction() * component
-                for coefficient, component in zip(row, components, strict=True)
-            )
-            if residual != bound.as_fraction():
-                raise _validation_error(
-                    "budget_exceeded", "solution does not satisfy A x = b exactly"
-                )
         return self
 
     @classmethod
@@ -143,15 +127,9 @@ class LinearRationalSolutionResult(StrictModel):
 class LinearRationalInconsistencyResult(StrictModel):
     """One exact inconsistency outcome bound to its declared source system.
 
-    Retains the canonical ``LinearRationalSystem`` so validation replays the
-    defining relations: an admitted separating witness ``y`` carries one
-    coordinate per source row, annihilates every source column exactly
-    (``y^T A = 0``), and its recorded pairing equals ``y^T b`` on the
-    retained right-hand side and is nonzero.  The witness is defined up to a
-    nonzero scaling; the producer emits the backend-scaled witness whose
-    pairing equals one. A consistent outcome carries no witness and is
-    constructed by the bounded owner kernel rather than by re-entering a
-    matrix operation during validation.
+    An admitted separating witness ``y`` carries one coordinate per source
+    row. The bounded owner kernel establishes ``y^T A = 0`` and the recorded
+    nonzero ``y^T b`` pairing.
     """
 
     system: LinearRationalSystem
@@ -177,33 +155,7 @@ class LinearRationalInconsistencyResult(StrictModel):
             raise _validation_error(
                 "shape_mismatch", "witness length must equal the source row count"
             )
-        coordinates = [value.as_fraction() for value in self.left_witness]
-        columns = range(len(self.system.coefficients.entries[0]))
-        for column in columns:
-            if (
-                sum(
-                    row[column].as_fraction() * coordinate
-                    for row, coordinate in zip(
-                        self.system.coefficients.entries,
-                        coordinates,
-                        strict=True,
-                    )
-                )
-                != 0
-            ):
-                raise _validation_error(
-                    "budget_exceeded", "witness does not satisfy y^T A = 0 exactly"
-                )
-        pairing = sum(
-            bound.as_fraction() * coordinate
-            for bound, coordinate in zip(self.system.rhs, coordinates, strict=True)
-        )
-        if pairing != self.rhs_pairing.as_fraction():
-            raise _validation_error(
-                "invariant_mismatch",
-                "recorded pairing must equal y^T b on the source system",
-            )
-        if pairing == 0:
+        if self.rhs_pairing.as_fraction() == 0:
             raise _validation_error(
                 "status_mismatch", "separating witness must have a nonzero pairing"
             )

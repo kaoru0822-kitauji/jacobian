@@ -360,7 +360,7 @@ def _compute_graded_jacobian_syzygy(
             break
 
     searched_through = first_degree if first_degree is not None else request.max_degree
-    return GradedJacobianSyzygyResult(
+    return GradedJacobianSyzygyResult._from_kernel(
         variables=variables,
         source_kind=source_kind,
         expanded_polynomial=rational_polynomial_from_sympy(source, variables),

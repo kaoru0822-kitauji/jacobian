@@ -8,6 +8,7 @@ from jacobian.math.cluster_algebras._models import (
     GVectorResult,
     SeedMutationRequest,
     SeedMutationResult,
+    _require_mutatable,
     encoded_entries,
     parsed_entries,
 )
@@ -59,6 +60,7 @@ def mutate_seed(request: SeedMutationRequest) -> SeedMutationResult:
     b'_{ij} = -sgn(i-k) * sgn(j-k) * b_{ij}  if i=k or j=k
     b'_{ij} = b_{ij} + max(0, b_{ik}) * max(0, b_{kj}) + min(0, b_{ik}) * min(0, b_{kj})  otherwise
     """
+    _require_mutatable(request.exchange_matrix, request.mutation_index)
     return SeedMutationResult._from_kernel(
         request,
         exchange_matrix=_mutation_of(request.exchange_matrix, request.mutation_index),

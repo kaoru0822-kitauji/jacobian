@@ -193,7 +193,6 @@ class SeedMutationRequest(StrictModel):
             raise _validation_error(
                 "cluster_algebra.mutation_index", "mutation_index must be in 0..n-1"
             )
-        _require_mutatable(self.exchange_matrix, self.mutation_index)
         return self
 
 

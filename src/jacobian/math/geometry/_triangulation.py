@@ -12,7 +12,11 @@ from jacobian.math.geometry._models import (
     PolygonTriangle,
     TriangulationSplitEntry,
     WeightedPolygonDiagonal,
+    _cross,
+    _point_key,
     _reconstruct_split_triangulation,
+    _require_bounded_split_table_rationals,
+    _subtract,
     _triangulation_subproblem_costs,
 )
 
@@ -27,7 +31,31 @@ def _wire(value: Fraction) -> CanonicalRational:
 def minimum_weight_triangulation(
     request: ConvexPolygonTriangulationRequest,
 ) -> ConvexPolygonTriangulationResult:
-    count = len(request.polygon.points)
+    points = tuple(_point_key(point) for point in request.polygon.points)
+    count = len(points)
+    if not 4 <= count <= 32:
+        raise ValueError("weighted triangulation supports 4 to 32 vertices")
+    if any(
+        _cross(
+            _subtract(points[(index + 1) % count], points[index]),
+            _subtract(points[(index + 2) % count], points[index]),
+        )
+        <= 0
+        for index in range(count)
+    ):
+        raise ValueError("weighted triangulation requires strict CCW convexity")
+    expected = {
+        (first, second)
+        for first in range(count)
+        for second in range(first + 1, count)
+        if second != first + 1 and (first, second) != (0, count - 1)
+    }
+    pairs = tuple((item.first, item.second) for item in request.diagonal_weights)
+    if len(set(pairs)) != len(pairs) or set(pairs) != expected:
+        raise ValueError("diagonal weights must cover every non-hull pair exactly")
+    if pairs != tuple(sorted(pairs)):
+        raise ValueError("diagonal weights must use lexicographic pair order")
+    _require_bounded_split_table_rationals(count, request.diagonal_weights)
     weights = {
         (item.first, item.second): item.weight.as_fraction()
         for item in request.diagonal_weights

@@ -57,11 +57,6 @@ SpectralGraph = Annotated[
 class GraphSpectrumRequest(StrictModel):
     graph: SpectralGraph
 
-    @model_validator(mode="after")
-    def require_admitted_graph(self) -> Self:
-        _require_spectral_graph(self.graph)
-        return self
-
 
 class GraphSpectrumResult(StrictModel):
     """The exact eigenvalues with algebraic multiplicities of a graph matrix.

@@ -386,6 +386,8 @@ def _clique_execute(
 ) -> GraphCliqueNumberResult:
     """Run the complete Z3 clique transaction in a bounded owner worker."""
 
+    if len(request.graph.vertices) > request.resource_budget.max_order:
+        raise ValueError("graph order exceeds the declared max_order budget")
     deadline = time.monotonic() + request.resource_budget.wall_seconds
     try:
         with TemporaryDirectory(prefix="jacobian-graph-clique-") as directory:

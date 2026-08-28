@@ -11,7 +11,9 @@ from jacobian.math.number_theory._derived_models import (
     FloorSquareRootResult,
     LegendreSymbolRequest,
     LegendreSymbolResult,
+    _is_bounded_prime,
 )
+from jacobian.math.number_theory._models import _validation_error
 
 
 def compute_floor_square_root(request: FloorSquareRootRequest) -> FloorSquareRootResult:
@@ -22,6 +24,11 @@ def compute_floor_square_root(request: FloorSquareRootRequest) -> FloorSquareRoo
 
 
 def compute_legendre_symbol(request: LegendreSymbolRequest) -> LegendreSymbolResult:
+    if not _is_bounded_prime(request.prime):
+        raise _validation_error(
+            "legendre_denominator_must_be_prime",
+            "Legendre denominator must be prime",
+        )
     from sympy import legendre_symbol
 
     return LegendreSymbolResult(

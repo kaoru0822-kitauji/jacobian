@@ -21,6 +21,8 @@ from jacobian.math.analysis.majorization._models import (
     TTransformStep,
     WeakMajorizationCheckRequest,
     WeakMajorizationCheckResult,
+    _bound_rational,
+    _require_majorization_matrix,
 )
 from jacobian.math.matrices.values import RationalMatrix
 
@@ -342,6 +344,7 @@ def compute_doubly_stochastic_check(
     request: DoublyStochasticCheckRequest,
 ) -> DoublyStochasticCheckResult:
     """Check if a rational matrix is doubly stochastic."""
+    _require_majorization_matrix(request.matrix)
     mat = _matrix_fractions(request.matrix)
     n = len(mat)
 
@@ -380,6 +383,7 @@ def compute_birkhoff_decomposition(
     Decomposes a doubly stochastic matrix into a convex combination of
     permutation matrices using the greedy matching + peel algorithm.
     """
+    _require_majorization_matrix(request.matrix)
     mat = _matrix_fractions(request.matrix)
     n = len(mat)
 
@@ -389,6 +393,13 @@ def compute_birkhoff_decomposition(
                 raise ValueError(
                     "Birkhoff decomposition requires a non-negative matrix"
                 )
+    if any(sum(row, Fraction()) != 1 for row in mat) or any(
+        sum((mat[row][column] for row in range(n)), Fraction()) != 1
+        for column in range(n)
+    ):
+        raise ValueError(
+            "Birkhoff decomposition requires row and column sums equal to 1"
+        )
 
     current = [list(row) for row in mat]
     terms: list[BirkhoffTerm] = []
@@ -468,6 +479,10 @@ def compute_schur_horn_check(
     A diagonal vector d is realizable as the diagonal of a Hermitian matrix
     with eigenvalues lambda iff lambda majorizes d.
     """
+    for index, value in enumerate(request.eigenvalues):
+        _bound_rational(value, f"eigenvalues[{index}]")
+    for index, value in enumerate(request.diagonal):
+        _bound_rational(value, f"diagonal[{index}]")
     eigenvalues = [v.as_fraction() for v in request.eigenvalues]
     diagonal = [v.as_fraction() for v in request.diagonal]
 

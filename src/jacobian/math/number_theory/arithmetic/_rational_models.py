@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from fractions import Fraction
 from typing import Self
 
 from pydantic import Field, model_validator
@@ -94,8 +93,7 @@ class RationalComparisonResult(StrictModel):
 class RationalContinuedFractionResult(StrictModel):
     """The canonical finite simple continued fraction of one rational.
 
-    Retains the source rational so validation replays the exact continuant
-    reconstruction and enforces the one canonical representation: every
+    Retains the source rational and the one canonical representation: every
     partial quotient after the first is positive, and a multi-term
     expansion never ends in ``1`` (the two-representation ambiguity is
     resolved by merging a trailing ``[... , x, 1]`` into ``[..., x + 1]``).
@@ -125,21 +123,13 @@ class RationalContinuedFractionResult(StrictModel):
                 "continued_fraction_trailing_one",
                 "a multi-term simple continued fraction must not end in 1",
             )
-        numerator_minus_2, numerator_minus_1 = 1, quotients[0]
-        denominator_minus_2, denominator_minus_1 = 0, 1
-        for quotient in quotients[1:]:
-            numerator_minus_2, numerator_minus_1 = (
-                numerator_minus_1,
-                quotient * numerator_minus_1 + numerator_minus_2,
-            )
-            denominator_minus_2, denominator_minus_1 = (
-                denominator_minus_1,
-                quotient * denominator_minus_1 + denominator_minus_2,
-            )
-        if Fraction(numerator_minus_1, denominator_minus_1) != self.value.as_fraction():
-            raise _validation_error(
-                "continued_fraction_reconstruction",
-                "terms must reconstruct the retained rational through the "
-                "continuant recurrence",
-            )
         return self
+
+    @classmethod
+    def _from_kernel(
+        cls,
+        *,
+        value: CanonicalRational,
+        terms: tuple[CanonicalInteger, ...],
+    ) -> Self:
+        return cls.model_construct(value=value, terms=terms)

@@ -77,22 +77,6 @@ class PolynomialCoefficientRecurrenceTableRequest(StrictModel):
     polynomial_convention: Literal["ASCENDING_POWERS_OF_N"]
     table_convention: Literal["VALUES_A_0_THROUGH_A_N_IN_ORDER"]
 
-    @model_validator(mode="after")
-    def require_complete_bounded_table(self) -> Self:
-        try:
-            _require_table_admission(
-                tuple(
-                    tuple(value.as_fraction() for value in polynomial)
-                    for polynomial in self.coefficient_polynomials
-                ),
-                tuple(value.as_fraction() for value in self.values),
-            )
-        except ValueError as exc:
-            if "digits" in str(exc):
-                raise _validation_error("recurrence_invariant", str(exc)) from None
-            raise
-        return self
-
 
 class PolynomialCoefficientRecurrenceTableResult(StrictModel):
     """Complete exact residual ledger for the supplied finite table."""
@@ -190,7 +174,7 @@ def _compute_recurrence_table_residuals(
 ) -> PolynomialCoefficientRecurrenceTableResult:
     """Catalog/MCP adapter for the recurrence-table residual kernel."""
 
-    return _recurrence_table_residuals(
+    return recurrence_table_residuals(
         tuple(
             tuple(value.as_fraction() for value in polynomial)
             for polynomial in request.coefficient_polynomials

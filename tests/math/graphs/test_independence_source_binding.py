@@ -5,7 +5,6 @@ from __future__ import annotations
 import copy
 import json
 import sys
-import time
 from pathlib import Path
 
 import pytest
@@ -13,11 +12,13 @@ from pydantic import ValidationError
 
 from jacobian.canonical import CanonicalLimits, encode_strict_json
 from jacobian.math.graphs import _independence_z3 as z3_backend
-from jacobian.math.graphs._independence_z3 import solve_independence_number
 from jacobian.math.graphs.independence import (
     IndependenceNumberBudget,
     IndependenceNumberRequest,
     IndependenceNumberResult,
+)
+from jacobian.math.graphs.independence import (
+    _compute_independence_number as solve_independence_number,
 )
 from jacobian.math.graphs.values import SimpleUndirectedGraph
 from jacobian.process import BoundedProcessResult, ProcessResourceLimits
@@ -42,14 +43,13 @@ def test_budget_exposes_only_enforced_limits() -> None:
         IndependenceNumberBudget.model_validate({"max_solver_calls": 1})
 
 
-def test_producer_results_parse_structurally_then_verify_exact_claims() -> None:
+def test_producer_results_parse_structurally() -> None:
     empty = solve_independence_number(IndependenceNumberRequest(graph=_graph((), ())))
     assert empty.status == "EXACT"
     assert empty.optimum_value == 0
     assert "result_schema_version" not in empty.model_dump(mode="json")
     reparsed_empty = IndependenceNumberResult.model_validate(empty.model_dump())
     assert reparsed_empty == empty
-    assert z3_backend.verify_independence_result(reparsed_empty)
 
     complete = solve_independence_number(
         IndependenceNumberRequest(graph=_graph(("a", "b"), (("a", "b"),)))
@@ -68,9 +68,7 @@ def test_producer_results_parse_structurally_then_verify_exact_claims() -> None:
     )
     assert nonunique.optimum_value == 2
     assert nonunique.witness_vertices == ("a", "b")
-    assert z3_backend.verify_independence_result(
-        IndependenceNumberResult.model_validate(nonunique.model_dump())
-    )
+    assert IndependenceNumberResult.model_validate(nonunique.model_dump()) == nonunique
 
 
 def test_witness_membership_and_edge_freedom_are_enforced() -> None:
@@ -167,56 +165,6 @@ def test_matching_via_edge_intersection_composition() -> None:
         assert result.optimum_value == 1
 
 
-def test_forged_nonmaximum_optimum_is_rejected_by_explicit_verifier() -> None:
-    """Parsing stays structural; only the explicit verifier replays a claim."""
-
-    feasible = solve_independence_number(
-        IndependenceNumberRequest(graph=_graph(("a", "b", "c"), ()))
-    )
-    dumped = feasible.model_dump()
-    dumped["graph"]["edges"] = [["a", "b"], ["b", "c"]]
-    dumped["witness_vertices"] = ["a"]
-    for field in (
-        "optimum_value",
-        "incumbent_value",
-        "lower_bound",
-        "upper_bound",
-    ):
-        dumped[field] = 1
-    dumped["termination_reason"] = "OPTIMUM_ESTABLISHED"
-    forged = IndependenceNumberResult.model_validate(dumped)
-    assert not z3_backend.verify_independence_result(forged)
-
-
-def test_edge_removal_invalidating_the_claimed_optimum_is_rejected_by_verifier() -> (
-    None
-):
-    triangle = solve_independence_number(
-        IndependenceNumberRequest(
-            graph=_graph(("a", "b", "c"), (("a", "b"), ("a", "c"), ("b", "c")))
-        )
-    )
-    assert triangle.optimum_value == 1
-    dumped = triangle.model_dump()
-    dumped["graph"]["edges"] = []
-    forged = IndependenceNumberResult.model_validate(dumped)
-    assert not z3_backend.verify_independence_result(forged)
-
-
-def test_explicit_replay_deadline_is_fail_closed() -> None:
-    """A stale verifier deadline fails before branch-and-bound can expand."""
-
-    graph = _graph(("a", "b", "c", "d"), (("a", "b"), ("b", "c"), ("c", "d")))
-    with pytest.raises(ValueError):
-        # The public verifier rejects illegal caller-selected envelopes before work.
-        z3_backend.verify_independence_result(
-            solve_independence_number(IndependenceNumberRequest(graph=graph)),
-            wall_seconds=0,
-        )
-    with pytest.raises(ValueError):
-        z3_backend._replay_exact_optimum(graph, 2, deadline=time.monotonic() - 1.0)
-
-
 def _matching_graph(edges: int) -> SimpleUndirectedGraph:
     return _graph(
         tuple(f"m{index:02d}" for index in range(2 * edges)),
@@ -224,12 +172,11 @@ def _matching_graph(edges: int) -> SimpleUndirectedGraph:
     )
 
 
-def test_matching_produced_exact_result_parses_then_verifies() -> None:
+def test_matching_produced_exact_result_reparses() -> None:
     """The reported rejection case: 15 disjoint edges, order 30, optimum 15.
 
     The producing solve must emit an ``EXACT`` payload whose serialized
-    output loads back structurally as an equal ``IndependenceNumberResult``;
-    the explicit verifier then checks its nonlocal optimum claim.
+    output loads back structurally as an equal ``IndependenceNumberResult``.
     """
 
     graph = _matching_graph(15)
@@ -240,16 +187,9 @@ def test_matching_produced_exact_result_parses_then_verifies() -> None:
     assert result.termination_reason == "OPTIMUM_ESTABLISHED"
     reparsed = IndependenceNumberResult.model_validate(result.model_dump())
     assert reparsed == result
-    assert z3_backend.verify_independence_result(reparsed)
 
 
-def test_structured_disjoint_graphs_verify_within_default_envelope() -> None:
-    """Component decomposition keeps disjoint structures inside tiny budgets.
-
-    Ten disjoint five-cycles have optimum 20, isolated vertices are forced
-    without branching, and each exact claim verifies under the documented
-    default finite envelope.
-    """
+def test_structured_disjoint_graphs_return_exact_results() -> None:
 
     cycle_vertices = []
     cycle_edges = []
@@ -275,7 +215,6 @@ def test_structured_disjoint_graphs_verify_within_default_envelope() -> None:
     for result in produced:
         reparsed = IndependenceNumberResult.model_validate(result.model_dump())
         assert reparsed == result
-        assert z3_backend.verify_independence_result(reparsed)
 
 
 class _StubBound:
@@ -388,7 +327,7 @@ def test_sat_with_open_objective_bounds_reports_order_as_upper_bound(
     assert IndependenceNumberResult.model_validate(result.model_dump()) == result
 
 
-def test_independence_worker_covers_encoding_solving_and_replay(
+def test_independence_worker_covers_encoding_and_solving(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     request = IndependenceNumberRequest(

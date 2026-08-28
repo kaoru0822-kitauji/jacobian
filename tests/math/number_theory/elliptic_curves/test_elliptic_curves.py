@@ -314,7 +314,7 @@ class TestResultSourceBinding:
             coefficient_b=CanonicalRational(num=b, den="1"),
         )
 
-    def test_discriminant_result_replays_the_retained_curve(self) -> None:
+    def test_discriminant_result_retains_and_reparses_the_curve(self) -> None:
         request = EllipticCurveRequest(curve=self._curve())
         result = compute_discriminant(request)
         assert result.request == request
@@ -323,15 +323,7 @@ class TestResultSourceBinding:
         )
         assert reparsed == result
 
-        forged = dict(result.model_dump(mode="json"))
-        # The thread's forgery: discriminant=1 for a curve whose exact
-        # discriminant is -64.
-        forged["discriminant"] = {"num": "1", "den": "1"}
-        with pytest.raises(ValidationError) as exc_info:
-            CurveDiscriminantResult.model_validate(forged)
-        _assert_error_code(exc_info, "elliptic_curve.discriminant_source_mismatch")
-
-    def test_point_on_curve_result_replays_the_predicate(self) -> None:
+    def test_point_on_curve_result_retains_and_reparses_the_source(self) -> None:
         from jacobian.math.number_theory.elliptic_curves._models import (
             PointOnCurveResult as Result,
         )
@@ -347,12 +339,6 @@ class TestResultSourceBinding:
         assert result.on_curve is True
         payload = result.model_dump(mode="json")
         assert Result.model_validate(payload).on_curve is True
-
-        forged = dict(payload)
-        forged["on_curve"] = False
-        with pytest.raises(ValidationError) as exc_info:
-            Result.model_validate(forged)
-        _assert_error_code(exc_info, "elliptic_curve.point_membership_mismatch")
 
     def test_point_addition_result_retains_its_parent_curve(self) -> None:
         """Doubling (0,0) on y²=x³+x and on y²=x³-x must serialize

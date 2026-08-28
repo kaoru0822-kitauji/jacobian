@@ -10,6 +10,10 @@ from sympy import Poly, Symbol, expand
 
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.polynomials._models import (
+    MAX_GRAPH_POLYNOMIAL_EDGES,
+    MAX_GRAPH_POLYNOMIAL_VERTICES,
+    MAX_MATCHING_EDGES,
+    MAX_MATCHING_VERTICES,
     GraphPolynomialRequest,
     GraphPolynomialResult,
     MatchingPolynomialRequest,
@@ -28,6 +32,20 @@ from jacobian.math.graphs.polynomials.operations import (
 def _build_graph(
     request: GraphPolynomialRequest | MatchingPolynomialRequest,
 ) -> nx.Graph[int]:
+    if isinstance(request, MatchingPolynomialRequest):
+        max_vertices, max_edges = MAX_MATCHING_VERTICES, MAX_MATCHING_EDGES
+        label = "matching polynomial"
+    else:
+        max_vertices, max_edges = (
+            MAX_GRAPH_POLYNOMIAL_VERTICES,
+            MAX_GRAPH_POLYNOMIAL_EDGES,
+        )
+        label = "graph polynomial"
+    if (
+        request.graph.vertex_count > max_vertices
+        or len(request.graph.edges) > max_edges
+    ):
+        raise ValueError(f"{label} graph exceeds its exact computation envelope")
     g: nx.Graph[int] = nx.Graph()
     g.add_nodes_from(range(request.graph.vertex_count))
     g.add_edges_from(request.graph.edges)

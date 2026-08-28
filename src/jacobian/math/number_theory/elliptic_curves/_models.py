@@ -68,18 +68,21 @@ class CurveDiscriminantResult(StrictModel):
                 "elliptic_curve.nonsingularity_mismatch",
                 "nonsingularity must match a nonzero discriminant",
             )
-        # The value must be derived from the retained curve: replay the
-        # exact formula so a valid-looking payload cannot detach from any
-        # computation.
-        a = self.request.curve.coefficient_a.as_fraction()
-        b = self.request.curve.coefficient_b.as_fraction()
-        expected = -16 * (4 * a**3 + 27 * b**2)
-        if self.discriminant.as_fraction() != expected:
-            raise PydanticCustomError(
-                "elliptic_curve.discriminant_source_mismatch",
-                "discriminant must be the exact discriminant of the retained source curve",
-            )
         return self
+
+    @classmethod
+    def _from_kernel(
+        cls,
+        *,
+        request: EllipticCurveRequest,
+        discriminant: CanonicalRational,
+        is_nonsingular: bool,
+    ) -> Self:
+        return cls.model_construct(
+            request=request,
+            discriminant=discriminant,
+            is_nonsingular=is_nonsingular,
+        )
 
 
 class RationalAffinePoint(StrictModel):
@@ -102,20 +105,9 @@ class PointOnCurveResult(StrictModel):
     request: CurvePointRequest
     on_curve: bool
 
-    @model_validator(mode="after")
-    def require_derived_predicate(self) -> Self:
-        # Replay y² = x³ + Ax + B from the retained sources so positive or
-        # negative conclusions are checkable and cannot be forged.
-        x = self.request.point.x.as_fraction()
-        y = self.request.point.y.as_fraction()
-        a = self.request.curve.coefficient_a.as_fraction()
-        b = self.request.curve.coefficient_b.as_fraction()
-        if self.on_curve is not (y * y == x**3 + a * x + b):
-            raise PydanticCustomError(
-                "elliptic_curve.point_membership_mismatch",
-                "on_curve must match the exact curve equation of the retained source",
-            )
-        return self
+    @classmethod
+    def _from_kernel(cls, *, request: CurvePointRequest, on_curve: bool) -> Self:
+        return cls.model_construct(request=request, on_curve=on_curve)
 
 
 def _require_group_law(

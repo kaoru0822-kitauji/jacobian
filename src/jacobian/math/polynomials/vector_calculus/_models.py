@@ -7,7 +7,7 @@ from typing import Literal, Self
 from pydantic import Field, model_validator
 from pydantic_core import PydanticCustomError
 
-from jacobian._exact import CanonicalRational, require_bounded_rational
+from jacobian._exact import CanonicalRational
 from jacobian._models import StrictModel
 from jacobian.math.polynomials.values import (
     RationalPolynomial,
@@ -54,19 +54,6 @@ class ScalarFieldRequest(StrictModel):
 
     polynomial: RationalPolynomial
 
-    @model_validator(mode="after")
-    def require_bounded_field(self) -> Self:
-        _require_field_polynomial(self.polynomial, label="scalar field")
-        if (
-            len(self.polynomial.polynomial.terms) * len(self.polynomial.variables)
-            > _MAX_TERMS
-        ):
-            raise _validation_error(
-                "derivative_term_budget",
-                "scalar-field derivatives exceed the result-term budget",
-            )
-        return self
-
 
 class VectorFieldRequest(StrictModel):
     """A polynomial vector field with one component per ordered variable."""
@@ -83,16 +70,10 @@ class VectorFieldRequest(StrictModel):
                 "component_count", "vector field must have one component per variable"
             )
         for component in self.components:
-            _require_field_polynomial(component, label="vector-field component")
             if component.variables != variables:
                 raise _validation_error(
                     "ordered_ring", "vector-field components must use one ordered ring"
                 )
-        if sum(len(item.polynomial.terms) for item in self.components) > _MAX_TERMS:
-            raise _validation_error(
-                "derivative_term_budget",
-                "vector-field derivatives exceed the result-term budget",
-            )
         return self
 
 
@@ -117,25 +98,10 @@ class DirectionalDerivativeRequest(StrictModel):
 
     @model_validator(mode="after")
     def require_matching_bounded_direction(self) -> Self:
-        _require_field_polynomial(self.polynomial, label="scalar field")
         if len(self.direction) != len(self.polynomial.variables):
             raise _validation_error(
                 "direction_length",
                 "direction vector length must match the polynomial axis",
-            )
-        for coordinate in self.direction:
-            require_bounded_rational(
-                coordinate,
-                max_digits=_MAX_COEFFICIENT_DIGITS,
-                label="direction coordinate",
-            )
-        if (
-            len(self.polynomial.polynomial.terms) * len(self.polynomial.variables)
-            > _MAX_TERMS
-        ):
-            raise _validation_error(
-                "derivative_term_budget",
-                "directional derivative exceeds the result-term budget",
             )
         return self
 
