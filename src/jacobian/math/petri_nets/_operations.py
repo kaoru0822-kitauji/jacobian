@@ -25,11 +25,6 @@ from jacobian.math.petri_nets.operations import (
     fire_transition,
     reachability_graph,
 )
-from jacobian.math.petri_nets.values import (
-    MAX_PETRI_MARKING,
-    Marking,
-    require_reachability_bounds,
-)
 
 __all__ = [
     "compute_enabled_transitions",
@@ -43,47 +38,28 @@ __all__ = [
 def compute_enabled_transitions(
     request: EnabledTransitionsRequest,
 ) -> EnabledTransitionsResult:
-    return EnabledTransitionsResult(
-        transitions=tuple(enabled_transitions(request.net, request.marking))
-    )
+    return enabled_transitions(request.net, request.marking)
 
 
 def compute_fire_transition(request: FireTransitionRequest) -> FireTransitionResult:
-    success, new_marking = fire_transition(
-        request.net, request.marking, request.transition
-    )
-    if any(token > MAX_PETRI_MARKING for token in new_marking):
-        return FireTransitionResult(
-            status="ESCAPES_DECLARED_ENVELOPE",
-            envelope_escape=new_marking,
-        )
-    return FireTransitionResult(
-        status="FIRED" if success else "NOT_ENABLED",
-        new_marking=Marking(tokens=new_marking),
-    )
+    return fire_transition(request.net, request.marking, request.transition)
 
 
 def compute_incidence(request: IncidenceMatrixRequest) -> IncidenceMatrixResult:
-    return IncidenceMatrixResult(incidence=compute_incidence_matrix(request.net))
+    return compute_incidence_matrix(request.net)
 
 
 def compute_reachability(request: ReachabilityRequest) -> ReachabilityResult:
     try:
-        require_reachability_bounds(request.net, request.max_states)
+        return reachability_graph(
+            request.net, request.initial_marking, request.max_states
+        )
     except ValueError as error:
         raise OperationDomainValidationError(
             location=("net", "max_states"),
             code="petri_net.reachability_bound",
             message=str(error),
         ) from error
-    states, edges, truncated = reachability_graph(
-        request.net, request.initial_marking, request.max_states
-    )
-    return ReachabilityResult(
-        states=tuple(states),
-        edges=tuple(edges),
-        truncated=truncated,
-    )
 
 
 def compute_siphon_trap(request: SiphonTrapRequest) -> SiphonTrapResult:

@@ -162,9 +162,7 @@ def compute_homomorphism_profile(
     request: HomomorphismProfileRequest,
 ) -> HomomorphismProfileResult:
     _admit_homomorphism(request)
-    return HomomorphismProfileResult._from_kernel(
-        homomorphism_profile(request.carrier_map)
-    )
+    return homomorphism_profile(request.carrier_map)
 
 
 def compute_congruence(request: CongruenceRequest) -> CongruenceResult:

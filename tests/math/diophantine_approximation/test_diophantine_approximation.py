@@ -231,9 +231,18 @@ def test_public_kernels_reject_perfect_square() -> None:
 
 
 def test_public_kernels_return_typed_values() -> None:
-    assert continued_fraction(2, 3) == ([1, 2, 2], 1, 1)
-    assert convergents(2, 3) == [(0, 1, 1), (1, 3, 2), (2, 7, 5)]
-    assert solve_pell(2) == (3, 2)
+    fraction = continued_fraction(2, 3)
+    assert fraction.coefficients == (1, 2, 2)
+    assert (fraction.preperiod_length, fraction.period_length) == (1, 1)
+
+    values = convergents(2, 3)
+    assert [
+        (value.index, value.numerator, value.denominator)
+        for value in values.convergents
+    ] == [(0, "1", "1"), (1, "3", "2"), (2, "7", "5")]
+
+    pell = solve_pell(2)
+    assert (pell.x, pell.y) == ("3", "2")
 
 
 # ---------------------------------------------------------------------------

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from jacobian.canonical import format_canonical_integer
 from jacobian.math.diophantine_approximation import (
     continued_fraction,
     convergents,
@@ -13,7 +12,6 @@ from jacobian.math.diophantine_approximation._models import (
     ContinuedFractionResult,
     ConvergentRequest,
     ConvergentResult,
-    ConvergentValue,
     PellEquationRequest,
     PellEquationResult,
 )
@@ -22,41 +20,15 @@ from jacobian.math.diophantine_approximation._models import (
 def compute_continued_fraction(
     request: ContinuedFractionRequest,
 ) -> ContinuedFractionResult:
-    coefficients, preperiod_length, period_length = continued_fraction(
-        request.discriminant, request.term_count
-    )
-    return ContinuedFractionResult._from_kernel(
-        discriminant=request.discriminant,
-        term_count=request.term_count,
-        coefficients=tuple(coefficients),
-        preperiod_length=preperiod_length,
-        period_length=period_length,
-    )
+    return continued_fraction(request.discriminant, request.term_count)
 
 
 def compute_convergents(request: ConvergentRequest) -> ConvergentResult:
-    values = convergents(request.discriminant, request.convergent_count)
-    return ConvergentResult._from_kernel(
-        discriminant=request.discriminant,
-        convergent_count=request.convergent_count,
-        convergents=tuple(
-            ConvergentValue(
-                index=index,
-                numerator=format_canonical_integer(numerator),
-                denominator=format_canonical_integer(denominator),
-            )
-            for index, numerator, denominator in values
-        ),
-    )
+    return convergents(request.discriminant, request.convergent_count)
 
 
 def compute_pell_equation(request: PellEquationRequest) -> PellEquationResult:
-    x, y = solve_pell(request.discriminant)
-    return PellEquationResult._from_kernel(
-        discriminant=request.discriminant,
-        x=format_canonical_integer(x),
-        y=format_canonical_integer(y),
-    )
+    return solve_pell(request.discriminant)
 
 
 __all__ = [

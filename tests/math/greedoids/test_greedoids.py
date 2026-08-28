@@ -366,6 +366,13 @@ def test_union_closed_true_for_antimatroid() -> None:
     assert greedoids.union_closed(_two_element_antimatroid())
 
 
+def test_native_convex_geometry_returns_the_canonical_result() -> None:
+    result = greedoids.antimatroid_to_convex_geometry(_two_element_antimatroid())
+
+    assert result.status == "ANTIMATROID"
+    assert result.closed_family == ((0, 1), (1,), (0,), ())
+
+
 def test_feasible_continuations() -> None:
     cont = greedoids.feasible_continuations(_two_element_antimatroid(), frozenset({0}))
     assert set(cont) == {1}
@@ -442,5 +449,5 @@ class TestNativeCarrierAdmission:
             feasible=((),),
         )
         result = greedoids.recognize(system)
-        assert result["status"] == "GREEDOID"
-        assert result["rank"] == 0
+        assert result.status == "GREEDOID"
+        assert result.rank == 0

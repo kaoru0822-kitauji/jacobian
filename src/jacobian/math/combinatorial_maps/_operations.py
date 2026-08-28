@@ -40,84 +40,38 @@ __all__ = [
 
 
 def compute_faces(request: FacesRequest) -> FacesResult:
-    walks, face_of_dart, successor, _ = face_orbits(request.map)
-    n = len(request.map.darts)
-    return FacesResult._from_kernel(
-        request,
-        face_walks=tuple(tuple(walk) for walk in walks),
-        face_of_dart=tuple(face_of_dart[d] for d in range(n)),
-        successor=tuple(successor),
-    )
+    return face_orbits(request.map)
 
 
 def compute_euler_characteristic(
     request: EulerCharacteristicRequest,
 ) -> EulerCharacteristicResult:
-    per_component, total = euler_characteristic(request.map)
-    return EulerCharacteristicResult._from_kernel(
-        per_component=tuple(
-            {"V": row["V"], "E": row["E"], "F": row["F"], "chi": row["chi"]}
-            for row in per_component
-        ),
-        total={
-            "V": total["V"],
-            "E": total["E"],
-            "F": total["F"],
-            "chi": total["chi"],
-        },
-    )
+    return euler_characteristic(request.map)
 
 
 def compute_orientable_genus(
     request: OrientableGenusRequest,
 ) -> OrientableGenusResult:
-    per_component, total = orientable_genus(request.map)
-    return OrientableGenusResult._from_kernel(
-        per_component=tuple(per_component),
-        total=total,
-    )
+    return orientable_genus(request.map)
 
 
 def compute_orientation_reverse(
     request: OrientationReverseRequest,
 ) -> OrientationReverseResult:
-    reversed_map, bijection = orientation_reverse(request.map)
-    return OrientationReverseResult._from_kernel(
-        request,
-        reversed_map=reversed_map,
-        face_bijection=bijection,
-    )
+    return orientation_reverse(request.map)
 
 
 def compute_connected_components(
     request: ConnectedComponentsRequest,
 ) -> ConnectedComponentsResult:
-    vertex_component, dart_component, face_component = connected_components(request.map)
-    n_vertices = request.map.vertex_count
-    n_darts = len(request.map.darts)
-    walks, _, _, _ = face_orbits(request.map)
-    n_faces = len(walks)
-    return ConnectedComponentsResult._from_kernel(
-        vertex_component=tuple(vertex_component[v] for v in range(n_vertices)),
-        dart_component=tuple(dart_component[d] for d in range(n_darts)),
-        face_component=tuple(face_component[f] for f in range(n_faces)),
-    )
+    return connected_components(request.map)
 
 
 def compute_dual(request: DualRequest) -> DualResult:
-    dual, primal_to_dual = dual_map(request.map)
-    return DualResult._from_kernel(dual=dual, primal_to_dual=primal_to_dual)
+    return dual_map(request.map)
 
 
 def compute_vertex_face_incidence(
     request: VertexFaceIncidenceRequest,
 ) -> VertexFaceIncidenceResult:
-    multiplicity, boolean = vertex_face_incidence(request.map)
-    nested: dict[int, dict[int, int]] = {}
-    for (vertex, face), count in multiplicity.items():
-        nested.setdefault(vertex, {})[face] = count
-    boolean_incidence = {v: tuple(sorted(boolean[v])) for v in sorted(boolean)}
-    return VertexFaceIncidenceResult._from_kernel(
-        multiplicity=nested,
-        boolean_incidence=boolean_incidence,
-    )
+    return vertex_face_incidence(request.map)

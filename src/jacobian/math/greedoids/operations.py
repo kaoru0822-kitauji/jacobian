@@ -9,7 +9,12 @@ expansion.
 
 from __future__ import annotations
 
-from jacobian.math.greedoids._models import require_bounded_carrier
+from jacobian.math.greedoids._models import (
+    BasicWordProfileResult,
+    ConvexGeometryResult,
+    RecognizeResult,
+    require_bounded_carrier,
+)
 from jacobian.math.greedoids.values import FiniteFeasibleSetSystem
 
 __all__ = [
@@ -50,8 +55,8 @@ def _accessibility_obstruction(
 def _exchange_obstruction(
     feasible_sets: list[frozenset[int]],
     index: dict[tuple[int, ...], int],
-) -> dict[str, object] | None:
-    """Return the first exchange violation as a result dict, or None."""
+) -> RecognizeResult | None:
+    """Return the first exchange violation, or ``None``."""
     by_size: dict[int, list[frozenset[int]]] = {}
     for fs in feasible_sets:
         by_size.setdefault(len(fs), []).append(fs)
@@ -68,18 +73,18 @@ def _exchange_obstruction(
                         if tuple(sorted(y_set | {elem})) in index
                     ]
                     if not augmenting:
-                        return {
-                            "status": "NOT_A_GREEDOID",
-                            "obstruction": "exchange_violation",
-                            "larger_set": tuple(sorted(x_set)),
-                            "smaller_set": tuple(sorted(y_set)),
-                        }
+                        return RecognizeResult(
+                            status="NOT_A_GREEDOID",
+                            obstruction="exchange_violation",
+                            larger_set=tuple(sorted(x_set)),
+                            smaller_set=tuple(sorted(y_set)),
+                        )
     return None
 
 
 def recognize(
     system: FiniteFeasibleSetSystem,
-) -> dict[str, object]:
+) -> RecognizeResult:
     """Return ``GREEDOID`` with rank and bases, or ``NOT_A_GREEDOID`` with the
     first exact obstruction under deterministic order.
 
@@ -90,34 +95,34 @@ def recognize(
     index = system.feasible_index()
     n = len(system.ground)
     if () not in index:
-        return {"status": "NOT_A_GREEDOID", "obstruction": "missing_empty_set"}
+        return RecognizeResult(status="NOT_A_GREEDOID", obstruction="missing_empty_set")
     access = _accessibility_obstruction(list(system.feasible), index)
     if access is not None:
-        return {
-            "status": "NOT_A_GREEDOID",
-            "obstruction": "inaccessible_feasible_set",
-            "feasible_set": access,
-        }
+        return RecognizeResult(
+            status="NOT_A_GREEDOID",
+            obstruction="inaccessible_feasible_set",
+            feasible_set=access,
+        )
     feasible_sets = _feasible_sets(system)
     exch = _exchange_obstruction(feasible_sets, index)
     if exch is not None:
         return exch
     r, basis_list = _bases_unchecked(system, None)
-    return {
-        "status": "GREEDOID",
-        "rank": r,
-        "bases": [tuple(sorted(b)) for b in basis_list],
-        "ground_size": n,
-    }
+    return RecognizeResult(
+        status="GREEDOID",
+        rank=r,
+        bases=tuple(tuple(sorted(b)) for b in basis_list),
+        ground_size=n,
+    )
 
 
 def _require_greedoid(system: FiniteFeasibleSetSystem) -> None:
     """Reject a structural family that has not established the greedoid axioms."""
     recognized = recognize(system)
-    if recognized["status"] != "GREEDOID":
+    if recognized.status != "GREEDOID":
         raise ValueError(
             "a greedoid operation requires a recognized greedoid "
-            f"(first obstruction: {recognized['obstruction']})"
+            f"(first obstruction: {recognized.obstruction})"
         )
 
 
@@ -213,7 +218,7 @@ def feasible_continuations(
 
 def basic_word_profile(
     system: FiniteFeasibleSetSystem, word: tuple[int, ...]
-) -> dict[str, object]:
+) -> BasicWordProfileResult:
     """Return whether ``word`` is a basic word.
 
     A basic word is a finite sequence of distinct ground elements such that
@@ -226,48 +231,48 @@ def basic_word_profile(
 
 def _basic_word_profile_unchecked(
     system: FiniteFeasibleSetSystem, word: tuple[int, ...]
-) -> dict[str, object]:
+) -> BasicWordProfileResult:
     """Profile a basic word after the greedoid axioms have been established."""
     n = len(system.ground)
     seen: set[int] = set()
     for elem in word:
         if not 0 <= elem < n:
-            return {
-                "status": "NOT_A_BASIC_WORD",
-                "obstruction": "foreign_element",
-                "prefix_index": len(seen),
-            }
+            return BasicWordProfileResult(
+                status="NOT_A_BASIC_WORD",
+                obstruction="foreign_element",
+                prefix_index=len(seen),
+            )
         if elem in seen:
-            return {
-                "status": "NOT_A_BASIC_WORD",
-                "obstruction": "repeated_element",
-                "prefix_index": len(seen),
-            }
+            return BasicWordProfileResult(
+                status="NOT_A_BASIC_WORD",
+                obstruction="repeated_element",
+                prefix_index=len(seen),
+            )
         seen.add(elem)
     index = system.feasible_index()
     prefix: frozenset[int] = frozenset()
     for i, elem in enumerate(word):
         prefix = prefix | {elem}
         if tuple(sorted(prefix)) not in index:
-            return {
-                "status": "NOT_A_BASIC_WORD",
-                "obstruction": "infeasible_prefix",
-                "prefix_index": i,
-                "prefix_set": tuple(sorted(prefix)),
-            }
+            return BasicWordProfileResult(
+                status="NOT_A_BASIC_WORD",
+                obstruction="infeasible_prefix",
+                prefix_index=i,
+                prefix_set=tuple(sorted(prefix)),
+            )
     r, _ = _bases_unchecked(system, None)
     is_full = len(word) == r
-    return {
-        "status": "BASIC_WORD",
-        "prefix_length": len(word),
-        "is_full": is_full,
-        "rank": r,
-    }
+    return BasicWordProfileResult(
+        status="BASIC_WORD",
+        prefix_length=len(word),
+        is_full=is_full,
+        rank=r,
+    )
 
 
 def antimatroid_to_convex_geometry(
     system: FiniteFeasibleSetSystem,
-) -> tuple[list[tuple[int, ...]], dict[tuple[int, ...], tuple[int, ...]]]:
+) -> ConvexGeometryResult:
     """Return the complementary closed-set family of a full-support antimatroid.
 
     The complementary family ``C = {E\\F : F in F}`` is an intersection-closed
@@ -281,7 +286,7 @@ def antimatroid_to_convex_geometry(
 
 def _antimatroid_to_convex_geometry_unchecked(
     system: FiniteFeasibleSetSystem,
-) -> tuple[list[tuple[int, ...]], dict[tuple[int, ...], tuple[int, ...]]]:
+) -> ConvexGeometryResult:
     """Project an already-established antimatroid to its closed family."""
     n = len(system.ground)
     ground_set = frozenset(range(n))
@@ -293,7 +298,10 @@ def _antimatroid_to_convex_geometry_unchecked(
         closed_tuple = tuple(sorted(closed))
         complement_map[feasible] = closed_tuple
         closed_family.append(closed_tuple)
-    return closed_family, complement_map
+    return ConvexGeometryResult(
+        closed_family=tuple(closed_family),
+        complement_map=tuple(sorted(complement_map.items())),
+    )
 
 
 def convex_geometry_to_antimatroid(

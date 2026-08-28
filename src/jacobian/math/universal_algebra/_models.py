@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, Self
+from typing import Annotated, Literal, Self
 
 from pydantic import ConfigDict, Field, model_validator
 from pydantic_core import PydanticCustomError
@@ -262,16 +262,6 @@ class HomomorphismProfileResult(StrictModel):
                 "NOT_A_HOMOMORPHISM cannot carry positive map-property data",
             )
         return self
-
-    @classmethod
-    def _from_kernel(cls, payload: dict[str, object]) -> Self:
-        """Build a profile after the admitted preservation scan established it."""
-
-        data: dict[str, Any] = payload.copy()
-        obstruction = data.get("obstruction")
-        if isinstance(obstruction, dict):
-            data["obstruction"] = HomomorphismObstruction.model_construct(**obstruction)
-        return cls.model_construct(**data)
 
 
 class _PartitionRequest(StrictModel):

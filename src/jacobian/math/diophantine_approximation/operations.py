@@ -4,7 +4,14 @@ from __future__ import annotations
 
 from math import isqrt
 
+from jacobian.canonical import format_canonical_integer
 from jacobian.math.arithmetic._integer_predicates import is_square_free
+from jacobian.math.diophantine_approximation._models import (
+    ContinuedFractionResult,
+    ConvergentResult,
+    ConvergentValue,
+    PellEquationResult,
+)
 
 __all__ = ["continued_fraction", "convergents", "solve_pell"]
 
@@ -57,22 +64,21 @@ def _coefficients(
 def continued_fraction(
     discriminant: int,
     term_count: int,
-) -> tuple[list[int], int, int]:
-    """Return the continued fraction expansion of sqrt(D) up to term_count terms.
-
-    Returns (coefficients, preperiod_length, period_length).
-    """
+) -> ContinuedFractionResult:
+    """Return the continued fraction expansion of sqrt(D)."""
     if term_count < 1:
         raise ValueError("term_count must be at least 1")
     preperiod, period = _cf_coefficients(discriminant)
-    return (
-        _coefficients(preperiod, period, term_count),
-        len(preperiod),
-        len(period),
+    return ContinuedFractionResult._from_kernel(
+        discriminant=discriminant,
+        term_count=term_count,
+        coefficients=tuple(_coefficients(preperiod, period, term_count)),
+        preperiod_length=len(preperiod),
+        period_length=len(period),
     )
 
 
-def convergents(discriminant: int, count: int) -> list[tuple[int, int, int]]:
+def convergents(discriminant: int, count: int) -> ConvergentResult:
     """Return the first count convergents (index, p_n, q_n) of sqrt(D)."""
     if count < 1:
         raise ValueError("count must be at least 1")
@@ -82,19 +88,30 @@ def convergents(discriminant: int, count: int) -> list[tuple[int, int, int]]:
     p_prev2, p_prev1 = 1, coefficients[0]
     q_prev2, q_prev1 = 0, 1
 
-    result = [(0, p_prev1, q_prev1)]
+    values = [(0, p_prev1, q_prev1)]
     for index in range(1, count):
         coefficient = coefficients[index]
         p_current = coefficient * p_prev1 + p_prev2
         q_current = coefficient * q_prev1 + q_prev2
         p_prev2, p_prev1 = p_prev1, p_current
         q_prev2, q_prev1 = q_prev1, q_current
-        result.append((index, p_prev1, q_prev1))
+        values.append((index, p_prev1, q_prev1))
 
-    return result
+    return ConvergentResult._from_kernel(
+        discriminant=discriminant,
+        convergent_count=count,
+        convergents=tuple(
+            ConvergentValue(
+                index=index,
+                numerator=format_canonical_integer(numerator),
+                denominator=format_canonical_integer(denominator),
+            )
+            for index, numerator, denominator in values
+        ),
+    )
 
 
-def solve_pell(discriminant: int) -> tuple[int, int]:
+def solve_pell(discriminant: int) -> PellEquationResult:
     """Return the fundamental solution (x, y) to x^2 - D*y^2 = 1.
 
     For a non-square positive integer D the continued fraction of sqrt(D) has
@@ -111,7 +128,11 @@ def solve_pell(discriminant: int) -> tuple[int, int]:
     q_prev2, q_prev1 = 0, 1
 
     if p_prev1**2 - discriminant * q_prev1**2 == 1:
-        return (p_prev1, q_prev1)
+        return PellEquationResult._from_kernel(
+            discriminant=discriminant,
+            x=format_canonical_integer(p_prev1),
+            y=format_canonical_integer(q_prev1),
+        )
 
     for index in range(1, convergents_needed):
         coefficient = coefficients[index]
@@ -121,6 +142,10 @@ def solve_pell(discriminant: int) -> tuple[int, int]:
         q_prev2, q_prev1 = q_prev1, q_current
 
         if p_prev1**2 - discriminant * q_prev1**2 == 1:
-            return (p_prev1, q_prev1)
+            return PellEquationResult._from_kernel(
+                discriminant=discriminant,
+                x=format_canonical_integer(p_prev1),
+                y=format_canonical_integer(q_prev1),
+            )
 
     raise ArithmeticError("Pell solution was not reached within the period bound")

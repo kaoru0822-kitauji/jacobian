@@ -229,17 +229,22 @@ class TestEulerCharacteristic:
         result = compute_euler_characteristic(
             EulerCharacteristicRequest(map=_four_cycle())
         )
-        assert result.total == {"V": 4, "E": 4, "F": 2, "chi": 2}
+        assert result.total.model_dump() == {
+            "vertices": 4,
+            "edges": 4,
+            "faces": 2,
+            "characteristic": 2,
+        }
         assert len(result.per_component) == 1
-        assert result.per_component[0] == {"V": 4, "E": 4, "F": 2, "chi": 2}
+        assert result.per_component[0] == result.total
 
     def test_torus(self) -> None:
         result = compute_euler_characteristic(EulerCharacteristicRequest(map=_torus()))
-        assert result.total == {"V": 1, "E": 2, "F": 1, "chi": 0}
+        assert result.total.characteristic == 0
 
     def test_tree(self) -> None:
         result = compute_euler_characteristic(EulerCharacteristicRequest(map=_tree()))
-        assert result.total == {"V": 3, "E": 2, "F": 1, "chi": 2}
+        assert result.total.characteristic == 2
 
     def test_disconnected_sums(self) -> None:
         result = compute_euler_characteristic(
@@ -247,13 +252,13 @@ class TestEulerCharacteristic:
         )
         assert len(result.per_component) == 2
         # Each component: V=1, E=1, F=2, chi=2. Total chi = 4.
-        assert result.total == {"V": 2, "E": 2, "F": 4, "chi": 4}
+        assert result.total.characteristic == 4
 
     def test_isolated_vertex_sphere(self) -> None:
         result = compute_euler_characteristic(
             EulerCharacteristicRequest(map=_isolated_vertex())
         )
-        assert result.total == {"V": 1, "E": 1, "F": 2, "chi": 2}
+        assert result.total.characteristic == 2
 
 
 # ---------------------------------------------------------------------------
@@ -425,11 +430,11 @@ class TestDual:
             dual_euler = compute_euler_characteristic(
                 EulerCharacteristicRequest(map=dual)
             )
-            assert dual_euler.total["chi"] == primal.total["chi"]
+            assert dual_euler.total.characteristic == primal.total.characteristic
             # Duality swaps vertices and faces and preserves edges.
-            assert dual_euler.total["V"] == primal.total["F"]
-            assert dual_euler.total["E"] == primal.total["E"]
-            assert dual_euler.total["F"] == primal.total["V"]
+            assert dual_euler.total.vertices == primal.total.faces
+            assert dual_euler.total.edges == primal.total.edges
+            assert dual_euler.total.faces == primal.total.vertices
 
     def test_dual_of_dual_recovers_primal_structure(self) -> None:
         m = _theta_graph()
@@ -600,9 +605,9 @@ def test_rotation_successor_cyclic() -> None:
 
 def test_face_orbits_covers_all_darts() -> None:
     m = _four_cycle()
-    walks, face_of_dart, _, _ = face_orbits(m)
+    result = face_orbits(m)
     all_darts: list[int] = []
-    for walk in walks:
+    for walk in result.face_walks:
         all_darts.extend(walk)
     assert sorted(all_darts) == list(range(len(m.darts)))
-    assert set(face_of_dart.keys()) == set(range(len(m.darts)))
+    assert len(result.face_of_dart) == len(m.darts)

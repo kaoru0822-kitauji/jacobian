@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian.catalog.models import OperationDomainValidationError
+from jacobian.math import petri_nets
 from jacobian.math.petri_nets._models import (
     MAX_SIPHON_TRAP_PLACES,
     EnabledTransitionsRequest,
@@ -47,6 +48,28 @@ def _token_passing_net() -> PetriNet:
         pre=((1, 0), (0, 1)),
         post=((0, 1), (1, 0)),
     )
+
+
+def test_native_operations_return_canonical_results() -> None:
+    net = _simple_net()
+    marking = Marking(tokens=(1, 0))
+
+    assert petri_nets.enabled_transitions(net, marking).transitions == (0,)
+    assert petri_nets.fire_transition(net, marking, 0).status == "FIRED"
+    assert petri_nets.compute_incidence_matrix(net).incidence == ((-1, 0), (0, 0))
+    assert petri_nets.reachability_graph(net, marking).states[0] == (1, 0)
+
+
+def test_native_operations_reject_mismatched_markings() -> None:
+    net = _simple_net()
+    marking = Marking(tokens=(1,))
+
+    with pytest.raises(ValueError, match="marking length"):
+        petri_nets.enabled_transitions(net, marking)
+    with pytest.raises(ValueError, match="marking length"):
+        petri_nets.fire_transition(net, marking, 0)
+    with pytest.raises(ValueError, match="marking length"):
+        petri_nets.reachability_graph(net, marking)
 
 
 # ---------------------------------------------------------------------------

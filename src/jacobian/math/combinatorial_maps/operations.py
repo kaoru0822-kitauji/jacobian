@@ -9,6 +9,16 @@ dart IDs; no backend embedding object crosses the boundary.
 from __future__ import annotations
 
 from ._face_orbits import face_orbit_data
+from ._models import (
+    ConnectedComponentsResult,
+    DualResult,
+    EulerCharacteristicCounts,
+    EulerCharacteristicResult,
+    FacesResult,
+    OrientableGenusResult,
+    OrientationReverseResult,
+    VertexFaceIncidenceResult,
+)
 from .values import FiniteCombinatorialMap
 
 __all__ = [
@@ -33,7 +43,7 @@ def rotation_successor(map_: FiniteCombinatorialMap, dart: int) -> int:
     return row[(index + 1) % len(row)]
 
 
-def face_orbits(
+def _face_orbits(
     map_: FiniteCombinatorialMap,
 ) -> tuple[list[list[int]], dict[int, int], list[int], dict[int, list[int]]]:
     """Return the complete face-orbit family.
@@ -57,6 +67,18 @@ def face_orbits(
         comp = comp_of_vertex[vertex]
         comp_of_face.setdefault(comp, []).append(face_index)
     return walks, face_of_dart, successor, comp_of_face
+
+
+def face_orbits(map_: FiniteCombinatorialMap) -> FacesResult:
+    """Return the complete canonical face-orbit family."""
+
+    walks, face_of_dart, successor, _ = _face_orbits(map_)
+    return FacesResult.model_construct(
+        map=map_,
+        face_walks=tuple(tuple(walk) for walk in walks),
+        face_of_dart=tuple(face_of_dart[dart] for dart in range(len(map_.darts))),
+        successor=tuple(successor),
+    )
 
 
 def connected_components_vertices(
@@ -92,11 +114,11 @@ def connected_components_vertices(
 
 def connected_components(
     map_: FiniteCombinatorialMap,
-) -> tuple[dict[int, int], dict[int, int], dict[int, int]]:
+) -> ConnectedComponentsResult:
     """Return the component partition of vertices, darts, and faces."""
 
     vertex_component = connected_components_vertices(map_)
-    walks, _, _, _ = face_orbits(map_)
+    walks, _, _, _ = _face_orbits(map_)
     face_component: dict[int, int] = {}
     for face_index, walk in enumerate(walks):
         representative = walk[0]
@@ -105,19 +127,25 @@ def connected_components(
     dart_component: dict[int, int] = {}
     for dart_index, dart in enumerate(map_.darts):
         dart_component[dart_index] = vertex_component[dart[0]]
-    return vertex_component, dart_component, face_component
+    return ConnectedComponentsResult.model_construct(
+        vertex_component=tuple(
+            vertex_component[vertex] for vertex in range(map_.vertex_count)
+        ),
+        dart_component=tuple(dart_component[dart] for dart in range(len(map_.darts))),
+        face_component=tuple(face_component[face] for face in range(len(walks))),
+    )
 
 
 def euler_characteristic(
     map_: FiniteCombinatorialMap,
-) -> tuple[list[dict[str, int]], dict[str, int]]:
+) -> EulerCharacteristicResult:
     """Return per-component and total Euler characteristic.
 
     Uses the disconnected-surface convention: each connected component is an
     independent closed surface, so ``chi = V - E + F`` per component and the
     total is the sum of component characteristics.
     """
-    walks, _, _, _ = face_orbits(map_)
+    walks, _, _, _ = _face_orbits(map_)
     vertex_component = connected_components_vertices(map_)
     component_vertices: dict[int, set[int]] = {}
     component_edges: dict[int, int] = {}
@@ -138,28 +166,37 @@ def euler_characteristic(
     all_components = (
         set(component_vertices) | set(component_edges) | set(component_faces)
     )
-    per_component: list[dict[str, int]] = []
+    per_component: list[EulerCharacteristicCounts] = []
     total_v = total_e = total_f = 0
     for comp in sorted(all_components):
         v = len(component_vertices.get(comp, set()))
         e = component_edges.get(comp, 0)
         f = component_faces.get(comp, 0)
-        per_component.append({"V": v, "E": e, "F": f, "chi": v - e + f})
+        per_component.append(
+            EulerCharacteristicCounts(
+                vertices=v,
+                edges=e,
+                faces=f,
+                characteristic=v - e + f,
+            )
+        )
         total_v += v
         total_e += e
         total_f += f
-    total = {
-        "V": total_v,
-        "E": total_e,
-        "F": total_f,
-        "chi": total_v - total_e + total_f,
-    }
-    return per_component, total
+    total = EulerCharacteristicCounts(
+        vertices=total_v,
+        edges=total_e,
+        faces=total_f,
+        characteristic=total_v - total_e + total_f,
+    )
+    return EulerCharacteristicResult.model_construct(
+        per_component=tuple(per_component), total=total
+    )
 
 
 def orientable_genus(
     map_: FiniteCombinatorialMap,
-) -> tuple[list[int], int]:
+) -> OrientableGenusResult:
     """Return per-component and total orientable genus.
 
     For each connected component, ``g = (2 - chi) / 2`` under the orientable
@@ -167,12 +204,12 @@ def orientable_genus(
     valid orientable combinatorial map.  The total genus is the sum of the
     component genera.
     """
-    per_component, _ = euler_characteristic(map_)
+    profile = euler_characteristic(map_)
     component_genera: list[int] = []
     total = 0
-    for row in per_component:
-        g = (2 - row["chi"]) // 2
-        if (2 - row["chi"]) % 2 != 0:
+    for row in profile.per_component:
+        g = (2 - row.characteristic) // 2
+        if (2 - row.characteristic) % 2 != 0:
             raise ValueError(
                 "orientable genus requires an even Euler characteristic per component"
             )
@@ -180,12 +217,14 @@ def orientable_genus(
             raise ValueError("orientable genus must be nonnegative")
         component_genera.append(g)
         total += g
-    return component_genera, total
+    return OrientableGenusResult.model_construct(
+        per_component=tuple(component_genera), total=total
+    )
 
 
 def orientation_reverse(
     map_: FiniteCombinatorialMap,
-) -> tuple[FiniteCombinatorialMap, dict[int, int]]:
+) -> OrientationReverseResult:
     """Reverse every local cyclic order.
 
     Returns the resulting combinatorial map together with the induced bijection
@@ -197,8 +236,8 @@ def orientation_reverse(
         darts=map_.darts,
         rotations=reversed_rotations,
     )
-    old_walks, old_face_of_dart, _, _ = face_orbits(map_)
-    new_walks, new_face_of_dart, _, _ = face_orbits(reversed_map)
+    old_walks, old_face_of_dart, _, _ = _face_orbits(map_)
+    new_walks, new_face_of_dart, _, _ = _face_orbits(reversed_map)
     # The reversed face permutation is phi' = alpha . phi^-1 . alpha, so the
     # new orbit of a dart is the reversal image of the old orbit: old face O
     # corresponds to the new face containing the reversed darts of O.  Match
@@ -215,12 +254,16 @@ def orientation_reverse(
         set(face_bijection.values())
     ) != len(new_walks):
         raise ValueError("orientation reversal did not induce a face bijection")
-    return reversed_map, face_bijection
+    return OrientationReverseResult.model_construct(
+        map=map_,
+        reversed_map=reversed_map,
+        face_bijection=face_bijection,
+    )
 
 
 def dual_map(
     map_: FiniteCombinatorialMap,
-) -> tuple[FiniteCombinatorialMap, dict[int, int]]:
+) -> DualResult:
     """Return the exact embedded dual.
 
     - one dual vertex per primal face;
@@ -234,7 +277,7 @@ def dual_map(
     with identity.  Returns the dual map and the primal-dart -> dual-dart
     bijection (the identity here, since dual darts inherit primal dart indices).
     """
-    walks, face_of_dart, _, _ = face_orbits(map_)
+    walks, face_of_dart, _, _ = _face_orbits(map_)
     n = len(map_.darts)
     face_count = len(walks)
     if face_count == 0:
@@ -269,12 +312,12 @@ def dual_map(
         rotations=tuple(dual_rotations),
     )
     primal_to_dual = {i: i for i in range(n)}
-    return dual, primal_to_dual
+    return DualResult.model_construct(dual=dual, primal_to_dual=primal_to_dual)
 
 
 def vertex_face_incidence(
     map_: FiniteCombinatorialMap,
-) -> tuple[dict[tuple[int, int], int], dict[int, set[int]]]:
+) -> VertexFaceIncidenceResult:
     """Return the exact finite incidence structure between vertices and faces.
 
     Returns ``(multiplicity, boolean_incidence)``:
@@ -282,7 +325,7 @@ def vertex_face_incidence(
       number of times the vertex occurs on the facial boundary.
     - ``boolean_incidence``: ``vertex -> set of incident face indices``
     """
-    walks, _, _, _ = face_orbits(map_)
+    walks, _, _, _ = _face_orbits(map_)
     multiplicity: dict[tuple[int, int], int] = {}
     boolean: dict[int, set[int]] = {v: set() for v in range(map_.vertex_count)}
     for face_index, walk in enumerate(walks):
@@ -291,4 +334,12 @@ def vertex_face_incidence(
             key = (vertex, face_index)
             multiplicity[key] = multiplicity.get(key, 0) + 1
             boolean[vertex].add(face_index)
-    return multiplicity, boolean
+    nested: dict[int, dict[int, int]] = {}
+    for (vertex, face), count in multiplicity.items():
+        nested.setdefault(vertex, {})[face] = count
+    return VertexFaceIncidenceResult.model_construct(
+        multiplicity=nested,
+        boolean_incidence={
+            vertex: tuple(sorted(boolean[vertex])) for vertex in sorted(boolean)
+        },
+    )

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.greedoids._models import (
     BasesRequest,
@@ -70,30 +68,16 @@ def _admit_subset(request: RankRequest | BasesRequest) -> None:
 
 def compute_recognize(request: RecognizeRequest) -> RecognizeResult:
     _admit_system(request)
-    result: dict[str, Any] = recognize(request.system)
-    if result["status"] == "GREEDOID":
-        return RecognizeResult(
-            status="GREEDOID",
-            rank=result["rank"],
-            bases=tuple(result["bases"]),
-            ground_size=result["ground_size"],
-        )
-    return RecognizeResult(
-        status="NOT_A_GREEDOID",
-        obstruction=result["obstruction"],
-        larger_set=result.get("larger_set"),
-        smaller_set=result.get("smaller_set"),
-        feasible_set=result.get("feasible_set"),
-    )
+    return recognize(request.system)
 
 
 def compute_rank(request: RankRequest) -> RankResult:
     _admit_subset(request)
     recognized = recognize(request.system)
-    if recognized["status"] != "GREEDOID":
+    if recognized.status != "GREEDOID":
         return RankResult(
             status="NOT_A_GREEDOID",
-            obstruction=str(recognized["obstruction"]),
+            obstruction=recognized.obstruction,
             subset=request.subset,
         )
     if request.subset is None:
@@ -106,11 +90,11 @@ def compute_rank(request: RankRequest) -> RankResult:
 def compute_bases(request: BasesRequest) -> BasesResult:
     _admit_subset(request)
     recognized = recognize(request.system)
-    if recognized["status"] != "GREEDOID":
+    if recognized.status != "GREEDOID":
         return BasesResult(
             status="NOT_A_GREEDOID",
             bases=(),
-            obstruction=str(recognized["obstruction"]),
+            obstruction=recognized.obstruction,
         )
     if request.subset is None:
         r, basis_list = _bases_unchecked(request.system, None)
@@ -127,25 +111,12 @@ def compute_basic_word_profile(
 ) -> BasicWordProfileResult:
     _admit_system(request)
     recognized = recognize(request.system)
-    if recognized["status"] != "GREEDOID":
+    if recognized.status != "GREEDOID":
         return BasicWordProfileResult(
             status="NOT_A_BASIC_WORD",
             obstruction="not_a_greedoid",
         )
-    result: dict[str, Any] = _basic_word_profile_unchecked(request.system, request.word)
-    if result["status"] == "BASIC_WORD":
-        return BasicWordProfileResult(
-            status="BASIC_WORD",
-            prefix_length=result["prefix_length"],
-            is_full=result["is_full"],
-            rank=result["rank"],
-        )
-    return BasicWordProfileResult(
-        status="NOT_A_BASIC_WORD",
-        obstruction=result["obstruction"],
-        prefix_index=result.get("prefix_index"),
-        prefix_set=result.get("prefix_set"),
-    )
+    return _basic_word_profile_unchecked(request.system, request.word)
 
 
 def compute_convex_geometry(
@@ -153,10 +124,10 @@ def compute_convex_geometry(
 ) -> ConvexGeometryResult:
     _admit_system(request)
     recognized = recognize(request.system)
-    if recognized["status"] != "GREEDOID":
+    if recognized.status != "GREEDOID":
         return ConvexGeometryResult(
             status="NOT_AN_ANTIMATROID",
-            obstruction=str(recognized["obstruction"]),
+            obstruction=recognized.obstruction,
         )
     from jacobian.math.greedoids.operations import union_closed
 
@@ -167,10 +138,4 @@ def compute_convex_geometry(
         return ConvexGeometryResult(
             status="NOT_AN_ANTIMATROID", obstruction="not_full_support_or_union_closed"
         )
-    closed_family, complement_map = _antimatroid_to_convex_geometry_unchecked(
-        request.system
-    )
-    return ConvexGeometryResult(
-        closed_family=tuple(closed_family),
-        complement_map=tuple(sorted(complement_map.items())),
-    )
+    return _antimatroid_to_convex_geometry_unchecked(request.system)

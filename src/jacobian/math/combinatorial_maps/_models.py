@@ -67,22 +67,6 @@ class FacesResult(StrictModel):
             )
         return self
 
-    @classmethod
-    def _from_kernel(
-        cls,
-        request: FacesRequest,
-        *,
-        face_walks: tuple[tuple[int, ...], ...],
-        face_of_dart: tuple[int, ...],
-        successor: tuple[int, ...],
-    ) -> Self:
-        return cls.model_construct(
-            map=request.map,
-            face_walks=face_walks,
-            face_of_dart=face_of_dart,
-            successor=successor,
-        )
-
 
 class EulerCharacteristicRequest(StrictModel):
     """Compute per-component and total Euler characteristic."""
@@ -90,29 +74,29 @@ class EulerCharacteristicRequest(StrictModel):
     map: FiniteCombinatorialMap
 
 
+class EulerCharacteristicCounts(StrictModel):
+    """Cell counts and their Euler characteristic for one component family."""
+
+    vertices: int = Field(ge=0)
+    edges: int = Field(ge=0)
+    faces: int = Field(ge=0)
+    characteristic: int
+
+    @model_validator(mode="after")
+    def bind_characteristic(self) -> Self:
+        if self.characteristic != self.vertices - self.edges + self.faces:
+            raise _validation_error(
+                "euler_characteristic_mismatch",
+                "characteristic must equal vertices - edges + faces",
+            )
+        return self
+
+
 class EulerCharacteristicResult(StrictModel):
     """Per-component and total Euler characteristic."""
 
-    per_component: tuple[dict[str, int], ...]
-    total: dict[str, int]
-
-    @model_validator(mode="after")
-    def bind_euler(self) -> Self:
-        required = {"V", "E", "F", "chi"}
-        if set(self.total.keys()) != required:
-            raise _validation_error("euler_total_keys", "total must carry V, E, F, chi")
-        for row in self.per_component:
-            if set(row.keys()) != required:
-                raise _validation_error(
-                    "euler_component_keys", "each component row must carry V, E, F, chi"
-                )
-        return self
-
-    @classmethod
-    def _from_kernel(
-        cls, *, per_component: tuple[dict[str, int], ...], total: dict[str, int]
-    ) -> Self:
-        return cls.model_construct(per_component=per_component, total=total)
+    per_component: tuple[EulerCharacteristicCounts, ...]
+    total: EulerCharacteristicCounts
 
 
 class OrientableGenusRequest(StrictModel):
@@ -126,10 +110,6 @@ class OrientableGenusResult(StrictModel):
 
     per_component: tuple[int, ...]
     total: int = Field(ge=0)
-
-    @classmethod
-    def _from_kernel(cls, *, per_component: tuple[int, ...], total: int) -> Self:
-        return cls.model_construct(per_component=per_component, total=total)
 
 
 class OrientationReverseRequest(StrictModel):
@@ -149,20 +129,6 @@ class OrientationReverseResult(StrictModel):
     reversed_map: FiniteCombinatorialMap
     face_bijection: dict[int, int]
 
-    @classmethod
-    def _from_kernel(
-        cls,
-        request: OrientationReverseRequest,
-        *,
-        reversed_map: FiniteCombinatorialMap,
-        face_bijection: dict[int, int],
-    ) -> Self:
-        return cls.model_construct(
-            map=request.map,
-            reversed_map=reversed_map,
-            face_bijection=face_bijection,
-        )
-
 
 class ConnectedComponentsRequest(StrictModel):
     """Return the component partition of vertices, darts, and faces."""
@@ -177,20 +143,6 @@ class ConnectedComponentsResult(StrictModel):
     dart_component: tuple[int, ...]
     face_component: tuple[int, ...]
 
-    @classmethod
-    def _from_kernel(
-        cls,
-        *,
-        vertex_component: tuple[int, ...],
-        dart_component: tuple[int, ...],
-        face_component: tuple[int, ...],
-    ) -> Self:
-        return cls.model_construct(
-            vertex_component=vertex_component,
-            dart_component=dart_component,
-            face_component=face_component,
-        )
-
 
 class DualRequest(StrictModel):
     """Compute the exact embedded dual of a combinatorial map."""
@@ -203,12 +155,6 @@ class DualResult(StrictModel):
 
     dual: FiniteCombinatorialMap
     primal_to_dual: dict[int, int]
-
-    @classmethod
-    def _from_kernel(
-        cls, *, dual: FiniteCombinatorialMap, primal_to_dual: dict[int, int]
-    ) -> Self:
-        return cls.model_construct(dual=dual, primal_to_dual=primal_to_dual)
 
 
 class VertexFaceIncidenceRequest(StrictModel):
@@ -227,24 +173,13 @@ class VertexFaceIncidenceResult(StrictModel):
     multiplicity: dict[int, dict[int, int]]
     boolean_incidence: dict[int, tuple[int, ...]]
 
-    @classmethod
-    def _from_kernel(
-        cls,
-        *,
-        multiplicity: dict[int, dict[int, int]],
-        boolean_incidence: dict[int, tuple[int, ...]],
-    ) -> Self:
-        return cls.model_construct(
-            multiplicity=multiplicity,
-            boolean_incidence=boolean_incidence,
-        )
-
 
 __all__ = [
     "ConnectedComponentsRequest",
     "ConnectedComponentsResult",
     "DualRequest",
     "DualResult",
+    "EulerCharacteristicCounts",
     "EulerCharacteristicRequest",
     "EulerCharacteristicResult",
     "FacesRequest",

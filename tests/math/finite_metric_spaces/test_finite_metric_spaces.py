@@ -17,6 +17,7 @@ from jacobian.math.finite_metric_spaces._operations import (
     compute_gromov_hyperbolicity,
     compute_metric_profile,
 )
+from jacobian.math.finite_metric_spaces.operations import ball, metric_profile
 
 
 def _ms(distances: list[list[int]]) -> FiniteMetricSpace:
@@ -34,6 +35,13 @@ def test_profile_path_graph() -> None:
     assert result.centers == (1,)
     assert result.periphery == (0, 2)
     assert result.method == "DIRECT_DISTANCE_MATRIX_SCAN"
+
+
+def test_native_profile_returns_the_canonical_result() -> None:
+    result = metric_profile(_ms([[0, 1], [1, 0]]))
+
+    assert result.diameter == 1
+    assert result.eccentricities[0].point == 0
 
 
 def test_profile_complete_graph() -> None:
@@ -72,6 +80,14 @@ def test_ball_radius_1_at_endpoint() -> None:
     ms = _ms([[0, 1, 2], [1, 0, 1], [2, 1, 0]])
     result = compute_ball(BallRequest(metric_space=ms, center=0, radius=1))
     assert set(result.points) == {0, 1}
+
+
+def test_native_ball_rejects_invalid_bounds() -> None:
+    ms = _ms([[0, 1], [1, 0]])
+    with pytest.raises(ValueError, match="center index"):
+        ball(ms, center=2, radius=1)
+    with pytest.raises(ValueError, match="non-negative"):
+        ball(ms, center=0, radius=-1)
 
 
 def test_gromov_hyperbolicity_path_graph() -> None:

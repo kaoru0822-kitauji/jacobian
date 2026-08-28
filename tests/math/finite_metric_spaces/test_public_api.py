@@ -8,6 +8,7 @@ from jacobian.math import finite_metric_spaces
 def test_exact_public_api_symbols() -> None:
     """Exact owner-local contract for the finite_metric_spaces public API."""
     expected = (
+        "FiniteMetricSpace",
         "ball",
         "gromov_hyperbolicity",
         "metric_profile",
