@@ -651,9 +651,9 @@ def _require_raw_support_conclusions_admissible(canonical: Any) -> None:
         )
     if isinstance(exposed_face, RationalExposedFace):
         # Its ordering, distinctness, and serialization invariants already
-        # hold by construction.  Whether it is the complete maximizing face
-        # is a mathematical claim, checked by the explicit owner verifier
-        # rather than while parsing a result.
+        # hold by construction. Whether it is the complete maximizing face is
+        # established by the owning support operation rather than while
+        # parsing a result.
         return
     vertices = exposed_face["vertices"]
     if not isinstance(vertices, (list, tuple)):

@@ -1,8 +1,7 @@
 """Bounded owner-local admission kernels for rational polytopes.
 
-These adapters keep request admission separate from result construction.  They
-are intentionally private: public operation adapters and result verifiers live
-in ``_operations``.
+These adapters keep request admission separate from result construction. They
+are intentionally private and are called by the owning operation adapters.
 """
 
 from __future__ import annotations

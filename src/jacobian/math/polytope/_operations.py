@@ -227,16 +227,6 @@ def compute_facet_incidence(
     )
 
 
-def verify_facet_incidence_result(result: FacetIncidenceResult) -> bool:
-    """Verify a claimed facet profile in its admitted finite envelope."""
-
-    try:
-        expected = _computed_facets_from_vertices(result.vertices, result.dimension)
-    except ValueError:
-        return False
-    return result.facets == expected
-
-
 def _deduplicate_halfspaces(
     halfspaces: tuple[Halfspace, ...],
 ) -> tuple[Halfspace, ...]:
@@ -846,21 +836,6 @@ def polytope_support(
     )
 
 
-def verify_polytope_support_result(result: PolytopeSupportResult) -> bool:
-    """Verify a claimed support value and exposed face in the admitted envelope."""
-
-    try:
-        require_full_dimensional_extreme_vertices(result.polytope)
-    except ValueError:
-        return False
-    value, vertices = support_data(result.polytope, result.covector)
-    return (
-        result.support_value == CanonicalRational.from_fraction(value)
-        and result.exposed_face.space == result.polytope.space
-        and result.exposed_face.vertices == vertices
-    )
-
-
 def compute_polytope_volume(
     request: PolytopeVolumeRequest,
 ) -> PolytopeVolumeResult:
@@ -952,6 +927,4 @@ __all__ = [
     "compute_facet_incidence",
     "compute_polytope_volume",
     "convex_hull_volume",
-    "verify_facet_incidence_result",
-    "verify_polytope_support_result",
 ]

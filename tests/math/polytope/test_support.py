@@ -26,7 +26,6 @@ from jacobian.math.polytope._models import (
 from jacobian.math.polytope._operations import (
     compute_polytope_support,
     require_full_dimensional_extreme_vertices,
-    verify_polytope_support_result,
 )
 from jacobian.math.polytope._tools import POLYTOPE_OPERATIONS
 
@@ -167,43 +166,6 @@ def test_positive_covector_scaling_preserves_face_and_scales_support() -> None:
 
     assert scaled.support_value.as_fraction() == 3 * unit.support_value.as_fraction()
     assert scaled.exposed_face == unit.exposed_face
-
-
-def test_support_result_is_structural_and_verifier_rejects_forged_claims() -> None:
-    result = compute_polytope_support(
-        PolytopeSupportRequest(polytope=_square(), covector=_covector(0, 1))
-    )
-
-    forged_value = PolytopeSupportResult.model_validate(
-        {
-            **result.model_dump(mode="json"),
-            "support_value": {"num": "2", "den": "1"},
-        }
-    )
-    assert not verify_polytope_support_result(forged_value)
-    forged_face = PolytopeSupportResult(
-        polytope=result.polytope,
-        covector=result.covector,
-        support_value=result.support_value,
-        exposed_face=RationalExposedFace(
-            space=result.polytope.space,
-            vertices=(result.polytope.vertices[0],),
-        ),
-    )
-    assert not verify_polytope_support_result(forged_face)
-    forged_covector = PolytopeSupportResult.model_validate(
-        {
-            **result.model_dump(mode="json"),
-            "covector": {
-                "space": {"axes": ["x", "y"]},
-                "components": [
-                    {"num": "1", "den": "1"},
-                    {"num": "0", "den": "1"},
-                ],
-            },
-        }
-    )
-    assert not verify_polytope_support_result(forged_covector)
 
 
 def test_request_rejects_coordinate_axis_mismatch() -> None:
@@ -883,32 +845,6 @@ def test_result_preflights_built_foreign_exposed_face_space_before_nested_parsin
         PolytopeSupportResult.model_validate(payload)
 
 
-def test_result_parses_forged_support_value_for_explicit_verification(
-    square_result: PolytopeSupportResult,
-) -> None:
-    """Result parsing is structural; claim replay belongs to the verifier."""
-
-    payload = square_result.model_dump(mode="json")
-    payload["support_value"] = {"num": "2", "den": "1"}
-
-    assert not verify_polytope_support_result(
-        PolytopeSupportResult.model_validate(payload)
-    )
-
-
-def test_result_parses_forged_exposed_face_for_explicit_verification(
-    square_result: PolytopeSupportResult,
-) -> None:
-    """A structurally sound but incomplete face is rejected by the verifier."""
-
-    payload = square_result.model_dump(mode="json")
-    payload["exposed_face"]["vertices"] = payload["exposed_face"]["vertices"][:1]
-
-    assert not verify_polytope_support_result(
-        PolytopeSupportResult.model_validate(payload)
-    )
-
-
 def test_result_preflight_binding_defers_unparsed_structural_faults(
     square_result: PolytopeSupportResult,
     monkeypatch: pytest.MonkeyPatch,
@@ -922,22 +858,6 @@ def test_result_preflight_binding_defers_unparsed_structural_faults(
 
     with pytest.raises(ValidationError):
         PolytopeSupportResult.model_validate(payload)
-
-
-def test_result_parses_forged_built_face_for_explicit_verification(
-    square_result: PolytopeSupportResult,
-) -> None:
-    """Built canonical values follow the same structural result boundary."""
-
-    payload = square_result.model_dump(mode="json")
-    payload["exposed_face"] = RationalExposedFace(
-        space=square_result.polytope.space,
-        vertices=(square_result.exposed_face.vertices[0],),
-    )
-
-    assert not verify_polytope_support_result(
-        PolytopeSupportResult.model_validate(payload)
-    )
 
 
 def test_result_defers_malformed_coordinate_containers_to_nested_validation(
@@ -987,23 +907,6 @@ def test_built_matching_exposed_face_composes_with_serialized_result(
     payload["exposed_face"] = square_result.exposed_face
 
     assert PolytopeSupportResult.model_validate(payload) == square_result
-
-
-def test_constructed_result_leaves_forged_face_to_explicit_verification(
-    square_result: PolytopeSupportResult,
-) -> None:
-    """A built face in the correct space is a verifier-owned claim."""
-
-    forged = PolytopeSupportResult(
-        polytope=square_result.polytope,
-        covector=square_result.covector,
-        support_value=square_result.support_value,
-        exposed_face=RationalExposedFace(
-            space=square_result.polytope.space,
-            vertices=(square_result.polytope.vertices[0],),
-        ),
-    )
-    assert not verify_polytope_support_result(forged)
 
 
 def test_result_rejects_forbidden_extra_field_before_nested_parsing(

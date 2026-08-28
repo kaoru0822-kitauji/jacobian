@@ -38,7 +38,6 @@ from jacobian.math.polytope._operations import (
     compute_facet_incidence,
     compute_polytope_support,
     compute_polytope_volume,
-    verify_facet_incidence_result,
 )
 
 
@@ -208,31 +207,6 @@ class TestFacetIncidence:
 
         assert len(result.facets) == 3
         assert all(len(facet.source_vertex_indices) >= 2 for facet in result.facets)
-
-    def test_result_is_structural_and_verifier_rejects_missing_facet_and_wrong_source(
-        self,
-    ) -> None:
-        vertices = (
-            _v((0, 1), (0, 1)),
-            _v((1, 1), (0, 1)),
-            _v((1, 1), (1, 1)),
-            _v((0, 1), (1, 1)),
-        )
-        result = _facet_profile(vertices)
-
-        missing_facet = FacetIncidenceResult(
-            vertices=vertices,
-            dimension=2,
-            facets=result.facets[:-1],
-        )
-        assert not verify_facet_incidence_result(missing_facet)
-        changed_source = (_v((0, 1), (0, 1)), _v((2, 1), (0, 1)), *vertices[2:])
-        forged_source = FacetIncidenceResult(
-            vertices=changed_source,
-            dimension=2,
-            facets=result.facets,
-        )
-        assert not verify_facet_incidence_result(forged_source)
 
     def test_facet_profile_composes_unchanged_into_volume_request(self) -> None:
         """Each computed facet's shared half-space value feeds
