@@ -58,9 +58,7 @@ def _admit_point_addition(request: EllipticCurvePointAdditionRequest) -> None:
     except PydanticCustomError as exc:
         _admission_error(
             exc,
-            ("second",)
-            if exc.type == "elliptic_curve.point_off_curve"
-            else ("curve",),
+            ("second",) if exc.type == "elliptic_curve.point_off_curve" else ("curve",),
         )
     if first_point == second_point:
         if first_point.y.as_fraction() == 0:
