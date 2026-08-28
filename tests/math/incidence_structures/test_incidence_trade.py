@@ -11,7 +11,6 @@ from jacobian.math.incidence_structures import (
     ContainmentProfileResult,
     IncidenceMomentComparison,
     IncidenceStructure,
-    IncidenceTradeResult,
     check_incidence_trade,
     containment_profile,
 )
@@ -27,9 +26,7 @@ from jacobian.math.incidence_structures._operations import (
     compute_incidence_trade,
 )
 from jacobian.math.incidence_structures.operations import (
-    verify_containment_profile_result,
     verify_incidence_moment_comparison,
-    verify_incidence_trade_result,
 )
 
 _TRADE_POINTS = ("1", "3", "4", "5", "6", "7", "8", "9", "10", "11", "13", "20")
@@ -95,7 +92,6 @@ def test_published_thirteen_for_twelve_trade_matches_through_order_two() -> None
     result = check_incidence_trade(removed, inserted, 2)
     assert result.zeroth_difference == 1
     assert result.positive_moments_equal
-    assert verify_incidence_trade_result(result)
     assert tuple(comparison.order for comparison in result.comparisons) == (1, 2)
     assert tuple(
         (comparison.left_total, comparison.right_total)
@@ -112,7 +108,6 @@ def test_distinct_indices_preserve_repeated_blocks() -> None:
     assert result.subset_profile == ((("a",), 2), (("b",), 0))
     assert result.histogram == ((0, 1), (2, 1))
     assert result.total_multiplicity == 2
-    assert verify_containment_profile_result(result)
 
 
 def test_nontrade_returns_every_nonzero_difference_in_point_order() -> None:
@@ -328,36 +323,6 @@ def test_result_validation_accepts_reordered_source_members() -> None:
     accepted = ContainmentProfileResult.model_validate(payload)
 
     assert accepted == result
-
-
-def test_profile_verifier_rejects_forged_source_and_authoritative_totals() -> None:
-    incidence = _family((("a",), ("a", "b")), "b", points=("a", "b"))
-    result = containment_profile(incidence, 1)
-    payload: dict[str, Any] = result.model_dump(mode="python")
-    payload["total_multiplicity"] = result.total_multiplicity + 1
-
-    assert not verify_containment_profile_result(
-        ContainmentProfileResult.model_validate(payload)
-    )
-
-    changed_source = _family((("b",), ("a", "b")), "b", points=("a", "b"))
-    payload = result.model_dump(mode="python")
-    payload["incidence"] = changed_source
-    assert not verify_containment_profile_result(
-        ContainmentProfileResult.model_validate(payload)
-    )
-
-
-def test_trade_verifier_rejects_forged_zeroth_difference() -> None:
-    left = _family((("a",), ("b",)), "l", points=("a", "b"))
-    right = _family((("a", "b"),), "r", points=("a", "b"))
-    result = check_incidence_trade(left, right, 1)
-    payload: dict[str, Any] = result.model_dump(mode="python")
-    payload["zeroth_difference"] = 0
-
-    assert not verify_incidence_trade_result(
-        IncidenceTradeResult.model_validate(payload)
-    )
 
 
 def test_moment_totals_bind_to_sparse_differences() -> None:

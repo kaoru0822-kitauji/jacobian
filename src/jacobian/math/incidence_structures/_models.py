@@ -291,11 +291,7 @@ class ContainmentProfileResult(StrictModel):
 
     @model_validator(mode="after")
     def require_structural_summary_consistency(self) -> Self:
-        """Validate only relations carried by this result's own fields.
-
-        Recomputing a profile belongs to ``verify_containment_profile_result``;
-        construction of a kernel result must not re-enter an operation path.
-        """
+        """Validate only relations carried by this result's own fields."""
         if self.is_constant != (self.min_multiplicity == self.max_multiplicity):
             raise _validation_error(
                 "containment_constant_mismatch",

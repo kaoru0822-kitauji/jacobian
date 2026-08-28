@@ -51,24 +51,6 @@ def check_incidence_trade(
     )
 
 
-def verify_containment_profile_result(result: ContainmentProfileResult) -> bool:
-    """Verify an independently supplied bounded containment-profile claim."""
-
-    try:
-        _require_containment_profile_admitted(result.incidence, result.t)
-    except ValueError:
-        return False
-    return (
-        result.subset_profile,
-        result.histogram,
-        result.total_multiplicity,
-        result.min_multiplicity,
-        result.max_multiplicity,
-        result.is_constant,
-        result.constant_lambda,
-    ) == _containment_profile_data(result.incidence, result.t)
-
-
 def verify_incidence_moment_comparison(
     comparison: IncidenceMomentComparison,
 ) -> bool:
@@ -99,25 +81,8 @@ def verify_incidence_moment_comparison(
     )
 
 
-def verify_incidence_trade_result(result: IncidenceTradeResult) -> bool:
-    """Verify an independently supplied bounded through-order trade claim."""
-
-    try:
-        _require_incidence_trade_admitted(result.left, result.right, result.max_order)
-    except ValueError:
-        return False
-    expected = _incidence_trade_data(result.left, result.right, result.max_order)
-    return (
-        result.zeroth_difference == expected[0]
-        and result.comparisons == expected[1]
-        and result.positive_moments_equal == expected[2]
-    )
-
-
 __all__ = [
     "check_incidence_trade",
     "containment_profile",
-    "verify_containment_profile_result",
     "verify_incidence_moment_comparison",
-    "verify_incidence_trade_result",
 ]
