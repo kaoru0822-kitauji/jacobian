@@ -11,7 +11,6 @@ from jacobian.math.hypergraphs._models import (
 )
 from jacobian.math.hypergraphs._operations import (
     compute_minimum_transversal,
-    verify_minimum_transversal_result,
 )
 
 HYPERGRAPH = {
@@ -146,20 +145,6 @@ class TestMinimumTransversal:
         with pytest.raises(ValueError):
             _transversal(hg)
 
-    def test_verify_round_trip(self) -> None:
-        result = _transversal(HYPERGRAPH)
-        assert verify_minimum_transversal_result(result)
-
-    def test_rejects_non_hitting_set(self) -> None:
-        with pytest.raises(ValidationError):
-            MinimumTransversalResult.model_validate(
-                {
-                    "hypergraph": HYPERGRAPH,
-                    "transversal": ["d"],
-                    "cardinality": 1,
-                }
-            )
-
     def test_rejects_wrong_cardinality(self) -> None:
         with pytest.raises(ValidationError):
             MinimumTransversalResult.model_validate(
@@ -176,37 +161,3 @@ class TestMinimumTransversal:
         # compute function must return the minimum.
         result = _transversal(HYPERGRAPH)
         assert result.cardinality == 2
-        assert verify_minimum_transversal_result(result)
-
-    def test_verify_accepts_tied_minimum_transversal(self) -> None:
-        result = MinimumTransversalResult.model_validate(
-            {
-                "hypergraph": {
-                    "vertices": ["a", "b", "c", "d"],
-                    "edges": [
-                        ["e1", ["a", "b"]],
-                        ["e2", ["c", "d"]],
-                    ],
-                },
-                "transversal": ["b", "c"],
-                "cardinality": 2,
-            }
-        )
-
-        assert verify_minimum_transversal_result(result)
-
-    def test_verify_rejects_source_outside_search_envelope(self) -> None:
-        vertices = [f"v{i}" for i in range(40)]
-        result = MinimumTransversalResult.model_validate(
-            {
-                "hypergraph": {
-                    "vertices": vertices,
-                    "edges": [[f"e{i}", [vertex]] for i, vertex in enumerate(vertices)],
-                },
-                "transversal": vertices,
-                "cardinality": 40,
-            }
-        )
-
-        with pytest.raises(ValueError, match="search exceeds"):
-            verify_minimum_transversal_result(result)

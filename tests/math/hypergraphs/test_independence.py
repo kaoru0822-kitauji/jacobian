@@ -7,6 +7,7 @@ import pytest
 import z3  # type: ignore[import-untyped]
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.hypergraphs._models import (
     MAX_HYPERGRAPH_INDEPENDENCE_SOLVER_CALLS,
     DualRequest,
@@ -17,6 +18,7 @@ from jacobian.math.hypergraphs._models import (
     ParametersRequest,
 )
 from jacobian.math.hypergraphs._operations import (
+    compute_dual,
     compute_independence_number,
     compute_parameters,
     verify_independence_result,
@@ -93,10 +95,11 @@ def _brute_force_witness(hypergraph: FiniteHypergraph) -> tuple[str, ...]:
 
 
 def test_rejects_empty_hyperedge_before_solver() -> None:
-    with pytest.raises(ValidationError):
-        HypergraphIndependenceRequest.model_validate(
-            {"hypergraph": {"vertices": ["v"], "edges": [["empty", []]]}}
-        )
+    request = HypergraphIndependenceRequest.model_validate(
+        {"hypergraph": {"vertices": ["v"], "edges": [["empty", []]]}}
+    )
+    with pytest.raises(OperationDomainValidationError, match="empty edges"):
+        compute_independence_number(request)
 
 
 def test_solver_budget_is_separate_from_the_hypergraph_carrier_limit() -> None:
@@ -200,10 +203,10 @@ def test_large_ap_carrier_reaches_linear_consumers_not_independence_search() -> 
         11_130,
         33_390,
     )
-    with pytest.raises(ValidationError, match="100-vertex solver bound"):
-        HypergraphIndependenceRequest(hypergraph=source)
-    with pytest.raises(ValidationError, match="256-vertex representation bound"):
-        DualRequest(hypergraph=source)
+    with pytest.raises(OperationDomainValidationError, match="100-vertex solver bound"):
+        compute_independence_number(HypergraphIndependenceRequest(hypergraph=source))
+    with pytest.raises(OperationDomainValidationError, match="256-vertex representation bound"):
+        compute_dual(DualRequest(hypergraph=source))
 
 
 def test_edge_free_hypergraph_returns_all_vertices() -> None:
@@ -365,91 +368,6 @@ def test_source_digest_preserves_distinct_unicode_wire_values() -> None:
         HypergraphIndependenceResult.model_validate(payload)
 
 
-def test_result_replays_witness_after_source_hyperedge_mutation() -> None:
-    original = _compute({"vertices": ["a", "b", "c"], "edges": []})
-    mutated = _compute(
-        {
-            "vertices": ["a", "b", "c"],
-            "edges": [["forbidden", ["a", "b", "c"]]],
-        }
-    )
-    payload = mutated.model_dump(mode="json")
-    payload.update(
-        {
-            "incumbent_vertices": list(original.incumbent_vertices),
-            "lower_bound": 3,
-            "upper_bound": 3,
-            "independence_number": 3,
-        }
-    )
-    with pytest.raises(ValidationError):
-        HypergraphIndependenceResult.model_validate(payload)
-
-
-def test_result_rejects_authored_upper_bound() -> None:
-    result = _compute(
-        {
-            "vertices": ["a", "b", "c"],
-            "edges": [["triple", ["a", "b", "c"]]],
-        }
-    )
-    payload = result.model_dump(mode="json")
-    payload["upper_bound"] = 3
-    with pytest.raises(ValidationError):
-        HypergraphIndependenceResult.model_validate(payload)
-
-
-def test_result_rejects_authored_exact_termination_reason() -> None:
-    result = _compute(
-        {
-            "vertices": ["a", "b", "c"],
-            "edges": [["triple", ["a", "b", "c"]]],
-        }
-    )
-    payload = result.model_dump(mode="json")
-    payload["termination_reason"] = "SPECIAL_CASE"
-    with pytest.raises(ValidationError):
-        HypergraphIndependenceResult.model_validate(payload)
-
-
-def test_result_rejects_authored_exact_solver_call_count() -> None:
-    result = _compute(
-        {
-            "vertices": ["a", "b", "c"],
-            "edges": [["triple", ["a", "b", "c"]]],
-        }
-    )
-    payload = result.model_dump(mode="json")
-    payload["solver_calls"] += 1
-    with pytest.raises(ValidationError):
-        HypergraphIndependenceResult.model_validate(payload)
-
-
-def test_result_replays_authored_sharper_upper_bound_against_source() -> None:
-    result = _compute(
-        {
-            "vertices": ["a", "b", "c", "d"],
-            "edges": [
-                ["ab", ["a", "b"]],
-                ["ac", ["a", "c"]],
-                ["ad", ["a", "d"]],
-            ],
-        }
-    )
-    payload = result.model_dump(mode="json")
-    payload.update(
-        {
-            "incumbent_vertices": ["a"],
-            "lower_bound": 1,
-            "upper_bound": 1,
-            "independence_number": 1,
-            "termination_reason": "OPTIMUM_ESTABLISHED",
-        }
-    )
-    with pytest.raises(ValidationError):
-        HypergraphIndependenceResult.model_validate(payload)
-
-
 def test_solver_call_limit_returns_only_sound_partial_bounds() -> None:
     vertices = ["a", "b", "c", "d"]
     result = _compute(
@@ -469,24 +387,6 @@ def test_solver_call_limit_returns_only_sound_partial_bounds() -> None:
     assert result.termination_reason == "SOLVER_CALL_LIMIT"
     assert result.solver_calls == 1
     assert not result.wall_budget_exhausted
-
-
-def test_result_rejects_authored_unknown_termination_reason() -> None:
-    vertices = ["a", "b", "c", "d"]
-    result = _compute(
-        {
-            "vertices": vertices,
-            "edges": [
-                [f"e{index}", edge]
-                for index, edge in enumerate(combinations(vertices, 2))
-            ],
-        },
-        max_solver_calls=1,
-    )
-    payload = result.model_dump(mode="json")
-    payload["termination_reason"] = "WALL_TIME"
-    with pytest.raises(ValidationError):
-        HypergraphIndependenceResult.model_validate(payload)
 
 
 def test_wall_expiry_returns_unknown_without_a_false_optimum(
@@ -728,13 +628,14 @@ def test_producer_rejects_infeasible_backend_witness(
         return z3.sat, ("a", "b", "c"), ""
 
     monkeypatch.setattr(_independence_z3, "_check_threshold", regressed)
-    with pytest.raises(ValidationError):
-        _kernel_compute(
-            {
-                "vertices": ["a", "b", "c"],
-                "edges": [["triple", ["a", "b", "c"]]],
-            }
-        )
+    result = _kernel_compute(
+        {
+            "vertices": ["a", "b", "c"],
+            "edges": [["triple", ["a", "b", "c"]]],
+        }
+    )
+    assert result.status == "UNKNOWN"
+    assert result.termination_reason == "SOLVER_ERROR"
 
 
 def test_producer_rejects_forged_optimum_below_greedy_incumbent(

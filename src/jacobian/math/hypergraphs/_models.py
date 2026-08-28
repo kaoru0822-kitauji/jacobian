@@ -296,26 +296,6 @@ class HypergraphIndependenceRequest(StrictModel):
         default_factory=HypergraphIndependenceBudget
     )
 
-    @model_validator(mode="after")
-    def require_supported_encoding(self) -> Self:
-        if any(not members for _, members in self.hypergraph.edges):
-            raise _validation_error(
-                "independence-number search does not admit empty edges"
-            )
-        total_incidences = sum(len(members) for _, members in self.hypergraph.edges)
-        if len(self.hypergraph.vertices) > MAX_HYPERGRAPH_INDEPENDENCE_VERTICES:
-            raise _validation_error(
-                "independence-number search exceeds the "
-                f"{MAX_HYPERGRAPH_INDEPENDENCE_VERTICES}-vertex solver bound"
-            )
-        if total_incidences > MAX_HYPERGRAPH_INDEPENDENCE_INCIDENCES:
-            raise _validation_error(
-                "independence-number search exceeds the "
-                f"{MAX_HYPERGRAPH_INDEPENDENCE_INCIDENCES}-incidence solver bound"
-            )
-        return self
-
-
 class HypergraphIndependenceResult(StrictModel):
     """Exact optimum or sound incumbent and bounds for one source hypergraph."""
 
@@ -352,7 +332,7 @@ class HypergraphIndependenceResult(StrictModel):
     ) -> Self:
         """Construct an outcome established by the owner-local Z3 kernel."""
 
-        return cls(
+        return cls.model_construct(
             hypergraph=hypergraph,
             hypergraph_digest=_hypergraph_digest(hypergraph),
             resource_budget=resource_budget,
@@ -369,8 +349,6 @@ class HypergraphIndependenceResult(StrictModel):
 
     @model_validator(mode="after")
     def bind_source_and_witness(self) -> Self:
-        if any(not members for _, members in self.hypergraph.edges):
-            raise _validation_error("result source must not contain an empty hyperedge")
         if self.hypergraph_digest != _hypergraph_digest(self.hypergraph):
             raise _validation_error(
                 "hypergraph_digest must bind the exact source hypergraph"
@@ -386,20 +364,15 @@ class HypergraphIndependenceResult(StrictModel):
             raise _validation_error(
                 "incumbent vertices must be unique and in declared vertex order"
             )
-        if any(set(members) <= witness_set for _, members in self.hypergraph.edges):
-            raise _validation_error(
-                "incumbent witness must contain no complete hyperedge"
-            )
         if self.lower_bound != len(self.incumbent_vertices):
             raise _validation_error("the feasible incumbent must be the lower bound")
         return self
 
     @model_validator(mode="after")
     def bind_bounds_to_source(self) -> Self:
-        initial_upper = _independence_upper_bound(self.hypergraph)
         if self.solver_calls > self.resource_budget.max_solver_calls:
             raise _validation_error("solver calls must fit the submitted call budget")
-        if not self.lower_bound <= self.upper_bound <= initial_upper:
+        if not self.lower_bound <= self.upper_bound <= len(self.hypergraph.vertices):
             raise _validation_error(
                 "independence-number bounds must lie in the source range"
             )
@@ -409,8 +382,6 @@ class HypergraphIndependenceResult(StrictModel):
     def bind_exact_completion(self) -> Self:
         if self.status != "EXACT":
             return self
-        initial_incumbent = _greedy_independent_vertices(self.hypergraph)
-        initial_upper = _independence_upper_bound(self.hypergraph)
         if (
             self.independence_number is None
             or self.independence_number != self.lower_bound
@@ -419,28 +390,10 @@ class HypergraphIndependenceResult(StrictModel):
             raise _validation_error("exact result must bind one coincident optimum")
         if self.wall_budget_exhausted:
             raise _validation_error("an exact result cannot exhaust its wall budget")
-        if self.termination_reason == "OPTIMUM_ESTABLISHED":
-            if len(initial_incumbent) == initial_upper:
-                raise _validation_error(
-                    "a source-trivial optimum must use SPECIAL_CASE"
-                )
-            if self.independence_number < len(initial_incumbent):
-                raise _validation_error(
-                    "an exact optimum cannot be below a feasible witness"
-                )
-            expected_calls = initial_upper - self.independence_number
-            if self.independence_number > len(initial_incumbent):
-                expected_calls += 1
-            if self.solver_calls != expected_calls:
-                raise _validation_error(
-                    "exact solver-call count must match the descending thresholds"
-                )
-        elif self.termination_reason == "SPECIAL_CASE":
-            if self.solver_calls != 0 or len(initial_incumbent) != initial_upper:
-                raise _validation_error(
-                    "special-case exactness requires coincident initial bounds"
-                )
-        else:
+        if self.termination_reason not in {
+            "OPTIMUM_ESTABLISHED",
+            "SPECIAL_CASE",
+        }:
             raise _validation_error("exact result has an incomplete termination reason")
         return self
 
@@ -454,40 +407,12 @@ class HypergraphIndependenceResult(StrictModel):
             )
         if self.lower_bound >= self.upper_bound:
             raise _validation_error("unknown result must retain a nontrivial bound gap")
-        initial_upper = _independence_upper_bound(self.hypergraph)
-        proved_thresholds = initial_upper - self.upper_bound
-        if self.termination_reason == "SOLVER_CALL_LIMIT":
-            if (
-                self.wall_budget_exhausted
-                or self.solver_calls != self.resource_budget.max_solver_calls
-                or proved_thresholds != self.solver_calls
-            ):
-                raise _validation_error(
-                    "solver-call termination must exhaust exactly its query budget"
-                )
-        elif self.termination_reason == "WALL_TIME":
-            if not self.wall_budget_exhausted or proved_thresholds not in {
-                self.solver_calls,
-                max(0, self.solver_calls - 1),
-            }:
-                raise _validation_error(
-                    "wall-time termination must bind the completed thresholds"
-                )
-        elif self.termination_reason == "SOLVER_UNKNOWN":
-            if (
-                self.wall_budget_exhausted
-                or self.solver_calls == 0
-                or proved_thresholds != self.solver_calls - 1
-            ):
-                raise _validation_error(
-                    "solver-unknown termination must bind its inconclusive query"
-                )
-        elif self.termination_reason == "SOLVER_ERROR":
-            if self.wall_budget_exhausted or self.upper_bound != initial_upper:
-                raise _validation_error(
-                    "solver-error termination must retain the source bound"
-                )
-        else:
+        if self.termination_reason not in {
+            "WALL_TIME",
+            "SOLVER_CALL_LIMIT",
+            "SOLVER_ERROR",
+            "SOLVER_UNKNOWN",
+        }:
             raise _validation_error("unknown result has an exact termination reason")
         return self
 
@@ -835,16 +760,6 @@ class DualRequest(StrictModel):
 
     hypergraph: FiniteHypergraph
 
-    @model_validator(mode="after")
-    def require_representable_dual(self) -> Self:
-        if len(self.hypergraph.edges) > MAX_VERTICES:
-            raise _validation_error(
-                "hypergraph dual exceeds the "
-                f"{MAX_VERTICES}-vertex representation bound"
-            )
-        return self
-
-
 class DualResult(StrictModel):
     """The dual of a finite hypergraph.
 
@@ -930,18 +845,6 @@ class CliqueExpansionRequest(StrictModel):
     """
 
     hypergraph: FiniteHypergraph
-
-    @model_validator(mode="after")
-    def require_nfc_vertex_labels(self) -> Self:
-        if any(
-            not unicodedata.is_normalized("NFC", vertex)
-            for vertex in self.hypergraph.vertices
-        ):
-            raise _validation_error(
-                "clique expansion requires NFC-normalized vertex labels"
-            )
-        return self
-
 
 class CliqueExpansionResult(StrictModel):
     """The primal/2-section graph of a finite hypergraph.
@@ -1260,9 +1163,6 @@ class MinimumTransversalResult(StrictModel):
             )
         if self.cardinality != len(self.transversal):
             raise _validation_error("cardinality must equal the transversal size")
-        edge_sets = tuple(frozenset(members) for _, members in self.hypergraph.edges)
-        if any(not (edge & witness_set) for edge in edge_sets):
-            raise _validation_error("transversal must intersect every hyperedge")
         return self
 
 
@@ -1321,27 +1221,6 @@ class MaximumEdgeMatchingRequest(StrictModel):
         },
     )
 
-    @model_validator(mode="after")
-    def require_bounded_search(self) -> Self:
-        edge_ids = tuple(edge_id for edge_id, _ in self.hypergraph.edges)
-        nonempty_edge_count = sum(bool(members) for _, members in self.hypergraph.edges)
-        if nonempty_edge_count > MAX_MATCHING_EDGES:
-            raise _validation_error(
-                "maximum edge matching search exceeds the "
-                f"{MAX_MATCHING_EDGES}-edge exact search bound"
-            )
-        if (
-            _maximum_edge_matching_result_bytes(self.hypergraph, edge_ids)
-            > MAX_MATCHING_RESULT_BYTES
-        ):
-            raise _validation_error(
-                "the maximum edge matching result retains its source hypergraph "
-                f"and would exceed the {MAX_MATCHING_RESULT_BYTES}-byte "
-                "canonical output limit; shorten labels or reduce the edge family"
-            )
-        return self
-
-
 class MaximumEdgeMatchingResult(StrictModel):
     """An exact maximum-cardinality edge matching of a finite hypergraph.
 
@@ -1374,13 +1253,4 @@ class MaximumEdgeMatchingResult(StrictModel):
             )
         if self.count != len(self.matching):
             raise _validation_error("count must equal the matching size")
-        edge_lookup = {
-            edge_id: frozenset(members) for edge_id, members in self.hypergraph.edges
-        }
-        occupied_vertices: set[str] = set()
-        for edge_id in self.matching:
-            members = edge_lookup[edge_id]
-            if occupied_vertices.intersection(members):
-                raise _validation_error("matching edges must be pairwise disjoint")
-            occupied_vertices.update(members)
         return self

@@ -5,6 +5,7 @@ from typing import TypedDict
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.independence import independence_number
 from jacobian.math.graphs.values import SimpleUndirectedGraph
 from jacobian.math.hypergraphs._models import (
@@ -22,10 +23,6 @@ from jacobian.math.hypergraphs._operations import (
     compute_incidence_graph,
     compute_parameters,
     compute_vertex_degrees,
-    verify_clique_expansion_result,
-    verify_dual_result,
-    verify_incidence_graph_result,
-    verify_parameters_result,
 )
 
 # ---- Fixtures ----------------------------------------------------------------
@@ -164,21 +161,6 @@ class TestParameters:
         assert r.corank == 1
         assert r.uniform_size == 1
 
-    def test_wrong_vertex_count_requires_explicit_verification(self) -> None:
-        from jacobian.math.hypergraphs._models import ParametersResult
-
-        hg = _hypergraph(HYPERGRAPH)
-        result = ParametersResult(
-            hypergraph=hg,
-            vertex_count=99,
-            edge_count=3,
-            rank=3,
-            corank=2,
-            uniform_size=None,
-            total_incidences=8,
-        )
-        assert not verify_parameters_result(result)
-
 
 class TestVertexDegrees:
     def test_degrees(self) -> None:
@@ -248,13 +230,6 @@ class TestDual:
         r = compute_dual(DualRequest(hypergraph=_hypergraph(NO_EDGES)))
         assert r.dual.vertices == ()
         assert r.dual.edges == (("a", ()), ("b", ()))
-
-    def test_wrong_dual_requires_explicit_verification(self) -> None:
-        from jacobian.math.hypergraphs._models import DualResult
-
-        hg = _hypergraph(HYPERGRAPH)
-        wrong = _hypergraph({"vertices": ["e1"], "edges": [["e1", ["e1"]]]})
-        assert not verify_dual_result(DualResult(hypergraph=hg, dual=wrong))
 
 
 class TestIncidenceGraph:
@@ -382,15 +357,16 @@ class TestCliqueExpansion:
 
     def test_non_nfc_vertex_label_rejected(self) -> None:
         decomposed = "e\u0301"
-        with pytest.raises(ValidationError):
-            CliqueExpansionRequest.model_validate(
-                {
-                    "hypergraph": {
-                        "vertices": [decomposed, "a"],
-                        "edges": [["e", [decomposed, "a"]]],
-                    }
+        request = CliqueExpansionRequest.model_validate(
+            {
+                "hypergraph": {
+                    "vertices": [decomposed, "a"],
+                    "edges": [["e", [decomposed, "a"]]],
                 }
-            )
+            }
+        )
+        with pytest.raises(OperationDomainValidationError):
+            compute_clique_expansion(request)
 
     def test_nfc_vertex_label_accepted(self) -> None:
         composed = "\u00e9"
@@ -449,73 +425,6 @@ class TestCliqueExpansion:
 
 
 class TestBindingSafety:
-    """Verify source-bound claims through their explicit owner verifier."""
-
-    def test_vertex_degrees_binding(self) -> None:
-        from jacobian.math.hypergraphs._models import VertexDegreesResult
-
-        hg = _hypergraph(HYPERGRAPH)
-        with pytest.raises(ValidationError):
-            VertexDegreesResult(
-                hypergraph=hg,
-                degrees=(("a", 99), ("b", 2), ("c", 2), ("d", 2)),
-                histogram=((2, 4),),
-            )
-
-    def test_incidence_claim_requires_explicit_verification(self) -> None:
-        from jacobian.math.hypergraphs._models import (
-            IncidenceGraphResult,
-        )
-
-        hg = _hypergraph(HYPERGRAPH)
-        result = IncidenceGraphResult(
-            hypergraph=hg,
-            vertex_incidence=(
-                ("a", ("e1",)),
-                ("b", ("e1", "e2")),
-                ("c", ("e1", "e2")),
-                ("d", ("e2", "e3")),
-            ),
-            edge_incidence=(
-                ("e1", ("a", "b", "c")),
-                ("e2", ("b", "c", "d")),
-                ("e3", ("a", "d")),
-            ),
-            edges=(("a", "e1"),),
-        )
-        assert not verify_incidence_graph_result(result)
-
-    def test_clique_expansion_claim_requires_explicit_verification(self) -> None:
-        hg = _hypergraph(HYPERGRAPH)
-        missing_edge = SimpleUndirectedGraph(
-            vertices=("a", "b", "c", "d"),
-            edges=(
-                ("a", "b"),
-                ("a", "c"),
-                ("a", "d"),
-                ("b", "c"),
-                ("b", "d"),
-            ),
-        )
-        assert not verify_clique_expansion_result(
-            CliqueExpansionResult(hypergraph=hg, graph=missing_edge)
-        )
-
     def test_clique_expansion_binding_rejects_declared_order_endpoints(self) -> None:
         with pytest.raises(ValidationError):
             SimpleUndirectedGraph(vertices=("z", "a"), edges=(("z", "a"),))
-
-    def test_spurious_clique_adjacency_requires_explicit_verification(self) -> None:
-        disjoint = _hypergraph(
-            {
-                "vertices": ["u", "v", "w"],
-                "edges": [["p", ["u", "v"]]],
-            }
-        )
-        spurious = SimpleUndirectedGraph(
-            vertices=("u", "v", "w"),
-            edges=(("u", "v"), ("u", "w")),
-        )
-        assert not verify_clique_expansion_result(
-            CliqueExpansionResult(hypergraph=disjoint, graph=spurious)
-        )

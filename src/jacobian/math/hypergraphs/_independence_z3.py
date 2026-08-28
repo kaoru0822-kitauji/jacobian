@@ -148,6 +148,24 @@ def _result(
     )
 
 
+def _solver_witness_is_canonical_and_independent(
+    source: FiniteHypergraph,
+    candidate: tuple[str, ...],
+) -> bool:
+    """Check backend witness shape and the defining independent-set invariant."""
+
+    candidate_set = set(candidate)
+    if len(candidate_set) != len(candidate) or any(
+        vertex not in source.vertices for vertex in candidate
+    ):
+        return False
+    if tuple(vertex for vertex in source.vertices if vertex in candidate_set) != candidate:
+        return False
+    return not any(
+        set(members) <= candidate_set for _, members in source.edges
+    )
+
+
 def _solve_independence_number_kernel(
     request: HypergraphIndependenceRequest,
 ) -> HypergraphIndependenceResult:
@@ -246,7 +264,9 @@ def _solve_independence_number_kernel(
             upper_bound = threshold - 1
             continue
         if solver_status == z3.sat:
-            if len(candidate) < threshold:
+            if len(candidate) < threshold or not _solver_witness_is_canonical_and_independent(
+                source, candidate
+            ):
                 return _result(
                     request,
                     status="UNKNOWN",
