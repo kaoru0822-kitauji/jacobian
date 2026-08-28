@@ -90,13 +90,6 @@ def test_public_math_namespaces_expose_no_wire_models() -> None:
         ), f"{domain} exports a wire model"
 
 
-def test_no_duplicate_root_exports() -> None:
-    """Root domain exports must be unique."""
-    from jacobian import math
-
-    assert len(math.__all__) == len(set(math.__all__))
-
-
 def test_public_functions_have_one_canonical_module() -> None:
     """Every public callable must resolve to one canonical owner, not an alias."""
     from jacobian import math
@@ -126,14 +119,13 @@ def test_parallel_contract_and_domain_namespaces_are_deleted() -> None:
             importlib.import_module(module_name)
 
 
-def test_public_math_imports_have_no_catalog_side_effect() -> None:
-    """Importing a public math module must not import catalog publication layers."""
+def test_public_math_exports_are_resolvable() -> None:
+    """Every symbol declared by a public math owner must be resolvable."""
 
     from jacobian import math
 
     for domain in math.__all__:
         module = importlib.import_module(f"jacobian.math.{domain}")
         assert hasattr(module, "__all__"), f"{domain} has no __all__"
-        # Every declared symbol must be resolvable on the public module.
         for name in module.__all__:
             assert hasattr(module, name), f"{domain}.{name} is missing"

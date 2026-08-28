@@ -136,14 +136,6 @@ def compute_independence_number(
     return _independence_z3.solve_independence_number(request)
 
 
-def verify_independence_result(result: HypergraphIndependenceResult) -> bool:
-    """Verify a separately supplied independence outcome when it is bounded."""
-
-    from jacobian.math.hypergraphs import _independence_z3
-
-    return _independence_z3.verify_independence_result(result)
-
-
 def _canonical_edges(
     hypergraph: FiniteHypergraph,
 ) -> tuple[tuple[str, tuple[str, ...]], ...]:

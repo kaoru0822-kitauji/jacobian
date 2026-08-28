@@ -8,6 +8,7 @@ import z3  # type: ignore[import-untyped]
 from pydantic import ValidationError
 
 from jacobian.catalog.models import OperationDomainValidationError
+from jacobian.math.hypergraphs import _independence_z3
 from jacobian.math.hypergraphs._models import (
     MAX_HYPERGRAPH_INDEPENDENCE_SOLVER_CALLS,
     DualRequest,
@@ -21,7 +22,6 @@ from jacobian.math.hypergraphs._operations import (
     compute_dual,
     compute_independence_number,
     compute_parameters,
-    verify_independence_result,
 )
 from jacobian.process import BoundedProcessResult, ProcessResourceLimits
 
@@ -590,7 +590,7 @@ def test_produced_result_satisfies_structural_and_explicit_verification() -> Non
     restored = HypergraphIndependenceResult.model_validate(
         result.model_dump(mode="json")
     )
-    assert verify_independence_result(restored)
+    assert _independence_z3.verify_independence_result(restored)
 
 
 def test_forged_structural_upper_bound_requires_explicit_verification() -> None:
@@ -618,7 +618,7 @@ def test_forged_structural_upper_bound_requires_explicit_verification() -> None:
         termination_reason="SOLVER_UNKNOWN",
         detail="an independently supplied bounded claim",
     )
-    assert verify_independence_result(result) is False
+    assert _independence_z3.verify_independence_result(result) is False
 
 
 def test_producer_rejects_infeasible_backend_witness(
