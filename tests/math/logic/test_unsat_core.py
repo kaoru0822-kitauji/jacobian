@@ -17,7 +17,6 @@ from jacobian.math.logic._unsat_core import (
 from jacobian.math.logic._unsat_core import (
     SmtUnsatCoreResult,
     compute_smt_unsat_core,
-    verify_smt_unsat_core_result,
 )
 from jacobian.process import BoundedProcessResult, ProcessResourceLimits
 
@@ -98,7 +97,7 @@ def _request(
     )
 
 
-def test_unsat_core_is_an_indexed_replayable_source_subset() -> None:
+def test_unsat_core_is_an_indexed_source_subset() -> None:
     result = compute_smt_unsat_core(_request())
 
     assert result.outcome == "UNSAT"
@@ -108,7 +107,6 @@ def test_unsat_core_is_an_indexed_replayable_source_subset() -> None:
     replay = z3.SolverFor(result.source.logic.value)
     replay.add(*(assertions[index] for index in result.core_indices))
     assert replay.check() == z3.unsat
-    assert verify_smt_unsat_core_result(result)
 
 
 @pytest.mark.property
@@ -117,31 +115,6 @@ def test_repeated_calls_have_a_stable_exact_outcome() -> None:
 
     assert tuple(result.outcome for result in results) == ("UNSAT",) * 2
     assert tuple(result.core_indices for result in results) == ((0, 1),) * 2
-
-
-def test_unsat_core_verifier_rejects_a_core_detached_from_its_source() -> None:
-    result = compute_smt_unsat_core(_request())
-    payload = result.model_dump(mode="json")
-    payload["source"]["smtlib"] = CONTRADICTORY_LIA.replace("(>= x 1)", "(>= x -1)")
-
-    assert not verify_smt_unsat_core_result(SmtUnsatCoreResult.model_validate(payload))
-
-
-def test_unsat_core_verifier_rejects_a_forged_proper_subset() -> None:
-    result = compute_smt_unsat_core(_request())
-    payload = result.model_dump(mode="json")
-    payload["core_indices"] = [0]
-
-    assert not verify_smt_unsat_core_result(SmtUnsatCoreResult.model_validate(payload))
-
-
-def test_unsat_core_verifier_rejects_a_forged_sat_conclusion() -> None:
-    result = compute_smt_unsat_core(_request())
-    payload = result.model_dump(mode="json")
-    payload["outcome"] = "SAT"
-    payload["core_indices"] = []
-
-    assert not verify_smt_unsat_core_result(SmtUnsatCoreResult.model_validate(payload))
 
 
 def test_empty_assertion_collection_is_satisfiable() -> None:

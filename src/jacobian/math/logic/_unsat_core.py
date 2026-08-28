@@ -222,7 +222,7 @@ class SmtUnsatCoreRequest(SmtSolveRequest):
 
 
 class SmtUnsatCoreResult(StrictModel):
-    """A source-bound satisfiability outcome and replayable UNSAT core."""
+    """A source-bound satisfiability outcome and indexed UNSAT core."""
 
     source: SmtUnsatCoreRequest
     outcome: Literal["SAT", "UNSAT", "UNKNOWN"]
@@ -242,10 +242,8 @@ class SmtUnsatCoreResult(StrictModel):
         """Validate only the serializable shape of an UNSAT-core outcome.
 
         Results produced by the owner-local Z3 kernel carry data it has already
-        established.  Replaying that data while constructing the public model
-        would run a second solver invocation with no new information.  Call
-        :func:`verify_smt_unsat_core_result` for an independently supplied
-        source-bound claim instead.
+        established. Replaying that data while constructing the public model
+        would run a second solver invocation with no new information.
         """
 
         if self.core_indices != tuple(sorted(set(self.core_indices))):
@@ -1379,25 +1377,6 @@ def _run_unsat_core_worker(
     return response if isinstance(response, dict) else None
 
 
-def verify_smt_unsat_core_result(result: SmtUnsatCoreResult) -> bool:
-    """Replay one independently supplied non-UNKNOWN source-bound claim.
-
-    The replay uses the result's admitted timeout and rlimit, so verification
-    has the same bounded Z3 envelope as the operation.  UNKNOWN communicates
-    no satisfiability conclusion and therefore needs no replay.
-    """
-
-    if result.outcome == "UNKNOWN":
-        return True
-    selected_indices = result.core_indices if result.outcome == "UNSAT" else None
-    response = _run_unsat_core_worker(result.source, selected_indices=selected_indices)
-    return (
-        response is not None
-        and response.get("kind") == "replay"
-        and response.get("outcome") == result.outcome
-    )
-
-
 def compute_smt_unsat_core(request: SmtUnsatCoreRequest) -> SmtUnsatCoreResult:
     """Return a bounded core of source-assertion indices when Z3 proves UNSAT."""
 
@@ -1477,5 +1456,4 @@ __all__ = [
     "SmtUnsatCoreRequest",
     "SmtUnsatCoreResult",
     "compute_smt_unsat_core",
-    "verify_smt_unsat_core_result",
 ]
