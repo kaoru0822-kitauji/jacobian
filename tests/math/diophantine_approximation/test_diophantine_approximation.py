@@ -22,9 +22,6 @@ from jacobian.math.diophantine_approximation._operations import (
     compute_continued_fraction,
     compute_convergents,
     compute_pell_equation,
-    verify_continued_fraction_result,
-    verify_convergent_result,
-    verify_pell_equation_result,
 )
 
 
@@ -256,7 +253,6 @@ def test_continued_fraction_result_replays_known_answers() -> None:
     assert (sqrt2.preperiod_length, sqrt2.period_length) == (1, 1)
     parsed = ContinuedFractionResult.model_validate(sqrt2.model_dump())
     assert parsed == sqrt2
-    assert verify_continued_fraction_result(parsed)
 
     sqrt3 = compute_continued_fraction(
         ContinuedFractionRequest(discriminant=3, term_count=6)
@@ -309,11 +305,6 @@ def test_continued_fraction_result_rejects_mutations() -> None:
         ContinuedFractionRequest(discriminant=2, term_count=5)
     ).model_dump()
 
-    wrong_source = dict(result, discriminant=3)
-    assert not verify_continued_fraction_result(
-        ContinuedFractionResult.model_validate(wrong_source)
-    )
-
     forged_coefficients = dict(result)
     forged_coefficients["coefficients"] = (1, 2, 2, 2, 3)
     with pytest.raises(ValidationError) as exc_info:
@@ -321,11 +312,6 @@ def test_continued_fraction_result_rejects_mutations() -> None:
     assert (
         exc_info.value.errors()[0]["type"]
         == "diophantine_approximation.coefficient_bound_exceeded"
-    )
-
-    forged_metadata = dict(result, preperiod_length=2)
-    assert not verify_continued_fraction_result(
-        ContinuedFractionResult.model_validate(forged_metadata)
     )
 
     count_mismatch = dict(result, term_count=4)
@@ -360,7 +346,6 @@ def test_convergent_result_replays_recurrence_and_determinant() -> None:
         assert determinant == (-1) ** (n - 1)
     parsed_result = ConvergentResult.model_validate(result.model_dump())
     assert parsed_result == result
-    assert verify_convergent_result(parsed_result)
 
     sqrt3 = compute_convergents(ConvergentRequest(discriminant=3, convergent_count=4))
     parsed3 = [
@@ -390,93 +375,12 @@ def test_convergent_result_rejects_mutations() -> None:
         ConvergentRequest(discriminant=2, convergent_count=4)
     ).model_dump()
 
-    zero_denominator = dict(result)
-    zero_denominator["convergents"] = [dict(item) for item in result["convergents"]]
-    zero_denominator["convergents"][0]["denominator"] = "0"
-    assert not verify_convergent_result(
-        ConvergentResult.model_validate(zero_denominator)
-    )
-
-    nonreduced = dict(result)
-    nonreduced["convergents"] = [dict(item) for item in result["convergents"]]
-    nonreduced["convergents"][1]["numerator"] = "6"
-    nonreduced["convergents"][1]["denominator"] = "4"
-    assert not verify_convergent_result(ConvergentResult.model_validate(nonreduced))
-
-    recurrence_break = dict(result)
-    recurrence_break["convergents"] = [dict(item) for item in result["convergents"]]
-    recurrence_break["convergents"][2]["numerator"] = "8"
-    assert not verify_convergent_result(
-        ConvergentResult.model_validate(recurrence_break)
-    )
-
-    wrong_source = dict(result, discriminant=3)
-    assert not verify_convergent_result(ConvergentResult.model_validate(wrong_source))
-
     count_mismatch = dict(result, convergent_count=9)
     with pytest.raises(ValidationError) as exc_info:
         ConvergentResult.model_validate(count_mismatch)
     assert (
         exc_info.value.errors()[0]["type"]
         == "diophantine_approximation.convergent_count_mismatch"
-    )
-
-
-def test_result_verifiers_reject_non_squarefree_discriminant() -> None:
-    """Explicit verifiers reject claims outside the operation's domain.
-
-    The forged payloads below carry the genuine canonical expansion and
-    convergents of sqrt(8), so only the squarefree predicate can reject them.
-    """
-    from jacobian.math.diophantine_approximation._models import (
-        ContinuedFractionResult,
-        ConvergentResult,
-        PellEquationResult,
-    )
-
-    # sqrt(8) = [2; overline{1, 4}] with convergents 2/1, 3/1, 14/5, 17/6.
-    sqrt8_cf = {
-        "discriminant": 8,
-        "term_count": 5,
-        "coefficients": (2, 1, 4, 1, 4),
-        "preperiod_length": 1,
-        "period_length": 2,
-    }
-    assert not verify_continued_fraction_result(
-        ContinuedFractionResult.model_validate(sqrt8_cf)
-    )
-
-    sqrt8_convergents = {
-        "discriminant": 8,
-        "convergent_count": 4,
-        "convergents": [
-            {"index": 0, "numerator": "2", "denominator": "1"},
-            {"index": 1, "numerator": "3", "denominator": "1"},
-            {"index": 2, "numerator": "14", "denominator": "5"},
-            {"index": 3, "numerator": "17", "denominator": "6"},
-        ],
-    }
-    assert not verify_convergent_result(
-        ConvergentResult.model_validate(sqrt8_convergents)
-    )
-
-    assert not verify_pell_equation_result(
-        PellEquationResult(discriminant=8, x="3", y="1")
-    )
-
-    assert not verify_pell_equation_result(
-        PellEquationResult(discriminant=9, x="3", y="1")
-    )
-
-
-def test_pell_result_verifier_rejects_nonfundamental_solution() -> None:
-    from jacobian.math.diophantine_approximation._models import PellEquationResult
-
-    result = compute_pell_equation(PellEquationRequest(discriminant=2))
-    assert verify_pell_equation_result(result)
-    # 17^2 - 2 * 12^2 = 1, but it is not the fundamental solution.
-    assert not verify_pell_equation_result(
-        PellEquationResult(discriminant=2, x="17", y="12")
     )
 
 

@@ -62,12 +62,7 @@ class ContinuedFractionRequest(StrictModel):
     term_count: StrictInt = Field(ge=1, le=_MAX_TERMS)
 
 class ContinuedFractionResult(StrictModel):
-    """A bounded continued-fraction prefix of ``sqrt(D)``.
-
-    Parsing establishes only the retained request and bounded carrier shape.
-    Use :func:`verify_continued_fraction_result` for an independently
-    supplied claim; kernel-produced results use :meth:`_from_kernel`.
-    """
+    """A bounded continued-fraction prefix of ``sqrt(D)``."""
 
     discriminant: StrictInt = Field(ge=2, le=_MAX_DISCRIMINANT)
     term_count: StrictInt = Field(ge=1, le=_MAX_TERMS)
