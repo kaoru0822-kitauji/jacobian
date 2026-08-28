@@ -215,49 +215,6 @@ def compute_chromatic_number_certificate_check(
     )
 
 
-def verify_chromatic_number_certificate_check_result(
-    result: ChromaticNumberCertificateCheckResult,
-) -> bool:
-    """Replay one independently supplied bounded chromatic certificate claim."""
-
-    try:
-        request = ChromaticNumberCertificateCheckRequest(
-            graph=result.graph,
-            claimed_chromatic_number=result.claimed_chromatic_number,
-            coloring=result.coloring,
-            weights=result.weights,
-        )
-    except ValueError:
-        return False
-    expected = _evaluate_chromatic_number_certificate(
-        request.graph,
-        request.claimed_chromatic_number,
-        request.coloring,
-        request.weights,
-    )
-    return (
-        result.verdict,
-        result.reason,
-        result.weight_sum.as_fraction(),
-        result.certified_lower_bound,
-        result.blocking_vertex,
-        result.blocking_edge,
-        result.blocking_independent_set,
-        None
-        if result.blocking_independent_set_weight is None
-        else result.blocking_independent_set_weight.as_fraction(),
-    ) == (
-        expected.verdict,
-        expected.reason,
-        expected.weight_sum,
-        expected.certified_lower_bound,
-        expected.blocking_vertex,
-        expected.blocking_edge,
-        expected.blocking_independent_set,
-        expected.blocking_independent_set_weight,
-    )
-
-
 def compute_k_colorability(request: KColorabilityRequest) -> KColorabilityResult:
     """Decide whether a simple graph admits a proper ``k``-coloring.
 

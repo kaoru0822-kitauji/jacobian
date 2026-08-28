@@ -21,7 +21,6 @@ from jacobian.math.graphs.coloring._chromatic_number_models import (
 )
 from jacobian.math.graphs.coloring._operations import (
     compute_chromatic_number_certificate_check,
-    verify_chromatic_number_certificate_check_result,
 )
 from jacobian.math.graphs.values import SimpleUndirectedGraph
 
@@ -309,49 +308,6 @@ def _accepted_edge_result() -> ChromaticNumberCertificateCheckResult:
         2,
         (0, 1),
         (_rational(1), _rational(1)),
-    )
-
-
-@pytest.mark.parametrize(
-    "field", ["graph", "claimed_chromatic_number", "coloring", "weights"]
-)
-def test_explicit_verifier_rejects_forged_sources(field: str) -> None:
-    payload = deepcopy(_accepted_edge_result().model_dump(mode="json"))
-    if field == "graph":
-        payload["graph"]["edges"] = []
-    elif field == "claimed_chromatic_number":
-        payload[field] = 1
-    elif field == "coloring":
-        payload[field] = [0, 0]
-    else:
-        payload[field] = [
-            {"num": "0", "den": "1"},
-            {"num": "0", "den": "1"},
-        ]
-
-    assert not verify_chromatic_number_certificate_check_result(
-        ChromaticNumberCertificateCheckResult.model_validate(payload)
-    )
-
-
-def test_explicit_verifier_rejects_forged_witness_and_conclusion() -> None:
-    rejected = _check(
-        _graph(("a", "b"), ()),
-        1,
-        (0, 0),
-        (_rational(1), _rational(1)),
-    )
-    payload = deepcopy(rejected.model_dump(mode="json"))
-    payload["blocking_independent_set"] = ["b"]
-    assert not verify_chromatic_number_certificate_check_result(
-        ChromaticNumberCertificateCheckResult.model_validate(payload)
-    )
-
-    payload = deepcopy(rejected.model_dump(mode="json"))
-    payload["verdict"] = "ACCEPTED"
-    payload["reason"] = "ACCEPTED"
-    assert not verify_chromatic_number_certificate_check_result(
-        ChromaticNumberCertificateCheckResult.model_validate(payload)
     )
 
 
