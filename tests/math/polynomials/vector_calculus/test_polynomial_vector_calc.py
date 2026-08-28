@@ -173,16 +173,14 @@ def test_vector_field_rejects_aggregate_result_term_growth() -> None:
     ]
     first = dict.fromkeys(monomials[:128], 1)
     second = dict.fromkeys(monomials[128:257], 1)
-    with pytest.raises(ValidationError) as exc_info:
-        VectorFieldRequest(
-            components=(
-                _polynomial(variables, first),
-                _polynomial(variables, second),
-            )
+    request = VectorFieldRequest(
+        components=(
+            _polynomial(variables, first),
+            _polynomial(variables, second),
         )
-    assert exc_info.value.errors()[0]["type"] == (
-        "polynomial_vector_calc.derivative_term_budget"
     )
+    with pytest.raises(ValueError, match="result-term budget"):
+        compute_divergence(request)
 
 
 def test_direction_length_must_match_polynomial_axis() -> None:

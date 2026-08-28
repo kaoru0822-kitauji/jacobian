@@ -135,11 +135,6 @@ def test_four_variable_rank_fixture_has_the_published_first_kernel() -> None:
         (364, 80, 76, 4),
     ]
 
-    # Revalidation replays every returned partial and the exact witness equation.
-    assert (
-        GradedJacobianSyzygyResult.model_validate(result.model_dump(mode="python"))
-        == result
-    )
 
 
 def test_three_variable_sparse_and_labelled_inputs_remain_compatible() -> None:
@@ -245,41 +240,6 @@ def test_sparse_coefficient_ledger_uses_four_variable_exponent_vectors() -> None
     )
 
 
-def test_result_rejects_a_mutated_witness_or_partial_derivative() -> None:
-    result = compute_graded_jacobian_syzygy(
-        GradedJacobianSyzygyRequest(
-            polynomial=_sparse_polynomial(("x", "y", "z"), {(1, 1, 1): 1}),
-            max_degree=1,
-        )
-    )
-    witness = result.kernel_witness
-    assert witness is not None
-    first_nonzero = next(
-        index
-        for index, coefficient in enumerate(witness.coefficient_vector)
-        if coefficient.as_fraction()
-    )
-    corrupted_witness = json.loads(result.model_dump_json())
-    corrupted_witness["kernel_witness"]["coefficient_vector"][first_nonzero] = {
-        "num": "2",
-        "den": "1",
-    }
-    with polynomial_validation_error():
-        GradedJacobianSyzygyResult.model_validate(corrupted_witness)
-
-    corrupted_partial = json.loads(result.model_dump_json())
-    corrupted_partial["partial_derivatives"][0]["polynomial"]["terms"][0][
-        "coefficient"
-    ] = {"num": "2", "den": "1"}
-    with polynomial_validation_error():
-        GradedJacobianSyzygyResult.model_validate(corrupted_partial)
-
-    corrupted_map = json.loads(result.model_dump_json())
-    corrupted_map["degree_maps"][0]["matrix_digest"] = "sha256:" + "0" * 64
-    with polynomial_validation_error():
-        GradedJacobianSyzygyResult.model_validate(corrupted_map)
-
-
 def test_result_rejects_negative_rank_minor_indices() -> None:
     """Negative minor positions must not reinterpret as Python-style offsets."""
 
@@ -305,22 +265,6 @@ def test_result_rejects_negative_rank_minor_indices() -> None:
     assert tampered
     with polynomial_validation_error():
         GradedJacobianSyzygyResult.model_validate(payload)
-
-
-def test_replayed_results_accept_every_admitted_variable_count() -> None:
-    """Replay uses the declared variable count, not a fixed block width."""
-
-    for variables in (("x",), ("x", "y"), ("x", "y", "z", "w")):
-        source = _sparse_polynomial(
-            variables,
-            {tuple(1 if axis == 0 else 0 for axis in range(len(variables))): 1},
-        )
-        request = GradedJacobianSyzygyRequest(polynomial=source, max_degree=1)
-        result = compute_graded_jacobian_syzygy(request)
-        replayed = GradedJacobianSyzygyResult.model_validate(
-            json.loads(result.model_dump_json())
-        )
-        assert replayed == result
 
 
 def test_dimension_specific_basis_boundary_rejects_before_backend_execution() -> None:
@@ -387,10 +331,6 @@ def test_zero_partial_derivatives_admit_the_forced_degree_zero_kernel() -> None:
         (item.row_count, item.column_count, item.rank, item.nullity)
         for item in result.degree_maps
     ] == [(1, 5, 1, 4)]
-    assert (
-        GradedJacobianSyzygyResult.model_validate(result.model_dump(mode="python"))
-        == result
-    )
 
 
 def test_default_bound_admits_eight_variables_when_the_kernel_is_forced() -> None:

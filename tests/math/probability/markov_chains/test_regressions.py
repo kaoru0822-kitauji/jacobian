@@ -5,6 +5,7 @@ from fractions import Fraction
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.probability.markov_chains import (
     ergodic_properties,
     stationary_distribution,
@@ -226,6 +227,11 @@ def test_stationary_family_solves_each_nonsingleton_closed_class_exactly() -> No
 def test_transition_contract_rejects_non_stochastic_matrices(
     matrix: object, error_code: str
 ) -> None:
-    with pytest.raises(ValidationError) as error:
-        TransitionMatrixRequest.model_validate({"matrix": matrix})
+    if error_code == "markov_chain.transition_matrix_not_square":
+        with pytest.raises(ValidationError) as error:
+            TransitionMatrixRequest.model_validate({"matrix": matrix})
+    else:
+        request = TransitionMatrixRequest.model_validate({"matrix": matrix})
+        with pytest.raises(OperationDomainValidationError) as error:
+            compute_ergodic_decision(request)
     assert error.value.errors()[0]["type"] == error_code

@@ -75,8 +75,9 @@ class TestHankel:
         assert int(result.determinant.den) > 0
 
     def test_insufficient_moments(self) -> None:
-        with pytest.raises(ValidationError):
-            HankelRequest(prefix=_prefix(_moments_uniform(3)), order=2)
+        request = HankelRequest(prefix=_prefix(_moments_uniform(3)), order=2)
+        with pytest.raises(ValueError):
+            compute_hankel_matrix(request)
 
 
 class TestShiftedHankel:
@@ -96,8 +97,9 @@ class TestShiftedHankel:
             CanonicalRational(num="0", den="1"),
             CanonicalRational.from_fraction(Fraction(10) ** 32767),
         )
-        with pytest.raises(ValidationError):
-            ShiftedHankelRequest(prefix=_prefix(moments), order=1)
+        request = ShiftedHankelRequest(prefix=_prefix(moments), order=1)
+        with pytest.raises(ValueError):
+            compute_shifted_hankel(request)
 
     def test_unconsumed_moments_do_not_gate_admission(self) -> None:
         """Moments beyond mu_(2r+1) are not read by the shifted determinant
@@ -143,10 +145,11 @@ class TestOrthogonalPolynomials:
         assert int(result.polynomials[1].squared_norm.den) == 3
 
     def test_insufficient_moments(self) -> None:
-        with pytest.raises(ValidationError):
-            OrthogonalPolynomialRequest(
-                prefix=_prefix(_moments_uniform(3)), max_degree=2
-            )
+        request = OrthogonalPolynomialRequest(
+            prefix=_prefix(_moments_uniform(3)), max_degree=2
+        )
+        with pytest.raises(ValueError):
+            compute_orthogonal_polynomials(request)
 
     def test_zero_norm_prefix_rejected(self) -> None:
         """moments [1,0,0,...]: p_1 has zero norm; no orthogonal family
@@ -292,8 +295,9 @@ class TestChristoffelDarboux:
             is_quasi_definite=False,
             is_positive_definite=False,
         )
-        with pytest.raises(ValidationError):
-            ChristoffelDarbouxRequest(family=family, degree=0)
+        request = ChristoffelDarbouxRequest(family=family, degree=0)
+        with pytest.raises(ValueError):
+            compute_christoffel_darboux(request)
 
     def test_zero_norm_beyond_degree_does_not_gate(self) -> None:
         """Only norms through the requested degree divide in the defining
@@ -422,10 +426,11 @@ class TestGaussianQuadrature:
         """Construction consumes moments through mu_(2n-1) exactly: 2n
         moments suffice for an exact order-n rule and 2n-1 do not."""
 
+        request = GaussianQuadratureRequest(
+            prefix=_prefix(self._moments_rational_nodes()[:3]), order=2
+        )
         with pytest.raises(ValueError):
-            GaussianQuadratureRequest(
-                prefix=_prefix(self._moments_rational_nodes()[:3]), order=2
-            )
+            compute_gaussian_quadrature(request)
         request = GaussianQuadratureRequest(
             prefix=_prefix(self._moments_rational_nodes()[:4]), order=2
         )
@@ -671,8 +676,9 @@ class TestGramSchmidtHeightAdmission:
             CanonicalRational.from_fraction(Fraction(10) ** 20000),
             CanonicalRational(num="0", den="1"),
         )
-        with pytest.raises(ValidationError):
-            OrthogonalPolynomialRequest(prefix=_prefix(moments), max_degree=1)
+        request = OrthogonalPolynomialRequest(prefix=_prefix(moments), max_degree=1)
+        with pytest.raises(ValueError):
+            compute_orthogonal_polynomials(request)
 
     def test_bounded_prefix_still_admits_and_executes(self) -> None:
         """A prefix inside the conservative bound keeps admitting, including
@@ -820,8 +826,9 @@ class TestJacobiNormRatioAdmission:
             is_quasi_definite=False,
             is_positive_definite=False,
         )
-        with pytest.raises(ValidationError):
-            JacobiMatrixRequest(family=family)
+        request = JacobiMatrixRequest(family=family)
+        with pytest.raises(ValueError):
+            compute_jacobi_matrix(request)
 
     def test_emitted_ratio_free_family_admits_zero_terminal_norm(self) -> None:
         """A two-polynomial family emits no norm ratio; a vanishing
@@ -954,8 +961,9 @@ class TestDerivedAlphaHeightAdmission:
             is_quasi_definite=True,
             is_positive_definite=False,
         )
-        with pytest.raises(ValidationError):
-            JacobiMatrixRequest(family=family)
+        request = JacobiMatrixRequest(family=family)
+        with pytest.raises(ValueError):
+            compute_jacobi_matrix(request)
 
 
 class TestFiniteSupportQuadratureAdmission:
@@ -997,8 +1005,9 @@ class TestDerivedQuadratureHeightAdmission:
             CanonicalRational.from_fraction(Fraction(10) ** 16400),
             CanonicalRational(num="0", den="1"),
         )
-        with pytest.raises(ValidationError):
-            GaussianQuadratureRequest(prefix=_prefix(moments), order=1)
+        request = GaussianQuadratureRequest(prefix=_prefix(moments), order=1)
+        with pytest.raises(ValueError):
+            compute_gaussian_quadrature(request)
 
     def test_representable_large_node_admitted_and_round_trips(self) -> None:
         """A 2,000-digit rational node stays inside the conservative bound;

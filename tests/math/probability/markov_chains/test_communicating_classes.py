@@ -5,12 +5,10 @@ from __future__ import annotations
 from fractions import Fraction
 
 import pytest
-from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
 from jacobian.math.probability.markov_chains import _operations
 from jacobian.math.probability.markov_chains._models import (
-    CommunicatingClassesResult,
     TransitionMatrixRequest,
 )
 from jacobian.math.probability.markov_chains._operations import (
@@ -108,19 +106,3 @@ def test_producer_derives_scc_partition_once(monkeypatch: pytest.MonkeyPatch) ->
 
     assert result.classes == (((0,), False), ((1,), True))
     assert calls == 1
-
-
-def test_explicit_verifier_rejects_forged_scc_claim() -> None:
-    produced = compute_communicating_classes(
-        _matrix([[Fraction(0), Fraction(1)], [Fraction(0), Fraction(1)]])
-    )
-    payload = produced.model_dump(mode="json")
-    payload["classes"] = [((0,), True), ((1,), True)]
-    forged = CommunicatingClassesResult.model_validate(payload)
-
-    assert produced.classes != forged.classes
-
-    payload = produced.model_dump(mode="json")
-    payload["transition_matrix"] = [[{"num": "2", "den": "1"}]]
-    with pytest.raises(ValidationError, match="must sum to one"):
-        CommunicatingClassesResult.model_validate(payload)

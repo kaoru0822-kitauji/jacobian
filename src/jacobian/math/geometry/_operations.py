@@ -8,8 +8,10 @@ from typing import Any, cast
 
 from jacobian._exact import CanonicalRational
 from jacobian.canonical import format_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.geometry._models import (
     INVERSION_ADMISSION_DIGITS,
+    MAX_COORDINATE_DIGITS,
     CircleInversionRequest,
     CircumcircleRequest,
     CircumradiusProfileRequest,
@@ -43,6 +45,7 @@ from jacobian.math.geometry._models import (
     SimplePolygonDecisionResult,
     SimplePolygonPointRequest,
     _inverted_components_within_bound,
+    _require_bounded_configuration,
     _require_circumradius_output_bound,
     _require_general_position_work_bound,
     _require_inversion_admission_bound,
@@ -50,6 +53,100 @@ from jacobian.math.geometry._models import (
 from jacobian.math.geometry._predicates import are_collinear, determinant4
 
 Compute = Callable[[LinePairRequest], GeometryBooleanResult]
+
+
+def _reject_geometry_domain(
+    *, location: tuple[str | int, ...], code: str, message: str
+) -> None:
+    raise OperationDomainValidationError(location=location, code=code, message=message)
+
+
+def _admit_inversion(request: CircleInversionRequest) -> None:
+    if request.power.as_fraction() <= 0:
+        _reject_geometry_domain(
+            location=("power",),
+            code="geometry.inversion_power_a_positive_rational",
+            message="inversion power must be a positive rational",
+        )
+    if request.point == request.center:
+        _reject_geometry_domain(
+            location=("point",),
+            code="geometry.point_invert_differ_center",
+            message="the point to invert must differ from the center",
+        )
+
+    for value, location, label in (
+        (request.center.x, ("center", "x"), "inversion center x"),
+        (request.center.y, ("center", "y"), "inversion center y"),
+        (request.power, ("power",), "inversion power"),
+        (request.point.x, ("point", "x"), "point x"),
+        (request.point.y, ("point", "y"), "point y"),
+    ):
+        try:
+            _require_inversion_admission_bound(value, label)
+        except ValueError as exc:
+            _reject_geometry_domain(
+                location=location,
+                code="geometry.label_exceeds_inversion_admission_digits_digit",
+                message=str(exc),
+            )
+
+    if not _inverted_components_within_bound(
+        request.center,
+        request.power,
+        request.point,
+        INVERSION_ADMISSION_DIGITS,
+    ):
+        _reject_geometry_domain(
+            location=("point",),
+            code="geometry.circle_inversion_result_exceeds_f_inversion",
+            message=(
+                "circle inversion result exceeds the "
+                f"{INVERSION_ADMISSION_DIGITS}-digit circle-inversion admission bound"
+            ),
+        )
+
+
+def _admit_configuration(
+    points: tuple[RationalPoint2D, ...], *, output_bound: bool
+) -> None:
+    try:
+        _require_bounded_configuration(points)
+    except ValueError as exc:
+        for index, point in enumerate(points):
+            for axis, value in (("x", point.x), ("y", point.y)):
+                if max(len(value.num.lstrip("-")), len(value.den)) > MAX_COORDINATE_DIGITS:
+                    _reject_geometry_domain(
+                        location=("points", index, axis),
+                        code="geometry.coordinate_digits_max",
+                        message=str(exc),
+                    )
+        _reject_geometry_domain(
+            location=("points",),
+            code="geometry.configuration_coordinate_bound",
+            message=str(exc),
+        )
+
+    keys = tuple((p.x.num, p.x.den, p.y.num, p.y.den) for p in points)
+    if len(keys) != len(set(keys)):
+        _reject_geometry_domain(
+            location=("points",),
+            code="geometry.point_set_coordinates_unique",
+            message="point-set coordinates must be unique",
+        )
+
+    try:
+        if output_bound:
+            _require_circumradius_output_bound(points)
+        else:
+            _require_general_position_work_bound(points)
+    except ValueError as exc:
+        code = (
+            "geometry.circumradius_profile_n_points_max_digits"
+            if output_bound
+            else "geometry.general_position_search_n_points_max"
+        )
+        _reject_geometry_domain(location=("points",), code=code, message=str(exc))
 
 
 def _fraction(value: Any) -> Fraction:
@@ -442,6 +539,7 @@ def circle_inversion(request: CircleInversionRequest) -> GeometryPointResult:
     rationals, where ``c`` is the center and ``s`` is the positive squared
     inversion radius.  The request ``p == c`` is rejected before division.
     """
+    _admit_inversion(request)
     center = request.center
     point = request.point
     power = request.power.as_fraction()
@@ -487,7 +585,7 @@ def general_position_search(request: GeneralPositionRequest) -> GeneralPositionR
     """Find all collinear triples and concyclic quadruples in a point configuration."""
     from itertools import combinations
 
-    _require_general_position_work_bound(request.points)
+    _admit_configuration(request.points, output_bound=False)
     pts = _points_to_fractions(request.points)
     n = len(pts)
 
@@ -534,7 +632,7 @@ def circumradius_profile(
     from fractions import Fraction
     from itertools import combinations
 
-    _require_circumradius_output_bound(request.points)
+    _admit_configuration(request.points, output_bound=True)
     pts = _points_to_fractions(request.points)
     n = len(pts)
 

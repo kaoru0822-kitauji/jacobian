@@ -154,8 +154,9 @@ class TestNewtonPolytope:
         pairs = sorted(((i % 11, i // 11) for i in range(97)), reverse=True)
         many = tuple(_term("1", list(pair)) for pair in pairs)
         assert len(many) == 97
+        request = NewtonPolytopeRequest(polynomial=_polynomial(many, VARS))
         with pytest.raises(ValueError, match="96"):
-            NewtonPolytopeRequest(polynomial=_polynomial(many, VARS))
+            compute_newton_polytope(request)
 
 
 class TestWeightProfile:
@@ -180,17 +181,24 @@ class TestWeightProfile:
         assert result.minimizing_exponents == ((0, 2),)
 
     def test_dimension_mismatch(self) -> None:
+        request = WeightProfileRequest(
+            polynomial=_polynomial(_XY_TERMS, VARS), weight=(1, 1, 1)
+        )
         with pytest.raises(ValueError, match="weight vector length"):
-            WeightProfileRequest(
-                polynomial=_polynomial(_XY_TERMS, VARS), weight=(1, 1, 1)
-            )
+            compute_weight_profile(request)
 
     def test_zero_polynomial_rejected(self) -> None:
         """The empty support has no minimum; the zero polynomial is inadmissible."""
+        weight_request = WeightProfileRequest(
+            polynomial=_polynomial((), VARS), weight=(1, 1)
+        )
         with pytest.raises(ValueError, match="zero polynomial"):
-            WeightProfileRequest(polynomial=_polynomial((), VARS), weight=(1, 1))
+            compute_weight_profile(weight_request)
+        initial_request = InitialFormRequest(
+            polynomial=_polynomial((), VARS), weight=(1, 1)
+        )
         with pytest.raises(ValueError, match="zero polynomial"):
-            InitialFormRequest(polynomial=_polynomial((), VARS), weight=(1, 1))
+            compute_initial_form(initial_request)
 
 
 class TestInitialForm:
@@ -246,10 +254,11 @@ class TestTransportableBounds:
     def test_huge_weight_component_rejected(self) -> None:
         """Derived weights must stay inside the interoperable JSON range."""
         big = 9007199254740991
-        with raises_code("weight_component_out_of_range"):
-            WeightProfileRequest(
-                polynomial=_polynomial(_XY_TERMS, VARS), weight=(big, 1)
-            )
+        request = WeightProfileRequest(
+            polynomial=_polynomial(_XY_TERMS, VARS), weight=(big, 1)
+        )
+        with pytest.raises(ValueError, match="weight components"):
+            compute_weight_profile(request)
 
     def test_initial_form_output_growth_bounded(self) -> None:
         """A zero weight makes every term minimal; oversized sources are
@@ -258,11 +267,12 @@ class TestTransportableBounds:
             _term("1", list(pair))
             for pair in sorted(((i % 32, i // 32) for i in range(1025)), reverse=True)
         )
-        with raises_code("initial_form_term_count_exceeded"):
-            InitialFormRequest(
-                polynomial=_polynomial(many, VARS),
-                weight=(0, 0),
-            )
+        request = InitialFormRequest(
+            polynomial=_polynomial(many, VARS),
+            weight=(0, 0),
+        )
+        with pytest.raises(ValueError, match="1024 terms"):
+            compute_initial_form(request)
 
 
 class TestNewtonInvariants:

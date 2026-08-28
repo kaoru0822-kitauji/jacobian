@@ -443,7 +443,6 @@ class CircleInversionRequest(StrictModel):
         ),
     )
 
-
 class PointTripleRequest(StrictModel):
     first: RationalPoint2D
     second: RationalPoint2D
@@ -1481,17 +1480,6 @@ class GeneralPositionRequest(StrictModel):
         ),
     )
 
-    @model_validator(mode="after")
-    def require_unique(self) -> Self:
-        _require_bounded_configuration(self.points)
-        keys = tuple((p.x.num, p.x.den, p.y.num, p.y.den) for p in self.points)
-        if len(keys) != len(set(keys)):
-            raise _validation_error(
-                "point_set_coordinates_unique", "point-set coordinates must be unique"
-            )
-        return self
-
-
 class CollinearTripleWitness(StrictModel):
     indices: tuple[int, int, int]
 
@@ -1565,17 +1553,6 @@ class CircumradiusProfileRequest(StrictModel):
             "stay within the 8,000,000-character output budget"
         ),
     )
-
-    @model_validator(mode="after")
-    def require_unique(self) -> Self:
-        _require_bounded_configuration(self.points)
-        keys = tuple((p.x.num, p.x.den, p.y.num, p.y.den) for p in self.points)
-        if len(keys) != len(set(keys)):
-            raise _validation_error(
-                "point_set_coordinates_unique", "point-set coordinates must be unique"
-            )
-        return self
-
 
 class CircumradiusTripleEntry(StrictModel):
     """One triple and its circumradius disposition."""
