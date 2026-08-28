@@ -63,6 +63,9 @@ _VALIDATION_CODES = {
     "orbit must begin at the bound start point": "orbit_start_mismatch",
     "orbit values must follow the bound polynomial map": "orbit_map_mismatch",
     "polynomial coefficients must omit trailing zeros": "trailing_zero_coefficients",
+    "cycle must contain distinct points": "cycle_points_not_distinct",
+    "cycle points do not follow the polynomial map": "cycle_map_mismatch",
+    "polynomial coefficients must omit trailing zeros modulo p": "trailing_zero_coefficients",
 }
 
 _VALIDATION_FRAGMENTS = (
@@ -71,10 +74,11 @@ _VALIDATION_FRAGMENTS = (
     ("exceeds the 128-digit bound", "rational_digit_bound"),
     ("exceeds the 2048-digit bound", "orbit_value_digit_bound"),
     ("exceeds the 32768-digit bound", "result_digit_bound"),
+    ("prime must be a prime number", "prime_not_prime"),
 )
 
 
-def _validation_error(message: str) -> PydanticCustomError:
+def _validation_code(message: str) -> str:
     code = _VALIDATION_CODES.get(message)
     if code is None:
         for fragment, fragment_code in _VALIDATION_FRAGMENTS:
@@ -89,7 +93,11 @@ def _validation_error(message: str) -> PydanticCustomError:
         )
     if code is None:
         code = "contract_invariant"
-    return PydanticCustomError(f"arithmetic_dynamics.{code}", message)
+    return code
+
+
+def _validation_error(message: str) -> PydanticCustomError:
+    return PydanticCustomError(f"arithmetic_dynamics.{_validation_code(message)}", message)
 
 
 def model_validator(

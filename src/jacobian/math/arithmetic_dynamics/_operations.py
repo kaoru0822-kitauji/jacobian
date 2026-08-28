@@ -30,6 +30,7 @@ from jacobian.math.arithmetic_dynamics._models import (
     _mobius,
     _multiply_height_polynomials,
     _require_polynomial_height,
+    _validation_code,
 )
 from jacobian.math.arithmetic_dynamics.operations import (
     cycle_multiplier,
@@ -50,19 +51,7 @@ def _domain_error(location: tuple[str | int, ...], code: str, message: str) -> N
 
 def _translate_value_error(exc: ValueError, location: tuple[str | int, ...]) -> None:
     message = str(exc)
-    codes = {
-        "polynomial coefficients must omit trailing zeros": "trailing_zero_coefficients",
-        "iterate output degree exceeds bound": "iterate_degree_exceeds_bound",
-        "iterate coefficient growth exceeds the 32768-digit output bound": "iterate_coefficient_growth_exceeds_bound",
-        "dynatomic polynomial requires degree at least two": "dynatomic_degree_too_small",
-        "dynatomic output degree exceeds bound": "dynatomic_degree_exceeds_bound",
-        "cycle must contain distinct points": "cycle_points_not_distinct",
-        "cycle points do not follow the polynomial map": "cycle_map_mismatch",
-        "prime must be a prime number between 2 and 10000": "prime_not_prime",
-        "polynomial coefficients must omit trailing zeros modulo p": "trailing_zero_coefficients",
-    }
-    code = next((value for key, value in codes.items() if key in message), "contract_invariant")
-    _domain_error(location, code, message)
+    _domain_error(location, _validation_code(message), message)
 
 
 def _polynomial(request: PolynomialCoefficientRequest) -> Any:
