@@ -10,6 +10,8 @@ from pydantic_core import PydanticCustomError
 
 from jacobian._exact import CanonicalRational, require_bounded_rational
 from jacobian._models import StrictModel
+from jacobian.canonical import format_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.combinatorics._recurrence_models import (
     MAX_COMBINATORICS_INPUT_RATIONAL_DIGITS,
     MAX_COMBINATORICS_RESULT_RATIONAL_DIGITS,
@@ -21,6 +23,31 @@ from jacobian.math.combinatorics._recurrence_models import (
 
 def _validation_error(reason: str, message: str) -> PydanticCustomError:
     return PydanticCustomError(f"combinatorics.{reason}", message)
+
+
+def _admit_bounded_rational(
+    value: Fraction,
+    *,
+    max_digits: int,
+    label: str,
+    location: tuple[str | int, ...],
+) -> None:
+    """Apply a rational bound before exposing a canonical result value."""
+
+    try:
+        require_bounded_rational(
+            CanonicalRational.from_fraction(value),
+            max_digits=max_digits,
+            label=label,
+        )
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=location, code=exc.type, message=exc.message()
+        ) from exc
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=location, code="combinatorics.admission", message=str(exc)
+        ) from exc
 
 
 class IndexedRecurrenceResidual(StrictModel):
@@ -36,29 +63,55 @@ def _require_table_admission(
 
     order = len(coefficient_polynomials) - 1
     if not 1 <= order <= MAX_LINEAR_RECURRENCE_ORDER:
-        raise ValueError("recurrence order is outside the bound")
-    if not 2 <= len(values) <= MAX_LINEAR_RECURRENCE_INDEX + 1:
-        raise ValueError("table length is outside the bound")
-    if len(values) <= order:
-        raise ValueError(
-            "values must include the initial range and at least one checked step"
+        raise OperationDomainValidationError(
+            location=("coefficient_polynomials",),
+            code="combinatorics.recurrence_invariant",
+            message="recurrence order is outside the bound",
         )
-    for polynomial in coefficient_polynomials:
+    if not 2 <= len(values) <= MAX_LINEAR_RECURRENCE_INDEX + 1:
+        raise OperationDomainValidationError(
+            location=("values",),
+            code="combinatorics.result_bound",
+            message="table length is outside the bound",
+        )
+    if len(values) <= order:
+        raise OperationDomainValidationError(
+            location=("values",),
+            code="combinatorics.recurrence_invariant",
+            message=(
+                "values must include the initial range and at least one checked step"
+            ),
+        )
+    for polynomial_index, polynomial in enumerate(coefficient_polynomials):
         if not polynomial or len(polynomial) > MAX_P_RECURSIVE_POLYNOMIAL_DEGREE + 1:
-            raise ValueError("coefficient polynomial degree is outside the bound")
+            raise OperationDomainValidationError(
+                location=("coefficient_polynomials", polynomial_index),
+                code="combinatorics.polynomial_invariant",
+                message="coefficient polynomial degree is outside the bound",
+            )
         if polynomial[-1] == 0:
-            raise ValueError("coefficient polynomial must omit trailing zero terms")
-        for coefficient in polynomial:
-            require_bounded_rational(
-                CanonicalRational.from_fraction(coefficient),
+            raise OperationDomainValidationError(
+                location=("coefficient_polynomials", polynomial_index),
+                code="combinatorics.polynomial_invariant",
+                message="coefficient polynomial must omit trailing zero terms",
+            )
+        for coefficient_index, coefficient in enumerate(polynomial):
+            _admit_bounded_rational(
+                coefficient,
                 max_digits=MAX_COMBINATORICS_INPUT_RATIONAL_DIGITS,
                 label="recurrence polynomial coefficient",
+                location=(
+                    "coefficient_polynomials",
+                    polynomial_index,
+                    coefficient_index,
+                ),
             )
-    for value in values:
-        require_bounded_rational(
-            CanonicalRational.from_fraction(value),
+    for index, value in enumerate(values):
+        _admit_bounded_rational(
+            value,
             max_digits=MAX_COMBINATORICS_INPUT_RATIONAL_DIGITS,
             label="submitted recurrence table value",
+            location=("values", index),
         )
 
 
@@ -118,6 +171,15 @@ def _evaluate(polynomial: tuple[Fraction, ...], index: int) -> Fraction:
     )
 
 
+def _fraction_digit_count(value: Fraction) -> tuple[int, int]:
+    """Measure exact components before constructing a canonical wire value."""
+
+    return (
+        len(format_canonical_integer(value.numerator).lstrip("-")),
+        len(format_canonical_integer(value.denominator).lstrip("-")),
+    )
+
+
 def _recurrence_table_residuals(
     coefficient_polynomials: tuple[tuple[Fraction, ...], ...],
     values: tuple[Fraction, ...],
@@ -136,11 +198,24 @@ def _recurrence_table_residuals(
             ),
             Fraction(),
         )
+        if any(
+            digits > MAX_COMBINATORICS_RESULT_RATIONAL_DIGITS
+            for digits in _fraction_digit_count(residual)
+        ):
+            raise OperationDomainValidationError(
+                location=("residuals", index),
+                code="combinatorics.rational_bound",
+                message=(
+                    "submitted recurrence residual exceeds the "
+                    f"{MAX_COMBINATORICS_RESULT_RATIONAL_DIGITS}-digit bound"
+                ),
+            )
         wire = CanonicalRational.from_fraction(residual)
-        require_bounded_rational(
-            wire,
+        _admit_bounded_rational(
+            residual,
             max_digits=MAX_COMBINATORICS_RESULT_RATIONAL_DIGITS,
             label="submitted recurrence residual",
+            location=("residuals", index),
         )
         residuals.append(IndexedRecurrenceResidual(index=index, value=wire))
         if residual:

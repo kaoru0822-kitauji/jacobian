@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from fractions import Fraction
 
+from pydantic_core import PydanticCustomError
+
 from jacobian._exact import CanonicalRational, format_canonical_rational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.analysis.majorization._models import (
     BirkhoffDecompositionRequest,
     BirkhoffDecompositionResult,
@@ -25,6 +28,41 @@ from jacobian.math.analysis.majorization._models import (
     _require_majorization_matrix,
 )
 from jacobian.math.matrices.values import RationalMatrix
+
+
+def _run_admission(
+    admission: Callable[[], None], *, location: tuple[str | int, ...]
+) -> None:
+    """Expose owner admission failures through the native operation contract."""
+
+    try:
+        admission()
+    except OperationDomainValidationError:
+        raise
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=location, code=exc.type, message=exc.message()
+        ) from exc
+
+
+def _admit_bounded_rational(
+    value: CanonicalRational,
+    *,
+    label: str,
+    location: tuple[str | int, ...],
+) -> None:
+    """Apply the majorization rational envelope at a field-specific path."""
+
+    try:
+        _bound_rational(value, label)
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=location, code=exc.type, message=exc.message()
+        ) from exc
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=location, code="majorization.admission", message=str(exc)
+        ) from exc
 
 
 def _to_cr(value: Fraction) -> CanonicalRational:
@@ -344,7 +382,10 @@ def compute_doubly_stochastic_check(
     request: DoublyStochasticCheckRequest,
 ) -> DoublyStochasticCheckResult:
     """Check if a rational matrix is doubly stochastic."""
-    _require_majorization_matrix(request.matrix)
+    _run_admission(
+        lambda: _require_majorization_matrix(request.matrix),
+        location=("matrix",),
+    )
     mat = _matrix_fractions(request.matrix)
     n = len(mat)
 
@@ -383,23 +424,35 @@ def compute_birkhoff_decomposition(
     Decomposes a doubly stochastic matrix into a convex combination of
     permutation matrices using the greedy matching + peel algorithm.
     """
-    _require_majorization_matrix(request.matrix)
+    _run_admission(
+        lambda: _require_majorization_matrix(request.matrix),
+        location=("matrix",),
+    )
     mat = _matrix_fractions(request.matrix)
     n = len(mat)
 
     for i in range(n):
         for j in range(n):
             if mat[i][j] < 0:
-                raise ValueError(
-                    "Birkhoff decomposition requires a non-negative matrix"
+                raise OperationDomainValidationError(
+                    location=("matrix", "entries", i, j),
+                    code="majorization.birkhoff_negative_entry",
+                    message="Birkhoff decomposition requires a non-negative matrix",
                 )
-    if any(sum(row, Fraction()) != 1 for row in mat) or any(
-        sum((mat[row][column] for row in range(n)), Fraction()) != 1
-        for column in range(n)
-    ):
-        raise ValueError(
-            "Birkhoff decomposition requires row and column sums equal to 1"
-        )
+    for i, row in enumerate(mat):
+        if sum(row, Fraction()) != 1:
+            raise OperationDomainValidationError(
+                location=("matrix", "entries", i),
+                code="majorization.birkhoff_row_sum",
+                message="Birkhoff decomposition requires row sums equal to 1",
+            )
+    for j in range(n):
+        if sum((mat[i][j] for i in range(n)), Fraction()) != 1:
+            raise OperationDomainValidationError(
+                location=("matrix", "entries", j),
+                code="majorization.birkhoff_column_sum",
+                message="Birkhoff decomposition requires column sums equal to 1",
+            )
 
     current = [list(row) for row in mat]
     terms: list[BirkhoffTerm] = []
@@ -412,7 +465,7 @@ def compute_birkhoff_decomposition(
         # Find perfect matching in the bipartite graph of positive entries
         matching = _find_perfect_matching(current, n)
         if matching is None:
-            raise ValueError(
+            raise RuntimeError(
                 "Birkhoff decomposition failed: no perfect matching found; "
                 "matrix may not be doubly stochastic"
             )
@@ -480,9 +533,17 @@ def compute_schur_horn_check(
     with eigenvalues lambda iff lambda majorizes d.
     """
     for index, value in enumerate(request.eigenvalues):
-        _bound_rational(value, f"eigenvalues[{index}]")
+        _admit_bounded_rational(
+            value,
+            label=f"eigenvalues[{index}]",
+            location=("eigenvalues", index),
+        )
     for index, value in enumerate(request.diagonal):
-        _bound_rational(value, f"diagonal[{index}]")
+        _admit_bounded_rational(
+            value,
+            label=f"diagonal[{index}]",
+            location=("diagonal", index),
+        )
     eigenvalues = [v.as_fraction() for v in request.eigenvalues]
     diagonal = [v.as_fraction() for v in request.diagonal]
 

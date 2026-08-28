@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 
 import sympy
+from pydantic_core import PydanticCustomError
 
 from jacobian._exact import require_bounded_rational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.polynomials._conversions import (
     rational_polynomial_from_sympy,
     rational_polynomial_to_sympy,
@@ -26,17 +28,68 @@ from jacobian.math.polynomials.vector_calculus._models import (
 )
 
 
+def _run_admission(
+    admission: Callable[[], None], *, location: tuple[str | int, ...]
+) -> None:
+    """Translate field admission failures into typed operation diagnostics."""
+
+    try:
+        admission()
+    except OperationDomainValidationError:
+        raise
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=location, code=exc.type, message=exc.message()
+        ) from exc
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=location,
+            code="polynomial_vector_calc.admission",
+            message=str(exc),
+        ) from exc
+
+
+def _admit_field_polynomial(
+    polynomial: RationalPolynomial,
+    *,
+    label: str,
+    location: tuple[str | int, ...],
+) -> None:
+    """Apply the field polynomial envelope with a precise source location."""
+
+    _run_admission(
+        lambda: _require_field_polynomial(polynomial, label=label),
+        location=location,
+    )
+
+
 def _admit_scalar_field(polynomial: RationalPolynomial) -> None:
-    _require_field_polynomial(polynomial, label="scalar field")
+    _admit_field_polynomial(
+        polynomial,
+        label="scalar field",
+        location=("polynomial",),
+    )
     if len(polynomial.polynomial.terms) * len(polynomial.variables) > _MAX_TERMS:
-        raise ValueError("scalar-field derivatives exceed the result-term budget")
+        raise OperationDomainValidationError(
+            location=("polynomial",),
+            code="polynomial_vector_calc.derivative_term_budget",
+            message="scalar-field derivatives exceed the result-term budget",
+        )
 
 
 def _admit_vector_field(components: tuple[RationalPolynomial, ...]) -> None:
-    for component in components:
-        _require_field_polynomial(component, label="vector-field component")
+    for index, component in enumerate(components):
+        _admit_field_polynomial(
+            component,
+            label="vector-field component",
+            location=("components", index),
+        )
     if sum(len(item.polynomial.terms) for item in components) > _MAX_TERMS:
-        raise ValueError("vector-field derivatives exceed the result-term budget")
+        raise OperationDomainValidationError(
+            location=("components",),
+            code="polynomial_vector_calc.derivative_term_budget",
+            message="vector-field derivatives exceed the result-term budget",
+        )
 
 
 def _wire(expression: sympy.Expr, variables: tuple[str, ...]) -> RationalPolynomial:
@@ -120,12 +173,19 @@ def compute_directional_derivative(
     request: DirectionalDerivativeRequest,
 ) -> ScalarResult:
     _admit_scalar_field(request.polynomial)
-    for coordinate in request.direction:
-        require_bounded_rational(
-            coordinate,
-            max_digits=_MAX_COEFFICIENT_DIGITS,
-            label="direction coordinate",
-        )
+    for index, coordinate in enumerate(request.direction):
+        try:
+            require_bounded_rational(
+                coordinate,
+                max_digits=_MAX_COEFFICIENT_DIGITS,
+                label="direction coordinate",
+            )
+        except ValueError as exc:
+            raise OperationDomainValidationError(
+                location=("direction", index),
+                code="polynomial_vector_calc.direction_coordinate_bound",
+                message=str(exc),
+            ) from exc
     variables = request.polynomial.variables
     expression = rational_polynomial_to_sympy(request.polynomial).as_expr()
     gradient = (

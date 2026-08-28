@@ -7,6 +7,7 @@ import pytest
 from pydantic import ValidationError
 from pydantic_core import PydanticCustomError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.combinatorics._recurrence_models import (
     MAX_COMBINATORICS_RESULT_ARTIFACT_BYTES,
     PolynomialCoefficientRecurrenceEvaluationRequest,
@@ -119,5 +120,7 @@ def test_polynomial_recurrence_aborts_when_an_intermediate_exceeds_digit_bound()
     }
 
     parsed = PolynomialCoefficientRecurrenceEvaluationRequest.model_validate(request)
-    with pytest.raises(ValueError, match="digit bound"):
+    with pytest.raises(OperationDomainValidationError) as caught:
         evaluate_polynomial_coefficient_recurrence(parsed)
+    assert caught.value.errors()[0]["loc"] == ("values", 31)
+    assert caught.value.errors()[0]["type"] == "combinatorics.rational_bound"

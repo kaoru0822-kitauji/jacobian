@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from pydantic_core import PydanticCustomError
+
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.cluster_algebras._models import (
     ExchangeMatrix,
     GVectorRequest,
@@ -12,6 +15,17 @@ from jacobian.math.cluster_algebras._models import (
     encoded_entries,
     parsed_entries,
 )
+
+
+def _admit_mutation(request: SeedMutationRequest) -> None:
+    """Expose mutation-growth admission as a typed domain failure."""
+
+    try:
+        _require_mutatable(request.exchange_matrix, request.mutation_index)
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=("exchange_matrix",), code=exc.type, message=exc.message()
+        ) from exc
 
 
 def _mutation_of(matrix: ExchangeMatrix, k: int) -> ExchangeMatrix:
@@ -60,7 +74,7 @@ def mutate_seed(request: SeedMutationRequest) -> SeedMutationResult:
     b'_{ij} = -sgn(i-k) * sgn(j-k) * b_{ij}  if i=k or j=k
     b'_{ij} = b_{ij} + max(0, b_{ik}) * max(0, b_{kj}) + min(0, b_{ik}) * min(0, b_{kj})  otherwise
     """
-    _require_mutatable(request.exchange_matrix, request.mutation_index)
+    _admit_mutation(request)
     return SeedMutationResult._from_kernel(
         request,
         exchange_matrix=_mutation_of(request.exchange_matrix, request.mutation_index),

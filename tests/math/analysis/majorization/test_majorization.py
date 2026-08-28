@@ -2,7 +2,10 @@
 
 from fractions import Fraction
 
+import pytest
+
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.analysis.majorization._models import (
     BirkhoffDecompositionRequest,
     DoublyStochasticCheckRequest,
@@ -210,6 +213,27 @@ class TestBirkhoff:
         assert len(result.terms) == 2
         weights_sum = sum(t.weight.as_fraction() for t in result.terms)
         assert weights_sum == 1
+
+    def test_non_doubly_stochastic_input_is_rejected_by_operation(self) -> None:
+        request = BirkhoffDecompositionRequest(
+            matrix=RationalMatrix(
+                entries=(
+                    (cr("-1"), cr("2")),
+                    (cr("2"), cr("-1")),
+                ),
+            )
+        )
+
+        with pytest.raises(OperationDomainValidationError) as caught:
+            compute_birkhoff_decomposition(request)
+
+        assert caught.value.errors() == (
+            {
+                "loc": ("matrix", "entries", 0, 0),
+                "type": "majorization.birkhoff_negative_entry",
+                "msg": "Birkhoff decomposition requires a non-negative matrix",
+            },
+        )
 
 
 class TestSchurHorn:

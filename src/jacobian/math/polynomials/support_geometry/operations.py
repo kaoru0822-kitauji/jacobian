@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from fractions import Fraction
 
+from pydantic_core import PydanticCustomError
+
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.polynomials.support_geometry._models import (
     MAX_WEIGHTED_COEFFICIENT_DIGITS,
     MAX_WEIGHTED_POLYNOMIAL_TERMS,
@@ -26,6 +30,27 @@ from jacobian.math.polynomials.values import (
     RationalPolynomialTerm,
     SparseRationalPolynomial,
 )
+
+
+def _run_admission(
+    admission: Callable[[], None], *, location: tuple[str | int, ...]
+) -> None:
+    """Expose support-geometry admission through the typed domain boundary."""
+
+    try:
+        admission()
+    except OperationDomainValidationError:
+        raise
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=location, code=exc.type, message=exc.message()
+        ) from exc
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=location,
+            code="polynomial_support_geometry.admission",
+            message=str(exc),
+        ) from exc
 
 
 def _term_pairs(
@@ -59,31 +84,50 @@ def _require_weighted_polynomial_domain(
     importing transport-size caps.
     """
     if len(weight) != len(polynomial.variables):
-        raise ValueError("weight vector length must match variable count")
+        raise OperationDomainValidationError(
+            location=("weight",),
+            code="polynomial_support_geometry.weight_dimension_mismatch",
+            message="weight vector length must match variable count",
+        )
     if all(term.coefficient.as_fraction() == 0 for term in polynomial.polynomial.terms):
-        raise ValueError(
-            "the zero polynomial has no weight profile; supply a nonzero polynomial"
+        raise OperationDomainValidationError(
+            location=("polynomial",),
+            code="polynomial_support_geometry.zero_weight_profile",
+            message=(
+                "the zero polynomial has no weight profile; supply a nonzero polynomial"
+            ),
         )
 
 
 def _admit_weighted_polynomial(
     polynomial: RationalPolynomial, weight: tuple[int, ...], *, label: str
 ) -> None:
-    _require_transportable_weight(weight, polynomial.variables)
+    _run_admission(
+        lambda: _require_transportable_weight(weight, polynomial.variables),
+        location=("weight",),
+    )
     _require_weighted_polynomial_domain(polynomial, weight)
     terms = polynomial.polynomial.terms
     if len(terms) > MAX_WEIGHTED_POLYNOMIAL_TERMS:
-        raise ValueError(
-            f"{label} requests are limited to {MAX_WEIGHTED_POLYNOMIAL_TERMS} terms"
+        raise OperationDomainValidationError(
+            location=("polynomial",),
+            code="polynomial_support_geometry.weighted_term_count_exceeded",
+            message=(
+                f"{label} requests are limited to {MAX_WEIGHTED_POLYNOMIAL_TERMS} terms"
+            ),
         )
     if any(
         len(component.lstrip("-")) > MAX_WEIGHTED_COEFFICIENT_DIGITS
         for term in terms
         for component in (term.coefficient.num, term.coefficient.den)
     ):
-        raise ValueError(
-            f"{label} coefficients are limited to "
-            f"{MAX_WEIGHTED_COEFFICIENT_DIGITS} digits"
+        raise OperationDomainValidationError(
+            location=("polynomial",),
+            code="polynomial_support_geometry.weighted_coefficient_bound",
+            message=(
+                f"{label} coefficients are limited to "
+                f"{MAX_WEIGHTED_COEFFICIENT_DIGITS} digits"
+            ),
         )
 
 
@@ -371,8 +415,12 @@ def newton_polytope_from_polynomial(
     and native callers alike.
     """
     if len(polynomial.polynomial.terms) > MAX_NEWTON_TERMS:
-        raise ValueError(
-            f"Newton polytope requests are limited to {MAX_NEWTON_TERMS} terms"
+        raise OperationDomainValidationError(
+            location=("polynomial",),
+            code="polynomial_support_geometry.newton_term_count_exceeded",
+            message=(
+                f"Newton polytope requests are limited to {MAX_NEWTON_TERMS} terms"
+            ),
         )
     terms = _term_pairs(polynomial)
     variables = polynomial.variables

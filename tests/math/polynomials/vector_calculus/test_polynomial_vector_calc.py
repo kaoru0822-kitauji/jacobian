@@ -9,6 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.polynomials.values import (
     RationalPolynomial,
     RationalPolynomialTerm,
@@ -179,8 +180,11 @@ def test_vector_field_rejects_aggregate_result_term_growth() -> None:
             _polynomial(variables, second),
         )
     )
-    with pytest.raises(ValueError, match="result-term budget"):
+    with pytest.raises(OperationDomainValidationError) as exc_info:
         compute_divergence(request)
+    assert exc_info.value.errors()[0]["type"] == (
+        "polynomial_vector_calc.derivative_term_budget"
+    )
 
 
 def test_direction_length_must_match_polynomial_axis() -> None:

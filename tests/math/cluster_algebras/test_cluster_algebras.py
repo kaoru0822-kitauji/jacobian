@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian.canonical import parse_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.cluster_algebras._models import (
     ExchangeMatrix,
     GVectorRequest,
@@ -168,8 +169,10 @@ class TestCoefficientBounds:
             (str(1), str(1), str(1)),
         )
         request = SeedMutationRequest(exchange_matrix=b, mutation_index=1)
-        with pytest.raises(ValueError, match="bounded"):
+        with pytest.raises(OperationDomainValidationError) as caught:
             mutate_seed(request)
+        assert caught.value.errors()[0]["loc"] == ("exchange_matrix",)
+        assert caught.value.errors()[0]["type"] == "cluster_algebra.mutation_bounded"
 
     def test_request_accepts_large_entries_under_negation_only_mutation(self) -> None:
         edge = 10**129 - 1

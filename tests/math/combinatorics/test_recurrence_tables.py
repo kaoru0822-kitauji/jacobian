@@ -2,6 +2,9 @@
 
 from fractions import Fraction
 
+import pytest
+
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.combinatorics.recurrence_tables import (
     PolynomialCoefficientRecurrenceTableRequest,
     _compute_recurrence_table_residuals,
@@ -38,3 +41,18 @@ def test_native_recurrence_table_residuals_accepts_canonical_rationals() -> None
     assert native == wire
     assert native.satisfies_recurrence is True
     assert all(residual.value.as_fraction() == 0 for residual in native.residuals)
+
+
+def test_native_recurrence_table_admission_is_typed() -> None:
+    """Semantic table bounds are reported by the operation, not its parser."""
+
+    with pytest.raises(OperationDomainValidationError) as caught:
+        recurrence_table_residuals(((Fraction(1),), (Fraction(-1),)), (Fraction(1),))
+
+    assert caught.value.errors() == (
+        {
+            "loc": ("values",),
+            "type": "combinatorics.result_bound",
+            "msg": "table length is outside the bound",
+        },
+    )

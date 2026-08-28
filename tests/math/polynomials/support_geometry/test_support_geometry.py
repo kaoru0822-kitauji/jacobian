@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.polynomials.support_geometry._models import (
     InitialFormRequest,
     NewtonPolytopeRequest,
@@ -43,6 +44,13 @@ def raises_code(code: str) -> Iterator[None]:
 @contextmanager
 def raises_pydantic_code(code: str) -> Iterator[None]:
     with pytest.raises(ValidationError) as caught:
+        yield
+    assert caught.value.errors()[0]["type"] == code
+
+
+@contextmanager
+def raises_domain_code(code: str) -> Iterator[None]:
+    with pytest.raises(OperationDomainValidationError) as caught:
         yield
     assert caught.value.errors()[0]["type"] == code
 
@@ -155,7 +163,9 @@ class TestNewtonPolytope:
         many = tuple(_term("1", list(pair)) for pair in pairs)
         assert len(many) == 97
         request = NewtonPolytopeRequest(polynomial=_polynomial(many, VARS))
-        with pytest.raises(ValueError, match="96"):
+        with raises_domain_code(
+            "polynomial_support_geometry.newton_term_count_exceeded"
+        ):
             compute_newton_polytope(request)
 
 
@@ -184,7 +194,9 @@ class TestWeightProfile:
         request = WeightProfileRequest(
             polynomial=_polynomial(_XY_TERMS, VARS), weight=(1, 1, 1)
         )
-        with pytest.raises(ValueError, match="weight vector length"):
+        with raises_domain_code(
+            "polynomial_support_geometry.weight_dimension_mismatch"
+        ):
             compute_weight_profile(request)
 
     def test_zero_polynomial_rejected(self) -> None:
@@ -192,12 +204,12 @@ class TestWeightProfile:
         weight_request = WeightProfileRequest(
             polynomial=_polynomial((), VARS), weight=(1, 1)
         )
-        with pytest.raises(ValueError, match="zero polynomial"):
-            compute_weight_profile(weight_request)
         initial_request = InitialFormRequest(
             polynomial=_polynomial((), VARS), weight=(1, 1)
         )
-        with pytest.raises(ValueError, match="zero polynomial"):
+        with raises_domain_code("polynomial_support_geometry.zero_weight_profile"):
+            compute_weight_profile(weight_request)
+        with raises_domain_code("polynomial_support_geometry.zero_weight_profile"):
             compute_initial_form(initial_request)
 
 
@@ -257,7 +269,9 @@ class TestTransportableBounds:
         request = WeightProfileRequest(
             polynomial=_polynomial(_XY_TERMS, VARS), weight=(big, 1)
         )
-        with pytest.raises(ValueError, match="weight components"):
+        with raises_domain_code(
+            "polynomial_support_geometry.weight_component_out_of_range"
+        ):
             compute_weight_profile(request)
 
     def test_initial_form_output_growth_bounded(self) -> None:
@@ -271,7 +285,9 @@ class TestTransportableBounds:
             polynomial=_polynomial(many, VARS),
             weight=(0, 0),
         )
-        with pytest.raises(ValueError, match="1024 terms"):
+        with raises_domain_code(
+            "polynomial_support_geometry.weighted_term_count_exceeded"
+        ):
             compute_initial_form(request)
 
 
@@ -331,14 +347,18 @@ class TestNativeSurface:
         )
 
         zero = _polynomial((), VARS)
-        with pytest.raises(ValueError, match="nonzero"):
+        with pytest.raises(OperationDomainValidationError, match="nonzero"):
             weight_profile(zero, (1, 1))
-        with pytest.raises(ValueError, match="nonzero"):
+        with pytest.raises(OperationDomainValidationError, match="nonzero"):
             initial_form(zero, (1, 1))
         nonzero = _polynomial(_XY_TERMS, VARS)
-        with pytest.raises(ValueError, match="weight vector length"):
+        with pytest.raises(
+            OperationDomainValidationError, match="weight vector length"
+        ):
             weight_profile(nonzero, (1,))
-        with pytest.raises(ValueError, match="weight vector length"):
+        with pytest.raises(
+            OperationDomainValidationError, match="weight vector length"
+        ):
             initial_form(nonzero, (1,))
 
 
