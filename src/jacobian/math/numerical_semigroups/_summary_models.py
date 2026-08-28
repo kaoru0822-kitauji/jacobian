@@ -42,10 +42,28 @@ class NumericalSemigroupSummaryResult(StrictModel):
     gaps: tuple[CanonicalInteger, ...]
 
     @classmethod
-    def _from_kernel(cls, **values: object) -> NumericalSemigroupSummaryResult:
+    def _from_kernel(
+        cls,
+        *,
+        minimal_generators: tuple[CanonicalInteger, ...],
+        multiplicity: CanonicalInteger,
+        embedding_dimension: int,
+        frobenius_number: str,
+        conductor: str,
+        genus: int,
+        gaps: tuple[CanonicalInteger, ...],
+    ) -> NumericalSemigroupSummaryResult:
         """Construct a summary after the native kernel establishes its invariants."""
 
-        return cls.model_construct(**values)
+        return cls.model_construct(
+            minimal_generators=minimal_generators,
+            multiplicity=multiplicity,
+            embedding_dimension=embedding_dimension,
+            frobenius_number=frobenius_number,
+            conductor=conductor,
+            genus=genus,
+            gaps=gaps,
+        )
 
 
 class SemigroupMembershipRequest(StrictModel):

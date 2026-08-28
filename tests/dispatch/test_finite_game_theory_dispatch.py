@@ -4,7 +4,8 @@ import pytest
 from jsonschema.validators import Draft202012Validator
 
 from jacobian.catalog.catalog import Catalog
-from jacobian.dispatch import OperationRequestValidationError, invoke_operation
+from jacobian.catalog.models import OperationDomainValidationError
+from jacobian.dispatch import invoke_operation
 from jacobian.math.finite_game_theory._models import MAX_EXACT_EQUILIBRIUM_WORK
 from jacobian.math.finite_game_theory._tools import FINITE_GAME_THEORY_OPERATIONS
 
@@ -66,7 +67,7 @@ def test_zero_sum_schema_explains_structurally_valid_exact_work_rejection() -> N
     }
 
     assert not list(Draft202012Validator(schema).iter_errors(payload))
-    with pytest.raises(OperationRequestValidationError) as exc_info:
+    with pytest.raises(OperationDomainValidationError) as exc_info:
         invoke_operation(operation.operation_id, payload, Catalog.open())
     assert exc_info.value.errors()[0]["type"] == "finite_game.exact_equilibrium_budget"
 

@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import unicodedata
 from itertools import product
+from typing import NoReturn
 
 from sympy import isprime
 
 from jacobian.canonical import encode_strict_json, format_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.finite_geometry._linear import (
     canonical_basis,
     intersection_basis,
@@ -47,27 +49,51 @@ from jacobian.math.finite_geometry.values import (
 from jacobian.math.incidence_structures._models import IncidenceStructure
 
 
+def _domain_error(
+    location: tuple[str | int, ...], code: str, message: str
+) -> NoReturn:
+    raise OperationDomainValidationError(
+        location=location,
+        code=f"finite_geometry.{code}",
+        message=message,
+    )
+
+
 def _admit_span(request: SubspaceSpanRequest) -> None:
     if not request.vectors and not request.subspaces:
-        raise ValueError("span requires at least one vector or subspace")
+        _domain_error(
+            ("vectors",),
+            "span_source_required",
+            "span requires at least one vector or subspace",
+        )
     if len(request.vectors) + sum(len(item.basis) for item in request.subspaces) > MAX_DIM:
-        raise ValueError("span generator count exceeds bound")
+        _domain_error(
+            ("vectors",),
+            "span_generator_count_exceeds_bound",
+            "span generator count exceeds bound",
+        )
 
 
 def _admit_grassmannian(request: GrassmannianCountRequest) -> None:
     if not isprime(request.field_order):
-        raise ValueError("field_order must be prime")
+        _domain_error(("field_order",), "field_order_not_prime", "field_order must be prime")
     if request.subspace_dimension > request.ambient_dimension:
-        raise ValueError("subspace dimension cannot exceed ambient dimension")
+        _domain_error(
+            ("subspace_dimension",),
+            "subspace_dimension_exceeds_ambient",
+            "subspace dimension cannot exceed ambient dimension",
+        )
 
 
 def _admit_projective_enumeration(request: ProjectiveSpaceEnumerateRequest) -> None:
     q = request.space.field_order
     n = len(request.space.axis)
     if q**n > MAX_PROJECTIVE_SPACE_ENUMERATION_VECTORS:
-        raise ValueError(
+        _domain_error(
+            ("space",),
+            "enumeration_vector_count_exceeds_bound",
             "projective space exceeds the "
-            f"{MAX_PROJECTIVE_SPACE_ENUMERATION_VECTORS}-vector enumeration envelope"
+            f"{MAX_PROJECTIVE_SPACE_ENUMERATION_VECTORS}-vector enumeration envelope",
         )
     digit_width = len(str(q - 1))
     point_count = (q**n - 1) // (q - 1)
@@ -77,9 +103,11 @@ def _admit_projective_enumeration(request: ProjectiveSpaceEnumerateRequest) -> N
         for label in request.space.axis
     ) + point_count * per_point_bytes
     if predicted > MAX_PROJECTIVE_ENUMERATION_RESULT_BYTES:
-        raise ValueError(
+        _domain_error(
+            ("space",),
+            "enumeration_result_exceeds_bound",
             "the complete serialized point list would exceed the "
-            f"{MAX_PROJECTIVE_ENUMERATION_RESULT_BYTES}-byte result budget"
+            f"{MAX_PROJECTIVE_ENUMERATION_RESULT_BYTES}-byte result budget",
         )
 
 
@@ -87,7 +115,11 @@ def compute_projective_point_canonicalize(
     request: ProjectivePointCanonicalizeRequest,
 ) -> ProjectivePointCanonicalizeResult:
     if all(value == 0 for value in request.vector):
-        raise ValueError("zero vector has no projective point")
+        _domain_error(
+            ("vector",),
+            "zero_projective_vector",
+            "zero vector has no projective point",
+        )
     vector = list(request.vector)
     q = request.space.field_order
     for _i, v in enumerate(vector):
@@ -100,16 +132,11 @@ def compute_projective_point_canonicalize(
                 ProjectivePoint(space=request.space, coordinates=tuple(canonical)),
                 scale,
             )
-    raise ValueError("zero vector has no projective point")
-
-
-def _canonicalize_projective(vector: list[int], q: int) -> tuple[int, ...]:
-    """Canonicalize a nonzero vector by scaling first nonzero entry to 1."""
-    for i in range(len(vector)):
-        if vector[i] % q != 0:
-            inv = pow(vector[i] % q, -1, q)
-            return tuple((v * inv) % q for v in vector)
-    raise ValueError("zero vector has no projective point")
+    _domain_error(
+        ("vector",),
+        "zero_projective_vector",
+        "zero vector has no projective point",
+    )
 
 
 def compute_projective_point_equal(
@@ -238,10 +265,14 @@ def compute_prime_field_affine_plane(
     """
     q = request.prime_order
     if not isprime(q):
-        raise ValueError("prime_order must be prime")
+        _domain_error(
+            ("prime_order",), "prime_order_not_prime", "prime_order must be prime"
+        )
     if q > MAX_AFFINE_PLANE_FIELD_ORDER:
-        raise ValueError(
-            "prime_order exceeds the affine-plane operation envelope"
+        _domain_error(
+            ("prime_order",),
+            "prime_order_exceeds_bound",
+            "prime_order exceeds the affine-plane operation envelope",
         )
 
     # Points: (x, y) in lexicographic order, index = x * q + y

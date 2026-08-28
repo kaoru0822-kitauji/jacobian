@@ -7,7 +7,7 @@ from fractions import Fraction
 
 from pydantic_core import PydanticCustomError
 
-from jacobian._exact import CanonicalRational
+from jacobian._exact import MAX_CANONICAL_RATIONAL_DIGITS, CanonicalRational
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.polynomials.interpolation._kernel import (
     divided_difference_coefficients,
@@ -17,7 +17,6 @@ from jacobian.math.polynomials.interpolation._kernel import (
 )
 from jacobian.math.polynomials.interpolation._models import (
     _MAX_RATIONAL_DIGITS,
-    MAX_CANONICAL_RATIONAL_DIGITS,
     DividedDifferencesRequest,
     DividedDifferencesResult,
     HermiteConstraintReplay,

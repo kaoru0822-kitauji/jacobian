@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.polynomials._models import PolynomialGcdRequest
 from jacobian.math.polynomials._operations import polynomial_gcd
 
@@ -69,8 +70,9 @@ def test_gcd_is_symmetric() -> None:
 
 def test_both_zero_rejected() -> None:
     """gcd(0, 0) is rejected because zero has no monic normalization."""
-    with pytest.raises(Exception, match="monic"):
-        PolynomialGcdRequest.model_validate({"left": ZERO, "right": ZERO})
+    request = PolynomialGcdRequest.model_validate({"left": ZERO, "right": ZERO})
+    with pytest.raises(OperationDomainValidationError, match="monic"):
+        polynomial_gcd(request)
 
 
 def test_bezout_left_zero() -> None:

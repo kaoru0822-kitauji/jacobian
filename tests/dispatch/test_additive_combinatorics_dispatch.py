@@ -3,13 +3,14 @@
 import pytest
 
 from jacobian.catalog.catalog import Catalog
-from jacobian.dispatch import OperationRequestValidationError, invoke_operation
+from jacobian.catalog.models import OperationDomainValidationError
+from jacobian.dispatch import invoke_operation
 
 
 def test_direct_sum_rejects_an_oversized_complete_diagnostic_before_execution() -> None:
     """The public boundary reports output admission, not post-run transport failure."""
 
-    with pytest.raises(OperationRequestValidationError) as exc_info:
+    with pytest.raises(OperationDomainValidationError) as exc_info:
         invoke_operation(
             "additive.direct_sum_predicate.compute",
             {

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.finite_topology._models import (
     MAX_TOPOLOGY_OPERATION_OPENS,
     MAX_TOPOLOGY_OPERATION_POINTS,
@@ -20,25 +21,36 @@ from jacobian.math.finite_topology.operations import (
     continuity,
     specialization_preorder,
 )
+from jacobian.math.finite_topology.values import FiniteTopology
 
 
-def _admit_topology(topology) -> None:
+def _admit_topology(
+    topology: FiniteTopology, *, location: tuple[str | int, ...]
+) -> None:
     if topology.point_count > MAX_TOPOLOGY_OPERATION_POINTS:
-        raise ValueError(
-            "finite-topology operations support at most "
-            f"{MAX_TOPOLOGY_OPERATION_POINTS} points"
+        raise OperationDomainValidationError(
+            location=location,
+            code="finite_topology.point_count_exceeds_bound",
+            message=(
+                "finite-topology operations support at most "
+                f"{MAX_TOPOLOGY_OPERATION_POINTS} points"
+            ),
         )
     if len(topology.open_sets) > MAX_TOPOLOGY_OPERATION_OPENS:
-        raise ValueError(
-            "finite-topology operations support at most "
-            f"{MAX_TOPOLOGY_OPERATION_OPENS} open sets"
+        raise OperationDomainValidationError(
+            location=location,
+            code="finite_topology.open_set_count_exceeds_bound",
+            message=(
+                "finite-topology operations support at most "
+                f"{MAX_TOPOLOGY_OPERATION_OPENS} open sets"
+            ),
         )
 
 
 def compute_specialization_preorder(
     request: SpecializationPreorderRequest,
 ) -> SpecializationPreorderResult:
-    _admit_topology(request.topology)
+    _admit_topology(request.topology, location=("topology",))
     return SpecializationPreorderResult._from_kernel(
         request, specialization_preorder(request.topology)
     )
@@ -47,14 +59,14 @@ def compute_specialization_preorder(
 def compute_connected_components(
     request: ConnectedComponentsRequest,
 ) -> ConnectedComponentsResult:
-    _admit_topology(request.topology)
+    _admit_topology(request.topology, location=("topology",))
     components = connected_components(request.topology)
     return ConnectedComponentsResult._from_kernel(request, components)
 
 
 def compute_continuity(request: ContinuityRequest) -> ContinuityResult:
-    _admit_topology(request.domain)
-    _admit_topology(request.codomain)
+    _admit_topology(request.domain, location=("domain",))
+    _admit_topology(request.codomain, location=("codomain",))
     analysis = continuity(request.domain, request.codomain, request.point_map)
     return ContinuityResult._from_kernel(
         request,
@@ -65,7 +77,7 @@ def compute_continuity(request: ContinuityRequest) -> ContinuityResult:
 
 
 def compute_beat_points(request: BeatPointsRequest) -> BeatPointsResult:
-    _admit_topology(request.topology)
+    _admit_topology(request.topology, location=("topology",))
     analysis = beat_points(request.topology)
     return BeatPointsResult._from_kernel(
         request,

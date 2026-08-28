@@ -6,6 +6,7 @@ from contextlib import contextmanager
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.code_linear._models import (
     CodeEqualRequest,
     CodewordCheckRequest,
@@ -585,8 +586,10 @@ def test_equal_request_rejects_incomparable_encoders() -> None:
         coordinate_axis=("x0", "x1"),
         generator_matrix=((1, 1), (1, 0)),
     )
-    with _validation_error("enumeration_bound"):
-        CodeEqualRequest(encoder_a=oversized, encoder_b=oversized)
+    request = CodeEqualRequest(encoder_a=oversized, encoder_b=oversized)
+    with pytest.raises(OperationDomainValidationError) as exc_info:
+        compute_code_equal(request)
+    assert "enumeration_bound" in exc_info.value.errors()[0]["type"]
 
 
 def test_puncture_and_shorten_requests_reject_unselectable_coordinates() -> None:
