@@ -11,7 +11,7 @@ from pydantic_core import PydanticCustomError
 from jacobian._exact import CanonicalInteger, CanonicalRational
 from jacobian._models import StrictModel
 
-_MAX_CONTINUED_FRACTION_TERMS = 1_024
+MAX_RATIONAL_CONTINUED_FRACTION_TERMS = 1_024
 
 
 def _validation_error(reason: str, message: str) -> PydanticCustomError:
@@ -36,14 +36,6 @@ class NonzeroRationalValueRequest(StrictModel):
 
     value: CanonicalRational
 
-    @model_validator(mode="after")
-    def require_nonzero(self) -> Self:
-        if self.value.as_fraction() == 0:
-            raise _validation_error(
-                "reciprocal_requires_nonzero", "reciprocal requires a nonzero rational"
-            )
-        return self
-
 
 class RationalPairRequest(StrictModel):
     """Two canonical rationals supplied to a binary rational operation."""
@@ -57,15 +49,6 @@ class RationalDivisionRequest(StrictModel):
 
     left: CanonicalRational
     right: CanonicalRational
-
-    @model_validator(mode="after")
-    def require_nonzero_divisor(self) -> Self:
-        if self.right.as_fraction() == 0:
-            raise _validation_error(
-                "division_requires_nonzero_divisor",
-                "quotient requires a nonzero divisor",
-            )
-        return self
 
 
 # ---------------------------------------------------------------------------
@@ -106,7 +89,7 @@ class RationalContinuedFractionResult(StrictModel):
     value: CanonicalRational
     terms: tuple[CanonicalInteger, ...] = Field(
         min_length=1,
-        max_length=_MAX_CONTINUED_FRACTION_TERMS,
+        max_length=MAX_RATIONAL_CONTINUED_FRACTION_TERMS,
     )
 
     @model_validator(mode="after")
