@@ -205,8 +205,8 @@ class GroupConjugacyClassesResult(StrictModel):
 
     ``classes`` is canonically ordered (members lexicographically sorted,
     classes sorted by smallest member) so equal groups serialize
-    identically. The producing kernel establishes closure and the conjugacy
-    orbits; ordinary model parsing checks only the canonical partition shape.
+    identically. External parsing authenticates closure and the conjugacy
+    orbits; the trusted producing kernel bypasses that replay.
     """
 
     classes: tuple[ConjugacyClass, ...] = Field(
@@ -217,7 +217,8 @@ class GroupConjugacyClassesResult(StrictModel):
 
     @model_validator(mode="after")
     def require_conjugacy_class_partition(self) -> Self:
-        _require_canonical_partition(self.classes)
+        elements = _require_canonical_partition(self.classes)
+        _require_conjugacy_orbits(self.classes, elements)
         return self
 
     @classmethod
@@ -273,6 +274,38 @@ def _require_canonical_partition(
             f"{MAX_CONJUGACY_CLASSES_GROUP_ORDER} elements",
         )
     return elements
+
+
+def _require_conjugacy_orbits(
+    classes: tuple[ConjugacyClass, ...], elements: set[tuple[int, ...]]
+) -> None:
+    from sympy.combinatorics import Permutation, PermutationGroup
+
+    degree = len(classes[0][0])
+    backend_group = PermutationGroup(
+        *(Permutation(list(element)) for element in elements)
+    )
+    if int(backend_group.order()) != len(elements):
+        raise _validation_error(
+            "group.partition_not_closed",
+            "conjugacy classes must contain exactly one finite subgroup",
+        )
+    expected = [
+        tuple(sorted(_full_permutation_form(element, degree) for element in orbit))
+        for orbit in backend_group.conjugacy_classes()
+    ]
+    expected.sort(key=lambda orbit: orbit[0])
+    if tuple(expected) != classes:
+        raise _validation_error(
+            "group.conjugacy_orbits",
+            "classes must be the exact conjugacy orbits of their permutation group",
+        )
+
+
+def _full_permutation_form(permutation: Any, degree: int) -> tuple[int, ...]:
+    form = list(permutation.array_form)
+    form.extend(range(len(form), degree))
+    return tuple(form)
 
 
 class GroupStabilizerRequest(StrictModel):

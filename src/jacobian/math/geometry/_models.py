@@ -17,6 +17,7 @@ from jacobian._exact import (
 )
 from jacobian._models import StrictModel
 from jacobian.canonical import encode_strict_json, format_canonical_integer
+from jacobian.math.geometry._predicates import are_collinear, determinant4
 
 
 def _validation_error(reason: str, message: str) -> PydanticCustomError:
@@ -116,6 +117,36 @@ def _require_circumradius_output_bound(points: tuple[RationalPoint2D, ...]) -> N
         )
 
 
+def _expected_collinear_indices(
+    pts: list[tuple[Fraction, Fraction]],
+) -> set[tuple[int, int, int]]:
+    return {
+        (i, j, k)
+        for i, j, k in combinations(range(len(pts)), 3)
+        if are_collinear(pts[i], pts[j], pts[k])
+    }
+
+
+def _expected_concyclic_indices(
+    pts: list[tuple[Fraction, Fraction]],
+    collinear_set: set[tuple[int, int, int]],
+) -> set[tuple[int, int, int, int]]:
+    result: set[tuple[int, int, int, int]] = set()
+    for i, j, k, m in combinations(range(len(pts)), 4):
+        if any(
+            triple in collinear_set
+            for triple in ((i, j, k), (i, j, m), (i, k, m), (j, k, m))
+        ):
+            continue
+        rows = tuple(
+            (px * px + py * py, px, py, Fraction(1))
+            for px, py in (pts[i], pts[j], pts[k], pts[m])
+        )
+        if determinant4(rows) == 0:
+            result.add((i, j, k, m))
+    return result
+
+
 def _check_witness_sorted_distinct(
     indices: tuple[int, ...], n: int, expected: int, label: str
 ) -> None:
@@ -187,6 +218,27 @@ def _validate_general_position_witnesses(
         )
 
 
+def _validate_general_position_binding(
+    points: tuple[RationalPoint2D, ...],
+    collinear: tuple[CollinearTripleWitness, ...],
+    concyclic: tuple[ConcyclicQuadrupleWitness, ...],
+) -> None:
+    pts = [(p.x.as_fraction(), p.y.as_fraction()) for p in points]
+    expected_collinear = _expected_collinear_indices(pts)
+    if {w.indices for w in collinear} != expected_collinear:
+        raise _validation_error(
+            "collinear_triples_configuration_s_collinear_triples",
+            "collinear_triples must exactly match the configuration's collinear triples",
+        )
+    expected_concyclic = _expected_concyclic_indices(pts, expected_collinear)
+    if {w.indices for w in concyclic} != expected_concyclic:
+        raise _validation_error(
+            "concyclic_quadruples_configuration_s_concyclic_quadruples",
+            "concyclic_quadruples must exactly match the configuration's concyclic "
+            "quadruples (excluding collinear quadruples)",
+        )
+
+
 def _validate_circumradius_entries_basic(
     entries: tuple[CircumradiusTripleEntry, ...], n: int
 ) -> set[tuple[int, int, int]]:
@@ -211,6 +263,40 @@ def _validate_circumradius_entries_basic(
             "entries_cover_c_n_triples", "entries must cover exactly C(n,3) triples"
         )
     return seen
+
+
+def _validate_circumradius_binding(
+    points: tuple[RationalPoint2D, ...],
+    entries: tuple[CircumradiusTripleEntry, ...],
+) -> None:
+    pts = [(p.x.as_fraction(), p.y.as_fraction()) for p in points]
+    for entry in entries:
+        i, j, k = entry.indices
+        ax, ay = pts[i]
+        bx, by = pts[j]
+        cx, cy = pts[k]
+        cross = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
+        is_degenerate = cross == 0
+        if entry.is_degenerate != is_degenerate:
+            raise _validation_error(
+                "degenerate_collinearity", "is_degenerate must match collinearity"
+            )
+        if is_degenerate:
+            continue
+        ab_sq = (bx - ax) ** 2 + (by - ay) ** 2
+        bc_sq = (cx - bx) ** 2 + (cy - by) ** 2
+        ca_sq = (ax - cx) ** 2 + (ay - cy) ** 2
+        expected = CanonicalRational.from_fraction(
+            Fraction(ab_sq * bc_sq * ca_sq) / Fraction(4 * cross * cross)
+        )
+        require_bounded_rational(
+            expected, max_digits=MAX_COORDINATE_DIGITS * 40, label="circumradius"
+        )
+        if entry.radius_squared != expected:
+            raise _validation_error(
+                "radius_squared_exact_circumradius",
+                "radius_squared must match exact circumradius",
+            )
 
 
 class RationalPoint2D(StrictModel):
@@ -1483,6 +1569,7 @@ class GeneralPositionResult(StrictModel):
     @model_validator(mode="after")
     def require_canonical(self) -> Self:
         _require_bounded_configuration(self.points)
+        _require_general_position_work_bound(self.points)
         _validate_general_position_points(self.points, self.num_points)
         _validate_general_position_witnesses(
             self.collinear_triples,
@@ -1490,6 +1577,9 @@ class GeneralPositionResult(StrictModel):
             self.has_collinear_triple,
             self.has_concyclic_quadruple,
             len(self.points),
+        )
+        _validate_general_position_binding(
+            self.points, self.collinear_triples, self.concyclic_quadruples
         )
         return self
 
@@ -1587,6 +1677,7 @@ class CircumradiusProfileResult(StrictModel):
     @model_validator(mode="after")
     def require_canonical(self) -> Self:
         _require_bounded_configuration(self.points)
+        _require_circumradius_output_bound(self.points)
         keys = tuple((p.x.num, p.x.den, p.y.num, p.y.den) for p in self.points)
         if len(keys) != len(set(keys)):
             raise _validation_error(
@@ -1602,6 +1693,7 @@ class CircumradiusProfileResult(StrictModel):
                 "entries_cover_c_n_triples", "entries must cover exactly C(n,3) triples"
             )
         _validate_circumradius_entries_basic(self.entries, n)
+        _validate_circumradius_binding(self.points, self.entries)
         return self
 
     @classmethod

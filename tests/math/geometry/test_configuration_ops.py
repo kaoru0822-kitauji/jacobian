@@ -3,12 +3,15 @@
 from fractions import Fraction
 
 import pytest
+from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.geometry._models import (
     CircumradiusProfileRequest,
+    CircumradiusProfileResult,
     GeneralPositionRequest,
+    GeneralPositionResult,
     RationalPoint2D,
 )
 from jacobian.math.geometry._operations import (
@@ -80,6 +83,16 @@ class TestGeneralPosition:
                 points=(_point("0", "0"), _point("0", "0"), _point("1", "0"))
             )
 
+    def test_external_result_rejects_missing_collinear_witness(self) -> None:
+        points = (_point("0", "0"), _point("1", "0"), _point("2", "0"))
+        result = general_position_search(GeneralPositionRequest(points=points))
+        forged = result.model_dump()
+        forged["has_collinear_triple"] = False
+        forged["collinear_triples"] = []
+
+        with pytest.raises(ValidationError, match="must exactly match"):
+            GeneralPositionResult.model_validate(forged)
+
 
 class TestCircumradiusProfile:
     def test_triangle(self) -> None:
@@ -132,6 +145,15 @@ class TestCircumradiusProfile:
             if not entry.is_degenerate and entry.radius_squared:
                 radii.add((entry.radius_squared.num, entry.radius_squared.den))
         assert len(radii) == 1
+
+    def test_external_result_rejects_forged_radius(self) -> None:
+        points = (_point("0", "0"), _point("1", "0"), _point("0", "1"))
+        result = circumradius_profile(CircumradiusProfileRequest(points=points))
+        forged = result.model_dump()
+        forged["entries"][0]["radius_squared"] = {"num": "3", "den": "4"}
+
+        with pytest.raises(ValidationError, match="exact circumradius"):
+            CircumradiusProfileResult.model_validate(forged)
 
 
 class TestAdmissionBounds:
