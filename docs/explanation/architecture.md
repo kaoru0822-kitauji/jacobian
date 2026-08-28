@@ -165,7 +165,7 @@ subjects such as matrices, graphs, polynomials, probability, and number theory
 over vague umbrellas that would contain much of the library. Keep the top level
 free of ticket-shaped feature packages, backend names, and workflow groupings.
 
-The target first-level taxonomy is deliberately restrained:
+The first-level taxonomy is deliberately restrained:
 
 ```text
 jacobian.math
@@ -176,12 +176,10 @@ jacobian.math
   optimization        dynamics             logic
 ```
 
-This list is the package-migration target, not a claim that every current
-package has already been folded. A subject may remain first-level only when it
-cannot be represented honestly as a mathematical subdivision of one of these
-owners; do not force an independent subject into an inaccurate parent merely
-to reduce the directory count. Record that exception here when it becomes a
-durable part of the public taxonomy.
+Independent subjects that do not fit those owners honestly remain explicit:
+`cluster_algebras`, `coalgebras`, `crossed_products`, `finite_categories`,
+`finite_dim_algebras`, `finite_semigroups`, and `universal_algebra`. Do not
+force them into an inaccurate parent merely to reduce the directory count.
 
 Decide by evidence, in this order:
 
@@ -223,7 +221,7 @@ small owner                    large owner
     values.py                      values.py
     operations.py                  ideals/
     _models.py                     interpolation/
-    _tools.py                      formal_series/
+    _tools.py                      series/
 ```
 
 Nest into a subpackage when a cohesive mathematical slice needs its own values,
@@ -235,12 +233,12 @@ family prefix when nesting (`matrix_analysis` -> `matrices/analysis`,
 `graph_coloring_ops` -> `graphs/coloring`), and keep descriptive names
 otherwise.
 
-A fold preserves operation IDs and request/result schemas, keeps one math
-owner per tool, preserves cross-domain canonical values unchanged, deletes the
-old path in the same change, and lands as one family per change. A proposed
-repository-wide taxonomy remains a migration plan until each fold establishes
-its value owner, operation owner, and mathematical-subdivision relationship; do
-not document an aspirational directory tree as current behavior.
+The repository uses the taxonomy above today. Future package changes preserve
+operation IDs and request/result schemas, keep one mathematical owner per tool,
+reuse cross-domain canonical values unchanged, and delete replaced paths in the
+same change. Change an owner only when the value owner, operation owner, or
+mathematical-subdivision evidence changes; directory-count reduction alone is
+not a reason to move a package.
 
 Because Jacobian is pre-stable, a fold updates repository imports and public
 examples atomically and does not retain forwarding packages at the former path.
