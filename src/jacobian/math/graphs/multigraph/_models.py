@@ -789,17 +789,6 @@ class CycleMulticoverRequest(StrictModel):
     cycles: tuple[CycleRecord, ...] = Field(max_length=MAX_CYCLE_COUNT)
     target_multiplicity: StrictInt = Field(ge=0, le=MAX_PARALLEL_MULTIPLICITY)
 
-    @model_validator(mode="after")
-    def require_bounded_incidence(self) -> Self:
-        total = sum(len(cycle.edge_ids) for cycle in self.cycles)
-        if total > MAX_CYCLE_EDGE_INCIDENCES:
-            raise PydanticCustomError(
-                "graph.total_cycle_edge_incidences_exceed_max_cycle",
-                f"total cycle-edge incidences exceed {MAX_CYCLE_EDGE_INCIDENCES}",
-            )
-        return self
-
-
 class CycleMulticoverResult(StrictModel):
     """Per-cycle validity and exact edge-multiplicity profile for a cover.
 

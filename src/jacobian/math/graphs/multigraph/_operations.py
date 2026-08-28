@@ -12,7 +12,9 @@ from typing import Literal
 
 import networkx as nx
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.multigraph._models import (
+    MAX_CYCLE_EDGE_INCIDENCES,
     CycleMulticoverRequest,
     CycleMulticoverResult,
     CycleRecord,
@@ -60,7 +62,6 @@ def check_multigraph_flow(
     divergence_ledger, conservation_holds = _compute_divergence_ledger(
         graph, group, request.edge_values
     )
-
     # Identify zero-valued edges
     zero_edge_ids = [
         assign.edge_id for assign in request.edge_values if group.is_zero(assign.value)
@@ -503,6 +504,17 @@ def check_cycle_multicover(
     in the graph.  Cycles may appear in any ordering, rotation, or reversal.
     The operation scores per-edge multiplicity.
     """
+    total_incidences = sum(len(cycle.edge_ids) for cycle in request.cycles)
+    if total_incidences > MAX_CYCLE_EDGE_INCIDENCES:
+        raise OperationDomainValidationError(
+            location=("cycles",),
+            code="graph.total_cycle_edge_incidences_exceed_max_cycle",
+            message=(
+                "total cycle-edge incidences exceed "
+                f"{MAX_CYCLE_EDGE_INCIDENCES}"
+            ),
+        )
+
     graph = request.graph
     k = request.target_multiplicity
 
@@ -549,50 +561,3 @@ def check_cycle_multicover(
         overcovered_edge_ids=tuple(overcovered),
         is_exact_k_cover=is_exact,
     )
-
-
-def _verify_multigraph_flow_check_result(result: MultigraphFlowCheckResult) -> bool:
-    """Deliberately recompute one independently supplied flow-check claim."""
-    request = MultigraphFlowCheckRequest(
-        graph=result.graph,
-        group=result.group,
-        edge_values=result.edge_flow_records,
-    )
-    return check_multigraph_flow(request) == result
-
-
-def _verify_multigraph_flow_find_result(result: MultigraphFlowFindResult) -> bool:
-    """Deliberately replay one bounded flow-search claim under its own budget."""
-    request = MultigraphFlowFindRequest(
-        graph=result.graph,
-        group=result.group,
-        resource_budget=result.resource_budget,
-    )
-    outcome = _search_flow_unbound(
-        request.graph, request.group, request.resource_budget
-    )
-    return (
-        result.status == outcome.status
-        and result.flow == outcome.flow
-        and result.states_explored == outcome.states_explored
-        and result.termination_reason == outcome.termination_reason
-    )
-
-
-def _verify_eulerian_cycles_result(result: EulerianCyclesResult) -> bool:
-    """Deliberately recompute one independently supplied decomposition claim."""
-    request = EulerianCyclesRequest(
-        graph=result.graph,
-        edge_subset=result.edge_subset,
-    )
-    return compute_eulerian_cycles(request) == result
-
-
-def _verify_cycle_multicover_result(result: CycleMulticoverResult) -> bool:
-    """Deliberately recompute one independently supplied multicover claim."""
-    request = CycleMulticoverRequest(
-        graph=result.graph,
-        cycles=result.cycles,
-        target_multiplicity=result.target_multiplicity,
-    )
-    return check_cycle_multicover(request) == result
