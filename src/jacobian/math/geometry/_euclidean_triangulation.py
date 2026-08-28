@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from fractions import Fraction
 
+from pydantic_core import PydanticCustomError
+
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.geometry._models import (
     EUCLIDEAN_TRIANGULATION_COMPARISON_PRECISION_BITS,
     EuclideanComparisonUnresolved,
@@ -18,6 +21,17 @@ from jacobian.math.geometry._models import (
     _euclidean_squared_length,
     _require_euclidean_triangulation_envelope,
 )
+
+
+def _admit_euclidean_triangulation(
+    request: EuclideanConvexPolygonTriangulationRequest,
+) -> tuple[tuple[Fraction, Fraction], ...]:
+    try:
+        return _require_euclidean_triangulation_envelope(request.polygon)
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=("polygon", "points"), code=exc.type, message=exc.message()
+        ) from exc
 
 
 def _expression(values: tuple[Fraction, ...]) -> EuclideanLengthExpression:
@@ -40,7 +54,7 @@ def minimum_euclidean_weight_triangulation(
     expressions at the declared precision.
     """
 
-    points = _require_euclidean_triangulation_envelope(request.polygon)
+    points = _admit_euclidean_triangulation(request)
     count = len(points)
 
     def is_hull_edge(first: int, second: int) -> bool:

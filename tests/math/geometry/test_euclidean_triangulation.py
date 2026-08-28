@@ -261,9 +261,8 @@ class TestEuclideanTriangulation:
             minimum_euclidean_weight_triangulation(request)
 
     def test_request_rejects_a_triangle_below_the_admitted_vertex_floor(self) -> None:
-        request = _request((_point(0, 0), _point(2, 0), _point(0, 2)))
-        with pytest.raises(OperationDomainValidationError):
-            minimum_euclidean_weight_triangulation(request)
+        with pytest.raises(ValidationError):
+            _request((_point(0, 0), _point(2, 0), _point(0, 2)))
 
     def test_request_admits_a_ring_past_the_former_fixed_vertex_ceiling(
         self,
@@ -294,14 +293,13 @@ class TestEuclideanTriangulation:
         assert validated.optimum == result.optimum
 
     def test_request_rejects_a_ring_beyond_the_derived_vertex_ceiling(self) -> None:
-        request = _request(
-            tuple(
-                _point(index, index * index)
-                for index in range(MAX_EUCLIDEAN_TRIANGULATION_VERTICES + 1)
+        with pytest.raises(ValidationError):
+            _request(
+                tuple(
+                    _point(index, index * index)
+                    for index in range(MAX_EUCLIDEAN_TRIANGULATION_VERTICES + 1)
+                )
             )
-        )
-        with pytest.raises(OperationDomainValidationError):
-            minimum_euclidean_weight_triangulation(request)
 
     def test_request_admits_a_far_translated_unit_square(self) -> None:
         scale = 10**32 + 7
