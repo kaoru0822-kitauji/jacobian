@@ -153,7 +153,11 @@ def _admit_partial_trace(request: Any) -> None:
 def _admit_determinant(request: Any) -> None:
     _admit_square_rational(request)
     if len(request.matrix.entries) > MAX_DETERMINANT_MATRIX_DIMENSION:
-        raise _validation_error("budget_exceeded", "determinant matrices are limited to order 64")
+        raise _validation_error(
+            "budget_exceeded",
+            "determinant matrices are limited to order "
+            f"{MAX_DETERMINANT_MATRIX_DIMENSION}",
+        )
 
 
 def _admit_linear_solve(request: RationalLinearSolveRequest) -> None:
