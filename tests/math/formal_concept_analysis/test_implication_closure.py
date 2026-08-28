@@ -68,7 +68,7 @@ def test_multi_round_closure_has_replayable_first_lineage() -> None:
         for step in result.lineage
     ) == ((1, 0, 1), (2, 1, 2))
     assert result.work.productive_rounds == 2
-    assert result.work.canonical_replay_work == (
+    assert result.work.total_logical_work == (
         result.work.canonical_implication_checks
         + result.work.canonical_membership_checks
     )
@@ -82,7 +82,7 @@ def test_empty_carrier_and_empty_system_have_empty_exact_closure() -> None:
     assert result.closure == ()
     assert result.added == ()
     assert result.lineage == ()
-    assert result.work.canonical_replay_work == 0
+    assert result.work.total_logical_work == 0
 
 
 def test_empty_premise_fires_and_empty_conclusion_is_inert() -> None:
@@ -221,7 +221,7 @@ def test_zero_work_carrier_beyond_the_formal_context_cap_is_admitted() -> None:
     assert result.added == ()
     assert result.lineage == ()
     assert result.work.productive_rounds == 0
-    assert result.work.canonical_replay_work == 0
+    assert result.work.total_logical_work == 0
     assert ImplicationClosureRequest(system=system).seed == ()
 
 

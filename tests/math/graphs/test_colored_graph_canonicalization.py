@@ -281,7 +281,7 @@ def test_request_admits_by_color_class_size_not_only_vertex_count() -> None:
 def test_edgeless_distinguished_carrier_admits_past_the_fixed_order_cap() -> None:
     """A 65-vertex edgeless graph with distinct vertex colors must be admitted.
 
-    Distinct colors leave one candidate labeling, only ``2 * 65`` replay-work
+    Distinct colors leave one candidate labeling, only 65 execution-work
     units, and a small exact result, so the derived work and result admission
     accepts what a fixed 64-vertex carrier cap would have rejected.
     """
@@ -347,7 +347,7 @@ def test_request_rejects_edge_key_work_before_enumeration() -> None:
             ),
         ),
     ],
-    ids=["permutation-bound", "replay-work-bound"],
+    ids=["permutation-bound", "execution-work-bound"],
 )
 def test_native_and_wire_operations_reject_the_same_domain(
     graph: ColoredUndirectedGraph,
@@ -386,7 +386,7 @@ def _dense_complete_colored_graph(label_bytes: int) -> ColoredUndirectedGraph:
 def test_request_admits_transport_bounded_dense_results() -> None:
     """A 64-vertex complete graph with 49-byte labels fits the derived budget.
 
-    Distinct vertex colors leave one candidate labeling, the replay work stays
+    Distinct vertex colors leave one candidate labeling, the execution work stays
     below its bound, and the exact result sits far below the repository's
     10 MiB canonical JSON output limit, so only the superseded 512 KiB ceiling
     rejected it.

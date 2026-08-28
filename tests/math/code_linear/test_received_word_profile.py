@@ -350,8 +350,8 @@ def test_threshold_mode_relation_is_schema_visible() -> None:
     assert "NONE without a threshold" in mode_description
 
 
-def test_replay_work_admits_larger_profiles_without_a_codeword_cap() -> None:
-    # A binary 13x13 identity encoder has 8,192 codewords and replay work
+def test_execution_work_admits_larger_profiles_without_a_codeword_cap() -> None:
+    # A binary 13x13 identity encoder has 8,192 codewords and execution work
     # 2,981,888, so admission comes from the work bound alone.
     identity_13 = tuple(
         tuple(int(row == column) for column in range(13)) for row in range(13)
@@ -361,7 +361,7 @@ def test_replay_work_admits_larger_profiles_without_a_codeword_cap() -> None:
         received_word=(0,) * 13,
     )
     assert request.encoder.codeword_count == 8_192
-    assert request.profile_replay_work == 2_981_888
+    assert request.profile_execution_work == 2_981_888
 
     result = compute_received_word_profile(request)
     assert result.codeword_count == 8_192
@@ -379,14 +379,14 @@ def test_work_bound_still_rejects_before_enumeration() -> None:
             received_word=(0,) * length,
         )
 
-    assert rectangular_identity(28).profile_replay_work == 2_981_888
+    assert rectangular_identity(28).profile_execution_work == 2_981_888
     request = rectangular_identity(29)
-    with _operation_error("code_linear.profile_replay_work_exceeded"):
+    with _operation_error("code_linear.profile_execution_work_exceeded"):
         compute_received_word_profile(request)
 
 
-def test_codeword_budget_is_derived_from_the_replay_work_bound() -> None:
-    # GF(47)^3 is the largest image admitted by the 3,000,000 replay-work
+def test_codeword_budget_is_derived_from_the_execution_work_bound() -> None:
+    # GF(47)^3 is the largest image admitted by the 3,000,000 execution-work
     # budget: 2 * 47^3 * 3 * 4 = 2,491,752; GF(53)^3 needs 3,573,048.
     assert MAX_RECEIVED_PROFILE_CODEWORDS == 47**3 == 103_823
 
@@ -396,13 +396,13 @@ def test_codeword_budget_is_derived_from_the_replay_work_bound() -> None:
         received_word=(0, 0, 0),
     )
     assert admitted.encoder.codeword_count == MAX_RECEIVED_PROFILE_CODEWORDS
-    assert admitted.profile_replay_work == 2_491_752
+    assert admitted.profile_execution_work == 2_491_752
 
     over_budget = ReceivedWordProfileRequest(
         encoder=_encoder(identity, field_order=53),
         received_word=(0, 0, 0),
     )
-    with _operation_error("code_linear.profile_replay_work_exceeded"):
+    with _operation_error("code_linear.profile_execution_work_exceeded"):
         compute_received_word_profile(over_budget)
 
 

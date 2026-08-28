@@ -10,7 +10,7 @@ from jacobian.canonical import encode_strict_json
 from jacobian.math.graphs.values import ColoredUndirectedGraph, SimpleUndirectedGraph
 
 MAX_CANONICAL_PERMUTATIONS = factorial(9)
-MAX_CANONICAL_REPLAY_WORK = 100_000_000
+MAX_CANONICALIZATION_WORK = 100_000_000
 MAX_CANONICALIZATION_RESULT_BYTES = 10 * 1024 * 1024
 """Aggregate canonical-output budget aligned with Jacobian's 10 MiB JSON limit."""
 _RESULT_ENVELOPE_RESERVE_BYTES = 1_024
@@ -41,8 +41,8 @@ def canonical_permutation_count(graph: ColoredUndirectedGraph) -> int:
     return count
 
 
-def canonical_replay_work(graph: ColoredUndirectedGraph) -> int:
-    """Bound execution plus result replay in integer key-work units.
+def canonicalization_work(graph: ColoredUndirectedGraph) -> int:
+    """Bound canonicalization execution in integer key-work units.
 
     Each candidate assigns every vertex and transforms every edge.  The
     ``m * m`` term conservatively covers transformed-edge ordering without
@@ -55,7 +55,7 @@ def canonical_replay_work(graph: ColoredUndirectedGraph) -> int:
     edge_count = len(graph.graph.edges)
     edge_key_work = edge_count * edge_count
     per_candidate = max(1, vertex_count + edge_key_work)
-    return 2 * canonical_permutation_count(graph) * per_candidate
+    return canonical_permutation_count(graph) * per_candidate
 
 
 def _target_vectors(
@@ -242,11 +242,11 @@ def canonicalize_colored_graph_data(
 
 __all__ = [
     "MAX_CANONICALIZATION_RESULT_BYTES",
+    "MAX_CANONICALIZATION_WORK",
     "MAX_CANONICAL_PERMUTATIONS",
-    "MAX_CANONICAL_REPLAY_WORK",
     "apply_colored_graph_relabeling",
     "canonical_permutation_count",
-    "canonical_replay_work",
     "canonicalization_result_wire_bytes",
+    "canonicalization_work",
     "canonicalize_colored_graph_data",
 ]

@@ -8,7 +8,7 @@ from typing import NamedTuple
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.code_linear._models import (
     MAX_CODEWORDS,
-    MAX_RECEIVED_PROFILE_REPLAY_WORK,
+    MAX_RECEIVED_PROFILE_EXECUTION_WORK,
     MAX_RECEIVED_PROFILE_WITNESS_CELLS,
     CodeEqualRequest,
     CodeEqualResult,
@@ -115,11 +115,11 @@ def _received_word_profile_data(
 def compute_received_word_profile(
     request: ReceivedWordProfileRequest,
 ) -> ReceivedWordProfileResult:
-    if request.profile_replay_work > MAX_RECEIVED_PROFILE_REPLAY_WORK:
+    if request.profile_execution_work > MAX_RECEIVED_PROFILE_EXECUTION_WORK:
         raise OperationDomainValidationError(
             location=("encoder",),
-            code="code_linear.profile_replay_work_exceeded",
-            message="received-word profile replay work exceeds its bound",
+            code="code_linear.profile_execution_work_exceeded",
+            message="received-word profile execution work exceeds its bound",
         )
     if (
         request.witness_mode == "ALL"

@@ -17,7 +17,7 @@ MAX_IMPLICATION_MEMBERSHIPS = 4_096
 
 # One synchronous forward-chaining round rescans the whole canonical family,
 # and the closing satisfaction scan does so once more; every productive round
-# adds at least one carrier attribute, so exact replay work is at most
+# adds at least one carrier attribute, so exact logical work is at most
 # ``(carrier_size + 1) * (rows + memberships)``.  Admission below bounds
 # exactly that product, so the accepted implication-system carrier axis is
 # limited by predicted work and serialized-result size rather than by a fixed
@@ -25,7 +25,7 @@ MAX_IMPLICATION_MEMBERSHIPS = 4_096
 # 4,096 memberships) over a 64-attribute carrier and proportionally smaller
 # families over larger carriers.
 MAX_FORWARD_CHAIN_WORK = 2 * 65 * (MAX_IMPLICATIONS + MAX_IMPLICATION_MEMBERSHIPS)
-MAX_CANONICAL_REPLAY_WORK = MAX_FORWARD_CHAIN_WORK // 2
+MAX_CANONICAL_CLOSURE_WORK = MAX_FORWARD_CHAIN_WORK // 2
 MAX_IMPLICATION_CLOSURE_RESULT_BYTES = 128 * 1_024
 
 # Attribute indices are carrier members: each owning model validator below
@@ -194,7 +194,7 @@ class ImplicationDerivation(StrictModel):
 
 
 class ImplicationClosureWork(StrictModel):
-    """Exact cost of the canonical synchronous lineage replay.
+    """Exact cost of canonical synchronous closure construction.
 
     These logical counts are defined by the public replay procedure, independent
     of whether the private closure kernel uses repeated scans or counters.
@@ -203,25 +203,25 @@ class ImplicationClosureWork(StrictModel):
     productive_rounds: StrictInt = Field(ge=0)
     canonical_implication_checks: StrictInt = Field(
         ge=0,
-        le=MAX_CANONICAL_REPLAY_WORK,
+        le=MAX_CANONICAL_CLOSURE_WORK,
     )
     canonical_membership_checks: StrictInt = Field(
         ge=0,
-        le=MAX_CANONICAL_REPLAY_WORK,
+        le=MAX_CANONICAL_CLOSURE_WORK,
     )
-    canonical_replay_work: StrictInt = Field(
+    total_logical_work: StrictInt = Field(
         ge=0,
-        le=MAX_CANONICAL_REPLAY_WORK,
+        le=MAX_CANONICAL_CLOSURE_WORK,
     )
 
     @model_validator(mode="after")
-    def bind_canonical_replay_work(self) -> Self:
-        if self.canonical_replay_work != (
+    def bind_total_logical_work(self) -> Self:
+        if self.total_logical_work != (
             self.canonical_implication_checks + self.canonical_membership_checks
         ):
             raise PydanticCustomError(
-                "formal_concept_analysis.replay_work_mismatch",
-                "canonical_replay_work must equal implication plus membership checks",
+                "formal_concept_analysis.logical_work_mismatch",
+                "total_logical_work must equal implication plus membership checks",
             )
         return self
 
@@ -243,134 +243,6 @@ def _require_canonical_carrier_subset(
             f"{name} contains an attribute outside the carrier",
             {"name": name},
         )
-
-
-def _replay_implication_lineage(
-    system: FiniteAttributeImplicationSystem,
-    seed: set[int],
-    closure: set[int],
-    lineage: tuple[ImplicationDerivation, ...],
-    productive_rounds: int,
-) -> tuple[int, int]:
-    reconstructed = set(seed)
-    lineage_index = 0
-    implication_checks = 0
-    membership_checks = 0
-    for activation_round in range(1, productive_rounds + 1):
-        expected_sources: dict[int, int] = {}
-        for implication_index, implication in enumerate(system.implications):
-            implication_checks += 1
-            membership_checks += len(implication.premise)
-            if not set(implication.premise).issubset(reconstructed):
-                continue
-            membership_checks += len(implication.conclusion)
-            for attribute in implication.conclusion:
-                if attribute not in reconstructed:
-                    expected_sources.setdefault(attribute, implication_index)
-        if not expected_sources:
-            raise PydanticCustomError(
-                "formal_concept_analysis.productive_round_empty",
-                "every reported productive round must add an attribute",
-            )
-
-        reported_sources: dict[int, int] = {}
-        while (
-            lineage_index < len(lineage)
-            and lineage[lineage_index].activation_round == activation_round
-        ):
-            step = lineage[lineage_index]
-            if step.attribute in reconstructed or step.attribute in reported_sources:
-                raise PydanticCustomError(
-                    "formal_concept_analysis.lineage_duplicate_attribute",
-                    "lineage derives an attribute more than once",
-                )
-            reported_sources[step.attribute] = step.implication_index
-            lineage_index += 1
-        if reported_sources != expected_sources:
-            raise PydanticCustomError(
-                "formal_concept_analysis.lineage_round_mismatch",
-                "lineage does not replay each simultaneous first derivation",
-            )
-        reconstructed.update(reported_sources)
-
-    if lineage_index != len(lineage) or reconstructed != closure:
-        raise PydanticCustomError(
-            "formal_concept_analysis.lineage_fixed_point_mismatch",
-            "lineage does not reconstruct the claimed least implication fixed point",
-        )
-
-    final_sources: set[int] = set()
-    for implication in system.implications:
-        implication_checks += 1
-        membership_checks += len(implication.premise)
-        if not set(implication.premise).issubset(reconstructed):
-            continue
-        membership_checks += len(implication.conclusion)
-        final_sources.update(set(implication.conclusion) - reconstructed)
-    if final_sources:
-        raise PydanticCustomError(
-            "formal_concept_analysis.closure_not_closed",
-            "closure must satisfy every implication",
-        )
-    return implication_checks, membership_checks
-
-
-def _require_exact_implication_work(
-    expected_implication_checks: int,
-    expected_membership_checks: int,
-    work: ImplicationClosureWork,
-) -> None:
-    expected_replay_work = expected_implication_checks + expected_membership_checks
-    if (
-        work.canonical_implication_checks != expected_implication_checks
-        or work.canonical_membership_checks != expected_membership_checks
-        or work.canonical_replay_work != expected_replay_work
-    ):
-        raise PydanticCustomError(
-            "formal_concept_analysis.work_accounting_mismatch",
-            "work accounting does not match the canonical lineage replay",
-        )
-
-
-def _canonical_implication_closure(
-    system: FiniteAttributeImplicationSystem,
-    seed: frozenset[int],
-) -> tuple[int, ...]:
-    """Return the least closure for independent bounded-result verification."""
-
-    closure = set(seed)
-    while True:
-        added = {
-            attribute
-            for implication in system.implications
-            if set(implication.premise).issubset(closure)
-            for attribute in implication.conclusion
-            if attribute not in closure
-        }
-        if not added:
-            return tuple(sorted(closure))
-        closure.update(added)
-
-
-def _canonical_implication_closure_work(
-    system: FiniteAttributeImplicationSystem,
-    seed: frozenset[int],
-) -> tuple[tuple[int, ...], int]:
-    """Replay closure with the public logical-work accounting convention."""
-
-    closure = set(seed)
-    work = 0
-    while True:
-        first_sources: set[int] = set()
-        for implication in system.implications:
-            work += 1 + len(implication.premise)
-            if not set(implication.premise).issubset(closure):
-                continue
-            work += len(implication.conclusion)
-            first_sources.update(set(implication.conclusion) - closure)
-        if not first_sources:
-            return tuple(sorted(closure)), work
-        closure.update(first_sources)
 
 
 class ImplicationClosureResult(StrictModel):
@@ -455,7 +327,7 @@ class FormalContext(StrictModel):
 
 __all__ = [
     "MAX_ATTRIBUTES",
-    "MAX_CANONICAL_REPLAY_WORK",
+    "MAX_CANONICAL_CLOSURE_WORK",
     "MAX_FORWARD_CHAIN_WORK",
     "MAX_IMPLICATIONS",
     "MAX_IMPLICATION_CLOSURE_RESULT_BYTES",

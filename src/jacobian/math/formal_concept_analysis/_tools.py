@@ -240,7 +240,7 @@ FORMAL_CONCEPT_ANALYSIS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
         "Compute closure under a finite attribute implication system",
         "Return the unique least superset of a seed that satisfies every finite "
         "attribute implication, together with the first canonical derivation of "
-        "each added attribute and exact canonical lineage-replay work.",
+        "each added attribute and exact canonical closure work.",
         ImplicationClosureRequest,
         ImplicationClosureResult,
         compute_implication_closure,

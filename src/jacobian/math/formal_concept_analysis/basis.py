@@ -35,7 +35,7 @@ from jacobian.math.formal_concept_analysis.values import (
 #     closure-equivalence pass over the constructed basis. The carrier-fit
 #     check below keeps that basis inside #2267's
 #     MAX_IMPLICATIONS rows and MAX_IMPLICATION_MEMBERSHIPS memberships, so
-#     every admitted query also stays under MAX_CANONICAL_REPLAY_WORK;
+#     every admitted query also stays under MAX_CANONICAL_CLOSURE_WORK;
 #   * serialized result bytes -- a worst-case payload shaped by the probed
 #     basis size with full-width rows, measured through the strict-JSON
 #     canonical encoder.

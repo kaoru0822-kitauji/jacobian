@@ -17,7 +17,7 @@ from jacobian.math.code_linear.values import (
 )
 
 MAX_CODEWORDS = 16384  # binary k=14 (2^14), ternary k=8 (3^8=6561); mainly for equal.decide witness enumeration
-MAX_RECEIVED_PROFILE_REPLAY_WORK = 3_000_000
+MAX_RECEIVED_PROFILE_EXECUTION_WORK = 3_000_000
 MAX_RECEIVED_PROFILE_WITNESS_CELLS = 65_536
 
 
@@ -25,8 +25,8 @@ def _validation_error(code: str, message: str) -> PydanticCustomError:
     return PydanticCustomError(f"code_linear.{code}", message)
 
 
-def _max_codewords_within_replay_work(replay_work_bound: int) -> int:
-    """Largest encoder image admitted by the exact replay-work bound."""
+def _max_codewords_within_execution_work(execution_work_bound: int) -> int:
+    """Largest encoder image admitted by the exact execution-work bound."""
 
     best = 1
     for order in range(2, 252):
@@ -36,17 +36,17 @@ def _max_codewords_within_replay_work(replay_work_bound: int) -> int:
             count = order**dimension
             # Full rank forces length >= dimension, so the work product is
             # minimized at length == dimension; larger lengths reject sooner.
-            if 2 * count * dimension * (dimension + 1) > replay_work_bound:
+            if 2 * count * dimension * (dimension + 1) > execution_work_bound:
                 break
             if count > best:
                 best = count
     return best
 
 
-# Derived from the replay-work bound over primes <= 251: every admitted
+# Derived from the execution-work bound over primes <= 251: every admitted
 # encoder image satisfies codeword_count <= this constant.
-MAX_RECEIVED_PROFILE_CODEWORDS = _max_codewords_within_replay_work(
-    MAX_RECEIVED_PROFILE_REPLAY_WORK
+MAX_RECEIVED_PROFILE_CODEWORDS = _max_codewords_within_execution_work(
+    MAX_RECEIVED_PROFILE_EXECUTION_WORK
 )
 
 _FieldElement = Annotated[StrictInt, Field(ge=0, le=250)]
@@ -161,8 +161,8 @@ class ReceivedWordProfileRequest(StrictModel):
         return min(self.encoder.codeword_count, ambient_match_count) * row_width
 
     @property
-    def profile_replay_work(self) -> int:
-        """Bound kernel construction, comparison, and result-validation replay."""
+    def profile_execution_work(self) -> int:
+        """Bound kernel construction and comparison work."""
 
         dimension = len(self.encoder.message_axis)
         length = len(self.encoder.coordinate_axis)

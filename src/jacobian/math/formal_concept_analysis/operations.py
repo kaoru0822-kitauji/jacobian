@@ -104,7 +104,7 @@ def implication_closure(
             )
         closure.update(first_sources)
 
-    canonical_replay_work = implication_checks + membership_checks
+    total_logical_work = implication_checks + membership_checks
     return ImplicationClosureResult._from_kernel(
         system=system,
         seed=tuple(sorted(seed)),
@@ -115,7 +115,7 @@ def implication_closure(
             productive_rounds=productive_rounds,
             canonical_implication_checks=implication_checks,
             canonical_membership_checks=membership_checks,
-            canonical_replay_work=canonical_replay_work,
+            total_logical_work=total_logical_work,
         ),
     )
 
@@ -201,7 +201,7 @@ def duquenne_guigues_basis(
             raise RuntimeError(
                 "constructed canonical basis failed source closure equivalence"
             )
-        basis_closure_work += closure_result.work.canonical_replay_work
+        basis_closure_work += closure_result.work.total_logical_work
 
     closure_matrix_memberships = sum(
         len(row.subset) + len(row.closure) for row in closure_matrix
