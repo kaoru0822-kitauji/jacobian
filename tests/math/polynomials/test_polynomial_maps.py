@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from fractions import Fraction
 
+import pytest
 from tests.math.polynomials._support import polynomial_validation_error
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.polynomials.maps._models import (
     CompositionRequest,
     EvalRequest,
@@ -59,25 +61,27 @@ def test_evaluation_returns_a_canonical_rational() -> None:
 
 
 def test_evaluation_requires_the_complete_ordered_axis() -> None:
-    with polynomial_validation_error():
-        EvalRequest(
-            polynomial=_polynomial(("x", "y"), {(1, 0): 1}),
-            point=VariablePoint(
-                variables=("x",),
-                values=(CanonicalRational(num="1", den="1"),),
-            ),
-        )
+    request = EvalRequest(
+        polynomial=_polynomial(("x", "y"), {(1, 0): 1}),
+        point=VariablePoint(
+            variables=("x",),
+            values=(CanonicalRational(num="1", den="1"),),
+        ),
+    )
+    with pytest.raises(OperationDomainValidationError):
+        evaluate_polynomial(request)
 
 
 def test_evaluation_rejects_a_point_whose_exact_value_exceeds_result_bound() -> None:
-    with polynomial_validation_error():
-        EvalRequest(
-            polynomial=_polynomial(("x",), {(64,): 1}),
-            point=VariablePoint(
-                variables=("x",),
-                values=(CanonicalRational(num="1" + "0" * 600, den="1"),),
-            ),
-        )
+    request = EvalRequest(
+        polynomial=_polynomial(("x",), {(64,): 1}),
+        point=VariablePoint(
+            variables=("x",),
+            values=(CanonicalRational(num="1" + "0" * 600, den="1"),),
+        ),
+    )
+    with pytest.raises(OperationDomainValidationError):
+        evaluate_polynomial(request)
 
 
 def test_jacobian_entries_are_directly_composable_polynomials() -> None:
@@ -123,10 +127,11 @@ def test_univariate_composition_returns_a_canonical_polynomial() -> None:
 
 
 def test_composition_rejects_multivariate_operands() -> None:
-    with polynomial_validation_error():
-        CompositionRequest(
-            outer=_polynomial(("u", "v"), {(1, 0): 1}),
-            inner=_polynomial(("x",), {(1,): 1}),
-            inner_variable="x",
-            outer_variable="u",
-        )
+    request = CompositionRequest(
+        outer=_polynomial(("u", "v"), {(1, 0): 1}),
+        inner=_polynomial(("x",), {(1,): 1}),
+        inner_variable="x",
+        outer_variable="u",
+    )
+    with pytest.raises(OperationDomainValidationError):
+        compose_polynomials(request)

@@ -20,6 +20,8 @@ from jacobian.math.polynomials._models import (
     _MAX_ELIMINATION_DEGREE_SUM,
     _MAX_GCD_DEGREE,
     _MAX_GCD_TERMS,
+    _MAX_GROEBNER_COEFFICIENT_DIGITS,
+    _MAX_GROEBNER_EXPONENT,
     _MAX_INVARIANT_TERMS,
     _MAX_SQUARE_FREE_EXPONENT,
     PolynomialBezoutIdentity,
@@ -131,18 +133,28 @@ def _admit_factorization(request: PolynomialFactorRequest) -> None:
 
 
 def _admit_groebner(request: PolynomialGroebnerBasisRequest) -> None:
-    if sum(len(generator.polynomial.terms) for generator in request.generators) > 256:
-        raise _validation_error("ideal generators exceed the aggregate term budget")
+    if (
+        sum(len(generator.polynomial.terms) for generator in request.generators)
+        > _MAX_INVARIANT_TERMS
+    ):
+        raise _validation_error(
+            f"ideal generators exceed the {_MAX_INVARIANT_TERMS}-term aggregate budget"
+        )
     for generator in request.generators:
         require_polynomial_budget(
             generator,
             maximum_terms=MAX_POLYNOMIAL_TERMS,
-            maximum_exponent=12,
-            maximum_coefficient_digits=128,
+            maximum_exponent=_MAX_GROEBNER_EXPONENT,
+            maximum_coefficient_digits=_MAX_GROEBNER_COEFFICIENT_DIGITS,
             label="ideal generator",
         )
-        if any(sum(term.exponents) > 12 for term in generator.polynomial.terms):
-            raise _validation_error("ideal generator exceeds total degree 12")
+        if any(
+            sum(term.exponents) > _MAX_GROEBNER_EXPONENT
+            for term in generator.polynomial.terms
+        ):
+            raise _validation_error(
+                f"ideal generator exceeds total degree {_MAX_GROEBNER_EXPONENT}"
+            )
 
 
 def _result_polynomial(poly: object, variables: tuple[str, ...]) -> RationalPolynomial:

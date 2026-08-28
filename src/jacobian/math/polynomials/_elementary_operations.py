@@ -64,7 +64,9 @@ def _run_admission(admission: Any) -> None:
 
 def _admit_integer(polynomial: IntegerPolynomial) -> None:
     if len(polynomial.coefficients) > _MAX_ELEMENTARY_DEGREE + 1:
-        raise _validation_error("integer polynomial exceeds the degree-127 operation budget")
+        raise _validation_error(
+            f"integer polynomial exceeds the degree-{_MAX_ELEMENTARY_DEGREE} operation budget"
+        )
     if any(len(coefficient.lstrip("-")) > _MAX_INTEGER_COEFFICIENT_DIGITS for coefficient in polynomial.coefficients):
         raise _validation_error("integer coefficient exceeds the decimal-digit budget")
 
@@ -84,7 +86,9 @@ def _admit_integer_composition(request: IntegerPolynomialCompositionRequest) -> 
     _admit_integer(request.outer)
     _admit_integer(request.inner)
     if (len(request.outer.coefficients) - 1) * (len(request.inner.coefficients) - 1) > _MAX_ELEMENTARY_DEGREE:
-        raise _validation_error("composition exceeds the degree-127 output budget")
+        raise _validation_error(
+            f"composition exceeds the degree-{_MAX_ELEMENTARY_DEGREE} output budget"
+        )
 
 
 def _admit_rational(request: RationalPolynomialRequest) -> None:

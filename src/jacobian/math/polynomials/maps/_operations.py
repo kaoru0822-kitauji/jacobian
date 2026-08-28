@@ -96,31 +96,55 @@ def _admit_generic_degree(request: GenericDegreeRequest) -> None:
     source_count = len(polynomial_map.input_variables)
     target_count = len(polynomial_map.output_polynomials)
     if source_count > MAX_GENERIC_DEGREE_SOURCE_VARIABLES:
-        raise _validation_error("generic-degree source exceeds the 3-variable operation budget")
+        raise _validation_error(
+            "generic-degree source exceeds the "
+            f"{MAX_GENERIC_DEGREE_SOURCE_VARIABLES}-variable operation budget"
+        )
     if target_count > MAX_GENERIC_DEGREE_TARGET_VARIABLES:
-        raise _validation_error("generic-degree target exceeds the 3-component operation budget")
+        raise _validation_error(
+            "generic-degree target exceeds the "
+            f"{MAX_GENERIC_DEGREE_TARGET_VARIABLES}-component operation budget"
+        )
     aggregate_terms = sum(len(polynomial.polynomial.terms) for polynomial in polynomial_map.output_polynomials)
     if aggregate_terms > MAX_GENERIC_DEGREE_AGGREGATE_TERMS:
-        raise _validation_error("generic-degree map exceeds the 96-term aggregate input budget")
+        raise _validation_error(
+            "generic-degree map exceeds the "
+            f"{MAX_GENERIC_DEGREE_AGGREGATE_TERMS}-term aggregate input budget"
+        )
     if len(polynomial_map.model_dump_json().encode("utf-8")) > MAX_GENERIC_DEGREE_ENCODED_MAP_BYTES:
-        raise _validation_error("generic-degree map exceeds the 65536-byte input budget")
+        raise _validation_error(
+            "generic-degree map exceeds the "
+            f"{MAX_GENERIC_DEGREE_ENCODED_MAP_BYTES}-byte input budget"
+        )
     degrees: list[int] = []
     for polynomial in polynomial_map.output_polynomials:
         if len(polynomial.polynomial.terms) > MAX_GENERIC_DEGREE_COMPONENT_TERMS:
-            raise _validation_error("generic-degree component exceeds the 48-term input budget")
+            raise _validation_error(
+                "generic-degree component exceeds the "
+                f"{MAX_GENERIC_DEGREE_COMPONENT_TERMS}-term input budget"
+            )
         degree = _total_degree(polynomial)
         degrees.append(degree)
         if degree > MAX_GENERIC_DEGREE_TOTAL_DEGREE:
-            raise _validation_error("generic-degree component exceeds total degree 8")
+            raise _validation_error(
+                "generic-degree component exceeds total degree "
+                f"{MAX_GENERIC_DEGREE_TOTAL_DEGREE}"
+            )
         for term in polynomial.polynomial.terms:
             if len(term.coefficient.num.lstrip("-")) > MAX_GENERIC_DEGREE_COEFFICIENT_DIGITS or len(term.coefficient.den) > MAX_GENERIC_DEGREE_COEFFICIENT_DIGITS:
-                raise _validation_error("generic-degree coefficient exceeds the 64-digit input budget")
+                raise _validation_error(
+                    "generic-degree coefficient exceeds the "
+                    f"{MAX_GENERIC_DEGREE_COEFFICIENT_DIGITS}-digit input budget"
+                )
     if target_count >= source_count:
         bezout_bound = 1
         for degree in sorted(degrees)[:source_count]:
             bezout_bound *= max(1, degree)
         if bezout_bound > MAX_GENERIC_DEGREE_BEZOUT_BOUND:
-            raise _validation_error("generic-degree finite-fiber Bezout bound exceeds 512")
+            raise _validation_error(
+                "generic-degree finite-fiber Bezout bound exceeds "
+                f"{MAX_GENERIC_DEGREE_BEZOUT_BOUND}"
+            )
 
 
 def compute_generic_degree(request: GenericDegreeRequest) -> GenericDegreeResult:
