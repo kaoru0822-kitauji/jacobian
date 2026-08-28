@@ -1,7 +1,11 @@
 """Exact bounded integral binary quadratic form operations."""
 
+from collections.abc import Callable
 from math import isqrt
 
+from pydantic_core import PydanticCustomError
+
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.number_theory.quadratic_forms.binary._models import (
     BinaryQuadraticFormCheckRequest,
     BinaryQuadraticFormCheckResult,
@@ -17,9 +21,21 @@ from jacobian.math.number_theory.quadratic_forms.binary._models import (
     ProperEquivalenceResult,
     ReducedBinaryQuadraticFormResult,
     ReducedClassesResult,
+    _has_sum_of_two_squares_mod_four_obstruction,
+    _representation_y_bound,
+    _require_evaluated_value_bound,
     _require_reduced_class_search_budget,
     _require_representation_budget,
 )
+
+
+def _admit(operation: Callable[[], None], *, location: tuple[str | int, ...]) -> None:
+    try:
+        operation()
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=location, code=exc.type, message=exc.message()
+        ) from exc
 
 
 def _gcd(a: int, b: int) -> int:
@@ -198,6 +214,11 @@ def compute_evaluate(
 ) -> BinaryQuadraticFormEvaluateResult:
     """Evaluate a binary quadratic form at an integer pair."""
 
+    _admit(
+        lambda: _require_evaluated_value_bound(request.form, request.x, request.y),
+        location=("x", "y"),
+    )
+
     value = _evaluate(
         request.form.a, request.form.b, request.form.c, request.x, request.y
     )
@@ -277,6 +298,10 @@ def compute_reduced_classes(
 ) -> ReducedClassesResult:
     """Enumerate all reduced primitive positive-definite classes of a discriminant."""
 
+    _admit(
+        lambda: _require_reduced_class_search_budget(request.discriminant),
+        location=("discriminant",),
+    )
     classes = _enumerate_reduced_classes(request.discriminant)
     return ReducedClassesResult._from_kernel(
         discriminant=request.discriminant, classes=classes
@@ -295,9 +320,9 @@ def _enumerate_representations(
     a, b, c = form.a, form.b, form.c
     discriminant = form.discriminant
     rows: list[BinaryQuadraticFormRepresentation] = []
-    y_bound = _require_representation_budget(form, target)
-    if y_bound is None:
+    if _has_sum_of_two_squares_mod_four_obstruction(form, target):
         return ()
+    y_bound = _representation_y_bound(form, target)
     for y in range(-y_bound, y_bound + 1):
         x_discriminant = 4 * a * target + discriminant * y * y
         if x_discriminant < 0:
@@ -329,6 +354,10 @@ def compute_representations(
     request: BinaryQuadraticFormRepresentationsRequest,
 ) -> BinaryQuadraticFormRepresentationsResult:
     """Return all ordered signed integer representations of one target exactly."""
+    _admit(
+        lambda: _require_representation_budget(request.form, request.target),
+        location=("target",),
+    )
     representations = _enumerate_representations(request.form, request.target)
     return BinaryQuadraticFormRepresentationsResult._from_kernel(
         form=request.form, target=request.target, representations=representations
@@ -339,8 +368,6 @@ def _enumerate_reduced_classes(
     discriminant: int,
 ) -> tuple[PrimitivePositiveDefiniteBinaryQuadraticForm, ...]:
     """Enumerate every reduced primitive class without constructing a result."""
-    _require_reduced_class_search_budget(discriminant)
-
     classes: list[PrimitivePositiveDefiniteBinaryQuadraticForm] = []
     # For reduced forms: |b| <= a <= c, b^2 - 4ac = D
     # Since D < 0, we have 4ac = b^2 - D > 0, so a,c > 0

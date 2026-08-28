@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.number_theory.quadratic_forms.general import (
     QuadraticCrossTerm,
     RationalCoordinateVector,
@@ -246,8 +247,10 @@ def test_evaluation_preflights_the_aggregate_denominator() -> None:
         "coordinates": [_rational(1) for _ in labels],
     }
 
-    with pytest.raises(ValidationError) as error:
-        EvaluationRequest.model_validate({"form": form, "vector": vector})
+    with pytest.raises(OperationDomainValidationError) as error:
+        evaluate_form(
+            EvaluationRequest.model_validate({"form": form, "vector": vector})
+        )
     assert error.value.errors()[0]["type"] == "quadratic_form.evaluation_budget"
 
 
@@ -340,8 +343,10 @@ def test_total_support_bound_rejects_unbounded_annihilated_support() -> None:
         "coordinates": [_rational(0) for _ in labels],
     }
 
-    with pytest.raises(ValidationError) as error:
-        EvaluationRequest.model_validate({"form": form, "vector": vector})
+    with pytest.raises(OperationDomainValidationError) as error:
+        evaluate_form(
+            EvaluationRequest.model_validate({"form": form, "vector": vector})
+        )
     assert error.value.errors()[0]["type"] == "quadratic_form.support_budget"
     result = EvaluationResult.model_validate(
         {"form": form, "vector": vector, "value": _rational(0)}
@@ -372,9 +377,11 @@ def test_total_support_admits_the_boundary_and_rejects_one_past_it() -> None:
     assert evaluate_rational_quadratic_form(accepted.form, accepted.vector) == Fraction(
         0
     )
-    with pytest.raises(ValidationError) as error:
-        EvaluationRequest.model_validate(
-            _request(MAX_QUADRATIC_EVALUATION_SUPPORT_TERMS + 1)
+    with pytest.raises(OperationDomainValidationError) as error:
+        evaluate_form(
+            EvaluationRequest.model_validate(
+                _request(MAX_QUADRATIC_EVALUATION_SUPPORT_TERMS + 1)
+            )
         )
     assert error.value.errors()[0]["type"] == "quadratic_form.support_budget"
 

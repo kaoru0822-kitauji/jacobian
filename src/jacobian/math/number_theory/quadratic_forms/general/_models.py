@@ -16,7 +16,6 @@ from jacobian.math.number_theory.quadratic_forms.general.values import (
     MAX_QUADRATIC_EVALUATION_TERM_DIGITS,
     RationalCoordinateVector,
     RationalQuadraticForm,
-    require_evaluation_budget,
 )
 
 
@@ -58,15 +57,6 @@ class EvaluationRequest(StrictModel):
             raise _validation_error(
                 "axis_mismatch", "vector axis must equal the quadratic-form axis"
             )
-        try:
-            require_evaluation_budget(self.form, self.vector)
-        except ValueError as error:
-            reason = (
-                "support_budget"
-                if "total support" in str(error)
-                else "evaluation_budget"
-            )
-            raise _validation_error(reason, str(error)) from error
         return self
 
 

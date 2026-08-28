@@ -2,16 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Self
-
-from pydantic import Field, model_validator
+from pydantic import Field
 
 from jacobian._models import StrictModel
-from jacobian.math.matrices.quadratic_spectral._bounds import (
-    require_inertia_matrix,
-    require_singular_spectrum_matrix,
-    require_symmetric_spectrum_matrix,
-)
 from jacobian.math.matrices.values import RealQuadraticMatrix
 
 
@@ -26,11 +19,6 @@ class RealQuadraticSymmetricSpectrumRequest(StrictModel):
         )
     )
 
-    @model_validator(mode="after")
-    def require_admitted_matrix(self) -> Self:
-        require_symmetric_spectrum_matrix(self.matrix)
-        return self
-
 
 class RealQuadraticSingularSpectrumRequest(StrictModel):
     """One 2 by 2 matrix over a shared real quadratic field."""
@@ -43,11 +31,6 @@ class RealQuadraticSingularSpectrumRequest(StrictModel):
         )
     )
 
-    @model_validator(mode="after")
-    def require_admitted_matrix(self) -> Self:
-        require_singular_spectrum_matrix(self.matrix)
-        return self
-
 
 class RealQuadraticInertiaRequest(StrictModel):
     """One symmetric matrix of dimension at most four over a quadratic field."""
@@ -58,11 +41,6 @@ class RealQuadraticInertiaRequest(StrictModel):
             "shared Q(sqrt(d))."
         )
     )
-
-    @model_validator(mode="after")
-    def require_admitted_matrix(self) -> Self:
-        require_inertia_matrix(self.matrix)
-        return self
 
 
 __all__ = [

@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING
+
+from pydantic_core import PydanticCustomError
+
+from jacobian.catalog.models import OperationDomainValidationError
 
 if TYPE_CHECKING:
     from sympy.combinatorics.perm_groups import PermutationGroup
@@ -18,11 +23,67 @@ from jacobian.math.number_theory.galois._models import (
     GaloisGroupResult,
     SolvableRequest,
     SolvableResult,
+    _require_prime,
+    _supported_galois_polynomial,
 )
+
+
+def _admit(operation: Callable[[], None], *, location: tuple[str | int, ...]) -> None:
+    try:
+        operation()
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=location, code=exc.type, message=exc.message()
+        ) from exc
+
+
+def _admit_factor(request: GaloisFactorRequest) -> None:
+    _require_prime(request.field_order)
+    if any(
+        not 0 <= coefficient < request.field_order
+        for coefficient in request.coefficients
+    ):
+        raise PydanticCustomError(
+            "galois_theory.coefficients_not_canonical",
+            "coefficients must be canonical field residues",
+        )
+    if request.coefficients[-1] == 0:
+        raise PydanticCustomError(
+            "galois_theory.polynomial_zero",
+            "factorization requires a nonzero polynomial with canonical degree",
+        )
+
+
+def _admit_frobenius(request: FrobeniusCycleRequest) -> None:
+    from collections import Counter
+
+    from sympy import divisors, mobius
+
+    _require_prime(request.field_order)
+    if sum(request.factorization_degrees) != request.polynomial_degree:
+        raise PydanticCustomError(
+            "galois_theory.partition_degree_mismatch",
+            "factorization degrees must sum to polynomial degree",
+        )
+    for degree, count in Counter(request.factorization_degrees).items():
+        available = (
+            sum(
+                int(mobius(divisor)) * request.field_order ** (degree // divisor)
+                for divisor in divisors(degree)
+            )
+            // degree
+        )
+        if count > available:
+            raise PydanticCustomError(
+                "galois_theory.partition_unrealizable",
+                "factorization pattern exceeds the available distinct "
+                f"degree-{degree} irreducible factors over the field",
+            )
 
 
 def compute_galois_factor(request: GaloisFactorRequest) -> GaloisFactorResult:
     """Factor a polynomial over GF(p) using SymPy."""
+    _admit(lambda: _admit_factor(request), location=("field_order", "coefficients"))
     from sympy import GF, Poly, Symbol
 
     field = GF(request.field_order)
@@ -59,6 +120,10 @@ def compute_galois_factor(request: GaloisFactorRequest) -> GaloisFactorResult:
 
 
 def compute_frobenius_cycle(request: FrobeniusCycleRequest) -> FrobeniusCycleResult:
+    _admit(
+        lambda: _admit_frobenius(request),
+        location=("field_order", "factorization_degrees"),
+    )
     cycle_type = tuple(sorted(request.factorization_degrees, reverse=True))
     is_irred = cycle_type == (request.polynomial_degree,)
     return FrobeniusCycleResult(
@@ -100,6 +165,10 @@ def _wire_group(perm_group: PermutationGroup, degree: int) -> FinitePermutationG
 
 def compute_galois_group(request: GaloisGroupRequest) -> GaloisGroupResult:
     """Compute the Galois group of a polynomial over Q."""
+    _admit(
+        lambda: _supported_galois_polynomial(request.coefficients),
+        location=("coefficients",),
+    )
     perm_group = _galois_group_from_coeffs(request.coefficients)
     group_name = str(perm_group)
     order = int(perm_group.order())
@@ -120,6 +189,10 @@ def compute_solvable(request: SolvableRequest) -> SolvableResult:
     A polynomial is solvable by radicals iff its Galois group is solvable.
     This is computed from the actual Galois group, not from the degree alone.
     """
+    _admit(
+        lambda: _supported_galois_polynomial(request.coefficients),
+        location=("coefficients",),
+    )
     perm_group = _galois_group_from_coeffs(request.coefficients)
     is_solvable = bool(perm_group.is_solvable)
     return SolvableResult._from_kernel(

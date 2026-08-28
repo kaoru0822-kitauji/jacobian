@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.matrices.quadratic_spectral import (
     RealQuadraticInertia,
     inertia,
@@ -18,6 +19,11 @@ from jacobian.math.matrices.quadratic_spectral._models import (
     RealQuadraticInertiaRequest,
     RealQuadraticSingularSpectrumRequest,
     RealQuadraticSymmetricSpectrumRequest,
+)
+from jacobian.math.matrices.quadratic_spectral._operations import (
+    compute_inertia,
+    compute_singular_spectrum,
+    compute_symmetric_spectrum,
 )
 from jacobian.math.matrices.quadratic_spectral._tools import TOOLS
 from jacobian.math.matrices.values import RealQuadraticMatrix
@@ -242,17 +248,21 @@ def test_matrix_value_requires_one_explicit_quadratic_field() -> None:
 
 def test_operation_specific_shape_and_work_bounds_are_preflighted() -> None:
     nonsymmetric = _matrix(((_q(), _q(1)), (_q(0), _q())))
-    with pytest.raises(ValidationError):
-        RealQuadraticSymmetricSpectrumRequest(matrix=nonsymmetric)
+    with pytest.raises(OperationDomainValidationError):
+        compute_symmetric_spectrum(
+            RealQuadraticSymmetricSpectrumRequest(matrix=nonsymmetric)
+        )
 
     five = tuple(tuple(_q(radicand=2) for _ in range(5)) for _ in range(5))
-    with pytest.raises(ValidationError):
-        RealQuadraticInertiaRequest(matrix=_matrix(five))
+    with pytest.raises(OperationDomainValidationError):
+        compute_inertia(RealQuadraticInertiaRequest(matrix=_matrix(five)))
 
     huge = _q(10**255, 0, 2)
     large_diagonal = _matrix(((huge, _q(radicand=2)), (_q(radicand=2), huge)))
-    with pytest.raises(ValidationError):
-        RealQuadraticSingularSpectrumRequest(matrix=large_diagonal)
+    with pytest.raises(OperationDomainValidationError):
+        compute_singular_spectrum(
+            RealQuadraticSingularSpectrumRequest(matrix=large_diagonal)
+        )
 
 
 def test_quadratic_spectral_public_api_and_catalog_are_exact() -> None:

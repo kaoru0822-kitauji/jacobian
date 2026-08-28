@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian.canonical import canonicalize_json
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.number_theory.quadratic_forms.binary._models import (
     MAX_REPRESENTATION_TARGET,
     MAX_REPRESENTATION_Y_CANDIDATES,
@@ -113,16 +114,20 @@ class TestEvaluate:
     ) -> None:
         # Q(10^8, 0) = 10^16 > 2^53 - 1 for [1,0,1]: the request must be
         # rejected at admission instead of failing transport canonicalization.
-        with pytest.raises(ValidationError) as exc_info:
-            BinaryQuadraticFormEvaluateRequest(
-                form=_positive_form(1, 0, 1), x=100_000_000, y=0
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_evaluate(
+                BinaryQuadraticFormEvaluateRequest(
+                    form=_positive_form(1, 0, 1), x=100_000_000, y=0
+                )
             )
         _assert_error_type(
             exc_info, "integral_binary_quadratic_form.evaluated_value_range"
         )
-        with pytest.raises(ValidationError) as exc_info:
-            BinaryQuadraticFormEvaluateRequest(
-                form=_positive_form(1, 0, 1), x=-100_000_000, y=0
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_evaluate(
+                BinaryQuadraticFormEvaluateRequest(
+                    form=_positive_form(1, 0, 1), x=-100_000_000, y=0
+                )
             )
         _assert_error_type(
             exc_info, "integral_binary_quadratic_form.evaluated_value_range"
@@ -141,16 +146,20 @@ class TestEvaluate:
     def test_evaluate_boundary_one_above_the_interoperable_bound_is_rejected(
         self,
     ) -> None:
-        with pytest.raises(ValidationError) as exc_info:
-            BinaryQuadraticFormEvaluateRequest(
-                form=_positive_form(1, 0, 1), x=94_906_266, y=0
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_evaluate(
+                BinaryQuadraticFormEvaluateRequest(
+                    form=_positive_form(1, 0, 1), x=94_906_266, y=0
+                )
             )
         _assert_error_type(
             exc_info, "integral_binary_quadratic_form.evaluated_value_range"
         )
-        with pytest.raises(ValidationError) as exc_info:
-            BinaryQuadraticFormEvaluateRequest(
-                form=_positive_form(1, 0, 1), x=-94_906_266, y=0
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_evaluate(
+                BinaryQuadraticFormEvaluateRequest(
+                    form=_positive_form(1, 0, 1), x=-94_906_266, y=0
+                )
             )
         _assert_error_type(
             exc_info, "integral_binary_quadratic_form.evaluated_value_range"
@@ -315,15 +324,19 @@ class TestReducedClasses:
 
     def test_reduced_class_search_just_over_budget_is_rejected(self) -> None:
         # Here A=100, so the exact nested scan would have 10,200 candidates.
-        with pytest.raises(ValidationError) as exc_info:
-            BinaryQuadraticFormReducedClassesRequest(discriminant=-29_404)
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_reduced_classes(
+                BinaryQuadraticFormReducedClassesRequest(discriminant=-29_404)
+            )
         _assert_error_type(
             exc_info, "integral_binary_quadratic_form.reduced_class_candidate_budget"
         )
 
     def test_non_discriminant_is_rejected_before_enumeration(self) -> None:
-        with pytest.raises(ValidationError) as exc_info:
-            BinaryQuadraticFormReducedClassesRequest(discriminant=-5)
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_reduced_classes(
+                BinaryQuadraticFormReducedClassesRequest(discriminant=-5)
+            )
         _assert_error_type(
             exc_info, "integral_binary_quadratic_form.invalid_discriminant_congruence"
         )
@@ -413,9 +426,11 @@ class TestRepresentations:
         assert result.count == result.primitive_count == 0
         assert type(result).model_validate(result.model_dump(mode="json")) == result
 
-        with pytest.raises(ValidationError) as exc_info:
-            BinaryQuadraticFormRepresentationsRequest(
-                form=form, target=MAX_REPRESENTATION_TARGET
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_representations(
+                BinaryQuadraticFormRepresentationsRequest(
+                    form=form, target=MAX_REPRESENTATION_TARGET
+                )
             )
         _assert_error_type(
             exc_info, "integral_binary_quadratic_form.representation_candidate_budget"
@@ -432,10 +447,12 @@ class TestRepresentations:
         ) == ((0, 0, False),)
 
     def test_admission_rejects_unbounded_y_search_before_enumeration(self) -> None:
-        with pytest.raises(ValidationError) as exc_info:
-            BinaryQuadraticFormRepresentationsRequest(
-                form=_positive_form(1_000_000, 0, 1),
-                target=1_000_000_000_000,
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_representations(
+                BinaryQuadraticFormRepresentationsRequest(
+                    form=_positive_form(1_000_000, 0, 1),
+                    target=1_000_000_000_000,
+                )
             )
         _assert_error_type(
             exc_info, "integral_binary_quadratic_form.representation_candidate_budget"

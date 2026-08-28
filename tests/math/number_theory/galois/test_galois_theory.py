@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 from sympy.combinatorics import Permutation, PermutationGroup
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.number_theory.galois._models import (
     FrobeniusCycleRequest,
     GaloisFactorRequest,
@@ -131,12 +132,12 @@ def test_multiplying_by_every_field_unit_preserves_monic_factors(
 
 
 def test_zero_and_noncanonical_degree_are_rejected_before_sympy() -> None:
-    with pytest.raises(ValidationError) as exc:
-        GaloisFactorRequest(field_order=3, coefficients=(0, 0))
-    assert exc.value.errors()[0]["type"] == "galois_theory.polynomial_zero"
-    with pytest.raises(ValidationError) as exc:
-        GaloisFactorRequest(field_order=3, coefficients=(1, 0))
-    assert exc.value.errors()[0]["type"] == "galois_theory.polynomial_zero"
+    for coefficients in ((0, 0), (1, 0)):
+        with pytest.raises(OperationDomainValidationError) as exc:
+            compute_galois_factor(
+                GaloisFactorRequest(field_order=3, coefficients=coefficients)
+            )
+        assert exc.value.errors()[0]["type"] == "galois_theory.polynomial_zero"
 
 
 def test_factorization_result_parses_structurally() -> None:
@@ -194,11 +195,13 @@ def test_frobenius_cycle_is_canonical_positive_partition() -> None:
 
 
 def test_frobenius_cycle_rejects_unrealizable_distinct_factor_pattern() -> None:
-    with pytest.raises(ValidationError) as exc:
-        FrobeniusCycleRequest(
-            field_order=2,
-            polynomial_degree=3,
-            factorization_degrees=(1, 1, 1),
+    with pytest.raises(OperationDomainValidationError) as exc:
+        compute_frobenius_cycle(
+            FrobeniusCycleRequest(
+                field_order=2,
+                polynomial_degree=3,
+                factorization_degrees=(1, 1, 1),
+            )
         )
     assert exc.value.errors()[0]["type"] == "galois_theory.partition_unrealizable"
 
@@ -217,8 +220,11 @@ def test_frobenius_rejects_nonpositive_factor_degrees(
 
 @pytest.mark.parametrize("request_type", [GaloisGroupRequest, SolvableRequest])
 def test_galois_backend_domain_is_enforced_before_execution(request_type: type) -> None:
-    with pytest.raises(ValidationError) as exc:
-        request_type(coefficients=(0, 0, 0, 0, 1))
+    operation = (
+        compute_galois_group if request_type is GaloisGroupRequest else compute_solvable
+    )
+    with pytest.raises(OperationDomainValidationError) as exc:
+        operation(request_type(coefficients=(0, 0, 0, 0, 1)))
     assert exc.value.errors()[0]["type"] == "galois_theory.polynomial_not_irreducible"
     with pytest.raises(ValidationError) as exc:
         request_type(coefficients=(-2, 0, 0, 0, 0, 0, 0, 1))
