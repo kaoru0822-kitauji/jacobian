@@ -8,6 +8,7 @@ from jacobian._exact import MAX_CANONICAL_RATIONAL_DIGITS, CanonicalRational
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math._rational_height import RationalHeight
 from jacobian.math.analysis.orthogonal_polynomials._jacobi import (
+    JacobiMatrixAdmissionError,
     jacobi_matrix_from_family,
     require_jacobi_matrix_admission,
 )
@@ -51,6 +52,10 @@ class MomentsOrthogonalAdmissionError(ValueError):
 
 class GaussianQuadratureAdmissionError(MomentsOrthogonalAdmissionError):
     """A value-based Gaussian-quadrature admission failure."""
+
+
+class ChristoffelDarbouxAdmissionError(MomentsOrthogonalAdmissionError):
+    """A value-based Christoffel-Darboux admission failure."""
 
 
 def _to_fraction(r: CanonicalRational) -> Fraction:
@@ -414,12 +419,16 @@ def _require_gram_schmidt_admission(
     )
 
     if not 0 <= max_degree <= MAX_POLYNOMIAL_DEGREE:
-        raise ValueError(f"max_degree must be between 0 and {MAX_POLYNOMIAL_DEGREE}")
+        raise MomentsOrthogonalAdmissionError(
+            "degree_range",
+            f"max_degree must be between 0 and {MAX_POLYNOMIAL_DEGREE}",
+        )
     needed = 2 * max_degree + 1
     if len(prefix.moments) < needed:
-        raise ValueError(
+        raise MomentsOrthogonalAdmissionError(
+            "insufficient_moments",
             f"need at least {needed} moments for degree {max_degree}, got "
-            f"{len(prefix.moments)}"
+            f"{len(prefix.moments)}",
         )
     _require_gram_schmidt_heights_admissible(prefix.moments, max_degree)
 
@@ -428,9 +437,9 @@ def compute_orthogonal_polynomials(
     request: OrthogonalPolynomialRequest,
 ) -> OrthogonalPolynomialFamily:
     """MCP adapter: validate the wire request, then run the shared kernel."""
-    _require_gram_schmidt_admission(request.prefix, request.max_degree)
-    moments = [_to_fraction(m) for m in request.prefix.moments]
     try:
+        _require_gram_schmidt_admission(request.prefix, request.max_degree)
+        moments = [_to_fraction(m) for m in request.prefix.moments]
         return orthogonal_polynomials_from_moments(
             moments, request.max_degree, request.prefix.variable
         )
@@ -455,9 +464,10 @@ def _require_quasi_definite_family(family: OrthogonalPolynomialFamily) -> None:
     """
     polynomials = family.polynomials[:-1]
     if any(term.squared_norm.as_fraction() == 0 for term in polynomials):
-        raise ValueError(
+        raise MomentsOrthogonalAdmissionError(
+            "zero_norm",
             "recurrence coefficients require every non-terminal squared "
-            "norm to be nonzero"
+            "norm to be nonzero",
         )
 
 
@@ -511,9 +521,10 @@ def recurrence_coefficients_from_family(
     # result range; measure the exact Fraction height before conversion.
     for value in (*alphas, *betas):
         if _fraction_exceeds_canonical_limit(value):
-            raise ValueError(
+            raise MomentsOrthogonalAdmissionError(
+                "recurrence_height",
                 "recurrence coefficients exceed the canonical rational "
-                "digit limit for this family"
+                "digit limit for this family",
             )
     return ThreeTermRecurrence._from_kernel(
         alpha=tuple(_from_fraction(a) for a in alphas),
@@ -524,7 +535,14 @@ def recurrence_coefficients_from_family(
 
 def compute_recurrence(request: RecurrenceRequest) -> ThreeTermRecurrence:
     """MCP adapter: parse one request, call the domain kernel once."""
-    return recurrence_coefficients_from_family(request.family)
+    try:
+        return recurrence_coefficients_from_family(request.family)
+    except MomentsOrthogonalAdmissionError as exc:
+        raise OperationDomainValidationError(
+            location=("family",),
+            code=f"moments_orthogonal.{exc.reason}",
+            message=str(exc),
+        ) from exc
 
 
 def _kernel_coefficient_matrix(
@@ -540,9 +558,10 @@ def _kernel_coefficient_matrix(
         p_k = [_to_fraction(c) for c in polynomials[k].coefficients]
         h_k = _to_fraction(polynomials[k].squared_norm)
         if h_k == 0:
-            raise ValueError(
+            raise ChristoffelDarbouxAdmissionError(
+                "zero_norm",
                 f"family polynomial p_{k} has zero squared norm; the "
-                "Christoffel-Darboux kernel is undefined"
+                "Christoffel-Darboux kernel is undefined",
             )
         for i in range(k + 1):
             for j in range(k + 1):
@@ -565,7 +584,9 @@ def christoffel_darboux_kernel_from_family(
     m = degree
 
     if m >= len(polys):
-        raise ValueError(f"degree {m} exceeds family size {len(polys)}")
+        raise ChristoffelDarbouxAdmissionError(
+            "degree_range", f"degree {m} exceeds family size {len(polys)}"
+        )
 
     coefficients = _kernel_coefficient_matrix(polys, m)
     size = m + 1
@@ -576,9 +597,10 @@ def christoffel_darboux_kernel_from_family(
     for row in coefficients:
         for value in row:
             if _fraction_exceeds_canonical_limit(value):
-                raise ValueError(
+                raise ChristoffelDarbouxAdmissionError(
+                    "coefficient_height",
                     "Christoffel-Darboux kernel coefficients exceed the "
-                    "canonical rational digit limit for this family"
+                    "canonical rational digit limit for this family",
                 )
     return ChristoffelDarbouxKernel._from_kernel(
         degree=m,
@@ -595,12 +617,26 @@ def compute_christoffel_darboux(
     request: ChristoffelDarbouxRequest,
 ) -> ChristoffelDarbouxKernel:
     """MCP adapter: parse one request, call the domain kernel once."""
-    return christoffel_darboux_kernel_from_family(request.family, request.degree)
+    try:
+        return christoffel_darboux_kernel_from_family(request.family, request.degree)
+    except ChristoffelDarbouxAdmissionError as exc:
+        raise OperationDomainValidationError(
+            location=("family", "degree"),
+            code=f"moments_orthogonal.christoffel_darboux.{exc.reason}",
+            message=str(exc),
+        ) from exc
 
 
 def compute_jacobi_matrix(request: JacobiMatrixRequest) -> JacobiMatrix:
     """MCP adapter: parse one request, call the canonical-family kernel."""
-    require_jacobi_matrix_admission(request.family)
+    try:
+        require_jacobi_matrix_admission(request.family)
+    except JacobiMatrixAdmissionError as exc:
+        raise OperationDomainValidationError(
+            location=("family",),
+            code=f"moments_orthogonal.jacobi_matrix.{exc.reason}",
+            message=str(exc),
+        ) from exc
     return jacobi_matrix_from_family(request.family)
 
 

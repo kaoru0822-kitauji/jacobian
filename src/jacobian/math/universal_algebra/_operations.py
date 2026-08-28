@@ -7,6 +7,7 @@ from jacobian.canonical import (
     CanonicalLimits,
     encode_strict_json,
 )
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.universal_algebra._models import (
     _HOMOMORPHISM_RESULT_RESERVE_BYTES,
     MAX_ENUMERATION_WORK,
@@ -48,16 +49,32 @@ __all__ = [
 ]
 
 
+def _reject(*, location: tuple[str | int, ...], code: str, message: str) -> None:
+    raise OperationDomainValidationError(
+        location=location,
+        code=f"universal_algebra.{code}",
+        message=message,
+    )
+
+
 def _admit_evaluate(request: EvaluateRequest) -> None:
     try:
         require_term_for_algebra(request.term, request.algebra)
     except UniversalAlgebraAdmissionError as exc:
-        raise ValueError(str(exc)) from None
+        _reject(location=("term",), code="term_signature", message=str(exc))
     if len(request.assignment) != request.term.variable_count:
-        raise ValueError("assignment must cover exactly the referenced variables")
+        _reject(
+            location=("assignment",),
+            code="assignment_coverage",
+            message="assignment must cover exactly the referenced variables",
+        )
     size = len(request.algebra.carrier)
     if any(not 0 <= value < size for value in request.assignment):
-        raise ValueError("assignment value out of carrier range")
+        _reject(
+            location=("assignment",),
+            code="assignment_carrier_range",
+            message="assignment value out of carrier range",
+        )
 
 
 def _admit_equation_profile(request: EquationProfileRequest) -> None:
@@ -65,36 +82,67 @@ def _admit_equation_profile(request: EquationProfileRequest) -> None:
         try:
             require_term_for_algebra(term, request.algebra)
         except UniversalAlgebraAdmissionError as exc:
-            raise ValueError(str(exc)) from None
+            _reject(location=("term",), code="term_signature", message=str(exc))
     if (
         max(request.left.variable_count, request.right.variable_count)
         > request.variable_count
     ):
-        raise ValueError("variable_count must cover every referenced variable")
+        _reject(
+            location=("variable_count",),
+            code="variable_coverage",
+            message="variable_count must cover every referenced variable",
+        )
     if len(request.algebra.carrier) ** request.variable_count > MAX_ENUMERATION_WORK:
-        raise ValueError("equation profile exceeds the assignment work budget")
+        _reject(
+            location=("variable_count",),
+            code="equation_work_bound",
+            message="equation profile exceeds the assignment work budget",
+        )
 
 
 def _admit_subalgebra(request: SubalgebraRequest) -> None:
     size = len(request.algebra.carrier)
     if any(not 0 <= generator < size for generator in request.generators):
-        raise ValueError("generator out of carrier range")
+        _reject(
+            location=("generators",),
+            code="generator_carrier_range",
+            message="generator out of carrier range",
+        )
     work = sum(size**symbol.arity for symbol in request.algebra.operations) * size
     if work > MAX_ENUMERATION_WORK:
-        raise ValueError("subalgebra closure exceeds the operation work budget")
+        _reject(
+            location=("generators",),
+            code="subalgebra_work_bound",
+            message="subalgebra closure exceeds the operation work budget",
+        )
 
 
 def _admit_homomorphism(request: HomomorphismProfileRequest) -> None:
     preservation_cells = sum(len(table) for table in request.carrier_map.source.tables)
     if preservation_cells > MAX_ENUMERATION_WORK:
-        raise ValueError("homomorphism operation work exceeds the enumeration budget")
-    _require_homomorphism_output_headroom(request.carrier_map)
+        _reject(
+            location=("carrier_map",),
+            code="homomorphism_work_bound",
+            message="homomorphism operation work exceeds the enumeration budget",
+        )
+    try:
+        _require_homomorphism_output_headroom(request.carrier_map)
+    except ValueError as exc:
+        _reject(
+            location=("carrier_map",),
+            code="homomorphism_output_bound",
+            message=str(exc),
+        )
 
 
 def _admit_partition(request: CongruenceRequest | QuotientRequest) -> None:
     congruence_work = _congruence_work(request.algebra)
     if congruence_work > MAX_ENUMERATION_WORK:
-        raise ValueError("congruence check exceeds the operation work budget")
+        _reject(
+            location=("algebra",),
+            code="congruence_work_bound",
+            message="congruence check exceeds the operation work budget",
+        )
     if not isinstance(request, QuotientRequest):
         return
     quotient_size = len(request.partition)
@@ -107,7 +155,11 @@ def _admit_partition(request: CongruenceRequest | QuotientRequest) -> None:
         + quotient_table_cells
     )
     if quotient_work > MAX_ENUMERATION_WORK:
-        raise ValueError("quotient construction exceeds the operation work budget")
+        _reject(
+            location=("partition",),
+            code="quotient_work_bound",
+            message="quotient construction exceeds the operation work budget",
+        )
     try:
         source_bytes = len(encode_strict_json(request.algebra.model_dump(mode="json")))
         operation_bytes = len(
@@ -122,7 +174,11 @@ def _admit_partition(request: CongruenceRequest | QuotientRequest) -> None:
             len(encode_strict_json(f"B{index}")) + 1 for index in range(quotient_size)
         )
     except CanonicalizationError as exc:
-        raise ValueError("quotient source exceeds the canonical output limit") from exc
+        raise OperationDomainValidationError(
+            location=("algebra",),
+            code="universal_algebra.quotient_output_bound",
+            message="quotient source exceeds the canonical output limit",
+        ) from exc
     quotient_index_bytes = len(str(quotient_size - 1)) + 1
     predicted_bytes = (
         source_bytes
@@ -133,8 +189,10 @@ def _admit_partition(request: CongruenceRequest | QuotientRequest) -> None:
         + _HOMOMORPHISM_RESULT_RESERVE_BYTES
     )
     if predicted_bytes > CanonicalLimits().max_output_bytes:
-        raise ValueError(
-            "canonical quotient homomorphism would exceed the output limit"
+        _reject(
+            location=("partition",),
+            code="quotient_output_bound",
+            message="canonical quotient homomorphism would exceed the output limit",
         )
 
 

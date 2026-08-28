@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.topology.edge_paths._models import (
     EdgePathConcatenateRequest,
     EdgePathConcatenateResult,
@@ -10,30 +11,66 @@ from jacobian.math.topology.edge_paths._models import (
 )
 
 
+def _reject(*, location: tuple[str | int, ...], code: str, message: str) -> None:
+    raise OperationDomainValidationError(
+        location=location,
+        code=f"topology.edge_path.{code}",
+        message=message,
+    )
+
+
 def _admit_edge_path_word(request: EdgePathWordRequest) -> None:
     for u, v in request.edges:
         if not (0 <= u < request.vertex_count and 0 <= v < request.vertex_count):
-            raise ValueError("edge vertices must be in 0..vertex_count-1")
+            _reject(
+                location=("edges",),
+                code="edge_vertex_range",
+                message="edge vertices must be in 0..vertex_count-1",
+            )
     if not 0 <= request.start_vertex < request.vertex_count:
-        raise ValueError("start vertex must be in 0..vertex_count-1")
+        _reject(
+            location=("start_vertex",),
+            code="start_vertex_range",
+            message="start vertex must be in 0..vertex_count-1",
+        )
     current = request.start_vertex
     for step in request.path:
         if step.edge_index >= len(request.edges):
-            raise ValueError("path edge index is outside the graph")
+            _reject(
+                location=("path",),
+                code="edge_index_range",
+                message="path edge index is outside the graph",
+            )
         left, right = request.edges[step.edge_index]
         source, target = (left, right) if step.orientation == 1 else (right, left)
         if source != current:
-            raise ValueError("oriented edge path is not continuous")
+            _reject(
+                location=("path",),
+                code="path_continuity",
+                message="oriented edge path is not continuous",
+            )
         current = target
 
 
 def _admit_edge_path_concatenation(request: EdgePathConcatenateRequest) -> None:
     if any(not 0 <= v < request.vertex_count for v in request.path_a):
-        raise ValueError("path_a vertices must be valid")
+        _reject(
+            location=("path_a",),
+            code="vertex_range",
+            message="path_a vertices must be valid",
+        )
     if any(not 0 <= v < request.vertex_count for v in request.path_b):
-        raise ValueError("path_b vertices must be valid")
+        _reject(
+            location=("path_b",),
+            code="vertex_range",
+            message="path_b vertices must be valid",
+        )
     if request.path_a[-1] != request.path_b[0]:
-        raise ValueError("concatenated paths must share their endpoint")
+        _reject(
+            location=("path_b",),
+            code="concatenation_endpoint",
+            message="concatenated paths must share their endpoint",
+        )
 
 
 def compute_edge_path_word(request: EdgePathWordRequest) -> EdgePathWordResult:

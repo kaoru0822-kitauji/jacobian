@@ -218,6 +218,42 @@ def test_mcp_describes_and_invokes_operations(tmp_path: Path) -> None:
                 }
             ]
 
+            with pytest.raises(MCPError) as semantic_error:
+                await client.call_tool(
+                    "math.run",
+                    {
+                        "operation_id": "universal_algebra.term.evaluate.compute",
+                        "payload": {
+                            "algebra": {
+                                "carrier": ["0", "1"],
+                                "operations": [{"operation_id": "and", "arity": 2}],
+                                "tables": [[0, 0, 0, 1]],
+                            },
+                            "term": {
+                                "nodes": [
+                                    {"kind": "variable", "variable_id": 0},
+                                    {"kind": "variable", "variable_id": 1},
+                                    {
+                                        "kind": "application",
+                                        "operation": 0,
+                                        "children": [0, 1],
+                                    },
+                                ],
+                                "root": 2,
+                            },
+                            "assignment": [0],
+                        },
+                    },
+                )
+            assert semantic_error.value.code == -32602
+            assert semantic_error.value.data["errors"] == [
+                {
+                    "location": ["assignment"],
+                    "code": "universal_algebra.assignment_coverage",
+                    "message": "assignment must cover exactly the referenced variables",
+                }
+            ]
+
             with pytest.raises(MCPError) as oversized_error:
                 await client.call_tool(
                     "math.run",
