@@ -29,9 +29,13 @@ from jacobian.math.number_theory.quadratic_forms.binary._models import (
 )
 
 
-def _admit(operation: Callable[[], None], *, location: tuple[str | int, ...]) -> None:
+def _admit[AdmissionResult](
+    operation: Callable[[], AdmissionResult],
+    *,
+    location: tuple[str | int, ...],
+) -> AdmissionResult:
     try:
-        operation()
+        return operation()
     except PydanticCustomError as exc:
         raise OperationDomainValidationError(
             location=location, code=exc.type, message=exc.message()

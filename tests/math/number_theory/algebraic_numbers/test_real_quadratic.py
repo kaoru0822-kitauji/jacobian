@@ -6,7 +6,6 @@ from fractions import Fraction
 from typing import cast
 
 import pytest
-from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
 from jacobian.catalog.models import MathTool
@@ -31,12 +30,12 @@ def _value(rational: int) -> RealQuadraticValue:
 def test_order_preflights_a_difference_that_cannot_be_returned() -> None:
     maximum_component = 10**256 - 1
 
-    with pytest.raises(ValidationError) as error:
-        RealQuadraticOrderRequest(
-            left=_value(maximum_component),
-            right=_value(-maximum_component),
-        )
-    assert error.value.errors()[0]["type"] == "real_quadratic.difference_bound_exceeded"
+    request = RealQuadraticOrderRequest(
+        left=_value(maximum_component),
+        right=_value(-maximum_component),
+    )
+    with pytest.raises(ValueError, match="difference"):
+        real_quadratic_order(request.left, request.right)
 
 
 def test_native_order_api_accepts_canonical_values_without_a_wire_request() -> None:

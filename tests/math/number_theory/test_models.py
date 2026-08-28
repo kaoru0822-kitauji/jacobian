@@ -8,6 +8,7 @@ from jacobian.math.number_theory._derived_models import (
     FactorialValuationRequest,
     LegendreSymbolRequest,
 )
+from jacobian.math.number_theory._derived_operations import compute_legendre_symbol
 from jacobian.math.number_theory._direct_factorization_models import (
     MAX_DIRECT_FACTORIZATION_DIGITS,
     DivisorListResult,
@@ -64,8 +65,9 @@ def test_legendre_request_admits_prime_denominators_without_a_backend(
 
 @pytest.mark.parametrize("composite", (9, 99, 9_999_999))
 def test_legendre_request_rejects_composite_denominators(composite: int) -> None:
-    with expect_validation("number_theory.legendre_denominator_must_be_prime"):
-        LegendreSymbolRequest(a=2, prime=composite)
+    request = LegendreSymbolRequest(a=2, prime=composite)
+    with pytest.raises(ValueError, match="Legendre denominator must be prime"):
+        compute_legendre_symbol(request)
 
 
 def test_chinese_remainder_rejects_combined_modulus_beyond_result_budget() -> None:

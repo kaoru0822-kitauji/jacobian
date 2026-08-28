@@ -147,8 +147,6 @@ def test_node_limit_returns_unknown_not_no_cover() -> None:
     assert limited.status == "UNKNOWN"
     assert limited.selected_row_ids is None
     assert complete.status == "NO_COVER"
-    # UNKNOWN is an operational outcome bound to this deterministic limit.
-    assert type(limited).model_validate(limited.model_dump()) == limited
 
 
 def test_empty_primary_domain_has_the_empty_cover() -> None:
@@ -445,8 +443,12 @@ def test_search_and_retained_output_boundaries_are_preflighted() -> None:
             for index in range(MAX_EXACT_COVER_INCIDENCES // len(all_items))
         ),
     )
-    with raises_code("combinatorics.invariant"):
-        GeneralizedExactCoverRequest(instance=large_source)
+    request = GeneralizedExactCoverRequest(instance=large_source)
+    with pytest.raises(ValueError, match="canonical output"):
+        find_generalized_exact_cover(
+            request.instance,
+            search_node_limit=request.search_node_limit,
+        )
 
 
 def test_schema_publishes_the_exact_cover_contract() -> None:

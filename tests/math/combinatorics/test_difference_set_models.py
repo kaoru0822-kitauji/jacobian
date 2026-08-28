@@ -7,12 +7,17 @@ from contextlib import contextmanager
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.combinatorics._difference_set_models import (
     CyclicDifferenceMultiplicity,
     CyclicDifferenceSetExtensionRequest,
     CyclicDifferenceSetExtensionResult,
     CyclicPerfectDifferenceSetResult,
     IntegerSidonRequest,
+    IntegerSidonResult,
+)
+from jacobian.math.combinatorics._difference_sets import (
+    decide_cyclic_difference_set_extension,
 )
 
 
@@ -28,12 +33,29 @@ def test_sidon_request_rejects_duplicate_integer_elements() -> None:
         IntegerSidonRequest(elements=("1", "2", "1"))
 
 
+def test_sidon_result_keeps_structural_normalization() -> None:
+    result = IntegerSidonResult(
+        normalized_elements=("1", "2", "4"),
+        ordered_differences=(),
+        is_sidon=True,
+    )
+    assert result.normalized_elements == ("1", "2", "4")
+
+
 def test_extension_request_rejects_an_unbounded_candidate_space() -> None:
-    with raises_code("combinatorics.extension_invariant"):
-        CyclicDifferenceSetExtensionRequest(
-            base_elements=("0", "1", "2", "3", "4", "5", "6"),
-            target_order=10,
-        )
+    request = CyclicDifferenceSetExtensionRequest(
+        base_elements=("0", "1", "2", "3", "4", "5", "6"),
+        target_order=10,
+    )
+    with pytest.raises(OperationDomainValidationError) as error:
+        decide_cyclic_difference_set_extension(request)
+    assert error.value.errors() == (
+        {
+            "loc": ("base_elements", "target_order"),
+            "type": "combinatorics.extension_candidate_space_bound",
+            "msg": "extension candidate space exceeds the complete-search bound",
+        },
+    )
 
 
 def test_negative_extension_result_binds_exact_candidate_count() -> None:

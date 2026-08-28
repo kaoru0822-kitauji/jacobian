@@ -6,6 +6,7 @@ import math
 from collections import Counter
 
 from jacobian.catalog._examples import example
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.combinatorics._difference_set_models import (
     MAX_CYCLIC_DIFFERENCE_SET_MODULUS,
     MAX_DIFFERENCE_SET_ADDITIONAL_ELEMENTS,
@@ -37,7 +38,7 @@ def decide_integer_sidon(request: IntegerSidonRequest) -> IntegerSidonResult:
         if left != right
     )
     values = tuple(int(record.difference) for record in differences)
-    return IntegerSidonResult._from_kernel(
+    return IntegerSidonResult(
         normalized_elements=tuple(str(value) for value in elements),
         ordered_differences=differences,
         is_sidon=len(set(values)) == len(values),
@@ -69,7 +70,7 @@ def decide_cyclic_perfect_difference_set(
     repeated = tuple(item.residue for item in profile if item.multiplicity > 1)
     order = len(residues)
     expected_modulus = order * (order - 1) + 1
-    return CyclicPerfectDifferenceSetResult._from_kernel(
+    return CyclicPerfectDifferenceSetResult(
         modulus=request.modulus,
         normalized_residues=residues,
         order=order,
@@ -173,23 +174,41 @@ def decide_cyclic_difference_set_extension(
     order = request.target_order
     modulus = order * (order - 1) + 1
     if modulus > MAX_CYCLIC_DIFFERENCE_SET_MODULUS:
-        raise ValueError("derived extension modulus exceeds the supported bound")
+        raise OperationDomainValidationError(
+            location=("target_order",),
+            code="combinatorics.extension_modulus_bound",
+            message="derived extension modulus exceeds the supported bound",
+        )
     base = tuple(sorted({int(value) % modulus for value in request.base_elements}))
     additional = order - len(base)
     if additional < 0:
-        raise ValueError("target_order is smaller than the reduced base set")
+        raise OperationDomainValidationError(
+            location=("target_order",),
+            code="combinatorics.extension_target_order_bound",
+            message="target_order is smaller than the reduced base set",
+        )
     if additional > MAX_DIFFERENCE_SET_ADDITIONAL_ELEMENTS:
-        raise ValueError("extension request requires too many added elements")
+        raise OperationDomainValidationError(
+            location=("target_order",),
+            code="combinatorics.extension_additional_elements_bound",
+            message="extension request requires too many added elements",
+        )
     candidate_count = math.comb(modulus - len(base), additional)
     if candidate_count > MAX_DIFFERENCE_SET_EXTENSION_CANDIDATES:
-        raise ValueError("extension candidate space exceeds the complete-search bound")
+        raise OperationDomainValidationError(
+            location=("base_elements", "target_order"),
+            code="combinatorics.extension_candidate_space_bound",
+            message="extension candidate space exceeds the complete-search bound",
+        )
     extension = _find_extension(base, order, modulus)
-    return CyclicDifferenceSetExtensionResult._from_kernel(
+    return CyclicDifferenceSetExtensionResult(
         target_order=order,
         modulus=modulus,
         base_residues=base,
         candidate_space_size=candidate_count,
-        extension=extension,
+        decision="EXTENDS" if extension is not None else "DOES_NOT_EXTEND",
+        extension=extension or (),
+        coverage="WITNESS" if extension is not None else "ALL_CANDIDATES",
     )
 
 

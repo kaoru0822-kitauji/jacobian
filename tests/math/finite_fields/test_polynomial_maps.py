@@ -1,17 +1,14 @@
 from __future__ import annotations
 
 import pytest
-from pydantic import ValidationError
 
 from jacobian.math.finite_fields import (
-    CollisionResult,
-    FiberPartition,
     FiniteMapTable,
     FinitePolynomialMap,
-    PermutationResult,
     analyze_collisions,
     analyze_permutation,
     element,
+    evaluate_finite_polynomial,
     fiber_partition,
     finite_field,
     finite_map_table,
@@ -51,7 +48,13 @@ def test_complete_table_and_fibers_reuse_exact_slice_a_field_identity() -> None:
         next(target for source, target in table.entries if source == collision.left)
         == collision.image
     )
-    assert type(table).model_validate(table.model_dump(mode="json")) == table
+    assert tuple(
+        target
+        for _source, target in table.entries
+    ) == tuple(
+        evaluate_finite_polynomial(polynomial_map.polynomial, source)
+        for source, _target in table.entries
+    )
 
 
 def test_frobenius_map_is_a_permutation() -> None:
@@ -64,9 +67,12 @@ def test_frobenius_map_is_a_permutation() -> None:
     assert {target.digest for _, target in table.entries} == {
         source.digest for source, _ in result.inverse_entries
     }
+    assert {
+        source.digest: target.digest for source, target in table.entries
+    } == {target.digest: source.digest for target, source in result.inverse_entries}
 
 
-def test_slice_b_values_reject_wrong_parent_incomplete_table_and_forged_fiber() -> None:
+def test_slice_b_values_reject_wrong_parent_and_incomplete_table() -> None:
     polynomial_map = _map(3)
     table = finite_map_table(polynomial_map)
     other = finite_field(2, (1, 1, 1), generator="z")
@@ -85,46 +91,33 @@ def test_slice_b_values_reject_wrong_parent_incomplete_table_and_forged_fiber() 
         FiniteMapTable(map=polynomial_map, entries=table.entries[:-1])
     with pytest.raises(ValueError, match="canonical domain order"):
         FiniteMapTable(map=polynomial_map, entries=tuple(reversed(table.entries)))
-    with pytest.raises(ValueError, match="partition"):
-        FiberPartition(
-            table=table,
-            fibers=((table.entries[0][1], (table.entries[0][0],)),),
-        )
-
-
-def test_certificates_reject_values_not_bound_to_the_exact_table() -> None:
-    collision_table = finite_map_table(_map(3))
-    permutation_table = finite_map_table(_map(2))
-    collision = analyze_collisions(collision_table)
-    permutation = analyze_permutation(permutation_table)
-
-    with pytest.raises(ValueError, match="exact bound table"):
-        CollisionResult(
-            table=collision_table,
-            status="COLLISION",
-            left=collision.left,
-            right=collision.right,
-            image=collision_table.entries[0][1],
-        )
-    with pytest.raises(ValueError, match="exact permutation"):
-        PermutationResult(
-            table=permutation_table,
-            status="PERMUTATION",
-            inverse_entries=tuple(reversed(permutation.inverse_entries)),
-        )
-
-
-def test_table_consumers_reject_unevaluated_targets() -> None:
+def test_table_consumers_parse_structural_targets_without_replay() -> None:
     identity_table = finite_map_table(_map(1))
     zero = identity_table.entries[0][1]
-    with pytest.raises(ValidationError) as error:
-        FiniteMapTable(
-            map=identity_table.map,
-            entries=tuple((source, zero) for source, _ in identity_table.entries),
-        )
-    assert (
-        error.value.errors()[0]["type"]
-        == "finite_field.finite_map_table_targets_match_bound_polynomial"
+    parsed = FiniteMapTable(
+        map=identity_table.map,
+        entries=tuple((source, zero) for source, _ in identity_table.entries),
+    )
+    assert parsed.entries == tuple((source, zero) for source, _ in identity_table.entries)
+
+
+def test_fibers_and_collisions_preserve_the_table_defining_invariants() -> None:
+    table = finite_map_table(_map(3))
+    partition = fiber_partition(table)
+    collision = analyze_collisions(table)
+
+    assert all(
+        sources
+        == tuple(source for source, target in table.entries if target == image)
+        for image, sources in partition.fibers
+    )
+    assert collision.left is not None
+    assert collision.right is not None
+    assert collision.image is not None
+    assert all(
+        target == collision.image
+        for source, target in table.entries
+        if source in (collision.left, collision.right)
     )
 
 

@@ -13,6 +13,7 @@ from jacobian.math.finite_fields import (
     direction_rank_ledger,
     element,
     finite_field,
+    linear_map_rank,
     orbit_distribution,
     projective_line,
     projective_point,
@@ -155,6 +156,17 @@ def test_slice_a_restricts_to_f2_4_to_f2_6_and_matches_paper_ranks() -> None:
     ) == tuple(rank(linear_map.matrix) for linear_map in maps)
 
 
+def test_restriction_and_rank_operations_preserve_their_defining_invariant() -> None:
+    subspace, directions = _slice_a_values()
+    direction = directions.points[0]
+
+    restricted = restrict_scalars(subspace, direction)
+    result = linear_map_rank(subspace, direction)
+
+    assert result.linear_map == restricted
+    assert result.rank == rank(restricted.matrix)
+
+
 def test_slice_a_keeps_directions_bound_through_orbit_aggregation() -> None:
     subspace, directions = _slice_a_values()
 
@@ -166,10 +178,6 @@ def test_slice_a_keeps_directions_bound_through_orbit_aggregation() -> None:
     assert tuple(entry.rank for entry in ledger.entries) == (3, 3, 3, 3, 3, 3, 4, 4, 4)
     assert distribution.counts == ((1, 9), (8, 48), (16, 12))
     assert distribution.ledger is ledger
-    assert (
-        type(distribution).model_validate(distribution.model_dump(mode="json"))
-        == distribution
-    )
 
 
 def test_slice_a_rank_derives_the_restriction_from_its_source() -> None:

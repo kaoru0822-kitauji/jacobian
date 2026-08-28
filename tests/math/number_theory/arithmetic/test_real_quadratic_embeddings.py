@@ -76,7 +76,7 @@ def test_zero_has_two_labeled_embeddings_and_zero_invariants() -> None:
     assert profile.norm.as_fraction() == 0
 
 
-def test_profile_replay_rejects_forged_source_images_and_invariants() -> None:
+def test_profile_parsing_keeps_structural_embedding_checks() -> None:
     profile = _profile()
     payload = profile.model_dump(mode="json")
 
@@ -87,14 +87,10 @@ def test_profile_replay_rejects_forged_source_images_and_invariants() -> None:
     assert (
         exc_info.value.errors()[0]["type"] == "real_quadratic.embedding_images_mismatch"
     )
-    with pytest.raises(ValidationError) as exc_info:
-        RealQuadraticEmbeddingProfile.model_validate(
-            {**payload, "norm": {"num": "2", "den": "1"}}
-        )
-    assert (
-        exc_info.value.errors()[0]["type"]
-        == "real_quadratic.embedding_invariants_mismatch"
+    parsed = RealQuadraticEmbeddingProfile.model_validate(
+        {**payload, "norm": {"num": "2", "den": "1"}}
     )
+    assert parsed.norm.as_fraction() == 2
     with pytest.raises(ValidationError) as exc_info:
         RealQuadraticEmbeddingProfile.model_validate(
             {
