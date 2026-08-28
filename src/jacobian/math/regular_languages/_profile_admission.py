@@ -20,7 +20,7 @@ from jacobian.math.regular_languages.values import (
 _MAX_DP_UPDATES = 2_000_000
 _MAX_VECTOR_UPDATE_WORK = 20_000_000
 _MAX_VECTOR_COORDINATES = 4_000_000
-_MAX_RESULT_BYTES = 4 * 1024 * 1024
+MAX_TRANSITION_PROFILE_RESULT_BYTES = 4 * 1024 * 1024
 _MAX_COMPOSITION_CELLS = 20_000_000
 _AUTOMATON_BASE_WIRE_BYTES = 256
 _AUTOMATON_TRANSITION_WIRE_BYTES = 128
@@ -175,7 +175,7 @@ def admit_transition_profile(
         + _PROFILE_BASE_WIRE_BYTES
         + profile_cells * estimated_entry_bytes
     )
-    if estimated_bytes > _MAX_RESULT_BYTES:
+    if estimated_bytes > MAX_TRANSITION_PROFILE_RESULT_BYTES:
         raise ValueError(
             "transition-Parikh serialized-result bound exceeded; reduce the "
             "transition axis or profile support"
@@ -186,4 +186,8 @@ def admit_transition_profile(
     )
 
 
-__all__ = ["TransitionParikhAdmissionPlan", "admit_transition_profile"]
+__all__ = [
+    "MAX_TRANSITION_PROFILE_RESULT_BYTES",
+    "TransitionParikhAdmissionPlan",
+    "admit_transition_profile",
+]

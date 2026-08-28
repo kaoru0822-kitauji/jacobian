@@ -7,7 +7,6 @@ from fractions import Fraction
 import sympy
 
 from jacobian._exact import CanonicalRational
-from jacobian.canonical import format_canonical_integer
 from jacobian.math.boolean_analysis._models import (
     ErasureNoiseRequest,
     ErasureNoiseResult,
@@ -26,11 +25,7 @@ def _variable_count(truth_table_len: int) -> int:
 
 def _rational(value: Fraction | int) -> CanonicalRational:
     """Convert an exact Fraction or int to a CanonicalRational."""
-    frac = Fraction(value)
-    return CanonicalRational(
-        num=format_canonical_integer(frac.numerator),
-        den=format_canonical_integer(frac.denominator),
-    )
+    return CanonicalRational.from_fraction(Fraction(value))
 
 
 def compute_truth_table(request: TruthTableRequest) -> TruthTableResult:

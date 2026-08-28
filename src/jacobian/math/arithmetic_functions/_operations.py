@@ -5,7 +5,6 @@ from __future__ import annotations
 from fractions import Fraction
 
 from jacobian._exact import MAX_CANONICAL_RATIONAL_DIGITS, CanonicalRational
-from jacobian.canonical import format_canonical_integer
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math._rational_height import RationalHeight, sum_heights
 from jacobian.math.arithmetic_functions._models import (
@@ -22,11 +21,7 @@ from jacobian.math.arithmetic_functions._models import (
 
 def _rational(value: Fraction | int) -> CanonicalRational:
     """Convert an exact Fraction or int to a CanonicalRational."""
-    frac = Fraction(value)
-    return CanonicalRational(
-        num=format_canonical_integer(frac.numerator),
-        den=format_canonical_integer(frac.denominator),
-    )
+    return CanonicalRational.from_fraction(Fraction(value))
 
 
 def _divisors(n: int) -> list[int]:

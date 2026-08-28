@@ -23,9 +23,6 @@ __all__ = [
     "transition_parikh_profile",
 ]
 
-# Compatibility for owner-local boundary evidence; admission owns its use.
-_MAX_TRANSITION_PROFILE_RESULT_BYTES = 4 * 1024 * 1024
-
 
 def _transition_map(dfa: DFA) -> dict[tuple[int, int], int]:
     return {(tr.source, tr.symbol): tr.target for tr in dfa.transitions}

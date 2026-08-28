@@ -8,7 +8,6 @@ from typing import Any
 import networkx as nx
 
 from jacobian._exact import CanonicalRational
-from jacobian.canonical import format_canonical_integer
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.flow._models import (
     EdgeDisjointPathsRequest,
@@ -89,11 +88,7 @@ def _build_digraph(graph: FlowGraph) -> nx.DiGraph[int]:
 
 def _rational(value: Fraction | int) -> CanonicalRational:
     """Convert an exact Fraction or int to a CanonicalRational."""
-    frac = Fraction(value)
-    return CanonicalRational(
-        num=format_canonical_integer(frac.numerator),
-        den=format_canonical_integer(frac.denominator),
-    )
+    return CanonicalRational.from_fraction(Fraction(value))
 
 
 def compute_max_flow(request: MaxFlowRequest) -> MaxFlowResult:

@@ -16,8 +16,10 @@ from jacobian.math.regular_languages._models import (
 from jacobian.math.regular_languages._operations import (
     compute_transition_parikh_profile,
 )
+from jacobian.math.regular_languages._profile_admission import (
+    MAX_TRANSITION_PROFILE_RESULT_BYTES,
+)
 from jacobian.math.regular_languages.operations import (
-    _MAX_TRANSITION_PROFILE_RESULT_BYTES,
     dfa_transition_carrier,
     transition_parikh_profile,
 )
@@ -545,7 +547,7 @@ def test_owner_rejects_excessive_serialized_result() -> None:
     encoded = encode_strict_json(
         compute_transition_parikh_profile(accepted).model_dump(mode="json")
     )
-    assert len(encoded) <= _MAX_TRANSITION_PROFILE_RESULT_BYTES
+    assert len(encoded) <= MAX_TRANSITION_PROFILE_RESULT_BYTES
 
     request = TransitionParikhProfileRequest(
         automaton=_loop_automaton(130),

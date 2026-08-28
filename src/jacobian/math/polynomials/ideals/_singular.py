@@ -42,6 +42,9 @@ _PROTOCOL_HEADER = "JACOBIAN_SINGULAR_IDEAL_V1"
 _COEFFICIENT = re.compile(r"^(0|-?[1-9][0-9]*)(?:/([1-9][0-9]*))?$")
 _STDOUT_LIMIT = 512 * 1024
 _STDERR_LIMIT = 64 * 1024
+_SINGULAR_ADDRESS_SPACE_BYTES = 1024 * 1024 * 1024
+_SYMPY_ADDRESS_SPACE_BYTES = 2 * 1024 * 1024 * 1024
+_WORKER_FILE_SIZE_BYTES = 1024 * 1024
 _CANONICAL_OUTPUT_LIMIT = CanonicalLimits().max_output_bytes
 
 SingularOperation = Literal["radical", "quotient", "saturation"]
@@ -592,8 +595,8 @@ def run_singular_minimal_primes(
                 stderr_limit=_STDERR_LIMIT,
                 resource_limits=ProcessResourceLimits(
                     cpu_seconds=math.ceil(allowance),
-                    address_space_bytes=1024 * 1024 * 1024,
-                    file_size_bytes=1024 * 1024,
+                    address_space_bytes=_SINGULAR_ADDRESS_SPACE_BYTES,
+                    file_size_bytes=_WORKER_FILE_SIZE_BYTES,
                 ),
                 platform_tools=ProcessPlatformTools(prlimit_executable=prlimit),
                 cwd=directory,
@@ -874,8 +877,8 @@ def run_singular_minimal_primes_verification(
                 stderr_limit=_STDERR_LIMIT,
                 resource_limits=ProcessResourceLimits(
                     cpu_seconds=math.ceil(allowance),
-                    address_space_bytes=1024 * 1024 * 1024,
-                    file_size_bytes=1024 * 1024,
+                    address_space_bytes=_SINGULAR_ADDRESS_SPACE_BYTES,
+                    file_size_bytes=_WORKER_FILE_SIZE_BYTES,
                 ),
                 platform_tools=ProcessPlatformTools(prlimit_executable=prlimit),
                 cwd=directory,
@@ -1001,8 +1004,8 @@ def run_singular_saturation_verification(
                 stderr_limit=_STDERR_LIMIT,
                 resource_limits=ProcessResourceLimits(
                     cpu_seconds=budget.wall_seconds,
-                    address_space_bytes=1024 * 1024 * 1024,
-                    file_size_bytes=1024 * 1024,
+                    address_space_bytes=_SINGULAR_ADDRESS_SPACE_BYTES,
+                    file_size_bytes=_WORKER_FILE_SIZE_BYTES,
                 ),
                 platform_tools=ProcessPlatformTools(prlimit_executable=prlimit),
                 cwd=directory,
@@ -1078,8 +1081,8 @@ def run_bounded_stdin_python_kernel(
             stderr_limit=stderr_limit,
             resource_limits=ProcessResourceLimits(
                 cpu_seconds=int(wall_seconds),
-                address_space_bytes=2 * 1024 * 1024 * 1024,
-                file_size_bytes=1024 * 1024,
+                address_space_bytes=_SYMPY_ADDRESS_SPACE_BYTES,
+                file_size_bytes=_WORKER_FILE_SIZE_BYTES,
             ),
             platform_tools=ProcessPlatformTools(prlimit_executable=prlimit),
             cwd=directory,
