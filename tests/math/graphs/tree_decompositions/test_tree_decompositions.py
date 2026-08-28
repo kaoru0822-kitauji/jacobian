@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
-
 import pytest
 from pydantic import ValidationError
 
@@ -119,15 +117,15 @@ class TestVertexOccurrences:
         result = compute_vertex_occurrences(VertexOccurrencesRequest(decomposition=td))
         per_vertex = result.per_vertex
         # Vertex b appears in both bags.
-        assert set(cast(Any, per_vertex["b"]["nodes"])) == {"t0", "t1"}
-        assert cast(int, per_vertex["b"]["count"]) == 2
-        assert cast(Any, per_vertex["b"]["edges"]) == (("t0", "t1"),)
+        assert set(per_vertex["b"].nodes) == {"t0", "t1"}
+        assert per_vertex["b"].count == 2
+        assert per_vertex["b"].edges == (("t0", "t1"),)
         # Vertex a appears in one bag.
-        assert cast(Any, per_vertex["a"]["nodes"]) == ("t0",)
-        assert cast(int, per_vertex["a"]["count"]) == 1
+        assert per_vertex["a"].nodes == ("t0",)
+        assert per_vertex["a"].count == 1
         # Vertex c appears in one bag.
-        assert per_vertex["c"]["nodes"] == ("t1",)
-        assert cast(int, per_vertex["c"]["count"]) == 1
+        assert per_vertex["c"].nodes == ("t1",)
+        assert per_vertex["c"].count == 1
 
 
 # ---------------------------------------------------------------------------
@@ -142,9 +140,9 @@ class TestAdhesions:
         assert result.max_adhesion == 1
         assert len(result.edges) == 1
         edge = result.edges[0]
-        assert edge["edge"] == ("t0", "t1")
-        assert edge["adhesion"] == ("b",)
-        assert edge["size"] == 1
+        assert edge.edge == ("t0", "t1")
+        assert edge.adhesion == ("b",)
+        assert edge.size == 1
         assert result.size_profile == (1,)
 
 
@@ -228,8 +226,8 @@ class TestRestrict:
         td = _path_decomposition()
         result = compute_restrict(RestrictRequest(decomposition=td, subset=("a", "b")))
         # The restricted graph has vertices {a, b} and edge {(a,b)}.
-        assert cast(Any, result.graph["vertices"]) == ("a", "b")
-        assert cast(Any, result.graph["edges"]) == (("a", "b"),)
+        assert result.graph.vertices == ("a", "b")
+        assert result.graph.edges == (("a", "b"),)
         # The bag {b,c} restricted to {a,b} becomes {b}; bag {a,b} restricted to
         # {a,b} becomes {a,b}. The redundant single-element bag {b} should be
         # pruned if it is contained in its neighbor {a,b}.
@@ -278,7 +276,7 @@ class TestBagIntersectionGraph:
         )
         assert len(result.nodes) == 2
         for node in result.nodes:
-            assert node["bag_size"] == 2
+            assert node.bag_size == 2
         assert result.max_adhesion == 1
 
 

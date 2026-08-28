@@ -169,11 +169,7 @@ def compute_homomorphism_profile(
 
 def compute_congruence(request: CongruenceRequest) -> CongruenceResult:
     _admit_partition(request)
-    result = congruence_check(request.algebra, request.partition)
-    return CongruenceResult(
-        is_congruence=result["is_congruence"],
-        obstruction=result.get("obstruction"),
-    )
+    return congruence_check(request.algebra, request.partition)
 
 
 def compute_quotient(request: QuotientRequest) -> FiniteAlgebraHomomorphism:

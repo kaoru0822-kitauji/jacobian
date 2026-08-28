@@ -294,6 +294,35 @@ class CongruenceRequest(_PartitionRequest):
 class CongruenceResult(StrictModel):
     is_congruence: bool
     obstruction: str | None = None
+    operation: int | None = Field(default=None, ge=0)
+    x: tuple[int, ...] | None = None
+    y: tuple[int, ...] | None = None
+
+    @model_validator(mode="after")
+    def bind_obstruction(self) -> Self:
+        witness = (self.operation, self.x, self.y)
+        if self.is_congruence:
+            if self.obstruction is not None or any(
+                item is not None for item in witness
+            ):
+                raise _validation_error(
+                    "congruence_has_obstruction",
+                    "a congruence result cannot carry obstruction data",
+                )
+            return self
+        if self.obstruction is None:
+            raise _validation_error(
+                "noncongruence_missing_obstruction",
+                "a noncongruence result must identify its obstruction",
+            )
+        if self.obstruction == "compatibility_violation" and any(
+            item is None for item in witness
+        ):
+            raise _validation_error(
+                "compatibility_witness_incomplete",
+                "a compatibility violation must retain its operation and arguments",
+            )
+        return self
 
 
 class QuotientRequest(_PartitionRequest):

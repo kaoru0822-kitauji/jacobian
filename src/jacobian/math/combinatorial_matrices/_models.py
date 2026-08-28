@@ -91,6 +91,14 @@ class DeterminantProfileResult(StrictModel):
     identity: str
 
 
+class KroneckerProductResult(StrictModel):
+    """A canonical Hadamard product and its factor-coordinate axes."""
+
+    product: HadamardMatrix
+    row_map: tuple[tuple[int, int], ...]
+    column_map: tuple[tuple[int, int], ...]
+
+
 class SylvesterRequest(StrictModel):
     """Construct the Sylvester Hadamard matrix of order 2^k."""
 
@@ -110,6 +118,7 @@ __all__ = [
     "DeterminantProfileResult",
     "GramProfileRequest",
     "GramProfileResult",
+    "KroneckerProductResult",
     "NormalizeRequest",
     "NormalizeResult",
     "SignProfileRequest",

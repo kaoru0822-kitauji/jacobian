@@ -6,7 +6,7 @@ from typing import TypedDict
 
 from jacobian.canonical import encode_strict_json
 
-from ._models import MAX_CONCEPTS
+from ._models import MAX_CONCEPTS, ConceptLatticeResult, ConceptResult
 from .basis import (
     CanonicalImplicationBasisResult,
     DGBasisClosureRow,
@@ -44,14 +44,6 @@ __all__ = [
 class _Concept(TypedDict):
     extent: frozenset[int]
     intent: frozenset[int]
-
-
-class _ConceptLattice(TypedDict):
-    concepts: tuple[_Concept, ...]
-    order: tuple[tuple[int, int], ...]
-    covers: tuple[tuple[int, int], ...]
-    top: int | None
-    bottom: int | None
 
 
 def _require_implication_seed(
@@ -307,18 +299,26 @@ def attribute_closure(ctx: FormalContext, attributes: frozenset[int]) -> frozens
     return object_derivation(ctx, attribute_derivation(ctx, attributes))
 
 
-def concept_from_objects(ctx: FormalContext, objects: frozenset[int]) -> _Concept:
+def concept_from_objects(ctx: FormalContext, objects: frozenset[int]) -> ConceptResult:
     """Return the unique concept (A'', A')."""
     intent = object_derivation(ctx, objects)
     extent = attribute_derivation(ctx, intent)
-    return {"extent": extent, "intent": intent}
+    return ConceptResult(
+        extent=tuple(sorted(extent)),
+        intent=tuple(sorted(intent)),
+    )
 
 
-def concept_from_attributes(ctx: FormalContext, attributes: frozenset[int]) -> _Concept:
+def concept_from_attributes(
+    ctx: FormalContext, attributes: frozenset[int]
+) -> ConceptResult:
     """Return the unique concept (B', B'')."""
     extent = attribute_derivation(ctx, attributes)
     intent = object_derivation(ctx, extent)
-    return {"extent": extent, "intent": intent}
+    return ConceptResult(
+        extent=tuple(sorted(extent)),
+        intent=tuple(sorted(intent)),
+    )
 
 
 def _next_closure(
@@ -434,7 +434,7 @@ def _cover_relation(order: list[tuple[int, int]], n: int) -> list[tuple[int, int
 
 def concept_lattice(
     ctx: FormalContext,
-) -> _ConceptLattice:
+) -> ConceptLatticeResult:
     """Return the concept lattice: concepts, partial order by extent inclusion,
     cover relation, top and bottom concepts."""
     return _concept_lattice_from_concepts(enumerate_concepts(ctx))
@@ -442,7 +442,7 @@ def concept_lattice(
 
 def _concept_lattice_from_canonical_concepts(
     concepts: tuple[tuple[tuple[int, ...], tuple[int, ...]], ...],
-) -> _ConceptLattice:
+) -> ConceptLatticeResult:
     """Derive one lattice from an already admitted canonical concept family."""
 
     return _concept_lattice_from_concepts(
@@ -455,14 +455,16 @@ def _concept_lattice_from_canonical_concepts(
 
 def _concept_lattice_from_concepts(
     concepts: list[_Concept],
-) -> _ConceptLattice:
+) -> ConceptLatticeResult:
     """Derive one lattice from a complete exact concept family."""
 
     n = len(concepts)
     order = _inclusion_order(concepts)
     covers = _cover_relation(order, n)
     if n == 0:
-        return {"concepts": (), "order": (), "covers": (), "top": None, "bottom": None}
+        return ConceptLatticeResult(
+            concepts=(), order=(), covers=(), top=None, bottom=None
+        )
     bottom = 0
     top = 0
     for i in range(n):
@@ -470,10 +472,13 @@ def _concept_lattice_from_concepts(
             bottom = i
         if concepts[i]["extent"] > concepts[top]["extent"]:
             top = i
-    return {
-        "concepts": tuple(concepts),
-        "order": tuple(order),
-        "covers": tuple(covers),
-        "top": top,
-        "bottom": bottom,
-    }
+    return ConceptLatticeResult(
+        concepts=tuple(
+            (tuple(sorted(concept["extent"])), tuple(sorted(concept["intent"])))
+            for concept in concepts
+        ),
+        order=tuple(order),
+        covers=tuple(covers),
+        top=top,
+        bottom=bottom,
+    )

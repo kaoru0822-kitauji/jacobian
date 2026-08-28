@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
-from typing import TypedDict
-
-from ._models import DeterminantProfileResult, GramProfileResult, SignProfileResult
+from ._models import (
+    DeterminantProfileResult,
+    GramProfileResult,
+    KroneckerProductResult,
+    NormalizeResult,
+    SignProfileResult,
+    SylvesterResult,
+)
 from .values import MAX_MATRIX_ORDER, HadamardMatrix, SignMatrix
 
 __all__ = [
@@ -15,24 +20,6 @@ __all__ = [
     "sign_profile",
     "sylvester",
 ]
-
-
-class _NormalizedMatrix(TypedDict):
-    normalized: tuple[tuple[int, ...], ...]
-    row_switches: tuple[int, ...]
-    column_switches: tuple[int, ...]
-
-
-class _KroneckerProduct(TypedDict):
-    product: tuple[tuple[int, ...], ...]
-    row_map: tuple[tuple[int, int], ...]
-    column_map: tuple[tuple[int, int], ...]
-
-
-class _SylvesterMatrix(TypedDict):
-    matrix: tuple[tuple[int, ...], ...]
-    construction: str
-    order: int
 
 
 def sign_profile(matrix: SignMatrix) -> SignProfileResult:
@@ -85,7 +72,7 @@ def gram_profile(matrix: SignMatrix) -> GramProfileResult:
     )
 
 
-def normalize(matrix: HadamardMatrix | SignMatrix) -> _NormalizedMatrix:
+def normalize(matrix: HadamardMatrix | SignMatrix) -> NormalizeResult:
     """Return a deterministically normalized sign matrix whose first row and
     first column are all ``+1``, plus the exact row/column sign switches
     used. Normalization must preserve the full matrix and be idempotent."""
@@ -102,11 +89,12 @@ def normalize(matrix: HadamardMatrix | SignMatrix) -> _NormalizedMatrix:
             row_switches[i] = 1
             for j in range(len(rows[0])):
                 rows[i][j] = -rows[i][j]
-    return {
-        "normalized": tuple(tuple(row) for row in rows),
-        "row_switches": tuple(row_switches),
-        "column_switches": tuple(col_switches),
-    }
+    value_type = HadamardMatrix if isinstance(matrix, HadamardMatrix) else SignMatrix
+    return NormalizeResult(
+        normalized=value_type(rows=tuple(tuple(row) for row in rows)),
+        row_switches=tuple(row_switches),
+        column_switches=tuple(col_switches),
+    )
 
 
 def determinant_profile(hadamard: HadamardMatrix) -> DeterminantProfileResult:
@@ -125,7 +113,7 @@ def determinant_profile(hadamard: HadamardMatrix) -> DeterminantProfileResult:
     )
 
 
-def kronecker(left: HadamardMatrix, right: HadamardMatrix) -> _KroneckerProduct:
+def kronecker(left: HadamardMatrix, right: HadamardMatrix) -> KroneckerProductResult:
     """Return the Kronecker product of two Hadamard matrices as a Hadamard
     matrix, factor-to-product row/column maps, and the exact Gram
     factorization."""
@@ -150,32 +138,32 @@ def kronecker(left: HadamardMatrix, right: HadamardMatrix) -> _KroneckerProduct:
     for i in range(n):
         for j in range(m):
             col_map.append((i, j))
-    return {
-        "product": tuple(tuple(row) for row in result),
-        "row_map": tuple(row_map),
-        "column_map": tuple(col_map),
-    }
+    return KroneckerProductResult(
+        product=HadamardMatrix(rows=tuple(tuple(row) for row in result)),
+        row_map=tuple(row_map),
+        column_map=tuple(col_map),
+    )
 
 
-def sylvester(k: int) -> _SylvesterMatrix:
+def sylvester(k: int) -> SylvesterResult:
     """For bounded ``k``, return the recursively defined order ``2^k``
     Hadamard matrix with construction ledger."""
     if k < 0 or k > 7:
         raise ValueError("k must be in [0, 7]")
     if k == 0:
-        return {
-            "matrix": ((1,),),
-            "construction": "base_case",
-            "order": 1,
-        }
+        return SylvesterResult(
+            matrix=HadamardMatrix(rows=((1,),)),
+            construction="base_case",
+            order=1,
+        )
     prev_result = sylvester(k - 1)
-    prev = [list(row) for row in prev_result["matrix"]]
+    prev = [list(row) for row in prev_result.matrix.rows]
     n = len(prev)
     top = [prev[i] + prev[i] for i in range(n)]
     bottom = [prev[i] + [-prev[i][j] for j in range(n)] for i in range(n)]
     result = top + bottom
-    return {
-        "matrix": tuple(tuple(row) for row in result),
-        "construction": "sylvester_recursion",
-        "order": 2**k,
-    }
+    return SylvesterResult(
+        matrix=HadamardMatrix(rows=tuple(tuple(row) for row in result)),
+        construction="sylvester_recursion",
+        order=2**k,
+    )

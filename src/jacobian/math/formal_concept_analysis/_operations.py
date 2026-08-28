@@ -91,19 +91,11 @@ def compute_duquenne_guigues_basis(
 
 
 def compute_concept_from_objects(request: ObjectSubsetRequest) -> ConceptResult:
-    result = concept_from_objects(request.context, frozenset(request.subset))
-    return ConceptResult(
-        extent=tuple(sorted(result["extent"])),
-        intent=tuple(sorted(result["intent"])),
-    )
+    return concept_from_objects(request.context, frozenset(request.subset))
 
 
 def compute_concept_from_attributes(request: AttributeSubsetRequest) -> ConceptResult:
-    result = concept_from_attributes(request.context, frozenset(request.subset))
-    return ConceptResult(
-        extent=tuple(sorted(result["extent"])),
-        intent=tuple(sorted(result["intent"])),
-    )
+    return concept_from_attributes(request.context, frozenset(request.subset))
 
 
 def compute_enumerate_concepts(
@@ -119,16 +111,6 @@ def compute_enumerate_concepts(
 def compute_concept_lattice(
     request: EnumerateConceptsRequest,
 ) -> ConceptLatticeResult:
-    result = _concept_lattice_from_canonical_concepts(
+    return _concept_lattice_from_canonical_concepts(
         enumerate_concept_pairs(request.context)
-    )
-    return ConceptLatticeResult(
-        concepts=tuple(
-            (tuple(sorted(concept["extent"])), tuple(sorted(concept["intent"])))
-            for concept in result["concepts"]
-        ),
-        order=result["order"],
-        covers=result["covers"],
-        top=result["top"],
-        bottom=result["bottom"],
     )

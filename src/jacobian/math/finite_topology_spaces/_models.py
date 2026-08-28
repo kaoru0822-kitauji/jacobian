@@ -67,6 +67,7 @@ class KolmogorovQuotientRequest(StrictModel):
 class KolmogorovQuotientResult(StrictModel):
     quotient_points: tuple[tuple[OpaqueLabel, ...], ...]
     quotient_preorder: tuple[tuple[int, ...], ...]
+    class_map: tuple[int, ...]
 
 
 __all__ = [

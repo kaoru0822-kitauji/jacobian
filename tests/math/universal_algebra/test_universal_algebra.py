@@ -375,6 +375,20 @@ class TestCongruence:
         )
         assert result.is_congruence is True
 
+    def test_incompatibility_retains_the_exact_witness(self) -> None:
+        result = compute_congruence(
+            CongruenceRequest(
+                algebra=_cyclic_addition_algebra(3),
+                partition=((0, 1), (2,)),
+            )
+        )
+
+        assert result.is_congruence is False
+        assert result.obstruction == "compatibility_violation"
+        assert result.operation == 0
+        assert result.x is not None
+        assert result.y is not None
+
 
 # ---------------------------------------------------------------------------
 # Quotient

@@ -14,7 +14,6 @@ from jacobian.math.graphs.tree_decompositions._models import (
     RerootRequest,
     RerootResult,
     RestrictRequest,
-    RestrictResult,
     VertexOccurrencesRequest,
     VertexOccurrencesResult,
     WidthRequest,
@@ -28,6 +27,7 @@ from jacobian.math.graphs.tree_decompositions._operations import (
     compute_vertex_occurrences,
     compute_width,
 )
+from jacobian.math.graphs.tree_decompositions.values import TreeDecomposition
 
 
 def _op[
@@ -162,7 +162,7 @@ TREE_DECOMPOSITION_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
         "source graph G[S]. A direct transformation, not a better-decomposition "
         "search.",
         RestrictRequest,
-        RestrictResult,
+        TreeDecomposition,
         compute_restrict,
         "tree-decomposition",
         "restrict",

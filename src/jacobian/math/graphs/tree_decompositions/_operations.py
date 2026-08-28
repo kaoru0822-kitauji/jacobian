@@ -10,7 +10,6 @@ from jacobian.math.graphs.tree_decompositions._models import (
     RerootRequest,
     RerootResult,
     RestrictRequest,
-    RestrictResult,
     VertexOccurrencesRequest,
     VertexOccurrencesResult,
     WidthRequest,
@@ -24,6 +23,7 @@ from jacobian.math.graphs.tree_decompositions.operations import (
     vertex_occurrences,
     width,
 )
+from jacobian.math.graphs.tree_decompositions.values import TreeDecomposition
 
 __all__ = [
     "compute_adhesions",
@@ -42,41 +42,22 @@ def compute_width(request: WidthRequest) -> WidthResult:
 def compute_vertex_occurrences(
     request: VertexOccurrencesRequest,
 ) -> VertexOccurrencesResult:
-    result = vertex_occurrences(request.decomposition)
-    return VertexOccurrencesResult(
-        per_vertex={vertex: dict(profile) for vertex, profile in result.items()}
-    )
+    return vertex_occurrences(request.decomposition)
 
 
 def compute_adhesions(request: AdhesionsRequest) -> AdhesionsResult:
-    result = adhesions(request.decomposition)
-    return AdhesionsResult(
-        edges=tuple(dict(edge) for edge in result["edges"]),
-        max_adhesion=result["max_adhesion"],
-        size_profile=result["size_profile"],
-    )
+    return adhesions(request.decomposition)
 
 
 def compute_reroot(request: RerootRequest) -> RerootResult:
     return reroot(request.decomposition, request.root)
 
 
-def compute_restrict(request: RestrictRequest) -> RestrictResult:
-    result = restrict(request.decomposition, frozenset(request.subset))
-    return RestrictResult(
-        graph=dict(result["graph"]),
-        tree_nodes=result["tree_nodes"],
-        tree_edges=result["tree_edges"],
-        bags=result["bags"],
-    )
+def compute_restrict(request: RestrictRequest) -> TreeDecomposition:
+    return restrict(request.decomposition, frozenset(request.subset))
 
 
 def compute_bag_intersection_graph(
     request: BagIntersectionGraphRequest,
 ) -> BagIntersectionGraphResult:
-    result = bag_intersection_graph(request.decomposition)
-    return BagIntersectionGraphResult(
-        nodes=tuple(dict(node) for node in result["nodes"]),
-        edges=tuple(dict(edge) for edge in result["edges"]),
-        max_adhesion=result["max_adhesion"],
-    )
+    return bag_intersection_graph(request.decomposition)

@@ -6,9 +6,19 @@ All functions are deterministic and complete for accepted values.
 from __future__ import annotations
 
 from collections import deque
-from typing import TypedDict
 
-from ._models import RerootResult, WidthResult
+from jacobian.math.graphs.values import SimpleUndirectedGraph
+
+from ._models import (
+    Adhesion,
+    AdhesionsResult,
+    BagIntersectionGraphResult,
+    BagNode,
+    OccurrenceSubtree,
+    RerootResult,
+    VertexOccurrencesResult,
+    WidthResult,
+)
 from .values import TreeDecomposition
 
 __all__ = [
@@ -19,48 +29,6 @@ __all__ = [
     "vertex_occurrences",
     "width",
 ]
-
-
-class _OccurrenceSubtree(TypedDict):
-    nodes: tuple[str, ...]
-    edges: tuple[tuple[str, str], ...]
-    count: int
-    leaves: tuple[str, ...]
-
-
-class _Adhesion(TypedDict):
-    edge: tuple[str, str]
-    adhesion: tuple[str, ...]
-    size: int
-
-
-class _AdhesionProfile(TypedDict):
-    edges: tuple[_Adhesion, ...]
-    max_adhesion: int
-    size_profile: tuple[int, ...]
-
-
-class _InducedGraph(TypedDict):
-    vertices: tuple[str, ...]
-    edges: tuple[tuple[str, str], ...]
-
-
-class _RestrictedDecomposition(TypedDict):
-    graph: _InducedGraph
-    tree_nodes: tuple[str, ...]
-    tree_edges: tuple[tuple[str, str], ...]
-    bags: tuple[tuple[str, ...], ...]
-
-
-class _BagNode(TypedDict):
-    node: str
-    bag_size: int
-
-
-class _BagIntersectionGraph(TypedDict):
-    nodes: tuple[_BagNode, ...]
-    edges: tuple[_Adhesion, ...]
-    max_adhesion: int
 
 
 def _index_of(td: TreeDecomposition) -> dict[str, int]:
@@ -92,7 +60,7 @@ def _occurrence_subtree(
     int_edges: list[tuple[int, int]],
     vertex: str,
     containing: list[int],
-) -> _OccurrenceSubtree:
+) -> OccurrenceSubtree:
     containing_set = set(containing)
     reached: set[int] = {containing[0]}
     stack = [containing[0]]
@@ -112,17 +80,17 @@ def _occurrence_subtree(
             induced_degree[a] += 1
             induced_degree[b] += 1
     leaves = tuple(td.tree_nodes[n] for n in nodes if induced_degree[n] <= 1)
-    return {
-        "nodes": tuple(td.tree_nodes[n] for n in nodes),
-        "edges": tuple(node_edges),
-        "count": len(nodes),
-        "leaves": leaves,
-    }
+    return OccurrenceSubtree(
+        nodes=tuple(td.tree_nodes[n] for n in nodes),
+        edges=tuple(node_edges),
+        count=len(nodes),
+        leaves=leaves,
+    )
 
 
 def vertex_occurrences(
     td: TreeDecomposition,
-) -> dict[str, _OccurrenceSubtree]:
+) -> VertexOccurrencesResult:
     """Return per-source-vertex occurrence subtree node set, induced tree edges,
     occurrence counts, and leaf/extremal nodes."""
     int_edges = _int_edges(td)
@@ -130,24 +98,21 @@ def vertex_occurrences(
     for a, b in int_edges:
         adjacency[a].append(b)
         adjacency[b].append(a)
-    per_vertex: dict[str, _OccurrenceSubtree] = {}
+    per_vertex: dict[str, OccurrenceSubtree] = {}
     for vertex in td.graph.vertices:
         containing = [i for i, bag in enumerate(td.bags) if vertex in bag]
         if not containing:
-            per_vertex[vertex] = {
-                "nodes": (),
-                "edges": (),
-                "count": 0,
-                "leaves": (),
-            }
+            per_vertex[vertex] = OccurrenceSubtree(
+                nodes=(), edges=(), count=0, leaves=()
+            )
             continue
         per_vertex[vertex] = _occurrence_subtree(
             td, adjacency, int_edges, vertex, containing
         )
-    return per_vertex
+    return VertexOccurrencesResult(per_vertex=per_vertex)
 
 
-def adhesions(td: TreeDecomposition) -> _AdhesionProfile:
+def adhesions(td: TreeDecomposition) -> AdhesionsResult:
     """For every decomposition-tree edge, compute adhesion(t,t') = B_t ∩ B_t',
     its size, and the left/right component vertex coverage after deleting tt'.
 
@@ -156,24 +121,24 @@ def adhesions(td: TreeDecomposition) -> _AdhesionProfile:
     minimum-separator computation."""
     int_edges = _int_edges(td)
     bag_sets = [set(bag) for bag in td.bags]
-    per_edge: list[_Adhesion] = []
+    per_edge: list[Adhesion] = []
     for a, b in int_edges:
         la, lb = td.tree_nodes[a], td.tree_nodes[b]
         edge_label = (la, lb) if la <= lb else (lb, la)
         adhesion = sorted(bag_sets[a] & bag_sets[b])
         per_edge.append(
-            {
-                "edge": edge_label,
-                "adhesion": tuple(adhesion),
-                "size": len(adhesion),
-            }
+            Adhesion(
+                edge=edge_label,
+                adhesion=tuple(adhesion),
+                size=len(adhesion),
+            )
         )
-    max_adhesion = max((row["size"] for row in per_edge), default=0)
-    return {
-        "edges": tuple(per_edge),
-        "max_adhesion": max_adhesion,
-        "size_profile": tuple(row["size"] for row in per_edge),
-    }
+    max_adhesion = max((row.size for row in per_edge), default=0)
+    return AdhesionsResult(
+        edges=tuple(per_edge),
+        max_adhesion=max_adhesion,
+        size_profile=tuple(row.size for row in per_edge),
+    )
 
 
 def _bfs_parents(
@@ -274,7 +239,7 @@ def _prune_redundant_leaves(
                     changed = True
 
 
-def restrict(td: TreeDecomposition, subset: frozenset[str]) -> _RestrictedDecomposition:
+def restrict(td: TreeDecomposition, subset: frozenset[str]) -> TreeDecomposition:
     """Return the decomposition obtained by replacing every bag B_t with
     B_t ∩ S, then applying the documented deterministic cleanup of empty/
     redundant tree nodes. Bind the result to the induced source graph G[S]."""
@@ -283,10 +248,10 @@ def restrict(td: TreeDecomposition, subset: frozenset[str]) -> _RestrictedDecomp
     # New source graph induced by S.
     keep_list = [v for v in td.graph.vertices if v in subset]
     new_edges = [(a, b) for a, b in td.graph.edges if a in subset and b in subset]
-    new_graph: _InducedGraph = {
-        "vertices": tuple(keep_list),
-        "edges": tuple(new_edges),
-    }
+    new_graph = SimpleUndirectedGraph(
+        vertices=tuple(keep_list),
+        edges=tuple(new_edges),
+    )
     # New bags intersected with S.
     new_bags = [tuple(v for v in bag if v in subset) for bag in td.bags]
     # Cleanup: remove empty bags, contracting through deleted internal nodes
@@ -331,29 +296,23 @@ def restrict(td: TreeDecomposition, subset: frozenset[str]) -> _RestrictedDecomp
             result_edges.append((la, lb) if la <= lb else (lb, la))
     result_edges = sorted(set(result_edges))
     result_bags = tuple(new_bags[i] for i in final_nodes)
-    return {
-        "graph": new_graph,
-        "tree_nodes": result_nodes,
-        "tree_edges": tuple(result_edges),
-        "bags": result_bags,
-    }
+    return TreeDecomposition(
+        graph=new_graph,
+        tree_nodes=result_nodes,
+        tree_edges=tuple(result_edges),
+        bags=result_bags,
+    )
 
 
-def bag_intersection_graph(td: TreeDecomposition) -> _BagIntersectionGraph:
+def bag_intersection_graph(td: TreeDecomposition) -> BagIntersectionGraphResult:
     """Return the weighted tree itself with each edge labelled by its exact
     adhesion set/size and each node labelled by bag size."""
     result = adhesions(td)
-    edges = result["edges"]
-    node_labels: list[_BagNode] = []
+    node_labels: list[BagNode] = []
     for i, bag in enumerate(td.bags):
-        node_labels.append(
-            {
-                "node": td.tree_nodes[i],
-                "bag_size": len(bag),
-            }
-        )
-    return {
-        "nodes": tuple(node_labels),
-        "edges": edges,
-        "max_adhesion": result["max_adhesion"],
-    }
+        node_labels.append(BagNode(node=td.tree_nodes[i], bag_size=len(bag)))
+    return BagIntersectionGraphResult(
+        nodes=tuple(node_labels),
+        edges=result.edges,
+        max_adhesion=result.max_adhesion,
+    )

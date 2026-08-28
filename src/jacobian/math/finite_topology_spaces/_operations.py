@@ -54,8 +54,4 @@ def compute_continuous_check(
 def compute_kolmogorov_quotient(
     request: KolmogorovQuotientRequest,
 ) -> KolmogorovQuotientResult:
-    result = kolmogorov_quotient(request.space)
-    return KolmogorovQuotientResult(
-        quotient_points=result["quotient_points"],
-        quotient_preorder=result["quotient_preorder"],
-    )
+    return kolmogorov_quotient(request.space)

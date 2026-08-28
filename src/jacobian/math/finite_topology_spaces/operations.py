@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TypedDict
-
+from ._models import KolmogorovQuotientResult
 from .values import FiniteTopologicalMap, FiniteTopologicalSpace
 
 __all__ = [
@@ -16,12 +15,6 @@ __all__ = [
     "minimal_neighbourhoods",
     "specialization_preorder",
 ]
-
-
-class _KolmogorovQuotient(TypedDict):
-    quotient_points: tuple[tuple[str, ...], ...]
-    quotient_preorder: tuple[tuple[int, ...], ...]
-    class_map: dict[int, int]
 
 
 def from_preorder(
@@ -97,7 +90,7 @@ def continuous_check(map_: FiniteTopologicalMap) -> bool:
     return True
 
 
-def kolmogorov_quotient(space: FiniteTopologicalSpace) -> _KolmogorovQuotient:
+def kolmogorov_quotient(space: FiniteTopologicalSpace) -> KolmogorovQuotientResult:
     """Return the T0 (Kolmogorov) quotient: identify points with the same
     minimal open neighbourhood."""
     nbhd_to_class: dict[tuple[int, ...], list[int]] = {}
@@ -119,8 +112,8 @@ def kolmogorov_quotient(space: FiniteTopologicalSpace) -> _KolmogorovQuotient:
         for j in space.preorder[representative]:
             row_set.add(class_map[j])
         quotient_preorder.append(tuple(sorted(row_set)))
-    return {
-        "quotient_points": quotient_points,
-        "quotient_preorder": tuple(quotient_preorder),
-        "class_map": class_map,
-    }
+    return KolmogorovQuotientResult(
+        quotient_points=quotient_points,
+        quotient_preorder=tuple(quotient_preorder),
+        class_map=tuple(class_map[index] for index in range(len(space.points))),
+    )

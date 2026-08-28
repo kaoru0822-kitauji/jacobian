@@ -21,6 +21,7 @@ from jacobian.math.combinatorial_matrices._operations import (
     compute_sylvester,
 )
 from jacobian.math.combinatorial_matrices._tools import TOOLS
+from jacobian.math.combinatorial_matrices.operations import kronecker
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -126,6 +127,20 @@ class TestDeterminantProfile:
         assert result.order == 2
         assert result.determinant_magnitude == 2  # 2^(2/2) = 2
         assert result.gram_determinant == 4  # 2^2
+
+
+# ---------------------------------------------------------------------------
+# Kronecker product
+# ---------------------------------------------------------------------------
+
+
+def test_kronecker_returns_a_canonical_hadamard_matrix() -> None:
+    factor = HadamardMatrix(rows=_h2().rows)
+    result = kronecker(factor, factor)
+
+    assert isinstance(result.product, HadamardMatrix)
+    assert result.row_map == ((0, 0), (0, 1), (1, 0), (1, 1))
+    assert result.column_map == result.row_map
 
 
 # ---------------------------------------------------------------------------

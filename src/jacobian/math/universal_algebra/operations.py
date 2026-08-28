@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 from itertools import product as iproduct
-from typing import NotRequired, TypedDict
 
-from ._models import EquationCounterexample, EquationProfileResult, SubalgebraResult
+from ._models import (
+    CongruenceResult,
+    EquationCounterexample,
+    EquationProfileResult,
+    SubalgebraResult,
+)
 from .values import (
     ApplicationTerm,
     FiniteAlgebra,
@@ -27,14 +31,6 @@ __all__ = [
     "homomorphism_profile",
     "quotient",
 ]
-
-
-class _CongruenceProfile(TypedDict):
-    is_congruence: bool
-    obstruction: NotRequired[str]
-    operation: NotRequired[int]
-    x: NotRequired[tuple[int, ...]]
-    y: NotRequired[tuple[int, ...]]
 
 
 def _evaluate_node(
@@ -213,7 +209,7 @@ def _compatibility_violation(
     symbol: OperationSymbol,
     x: tuple[int, ...],
     y: tuple[int, ...],
-) -> _CongruenceProfile | None:
+) -> CongruenceResult | None:
     if not all(block_of[x[j]] == block_of[y[j]] for j in range(symbol.arity)):
         return None
     cell_x = 0
@@ -225,20 +221,20 @@ def _compatibility_violation(
     fy = algebra.tables[op_idx][cell_y]
     if block_of[fx] == block_of[fy]:
         return None
-    return {
-        "is_congruence": False,
-        "obstruction": "compatibility_violation",
-        "operation": op_idx,
-        "x": x,
-        "y": y,
-    }
+    return CongruenceResult(
+        is_congruence=False,
+        obstruction="compatibility_violation",
+        operation=op_idx,
+        x=x,
+        y=y,
+    )
 
 
 def _check_compatibility(
     algebra: FiniteAlgebra,
     block_of: dict[int, int],
     n: int,
-) -> _CongruenceProfile | None:
+) -> CongruenceResult | None:
     """Check congruence compatibility, returning an obstruction or None."""
     for op_idx, symbol in enumerate(algebra.operations):
         if symbol.arity == 0:
@@ -263,7 +259,7 @@ def _check_compatibility(
 
 def congruence_check(
     algebra: FiniteAlgebra, partition: tuple[tuple[int, ...], ...]
-) -> _CongruenceProfile:
+) -> CongruenceResult:
     """Check whether a carrier partition is a compatible equivalence
     relation (congruence).
 
@@ -276,12 +272,12 @@ def congruence_check(
         for elem in block:
             block_of[elem] = block_idx
     if len(block_of) != n:
-        return {
-            "is_congruence": False,
-            "obstruction": "partition does not cover carrier",
-        }
+        return CongruenceResult(
+            is_congruence=False,
+            obstruction="partition does not cover carrier",
+        )
     result = _check_compatibility(algebra, block_of, n)
-    return result if result is not None else {"is_congruence": True}
+    return result if result is not None else CongruenceResult(is_congruence=True)
 
 
 def quotient(
@@ -289,7 +285,7 @@ def quotient(
 ) -> FiniteAlgebraHomomorphism:
     """Return the canonical quotient homomorphism ``A -> A/theta``."""
     check = congruence_check(algebra, partition)
-    if not check["is_congruence"]:
+    if not check.is_congruence:
         raise ValueError("partition is not a congruence")
     n = len(algebra.carrier)
     block_of: dict[int, int] = {}

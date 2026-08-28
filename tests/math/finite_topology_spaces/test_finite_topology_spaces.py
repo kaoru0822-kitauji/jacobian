@@ -139,6 +139,7 @@ class TestKolmogorovQuotient:
 
         assert result.quotient_points == ((left, right),)
         assert result.quotient_preorder == ((0,),)
+        assert result.class_map == (0, 0)
 
 
 # ---------------------------------------------------------------------------

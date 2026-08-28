@@ -133,11 +133,18 @@ class VertexOccurrencesRequest(StrictModel):
     decomposition: TreeDecomposition
 
 
+class OccurrenceSubtree(StrictModel):
+    nodes: tuple[str, ...]
+    edges: tuple[tuple[str, str], ...]
+    count: int = Field(ge=0)
+    leaves: tuple[str, ...]
+
+
 class VertexOccurrencesResult(StrictModel):
     """Per-source-vertex occurrence subtree node set, induced tree edges,
     count, and leaf/extremal nodes."""
 
-    per_vertex: dict[str, dict[str, object]]
+    per_vertex: dict[str, OccurrenceSubtree]
 
 
 class AdhesionsRequest(StrictModel):
@@ -146,10 +153,16 @@ class AdhesionsRequest(StrictModel):
     decomposition: TreeDecomposition
 
 
+class Adhesion(StrictModel):
+    edge: tuple[str, str]
+    adhesion: tuple[str, ...]
+    size: int = Field(ge=0)
+
+
 class AdhesionsResult(StrictModel):
     """Per-tree-edge adhesion, maximum adhesion, and size profile."""
 
-    edges: tuple[dict[str, object], ...]
+    edges: tuple[Adhesion, ...]
     max_adhesion: int = Field(ge=0)
     size_profile: tuple[int, ...]
 
@@ -225,38 +238,36 @@ class RestrictRequest(StrictModel):
         return self
 
 
-class RestrictResult(StrictModel):
-    """The restricted decomposition bound to the induced source graph."""
-
-    graph: dict[str, object]
-    tree_nodes: tuple[str, ...]
-    tree_edges: tuple[tuple[str, str], ...]
-    bags: tuple[tuple[str, ...], ...]
-
-
 class BagIntersectionGraphRequest(StrictModel):
     """Compute the weighted bag-intersection graph of a decomposition."""
 
     decomposition: TreeDecomposition
 
 
+class BagNode(StrictModel):
+    node: str
+    bag_size: int = Field(ge=0)
+
+
 class BagIntersectionGraphResult(StrictModel):
     """The weighted tree: each node labelled by bag size, each edge by adhesion."""
 
-    nodes: tuple[dict[str, object], ...]
-    edges: tuple[dict[str, object], ...]
+    nodes: tuple[BagNode, ...]
+    edges: tuple[Adhesion, ...]
     max_adhesion: int = Field(ge=0)
 
 
 __all__ = [
+    "Adhesion",
     "AdhesionsRequest",
     "AdhesionsResult",
     "BagIntersectionGraphRequest",
     "BagIntersectionGraphResult",
+    "BagNode",
+    "OccurrenceSubtree",
     "RerootRequest",
     "RerootResult",
     "RestrictRequest",
-    "RestrictResult",
     "VertexOccurrencesRequest",
     "VertexOccurrencesResult",
     "WidthRequest",
