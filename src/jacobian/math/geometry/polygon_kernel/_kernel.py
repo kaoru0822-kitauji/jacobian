@@ -170,10 +170,15 @@ class KernelData:
     polygon_to_hull_area_ratio: CanonicalRational
 
 
-def compute_kernel_data(polygon: KernelPolygon) -> KernelData:
+def compute_kernel_data(
+    polygon: KernelPolygon,
+    *,
+    half_planes: tuple[OrientedEdgeHalfPlane, ...] | None = None,
+) -> KernelData:
     """Compute the complete canonical kernel data for one admitted polygon."""
 
-    half_planes = oriented_half_planes(polygon)
+    if half_planes is None:
+        half_planes = oriented_half_planes(polygon)
     candidates = _feasible_boundary_intersections(half_planes)
     kernel_points = _canonical_hull(candidates)
     dimension: Literal["EMPTY", "POINT", "SEGMENT", "POLYGON"] = (

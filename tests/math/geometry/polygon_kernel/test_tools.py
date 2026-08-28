@@ -18,6 +18,7 @@ from jacobian.math.geometry.polygon_kernel._models import (
     MAX_KERNEL_RESULT_CHARS,
     MAX_KERNEL_SOURCE_VERTICES,
     KernelPolygon,
+    OrientedEdgeHalfPlane,
     PolygonKernelRequest,
     PolygonKernelResult,
     _estimate_visibility_kernel_result_characters,
@@ -304,15 +305,16 @@ def test_fractional_polygon_round_trips_structurally() -> None:
 
 def test_trusted_producer_runs_kernel_once(monkeypatch: pytest.MonkeyPatch) -> None:
     calls = 0
-    original = cast(
-        Callable[[KernelPolygon], object],
-        vars(_operations)["compute_kernel_data"],
-    )
+    original = cast(Callable[..., object], vars(_operations)["compute_kernel_data"])
 
-    def counted(polygon: KernelPolygon) -> object:
+    def counted(
+        polygon: KernelPolygon,
+        *,
+        half_planes: tuple[OrientedEdgeHalfPlane, ...] | None = None,
+    ) -> object:
         nonlocal calls
         calls += 1
-        return original(polygon)
+        return original(polygon, half_planes=half_planes)
 
     monkeypatch.setattr(_operations, "compute_kernel_data", counted)
     result = compute_visibility_kernel(_request(PUBLISHED_PENTAGON))
@@ -354,13 +356,15 @@ def test_rejects_immediately_above_structural_boundaries() -> None:
 
 
 def test_rejects_derived_work_before_pairwise_expansion() -> None:
-    with pytest.raises(ValidationError):
-        _request(_parabola_polygon(10**30))
+    request = _request(_parabola_polygon(10**30))
+    with pytest.raises(ValueError, match="feasibility work"):
+        compute_visibility_kernel(request)
 
 
 def test_rejects_derived_result_size_before_pairwise_expansion() -> None:
-    with pytest.raises(ValidationError):
-        _request(_parabola_polygon(10**45))
+    request = _request(_parabola_polygon(10**45))
+    with pytest.raises(ValueError, match="result can require"):
+        compute_visibility_kernel(request)
 
 
 @pytest.mark.parametrize(
@@ -407,8 +411,5 @@ def test_feasibility_admission_flips_at_the_derived_work_boundary() -> None:
     accepted = _request(_parabola_polygon(10**28))
     assert len(accepted.polygon.points) == MAX_KERNEL_SOURCE_VERTICES
 
-    with pytest.raises(ValidationError) as error:
-        _request(_parabola_polygon(10**29))
-    assert error.value.errors()[0]["type"] == (
-        "geometry.visibility_kernel_feasibility_work_f_c"
-    )
+    with pytest.raises(ValueError, match="feasibility work"):
+        compute_visibility_kernel(_request(_parabola_polygon(10**29)))

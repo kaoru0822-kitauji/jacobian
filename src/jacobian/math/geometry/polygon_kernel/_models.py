@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from math import comb
 from typing import TYPE_CHECKING, Literal, Self
 
 from pydantic import ConfigDict, Field, StrictInt, model_validator
@@ -94,77 +93,13 @@ class KernelPolygon(PolygonRequest):
                 f"{MAX_KERNEL_COORDINATE_DIGITS}-digit visibility-kernel bound",
             )
 
-        # Constructing the n oriented edge equations is the only arithmetic
-        # done before the pairwise expansion. Their actual normalized height
-        # makes the following work/output admission representation-sensitive.
-        from jacobian.math.geometry.polygon_kernel._kernel import (
-            oriented_half_planes,
-            polygon_signed_area,
-        )
-
-        half_planes = oriented_half_planes(self)
-        coefficient_digits = max(
-            canonical_rational_component_digits(value)
-            for half_plane in half_planes
-            for value in (half_plane.a, half_plane.b, half_plane.c)
-        )
-        if coefficient_digits > MAX_HALF_PLANE_COEFFICIENT_DIGITS:
-            raise _validation_error(
-                "oriented_half_plane_coefficients_exceed_f",
-                "oriented half-plane coefficients exceed the "
-                f"{MAX_HALF_PLANE_COEFFICIENT_DIGITS}-digit bound",
-            )
-        # A 2x2 boundary intersection forms products and differences of
-        # rational coefficients, then divides two such rationals. Eight input
-        # component heights plus constant sign/carry slack bounds either
-        # reduced output component.
-        intersection_digits = 8 * coefficient_digits + 8
-        if intersection_digits > MAX_INTERSECTION_COMPONENT_DIGITS:
-            raise _validation_error(
-                "a_boundary_line_intersection_exceed_f",
-                "a boundary-line intersection can exceed the "
-                f"{MAX_INTERSECTION_COMPONENT_DIGITS}-digit component bound",
-            )
-
-        vertex_count = len(self.points)
-        # The result retains the source once, n half-planes and turns, and at
-        # most n hull/kernel vertices. The formula charges four rational
-        # components per retained point plus JSON/index overhead.
-        estimated_result_chars = _estimate_visibility_kernel_result_characters(
-            vertex_count,
-            max_coordinate_digits,
-            coefficient_digits,
-            intersection_digits,
-        )
-        if estimated_result_chars > MAX_KERNEL_RESULT_CHARS:
-            raise _validation_error(
-                "visibility_kernel_result_require_f_estimated",
-                "visibility-kernel result can require "
-                f"{estimated_result_chars} characters, exceeding the "
-                f"{MAX_KERNEL_RESULT_CHARS}-character bound",
-            )
-
-        pair_count = comb(vertex_count, 2)
-        # Every boundary-line pair may produce one exact point which is checked
-        # against every half-plane. Integer/Fraction multiplication at height h
-        # is conservatively charged h^2 units.
-        feasibility_work = (
-            pair_count * vertex_count * coefficient_digits * coefficient_digits
-        )
-        if feasibility_work > MAX_KERNEL_FEASIBILITY_WORK:
-            raise _validation_error(
-                "visibility_kernel_feasibility_work_f_c",
-                "visibility-kernel feasibility work "
-                f"C({vertex_count},2)*{vertex_count}*"
-                f"{coefficient_digits}^2={feasibility_work} exceeds "
-                f"{MAX_KERNEL_FEASIBILITY_WORK}",
-            )
-
         if not _is_simple_ring(self.points):
             raise _validation_error(
                 "visibility_kernel_input_a_simple_polygon",
                 "visibility-kernel input must be a simple polygon",
             )
+        from jacobian.math.geometry.polygon_kernel._kernel import polygon_signed_area
+
         if polygon_signed_area(self.points) <= 0:
             raise _validation_error(
                 "visibility_kernel_vertices_use_counterclockwise_cyclic",
