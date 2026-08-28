@@ -6,7 +6,11 @@ from fractions import Fraction
 
 from jacobian._exact import CanonicalRational
 from jacobian.catalog._examples import example
-from jacobian.catalog.models import MathTool, MathTools
+from jacobian.catalog.models import (
+    MathTool,
+    MathTools,
+    OperationDomainValidationError,
+)
 from jacobian.math.optimization._arithmetic import rational_dot
 from jacobian.math.optimization._general_models import (
     GeneralFormRationalLinearProgram,
@@ -20,6 +24,7 @@ from jacobian.math.optimization._general_normalization import (
     _mapped_point_digit_bound,
     _mapped_residual_digit_bound,
     normalize_general_program,
+    require_admitted_general_normalization,
 )
 from jacobian.math.optimization._models import (
     RationalLinearProgramRequest,
@@ -461,6 +466,14 @@ def _general_linear_program(
     from jacobian.math.optimization._operations import _linear_program
 
     program = request.program
+    try:
+        require_admitted_general_normalization(program)
+    except ValueError as error:
+        raise OperationDomainValidationError(
+            location=("program",),
+            code="optimization.linear.general_normalization_admission",
+            message=str(error),
+        ) from error
     normalization = normalize_general_program(program)
     standard_result = _linear_program(
         RationalLinearProgramRequest(program=normalization.standard_program)

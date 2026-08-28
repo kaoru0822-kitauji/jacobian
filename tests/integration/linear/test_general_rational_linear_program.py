@@ -12,6 +12,7 @@ from tests.integration.linear._support import linear_validation_error
 from tests.support.rationals import rational_payload as q
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.optimization._general_models import (
     GeneralRationalLinearProgramRequest,
     GeneralRationalLinearProgramResult,
@@ -287,16 +288,14 @@ def test_general_lp_preflights_private_sign_split_and_slack_expansion() -> None:
     variables = [_variable(f"x{index}") for index in range(16)]
     objective = [q(0) for _ in variables]
     constraints = [_row("one_more_slack", [q(0) for _ in variables], "LE", q(0))]
-    with linear_validation_error():
-        GeneralRationalLinearProgramRequest.model_validate(
-            {
-                "program": _program(
-                    variables=variables,
-                    sense="MINIMIZE",
-                    objective=objective,
-                    constraints=constraints,
-                )
-            }
+    with pytest.raises(OperationDomainValidationError):
+        _run(
+            _program(
+                variables=variables,
+                sense="MINIMIZE",
+                objective=objective,
+                constraints=constraints,
+            )
         )
 
 
@@ -378,16 +377,14 @@ def test_general_lp_rejects_variables_beyond_the_public_envelope() -> None:
 
 def test_general_lp_defers_free_split_admission_to_the_normalized_columns() -> None:
     variables = [_variable(f"x{index}") for index in range(17)]
-    with linear_validation_error():
-        GeneralRationalLinearProgramRequest.model_validate(
-            {
-                "program": _program(
-                    variables=variables,
-                    sense="MINIMIZE",
-                    objective=[q(1) for _ in variables],
-                    constraints=[],
-                )
-            }
+    with pytest.raises(OperationDomainValidationError):
+        _run(
+            _program(
+                variables=variables,
+                sense="MINIMIZE",
+                objective=[q(1) for _ in variables],
+                constraints=[],
+            )
         )
 
 
@@ -427,16 +424,14 @@ def test_general_lp_rejects_constraints_beyond_the_public_row_envelope() -> None
 
 def test_general_lp_defers_upper_expansion_rows_to_normalized_admission() -> None:
     constraints = [_row(f"row_{index}", [q(1)], "EQ", q(0)) for index in range(64)]
-    with linear_validation_error():
-        GeneralRationalLinearProgramRequest.model_validate(
-            {
-                "program": _program(
-                    variables=[_variable("x", q(0), q(1))],
-                    sense="MINIMIZE",
-                    objective=[q(1)],
-                    constraints=constraints,
-                )
-            }
+    with pytest.raises(OperationDomainValidationError):
+        _run(
+            _program(
+                variables=[_variable("x", q(0), q(1))],
+                sense="MINIMIZE",
+                objective=[q(1)],
+                constraints=constraints,
+            )
         )
 
 
@@ -471,16 +466,14 @@ def test_general_lp_still_rejects_expansions_beyond_the_derived_envelope() -> No
             prime = nextprime(prime)
             coefficients.append(q(1, prime))
         constraints.append(_row(f"dense_{row_index}", coefficients, "EQ", q(0)))
-    with linear_validation_error():
-        GeneralRationalLinearProgramRequest.model_validate(
-            {
-                "program": _program(
-                    variables=[_variable(f"x{index}") for index in range(16)],
-                    sense="MINIMIZE",
-                    objective=[q(1)] * 16,
-                    constraints=constraints,
-                )
-            }
+    with pytest.raises(OperationDomainValidationError):
+        _run(
+            _program(
+                variables=[_variable(f"x{index}") for index in range(16)],
+                sense="MINIMIZE",
+                objective=[q(1)] * 16,
+                constraints=constraints,
+            )
         )
 
 

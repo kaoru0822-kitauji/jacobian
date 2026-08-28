@@ -241,7 +241,7 @@ class GeneralFormRationalLinearProgram(StrictModel):
             raise _validation_error("raw_input_bound", str(error)) from error
 
     @model_validator(mode="after")
-    def require_dimensions_and_admission(self) -> Self:
+    def require_dimensions(self) -> Self:
         if len({variable.name for variable in self.variables}) != len(self.variables):
             raise _validation_error(
                 "duplicate_variable",
@@ -267,16 +267,6 @@ class GeneralFormRationalLinearProgram(StrictModel):
                 "constraint_row_length",
                 "every constraint row must match the variable count",
             )
-        # Import lazily: normalizing imports these public source types, while
-        # this model owns the pre-backend work admission.
-        from jacobian.math.optimization._general_normalization import (
-            require_admitted_general_normalization,
-        )
-
-        try:
-            require_admitted_general_normalization(self)
-        except ValueError as error:
-            raise _validation_error("normalization_admission", str(error)) from error
         return self
 
 
