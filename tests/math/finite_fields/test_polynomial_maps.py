@@ -3,8 +3,11 @@ from __future__ import annotations
 import pytest
 
 from jacobian.math.finite_fields import (
+    CollisionResult,
+    FiberPartition,
     FiniteMapTable,
     FinitePolynomialMap,
+    PermutationResult,
     analyze_collisions,
     analyze_permutation,
     element,
@@ -117,6 +120,55 @@ def test_fibers_and_collisions_preserve_the_table_defining_invariants() -> None:
         for source, target in table.entries
         if source in (collision.left, collision.right)
     )
+
+
+def test_external_fiber_partition_must_match_its_bound_table() -> None:
+    partition = fiber_partition(finite_map_table(_map(3)))
+    payload = partition.model_dump(mode="json")
+    payload["fibers"] = payload["fibers"][:-1]
+
+    with pytest.raises(ValueError, match="exactly the fibers"):
+        FiberPartition.model_validate(payload)
+
+
+def test_external_collision_must_match_its_bound_table() -> None:
+    collision = analyze_collisions(finite_map_table(_map(3)))
+    payload = collision.model_dump(mode="json")
+    payload["image"] = payload["table"]["entries"][0][1]
+
+    with pytest.raises(ValueError, match="first canonical collision"):
+        CollisionResult.model_validate(payload)
+
+
+def test_external_injective_claim_must_match_its_bound_table() -> None:
+    table = finite_map_table(_map(3))
+
+    with pytest.raises(ValueError, match="requires an injective bound table"):
+        CollisionResult.model_validate(
+            {"table": table.model_dump(mode="json"), "status": "INJECTIVE"}
+        )
+
+
+def test_external_permutation_and_inverse_must_match_their_bound_table() -> None:
+    result = analyze_permutation(finite_map_table(_map(2)))
+    payload = result.model_dump(mode="json")
+    inverse_entries = payload["inverse_entries"]
+    payload["inverse_entries"] = tuple(reversed(payload["inverse_entries"]))
+
+    with pytest.raises(ValueError, match="canonical inverse"):
+        PermutationResult.model_validate(payload)
+    with pytest.raises(ValueError, match="requires a non-permutation bound table"):
+        PermutationResult.model_validate(
+            {"table": payload["table"], "status": "NOT_PERMUTATION"}
+        )
+    with pytest.raises(ValueError, match="canonical inverse"):
+        PermutationResult.model_validate(
+            {
+                "table": finite_map_table(_map(3)).model_dump(mode="json"),
+                "status": "PERMUTATION",
+                "inverse_entries": inverse_entries,
+            }
+        )
 
 
 def test_slice_b_reuses_one_table_for_fiber_and_certificate_handoff() -> None:

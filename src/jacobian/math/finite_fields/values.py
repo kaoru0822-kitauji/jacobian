@@ -901,6 +901,11 @@ class FiberPartition(StrictModel):
                 "finite_field.fiber_partition_nonempty_fibers",
                 "fiber partition requires nonempty fibers",
             )
+        if self.fibers != _fibers_for_table(self.table):
+            raise _validation_error(
+                "finite_field.fiber_partition_matches_bound_table",
+                "fiber partition must contain exactly the fibers of its bound table",
+            )
         return self
 
     @classmethod
@@ -932,11 +937,26 @@ class CollisionResult(StrictModel):
 
     @model_validator(mode="after")
     def validate_collision(self) -> Self:
+        expected: (
+            tuple[FiniteFieldElement, FiniteFieldElement, FiniteFieldElement] | None
+        ) = None
+        seen: dict[str, tuple[FiniteFieldElement, FiniteFieldElement]] = {}
+        for source, target in self.table.entries:
+            previous = seen.get(target.digest)
+            if previous is not None:
+                expected = (previous[0], source, target)
+                break
+            seen[target.digest] = (source, target)
         if self.status == "INJECTIVE":
             if any(value is not None for value in (self.left, self.right, self.image)):
                 raise _validation_error(
                     "finite_field.injective_table_carry_collision_values",
                     "an injective table cannot carry collision values",
+                )
+            if expected is not None:
+                raise _validation_error(
+                    "finite_field.injective_result_matches_bound_table",
+                    "an injective result requires an injective bound table",
                 )
             return self
         if self.left is None or self.right is None or self.image is None:
@@ -948,6 +968,11 @@ class CollisionResult(StrictModel):
             raise _validation_error(
                 "finite_field.collision_inputs_distinct",
                 "collision inputs must be distinct",
+            )
+        if expected != (self.left, self.right, self.image):
+            raise _validation_error(
+                "finite_field.collision_result_matches_bound_table",
+                "collision result must contain the first canonical collision of its bound table",
             )
         return self
 
@@ -988,13 +1013,32 @@ class PermutationResult(StrictModel):
 
     @model_validator(mode="after")
     def validate_permutation(self) -> Self:
+        inverse_entries = tuple(
+            sorted(
+                ((target, source) for source, target in self.table.entries),
+                key=lambda entry: _encoded_coordinates(entry[0]),
+            )
+        )
+        is_permutation = len(
+            {target.digest for _, target in self.table.entries}
+        ) == len(self.table.entries)
         if self.status == "NOT_PERMUTATION":
             if self.inverse_entries:
                 raise _validation_error(
                     "finite_field.non_permutation_result_carry_inverse",
                     "a non-permutation result cannot carry an inverse",
                 )
+            if is_permutation:
+                raise _validation_error(
+                    "finite_field.non_permutation_result_matches_bound_table",
+                    "a non-permutation result requires a non-permutation bound table",
+                )
             return self
+        if not is_permutation or self.inverse_entries != inverse_entries:
+            raise _validation_error(
+                "finite_field.permutation_result_matches_bound_table",
+                "permutation result must contain the canonical inverse of its bound table",
+            )
         return self
 
     @classmethod
