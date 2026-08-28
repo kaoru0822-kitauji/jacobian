@@ -87,10 +87,16 @@ def test_profile_parsing_keeps_structural_embedding_checks() -> None:
     assert (
         exc_info.value.errors()[0]["type"] == "real_quadratic.embedding_images_mismatch"
     )
-    parsed = RealQuadraticEmbeddingProfile.model_validate(
-        {**payload, "norm": {"num": "2", "den": "1"}}
-    )
-    assert parsed.norm.as_fraction() == 2
+    with pytest.raises(ValidationError) as exc_info:
+        RealQuadraticEmbeddingProfile.model_validate(
+            {**payload, "norm": {"num": "2", "den": "1"}}
+        )
+    assert exc_info.value.errors()[0]["type"] == "real_quadratic.norm_mismatch"
+    with pytest.raises(ValidationError) as exc_info:
+        RealQuadraticEmbeddingProfile.model_validate(
+            {**payload, "trace": {"num": "7", "den": "1"}}
+        )
+    assert exc_info.value.errors()[0]["type"] == "real_quadratic.trace_mismatch"
     with pytest.raises(ValidationError) as exc_info:
         RealQuadraticEmbeddingProfile.model_validate(
             {

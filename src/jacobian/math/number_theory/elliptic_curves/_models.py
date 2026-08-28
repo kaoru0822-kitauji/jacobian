@@ -62,7 +62,13 @@ class CurveDiscriminantResult(StrictModel):
     is_nonsingular: bool
 
     @model_validator(mode="after")
-    def require_consistent_nonsingularity(self) -> Self:
+    def bind_discriminant_to_curve(self) -> Self:
+        expected = self.request.curve.discriminant()
+        if self.discriminant.as_fraction() != expected:
+            raise PydanticCustomError(
+                "elliptic_curve.discriminant_mismatch",
+                "discriminant must equal -16(4A^3 + 27B^2) for the retained curve",
+            )
         if self.is_nonsingular is (self.discriminant.as_fraction() == 0):
             raise PydanticCustomError(
                 "elliptic_curve.nonsingularity_mismatch",
@@ -104,6 +110,24 @@ class PointOnCurveResult(StrictModel):
 
     request: CurvePointRequest
     on_curve: bool
+
+    @model_validator(mode="after")
+    def bind_decision_to_curve_equation(self) -> Self:
+        curve = self.request.curve
+        point = self.request.point
+        x = point.x.as_fraction()
+        y = point.y.as_fraction()
+        expected = y * y == (
+            x**3
+            + curve.coefficient_a.as_fraction() * x
+            + curve.coefficient_b.as_fraction()
+        )
+        if self.on_curve is not expected:
+            raise PydanticCustomError(
+                "elliptic_curve.point_decision_mismatch",
+                "on_curve must match the retained curve equation and point",
+            )
+        return self
 
     @classmethod
     def _from_kernel(cls, *, request: CurvePointRequest, on_curve: bool) -> Self:

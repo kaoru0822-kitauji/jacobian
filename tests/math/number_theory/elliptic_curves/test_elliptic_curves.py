@@ -16,6 +16,7 @@ from jacobian.math.number_theory.elliptic_curves._models import (
     EllipticCurvePointAdditionRequest,
     EllipticCurvePointResult,
     EllipticCurveRequest,
+    PointOnCurveResult,
     RationalAffinePoint,
     ScalarMultiplicationRequest,
     ShortWeierstrassCurve,
@@ -336,11 +337,20 @@ class TestResultSourceBinding:
         )
         assert reparsed == result
 
-    def test_point_on_curve_result_retains_and_reparses_the_source(self) -> None:
-        from jacobian.math.number_theory.elliptic_curves._models import (
-            PointOnCurveResult as Result,
+    def test_discriminant_result_rejects_a_forged_curve_invariant(self) -> None:
+        result = compute_discriminant(EllipticCurveRequest(curve=self._curve()))
+        payload = result.model_dump(mode="json")
+
+        with pytest.raises(ValidationError) as exc_info:
+            CurveDiscriminantResult.model_validate(
+                {**payload, "discriminant": {"num": "1", "den": "1"}}
+            )
+
+        assert exc_info.value.errors()[0]["type"] == (
+            "elliptic_curve.discriminant_mismatch"
         )
 
+    def test_point_on_curve_result_retains_and_reparses_the_source(self) -> None:
         request = CurvePointRequest(
             curve=self._curve(),
             point=RationalAffinePoint(
@@ -351,7 +361,14 @@ class TestResultSourceBinding:
         result = check_point_on_curve(request)
         assert result.on_curve is True
         payload = result.model_dump(mode="json")
-        assert Result.model_validate(payload).on_curve is True
+        assert PointOnCurveResult.model_validate(payload).on_curve is True
+
+        with pytest.raises(ValidationError) as exc_info:
+            PointOnCurveResult.model_validate({**payload, "on_curve": False})
+
+        assert exc_info.value.errors()[0]["type"] == (
+            "elliptic_curve.point_decision_mismatch"
+        )
 
     def test_point_addition_result_retains_its_parent_curve(self) -> None:
         """Doubling (0,0) on y²=x³+x and on y²=x³-x must serialize

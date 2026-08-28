@@ -6,6 +6,7 @@ from fractions import Fraction
 from typing import cast
 
 import pytest
+from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
 from jacobian.catalog.models import MathTool
@@ -43,6 +44,43 @@ def test_native_order_api_accepts_canonical_values_without_a_wire_request() -> N
 
     assert result.order == "GT"
     assert result.difference.rational_part.as_fraction() == 2
+
+
+@pytest.mark.parametrize(
+    ("field", "forged_value", "error_type"),
+    (
+        (
+            "difference",
+            {
+                "rational_part": {"num": "1", "den": "1"},
+                "radical_coefficient": {"num": "0", "den": "1"},
+                "radicand": 2,
+            },
+            "real_quadratic.difference_mismatch",
+        ),
+        ("order", "LT", "real_quadratic.order_mismatch"),
+        ("sign_basis", "RADICAL_ONLY", "real_quadratic.order_mismatch"),
+        (
+            "sign_certificate",
+            {
+                "rational_part_squared": {"num": "1", "den": "1"},
+                "radical_part_squared": {"num": "0", "den": "1"},
+                "magnitude_order": "GT",
+            },
+            "real_quadratic.sign_certificate_mismatch",
+        ),
+    ),
+)
+def test_order_result_rejects_forged_source_bound_fields(
+    field: str, forged_value: object, error_type: str
+) -> None:
+    result = real_quadratic_order(_value(3), _value(1))
+    payload = result.model_dump(mode="json")
+
+    with pytest.raises(ValidationError) as exc_info:
+        RealQuadraticOrderValue.model_validate({**payload, field: forged_value})
+
+    assert exc_info.value.errors()[0]["type"] == error_type
 
 
 def test_native_order_api_retains_shared_field_admission() -> None:
