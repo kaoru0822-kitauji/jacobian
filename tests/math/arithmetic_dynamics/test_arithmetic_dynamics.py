@@ -65,9 +65,11 @@ class TestMapIterate:
 
     def test_degree_growth_beyond_output_bound_is_rejected(self) -> None:
         with pytest.raises(OperationDomainValidationError) as exc_info:
-            compute_map_iterate(MapIterateRequest(
-                coefficients=(_r(1), _r(0), _r(0), _r(0), _r(0), _r(1)), n=5
-            ))
+            compute_map_iterate(
+                MapIterateRequest(
+                    coefficients=(_r(1), _r(0), _r(0), _r(0), _r(0), _r(1)), n=5
+                )
+            )
         assert (
             exc_info.value.errors()[0]["type"]
             == "arithmetic_dynamics.iterate_degree_exceeds_bound"
@@ -203,9 +205,11 @@ class TestCycleMultiplier:
 
     def test_arbitrary_points_cannot_be_labeled_a_cycle(self) -> None:
         with pytest.raises(OperationDomainValidationError) as exc_info:
-            compute_cycle_multiplier(CycleMultiplierRequest(
-                coefficients=(_r(0), _r(0), _r(1)), cycle=(_r(0), _r(1))
-            ))
+            compute_cycle_multiplier(
+                CycleMultiplierRequest(
+                    coefficients=(_r(0), _r(0), _r(1)), cycle=(_r(0), _r(1))
+                )
+            )
         assert (
             exc_info.value.errors()[0]["type"]
             == "arithmetic_dynamics.cycle_map_mismatch"
@@ -213,9 +217,11 @@ class TestCycleMultiplier:
 
     def test_repeated_cycle_points_are_rejected(self) -> None:
         with pytest.raises(OperationDomainValidationError) as exc_info:
-            compute_cycle_multiplier(CycleMultiplierRequest(
-                coefficients=(_r(0), _r(0), _r(1)), cycle=(_r(0), _r(0))
-            ))
+            compute_cycle_multiplier(
+                CycleMultiplierRequest(
+                    coefficients=(_r(0), _r(0), _r(1)), cycle=(_r(0), _r(0))
+                )
+            )
         assert (
             exc_info.value.errors()[0]["type"]
             == "arithmetic_dynamics.cycle_points_not_distinct"
@@ -287,14 +293,18 @@ class TestFiniteFieldFunctionalGraph:
 
     def test_nonprime_modulus_is_rejected(self) -> None:
         with pytest.raises(OperationDomainValidationError) as exc_info:
-            compute_finite_field_map(FiniteFieldMapRequest(prime=4, coefficients=("1",)))
+            compute_finite_field_map(
+                FiniteFieldMapRequest(prime=4, coefficients=("1",))
+            )
         assert (
             exc_info.value.errors()[0]["type"] == "arithmetic_dynamics.prime_not_prime"
         )
 
     def test_noncanonical_integer_coefficients_have_an_owner_code(self) -> None:
         with pytest.raises(OperationDomainValidationError) as exc_info:
-            compute_finite_field_map(FiniteFieldMapRequest(prime=5, coefficients=("01",)))
+            compute_finite_field_map(
+                FiniteFieldMapRequest(prime=5, coefficients=("01",))
+            )
         assert exc_info.value.errors()[0]["type"] == (
             "arithmetic_dynamics.coefficient_not_canonical"
         )
@@ -310,7 +320,9 @@ class TestFiniteFieldFunctionalGraph:
 
     def test_trailing_zero_mod_prime_is_rejected(self) -> None:
         with pytest.raises(OperationDomainValidationError) as exc_info:
-            compute_finite_field_map(FiniteFieldMapRequest(prime=5, coefficients=("1", "5")))
+            compute_finite_field_map(
+                FiniteFieldMapRequest(prime=5, coefficients=("1", "5"))
+            )
         assert (
             exc_info.value.errors()[0]["type"]
             == "arithmetic_dynamics.trailing_zero_coefficients"

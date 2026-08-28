@@ -76,6 +76,7 @@ class EvaluateRequest(StrictModel):
     term: FlatTerm
     assignment: tuple[int, ...] = Field(default=(), max_length=256)
 
+
 class EvaluateResult(StrictModel):
     value: int = Field(ge=0)
 
@@ -85,6 +86,7 @@ class EquationProfileRequest(StrictModel):
     left: FlatTerm
     right: FlatTerm
     variable_count: int = Field(ge=1, le=8, strict=True)
+
 
 class EquationCounterexample(StrictModel):
     assignment: tuple[int, ...] = Field(max_length=8)
@@ -113,6 +115,7 @@ class SubalgebraRequest(StrictModel):
         default=(),
         max_length=MAX_CARRIER_SIZE,
     )
+
 
 class SubalgebraResult(StrictModel):
     generated_carrier: tuple[int, ...]
@@ -162,6 +165,7 @@ class HomomorphismProfileRequest(StrictModel):
             "match exactly; carrier sizes may differ."
         )
     )
+
 
 class HomomorphismObstruction(StrictModel):
     """The first exact operation-preservation failure in canonical scan order."""

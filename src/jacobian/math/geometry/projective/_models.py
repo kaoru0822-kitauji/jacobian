@@ -30,6 +30,7 @@ class ProjectiveLineArrangementRequest(StrictModel):
         max_length=64,
     )
 
+
 class NormalizedProjectiveLine(StrictModel):
     label: ProjectiveLabel
     coefficients: PrimitiveProjectiveTriple

@@ -178,6 +178,7 @@ class TestLatticeResultBoundToSourceGroup:
         payload = result.model_dump(mode="json")
         assert GroupSubgroupLatticeResult.model_validate(payload) == result
 
+
 class TestLatticeWorkBound:
     """Traversal work is bounded by search-node count, not only group order."""
 

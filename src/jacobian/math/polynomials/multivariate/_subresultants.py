@@ -253,6 +253,7 @@ class MultivariateSubresultantSequenceRequest(StrictModel):
         examples=["x"],
     )
 
+
 class MultivariateSubresultantMember(StrictModel):
     """One nonzero member of the source-bound subresultant PRS."""
 

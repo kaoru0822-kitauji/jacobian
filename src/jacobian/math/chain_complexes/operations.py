@@ -41,7 +41,8 @@ def _require_tensor_admission(
 ) -> None:
     if left.coefficient_field != right.coefficient_field or left.prime != right.prime:
         raise ChainComplexAdmissionError(
-            "tensor_context_mismatch", "tensor product requires same coefficient field and prime"
+            "tensor_context_mismatch",
+            "tensor product requires same coefficient field and prime",
         )
     group_count = len(left.basis_sizes) + len(right.basis_sizes) - 1
     group_sizes: list[int] = []
@@ -59,10 +60,12 @@ def _require_tensor_admission(
             )
         group_sizes.append(size)
     allocated_cells = sum(
-        group_sizes[index - 1] * group_sizes[index]
-        for index in range(1, group_count)
+        group_sizes[index - 1] * group_sizes[index] for index in range(1, group_count)
     )
-    if sum(group_sizes) > MAX_TENSOR_TOTAL_CELLS or allocated_cells > MAX_TENSOR_TOTAL_CELLS:
+    if (
+        sum(group_sizes) > MAX_TENSOR_TOTAL_CELLS
+        or allocated_cells > MAX_TENSOR_TOTAL_CELLS
+    ):
         raise ChainComplexAdmissionError(
             "tensor_cell_budget_exceeded",
             f"tensor product allocates {max(sum(group_sizes), allocated_cells)} cells, "
@@ -83,12 +86,18 @@ def _require_tensor_admission(
                             f"{MAX_TENSOR_COEFFICIENT_DIGITS}-digit coefficients",
                         )
     _require_square_zero(
-        _parsed_differentials(left, left.prime), left.prime, label="tensor product left",
-        group_columns=list(left.basis_sizes), degree_min=left.degree_min,
+        _parsed_differentials(left, left.prime),
+        left.prime,
+        label="tensor product left",
+        group_columns=list(left.basis_sizes),
+        degree_min=left.degree_min,
     )
     _require_square_zero(
-        _parsed_differentials(right, right.prime), right.prime, label="tensor product right",
-        group_columns=list(right.basis_sizes), degree_min=right.degree_min,
+        _parsed_differentials(right, right.prime),
+        right.prime,
+        label="tensor product right",
+        group_columns=list(right.basis_sizes),
+        degree_min=right.degree_min,
     )
     tensor_degree_min = left.degree_min + right.degree_min
     placeholder_diffs = tuple(
@@ -103,8 +112,18 @@ def _require_tensor_admission(
         basis_sizes=tuple(group_sizes),
         differential_matrices=placeholder_diffs,
     )
+
     def max_entry_length(value: ChainComplexValue) -> int:
-        return max((len(entry) for matrix in value.differential_matrices for row in matrix for entry in row), default=1)
+        return max(
+            (
+                len(entry)
+                for matrix in value.differential_matrices
+                for row in matrix
+                for entry in row
+            ),
+            default=1,
+        )
+
     worst_entry_chars = max(max_entry_length(left), max_entry_length(right)) + 1
     if allocated_cells * worst_entry_chars > MAX_MATRIX_ENTRY_CHARS:
         raise ChainComplexAdmissionError(
@@ -124,14 +143,18 @@ def _require_cone_admission(
         for index in range(max(len(source.basis_sizes), len(target.basis_sizes)) + 1)
     )
     placeholder_diffs = tuple(
-        tuple(("0",) * cone_basis_sizes[index + 1] for _ in range(cone_basis_sizes[index]))
+        tuple(
+            ("0",) * cone_basis_sizes[index + 1] for _ in range(cone_basis_sizes[index])
+        )
         for index in range(max(0, len(cone_basis_sizes) - 1))
     )
     ChainComplexValue(
-        coefficient_field=source.coefficient_field, prime=source.prime,
+        coefficient_field=source.coefficient_field,
+        prime=source.prime,
         degree_min=source.degree_min,
         degree_max=source.degree_min + len(cone_basis_sizes) - 1,
-        basis_sizes=cone_basis_sizes, differential_matrices=placeholder_diffs,
+        basis_sizes=cone_basis_sizes,
+        differential_matrices=placeholder_diffs,
     )
     cone_cells = sum(
         cone_basis_sizes[index] * cone_basis_sizes[index + 1]
@@ -876,6 +899,7 @@ def compute_mapping_cone(request: MappingConeRequest) -> MappingConeResult:
         map_matrices=request.map_matrices,
         value=value,
     )
+
 
 def _tensor_group_sizes(
     left: ChainComplexValue, right: ChainComplexValue

@@ -31,6 +31,7 @@ class BettiElementsRequest(StrictModel):
         ),
     )
 
+
 class BettiElementsResult(StrictModel):
     """Betti elements of a semigroup."""
 
@@ -83,6 +84,7 @@ class DeltaSetRequest(StrictModel):
             + "The presentation may be reordered or redundant; the complete delta set uses its increasing minimal generator axis."
         ),
     )
+
 
 class DeltaSetResult(StrictModel):
     """Global delta set of the semigroup."""
@@ -144,6 +146,7 @@ class ElasticityRequest(StrictModel):
         ),
     )
 
+
 class ElasticityResult(StrictModel):
     """Global elasticity of the semigroup."""
 
@@ -174,6 +177,7 @@ class CatenaryDegreeRequest(StrictModel):
             + "The presentation may be reordered or redundant; factorization coordinates use its increasing minimal generator axis."
         ),
     )
+
 
 class BettiCatenaryDegree(StrictModel):
     """Catenary degree witnessed at one Betti element."""

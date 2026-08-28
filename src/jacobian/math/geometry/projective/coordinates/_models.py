@@ -48,6 +48,7 @@ class RationalPointConstructRequest(StrictModel):
         ),
     )
 
+
 class StandardChartRequest(StrictModel):
     point: RationalProjectivePoint = Field(
         description=(
@@ -56,6 +57,7 @@ class StandardChartRequest(StrictModel):
         )
     )
     chart_index: int = Field(ge=0)
+
 
 class ChartTransitionRequest(StrictModel):
     point: RationalProjectivePoint = Field(
@@ -66,6 +68,7 @@ class ChartTransitionRequest(StrictModel):
     )
     chart_i: int = Field(ge=0)
     chart_j: int = Field(ge=0)
+
 
 # Results
 

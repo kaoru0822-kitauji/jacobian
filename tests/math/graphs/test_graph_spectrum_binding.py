@@ -99,6 +99,7 @@ def test_structural_constraints_reject_forged_payloads() -> None:
     with pytest.raises(ValidationError):
         GraphSpectrumResult.model_validate(wrong_total)
 
+
 def test_permuted_pair_order_remains_structurally_valid() -> None:
 
     complete_graph = _graph(4, ((0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)))

@@ -205,7 +205,9 @@ def test_large_ap_carrier_reaches_linear_consumers_not_independence_search() -> 
     )
     with pytest.raises(OperationDomainValidationError, match="100-vertex solver bound"):
         compute_independence_number(HypergraphIndependenceRequest(hypergraph=source))
-    with pytest.raises(OperationDomainValidationError, match="256-vertex representation bound"):
+    with pytest.raises(
+        OperationDomainValidationError, match="256-vertex representation bound"
+    ):
         compute_dual(DualRequest(hypergraph=source))
 
 

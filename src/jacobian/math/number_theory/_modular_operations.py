@@ -145,9 +145,7 @@ def _admit_residue_image(request: ModularPolynomialResidueImageRequest) -> None:
             "term_exponent_vectors_must_be_unique_and_lexicographically_increasing",
             "term exponent vectors must be unique and lexicographically increasing",
         )
-    if any(
-        int(term.coefficient) % request.modulus == 0 for term in request.terms
-    ):
+    if any(int(term.coefficient) % request.modulus == 0 for term in request.terms):
         _domain_error(
             ("terms",),
             "sparse_polynomial_terms_must_have_nonzero_coefficient_modulo_m",

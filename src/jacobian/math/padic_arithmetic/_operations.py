@@ -31,8 +31,10 @@ def _domain_error(location: tuple[str | int, ...], code: str, message: str) -> N
 
 
 def _require_prime(value: int) -> None:
-    if value < 2 or value > MAX_PRIME or any(
-        value % divisor == 0 for divisor in range(2, int(value**0.5) + 1)
+    if (
+        value < 2
+        or value > MAX_PRIME
+        or any(value % divisor == 0 for divisor in range(2, int(value**0.5) + 1))
     ):
         _domain_error(("prime",), "prime_not_prime", "prime must be a prime modulus")
 
@@ -74,7 +76,10 @@ def _admit_root(request: HenselRootRequest) -> tuple[int, ...]:
             "root_not_root",
             "root_mod_p must satisfy f(root_mod_p) = 0 mod p",
         )
-    if _poly_deriv_mod_p(coeffs, request.root_mod_p, request.prime) % request.prime == 0:
+    if (
+        _poly_deriv_mod_p(coeffs, request.root_mod_p, request.prime) % request.prime
+        == 0
+    ):
         _domain_error(
             ("root_mod_p",),
             "root_not_simple",

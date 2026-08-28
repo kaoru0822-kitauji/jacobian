@@ -774,7 +774,9 @@ def test_graph_symmetry_admission_flips_exactly_at_the_output_limit(
         lambda **kwargs: CanonicalLimits(max_output_bytes=actual - 1),
     )
     with pytest.raises(OperationDomainValidationError):
-        _generator_orbits(GraphSymmetryOrbitRequest.model_validate(_wide_orbit_payload(14)))
+        _generator_orbits(
+            GraphSymmetryOrbitRequest.model_validate(_wide_orbit_payload(14))
+        )
 
 
 def test_graph_symmetry_operation_declares_version_seven() -> None:

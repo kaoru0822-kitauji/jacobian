@@ -37,6 +37,7 @@ class ArbPointEnclosureRequest(StrictModel):
     argument: CanonicalRational
     precision_bits: StrictInt = Field(default=128, ge=32, le=4096)
 
+
 type PointEnclosureCheckOutcome = Literal["ACCEPTED", "REJECTED", "NON_RESULT"]
 
 

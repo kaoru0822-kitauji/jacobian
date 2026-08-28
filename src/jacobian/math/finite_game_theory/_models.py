@@ -75,6 +75,7 @@ class NashEquilibriumRequest(ZeroSumGameRequest):
         }
     )
 
+
 class BestResponseResult(StrictModel):
     """Best response values for the row player."""
 

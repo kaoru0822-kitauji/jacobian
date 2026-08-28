@@ -1638,7 +1638,6 @@ class EuclideanConvexPolygonTriangulationResult(StrictModel):
         )
 
 
-
 # ---------------------------------------------------------------------------
 # Configuration-level operations (issues #2107, #2106)
 # ---------------------------------------------------------------------------

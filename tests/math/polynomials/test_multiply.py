@@ -51,7 +51,9 @@ def test_rejects_product_support_budget() -> None:
         "polynomial": {"terms": right_terms},
     }
 
-    request = RationalPolynomialMultiplyRequest.model_validate({"left": left, "right": right})
+    request = RationalPolynomialMultiplyRequest.model_validate(
+        {"left": left, "right": right}
+    )
     with pytest.raises(OperationDomainValidationError, match="canonical term limit"):
         rational_polynomial_multiply(request)
 
@@ -134,7 +136,9 @@ def test_rejects_serialized_result_budget() -> None:
         "polynomial": {"terms": right_terms},
     }
 
-    request = RationalPolynomialMultiplyRequest.model_validate({"left": left, "right": right})
+    request = RationalPolynomialMultiplyRequest.model_validate(
+        {"left": left, "right": right}
+    )
     with pytest.raises(OperationDomainValidationError, match="serialized result size"):
         rational_polynomial_multiply(request)
 
@@ -247,5 +251,7 @@ def test_rejects_product_exponent_overflow() -> None:
     request = RationalPolynomialMultiplyRequest.model_validate(
         {"left": polynomial, "right": polynomial}
     )
-    with pytest.raises(OperationDomainValidationError, match="canonical exponent limit"):
+    with pytest.raises(
+        OperationDomainValidationError, match="canonical exponent limit"
+    ):
         rational_polynomial_multiply(request)

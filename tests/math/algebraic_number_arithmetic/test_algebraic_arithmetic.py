@@ -205,9 +205,9 @@ def test_multiplication_still_rejects_unrepresentable_products() -> None:
     # (10**200)^2 exceeds the 256-digit result bound for multiply...
     big = 10**200
     request = AlgebraicMultiplicationRequest(
-            left=_element(big, 0, 2),
-            right=_element(big, 0, 2),
-        )
+        left=_element(big, 0, 2),
+        right=_element(big, 0, 2),
+    )
     with pytest.raises(OperationDomainValidationError) as exc_info:
         compute_algebraic_multiply(request)
     assert exc_info.value.errors()[0]["type"] == (
@@ -222,9 +222,9 @@ def test_addition_still_rejects_unrepresentable_sums() -> None:
     # beyond the result bound.
     huge = 10**256 - 1
     request = AlgebraicAdditionRequest(
-            left=_element(huge, 0, 2),
-            right=_element(huge, 0, 2),
-        )
+        left=_element(huge, 0, 2),
+        right=_element(huge, 0, 2),
+    )
     with pytest.raises(OperationDomainValidationError) as exc_info:
         compute_algebraic_add(request)
     assert exc_info.value.errors()[0]["type"] == (

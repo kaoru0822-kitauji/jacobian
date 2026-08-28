@@ -160,7 +160,9 @@ def _admit_projective_line_arrangement(
         _primitive_integer_triple(line.coefficients) for line in request.lines
     )
     if len(normalized) != len(set(normalized)):
-        raise ValueError("projectively duplicate lines must be merged before invocation")
+        raise ValueError(
+            "projectively duplicate lines must be merged before invocation"
+        )
 
 
 PROJECTIVE_LINE_ARRANGEMENT_OPERATION: MathTool[

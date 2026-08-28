@@ -749,9 +749,7 @@ def test_profile_accounts_for_retained_source_and_wide_residue_output_bytes() ->
     }
 
     assert _measure(payload).occupied_count == str(output_rows)
-    with pytest.raises(
-        OperationDomainValidationError, match="canonical output budget"
-    ):
+    with pytest.raises(OperationDomainValidationError, match="canonical output budget"):
         _profile(payload)
 
 
@@ -798,9 +796,9 @@ def test_non_coprime_generalized_crt_replays_scaled_union() -> None:
         ]
     }
     request = PeriodicCongruenceUnionRequest.model_validate(payload)
-    assert require_admitted_periodic_source(normalize_periodic_source(request)).method == (
-        "INCLUSION_EXCLUSION"
-    )
+    assert require_admitted_periodic_source(
+        normalize_periodic_source(request)
+    ).method == ("INCLUSION_EXCLUSION")
 
     union = compute_periodic_congruence_union_measure(request)
     assert union.common_period == str(large_multiple)

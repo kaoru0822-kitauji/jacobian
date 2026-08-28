@@ -73,8 +73,7 @@ def _admit_visibility_kernel(
     )
     if feasibility_work > MAX_KERNEL_FEASIBILITY_WORK:
         raise ValueError(
-            "visibility-kernel feasibility work exceeds "
-            f"{MAX_KERNEL_FEASIBILITY_WORK}"
+            f"visibility-kernel feasibility work exceeds {MAX_KERNEL_FEASIBILITY_WORK}"
         )
     return half_planes
 

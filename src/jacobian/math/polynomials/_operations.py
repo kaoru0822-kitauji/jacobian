@@ -85,7 +85,9 @@ def _admit_gcd(request: PolynomialGcdRequest) -> None:
             maximum_exponent=_MAX_GCD_DEGREE,
         )
     if not request.left.polynomial.terms and not request.right.polynomial.terms:
-        raise _validation_error("gcd(0, 0) is undefined: zero has no monic normalization")
+        raise _validation_error(
+            "gcd(0, 0) is undefined: zero has no monic normalization"
+        )
 
 
 def _admit_resultant(request: PolynomialResultantRequest) -> None:
@@ -98,19 +100,29 @@ def _admit_resultant(request: PolynomialResultantRequest) -> None:
             maximum_exponent=_MAX_ELIMINATION_DEGREE_SUM,
         )
     index = request.left.variables.index(request.elimination_variable)
-    if _degree(request.left, index) + _degree(request.right, index) > _MAX_ELIMINATION_DEGREE_SUM:
+    if (
+        _degree(request.left, index) + _degree(request.right, index)
+        > _MAX_ELIMINATION_DEGREE_SUM
+    ):
         raise _validation_error("Sylvester degree exceeds the resultant budget")
 
 
 def _admit_discriminant(request: PolynomialDiscriminantRequest) -> None:
     if request.variable not in request.polynomial.variables:
-        raise _validation_error("discriminant variable must belong to the declared ring")
+        raise _validation_error(
+            "discriminant variable must belong to the declared ring"
+        )
     require_polynomial_budget(
         request.polynomial,
         maximum_terms=_MAX_INVARIANT_TERMS,
         maximum_exponent=_MAX_SQUARE_FREE_EXPONENT,
     )
-    if _degree(request.polynomial, request.polynomial.variables.index(request.variable)) > _MAX_DISCRIMINANT_DEGREE:
+    if (
+        _degree(
+            request.polynomial, request.polynomial.variables.index(request.variable)
+        )
+        > _MAX_DISCRIMINANT_DEGREE
+    ):
         raise _validation_error("main-variable degree exceeds the discriminant budget")
 
 

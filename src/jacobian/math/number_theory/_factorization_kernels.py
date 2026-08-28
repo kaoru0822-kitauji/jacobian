@@ -426,9 +426,7 @@ def factorize_primes(request: FactorizationRequest) -> PrimeFactorizationResult:
             value=request.value,
             detail="the bounded factorization worker did not establish a complete result",
         )
-    return PrimeFactorizationResult._from_kernel(
-        value=request.value, factors=factors
-    )
+    return PrimeFactorizationResult._from_kernel(value=request.value, factors=factors)
 
 
 def decide_squarefree(request: ArithmeticFunctionRequest) -> SquarefreeResult:

@@ -320,7 +320,6 @@ class PolynomialBoxEnclosureRequest(StrictModel):
     box: RationalBox
 
 
-
 class PolynomialBoxEnclosureResult(StrictModel):
     """An exact enclosure bound to its source polynomial and box."""
 

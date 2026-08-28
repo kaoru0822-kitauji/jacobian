@@ -26,7 +26,9 @@ from jacobian.math.graphs.flow._models import (
 )
 
 
-def _admit_terminals(request: MaxFlowRequest | MinCutRequest | EdgeDisjointPathsRequest) -> None:
+def _admit_terminals(
+    request: MaxFlowRequest | MinCutRequest | EdgeDisjointPathsRequest,
+) -> None:
     if not 0 <= request.source < request.graph.vertex_count:
         raise OperationDomainValidationError(
             location=("source",),

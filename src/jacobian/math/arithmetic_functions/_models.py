@@ -43,6 +43,7 @@ class DirichletConvolutionRequest(StrictModel):
             )
         return self
 
+
 class DirichletConvolutionResult(StrictModel):
     """Result: the Dirichlet convolution ``(f*g)(1)..(f*g)(n)``."""
 
@@ -82,6 +83,7 @@ class MobiusTransformRequest(StrictModel):
             )
         return self
 
+
 class MobiusTransformResult(StrictModel):
     """Result: the (inverse) Möbius transform at indices 1..n."""
 
@@ -112,6 +114,7 @@ class SummatoryFunctionRequest(StrictModel):
                 f"values must have between {_MIN_LENGTH} and {_MAX_LENGTH} entries",
             )
         return self
+
 
 class SummatoryFunctionResult(StrictModel):
     """Result: the partial sums ``S(1)..S(n)``."""
@@ -147,6 +150,7 @@ class DirichletInverseRequest(StrictModel):
         if self.values[0].as_fraction() == 0:
             raise _validation_error("zero_unit", "f(1) must be nonzero")
         return self
+
 
 class DirichletInverseResult(StrictModel):
     """Result: the Dirichlet inverse at indices 1..n."""

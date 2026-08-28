@@ -135,6 +135,7 @@ class SiphonTrapRequest(StrictModel):
 
     net: PetriNet
 
+
 class SiphonTrapResult(StrictModel):
     """Minimal siphons and traps of the net.
 

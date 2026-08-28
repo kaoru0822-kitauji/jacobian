@@ -46,6 +46,7 @@ class FloorSumRequest(StrictModel):
     a: int = Field(ge=0, le=_MAX_FLOOR_SUM_PARAM)
     b: int = Field(ge=0, le=_MAX_FLOOR_SUM_PARAM)
 
+
 class FloorSumResult(StrictModel):
     """The exact floor sum value."""
 

@@ -43,9 +43,7 @@ from jacobian.math.arithmetic_dynamics.operations import (
 )
 
 
-def _domain_error(
-    location: tuple[str | int, ...], code: str, message: str
-) -> NoReturn:
+def _domain_error(location: tuple[str | int, ...], code: str, message: str) -> NoReturn:
     raise OperationDomainValidationError(
         location=location, code=f"arithmetic_dynamics.{code}", message=message
     )
@@ -70,7 +68,9 @@ def _admit_iterate(request: MapIterateRequest) -> Any:
     output_degree = 1 if request.n == 0 else degree**request.n
     if output_degree > MAX_ITERATE_DEGREE:
         _domain_error(
-            ("n",), "iterate_degree_exceeds_bound", "iterate output degree exceeds bound"
+            ("n",),
+            "iterate_degree_exceeds_bound",
+            "iterate output degree exceeds bound",
         )
     try:
         _iterate_heights(
@@ -93,7 +93,9 @@ def _admit_dynatomic(request: DynatomicPolynomialRequest) -> Any:
         )
     if degree**request.n > MAX_DYNATOMIC_DEGREE:
         _domain_error(
-            ("n",), "dynatomic_degree_exceeds_bound", "dynatomic output degree exceeds bound"
+            ("n",),
+            "dynatomic_degree_exceeds_bound",
+            "dynatomic output degree exceeds bound",
         )
     source = tuple(_fraction_height(value) for value in request.coefficient_values())
     numerator: tuple[CoefficientHeight, ...] = (RationalHeight(1, 1),)
@@ -174,7 +176,9 @@ def compute_map_iterate(request: MapIterateRequest) -> MapIterateResult:
 def compute_orbit_prefix(request: OrbitPrefixRequest) -> OrbitPrefixResult:
     polynomial = _polynomial(request)
     try:
-        result = orbit_prefix(polynomial, request.start.as_fraction(), request.max_steps)
+        result = orbit_prefix(
+            polynomial, request.start.as_fraction(), request.max_steps
+        )
     except ValueError as exc:
         _translate_value_error(exc, ("start",))
     repeat = (

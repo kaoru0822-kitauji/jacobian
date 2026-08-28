@@ -94,7 +94,9 @@ def _admit_square_integer(request: Any) -> None:
     matrix = request.matrix
     rows = len(matrix.entries)
     if rows == 0 or rows != len(matrix.entries[0]):
-        raise _validation_error("budget_exceeded", "operation requires a square integer matrix")
+        raise _validation_error(
+            "budget_exceeded", "operation requires a square integer matrix"
+        )
 
 
 def _admit_permanent(request: Any) -> None:
@@ -102,7 +104,9 @@ def _admit_permanent(request: Any) -> None:
     matrix = request.matrix
     order = len(matrix.entries)
     if order != len(matrix.entries[0]):
-        raise _validation_error("budget_exceeded", "permanent computation requires a square matrix")
+        raise _validation_error(
+            "budget_exceeded", "permanent computation requires a square matrix"
+        )
     if (1 << order) > MAX_PERMANENT_RYSER_SUBSETS:
         raise _validation_error(
             "budget_exceeded",

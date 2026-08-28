@@ -12,8 +12,7 @@ from jacobian.math.topology._models import (
 def require_complex_admission(request: SimplicialComplexRequest) -> None:
     """Check semantic complex bounds immediately before a kernel runs."""
     if any(
-        not 1 <= len(facet) <= MAX_TOPOLOGY_DIMENSION + 1
-        for facet in request.facets
+        not 1 <= len(facet) <= MAX_TOPOLOGY_DIMENSION + 1 for facet in request.facets
     ):
         raise ValueError(
             "each facet must contain between 1 and "

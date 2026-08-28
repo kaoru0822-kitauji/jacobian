@@ -399,9 +399,9 @@ def test_codeword_budget_is_derived_from_the_replay_work_bound() -> None:
     assert admitted.profile_replay_work == 2_491_752
 
     over_budget = ReceivedWordProfileRequest(
-            encoder=_encoder(identity, field_order=53),
-            received_word=(0, 0, 0),
-        )
+        encoder=_encoder(identity, field_order=53),
+        received_word=(0, 0, 0),
+    )
     with _operation_error("code_linear.profile_replay_work_exceeded"):
         compute_received_word_profile(over_budget)
 
@@ -419,17 +419,17 @@ def test_all_witness_output_has_a_separate_preflight_bound() -> None:
         witness_mode="FIRST",
     )
     all_witness = ReceivedWordProfileRequest.model_validate(
-            {
-                "encoder": encoder,
-                "received_word": (0,) * 32,
-                "threshold": {
-                    "metric": "DISTANCE",
-                    "comparison": "GE",
-                    "value": 0,
-                },
-                "witness_mode": "ALL",
-            }
-        )
+        {
+            "encoder": encoder,
+            "received_word": (0,) * 32,
+            "threshold": {
+                "metric": "DISTANCE",
+                "comparison": "GE",
+                "value": 0,
+            },
+            "witness_mode": "ALL",
+        }
+    )
     with _operation_error("code_linear.witness_cells_exceeded"):
         compute_received_word_profile(all_witness)
 

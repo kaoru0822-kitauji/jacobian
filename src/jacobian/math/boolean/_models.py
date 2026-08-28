@@ -30,6 +30,7 @@ class BooleanTruthTableRequest(StrictModel):
         max_length=MAX_TRUTH_TABLE_LENGTH,
     )
 
+
 class BooleanWalshTransformResult(StrictModel):
     """The exact Boolean Walsh spectrum of a Boolean truth table.
 

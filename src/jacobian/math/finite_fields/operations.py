@@ -231,7 +231,10 @@ def direction_rank_ledger(
 ) -> DirectionRankLedger:
     """Restrict scalars and rank every supplied direction without losing order."""
 
-    if _direction_rank_work(subspace, len(directions.points)) > _MAX_DIRECTION_RANK_WORK:
+    if (
+        _direction_rank_work(subspace, len(directions.points))
+        > _MAX_DIRECTION_RANK_WORK
+    ):
         raise OperationDomainValidationError(
             location=("directions",),
             code="finite_field.direction_rank_ledger_exceeds_operation_work_budget",

@@ -105,15 +105,15 @@ def test_chart_transition_rejects_unrepresentable_ratio_growth() -> None:
     component = "1" + "0" * 16_384
 
     request = ChartTransitionRequest(
-            point=RationalProjectivePoint(
-                coordinates=(
-                    CanonicalRational(num=component, den="1"),
-                    CanonicalRational(num="1", den=component),
-                )
-            ),
-            chart_i=0,
-            chart_j=1,
-        )
+        point=RationalProjectivePoint(
+            coordinates=(
+                CanonicalRational(num=component, den="1"),
+                CanonicalRational(num="1", den=component),
+            )
+        ),
+        chart_i=0,
+        chart_j=1,
+    )
     with pytest.raises(OperationDomainValidationError):
         compute_chart_transition(request)
 

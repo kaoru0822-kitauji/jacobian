@@ -789,6 +789,7 @@ class CycleMulticoverRequest(StrictModel):
     cycles: tuple[CycleRecord, ...] = Field(max_length=MAX_CYCLE_COUNT)
     target_multiplicity: StrictInt = Field(ge=0, le=MAX_PARALLEL_MULTIPLICITY)
 
+
 class CycleMulticoverResult(StrictModel):
     """Per-cycle validity and exact edge-multiplicity profile for a cover.
 

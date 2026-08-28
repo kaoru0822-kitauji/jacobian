@@ -848,10 +848,12 @@ class SymbolicMatrixProductRequest(StrictModel):
         )
     )
 
+
 class SymbolicMatrixRequest(StrictModel):
     """A symbolic matrix over a declared variable list."""
 
     matrix: SymbolicMatrix
+
 
 class SquareSymbolicMatrixRequest(SymbolicMatrixRequest):
     """A square symbolic matrix for operations requiring square input.
@@ -885,6 +887,7 @@ class SymbolicDeterminantRequest(SquareSymbolicMatrixRequest):
         )
     )
 
+
 class SymbolicCharacteristicPolynomialRequest(SquareSymbolicMatrixRequest):
     """A square matrix whose characteristic polynomial fits the result type."""
 
@@ -896,6 +899,7 @@ class SymbolicCharacteristicPolynomialRequest(SquareSymbolicMatrixRequest):
             "256 terms, exponent 64, and 128-digit coefficient components."
         )
     )
+
 
 class SymbolicDeterminantResult(StrictModel):
     """The exact determinant in the matrix's rational-function field."""

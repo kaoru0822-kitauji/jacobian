@@ -53,9 +53,7 @@ def _admit_independence(request: HypergraphIndependenceRequest) -> None:
             code="hypergraph.independence_number.empty_edge",
             message="independence-number search does not admit empty edges",
         )
-    total_incidences = sum(
-        len(members) for _, members in request.hypergraph.edges
-    )
+    total_incidences = sum(len(members) for _, members in request.hypergraph.edges)
     if len(request.hypergraph.vertices) > MAX_HYPERGRAPH_INDEPENDENCE_VERTICES:
         raise OperationDomainValidationError(
             location=("hypergraph",),
@@ -154,6 +152,7 @@ def _canonical_edges(
     return tuple(
         (edge_id, tuple(sorted(members))) for edge_id, members in hypergraph.edges
     )
+
 
 def _parameters_data(
     hypergraph: FiniteHypergraph,

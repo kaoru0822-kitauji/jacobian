@@ -28,6 +28,7 @@ class FactorsLengthRequest(StrictModel):
     word: FiniteWord
     factor_length: int = Field(ge=0)
 
+
 class FactorsLengthResult(FactorsLengthRequest):
     """Complete factor enumeration, ordered by first occurrence."""
 
@@ -204,6 +205,7 @@ class SubstitutionDependencyGraphRequest(StrictModel):
 
     substitution: Substitution
 
+
 class SubstitutionDependencyGraphResult(SubstitutionDependencyGraphRequest):
     """Exact source-bound letter graph, including every occurrence position."""
 
@@ -229,6 +231,7 @@ class SubstitutionPrimitivityProfileRequest(StrictModel):
     """Decide primitivity from a canonical substitution dependency graph."""
 
     dependency_graph: SubstitutionDependencyGraph
+
 
 class SubstitutionPrimitivityProfileResult(SubstitutionPrimitivityProfileRequest):
     """Complete Boolean-power primitivity profile with graph obstruction."""
@@ -318,6 +321,7 @@ class SubstitutionFixedPointPrefixRequest(StrictModel):
 
     source: ProlongableSubstitution
     prefix_length: int = Field(ge=0, le=MAX_MORPHISM_OUTPUT_LENGTH)
+
 
 class SubstitutionFixedPointPrefixResult(SubstitutionFixedPointPrefixRequest):
     """Exact fixed-point prefix from the least sufficient iterate."""

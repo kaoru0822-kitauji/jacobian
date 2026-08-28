@@ -112,6 +112,7 @@ class FiniteAbelianGroupFactorizationRequest(StrictModel):
         max_length=MAX_FINITE_GROUP_FACTOR_SIZE,
     )
 
+
 def _require_factorization_admission(
     group: FiniteAbelianProductGroup,
     left: tuple[tuple[int, ...], ...],
@@ -247,6 +248,7 @@ class FiniteAbelianSpectralPairRequest(StrictModel):
     """
 
     source: FiniteAbelianSpectralPairSource
+
 
 class FiniteAbelianNonorthogonalityWitness(StrictModel):
     """First nonorthogonal frequency pair and its exact cyclotomic remainder.

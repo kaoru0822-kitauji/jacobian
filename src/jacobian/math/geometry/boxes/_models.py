@@ -72,6 +72,7 @@ class BoxUnionVolumeRequest(StrictModel):
         ),
     )
 
+
 class BoxIntersectionLedgerEntry(StrictModel):
     """One nonempty source-subset intersection and its exact volume."""
 

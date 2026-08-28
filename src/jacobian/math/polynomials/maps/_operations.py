@@ -85,8 +85,12 @@ def _admit_composition(request: CompositionRequest) -> None:
         raise _validation_error("outer polynomial must use exactly outer_variable")
     if request.inner.variables != (request.inner_variable,):
         raise _validation_error("inner polynomial must use exactly inner_variable")
-    outer_degree = max((term.exponents[0] for term in request.outer.polynomial.terms), default=0)
-    inner_degree = max((term.exponents[0] for term in request.inner.polynomial.terms), default=0)
+    outer_degree = max(
+        (term.exponents[0] for term in request.outer.polynomial.terms), default=0
+    )
+    inner_degree = max(
+        (term.exponents[0] for term in request.inner.polynomial.terms), default=0
+    )
     if outer_degree * inner_degree > _MAX_COMPOSITION_DEGREE:
         raise _validation_error(f"composition exceeds degree {_MAX_COMPOSITION_DEGREE}")
 
@@ -105,13 +109,19 @@ def _admit_generic_degree(request: GenericDegreeRequest) -> None:
             "generic-degree target exceeds the "
             f"{MAX_GENERIC_DEGREE_TARGET_VARIABLES}-component operation budget"
         )
-    aggregate_terms = sum(len(polynomial.polynomial.terms) for polynomial in polynomial_map.output_polynomials)
+    aggregate_terms = sum(
+        len(polynomial.polynomial.terms)
+        for polynomial in polynomial_map.output_polynomials
+    )
     if aggregate_terms > MAX_GENERIC_DEGREE_AGGREGATE_TERMS:
         raise _validation_error(
             "generic-degree map exceeds the "
             f"{MAX_GENERIC_DEGREE_AGGREGATE_TERMS}-term aggregate input budget"
         )
-    if len(polynomial_map.model_dump_json().encode("utf-8")) > MAX_GENERIC_DEGREE_ENCODED_MAP_BYTES:
+    if (
+        len(polynomial_map.model_dump_json().encode("utf-8"))
+        > MAX_GENERIC_DEGREE_ENCODED_MAP_BYTES
+    ):
         raise _validation_error(
             "generic-degree map exceeds the "
             f"{MAX_GENERIC_DEGREE_ENCODED_MAP_BYTES}-byte input budget"
@@ -131,7 +141,11 @@ def _admit_generic_degree(request: GenericDegreeRequest) -> None:
                 f"{MAX_GENERIC_DEGREE_TOTAL_DEGREE}"
             )
         for term in polynomial.polynomial.terms:
-            if len(term.coefficient.num.lstrip("-")) > MAX_GENERIC_DEGREE_COEFFICIENT_DIGITS or len(term.coefficient.den) > MAX_GENERIC_DEGREE_COEFFICIENT_DIGITS:
+            if (
+                len(term.coefficient.num.lstrip("-"))
+                > MAX_GENERIC_DEGREE_COEFFICIENT_DIGITS
+                or len(term.coefficient.den) > MAX_GENERIC_DEGREE_COEFFICIENT_DIGITS
+            ):
                 raise _validation_error(
                     "generic-degree coefficient exceeds the "
                     f"{MAX_GENERIC_DEGREE_COEFFICIENT_DIGITS}-digit input budget"

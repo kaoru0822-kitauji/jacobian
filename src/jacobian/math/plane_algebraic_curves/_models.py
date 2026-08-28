@@ -180,6 +180,7 @@ class RationalConicParametrizationRequest(StrictModel):
         examples=["t"],
     )
 
+
 class AffineCurveResult(StrictModel):
     is_valid: bool
     degree: int = Field(ge=0, le=_MAX_EXPONENT)

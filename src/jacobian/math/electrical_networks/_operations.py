@@ -97,7 +97,9 @@ def _require_connected(network: ConductanceNetwork) -> None:
                 seen.add(neighbor)
                 stack.append(neighbor)
     if len(seen) != network.vertex_count:
-        _domain_error(("network",), "network_not_connected", "network must be connected")
+        _domain_error(
+            ("network",), "network_not_connected", "network must be connected"
+        )
 
 
 def _admit_terminals(
@@ -116,8 +118,12 @@ def _admit_terminals(
     if first == second:
         _domain_error(
             names,
-            "terminals_not_distinct" if names == ("terminal_a", "terminal_b") else "source_sink_not_distinct",
-            "terminals must be distinct" if names == ("terminal_a", "terminal_b") else "source and sink must be distinct",
+            "terminals_not_distinct"
+            if names == ("terminal_a", "terminal_b")
+            else "source_sink_not_distinct",
+            "terminals must be distinct"
+            if names == ("terminal_a", "terminal_b")
+            else "source and sink must be distinct",
         )
 
 
@@ -135,7 +141,9 @@ def compute_effective_resistance(
 ) -> EffectiveResistanceResult:
     network = request.network
     _admit_network(network)
-    _admit_terminals(network, request.terminal_a, request.terminal_b, ("terminal_a", "terminal_b"))
+    _admit_terminals(
+        network, request.terminal_a, request.terminal_b, ("terminal_a", "terminal_b")
+    )
     _require_connected(network)
     value = effective_resistance(
         network.vertex_count,

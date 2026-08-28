@@ -57,9 +57,7 @@ def compute_nash_equilibrium(
 
     matrix_value = request.payoff_matrix
     denominator_digits = sum(len(value.den) for value in matrix_value.entries)
-    numerator_digits = max(
-        len(value.num.lstrip("-")) for value in matrix_value.entries
-    )
+    numerator_digits = max(len(value.num.lstrip("-")) for value in matrix_value.entries)
     elimination_dimension = max(matrix_value.n_rows, matrix_value.n_cols) + 2
     work = elimination_dimension * (denominator_digits + numerator_digits)
     if work > MAX_EXACT_EQUILIBRIUM_WORK:

@@ -174,6 +174,7 @@ class HochschildChainComplexRequest(StrictModel):
     algebra: AlgebraStructure
     max_degree: int = Field(ge=1, le=MAX_HOCHSCHILD_DEGREE)
 
+
 class HochschildDifferential(StrictModel):
     """One Hochschild differential as the canonical prime-field matrix value.
 
@@ -295,6 +296,7 @@ class HochschildHomologyRequest(StrictModel):
 
     algebra: AlgebraStructure
     max_degree: int = Field(ge=1, le=MAX_HOCHSCHILD_DEGREE)
+
 
 class HochschildHomologyGroup(StrictModel):
     """One Hochschild homology group."""

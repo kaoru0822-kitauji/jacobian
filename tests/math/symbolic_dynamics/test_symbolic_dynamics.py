@@ -86,14 +86,10 @@ def test_zeta_distinguishes_full_shift_cycle_and_disjoint_components() -> None:
         ArtinMazurZetaRequest(shift=AdjacencyShift(matrix=((2,),)))
     )
     cycle = compute_artin_mazur_zeta(
-        ArtinMazurZetaRequest(
-            shift=AdjacencyShift(matrix=((0, 1), (1, 0)))
-        )
+        ArtinMazurZetaRequest(shift=AdjacencyShift(matrix=((0, 1), (1, 0))))
     )
     disjoint = compute_artin_mazur_zeta(
-        ArtinMazurZetaRequest(
-            shift=AdjacencyShift(matrix=((2, 0), (0, 3)))
-        )
+        ArtinMazurZetaRequest(shift=AdjacencyShift(matrix=((2, 0), (0, 3))))
     )
 
     assert (
@@ -149,9 +145,7 @@ def test_zeta_admission_bounds_coefficient_growth_before_backend() -> None:
     dense_large = (tuple((1_000_000,) * 50),) * 50
     with pytest.raises(ValueError, match="coefficient digit bound"):
         compute_artin_mazur_zeta(
-            ArtinMazurZetaRequest(
-                shift=AdjacencyShift(matrix=dense_large)
-            )
+            ArtinMazurZetaRequest(shift=AdjacencyShift(matrix=dense_large))
         )
 
 
@@ -283,12 +277,12 @@ def test_oversized_enumerations_fail_before_computation() -> None:
             )
         )
     request = HigherBlockRequest(
-            shift=ForbiddenBlockShift(
-                alphabet=ten_symbols,
-                forbidden_blocks=(),
-            ),
-            block_length=4,
-        )
+        shift=ForbiddenBlockShift(
+            alphabet=ten_symbols,
+            forbidden_blocks=(),
+        ),
+        block_length=4,
+    )
     with pytest.raises(ValueError, match="presentation adjacency"):
         compute_higher_block(request)
     oversized_support = ForbiddenBlockShift(

@@ -193,9 +193,7 @@ def compute_summatory_function(
     request: SummatoryFunctionRequest,
 ) -> SummatoryFunctionResult:
     """Compute ``S(K) = sum_{i=1}^{K} f(i)`` for K = 1..n."""
-    _require_result_height(
-        sum_heights(_heights(request.values)), "summatory function"
-    )
+    _require_result_height(sum_heights(_heights(request.values)), "summatory function")
     n = len(request.values)
     values = [v.as_fraction() for v in request.values]
     result_values: list[Fraction] = [Fraction(0)] * n

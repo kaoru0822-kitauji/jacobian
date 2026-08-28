@@ -218,6 +218,7 @@ class KColorabilityRequest(StrictModel):
         ),
     )
 
+
 class KColorabilityResult(StrictModel):
     """Whether a proper ``k``-coloring exists, with one coloring witness."""
 
@@ -507,6 +508,7 @@ class EdgeKColorabilityRequest(StrictModel):
             "separately without a mathematical conclusion."
         ),
     )
+
 
 class EdgeKColorabilityResult(StrictModel):
     """Whether a proper ``k``-edge-coloring exists, with one coloring witness."""

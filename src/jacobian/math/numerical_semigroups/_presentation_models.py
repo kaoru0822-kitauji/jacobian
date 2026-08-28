@@ -29,6 +29,7 @@ class MinimalPresentationRequest(StrictModel):
         ),
     )
 
+
 class MinimalPresentationRelation(StrictModel):
     """One relation (pair of distinct factorizations) in a presentation."""
 
@@ -109,6 +110,7 @@ class PresentationBinomialsRequest(StrictModel):
         ),
     )
     relations: tuple[MinimalPresentationRelation, ...]
+
 
 class PresentationBinomial(StrictModel):
     """One sparse binomial (aX - bX) arising from a presentation relation."""

@@ -38,7 +38,9 @@ def _admit_graph_symmetry_orbit(request: GraphSymmetryOrbitRequest) -> None:
                 "graph.symmetry_exceeds_max_symmetry_edges_edge_bound",
                 f"graph symmetry exceeds the {MAX_GRAPH_SYMMETRY_EDGES}-edge bound",
             )
-        generator_ids = tuple(generator.generator_id for generator in request.generators)
+        generator_ids = tuple(
+            generator.generator_id for generator in request.generators
+        )
         if len(set(generator_ids)) != len(generator_ids):
             raise PydanticCustomError(
                 "graph.graph_symmetry_generator_identifiers_must_be_uni",

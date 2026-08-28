@@ -264,6 +264,7 @@ class GraphSymmetryOrbitRequest(StrictModel):
         "DECLARED_AUTOMORPHISM_GENERATORS"
     )
 
+
 class GraphVertexOrbit(StrictModel):
     orbit_index: StrictInt = Field(ge=0, le=MAX_GRAPH_SYMMETRY_VERTICES - 1)
     representative: GraphSymmetryLabel

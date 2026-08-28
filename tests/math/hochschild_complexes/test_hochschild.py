@@ -159,11 +159,11 @@ class TestHochschildAdmissionAndTopDegree:
             ((1, 0), (0, 0)),
         )
         algebra = AlgebraStructure(
-                prime=5,
-                dimension=2,
-                structure_constants=c,
-                augmentation=(0, 0),
-            )
+            prime=5,
+            dimension=2,
+            structure_constants=c,
+            augmentation=(0, 0),
+        )
         with pytest.raises(ValueError, match="associative"):
             compute_hochschild_chain_complex(
                 HochschildChainComplexRequest(algebra=algebra, max_degree=1)
@@ -189,7 +189,9 @@ class TestHochschildAdmissionAndTopDegree:
         alg = _coordinatewise_algebra(2, 7)
         assert alg.dimension ** (4 + 1) <= 20_000
         with pytest.raises(ValueError, match="matrix"):
-            compute_hochschild_homology(HochschildHomologyRequest(algebra=alg, max_degree=4))
+            compute_hochschild_homology(
+                HochschildHomologyRequest(algebra=alg, max_degree=4)
+            )
         with pytest.raises(ValueError, match="matrix"):
             compute_hochschild_chain_complex(
                 HochschildChainComplexRequest(algebra=alg, max_degree=4)
@@ -479,14 +481,14 @@ class TestAugmentationEndpointFaces:
     def test_non_multiplicative_augmentation_rejected(self) -> None:
         """An augmentation that is not an algebra map must fail admission."""
         algebra = AlgebraStructure(
-                prime=5,
-                dimension=2,
-                structure_constants=(
-                    ((1, 0), (0, 1)),
-                    ((0, 1), (0, 0)),
-                ),
-                augmentation=(1, 1),
-            )
+            prime=5,
+            dimension=2,
+            structure_constants=(
+                ((1, 0), (0, 1)),
+                ((0, 1), (0, 0)),
+            ),
+            augmentation=(1, 1),
+        )
         with pytest.raises(ValueError, match="augmentation"):
             compute_hochschild_chain_complex(
                 HochschildChainComplexRequest(algebra=algebra, max_degree=1)

@@ -78,8 +78,13 @@ def _admit_linear_recurrence(
     minimum_size += sum(
         _minimum_fraction_wire_bytes(replay[index]) for index in requested_indices
     )
-    if minimum_size + _RESULT_WIRE_FIXED_BYTES > MAX_COMBINATORICS_RESULT_ARTIFACT_BYTES:
-        raise ValueError("the exact combinatorics result exceeds the bounded result limit")
+    if (
+        minimum_size + _RESULT_WIRE_FIXED_BYTES
+        > MAX_COMBINATORICS_RESULT_ARTIFACT_BYTES
+    ):
+        raise ValueError(
+            "the exact combinatorics result exceeds the bounded result limit"
+        )
     for value in replay:
         _require_bounded_fraction(value, label="recurrence result")
     _validate_result_inline_size(
@@ -139,7 +144,9 @@ def _admit_p_recursive_recurrence(
             polynomial_value(polynomial, index) for polynomial in polynomials
         )
         if coefficients[0] == 0:
-            raise ValueError(f"leading coefficient polynomial vanishes at index {index}")
+            raise ValueError(
+                f"leading coefficient polynomial vanishes at index {index}"
+            )
         next_value = (
             -sum(
                 (
@@ -159,7 +166,9 @@ def _admit_p_recursive_recurrence(
         )
         minimum_size += _RESIDUAL_WIRE_FIXED_BYTES
         if minimum_size > MAX_COMBINATORICS_RESULT_ARTIFACT_BYTES:
-            raise ValueError("the exact combinatorics result exceeds the bounded result limit")
+            raise ValueError(
+                "the exact combinatorics result exceeds the bounded result limit"
+            )
         replay.append(next_value)
         residuals.append(
             (
@@ -225,8 +234,13 @@ def _admit_series(
         coefficients.append(coefficient)
     minimum_size = sum(_minimum_fraction_wire_bytes(value) for value in coefficients)
     minimum_size += truncation_order * _minimum_fraction_wire_bytes(Fraction())
-    if minimum_size + _RESULT_WIRE_FIXED_BYTES > MAX_COMBINATORICS_RESULT_ARTIFACT_BYTES:
-        raise ValueError("the exact combinatorics result exceeds the bounded result limit")
+    if (
+        minimum_size + _RESULT_WIRE_FIXED_BYTES
+        > MAX_COMBINATORICS_RESULT_ARTIFACT_BYTES
+    ):
+        raise ValueError(
+            "the exact combinatorics result exceeds the bounded result limit"
+        )
     _validate_result_inline_size(
         {
             "coefficient_convention": coefficient_convention,

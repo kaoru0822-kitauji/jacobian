@@ -54,6 +54,7 @@ class FixedLengthPathsRequest(StrictModel):
     # rather than tying length to MAX_VERTICES.
     length: int = Field(ge=0, le=32)
 
+
 # Results
 
 

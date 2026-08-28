@@ -81,6 +81,7 @@ class MaxFlowRequest(StrictModel):
     source: int = Field(ge=0, le=63)
     sink: int = Field(ge=0, le=63)
 
+
 class FlowEdgeValue(StrictModel):
     """The flow assigned to one directed edge."""
 
@@ -101,6 +102,7 @@ class MinCutRequest(StrictModel):
     graph: FlowGraph
     source: int = Field(ge=0, le=63)
     sink: int = Field(ge=0, le=63)
+
 
 class MinCutResult(StrictModel):
     cut_value: CanonicalRational
@@ -144,6 +146,7 @@ class EdgeDisjointPathsRequest(StrictModel):
     graph: EdgeDisjointPathsGraph
     source: int = Field(ge=0, le=63)
     sink: int = Field(ge=0, le=63)
+
 
 class EdgeDisjointPathsResult(StrictModel):
     path_count: int = Field(ge=0)
@@ -198,7 +201,6 @@ class CostedFlowGraph(StrictModel):
 class MinCostFlowRequest(StrictModel):
     graph: CostedFlowGraph
     demands: tuple[int, ...] = Field(default=(), max_length=64)
-
 
 
 class FlowEdgeResult(StrictModel):

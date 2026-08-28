@@ -97,7 +97,9 @@ def _validation_code(message: str) -> str:
 
 
 def _validation_error(message: str) -> PydanticCustomError:
-    return PydanticCustomError(f"arithmetic_dynamics.{_validation_code(message)}", message)
+    return PydanticCustomError(
+        f"arithmetic_dynamics.{_validation_code(message)}", message
+    )
 
 
 def model_validator(
@@ -388,7 +390,9 @@ class OrbitPrefixResult(StrictModel):
         request: OrbitPrefixRequest,
         *,
         orbit: tuple[CanonicalRational, ...],
-        termination: Literal["REPEAT_FOUND", "STEP_BOUND_REACHED", "OUTPUT_BOUND_REACHED"],
+        termination: Literal[
+            "REPEAT_FOUND", "STEP_BOUND_REACHED", "OUTPUT_BOUND_REACHED"
+        ],
         repeat: OrbitRepeatEvidence | None,
     ) -> Self:
         found_repeat = termination == "REPEAT_FOUND"

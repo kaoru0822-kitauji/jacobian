@@ -509,10 +509,7 @@ def check_cycle_multicover(
         raise OperationDomainValidationError(
             location=("cycles",),
             code="graph.total_cycle_edge_incidences_exceed_max_cycle",
-            message=(
-                "total cycle-edge incidences exceed "
-                f"{MAX_CYCLE_EDGE_INCIDENCES}"
-            ),
+            message=(f"total cycle-edge incidences exceed {MAX_CYCLE_EDGE_INCIDENCES}"),
         )
 
     graph = request.graph

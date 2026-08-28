@@ -310,6 +310,7 @@ class PeriodicCongruenceUnionRequest(StrictModel):
         normalized_data["subsets"] = tuple(normalized_subsets)
         return normalized_data
 
+
 class PeriodicCongruenceUnionProfileRequest(PeriodicCongruenceUnionRequest):
     """A periodic-congruence union whose complete common-period set fits output."""
 

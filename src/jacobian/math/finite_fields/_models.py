@@ -20,17 +20,21 @@ class RestrictScalarsRequest(StrictModel):
     subspace: FiniteDimensionalSubspace
     direction: ProjectivePoint
 
+
 class LinearMapRankRequest(StrictModel):
     subspace: FiniteDimensionalSubspace
     direction: ProjectivePoint
+
 
 class ProjectiveLineRequest(StrictModel):
     presentation: FiniteFieldPresentation
     axis: Axis
 
+
 class DirectionRankLedgerRequest(StrictModel):
     subspace: FiniteDimensionalSubspace
     directions: ProjectiveLine
+
 
 class OrbitDistributionRequest(StrictModel):
     ledger: DirectionRankLedger

@@ -112,6 +112,7 @@ class FiniteRawMomentRequest(StrictModel):
     )
     order: StrictInt = Field(ge=0, le=128)
 
+
 class FiniteRawMomentContribution(StrictModel):
     value: CanonicalRational
     probability: CanonicalRational
@@ -150,6 +151,7 @@ class FiniteEventRequest(StrictModel):
     event_values: tuple[CanonicalRational, ...] = Field(
         max_length=MAX_FINITE_DISTRIBUTION_ATOMS
     )
+
 
 class FiniteConditionRequest(FiniteEventRequest):
     """A finite event known to have positive exact probability."""
@@ -261,6 +263,7 @@ class FinitePushforwardRequest(StrictModel):
         max_length=MAX_FINITE_DISTRIBUTION_ATOMS,
     )
 
+
 class FinitePushforwardContribution(StrictModel):
     source: CanonicalRational
     target: CanonicalRational
@@ -316,6 +319,7 @@ class FinitePushforwardResult(StrictModel):
 class FiniteConvolutionRequest(StrictModel):
     left: FiniteRationalDistribution
     right: FiniteRationalDistribution
+
 
 class FiniteConvolutionContribution(StrictModel):
     left_value: CanonicalRational

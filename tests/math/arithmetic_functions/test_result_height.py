@@ -23,13 +23,13 @@ def _rational(num: str, den: str = "1") -> dict[str, str]:
 def test_summatory_rejects_cross_denominator_growth() -> None:
     power = 32_768
     request = SummatoryFunctionRequest.model_validate(
-            {
-                "values": [
-                    _rational("1", format_canonical_integer(2**power)),
-                    _rational("1", format_canonical_integer(5**power)),
-                ]
-            }
-        )
+        {
+            "values": [
+                _rational("1", format_canonical_integer(2**power)),
+                _rational("1", format_canonical_integer(5**power)),
+            ]
+        }
+    )
     with pytest.raises(OperationDomainValidationError) as exc_info:
         compute_summatory_function(request)
     assert exc_info.value.errors()[0]["type"] == (
@@ -40,8 +40,8 @@ def test_summatory_rejects_cross_denominator_growth() -> None:
 def test_convolution_accounts_for_numerator_products() -> None:
     large = "1" + "0" * 20_000
     request = DirichletConvolutionRequest.model_validate(
-            {"f": [_rational(large)], "g": [_rational(large)]}
-        )
+        {"f": [_rational(large)], "g": [_rational(large)]}
+    )
     with pytest.raises(OperationDomainValidationError) as exc_info:
         compute_dirichlet_convolution(request)
     assert exc_info.value.errors()[0]["type"] == (
@@ -52,13 +52,13 @@ def test_convolution_accounts_for_numerator_products() -> None:
 def test_mobius_transform_accounts_for_signed_sums() -> None:
     power = 32_768
     request = MobiusTransformRequest.model_validate(
-            {
-                "values": [
-                    _rational("1", format_canonical_integer(2**power)),
-                    _rational("1", format_canonical_integer(5**power)),
-                ]
-            }
-        )
+        {
+            "values": [
+                _rational("1", format_canonical_integer(2**power)),
+                _rational("1", format_canonical_integer(5**power)),
+            ]
+        }
+    )
     with pytest.raises(OperationDomainValidationError) as exc_info:
         compute_mobius_transform(request)
     assert exc_info.value.errors()[0]["type"] == (
@@ -69,8 +69,8 @@ def test_mobius_transform_accounts_for_signed_sums() -> None:
 def test_dirichlet_inverse_propagates_its_recurrence() -> None:
     denominator = "1" + "0" * 20_000
     request = DirichletInverseRequest.model_validate(
-            {"values": [_rational("1", denominator), _rational("1")]}
-        )
+        {"values": [_rational("1", denominator), _rational("1")]}
+    )
     with pytest.raises(OperationDomainValidationError) as exc_info:
         compute_dirichlet_inverse(request)
     assert exc_info.value.errors()[0]["type"] == (

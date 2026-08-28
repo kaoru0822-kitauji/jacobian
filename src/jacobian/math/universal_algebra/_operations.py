@@ -67,7 +67,10 @@ def _admit_equation_profile(request: EquationProfileRequest) -> None:
             require_term_for_algebra(term, request.algebra)
         except UniversalAlgebraAdmissionError as exc:
             raise ValueError(str(exc)) from None
-    if max(request.left.variable_count, request.right.variable_count) > request.variable_count:
+    if (
+        max(request.left.variable_count, request.right.variable_count)
+        > request.variable_count
+    ):
         raise ValueError("variable_count must cover every referenced variable")
     if len(request.algebra.carrier) ** request.variable_count > MAX_ENUMERATION_WORK:
         raise ValueError("equation profile exceeds the assignment work budget")
@@ -108,13 +111,16 @@ def _admit_partition(request: CongruenceRequest | QuotientRequest) -> None:
         raise ValueError("quotient construction exceeds the operation work budget")
     try:
         source_bytes = len(encode_strict_json(request.algebra.model_dump(mode="json")))
-        operation_bytes = len(encode_strict_json([
-            operation.model_dump(mode="json")
-            for operation in request.algebra.operations
-        ]))
+        operation_bytes = len(
+            encode_strict_json(
+                [
+                    operation.model_dump(mode="json")
+                    for operation in request.algebra.operations
+                ]
+            )
+        )
         quotient_carrier_bytes = sum(
-            len(encode_strict_json(f"B{index}")) + 1
-            for index in range(quotient_size)
+            len(encode_strict_json(f"B{index}")) + 1 for index in range(quotient_size)
         )
     except CanonicalizationError as exc:
         raise ValueError("quotient source exceeds the canonical output limit") from exc
@@ -128,7 +134,9 @@ def _admit_partition(request: CongruenceRequest | QuotientRequest) -> None:
         + _HOMOMORPHISM_RESULT_RESERVE_BYTES
     )
     if predicted_bytes > CanonicalLimits().max_output_bytes:
-        raise ValueError("canonical quotient homomorphism would exceed the output limit")
+        raise ValueError(
+            "canonical quotient homomorphism would exceed the output limit"
+        )
 
 
 def compute_evaluate(request: EvaluateRequest) -> EvaluateResult:

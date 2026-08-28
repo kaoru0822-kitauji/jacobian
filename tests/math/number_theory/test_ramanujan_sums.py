@@ -273,9 +273,7 @@ def test_ramanujan_sum_request_bounds_factorization_and_frequency_work() -> None
     with expect_validation("number_theory."):
         RamanujanSumRequest(modulus="1", frequency="9" * (_MAX_INTEGER_LENGTH + 1))
     with pytest.raises(OperationDomainValidationError, match="nonnegative"):
-        RAMANUJAN_SUM_OPERATION.run(
-            RamanujanSumRequest(modulus="-1", frequency="0")
-        )
+        RAMANUJAN_SUM_OPERATION.run(RamanujanSumRequest(modulus="-1", frequency="0"))
 
 
 def test_ramanujan_sum_rejects_negative_native_modulus() -> None:

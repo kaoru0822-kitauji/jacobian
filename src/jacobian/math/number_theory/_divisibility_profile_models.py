@@ -25,6 +25,7 @@ class GcdQuotientProfileRequest(StrictModel):
         ),
     )
 
+
 class GcdQuotientProfileResult(StrictModel):
     """Complete gcd-normalized quotient profile."""
 
@@ -54,6 +55,7 @@ class ProductDivisibilityProfileRequest(StrictModel):
             "strictly greater than zero. Zero and negative integers are invalid."
         ),
     )
+
 
 class ProductDivisibilityProfileResult(StrictModel):
     """Complete product-divisibility relation profile."""

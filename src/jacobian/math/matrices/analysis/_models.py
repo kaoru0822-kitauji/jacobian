@@ -69,6 +69,7 @@ class RationalSpectrumClaimRequest(StrictModel):
         ),
     )
 
+
 class RationalSpectrumNullityLedgerEntry(StrictModel):
     """Exact shifted nullity and multiplicity comparison for one claim."""
 

@@ -60,6 +60,7 @@ class AlgebraicAdditionRequest(AlgebraicArithmeticRequest):
     rational bound; multiplication growth is irrelevant here.
     """
 
+
 class AlgebraicMultiplicationRequest(AlgebraicArithmeticRequest):
     """Two elements of Q(sqrt(d)) whose exact product is returnable.
 
@@ -67,6 +68,7 @@ class AlgebraicMultiplicationRequest(AlgebraicArithmeticRequest):
     ``(ac+bed) + (ae+bc)*sqrt(d)`` would exceed the 256-digit canonical
     rational bound; addition growth is irrelevant here.
     """
+
 
 __all__ = [
     "AlgebraicAdditionRequest",

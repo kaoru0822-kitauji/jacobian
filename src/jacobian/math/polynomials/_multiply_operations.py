@@ -31,30 +31,52 @@ from jacobian.math.polynomials.values import (
 def _admit(request: RationalPolynomialMultiplyRequest) -> None:
     if request.left.variables != request.right.variables:
         raise _validation_error("polynomials must use the same ordered variables")
-    product_term_work = len(request.left.polynomial.terms) * len(request.right.polynomial.terms)
+    product_term_work = len(request.left.polynomial.terms) * len(
+        request.right.polynomial.terms
+    )
     if product_term_work > MAX_MULTIPLY_PRODUCT_WORK:
-        raise _validation_error("the polynomial product exceeds the bounded convolution work limit")
-    coefficient_digits = _maximum_product_coefficient_digits(request.left, request.right)
+        raise _validation_error(
+            "the polynomial product exceeds the bounded convolution work limit"
+        )
+    coefficient_digits = _maximum_product_coefficient_digits(
+        request.left, request.right
+    )
     if coefficient_digits > MAX_CANONICAL_RATIONAL_DIGITS:
-        raise _validation_error("the polynomial product may exceed the canonical coefficient digit limit")
+        raise _validation_error(
+            "the polynomial product may exceed the canonical coefficient digit limit"
+        )
     maximum_exponents = tuple(
-        max((term.exponents[index] for term in request.left.polynomial.terms), default=0)
-        + max((term.exponents[index] for term in request.right.polynomial.terms), default=0)
+        max(
+            (term.exponents[index] for term in request.left.polynomial.terms), default=0
+        )
+        + max(
+            (term.exponents[index] for term in request.right.polynomial.terms),
+            default=0,
+        )
         for index in range(len(request.left.variables))
     )
     support_term_bound = math.prod(exponent + 1 for exponent in maximum_exponents)
     result_term_bound = min(product_term_work, support_term_bound)
     if result_term_bound > MAX_MULTIPLY_RESULT_TERMS:
-        raise _validation_error("the polynomial product may exceed the canonical term limit")
+        raise _validation_error(
+            "the polynomial product may exceed the canonical term limit"
+        )
     if any(exponent > MAX_POLYNOMIAL_EXPONENT for exponent in maximum_exponents):
-        raise _validation_error("the polynomial product may exceed the canonical exponent limit")
-    if _result_wire_upper_bound(
-        request.left.variables,
-        term_count=result_term_bound,
-        coefficient_digits=coefficient_digits,
-        maximum_exponents=maximum_exponents,
-    ) > MAX_MULTIPLY_RESULT_BYTES:
-        raise _validation_error("the polynomial product may exceed the canonical serialized result size")
+        raise _validation_error(
+            "the polynomial product may exceed the canonical exponent limit"
+        )
+    if (
+        _result_wire_upper_bound(
+            request.left.variables,
+            term_count=result_term_bound,
+            coefficient_digits=coefficient_digits,
+            maximum_exponents=maximum_exponents,
+        )
+        > MAX_MULTIPLY_RESULT_BYTES
+    ):
+        raise _validation_error(
+            "the polynomial product may exceed the canonical serialized result size"
+        )
 
 
 def _run_admission(request: RationalPolynomialMultiplyRequest) -> None:

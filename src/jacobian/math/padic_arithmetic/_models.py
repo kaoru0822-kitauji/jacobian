@@ -45,6 +45,7 @@ class HenselRootRequest(StrictModel):
     root_mod_p: int = Field(ge=0)
     precision: int = Field(ge=1, le=64)
 
+
 class HenselRootResult(StrictModel):
     """A p-adic root approximation lifted via Hensel's lemma.
 
@@ -99,6 +100,7 @@ class HenselFactorLiftRequest(StrictModel):
     prime: int = Field(ge=2, le=10_000)
     precision: int = Field(ge=1, le=64)
 
+
 class HenselFactorLiftResult(StrictModel):
     """Lifted coprime factors mod p^k."""
 
@@ -120,6 +122,7 @@ class PAdicRootsRequest(StrictModel):
     polynomial: IntegerPolynomial
     prime: int = Field(ge=2, le=10_000)
     precision: int = Field(ge=1, le=64)
+
 
 class PAdicRootEntry(StrictModel):
     """One exact root of f mod p^k lifted from a simple root mod p."""

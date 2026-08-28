@@ -216,8 +216,6 @@ class TestCount:
         assert counted == 8
 
 
-
-
 class TestRejection:
     def test_unbounded_halfspace_representation_is_rejected(self) -> None:
         # Only x <= 1: the polytope is unbounded in every other direction.

@@ -33,6 +33,7 @@ class TreeRunRequest(StrictModel):
     automaton: BottomUpTreeAutomaton
     tree: RankedTree
 
+
 class TreeRunResult(TreeRunRequest):
     """Result of a tree automaton run."""
 
@@ -83,6 +84,7 @@ class AcceptedTreeCountRequest(StrictModel):
 
     automaton: BottomUpTreeAutomaton
     tree_size: int = Field(ge=1, le=100)
+
 
 class AcceptedTreeCountResult(AcceptedTreeCountRequest):
     """Exact count of accepted trees."""

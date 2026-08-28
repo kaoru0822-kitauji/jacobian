@@ -184,6 +184,7 @@ class LinkRequest(StrictModel):
         min_length=1, max_length=MAX_TOPOLOGY_DIMENSION + 1
     )
 
+
 class LinkResult(TopologyExactResult):
     """The maximal facets of the link of a simplex."""
 
@@ -199,6 +200,7 @@ class StarRequest(StrictModel):
     simplex: tuple[VertexLabel, ...] = Field(
         min_length=1, max_length=MAX_TOPOLOGY_DIMENSION + 1
     )
+
 
 class StarResult(TopologyExactResult):
     """The closed star produced for a simplex."""
@@ -270,6 +272,7 @@ class VertexDeletionRequest(StrictModel):
         description="Vertex subset to remove. The deletion must leave at least one simplex on the remaining vertices: deleting every vertex is rejected because the empty complex has no canonical value.",
     )
 
+
 class VertexDeletionResult(TopologyExactResult):
     """The induced subcomplex produced after deleting a vertex subset."""
 
@@ -320,6 +323,7 @@ class SkeletonRequest(StrictModel):
 
     complex: SimplicialComplexRequest
     k: StrictInt = Field(ge=0, le=MAX_TOPOLOGY_DIMENSION)
+
 
 class SkeletonResult(TopologyExactResult):
     """The k-skeleton as a facet list."""
@@ -399,6 +403,7 @@ class JoinRequest(StrictModel):
     complex_a: SimplicialComplexRequest
     complex_b: SimplicialComplexRequest
 
+
 class JoinResult(TopologyExactResult):
     """The join of two complexes."""
 
@@ -445,6 +450,7 @@ class ElementaryCollapseRequest(StrictModel):
     coface: tuple[VertexLabel, ...] = Field(
         min_length=2, max_length=MAX_TOPOLOGY_DIMENSION + 1
     )
+
 
 class ElementaryCollapseResult(TopologyExactResult):
     """Result of one elementary collapse step."""

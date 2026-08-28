@@ -38,6 +38,7 @@ class MultivariateFactorRequest(StrictModel):
         )
     )
 
+
 def _require_representable_content(polynomial: RationalPolynomial) -> None:
     """Bound aggregate rational content before the factor backend expands it."""
 

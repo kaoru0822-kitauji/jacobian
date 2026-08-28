@@ -122,8 +122,7 @@ def _admit_integral_homology_request(
     request: IntegralSimplicialHomologyRequest,
 ) -> None:
     if any(
-        size > MAX_INTEGRAL_HOMOLOGY_CHAIN_GROUP
-        for size in request.complex.f_vector
+        size > MAX_INTEGRAL_HOMOLOGY_CHAIN_GROUP for size in request.complex.f_vector
     ):
         raise ValueError(
             "integral homology requires at most "

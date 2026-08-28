@@ -228,16 +228,16 @@ def test_value_height_bound_keeps_scan_work_small() -> None:
         subset=(0,), value=CanonicalRational(num="9" * 129, den="1")
     )
     monotonicity_request = MonotonicityCheckRequest(
-            function=SetFunction(ground_set_size=1, entries=(wide_empty, wide_full))
-        )
+        function=SetFunction(ground_set_size=1, entries=(wide_empty, wide_full))
+    )
     with pytest.raises(OperationDomainValidationError) as error:
         check_monotonicity(monotonicity_request)
     assert (
         error.value.errors()[0]["type"] == "submodular_opt.scan_value_height_exceeded"
     )
     submodularity_request = SubmodularityCheckRequest(
-            function=SetFunction(ground_set_size=1, entries=(wide_empty, wide_full))
-        )
+        function=SetFunction(ground_set_size=1, entries=(wide_empty, wide_full))
+    )
     with pytest.raises(OperationDomainValidationError) as error:
         check_submodularity(submodularity_request)
     assert (

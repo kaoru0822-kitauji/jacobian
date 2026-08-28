@@ -49,38 +49,86 @@ from jacobian.math.matrices.values import RationalMatrix, require_matrix_scalar_
 def _admit_rational_spectrum_claim(request: RationalSpectrumClaimRequest) -> None:
     order = len(request.matrix.entries)
     if order != len(request.matrix.entries[0]):
-        raise _validation_error("shape_mismatch", "rational spectrum claims require a square matrix")
+        raise _validation_error(
+            "shape_mismatch", "rational spectrum claims require a square matrix"
+        )
     if order > MAX_RATIONAL_SPECTRUM_ORDER:
-        raise _validation_error("budget_exceeded", f"rational spectrum claims support matrix order at most {MAX_RATIONAL_SPECTRUM_ORDER}")
-    if any(request.matrix.entries[row][column] != request.matrix.entries[column][row] for row in range(order) for column in range(row + 1, order)):
-        raise _validation_error("budget_exceeded", "rational spectrum claims require a symmetric matrix")
-    require_matrix_scalar_digits(request.matrix.entries, maximum=MAX_RATIONAL_SPECTRUM_INPUT_DIGITS, label="rational spectrum matrix")
-    nonzero_entries = sum(entry.num != "0" for row in request.matrix.entries for entry in row)
+        raise _validation_error(
+            "budget_exceeded",
+            f"rational spectrum claims support matrix order at most {MAX_RATIONAL_SPECTRUM_ORDER}",
+        )
+    if any(
+        request.matrix.entries[row][column] != request.matrix.entries[column][row]
+        for row in range(order)
+        for column in range(row + 1, order)
+    ):
+        raise _validation_error(
+            "budget_exceeded", "rational spectrum claims require a symmetric matrix"
+        )
+    require_matrix_scalar_digits(
+        request.matrix.entries,
+        maximum=MAX_RATIONAL_SPECTRUM_INPUT_DIGITS,
+        label="rational spectrum matrix",
+    )
+    nonzero_entries = sum(
+        entry.num != "0" for row in request.matrix.entries for entry in row
+    )
     if nonzero_entries > MAX_RATIONAL_SPECTRUM_NONZERO_ENTRIES:
-        raise _validation_error("budget_exceeded", "rational spectrum matrix exceeds the nonzero-entry budget")
+        raise _validation_error(
+            "budget_exceeded",
+            "rational spectrum matrix exceeds the nonzero-entry budget",
+        )
     eigenvalues = tuple(claim.eigenvalue for claim in request.claimed_profile)
     for eigenvalue in eigenvalues:
-        require_bounded_rational(eigenvalue, max_digits=MAX_RATIONAL_SPECTRUM_INPUT_DIGITS, label="claimed eigenvalue")
+        require_bounded_rational(
+            eigenvalue,
+            max_digits=MAX_RATIONAL_SPECTRUM_INPUT_DIGITS,
+            label="claimed eigenvalue",
+        )
     if len(set(eigenvalues)) != len(eigenvalues):
-        raise _validation_error("budget_exceeded", "claimed rational eigenvalues must be pairwise distinct")
-    shifted_digits = max(canonical_rational_component_digits(CanonicalRational.from_fraction(request.matrix.entries[index][index].as_fraction() - eigenvalue.as_fraction())) for eigenvalue in eigenvalues for index in range(order))
+        raise _validation_error(
+            "budget_exceeded", "claimed rational eigenvalues must be pairwise distinct"
+        )
+    shifted_digits = max(
+        canonical_rational_component_digits(
+            CanonicalRational.from_fraction(
+                request.matrix.entries[index][index].as_fraction()
+                - eigenvalue.as_fraction()
+            )
+        )
+        for eigenvalue in eigenvalues
+        for index in range(order)
+    )
     if shifted_digits > MAX_RATIONAL_SPECTRUM_SHIFTED_DIGITS:
-        raise _validation_error("budget_exceeded", "shifted diagonal entries exceed the rational spectrum digit budget")
+        raise _validation_error(
+            "budget_exceeded",
+            "shifted diagonal entries exceed the rational spectrum digit budget",
+        )
     if len(eigenvalues) * order**3 > MAX_RATIONAL_SPECTRUM_RANK_WORK:
-        raise _validation_error("budget_exceeded", "shifted-rank computations exceed the aggregate work budget")
+        raise _validation_error(
+            "budget_exceeded",
+            "shifted-rank computations exceed the aggregate work budget",
+        )
     minor_digits = order * order * shifted_digits + len(str(factorial(order))) + 1
     if minor_digits > MAX_RATIONAL_SPECTRUM_MINOR_DIGITS:
-        raise _validation_error("budget_exceeded", "exact shifted-rank minors exceed the digit budget")
+        raise _validation_error(
+            "budget_exceeded", "exact shifted-rank minors exceed the digit budget"
+        )
     result_bytes = (
         _RATIONAL_SPECTRUM_RESULT_BASE_BYTES
         + order
         * order
-        * (2 * MAX_RATIONAL_SPECTRUM_INPUT_DIGITS + _RATIONAL_SPECTRUM_MATRIX_ENTRY_BYTES)
+        * (
+            2 * MAX_RATIONAL_SPECTRUM_INPUT_DIGITS
+            + _RATIONAL_SPECTRUM_MATRIX_ENTRY_BYTES
+        )
         + len(eigenvalues)
         * (4 * MAX_RATIONAL_SPECTRUM_INPUT_DIGITS + _RATIONAL_SPECTRUM_CLAIM_BYTES)
     )
     if result_bytes > MAX_RATIONAL_SPECTRUM_RESULT_BYTES:
-        raise _validation_error("budget_exceeded", "rational spectrum ledger exceeds the result-size budget")
+        raise _validation_error(
+            "budget_exceeded", "rational spectrum ledger exceeds the result-size budget"
+        )
 
 
 def _admit(request: Any) -> None:
@@ -91,10 +139,15 @@ def _admit(request: Any) -> None:
             seen: set[tuple[int, int]] = set()
             for entry in request.entries:
                 if entry.row >= request.dimension or entry.col >= request.dimension:
-                    raise _validation_error("shape_mismatch", "entry indices must be < dimension")
+                    raise _validation_error(
+                        "shape_mismatch", "entry indices must be < dimension"
+                    )
                 key = (min(entry.row, entry.col), max(entry.row, entry.col))
                 if key in seen:
-                    raise _validation_error("invariant_mismatch", "symmetric matrix entries must not conflict")
+                    raise _validation_error(
+                        "invariant_mismatch",
+                        "symmetric matrix entries must not conflict",
+                    )
                 seen.add(key)
             source = _canonical_source_matrix(request)
             output_limit = CanonicalLimits().max_output_bytes
@@ -103,9 +156,14 @@ def _admit(request: Any) -> None:
             except CanonicalizationError:
                 retained_bytes = output_limit + 1
             if retained_bytes + _RESULT_ENVELOPE_RESERVE_BYTES > output_limit:
-                raise _validation_error("invariant_mismatch", "the inertia result retains its source matrix and would exceed the canonical output limit")
+                raise _validation_error(
+                    "invariant_mismatch",
+                    "the inertia result retains its source matrix and would exceed the canonical output limit",
+                )
     except PydanticCustomError as exc:
-        raise OperationDomainValidationError(location=("request",), code=exc.type, message=exc.message()) from exc
+        raise OperationDomainValidationError(
+            location=("request",), code=exc.type, message=exc.message()
+        ) from exc
 
 
 def _exact_shifted_nullities(

@@ -34,6 +34,7 @@ class ElementDeltaSetRequest(StrictModel):
     )
     value: CanonicalInteger
 
+
 class ElementDeltaSetResult(StrictModel):
     """Delta set of one element."""
 
@@ -98,6 +99,7 @@ class ElementElasticityRequest(StrictModel):
         description="Positive semigroup element. " + _GENERAL_ELEMENT_ENVELOPE
     )
 
+
 class ElementElasticityResult(StrictModel):
     """Elasticity of one element."""
 
@@ -156,6 +158,7 @@ class ElementCatenaryDegreeRequest(StrictModel):
         ),
     )
     value: CanonicalInteger
+
 
 class ElementCatenaryDegreeResult(StrictModel):
     """Catenary degree of one element."""

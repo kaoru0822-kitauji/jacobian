@@ -31,6 +31,7 @@ class FactorizationComputeRequest(StrictModel):
     )
     value: CanonicalInteger
 
+
 class FactorizationComputeResult(StrictModel):
     """Complete factorization family Z(s) for one element."""
 
@@ -83,6 +84,7 @@ class FactorizationLengthsComputeRequest(StrictModel):
         ),
     )
     value: CanonicalInteger
+
 
 class FactorizationLengthsComputeResult(StrictModel):
     """Sorted length set of one element."""
@@ -145,6 +147,7 @@ class FactorizationDistanceRequest(StrictModel):
     first: tuple[int, ...] = Field(min_length=1)
     second: tuple[int, ...] = Field(min_length=1)
 
+
 class FactorizationDistanceResult(StrictModel):
     """Distance between two factorizations."""
 
@@ -167,6 +170,7 @@ class FactorizationGraphComputeRequest(StrictModel):
         ),
     )
     value: CanonicalInteger
+
 
 class FactorizationGraphComputeResult(StrictModel):
     """Standard factorization graph with connected components."""

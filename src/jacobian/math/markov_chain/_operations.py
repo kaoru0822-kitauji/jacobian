@@ -66,8 +66,7 @@ def _admit_mixing(request: MixingTimeRequest) -> None:
         )
     values = (request.epsilon, *(item for row in request.matrix for item in row))
     if any(
-        max(len(value.num.lstrip("-")), len(value.den))
-        > _MAX_MIXING_COMPONENT_DIGITS
+        max(len(value.num.lstrip("-")), len(value.den)) > _MAX_MIXING_COMPONENT_DIGITS
         for value in values
     ):
         _reject(

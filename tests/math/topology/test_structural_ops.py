@@ -288,6 +288,7 @@ class TestBarycentricSubdivision:
             f"bv{i}" for i in range(len(faces))
         ]
 
+
 class TestCanonicalComplexFeeding:
     """A canonical ``FiniteSimplicialComplex`` value must feed structural
     requests unchanged (review thread: deletion result -> skeleton)."""
@@ -451,6 +452,7 @@ class TestPseudomanifold:
         assert not result.is_pseudomanifold
         assert result.obstruction is not None
         assert "3 facets" in result.obstruction
+
 
 class TestShellingCheck:
     def test_valid_shelling_of_single_facet(self) -> None:

@@ -27,7 +27,9 @@ def _domain_error(location: tuple[str | int, ...], code: str, message: str) -> N
 
 def _admit_divisor(request: DivisibilityRequest) -> None:
     if int(request.divisor) == 0:
-        _domain_error(("divisor",), "divisor_must_be_nonzero", "divisor must be nonzero")
+        _domain_error(
+            ("divisor",), "divisor_must_be_nonzero", "divisor must be nonzero"
+        )
 
 
 def _admit_valuation(request: ValuationRequest) -> None:

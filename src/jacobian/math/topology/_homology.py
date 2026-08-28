@@ -45,6 +45,7 @@ class SimplicialHomologyRequest(StrictModel):
     prime: StrictInt = Field(ge=2, le=MAX_TOPOLOGY_PRIME)
     convention: HomologyConvention = HomologyConvention.UNREDUCED
 
+
 class ModularVector(StrictModel):
     coefficients: tuple[StrictInt, ...] = Field(
         min_length=1,
@@ -160,6 +161,7 @@ class SimplicialHomologyResult(TopologyExactResult):
 class IntegralSimplicialHomologyRequest(StrictModel):
     complex: FiniteSimplicialComplex
     convention: HomologyConvention = HomologyConvention.UNREDUCED
+
 
 class IntegralVector(StrictModel):
     coefficients: tuple[CanonicalInteger, ...] = Field(

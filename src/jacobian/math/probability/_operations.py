@@ -93,7 +93,9 @@ def _admit_event(request: FiniteEventRequest, *, require_positive: bool) -> None
         _admit_distribution(request.distribution.atoms, require_canonical=True)
     )
     try:
-        event = _require_strictly_increasing(request.event_values, label="finite event values")
+        event = _require_strictly_increasing(
+            request.event_values, label="finite event values"
+        )
         for value in request.event_values:
             require_bounded_rational(
                 value,
@@ -139,16 +141,30 @@ def _admit_pushforward(request: FinitePushforwardRequest) -> None:
         aggregated: dict[Fraction, Fraction] = {}
         for atom, item in zip(request.distribution.atoms, request.mapping, strict=True):
             require_bounded_rational(
-                item.source, max_digits=MAX_INPUT_RATIONAL_DIGITS, label="pushforward source"
+                item.source,
+                max_digits=MAX_INPUT_RATIONAL_DIGITS,
+                label="pushforward source",
             )
             require_bounded_rational(
-                item.target, max_digits=MAX_INPUT_RATIONAL_DIGITS, label="pushforward target"
+                item.target,
+                max_digits=MAX_INPUT_RATIONAL_DIGITS,
+                label="pushforward target",
             )
             target = item.target.as_fraction()
-            aggregated[target] = aggregated.get(target, Fraction()) + atom.probability.as_fraction()
+            aggregated[target] = (
+                aggregated.get(target, Fraction()) + atom.probability.as_fraction()
+            )
         for target, probability in aggregated.items():
-            _require_bounded_fraction(target, max_digits=MAX_RESULT_RATIONAL_DIGITS, label="pushforward target")
-            _require_bounded_fraction(probability, max_digits=MAX_RESULT_RATIONAL_DIGITS, label="pushforward probability")
+            _require_bounded_fraction(
+                target,
+                max_digits=MAX_RESULT_RATIONAL_DIGITS,
+                label="pushforward target",
+            )
+            _require_bounded_fraction(
+                probability,
+                max_digits=MAX_RESULT_RATIONAL_DIGITS,
+                label="pushforward probability",
+            )
     except ValueError as exc:
         raise OperationDomainValidationError(
             location=("mapping",),
@@ -160,7 +176,10 @@ def _admit_pushforward(request: FinitePushforwardRequest) -> None:
 def _admit_convolution(request: FiniteConvolutionRequest) -> None:
     _admit_distribution(request.left.atoms, require_canonical=True)
     _admit_distribution(request.right.atoms, require_canonical=True)
-    if len(request.left.atoms) * len(request.right.atoms) > MAX_FINITE_CONVOLUTION_PAIRS:
+    if (
+        len(request.left.atoms) * len(request.right.atoms)
+        > MAX_FINITE_CONVOLUTION_PAIRS
+    ):
         raise OperationDomainValidationError(
             location=("left", "right"),
             code="probability.convolution.pair_bound",
@@ -173,15 +192,23 @@ def _admit_convolution(request: FiniteConvolutionRequest) -> None:
         for left in request.left.atoms:
             for right in request.right.atoms:
                 value = left.value.as_fraction() + right.value.as_fraction()
-                probability = left.probability.as_fraction() * right.probability.as_fraction()
+                probability = (
+                    left.probability.as_fraction() * right.probability.as_fraction()
+                )
                 aggregated[value] = aggregated.get(value, Fraction()) + probability
         if len(aggregated) > MAX_FINITE_DISTRIBUTION_ATOMS:
             raise ValueError(
                 f"finite convolution exceeds the {MAX_FINITE_DISTRIBUTION_ATOMS}-atom output bound"
             )
         for value, probability in aggregated.items():
-            _require_bounded_fraction(value, max_digits=MAX_RESULT_RATIONAL_DIGITS, label="convolution atom")
-            _require_bounded_fraction(probability, max_digits=MAX_RESULT_RATIONAL_DIGITS, label="convolution probability")
+            _require_bounded_fraction(
+                value, max_digits=MAX_RESULT_RATIONAL_DIGITS, label="convolution atom"
+            )
+            _require_bounded_fraction(
+                probability,
+                max_digits=MAX_RESULT_RATIONAL_DIGITS,
+                label="convolution probability",
+            )
     except ValueError as exc:
         raise OperationDomainValidationError(
             location=("left", "right"),

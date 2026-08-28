@@ -376,6 +376,7 @@ class GroupLikeElementsRequest(StrictModel):
 
     coalgebra: Coalgebra
 
+
 class GroupLikeElement(StrictModel):
     """One group-like element with its coefficients."""
 

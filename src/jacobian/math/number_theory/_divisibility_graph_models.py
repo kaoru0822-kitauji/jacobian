@@ -25,6 +25,7 @@ class DivisibilityIncidenceGraphRequest(StrictModel):
         description="Unique positive integers labelling the right vertex family.",
     )
 
+
 class DivisibilityIncidenceGraphResult(StrictModel):
     """Canonical bipartite simple graph with edges for each (l, r) with l | r."""
 

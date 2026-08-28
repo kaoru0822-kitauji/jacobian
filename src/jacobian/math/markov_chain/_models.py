@@ -139,7 +139,6 @@ class MixingTimeRequest(TransitionMatrixRequest):
     max_steps: StrictInt = Field(default=64, ge=1, le=256)
 
 
-
 class MixingTimeResult(StrictModel):
     status: Literal["FOUND", "NOT_ERGODIC", "BOUND_EXCEEDED"]
     epsilon: CanonicalRational

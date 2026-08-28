@@ -67,7 +67,10 @@ def _admit_integer(polynomial: IntegerPolynomial) -> None:
         raise _validation_error(
             f"integer polynomial exceeds the degree-{_MAX_ELEMENTARY_DEGREE} operation budget"
         )
-    if any(len(coefficient.lstrip("-")) > _MAX_INTEGER_COEFFICIENT_DIGITS for coefficient in polynomial.coefficients):
+    if any(
+        len(coefficient.lstrip("-")) > _MAX_INTEGER_COEFFICIENT_DIGITS
+        for coefficient in polynomial.coefficients
+    ):
         raise _validation_error("integer coefficient exceeds the decimal-digit budget")
 
 
@@ -85,7 +88,9 @@ def _admit_integer_evaluation(request: IntegerPolynomialEvaluationRequest) -> No
 def _admit_integer_composition(request: IntegerPolynomialCompositionRequest) -> None:
     _admit_integer(request.outer)
     _admit_integer(request.inner)
-    if (len(request.outer.coefficients) - 1) * (len(request.inner.coefficients) - 1) > _MAX_ELEMENTARY_DEGREE:
+    if (len(request.outer.coefficients) - 1) * (
+        len(request.inner.coefficients) - 1
+    ) > _MAX_ELEMENTARY_DEGREE:
         raise _validation_error(
             f"composition exceeds the degree-{_MAX_ELEMENTARY_DEGREE} output budget"
         )
@@ -94,7 +99,11 @@ def _admit_integer_composition(request: IntegerPolynomialCompositionRequest) -> 
 def _admit_rational(request: RationalPolynomialRequest) -> None:
     if len(request.polynomial.variables) != 1:
         raise _validation_error("elementary polynomial operations require one variable")
-    require_polynomial_budget(request.polynomial, maximum_terms=_MAX_GCD_TERMS, maximum_exponent=_MAX_ELEMENTARY_DEGREE)
+    require_polynomial_budget(
+        request.polynomial,
+        maximum_terms=_MAX_GCD_TERMS,
+        maximum_exponent=_MAX_ELEMENTARY_DEGREE,
+    )
 
 
 def _admit_division(request: RationalPolynomialDivisionRequest) -> None:
@@ -103,7 +112,11 @@ def _admit_division(request: RationalPolynomialDivisionRequest) -> None:
     if not request.right.polynomial.terms:
         raise _validation_error("divisor polynomial must be nonzero")
     for polynomial in (request.left, request.right):
-        require_polynomial_budget(polynomial, maximum_terms=_MAX_GCD_TERMS, maximum_exponent=_MAX_ELEMENTARY_DEGREE)
+        require_polynomial_budget(
+            polynomial,
+            maximum_terms=_MAX_GCD_TERMS,
+            maximum_exponent=_MAX_ELEMENTARY_DEGREE,
+        )
 
 
 def _admit_partial_fractions(request: RationalFunctionRequest) -> None:
@@ -114,7 +127,11 @@ def _admit_partial_fractions(request: RationalFunctionRequest) -> None:
     if not request.denominator.polynomial.terms:
         raise _validation_error("denominator polynomial must be nonzero")
     for polynomial in (request.numerator, request.denominator):
-        require_polynomial_budget(polynomial, maximum_terms=_MAX_INVARIANT_TERMS, maximum_exponent=_MAX_ELEMENTARY_DEGREE)
+        require_polynomial_budget(
+            polynomial,
+            maximum_terms=_MAX_INVARIANT_TERMS,
+            maximum_exponent=_MAX_ELEMENTARY_DEGREE,
+        )
 
 
 @cache

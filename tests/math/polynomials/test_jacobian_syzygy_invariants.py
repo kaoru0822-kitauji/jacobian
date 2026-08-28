@@ -325,27 +325,36 @@ def test_replayed_results_accept_every_admitted_variable_count() -> None:
 
 def test_dimension_specific_basis_boundary_rejects_before_backend_execution() -> None:
     with pytest.raises(OperationDomainValidationError):
-        compute_graded_jacobian_syzygy(GradedJacobianSyzygyRequest(
-            polynomial=_sparse_polynomial(
-                ("x", "y", "z", "w"),
-                {
-                    (11, 0, 0, 0): 1,
-                    (0, 11, 0, 0): 1,
-                    (0, 0, 11, 0): 1,
-                    (0, 0, 0, 11): 1,
-                },
-            ),
-            max_degree=3,
-        ))
+        compute_graded_jacobian_syzygy(
+            GradedJacobianSyzygyRequest(
+                polynomial=_sparse_polynomial(
+                    ("x", "y", "z", "w"),
+                    {
+                        (11, 0, 0, 0): 1,
+                        (0, 11, 0, 0): 1,
+                        (0, 0, 11, 0): 1,
+                        (0, 0, 0, 11): 1,
+                    },
+                ),
+                max_degree=3,
+            )
+        )
 
     with pytest.raises(OperationDomainValidationError):
-        compute_graded_jacobian_syzygy(GradedJacobianSyzygyRequest(
-            polynomial=_sparse_polynomial(
-                ("x", "y", "z", "w"),
-                {(9, 0, 0, 0): 1, (0, 9, 0, 0): 1, (0, 0, 9, 0): 1, (0, 0, 0, 9): 1},
-            ),
-            max_degree=4,
-        ))
+        compute_graded_jacobian_syzygy(
+            GradedJacobianSyzygyRequest(
+                polynomial=_sparse_polynomial(
+                    ("x", "y", "z", "w"),
+                    {
+                        (9, 0, 0, 0): 1,
+                        (0, 9, 0, 0): 1,
+                        (0, 0, 9, 0): 1,
+                        (0, 0, 0, 9): 1,
+                    },
+                ),
+                max_degree=4,
+            )
+        )
 
 
 def test_syzygy_kernel_rejects_an_incomplete_linear_factor_request() -> None:

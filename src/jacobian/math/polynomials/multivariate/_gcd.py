@@ -15,7 +15,6 @@ class MultivariateGcdRequest(StrictModel):
     right: RationalPolynomial
 
 
-
 class MultivariateGcdResult(StrictModel):
     gcd: RationalPolynomial
     convention: Literal["MONIC_ASSOCIATE"] = "MONIC_ASSOCIATE"

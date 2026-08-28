@@ -118,6 +118,7 @@ class ArtinMazurZetaResult(ArtinMazurZetaRequest):
         "SYMPY_EXACT_CHARACTERISTIC_POLYNOMIAL"
     )
 
+
 def _from_kernel_artin_mazur_zeta(
     request: ArtinMazurZetaRequest,
     determinant_polynomial: RationalPolynomial,
@@ -125,10 +126,7 @@ def _from_kernel_artin_mazur_zeta(
 ) -> ArtinMazurZetaResult:
     """Construct a zeta result from the trusted one-pass owner kernel."""
 
-    if (
-        determinant_polynomial.variables != ("t",)
-        or zeta_function.variables != ("t",)
-    ):
+    if determinant_polynomial.variables != ("t",) or zeta_function.variables != ("t",):
         raise _validation_error(
             "artin_mazur_zeta_computed_shape",
             "computed zeta values must retain the canonical t axis",

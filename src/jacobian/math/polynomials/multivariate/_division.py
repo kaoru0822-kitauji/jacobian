@@ -19,7 +19,6 @@ class MultivariateDivisionRequest(StrictModel):
     monomial_order: MonomialOrder = "lex"
 
 
-
 class MultivariateDivisionResult(StrictModel):
     quotient: RationalPolynomial
     remainder: RationalPolynomial

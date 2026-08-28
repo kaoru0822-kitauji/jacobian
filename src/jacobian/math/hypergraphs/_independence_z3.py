@@ -159,11 +159,12 @@ def _solver_witness_is_canonical_and_independent(
         vertex not in source.vertices for vertex in candidate
     ):
         return False
-    if tuple(vertex for vertex in source.vertices if vertex in candidate_set) != candidate:
+    if (
+        tuple(vertex for vertex in source.vertices if vertex in candidate_set)
+        != candidate
+    ):
         return False
-    return not any(
-        set(members) <= candidate_set for _, members in source.edges
-    )
+    return not any(set(members) <= candidate_set for _, members in source.edges)
 
 
 def _solve_independence_number_kernel(
@@ -264,7 +265,9 @@ def _solve_independence_number_kernel(
             upper_bound = threshold - 1
             continue
         if solver_status == z3.sat:
-            if len(candidate) < threshold or not _solver_witness_is_canonical_and_independent(
+            if len(
+                candidate
+            ) < threshold or not _solver_witness_is_canonical_and_independent(
                 source, candidate
             ):
                 return _result(

@@ -37,7 +37,9 @@ from jacobian.math.polynomials.values import require_polynomial_budget
 
 def _admit_strict_sublevel(request: StrictSublevelMeasureRequest) -> None:
     if len(request.polynomial.variables) != 1:
-        raise _validation_error("variable_count", "strict sublevel measure requires one polynomial variable")
+        raise _validation_error(
+            "variable_count", "strict sublevel measure requires one polynomial variable"
+        )
     require_polynomial_budget(
         request.polynomial,
         maximum_terms=MAX_STRICT_SUBLEVEL_TERMS,
@@ -50,12 +52,22 @@ def _admit_strict_sublevel(request: StrictSublevelMeasureRequest) -> None:
         (request.lower, "strict sublevel lower scope endpoint"),
         (request.upper, "strict sublevel upper scope endpoint"),
     ):
-        require_bounded_rational(value, max_digits=MAX_STRICT_SUBLEVEL_INPUT_DIGITS, label=label)
+        require_bounded_rational(
+            value, max_digits=MAX_STRICT_SUBLEVEL_INPUT_DIGITS, label=label
+        )
     if request.threshold.as_fraction() < 0:
-        raise _validation_error("negative_threshold", "strict sublevel threshold must be nonnegative")
+        raise _validation_error(
+            "negative_threshold", "strict sublevel threshold must be nonnegative"
+        )
     if request.lower.as_fraction() > request.upper.as_fraction():
-        raise _validation_error("scope_order", "strict sublevel lower endpoint must not exceed upper")
-    if request.threshold.as_fraction() == 0 or _polynomial_degree(request.polynomial) == 0 or request.lower == request.upper:
+        raise _validation_error(
+            "scope_order", "strict sublevel lower endpoint must not exceed upper"
+        )
+    if (
+        request.threshold.as_fraction() == 0
+        or _polynomial_degree(request.polynomial) == 0
+        or request.lower == request.upper
+    ):
         return
     boundary_heights = []
     for subtract_threshold, label in ((True, "f-threshold"), (False, "f+threshold")):
@@ -86,9 +98,13 @@ def _run_admission(request: StrictSublevelMeasureRequest) -> None:
     except OperationDomainValidationError:
         raise
     except PydanticCustomError as exc:
-        raise OperationDomainValidationError(location=(), code=exc.type, message=exc.message()) from exc
+        raise OperationDomainValidationError(
+            location=(), code=exc.type, message=exc.message()
+        ) from exc
     except ValueError as exc:
-        raise OperationDomainValidationError(location=(), code="polynomial.strict_sublevel_admission", message=str(exc)) from exc
+        raise OperationDomainValidationError(
+            location=(), code="polynomial.strict_sublevel_admission", message=str(exc)
+        ) from exc
 
 
 def _poly_to_terms(poly: UnivariatePolynomial) -> list[tuple[Fraction, int]]:

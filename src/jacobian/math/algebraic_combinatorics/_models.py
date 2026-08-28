@@ -103,6 +103,7 @@ class RSKPermutationRequest(StrictModel):
     )
     convention: RSKConvention = "ROW_INSERTION_RSK_V1"
 
+
 class RSKResult(StrictModel):
     """Canonical tableaux produced by one admitted permutation-RSK kernel."""
 

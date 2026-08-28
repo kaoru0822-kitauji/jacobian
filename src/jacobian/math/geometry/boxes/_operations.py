@@ -61,7 +61,10 @@ def _digit_bounds(
             len(value) for value in {endpoint.den for endpoint in endpoints}
         )
     union_numerator_digits = (
-        volume_numerator_digits + common_denominator_digits + len(str(candidate_count)) + 2
+        volume_numerator_digits
+        + common_denominator_digits
+        + len(str(candidate_count))
+        + 2
     )
     union_denominator_digits = common_denominator_digits + 1
     return (

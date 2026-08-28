@@ -153,6 +153,7 @@ class GrassmannianCountRequest(StrictModel):
     ambient_dimension: int = Field(ge=1, le=MAX_DIM)
     subspace_dimension: int = Field(ge=0, le=MAX_DIM)
 
+
 class ProjectiveSpaceEnumerateRequest(StrictModel):
     """One finite projective space whose complete point list fits the envelope.
 
@@ -192,6 +193,7 @@ class ProjectiveSpaceEnumerateRequest(StrictModel):
             "tuples in this axis order."
         )
     )
+
 
 class ProjectivePointCanonicalizeResult(ProjectivePointCanonicalizeRequest):
     point: ProjectivePoint
@@ -403,6 +405,7 @@ class PrimeFieldAffinePlaneRequest(StrictModel):
     """
 
     prime_order: int = Field(ge=2, le=MAX_AFFINE_PLANE_FIELD_ORDER)
+
 
 class PrimeFieldAffinePlaneResult(StrictModel):
     """The complete prime-field affine plane AG(2, q).

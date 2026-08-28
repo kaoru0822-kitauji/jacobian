@@ -270,14 +270,18 @@ def test_request_rejects_outside_domain_and_work_bounds() -> None:
     with pytest.raises(ValidationError):
         _request(_polynomial((1, 1), variables=("x", "y")))
     with pytest.raises(OperationDomainValidationError):
-        compute_strict_sublevel_measure(StrictSublevelMeasureRequest(
-            polynomial=_polynomial((1, 1)),
-            threshold=_rational(-1),
-            lower=_rational(-1),
-            upper=_rational(1),
-        ))
+        compute_strict_sublevel_measure(
+            StrictSublevelMeasureRequest(
+                polynomial=_polynomial((1, 1)),
+                threshold=_rational(-1),
+                lower=_rational(-1),
+                upper=_rational(1),
+            )
+        )
     with pytest.raises(OperationDomainValidationError):
-        compute_strict_sublevel_measure(_request(_polynomial((1, 1)), lower=2, upper=-2))
+        compute_strict_sublevel_measure(
+            _request(_polynomial((1, 1)), lower=2, upper=-2)
+        )
     with pytest.raises(OperationDomainValidationError):
         compute_strict_sublevel_measure(_request(_polynomial((1, 17))))
     _request(_polynomial((1, 16)))

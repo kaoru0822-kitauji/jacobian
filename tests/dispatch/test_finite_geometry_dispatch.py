@@ -78,7 +78,9 @@ def test_projective_space_schema_publishes_coupled_enumeration_bound() -> None:
     }
     assert not list(validator.iter_errors(structurally_valid_but_too_large))
     with pytest.raises(ValueError, match="vector enumeration envelope"):
-        invoke_operation(operation.operation_id, structurally_valid_but_too_large, Catalog.open())
+        invoke_operation(
+            operation.operation_id, structurally_valid_but_too_large, Catalog.open()
+        )
 
 
 def test_dispatch_returns_maximal_enumeration_within_transport_limit() -> None:

@@ -26,6 +26,7 @@ class RecurrenceFindRequest(StrictModel):
         min_length=2, max_length=MAX_RATIONAL_SEQUENCE_LENGTH
     )
 
+
 class RecurrenceFindResult(StrictModel):
     """A fitted recurrence or an explicit finite-prefix missing outcome."""
 
@@ -78,6 +79,7 @@ class ClosedFormRequest(StrictModel):
         description="Characteristic polynomial coefficients in descending order, with degree at most 16.",
     )
     initial_values: tuple[CanonicalRational, ...] = Field(min_length=1, max_length=16)
+
 
 class ClosedFormResult(StrictModel):
     """The closed-form solution as a SymPy expression string."""
@@ -164,6 +166,7 @@ class PrimeFieldRecurrenceFindRequest(StrictModel):
             "or oversized representatives are rejected."
         ),
     )
+
 
 class PrimeFieldRecurrenceFindResult(StrictModel):
     """The minimal LFSR over ``GF(p)`` found by Berlekamp-Massey.

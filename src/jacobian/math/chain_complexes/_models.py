@@ -197,6 +197,7 @@ class ComputeHomologyRequest(StrictModel):
 
     complex: ChainComplexValue
 
+
 class MappingConeRequest(StrictModel):
     """Compute the mapping cone of a chain map."""
 
@@ -212,11 +213,13 @@ class MappingConeRequest(StrictModel):
         )
     )
 
+
 class TensorProductRequest(StrictModel):
     """Compute the tensor product of two chain complexes."""
 
     left: ChainComplexValue
     right: ChainComplexValue
+
 
 __all__ = [
     "ComputeHomologyRequest",

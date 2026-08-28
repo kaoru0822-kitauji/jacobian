@@ -19,7 +19,9 @@ from jacobian.math.group_cohomology._models import (
 
 
 def _enumerated_group_order(group: PermutationGroupRequest) -> int:
-    return int(PermutationGroup(*(Permutation(list(g)) for g in group.generators)).order())
+    return int(
+        PermutationGroup(*(Permutation(list(g)) for g in group.generators)).order()
+    )
 
 
 def _admitted_max_degree(order: int) -> int:

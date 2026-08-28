@@ -91,7 +91,6 @@ class MultivariateResultantRequest(StrictModel):
     )
 
 
-
 class MultivariateScalarValue(StrictModel):
     kind: Literal["SCALAR"] = "SCALAR"
     value: CanonicalRational

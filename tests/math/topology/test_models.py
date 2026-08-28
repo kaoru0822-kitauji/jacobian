@@ -71,9 +71,7 @@ def test_facet_request_rejects_duplicates_nonmaximal_faces_and_hidden_isolates()
         )
     with pytest.raises(ValueError):
         _operation("topology.simplicial_complex.canonicalize").run(
-            SimplicialComplexRequest(
-                vertices=("a", "b"), facets=(("a",), ("a", "b"))
-            )
+            SimplicialComplexRequest(vertices=("a", "b"), facets=(("a",), ("a", "b")))
         )
     with pytest.raises(ValueError):
         _operation("topology.simplicial_complex.canonicalize").run(

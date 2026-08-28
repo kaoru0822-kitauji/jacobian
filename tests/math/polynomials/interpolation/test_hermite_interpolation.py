@@ -362,9 +362,7 @@ def test_intermediate_growth_boundary_rejects_before_matrix_construction() -> No
     # fraction-free-minor envelope while every raw rational remains admissible.
     accepted = OrdinaryDerivativeJetTable.model_validate(_full_multiplicity_payload(64))
     assert hermite_interpolation(accepted).polynomial.polynomial.terms == ()
-    rejected = OrdinaryDerivativeJetTable.model_validate(
-        _full_multiplicity_payload(65)
-    )
+    rejected = OrdinaryDerivativeJetTable.model_validate(_full_multiplicity_payload(65))
     with pytest.raises(OperationDomainValidationError):
         hermite_interpolation(rejected)
 

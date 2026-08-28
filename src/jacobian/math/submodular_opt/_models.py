@@ -132,6 +132,7 @@ class MonotonicityCheckRequest(StrictModel):
 
     function: SetFunction
 
+
 class MonotonicityCheckResult(StrictModel):
     """Whether the function is monotone non-decreasing."""
 
@@ -143,6 +144,7 @@ class SubmodularityCheckRequest(StrictModel):
     """Check if a set function is submodular."""
 
     function: SetFunction
+
 
 class SubmodularityCheckResult(StrictModel):
     """Whether the function is submodular."""

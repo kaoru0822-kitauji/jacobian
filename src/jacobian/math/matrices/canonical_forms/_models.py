@@ -1331,7 +1331,6 @@ class MatrixPolynomialEvaluationRequest(StrictModel):
     )
 
 
-
 class MatrixPolynomialEvaluationResult(StrictModel):
     """Exact value of one polynomial at one rational matrix.
 
@@ -1407,7 +1406,6 @@ class SquareMatrixRequest(StrictModel):
     """One square rational matrix bounded for canonical-form computation."""
 
     matrix: RationalMatrix
-
 
 
 class MonicPolynomial(StrictModel):

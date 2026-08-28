@@ -47,12 +47,14 @@ class EdgePathWordRequest(StrictModel):
     start_vertex: int = Field(ge=0)
     path: tuple[OrientedEdge, ...] = Field(min_length=1, max_length=MAX_WORD)
 
+
 class EdgePathConcatenateRequest(StrictModel):
     """Concatenate two edge paths."""
 
     vertex_count: int = Field(ge=2)
     path_a: tuple[int, ...] = Field(min_length=2, max_length=MAX_WORD)
     path_b: tuple[int, ...] = Field(min_length=2, max_length=MAX_WORD)
+
 
 # Results
 

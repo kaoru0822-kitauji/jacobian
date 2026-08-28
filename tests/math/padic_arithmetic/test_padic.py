@@ -98,7 +98,9 @@ class TestPAdicRoots:
         """Composite moduli are rejected at the typed boundary."""
         poly = IntegerPolynomial(coefficients=("1", "-1"))
         with pytest.raises(OperationDomainValidationError) as exc_info:
-            hensel_lift_root(HenselRootRequest(polynomial=poly, prime=4, root_mod_p=1, precision=2))
+            hensel_lift_root(
+                HenselRootRequest(polynomial=poly, prime=4, root_mod_p=1, precision=2)
+            )
         assert exc_info.value.errors()[0]["type"] == "padic_arithmetic.prime_not_prime"
 
     def test_result_roundtrips_with_structural_shape(self) -> None:
@@ -142,7 +144,9 @@ class TestPAdicRoots:
         """f=x^2+5, p=5: r=0 is a multiple root; lifting is refused."""
         poly = IntegerPolynomial(coefficients=("1", "0", "5"))
         with pytest.raises(OperationDomainValidationError) as exc_info:
-            hensel_lift_root(HenselRootRequest(polynomial=poly, prime=5, root_mod_p=0, precision=2))
+            hensel_lift_root(
+                HenselRootRequest(polynomial=poly, prime=5, root_mod_p=0, precision=2)
+            )
         assert exc_info.value.errors()[0]["type"] == "padic_arithmetic.root_not_simple"
 
     def test_all_roots_are_valid(self) -> None:

@@ -29,6 +29,7 @@ class ConductanceEdge(StrictModel):
     target: int = Field(ge=0, le=MAX_NETWORK_VERTICES - 1)
     conductance: CanonicalRational
 
+
 class ConductanceNetwork(StrictModel):
     """An undirected graph of positive conductances over vertices 0..vertex_count-1."""
 
@@ -37,12 +38,14 @@ class ConductanceNetwork(StrictModel):
         min_length=1, max_length=MAX_NETWORK_EDGES
     )
 
+
 class EffectiveResistanceRequest(StrictModel):
     """Effective resistance between two distinct terminals of a conductance network."""
 
     network: ConductanceNetwork
     terminal_a: int = Field(ge=0, le=MAX_NETWORK_VERTICES - 1)
     terminal_b: int = Field(ge=0, le=MAX_NETWORK_VERTICES - 1)
+
 
 class EffectiveResistanceResult(StrictModel):
     """Exact effective resistance between two terminals."""
@@ -59,6 +62,7 @@ class NodePotentialRequest(StrictModel):
     network: ConductanceNetwork
     source: int = Field(ge=0, le=MAX_NETWORK_VERTICES - 1)
     sink: int = Field(ge=0, le=MAX_NETWORK_VERTICES - 1)
+
 
 class NodePotentialValue(StrictModel):
     """One node's exact potential after solving a Dirichlet problem."""

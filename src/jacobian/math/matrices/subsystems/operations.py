@@ -65,8 +65,7 @@ def _admit_kronecker(
     if product_dimension > MAX_SUBSYSTEM_DIMENSION:
         raise _validation_error(
             "budget_exceeded",
-            "Kronecker product dimension exceeds the "
-            f"{MAX_SUBSYSTEM_DIMENSION} bound",
+            f"Kronecker product dimension exceeds the {MAX_SUBSYSTEM_DIMENSION} bound",
         )
     labels = (*left.factors, *right.factors)
     if len(labels) > MAX_SUBSYSTEM_FACTORS:
@@ -100,13 +99,9 @@ def _admit_partial_trace(
     matrix: FactorizedHermitianMatrix,
     traced_factor_labels: tuple[str, ...],
 ) -> None:
-    expected_entries = _require_trace_work_envelope(
-        matrix, traced_factor_labels
-    )
+    expected_entries = _require_trace_work_envelope(matrix, traced_factor_labels)
     _require_trace_result_envelope(expected_entries)
-    _require_trace_transport_envelope(
-        matrix, traced_factor_labels, expected_entries
-    )
+    _require_trace_transport_envelope(matrix, traced_factor_labels, expected_entries)
 
 
 def _admit_psd(

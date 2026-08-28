@@ -398,6 +398,7 @@ class TestCycleMulticoverDoubleCover:
         for _eid, count in result.edge_multiplicity:
             assert count == 2
 
+
 # ---------------------------------------------------------------------------
 # Fixture 9: One missing and one overcovered edge
 # ---------------------------------------------------------------------------
@@ -488,6 +489,7 @@ class TestFlowSearchExhausted:
         assert result.status == "EXHAUSTED"
         assert result.termination_reason == "SEARCH_EXHAUSTED"
         assert result.flow is None
+
 
 # ---------------------------------------------------------------------------
 # Fixture 12: Search that returns UNKNOWN at a tiny budget

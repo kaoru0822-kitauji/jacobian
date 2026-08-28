@@ -26,6 +26,7 @@ class NumericalSemigroupSummaryRequest(StrictModel):
         ),
     )
 
+
 class NumericalSemigroupSummaryResult(StrictModel):
     """Summary of a numerical semigroup."""
 
@@ -81,6 +82,7 @@ class SemigroupMembershipRequest(StrictModel):
     value: CanonicalInteger = Field(
         description="Integer to test for membership. " + _GENERAL_ELEMENT_ENVELOPE
     )
+
 
 class SemigroupMembershipResult(StrictModel):
     """Whether the value is in the semigroup."""

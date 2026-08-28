@@ -79,8 +79,8 @@ def test_fixed_length_paths_admits_transportable_count_boundary() -> None:
 def test_fixed_length_paths_rejects_untransportable_count_before_kernel() -> None:
     """The next power would produce raw JSON integers above 2**53 - 1."""
     request = FixedLengthPathsRequest(
-            quiver=FiniteQuiver(vertex_count=1, arrows=((0, 0),) * 8), length=18
-        )
+        quiver=FiniteQuiver(vertex_count=1, arrows=((0, 0),) * 8), length=18
+    )
     with pytest.raises(OperationDomainValidationError) as exc_info:
         compute_fixed_length_paths(request)
 
@@ -92,7 +92,7 @@ def test_fixed_length_paths_rejects_untransportable_count_before_kernel() -> Non
 def test_fixed_length_paths_rejects_parallel_loop_explosion_before_kernel() -> None:
     """The reported 32-loop, length-32 request is rejected at admission."""
     request = FixedLengthPathsRequest(
-            quiver=FiniteQuiver(vertex_count=1, arrows=((0, 0),) * 32), length=32
-        )
+        quiver=FiniteQuiver(vertex_count=1, arrows=((0, 0),) * 32), length=32
+    )
     with pytest.raises(OperationDomainValidationError):
         compute_fixed_length_paths(request)

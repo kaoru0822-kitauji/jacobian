@@ -25,7 +25,10 @@ from jacobian.math.code_theory.operations import (
 
 
 def compute_min_distance(request: LinearCodeRequest) -> MinimumDistanceResult:
-    if EXACT_ENUMERATION_PASSES * request.field_order ** len(request.generator_matrix) > MAX_EXACT_CODEWORD_EVALUATIONS:
+    if (
+        EXACT_ENUMERATION_PASSES * request.field_order ** len(request.generator_matrix)
+        > MAX_EXACT_CODEWORD_EVALUATIONS
+    ):
         raise OperationDomainValidationError(
             location=("generator_matrix",),
             code="code_theory.enumeration_work_exceeded",
@@ -39,7 +42,10 @@ def compute_min_distance(request: LinearCodeRequest) -> MinimumDistanceResult:
 
 
 def compute_weight_dist(request: LinearCodeRequest) -> WeightDistributionResult:
-    if EXACT_ENUMERATION_PASSES * request.field_order ** len(request.generator_matrix) > MAX_EXACT_CODEWORD_EVALUATIONS:
+    if (
+        EXACT_ENUMERATION_PASSES * request.field_order ** len(request.generator_matrix)
+        > MAX_EXACT_CODEWORD_EVALUATIONS
+    ):
         raise OperationDomainValidationError(
             location=("generator_matrix",),
             code="code_theory.enumeration_work_exceeded",
@@ -63,7 +69,10 @@ def compute_covering_radius(request: CoveringRadiusRequest) -> CoveringRadiusRes
             message="syndrome space exceeds the exact state bound",
         )
     move_count_bound = min(width * (request.field_order - 1), max(state_count - 1, 0))
-    if SYNDROME_BFS_PASSES * state_count * move_count_bound > MAX_COVERING_RADIUS_TRANSITIONS:
+    if (
+        SYNDROME_BFS_PASSES * state_count * move_count_bound
+        > MAX_COVERING_RADIUS_TRANSITIONS
+    ):
         raise OperationDomainValidationError(
             location=("generator_matrix",),
             code="code_theory.syndrome_transition_bound_exceeded",

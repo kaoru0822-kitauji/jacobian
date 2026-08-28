@@ -120,6 +120,7 @@ class ReachabilityRequest(StrictModel):
     graph: DirectedOperationGraph
     source: int = Field(ge=0, le=MAX_DIRECTED_OPERATION_VERTICES - 1)
 
+
 class ReachabilityResult(StrictModel):
     source: int = Field(ge=0, le=255)
     reachable: tuple[int, ...]

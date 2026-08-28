@@ -245,9 +245,9 @@ def test_transported_variable_and_axis_permutation_preserves_enclosure() -> None
 def test_box_must_use_the_polynomial_complete_ordered_axis() -> None:
     polynomial = _polynomial(("x", "y"), {(1, 0): 1})
     request = PolynomialBoxEnclosureRequest(
-            polynomial=polynomial,
-            box=_box(("y", "x"), ((0, 1), (0, 1))),
-        )
+        polynomial=polynomial,
+        box=_box(("y", "x"), ((0, 1), (0, 1))),
+    )
     with pytest.raises(OperationDomainValidationError):
         compute_polynomial_box_enclosure(request)
 
@@ -580,11 +580,11 @@ def test_exact_result_digit_growth_boundary() -> None:
     assert compute_polynomial_box_enclosure(at_limit).box == at_limit.box
 
     above_limit = _growth_boundary_request(
-            second_endpoint_numerator_digits=128,
-            second_endpoint_denominator_digits=127,
-            coefficient_numerator="1",
-            coefficient_denominator_digits=64,
-        )
+        second_endpoint_numerator_digits=128,
+        second_endpoint_denominator_digits=127,
+        coefficient_numerator="1",
+        coefficient_denominator_digits=64,
+    )
     with pytest.raises(OperationDomainValidationError):
         compute_polynomial_box_enclosure(above_limit)
 

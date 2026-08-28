@@ -40,7 +40,11 @@ def _require_ratio_result_budget(
         )
 
 
-def _admit(request: RationalPointConstructRequest | StandardChartRequest | ChartTransitionRequest) -> None:
+def _admit(
+    request: RationalPointConstructRequest
+    | StandardChartRequest
+    | ChartTransitionRequest,
+) -> None:
     coordinates = (
         request.coordinates
         if isinstance(request, RationalPointConstructRequest)
@@ -57,7 +61,9 @@ def _admit(request: RationalPointConstructRequest | StandardChartRequest | Chart
             return
         if isinstance(request, StandardChartRequest):
             if request.chart_index >= len(coordinates):
-                raise _validation_error("chart_index_out_range", "chart_index out of range")
+                raise _validation_error(
+                    "chart_index_out_range", "chart_index out of range"
+                )
             if coordinates[request.chart_index].as_fraction() == 0:
                 raise _validation_error(
                     "chart_coordinate_nonzero", "chart coordinate must be nonzero"

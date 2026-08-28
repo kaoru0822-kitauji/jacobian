@@ -447,6 +447,7 @@ class TestSOSResultAdmission:
             SOSDecompositionCheckResult.model_validate(payload)
         assert exc_info.value.errors()[0]["type"] == "sum_of_squares.sos_work_bound"
 
+
 class TestSOSResultRingAdmission:
     def test_result_replay_rejects_mismatched_summand_ring(self) -> None:
         """A serialized result whose summand uses another ring is rejected at
@@ -532,6 +533,7 @@ class TestExactPsdCriterion:
             )
         )
         assert result.is_psd is False
+
 
 class TestSOSCoefficientGrowthAdmission:
     """Admission bounds coefficient growth without expanding the summands."""

@@ -97,9 +97,7 @@ def compute_siphon_trap(request: SiphonTrapRequest) -> SiphonTrapResult:
             ),
         )
     candidates = (1 << request.net.place_count) - 1
-    work = 2 * candidates * (
-        request.net.transition_count + request.net.place_count
-    )
+    work = 2 * candidates * (request.net.transition_count + request.net.place_count)
     if work > MAX_SIPHON_TRAP_WORK:
         raise OperationDomainValidationError(
             location=("net",),

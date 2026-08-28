@@ -31,6 +31,7 @@ class RunRequest(StrictModel):
     dfa: DFA
     word: tuple[int, ...] = Field(max_length=MAX_WORD_LENGTH)
 
+
 class CountRequest(StrictModel):
     """Count accepted words of a given length."""
 

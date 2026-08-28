@@ -137,8 +137,7 @@ def _admit_graph_connection_request(
         )
     if len(request.graph.edges) > MAX_GRAPH_RELIABILITY_EDGES:
         raise ValueError(
-            "graph reliability exceeds the "
-            f"{MAX_GRAPH_RELIABILITY_EDGES}-edge bound"
+            f"graph reliability exceeds the {MAX_GRAPH_RELIABILITY_EDGES}-edge bound"
         )
     if tuple(item.edge for item in request.edge_probabilities) != request.graph.edges:
         raise ValueError(
@@ -167,7 +166,9 @@ def _admit_graph_connection_request(
     )
     probability_numerator_digits = sum(
         max(
-            len(format_canonical_integer(item.open_probability.as_fraction().numerator)),
+            len(
+                format_canonical_integer(item.open_probability.as_fraction().numerator)
+            ),
             len(
                 format_canonical_integer(
                     (1 - item.open_probability.as_fraction()).numerator

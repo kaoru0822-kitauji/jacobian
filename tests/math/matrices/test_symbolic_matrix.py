@@ -479,9 +479,7 @@ def test_symbolic_matrix_product_ignores_unit_denominator_coefficient_digits() -
 def test_symbolic_matrix_product_rejects_coefficient_growth_before_kernel() -> None:
     digits = "9" * 65
     large = _rf((), (int(digits), 1, ()))
-    _assert_product_admission_rejected(
-        _product_request(((large,),), ((large,),), ())
-    )
+    _assert_product_admission_rejected(_product_request(((large,),), ((large,),), ()))
 
 
 def test_symbolic_matrix_product_rejects_exponent_growth_before_kernel() -> None:

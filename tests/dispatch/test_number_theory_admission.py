@@ -136,9 +136,7 @@ def test_modular_polynomial_admission_is_native() -> None:
             ModularPolynomialVariable(name="x", residues=(0, 1)),
             ModularPolynomialVariable(name="x", residues=(0, 1)),
         ),
-        terms=(
-            ModularPolynomialTerm(coefficient="1", exponents=(1, 1)),
-        ),
+        terms=(ModularPolynomialTerm(coefficient="1", exponents=(1, 1)),),
     )
     with pytest.raises(OperationDomainValidationError) as native_error:
         compute_modular_polynomial_residue_image(request)

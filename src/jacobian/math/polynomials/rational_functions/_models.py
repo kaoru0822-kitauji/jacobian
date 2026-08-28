@@ -93,7 +93,6 @@ class HermiteReductionRequest(StrictModel):
     )
 
 
-
 class HermiteReductionResult(HermiteReductionRequest):
     """The canonical rational derivative and reduced logarithmic remainder."""
 

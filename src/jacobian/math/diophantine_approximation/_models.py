@@ -55,11 +55,13 @@ class SquarefreeRequest(StrictModel):
 
     discriminant: StrictInt = Field(ge=2, le=_MAX_DISCRIMINANT)
 
+
 class ContinuedFractionRequest(StrictModel):
     """Request the continued fraction expansion of sqrt(D) up to n terms."""
 
     discriminant: StrictInt = Field(ge=2, le=_MAX_DISCRIMINANT)
     term_count: StrictInt = Field(ge=1, le=_MAX_TERMS)
+
 
 class ContinuedFractionResult(StrictModel):
     """A bounded continued-fraction prefix of ``sqrt(D)``."""
@@ -115,6 +117,7 @@ class ConvergentRequest(StrictModel):
 
     discriminant: StrictInt = Field(ge=2, le=_MAX_DISCRIMINANT)
     convergent_count: StrictInt = Field(ge=1, le=_MAX_TERMS)
+
 
 class ConvergentValue(StrictModel):
     """One convergent p_n/q_n with index n."""
@@ -187,6 +190,7 @@ class PellEquationRequest(StrictModel):
     """Solve x^2 - D*y^2 = 1 for the fundamental solution."""
 
     discriminant: StrictInt = Field(ge=2, le=_MAX_DISCRIMINANT)
+
 
 class PellEquationResult(StrictModel):
     """The fundamental solution (x, y) to x^2 - D*y^2 = 1."""

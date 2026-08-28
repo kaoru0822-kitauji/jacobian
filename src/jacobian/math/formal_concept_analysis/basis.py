@@ -509,6 +509,7 @@ class CanonicalImplicationBasisResult(StrictModel):
 
         return cls.model_validate(payload)
 
+
 __all__ = [
     "MAX_DG_ATTRIBUTES",
     "MAX_DG_CANDIDATE_STATES",

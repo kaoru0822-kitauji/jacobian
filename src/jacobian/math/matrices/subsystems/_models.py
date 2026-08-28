@@ -166,16 +166,16 @@ def _require_traceable_factors(
     traced_factor_labels: tuple[str, ...],
 ) -> None:
     if len(set(traced_factor_labels)) != len(traced_factor_labels):
-        raise _validation_error("status_mismatch", "traced subsystem labels must be unique")
+        raise _validation_error(
+            "status_mismatch", "traced subsystem labels must be unique"
+        )
     labels = tuple(factor.label for factor in matrix.factors)
     if not set(traced_factor_labels) <= set(labels):
         raise _validation_error(
             "invariant_mismatch",
             "each traced subsystem label must occur in matrix.factors",
         )
-    expected_order = tuple(
-        label for label in labels if label in traced_factor_labels
-    )
+    expected_order = tuple(label for label in labels if label in traced_factor_labels)
     if traced_factor_labels != expected_order:
         raise _validation_error(
             "invariant_mismatch",
@@ -317,6 +317,7 @@ class SubsystemKroneckerProductRequest(StrictModel):
             f"{MAX_KRONECKER_RESULT_COMPONENT_DIGITS}-digit product component envelope."
         ),
     )
+
 
 class SubsystemKroneckerProductResult(StrictModel):
     """The factorized exact product of two rational Hermitian matrices."""
@@ -470,6 +471,7 @@ class PsdOrderRequest(StrictModel):
             "Identical operands measure the zero matrix and admit trivially."
         ),
     )
+
 
 class PsdOrderResult(StrictModel):
     """A source-bound exact decision of whether ``right - left`` is PSD."""

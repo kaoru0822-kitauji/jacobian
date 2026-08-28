@@ -130,9 +130,16 @@ def _admit_resultant(request: MultivariateResultantRequest) -> None:
     if request.elimination_variable not in request.left.variables:
         raise _validation_error("elimination variable must belong to the declared ring")
     index = request.left.variables.index(request.elimination_variable)
-    if _degree_in_variable(request.left, index) + _degree_in_variable(request.right, index) > _MAX_ELIMINATION_DEGREE_SUM:
+    if (
+        _degree_in_variable(request.left, index)
+        + _degree_in_variable(request.right, index)
+        > _MAX_ELIMINATION_DEGREE_SUM
+    ):
         raise _validation_error("Sylvester degree exceeds the resultant budget")
-    if _resultant_support_bound(request.left, request.right, index) > _MAX_RESULTANT_TERMS:
+    if (
+        _resultant_support_bound(request.left, request.right, index)
+        > _MAX_RESULTANT_TERMS
+    ):
         raise _validation_error("resultant output exceeds the term budget")
 
 
@@ -146,22 +153,44 @@ def _admit_subresultants(request: MultivariateSubresultantSequenceRequest) -> No
         _degree_in_variable(request.right, index),
     )
     if any(degree == 0 for degree in degrees):
-        raise _validation_error("both polynomials must have positive main-variable degree")
+        raise _validation_error(
+            "both polynomials must have positive main-variable degree"
+        )
     if sum(degrees) > _MAX_ELIMINATION_DEGREE_SUM:
-        raise _validation_error("Sylvester order exceeds the subresultant backend budget")
+        raise _validation_error(
+            "Sylvester order exceeds the subresultant backend budget"
+        )
     envelope = _subresultant_envelope(request.left, request.right, index)
     if envelope.aggregate_terms > _MAX_SUBRESULTANT_SEQUENCE_TERMS:
-        raise _validation_error("formal subresultant sequence support exceeds the aggregate result-term budget")
+        raise _validation_error(
+            "formal subresultant sequence support exceeds the aggregate result-term budget"
+        )
     if envelope.maximum_coefficient_support > _MAX_SUBRESULTANT_COEFFICIENT_SUPPORT:
-        raise _validation_error("subresultant coefficient support exceeds the intermediate polynomial-term budget")
+        raise _validation_error(
+            "subresultant coefficient support exceeds the intermediate polynomial-term budget"
+        )
     if envelope.arithmetic_term_pairs > _MAX_SUBRESULTANT_ARITHMETIC_TERM_PAIRS:
-        raise _validation_error("subresultant pseudo-remainder arithmetic exceeds the term-pair work budget")
+        raise _validation_error(
+            "subresultant pseudo-remainder arithmetic exceeds the term-pair work budget"
+        )
     if envelope.coefficient_bits > _MAX_SUBRESULTANT_COEFFICIENT_BITS:
-        raise _validation_error("subresultant determinant coefficient height exceeds the exact coefficient-bit budget")
-    if envelope.intermediate_coefficient_bits > _MAX_SUBRESULTANT_INTERMEDIATE_COEFFICIENT_BITS:
-        raise _validation_error("Brown pseudo-remainder intermediate coefficient height exceeds the exact coefficient-bit budget")
-    if envelope.serialized_coefficient_bits > _MAX_SUBRESULTANT_SERIALIZED_COEFFICIENT_BITS:
-        raise _validation_error("subresultant sequence exceeds the aggregate exact-output budget")
+        raise _validation_error(
+            "subresultant determinant coefficient height exceeds the exact coefficient-bit budget"
+        )
+    if (
+        envelope.intermediate_coefficient_bits
+        > _MAX_SUBRESULTANT_INTERMEDIATE_COEFFICIENT_BITS
+    ):
+        raise _validation_error(
+            "Brown pseudo-remainder intermediate coefficient height exceeds the exact coefficient-bit budget"
+        )
+    if (
+        envelope.serialized_coefficient_bits
+        > _MAX_SUBRESULTANT_SERIALIZED_COEFFICIENT_BITS
+    ):
+        raise _validation_error(
+            "subresultant sequence exceeds the aggregate exact-output budget"
+        )
 
 
 class MultivariateOutputBudgetError(RuntimeError):

@@ -59,6 +59,7 @@ class IntegerBaseDigitsRequest(StrictModel):
     value: CanonicalInteger
     base: int = Field(ge=2, le=_MAX_BASE)
 
+
 # ---------------------------------------------------------------------------
 # Requests — nth root
 # ---------------------------------------------------------------------------
@@ -73,6 +74,7 @@ class IntegerNthRootRequest(StrictModel):
 
     value: CanonicalInteger
     degree: int = Field(ge=1, le=_MAX_NTH_ROOT_DEGREE)
+
 
 class IntegerSignResult(StrictModel):
     """The sign of one integer as -1, 0, or 1."""

@@ -296,6 +296,7 @@ class HypergraphIndependenceRequest(StrictModel):
         default_factory=HypergraphIndependenceBudget
     )
 
+
 class HypergraphIndependenceResult(StrictModel):
     """Exact optimum or sound incumbent and bounds for one source hypergraph."""
 
@@ -760,6 +761,7 @@ class DualRequest(StrictModel):
 
     hypergraph: FiniteHypergraph
 
+
 class DualResult(StrictModel):
     """The dual of a finite hypergraph.
 
@@ -845,6 +847,7 @@ class CliqueExpansionRequest(StrictModel):
     """
 
     hypergraph: FiniteHypergraph
+
 
 class CliqueExpansionResult(StrictModel):
     """The primal/2-section graph of a finite hypergraph.
@@ -1220,6 +1223,7 @@ class MaximumEdgeMatchingRequest(StrictModel):
             "empty_edge_witness_prefix": True,
         },
     )
+
 
 class MaximumEdgeMatchingResult(StrictModel):
     """An exact maximum-cardinality edge matching of a finite hypergraph.

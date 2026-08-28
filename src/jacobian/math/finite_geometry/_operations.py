@@ -49,9 +49,7 @@ from jacobian.math.finite_geometry.values import (
 from jacobian.math.incidence_structures._models import IncidenceStructure
 
 
-def _domain_error(
-    location: tuple[str | int, ...], code: str, message: str
-) -> NoReturn:
+def _domain_error(location: tuple[str | int, ...], code: str, message: str) -> NoReturn:
     raise OperationDomainValidationError(
         location=location,
         code=f"finite_geometry.{code}",
@@ -66,7 +64,10 @@ def _admit_span(request: SubspaceSpanRequest) -> None:
             "span_source_required",
             "span requires at least one vector or subspace",
         )
-    if len(request.vectors) + sum(len(item.basis) for item in request.subspaces) > MAX_DIM:
+    if (
+        len(request.vectors) + sum(len(item.basis) for item in request.subspaces)
+        > MAX_DIM
+    ):
         _domain_error(
             ("vectors",),
             "span_generator_count_exceeds_bound",
@@ -76,7 +77,9 @@ def _admit_span(request: SubspaceSpanRequest) -> None:
 
 def _admit_grassmannian(request: GrassmannianCountRequest) -> None:
     if not isprime(request.field_order):
-        _domain_error(("field_order",), "field_order_not_prime", "field_order must be prime")
+        _domain_error(
+            ("field_order",), "field_order_not_prime", "field_order must be prime"
+        )
     if request.subspace_dimension > request.ambient_dimension:
         _domain_error(
             ("subspace_dimension",),
@@ -98,10 +101,14 @@ def _admit_projective_enumeration(request: ProjectiveSpaceEnumerateRequest) -> N
     digit_width = len(str(q - 1))
     point_count = (q**n - 1) // (q - 1)
     per_point_bytes = 2 + n * digit_width + (n - 1) + 1
-    predicted = _PROJECTIVE_ENUMERATION_ENVELOPE_BYTES + sum(
-        len(encode_strict_json(unicodedata.normalize("NFC", label)))
-        for label in request.space.axis
-    ) + point_count * per_point_bytes
+    predicted = (
+        _PROJECTIVE_ENUMERATION_ENVELOPE_BYTES
+        + sum(
+            len(encode_strict_json(unicodedata.normalize("NFC", label)))
+            for label in request.space.axis
+        )
+        + point_count * per_point_bytes
+    )
     if predicted > MAX_PROJECTIVE_ENUMERATION_RESULT_BYTES:
         _domain_error(
             ("space",),

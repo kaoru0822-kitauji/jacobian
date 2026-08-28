@@ -32,9 +32,7 @@ def test_frame_requires_full_ambient_span() -> None:
 
 
 def test_coherence_rejects_zero_vector() -> None:
-    request = CoherenceRequest.model_validate(
-        {"vectors": [[0, 0], [1, 0], [0, 1]]}
-    )
+    request = CoherenceRequest.model_validate({"vectors": [[0, 0], [1, 0], [0, 1]]})
     with pytest.raises(OperationDomainValidationError) as error:
         compute_coherence(request)
     assert error.value.errors()[0]["type"] == "frames.zero_vector"

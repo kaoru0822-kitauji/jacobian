@@ -34,6 +34,7 @@ class IntervalExpressionEnclosureRequest(StrictModel):
             _bound_raw_rational(value.get("argument"), "interval-enclosure argument")
         return value
 
+
 class IntervalExpressionEnclosureResult(StrictModel):
     status: Literal[
         "ENCLOSED",

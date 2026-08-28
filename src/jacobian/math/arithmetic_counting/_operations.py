@@ -49,9 +49,7 @@ def compute_congruence_box_count(
     request: CongruenceBoxCountRequest,
 ) -> CongruenceBoxCountResult:
     """Count lattice points in a box satisfying u*x + v*y = c (mod modulus)."""
-    area = (request.x_hi - request.x_lo + 1) * (
-        request.y_hi - request.y_lo + 1
-    )
+    area = (request.x_hi - request.x_lo + 1) * (request.y_hi - request.y_lo + 1)
     if area > _MAX_BOX_AREA:
         raise OperationDomainValidationError(
             location=("x_lo", "x_hi", "y_lo", "y_hi"),

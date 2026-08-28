@@ -69,7 +69,9 @@ def _admit_matrix_polynomial_evaluation(
     )
     degree = _polynomial_degree(request.polynomial)
     scalar_products_per_pass = degree * dimension**3
-    total_scalar_products = MATRIX_POLYNOMIAL_EVALUATION_PASSES * scalar_products_per_pass
+    total_scalar_products = (
+        MATRIX_POLYNOMIAL_EVALUATION_PASSES * scalar_products_per_pass
+    )
     if total_scalar_products > MAX_MATRIX_POLYNOMIAL_SCALAR_PRODUCTS:
         raise _validation_error(
             "budget_exceeded",

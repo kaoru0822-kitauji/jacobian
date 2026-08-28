@@ -169,10 +169,8 @@ class RationalMatrixProductRequest(_MatrixRequest):
     right: RationalMatrix
 
 
-
 class SquareRationalMatrixRequest(_MatrixRequest):
     matrix: RationalMatrix
-
 
 
 class MatrixPermanentRequest(_MatrixRequest):
@@ -182,13 +180,11 @@ class MatrixPermanentRequest(_MatrixRequest):
     _raw_matrix_axis_limit: ClassVar[int] = MAX_PERMANENT_MATRIX_ORDER
 
 
-
 class MatrixDeterminantRequest(_MatrixRequest):
     """One square rational matrix of order at most 64."""
 
     matrix: RationalMatrix
     _raw_matrix_axis_limit: ClassVar[int] = MAX_DETERMINANT_MATRIX_DIMENSION
-
 
 
 class MatrixRankRequest(_MatrixRequest):
@@ -197,10 +193,8 @@ class MatrixRankRequest(_MatrixRequest):
     matrix: RationalMatrix
 
 
-
 class IntegerMatrixRequest(_MatrixRequest):
     matrix: IntegerMatrix
-
 
 
 class NonsingularIntegerMatrixRequest(_MatrixRequest):
@@ -209,10 +203,8 @@ class NonsingularIntegerMatrixRequest(_MatrixRequest):
     matrix: IntegerMatrix
 
 
-
 class SquareIntegerMatrixRequest(_MatrixRequest):
     matrix: IntegerMatrix
-
 
 
 class RationalLinearSolveRequest(_MatrixRequest):
@@ -221,7 +213,6 @@ class RationalLinearSolveRequest(_MatrixRequest):
         min_length=1,
         max_length=MAX_MATRIX_DIMENSION,
     )
-
 
 
 class RrefResult(StrictModel):
@@ -516,7 +507,6 @@ class MatrixKroneckerProductRequest(_MatrixRequest):
     right: RationalMatrix
 
 
-
 class MatrixKroneckerProductResult(StrictModel):
     """The Kronecker product of two bounded matrices over QQ."""
 
@@ -550,7 +540,6 @@ class MatrixPartialTraceRequest(_MatrixRequest):
     matrix: RationalMatrix
     traced_dimension: int = Field(ge=1, le=MAX_MATRIX_DIMENSION)
     kept_dimension: int = Field(ge=1, le=MAX_MATRIX_DIMENSION)
-
 
 
 class MatrixPartialTraceResult(StrictModel):

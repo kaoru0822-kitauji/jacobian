@@ -372,7 +372,9 @@ class TestMappingConeDefiningEquations:
         with pytest.raises(ValueError):
             compute_mapping_cone(
                 MappingConeRequest(
-                    source=source, target=target, map_matrices=tuple(payload["map_matrices"])
+                    source=source,
+                    target=target,
+                    map_matrices=tuple(payload["map_matrices"]),
                 )
             )
 

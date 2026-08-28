@@ -32,9 +32,7 @@ class Recurrence:
     status: Literal["FOUND", "NO_FITTING_RECURRENCE"]
 
 
-def _validate_rationals(
-    values: tuple[CanonicalRational, ...], *, label: str
-) -> None:
+def _validate_rationals(values: tuple[CanonicalRational, ...], *, label: str) -> None:
     for value in values:
         require_bounded_rational(value, max_digits=MAX_RATIONAL_DIGITS, label=label)
 
@@ -86,8 +84,7 @@ def find_recurrence(sequence: tuple[CanonicalRational, ...]) -> Recurrence:
 
     if not 2 <= len(sequence) <= MAX_RATIONAL_SEQUENCE_LENGTH:
         raise ValueError(
-            "sequence must have length between 2 and "
-            f"{MAX_RATIONAL_SEQUENCE_LENGTH}"
+            f"sequence must have length between 2 and {MAX_RATIONAL_SEQUENCE_LENGTH}"
         )
     _validate_rationals(sequence, label="sequence value")
 
@@ -134,13 +131,14 @@ def closed_form(
     _validate_rationals(char_coeffs, label="characteristic coefficient")
     _validate_rationals(initial_values, label="initial value")
     if char_coeffs[0].as_fraction() == 0:
-        raise ValueError("characteristic polynomial must have nonzero leading coefficient")
+        raise ValueError(
+            "characteristic polynomial must have nonzero leading coefficient"
+        )
 
     x = sympy.Symbol("x")
     n = sympy.Symbol("n", integer=True, nonnegative=True)
     char_poly_coeffs = [
-        sympy.Rational(*value.as_integer_ratio())
-        for value in char_coeffs
+        sympy.Rational(*value.as_integer_ratio()) for value in char_coeffs
     ]
     char_poly = sum(
         c * x ** (len(char_poly_coeffs) - 1 - i) for i, c in enumerate(char_poly_coeffs)

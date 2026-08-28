@@ -230,6 +230,7 @@ class StrictSublevelMeasureRequest(StrictModel):
             )
         return prepared
 
+
 class LevelRootReference(StrictModel):
     """One distinct real root of a retained level polynomial.
 
