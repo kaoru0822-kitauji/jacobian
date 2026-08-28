@@ -7,6 +7,7 @@ from typing import Annotated
 from pydantic import Field, StrictInt, StringConstraints
 
 from jacobian._models import StrictModel
+from jacobian.math.number_theory._integer_models import MAX_SAFE_INTEGER
 from jacobian.math.number_theory._models import BoundedInteger
 
 # ``primorial(n)`` carries n(ln n + ln ln n)/ln 10 digits.  The declared
@@ -39,7 +40,7 @@ class PrimorialRequest(StrictModel):
 class PreviousPrimeRequest(StrictModel):
     """One bounded integer n >= 3 for previous-prime queries."""
 
-    n: StrictInt = Field(ge=3, le=10_000)
+    n: StrictInt = Field(ge=3, le=MAX_SAFE_INTEGER)
 
 
 PrimorialInteger = Annotated[

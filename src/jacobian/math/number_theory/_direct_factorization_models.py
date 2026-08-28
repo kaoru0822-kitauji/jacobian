@@ -12,7 +12,7 @@ from typing import Annotated, Literal, Self
 from pydantic import Field, StringConstraints, model_validator
 
 from jacobian._models import StrictModel
-from jacobian.math.number_theory._integer_models import PrimePower
+from jacobian.math.number_theory._integer_models import MAX_SAFE_INTEGER, PrimePower
 from jacobian.math.number_theory._models import (
     BoundedInteger,
     _validation_error,
@@ -21,7 +21,10 @@ from jacobian.math.number_theory._models import (
 # Twenty decimal digits keep the worker's factorization envelope useful for
 # ordinary exact divisor and prime-factor workflows.
 MAX_DIRECT_FACTORIZATION_DIGITS = 20
-MAX_DIRECT_DIVISORS = 4_096
+# The largest divisor count below 10**MAX_DIRECT_FACTORIZATION_DIGITS is
+# attained by 92005279690628304000. This binds enumeration to the actual source
+# envelope instead of rejecting valid 20-digit inputs at an unrelated list cap.
+MAX_DIRECT_DIVISORS = 245_760
 MAX_DIRECT_FACTOR_ENTRIES = 256
 
 FactorizationInteger = Annotated[
@@ -185,7 +188,7 @@ class SquarefreeResult(StrictModel):
     """A squarefreeness decision, or an explicit non-conclusion."""
 
     status: Literal["SQUAREFREE", "NOT_SQUAREFREE", "UNKNOWN"]
-    n: int = Field(ge=0, le=10_000)
+    n: int = Field(ge=0, le=MAX_SAFE_INTEGER)
     detail: str | None = None
 
     @classmethod
@@ -206,7 +209,7 @@ class RadicalResult(StrictModel):
     """The exact radical of one admitted integer, or an explicit non-conclusion."""
 
     status: Literal["COMPLETE", "UNKNOWN"] = "COMPLETE"
-    n: int = Field(ge=0, le=10_000)
+    n: int = Field(ge=0, le=MAX_SAFE_INTEGER)
     value: BoundedInteger | None = None
     detail: str | None = None
 

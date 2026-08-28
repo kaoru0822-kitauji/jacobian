@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Literal, cast
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.number_theory._derived_models import (
     FactorialValuationRequest,
     FactorialValuationResult,
@@ -11,9 +12,7 @@ from jacobian.math.number_theory._derived_models import (
     FloorSquareRootResult,
     LegendreSymbolRequest,
     LegendreSymbolResult,
-    _is_bounded_prime,
 )
-from jacobian.math.number_theory._models import _validation_error
 
 
 def compute_floor_square_root(request: FloorSquareRootRequest) -> FloorSquareRootResult:
@@ -24,12 +23,14 @@ def compute_floor_square_root(request: FloorSquareRootRequest) -> FloorSquareRoo
 
 
 def compute_legendre_symbol(request: LegendreSymbolRequest) -> LegendreSymbolResult:
-    if not _is_bounded_prime(request.prime):
-        raise _validation_error(
-            "legendre_denominator_must_be_prime",
-            "Legendre denominator must be prime",
+    from sympy import isprime, legendre_symbol
+
+    if not isprime(request.prime):
+        raise OperationDomainValidationError(
+            location=("prime",),
+            code="number_theory.legendre_denominator_must_be_prime",
+            message="Legendre denominator must be prime",
         )
-    from sympy import legendre_symbol
 
     return LegendreSymbolResult(
         a=request.a,

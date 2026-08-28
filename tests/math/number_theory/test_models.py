@@ -6,9 +6,13 @@ from tests.math.number_theory._validation import expect_validation
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.number_theory._derived_models import (
     FactorialValuationRequest,
+    FloorSquareRootRequest,
     LegendreSymbolRequest,
 )
-from jacobian.math.number_theory._derived_operations import compute_legendre_symbol
+from jacobian.math.number_theory._derived_operations import (
+    compute_floor_square_root,
+    compute_legendre_symbol,
+)
 from jacobian.math.number_theory._direct_factorization_models import (
     MAX_DIRECT_FACTORIZATION_DIGITS,
     DivisorListResult,
@@ -16,6 +20,8 @@ from jacobian.math.number_theory._direct_factorization_models import (
     PrimeFactorizationResult,
 )
 from jacobian.math.number_theory._integer_models import (
+    MAX_SAFE_INTEGER,
+    ArithmeticFunctionRequest,
     NonnegativeIntegerRequest,
     PositiveIntegerRequest,
 )
@@ -29,7 +35,11 @@ from jacobian.math.number_theory._modular_models import (
     ModularPolynomialResidueImageRequest,
 )
 from jacobian.math.number_theory._modular_operations import solve_chinese_remainder
-from jacobian.math.number_theory._prime_models import PrimalityRequest
+from jacobian.math.number_theory._prime_models import (
+    PreviousPrimeRequest,
+    PrimalityRequest,
+)
+from jacobian.math.number_theory._prime_operations import compute_previous_prime
 
 
 @pytest.mark.parametrize("residue", [-1, 3])
@@ -66,8 +76,24 @@ def test_legendre_request_admits_prime_denominators_without_a_backend(
 @pytest.mark.parametrize("composite", (9, 99, 9_999_999))
 def test_legendre_request_rejects_composite_denominators(composite: int) -> None:
     request = LegendreSymbolRequest(a=2, prime=composite)
-    with pytest.raises(ValueError, match="Legendre denominator must be prime"):
+    with pytest.raises(
+        OperationDomainValidationError, match="Legendre denominator must be prime"
+    ):
         compute_legendre_symbol(request)
+
+
+def test_constant_work_integer_operations_admit_safe_integer_scale() -> None:
+    square_root = compute_floor_square_root(FloorSquareRootRequest(n=MAX_SAFE_INTEGER))
+    previous = compute_previous_prime(PreviousPrimeRequest(n=MAX_SAFE_INTEGER))
+    legendre = compute_legendre_symbol(LegendreSymbolRequest(a=2, prime=1_000_000_007))
+
+    assert square_root.root**2 <= MAX_SAFE_INTEGER < (square_root.root + 1) ** 2
+    assert int(previous.value) < MAX_SAFE_INTEGER
+    assert legendre.symbol == 1
+
+
+def test_killable_arithmetic_function_request_admits_safe_integer_scale() -> None:
+    assert ArithmeticFunctionRequest(n=MAX_SAFE_INTEGER).n == MAX_SAFE_INTEGER
 
 
 def test_chinese_remainder_rejects_combined_modulus_beyond_result_budget() -> None:
@@ -320,3 +346,15 @@ def test_producer_results_serialize_and_reconstruct() -> None:
     assert len(proper.divisors) == len(full.divisors) - 1
     pairs = list(zip(full.divisors, reversed(full.divisors), strict=True))
     assert all(int(a) * int(b) == 72 for a, b in pairs)
+
+
+def test_divisor_enumeration_uses_the_twenty_digit_source_envelope() -> None:
+    from jacobian.math.number_theory._factorization_kernels import enumerate_divisors
+
+    # This is the least integer with more than the former 4096-divisor ceiling.
+    result = enumerate_divisors(FactorizationRequest(value="146659312800"))
+
+    assert result.status == "COMPLETE"
+    assert len(result.divisors) == 4320
+    assert result.divisors[0] == "1"
+    assert result.divisors[-1] == result.value

@@ -354,7 +354,8 @@ def _divisors_from_factors(
     factors: tuple[PrimePower, ...], *, proper: bool
 ) -> tuple[str, ...]:
     divisor_count = math.prod(factor.power + 1 for factor in factors)
-    if divisor_count > MAX_DIRECT_DIVISORS:
+    output_count = divisor_count - int(proper)
+    if output_count > MAX_DIRECT_DIVISORS:
         raise ValueError("divisor output exceeds admitted bound")
     divisors = [1]
     for factor in factors:

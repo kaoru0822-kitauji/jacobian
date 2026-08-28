@@ -10,6 +10,8 @@ import pytest
 from jacobian.catalog.catalog import Catalog
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.dispatch import invoke_operation
+from jacobian.math.number_theory._derived_models import LegendreSymbolRequest
+from jacobian.math.number_theory._derived_operations import compute_legendre_symbol
 from jacobian.math.number_theory._direct_factorization_models import (
     FactorizationRequest,
 )
@@ -70,6 +72,12 @@ from jacobian.math.number_theory.modular_polynomials import ModularPolynomialTer
             {"modulus": "-1", "frequency": "0"},
             RamanujanSumRequest(modulus="-1", frequency="0"),
             compute_ramanujan_sum,
+        ),
+        (
+            "number_theory.compute.legendre_symbol",
+            {"a": 2, "prime": 9},
+            LegendreSymbolRequest(a=2, prime=9),
+            compute_legendre_symbol,
         ),
     ),
 )

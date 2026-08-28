@@ -14,6 +14,7 @@ from jacobian.math.number_theory._models import BoundedInteger
 
 # These operations may invoke a bounded in-process factorization backend.
 MAX_SMALL_INTEGER = 10_000
+MAX_SAFE_INTEGER = (1 << 53) - 1
 
 
 class IntegerValueRequest(StrictModel):
@@ -23,9 +24,9 @@ class IntegerValueRequest(StrictModel):
 
 
 class ArithmeticFunctionRequest(StrictModel):
-    """A small nonnegative integer for an exact arithmetic function."""
+    """A safely encoded nonnegative integer for a killable exact operation."""
 
-    n: StrictInt = Field(ge=0, le=MAX_SMALL_INTEGER)
+    n: StrictInt = Field(ge=0, le=MAX_SAFE_INTEGER)
 
 
 class NonnegativeIntegerRequest(StrictModel):
@@ -54,6 +55,7 @@ class PrimePower(StrictModel):
 
 
 __all__ = [
+    "MAX_SAFE_INTEGER",
     "MAX_SMALL_INTEGER",
     "ArithmeticFunctionRequest",
     "BooleanResult",

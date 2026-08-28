@@ -2,20 +2,22 @@
 
 from __future__ import annotations
 
+from math import isqrt
 from typing import Literal
 
 from pydantic import Field, StrictInt
 
 from jacobian._models import StrictModel
+from jacobian.math.number_theory._integer_models import MAX_SAFE_INTEGER
 
 MAX_FACTORIAL_ARGUMENT = 100_000
 MAX_FACTORIAL_BASE = 1_000_000
-MAX_FLOOR_SQUARE_ROOT = 1_000_000
-MAX_LEGENDRE_PRIME = 10_000_000
+MAX_FLOOR_SQUARE_ROOT = isqrt(MAX_SAFE_INTEGER)
+MAX_LEGENDRE_PRIME = MAX_SAFE_INTEGER
 
 
 class FloorSquareRootRequest(StrictModel):
-    n: StrictInt = Field(ge=0, le=MAX_FLOOR_SQUARE_ROOT**2)
+    n: StrictInt = Field(ge=0, le=MAX_SAFE_INTEGER)
 
 
 class FloorSquareRootResult(StrictModel):
@@ -24,27 +26,10 @@ class FloorSquareRootResult(StrictModel):
     root: StrictInt = Field(ge=0, le=MAX_FLOOR_SQUARE_ROOT)
 
 
-def _is_bounded_prime(value: int) -> bool:
-    """Decide primality within the Legendre-denominator admission envelope."""
-
-    if value < 2:
-        return False
-    if value in (2, 3):
-        return True
-    if value % 2 == 0 or value % 3 == 0:
-        return False
-    candidate = 5
-    while candidate * candidate <= value:
-        if value % candidate == 0 or value % (candidate + 2) == 0:
-            return False
-        candidate += 6
-    return True
-
-
 class LegendreSymbolRequest(StrictModel):
     """Arguments for the Legendre symbol with a bounded odd prime denominator."""
 
-    a: StrictInt = Field(ge=-(2**53 - 1), le=2**53 - 1)
+    a: StrictInt = Field(ge=-MAX_SAFE_INTEGER, le=MAX_SAFE_INTEGER)
     prime: StrictInt = Field(ge=3, le=MAX_LEGENDRE_PRIME)
 
 
