@@ -535,6 +535,11 @@ class RankResult(StrictModel):
                 "finite_field.rank_linear_map_dimensions",
                 "rank is outside the linear-map dimensions",
             )
+        if self.rank != rank(self.linear_map.matrix):
+            raise _validation_error(
+                "finite_field.rank_match_bound_linear_map",
+                "rank must match the exact bound linear map",
+            )
         if self.direction.presentation != self.subspace.presentation:
             raise _validation_error(
                 "finite_field.rank_direction_subspace_presentation",
@@ -544,6 +549,13 @@ class RankResult(StrictModel):
             raise _validation_error(
                 "finite_field.rank_direction_subspace_row_axis",
                 "rank direction must use the subspace row axis",
+            )
+        from jacobian.math.finite_fields import _sympy
+
+        if self.linear_map != _sympy.restrict_scalars(self.subspace, self.direction):
+            raise _validation_error(
+                "finite_field.rank_map_derived_subspace_direction",
+                "rank map must be derived from its subspace and direction",
             )
         return self
 
@@ -612,7 +624,8 @@ class DirectionRankLedger(StrictModel):
                 "direction-rank ledger cannot repeat a direction",
             )
         if any(
-            entry.direction.presentation != first.direction.presentation
+            entry.subspace != self.subspace
+            or entry.direction.presentation != first.direction.presentation
             or entry.direction.axis != first.direction.axis
             or entry.linear_map.source_axis != first.linear_map.source_axis
             or entry.linear_map.target_axis != first.linear_map.target_axis
@@ -644,17 +657,16 @@ class DirectionRankLedger(StrictModel):
                 "finite_field.direction_rank_ledger_exceeds_derivation_work_budget",
                 "direction-rank ledger exceeds its derivation work budget",
             )
-        from jacobian.math.finite_fields import _sympy
-
-        for entry in self.entries:
-            if entry.linear_map != _sympy.restrict_scalars(
-                self.subspace, entry.direction
-            ):
-                raise _validation_error(
-                    "finite_field.direction_rank_ledger_map_matches_bound_subspace",
-                    "direction-rank ledger map does not match the bound subspace",
-                )
         return self
+
+    @classmethod
+    def _from_kernel(
+        cls,
+        *,
+        subspace: FiniteDimensionalSubspace,
+        entries: tuple[RankResult, ...],
+    ) -> Self:
+        return cls.model_construct(subspace=subspace, entries=entries)
 
     @property
     def digest(self) -> str:
@@ -821,6 +833,27 @@ class FiniteMapTable(StrictModel):
             raise _validation_error(
                 "finite_field.finite_map_table_outputs_codomain",
                 "finite map table outputs must use the exact codomain",
+            )
+        work = (
+            len(self.entries)
+            * len(self.map.polynomial.coefficients)
+            * self.map.domain.degree
+        )
+        if work > _MAX_DERIVATION_WORK:
+            raise _validation_error(
+                "finite_field.finite_map_table_exceeds_derivation_work_budget",
+                "finite map table exceeds its derivation work budget",
+            )
+        from jacobian.math.finite_fields import _sympy
+
+        expected = _sympy.evaluate_polynomial_values(self.map.polynomial, inputs)
+        if any(
+            target.coordinates != coordinates
+            for (_, target), coordinates in zip(self.entries, expected, strict=True)
+        ):
+            raise _validation_error(
+                "finite_field.finite_map_table_targets_match_bound_polynomial",
+                "finite map table targets must match the bound polynomial",
             )
         return self
 

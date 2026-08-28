@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 from flint import nmod_mat
+from pydantic import ValidationError
 
 from jacobian.math import finite_fields
 from jacobian.math.finite_fields import (
@@ -10,6 +11,7 @@ from jacobian.math.finite_fields import (
     FiniteDimensionalSubspace,
     FiniteFieldElement,
     ProjectiveLine,
+    RankResult,
     direction_rank_ledger,
     element,
     finite_field,
@@ -165,6 +167,16 @@ def test_restriction_and_rank_operations_preserve_their_defining_invariant() -> 
 
     assert result.linear_map == restricted
     assert result.rank == rank(restricted.matrix)
+
+
+def test_serialized_rank_result_rejects_a_forged_rank() -> None:
+    subspace, directions = _slice_a_values()
+    result = linear_map_rank(subspace, directions.points[0])
+    payload = result.model_dump(mode="json")
+    payload["rank"] = 0
+
+    with pytest.raises(ValidationError, match="rank must match the exact bound"):
+        RankResult.model_validate(payload)
 
 
 def test_slice_a_keeps_directions_bound_through_orbit_aggregation() -> None:

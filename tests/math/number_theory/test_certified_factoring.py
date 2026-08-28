@@ -10,7 +10,9 @@ from tests.math.number_theory._validation import expect_validation
 
 from jacobian.canonical import parse_canonical_integer
 from jacobian.math.number_theory._certification_models import (
+    CertifiedFactor,
     CertifiedFactorizationRequest,
+    CertifiedFactorizationResult,
     PrattCertificateNode,
     PrimalityCertificateRequest,
     PrimalityCertificateResult,
@@ -104,6 +106,21 @@ def test_result_binds_product_and_ordering() -> None:
     primes = [int(f.prime) for f in result.factors]
     assert primes == sorted(primes)
     assert primes == [2, 3, 5]
+
+
+@pytest.mark.parametrize("value", ["6", "-2", "1"])
+def test_complete_worker_result_must_reconstruct_its_bound_value(value: str) -> None:
+    certificate = PrattCertificateNode(prime="2")
+    with pytest.raises(ValidationError, match="must reconstruct its value exactly"):
+        CertifiedFactorizationResult.model_validate(
+            {
+                "status": "COMPLETE",
+                "value": value,
+                "factors": [
+                    CertifiedFactor(prime="2", exponent=1, certificate=certificate)
+                ],
+            }
+        )
 
 
 # ---------------------------------------------------------------------------

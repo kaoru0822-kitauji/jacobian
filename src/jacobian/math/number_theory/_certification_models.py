@@ -173,6 +173,14 @@ class CertifiedFactorizationResult(StrictModel):
                 "factor_certificate_prime_must_equal_the_factor_prime",
                 "factor certificate prime must equal the factor prime",
             )
+        reconstructed = 1
+        for item in self.factors:
+            reconstructed *= parse_canonical_integer(item.prime) ** item.exponent
+        if reconstructed != parse_canonical_integer(self.value):
+            raise _validation_error(
+                "complete_factorization_must_reconstruct_value",
+                "a complete factorization must reconstruct its value exactly",
+            )
         return self
 
     @classmethod

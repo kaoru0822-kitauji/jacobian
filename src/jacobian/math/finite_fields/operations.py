@@ -240,7 +240,7 @@ def direction_rank_ledger(
             code="finite_field.direction_rank_ledger_exceeds_operation_work_budget",
             message="direction-rank ledger exceeds the operation work budget",
         )
-    return DirectionRankLedger(
+    return DirectionRankLedger._from_kernel(
         subspace=subspace,
         entries=tuple(
             linear_map_rank(subspace, direction) for direction in directions.points

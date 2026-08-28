@@ -90,16 +90,14 @@ def test_slice_b_values_reject_wrong_parent_and_incomplete_table() -> None:
         FiniteMapTable(map=polynomial_map, entries=tuple(reversed(table.entries)))
 
 
-def test_table_consumers_parse_structural_targets_without_replay() -> None:
+def test_table_rejects_targets_not_defined_by_its_polynomial() -> None:
     identity_table = finite_map_table(_map(1))
     zero = identity_table.entries[0][1]
-    parsed = FiniteMapTable(
-        map=identity_table.map,
-        entries=tuple((source, zero) for source, _ in identity_table.entries),
-    )
-    assert parsed.entries == tuple(
-        (source, zero) for source, _ in identity_table.entries
-    )
+    with pytest.raises(ValueError, match="targets must match the bound polynomial"):
+        FiniteMapTable(
+            map=identity_table.map,
+            entries=tuple((source, zero) for source, _ in identity_table.entries),
+        )
 
 
 def test_fibers_and_collisions_preserve_the_table_defining_invariants() -> None:
