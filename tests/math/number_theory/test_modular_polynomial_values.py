@@ -85,6 +85,20 @@ def test_identity_native_api_exposes_values_and_semantic_scalars() -> None:
     )
 
 
+def test_identity_result_rejects_a_forged_residual() -> None:
+    identity = modular_polynomial_identity(
+        5,
+        ("x",),
+        (ModularPolynomialTerm(coefficient="1", exponents=(1,)),),
+    )
+    payload = identity.model_dump(mode="json")
+    payload["residual"] = []
+    payload["identical"] = True
+
+    with pytest.raises(ValidationError, match="residual must equal"):
+        type(identity).model_validate(payload)
+
+
 def test_residue_image_keeps_its_narrower_exponent_admission() -> None:
     with pytest.raises(OperationDomainValidationError, match="exponents"):
         compute_modular_polynomial_residue_image(_request(exponent=33))

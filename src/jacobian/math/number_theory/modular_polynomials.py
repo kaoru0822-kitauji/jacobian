@@ -88,6 +88,12 @@ class ModularPolynomialIdentityValue(StrictModel):
                 for term in terms
             ):
                 raise ValueError("normalized term is outside result scope")
+        if self.residual != _subtract_normalized(
+            self.normalized_left, self.normalized_right, self.modulus
+        ):
+            raise ValueError(
+                "residual must equal normalized_left - normalized_right modulo modulus"
+            )
         return self
 
     @classmethod

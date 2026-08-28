@@ -20,6 +20,7 @@ from jacobian.math.combinatorics._difference_set_models import (
 from jacobian.math.combinatorics._difference_sets import (
     decide_cyclic_difference_set_extension,
     decide_cyclic_perfect_difference_set,
+    decide_integer_sidon,
 )
 
 
@@ -36,12 +37,27 @@ def test_sidon_request_rejects_duplicate_integer_elements() -> None:
 
 
 def test_sidon_result_keeps_structural_normalization() -> None:
-    result = IntegerSidonResult(
-        normalized_elements=("1", "2", "4"),
-        ordered_differences=(),
-        is_sidon=True,
-    )
+    produced = decide_integer_sidon(IntegerSidonRequest(elements=("4", "1", "2")))
+    result = IntegerSidonResult.model_validate(produced.model_dump(mode="json"))
     assert result.normalized_elements == ("1", "2", "4")
+
+
+def test_sidon_result_rejects_a_forged_difference_profile() -> None:
+    result = decide_integer_sidon(IntegerSidonRequest(elements=("0", "1", "3")))
+    payload = result.model_dump(mode="json")
+    payload["ordered_differences"][0]["difference"] = "0"
+
+    with raises_code("combinatorics.sidon_invariant"):
+        IntegerSidonResult.model_validate(payload)
+
+
+def test_sidon_result_rejects_a_forged_decision() -> None:
+    result = decide_integer_sidon(IntegerSidonRequest(elements=("0", "1", "3")))
+    payload = result.model_dump(mode="json")
+    payload["is_sidon"] = not result.is_sidon
+
+    with raises_code("combinatorics.sidon_invariant"):
+        IntegerSidonResult.model_validate(payload)
 
 
 def test_extension_request_rejects_an_unbounded_candidate_space() -> None:

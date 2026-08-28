@@ -64,3 +64,15 @@ def test_result_rejects_nonpositive_tail_term() -> None:
         exc_info.value.errors()[0]["type"]
         == "arithmetic.continued_fraction_nonpositive_term"
     )
+
+
+def test_result_rejects_terms_for_a_different_rational() -> None:
+    with pytest.raises(ValidationError) as exc_info:
+        RationalContinuedFractionResult(
+            value=CanonicalRational(num="7", den="3"),
+            terms=("2", "2"),
+        )
+    assert (
+        exc_info.value.errors()[0]["type"]
+        == "arithmetic.continued_fraction_reconstruction"
+    )

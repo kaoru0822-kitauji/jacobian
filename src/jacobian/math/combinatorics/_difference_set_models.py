@@ -91,6 +91,27 @@ class IntegerSidonResult(StrictModel):
                 "combinatorics.sidon_invariant",
                 "normalized Sidon elements must be sorted and unique",
             )
+        expected = tuple(
+            (left, right, left - right)
+            for left in values
+            for right in values
+            if left != right
+        )
+        actual = tuple(
+            (int(item.minuend), int(item.subtrahend), int(item.difference))
+            for item in self.ordered_differences
+        )
+        if actual != expected:
+            raise _difference_set_validation_error(
+                "combinatorics.sidon_invariant",
+                "ordered differences must be the complete canonical profile",
+            )
+        differences = tuple(difference for _, _, difference in expected)
+        if self.is_sidon != (len(set(differences)) == len(differences)):
+            raise _difference_set_validation_error(
+                "combinatorics.sidon_invariant",
+                "Sidon decision must agree with the ordered-difference profile",
+            )
         return self
 
     @classmethod
