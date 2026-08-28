@@ -42,7 +42,8 @@ def _require_polynomial_budget(polynomial: IntegerPolynomial, field: str) -> Non
         _domain_error(
             (field, "coefficients"),
             "polynomial_budget",
-            "p-adic polynomial exceeds the 64-coefficient operation budget",
+            "p-adic polynomial exceeds the "
+            f"{_MAX_PADIC_COEFFICIENTS}-coefficient operation budget",
         )
 
 
