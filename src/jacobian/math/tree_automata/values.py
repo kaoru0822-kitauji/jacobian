@@ -289,14 +289,6 @@ class _WitnessChoice:
     transition: TreeAutomatonTransition
 
 
-def reachability_admission_profile(
-    automaton: BottomUpTreeAutomaton,
-) -> ReachableStateProfile:
-    """Materialize the request-admission profile used to bound witnesses."""
-
-    return _build_reachable_state_profile(automaton)
-
-
 def _build_reachable_state_profile(
     automaton: BottomUpTreeAutomaton,
 ) -> ReachableStateProfile:
@@ -390,12 +382,6 @@ def reachability_execution_work_bound(automaton: BottomUpTreeAutomaton) -> int:
 
     sort_work, per_scan_work, scan_rounds = reachability_price_components(automaton)
     return sort_work + scan_rounds * per_scan_work + 3 * MAX_REACHABILITY_WITNESS_NODES
-
-
-def reachability_public_path_work_bound(automaton: BottomUpTreeAutomaton) -> int:
-    """Price the single owner-local saturation pass on the public path."""
-
-    return reachability_execution_work_bound(automaton)
 
 
 def _transition_key(

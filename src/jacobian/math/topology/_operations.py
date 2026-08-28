@@ -71,15 +71,6 @@ from jacobian.math.topology._request_admission import require_complex_admission
 from jacobian.math.topology._shelling import evaluate_shelling
 
 
-def _canonical_complex(
-    vertices: tuple[str, ...],
-    facets: tuple[tuple[str, ...], ...],
-) -> FiniteSimplicialComplex:
-    """Backward-compatible private spelling for the neutral value factory."""
-
-    return canonical_complex(vertices, facets)
-
-
 def _admit_chain_request(request: ChainComplexRequest) -> None:
     require_complex_admission(
         SimplicialComplexRequest(
@@ -156,7 +147,7 @@ def _canonicalize(
 ) -> SimplicialComplexCanonicalizationResult:
     require_complex_admission(request)
     return SimplicialComplexCanonicalizationResult(
-        complex=_canonical_complex(request.vertices, request.facets)
+        complex=canonical_complex(request.vertices, request.facets)
     )
 
 

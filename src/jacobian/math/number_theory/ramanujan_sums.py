@@ -6,7 +6,7 @@ from typing import SupportsIndex
 
 from jacobian.canonical import parse_canonical_integer
 from jacobian.math.arithmetic.values import IntegerValue
-from jacobian.math.number_theory._models import _MAX_INTEGER_LENGTH
+from jacobian.math.number_theory._models import MAX_INTEGER_DIGITS
 
 __all__ = ["ramanujan_sum"]
 
@@ -47,10 +47,10 @@ def ramanujan_sum(
     # Character-length parity with the wire contract: positive frequencies
     # carry at most 256 digits and negative frequencies at most 255 plus one
     # sign character, checked via magnitudes without materializing digits.
-    if n >= 10**_MAX_INTEGER_LENGTH or n <= -(10 ** (_MAX_INTEGER_LENGTH - 1)):
+    if n >= 10**MAX_INTEGER_DIGITS or n <= -(10 ** (MAX_INTEGER_DIGITS - 1)):
         raise ValueError(
             "a Ramanujan-sum frequency must carry at most "
-            f"{_MAX_INTEGER_LENGTH} characters"
+            f"{MAX_INTEGER_DIGITS} characters"
         )
     if q == 0:
         return 0

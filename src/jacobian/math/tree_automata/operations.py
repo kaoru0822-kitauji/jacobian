@@ -14,9 +14,6 @@ from jacobian.math.tree_automata.values import (
     TreeAutomatonTransition,
     _build_reachable_state_profile,
     accepted_tree_count_work_bound,
-    reachability_execution_work_bound,
-    reachability_price_components,
-    reachability_public_path_work_bound,
     validate_ranked_tree,
 )
 
@@ -35,26 +32,6 @@ def reachable_state_profile(
     """Return each reachable state and its canonical minimum-node witness tree."""
 
     return _build_reachable_state_profile(automaton)
-
-
-def _reachability_price_components(
-    automaton: BottomUpTreeAutomaton,
-) -> tuple[int, int, int]:
-    """Return the value-owner's exact prices for one saturation pass."""
-
-    return reachability_price_components(automaton)
-
-
-def _reachability_execution_work_bound(automaton: BottomUpTreeAutomaton) -> int:
-    """Return the value-owner's native reachability work envelope."""
-
-    return reachability_execution_work_bound(automaton)
-
-
-def _reachability_public_path_work_bound(automaton: BottomUpTreeAutomaton) -> int:
-    """Return the actual request-to-result reachability work envelope."""
-
-    return reachability_public_path_work_bound(automaton)
 
 
 def run_tree_automaton(

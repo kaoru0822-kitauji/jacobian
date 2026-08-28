@@ -13,9 +13,6 @@ from pydantic import StringConstraints
 from pydantic_core import PydanticCustomError
 
 MAX_INTEGER_DIGITS = 256
-# Private compatibility spelling for the neutral grammar width.  Family
-# contracts must not add their own bounds here.
-_MAX_INTEGER_LENGTH = MAX_INTEGER_DIGITS
 
 BoundedInteger = Annotated[
     str,

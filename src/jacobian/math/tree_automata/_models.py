@@ -129,14 +129,10 @@ class TreeAutomatonReachabilityRequest(StrictModel):
     - ``MAX_TREE_AUTOMATON_REACHABILITY_WORK`` ({MAX_TREE_AUTOMATON_REACHABILITY_WORK:,} units) prices one
       profile's transition sorting, saturation scans measured to their exact
       convergence depth by a shared-code-path pass, and witness
-      materialization and recount, charged across the three priced passes the
-      public path performs: work admission's own convergence-measuring pass
-      plus one pass consumed by each of the two profile invocations
-      (request admission and execution).  Each
-      pass performs exactly one sort and one saturation, and each profile
-      reuses its own pass's result, so no unpriced sort or probe executes.
-      The pass always terminates within ``state_count + 1`` rounds for any
-      schema-valid automaton.
+      materialization and recount. The owner-local operation performs exactly
+      one sort and one saturation, reusing that pass for admission and result
+      construction. The pass always terminates within ``state_count + 1``
+      rounds for any schema-valid automaton.
     - ``MAX_REACHABILITY_WITNESS_NODES`` ({MAX_REACHABILITY_WITNESS_NODES} nodes) bounds the total node
       count summed over the minimum witnesses of all reachable states: it is
       an aggregate output limit across states, not a per-witness limit.

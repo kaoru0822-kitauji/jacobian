@@ -9,7 +9,7 @@ from typing import Literal, cast
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.arithmetic.values import IntegerValue
 from jacobian.math.modular_polynomials import NormalizedModularPolynomialTerm
-from jacobian.math.number_theory._models import _MAX_INTEGER_LENGTH
+from jacobian.math.number_theory._models import MAX_INTEGER_DIGITS
 from jacobian.math.number_theory._modular_basic_models import (
     MAX_CRT_COMBINED_MODULUS,
     MAX_MODULUS,
@@ -126,7 +126,7 @@ def _admit_residue_image(request: ModularPolynomialResidueImageRequest) -> None:
             "every term exponent vector must match the variable count",
         )
     if any(
-        len(term.coefficient) > _MAX_INTEGER_LENGTH
+        len(term.coefficient) > MAX_INTEGER_DIGITS
         or any(
             exponent < 0 or exponent > _MAX_RESIDUE_EXPONENT
             for exponent in term.exponents

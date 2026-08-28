@@ -24,7 +24,7 @@ from jacobian.math.modular_polynomials import (
     NormalizedModularPolynomialTerm as _NormalizedModularPolynomialTerm,
 )
 from jacobian.math.number_theory._models import (
-    _MAX_INTEGER_LENGTH,
+    MAX_INTEGER_DIGITS,
     _validation_error,
 )
 
@@ -83,7 +83,7 @@ def _residue_image_term_schema() -> JsonSchemaValue:
 
     schema = _ModularPolynomialTerm.model_json_schema()
     coefficient = schema["properties"]["coefficient"]
-    coefficient["maxLength"] = _MAX_INTEGER_LENGTH
+    coefficient["maxLength"] = MAX_INTEGER_DIGITS
     coefficient["pattern"] = _TERM_INTEGER.pattern
     exponents = schema["properties"]["exponents"]
     exponents["maxItems"] = _MAX_RESIDUE_VARIABLES

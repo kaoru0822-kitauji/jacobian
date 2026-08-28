@@ -12,10 +12,10 @@ from jacobian.math.topology._models import (
     ShellingCheckRequest,
     ShellingCheckResult,
     SimplicialComplexRequest,
+    canonical_complex,
 )
 from jacobian.math.topology._operations import (
     _CANONICAL_CIRCLE,
-    _canonical_complex,
     compute_barycentric_subdivision,
     compute_pseudomanifold_decision,
     compute_shelling_check,
@@ -101,7 +101,7 @@ class TestStar:
             simplex=("a",),
             star_facets=(("a", "b"),),
             star_is_empty=False,
-            star_complex=_canonical_complex(("a", "b"), (("a", "b"),)),
+            star_complex=canonical_complex(("a", "b"), (("a", "b"),)),
         )
         assert StarResult.model_validate(result.model_dump()) == result
 
@@ -855,7 +855,7 @@ class TestResultDomainMirrorsRequest:
                 simplex=(),
                 star_facets=(("a", "b"),),
                 star_is_empty=False,
-                star_complex=_canonical_complex(("a", "b"), (("a", "b"),)),
+                star_complex=canonical_complex(("a", "b"), (("a", "b"),)),
             )
 
     def test_deletion_result_empty_deleted_vertices_rejected(self) -> None:
@@ -867,7 +867,7 @@ class TestResultDomainMirrorsRequest:
                 deleted_vertices=(),
                 remaining_vertices=("a", "b", "c"),
                 remaining_facets=(("a", "b"), ("b", "c"), ("a", "c")),
-                remaining_complex=_canonical_complex(
+                remaining_complex=canonical_complex(
                     ("a", "b", "c"), (("a", "b"), ("b", "c"), ("a", "c"))
                 ),
             )

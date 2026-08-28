@@ -12,7 +12,7 @@ from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.arithmetic import absolute_value
 from jacobian.math.arithmetic.values import IntegerValue
 from jacobian.math.number_theory import ramanujan_sum
-from jacobian.math.number_theory._models import _MAX_INTEGER_LENGTH
+from jacobian.math.number_theory._models import MAX_INTEGER_DIGITS
 from jacobian.math.number_theory._ramanujan_sum import (
     RAMANUJAN_SUM_OPERATION,
     RamanujanSumRequest,
@@ -155,7 +155,7 @@ def test_equal_frequencies_share_one_serialized_identity() -> None:
         "0",
         "7",
         "-7",
-        "9" * _MAX_INTEGER_LENGTH,
+        "9" * MAX_INTEGER_DIGITS,
         "-0",
         "+0",
         "00",
@@ -261,7 +261,7 @@ def test_result_accepts_canonical_nonzero_values(
 def test_ramanujan_sum_request_bounds_factorization_and_frequency_work() -> None:
     boundary = RamanujanSumRequest(
         modulus="9" * _MAX_MODULUS_DIGITS,
-        frequency="9" * _MAX_INTEGER_LENGTH,
+        frequency="9" * MAX_INTEGER_DIGITS,
     )
     result = RAMANUJAN_SUM_OPERATION.run(boundary)
     assert int(result.value) == ramanujan_sum(
@@ -271,7 +271,7 @@ def test_ramanujan_sum_request_bounds_factorization_and_frequency_work() -> None
     with expect_validation("number_theory."):
         RamanujanSumRequest(modulus=str(10**_MAX_MODULUS_DIGITS), frequency="0")
     with expect_validation("number_theory."):
-        RamanujanSumRequest(modulus="1", frequency="9" * (_MAX_INTEGER_LENGTH + 1))
+        RamanujanSumRequest(modulus="1", frequency="9" * (MAX_INTEGER_DIGITS + 1))
     with pytest.raises(OperationDomainValidationError, match="nonnegative"):
         RAMANUJAN_SUM_OPERATION.run(RamanujanSumRequest(modulus="-1", frequency="0"))
 
@@ -291,16 +291,16 @@ def test_native_ramanujan_sum_bounds_frequency_magnitude() -> None:
     # Reported failure mode: the native entry point must enforce the same
     # 256-character frequency envelope as the wire request before any
     # factorization or modular reduction.
-    with pytest.raises(ValueError, match=rf"at most {_MAX_INTEGER_LENGTH}"):
-        ramanujan_sum(4, 10**_MAX_INTEGER_LENGTH)
-    with pytest.raises(ValueError, match=rf"at most {_MAX_INTEGER_LENGTH}"):
-        ramanujan_sum(4, -(10 ** (_MAX_INTEGER_LENGTH - 1)))
-    with pytest.raises(ValueError, match=rf"at most {_MAX_INTEGER_LENGTH}"):
-        ramanujan_sum(0, 10**_MAX_INTEGER_LENGTH)
+    with pytest.raises(ValueError, match=rf"at most {MAX_INTEGER_DIGITS}"):
+        ramanujan_sum(4, 10**MAX_INTEGER_DIGITS)
+    with pytest.raises(ValueError, match=rf"at most {MAX_INTEGER_DIGITS}"):
+        ramanujan_sum(4, -(10 ** (MAX_INTEGER_DIGITS - 1)))
+    with pytest.raises(ValueError, match=rf"at most {MAX_INTEGER_DIGITS}"):
+        ramanujan_sum(0, 10**MAX_INTEGER_DIGITS)
 
-    assert ramanujan_sum(4, 10**_MAX_INTEGER_LENGTH - 2) == -2
-    assert ramanujan_sum(4, -(10 ** (_MAX_INTEGER_LENGTH - 1) - 2)) == -2
-    assert ramanujan_sum(4, 10**_MAX_INTEGER_LENGTH - 1) == 0
+    assert ramanujan_sum(4, 10**MAX_INTEGER_DIGITS - 2) == -2
+    assert ramanujan_sum(4, -(10 ** (MAX_INTEGER_DIGITS - 1) - 2)) == -2
+    assert ramanujan_sum(4, 10**MAX_INTEGER_DIGITS - 1) == 0
 
 
 def test_native_ramanujan_sum_accepts_the_shared_canonical_integer_value() -> None:
@@ -315,14 +315,14 @@ def test_native_ramanujan_sum_accepts_the_shared_canonical_integer_value() -> No
 
 
 def test_native_frequency_bound_covers_canonical_integer_values() -> None:
-    with pytest.raises(ValueError, match=rf"at most {_MAX_INTEGER_LENGTH}"):
-        ramanujan_sum(4, IntegerValue(value="9" * (_MAX_INTEGER_LENGTH + 1)))
+    with pytest.raises(ValueError, match=rf"at most {MAX_INTEGER_DIGITS}"):
+        ramanujan_sum(4, IntegerValue(value="9" * (MAX_INTEGER_DIGITS + 1)))
 
 
 def test_native_frequency_bound_matches_wire_admission() -> None:
     for modulus, frequency in (
-        ("4", str(10**_MAX_INTEGER_LENGTH - 2)),
-        ("1", "9" * _MAX_INTEGER_LENGTH),
+        ("4", str(10**MAX_INTEGER_DIGITS - 2)),
+        ("1", "9" * MAX_INTEGER_DIGITS),
     ):
         request = RamanujanSumRequest(modulus=modulus, frequency=frequency)
         assert RAMANUJAN_SUM_OPERATION.run(request).value == str(
