@@ -8,7 +8,6 @@ from pydantic import ValidationError
 from jacobian.canonical import encode_strict_json
 from jacobian.math.finite_categories import (
     FiniteCategory,
-    FiniteCategoryProduct,
     MorphismSpec,
     product,
 )
@@ -23,7 +22,6 @@ from jacobian.math.finite_categories._operations import (
 )
 from jacobian.math.finite_categories._product import (
     _product_plan,
-    _verify_product_claim,
 )
 
 
@@ -397,40 +395,6 @@ class TestProduct:
         assert result.product == empty
         assert result.object_projections == ()
         assert result.morphism_projections == ()
-
-    def test_explicit_verifier_rejects_a_different_valid_category(self) -> None:
-        expected = product(
-            FiniteCategory.model_validate(TERMINAL_CATEGORY),
-            FiniteCategory.model_validate(TERMINAL_CATEGORY),
-        )
-        different_terminal = FiniteCategory(
-            objects=("other",),
-            morphisms=(
-                MorphismSpec(morphism_id="id_other", source="other", target="other"),
-            ),
-            identities=(("other", "id_other"),),
-            composition=(("id_other", "id_other", "id_other"),),
-        )
-
-        claim = FiniteCategoryProduct(
-            left=expected.left,
-            right=expected.right,
-            product=different_terminal,
-            object_projections=expected.object_projections,
-            morphism_projections=expected.morphism_projections,
-        )
-
-        assert not _verify_product_claim(claim)
-
-    def test_explicit_verifier_rejects_forged_pair_projection(self) -> None:
-        result = product(
-            FiniteCategory.model_validate(TERMINAL_CATEGORY),
-            FiniteCategory.model_validate(TERMINAL_CATEGORY),
-        )
-        payload = result.model_dump(mode="json")
-        payload["object_projections"][0]["left"] = "not_T"
-
-        assert not _verify_product_claim(FiniteCategoryProduct.model_validate(payload))
 
     def test_object_product_count_is_accepted_at_and_rejected_above_bound(
         self,

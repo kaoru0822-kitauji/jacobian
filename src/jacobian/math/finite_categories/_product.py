@@ -399,20 +399,4 @@ def product(left: FiniteCategory, right: FiniteCategory) -> FiniteCategoryProduc
     )
 
 
-def _verify_product_claim(result: FiniteCategoryProduct) -> bool:
-    """Check an independently supplied product claim in its admitted envelope."""
-
-    try:
-        product_category, object_projections, morphism_projections = _product_data(
-            result.left, result.right
-        )
-    except (CategoryProductAdmissionError, ValueError):
-        return False
-    return (
-        result.product == product_category
-        and result.object_projections == object_projections
-        and result.morphism_projections == morphism_projections
-    )
-
-
 __all__ = ["product"]
