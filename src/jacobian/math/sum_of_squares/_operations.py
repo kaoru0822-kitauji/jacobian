@@ -53,13 +53,6 @@ def check_sos_decomposition(
     )
 
 
-def verify_sos_decomposition_result(result: SOSDecompositionCheckResult) -> bool:
-    """Replay an independently supplied SOS claim within its admitted envelope."""
-
-    is_valid, computed_sum = _check_sos_invariants(result.polynomial, result.summands)
-    return result.is_valid == is_valid and result.computed_sum == computed_sum
-
-
 def _check_gram_invariants(
     polynomial: RationalPolynomial,
     monomial_basis: tuple[RationalPolynomial, ...],
@@ -126,23 +119,7 @@ def check_gram_certificate(
     )
 
 
-def verify_gram_certificate_result(result: GramCertificateResult) -> bool:
-    """Replay an independently supplied Gram-certificate claim."""
-
-    is_symmetric, reconstructs, is_psd = _check_gram_invariants(
-        result.polynomial, result.monomial_basis, result.gram_matrix.entries
-    )
-    return (
-        result.is_symmetric == is_symmetric
-        and result.reconstructs_polynomial == reconstructs
-        and result.is_psd == is_psd
-        and result.is_valid == (is_symmetric and reconstructs and is_psd)
-    )
-
-
 __all__ = [
     "check_gram_certificate",
     "check_sos_decomposition",
-    "verify_gram_certificate_result",
-    "verify_sos_decomposition_result",
 ]

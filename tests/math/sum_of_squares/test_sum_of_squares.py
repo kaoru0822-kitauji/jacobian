@@ -19,8 +19,6 @@ from jacobian.math.sum_of_squares._models import (
 from jacobian.math.sum_of_squares._operations import (
     check_gram_certificate,
     check_sos_decomposition,
-    verify_gram_certificate_result,
-    verify_sos_decomposition_result,
 )
 
 
@@ -449,19 +447,6 @@ class TestSOSResultAdmission:
             SOSDecompositionCheckResult.model_validate(payload)
         assert exc_info.value.errors()[0]["type"] == "sum_of_squares.sos_work_bound"
 
-    def test_forged_sos_claim_is_rejected_by_explicit_verifier(self) -> None:
-        """Result parsing is structural; only the verifier replays the identity."""
-        p = _poly(("x",), (1, 1, (2,)), (1, 1, (0,)))
-        q = _poly(("x",), (1, 1, (1,)))
-        result = check_sos_decomposition(
-            SOSDecompositionCheckRequest(polynomial=p, summands=(q,))
-        )
-        payload = result.model_dump(mode="json")
-        payload["computed_sum"] = _poly(("x",), (1, 1, (0,))).model_dump(mode="json")
-        forged = SOSDecompositionCheckResult.model_validate(payload)
-        assert not verify_sos_decomposition_result(forged)
-
-
 class TestSOSResultRingAdmission:
     def test_result_replay_rejects_mismatched_summand_ring(self) -> None:
         """A serialized result whose summand uses another ring is rejected at
@@ -547,39 +532,6 @@ class TestExactPsdCriterion:
             )
         )
         assert result.is_psd is False
-
-    def test_forged_gram_claim_is_rejected_by_explicit_verifier(self) -> None:
-        result = check_gram_certificate(
-            GramCertificateRequest.model_validate(
-                {
-                    "polynomial": _poly(("x",), (1, 1, (2,)), (1, 1, (0,))).model_dump(
-                        mode="json"
-                    ),
-                    "monomial_basis": [
-                        _poly(("x",), (1, 1, (1,))).model_dump(mode="json"),
-                        _poly(("x",), (1, 1, (0,))).model_dump(mode="json"),
-                    ],
-                    "gram_matrix": {
-                        "entries": (
-                            (
-                                {"num": "1", "den": "1"},
-                                {"num": "0", "den": "1"},
-                            ),
-                            (
-                                {"num": "0", "den": "1"},
-                                {"num": "1", "den": "1"},
-                            ),
-                        )
-                    },
-                }
-            )
-        )
-        payload = result.model_dump(mode="json")
-        payload["is_valid"] = False
-        payload["is_psd"] = False
-        forged = GramCertificateResult.model_validate(payload)
-        assert not verify_gram_certificate_result(forged)
-
 
 class TestSOSCoefficientGrowthAdmission:
     """Admission bounds coefficient growth without expanding the summands."""
