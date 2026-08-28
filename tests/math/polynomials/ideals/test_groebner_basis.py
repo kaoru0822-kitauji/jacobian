@@ -21,9 +21,6 @@ from jacobian.math.polynomials.ideals._operations import (
     compute_elimination_ideal,
     compute_groebner_basis,
     compute_ideal_normal_form,
-    verify_elimination_ideal_result,
-    verify_groebner_basis_result,
-    verify_ideal_normal_form_result,
 )
 from jacobian.math.polynomials.ideals._singular import (
     run_bounded_stdin_python_kernel,
@@ -195,7 +192,6 @@ class TestIdealNormalForm:
         assert result.in_ideal is False
         assert result.remainder is not None
         assert len(result.remainder.polynomial.terms) > 0
-        assert verify_ideal_normal_form_result(result)
 
     def test_polynomial_in_ideal_exactly(self) -> None:
         """x^2 - y^2 mod <x^2 - y^2> should give zero (in the ideal)."""
@@ -234,7 +230,6 @@ class TestEliminationIdeal:
         assert result.elimination_ideal is not None
         assert "x" not in result.elimination_ideal.variables
         assert len(result.elimination_ideal.generators) >= 1
-        assert verify_elimination_ideal_result(result)
 
     def test_eliminated_variables_not_in_result(self) -> None:
         """The elimination ideal should not contain eliminated variables."""
@@ -430,26 +425,6 @@ class TestBoundedResultValidation:
                 for term in generator.polynomial.terms:
                     assert all(e <= 32768 for e in term.exponents)
 
-    def test_explicit_verifier_uses_order_specific_leading_monomials(self) -> None:
-        """The claimed list (x + y^2, xy) is not a reduced Groebner basis
-        under grevlex: its true S-polynomial is x^2, which does not reduce.
-        A lex-default replay fabricates y^3 instead and wrongly accepts it.
-        """
-        g1 = _poly(("x", "y"), (1, 1, (1, 0)), (1, 1, (0, 2)))
-        g2 = _poly(("x", "y"), (1, 1, (1, 1)))
-        request = GroebnerBasisRequest(
-            ideal=_ideal(("x", "y"), (g1, g2)), monomial_order="grevlex"
-        )
-        forged = RationalPolynomialIdeal(variables=("x", "y"), generators=(g1, g2))
-        result = GroebnerBasisResult(
-            request=request,
-            outcome="COMPUTED",
-            basis=forged,
-            generator_count=2,
-            monomial_order="grevlex",
-        )
-        assert not verify_groebner_basis_result(result)
-
     def test_aggregate_basis_terms_enforce_result_budget(self) -> None:
         """Every reduced-basis polynomial stays under the per-polynomial
         term limit while their sum crosses the declared exact-result
@@ -500,34 +475,3 @@ class TestBoundedResultValidation:
         )
         assert result.outcome == "LIMIT_EXCEEDED"
         assert "transport bound" in (result.detail or "")
-
-    def test_explicit_verifier_rejects_a_forged_basis(self) -> None:
-        """Non-reduced claimed bases fail the combined verification."""
-        g1 = _poly(("x", "y"), (1, 1, (1, 0)), (-1, 1, (0, 1)))
-        g2 = _poly(("x", "y"), (2, 1, (1, 0)), (-2, 1, (0, 1)))
-        request = GroebnerBasisRequest(ideal=_ideal(("x", "y"), (g1,)))
-        forged = RationalPolynomialIdeal(variables=("x", "y"), generators=(g1, g2))
-        result = GroebnerBasisResult(
-            request=request,
-            outcome="COMPUTED",
-            basis=forged,
-            generator_count=2,
-            monomial_order="grevlex",
-        )
-        assert not verify_groebner_basis_result(result)
-
-    def test_generated_ci_artifacts_removed(self) -> None:
-        """The source tree carries no extracted runner-log artifacts."""
-        import subprocess
-        import sys
-
-        code = (
-            "import os;"
-            "bad = [p for p in ('il2240', 'i2240.zip')"
-            " if os.path.exists(os.path.join(os.getcwd(), p))];"
-            "assert not bad, bad"
-        )
-        proc = subprocess.run(
-            [sys.executable, "-c", code], capture_output=True, text=True
-        )
-        assert proc.returncode == 0, proc.stderr

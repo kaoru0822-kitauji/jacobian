@@ -1,4 +1,4 @@
-"""Tests for moment-functional and orthogonal-polynomial operations (#1900)."""
+"""Tests for moment-functional and orthogonal-polynomial operations."""
 
 from __future__ import annotations
 
@@ -25,9 +25,6 @@ from jacobian.math.moments_orthogonal.operations import (
     compute_orthogonal_polynomials,
     compute_recurrence,
     compute_shifted_hankel,
-    verify_christoffel_darboux_kernel,
-    verify_gaussian_quadrature_rule,
-    verify_orthogonal_polynomial_family,
 )
 from jacobian.math.moments_orthogonal.values import (
     GaussianQuadratureRule,
@@ -588,25 +585,6 @@ class TestFamilyResidualBasisCheck:
             squared_norm=CanonicalRational.from_fraction(Fraction(norm)),
         )
 
-    def test_residual_component_below_p_prev_rejected(self) -> None:
-        """p_2 = x^2 + 1 with unit norms reconstructs x^2 - 1; the residual
-        decomposition in the p_0..p_k basis exposes the forgery."""
-        from jacobian.math.moments_orthogonal.values import (
-            OrthogonalPolynomialFamily,
-        )
-
-        family = OrthogonalPolynomialFamily(
-            polynomials=(
-                self._term(0, (1,), 1),
-                self._term(1, (0, 1), 1),
-                self._term(2, (1, 0, 1), 1),
-            ),
-            variable="x",
-            is_quasi_definite=True,
-            is_positive_definite=True,
-        )
-        assert not verify_orthogonal_polynomial_family(family)
-
     def test_consistent_family_accepted(self) -> None:
         """The Legendre prefix p_0=1, p_1=x, p_2=x^2-1/3 with h=(1,1/3,1/45)
         satisfies the recurrence and every norm ratio."""
@@ -641,27 +619,6 @@ class TestDegenerateNormRecurrenceIdentities:
             ),
             squared_norm=CanonicalRational.from_fraction(Fraction(norm)),
         )
-
-    def test_impossible_degenerate_family_rejected(self) -> None:
-        """p_0=1,h_0=0; p_1=x,h_1=1; p_2=x^2,h_2=1 claims L(x^2)=1 through
-        h_1 while orthogonality of p_0 and p_2 forces L(x^2)=0; no linear
-        functional realizes it, so the zero-safe relation h_k = beta_k *
-        h_{k-1} must reject it instead of skipping degenerate norms."""
-        from jacobian.math.moments_orthogonal.values import (
-            OrthogonalPolynomialFamily,
-        )
-
-        family = OrthogonalPolynomialFamily(
-            polynomials=(
-                self._term(0, (1,), 0),
-                self._term(1, (0, 1), 1),
-                self._term(2, (0, 0, 1), 1),
-            ),
-            variable="x",
-            is_quasi_definite=False,
-            is_positive_definite=False,
-        )
-        assert not verify_orthogonal_polynomial_family(family)
 
     def test_all_zero_norms_remain_admitted(self) -> None:
         """The zero functional realizes every-vanishing norms, so the fully
@@ -940,35 +897,6 @@ class TestQuadratureVariableBinding:
         assert "prefix" in rule_payload
 
 
-class TestKernelFamilyBinding:
-    def test_forged_kernel_rejected_against_family(self) -> None:
-        """An asymmetric bivariate payload cannot revalidate as the
-        kernel of a retained family."""
-        from jacobian.math.moments_orthogonal._models import (
-            OrthogonalPolynomialRequest,
-        )
-        from jacobian.math.moments_orthogonal.values import ChristoffelDarbouxKernel
-
-        family = compute_orthogonal_polynomials(
-            OrthogonalPolynomialRequest(
-                prefix=_prefix(_moments_uniform(3)), max_degree=1
-            )
-        )
-        payload = {
-            "degree": 1,
-            "coefficients": (({"num": "1", "den": "2"}, {"num": "7", "den": "5"}),),
-            "variable": "x",
-            "family": family.model_dump(),
-        }
-        # Pad to a square matrix so shape passes and the sum replay fails.
-        payload["coefficients"] = (
-            ({"num": "1", "den": "2"}, {"num": "7", "den": "5"}),
-            ({"num": "0", "den": "1"}, {"num": "3", "den": "2"}),
-        )
-        claim = ChristoffelDarbouxKernel.model_validate(payload)
-        assert not verify_christoffel_darboux_kernel(claim)
-
-
 class TestDerivedAlphaHeightAdmission:
     def test_nonrepresentable_derived_alpha_rejected_at_admission(self) -> None:
         """Two canonical coefficients can differ by a non-canonical rational;
@@ -1080,28 +1008,7 @@ class TestDerivedQuadratureHeightAdmission:
         assert GaussianQuadratureRule.model_validate(result.model_dump()) == result
 
 
-class TestReplayedRulePositivity:
-    def test_negative_weight_rule_rejected_on_revalidation(self) -> None:
-        """A serialized rule whose retained prefix replays to a negative
-        weight violates the operation's advertised positive-weight contract
-        and must not revalidate as the operation's exact result."""
-        prefix = _prefix(
-            tuple(CanonicalRational(num=v, den="1") for v in ("-1", "0", "0"))
-        )
-        rule = GaussianQuadratureRule(
-            order=1,
-            nodes=(
-                QuadratureNode(
-                    node=CanonicalRational(num="0", den="1"),
-                    weight=CanonicalRational(num="-1", den="1"),
-                ),
-            ),
-            variable="x",
-            exactness_degree=1,
-            prefix=prefix,
-        )
-        assert not verify_gaussian_quadrature_rule(rule)
-
+class TestRuleRoundTrip:
     def test_quasi_definite_positive_weight_rule_revalidates(self) -> None:
         """A genuine positive-weight order-1 rule keeps validating against
         its quasi-definite source prefix."""

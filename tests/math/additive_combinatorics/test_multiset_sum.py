@@ -29,7 +29,6 @@ from jacobian.math.additive_combinatorics._multiset_sum import (
 from jacobian.math.additive_combinatorics._operations import (
     compute_multiset_sum_representation_profile,
     compute_representation_profile,
-    verify_multiset_sum_representation_profile,
 )
 
 
@@ -136,40 +135,12 @@ def test_result_retains_source_for_unchanged_recomposition() -> None:
     assert recomputed == result
 
 
-def test_verifier_rejects_forged_source_bound_profile() -> None:
-    result = compute_multiset_sum_representation_profile(_request((0, 1, 2), 2))
-    payload = result.model_dump(mode="json")
-    payload["source"]["elements"] = ["0", "1", "3"]
-    assert not verify_multiset_sum_representation_profile(
-        MultisetSumRepresentationProfileResult.model_validate(payload)
-    )
-
-
-def test_verifier_rejects_forged_multiplicity() -> None:
-    result = compute_multiset_sum_representation_profile(_request((0, 1, 2), 2))
-    payload = result.model_dump(mode="json")
-    payload["entries"][2]["multiplicity"] = 1
-    assert not verify_multiset_sum_representation_profile(
-        MultisetSumRepresentationProfileResult.model_validate(payload)
-    )
-
-
-def test_verifier_rejects_mutated_window() -> None:
-    result = compute_multiset_sum_representation_profile(_request((0, 1, 2), 2, (2, 2)))
-    payload = result.model_dump(mode="json")
-    payload["window"] = {"lower": "1", "upper": "2"}
-    assert not verify_multiset_sum_representation_profile(
-        MultisetSumRepresentationProfileResult.model_validate(payload)
-    )
-
-
-def test_result_round_trip_has_the_defining_invariant() -> None:
+def test_result_round_trip_preserves_the_profile() -> None:
     result = compute_multiset_sum_representation_profile(
         _request((-5, 0, 9), 5, (-10, 20))
     )
     decoded = MultisetSumRepresentationProfileResult.model_validate(result.model_dump())
     assert decoded == result
-    assert verify_multiset_sum_representation_profile(decoded)
 
 
 def test_request_requires_canonical_source_order() -> None:
@@ -296,18 +267,6 @@ def test_intersecting_window_still_pays_full_enumeration_work(
     # rejects it even though the declared span is small.
     with pytest.raises(ValueError):
         _profile((0, 1), 10**15, window)
-
-
-def test_verifier_rejects_disjoint_window_forged_entries() -> None:
-    result = compute_multiset_sum_representation_profile(
-        _request((0, 1), 10**15, (-10, -1))
-    )
-    assert result.entries == ()
-    payload = result.model_dump(mode="json")
-    payload["entries"] = [{"sum": "5", "multiplicity": 1}]
-    assert not verify_multiset_sum_representation_profile(
-        MultisetSumRepresentationProfileResult.model_validate(payload)
-    )
 
 
 def test_narrow_window_over_large_slot_family_matches_closed_form() -> None:

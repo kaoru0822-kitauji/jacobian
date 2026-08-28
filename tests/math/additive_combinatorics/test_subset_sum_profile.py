@@ -21,10 +21,7 @@ from jacobian.math.additive_combinatorics import (
     subset_sum_profile,
 )
 from jacobian.math.additive_combinatorics._models import SubsetSumProfileRequest
-from jacobian.math.additive_combinatorics._operations import (
-    compute_subset_sum_profile,
-    verify_subset_sum_profile,
-)
+from jacobian.math.additive_combinatorics._operations import compute_subset_sum_profile
 from jacobian.math.additive_combinatorics._subset_sum_profile import (
     MAX_SUBSET_SUM_DP_TRANSITIONS,
     MAX_SUBSET_SUM_PROFILE_RESULT_BYTES,
@@ -115,55 +112,11 @@ def test_conway_guy_eleven_set_has_2048_distinct_subset_sums() -> None:
     assert all(entry.multiplicity == "1" for entry in result.entries)
 
 
-def test_result_round_trip_has_complete_profile_verifier() -> None:
+def test_result_round_trip_preserves_complete_profile() -> None:
     result = compute_subset_sum_profile(_request(-2, 0, 3, 3))
 
     decoded = SubsetSumProfile.model_validate(result.model_dump())
     assert decoded == result
-    assert verify_subset_sum_profile(decoded)
-
-
-def test_verifier_rejects_mutated_source() -> None:
-    result = compute_subset_sum_profile(_request(1, 1))
-    payload = result.model_dump(mode="json")
-    payload["source"]["items"] = ["1", "2"]
-
-    assert not verify_subset_sum_profile(SubsetSumProfile.model_validate(payload))
-
-
-def test_verifier_rejects_mutated_multiplicity() -> None:
-    result = compute_subset_sum_profile(_request(1, 1))
-    payload = result.model_dump(mode="json")
-    payload["entries"][1]["multiplicity"] = "3"
-
-    assert not verify_subset_sum_profile(SubsetSumProfile.model_validate(payload))
-
-
-def test_verifier_rejects_mutated_profile_sum() -> None:
-    result = compute_subset_sum_profile(_request(1, 1))
-    payload = result.model_dump(mode="json")
-    payload["entries"][-1]["sum"] = "3"
-
-    assert not verify_subset_sum_profile(SubsetSumProfile.model_validate(payload))
-
-
-def test_verifier_rejects_mutated_total() -> None:
-    result = compute_subset_sum_profile(_request(1, 1))
-    payload = result.model_dump(mode="json")
-    payload["total_subsets"] = "3"
-
-    assert not verify_subset_sum_profile(SubsetSumProfile.model_validate(payload))
-
-
-def test_verifier_fails_closed_for_a_structural_profile_outside_admission() -> None:
-    profile = SubsetSumProfile(
-        source=IndexedIntegerSequence(items=tuple(str(index) for index in range(200))),
-        entries=(SubsetSumProfileEntry(sum="0", multiplicity="1"),),
-        support_size=1,
-        total_subsets=str(1 << 200),
-    )
-
-    assert not verify_subset_sum_profile(profile)
 
 
 def test_result_sensitive_admission_accepts_many_repeated_zeros() -> None:

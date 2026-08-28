@@ -742,9 +742,6 @@ __all__ = [
     "compute_ideal_radical",
     "compute_ideal_radical_membership",
     "compute_ideal_saturation",
-    "verify_elimination_ideal_result",
-    "verify_groebner_basis_result",
-    "verify_ideal_normal_form_result",
 ]
 
 
@@ -753,7 +750,6 @@ def compute_groebner_basis(request: GroebnerBasisRequest) -> GroebnerBasisResult
     _run_admission(lambda: _admit_groebner(request))
     from jacobian.math.polynomials.ideals._models import GroebnerBasisResult
     from jacobian.math.polynomials.values import (
-        RationalPolynomial,
         RationalPolynomialIdeal,
     )
 
@@ -828,45 +824,10 @@ def compute_groebner_basis(request: GroebnerBasisRequest) -> GroebnerBasisResult
     return GroebnerBasisResult._from_kernel(request, ideal, request.monomial_order)
 
 
-def verify_groebner_basis_result(result: GroebnerBasisResult) -> bool:
-    """Replay the bounded defining invariants of a supplied basis result."""
-
-    if result.outcome != "COMPUTED" or result.basis is None:
-        return False
-    if (
-        len(result.basis.generators) == 1
-        and not result.basis.generators[0].polynomial.terms
-    ):
-        return all(
-            not generator.polynomial.terms
-            for generator in result.request.ideal.generators
-        )
-    payload = {
-        "mode": "verify_groebner_basis",
-        "variables": list(result.request.ideal.variables),
-        "order": result.monomial_order,
-        "generators": [
-            generator.model_dump(mode="json")
-            for generator in result.request.ideal.generators
-        ],
-        "basis": [
-            generator.model_dump(mode="json") for generator in result.basis.generators
-        ],
-    }
-    try:
-        verification = _run_sympy_kernel(
-            payload, float(result.request.resource_budget.wall_seconds)
-        )
-    except (_ResultLimitExceededError, _SympyKernelError, _SympyKernelTimeoutError):
-        return False
-    return bool(verification.get("equal"))
-
-
 def compute_ideal_normal_form(request: IdealNormalFormRequest) -> IdealNormalFormResult:
     """Reduce one polynomial modulo an ideal using a Gröbner basis remainder."""
     _run_admission(lambda: _admit_normal_form(request))
     from jacobian.math.polynomials.ideals._models import IdealNormalFormResult
-    from jacobian.math.polynomials.values import RationalPolynomial
 
     payload = {
         "mode": "normal_form",
@@ -912,28 +873,6 @@ def compute_ideal_normal_form(request: IdealNormalFormRequest) -> IdealNormalFor
     return IdealNormalFormResult._from_kernel(request, remainder_poly)
 
 
-def verify_ideal_normal_form_result(result: IdealNormalFormResult) -> bool:
-    """Replay a supplied normal-form result inside the bounded worker."""
-
-    if result.outcome != "COMPUTED" or result.remainder is None:
-        return False
-    payload = {
-        "mode": "normal_form",
-        "variables": list(result.request.ideal.variables),
-        "order": result.monomial_order,
-        "generators": [
-            generator.model_dump(mode="json")
-            for generator in result.request.ideal.generators
-        ],
-        "polynomial": result.request.polynomial.model_dump(mode="json"),
-    }
-    try:
-        expected = _run_sympy_kernel(payload, 10)
-    except (_ResultLimitExceededError, _SympyKernelError, _SympyKernelTimeoutError):
-        return False
-    return result.remainder == RationalPolynomial.model_validate(expected["remainder"])
-
-
 def _elimination_ideal_from_payload(
     result_payload: dict[str, Any],
 ) -> RationalPolynomialIdeal:
@@ -941,7 +880,6 @@ def _elimination_ideal_from_payload(
 
     from jacobian._exact import CanonicalRational
     from jacobian.math.polynomials.values import (
-        RationalPolynomial,
         RationalPolynomialIdeal,
         RationalPolynomialTerm,
         SparseRationalPolynomial,
@@ -1038,27 +976,3 @@ def compute_elimination_ideal(
     return EliminationIdealResult._from_kernel(
         request, _elimination_ideal_from_payload(result_payload)
     )
-
-
-def verify_elimination_ideal_result(result: EliminationIdealResult) -> bool:
-    """Replay the bounded lex-elimination invariant for supplied data."""
-
-    if result.outcome != "COMPUTED" or result.elimination_ideal is None:
-        return False
-    payload = {
-        "mode": "elimination",
-        "variables": list(result.request.ideal.variables),
-        "eliminated": list(result.request.eliminated_variables),
-        "generators": [
-            generator.model_dump(mode="json")
-            for generator in result.request.ideal.generators
-        ],
-    }
-    try:
-        replayed = _run_sympy_kernel(
-            payload, float(result.request.resource_budget.wall_seconds)
-        )
-    except (_ResultLimitExceededError, _SympyKernelError, _SympyKernelTimeoutError):
-        return False
-    expected = _elimination_ideal_from_payload(replayed)
-    return result.elimination_ideal == expected

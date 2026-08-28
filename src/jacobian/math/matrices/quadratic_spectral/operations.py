@@ -616,27 +616,8 @@ def inertia(matrix: RealQuadraticMatrix) -> RealQuadraticInertia:
     )
 
 
-def verify_real_quadratic_spectrum(result: RealQuadraticSpectrum) -> bool:
-    """Replay an independently supplied spectrum in the admitted envelope."""
-
-    return result.values == spectrum_rows(result.matrix, result.spectrum_kind)
-
-
-def verify_real_quadratic_inertia(result: RealQuadraticInertia) -> bool:
-    """Replay an independently supplied inertia claim in the admitted envelope."""
-
-    return (
-        result.n_positive,
-        result.n_negative,
-        result.n_zero,
-        result.definiteness,
-    ) == inertia_data(result.matrix)
-
-
 __all__ = [
     "inertia",
     "singular_spectrum",
     "symmetric_spectrum",
-    "verify_real_quadratic_inertia",
-    "verify_real_quadratic_spectrum",
 ]

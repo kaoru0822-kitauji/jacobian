@@ -38,10 +38,6 @@ from jacobian.math.additive_combinatorics._multiset_sum import (
     MAX_SUPPORT_SIZE,
     count_sums,
 )
-from jacobian.math.additive_combinatorics._subset_sum_profile import (
-    subset_sum_profile_counts,
-    subset_sum_profile_envelope,
-)
 from jacobian.math.additive_combinatorics.operations import subset_sum_profile
 from jacobian.math.additive_combinatorics.values import SubsetSumProfile
 
@@ -328,61 +324,3 @@ def compute_ordered_difference_profile(
         has_repeated_difference=has_repeated,
         first_collision=first_collision,
     )
-
-
-def verify_subset_sum_profile(profile: SubsetSumProfile) -> bool:
-    """Check an independently supplied complete profile within its envelope."""
-
-    try:
-        envelope = subset_sum_profile_envelope(profile.source)
-        expected = tuple(sorted(subset_sum_profile_counts(profile.source).items()))
-    except ValueError:
-        return False
-    actual = tuple(
-        (
-            parse_canonical_integer(entry.sum),
-            parse_canonical_integer(entry.multiplicity),
-        )
-        for entry in profile.entries
-    )
-    return (
-        len(expected) <= envelope.support_bound
-        and actual == expected
-        and parse_canonical_integer(profile.total_subsets)
-        == 1 << len(profile.source.items)
-    )
-
-
-def verify_multiset_sum_representation_profile(
-    result: MultisetSumRepresentationProfileResult,
-) -> bool:
-    """Check a supplied complete multiset-sum profile under request admission."""
-
-    try:
-        request = MultisetSumRepresentationProfileRequest(
-            source=result.source, arity=result.arity, window=result.window
-        )
-        values = _multiset_sum_source_values(request.source)
-        _admit_multiset_sum_profile(request, values)
-        bounds = (
-            request.window.as_integer_bounds() if request.window is not None else None
-        )
-        counts = count_sums(values, request.arity, bounds)
-    except ValueError:
-        return False
-    expected = tuple(
-        RepresentationProfileEntry(
-            sum=format_canonical_integer(value), multiplicity=counts[value]
-        )
-        for value in sorted(counts)
-    )
-    return result.entries == expected
-
-
-def verify_ordered_difference_profile(result: OrderedDifferenceProfileResult) -> bool:
-    """Check an independently supplied complete ordered-difference profile."""
-
-    expected = compute_ordered_difference_profile(
-        OrderedDifferenceProfileRequest(vectors=result.vectors)
-    )
-    return result == expected

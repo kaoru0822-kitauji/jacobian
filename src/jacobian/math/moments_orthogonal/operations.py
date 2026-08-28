@@ -764,70 +764,6 @@ def _solve_linear_system(
     return [aug[i][n] / aug[i][i] for i in range(n)]
 
 
-def verify_orthogonal_polynomial_family(family: OrthogonalPolynomialFamily) -> bool:
-    """Check the bounded three-term and norm identities of a supplied family."""
-    try:
-        polynomials = family.polynomials
-        for k in range(len(polynomials) - 1):
-            p_k = [
-                coefficient.as_fraction() for coefficient in polynomials[k].coefficients
-            ]
-            p_next = [
-                coefficient.as_fraction()
-                for coefficient in polynomials[k + 1].coefficients
-            ]
-            residual = [Fraction(0), *p_k]
-            for index, coefficient in enumerate(p_next):
-                residual[index] -= coefficient
-            components = [Fraction(0)] * (k + 1)
-            for degree in range(k, -1, -1):
-                coefficient = residual[degree]
-                components[degree] = coefficient
-                for power, basis_coefficient in enumerate(
-                    polynomials[degree].coefficients
-                ):
-                    residual[power] -= coefficient * basis_coefficient.as_fraction()
-            if any(residual) or any(components[: max(k - 1, 0)]):
-                return False
-            if k >= 1 and (
-                polynomials[k].squared_norm.as_fraction()
-                != components[k - 1] * polynomials[k - 1].squared_norm.as_fraction()
-            ):
-                return False
-        norms = [term.squared_norm.as_fraction() for term in polynomials]
-        return family.is_quasi_definite == all(
-            norm != 0 for norm in norms
-        ) and family.is_positive_definite == all(norm > 0 for norm in norms)
-    except (IndexError, TypeError, ValueError, ZeroDivisionError):
-        return False
-
-
-def verify_christoffel_darboux_kernel(result: ChristoffelDarbouxKernel) -> bool:
-    """Verify one independently supplied bounded Christoffel--Darboux claim."""
-    try:
-        expected = _kernel_coefficient_matrix(result.family.polynomials, result.degree)
-        actual = tuple(
-            tuple(value.as_fraction() for value in row) for row in result.coefficients
-        )
-        return actual == tuple(tuple(row) for row in expected)
-    except (IndexError, TypeError, ValueError, ZeroDivisionError):
-        return False
-
-
-def verify_gaussian_quadrature_rule(result: GaussianQuadratureRule) -> bool:
-    """Verify a supplied bounded rational Gaussian quadrature certificate."""
-    try:
-        require_gaussian_quadrature_admission(result.prefix, result.order)
-        nodes, weights = _build_quadrature_rule(result.prefix, result.order)
-        expected = tuple(
-            QuadratureNode(node=_from_fraction(node), weight=_from_fraction(weight))
-            for node, weight in zip(nodes, weights, strict=True)
-        )
-        return result.nodes == expected
-    except (TypeError, ValueError, ZeroDivisionError):
-        return False
-
-
 __all__ = [
     "compute_christoffel_darboux",
     "compute_gaussian_quadrature",
@@ -836,7 +772,4 @@ __all__ = [
     "compute_orthogonal_polynomials",
     "compute_recurrence",
     "compute_shifted_hankel",
-    "verify_christoffel_darboux_kernel",
-    "verify_gaussian_quadrature_rule",
-    "verify_orthogonal_polynomial_family",
 ]

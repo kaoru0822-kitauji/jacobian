@@ -18,7 +18,6 @@ from jacobian.math.finite_categories._operations import (
     compute_category_product,
     compute_category_profile,
     compute_opposite_category,
-    verify_category_profile_claim,
 )
 from jacobian.math.finite_categories._product import (
     _admit_product,
@@ -156,15 +155,6 @@ class TestProfile:
         ids = dict(result.identity_morphisms)
         assert ids.get("A") == "id_A"
         assert ids.get("B") == "id_B"
-
-    def test_explicit_verifier_binds_profile_to_its_source(self) -> None:
-        category = FiniteCategory.model_validate(CATEGORY)
-        result = compute_category_profile(category)
-
-        assert verify_category_profile_claim(category, result)
-        assert not verify_category_profile_claim(
-            FiniteCategory.model_validate(TERMINAL_CATEGORY), result
-        )
 
 
 class TestOpposite:

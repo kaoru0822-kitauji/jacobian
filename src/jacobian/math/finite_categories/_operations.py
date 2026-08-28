@@ -56,22 +56,6 @@ def compute_category_profile(request: FiniteCategory) -> CategoryProfileResult:
     return CategoryProfileResult._from_kernel(request, hom_sets, endomorphisms)
 
 
-def verify_category_profile_claim(
-    category: FiniteCategory, result: CategoryProfileResult
-) -> bool:
-    """Check a supplied profile claim against its explicit source category."""
-
-    hom_sets, endomorphisms = _category_profile_data(category)
-    return (
-        result.objects == category.objects
-        and result.num_objects == len(category.objects)
-        and result.num_morphisms == len(category.morphisms)
-        and result.hom_sets == hom_sets
-        and result.endomorphisms == endomorphisms
-        and result.identity_morphisms == category.identities
-    )
-
-
 def compute_opposite_category(request: FiniteCategory) -> FiniteCategory:
     """Compute the opposite category.
 
