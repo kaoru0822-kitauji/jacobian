@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from fractions import Fraction
 
-from jacobian._exact import CanonicalRational
+from pydantic_core import PydanticCustomError
+
+from jacobian._exact import MAX_CANONICAL_RATIONAL_DIGITS, CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
+from jacobian.math._rational_height import RationalHeight
 from jacobian.math.number_theory.elliptic_curves._models import (
     CurveDiscriminantResult,
     CurvePointRequest,
@@ -15,7 +19,128 @@ from jacobian.math.number_theory.elliptic_curves._models import (
     RationalAffinePoint,
     ScalarMultiplicationRequest,
     ScalarMultiplicationResult,
+    _chord_step_heights,
+    _doubling_lambda_height,
+    _doubling_lambda_height_from_heights,
+    _generic_lambda_height,
+    _generic_lambda_height_from_heights,
+    _point_heights,
+    _require_group_law,
 )
+
+
+def _admission_error(exc: PydanticCustomError, location: tuple[str, ...]) -> None:
+    raise OperationDomainValidationError(
+        location=location, code=exc.type, message=exc.message()
+    ) from exc
+
+
+def _admit_point_addition(request: EllipticCurvePointAdditionRequest) -> None:
+    """Admit the group law and exact result-height envelope once per call."""
+    first_point = request.first.point
+    second_point = request.second.point
+    if first_point is None or second_point is None:
+        try:
+            _require_group_law(request.curve, ())
+        except PydanticCustomError as exc:
+            _admission_error(exc, ("curve",))
+        return
+    try:
+        _require_group_law(request.curve, ())
+        _require_group_law(request.curve, (first_point,))
+    except PydanticCustomError as exc:
+        _admission_error(
+            exc,
+            ("first",) if exc.type == "elliptic_curve.point_off_curve" else ("curve",),
+        )
+    try:
+        _require_group_law(request.curve, (second_point,))
+    except PydanticCustomError as exc:
+        _admission_error(
+            exc,
+            ("second",)
+            if exc.type == "elliptic_curve.point_off_curve"
+            else ("curve",),
+        )
+    if first_point == second_point:
+        if first_point.y.as_fraction() == 0:
+            result = None
+        else:
+            result = _chord_step_heights(
+                _doubling_lambda_height(request.curve, first_point),
+                _point_heights(first_point),
+                _point_heights(first_point),
+            )
+    elif first_point.x == second_point.x:
+        result = None
+    else:
+        result = _chord_step_heights(
+            _generic_lambda_height(first_point, second_point),
+            _point_heights(first_point),
+            _point_heights(second_point),
+        )
+    if result is not None and any(
+        height.exceeds(MAX_CANONICAL_RATIONAL_DIGITS) for height in result
+    ):
+        raise OperationDomainValidationError(
+            location=("first", "second"),
+            code="elliptic_curve.point_addition_result_bound",
+            message=(
+                "point addition would produce coordinates exceeding the "
+                "canonical result bound"
+            ),
+        )
+
+
+def _admit_scalar_multiplication(request: ScalarMultiplicationRequest) -> None:
+    """Admit the group law and double-and-add height envelope once per call."""
+    operand = request.point.point
+    if request.point.at_infinity or operand is None:
+        try:
+            _require_group_law(request.curve, ())
+        except PydanticCustomError as exc:
+            _admission_error(exc, ("curve",))
+        return
+    try:
+        _require_group_law(request.curve, (operand,))
+    except PydanticCustomError as exc:
+        location = (
+            ("point",) if exc.type == "elliptic_curve.point_off_curve" else ("curve",)
+        )
+        _admission_error(exc, location)
+
+    result: tuple[RationalHeight, RationalHeight] | None = None
+    addend: tuple[RationalHeight, RationalHeight] | None = _point_heights(operand)
+    addend_is_operand = True
+    operand_y_is_zero = operand.y.as_fraction() == 0
+    n = request.scalar
+    while n > 0:
+        if n & 1 and addend is not None:
+            if result is None:
+                result = addend
+            else:
+                lam = _generic_lambda_height_from_heights(result, addend)
+                result = _chord_step_heights(lam, result, addend)
+        if addend is not None:
+            if addend_is_operand and operand_y_is_zero:
+                addend = None
+            else:
+                lam = _doubling_lambda_height_from_heights(request.curve, addend)
+                addend = _chord_step_heights(lam, addend, addend)
+            addend_is_operand = False
+        for slot in (result, addend):
+            if slot is not None and any(
+                height.exceeds(MAX_CANONICAL_RATIONAL_DIGITS) for height in slot
+            ):
+                raise OperationDomainValidationError(
+                    location=("scalar",),
+                    code="elliptic_curve.scalar_multiplication_result_bound",
+                    message=(
+                        "scalar multiplication would exceed the canonical result "
+                        "height; reduce the scalar or use smaller coordinates"
+                    ),
+                )
+        n >>= 1
 
 
 def _curve_discriminant(a: Fraction, b: Fraction) -> Fraction:
@@ -79,6 +204,7 @@ def add_points(
     request: EllipticCurvePointAdditionRequest,
 ) -> EllipticCurvePointResult:
     """Add two points on a short Weierstrass elliptic curve."""
+    _admit_point_addition(request)
     a = request.curve.coefficient_a.as_fraction()
     b = request.curve.coefficient_b.as_fraction()
     first_point = request.first.point
@@ -127,6 +253,7 @@ def scalar_multiply(
     request: ScalarMultiplicationRequest,
 ) -> ScalarMultiplicationResult:
     """Compute n*P on a short Weierstrass elliptic curve using double-and-add."""
+    _admit_scalar_multiplication(request)
     operand = request.point.point
     if request.scalar == 0 or request.point.at_infinity or operand is None:
         return ScalarMultiplicationResult(curve=request.curve, at_infinity=True)

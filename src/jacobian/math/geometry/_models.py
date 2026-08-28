@@ -453,28 +453,6 @@ class PointTripleRequest(StrictModel):
 class CircumcircleRequest(PointTripleRequest):
     """Three distinct non-collinear points defining a circumcircle."""
 
-    @model_validator(mode="after")
-    def require_noncollinear_distinct(self) -> Self:
-        points = [self.first, self.second, self.third]
-        keys = tuple(_point_key(point) for point in points)
-        if len(set(keys)) != len(keys):
-            raise _validation_error(
-                "circumcircle_requires_three_distinct_points",
-                "circumcircle requires three distinct points",
-            )
-        p0, p1, p2 = points
-        x0, y0 = _point_key(p0)
-        dx1 = p1.x.as_fraction() - x0
-        dy1 = p1.y.as_fraction() - y0
-        dx2 = p2.x.as_fraction() - x0
-        dy2 = p2.y.as_fraction() - y0
-        if dx1 * dy2 - dy1 * dx2 == 0:
-            raise _validation_error(
-                "circumcircle_requires_three_noncollinear_points",
-                "circumcircle requires three noncollinear points",
-            )
-        return self
-
 
 class PointQuadrupleRequest(PointTripleRequest):
     fourth: RationalPoint2D
@@ -622,15 +600,6 @@ class SimplePolygonDecisionResult(StrictModel):
 class SimplePolygonPointRequest(StrictModel):
     polygon: PolygonRequest
     point: RationalPoint2D
-
-    @model_validator(mode="after")
-    def require_simple_polygon(self) -> Self:
-        if not _is_simple_ring(self.polygon.points):
-            raise _validation_error(
-                "point_classification_requires_a_simple_polygon",
-                "point classification requires a simple polygon",
-            )
-        return self
 
 
 class PolygonPointClassificationResult(StrictModel):

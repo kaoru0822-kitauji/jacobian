@@ -294,40 +294,6 @@ class EllipticCurvePointAdditionRequest(StrictModel):
 
     @model_validator(mode="after")
     def require_group_law(self) -> Self:
-        first_point = self.first.point
-        second_point = self.second.point
-        # An identity operand contributes nothing and adds no height, but
-        # the group law itself still requires a nonsingular curve.
-        if first_point is None or second_point is None:
-            _require_group_law(self.curve, ())
-            return self
-        _require_group_law(self.curve, (first_point, second_point))
-        if first_point == second_point:
-            if first_point.y.as_fraction() == 0:
-                # A point of order two doubles to the identity: no tangent
-                # slope exists and no coordinate height can grow.
-                result = None
-            else:
-                result = _chord_step_heights(
-                    _doubling_lambda_height(self.curve, first_point),
-                    _point_heights(first_point),
-                    _point_heights(first_point),
-                )
-        elif first_point.x == second_point.x:
-            result = None
-        else:
-            result = _chord_step_heights(
-                _generic_lambda_height(first_point, second_point),
-                _point_heights(first_point),
-                _point_heights(second_point),
-            )
-        if result is not None and any(
-            height.exceeds(MAX_CANONICAL_RATIONAL_DIGITS) for height in result
-        ):
-            raise PydanticCustomError(
-                "elliptic_curve.point_addition_result_bound",
-                "point addition would produce coordinates exceeding the canonical result bound",
-            )
         return self
 
 
@@ -349,57 +315,6 @@ class ScalarMultiplicationRequest(StrictModel):
 
     @model_validator(mode="after")
     def require_group_law(self) -> Self:
-        operand = self.point.point
-        # An identity operand contributes nothing, but the group law itself
-        # still requires a nonsingular curve.
-        if self.point.at_infinity or operand is None:
-            _require_group_law(self.curve, ())
-            return self
-        _require_group_law(self.curve, (operand,))
-        # Propagate coordinate heights through the same double-and-add scan
-        # the kernel performs: each bit doubles the addend and adds it to the
-        # accumulator on a set bit, and every step's chord-and-tangent output
-        # is bounded by rational-height propagation.  The naive n^2 digit
-        # heuristic both over-rejects and admits doublings whose exact
-        # coordinates exceed the canonical limit, so derive the budget from
-        # the recurrence.
-        #
-        # Each slot carries the finite/infinity state the group law actually
-        # produces.  An order-two point's first doubling lands on the identity
-        # (its y vanishes), the identity absorbs every later doubling, and no
-        # slope height is propagated through an infinity slot.  Intermediates
-        # whose state is not decidable from the request stay conservatively
-        # finite, which can only overestimate heights.
-        result: tuple[RationalHeight, RationalHeight] | None = None
-        addend: tuple[RationalHeight, RationalHeight] | None = _point_heights(operand)
-        addend_is_operand = True
-        operand_y_is_zero = operand.y.as_fraction() == 0
-        n = self.scalar
-        while n > 0:
-            if n & 1 and addend is not None:
-                if result is None:
-                    result = addend
-                else:
-                    lam = _generic_lambda_height_from_heights(result, addend)
-                    result = _chord_step_heights(lam, result, addend)
-            if addend is not None:
-                if addend_is_operand and operand_y_is_zero:
-                    # 2P = O for a point of order two; the identity absorbs
-                    # every later doubling of this addend.
-                    addend = None
-                else:
-                    lam = _doubling_lambda_height_from_heights(self.curve, addend)
-                    addend = _chord_step_heights(lam, addend, addend)
-                addend_is_operand = False
-            for slot in (result, addend):
-                if slot is not None and any(
-                    height.exceeds(MAX_CANONICAL_RATIONAL_DIGITS) for height in slot
-                ):
-                    raise PydanticCustomError(
-                        "elliptic_curve.scalar_multiplication_result_bound",
-                        "scalar multiplication would exceed the canonical result height; reduce the scalar or use smaller coordinates",
-                    )
-            n >>= 1
         return self
 
 

@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from fractions import Fraction
 
+from pydantic_core import PydanticCustomError
+
 from jacobian._exact import CanonicalRational
 from jacobian.canonical import format_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.geometry._models import (
     ConvexPolygonTriangulationRequest,
     ConvexPolygonTriangulationResult,
@@ -34,7 +37,11 @@ def minimum_weight_triangulation(
     points = tuple(_point_key(point) for point in request.polygon.points)
     count = len(points)
     if not 4 <= count <= 32:
-        raise ValueError("weighted triangulation supports 4 to 32 vertices")
+        raise OperationDomainValidationError(
+            location=("polygon", "points"),
+            code="geometry.weighted_triangulation_supports_vertices",
+            message="weighted triangulation supports 4 to 32 vertices",
+        )
     if any(
         _cross(
             _subtract(points[(index + 1) % count], points[index]),
@@ -43,7 +50,11 @@ def minimum_weight_triangulation(
         <= 0
         for index in range(count)
     ):
-        raise ValueError("weighted triangulation requires strict CCW convexity")
+        raise OperationDomainValidationError(
+            location=("polygon", "points"),
+            code="geometry.weighted_triangulation_requires_strict_ccw_convexity",
+            message="weighted triangulation requires strict CCW convexity",
+        )
     expected = {
         (first, second)
         for first in range(count)
@@ -52,10 +63,23 @@ def minimum_weight_triangulation(
     }
     pairs = tuple((item.first, item.second) for item in request.diagonal_weights)
     if len(set(pairs)) != len(pairs) or set(pairs) != expected:
-        raise ValueError("diagonal weights must cover every non-hull pair exactly")
+        raise OperationDomainValidationError(
+            location=("diagonal_weights",),
+            code="geometry.diagonal_weights_cover_every_non_hull",
+            message="diagonal weights must cover every non-hull pair exactly",
+        )
     if pairs != tuple(sorted(pairs)):
-        raise ValueError("diagonal weights must use lexicographic pair order")
-    _require_bounded_split_table_rationals(count, request.diagonal_weights)
+        raise OperationDomainValidationError(
+            location=("diagonal_weights",),
+            code="geometry.diagonal_weights_use_lexicographic_pair_order",
+            message="diagonal weights must use lexicographic pair order",
+        )
+    try:
+        _require_bounded_split_table_rationals(count, request.diagonal_weights)
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=("diagonal_weights",), code=exc.type, message=exc.message()
+        ) from exc
     weights = {
         (item.first, item.second): item.weight.as_fraction()
         for item in request.diagonal_weights

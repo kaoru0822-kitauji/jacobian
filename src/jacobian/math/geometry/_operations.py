@@ -45,6 +45,8 @@ from jacobian.math.geometry._models import (
     SimplePolygonDecisionResult,
     SimplePolygonPointRequest,
     _inverted_components_within_bound,
+    _is_simple_ring,
+    _point_key,
     _require_bounded_configuration,
     _require_circumradius_output_bound,
     _require_general_position_work_bound,
@@ -142,6 +144,32 @@ def _admit_configuration(
             else "geometry.general_position_search_n_points_max"
         )
         _reject_geometry_domain(location=("points",), code=code, message=str(exc))
+
+
+def _admit_circumcircle(request: CircumcircleRequest) -> None:
+    points = (request.first, request.second, request.third)
+    keys = tuple(_point_key(point) for point in points)
+    if len(set(keys)) != len(keys):
+        _reject_geometry_domain(
+            location=("first", "second", "third"),
+            code="geometry.circumcircle_requires_three_distinct_points",
+            message="circumcircle requires three distinct points",
+        )
+    if are_collinear(*keys):
+        _reject_geometry_domain(
+            location=("first", "second", "third"),
+            code="geometry.circumcircle_requires_three_noncollinear_points",
+            message="circumcircle requires three noncollinear points",
+        )
+
+
+def _admit_simple_polygon_point(request: SimplePolygonPointRequest) -> None:
+    if not _is_simple_ring(request.polygon.points):
+        _reject_geometry_domain(
+            location=("polygon", "points"),
+            code="geometry.point_classification_requires_a_simple_polygon",
+            message="point classification requires a simple polygon",
+        )
 
 
 def _fraction(value: Any) -> Fraction:
@@ -415,6 +443,7 @@ def centroid(request: PointTripleRequest) -> GeometryPointResult:
 def circumcircle(request: CircumcircleRequest) -> GeometryCircleResult:
     from sympy.geometry import Circle
 
+    _admit_circumcircle(request)
     triple = request
     points = [_point(triple.first), _point(triple.second), _point(triple.third)]
     circle = Circle(*points)
@@ -490,6 +519,7 @@ def classify_polygon_point(
 ) -> PolygonPointClassificationResult:
     from sympy.geometry import Polygon
 
+    _admit_simple_polygon_point(request)
     value = request
     point = _point(value.point)
     points = tuple(_point(item) for item in value.polygon.points)

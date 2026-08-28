@@ -3,18 +3,22 @@
 from fractions import Fraction
 
 import pytest
-from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
 from jacobian.canonical import encode_strict_json, format_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.geometry._models import (
     MAX_TRIANGULATION_OUTPUT_CHARS,
+    CircumcircleRequest,
     ConvexPolygonTriangulationRequest,
     ConvexPolygonTriangulationResult,
+    PolygonRequest,
+    SimplePolygonPointRequest,
 )
 from jacobian.math.geometry._models import (
     RationalPoint2D as GeometryRationalPoint2D,
 )
+from jacobian.math.geometry._operations import circumcircle, classify_polygon_point
 from jacobian.math.geometry._triangulation import minimum_weight_triangulation
 from jacobian.math.geometry.euclidean._models import (
     AngleEqualityRequest,
@@ -52,6 +56,33 @@ def test_euclidean_points_use_the_canonical_geometry_value() -> None:
 
     assert RationalPoint2D is GeometryRationalPoint2D
     assert GeometryRationalPoint2D.model_validate(point) is point
+
+
+def test_circumcircle_rejects_collinear_points_at_operation_boundary() -> None:
+    request = CircumcircleRequest(first=_pt(0, 0), second=_pt(1, 1), third=_pt(2, 2))
+
+    with pytest.raises(OperationDomainValidationError) as exc_info:
+        circumcircle(request)
+
+    assert exc_info.value.errors()[0]["type"] == (
+        "geometry.circumcircle_requires_three_noncollinear_points"
+    )
+
+
+def test_point_classification_rejects_non_simple_polygon_at_operation_boundary() -> (
+    None
+):
+    request = SimplePolygonPointRequest(
+        polygon=PolygonRequest(points=(_pt(0, 0), _pt(2, 2), _pt(0, 2), _pt(2, 0))),
+        point=_pt(1, 1),
+    )
+
+    with pytest.raises(OperationDomainValidationError) as exc_info:
+        classify_polygon_point(request)
+
+    assert exc_info.value.errors()[0]["type"] == (
+        "geometry.point_classification_requires_a_simple_polygon"
+    )
 
 
 class TestSegmentRatio:
@@ -156,11 +187,12 @@ class TestRationalWeightTriangulation:
             },
         )
 
-        with pytest.raises(ValidationError):
-            _triangulation_request(
-                polygon={"points": self._ring(*self._PENTAGON)},
-                diagonal_weights=weights,
-            )
+        request = _triangulation_request(
+            polygon={"points": self._ring(*self._PENTAGON)},
+            diagonal_weights=weights,
+        )
+        with pytest.raises(OperationDomainValidationError):
+            minimum_weight_triangulation(request)
 
     @pytest.mark.scale
     def test_single_large_weight_remains_admitted(self) -> None:
@@ -256,11 +288,12 @@ class TestRationalWeightTriangulation:
             },
         )
 
-        with pytest.raises(ValidationError):
-            _triangulation_request(
-                polygon={"points": self._ring(*self._PENTAGON)},
-                diagonal_weights=weights,
-            )
+        request = _triangulation_request(
+            polygon={"points": self._ring(*self._PENTAGON)},
+            diagonal_weights=weights,
+        )
+        with pytest.raises(OperationDomainValidationError):
+            minimum_weight_triangulation(request)
 
     @pytest.mark.scale
     def test_boundary_height_pair_stays_admitted_with_ledger_invariant(self) -> None:
@@ -302,11 +335,12 @@ class TestRationalWeightTriangulation:
             },
         )
 
-        with pytest.raises(ValidationError):
-            _triangulation_request(
-                polygon={"points": self._ring(*self._PENTAGON)},
-                diagonal_weights=weights,
-            )
+        request = _triangulation_request(
+            polygon={"points": self._ring(*self._PENTAGON)},
+            diagonal_weights=weights,
+        )
+        with pytest.raises(OperationDomainValidationError):
+            minimum_weight_triangulation(request)
 
     @pytest.mark.scale
     def test_boundary_height_pair_stays_admitted_at_the_exact_cap(self) -> None:
@@ -368,11 +402,12 @@ class TestRationalWeightTriangulation:
         # so anchoring (0,2) hid the coexisting 20,001-digit denominator on
         # (0,3); admission accepted these weights and serializing the ledger
         # sum later raised inside CanonicalRational instead.
-        with pytest.raises(ValidationError):
-            _triangulation_request(
-                polygon={"points": self._ring(*self._REVIEW_PENTAGON)},
-                diagonal_weights=self._mixed_extreme_weights(10**20000),
-            )
+        request = _triangulation_request(
+            polygon={"points": self._ring(*self._REVIEW_PENTAGON)},
+            diagonal_weights=self._mixed_extreme_weights(10**20000),
+        )
+        with pytest.raises(OperationDomainValidationError):
+            minimum_weight_triangulation(request)
 
     @pytest.mark.scale
     def test_complementary_region_coexistence_stays_admitted_below_the_cap(
@@ -422,11 +457,12 @@ class TestRationalWeightTriangulation:
         # computing the triangulation.
         weights = self._uniform_ring_weights(format_canonical_integer(10**21999))
 
-        with pytest.raises(ValidationError):
-            _triangulation_request(
-                polygon={"points": self._ring(*self._UNIFORM_RING)},
-                diagonal_weights=weights,
-            )
+        request = _triangulation_request(
+            polygon={"points": self._ring(*self._UNIFORM_RING)},
+            diagonal_weights=weights,
+        )
+        with pytest.raises(OperationDomainValidationError):
+            minimum_weight_triangulation(request)
 
     @pytest.mark.scale
     def test_uniform_ring_with_fitting_aggregate_stays_certified(self) -> None:
@@ -502,11 +538,12 @@ class TestRationalWeightTriangulation:
             dict.fromkeys(self._UNIFORM_RING_DIAGONALS, ("1", denominator)),
         )
 
-        with pytest.raises(ValidationError):
-            _triangulation_request(
-                polygon={"points": self._ring(*self._UNIFORM_RING)},
-                diagonal_weights=weights,
-            )
+        request = _triangulation_request(
+            polygon={"points": self._ring(*self._UNIFORM_RING)},
+            diagonal_weights=weights,
+        )
+        with pytest.raises(OperationDomainValidationError):
+            minimum_weight_triangulation(request)
 
 
 class TestAngleEquality:

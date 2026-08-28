@@ -45,7 +45,7 @@ def weight_profile(
     """Weight profile of a canonical polynomial under an integer weight.
 
     Native callers bypass the wire transport caps and use the shared
-    kernel directly; the value validator still replays the profile.
+    kernel directly; the returned value validates only its canonical shape.
     """
     minimum_weight, minimizing, layers = _compute_weight_layers(polynomial, weight)
     return PolynomialWeightProfile(
@@ -63,7 +63,7 @@ def initial_form(
     """Initial form of a canonical polynomial under an integer weight.
 
     Native callers bypass the wire transport caps and build the face via
-    the shared kernel; the value validator still replays it.
+    the shared kernel; the returned value validates only its canonical shape.
     """
     face_terms = _initial_form_terms(polynomial, weight)
     initial_form_value = RationalPolynomial(

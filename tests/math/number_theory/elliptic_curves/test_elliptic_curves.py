@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
 from jacobian.canonical import format_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.number_theory.elliptic_curves._models import (
     CurveDiscriminantResult,
     CurvePointRequest,
@@ -232,38 +233,50 @@ class TestGroupLawAdmission:
         """(1,1) does not lie on y^2=x^3+x; the old code returned a fake sum."""
         curve = ShortWeierstrassCurve(coefficient_a=_pt("1"), coefficient_b=_pt("0"))
         p = RationalAffinePoint(x=_pt("1"), y=_pt("1"))
-        with pytest.raises(ValidationError) as exc_info:
-            add_points(
-                EllipticCurvePointAdditionRequest(
-                    curve=curve, first=_operand(curve, p), second=_operand(curve, p)
-                )
-            )
-        _assert_error_code(exc_info, "elliptic_curve.result_point_off_curve")
+        forged = EllipticCurvePointResult.model_construct(
+            curve=curve, point=p, at_infinity=False
+        )
+        request = EllipticCurvePointAdditionRequest.model_construct(
+            curve=curve, first=forged, second=forged
+        )
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            add_points(request)
+        assert exc_info.value.errors()[0]["type"] == "elliptic_curve.point_off_curve"
 
     def test_singular_curve_rejected(self) -> None:
         """y^2=x^3 has a cusp at the origin: discriminant zero."""
         curve = ShortWeierstrassCurve(coefficient_a=_pt("0"), coefficient_b=_pt("0"))
         p = RationalAffinePoint(x=_pt("1"), y=_pt("1"))
-        with pytest.raises(ValidationError) as exc_info:
-            ScalarMultiplicationRequest(curve=curve, point=_operand(curve, p), scalar=2)
-        _assert_error_code(exc_info, "elliptic_curve.singular_curve")
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            scalar_multiply(
+                ScalarMultiplicationRequest(
+                    curve=curve, point=_operand(curve, p), scalar=2
+                )
+            )
+        assert exc_info.value.errors()[0]["type"] == "elliptic_curve.singular_curve"
 
     def test_singular_curve_with_identity_operands_rejected(self) -> None:
         """The identity shortcut must not bypass nonsingularity: a singular
         curve is rejected even when every operand is the point at infinity."""
         curve = ShortWeierstrassCurve(coefficient_a=_pt("0"), coefficient_b=_pt("0"))
         identity = EllipticCurvePointResult(curve=curve, at_infinity=True)
-        with pytest.raises(ValidationError) as exc_info:
-            EllipticCurvePointAdditionRequest(
-                curve=curve, first=identity, second=identity
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            add_points(
+                EllipticCurvePointAdditionRequest(
+                    curve=curve, first=identity, second=identity
+                )
             )
-        _assert_error_code(exc_info, "elliptic_curve.singular_curve")
-        with pytest.raises(ValidationError) as exc_info:
-            ScalarMultiplicationRequest(curve=curve, point=identity, scalar=7)
-        _assert_error_code(exc_info, "elliptic_curve.singular_curve")
-        with pytest.raises(ValidationError) as exc_info:
-            ScalarMultiplicationRequest(curve=curve, point=identity, scalar=0)
-        _assert_error_code(exc_info, "elliptic_curve.singular_curve")
+        assert exc_info.value.errors()[0]["type"] == "elliptic_curve.singular_curve"
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            scalar_multiply(
+                ScalarMultiplicationRequest(curve=curve, point=identity, scalar=7)
+            )
+        assert exc_info.value.errors()[0]["type"] == "elliptic_curve.singular_curve"
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            scalar_multiply(
+                ScalarMultiplicationRequest(curve=curve, point=identity, scalar=0)
+            )
+        assert exc_info.value.errors()[0]["type"] == "elliptic_curve.singular_curve"
 
     def test_double_order_two_point_huge_denominator_admitted(self) -> None:
         """Doubling P=(1/q, 0) on y²=x³+x+B is O: admission must not
