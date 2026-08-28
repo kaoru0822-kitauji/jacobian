@@ -1,35 +1,35 @@
-"""Declarations for divisor-sum-product fibers and p-adic profiles."""
+"""Declarations for multiplier divisor-sum fibers and p-adic profiles."""
 
 from jacobian.catalog._examples import example
 from jacobian.math.number_theory._preimage_models import (
-    DivisorSumProductPreimageRequest,
-    DivisorSumProductPreimageResult,
+    KSigmaPreimageRequest,
+    KSigmaPreimageResult,
     PAdicIntervalProfileRequest,
     PAdicIntervalProfileResult,
 )
 from jacobian.math.number_theory._preimage_operations import (
-    compute_divisor_sum_product_preimage,
+    compute_ksigma_preimage,
     compute_p_adic_interval_profile,
 )
 from jacobian.math.number_theory._support import number_theory_operation
 
 PREIMAGE_OPERATIONS = (
     number_theory_operation(
-        "number_theory.divisor_sum_product.preimages.compute",
-        "Compute the preimage of n*sigma(n)",
-        "Find all positive n such that n * sigma(n) = target, where sigma is the sum-of-divisors function.",
-        DivisorSumProductPreimageRequest,
-        DivisorSumProductPreimageResult,
-        compute_divisor_sum_product_preimage,
+        "number_theory.ksigma.preimage.compute",
+        "Compute the preimage of k*sigma(n)",
+        "Find all positive n such that k * sigma(n) = target_value, where sigma is the sum-of-divisors function.",
+        KSigmaPreimageRequest,
+        KSigmaPreimageResult,
+        compute_ksigma_preimage,
         "number-theory",
         "divisor-function",
         "preimage",
         "exact",
         examples=(
             example(
-                "divisor_sum_product_preimage_336",
-                "Find all n with n*sigma(n) = 336.",
-                {"target": "336"},
+                "ksigma_preimage_2_8",
+                "Find all n with 2*sigma(n) = 8.",
+                {"k": 2, "target_value": "8"},
             ),
         ),
     ),

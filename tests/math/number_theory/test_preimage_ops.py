@@ -1,7 +1,6 @@
-"""Tests for divisor-sum-product fibers and p-adic interval profiles."""
+"""Tests for multiplier divisor-sum fibers and p-adic interval profiles."""
 
 import pytest
-from pydantic import ValidationError
 
 from jacobian.canonical import CanonicalLimits, canonicalize_json
 from jacobian.catalog.models import OperationDomainValidationError
@@ -10,40 +9,43 @@ from jacobian.math.number_theory._preimage_models import (
     MAX_INTERVAL_PROFILE_RESULT_BYTES,
     MAX_INTERVAL_PROFILE_ROWS,
     MAX_INTERVAL_PROFILE_WORK,
-    DivisorSumProductPreimageRequest,
+    KSigmaPreimageRequest,
     PAdicIntervalProfileRequest,
 )
 from jacobian.math.number_theory._preimage_operations import (
-    compute_divisor_sum_product_preimage,
+    compute_ksigma_preimage,
     compute_p_adic_interval_profile,
 )
 from jacobian.math.number_theory._preimage_ops import PREIMAGE_OPERATIONS
 
 
-def test_divisor_sum_product_preimage_collision_is_complete() -> None:
-    result = compute_divisor_sum_product_preimage(
-        DivisorSumProductPreimageRequest(target="336")
-    )
-    assert result.preimages == ("12", "14")
-    assert result.count == 2
+def test_ksigma_preimage_preserves_multiplier_contract() -> None:
+    result = compute_ksigma_preimage(KSigmaPreimageRequest(k=2, target_value="8"))
+    assert result.k == 2
+    assert result.target_value == "8"
+    assert result.preimages == ("3",)
+    assert result.count == 1
 
 
-def test_divisor_sum_product_preimage_empty_fiber() -> None:
-    result = compute_divisor_sum_product_preimage(
-        DivisorSumProductPreimageRequest(target="2")
-    )
+def test_ksigma_preimage_nondivisible_target_has_empty_fiber() -> None:
+    result = compute_ksigma_preimage(KSigmaPreimageRequest(k=3, target_value="8"))
     assert result.preimages == ()
 
 
-def test_divisor_sum_product_preimage_boundary_is_admitted() -> None:
-    request = DivisorSumProductPreimageRequest(target="10000000")
-    result = compute_divisor_sum_product_preimage(request)
-    assert all(int(n) * int(n) <= 10000000 for n in result.preimages)
+def test_ksigma_preimage_search_boundary_is_complete() -> None:
+    request = KSigmaPreimageRequest(k=100, target_value="10000000")
+    result = compute_ksigma_preimage(request)
+    assert all(
+        100 * __import__("sympy").divisor_sigma(int(n)) == 10000000
+        for n in result.preimages
+    )
 
 
-def test_divisor_sum_product_preimage_rejects_oversized_target() -> None:
-    with pytest.raises(ValidationError):
-        DivisorSumProductPreimageRequest(target="10000001")
+def test_ksigma_preimage_rejects_oversized_search() -> None:
+    request = KSigmaPreimageRequest(k=1, target_value="100001")
+    with pytest.raises(OperationDomainValidationError) as error:
+        compute_ksigma_preimage(request)
+    assert error.value.errors()[0]["type"] == "number_theory.ksigma_search_bound"
 
 
 def test_p_adic_profile_uses_interval_histogram() -> None:

@@ -322,9 +322,9 @@ ADMISSIONS: tuple[OperationAdmission, ...] = (
         "distinct complete pairwise divisibility profile that a loop of scalar divides checks cannot establish as one source-bound value",
     ),
     OperationAdmission(
-        "number_theory.divisor_sum_product.preimages.compute",
+        "number_theory.ksigma.preimage.compute",
         AdmissionDecision.KEEP,
-        "complete exact source-bound fiber of n*sigma(n), using the square-root inequality to avoid caller-side coverage proofs",
+        "complete exact source-bound fiber of k*sigma(n), using sigma(n) >= n + 1 for n > 1 to establish the search boundary",
     ),
     OperationAdmission(
         "number_theory.integer_interval.p_adic_valuation_profile.compute",

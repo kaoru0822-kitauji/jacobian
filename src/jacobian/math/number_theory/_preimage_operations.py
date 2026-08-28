@@ -1,9 +1,8 @@
-"""Exact kernels for divisor-sum-product fibers and p-adic profiles."""
+"""Exact kernels for multiplier divisor-sum fibers and p-adic profiles."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import isqrt
 
 from jacobian.canonical import (
     CanonicalizationError,
@@ -18,9 +17,11 @@ from jacobian.math.number_theory._preimage_models import (
     MAX_INTERVAL_PROFILE_RESULT_BYTES,
     MAX_INTERVAL_PROFILE_ROWS,
     MAX_INTERVAL_PROFILE_WORK,
+    MAX_KSIGMA_SEARCH,
+    MAX_KSIGMA_TARGET,
     PRIMALITY_WORK_DIGIT_EXPONENT,
-    DivisorSumProductPreimageRequest,
-    DivisorSumProductPreimageResult,
+    KSigmaPreimageRequest,
+    KSigmaPreimageResult,
     PAdicIntervalProfileRequest,
     PAdicIntervalProfileResult,
     PAdicIntervalProfileRow,
@@ -204,20 +205,39 @@ def _admit_p_adic_interval_profile(
     )
 
 
-def compute_divisor_sum_product_preimage(
-    request: DivisorSumProductPreimageRequest,
-) -> DivisorSumProductPreimageResult:
-    """Compute every positive n with ``n * sigma(n) == target``."""
+def compute_ksigma_preimage(
+    request: KSigmaPreimageRequest,
+) -> KSigmaPreimageResult:
+    """Compute every positive ``n`` with ``k * sigma(n) == target_value``."""
     from sympy import divisor_sigma
 
-    target = parse_canonical_integer(request.target)
-    source_upper_bound = isqrt(target)
+    target = parse_canonical_integer(request.target_value)
+    if not 1 <= target <= MAX_KSIGMA_TARGET:
+        raise OperationDomainValidationError(
+            location=("target_value",),
+            code="number_theory.ksigma_target_bound",
+            message=f"target_value must be between 1 and {MAX_KSIGMA_TARGET}",
+        )
+    if target % request.k:
+        return KSigmaPreimageResult._from_kernel(request, preimages=())
+
+    sigma_target = target // request.k
+    if sigma_target > MAX_KSIGMA_SEARCH:
+        raise OperationDomainValidationError(
+            location=("target_value",),
+            code="number_theory.ksigma_search_bound",
+            message=(
+                "target_value / k must be at most "
+                f"{MAX_KSIGMA_SEARCH} when k divides target_value"
+            ),
+        )
+
+    # sigma(n) >= n + 1 for n > 1, while sigma(1) = 1, so this is a
+    # complete search of the positive preimage rather than a heuristic cap.
     preimages = tuple(
-        n
-        for n in range(1, source_upper_bound + 1)
-        if n * int(divisor_sigma(n)) == target
+        n for n in range(1, sigma_target + 1) if int(divisor_sigma(n)) == sigma_target
     )
-    return DivisorSumProductPreimageResult._from_kernel(
+    return KSigmaPreimageResult._from_kernel(
         request,
         preimages=preimages,
     )
@@ -244,6 +264,6 @@ def compute_p_adic_interval_profile(
 
 
 __all__ = [
-    "compute_divisor_sum_product_preimage",
+    "compute_ksigma_preimage",
     "compute_p_adic_interval_profile",
 ]

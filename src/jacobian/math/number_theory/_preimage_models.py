@@ -1,4 +1,4 @@
-"""Contracts for divisor-sum-product fibers and p-adic interval profiles."""
+"""Contracts for multiplier divisor-sum fibers and p-adic interval profiles."""
 
 from __future__ import annotations
 
@@ -14,8 +14,9 @@ from jacobian.math.number_theory._models import (
     _validation_error,
 )
 
-MAX_PREIMAGE_TARGET = 10_000_000
-MAX_PREIMAGE_SOURCE = 3_162  # floor(sqrt(MAX_PREIMAGE_TARGET))
+MAX_KSIGMA_MULTIPLIER = 100
+MAX_KSIGMA_TARGET = 10_000_000
+MAX_KSIGMA_SEARCH = 100_000
 MAX_INTERVAL_PROFILE_ROWS = 1_024
 MAX_INTERVAL_PROFILE_WORK = 3 * MAX_INTERVAL_PROFILE_ROWS
 MAX_INTERVAL_PROFILE_RESULT_BYTES = CanonicalLimits().max_output_bytes
@@ -35,57 +36,50 @@ _P_ADIC_REQUEST_DESCRIPTION = (
 )
 
 
-class DivisorSumProductPreimageRequest(StrictModel):
-    """One positive target for the map ``n -> n * sigma(n)``."""
+class KSigmaPreimageRequest(StrictModel):
+    """Find the complete positive preimage of ``n -> k * sigma(n)``."""
 
-    target: BoundedInteger = Field(
+    k: StrictInt = Field(ge=1, le=MAX_KSIGMA_MULTIPLIER)
+    target_value: BoundedInteger = Field(
         description=(
-            "Positive canonical target m. The complete source fiber is searched "
-            f"through floor(sqrt(m)) for m <= {MAX_PREIMAGE_TARGET}."
+            "Positive canonical target m. When k divides m, admission searches the "
+            "complete sigma preimage through m/k, provided that quotient is at most "
+            f"{MAX_KSIGMA_SEARCH}."
         ),
-        examples=["336"],
+        examples=["8"],
     )
 
-    @model_validator(mode="after")
-    def require_admitted_target(self) -> Self:
-        target = parse_canonical_integer(self.target)
-        if not 1 <= target <= MAX_PREIMAGE_TARGET:
-            raise _validation_error(
-                "divisor_sum_product_target_bound",
-                f"target must be between 1 and {MAX_PREIMAGE_TARGET}",
-            )
-        return self
 
+class KSigmaPreimageResult(StrictModel):
+    """The complete increasing fiber of ``n -> k * sigma(n)``."""
 
-class DivisorSumProductPreimageResult(StrictModel):
-    """The complete increasing fiber of ``n -> n * sigma(n)``."""
-
-    target: BoundedInteger
-    preimages: tuple[BoundedInteger, ...] = Field(max_length=MAX_PREIMAGE_SOURCE)
+    k: StrictInt = Field(ge=1, le=MAX_KSIGMA_MULTIPLIER)
+    target_value: BoundedInteger
+    preimages: tuple[BoundedInteger, ...] = Field(max_length=MAX_KSIGMA_SEARCH)
     count: StrictInt = Field(ge=0)
 
     @model_validator(mode="after")
     def require_canonical_fiber_shape(self) -> Self:
-        target = parse_canonical_integer(self.target)
+        target = parse_canonical_integer(self.target_value)
         values = tuple(parse_canonical_integer(value) for value in self.preimages)
-        if not 1 <= target <= MAX_PREIMAGE_TARGET:
+        if not 1 <= target <= MAX_KSIGMA_TARGET:
             raise _validation_error(
-                "divisor_sum_product_target_bound",
-                f"target must be between 1 and {MAX_PREIMAGE_TARGET}",
+                "ksigma_target_bound",
+                f"target_value must be between 1 and {MAX_KSIGMA_TARGET}",
             )
         if any(value < 1 for value in values):
             raise _validation_error(
-                "divisor_sum_product_preimages_must_be_positive",
+                "ksigma_preimages_must_be_positive",
                 "preimages must be positive",
             )
         if values != tuple(sorted(set(values))):
             raise _validation_error(
-                "divisor_sum_product_preimages_must_be_sorted",
+                "ksigma_preimages_must_be_sorted",
                 "preimages must be strictly increasing",
             )
         if self.count != len(values):
             raise _validation_error(
-                "divisor_sum_product_count_mismatch",
+                "ksigma_count_mismatch",
                 "count must equal the number of preimages",
             )
         return self
@@ -93,12 +87,13 @@ class DivisorSumProductPreimageResult(StrictModel):
     @classmethod
     def _from_kernel(
         cls,
-        request: DivisorSumProductPreimageRequest,
+        request: KSigmaPreimageRequest,
         *,
         preimages: tuple[int, ...],
     ) -> Self:
-        return cls(
-            target=request.target,
+        return cls.model_construct(
+            k=request.k,
+            target_value=request.target_value,
             preimages=tuple(str(value) for value in preimages),
             count=len(preimages),
         )
@@ -240,11 +235,12 @@ __all__ = [
     "MAX_INTERVAL_PROFILE_RESULT_BYTES",
     "MAX_INTERVAL_PROFILE_ROWS",
     "MAX_INTERVAL_PROFILE_WORK",
-    "MAX_PREIMAGE_SOURCE",
-    "MAX_PREIMAGE_TARGET",
+    "MAX_KSIGMA_MULTIPLIER",
+    "MAX_KSIGMA_SEARCH",
+    "MAX_KSIGMA_TARGET",
     "PRIMALITY_WORK_DIGIT_EXPONENT",
-    "DivisorSumProductPreimageRequest",
-    "DivisorSumProductPreimageResult",
+    "KSigmaPreimageRequest",
+    "KSigmaPreimageResult",
     "PAdicIntervalProfileRequest",
     "PAdicIntervalProfileResult",
     "PAdicIntervalProfileRow",
