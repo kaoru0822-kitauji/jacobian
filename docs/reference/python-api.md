@@ -21,6 +21,16 @@ or a maintained backend type when it already carries the complete mathematical
 meaning. Private backend modules perform lazy conversions and calls to SymPy,
 NetworkX, FLINT, or Z3.
 
+Public import paths follow mathematical ownership. Large owners expose
+recognizable subdivisions, for example
+`jacobian.math.graphs.chip_firing` or
+`jacobian.math.polynomials.interpolation`; backend and transport structure does
+not appear in the public path. When a pre-stable package is folded into its
+canonical owner, callers move to the owner path in the same release. The old
+path is removed rather than retained as a forwarding package, and operation IDs
+and wire schemas remain unchanged unless their mathematical contract changes
+independently.
+
 Native values are mathematical values rather than wire envelopes. Native and
 MCP calls use the same domain-owned request admission, kernel path, canonical
 result construction, and typed outcome semantics. Most native functions simply

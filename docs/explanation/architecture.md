@@ -151,6 +151,24 @@ subjects such as matrices, graphs, polynomials, probability, and number theory
 over vague umbrellas that would contain much of the library. Keep the top level
 free of ticket-shaped feature packages, backend names, and workflow groupings.
 
+The target first-level taxonomy is deliberately restrained:
+
+```text
+jacobian.math
+  matrices            polynomials          finite_fields
+  groups              lattices             graphs
+  combinatorics       number_theory        geometry
+  topology            analysis             probability
+  optimization        dynamics             logic
+```
+
+This list is the package-migration target, not a claim that every current
+package has already been folded. A subject may remain first-level only when it
+cannot be represented honestly as a mathematical subdivision of one of these
+owners; do not force an independent subject into an inaccurate parent merely
+to reduce the directory count. Record that exception here when it becomes a
+durable part of the public taxonomy.
+
 Decide by evidence, in this order:
 
 1. **Canonical value ownership.** Each mathematical value has one package that
@@ -209,6 +227,13 @@ old path in the same change, and lands as one family per change. A proposed
 repository-wide taxonomy remains a migration plan until each fold establishes
 its value owner, operation owner, and mathematical-subdivision relationship; do
 not document an aspirational directory tree as current behavior.
+
+Because Jacobian is pre-stable, a fold updates repository imports and public
+examples atomically and does not retain forwarding packages at the former path.
+Do not maintain parallel old and new import surfaces, migration registries, or
+hard-coded path aliases. Catalog discovery remains recursive and derives owner
+modules from packaged `_admission.py` files, so adding a mathematical nesting
+level must not require a central package inventory.
 
 Logic follows the same rule. CNF canonicalization and assignment checks are
 pure direct operations. SAT and bounded QF SMT-LIB solving use the maintained
