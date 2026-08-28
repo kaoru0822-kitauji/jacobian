@@ -355,19 +355,11 @@ def _prime_gap_profile_kernel(admission: IntervalAdmission) -> PrimeGapProfileRe
     if not primes_in_interval:
         return PrimeGapProfileResult(lower_bound=lo, upper_bound=hi, rows=())
 
-    # Find the successor prime after the last prime in interval
-    if primes_in_interval[-1] <= hi:
-        # Find next prime after hi (or after last_prime, which is <= hi)
-        from sympy import nextprime
+    from sympy import nextprime
 
-        successor = int(nextprime(hi))
-        # Admission charges the proven span of this mandatory search.  Dusart's
-        # bound makes this backend call finite on every admitted request.
-        primes_in_interval.append(successor)
-    elif len(primes_in_interval) >= 2:
-        # The last prime is already > hi (shouldn't happen since we only
-        # sieve up to hi), but handle defensively
-        pass
+    # Admission charges the proven span of this mandatory successor search.
+    # Dusart's bound makes the backend call finite on every admitted request.
+    primes_in_interval.append(int(nextprime(hi)))
 
     rows: list[PrimeGapProfileRow] = []
     for i in range(len(primes_in_interval) - 1):

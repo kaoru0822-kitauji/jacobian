@@ -34,48 +34,6 @@ from jacobian.math.number_theory._integer_models import (
 )
 
 
-def _compute_certified_factorization(
-    request: CertifiedFactorizationRequest,
-) -> CertifiedFactorizationResult:
-    return factorize_certified(request)
-
-
-def _compute_pratt_certificate(
-    request: PrimalityCertificateRequest,
-) -> PrimalityCertificateResult:
-    return compute_pratt_certificate(request)
-
-
-def _compute_divisors(
-    request: FactorizationRequest,
-) -> DivisorListResult:
-    return enumerate_divisors(request)
-
-
-def _compute_proper_divisors(
-    request: FactorizationRequest,
-) -> DivisorListResult:
-    return enumerate_proper_divisors(request)
-
-
-def _compute_prime_factorization(
-    request: FactorizationRequest,
-) -> PrimeFactorizationResult:
-    return factorize_primes(request)
-
-
-def _compute_squarefree(
-    request: ArithmeticFunctionRequest,
-) -> SquarefreeResult:
-    return decide_squarefree(request)
-
-
-def _compute_radical(
-    request: ArithmeticFunctionRequest,
-) -> RadicalResult:
-    return compute_radical(request)
-
-
 def _operation[RequestT: StrictModel, ResultT: StrictModel](
     *,
     operation_id: str,
@@ -114,7 +72,7 @@ FACTORIZATION_OPERATIONS = (
         ),
         request_model=CertifiedFactorizationRequest,
         result_model=CertifiedFactorizationResult,
-        implementation=_compute_certified_factorization,
+        implementation=factorize_certified,
         tags=("number-theory", "factorization", "bounded", "prime", "certificate"),
         examples=(
             example(
@@ -132,7 +90,7 @@ FACTORIZATION_OPERATIONS = (
         description="Produce a Pratt primality certificate for one declared prime, or report COMPOSITE when the candidate is not prime.",
         request_model=PrimalityCertificateRequest,
         result_model=PrimalityCertificateResult,
-        implementation=_compute_pratt_certificate,
+        implementation=compute_pratt_certificate,
         tags=("number-theory", "primality", "certificate"),
         examples=(
             example(
@@ -153,7 +111,7 @@ FACTORIZATION_OPERATIONS = (
         ),
         request_model=FactorizationRequest,
         result_model=DivisorListResult,
-        implementation=_compute_divisors,
+        implementation=enumerate_divisors,
         tags=("number-theory", "enumeration"),
         discovery_terms=("positive divisors",),
         examples=(
@@ -171,7 +129,7 @@ FACTORIZATION_OPERATIONS = (
         ),
         request_model=FactorizationRequest,
         result_model=DivisorListResult,
-        implementation=_compute_proper_divisors,
+        implementation=enumerate_proper_divisors,
         tags=("number-theory", "enumeration"),
         examples=(
             example(
@@ -191,7 +149,7 @@ FACTORIZATION_OPERATIONS = (
         ),
         request_model=FactorizationRequest,
         result_model=PrimeFactorizationResult,
-        implementation=_compute_prime_factorization,
+        implementation=factorize_primes,
         tags=("number-theory", "factorization"),
         examples=(
             example(
@@ -210,7 +168,7 @@ FACTORIZATION_OPERATIONS = (
         ),
         request_model=ArithmeticFunctionRequest,
         result_model=SquarefreeResult,
-        implementation=_compute_squarefree,
+        implementation=decide_squarefree,
         tags=("number-theory", "predicate"),
         examples=(
             example("squarefree_30", "Check whether 30 is square-free.", {"n": 30}),
@@ -225,7 +183,7 @@ FACTORIZATION_OPERATIONS = (
         ),
         request_model=ArithmeticFunctionRequest,
         result_model=RadicalResult,
-        implementation=_compute_radical,
+        implementation=compute_radical,
         tags=("number-theory", "arithmetic-function"),
         examples=(example("radical_360", "Compute the radical of 360.", {"n": 360}),),
     ),

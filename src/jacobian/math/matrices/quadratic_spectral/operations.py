@@ -167,13 +167,6 @@ def _polynomial_parts(
     return rational, radical, trace, determinant
 
 
-def _annihilating_coefficients(
-    matrix: RealQuadraticMatrix,
-    spectrum_kind: SpectrumKind,
-) -> tuple[int, ...]:
-    return annihilating_coefficients(matrix, spectrum_kind)
-
-
 def _sympy_polynomial(coefficients: tuple[int, ...]):  # type: ignore[no-untyped-def]
     import sympy
 
@@ -377,7 +370,7 @@ def spectrum_rows(
     if discriminant_sign < 0:  # pragma: no cover
         raise RuntimeError("a real symmetric 2 by 2 spectrum had negative discriminant")
 
-    polynomial = _sympy_polynomial(_annihilating_coefficients(matrix, spectrum_kind))
+    polynomial = _sympy_polynomial(annihilating_coefficients(matrix, spectrum_kind))
     roots = _root_data(polynomial)
     rational_roots = _rational_branches(
         roots, rational, radical, trace, spectrum_kind, radicand

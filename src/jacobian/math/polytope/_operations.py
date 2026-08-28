@@ -255,10 +255,6 @@ def _deduplicate_halfspaces(
         g = 0
         for value in ints:
             g = math.gcd(g, abs(value))
-        if g == 0:
-            # All-zero normals cannot occur: request validation rejects
-            # them before admission; keep the row untouched as a fallback.
-            g = 1
         key = (
             tuple(value // g for value in ints),
             ((offset * lcm / g).numerator, (offset * lcm / g).denominator),

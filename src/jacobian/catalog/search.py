@@ -222,10 +222,6 @@ def discovery_terms(query: str) -> frozenset[str]:
     )
 
 
-def normalized_discovery_terms(value: str) -> frozenset[str]:
-    return discovery_terms(value)
-
-
 def token_set(value: str) -> frozenset[str]:
     return frozenset(
         normalize_discovery_term(term)

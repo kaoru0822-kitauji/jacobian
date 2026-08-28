@@ -16,6 +16,7 @@ from jacobian.math.polynomials.values import RationalFunction, RationalPolynomia
 from jacobian.math.symbolic_dynamics._bounds import (
     MAX_PERIODIC_PROFILE_DIGITS,
     MAX_PERIODIC_PROFILE_WORK,
+    _contains,
     enumeration_size,
     normalize_forbidden_blocks,
     presentation_memory,
@@ -31,13 +32,6 @@ from jacobian.math.symbolic_dynamics.values import (
     ForbiddenBlockShift,
     LabeledTransition,
 )
-
-
-def _contains(word: tuple[str, ...], factor: tuple[str, ...]) -> bool:
-    return any(
-        word[start : start + len(factor)] == factor
-        for start in range(len(word) - len(factor) + 1)
-    )
 
 
 def block_language(

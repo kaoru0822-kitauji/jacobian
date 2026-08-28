@@ -12,7 +12,6 @@ from jacobian.catalog.search import (
     discover_operations,
     discovery_relevance,
     discovery_terms,
-    normalized_discovery_terms,
 )
 
 
@@ -280,13 +279,13 @@ def test_inflected_discovery_ties_are_deterministic_and_operation_id_ordered() -
 
 
 def test_discovery_normalizes_only_audited_ordinary_plural_forms() -> None:
-    assert normalized_discovery_terms("subset sums and repeated representations") == {
+    assert discovery_terms("subset sums and repeated representations") == {
         "subset",
         "sum",
         "repeated",
         "representation",
     }
-    assert normalized_discovery_terms("basis class series") == {
+    assert discovery_terms("basis class series") == {
         "basis",
         "class",
         "series",

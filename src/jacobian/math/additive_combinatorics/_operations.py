@@ -232,11 +232,6 @@ def decide_direct_sum_predicate(
     left = {a % modulus for a in _parse_set(request.left)}
     right = {b % modulus for b in _parse_set(request.right)}
 
-    if len(left) * len(right) != modulus:
-        # |A| * |B| must equal n for a direct factorization.  Even though this
-        # is a necessary condition, we still produce the full diagnostic below.
-        pass
-
     representatives: dict[int, int] = {}
     collisions: set[int] = set()
     for a in sorted(left):

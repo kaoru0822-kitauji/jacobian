@@ -547,19 +547,19 @@ class VerificationResult(StrictModel):
     @model_validator(mode="after")
     def require_complete_source(self) -> Self:
         """Require exactly one structurally complete checked relation."""
-        if self.complex is not None:
-            if self.source or self.target or self.map_matrices:
-                raise _validation_error(
-                    "verification_inputs_conflict",
-                    "a differential verification result must not carry chain-map inputs",
-                )
-        elif (
+        if self.complex is not None and (
+            self.source or self.target or self.map_matrices
+        ):
+            raise _validation_error(
+                "verification_inputs_conflict",
+                "a differential verification result must not carry chain-map inputs",
+            )
+        has_complete_map = (
             self.source is not None
             and self.target is not None
             and self.map_matrices is not None
-        ):
-            pass
-        else:
+        )
+        if self.complex is None and not has_complete_map:
             raise _validation_error(
                 "verification_inputs_missing",
                 "a verification result must retain the complete checked "
