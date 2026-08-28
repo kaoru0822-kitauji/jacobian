@@ -171,26 +171,8 @@ def compute_deterministic_terminal_game(
     )
 
 
-def verify_deterministic_terminal_game_solution(
-    result: DeterministicTerminalGameSolution,
-) -> bool:
-    """Check one independently supplied terminal-game minimax profile.
-
-    ``result.game`` was admitted before result construction, so this bounded
-    replay uses exactly the game's published threshold-work envelope.
-    """
-
-    value_classes, max_strategy, min_strategy = _solve_terminal_game_data(result.game)
-    return (
-        result.value_classes == value_classes
-        and result.max_strategy == max_strategy
-        and result.min_strategy == min_strategy
-    )
-
-
 __all__ = [
     "compute_best_response",
     "compute_deterministic_terminal_game",
     "compute_nash_equilibrium",
-    "verify_deterministic_terminal_game_solution",
 ]

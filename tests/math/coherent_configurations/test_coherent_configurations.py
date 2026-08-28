@@ -9,15 +9,11 @@ from jacobian.math.coherent_configurations._models import (
     CoherentConfigurationAnalyzeRequest,
     CoherentConfigurationAnalyzeResult,
 )
-from jacobian.math.coherent_configurations._operations import (
-    compute_analyze,
-    verify_finite_coherent_configuration,
-)
+from jacobian.math.coherent_configurations._operations import compute_analyze
 from jacobian.math.coherent_configurations._tools import TOOLS
 from jacobian.math.coherent_configurations.values import (
     MAX_POINT_LABEL_BYTES,
     MAX_RELATION_ID_BYTES,
-    FiniteCoherentConfiguration,
 )
 
 
@@ -201,14 +197,6 @@ def test_path_partition_reports_nonconstant_intersection_numbers() -> None:
     assert result.obstruction.second_pair == ("b", "b")
     assert result.obstruction.first_count == 1
     assert result.obstruction.second_count == 2
-
-
-def test_positive_value_is_structural_and_has_an_explicit_coherence_verifier() -> None:
-    claimed = FiniteCoherentConfiguration.model_validate(
-        _path_four_relation_partition()
-    )
-
-    assert not verify_finite_coherent_configuration(claimed)
 
 
 def test_malformed_partition_is_request_invalid_not_a_negative_conclusion() -> None:

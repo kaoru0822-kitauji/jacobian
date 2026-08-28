@@ -29,7 +29,6 @@ from jacobian.math.finite_game_theory._models import (
 )
 from jacobian.math.finite_game_theory._operations import (
     compute_deterministic_terminal_game,
-    verify_deterministic_terminal_game_solution,
 )
 from jacobian.math.finite_game_theory._tools import TOOLS
 
@@ -390,40 +389,6 @@ def test_result_size_is_rejected_independently_of_threshold_work() -> None:
     with pytest.raises(OperationDomainValidationError) as exc_info:
         compute_deterministic_terminal_game(DeterministicTerminalGameRequest(game=game))
     assert exc_info.value.errors()[0]["type"] == "finite_game.result_size_exceeded"
-
-
-def test_solution_claims_are_structural_and_verifier_rejects_mutations() -> None:
-    result = solve_terminal_game(_paper_game())
-
-    bad_classes = (
-        TerminalGameValueClass(payoff=_r(0), positions=("s", "u", "t1")),
-        *result.value_classes[1:],
-    )
-    bad_value_classes = DeterministicTerminalGameSolution(
-        game=result.game,
-        value_classes=bad_classes,
-        max_strategy=result.max_strategy,
-        min_strategy=result.min_strategy,
-    )
-    assert not verify_deterministic_terminal_game_solution(bad_value_classes)
-
-    bad_strategy = DeterministicTerminalGameSolution(
-        game=result.game,
-        value_classes=result.value_classes,
-        max_strategy=(StationaryChoice(position="u", target="u"),),
-        min_strategy=result.min_strategy,
-    )
-    assert not verify_deterministic_terminal_game_solution(bad_strategy)
-
-    draw_mutation = result.game.model_dump(mode="json")
-    draw_mutation["draw_payoff"] = {"num": "3", "den": "1"}
-    claim = DeterministicTerminalGameSolution(
-        game=DeterministicTerminalGame.model_validate(draw_mutation),
-        value_classes=result.value_classes,
-        max_strategy=result.max_strategy,
-        min_strategy=result.min_strategy,
-    )
-    assert not verify_deterministic_terminal_game_solution(claim)
 
 
 def test_public_request_and_example_return_the_declared_result() -> None:

@@ -119,12 +119,7 @@ class CoherentConfigurationInput(StrictModel):
 
 
 class FiniteCoherentConfiguration(CoherentConfigurationInput):
-    """A claimed finite coherent configuration with canonical pair-partition data.
-
-    Coherence is a derived mathematical claim.  Kernel-produced values are
-    constructed by the owner-local trusted factory; independently supplied
-    values must be checked with ``verify_finite_coherent_configuration``.
-    """
+    """A kernel-established coherent configuration with canonical pair data."""
 
     @classmethod
     def _from_kernel(cls, source: CoherentConfigurationInput) -> Self:

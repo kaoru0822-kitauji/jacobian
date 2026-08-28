@@ -508,26 +508,12 @@ def test_widened_truncate_request_is_versioned_as_version_three() -> None:
     {tool.operation_id: tool for tool in TOOLS}
 
 
-def test_truncate_source_ceiling_covers_the_level_one_replay_envelope() -> None:
+def test_truncate_accepts_a_large_canonical_modular_series() -> None:
     from jacobian.math.modular_forms.kernel import (
         eisenstein_coefficients,
         metadata,
-        require_level_one_replay,
     )
     from jacobian.math.modular_forms.values import LevelOneModularQExpansion
-
-    require_level_one_replay("E4", MAX_TRUNCATE_SOURCE_ORDER)
-    widest, lo, hi = 1, 1, MAX_TRUNCATE_SOURCE_ORDER + 1
-    while lo < hi:
-        middle = (lo + hi + 1) // 2
-        try:
-            require_level_one_replay("E4", middle)
-        except ValueError:
-            hi = middle - 1
-        else:
-            widest = middle
-            lo = middle
-    assert widest == MAX_TRUNCATE_SOURCE_ORDER
 
     weight, space_kind, normalization = metadata("E4")
     coefficients = eisenstein_coefficients("E4", 3_000)

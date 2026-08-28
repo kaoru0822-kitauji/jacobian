@@ -9,12 +9,7 @@ from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
 from jacobian.math.formal_power_series._models import TruncatedSeries
-from jacobian.math.modular_forms.kernel import (
-    NamedLevelOneModularForm,
-    expected_coefficients,
-    metadata,
-    require_level_one_replay,
-)
+from jacobian.math.modular_forms.kernel import NamedLevelOneModularForm, metadata
 
 
 def _validation_error(reason: str, message: str) -> PydanticCustomError:
@@ -78,18 +73,4 @@ class LevelOneModularQExpansion(StrictModel):
         )
 
 
-def verify_level_one_q_expansion(value: LevelOneModularQExpansion) -> bool:
-    """Boundedly verify an independently supplied named q-expansion."""
-
-    try:
-        require_level_one_replay(value.form, value.q_expansion.truncation_order)
-    except ValueError:
-        return False
-    expected = expected_coefficients(value.form, value.q_expansion.truncation_order)
-    actual = tuple(
-        coefficient.as_fraction() for coefficient in value.q_expansion.coefficients
-    )
-    return actual == expected
-
-
-__all__ = ["LevelOneModularQExpansion", "verify_level_one_q_expansion"]
+__all__ = ["LevelOneModularQExpansion"]

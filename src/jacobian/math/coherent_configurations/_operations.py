@@ -29,7 +29,6 @@ from jacobian.math.coherent_configurations.values import (
 
 __all__ = [
     "compute_analyze",
-    "verify_finite_coherent_configuration",
 ]
 
 
@@ -134,11 +133,3 @@ def compute_analyze(
             message=str(exc),
         ) from exc
     return _computed_analysis_result(request.configuration, data)
-
-
-def verify_finite_coherent_configuration(
-    configuration: CoherentConfigurationInput,
-) -> bool:
-    """Check one independently supplied claimed coherent configuration."""
-
-    return _analyze(configuration).obstruction is None
