@@ -311,10 +311,10 @@ def test_native_recurrence_api_enforces_the_sequence_contract() -> None:
     assert recurrence.coefficients == (_r(2),)
     assert closed_form((_r(1), _r(-2)), (_r(3),)).expression == "3*2**n"
 
-    with algebra_validation_error():
+    with pytest.raises(ValueError, match="sequence must have length"):
         find_recurrence((_r(1),))
 
-    with algebra_validation_error():
+    with pytest.raises(ValueError, match="initial value count"):
         closed_form((_r(1), _r(-1), _r(-1)), (_r(1),))
 
 
@@ -361,8 +361,9 @@ def test_closed_form_contract_rejects_characteristic_polynomials_above_degree_fo
 
 
 def test_closed_form_contract_requires_every_initial_value() -> None:
-    with algebra_validation_error():
-        ClosedFormRequest(
-            characteristic_coefficients=(_r(1), _r(-1), _r(-1)),
-            initial_values=(_r(1),),
-        )
+    request = ClosedFormRequest(
+        characteristic_coefficients=(_r(1), _r(-1), _r(-1)),
+        initial_values=(_r(1),),
+    )
+    with pytest.raises(OperationDomainValidationError, match="initial value count"):
+        compute_closed_form(request)

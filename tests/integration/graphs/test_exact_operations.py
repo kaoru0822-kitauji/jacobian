@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import pytest
 from tests.integration.graphs._support import graph_validation_error
 
 from jacobian.catalog.catalog import Catalog
-from jacobian.catalog.models import OperationDiscoveryRequest
+from jacobian.catalog.models import (
+    OperationDiscoveryRequest,
+    OperationDomainValidationError,
+)
 from jacobian.math.graphs.coloring._admission import ADMISSIONS
 from jacobian.math.graphs.coloring._models import (
     KColorabilityRequest,
@@ -75,23 +79,24 @@ def test_flow_preserves_large_exact_rational_capacity() -> None:
 
 
 def test_flow_contract_rejects_out_of_range_terminals() -> None:
-    with graph_validation_error():
-        MaxFlowRequest.model_validate(
-            {
-                "graph": {
-                    "vertex_count": 2,
-                    "edges": [
-                        {
-                            "source": 0,
-                            "target": 1,
-                            "capacity": {"num": "1", "den": "1"},
-                        }
-                    ],
-                },
-                "source": 2,
-                "sink": 1,
-            }
-        )
+    request = MaxFlowRequest.model_validate(
+        {
+            "graph": {
+                "vertex_count": 2,
+                "edges": [
+                    {
+                        "source": 0,
+                        "target": 1,
+                        "capacity": {"num": "1", "den": "1"},
+                    }
+                ],
+            },
+            "source": 2,
+            "sink": 1,
+        }
+    )
+    with pytest.raises(OperationDomainValidationError, match="source must be in"):
+        compute_max_flow(request)
 
 
 def test_spectral_contract_rejects_non_simple_graphs() -> None:

@@ -9,7 +9,8 @@ import pytest
 from jacobian._exact import MAX_CANONICAL_RATIONAL_DIGITS
 from jacobian.canonical import canonicalize_json, encode_strict_json
 from jacobian.catalog.catalog import Catalog
-from jacobian.dispatch import OperationRequestValidationError, invoke_operation
+from jacobian.catalog.models import OperationDomainValidationError
+from jacobian.dispatch import invoke_operation
 from jacobian.math.matrices.values import MAX_MATRIX_DIMENSION
 
 
@@ -79,13 +80,13 @@ def _encoded_inertia_payload_near_limit(offset: int) -> bytes:
 
 @pytest.mark.scale
 def test_dispatch_rejects_unfittable_inertia_request_as_typed_error() -> None:
-    with pytest.raises(OperationRequestValidationError) as excinfo:
+    with pytest.raises(OperationDomainValidationError) as excinfo:
         invoke_operation(
             "matrix.inertia.compute",
             json.loads(_encoded_inertia_payload_near_limit(offset=512)),
             Catalog.open(),
         )
-    assert "canonical output limit" in str(excinfo.value.cause)
+    assert "canonical output limit" in str(excinfo.value)
 
 
 def test_dispatch_admits_order_33_diagonal_inertia_request() -> None:
