@@ -6,6 +6,9 @@ from jacobian.math.number_theory.arithmetic._integer_predicates import is_square
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
+        (0, False),
+        (-12, False),
+        (-6, True),
         (1, True),
         (2, True),
         (6, True),
