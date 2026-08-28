@@ -13,7 +13,11 @@ from typing import Any, cast
 
 from jacobian._models import StrictModel
 from jacobian.catalog._examples import example
-from jacobian.catalog.models import MathTool, OperationExample
+from jacobian.catalog.models import (
+    MathTool,
+    OperationDomainValidationError,
+    OperationExample,
+)
 from jacobian.math.graphs.optimization._exact_search import (
     solve_domination,
     solve_induced_bipartite,
@@ -179,7 +183,11 @@ def _execute[ResultT: StrictModel](
     """Run one complete graph Z3 operation in its bounded owner worker."""
 
     if len(request.graph.vertices) > request.resource_budget.max_order:
-        raise ValueError("graph order exceeds the declared max_order budget")
+        raise OperationDomainValidationError(
+            location=("resource_budget", "max_order"),
+            code="graph.optimization.max_order_budget",
+            message="graph order exceeds the declared max_order budget",
+        )
     graph = cast(Any, build_simple_graph(request.graph))
     deadline = time.monotonic() + request.resource_budget.wall_seconds
     try:

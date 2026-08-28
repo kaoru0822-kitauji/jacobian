@@ -14,7 +14,11 @@ from typing import Any, cast
 
 from jacobian._models import StrictModel
 from jacobian.catalog._examples import example
-from jacobian.catalog.models import MathTool, OperationExample
+from jacobian.catalog.models import (
+    MathTool,
+    OperationDomainValidationError,
+    OperationExample,
+)
 from jacobian.math.graphs.optimization._budget import remaining_ms as _remaining_ms
 from jacobian.math.graphs.optimization._invariant_models import (
     GraphCliqueNumberResult,
@@ -387,7 +391,11 @@ def _clique_execute(
     """Run the complete Z3 clique transaction in a bounded owner worker."""
 
     if len(request.graph.vertices) > request.resource_budget.max_order:
-        raise ValueError("graph order exceeds the declared max_order budget")
+        raise OperationDomainValidationError(
+            location=("resource_budget", "max_order"),
+            code="graph.clique_number.max_order_budget",
+            message="graph order exceeds the declared max_order budget",
+        )
     deadline = time.monotonic() + request.resource_budget.wall_seconds
     try:
         with TemporaryDirectory(prefix="jacobian-graph-clique-") as directory:
