@@ -22,6 +22,9 @@ from jacobian.math.markov_chain._models import (
 )
 from jacobian.math.markov_chain.operations import _stationary_distribution_extremes
 
+_MAX_MIXING_COMPONENT_DIGITS = 32
+_MIXING_RESULT_DIGIT_RESERVE = 1_024
+
 
 def _reject(location: tuple[str | int, ...], code: str, message: str) -> None:
     raise OperationDomainValidationError(
@@ -62,11 +65,16 @@ def _admit_mixing(request: MixingTimeRequest) -> None:
             "epsilon must lie in (0, 1]",
         )
     values = (request.epsilon, *(item for row in request.matrix for item in row))
-    if any(max(len(value.num.lstrip("-")), len(value.den)) > 32 for value in values):
+    if any(
+        max(len(value.num.lstrip("-")), len(value.den))
+        > _MAX_MIXING_COMPONENT_DIGITS
+        for value in values
+    ):
         _reject(
             ("matrix",),
             "mixing_component_digits_exceed_limit",
-            "mixing-time rational components support at most 32 digits",
+            "mixing-time rational components support at most "
+            f"{_MAX_MIXING_COMPONENT_DIGITS} digits",
         )
     matrix_digits = max(
         max(len(value.num.lstrip("-")), len(value.den))
@@ -75,7 +83,7 @@ def _admit_mixing(request: MixingTimeRequest) -> None:
     )
     state_count = len(request.matrix)
     height = matrix_digits * (state_count**3 + request.max_steps * state_count**2)
-    if height > MAX_CANONICAL_RATIONAL_DIGITS - 1_024:
+    if height > MAX_CANONICAL_RATIONAL_DIGITS - _MIXING_RESULT_DIGIT_RESERVE:
         _reject(
             ("matrix",),
             "mixing_result_height_exceeds_bound",
