@@ -2,11 +2,13 @@
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+
 import pytest
 import sympy
 from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.plane_algebraic_curves import _conic
 from jacobian.math.plane_algebraic_curves._conic import MAX_CONIC_INPUT_DIGITS
 from jacobian.math.plane_algebraic_curves._models import (
@@ -39,6 +41,13 @@ from jacobian.math.polynomials.values import (
 @contextmanager
 def _raises_code(code: str) -> Iterator[None]:
     with pytest.raises(ValidationError) as caught:
+        yield
+    assert caught.value.errors()[0]["type"] == f"plane_algebraic_curve.{code}"
+
+
+@contextmanager
+def _raises_operation_code(code: str) -> Iterator[None]:
+    with pytest.raises(OperationDomainValidationError) as caught:
         yield
     assert caught.value.errors()[0]["type"] == f"plane_algebraic_curve.{code}"
 
@@ -309,16 +318,16 @@ def test_nonzero_equation_rescaling_preserves_normalized_parametrization() -> No
     assert scaled.finite_parameter_denominator == original.finite_parameter_denominator
 
 
-def test_request_rejects_point_outside_conic() -> None:
-    with _raises_code("point_not_on_conic"):
-        RationalConicParametrizationRequest(
+def test_operation_rejects_point_outside_conic() -> None:
+    with _raises_operation_code("point_not_on_conic"):
+        _parametrize(
             polynomial=_polynomial(
                 ("x", "y"),
                 (1, (2, 0)),
                 (1, (0, 2)),
                 (-1, (0, 0)),
             ),
-            point=_point(("x", "y"), (_rational(0), _rational(0))),
+            point=(_rational(0), _rational(0)),
         )
 
 
@@ -339,51 +348,55 @@ def test_request_rejects_point_outside_conic() -> None:
         ),
     ],
 )
-def test_request_rejects_singular_or_reducible_quadratics(
+def test_operation_rejects_singular_or_reducible_quadratics(
     source: RationalPolynomial,
     point: tuple[CanonicalRational, CanonicalRational],
 ) -> None:
-    with _raises_code("conic_not_smooth_irreducible"):
-        RationalConicParametrizationRequest(
+    with _raises_operation_code("conic_not_smooth_irreducible"):
+        _parametrize(
             polynomial=source,
-            point=_point(source.variables, point),
+            point=point,
         )
 
 
-def test_request_rejects_wrong_degree_axis_and_parameter_collision() -> None:
+def test_operation_rejects_wrong_degree_axis_and_parameter_collision() -> None:
     point = (_rational(0), _rational(0))
-    with _raises_code("conic_degree_invalid"):
-        RationalConicParametrizationRequest(
+    with _raises_operation_code("conic_degree_invalid"):
+        _parametrize(
             polynomial=_polynomial(("x", "y"), (1, (1, 0))),
-            point=_point(("x", "y"), point),
+            point=point,
         )
-    with _raises_code("conic_axis_invalid"):
-        RationalConicParametrizationRequest(
-            polynomial=_polynomial(("x",), (1, (2,))),
-            point=_point(("x", "y"), point),
+    with _raises_operation_code("conic_axis_invalid"):
+        compute_rational_conic_parametrization(
+            RationalConicParametrizationRequest(
+                polynomial=_polynomial(("x",), (1, (2,))),
+                point=_point(("x",), (_rational(0),)),
+            )
         )
-    with _raises_code("parameter_axis_collision"):
-        RationalConicParametrizationRequest(
+    with _raises_operation_code("parameter_axis_collision"):
+        _parametrize(
             polynomial=_polynomial(
                 ("x", "y"),
                 (1, (2, 0)),
                 (1, (0, 2)),
                 (-1, (0, 0)),
             ),
-            point=_point(("x", "y"), (_rational(1), _rational(0))),
+            point=(_rational(1), _rational(0)),
             parameter="x",
         )
 
 
 @pytest.mark.parametrize("variables", [("x", "z"), ("y", "x")])
-def test_request_rejects_mismatched_or_reordered_point_axis(
+def test_operation_rejects_mismatched_or_reordered_point_axis(
     variables: tuple[str, str],
 ) -> None:
     source = _polynomial(("x", "y"), (1, (2, 0)), (1, (0, 2)), (-1, (0, 0)))
-    with _raises_code("point_axis_mismatch"):
-        RationalConicParametrizationRequest(
-            polynomial=source,
-            point=_point(variables, (_rational(1), _rational(0))),
+    with _raises_operation_code("point_axis_mismatch"):
+        compute_rational_conic_parametrization(
+            RationalConicParametrizationRequest(
+                polynomial=source,
+                point=_point(variables, (_rational(1), _rational(0))),
+            )
         )
 
 
@@ -405,10 +418,10 @@ def test_input_coefficient_boundary_is_accepted_then_rejected() -> None:
         (("1", rejected_denominator), (0, 2)),
         (("-1", rejected_denominator), (0, 0)),
     )
-    with _raises_code("coefficient_height_exceeded"):
-        RationalConicParametrizationRequest(
+    with _raises_operation_code("coefficient_height_exceeded"):
+        _parametrize(
             polynomial=rejected,
-            point=_point(("x", "y"), (_rational(1), _rational(0))),
+            point=(_rational(1), _rational(0)),
         )
 
 
@@ -422,17 +435,14 @@ def test_normalized_result_height_boundary_is_accepted_then_rejected() -> None:
     assert accepted.coordinates
 
     rejected_x = 10**32
-    with _raises_code("coefficient_height_exceeded"):
-        RationalConicParametrizationRequest(
+    with _raises_operation_code("coefficient_height_exceeded"):
+        _parametrize(
             polynomial=source,
-            point=_point(
-                ("x", "y"),
-                (_rational(rejected_x), _rational(rejected_x**2)),
-            ),
+            point=(_rational(rejected_x), _rational(rejected_x**2)),
         )
 
 
-def test_request_admission_completes_before_any_backend_expansion(
+def test_operation_admission_completes_before_any_backend_expansion(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class _ForbiddenSympy:
@@ -450,13 +460,15 @@ def test_request_admission_completes_before_any_backend_expansion(
     assert request.parameter == "t"
 
     rejected_x = 10**32
-    with _raises_code("coefficient_height_exceeded"):
-        RationalConicParametrizationRequest(
-            polynomial=source,
-            point=_point(
-                ("x", "y"),
-                (_rational(rejected_x), _rational(rejected_x**2)),
-            ),
+    with _raises_operation_code("coefficient_height_exceeded"):
+        compute_rational_conic_parametrization(
+            RationalConicParametrizationRequest(
+                polynomial=source,
+                point=_point(
+                    ("x", "y"),
+                    (_rational(rejected_x), _rational(rejected_x**2)),
+                ),
+            )
         )
 
 

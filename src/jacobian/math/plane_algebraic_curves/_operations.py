@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import sympy
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.plane_algebraic_curves._conic import (
     derive_rational_conic_parametrization,
+    validate_rational_conic_request,
 )
 from jacobian.math.plane_algebraic_curves._models import (
     HOMOGENIZING_COORDINATE,
@@ -17,6 +19,7 @@ from jacobian.math.plane_algebraic_curves._models import (
     ProjectiveClosureResult,
     RationalConicParametrizationRequest,
     RationalConicParametrizationResult,
+    _validation_error_from,
 )
 from jacobian.math.polynomials._conversions import (
     rational_polynomial_from_sympy,
@@ -106,6 +109,20 @@ def compute_rational_conic_parametrization(
     request: RationalConicParametrizationRequest,
 ) -> RationalConicParametrizationResult:
     """Parametrize a smooth rational conic by its normalized line pencil."""
+
+    try:
+        validate_rational_conic_request(
+            request.polynomial,
+            request.point,
+            request.parameter,
+        )
+    except ValueError as exc:
+        classified = _validation_error_from(exc)
+        raise OperationDomainValidationError(
+            location=("request",),
+            code=classified.type,
+            message=classified.message(),
+        ) from exc
 
     data = derive_rational_conic_parametrization(
         request.polynomial,

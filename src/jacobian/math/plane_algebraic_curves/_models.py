@@ -9,7 +9,6 @@ from pydantic_core import PydanticCustomError
 
 from jacobian._exact import require_bounded_rational
 from jacobian._models import StrictModel
-from jacobian.math.plane_algebraic_curves._conic import validate_rational_conic_request
 from jacobian.math.polynomials._conversions import rational_polynomial_to_sympy
 from jacobian.math.polynomials.maps._models import VariablePoint
 from jacobian.math.polynomials.values import (
@@ -180,15 +179,6 @@ class RationalConicParametrizationRequest(StrictModel):
         ),
         examples=["t"],
     )
-
-    @model_validator(mode="after")
-    def require_smooth_conic_with_admitted_output(self) -> Self:
-        try:
-            validate_rational_conic_request(self.polynomial, self.point, self.parameter)
-        except ValueError as exc:
-            raise _validation_error_from(exc) from exc
-        return self
-
 
 class AffineCurveResult(StrictModel):
     is_valid: bool
