@@ -140,9 +140,8 @@ class ChirotopeCheckRequest(StrictModel):
 class ChirotopeCheckResult(StrictModel):
     """A structurally bounded validity result or B2-obstruction claim.
 
-    Kernel-produced results use :meth:`_from_kernel`. Use
-    :func:`verify_chirotope_check_result` for an independently supplied exact
-    claim; model validation deliberately does not execute the B2 enumeration.
+    Kernel-produced results use :meth:`_from_kernel`; model validation
+    deliberately does not execute the B2 enumeration.
     """
 
     chirotope: UniformRank3Chirotope

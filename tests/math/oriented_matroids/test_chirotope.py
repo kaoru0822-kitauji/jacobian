@@ -21,7 +21,6 @@ from jacobian.math.oriented_matroids._models import (
 from jacobian.math.oriented_matroids._operations import (
     _alternating_value,
     check_chirotope,
-    verify_chirotope_check_result,
 )
 from jacobian.math.oriented_matroids._tools import TOOLS
 
@@ -216,40 +215,6 @@ class TestChirotopeCheck:
         )
         assert result.status is ChirotopeCheckStatus.VALID
         assert result.b2_exchange_instances_checked == 531_441
-
-    def test_explicit_verifier_rejects_source_and_conclusion_corruption(self) -> None:
-        result = check_chirotope(
-            ChirotopeCheckRequest.model_validate({"chirotope": _ringel_table()})
-        )
-        source_corruption = result.model_dump(mode="json")
-        source_corruption["chirotope"]["entries"][0]["sign"] *= -1
-        assert not verify_chirotope_check_result(
-            ChirotopeCheckResult.model_validate(source_corruption)
-        )
-
-        conclusion_corruption = result.model_dump(mode="json")
-        conclusion_corruption["b2_exchange_instances_checked"] -= 1
-        assert not verify_chirotope_check_result(
-            ChirotopeCheckResult.model_validate(conclusion_corruption)
-        )
-
-    def test_explicit_verifier_rejects_corrupted_b2_witness(self) -> None:
-        table = _ringel_table()
-        table["entries"][0]["sign"] *= -1
-        result = check_chirotope(
-            ChirotopeCheckRequest.model_validate({"chirotope": table})
-        )
-        witness_corruption = result.model_dump(mode="json")
-        assert witness_corruption["obstruction"] is not None
-        original_x = witness_corruption["obstruction"]["x"]
-        witness_corruption["obstruction"]["x"] = [
-            (original_x[0] + 1) % 9,
-            original_x[1],
-            original_x[2],
-        ]
-        assert not verify_chirotope_check_result(
-            ChirotopeCheckResult.model_validate(witness_corruption)
-        )
 
     def test_boundary_ten_reserves_one_b2_scan(self) -> None:
         result = check_chirotope(

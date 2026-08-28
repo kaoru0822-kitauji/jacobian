@@ -135,10 +135,4 @@ def check_chirotope(request: ChirotopeCheckRequest) -> ChirotopeCheckResult:
     return _compute_result(request.chirotope)
 
 
-def verify_chirotope_check_result(result: ChirotopeCheckResult) -> bool:
-    """Verify an independently supplied exact claim in the admitted envelope."""
-
-    return result == _compute_result(result.chirotope)
-
-
-__all__ = ["check_chirotope", "verify_chirotope_check_result"]
+__all__ = ["check_chirotope"]
