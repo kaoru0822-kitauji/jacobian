@@ -6,7 +6,8 @@ from typing import Any
 import pytest
 
 from jacobian.catalog.catalog import Catalog
-from jacobian.dispatch import OperationRequestValidationError, invoke_operation
+from jacobian.catalog.models import OperationDomainValidationError
+from jacobian.dispatch import invoke_operation
 from jacobian.math.polytope._models import MAX_COMPUTED_FACETS
 
 
@@ -67,14 +68,13 @@ def test_dispatch_rejects_a_profile_beyond_the_facet_cap_as_invalid_request() ->
     """A moment-curve hull is a cyclic polytope, so its facet count is the
     upper-bound-theorem maximum for its vertex count; the payload size is
     derived so that count exceeds MAX_COMPUTED_FACETS. Admission
-    materializes that enumeration during request validation, so math.run
-    must answer with the typed invalid-request error -- never leak an
-    execution-time ValueError as a host exception."""
+    materializes that enumeration in the native operation, which must raise
+    the typed domain-validation error rather than leak its internal ValueError."""
     payload = _moment_curve_payload(
         count=_moment_curve_size_beyond_facet_cap(dimension=7), dimension=7
     )
 
-    with pytest.raises(OperationRequestValidationError) as exc_info:
+    with pytest.raises(OperationDomainValidationError) as exc_info:
         invoke_operation("polytope.facets.compute", payload, Catalog.open())
 
     assert (
