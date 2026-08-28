@@ -65,13 +65,13 @@ def _admit_inversion(request: CircleInversionRequest) -> None:
     if request.power.as_fraction() <= 0:
         _reject_geometry_domain(
             location=("power",),
-            code="geometry.inversion_power_a_positive_rational",
+            code="geometry.inversion_power_must_be_positive",
             message="inversion power must be a positive rational",
         )
     if request.point == request.center:
         _reject_geometry_domain(
             location=("point",),
-            code="geometry.point_invert_differ_center",
+            code="geometry.inversion_point_must_differ_from_center",
             message="the point to invert must differ from the center",
         )
 
@@ -87,7 +87,7 @@ def _admit_inversion(request: CircleInversionRequest) -> None:
         except ValueError as exc:
             _reject_geometry_domain(
                 location=location,
-                code="geometry.label_exceeds_inversion_admission_digits_digit",
+                code="geometry.inversion_input_digit_bound",
                 message=str(exc),
             )
 
@@ -99,7 +99,7 @@ def _admit_inversion(request: CircleInversionRequest) -> None:
     ):
         _reject_geometry_domain(
             location=("point",),
-            code="geometry.circle_inversion_result_exceeds_f_inversion",
+            code="geometry.inversion_result_digit_bound",
             message=(
                 "circle inversion result exceeds the "
                 f"{INVERSION_ADMISSION_DIGITS}-digit circle-inversion admission bound"
@@ -535,25 +535,9 @@ def circle_inversion(request: CircleInversionRequest) -> GeometryPointResult:
     center = request.center
     point = request.point
     power = request.power.as_fraction()
-    if power <= 0:
-        raise ValueError("inversion power must be a positive rational")
-    for value, label in (
-        (center.x, "inversion center x"),
-        (center.y, "inversion center y"),
-        (request.power, "inversion power"),
-        (point.x, "point x"),
-        (point.y, "point y"),
-    ):
-        _require_inversion_admission_bound(value, label)
-    if not _inverted_components_within_bound(
-        center, request.power, point, INVERSION_ADMISSION_DIGITS
-    ):
-        raise ValueError("circle inversion result exceeds the admission bound")
     dx = point.x.as_fraction() - center.x.as_fraction()
     dy = point.y.as_fraction() - center.y.as_fraction()
     norm_squared = dx * dx + dy * dy
-    if norm_squared == 0:
-        raise ValueError("the point to invert must differ from the center")
     scale = power / norm_squared
     inverted = RationalPoint2D(
         x=CanonicalRational.from_fraction(center.x.as_fraction() + scale * dx),
