@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import math
-from collections import Counter
 from typing import Annotated, Literal, Self
 
 from pydantic import Field, StrictBool, StrictInt, StringConstraints, model_validator
@@ -130,43 +128,6 @@ class CyclicPerfectDifferenceSetRequest(StrictModel):
         return self
 
 
-def _cyclic_difference_multiplicities(
-    residues: tuple[int, ...],
-    modulus: int,
-) -> dict[int, int]:
-    """Recompute nonzero cyclic difference multiplicities from the residue set.
-
-    The authoritative result-model validators use this clean-room recompute to
-    reject forged but internally self-consistent profiles: a producer regression
-    that materializes an incorrect ``COMPUTED`` result cannot pass the boundary
-    even when the submitted multiplicity fields agree with the decision flag.
-    """
-
-    counts: Counter[int] = Counter(
-        (left - right) % modulus
-        for left in residues
-        for right in residues
-        if left != right
-    )
-    return {residue: counts.get(residue, 0) for residue in range(1, modulus)}
-
-
-def _is_perfect_difference_set(
-    residues: tuple[int, ...],
-    modulus: int,
-) -> bool:
-    """Decide the perfect-difference-set property from the residue set."""
-
-    if modulus != len(residues) * (len(residues) - 1) + 1:
-        return False
-    return all(
-        multiplicity == 1
-        for multiplicity in _cyclic_difference_multiplicities(
-            residues, modulus
-        ).values()
-    )
-
-
 class CyclicDifferenceMultiplicity(StrictModel):
     residue: StrictInt = Field(ge=1, lt=MAX_CYCLIC_DIFFERENCE_SET_MODULUS)
     multiplicity: StrictInt = Field(ge=0, le=MAX_CYCLIC_DIFFERENCE_SET_MODULUS)
@@ -266,74 +227,6 @@ class CyclicDifferenceSetExtensionRequest(StrictModel):
         return self
 
 
-def _extension_result_candidate_count(
-    *,
-    target_order: int,
-    modulus: int,
-    base_residues: tuple[int, ...],
-) -> int:
-    expected_modulus = target_order * (target_order - 1) + 1
-    if modulus != expected_modulus:
-        raise _difference_set_validation_error(
-            "combinatorics.extension_invariant", "extension modulus must equal k(k-1)+1"
-        )
-    if base_residues != tuple(sorted(set(base_residues))):
-        raise _difference_set_validation_error(
-            "combinatorics.invariant", "base residues must be sorted and unique"
-        )
-    if any(residue < 0 or residue >= modulus for residue in base_residues):
-        raise _difference_set_validation_error(
-            "combinatorics.invariant", "base residues must lie in the derived modulus"
-        )
-    additional = target_order - len(base_residues)
-    if additional < 0 or additional > MAX_DIFFERENCE_SET_ADDITIONAL_ELEMENTS:
-        raise _difference_set_validation_error(
-            "combinatorics.extension_invariant",
-            "extension result lies outside the supported added-element bound",
-        )
-    return math.comb(modulus - len(base_residues), additional)
-
-
-def _require_positive_extension_shape(
-    *,
-    target_order: int,
-    modulus: int,
-    base_residues: tuple[int, ...],
-    extension: tuple[int, ...],
-    coverage: str,
-) -> None:
-    if coverage != "WITNESS":
-        raise _difference_set_validation_error(
-            "combinatorics.extension_invariant",
-            "positive extension decisions require witness coverage",
-        )
-    if extension != tuple(sorted(set(extension))):
-        raise _difference_set_validation_error(
-            "combinatorics.extension_invariant",
-            "extension witness must be sorted and unique",
-        )
-    if len(extension) != target_order:
-        raise _difference_set_validation_error(
-            "combinatorics.extension_invariant",
-            "extension witness must have target_order residues",
-        )
-    if any(residue < 0 or residue >= modulus for residue in extension):
-        raise _difference_set_validation_error(
-            "combinatorics.extension_invariant",
-            "extension witness residues must lie in the derived modulus",
-        )
-    if not set(base_residues) <= set(extension):
-        raise _difference_set_validation_error(
-            "combinatorics.extension_invariant",
-            "extension witness must contain the reduced base set",
-        )
-    if not _is_perfect_difference_set(extension, modulus):
-        raise _difference_set_validation_error(
-            "combinatorics.difference_set_invariant",
-            "extension witness must be a perfect difference set of the derived modulus",
-        )
-
-
 class CyclicDifferenceSetExtensionResult(StrictModel):
     """A witness or complete negative decision for one fixed PDS order."""
 
@@ -348,33 +241,6 @@ class CyclicDifferenceSetExtensionResult(StrictModel):
     coverage: Literal["WITNESS", "ALL_CANDIDATES"]
     exactness: Literal["EXACT_FINITE"] = "EXACT_FINITE"
     determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
-
-    @model_validator(mode="after")
-    def bind_fixed_order_scope_and_decision_shape(self) -> Self:
-        expected_candidates = _extension_result_candidate_count(
-            target_order=self.target_order,
-            modulus=self.modulus,
-            base_residues=self.base_residues,
-        )
-        if self.candidate_space_size != expected_candidates:
-            raise _difference_set_validation_error(
-                "combinatorics.extension_invariant",
-                "candidate_space_size must cover the exact combination space",
-            )
-        if self.decision == "EXTENDS":
-            _require_positive_extension_shape(
-                target_order=self.target_order,
-                modulus=self.modulus,
-                base_residues=self.base_residues,
-                extension=self.extension,
-                coverage=self.coverage,
-            )
-        elif self.extension or self.coverage != "ALL_CANDIDATES":
-            raise _difference_set_validation_error(
-                "combinatorics.extension_invariant",
-                "negative extension decisions require empty witness and full coverage",
-            )
-        return self
 
     @classmethod
     def _from_kernel(

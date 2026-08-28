@@ -201,14 +201,12 @@ def decide_cyclic_difference_set_extension(
             message="extension candidate space exceeds the complete-search bound",
         )
     extension = _find_extension(base, order, modulus)
-    return CyclicDifferenceSetExtensionResult(
+    return CyclicDifferenceSetExtensionResult._from_kernel(
         target_order=order,
         modulus=modulus,
         base_residues=base,
         candidate_space_size=candidate_count,
-        decision="EXTENDS" if extension is not None else "DOES_NOT_EXTEND",
-        extension=extension or (),
-        coverage="WITNESS" if extension is not None else "ALL_CANDIDATES",
+        extension=extension,
     )
 
 
