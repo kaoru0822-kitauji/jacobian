@@ -12,6 +12,7 @@ from jacobian._models import StrictModel
 
 MAX_RATIONAL_DIGITS = 256
 MAX_RATIONAL_SEQUENCE_LENGTH = 256
+MAX_CLOSED_FORM_ORDER = 16
 
 
 def _validation_error(reason: str, message: str) -> PydanticCustomError:
@@ -28,8 +29,10 @@ class RecurrenceFindRequest(StrictModel):
 class RecurrenceFindResult(StrictModel):
     """A fitted recurrence or an explicit finite-prefix missing outcome."""
 
-    coefficients: tuple[CanonicalRational, ...] = Field(max_length=255)
-    order: int = Field(ge=0, le=255)
+    coefficients: tuple[CanonicalRational, ...] = Field(
+        max_length=MAX_RATIONAL_SEQUENCE_LENGTH - 1
+    )
+    order: int = Field(ge=0, le=MAX_RATIONAL_SEQUENCE_LENGTH - 1)
     status: Literal["FOUND", "NO_FITTING_RECURRENCE"]
     method: Literal["RATIONAL_INTERPOLATION"] = "RATIONAL_INTERPOLATION"
 

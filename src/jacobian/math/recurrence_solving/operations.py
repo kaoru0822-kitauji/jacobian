@@ -9,6 +9,7 @@ from jacobian._exact import CanonicalRational, require_bounded_rational
 from jacobian.math.recurrence_solving._models import (
     _MAX_FIELD_PRIME,
     _MAX_FIELD_SEQUENCE_LENGTH,
+    MAX_CLOSED_FORM_ORDER,
     MAX_RATIONAL_DIGITS,
     MAX_RATIONAL_SEQUENCE_LENGTH,
     PrimeFieldRecurrence,
@@ -123,8 +124,11 @@ def closed_form(
     import sympy
 
     order = len(char_coeffs) - 1
-    if not 1 <= order <= 16:
-        raise ValueError("characteristic polynomial must have degree between 1 and 16")
+    if not 1 <= order <= MAX_CLOSED_FORM_ORDER:
+        raise ValueError(
+            "characteristic polynomial must have degree between 1 and "
+            f"{MAX_CLOSED_FORM_ORDER}"
+        )
     if len(initial_values) != order:
         raise ValueError("initial value count must match the recurrence order")
     _validate_rationals(char_coeffs, label="characteristic coefficient")
