@@ -51,7 +51,7 @@ from jacobian.math.formal_power_series._operations import (
     compute_truncate,
 )
 
-FORMAL_POWER_SERIES_OPERATIONS = (
+TOOLS = (
     MathTool(
         operation_id="formal_series.rational.add.compute",
         title="Add two truncated formal power series",
@@ -654,6 +654,5 @@ FORMAL_POWER_SERIES_OPERATIONS = (
     ),
 )
 
-TOOLS = FORMAL_POWER_SERIES_OPERATIONS
 
 __all__ = ["TOOLS"]

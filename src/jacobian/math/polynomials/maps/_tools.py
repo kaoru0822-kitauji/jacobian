@@ -84,7 +84,7 @@ def _op[
     )
 
 
-POLYNOMIAL_MAP_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "polynomial.map.generic_degree.compute",
         "Compute the exact generic degree of a polynomial map",
@@ -195,7 +195,5 @@ POLYNOMIAL_MAP_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-
-TOOLS = POLYNOMIAL_MAP_OPERATIONS
 
 __all__ = ["TOOLS"]

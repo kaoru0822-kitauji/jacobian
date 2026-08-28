@@ -43,7 +43,7 @@ def da_operation[RequestT: StrictModel, ResultT: StrictModel](
     )
 
 
-DIOPHANTINE_APPROXIMATION_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     da_operation(
         "diophantine.continued_fraction.compute",
         "Compute the continued fraction expansion of sqrt(D)",
@@ -105,6 +105,5 @@ DIOPHANTINE_APPROXIMATION_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = DIOPHANTINE_APPROXIMATION_OPERATIONS
 
 __all__ = ["TOOLS"]

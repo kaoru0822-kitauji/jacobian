@@ -27,7 +27,7 @@ from jacobian.math.polytope._operations import (
     compute_polytope_support,
     require_full_dimensional_extreme_vertices,
 )
-from jacobian.math.polytope._tools import POLYTOPE_OPERATIONS
+from jacobian.math.polytope._tools import TOOLS
 
 
 def _rational(value: int) -> CanonicalRational:
@@ -1187,7 +1187,7 @@ def test_support_schema_publishes_common_space_requirement() -> None:
 def test_support_example_teaches_common_space_precondition() -> None:
     support_tool = next(
         tool
-        for tool in POLYTOPE_OPERATIONS
+        for tool in TOOLS
         if tool.operation_id == "polytope.rational.support.compute"
     )
     (only_example,) = support_tool.examples

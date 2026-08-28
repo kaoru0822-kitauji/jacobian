@@ -51,7 +51,7 @@ _METRIC_SPACE = {
 }
 
 
-FINITE_METRIC_SPACE_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     fms_operation(
         "metric_space.profile.compute",
         "Compute diameter, radius, eccentricities, centers, and periphery",
@@ -116,6 +116,5 @@ FINITE_METRIC_SPACE_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = FINITE_METRIC_SPACE_OPERATIONS
 
 __all__ = ["TOOLS"]

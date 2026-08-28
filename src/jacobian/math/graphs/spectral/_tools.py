@@ -46,7 +46,7 @@ def graph_spectral_operation[
 
 PATH_P3 = {"graph": {"vertex_count": 3, "edges": [[0, 1], [1, 2]]}}
 
-GRAPH_SPECTRAL_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     graph_spectral_operation(
         "graph.spectrum.adjacency.compute",
         "Compute exact adjacency matrix eigenvalues",
@@ -151,6 +151,5 @@ GRAPH_SPECTRAL_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = GRAPH_SPECTRAL_OPERATIONS
 
 __all__ = ["TOOLS"]

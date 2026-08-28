@@ -49,7 +49,7 @@ def arithmetic_functions_operation[
     )
 
 
-ARITHMETIC_FUNCTIONS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     arithmetic_functions_operation(
         "arithmetic.dirichlet_convolution.compute",
         "Compute the Dirichlet convolution of two arithmetic functions",
@@ -159,6 +159,5 @@ ARITHMETIC_FUNCTIONS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = ARITHMETIC_FUNCTIONS_OPERATIONS
 
 __all__ = ["TOOLS"]

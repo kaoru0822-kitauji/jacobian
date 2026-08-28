@@ -58,7 +58,7 @@ _TRIANGLE_GRAPH = {
     ],
 }
 
-MULTIGRAPH_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     multigraph_operation(
         "graph.multigraph.flow.finite_abelian.check",
         "Check a finite-Abelian flow on a loopless multigraph",
@@ -207,6 +207,5 @@ MULTIGRAPH_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = MULTIGRAPH_OPERATIONS
 
 __all__ = ["TOOLS"]

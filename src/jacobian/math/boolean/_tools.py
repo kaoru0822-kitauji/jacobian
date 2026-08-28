@@ -37,7 +37,7 @@ def boolean_operation[
     )
 
 
-BOOLEAN_OPERATIONS = (
+TOOLS = (
     boolean_operation(
         "boolean.fourier.walsh_transform.compute",
         "Compute an exact Walsh-Hadamard transform from a Boolean truth table",
@@ -69,6 +69,5 @@ BOOLEAN_OPERATIONS = (
     ),
 )
 
-TOOLS = BOOLEAN_OPERATIONS
 
 __all__ = ["TOOLS"]

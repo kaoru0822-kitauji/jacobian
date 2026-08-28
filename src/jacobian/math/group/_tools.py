@@ -61,7 +61,7 @@ S3_STABILIZER_POINT_0 = {
     "point": 0,
 }
 
-GROUP_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     group_operation(
         "group.order.compute",
         "Compute the exact order of a finite permutation group",
@@ -223,6 +223,5 @@ GROUP_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = GROUP_OPERATIONS
 
 __all__ = ["TOOLS"]

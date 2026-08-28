@@ -116,7 +116,7 @@ _SCALAR_MULT_EXAMPLE: dict[str, Any] = {
 }
 
 
-ELLIPTIC_CURVE_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     elliptic_curve_operation(
         "number_theory.elliptic_curve.short_weierstrass.discriminant.compute",
         "Compute the discriminant of a short Weierstrass elliptic curve",
@@ -200,6 +200,5 @@ ELLIPTIC_CURVE_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = ELLIPTIC_CURVE_OPERATIONS
 
 __all__ = ["TOOLS"]

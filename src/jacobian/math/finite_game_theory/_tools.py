@@ -89,7 +89,7 @@ DETERMINISTIC_TERMINAL_GAME_EXAMPLE = {
 }
 
 
-FINITE_GAME_THEORY_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "game_theory.best_response.compute",
         "Compute best response in a zero-sum game",
@@ -160,7 +160,5 @@ FINITE_GAME_THEORY_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-
-TOOLS = FINITE_GAME_THEORY_OPERATIONS
 
 __all__ = ["TOOLS"]

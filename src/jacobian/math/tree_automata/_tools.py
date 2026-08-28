@@ -71,7 +71,7 @@ _RUN_EXAMPLE = {
     },
 }
 
-TREE_AUTOMATA_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "tree_automaton.states.reachable.compute",
         "Compute bottom-up tree-automaton reachable states",
@@ -151,6 +151,5 @@ TREE_AUTOMATA_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = TREE_AUTOMATA_OPERATIONS
 
 __all__ = ["TOOLS"]

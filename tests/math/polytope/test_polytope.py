@@ -1255,12 +1255,10 @@ class TestNonzeroNormalContractPublished:
         assert "nonzero normal" in halfspaces_description
 
     def test_operation_example_demonstrates_halfspace_input(self) -> None:
-        from jacobian.math.polytope._tools import POLYTOPE_OPERATIONS
+        from jacobian.math.polytope._tools import TOOLS
 
         operation = next(
-            tool
-            for tool in POLYTOPE_OPERATIONS
-            if tool.operation_id == "polytope.volume.compute"
+            tool for tool in TOOLS if tool.operation_id == "polytope.volume.compute"
         )
         names = [e.name for e in operation.examples]
         assert "unit_square_halfspaces" in names
@@ -1780,12 +1778,10 @@ class TestCanonicalVPolytopeComposition:
         assert "RationalVPolytope" in schema["$defs"]
 
     def test_operation_description_publishes_canonical_acceptance(self) -> None:
-        from jacobian.math.polytope._tools import POLYTOPE_OPERATIONS
+        from jacobian.math.polytope._tools import TOOLS
 
         operation = next(
-            tool
-            for tool in POLYTOPE_OPERATIONS
-            if tool.operation_id == "polytope.volume.compute"
+            tool for tool in TOOLS if tool.operation_id == "polytope.volume.compute"
         )
 
         assert "RationalVPolytope" in operation.description
@@ -1968,12 +1964,10 @@ class TestCanonicalVPolytopeFacetComposition:
         assert "RationalVPolytope" in schema["$defs"]
 
     def test_operation_description_publishes_canonical_acceptance(self) -> None:
-        from jacobian.math.polytope._tools import POLYTOPE_OPERATIONS
+        from jacobian.math.polytope._tools import TOOLS
 
         operation = next(
-            tool
-            for tool in POLYTOPE_OPERATIONS
-            if tool.operation_id == "polytope.facets.compute"
+            tool for tool in TOOLS if tool.operation_id == "polytope.facets.compute"
         )
 
         assert "RationalVPolytope" in operation.description

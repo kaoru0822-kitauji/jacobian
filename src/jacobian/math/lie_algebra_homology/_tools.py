@@ -55,7 +55,7 @@ _CE_EXAMPLE: dict[str, Any] = {
 }
 
 
-LIE_HOMOLOGY_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     lie_homology_operation(
         "lie_algebra.chevalley_eilenberg.complex.compute",
         "Compute the Chevalley-Eilenberg chain complex for a Lie algebra",
@@ -110,6 +110,5 @@ LIE_HOMOLOGY_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = LIE_HOMOLOGY_OPERATIONS
 
 __all__ = ["TOOLS"]

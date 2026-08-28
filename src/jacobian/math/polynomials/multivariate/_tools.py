@@ -224,7 +224,7 @@ _SUBRESULTANT_EXAMPLE = example(
 )
 
 
-MULTIVARIATE_POLYNOMIAL_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     multivariate_polynomial_operation(
         "polynomial.multivariate.gcd.compute",
         "Compute a multivariate polynomial GCD over QQ",
@@ -354,6 +354,5 @@ MULTIVARIATE_POLYNOMIAL_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = MULTIVARIATE_POLYNOMIAL_OPERATIONS
 
 __all__ = ["TOOLS"]

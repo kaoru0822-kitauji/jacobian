@@ -89,7 +89,7 @@ _UNIFY_EXAMPLE = {
     },
 }
 
-_TERM_REWRITING_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "term_rewriting.critical_pairs.compute",
         "Compute first-order critical pairs",
@@ -221,6 +221,5 @@ _TERM_REWRITING_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = _TERM_REWRITING_OPERATIONS
 
 __all__ = ["TOOLS"]

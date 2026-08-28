@@ -43,7 +43,7 @@ def graph_isomorphism_operation[
     )
 
 
-GRAPH_ISOMORPHISM_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     graph_isomorphism_operation(
         "graph.isomorphism.decide.compute",
         "Decide whether two simple graphs are isomorphic",
@@ -135,6 +135,5 @@ GRAPH_ISOMORPHISM_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = GRAPH_ISOMORPHISM_OPERATIONS
 
 __all__ = ["TOOLS"]

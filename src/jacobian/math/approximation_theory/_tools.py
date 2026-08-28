@@ -69,7 +69,7 @@ _INTERP_EXAMPLE: dict[str, Any] = {
 }
 
 
-APPROXIMATION_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     approximation_operation(
         "approximation.lagrange.basis.compute",
         "Compute Lagrange basis polynomials for rational nodes",
@@ -114,6 +114,5 @@ APPROXIMATION_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = APPROXIMATION_OPERATIONS
 
 __all__ = ["TOOLS"]

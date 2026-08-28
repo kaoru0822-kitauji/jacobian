@@ -19,7 +19,7 @@ from jacobian.math.tree_automata._operations import (
     compute_tree_automaton_reachability,
     compute_tree_run,
 )
-from jacobian.math.tree_automata._tools import TREE_AUTOMATA_OPERATIONS
+from jacobian.math.tree_automata._tools import TOOLS
 from jacobian.math.tree_automata.operations import (
     accepted_tree_count,
     run_tree_automaton,
@@ -519,7 +519,7 @@ class TestReachableStates:
 
         reachability_tool = next(
             tool
-            for tool in TREE_AUTOMATA_OPERATIONS
+            for tool in TOOLS
             if tool.operation_id == "tree_automaton.states.reachable.compute"
         )
         assert "lexicographically smallest" in reachability_tool.description

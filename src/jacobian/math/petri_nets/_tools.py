@@ -73,7 +73,7 @@ _NET2 = {
     },
 }
 
-PETRI_NET_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "petri_net.enabled_transitions.compute",
         "Find enabled transitions in a Petri net",
@@ -194,6 +194,5 @@ PETRI_NET_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = PETRI_NET_OPERATIONS
 
 __all__ = ["TOOLS"]

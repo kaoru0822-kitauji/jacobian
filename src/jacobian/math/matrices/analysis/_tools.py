@@ -46,7 +46,7 @@ def _op[
     )
 
 
-MATRIX_ANALYSIS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "matrix.symmetric.rational_spectrum_claim.check",
         "Check a complete rational spectrum claim for a symmetric matrix",
@@ -164,7 +164,5 @@ MATRIX_ANALYSIS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-
-TOOLS = MATRIX_ANALYSIS_OPERATIONS
 
 __all__ = ["TOOLS"]

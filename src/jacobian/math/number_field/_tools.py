@@ -37,7 +37,7 @@ def nf_operation[RequestT: StrictModel, ResultT: StrictModel](
     )
 
 
-NUMBER_FIELD_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     nf_operation(
         "number_field.discriminant.compute",
         "Compute the discriminant of a number field",
@@ -58,6 +58,5 @@ NUMBER_FIELD_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = NUMBER_FIELD_OPERATIONS
 
 __all__ = ["TOOLS"]

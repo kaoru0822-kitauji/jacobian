@@ -133,7 +133,7 @@ MATRIX_DETERMINANT_COMPUTE = matrix_operation(
     ),
 )
 
-MATRIX_OPERATIONS = (
+TOOLS = (
     MATRIX_DETERMINANT_COMPUTE,
     matrix_operation(
         "matrix.rank.compute",
@@ -678,6 +678,5 @@ MATRIX_OPERATIONS = (
     ),
 )
 
-TOOLS = MATRIX_OPERATIONS
 
 __all__ = ["TOOLS"]

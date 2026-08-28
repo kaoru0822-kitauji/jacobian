@@ -46,7 +46,7 @@ def graph_realization_operation[
     )
 
 
-GRAPH_REALIZATION_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     graph_realization_operation(
         "graph.realization.is_graphical.compute",
         "Determine if a degree sequence is graphical",
@@ -128,6 +128,5 @@ GRAPH_REALIZATION_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = GRAPH_REALIZATION_OPERATIONS
 
 __all__ = ["TOOLS"]

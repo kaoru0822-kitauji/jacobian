@@ -61,7 +61,7 @@ _GVECTOR_EXAMPLE: dict[str, Any] = {
 }
 
 
-CLUSTER_ALGEBRA_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     cluster_algebra_operation(
         "cluster_algebra.seed.mutate.compute",
         "Mutate a cluster seed at a specified index",
@@ -107,6 +107,5 @@ CLUSTER_ALGEBRA_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = CLUSTER_ALGEBRA_OPERATIONS
 
 __all__ = ["TOOLS"]

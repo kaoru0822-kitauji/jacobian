@@ -49,7 +49,7 @@ def graph_flow_operation[
     )
 
 
-GRAPH_FLOW_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     graph_flow_operation(
         "graph.flow.maximum.compute",
         "Compute the maximum flow in a capacitated graph",
@@ -258,6 +258,5 @@ GRAPH_FLOW_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = GRAPH_FLOW_OPERATIONS
 
 __all__ = ["TOOLS"]

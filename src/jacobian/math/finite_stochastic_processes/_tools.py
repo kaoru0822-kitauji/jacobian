@@ -70,7 +70,7 @@ _SPACE = {
     "masses": [_rational(1, 2), _rational(1, 2)],
 }
 
-FINIT_STOCHASTIC_PROCESS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "probability.finite_sigma_algebra.from_observation.compute",
         "Construct a sigma algebra from an observation map",
@@ -182,33 +182,30 @@ FINIT_STOCHASTIC_PROCESS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
             ),
         ),
     ),
-)
-
-_POISSON_BINOMIAL_TOOL = MathTool(
-    operation_id="probability.poisson_binomial.distribution.compute",
-    title="Compute exact Poisson-binomial count distribution",
-    description=(
-        "Given independent Bernoulli trials with success probabilities, "
-        "compute the exact probability of exactly k successes for each k."
-    ),
-    request_type=PoissonBinomialRequest,
-    result_type=PoissonBinomialResult,
-    run=compute_poisson_binomial,
-    tags=("probability", "poisson-binomial", "exact"),
-    examples=(
-        example(
-            "poisson_binomial_basic",
-            "Compute the count distribution for two fair coins.",
-            {
-                "probabilities": [
-                    {"num": "1", "den": "2"},
-                    {"num": "1", "den": "2"},
-                ]
-            },
+    MathTool(
+        operation_id="probability.poisson_binomial.distribution.compute",
+        title="Compute exact Poisson-binomial count distribution",
+        description=(
+            "Given independent Bernoulli trials with success probabilities, "
+            "compute the exact probability of exactly k successes for each k."
+        ),
+        request_type=PoissonBinomialRequest,
+        result_type=PoissonBinomialResult,
+        run=compute_poisson_binomial,
+        tags=("probability", "poisson-binomial", "exact"),
+        examples=(
+            example(
+                "poisson_binomial_basic",
+                "Compute the count distribution for two fair coins.",
+                {
+                    "probabilities": [
+                        {"num": "1", "den": "2"},
+                        {"num": "1", "den": "2"},
+                    ]
+                },
+            ),
         ),
     ),
 )
-
-TOOLS = (*FINIT_STOCHASTIC_PROCESS_OPERATIONS, _POISSON_BINOMIAL_TOOL)
 
 __all__ = ["TOOLS"]

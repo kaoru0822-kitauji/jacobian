@@ -15,7 +15,7 @@ from jacobian.math.dirichlet_characters._operations import (
 )
 from jacobian.math.dirichlet_characters.values import PrincipalDirichletCharacter
 
-PRINCIPAL_DIRICHLET_CHARACTER_OPERATIONS: MathTools = (
+TOOLS: MathTools = (
     MathTool(
         operation_id="dirichlet_character.principal.compute",
         title="Compute an exact principal Dirichlet character",
@@ -65,6 +65,4 @@ PRINCIPAL_DIRICHLET_CHARACTER_OPERATIONS: MathTools = (
     ),
 )
 
-TOOLS = PRINCIPAL_DIRICHLET_CHARACTER_OPERATIONS
-
-__all__ = ["PRINCIPAL_DIRICHLET_CHARACTER_OPERATIONS", "TOOLS"]
+__all__ = ["TOOLS"]

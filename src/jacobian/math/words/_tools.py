@@ -27,7 +27,7 @@ from jacobian.math.words._operations import (
     compute_substitution_primitivity_profile,
 )
 
-WORDS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     MathTool(
         operation_id="word.factors.length.compute",
         title="Compute all factors of one length",
@@ -226,6 +226,5 @@ WORDS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = WORDS_OPERATIONS
 
 __all__ = ["TOOLS"]

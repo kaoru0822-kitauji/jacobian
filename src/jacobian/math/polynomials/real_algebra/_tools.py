@@ -45,7 +45,7 @@ def ra_operation[RequestT: StrictModel, ResultT: StrictModel](
     )
 
 
-REAL_ALGEBRA_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     ra_operation(
         "polynomial.sturm_chain.compute",
         "Compute an ordinary exact Sturm sequence",
@@ -148,6 +148,5 @@ REAL_ALGEBRA_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = REAL_ALGEBRA_OPERATIONS
 
 __all__ = ["TOOLS"]

@@ -77,7 +77,7 @@ PETERSEN_GRAPH = {
     }
 }
 
-GRAPH_COLORING_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     graph_coloring_operation(
         "graph.coloring.chromatic_number.check",
         "Check an exact chromatic-number certificate",
@@ -248,6 +248,5 @@ GRAPH_COLORING_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = GRAPH_COLORING_OPERATIONS
 
 __all__ = ["TOOLS"]

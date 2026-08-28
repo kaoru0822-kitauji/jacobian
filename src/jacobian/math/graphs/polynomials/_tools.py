@@ -78,7 +78,7 @@ _PATH_TREE_EXAMPLE: dict[str, Any] = {
 }
 
 
-GRAPH_POLYNOMIAL_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     graph_polynomial_operation(
         "graph.polynomial.tutte.compute",
         "Compute the Tutte polynomial",
@@ -193,7 +193,5 @@ GRAPH_POLYNOMIAL_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-
-TOOLS = GRAPH_POLYNOMIAL_OPERATIONS
 
 __all__ = ["TOOLS"]

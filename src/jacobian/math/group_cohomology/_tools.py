@@ -48,7 +48,7 @@ _COHOMOLOGY_EXAMPLE: dict[str, Any] = {
 }
 
 
-GROUP_COHOMOLOGY_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     group_cohomology_operation(
         "group_cohomology.cohomology.compute",
         "Compute group cohomology with trivial coefficients over GF(p)",
@@ -77,6 +77,5 @@ GROUP_COHOMOLOGY_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = GROUP_COHOMOLOGY_OPERATIONS
 
 __all__ = ["TOOLS"]

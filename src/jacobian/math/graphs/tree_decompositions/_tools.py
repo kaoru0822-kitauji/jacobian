@@ -69,7 +69,7 @@ _DECOMPOSITION = {
 }
 
 
-TREE_DECOMPOSITION_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "graph.tree_decomposition.width.compute",
         "Compute the width of a tree decomposition",
@@ -197,6 +197,5 @@ TREE_DECOMPOSITION_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = TREE_DECOMPOSITION_OPERATIONS
 
 __all__ = ["TOOLS"]

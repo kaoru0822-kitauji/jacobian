@@ -7,7 +7,7 @@ from jacobian.catalog.catalog import Catalog
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.dispatch import invoke_operation
 from jacobian.math.finite_game_theory._models import MAX_EXACT_EQUILIBRIUM_WORK
-from jacobian.math.finite_game_theory._tools import FINITE_GAME_THEORY_OPERATIONS
+from jacobian.math.finite_game_theory._tools import TOOLS
 
 
 def _small_game() -> dict[str, object]:
@@ -75,7 +75,7 @@ def test_zero_sum_schema_explains_structurally_valid_exact_work_rejection() -> N
 def test_best_response_declaration_publishes_an_operation_neutral_schema() -> None:
     """The exact-equilibrium envelope appears only on the Nash operation."""
 
-    tools = {tool.operation_id: tool for tool in FINITE_GAME_THEORY_OPERATIONS}
+    tools = {tool.operation_id: tool for tool in TOOLS}
     best_response_schema = tools[
         "game_theory.best_response.compute"
     ].request_type.model_json_schema()

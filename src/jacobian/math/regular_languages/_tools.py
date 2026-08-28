@@ -76,7 +76,7 @@ _TRANSITION_PROFILE_EXAMPLE = {
 }
 
 
-REGULAR_LANGUAGE_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     rl_operation(
         "automaton.path.transition_parikh_profile.compute",
         "Compute a transition-Parikh profile for fixed-length automaton paths",
@@ -159,6 +159,5 @@ REGULAR_LANGUAGE_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = REGULAR_LANGUAGE_OPERATIONS
 
 __all__ = ["TOOLS"]

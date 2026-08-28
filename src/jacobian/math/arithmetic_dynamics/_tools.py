@@ -52,7 +52,7 @@ def _op[
     )
 
 
-ARITHMETIC_DYNAMICS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "arithmetic_dynamics.map.iterate.compute",
         "Compute the n-th iterate of a polynomial map",
@@ -187,7 +187,5 @@ ARITHMETIC_DYNAMICS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-
-TOOLS = ARITHMETIC_DYNAMICS_OPERATIONS
 
 __all__ = ["TOOLS"]

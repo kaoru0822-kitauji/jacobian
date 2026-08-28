@@ -52,7 +52,7 @@ def graph_decomposition_operation[
     )
 
 
-GRAPH_DECOMPOSITION_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     graph_decomposition_operation(
         "graph.decomposition.spqr_tree.compute",
         "Compute a normalized SPQR tree of an undirected graph",
@@ -215,6 +215,5 @@ GRAPH_DECOMPOSITION_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = GRAPH_DECOMPOSITION_OPERATIONS
 
 __all__ = ["TOOLS"]

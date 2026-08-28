@@ -54,7 +54,7 @@ _COMPLEX_EXAMPLE: dict[str, Any] = {
 }
 
 
-HOCHSCHILD_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     hochschild_operation(
         "hochschild.chain_complex.compute",
         "Compute the Hochschild chain complex with trivial bimodule",
@@ -101,6 +101,5 @@ HOCHSCHILD_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = HOCHSCHILD_OPERATIONS
 
 __all__ = ["TOOLS"]

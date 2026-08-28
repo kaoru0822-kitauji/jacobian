@@ -43,7 +43,7 @@ def en_operation[RequestT: StrictModel, ResultT: StrictModel](
     )
 
 
-ELECTRICAL_NETWORK_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     en_operation(
         "electrical_network.effective_resistance.compute",
         "Compute the exact effective resistance between two terminals",
@@ -155,6 +155,5 @@ ELECTRICAL_NETWORK_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = ELECTRICAL_NETWORK_OPERATIONS
 
 __all__ = ["TOOLS"]

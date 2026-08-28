@@ -67,7 +67,7 @@ _GROUP_LIKE_EXAMPLE: dict[str, Any] = {
 }
 
 
-COALGEBRA_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     coalgebra_operation(
         "coalgebra.comultiplication.compute",
         "Compute comultiplication Delta(c_i) for a coalgebra basis element",
@@ -114,6 +114,5 @@ COALGEBRA_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = COALGEBRA_OPERATIONS
 
 __all__ = ["TOOLS"]

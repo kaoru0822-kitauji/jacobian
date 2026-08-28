@@ -30,7 +30,7 @@ _GOLDEN_MEAN = {
     "two_sided": True,
 }
 
-SYMBOLIC_DYNAMICS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     MathTool(
         operation_id="symbolic_dynamics.finite_type_shift.construct",
         title="Construct a finite-type shift presentation",
@@ -135,6 +135,5 @@ SYMBOLIC_DYNAMICS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = SYMBOLIC_DYNAMICS_OPERATIONS
 
 __all__ = ["TOOLS"]

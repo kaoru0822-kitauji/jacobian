@@ -46,7 +46,7 @@ def _op[
     )
 
 
-POLYTOPE_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "polytope.rational.support.compute",
         "Compute an exact rational polytope support value",
@@ -262,7 +262,5 @@ POLYTOPE_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-
-TOOLS = POLYTOPE_OPERATIONS
 
 __all__ = ["TOOLS"]

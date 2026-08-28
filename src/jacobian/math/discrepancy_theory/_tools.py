@@ -46,7 +46,7 @@ def discrepancy_theory_operation[
     )
 
 
-DISCREPANCY_THEORY_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     discrepancy_theory_operation(
         "discrepancy.hard_constraint_round.compute",
         "Round a rational vector under hard cardinality constraints",
@@ -146,6 +146,5 @@ DISCREPANCY_THEORY_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = DISCREPANCY_THEORY_OPERATIONS
 
 __all__ = ["TOOLS"]

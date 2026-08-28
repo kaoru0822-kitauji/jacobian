@@ -53,7 +53,7 @@ def _z(n: str) -> dict[str, str]:
     return {"num": n, "den": "1"}
 
 
-BOOLEAN_ANALYSIS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     boolean_analysis_operation(
         "boolean.truth_table.compute",
         "Evaluate a Boolean function over all 2^n inputs",
@@ -137,6 +137,5 @@ BOOLEAN_ANALYSIS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = BOOLEAN_ANALYSIS_OPERATIONS
 
 __all__ = ["TOOLS"]

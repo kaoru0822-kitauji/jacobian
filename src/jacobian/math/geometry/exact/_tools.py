@@ -113,7 +113,7 @@ UNIT_SQUARE_ORIGIN = {
     "anchor": [{"num": "0", "den": "1"}, {"num": "0", "den": "1"}],
 }
 
-EXACT_GEOMETRY_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "geometry.points.distance_profile.compute",
         "Compute pairwise distance profile",
@@ -196,7 +196,5 @@ EXACT_GEOMETRY_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-
-TOOLS = EXACT_GEOMETRY_OPERATIONS
 
 __all__ = ["TOOLS"]

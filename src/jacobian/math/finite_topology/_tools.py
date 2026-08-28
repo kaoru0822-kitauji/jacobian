@@ -26,7 +26,7 @@ _SIERPINSKI = {
     "open_sets": [[], [1], [0, 1]],
 }
 
-FINITE_TOPOLOGY_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     MathTool(
         operation_id="topology.specialization_preorder.compute",
         title="Compute a specialization preorder",
@@ -113,6 +113,5 @@ FINITE_TOPOLOGY_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = FINITE_TOPOLOGY_OPERATIONS
 
 __all__ = ["TOOLS"]

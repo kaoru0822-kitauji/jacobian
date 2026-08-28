@@ -69,7 +69,7 @@ _CONTEXT = {
 }
 
 
-FORMAL_CONCEPT_ANALYSIS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "formal_context.objects.derivation.compute",
         "Compute A' = {m : every g in A has m}",
@@ -268,6 +268,5 @@ FORMAL_CONCEPT_ANALYSIS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = FORMAL_CONCEPT_ANALYSIS_OPERATIONS
 
 __all__ = ["TOOLS"]

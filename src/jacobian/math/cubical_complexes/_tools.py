@@ -50,7 +50,7 @@ _CELLS = {
     ]
 }
 
-_TOOLS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "cubical.f_vector.compute",
         "Compute the f-vector of a cubical complex",
@@ -95,5 +95,4 @@ _TOOLS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = _TOOLS
 __all__ = ["TOOLS"]

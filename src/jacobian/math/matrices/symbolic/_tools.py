@@ -148,7 +148,7 @@ _SYMBOLIC_PRODUCT_EXAMPLE = example(
 )
 
 
-SYMBOLIC_MATRIX_OPERATIONS = (
+TOOLS = (
     symbolic_matrix_operation(
         "matrix.symbolic.determinant.compute",
         "Compute an exact symbolic matrix determinant (det) over QQ(t_1, ..., t_n)",
@@ -295,6 +295,5 @@ SYMBOLIC_MATRIX_OPERATIONS = (
     ),
 )
 
-TOOLS = SYMBOLIC_MATRIX_OPERATIONS
 
 __all__ = ["TOOLS"]

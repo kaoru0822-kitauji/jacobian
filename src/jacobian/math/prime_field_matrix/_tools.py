@@ -44,7 +44,7 @@ def _op[
     )
 
 
-_TOOLS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "prime_field.matrix.rank.compute",
         "Compute matrix rank over GF(p)",
@@ -128,6 +128,5 @@ _TOOLS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = _TOOLS
 
 __all__ = ["TOOLS"]

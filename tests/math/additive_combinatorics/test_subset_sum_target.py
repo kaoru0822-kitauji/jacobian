@@ -32,7 +32,7 @@ from jacobian.math.additive_combinatorics._subset_sum_target_kernel import (
     _solve_subset_sum_target,
 )
 from jacobian.math.additive_combinatorics._tools import (
-    ADDITIVE_COMBINATORICS_OPERATIONS,
+    TOOLS,
 )
 from jacobian.math.additive_combinatorics.values import (
     MAX_INDEXED_INTEGER_SEQUENCE_ITEMS,
@@ -45,7 +45,7 @@ def _operation() -> MathTool[SubsetSumTargetRequest, SubsetSumTargetResult]:
         MathTool[SubsetSumTargetRequest, SubsetSumTargetResult],
         next(
             operation
-            for operation in ADDITIVE_COMBINATORICS_OPERATIONS
+            for operation in TOOLS
             if operation.operation_id == "additive.subset_sum.target.solve"
         ),
     )

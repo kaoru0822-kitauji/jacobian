@@ -25,7 +25,7 @@ from jacobian.math.polytope._operations import (
     compute_polytope_support,
     compute_polytope_volume,
 )
-from jacobian.math.polytope._tools import POLYTOPE_OPERATIONS
+from jacobian.math.polytope._tools import TOOLS
 from jacobian.math.tree_automata._models import (
     AcceptedTreeCountRequest,
     TreeAutomatonReachabilityRequest,
@@ -72,7 +72,7 @@ def test_matrix_product_value_composes_into_determinant_request() -> None:
 def test_support_polytope_value_composes_into_volume_request() -> None:
     support_tool = next(
         tool
-        for tool in POLYTOPE_OPERATIONS
+        for tool in TOOLS
         if tool.operation_id == "polytope.rational.support.compute"
     )
     support = compute_polytope_support(

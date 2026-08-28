@@ -43,7 +43,7 @@ def _op[
     )
 
 
-LATTICE_POLYTOPE_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "polytope.lattice_points.enumerate",
         "Enumerate lattice points inside a bounded rational polytope",
@@ -157,6 +157,5 @@ LATTICE_POLYTOPE_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = LATTICE_POLYTOPE_OPERATIONS
 
 __all__ = ["TOOLS"]

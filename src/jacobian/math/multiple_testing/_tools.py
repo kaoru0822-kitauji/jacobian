@@ -43,7 +43,7 @@ def _op[
     )
 
 
-MULTIPLE_TESTING_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "probability.bh_step_up.compute",
         "Benjamini-Hochberg step-up procedure",
@@ -93,7 +93,5 @@ MULTIPLE_TESTING_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-
-TOOLS = MULTIPLE_TESTING_OPERATIONS
 
 __all__ = ["TOOLS"]

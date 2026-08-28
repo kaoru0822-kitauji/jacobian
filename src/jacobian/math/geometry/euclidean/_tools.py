@@ -46,7 +46,7 @@ def _op[
     )
 
 
-EUCLIDEAN_GEOMETRY_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "geometry.euclidean.segment_ratio.compute",
         "Compute squared-length ratio of two segments",
@@ -166,7 +166,5 @@ EUCLIDEAN_GEOMETRY_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-
-TOOLS = EUCLIDEAN_GEOMETRY_OPERATIONS
 
 __all__ = ["TOOLS"]

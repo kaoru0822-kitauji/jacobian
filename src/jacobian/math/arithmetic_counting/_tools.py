@@ -43,7 +43,7 @@ def _op[
     )
 
 
-ARITHMETIC_COUNTING_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "integer.counting.floor_sum.compute",
         "Compute floor sum",
@@ -93,7 +93,5 @@ ARITHMETIC_COUNTING_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-
-TOOLS = ARITHMETIC_COUNTING_OPERATIONS
 
 __all__ = ["TOOLS"]

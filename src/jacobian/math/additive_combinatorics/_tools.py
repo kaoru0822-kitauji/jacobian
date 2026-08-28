@@ -121,7 +121,7 @@ _DIRECT_SUM_NON_TILING_EXAMPLE: dict[str, Any] = {
 }
 
 
-ADDITIVE_COMBINATORICS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     additive_combinatorics_operation(
         "additive.subset_sum.target.solve",
         "Solve one exact indexed subset-sum target",
@@ -392,6 +392,5 @@ ADDITIVE_COMBINATORICS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = ADDITIVE_COMBINATORICS_OPERATIONS
 
 __all__ = ["TOOLS"]

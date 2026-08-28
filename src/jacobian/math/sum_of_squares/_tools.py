@@ -117,7 +117,7 @@ _GRAM_CHECK_EXAMPLE: dict[str, Any] = {
 }
 
 
-SOS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     sos_operation(
         "polynomial.sos.decomposition.check",
         "Check a rational sum-of-squares decomposition by exact coefficient identity",
@@ -165,6 +165,5 @@ SOS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = SOS_OPERATIONS
 
 __all__ = ["TOOLS"]

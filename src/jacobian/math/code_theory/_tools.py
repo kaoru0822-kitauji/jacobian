@@ -42,7 +42,7 @@ def ct_operation[RequestT: StrictModel, ResultT: StrictModel](
     )
 
 
-CODE_THEORY_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     ct_operation(
         "code.minimum_distance.compute",
         "Compute the minimum distance of a linear code",
@@ -99,6 +99,5 @@ CODE_THEORY_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = CODE_THEORY_OPERATIONS
 
 __all__ = ["TOOLS"]

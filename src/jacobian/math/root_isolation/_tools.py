@@ -40,7 +40,7 @@ def ri_operation[RequestT: StrictModel, ResultT: StrictModel](
     )
 
 
-ROOT_ISOLATION_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     ri_operation(
         "polynomial.roots.isolate",
         "Isolate real roots of a univariate polynomial",
@@ -116,6 +116,5 @@ ROOT_ISOLATION_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = ROOT_ISOLATION_OPERATIONS
 
 __all__ = ["TOOLS"]

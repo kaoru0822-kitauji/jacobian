@@ -45,7 +45,7 @@ def rs_operation[RequestT: StrictModel, ResultT: StrictModel](
 
 FIBONACCI_MOD_7 = {"prime": 7, "sequence": [0, 1, 1, 2, 3, 5, 1, 6, 0]}
 
-RECURRENCE_SOLVING_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     rs_operation(
         "sequence.recurrence.find",
         "Find the minimal linear recurrence of a sequence",
@@ -143,6 +143,5 @@ RECURRENCE_SOLVING_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = RECURRENCE_SOLVING_OPERATIONS
 
 __all__ = ["TOOLS"]

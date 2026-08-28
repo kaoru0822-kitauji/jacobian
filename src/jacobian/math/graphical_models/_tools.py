@@ -63,7 +63,7 @@ _FACTOR_SINGLE = {
     "table": [{"num": "1", "den": "3"}, {"num": "2", "den": "3"}],
 }
 
-GRAPHICAL_MODEL_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "graphical_model.factor.multiply",
         "Multiply two factors",
@@ -144,6 +144,5 @@ GRAPHICAL_MODEL_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = GRAPHICAL_MODEL_OPERATIONS
 
 __all__ = ["TOOLS"]

@@ -43,7 +43,7 @@ def _op[
     )
 
 
-CONVEX_ANALYSIS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "convex.max_affine.evaluate",
         "Evaluate a max-affine function",
@@ -116,7 +116,5 @@ CONVEX_ANALYSIS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-
-TOOLS = CONVEX_ANALYSIS_OPERATIONS
 
 __all__ = ["TOOLS"]

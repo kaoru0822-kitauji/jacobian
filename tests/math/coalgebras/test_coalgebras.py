@@ -443,9 +443,9 @@ class TestCounitOperationRemovalFromCatalog:
     stays native-only and out of the declared public operations."""
 
     def test_counit_operation_is_not_declared(self) -> None:
-        from jacobian.math.coalgebras._tools import COALGEBRA_OPERATIONS
+        from jacobian.math.coalgebras._tools import TOOLS
 
-        assert {tool.operation_id for tool in COALGEBRA_OPERATIONS} == {
+        assert {tool.operation_id for tool in TOOLS} == {
             "coalgebra.comultiplication.compute",
             "coalgebra.group_like_elements.compute",
         }

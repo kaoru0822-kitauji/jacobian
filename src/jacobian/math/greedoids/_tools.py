@@ -60,7 +60,7 @@ _SYSTEM = {
 }
 
 
-GREEDOID_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "greedoid.recognize.compute",
         "Recognize a feasible-set family as a greedoid",
@@ -164,6 +164,5 @@ GREEDOID_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = GREEDOID_OPERATIONS
 
 __all__ = ["TOOLS"]

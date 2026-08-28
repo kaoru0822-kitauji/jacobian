@@ -59,7 +59,7 @@ _BOCKSTEIN_EXAMPLE: dict[str, Any] = {
 }
 
 
-COHOMOLOGY_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     cohomology_operation(
         "cohomology.steenrod_square.compute",
         "Compute Sq^0, Sq^n (cup) and Sq^k=0 for k>n over GF(2) for cocycles",
@@ -109,6 +109,5 @@ COHOMOLOGY_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = COHOMOLOGY_OPERATIONS
 
 __all__ = ["TOOLS"]

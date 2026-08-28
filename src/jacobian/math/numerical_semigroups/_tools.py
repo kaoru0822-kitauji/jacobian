@@ -87,7 +87,7 @@ def _operation[
     )
 
 
-NUMERICAL_SEMIGROUP_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _operation(
         "number_theory.numerical_semigroup.summary.compute",
         "Compute numerical semigroup summary",
@@ -322,7 +322,5 @@ NUMERICAL_SEMIGROUP_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-
-TOOLS = NUMERICAL_SEMIGROUP_OPERATIONS
 
 __all__ = ["TOOLS"]

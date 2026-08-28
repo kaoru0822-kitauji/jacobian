@@ -57,7 +57,7 @@ _PADIC_ROOTS_EXAMPLE: dict[str, Any] = {
 }
 
 
-PADIC_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     padic_operation(
         "number_theory.padic.hensel_root.compute",
         "Lift a simple root mod p to a root mod p^k via Hensel's lemma",
@@ -105,6 +105,5 @@ PADIC_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = PADIC_OPERATIONS
 
 __all__ = ["TOOLS"]

@@ -85,7 +85,7 @@ _CYCLE_MAP = {
 }
 
 
-COMBINATORIAL_MAP_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "combinatorial_map.faces.compute",
         "Compute the face-orbit family of a combinatorial map",
@@ -232,6 +232,5 @@ COMBINATORIAL_MAP_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = COMBINATORIAL_MAP_OPERATIONS
 
 __all__ = ["TOOLS"]

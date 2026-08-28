@@ -58,7 +58,7 @@ _SPACE = {
 }
 
 
-TOPOLOGY_SPACE_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "topology.finite.interior.compute",
         "Compute the interior of a subset",
@@ -163,6 +163,5 @@ TOPOLOGY_SPACE_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = TOPOLOGY_SPACE_OPERATIONS
 
 __all__ = ["TOOLS"]

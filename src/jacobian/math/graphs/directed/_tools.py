@@ -52,7 +52,7 @@ def directed_graph_operation[
     )
 
 
-DIRECTED_GRAPH_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     directed_graph_operation(
         "graph.directed.reachability.compute",
         "Compute reachable vertices from a source in a directed graph",
@@ -187,6 +187,5 @@ DIRECTED_GRAPH_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = DIRECTED_GRAPH_OPERATIONS
 
 __all__ = ["TOOLS"]

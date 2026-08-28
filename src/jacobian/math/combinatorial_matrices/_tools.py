@@ -56,7 +56,7 @@ def _op[
 _H2 = [[1, 1], [1, -1]]
 
 
-COMBINATORIAL_MATRIX_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "matrix.sign.profile.compute",
         "Compute the sign profile of a sign matrix",
@@ -159,6 +159,5 @@ COMBINATORIAL_MATRIX_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = COMBINATORIAL_MATRIX_OPERATIONS
 
 __all__ = ["TOOLS"]

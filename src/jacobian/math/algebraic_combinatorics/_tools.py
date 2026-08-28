@@ -54,7 +54,7 @@ def ac_operation[RequestT: StrictModel, ResultT: StrictModel](
 
 _PARTITION_321 = {"partition": {"parts": [3, 2, 1]}}
 
-ALGEBRAIC_COMBINATORICS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     ac_operation(
         "combinatorics.hook_length.compute",
         "Compute hook lengths of a Young diagram",
@@ -203,6 +203,5 @@ ALGEBRAIC_COMBINATORICS_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = ALGEBRAIC_COMBINATORICS_OPERATIONS
 
 __all__ = ["TOOLS"]

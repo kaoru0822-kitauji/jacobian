@@ -46,7 +46,7 @@ def _op[
     )
 
 
-SUBMODULAR_OPT_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "combinatorics.set_function.evaluate",
         "Evaluate a set function",
@@ -143,7 +143,5 @@ SUBMODULAR_OPT_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-
-TOOLS = SUBMODULAR_OPT_OPERATIONS
 
 __all__ = ["TOOLS"]

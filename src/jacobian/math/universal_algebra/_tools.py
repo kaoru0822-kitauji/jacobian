@@ -83,7 +83,7 @@ _TERM = {
 }
 
 
-UNIVERSAL_ALGEBRA_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
+TOOLS: tuple[MathTool[Any, Any], ...] = (
     _op(
         "universal_algebra.term.evaluate.compute",
         "Evaluate a source-bound term under a complete assignment",
@@ -238,6 +238,5 @@ UNIVERSAL_ALGEBRA_OPERATIONS: tuple[MathTool[Any, Any], ...] = (
     ),
 )
 
-TOOLS = UNIVERSAL_ALGEBRA_OPERATIONS
 
 __all__ = ["TOOLS"]
