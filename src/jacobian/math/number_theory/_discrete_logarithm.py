@@ -65,7 +65,7 @@ def _compute(request: DiscreteLogarithmRequest) -> DiscreteLogarithmResult:
     value = 1 % modulus
     for exponent in range(modulus):
         if value == target:
-            return DiscreteLogarithmResult.model_construct(
+            return DiscreteLogarithmResult(
                 status="SOLVED",
                 base=request.base,
                 target=request.target,
@@ -73,7 +73,7 @@ def _compute(request: DiscreteLogarithmRequest) -> DiscreteLogarithmResult:
                 discrete_log=exponent,
             )
         value = (value * base) % modulus
-    return DiscreteLogarithmResult.model_construct(
+    return DiscreteLogarithmResult(
         status="UNSOLVABLE",
         base=request.base,
         target=request.target,

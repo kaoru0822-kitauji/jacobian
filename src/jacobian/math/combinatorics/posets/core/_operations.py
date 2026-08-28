@@ -16,6 +16,7 @@ from jacobian.catalog.models import (
 from jacobian.math.combinatorics.posets.core._models import (
     MAX_ANTICHAIN_PROFILE_CANDIDATES,
     MAX_ANTICHAIN_PROFILE_ELEMENTS,
+    MAX_LINEAR_EXTENSION_ELEMENTS,
     AntichainProfileRequest,
     AntichainProfileResult,
     FinitePoset,
@@ -234,6 +235,15 @@ def _linear_extensions(
 ) -> LinearExtensionCountResult:
     poset = request.poset
     elements = poset.elements
+    if len(elements) > MAX_LINEAR_EXTENSION_ELEMENTS:
+        raise OperationDomainValidationError(
+            location=("poset", "elements"),
+            code="poset.linear_extension_size_bound",
+            message=(
+                "linear-extension counting supports at most "
+                f"{MAX_LINEAR_EXTENSION_ELEMENTS} elements"
+            ),
+        )
     index = {element: position for position, element in enumerate(elements)}
     predecessor_masks = [0] * len(elements)
     successor_masks = [0] * len(elements)

@@ -161,9 +161,8 @@ class DeterministicTerminalGameSolution(StrictModel):
     """All position values and one canonical optimal stationary strategy pair.
 
     The source game is retained for composition. Deserialization checks the
-    bounded result shape only; use the owner-local verifier to check an
-    independently supplied minimax claim. Kernel output uses the trusted
-    factory below. Value classes are ordered by payoff and list members in
+    bounded result shape only; kernel output uses the trusted factory below.
+    Value classes are ordered by payoff and list members in
     declared position order. Strategy choices follow the corresponding
     player's declared positions.
     """
@@ -277,8 +276,8 @@ def _require_terminal_game_envelope(game: DeterministicTerminalGame) -> None:
 
     # Each threshold performs at most four full vertex passes (target choice,
     # attractor setup, safety complement, and value update), one edge pass, and
-    # the solve performs one final O(V+E) strategy pass. Result construction
-    # replays the same kernel.
+    # the solve performs one final O(V+E) strategy pass. Result construction is
+    # structural and does not repeat the solver.
     # Forming threshold targets compares every terminal payoff with every
     # threshold. Sorting k exact rationals uses at most k*ceil(log2(k)) more
     # comparisons. Each comparison is conservatively charged quadratically in
@@ -291,7 +290,7 @@ def _require_terminal_game_envelope(game: DeterministicTerminalGame) -> None:
         * max_digits
         * max_digits
     )
-    work_units = 2 * (
+    work_units = (
         threshold_count * (4 * position_count + move_count)
         + position_count
         + move_count

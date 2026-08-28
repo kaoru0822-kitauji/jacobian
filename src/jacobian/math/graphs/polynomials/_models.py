@@ -240,9 +240,8 @@ class TreeIndependencePolynomialRequest(StrictModel):
 class TreeIndependencePolynomialResult(StrictModel):
     """One source-bound exact independence polynomial and its defining values.
 
-    The trusted tree kernel constructs this result.  An independently supplied
-    claim can be checked by the explicit owner-local verifier without making
-    Pydantic validation execute the coefficient dynamic program again.
+    The trusted tree kernel constructs this result without making Pydantic
+    validation execute the coefficient dynamic program again.
     """
 
     graph: SimpleUndirectedGraph
@@ -297,7 +296,6 @@ class TreeIndependencePolynomialResult(StrictModel):
                 "independent-set count exceeds the "
                 f"{MAX_INDEPENDENCE_POLYNOMIAL_COEFFICIENT_DIGITS}-digit bound",
             )
-        TreeIndependencePolynomialRequest(graph=self.graph)
         coefficients = tuple(
             parse_canonical_integer(coefficient) for coefficient in self.coefficients
         )

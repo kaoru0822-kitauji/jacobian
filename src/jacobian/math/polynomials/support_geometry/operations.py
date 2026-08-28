@@ -207,14 +207,6 @@ def _solve_convex_membership(
     basis = [count + i for i in range(len(rows))]
     costs = [Fraction(0)] * count + [Fraction(1)] * len(rows)
 
-    def _price_out(objective: list[Fraction]) -> None:
-        for i, basic in enumerate(basis):
-            factor = objective[basic]
-            if factor:
-                row = tableau[i]
-                for col in range(total + 1):
-                    objective[col] -= factor * row[col]
-
     objective = [*costs, Fraction(0)]
     _price_out_basis(objective, tableau, basis, total)
 

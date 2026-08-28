@@ -423,9 +423,8 @@ class ProductMorphismProjection(StrictModel):
 class FiniteCategoryProduct(StrictModel):
     """A bounded product-category claim with its pair projections.
 
-    Deserialization checks only the structural envelope.  The product law is
-    available through the owner-local explicit verifier for independently
-    supplied claims; kernel output is created by ``_from_kernel``.
+    Deserialization checks only the structural envelope. Kernel output is
+    created by ``_from_kernel`` after multiplication establishes the product.
     """
 
     left: FiniteCategory
@@ -450,7 +449,7 @@ class FiniteCategoryProduct(StrictModel):
     ) -> Self:
         """Build a product result from the trusted owner-local kernel."""
 
-        return cls(
+        return cls.model_construct(
             left=left,
             right=right,
             product=product,

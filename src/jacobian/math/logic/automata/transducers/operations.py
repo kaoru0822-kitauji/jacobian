@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import deque
 from typing import Literal
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.logic.automata.transducers.values import (
     MAX_FST_RESULT_WORD_LENGTH,
     MAX_FST_STATES,
@@ -26,6 +27,14 @@ __all__ = [
     "run_subsequential",
     "trim_subsequential",
 ]
+
+
+def _reject(code: str, message: str, *location: str) -> None:
+    raise OperationDomainValidationError(
+        location=location,
+        code=f"finite_state_transducer.{code}",
+        message=message,
+    )
 
 
 def _transition_map(
@@ -61,9 +70,26 @@ def run_subsequential(
     ``"NONFINAL_DOMAIN_STATE"``.
     """
     if any(not 0 <= symbol < transducer.input_alphabet_size for symbol in word):
-        raise ValueError("word symbol is outside the input alphabet")
+        _reject(
+            "word_symbol_out_of_range",
+            "word symbol is outside the input alphabet",
+            "word",
+        )
     if len(word) > MAX_FST_WORD_LENGTH:
-        raise ValueError("input word exceeds the length bound")
+        _reject("word_length_exceeded", "input word exceeds the length bound", "word")
+    transition_bound = max(
+        (len(transition.output) for transition in transducer.transitions),
+        default=0,
+    )
+    final_bound = max(
+        (len(final.output) for final in transducer.final_outputs), default=0
+    )
+    if len(word) * transition_bound + final_bound > MAX_FST_RESULT_WORD_LENGTH:
+        _reject(
+            "run_output_exceeds_bound",
+            "subsequential output may exceed the result word bound",
+            "word",
+        )
     transitions = _transition_map(transducer)
     finals = _final_output_map(transducer)
     state = transducer.initial_state
@@ -81,7 +107,7 @@ def run_subsequential(
         target, output = transitions[key]
         accumulated.extend(output)
         if len(accumulated) > MAX_FST_RESULT_WORD_LENGTH:
-            raise ValueError("subsequential output exceeds the result word bound")
+            raise RuntimeError("admitted subsequential output exceeded its bound")
         state = target
     if state not in finals:
         return (
@@ -94,7 +120,7 @@ def run_subsequential(
     final_word = finals[state]
     accumulated.extend(final_word)
     if len(accumulated) > MAX_FST_RESULT_WORD_LENGTH:
-        raise ValueError("subsequential output exceeds the result word bound")
+        raise RuntimeError("admitted subsequential output exceeded its bound")
     return ("OUTPUT", tuple(accumulated), state, None, ())
 
 
@@ -273,7 +299,7 @@ def compose_subsequential(
                 continue
             u_next_final, all_output = result
             if len(all_output) > MAX_FST_WORD_LENGTH:
-                raise ValueError("composite transition output exceeds the word bound")
+                raise RuntimeError("admitted composite transition exceeded its bound")
             pair_next = (t_next, u_next_final)
             if pair_next not in state_pairs:
                 state_pairs[pair_next] = len(state_pairs)
@@ -318,7 +344,7 @@ def _composite_finals(
         final_state, output = result
         output.extend(second_finals[final_state])
         if len(output) > MAX_FST_WORD_LENGTH:
-            raise ValueError("composite final output exceeds the word bound")
+            raise RuntimeError("admitted composite final output exceeded its bound")
         result_finals.append(
             SubseqFinalOutput(state=composite_state, output=tuple(output))
         )
@@ -329,9 +355,19 @@ def _validate_composition_bounds(
     first: SubsequentialTransducer, second: SubsequentialTransducer
 ) -> None:
     if first.output_alphabet_size != second.input_alphabet_size:
-        raise ValueError("first output alphabet must match second input alphabet")
+        _reject(
+            "composition_alphabet_mismatch",
+            "first output alphabet must match second input alphabet",
+            "first",
+            "second",
+        )
     if first.state_count * second.state_count > MAX_FST_STATES:
-        raise ValueError("composite product-state bound exceeds 64")
+        _reject(
+            "composition_state_bound_exceeded",
+            f"composite product-state bound exceeds {MAX_FST_STATES}",
+            "first",
+            "second",
+        )
     second_output_bound = max(
         (len(transition.output) for transition in second.transitions), default=0
     )
@@ -345,12 +381,22 @@ def _validate_composition_bounds(
         (len(final.output) for final in second.final_outputs), default=0
     )
     if first_transition_bound * second_output_bound > MAX_FST_WORD_LENGTH:
-        raise ValueError("composite transition output may exceed the word bound")
+        _reject(
+            "composition_transition_output_exceeds_bound",
+            "composite transition output may exceed the word bound",
+            "first",
+            "second",
+        )
     if (
         first_final_bound * second_output_bound + second_final_bound
         > MAX_FST_WORD_LENGTH
     ):
-        raise ValueError("composite final output may exceed the word bound")
+        _reject(
+            "composition_final_output_exceeds_bound",
+            "composite final output may exceed the word bound",
+            "first",
+            "second",
+        )
 
 
 def invert_rational(
@@ -392,9 +438,30 @@ def replay_rational_path(
     Returns ``(status, input_word, output_word, state_trace, error)``.
     """
     if initial_state not in transducer.initial_states:
-        raise ValueError("initial_state must select one declared initial state")
+        _reject(
+            "initial_state_not_declared",
+            "initial_state must select one declared initial state",
+            "initial_state",
+        )
     if len(edge_path) > MAX_FST_WORD_LENGTH:
-        raise ValueError("edge path exceeds the length bound")
+        _reject(
+            "edge_path_length_exceeded",
+            "edge path exceeds the length bound",
+            "edge_path",
+        )
+    if all(0 <= index < len(transducer.edges) for index in edge_path):
+        input_length = sum(
+            len(transducer.edges[index].input_label) for index in edge_path
+        )
+        output_length = sum(
+            len(transducer.edges[index].output_label) for index in edge_path
+        )
+        if max(input_length, output_length) > MAX_FST_RESULT_WORD_LENGTH:
+            _reject(
+                "replay_labels_exceed_bound",
+                "replayed labels exceed the result word bound",
+                "edge_path",
+            )
     accepting = set(transducer.accepting_states)
     if not edge_path:
         if initial_state in accepting:

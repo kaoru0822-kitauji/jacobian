@@ -13,7 +13,6 @@ from jacobian.math.analysis.orthogonal_polynomials.operations import (
     hankel_matrix_from_prefix,
     orthogonal_polynomials_from_moments,
     recurrence_coefficients_from_family,
-    require_gaussian_quadrature_admission,
     require_hankel_matrix_admission,
 )
 from jacobian.math.analysis.orthogonal_polynomials.values import (
@@ -87,5 +86,4 @@ def gaussian_quadrature_rule(
     prefix: MomentFunctionalPrefix, order: int
 ) -> GaussianQuadratureRule:
     """Exact Gaussian quadrature rule of one bounded moment prefix."""
-    require_gaussian_quadrature_admission(prefix, order)
     return gaussian_quadrature_rule_from_prefix(prefix, order)

@@ -70,9 +70,8 @@ class AllTerminalReliabilityRequest(StrictModel):
 class AllTerminalReliabilityWireResult(StrictModel):
     """Exact probability with its bounded connected-subgraph profile.
 
-    Deserialization checks the structural result envelope.  The kernel uses
-    ``_from_kernel`` after its one complete enumeration; an independently
-    supplied claim can be replayed with the owner-local verifier below.
+    Deserialization checks the structural result envelope. The kernel uses
+    ``_from_kernel`` after its one complete enumeration.
     """
 
     model_config = ConfigDict(

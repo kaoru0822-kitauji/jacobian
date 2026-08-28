@@ -87,7 +87,7 @@ class PrimeTupleResidueWheel(StrictModel):
         modulus: str,
         valid_count: str,
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             source=request.source,
             primes=request.primes,
             local_rows=local_rows,
@@ -149,7 +149,7 @@ class PrimeTupleResidueWheelEnumeration(StrictModel):
         *,
         residues: tuple[PrimeTupleWheelResidueRow, ...],
     ) -> Self:
-        return cls(wheel=request.wheel, residues=residues)
+        return cls.model_construct(wheel=request.wheel, residues=residues)
 
 
 class PrimeTupleWheelMembershipRequest(StrictModel):
@@ -193,7 +193,7 @@ class PrimeTupleWheelMembershipResult(StrictModel):
         first_excluded_prime: int | None,
         vanishing_form_ids: tuple[str, ...],
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             wheel=request.wheel,
             value=request.value,
             canonical_residue=canonical_residue,
@@ -246,7 +246,7 @@ class PrimeTupleIntervalResidueProfileResult(StrictModel):
     ) -> Self:
         lower = parse_canonical_integer(request.lower)
         upper = parse_canonical_integer(request.upper)
-        return cls(
+        return cls.model_construct(
             wheel=request.wheel,
             lower=request.lower,
             upper=request.upper,

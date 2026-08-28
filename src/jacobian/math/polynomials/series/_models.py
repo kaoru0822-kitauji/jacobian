@@ -498,19 +498,6 @@ class _SeriesPairRequest(StrictModel):
     left: InputTruncatedSeries
     right: InputTruncatedSeries
 
-    @model_validator(mode="after")
-    def require_matching_context(self) -> Self:
-        if self.left.variable != self.right.variable:
-            raise _validation_error(
-                "operand_variable_mismatch", "operands must share the same variable"
-            )
-        if self.left.truncation_order != self.right.truncation_order:
-            raise _validation_error(
-                "operand_order_mismatch",
-                "operands must share the same truncation order",
-            )
-        return self
-
 
 class _SeriesAddSubtractRequest(_SeriesPairRequest):
     """Pair request admitted through coefficientwise arithmetic bounds."""
@@ -744,20 +731,6 @@ class SeriesDivideResult(StrictModel):
 class SeriesComposeRequest(StrictModel):
     outer: InputTruncatedSeries
     inner: InputTruncatedSeries
-
-    @model_validator(mode="after")
-    def require_matching_variable_and_zero_inner_constant(self) -> Self:
-        if self.outer.variable != self.inner.variable:
-            raise _validation_error(
-                "composition_variable_mismatch",
-                "outer and inner series must share the same variable",
-            )
-        if self.outer.truncation_order != self.inner.truncation_order:
-            raise _validation_error(
-                "composition_order_mismatch",
-                "outer and inner series must share the same truncation order",
-            )
-        return self
 
 
 class SeriesComposeResult(StrictModel):

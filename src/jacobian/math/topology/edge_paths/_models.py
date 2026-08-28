@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Literal, Self
+from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field
 from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
@@ -15,23 +15,6 @@ MAX_WORD = 128
 
 def _validation_error(reason: str, message: str) -> PydanticCustomError:
     return PydanticCustomError(reason, message)
-
-
-class EdgePath(StrictModel):
-    """A path in a graph as a sequence of oriented edges."""
-
-    vertex_count: int = Field(ge=2)
-    edges: tuple[tuple[int, int], ...] = Field(min_length=1, max_length=MAX_EDGES)
-
-    @model_validator(mode="after")
-    def require_valid(self) -> Self:
-        for u, v in self.edges:
-            if not (0 <= u < self.vertex_count and 0 <= v < self.vertex_count):
-                raise _validation_error(
-                    "topology.edge_paths.require_valid_1",
-                    "edge vertices must be in 0..vertex_count-1",
-                )
-        return self
 
 
 class OrientedEdge(StrictModel):

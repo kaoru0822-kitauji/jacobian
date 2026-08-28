@@ -104,7 +104,7 @@ def compute_rational_point_construct(
                 point=RationalProjectivePoint(coordinates=canonical),
                 scale=scale,
             )
-    raise ValueError("all coordinates are zero")
+    raise AssertionError("admission accepted all-zero projective coordinates")
 
 
 def compute_standard_chart(request: StandardChartRequest) -> StandardChartResult:

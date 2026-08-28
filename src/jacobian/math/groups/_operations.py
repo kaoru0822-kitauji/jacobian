@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic_core import PydanticCustomError
-
 from jacobian.canonical import format_canonical_integer
-from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.groups import (
     element_order,
     group_conjugacy_classes,
@@ -15,8 +12,6 @@ from jacobian.math.groups import (
     subgroup_lattice,
 )
 from jacobian.math.groups._models import (
-    MAX_CONJUGACY_CLASSES_GROUP_ORDER,
-    MAX_SUBGROUP_LATTICE_GROUP_ORDER,
     GroupConjugacyClassesRequest,
     GroupConjugacyClassesResult,
     GroupElementOrderRequest,
@@ -29,7 +24,6 @@ from jacobian.math.groups._models import (
     GroupSubgroupLatticeRequest,
     GroupSubgroupLatticeResult,
     PermutationGroup,
-    _require_bounded_group_order,
 )
 
 
@@ -51,17 +45,6 @@ def compute_group_orbit(request: GroupOrbitRequest) -> GroupOrbitResult:
 def compute_group_conjugacy_classes(
     request: GroupConjugacyClassesRequest,
 ) -> GroupConjugacyClassesResult:
-    try:
-        _require_bounded_group_order(
-            request.degree,
-            request.generators,
-            MAX_CONJUGACY_CLASSES_GROUP_ORDER,
-            "conjugacy classes",
-        )
-    except PydanticCustomError as error:
-        raise OperationDomainValidationError(
-            location=("generators",), code=error.type, message=str(error)
-        ) from error
     classes = group_conjugacy_classes(
         request.degree,
         [list(g) for g in request.generators],
@@ -83,18 +66,6 @@ def compute_subgroup_lattice(
     request: GroupSubgroupLatticeRequest,
 ) -> GroupSubgroupLatticeResult:
     from jacobian.math.groups.operations import SubgroupLatticeBudgetExceededError
-
-    try:
-        _require_bounded_group_order(
-            request.degree,
-            request.generators,
-            MAX_SUBGROUP_LATTICE_GROUP_ORDER,
-            "subgroup lattice enumeration",
-        )
-    except PydanticCustomError as error:
-        raise OperationDomainValidationError(
-            location=("generators",), code=error.type, message=str(error)
-        ) from error
 
     source = PermutationGroup(degree=request.degree, generators=request.generators)
     try:

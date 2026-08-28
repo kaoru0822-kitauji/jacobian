@@ -10,11 +10,7 @@ from pydantic import Field, model_validator
 from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
-from jacobian.canonical import (
-    CanonicalLimits,
-    encode_strict_json,
-    strict_json_object_size,
-)
+from jacobian.canonical import encode_strict_json, strict_json_object_size
 from jacobian.math.graphs.decomposition.tree_decompositions.values import (
     TreeDecomposition,
 )
@@ -175,43 +171,6 @@ class RerootRequest(StrictModel):
     decomposition: TreeDecomposition
     root: str
 
-    @model_validator(mode="after")
-    def require_valid_root(self) -> Self:
-        if self.root not in self.decomposition.tree_nodes:
-            raise PydanticCustomError(
-                "graph.root_must_be_a_declared_tree_node",
-                "root must be a declared tree node",
-            )
-        return self
-
-    @model_validator(mode="after")
-    def require_transportable_result(self) -> Self:
-        """Preflight the owner-local root-to-node path projection.
-
-        A tree with at most 256 nodes can still produce quadratically many
-        repeated node labels across its root-to-node paths.  Compute that
-        deterministic projection while admitting the request, so the final
-        transport wrapper never discovers an oversized result after execution.
-        Labels are compared after the transport boundary's NFC normalization,
-        so canonically equivalent spellings cannot collide as result keys.
-        """
-
-        normalized_nodes = _normalized_tree_nodes(self.decomposition)
-        if len(set(normalized_nodes)) != len(normalized_nodes):
-            raise PydanticCustomError(
-                "graph.reroot_tree_node_labels_collide_after_normalization",
-                "tree node labels collide after Unicode NFC normalization",
-            )
-        result_bytes = _reroot_result_wire_bytes(self.decomposition, self.root)
-        output_limit = CanonicalLimits().max_output_bytes
-        if result_bytes > output_limit:
-            raise PydanticCustomError(
-                "graph.reroot_result_exceeds_transport_limit",
-                "rerooted tree-decomposition paths exceed the "
-                f"{output_limit}-byte canonical output limit",
-            )
-        return self
-
 
 class RerootResult(StrictModel):
     """The rerooted decomposition with parent/children/depth/paths."""
@@ -228,16 +187,6 @@ class RestrictRequest(StrictModel):
 
     decomposition: TreeDecomposition
     subset: tuple[str, ...] = Field(min_length=1)
-
-    @model_validator(mode="after")
-    def require_source_vertices(self) -> Self:
-        source_vertices = set(self.decomposition.graph.vertices)
-        if not set(self.subset).issubset(source_vertices):
-            raise PydanticCustomError(
-                "graph.subset_must_contain_only_declared_source_vertice",
-                "subset must contain only declared source vertices",
-            )
-        return self
 
 
 class BagIntersectionGraphRequest(StrictModel):

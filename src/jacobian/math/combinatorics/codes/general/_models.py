@@ -96,7 +96,7 @@ class MinimumDistanceResult(StrictModel):
     def _from_kernel(cls, *, request: LinearCodeRequest, minimum_distance: int) -> Self:
         """Build a result produced by the owner-local enumeration kernel."""
 
-        return cls(request=request, minimum_distance=minimum_distance)
+        return cls.model_construct(request=request, minimum_distance=minimum_distance)
 
 
 class WeightDistributionResult(StrictModel):
@@ -135,7 +135,7 @@ class WeightDistributionResult(StrictModel):
     ) -> Self:
         """Build a profile produced by the owner-local enumeration kernel."""
 
-        return cls(request=request, weights=weights)
+        return cls.model_construct(request=request, weights=weights)
 
 
 class CoveringRadiusRequest(StrictModel):
@@ -170,4 +170,4 @@ class CoveringRadiusResult(StrictModel):
     ) -> Self:
         """Build a result produced by the owner-local syndrome kernel."""
 
-        return cls(request=request, covering_radius=covering_radius)
+        return cls.model_construct(request=request, covering_radius=covering_radius)

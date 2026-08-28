@@ -15,7 +15,7 @@ from jacobian.canonical import CanonicalLimits, encode_strict_json
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs import explicit_graph
 from jacobian.math.graphs.patterns._models import (
-    MAX_INDUCED_PATTERN_SUBSETS_PER_PASS,
+    MAX_INDUCED_PATTERN_CANDIDATES,
     MAX_INDUCED_PATTERN_TOTAL_WORK_UNITS,
     InducedVertexSubsetPatternCountRequest,
 )
@@ -238,7 +238,7 @@ def test_small_random_graphs_match_independent_subset_and_permutation_oracle() -
 
 
 def test_request_accepts_useful_case_near_subset_bound() -> None:
-    # C(20, 4) = 4,845, just below the 5,000-subset per-pass limit.
+    # C(20, 4) = 4,845, just below the named candidate limit.
     request = InducedVertexSubsetPatternCountRequest(
         host=_empty(20, "h"),
         pattern=_complete(4, "p"),
@@ -332,16 +332,15 @@ def test_numeric_admission_caps_are_visible_in_schema_and_tool_description() -> 
         InducedVertexSubsetPatternCountRequest.model_json_schema(),
         sort_keys=True,
     )
-    assert f"{MAX_INDUCED_PATTERN_SUBSETS_PER_PASS:,} subsets per pass" in schema
+    assert f"{MAX_INDUCED_PATTERN_CANDIDATES:,} candidate subsets" in schema
     assert f"{MAX_INDUCED_PATTERN_TOTAL_WORK_UNITS:,} total work units" in schema
-    assert "10,485,760-byte canonical output bound" in schema
+    assert (
+        f"{CanonicalLimits().max_output_bytes:,}-byte canonical output bound" in schema
+    )
     assert "C(|V(host)|, |V(pattern)|)" in schema
     assert "C(|V(pattern)|, 2) direct host-edge probes" in schema
     assert "partial-injection state bound" in schema
-    assert (
-        f"{MAX_INDUCED_PATTERN_SUBSETS_PER_PASS:,} subsets per pass"
-        in TOOLS[0].description
-    )
+    assert f"{MAX_INDUCED_PATTERN_CANDIDATES:,} subsets" in TOOLS[0].description
     assert (
         f"{MAX_INDUCED_PATTERN_TOTAL_WORK_UNITS:,} work units" in TOOLS[0].description
     )

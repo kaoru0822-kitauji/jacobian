@@ -222,8 +222,6 @@ def decide_direct_sum_predicate(
     """
     _admit_direct_sum(request)
     modulus = request.modulus
-    if modulus < 2:
-        raise ValueError("cyclic group modulus must be at least 2")
 
     left = {a % modulus for a in _parse_set(request.left)}
     right = {b % modulus for b in _parse_set(request.right)}

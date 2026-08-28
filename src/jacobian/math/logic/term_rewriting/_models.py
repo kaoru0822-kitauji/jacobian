@@ -63,20 +63,14 @@ class SubstitutionResult(SubstitutionRequest):
 
     result: Term
 
-    @model_validator(mode="after")
-    def bind_substitution(self) -> Self:
-        self.signature.validate_term(self.term)
-        for replacement in self.substitution.mapping.values():
-            self.signature.validate_term(replacement)
-        self.signature.validate_term(self.result)
-        _require_transport_safe_depth(
-            self.term, *self.substitution.mapping.values(), self.result
-        )
-        return self
-
     @classmethod
     def _from_kernel(cls, request: SubstitutionRequest, result: Term) -> Self:
-        return cls(**request.model_dump(), result=result)
+        return cls.model_construct(
+            signature=request.signature,
+            term=request.term,
+            substitution=request.substitution,
+            result=result,
+        )
 
 
 class MatchingRequest(StrictModel):
@@ -95,24 +89,23 @@ class MatchingResult(MatchingRequest):
 
     @model_validator(mode="after")
     def bind_matching(self) -> Self:
-        self.signature.validate_term(self.pattern)
-        self.signature.validate_term(self.subject)
         if not self.matched and self.substitution:
             raise _validation_error(
                 "matching_result", "an unmatched result cannot include a substitution"
             )
-        for replacement in self.substitution.values():
-            self.signature.validate_term(replacement)
-        _require_transport_safe_depth(
-            self.pattern, self.subject, *self.substitution.values()
-        )
         return self
 
     @classmethod
     def _from_kernel(
         cls, request: MatchingRequest, matched: bool, substitution: dict[int, Term]
     ) -> Self:
-        return cls(**request.model_dump(), matched=matched, substitution=substitution)
+        return cls.model_construct(
+            signature=request.signature,
+            pattern=request.pattern,
+            subject=request.subject,
+            matched=matched,
+            substitution=substitution,
+        )
 
 
 class UnificationRequest(StrictModel):
@@ -131,24 +124,23 @@ class UnificationResult(UnificationRequest):
 
     @model_validator(mode="after")
     def require_exact_unifier(self) -> Self:
-        self.signature.validate_term(self.left)
-        self.signature.validate_term(self.right)
         if not self.unified and self.substitution:
             raise _validation_error(
                 "failed_unification", "failed unification must not claim a substitution"
             )
-        for replacement in self.substitution.values():
-            self.signature.validate_term(replacement)
-        _require_transport_safe_depth(
-            self.left, self.right, *self.substitution.values()
-        )
         return self
 
     @classmethod
     def _from_kernel(
         cls, request: UnificationRequest, unified: bool, substitution: dict[int, Term]
     ) -> Self:
-        return cls(**request.model_dump(), unified=unified, substitution=substitution)
+        return cls.model_construct(
+            signature=request.signature,
+            left=request.left,
+            right=request.right,
+            unified=unified,
+            substitution=substitution,
+        )
 
 
 class RewriteStepSelection(StrictModel):
@@ -187,17 +179,6 @@ class RewriteStepResult(StrictModel):
 
     @model_validator(mode="after")
     def require_exact_applications(self) -> Self:
-        self.signature.validate_term(self.source_term)
-        for rule in self.rules:
-            self.signature.validate_term(rule.lhs)
-            self.signature.validate_term(rule.rhs)
-        _require_transport_safe_depth(
-            self.source_term,
-            *(side for rule in self.rules for side in (rule.lhs, rule.rhs)),
-        )
-        _require_transport_safe_depth(
-            *(application.term for application in self.applications)
-        )
         expected_scope = (
             "ALL_APPLICABLE_STEPS" if self.selection is None else "SELECTED_STEP"
         )
@@ -214,7 +195,7 @@ class RewriteStepResult(StrictModel):
         scope: Literal["ALL_APPLICABLE_STEPS", "SELECTED_STEP"],
         applications: tuple[RewriteApplication, ...],
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             signature=request.signature,
             source_term=request.term,
             rules=request.rules,
@@ -249,18 +230,6 @@ class NormalFormResult(StrictModel):
 
     @model_validator(mode="after")
     def require_exact_bounded_run(self) -> Self:
-        self.signature.validate_term(self.source_term)
-        for rule in self.rules:
-            self.signature.validate_term(rule.lhs)
-            self.signature.validate_term(rule.rhs)
-        _require_transport_safe_depth(
-            self.source_term,
-            *(side for rule in self.rules for side in (rule.lhs, rule.rhs)),
-        )
-        observed = [self.term]
-        if self.next_step is not None:
-            observed.append(self.next_step.term)
-        _require_transport_safe_depth(*observed)
         if self.status == "NORMAL_FORM" and self.next_step is not None:
             raise _validation_error(
                 "normal_form_shape", "a normal form cannot carry a next step"
@@ -276,7 +245,7 @@ class NormalFormResult(StrictModel):
         steps: int,
         next_step: RewriteApplication | None,
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             signature=request.signature,
             source_term=request.term,
             rules=request.rules,
@@ -331,15 +300,13 @@ class CriticalPairsResult(CriticalPairsRequest):
 
     profile: CriticalPairProfile
 
-    @model_validator(mode="after")
-    def bind_critical_pairs(self) -> Self:
-        return self
-
     @classmethod
     def _from_kernel(
         cls, request: CriticalPairsRequest, profile: CriticalPairProfile
     ) -> Self:
-        return cls(signature=request.signature, rules=request.rules, profile=profile)
+        return cls.model_construct(
+            signature=request.signature, rules=request.rules, profile=profile
+        )
 
 
 __all__ = [

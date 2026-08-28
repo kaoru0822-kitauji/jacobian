@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from typing import cast
 
 import pytest
 from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
-from jacobian.catalog.models import MathTool
 from jacobian.math.number_theory.algebraic_numbers import quadratic as real_quadratic
 from jacobian.math.number_theory.algebraic_numbers._models import (
     AlgebraicMultiplicationRequest,
@@ -18,14 +16,9 @@ from jacobian.math.number_theory.algebraic_numbers._operations import (
     compute_algebraic_multiply,
 )
 from jacobian.math.number_theory.algebraic_numbers.quadratic import (
-    _MAX_EMBEDDING_PROFILE_RESULT_DIGITS,
     RealQuadraticEmbeddingProfile,
     RealQuadraticValue,
     real_quadratic_embeddings,
-)
-from jacobian.math.number_theory.arithmetic._real_quadratic import (
-    REAL_QUADRATIC_OPERATIONS,
-    RealQuadraticEmbeddingsRequest,
 )
 
 
@@ -138,39 +131,11 @@ def test_result_bound_is_proved_from_the_accepted_input_envelope() -> None:
     )
 
 
-def test_embedding_declaration_adapter_serves_the_native_profile() -> None:
-    tools = {tool.operation_id: tool for tool in REAL_QUADRATIC_OPERATIONS}
-    tool = tools["arithmetic.real_quadratic.embeddings.compute"]
-    embedding_tool = cast(
-        MathTool[RealQuadraticEmbeddingsRequest, RealQuadraticEmbeddingProfile], tool
-    )
-    profile = embedding_tool.run(
-        RealQuadraticEmbeddingsRequest(element=_element(1, 1, 2))
-    )
-
-    assert profile == real_quadratic_embeddings(_element(1, 1, 2))
-    assert profile.trace.as_fraction() == 2
-    assert profile.norm.as_fraction() == -1
-
-
 def test_embedding_declaration_is_native_only_with_a_supported_symbol() -> None:
-    import importlib
+    from jacobian.math.number_theory.algebraic_numbers import quadratic
 
-    from jacobian.catalog.admission import AdmissionDecision
-    from jacobian.math.number_theory.arithmetic._admission import REGISTRATION
-
-    record = next(
-        admission
-        for admission in REGISTRATION.admissions
-        if admission.operation_id == "arithmetic.real_quadratic.embeddings.compute"
-    )
-
-    assert record.decision is AdmissionDecision.NATIVE_ONLY
-    assert record.native_symbol is not None
-    module_name, _, symbol_name = record.native_symbol.rpartition(".")
-    module = importlib.import_module(module_name)
-    assert symbol_name in module.__all__
-    assert callable(getattr(module, symbol_name))
+    assert "real_quadratic_embeddings" in quadratic.__all__
+    assert callable(quadratic.real_quadratic_embeddings)
 
 
 def test_embedding_profile_is_not_served_by_the_public_catalog() -> None:
@@ -180,16 +145,6 @@ def test_embedding_profile_is_not_served_by_the_public_catalog() -> None:
 
     assert "arithmetic.real_quadratic.embeddings.compute" not in ids
     assert "arithmetic.real_quadratic.order.compute" in ids
-
-
-def test_embedding_candidate_keeps_a_schema_visible_contract() -> None:
-    tools = {tool.operation_id: tool for tool in REAL_QUADRATIC_OPERATIONS}
-    tool = tools["arithmetic.real_quadratic.embeddings.compute"]
-
-    assert f"{_MAX_EMBEDDING_PROFILE_RESULT_DIGITS:,}-digit" in tool.description
-    schema = tool.request_type.model_json_schema()
-    assert "square-free" in schema["properties"]["element"]["description"]
-    assert tool.examples[0].input["element"]["radicand"] == 2
 
 
 def test_fractional_trace_and_norm_are_exact() -> None:

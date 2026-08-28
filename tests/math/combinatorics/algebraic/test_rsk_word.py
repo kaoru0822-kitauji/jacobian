@@ -9,13 +9,11 @@ from collections import Counter
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from jacobian.catalog.admission import AdmissionDecision
 from jacobian.math.combinatorics import algebraic as algebraic_combinatorics
 from jacobian.math.combinatorics.algebraic import (
     inverse_row_insertion_rsk,
     row_insertion_rsk,
 )
-from jacobian.math.combinatorics.algebraic._admission import ADMISSIONS
 from jacobian.math.combinatorics.algebraic._models import (
     MAX_RSK_PERMUTATION_LENGTH,
     HookLengthRequest,
@@ -490,11 +488,7 @@ def test_public_operations_are_admitted_and_examples_execute() -> None:
         "tableau.rsk.inverse_word.compute",
     }
     tools = {tool.operation_id: tool for tool in TOOLS}
-    decisions = {admission.operation_id: admission.decision for admission in ADMISSIONS}
     assert public_ids <= tools.keys()
-    assert all(
-        decisions[operation_id] is AdmissionDecision.KEEP for operation_id in public_ids
-    )
 
     for operation_id in public_ids:
         tool = tools[operation_id]

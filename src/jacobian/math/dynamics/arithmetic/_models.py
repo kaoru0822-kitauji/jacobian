@@ -30,7 +30,7 @@ CoefficientHeight = RationalHeight | None
 
 _VALIDATION_CODES = {
     "iterate output degree exceeds bound": "iterate_degree_exceeds_bound",
-    "iterate coefficient growth exceeds the 32768-digit output bound": "iterate_coefficient_growth_exceeds_bound",
+    f"iterate coefficient growth exceeds the {MAX_POLYNOMIAL_OUTPUT_DIGITS}-digit output bound": "iterate_coefficient_growth_exceeds_bound",
     "dynatomic polynomial requires map degree at least two": "dynatomic_degree_too_small",
     "dynatomic output degree exceeds bound": "dynatomic_degree_exceeds_bound",
     "cycle points must be distinct": "cycle_points_not_distinct",
@@ -71,9 +71,12 @@ _VALIDATION_CODES = {
 _VALIDATION_FRAGMENTS = (
     ("coefficient exceeds the integer digit bound", "coefficient_digit_bound"),
     ("coefficient must be a canonical integer", "coefficient_not_canonical"),
-    ("exceeds the 128-digit bound", "rational_digit_bound"),
-    ("exceeds the 2048-digit bound", "orbit_value_digit_bound"),
-    ("exceeds the 32768-digit bound", "result_digit_bound"),
+    (f"exceeds the {MAX_COEFFICIENT_DIGITS}-digit bound", "rational_digit_bound"),
+    (f"exceeds the {MAX_ORBIT_VALUE_DIGITS}-digit bound", "orbit_value_digit_bound"),
+    (
+        f"exceeds the {MAX_POLYNOMIAL_OUTPUT_DIGITS}-digit bound",
+        "result_digit_bound",
+    ),
     ("prime must be a prime number", "prime_not_prime"),
 )
 

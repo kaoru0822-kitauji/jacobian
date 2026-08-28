@@ -200,34 +200,11 @@ def test_native_api_rejects_boolean_modulus_and_integer() -> None:
 def test_catalog_declares_the_composable_principal_operations() -> None:
     assert tuple(tool.operation_id for tool in TOOLS) == (
         "dirichlet_character.principal.compute",
-        "dirichlet_character.principal.value.compute",
-    )
-
-
-def test_admission_classifies_table_lookup_as_native_only() -> None:
-    from jacobian.catalog.admission import AdmissionDecision
-    from jacobian.math.number_theory.characters._admission import ADMISSIONS
-
-    record = next(
-        entry
-        for entry in ADMISSIONS
-        if entry.operation_id == "dirichlet_character.principal.value.compute"
-    )
-
-    assert record.decision is AdmissionDecision.NATIVE_ONLY
-    assert (
-        record.native_symbol
-        == "jacobian.math.number_theory.characters.principal_dirichlet_character_value"
     )
 
 
 def test_published_catalog_keeps_only_the_complete_table_operation() -> None:
-    from jacobian.catalog.admission import curate_public_tools
-    from jacobian.math.number_theory.characters._admission import ADMISSIONS
-
-    published = tuple(
-        tool.operation_id for tool in curate_public_tools(TOOLS, ADMISSIONS)
-    )
+    published = tuple(tool.operation_id for tool in TOOLS)
 
     assert published == ("dirichlet_character.principal.compute",)
 

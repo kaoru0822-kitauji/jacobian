@@ -151,23 +151,16 @@ def _require_minimal_generators(generators: tuple[str, ...]) -> tuple[int, ...]:
     )
 
 
-def _require_canonical_minimal_axis(generators: tuple[str, ...]) -> tuple[int, ...]:
+def _require_canonical_generator_axis(generators: tuple[str, ...]) -> tuple[int, ...]:
+    """Validate the retained generator axis without recomputing minimality."""
+
     _require_positive_bounded_generators(generators)
     values = tuple(parse_canonical_integer(value) for value in generators)
-    if values != _require_minimal_generators(generators):
+    if values != tuple(sorted(set(values))):
         raise _validation_error(
-            "minimal_generators must use the canonical minimal generator axis"
+            "minimal_generators must be strictly increasing and duplicate-free"
         )
     return values
-
-
-def _summary_invariants(
-    generators: tuple[int, ...],
-) -> tuple[int, int, int, int, int, tuple[int, ...]]:
-    apery = apery_set(generators)
-    conductor = max(apery) - generators[0] + 1
-    gaps = tuple(value for value in range(1, conductor) if not belongs(value, apery))
-    return generators[0], len(generators), conductor - 1, conductor, len(gaps), gaps
 
 
 def _require_bounded_value(generators: tuple[int, ...], value: str) -> int:
@@ -215,59 +208,6 @@ def _require_global_delta_bound(generators: tuple[int, ...]) -> None:
         raise _validation_error(
             f"complete delta-set check requires elements through {checked}, exceeding the bound {MAX_GLOBAL_DELTA_CHECK}"
         )
-
-
-def _require_exact_factorization_family(
-    generators: tuple[int, ...], value: int, family: tuple[tuple[int, ...], ...]
-) -> None:
-    if len(set(family)) != len(family):
-        raise _validation_error("factorizations must be unique")
-    for factorization in family:
-        if len(factorization) != len(generators) or any(
-            coordinate < 0 for coordinate in factorization
-        ):
-            raise _validation_error("factorization has invalid coordinates")
-        if (
-            sum(
-                coordinate * generator
-                for coordinate, generator in zip(factorization, generators, strict=True)
-            )
-            != value
-        ):
-            raise _validation_error(
-                "factorization does not evaluate to the result value"
-            )
-    if len(family) != factorization_count(generators, value):
-        raise _validation_error("factorizations do not form the complete family")
-
-
-def _factorization_graph_data(
-    family: tuple[tuple[int, ...], ...],
-) -> tuple[tuple[tuple[int, int], ...], tuple[tuple[int, ...], ...]]:
-    edges = tuple(
-        (left, right)
-        for left in range(len(family))
-        for right in range(left + 1, len(family))
-        if any(
-            a > 0 and b > 0 for a, b in zip(family[left], family[right], strict=True)
-        )
-    )
-    unseen = set(range(len(family)))
-    components: list[tuple[int, ...]] = []
-    while unseen:
-        reached = {min(unseen)}
-        while (
-            expanded := reached
-            | {
-                right if left in reached else left
-                for left, right in edges
-                if left in reached or right in reached
-            }
-        ) != reached:
-            reached = expanded
-        unseen.difference_update(reached)
-        components.append(tuple(sorted(reached)))
-    return edges, tuple(components)
 
 
 __all__ = [

@@ -31,6 +31,11 @@ _MAX_ELEMENTARY_DEGREE = 127
 _MAX_INTEGER_COEFFICIENT_DIGITS = 256
 _MAX_GROEBNER_EXPONENT = 12
 _MAX_GROEBNER_COEFFICIENT_DIGITS = 128
+MAX_GROEBNER_BASIS_POLYNOMIALS = 64
+MAX_GROEBNER_GENERATORS = 16
+MAX_GROEBNER_OUTPUT_TERMS = 1_024
+MAX_GROEBNER_WALL_SECONDS = 60
+DEFAULT_GROEBNER_WALL_SECONDS = 10
 
 
 def _degree(polynomial: RationalPolynomial, variable_index: int) -> int:
@@ -269,13 +274,28 @@ class PolynomialFactorizationResult(StrictModel):
 class PolynomialGroebnerBudget(StrictModel):
     """Enforced wall and result limits for one isolated Gröbner computation."""
 
-    wall_seconds: StrictInt = Field(default=10, ge=1, le=60)
-    maximum_basis_polynomials: StrictInt = Field(default=64, ge=1, le=64)
-    maximum_output_terms: StrictInt = Field(default=1024, ge=1, le=1024)
+    wall_seconds: StrictInt = Field(
+        default=DEFAULT_GROEBNER_WALL_SECONDS,
+        ge=1,
+        le=MAX_GROEBNER_WALL_SECONDS,
+    )
+    maximum_basis_polynomials: StrictInt = Field(
+        default=MAX_GROEBNER_BASIS_POLYNOMIALS,
+        ge=1,
+        le=MAX_GROEBNER_BASIS_POLYNOMIALS,
+    )
+    maximum_output_terms: StrictInt = Field(
+        default=MAX_GROEBNER_OUTPUT_TERMS,
+        ge=1,
+        le=MAX_GROEBNER_OUTPUT_TERMS,
+    )
 
 
 class PolynomialGroebnerBasisRequest(StrictModel):
-    generators: tuple[RationalPolynomial, ...] = Field(min_length=1, max_length=16)
+    generators: tuple[RationalPolynomial, ...] = Field(
+        min_length=1,
+        max_length=MAX_GROEBNER_GENERATORS,
+    )
     monomial_order: Literal["lex", "grlex", "grevlex"] = "grevlex"
     resource_budget: PolynomialGroebnerBudget = Field(
         default_factory=PolynomialGroebnerBudget
@@ -297,14 +317,19 @@ class PolynomialGroebnerBasisResult(StrictModel):
         max_length=MAX_POLYNOMIAL_VARIABLES,
     )
     monomial_order: Literal["lex", "grlex", "grevlex"]
-    basis: tuple[RationalPolynomial, ...] = Field(max_length=64)
+    basis: tuple[RationalPolynomial, ...] = Field(
+        max_length=MAX_GROEBNER_BASIS_POLYNOMIALS
+    )
     normalization: Literal["REDUCED_MONIC"] = "REDUCED_MONIC"
 
     @model_validator(mode="after")
     def require_canonical_basis_ring(self) -> Self:
         if any(polynomial.variables != self.variables for polynomial in self.basis):
             raise _validation_error("every basis polynomial must use the declared ring")
-        if sum(len(polynomial.polynomial.terms) for polynomial in self.basis) > 1024:
+        if (
+            sum(len(polynomial.polynomial.terms) for polynomial in self.basis)
+            > MAX_GROEBNER_OUTPUT_TERMS
+        ):
             raise _validation_error(
                 "Gröbner basis exceeds the aggregate output term limit"
             )

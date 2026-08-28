@@ -250,76 +250,6 @@ def _check_entries_sorted(entries: tuple[OrderedDifferenceEntry, ...]) -> None:
         )
 
 
-def _check_entry_pairs(
-    entries: tuple[OrderedDifferenceEntry, ...],
-    dimension: int,
-    vectors: tuple[IntegerVector, ...],
-    set_size: int,
-) -> None:
-    zero = tuple(0 for _ in range(dimension))
-    for entry in entries:
-        difference = entry.difference.as_int_tuple()
-        if len(difference) != dimension:
-            raise _validation_error(
-                "_check_entry_pairs",
-                "entry difference dimension must match result dimension",
-            )
-        if difference == zero:
-            raise _validation_error(
-                "_check_entry_pairs", "entry difference must be nonzero"
-            )
-        previous: tuple[int, int] | None = None
-        for pair in entry.pairs:
-            key = (pair.left_index, pair.right_index)
-            if previous is not None and key <= previous:
-                raise _validation_error(
-                    "_check_entry_pairs",
-                    "entry pairs must be sorted and unique in lexicographic order",
-                )
-            previous = key
-            if pair.left_index >= set_size or pair.right_index >= set_size:
-                raise _validation_error(
-                    "_check_entry_pairs", "pair indices must be less than set_size"
-                )
-            if vectors:
-                expected = tuple(
-                    vectors[pair.left_index].as_int_tuple()[k]
-                    - vectors[pair.right_index].as_int_tuple()[k]
-                    for k in range(dimension)
-                )
-                if expected != difference:
-                    raise _validation_error(
-                        "_check_entry_pairs", "pair difference must match vectors"
-                    )
-
-
-def _check_all_pairs_exactly_once(
-    entries: tuple[OrderedDifferenceEntry, ...],
-    set_size: int,
-) -> None:
-    seen: set[tuple[int, int]] = set()
-    for entry in entries:
-        for pair in entry.pairs:
-            key = (pair.left_index, pair.right_index)
-            if key in seen:
-                raise _validation_error(
-                    "_check_all_pairs_exactly_once",
-                    f"ordered pair {key} appears more than once",
-                )
-            seen.add(key)
-    expected: set[tuple[int, int]] = {
-        (i, j) for i in range(set_size) for j in range(set_size) if i != j
-    }
-    if seen != expected:
-        missing = expected - seen
-        extra = seen - expected
-        raise _validation_error(
-            "_check_all_pairs_exactly_once",
-            f"entries must contain every ordered pair exactly once; "
-            f"missing {sorted(missing)[:5]}, extra {sorted(extra)[:5]}",
-        )
-
-
 def _check_first_collision(
     entries: tuple[OrderedDifferenceEntry, ...],
     has_repeated_difference: bool,
@@ -327,8 +257,8 @@ def _check_first_collision(
 ) -> None:
     if entries and has_repeated_difference:
         # Pair order is canonically lexicographic (checked in
-        # _check_entry_pairs), so pairs[0] of an entry is independently
-        # determined as its minimum pair; the witness must be exactly that
+        # by the entry model, so pairs[0] is independently determined as its
+        # minimum pair; the witness must be exactly that
         # designated pair of the first sorted repeated-difference entry.
         expected_entry = next((e for e in entries if e.multiplicity > 1), None)
         if expected_entry is None:
@@ -608,8 +538,8 @@ class MultisetSumRepresentationProfileResult(StrictModel):
 
     For each row ``s -> m``, ``m`` is the number of nondecreasing source-index
     tuples of the declared arity summing to ``s``. Deserialization validates
-    only the bounded canonical shape; the owner-local verifier checks an
-    independently supplied complete claim under the request envelope.
+    the bounded canonical shape. Defining multiplicity evidence belongs to the
+    producing kernel's tests rather than result deserialization.
     """
 
     source: FiniteIntegerSet = Field(description=_MULTISET_SUM_SOURCE_DESCRIPTION)
@@ -635,7 +565,7 @@ class MultisetSumRepresentationProfileResult(StrictModel):
         request: MultisetSumRepresentationProfileRequest,
         entries: tuple[RepresentationProfileEntry, ...],
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             source=request.source,
             arity=request.arity,
             window=request.window,
@@ -666,7 +596,7 @@ class SubsetSumProfileRequest(StrictModel):
             "remain distinct positions. Before execution, S=min(2^n, "
             "positive_sum-negative_sum+1, product(m_v+1) over distinct "
             f"nonzero values v) must fit {MAX_SUBSET_SUM_PROFILE_ENTRIES:,} "
-            f"rows, 4*n*S must not exceed {MAX_SUBSET_SUM_DP_TRANSITIONS:,} "
+            f"rows, 2*n*S must not exceed {MAX_SUBSET_SUM_DP_TRANSITIONS:,} "
             "dictionary transitions during construction, "
             "and the conservative serialized-result estimate must not exceed "
             f"{MAX_SUBSET_SUM_PROFILE_RESULT_BYTES:,} bytes."
@@ -767,7 +697,7 @@ class AdditiveEnergyResult(StrictModel):
     def _from_kernel(
         cls, energy: int, decomposition: tuple[RepresentationProfileEntry, ...]
     ) -> Self:
-        return cls(energy=energy, decomposition=decomposition)
+        return cls.model_construct(energy=energy, decomposition=decomposition)
 
 
 # ---------------------------------------------------------------------------
@@ -806,7 +736,7 @@ class SumsetCardinalityResult(StrictModel):
 
     @classmethod
     def _from_kernel(cls, support: tuple[CanonicalInteger, ...]) -> Self:
-        return cls(cardinality=len(support), support=support)
+        return cls.model_construct(cardinality=len(support), support=support)
 
 
 # ---------------------------------------------------------------------------
@@ -855,7 +785,7 @@ class DirectSumPredicateResult(StrictModel):
         collisions: tuple[CanonicalInteger, ...],
         missing: tuple[CanonicalInteger, ...],
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             holds=holds,
             modulus=modulus,
             representatives=representatives,
@@ -1008,7 +938,7 @@ class OrderedDifferenceProfileResult(StrictModel):
         has_repeated_difference: bool,
         first_collision: OrderedDifferencePair | None,
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             vectors=request.vectors,
             dimension=dimension,
             set_size=len(request.vectors.vectors),

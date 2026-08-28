@@ -19,7 +19,6 @@ from jacobian.math.logic.term_rewriting._kernel import (
     _positions,
     _replace_at_position,
     _ResultEnvelopeError,
-    _standardize_apart,
     _term_depth,
     _term_node_count,
     _unify,
@@ -64,6 +63,22 @@ from jacobian.math.logic.term_rewriting.values import (
     Substitution,
     Term,
 )
+
+
+def _standardize_apart(
+    outer: RewriteRule, inner: RewriteRule
+) -> tuple[RewriteRule, RewriteRule, dict[int, int], dict[int, int]]:
+    """Reconstruct the complete renamed rules from the producer's root setup."""
+
+    _, _, outer_renaming, inner_renaming = operations_module._overlap_unification_terms(
+        outer, inner, ()
+    )
+    return (
+        operations_module._renamed_rule(outer, outer_renaming),
+        operations_module._renamed_rule(inner, inner_renaming),
+        outer_renaming,
+        inner_renaming,
+    )
 
 
 class _TermWire(TypedDict):
@@ -361,16 +376,6 @@ class TestUnification:
         assert wire_result.unified
         assert wire_result.substitution == result
 
-    def test_result_rejects_terms_outside_its_ranked_signature(self) -> None:
-        with _validation_error("term_rewriting.undeclared_symbol"):
-            UnificationResult(
-                signature=_signature(0),
-                left=_app(1),
-                right=_app(1),
-                unified=True,
-                substitution={},
-            )
-
 
 class TestRewriteStep:
     def test_rewrite_root(self) -> None:
@@ -451,19 +456,6 @@ class TestRewriteStep:
         assert result.scope == "SELECTED_STEP"
         assert result.applications == ()
 
-    def test_result_reestablishes_signature_membership(self) -> None:
-        result = compute_rewrite_step(
-            RewriteStepRequest(
-                signature=_signature(1, 0),
-                term=_app(0, _app(1)),
-                rules=(RewriteRule(lhs=_app(0, _var(0)), rhs=_var(0)),),
-            )
-        )
-        payload = result.model_dump()
-        payload["signature"] = {"arities": [0, 0]}
-        with _validation_error("term_rewriting.signature_arity"):
-            RewriteStepResult.model_validate(payload)
-
 
 class TestNormalForm:
     def test_convergent(self) -> None:
@@ -500,11 +492,6 @@ class TestNormalForm:
         assert result.term == _app(1)
         assert result.steps == 1
         assert result.next_step is None
-
-        payload = result.model_dump()
-        payload["signature"] = {"arities": [0, 0]}
-        with _validation_error("term_rewriting.signature_arity"):
-            NormalFormResult.model_validate(payload)
 
 
 class TestCriticalPairs:
@@ -1398,25 +1385,6 @@ class TestDeepTermTraversal:
             result
         )
 
-    def test_native_substitution_result_rejects_untransportable_composition(
-        self,
-    ) -> None:
-        def unary_chain(length: int, leaf: Term) -> Term:
-            term = leaf
-            for _ in range(length):
-                term = _app(0, term)
-            return term
-
-        term = unary_chain(30, _var(0))
-        mapping = {0: unary_chain(30, _app(1))}
-        with _validation_error("term_rewriting.transport_depth"):
-            SubstitutionResult(
-                signature=_signature(1, 0),
-                term=term,
-                substitution=_substitution(mapping),
-                result=apply_substitution(term, mapping),
-            )
-
     def test_spliced_rewrite_step_depth_is_transport_bounded(self) -> None:
         # f(g^15(x)) with rule g(y) -> f^30(y): every input path stays within
         # 31 nodes, but the rewritten term splices the expanded right side
@@ -1523,14 +1491,6 @@ class TestDeepTermTraversal:
         encoded = encode_strict_json(payload)
         with _validation_error("term_rewriting.transport_depth"):
             compute_unification(UnificationRequest.model_validate_json(encoded))
-        with _validation_error("term_rewriting.transport_depth"):
-            UnificationResult(
-                signature=_signature(2, 1, 0),
-                left=left,
-                right=right,
-                unified=True,
-                substitution=mgu,
-            )
 
     def test_boundary_composed_mgu_admits_and_transports(self) -> None:
         # With u^15 chains every composed binding stays exactly within the

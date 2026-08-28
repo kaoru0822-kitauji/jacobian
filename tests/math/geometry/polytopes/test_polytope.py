@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
 from jacobian.canonical import format_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.geometry.polytopes import Halfspace, Vertex
 from jacobian.math.geometry.polytopes import _operations as polytope_operations
 from jacobian.math.geometry.polytopes._models import (
@@ -249,10 +250,8 @@ class TestFacetIncidence:
         assert result.dimension == 7
         assert {len(facet.halfspace.coefficients) for facet in result.facets} == {7}
 
-        with pytest.raises(ValidationError):
-            PolytopeVolumeRequest(
-                halfspaces=tuple(facet.halfspace for facet in result.facets)
-            )
+        with pytest.raises(OperationDomainValidationError):
+            _volume_via_halfspaces(tuple(facet.halfspace for facet in result.facets))
 
     def test_forged_rescaled_facet_inequality_is_rejected(self) -> None:
         """A positively rescaled supporting inequality leaves the primitive
@@ -656,8 +655,8 @@ class TestRejection:
     def test_dimension_exceeds_bound(self) -> None:
         """Ambient dimension 7 exceeds the d <= 6 bound."""
         with pytest.raises(ValueError):
-            PolytopeVolumeRequest(
-                vertices=tuple(
+            _volume_via_vertices(
+                tuple(
                     _v(*((0, 1),) * 7)
                     if i == 0
                     else _v(*((1, 1) if j == i - 1 else (0, 1) for j in range(7)))
@@ -696,7 +695,7 @@ class TestRejection:
             halfspaces.append(_h(*upper, offset=(1, 1)))
             halfspaces.append(_h(*lower, offset=(0, 1)))
         with pytest.raises(ValueError, match="combinatorial bound"):
-            PolytopeVolumeRequest(halfspaces=tuple(halfspaces))
+            _volume_via_halfspaces(tuple(halfspaces))
 
     def test_result_carries_only_the_exact_volume(self) -> None:
         """The result exposes no generic assurance field."""
@@ -722,8 +721,8 @@ class TestRejection:
 
         huge = format_canonical_integer(10**20000)
         with pytest.raises(ValueError, match="result bound"):
-            PolytopeVolumeRequest(
-                vertices=(
+            _volume_via_vertices(
+                (
                     Vertex(coordinates=(_cr0(), _cr0())),
                     Vertex(
                         coordinates=(
@@ -796,8 +795,8 @@ class TestRequestValidation:
     def test_nonuniform_dimension_rejected(self) -> None:
         """Vertices of differing dimension are rejected."""
         with pytest.raises(ValueError):
-            PolytopeVolumeRequest(
-                vertices=(_v((0, 1), (0, 1)), _v((1, 1), (0, 1), (0, 1))),
+            _volume_via_vertices(
+                (_v((0, 1), (0, 1)), _v((1, 1), (0, 1), (0, 1))),
             )
 
 
@@ -868,7 +867,7 @@ class TestDimensionOne:
 
         big = 10**16400
         with pytest.raises(ValueError, match="result bound"):
-            PolytopeVolumeRequest(vertices=(endpoint(big), endpoint(big + 1)))
+            _volume_via_vertices((endpoint(big), endpoint(big + 1)))
 
     @pytest.mark.scale
     def test_representable_large_denominator_interval_computed(self) -> None:
@@ -948,7 +947,7 @@ class TestDimensionOne:
 
         huge = format_canonical_integer(10**32768 - 1)
         with pytest.raises(ValueError, match="result bound"):
-            PolytopeVolumeRequest(vertices=(endpoint(huge), endpoint("-" + huge)))
+            _volume_via_vertices((endpoint(huge), endpoint("-" + huge)))
 
 
 class TestDenominatorGrowth:
@@ -968,8 +967,8 @@ class TestDenominatorGrowth:
 
         big = 10**8500
         with pytest.raises(ValueError, match="result bound"):
-            PolytopeVolumeRequest(
-                vertices=(
+            _volume_via_vertices(
+                (
                     Vertex(coordinates=(_cr0(), _cr0())),
                     small_fraction(big),
                     small_fraction(big + 3),
@@ -1064,7 +1063,7 @@ class TestTriangulationWideDenominatorBound:
                 )
             )
         with pytest.raises(ValueError, match="result bound"):
-            PolytopeVolumeRequest(vertices=tuple(vertices))
+            _volume_via_vertices(tuple(vertices))
 
 
 class TestDuplicateVertexAdmission:
@@ -1091,7 +1090,7 @@ class TestDuplicateVertexAdmission:
         )
         duplicated = tuple(vertex for vertex in corners for _ in range(2))
         with pytest.raises(ValueError, match="result bound"):
-            PolytopeVolumeRequest(vertices=duplicated)
+            _volume_via_vertices(duplicated)
 
     def test_duplicated_representable_square_is_still_computed(self) -> None:
         """Exact deduplication keeps ordinary duplicate-laden inputs working."""
@@ -1134,7 +1133,7 @@ class TestDuplicateVertexAdmission:
             _v(*((i**k % 97 + i, 1) for k in range(6))) for i in range(1, 65)
         )
         with pytest.raises(ValueError, match="combinatorial bound"):
-            PolytopeVolumeRequest(vertices=vertices)
+            _volume_via_vertices(vertices)
 
 
 class TestNativeApiAdmission:
@@ -1310,14 +1309,14 @@ class TestHullWorkBoundPublished:
         with pytest.raises(
             ValueError, match=rf"combinatorial bound \({math.comb(26, 6)}"
         ):
-            PolytopeVolumeRequest(vertices=points)
+            _volume_via_vertices(points)
 
     def test_just_above_the_four_dimensional_maximum_rejected(self) -> None:
         points = tuple(_v(*((1000 * j + i, 1) for i in range(4))) for j in range(49))
         with pytest.raises(
             ValueError, match=rf"combinatorial bound \({math.comb(49, 4)}"
         ):
-            PolytopeVolumeRequest(vertices=points)
+            _volume_via_vertices(points)
 
 
 class TestHalfspaceWorkBoundPublished:
@@ -1373,7 +1372,7 @@ class TestHalfspaceWorkBoundPublished:
             rows.append(_h(*coeffs, offset=(t + 1, 1)))
         assert len(rows) == 31
         with pytest.raises(ValueError, match=r"boundedness precheck exceeds"):
-            PolytopeVolumeRequest(halfspaces=tuple(rows))
+            _volume_via_halfspaces(tuple(rows))
 
 
 class TestHalfspaceDuplicateRowAdmission:
@@ -1573,7 +1572,7 @@ class TestCanonicalVPolytopeComposition:
             num="1", den="1"
         )
 
-    def test_outer_halfspace_conflict_rejects_before_the_hull_replay(self) -> None:
+    def test_outer_halfspace_conflict_rejects_before_nested_parsing(self) -> None:
         payload = _support_square_result().polytope.model_dump(mode="json")
         payload["vertices"].insert(
             2,
@@ -1596,7 +1595,7 @@ class TestCanonicalVPolytopeComposition:
                 }
             )
 
-    def test_outer_dimension_bound_rejects_before_the_hull_replay(self) -> None:
+    def test_outer_dimension_bound_rejects_before_nested_parsing(self) -> None:
         ids = [f"v{a}{b}{c}" for a in (0, 1) for b in (0, 1) for c in (0, 1)]
         cube = RationalVPolytope(
             space=RationalCoordinateSpace(axes=("x", "y", "z")),
@@ -1635,7 +1634,7 @@ class TestCanonicalVPolytopeComposition:
         )
         return payload
 
-    def test_outer_extra_field_rejects_before_the_hull_replay(self) -> None:
+    def test_outer_extra_field_rejects_before_nested_parsing(self) -> None:
         with pytest.raises(ValidationError):
             PolytopeVolumeRequest.model_validate(
                 {
@@ -1644,7 +1643,7 @@ class TestCanonicalVPolytopeComposition:
                 }
             )
 
-    def test_outer_dimension_bound_type_rejects_before_the_hull_replay(self) -> None:
+    def test_outer_dimension_bound_type_rejects_before_nested_parsing(self) -> None:
         with pytest.raises(ValidationError):
             PolytopeVolumeRequest.model_validate(
                 {
@@ -1665,7 +1664,7 @@ class TestCanonicalVPolytopeComposition:
     ) -> None:
         """Dispatch validates strictly, so a numeric-string bound is
         inadmissible on the wire; the preflight rejects it under the same
-        strictness before any hull replay can run."""
+        strictness before nested canonical parsing."""
         with pytest.raises(ValidationError):
             PolytopeVolumeRequest.model_validate(
                 {
@@ -1701,14 +1700,11 @@ class TestCanonicalVPolytopeComposition:
         with pytest.raises(ValueError, match="exceeds the dimension bound"):
             PolytopeVolumeRequest(vertices=cube, dimension_bound=2)
 
-    def test_over_dimension_canonical_value_rejects_before_the_hull_replay(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_over_dimension_canonical_value_rejects_before_nested_parsing(self) -> None:
         """The canonical space may carry ``MAX_FACET_DIMENSION`` axes for
         facet-profile sources, but volume caps ambient dimension at
         ``MAX_DIMENSION``, so a full-dimensional canonical simplex one axis
-        beyond that bound fails the cheap dimension-bound preflight instead
-        of paying the extremality replay."""
+        beyond that bound fails the cheap dimension-bound preflight."""
         axes = tuple(f"x{axis}" for axis in range(MAX_DIMENSION + 1))
         rows = [
             RationalPolytopeVertex(
@@ -1728,15 +1724,6 @@ class TestCanonicalVPolytopeComposition:
         simplex = RationalVPolytope(
             space=RationalCoordinateSpace(axes=axes),
             vertices=tuple(rows),
-        )
-
-        def unexpected_proof(polytope: object) -> None:
-            raise AssertionError("extremality proof ran before the bound preflight")
-
-        monkeypatch.setattr(
-            polytope_operations,
-            "require_full_dimensional_extreme_vertices",
-            unexpected_proof,
         )
 
         with pytest.raises(

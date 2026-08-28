@@ -318,7 +318,9 @@ class BinaryQuadraticFormCheckResult(StrictModel):
         form: PrimitivePositiveDefiniteBinaryQuadraticForm | None = None,
     ) -> Self:
         """Construct a trusted result from the owner-local domain check."""
-        return cls(a=a, b=b, c=c, status=status, obstruction=obstruction, form=form)
+        return cls.model_construct(
+            a=a, b=b, c=c, status=status, obstruction=obstruction, form=form
+        )
 
 
 class BinaryQuadraticFormEvaluateResult(StrictModel):
@@ -341,7 +343,9 @@ class BinaryQuadraticFormEvaluateResult(StrictModel):
         primitive: bool,
     ) -> Self:
         """Construct a trusted result from the owner-local evaluation kernel."""
-        return cls(form=form, x=x, y=y, value=value, primitive=primitive)
+        return cls.model_construct(
+            form=form, x=x, y=y, value=value, primitive=primitive
+        )
 
 
 class ReducedBinaryQuadraticFormResult(StrictModel):
@@ -360,7 +364,7 @@ class ReducedBinaryQuadraticFormResult(StrictModel):
         matrix: tuple[tuple[int, int], tuple[int, int]],
     ) -> Self:
         """Construct a trusted result from the owner-local reduction kernel."""
-        return cls(form=form, reduced_form=reduced_form, matrix=matrix)
+        return cls.model_construct(form=form, reduced_form=reduced_form, matrix=matrix)
 
 
 class ProperEquivalenceResult(StrictModel):
@@ -381,7 +385,9 @@ class ProperEquivalenceResult(StrictModel):
         matrix: tuple[tuple[int, int], tuple[int, int]] | None = None,
     ) -> Self:
         """Construct a trusted result from the owner-local equivalence kernel."""
-        return cls(first=first, second=second, status=status, matrix=matrix)
+        return cls.model_construct(
+            first=first, second=second, status=status, matrix=matrix
+        )
 
 
 class ReducedClassesResult(StrictModel):

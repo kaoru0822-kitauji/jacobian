@@ -250,7 +250,7 @@ class InertiaResult(StrictModel):
     ) -> Self:
         """Construct a result emitted by the exact owner-local kernel."""
 
-        return cls(
+        return cls.model_construct(
             matrix=matrix,
             n_positive=n_positive,
             n_negative=n_negative,

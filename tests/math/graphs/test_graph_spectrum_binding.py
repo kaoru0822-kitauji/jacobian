@@ -158,30 +158,14 @@ def test_degenerate_and_repeated_spectra_stay_exact() -> None:
     }
 
 
-def test_v2_spectrum_operations_are_readmitted_with_source_bound_rationale() -> None:
-    """The materially changed v2 contracts carry fresh owner-local decisions."""
+def test_v2_spectrum_operations_are_published() -> None:
+    from jacobian.math.graphs.spectra._tools import TOOLS
 
-    from jacobian.catalog.admission import AdmissionDecision
-    from jacobian.math.graphs.spectra._admission import ADMISSIONS
-
-    records = {
-        record.operation_id: record
-        for record in ADMISSIONS
-        if record.operation_id
-        in (
-            "graph.spectrum.adjacency.compute",
-            "graph.spectrum.laplacian.compute",
-        )
-    }
-    assert set(records) == {
+    operation_ids = {tool.operation_id for tool in TOOLS}
+    assert {
         "graph.spectrum.adjacency.compute",
         "graph.spectrum.laplacian.compute",
-    }
-    for operation_id, record in sorted(records.items()):
-        assert record.decision is AdmissionDecision.KEEP, operation_id
-        rationale = record.rationale.lower()
-        assert "source graph" in rationale, operation_id
-        assert "verifier" in rationale, operation_id
+    } <= operation_ids
 
 
 def test_spectrum_reconstructs_the_characteristic_polynomial() -> None:

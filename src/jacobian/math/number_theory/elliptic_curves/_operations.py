@@ -7,6 +7,7 @@ from fractions import Fraction
 from pydantic_core import PydanticCustomError
 
 from jacobian._exact import MAX_CANONICAL_RATIONAL_DIGITS, CanonicalRational
+from jacobian.canonical import format_canonical_integer
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math._rational_height import RationalHeight
 from jacobian.math.number_theory.elliptic_curves._models import (
@@ -37,6 +38,12 @@ def _admission_error(exc: PydanticCustomError, location: tuple[str, ...]) -> Non
 
 def _admit_point_addition(request: EllipticCurvePointAdditionRequest) -> None:
     """Admit the group law and exact result-height envelope once per call."""
+    if request.first.curve != request.curve or request.second.curve != request.curve:
+        raise OperationDomainValidationError(
+            location=("first", "second"),
+            code="elliptic_curve.parent_curve_mismatch",
+            message="operands must carry this request's curve as their parent",
+        )
     first_point = request.first.point
     second_point = request.second.point
     if first_point is None or second_point is None:
@@ -92,6 +99,12 @@ def _admit_point_addition(request: EllipticCurvePointAdditionRequest) -> None:
 
 def _admit_scalar_multiplication(request: ScalarMultiplicationRequest) -> None:
     """Admit the group law and double-and-add height envelope once per call."""
+    if request.point.curve != request.curve:
+        raise OperationDomainValidationError(
+            location=("point",),
+            code="elliptic_curve.parent_curve_mismatch",
+            message="the operand must carry this request's curve as its parent",
+        )
     operand = request.point.point
     if request.point.at_infinity or operand is None:
         try:
@@ -151,6 +164,21 @@ def compute_discriminant(request: EllipticCurveRequest) -> CurveDiscriminantResu
     a = request.curve.coefficient_a.as_fraction()
     b = request.curve.coefficient_b.as_fraction()
     disc = _curve_discriminant(a, b)
+    if (
+        max(
+            len(format_canonical_integer(abs(disc.numerator))),
+            len(format_canonical_integer(disc.denominator)),
+        )
+        > MAX_CANONICAL_RATIONAL_DIGITS
+    ):
+        raise OperationDomainValidationError(
+            location=("curve",),
+            code="elliptic_curve.discriminant_result_bound",
+            message=(
+                "curve coefficients would produce a discriminant exceeding the "
+                "canonical result bound"
+            ),
+        )
     return CurveDiscriminantResult._from_kernel(
         request=request,
         discriminant=CanonicalRational.from_fraction(disc),

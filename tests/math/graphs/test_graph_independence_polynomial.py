@@ -252,7 +252,7 @@ def test_request_schema_exposes_tree_and_work_preconditions() -> None:
     assert graph_schema["properties"]["vertices"]["maxItems"] == 256
 
 
-def test_result_rejects_a_weaker_polynomial_and_a_changed_source() -> None:
+def test_result_rejects_a_polynomial_inconsistent_with_dense_coefficients() -> None:
     graph = _path(4)
     valid = compute_independence_polynomial(
         TreeIndependencePolynomialRequest(graph=graph)
@@ -274,13 +274,8 @@ def test_result_rejects_a_weaker_polynomial_and_a_changed_source() -> None:
             ]
         },
     }
-    changed_source = valid.copy()
-    changed_source["graph"] = _path(5).model_dump(mode="json")
-
     with pytest.raises(ValidationError):
         TreeIndependencePolynomialResult.model_validate(weaker)
-    with pytest.raises(ValidationError):
-        TreeIndependencePolynomialResult.model_validate(changed_source)
 
 
 @pytest.mark.parametrize(

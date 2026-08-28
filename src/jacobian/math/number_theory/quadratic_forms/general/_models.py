@@ -83,7 +83,7 @@ class EvaluationResult(StrictModel):
     def _from_kernel(cls, request: EvaluationRequest, *, value: Fraction) -> Self:
         """Build one result after the admitted rational kernel established it."""
 
-        return cls(
+        return cls.model_construct(
             form=request.form,
             vector=request.vector,
             value=CanonicalRational.from_fraction(value),

@@ -11,7 +11,10 @@ from jacobian.math.combinatorics.posets.core._models import (
     LinearExtensionRequest,
     MobiusFunctionRequest,
 )
-from jacobian.math.combinatorics.posets.core._operations import _materialized_poset
+from jacobian.math.combinatorics.posets.core._operations import (
+    _linear_extensions,
+    _materialized_poset,
+)
 from jacobian.math.combinatorics.posets.core._tools import TOOLS
 
 
@@ -112,9 +115,10 @@ def test_required_reflexive_policy_binds_the_entire_diagonal() -> None:
 
 def test_linear_extension_contract_has_a_separate_exponential_bound() -> None:
     antichain = _materialize([f"x{index}" for index in range(21)], [])
-    with pytest.raises(ValidationError) as exc:
-        LinearExtensionRequest(poset=antichain)
-    _assert_code(exc, "poset.linear_extension_size_bound")
+    request = LinearExtensionRequest(poset=antichain)
+    with pytest.raises(OperationDomainValidationError) as exc:
+        _linear_extensions(request)
+    _assert_operation_code(exc, "poset.linear_extension_size_bound")
 
 
 def test_selected_mobius_scope_rejects_nonintervals_and_empty_selection() -> None:

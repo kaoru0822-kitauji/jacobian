@@ -135,7 +135,7 @@ class PrimeTupleLocalFactorResult(StrictModel):
     ) -> Self:
         bad_by_residue = dict(bad)
         bad_count = len(bad)
-        return cls(
+        return cls.model_construct(
             source=request.source,
             prime=request.prime,
             residue_rows=tuple(
@@ -250,7 +250,7 @@ class FinitePrimeTupleFactorProduct(StrictModel):
         product: Fraction,
         first_obstruction: int | None,
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             source=request.source,
             primes=request.primes,
             rows=rows,

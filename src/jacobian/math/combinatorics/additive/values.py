@@ -160,7 +160,7 @@ class SubsetSumProfile(StrictModel):
     """The complete exact multiplicity profile of one indexed sequence.
 
     The empty subset is always included. Deserialization validates bounded
-    canonical shape; an owner-local verifier checks supplied exact claims.
+    canonical shape; the producing kernel establishes exact multiplicities.
     """
 
     source: Annotated[
@@ -205,7 +205,7 @@ class SubsetSumProfile(StrictModel):
             )
             for subtotal, count in sorted(counts.items())
         )
-        return cls(
+        return cls.model_construct(
             source=source,
             entries=entries,
             support_size=len(entries),

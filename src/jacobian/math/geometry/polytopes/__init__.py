@@ -73,7 +73,7 @@ def convex_hull_volume(
         MAX_DIMENSION,
         MAX_VERTICES,
         _canonical_v_polytope_vertices,
-        require_volume_components_within_result_bound,
+        _prepare_volume_components,
     )
 
     if isinstance(vertices, RationalVPolytope):
@@ -103,14 +103,22 @@ def convex_hull_volume(
                 raise ValueError(
                     f"vertex coordinate exceeds the {COORDINATE_DIGITS}-digit bound"
                 )
-    require_volume_components_within_result_bound(normalized, dim)
+    prepared, triangulation = _prepare_volume_components(normalized, dim)
+
+    from sympy import Rational
 
     from jacobian.math.geometry.polytopes._operations import (
-        convex_hull_volume as _kernel,
+        _canonical_rational,
+        _polytope_volume_from_prepared,
     )
 
-    value, _dimension = _kernel(normalized)
-    return value
+    exact_points = [
+        [Rational(value.numerator, value.denominator) for value in point]
+        for point in prepared
+    ]
+    return _canonical_rational(
+        _polytope_volume_from_prepared(exact_points, dim, triangulation)
+    )
 
 
 __all__ = [

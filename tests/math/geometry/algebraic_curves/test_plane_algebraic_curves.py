@@ -108,7 +108,7 @@ def _parametrize(
 
 def _point(
     variables: tuple[str, ...],
-    values: tuple[CanonicalRational, CanonicalRational],
+    values: tuple[CanonicalRational, ...],
 ) -> VariablePoint:
     return VariablePoint(variables=variables, values=values)
 
@@ -601,10 +601,11 @@ def test_duplicate_and_invalid_variable_names_are_rejected() -> None:
 
 
 def test_variable_named_z_rejected_in_projective_closure() -> None:
-    with _raises_code("homogenizing_coordinate_reserved"):
-        ProjectiveClosureRequest(
-            polynomial=_polynomial(("x", "z"), (1, (2, 0)), (-1, (0, 1)))
-        )
+    request = ProjectiveClosureRequest(
+        polynomial=_polynomial(("x", "z"), (1, (2, 0)), (-1, (0, 1)))
+    )
+    with _raises_operation_code("homogenizing_coordinate_reserved"):
+        compute_projective_closure(request)
 
 
 @pytest.mark.parametrize("constant", [0, 5])
@@ -618,26 +619,29 @@ def test_constant_polynomial_is_not_a_valid_curve(constant: int) -> None:
 
 
 def test_chart_requires_three_variables_and_a_homogeneous_polynomial() -> None:
-    with _raises_code("chart_axis_invalid"):
-        AffineChartRequest(
-            polynomial=_polynomial(("x", "y"), (1, (2, 0))),
-            chart_variable="x",
-        )
-    with _raises_code("polynomial_not_homogeneous"):
-        AffineChartRequest(
-            polynomial=_polynomial(("x", "y", "z"), (1, (2, 0, 0)), (1, (0, 1, 0))),
-            chart_variable="z",
-        )
+    wrong_axis = AffineChartRequest(
+        polynomial=_polynomial(("x", "y"), (1, (2, 0))),
+        chart_variable="x",
+    )
+    with _raises_operation_code("chart_axis_invalid"):
+        compute_affine_chart(wrong_axis)
+    inhomogeneous = AffineChartRequest(
+        polynomial=_polynomial(("x", "y", "z"), (1, (2, 0, 0)), (1, (0, 1, 0))),
+        chart_variable="z",
+    )
+    with _raises_operation_code("polynomial_not_homogeneous"):
+        compute_affine_chart(inhomogeneous)
 
 
 def test_chart_variable_must_be_on_the_projective_axis() -> None:
-    with _raises_code("chart_variable_axis_mismatch"):
-        AffineChartRequest(
-            polynomial=_polynomial(
-                ("x", "y", "z"),
-                (1, (2, 0, 0)),
-                (1, (0, 2, 0)),
-                (-1, (0, 0, 2)),
-            ),
-            chart_variable="w",
-        )
+    request = AffineChartRequest(
+        polynomial=_polynomial(
+            ("x", "y", "z"),
+            (1, (2, 0, 0)),
+            (1, (0, 2, 0)),
+            (-1, (0, 0, 2)),
+        ),
+        chart_variable="w",
+    )
+    with _raises_operation_code("chart_variable_axis_mismatch"):
+        compute_affine_chart(request)

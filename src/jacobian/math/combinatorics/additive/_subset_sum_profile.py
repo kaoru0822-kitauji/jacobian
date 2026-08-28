@@ -49,9 +49,9 @@ def subset_sum_profile_envelope(
         multiplicity + 1 for multiplicity in grouped.values()
     )
     support_bound = min(total_subsets, span_bound, selection_vector_bound)
-    # Construction and an explicit independently-supplied-claim verifier each
-    # make one dictionary pass with two updates per retained state.
-    transition_bound = 4 * item_count * support_bound
+    # Construction makes one dictionary pass with two updates per retained
+    # state. Result deserialization does not repeat the dynamic program.
+    transition_bound = 2 * item_count * support_bound
     maximum_sum_characters = max(
         len(format_canonical_integer(negative_sum)),
         len(format_canonical_integer(positive_sum)),

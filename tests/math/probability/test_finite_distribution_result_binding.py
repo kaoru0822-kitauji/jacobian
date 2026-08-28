@@ -1,23 +1,18 @@
-"""Forgery regressions for externally parsed finite-distribution results."""
+"""Defining-invariant tests for trusted finite-distribution producers."""
 
 from __future__ import annotations
 
-import pytest
-from pydantic import ValidationError
+from fractions import Fraction
 
 from jacobian._exact import CanonicalRational
 from jacobian.math.probability._distribution import (
     FiniteConditionRequest,
-    FiniteConditionResult,
     FiniteConvolutionRequest,
-    FiniteConvolutionResult,
     FiniteDistributionAtom,
     FinitePushforwardMapEntry,
     FinitePushforwardRequest,
-    FinitePushforwardResult,
     FiniteRationalDistribution,
     FiniteRawMomentRequest,
-    FiniteRawMomentResult,
 )
 from jacobian.math.probability._operations import (
     _condition,
@@ -40,29 +35,39 @@ def _distribution() -> FiniteRationalDistribution:
     )
 
 
-def test_raw_moment_rejects_a_forged_contribution() -> None:
+def test_raw_moment_producer_satisfies_its_contribution_identity() -> None:
     result = _raw_moment(FiniteRawMomentRequest(atoms=_distribution().atoms, order=2))
-    payload = result.model_dump(mode="json")
-    payload["contributions"][1]["contribution"] = {"num": "1", "den": "3"}
-    with pytest.raises(ValidationError):
-        FiniteRawMomentResult.model_validate(payload)
+    assert all(
+        item.powered_value.as_fraction() == item.value.as_fraction() ** result.order
+        and item.contribution.as_fraction()
+        == item.probability.as_fraction() * item.powered_value.as_fraction()
+        for item in result.contributions
+    )
+    assert result.moment.as_fraction() == sum(
+        (item.contribution.as_fraction() for item in result.contributions),
+        start=0,
+    )
 
 
-def test_condition_rejects_a_distribution_not_bound_to_contributions() -> None:
+def test_condition_producer_binds_distribution_to_contributions() -> None:
     source = _distribution()
     result = _condition(
         FiniteConditionRequest(distribution=source, event_values=(_q(0), _q(2)))
     )
-    payload = result.model_dump(mode="json")
-    payload["contributions"][0]["conditioned_probability"] = {
-        "num": "1",
-        "den": "2",
-    }
-    with pytest.raises(ValidationError):
-        FiniteConditionResult.model_validate(payload)
+    event_probability = result.event_probability.as_fraction()
+    assert all(
+        item.conditioned_probability.as_fraction()
+        == item.source_probability.as_fraction() / event_probability
+        for item in result.contributions
+    )
+    assert tuple(
+        (atom.value, atom.probability) for atom in result.distribution.atoms
+    ) == tuple(
+        (item.value, item.conditioned_probability) for item in result.contributions
+    )
 
 
-def test_pushforward_rejects_a_profile_not_bound_to_its_distribution() -> None:
+def test_pushforward_producer_aggregates_its_contributions() -> None:
     source = _distribution()
     result = _pushforward(
         FinitePushforwardRequest(
@@ -73,16 +78,22 @@ def test_pushforward_rejects_a_profile_not_bound_to_its_distribution() -> None:
             ),
         )
     )
-    payload = result.model_dump(mode="json")
-    payload["contributions"][0]["target"] = {"num": "2", "den": "1"}
-    with pytest.raises(ValidationError):
-        FinitePushforwardResult.model_validate(payload)
+    expected: dict[Fraction, Fraction] = {}
+    for item in result.contributions:
+        target = item.target.as_fraction()
+        expected[target] = expected.get(target, 0) + item.probability.as_fraction()
+    assert {
+        atom.value.as_fraction(): atom.probability.as_fraction()
+        for atom in result.distribution.atoms
+    } == expected
 
 
-def test_convolution_rejects_a_forged_sum_value() -> None:
+def test_convolution_producer_builds_the_complete_product_measure() -> None:
     source = _distribution()
     result = _convolution(FiniteConvolutionRequest(left=source, right=source))
-    payload = result.model_dump(mode="json")
-    payload["contributions"][0]["sum_value"] = {"num": "1", "den": "1"}
-    with pytest.raises(ValidationError):
-        FiniteConvolutionResult.model_validate(payload)
+    assert all(
+        item.sum_value.as_fraction()
+        == item.left_value.as_fraction() + item.right_value.as_fraction()
+        for item in result.contributions
+    )
+    assert len(result.contributions) == len(source.atoms) ** 2

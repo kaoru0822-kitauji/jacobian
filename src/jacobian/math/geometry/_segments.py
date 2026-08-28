@@ -2,41 +2,13 @@
 
 from jacobian.catalog._examples import example
 from jacobian.math.geometry._models import (
-    GeometryPointResult,
-    PointPairRequest,
     SegmentIntersectionRequest,
     SegmentIntersectionResult,
 )
-from jacobian.math.geometry._operations import midpoint, segment_intersection
+from jacobian.math.geometry._operations import segment_intersection
 from jacobian.math.geometry._support import geometry_operation
 
 SEGMENT_OPERATIONS = (
-    geometry_operation(
-        "geometry.segment.compute.midpoint",
-        "Construct segment midpoint",
-        "Construct the exact midpoint of two rational endpoints.",
-        PointPairRequest,
-        GeometryPointResult,
-        midpoint,
-        "geometry",
-        "construction",
-        examples=(
-            example(
-                "segment_midpoint",
-                "Construct the midpoint of a unit segment.",
-                {
-                    "first": {
-                        "x": {"num": "0", "den": "1"},
-                        "y": {"num": "0", "den": "1"},
-                    },
-                    "second": {
-                        "x": {"num": "1", "den": "1"},
-                        "y": {"num": "0", "den": "1"},
-                    },
-                },
-            ),
-        ),
-    ),
     geometry_operation(
         "geometry.segments.intersection.compute",
         "Intersect two closed rational segments",

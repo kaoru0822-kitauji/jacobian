@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from math import isqrt
 
 from jacobian.canonical import format_canonical_integer
 from jacobian.catalog.models import OperationDomainValidationError
@@ -34,7 +35,7 @@ def _require_prime(value: int) -> None:
     if (
         value < 2
         or value > MAX_PRIME
-        or any(value % divisor == 0 for divisor in range(2, int(value**0.5) + 1))
+        or any(value % divisor == 0 for divisor in range(2, isqrt(value) + 1))
     ):
         _domain_error(("prime",), "prime_not_prime", "prime must be a prime modulus")
 

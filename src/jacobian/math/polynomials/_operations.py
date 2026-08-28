@@ -51,7 +51,7 @@ from jacobian.math.polynomials.values import (
     require_polynomial_budget,
 )
 
-_MAX_OUTPUT_TERMS = 1024
+MAX_OPERATION_OUTPUT_TERMS = 1_024
 
 
 class PolynomialOutputBudgetError(RuntimeError):
@@ -174,7 +174,7 @@ def _result_polynomial(poly: object, variables: tuple[str, ...]) -> RationalPoly
         return rational_polynomial_from_sympy(
             poly,
             variables,
-            maximum_terms=_MAX_OUTPUT_TERMS,
+            maximum_terms=MAX_OPERATION_OUTPUT_TERMS,
         )
     except ValueError as exc:
         if "term operation budget" in str(exc):

@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.polynomials.real_algebra._models import (
     PolynomialTerm,
     RootCountRequest,
@@ -221,12 +222,13 @@ def test_root_count_empty_interval() -> None:
 
 
 def test_contract_rejects_lower_gt_upper() -> None:
-    with pytest.raises(ValidationError):
-        RootCountRequest(
-            polynomial=_poly(("1", "1", 1)),
-            lower=R(num="10", den="1"),
-            upper=R(num="0", den="1"),
-        )
+    request = RootCountRequest(
+        polynomial=_poly(("1", "1", 1)),
+        lower=R(num="10", den="1"),
+        upper=R(num="0", den="1"),
+    )
+    with pytest.raises(OperationDomainValidationError, match="lower bound"):
+        compute_root_count(request)
 
 
 def test_contract_rejects_duplicate_exponents() -> None:
@@ -250,32 +252,34 @@ def test_contract_rejects_oversized_coefficient_digits() -> None:
     """Review fix: a 17-digit coefficient exceeds the 16-digit input budget."""
     big_num = "9" * 17
     poly = _poly((big_num, "1", 2), ("-2", "1", 0))
-    with pytest.raises(ValidationError):
-        RootCountRequest(
-            polynomial=poly,
-            lower=R(num="-10", den="1"),
-            upper=R(num="10", den="1"),
-        )
+    request = RootCountRequest(
+        polynomial=poly,
+        lower=R(num="-10", den="1"),
+        upper=R(num="10", den="1"),
+    )
+    with pytest.raises(OperationDomainValidationError, match="polynomial coefficient"):
+        compute_root_count(request)
 
 
 def test_contract_rejects_non_integer_coefficients() -> None:
     """Review fix: rational coefficients would blow up SymPy's plain QQ chain."""
-    with pytest.raises(ValidationError):
-        RootCountRequest(
-            polynomial=_poly(("1", "2", 2), ("-2", "1", 0)),
-            lower=R(num="-10", den="1"),
-            upper=R(num="10", den="1"),
-        )
-    with pytest.raises(ValidationError):
-        SturmChainRequest(polynomial=_poly(("1", "2", 2), ("-2", "1", 0)))
+    polynomial = _poly(("1", "2", 2), ("-2", "1", 0))
+    root_request = RootCountRequest(
+        polynomial=polynomial,
+        lower=R(num="-10", den="1"),
+        upper=R(num="10", den="1"),
+    )
+    with pytest.raises(OperationDomainValidationError, match="must be integers"):
+        compute_root_count(root_request)
+    with pytest.raises(OperationDomainValidationError, match="must be integers"):
+        compute_sturm_chain(SturmChainRequest(polynomial=polynomial))
 
 
 def test_sturm_rejects_constant_polynomial() -> None:
     """Review fix: a degree-0 polynomial is rejected before execution."""
-    with pytest.raises(ValidationError):
-        SturmChainRequest(
-            polynomial=_poly(("5", "1", 0)),
-        )
+    request = SturmChainRequest(polynomial=_poly(("5", "1", 0)))
+    with pytest.raises(OperationDomainValidationError, match="non-constant"):
+        compute_sturm_chain(request)
 
 
 def test_sturm_chain_boundary_sixteen_digit_coefficient() -> None:

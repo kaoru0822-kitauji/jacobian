@@ -161,12 +161,11 @@ class MultivariateFactorResult(StrictModel):
         """Build one result from the operation's already-checked kernel output.
 
         The public model intentionally retains structural validation only.
-        An independently supplied claim can be checked with the explicit
-        owner verifier, which is the only path that may replay the bounded
-        factorization worker.
+        The producing operation establishes reconstruction before constructing
+        the result.
         """
 
-        return cls(
+        return cls.model_construct(
             status=status,
             coefficient=coefficient,
             factors=factors,

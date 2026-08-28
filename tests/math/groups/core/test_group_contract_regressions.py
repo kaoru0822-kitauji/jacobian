@@ -182,26 +182,6 @@ def test_group_conjugacy_classes_result_rejects_duplicate_elements() -> None:
         GroupConjugacyClassesResult(classes=(((1, 0),), ((1, 0),)))
 
 
-def test_group_conjugacy_classes_result_rejects_nonclosed_elements() -> None:
-    from jacobian.math.groups._models import GroupConjugacyClassesResult
-
-    with _group_error("group.partition_not_closed"):
-        GroupConjugacyClassesResult(classes=(((0, 1, 2),), ((1, 0, 2),), ((1, 2, 0),)))
-
-
-def test_group_conjugacy_classes_result_rejects_forged_orbits() -> None:
-    from jacobian.math.groups._models import GroupConjugacyClassesResult
-
-    with _group_error("group.conjugacy_orbits"):
-        GroupConjugacyClassesResult(
-            classes=(
-                ((0, 1, 2),),
-                ((0, 2, 1), (1, 2, 0), (2, 1, 0)),
-                ((1, 0, 2), (2, 0, 1)),
-            )
-        )
-
-
 def test_group_conjugacy_classes_result_requires_canonical_member_order() -> None:
     from jacobian.math.groups._models import GroupConjugacyClassesResult
 

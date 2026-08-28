@@ -6,7 +6,10 @@ from jsonschema.validators import Draft202012Validator
 from jacobian.catalog.catalog import Catalog
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.dispatch import invoke_operation
-from jacobian.math.logic.games.finite._models import MAX_EXACT_EQUILIBRIUM_WORK
+from jacobian.math.logic.games.finite._models import (
+    MAX_EXACT_EQUILIBRIUM_WORK,
+    ZeroSumGameRequest,
+)
 from jacobian.math.logic.games.finite._tools import TOOLS
 
 
@@ -76,12 +79,11 @@ def test_best_response_declaration_publishes_an_operation_neutral_schema() -> No
     """The exact-equilibrium envelope appears only on the Nash operation."""
 
     tools = {tool.operation_id: tool for tool in TOOLS}
-    best_response_schema = tools[
-        "game_theory.best_response.compute"
-    ].request_type.model_json_schema()
+    best_response_schema = ZeroSumGameRequest.model_json_schema()
     equilibrium_schema = tools[
         "game_theory.nash_equilibrium.compute"
     ].request_type.model_json_schema()
+    assert "game_theory.best_response.compute" not in tools
 
     assert "linear program" not in best_response_schema["description"]
     assert "x-jacobian-bounds" not in best_response_schema

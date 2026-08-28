@@ -465,7 +465,7 @@ class TestBiconnectedComponents:
 # ---------------------------------------------------------------------------
 
 
-class TestOperationRegistration:
+class TestOperationManifest:
     def test_operations_registered(self) -> None:
         from jacobian.math.graphs.decomposition._tools import TOOLS
 
@@ -475,7 +475,6 @@ class TestOperationRegistration:
             "graph.decomposition.block_cut_tree.compute",
             "graph.decomposition.bridge_block_tree.compute",
             "graph.decomposition.ear.compute",
-            "graph.decomposition.biconnected_components.compute",
             "graph.decomposition.spqr_tree.compute",
         }
 

@@ -1390,7 +1390,7 @@ class MatrixPolynomialEvaluationResult(StrictModel):
         value: RationalMatrix,
     ) -> Self:
         polynomial_degree = _mathematical_polynomial_degree(request.polynomial)
-        return cls(
+        return cls.model_construct(
             source_matrix=request.matrix,
             polynomial=request.polynomial,
             value=value,
@@ -1459,7 +1459,7 @@ class MinimalPolynomialResult(StrictModel):
         minimal_polynomial: MonicPolynomial,
         characteristic_polynomial: MonicPolynomial,
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             matrix=matrix,
             minimal_polynomial=minimal_polynomial,
             characteristic_polynomial=characteristic_polynomial,
@@ -1521,7 +1521,7 @@ class RationalCanonicalFormResult(StrictModel):
         characteristic_polynomial: MonicPolynomial,
         minimal_polynomial: MonicPolynomial,
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             matrix=matrix,
             invariant_factors=invariant_factors,
             characteristic_polynomial=characteristic_polynomial,
@@ -1559,7 +1559,7 @@ class PrimaryDecompositionResult(StrictModel):
         components: tuple[MonicPolynomial, ...],
         minimal_polynomial: MonicPolynomial,
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             matrix=matrix,
             components=components,
             minimal_polynomial=minimal_polynomial,

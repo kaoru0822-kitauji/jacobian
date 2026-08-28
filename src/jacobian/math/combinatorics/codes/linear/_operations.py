@@ -5,6 +5,8 @@ from __future__ import annotations
 from itertools import product
 from typing import NamedTuple
 
+from pydantic_core import PydanticCustomError
+
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.combinatorics.codes.linear._models import (
     MAX_CODEWORDS,
@@ -33,6 +35,7 @@ from jacobian.math.combinatorics.codes.linear._models import (
     SyndromeRequest,
     SyndromeResult,
     _threshold_matches_distance,
+    _validate_coordinate_axis,
     _validate_prime_matrix,
 )
 from jacobian.math.combinatorics.codes.linear.values import PrimeFieldLinearEncoder
@@ -201,7 +204,15 @@ def _hamming_weight(word: list[int] | tuple[int, ...]) -> int:
 
 
 def compute_from_generator(request: GeneratorMatrixRequest) -> FromGeneratorResult:
-    _validate_prime_matrix(request.field_order, request.generator_matrix)
+    try:
+        width = _validate_prime_matrix(request.field_order, request.generator_matrix)
+        _validate_coordinate_axis(request.coordinate_axis, width=width)
+    except PydanticCustomError as error:
+        raise OperationDomainValidationError(
+            location=("generator_matrix", "coordinate_axis"),
+            code=error.type,
+            message=error.message(),
+        ) from error
     if request.field_order ** len(request.generator_matrix) > MAX_CODEWORDS:
         raise OperationDomainValidationError(
             location=("generator_matrix",),

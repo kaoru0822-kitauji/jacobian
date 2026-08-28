@@ -221,7 +221,7 @@ class SPQRTreeResult(StrictModel):
     ) -> Self:
         """Construct a result established by the owner-local SPQR kernel."""
 
-        return cls(
+        return cls.model_construct(
             source_graph=source_graph,
             status=status,
             witness_kind=witness_kind,

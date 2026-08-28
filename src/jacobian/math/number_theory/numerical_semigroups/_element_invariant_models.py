@@ -13,8 +13,7 @@ from jacobian.math.number_theory.numerical_semigroups._models import (
     _GENERAL_ELEMENT_ENVELOPE,
     _GENERAL_GENERATOR_ENVELOPE,
     MAX_GENERATORS,
-    _require_bounded_value,
-    _require_canonical_minimal_axis,
+    _require_canonical_generator_axis,
     _validation_error,
 )
 
@@ -65,8 +64,7 @@ class ElementDeltaSetResult(StrictModel):
 
     @model_validator(mode="after")
     def require_set_semantics(self) -> Self:
-        generators = _require_canonical_minimal_axis(self.minimal_generators)
-        _require_bounded_value(generators, self.value)
+        _require_canonical_generator_axis(self.minimal_generators)
         if self.factorization_lengths != tuple(
             sorted(set(self.factorization_lengths))
         ) or any(length < 0 for length in self.factorization_lengths):
@@ -133,8 +131,7 @@ class ElementElasticityResult(StrictModel):
 
     @model_validator(mode="after")
     def require_length_ratio(self) -> Self:
-        generators = _require_canonical_minimal_axis(self.minimal_generators)
-        _require_bounded_value(generators, self.value)
+        _require_canonical_generator_axis(self.minimal_generators)
         if self.minimum_length > self.maximum_length:
             raise _validation_error("minimum_length must not exceed maximum_length")
         if Fraction(self.elasticity) != Fraction(
@@ -190,8 +187,7 @@ class ElementCatenaryDegreeResult(StrictModel):
 
     @model_validator(mode="after")
     def require_structural_degree(self) -> Self:
-        generators = _require_canonical_minimal_axis(self.minimal_generators)
-        _require_bounded_value(generators, self.value)
+        _require_canonical_generator_axis(self.minimal_generators)
         return self
 
 

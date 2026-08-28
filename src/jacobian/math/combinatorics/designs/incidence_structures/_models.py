@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from math import comb
-from typing import Self
+from typing import Literal, Self
 
 from pydantic import (
     ConfigDict,
@@ -318,7 +318,7 @@ class ContainmentProfileResult(StrictModel):
             int | None,
         ],
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             incidence=incidence,
             t=order,
             subset_profile=data[0],
@@ -451,7 +451,7 @@ class IncidenceMomentComparison(StrictModel):
         right_total: int,
         differences: tuple[IncidenceMultiplicityDifference, ...],
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             left=left,
             right=right,
             points=left.points,
@@ -545,7 +545,7 @@ class IncidenceTradeResult(StrictModel):
         zeroth_difference: int,
         comparisons: tuple[IncidenceMomentComparison, ...],
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             left=left,
             right=right,
             max_order=max_order,
@@ -655,20 +655,7 @@ class RestrictionResult(StrictModel):
 class DerivedResidualRequest(StrictModel):
     incidence: IncidenceStructure
     point: str
-    kind: str = Field(default="derived")
-
-    @model_validator(mode="after")
-    def require_valid_kind(self) -> Self:
-        if self.kind not in ("derived", "residual"):
-            raise _validation_error(
-                "derived_kind_invalid", "kind must be 'derived' or 'residual'"
-            )
-        if self.point not in self.incidence.points:
-            raise _validation_error(
-                "derived_point_undeclared",
-                "point must be a declared point in the incidence structure",
-            )
-        return self
+    kind: Literal["derived", "residual"] = "derived"
 
 
 class DerivedResidualResult(StrictModel):

@@ -6,78 +6,17 @@ from jacobian.math.geometry._models import (
     GeometryBooleanResult,
     GeometryConvexHullResult,
     GeometryPointResult,
-    GeometryRationalResult,
-    PointPairRequest,
     PointQuadrupleRequest,
     PointSetRequest,
-    PointTripleRequest,
 )
 from jacobian.math.geometry._operations import (
     circle_inversion,
-    collinear,
     concyclic,
     convex_hull_points,
-    squared_distance,
 )
 from jacobian.math.geometry._support import geometry_operation
 
 POINT_OPERATIONS = (
-    geometry_operation(
-        "geometry.points.compute.squared_distance",
-        "Compute squared distance",
-        "Compute exact squared Euclidean distance between two rational points.",
-        PointPairRequest,
-        GeometryRationalResult,
-        squared_distance,
-        "geometry",
-        "distance",
-        examples=(
-            example(
-                "diagonal_squared_distance",
-                "Compute the squared distance from (0,0) to (2,2).",
-                {
-                    "first": {
-                        "x": {"num": "0", "den": "1"},
-                        "y": {"num": "0", "den": "1"},
-                    },
-                    "second": {
-                        "x": {"num": "2", "den": "1"},
-                        "y": {"num": "2", "den": "1"},
-                    },
-                },
-            ),
-        ),
-    ),
-    geometry_operation(
-        "geometry.points.decide.collinear",
-        "Decide collinearity",
-        "Decide exact collinearity of three rational points.",
-        PointTripleRequest,
-        GeometryBooleanResult,
-        collinear,
-        "geometry",
-        "incidence",
-        examples=(
-            example(
-                "collinear_x_axis",
-                "Check three points on the x-axis.",
-                {
-                    "first": {
-                        "x": {"num": "0", "den": "1"},
-                        "y": {"num": "0", "den": "1"},
-                    },
-                    "second": {
-                        "x": {"num": "1", "den": "1"},
-                        "y": {"num": "0", "den": "1"},
-                    },
-                    "third": {
-                        "x": {"num": "2", "den": "1"},
-                        "y": {"num": "0", "den": "1"},
-                    },
-                },
-            ),
-        ),
-    ),
     geometry_operation(
         "geometry.points.decide.concyclic",
         "Decide concyclicity",

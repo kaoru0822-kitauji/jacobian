@@ -529,16 +529,6 @@ class PosetWidthResult(StrictModel):
 class LinearExtensionRequest(StrictModel):
     poset: FinitePoset
 
-    @model_validator(mode="after")
-    def require_subset_dp_bound(self) -> Self:
-        if len(self.poset.elements) > MAX_LINEAR_EXTENSION_ELEMENTS:
-            raise _validation_error(
-                "linear_extension_size_bound",
-                "linear-extension counting supports at most "
-                f"{MAX_LINEAR_EXTENSION_ELEMENTS} elements",
-            )
-        return self
-
 
 class LinearExtensionCountResult(StrictModel):
     count: StrictInt = Field(ge=1)

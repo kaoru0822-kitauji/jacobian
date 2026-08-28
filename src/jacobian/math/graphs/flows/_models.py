@@ -257,8 +257,3 @@ class MinCostFlowResult(StrictModel):
             feasible=feasible,
             flow_edges=flow_edges,
         )
-
-
-class CirculationResult(StrictModel):
-    feasible: bool
-    flow_edges: tuple[FlowEdgeResult, ...] = Field(default=())

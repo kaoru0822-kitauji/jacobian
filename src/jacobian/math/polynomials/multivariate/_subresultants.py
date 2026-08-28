@@ -439,7 +439,7 @@ class MultivariateSubresultantSequenceResult(StrictModel):
     ) -> Self:
         """Build a result after the admitted Brown kernel established its ledger."""
 
-        return cls(
+        return cls.model_construct(
             left=request.left,
             right=request.right,
             main_variable=request.main_variable,

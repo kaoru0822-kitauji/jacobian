@@ -11,6 +11,8 @@ from jacobian.math.groups.root_systems._cartan import (
     positive_roots as enumerate_positive_roots,
 )
 from jacobian.math.groups.root_systems._models import (
+    MAX_POSITIVE_ROOTS,
+    MAX_RANK,
     CartanMatrixRequest,
     PositiveRootsResult,
     RootComponentData,
@@ -20,12 +22,56 @@ from jacobian.math.groups.root_systems._models import (
     WeylGroupOrderResult,
 )
 
-MAX_SIGNED_ROOT_ACTION_DEGREE = 240
+MAX_SIGNED_ROOT_ACTION_DEGREE = 2 * MAX_POSITIVE_ROOTS
 
 
 def _admit_cartan_finite_type(matrix: tuple[tuple[int, ...], ...]) -> None:
     """Admit the finite-type Cartan domain before invoking a root kernel."""
     from jacobian.math.groups.root_systems._cartan import require_finite_type
+
+    rank = len(matrix)
+    if not 1 <= rank <= MAX_RANK:
+        raise OperationDomainValidationError(
+            location=("matrix",),
+            code="root_system.rank_out_of_range",
+            message=f"rank must be between 1 and {MAX_RANK}",
+        )
+    if any(len(row) != rank for row in matrix):
+        raise OperationDomainValidationError(
+            location=("matrix",),
+            code="root_system.not_square",
+            message="Cartan matrix must be square",
+        )
+    if any(matrix[index][index] != 2 for index in range(rank)):
+        raise OperationDomainValidationError(
+            location=("matrix",),
+            code="root_system.diagonal_entry",
+            message="diagonal entries must be 2",
+        )
+    for row in range(rank):
+        for column in range(rank):
+            if row == column:
+                continue
+            entry = matrix[row][column]
+            transpose_entry = matrix[column][row]
+            if entry > 0:
+                raise OperationDomainValidationError(
+                    location=("matrix",),
+                    code="root_system.positive_off_diagonal",
+                    message="off-diagonal entries must be non-positive",
+                )
+            if entry * transpose_entry not in (0, 1, 2, 3):
+                raise OperationDomainValidationError(
+                    location=("matrix",),
+                    code="root_system.off_diagonal_product",
+                    message="off-diagonal product must be 0, 1, 2, or 3",
+                )
+            if (entry == 0) != (transpose_entry == 0):
+                raise OperationDomainValidationError(
+                    location=("matrix",),
+                    code="root_system.zero_pattern",
+                    message="generalized Cartan matrix requires a_ij == 0 iff a_ji == 0",
+                )
 
     try:
         require_finite_type(matrix)
@@ -125,6 +171,19 @@ def compute_simple_reflection(
 ) -> SimpleReflectionResult:
     """Apply a simple reflection to a root lattice vector."""
     _admit_cartan_finite_type(request.matrix)
+    rank = len(request.matrix)
+    if request.simple_index >= rank:
+        raise OperationDomainValidationError(
+            location=("simple_index",),
+            code="root_system.simple_index_out_of_range",
+            message="simple_index out of range",
+        )
+    if len(request.vector) != rank:
+        raise OperationDomainValidationError(
+            location=("vector",),
+            code="root_system.vector_length_mismatch",
+            message="vector length must match rank",
+        )
     reflected = tuple(
         _apply_reflection(
             [list(row) for row in request.matrix],

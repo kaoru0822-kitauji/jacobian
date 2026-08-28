@@ -33,18 +33,6 @@ def _operation(operation_id: str) -> MathTool[Any, Any]:
     ("operation_id", "request_type", "result_type", "request_fields"),
     (
         (
-            "integer.compute.gcd",
-            IntegerPairRequest,
-            IntegerValue,
-            {"left", "right"},
-        ),
-        (
-            "integer.compute.lcm",
-            IntegerPairRequest,
-            IntegerValue,
-            {"left", "right"},
-        ),
-        (
             "integer.compute.extended_gcd",
             IntegerPairRequest,
             ExtendedGcdResult,
@@ -56,7 +44,6 @@ def _operation(operation_id: str) -> MathTool[Any, Any]:
             IntegerValue,
             {"value", "prime"},
         ),
-        ("integer.decide.divides", DivisibilityRequest, None, {"divisor", "dividend"}),
     ),
 )
 def test_divisibility_declarations_keep_their_owner_local_contracts(

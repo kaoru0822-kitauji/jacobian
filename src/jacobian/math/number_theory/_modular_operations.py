@@ -275,6 +275,6 @@ def solve_chinese_remainder(request: ChineseRemainderRequest) -> ChineseRemainde
         *zip(request.residues, request.moduli, strict=True), check=True
     )
     if result is None or result[0] is None:
-        raise ValueError("congruence system is inconsistent")
+        raise AssertionError("admitted congruence system was not solved")
     residue, modulus = result
     return ChineseRemainderResult(residue=str(int(residue)), modulus=str(int(modulus)))

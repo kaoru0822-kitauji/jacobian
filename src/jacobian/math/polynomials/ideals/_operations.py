@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import time
 from typing import Any
 
 import sympy
@@ -35,6 +34,7 @@ from jacobian.math.polynomials.ideals._models import (
     IdealRadicalResult,
     IdealSaturationRequest,
     IdealSaturationResult,
+    _require_computed_minimal_prime_family,
     _require_ideal_budget,
     _require_provable_family_fit,
     _validation_error,
@@ -43,7 +43,6 @@ from jacobian.math.polynomials.ideals._singular import (
     run_bounded_stdin_python_kernel,
     run_singular_ideal_operation,
     run_singular_minimal_primes,
-    run_singular_minimal_primes_verification,
 )
 from jacobian.math.polynomials.values import (
     RationalPolynomial,
@@ -111,6 +110,8 @@ def _admit_groebner(request: GroebnerBasisRequest) -> None:
 
 def _admit_normal_form(request: IdealNormalFormRequest) -> None:
     _admit_source(request.ideal, label="ideal")
+    if request.polynomial.variables != request.ideal.variables:
+        raise _validation_error("polynomial must use the ideal's ordered ring")
     require_polynomial_budget(
         request.polynomial,
         maximum_terms=MAX_INPUT_TERMS,
@@ -131,18 +132,6 @@ def _admit_elimination(request: EliminationIdealRequest) -> None:
         raise _validation_error(
             "elimination cannot remove every variable; at least one must remain"
         )
-
-
-class _GroebnerBudgetExceededError(TimeoutError):
-    """Internal signal-handler escape for the enforced Gröbner budget."""
-
-
-class _NormalFormTimeoutError(TimeoutError):
-    """Internal signal-handler escape for the enforced normal-form budget."""
-
-
-class _EliminationTimeoutError(TimeoutError):
-    """Internal signal-handler escape for the enforced elimination budget."""
 
 
 class _ResultLimitExceededError(ValueError):
@@ -529,21 +518,10 @@ def compute_ideal_radical(request: IdealRadicalRequest) -> IdealRadicalResult:
 def compute_ideal_minimal_primes(
     request: IdealMinimalPrimesRequest,
 ) -> IdealMinimalPrimesResult:
-    """Compute the complete minimal-prime family over ``QQ``.
-
-    The producing pass runs Singular's ``minAssGTZE`` kernel. A second
-    bounded pass then verifies the family's defining invariants by
-    independent evidence — radical-intersection equality, pairwise
-    non-containment, and agreement with the characteristic-set
-    decomposition — under ONE operation-level deadline: the verifier
-    subprocess receives only the wall allowance remaining after the
-    producing pass, so one request never exceeds its declared wall-time
-    budget.
-    """
+    """Compute the complete minimal-prime family over ``QQ``."""
 
     _run_admission(lambda: _admit_minimal_primes(request))
 
-    started = time.monotonic()
     backend = run_singular_minimal_primes(request.ideal, request.resource_budget)
     components = backend.components
     if backend.outcome != "COMPUTED" or components is None:
@@ -555,116 +533,34 @@ def compute_ideal_minimal_primes(
             detail=backend.detail,
         )
 
-    remaining = float(request.resource_budget.wall_seconds) - (
-        time.monotonic() - started
-    )
-    if remaining <= 0:
+    try:
+        _require_computed_minimal_prime_family(request, components)
+        result = IdealMinimalPrimesResult._from_kernel(
+            request=request,
+            components=components,
+            backend_version=backend.backend_version,
+        )
+        _require_transportable_minimal_primes_result(result)
+        return result
+    except _ResultLimitExceededError as error:
         return IdealMinimalPrimesResult(
             request=request,
-            outcome="TIMEOUT",
+            outcome="LIMIT_EXCEEDED",
             components=None,
             backend_version=None,
-            detail=(
-                "The minimal-prime defining-invariant verification did not "
-                "complete within the declared backend budget."
-            ),
+            detail=str(error),
         )
-
-    verdict = run_singular_minimal_primes_verification(
-        request.ideal,
-        components,
-        request.resource_budget,
-        wall_seconds=remaining,
-    )
-    if verdict == "VERIFIED":
-        # The producing pass and the independent verification pass above
-        # completed this request under one operation-level deadline. The
-        # trusted factory skips only a repeated backend verification while
-        # still enforcing shape, ring, exact-result envelopes, ordering, and
-        # uniqueness; externally supplied JSON always runs the model
-        # validator's own independent verification.
-        try:
-            result = IdealMinimalPrimesResult._from_kernel(
-                request=request,
-                components=components,
-                backend_version=backend.backend_version,
-            )
-            _require_transportable_minimal_primes_result(result)
-            return result
-        except _ResultLimitExceededError as error:
-            return IdealMinimalPrimesResult(
-                request=request,
-                outcome="LIMIT_EXCEEDED",
-                components=None,
-                backend_version=None,
-                detail=str(error),
-            )
-        except ValueError:
-            return IdealMinimalPrimesResult(
-                request=request,
-                outcome="ERROR",
-                components=None,
-                backend_version=None,
-                detail=(
-                    "The computed minimal-prime family violated its own shape, "
-                    "ring, exact-result-envelope, ordering, or uniqueness "
-                    "invariant."
-                ),
-            )
-    if verdict == "REFUTED":
+    except ValueError:
         return IdealMinimalPrimesResult(
             request=request,
             outcome="ERROR",
             components=None,
             backend_version=None,
             detail=(
-                "The computed minimal-prime family failed its independent "
-                "primality, minimality, or radical-intersection verification."
+                "The computed minimal-prime family violated its shape, ring, "
+                "exact-result envelope, ordering, or uniqueness invariant."
             ),
         )
-    if verdict == "TIMEOUT":
-        return IdealMinimalPrimesResult(
-            request=request,
-            outcome="TIMEOUT",
-            components=None,
-            backend_version=None,
-            detail=(
-                "The minimal-prime defining-invariant verification did not "
-                "complete within the declared backend budget."
-            ),
-        )
-    if verdict == "UNAVAILABLE":
-        return IdealMinimalPrimesResult(
-            request=request,
-            outcome="UNAVAILABLE",
-            components=None,
-            backend_version=None,
-            detail=(
-                "The supported Singular backend became unavailable during "
-                "independent verification."
-            ),
-        )
-    if verdict == "CANCELLED":
-        return IdealMinimalPrimesResult(
-            request=request,
-            outcome="CANCELLED",
-            components=None,
-            backend_version=None,
-            detail=(
-                "The minimal-prime defining-invariant verification was "
-                "cancelled before producing a verdict."
-            ),
-        )
-    return IdealMinimalPrimesResult(
-        request=request,
-        outcome="ERROR",
-        components=None,
-        backend_version=None,
-        detail=(
-            "The independent minimal-prime verification failed without "
-            "producing a verdict."
-        ),
-    )
 
 
 def compute_ideal_radical_membership(
@@ -767,8 +663,8 @@ def compute_groebner_basis(request: GroebnerBasisRequest) -> GroebnerBasisResult
     }
 
     # The unbounded search runs in a killable worker under the declared
-    # wall-time budget; result assembly and source-bound verification then
-    # operate only on the declared output limits.
+    # wall-time budget; result assembly then operates only on the declared
+    # output limits.
     try:
         result_payload = _run_sympy_kernel(
             payload, request.resource_budget.wall_seconds
@@ -840,8 +736,8 @@ def compute_ideal_normal_form(request: IdealNormalFormRequest) -> IdealNormalFor
     }
 
     # A conservative 10-second budget bounds the killable kernel that runs
-    # the unbounded Gröbner search; the remainder conversion and its
-    # source-bound replay then operate on declared output limits.
+    # the unbounded Gröbner search; remainder conversion then operates on
+    # declared output limits.
     try:
         result_payload = _run_sympy_kernel(payload, 10)
     except _SympyKernelTimeoutError:
@@ -936,8 +832,8 @@ def compute_elimination_ideal(
     }
 
     # The unbounded lex search runs in a killable worker under the declared
-    # wall-time budget; canonicalization and source-bound verification then
-    # operate only on the declared output limits.
+    # wall-time budget; canonicalization then operates only on the declared
+    # output limits.
     try:
         result_payload = _run_sympy_kernel(
             payload, request.resource_budget.wall_seconds

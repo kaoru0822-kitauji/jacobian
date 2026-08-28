@@ -67,10 +67,8 @@ class GraphSpectrumResult(StrictModel):
     and sum to the graph order, so the claimed spectrum reconstructs
     ``det(xI - M)`` exactly, where ``M`` is the adjacency matrix A for
     ``matrix_convention="ADJACENCY"`` and the Laplacian matrix L for
-    ``matrix_convention="LAPLACIAN"``.  Pair order carries no mathematical
-    meaning.  The explicit owner verifier compares ``(eigenvalue,
-    multiplicity)`` pairs as a multiset when an independently supplied claim
-    needs checking.
+    ``matrix_convention="LAPLACIAN"``. Pair order carries no mathematical
+    meaning.
     """
 
     graph: SpectralGraph
@@ -142,9 +140,8 @@ class GraphCharacteristicPolynomialResult(StrictModel):
     """The exact monic characteristic polynomial of a graph matrix over QQ.
 
     ``polynomial`` is the domain-owned canonical sparse value so downstream
-    polynomial operations compose without translation.  The result retains
-    its source graph and convention; the explicit owner verifier checks the
-    defining determinant relation for independently supplied claims.
+    polynomial operations compose without translation. The result retains its
+    source graph and convention.
     """
 
     graph: SpectralGraph

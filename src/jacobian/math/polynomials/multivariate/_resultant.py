@@ -174,7 +174,7 @@ class MultivariateResultantResult(StrictModel):
     ) -> Self:
         """Build a result after the admitted Sylvester kernel established it."""
 
-        return cls(
+        return cls.model_construct(
             left=request.left,
             right=request.right,
             elimination_variable=request.elimination_variable,

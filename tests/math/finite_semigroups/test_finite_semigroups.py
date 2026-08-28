@@ -5,6 +5,7 @@ from typing import TypedDict
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.finite_semigroups._models import (
     ElementPowerRequest,
     FiniteSemigroup,
@@ -313,13 +314,13 @@ class TestElementPower:
         assert error.value.errors()[0]["type"] == "greater_than_equal"
 
     def test_missing_element_rejected(self) -> None:
-        with pytest.raises(ValidationError) as error:
-            ElementPowerRequest(
-                semigroup=_finite_semigroup(Z3), element="9", exponent=2
-            )
-        assert (
-            error.value.errors()[0]["type"]
-            == "finite_semigroup.element_not_in_semigroup"
+        request = ElementPowerRequest(
+            semigroup=_finite_semigroup(Z3), element="9", exponent=2
+        )
+        with pytest.raises(OperationDomainValidationError) as error:
+            compute_element_power(request)
+        assert error.value.errors()[0]["type"] == (
+            "finite_semigroup.element_not_in_semigroup"
         )
 
     def test_power_replays_from_table(self) -> None:
@@ -432,40 +433,40 @@ class TestPrincipalIdeals:
                     assert table[index[member]][index[multiplier]] in ideal
 
     def test_duplicate_or_out_of_order_elements_are_rejected(self) -> None:
-        with pytest.raises(ValidationError) as error:
-            PrincipalIdealsRequest.model_validate(
-                {
-                    "semigroup": _finite_semigroup(Z3),
-                    "elements": ["1", "1"],
-                }
-            )
-        assert (
-            error.value.errors()[0]["type"]
-            == "finite_semigroup.requested_elements_not_distinct"
+        duplicate = PrincipalIdealsRequest.model_validate(
+            {
+                "semigroup": _finite_semigroup(Z3),
+                "elements": ["1", "1"],
+            }
         )
-        with pytest.raises(ValidationError) as error:
-            PrincipalIdealsRequest.model_validate(
-                {
-                    "semigroup": _finite_semigroup(Z3),
-                    "elements": ["2", "1"],
-                }
-            )
-        assert (
-            error.value.errors()[0]["type"]
-            == "finite_semigroup.requested_elements_wrong_order"
+        with pytest.raises(OperationDomainValidationError) as error:
+            compute_principal_ideals(duplicate)
+        assert error.value.errors()[0]["type"] == (
+            "finite_semigroup.requested_elements_not_distinct"
+        )
+        out_of_order = PrincipalIdealsRequest.model_validate(
+            {
+                "semigroup": _finite_semigroup(Z3),
+                "elements": ["2", "1"],
+            }
+        )
+        with pytest.raises(OperationDomainValidationError) as error:
+            compute_principal_ideals(out_of_order)
+        assert error.value.errors()[0]["type"] == (
+            "finite_semigroup.requested_elements_wrong_order"
         )
 
     def test_missing_element_rejected(self) -> None:
-        with pytest.raises(ValidationError) as error:
-            PrincipalIdealsRequest.model_validate(
-                {
-                    "semigroup": _finite_semigroup(Z3),
-                    "elements": ["nope"],
-                }
-            )
-        assert (
-            error.value.errors()[0]["type"]
-            == "finite_semigroup.element_not_in_semigroup"
+        request = PrincipalIdealsRequest.model_validate(
+            {
+                "semigroup": _finite_semigroup(Z3),
+                "elements": ["nope"],
+            }
+        )
+        with pytest.raises(OperationDomainValidationError) as error:
+            compute_principal_ideals(request)
+        assert error.value.errors()[0]["type"] == (
+            "finite_semigroup.element_not_in_semigroup"
         )
 
 

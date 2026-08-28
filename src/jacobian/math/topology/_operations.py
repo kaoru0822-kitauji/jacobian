@@ -815,7 +815,11 @@ def compute_shelling_check(request: ShellingCheckRequest) -> ShellingCheckResult
     """Check whether a submitted facet order is a valid shelling order."""
     require_complex_admission(request.complex)
     if sorted(request.facet_order) != list(range(len(request.complex.facets))):
-        raise ValueError("facet_order must be a permutation of facet indices")
+        raise OperationDomainValidationError(
+            location=("facet_order",),
+            code="topology.shelling_facet_order",
+            message="facet_order must be a permutation of facet indices",
+        )
 
     is_shelling, failed_at, failure_reason = evaluate_shelling(
         request.complex.facets, request.facet_order

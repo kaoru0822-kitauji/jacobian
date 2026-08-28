@@ -10,7 +10,6 @@ from sympy.ntheory.generate import Sieve, primerange
 
 from jacobian.math.number_theory._powerful_models import (
     MAX_POWERFUL_CUTOFF,
-    MAX_POWERFUL_INTEGER_DIGITS,
 )
 
 PowerfulConclusion = Literal[
@@ -65,8 +64,6 @@ def decide_powerful_data(value: int) -> PowerfulDecisionData:
     sum at least five and therefore exceed B**5 >= value.
     """
 
-    if not 1 <= value < 10**MAX_POWERFUL_INTEGER_DIGITS:
-        raise ValueError("powerful-number value must have at most 25 digits")
     cutoff = _ceil_fifth_root(value)
     assert cutoff <= MAX_POWERFUL_CUTOFF
     residual = value

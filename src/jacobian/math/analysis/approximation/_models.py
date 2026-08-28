@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from fractions import Fraction
 from typing import Self
 
 from pydantic import Field, model_validator
@@ -86,62 +85,8 @@ class LagrangeBasisPolynomial(StrictModel):
         return self
 
 
-def _evaluate_single_variable(
-    polynomial: RationalPolynomial,
-    point: Fraction,
-) -> Fraction:
-    """Exact evaluation of one canonical single-variable polynomial."""
-    value = Fraction(0)
-    for term in polynomial.polynomial.terms:
-        value += term.coefficient.as_fraction() * point ** term.exponents[0]
-    return value
-
-
-def _require_cardinal_entry(
-    entry: LagrangeBasisPolynomial,
-    nodes: list[Fraction],
-    k: int,
-    node_count: int,
-) -> None:
-    """Pin one cardinal polynomial to its node, weight, and delta property."""
-    # Node evaluations alone do not identify the basis: a forged
-    # higher-degree polynomial can agree with l_k on every node. The
-    # genuine cardinal polynomial has degree below node_count, which
-    # together with the delta property pins it uniquely.
-    terms = entry.polynomial.polynomial.terms
-    if any(term.exponents[0] >= node_count for term in terms):
-        raise _validation_error(
-            "basis_degree_exceeded", "basis polynomial degree must be below node_count"
-        )
-    expected_weight = Fraction(1)
-    for i, x_i in enumerate(nodes):
-        if i != k:
-            expected_weight /= nodes[k] - x_i
-    if entry.barycentric_weight.as_fraction() != expected_weight:
-        raise _validation_error(
-            "barycentric_weight_mismatch",
-            "barycentric weight must equal "
-            "1/prod_{i!=k}(x_k - x_i) on the retained nodes",
-        )
-    for j, x_j in enumerate(nodes):
-        evaluated = _evaluate_single_variable(entry.polynomial, x_j)
-        expected_value = Fraction(1) if j == k else Fraction(0)
-        if evaluated != expected_value:
-            raise _validation_error(
-                "cardinal_property_violation",
-                "basis polynomial must satisfy l_k(x_j) = delta_kj "
-                "on the retained nodes",
-            )
-
-
 class LagrangeBasisResult(StrictModel):
-    """Lagrange basis polynomials bound to their retained node set.
-
-    Indices cover 0..node_count-1 exactly once, every barycentric weight
-    equals the exact product 1/prod_{i!=k}(x_k - x_i), and each basis
-    polynomial satisfies l_k(x_j) = delta_kj on the retained nodes, so a
-    revalidated result can only describe this node set's genuine basis.
-    """
+    """Lagrange basis polynomials with their retained node set."""
 
     nodes: RationalNodeSet
     node_count: int = Field(ge=1, le=MAX_INTERPOLATION_NODES)
@@ -149,9 +94,7 @@ class LagrangeBasisResult(StrictModel):
 
     @model_validator(mode="after")
     def require_bound_to_nodes(self) -> Self:
-
-        nodes = [n.as_fraction() for n in self.nodes.nodes]
-        if self.node_count != len(nodes):
+        if self.node_count != len(self.nodes.nodes):
             raise _validation_error(
                 "node_count_mismatch", "node_count must match the retained node set"
             )
@@ -165,8 +108,6 @@ class LagrangeBasisResult(StrictModel):
                 "basis_indices_invalid",
                 "basis indices must be exactly 0..node_count-1 with no repeats",
             )
-        for entry in self.basis:
-            _require_cardinal_entry(entry, nodes, entry.index, self.node_count)
         return self
 
 

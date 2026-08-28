@@ -8,9 +8,8 @@ from typing import Self
 from pydantic import Field, model_validator
 from pydantic_core import PydanticCustomError
 
-from jacobian._exact import MAX_CANONICAL_RATIONAL_DIGITS, CanonicalRational
+from jacobian._exact import CanonicalRational
 from jacobian._models import StrictModel
-from jacobian.canonical import format_canonical_integer
 from jacobian.math._rational_height import RationalHeight, sum_heights
 
 
@@ -32,27 +31,6 @@ class EllipticCurveRequest(StrictModel):
 
     curve: ShortWeierstrassCurve
 
-    @model_validator(mode="after")
-    def require_discriminant_result_bound(self) -> Self:
-        # A cancellation-blind height estimate over-rejects curves whose
-        # large terms cancel exactly (A = -3t^2, B = 2t^3 gives
-        # 4A^3 + 27B^2 = 0 exactly).  Compute the reduced exact
-        # discriminant instead — three multiplications at the canonical
-        # digit limits, bounded work — and admit on its actual magnitude.
-        # Zero is admissible: the result reports singularity itself.
-        discriminant = self.curve.discriminant()
-        numerator_digits = len(format_canonical_integer(abs(discriminant.numerator)))
-        denominator_digits = len(format_canonical_integer(discriminant.denominator))
-        if (
-            numerator_digits > MAX_CANONICAL_RATIONAL_DIGITS
-            or denominator_digits > MAX_CANONICAL_RATIONAL_DIGITS
-        ):
-            raise PydanticCustomError(
-                "elliptic_curve.discriminant_result_bound",
-                "curve coefficients would produce a discriminant exceeding the canonical result bound",
-            )
-        return self
-
 
 class CurveDiscriminantResult(StrictModel):
     """The discriminant Δ = -16(4A^3 + 27B^2) of its retained source curve."""
@@ -60,21 +38,6 @@ class CurveDiscriminantResult(StrictModel):
     request: EllipticCurveRequest
     discriminant: CanonicalRational
     is_nonsingular: bool
-
-    @model_validator(mode="after")
-    def bind_discriminant_to_curve(self) -> Self:
-        expected = self.request.curve.discriminant()
-        if self.discriminant.as_fraction() != expected:
-            raise PydanticCustomError(
-                "elliptic_curve.discriminant_mismatch",
-                "discriminant must equal -16(4A^3 + 27B^2) for the retained curve",
-            )
-        if self.is_nonsingular is (self.discriminant.as_fraction() == 0):
-            raise PydanticCustomError(
-                "elliptic_curve.nonsingularity_mismatch",
-                "nonsingularity must match a nonzero discriminant",
-            )
-        return self
 
     @classmethod
     def _from_kernel(
@@ -110,24 +73,6 @@ class PointOnCurveResult(StrictModel):
 
     request: CurvePointRequest
     on_curve: bool
-
-    @model_validator(mode="after")
-    def bind_decision_to_curve_equation(self) -> Self:
-        curve = self.request.curve
-        point = self.request.point
-        x = point.x.as_fraction()
-        y = point.y.as_fraction()
-        expected = y * y == (
-            x**3
-            + curve.coefficient_a.as_fraction() * x
-            + curve.coefficient_b.as_fraction()
-        )
-        if self.on_curve is not expected:
-            raise PydanticCustomError(
-                "elliptic_curve.point_decision_mismatch",
-                "on_curve must match the retained curve equation and point",
-            )
-        return self
 
     @classmethod
     def _from_kernel(cls, *, request: CurvePointRequest, on_curve: bool) -> Self:
@@ -307,19 +252,6 @@ class EllipticCurvePointAdditionRequest(StrictModel):
     first: EllipticCurvePointResult
     second: EllipticCurvePointResult
 
-    @model_validator(mode="after")
-    def require_operands_in_the_same_group(self) -> Self:
-        if self.first.curve != self.curve or self.second.curve != self.curve:
-            raise PydanticCustomError(
-                "elliptic_curve.parent_curve_mismatch",
-                "operands must carry this request's curve as their parent",
-            )
-        return self
-
-    @model_validator(mode="after")
-    def require_group_law(self) -> Self:
-        return self
-
 
 class ScalarMultiplicationRequest(StrictModel):
     """Compute n*P on a short Weierstrass elliptic curve."""
@@ -327,19 +259,6 @@ class ScalarMultiplicationRequest(StrictModel):
     curve: ShortWeierstrassCurve
     point: EllipticCurvePointResult
     scalar: int = Field(ge=0, le=10_000)
-
-    @model_validator(mode="after")
-    def require_operand_in_the_same_group(self) -> Self:
-        if self.point.curve != self.curve:
-            raise PydanticCustomError(
-                "elliptic_curve.parent_curve_mismatch",
-                "the operand must carry this request's curve as its parent",
-            )
-        return self
-
-    @model_validator(mode="after")
-    def require_group_law(self) -> Self:
-        return self
 
 
 class ScalarMultiplicationResult(EllipticCurvePointResult):

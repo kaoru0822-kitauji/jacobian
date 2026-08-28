@@ -80,15 +80,6 @@ class SturmChainRequest(StrictModel):
 
     polynomial: UnivariatePolynomial
 
-    @model_validator(mode="after")
-    def require_nonconstant_polynomial(self) -> Self:
-        if max(t.exponent for t in self.polynomial.terms) < 1:
-            raise _validation_error(
-                "constant_input", "Sturm chain requires a non-constant polynomial"
-            )
-        _require_bounded_integer_coefficients(self.polynomial)
-        return self
-
 
 class RootCountRequest(StrictModel):
     """Count roots of a bounded integer polynomial in [lower, upper]."""
@@ -96,15 +87,6 @@ class RootCountRequest(StrictModel):
     polynomial: UnivariatePolynomial
     lower: CanonicalRational
     upper: CanonicalRational
-
-    @model_validator(mode="after")
-    def require_ordered_bounded_interval(self) -> Self:
-        if self.lower.as_fraction() > self.upper.as_fraction():
-            raise _validation_error(
-                "interval_order", "lower bound must not exceed upper bound"
-            )
-        _require_bounded_integer_coefficients(self.polynomial)
-        return self
 
 
 class SturmChainResult(StrictModel):

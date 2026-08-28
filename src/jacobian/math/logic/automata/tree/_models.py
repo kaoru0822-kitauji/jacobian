@@ -68,8 +68,9 @@ class TreeRunResult(TreeRunRequest):
     ) -> Self:
         """Construct a result emitted by the trusted tree-run kernel."""
 
-        return cls(
-            **request.model_dump(),
+        return cls.model_construct(
+            automaton=request.automaton,
+            tree=request.tree,
             accepted=accepted,
             root_states=root_states,
             state_chart=state_chart,
@@ -107,8 +108,9 @@ class AcceptedTreeCountResult(AcceptedTreeCountRequest):
     ) -> Self:
         """Construct a result emitted by the trusted subset-DP kernel."""
 
-        return cls(
-            **request.model_dump(),
+        return cls.model_construct(
+            automaton=request.automaton,
+            tree_size=request.tree_size,
             count=count,
             estimated_work_bound=estimated_work_bound,
         )

@@ -342,7 +342,11 @@ def compute_derived_residual(
     kind = request.kind
 
     if p not in points:
-        raise ValueError("anchor point must be a declared point")
+        raise OperationDomainValidationError(
+            location=("point",),
+            code="incidence.derived_point_undeclared",
+            message="point must be a declared point in the incidence structure",
+        )
 
     new_points = [x for x in points if x != p]
     sort_key = _point_sort_key(points)
@@ -361,15 +365,6 @@ def compute_derived_residual(
             new_block_ids.append(block_ids[j])
             new_blocks.append(blocks[j])
             source_blocks.append(block_ids[j])
-
-    if not new_block_ids:
-        if kind == "derived":
-            raise ValueError(
-                "derived structure requires at least one block containing the point"
-            )
-        raise ValueError(
-            "residual structure requires at least one block not containing the point"
-        )
 
     return DerivedResidualResult(
         kind=kind,

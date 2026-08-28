@@ -90,7 +90,7 @@ def compute_hochschild_chain_complex(
     augmentation-dependent endpoint faces. It squares to zero because epsilon
     is an algebra homomorphism and the multiplication is associative.
     """
-    from jacobian.math.topology.cohomology.hochschild._admission import (
+    from jacobian.math.topology.cohomology.hochschild._bounds import (
         require_algebra_admission,
         require_hochschild_budget,
     )
@@ -169,7 +169,7 @@ def compute_hochschild_homology(
     request: HochschildHomologyRequest,
 ) -> HochschildHomologyResult:
     """Compute exact Hochschild homology HH_n(A, K) for trivial coefficients."""
-    from jacobian.math.topology.cohomology.hochschild._admission import (
+    from jacobian.math.topology.cohomology.hochschild._bounds import (
         require_algebra_admission,
         require_hochschild_budget,
     )

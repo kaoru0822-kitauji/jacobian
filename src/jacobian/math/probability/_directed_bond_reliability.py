@@ -344,8 +344,7 @@ class DirectedBondConnectionProbabilityResult(StrictModel):
     """An exact complete directed bond reliability result.
 
     Deserialization validates a bounded ledger shape only. The kernel builds
-    output through ``_from_kernel`` after its one complete enumeration; use
-    the explicit verifier below for independently supplied claims.
+    output through ``_from_kernel`` after its one complete enumeration.
     """
 
     source: DirectedBondConnectionProbabilitySource

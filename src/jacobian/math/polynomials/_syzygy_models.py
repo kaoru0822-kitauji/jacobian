@@ -86,9 +86,10 @@ def _require_coefficient_map_budget(
 
     # Exact work is charged before SymPy runs. At each degree we perform a
     # producer RREF, an RREF to select independent minor rows, a determinant,
-    # a possible nullspace RREF, then validator RREF and determinant replay.
+    # and a possible nullspace RREF. Result parsing checks structural bindings
+    # only and does not repeat exact linear algebra.
     # With k=min(rows, columns), their conservative scalar-update bound is
-    # 3*rows*columns*k + k*k*rows + 2*k**3. A fraction-free intermediate is a
+    # 2*rows*columns*k + k*k*rows + k**3. A fraction-free intermediate is a
     # ratio of k-minors; each numerator and denominator has at most
     # k*(entry_digits + ceil(log10(k))) digits. This covers both the rank
     # certificate and every exact value that can cross the result boundary.
@@ -113,9 +114,9 @@ def _require_coefficient_map_budget(
         total_basis_monomials += source_basis_count + target_basis_count
         rank_bound = min(target_basis_count, column_count)
         total_linear_algebra_work += (
-            3 * target_basis_count * column_count * rank_bound
+            2 * target_basis_count * column_count * rank_bound
             + rank_bound * rank_bound * target_basis_count
-            + 2 * rank_bound**3
+            + rank_bound**3
         )
         maximum_intermediate_digits = max(
             maximum_intermediate_digits,

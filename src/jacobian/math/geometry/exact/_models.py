@@ -439,42 +439,6 @@ class PinnedLineDistanceRequest(StrictModel):
         ),
     )
 
-    @model_validator(mode="after")
-    def require_planar_and_matching_anchor(self) -> Self:
-        if not self.configuration.points:
-            return self
-        _require_bounded_point_configuration(self.configuration, self.anchor)
-        if len(self.configuration.points[0].coordinates) != 2:
-            raise _validation_error(
-                "pinned_line_distance_profile_requires_a",
-                "pinned line-distance profile requires a planar configuration",
-            )
-        # A pair of coincident points does not span a line; require distinct
-        # coordinates so every pair defines a geometric line.
-        coords = {
-            tuple(c.as_fraction() for c in pt.coordinates)
-            for pt in self.configuration.points
-        }
-        if len(coords) != len(self.configuration.points):
-            raise _validation_error(
-                "pinned_line_distance_profile_requires_distinct",
-                "pinned line-distance profile requires distinct point coordinates",
-            )
-        # Couple the point count to the coordinate heights through the
-        # aggregate output budget: C(n,2) lines with height-proportional
-        # rational components must stay canonically encodable.
-        estimated_bytes = _maximum_pinned_profile_wire_bytes(
-            self.configuration, self.anchor
-        )
-        if estimated_bytes > MAX_PINNED_PROFILE_RESULT_BYTES:
-            raise _validation_error(
-                "complete_pinned_line_distance_profile_would",
-                "the complete pinned line-distance profile would exceed the "
-                f"{MAX_PINNED_PROFILE_RESULT_BYTES}-byte aggregate result "
-                "budget; reduce the point count or coordinate heights",
-            )
-        return self
-
 
 class PinnedLineEntry(StrictModel):
     """One pair-spanned line with its canonical equation and source pairs."""

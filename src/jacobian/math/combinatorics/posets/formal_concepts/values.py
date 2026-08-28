@@ -226,25 +226,6 @@ class ImplicationClosureWork(StrictModel):
         return self
 
 
-def _require_canonical_carrier_subset(
-    name: str,
-    values: tuple[int, ...],
-    carrier_size: int,
-) -> None:
-    if values != tuple(sorted(set(values))):
-        raise PydanticCustomError(
-            "formal_concept_analysis.subset_not_canonical",
-            f"{name} must be sorted and duplicate-free",
-            {"name": name},
-        )
-    if any(attribute >= carrier_size for attribute in values):
-        raise PydanticCustomError(
-            "formal_concept_analysis.subset_attribute_out_of_range",
-            f"{name} contains an attribute outside the carrier",
-            {"name": name},
-        )
-
-
 class ImplicationClosureResult(StrictModel):
     """The least source-bound closure of a seed under finite implications."""
 
@@ -268,7 +249,7 @@ class ImplicationClosureResult(StrictModel):
     ) -> Self:
         """Build a result emitted by the owner-local closure kernel."""
 
-        return cls(
+        return cls.model_construct(
             system=system,
             seed=seed,
             closure=closure,

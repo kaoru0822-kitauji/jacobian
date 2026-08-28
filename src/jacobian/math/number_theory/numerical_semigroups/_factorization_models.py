@@ -11,8 +11,7 @@ from jacobian._models import StrictModel
 from jacobian.math.number_theory.numerical_semigroups._models import (
     _GENERAL_GENERATOR_ENVELOPE,
     MAX_GENERATORS,
-    _require_bounded_value,
-    _require_canonical_minimal_axis,
+    _require_canonical_generator_axis,
     _validation_error,
 )
 
@@ -62,8 +61,7 @@ class FactorizationComputeResult(StrictModel):
 
     @model_validator(mode="after")
     def require_exact_family(self) -> Self:
-        generators = _require_canonical_minimal_axis(self.minimal_generators)
-        _require_bounded_value(generators, self.value)
+        _require_canonical_generator_axis(self.minimal_generators)
         if self.in_semigroup != bool(self.factorizations):
             raise _validation_error(
                 "membership must agree with the factorization family"
@@ -116,8 +114,7 @@ class FactorizationLengthsComputeResult(StrictModel):
 
     @model_validator(mode="after")
     def require_length_set(self) -> Self:
-        generators = _require_canonical_minimal_axis(self.minimal_generators)
-        _require_bounded_value(generators, self.value)
+        _require_canonical_generator_axis(self.minimal_generators)
         if self.in_semigroup != bool(self.lengths):
             raise _validation_error(
                 "membership must agree with the factorization lengths"
@@ -211,8 +208,7 @@ class FactorizationGraphComputeResult(StrictModel):
 
     @model_validator(mode="after")
     def require_graph_partition(self) -> Self:
-        generators = _require_canonical_minimal_axis(self.minimal_generators)
-        _require_bounded_value(generators, self.value)
+        _require_canonical_generator_axis(self.minimal_generators)
         vertex_count = len(self.factorizations)
         if self.in_semigroup != bool(self.factorizations):
             raise _validation_error("membership must agree with graph vertices")

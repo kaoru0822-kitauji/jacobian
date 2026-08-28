@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from math import comb
+from math import comb, isqrt
 from typing import Annotated, Literal, Self
 
 from pydantic import Field, StrictInt, model_validator
@@ -13,6 +13,7 @@ from jacobian.math._labels import OpaqueLabel
 from jacobian.math.combinatorics.codes.linear.values import (
     MAX_LINEAR_CODE_DIMENSION,
     MAX_LINEAR_CODE_LENGTH,
+    MAX_LINEAR_FIELD_ORDER,
     PrimeFieldLinearEncoder,
 )
 
@@ -29,8 +30,8 @@ def _max_codewords_within_execution_work(execution_work_bound: int) -> int:
     """Largest encoder image admitted by the exact execution-work bound."""
 
     best = 1
-    for order in range(2, 252):
-        if any(order % divisor == 0 for divisor in range(2, int(order**0.5) + 1)):
+    for order in range(2, MAX_LINEAR_FIELD_ORDER + 1):
+        if any(order % divisor == 0 for divisor in range(2, isqrt(order) + 1)):
             continue
         for dimension in range(1, MAX_LINEAR_CODE_DIMENSION + 1):
             count = order**dimension
@@ -43,7 +44,7 @@ def _max_codewords_within_execution_work(execution_work_bound: int) -> int:
     return best
 
 
-# Derived from the execution-work bound over primes <= 251: every admitted
+# Derived from the execution-work bound over the admitted prime-field orders:
 # encoder image satisfies codeword_count <= this constant.
 MAX_RECEIVED_PROFILE_CODEWORDS = _max_codewords_within_execution_work(
     MAX_RECEIVED_PROFILE_EXECUTION_WORK
@@ -299,7 +300,7 @@ class ReceivedWordProfileResult(StrictModel):
     ) -> Self:
         """Build a profile produced by the owner-local enumeration kernel."""
 
-        return cls(
+        return cls.model_construct(
             source=source,
             distance_histogram=distance_histogram,
             codeword_count=codeword_count,
@@ -359,7 +360,7 @@ def _validate_coordinate_axis(
 class GeneratorMatrixRequest(StrictModel):
     """A linear code given by a generator matrix over a bounded prime field."""
 
-    field_order: int = Field(ge=2, le=251)
+    field_order: int = Field(ge=2, le=MAX_LINEAR_FIELD_ORDER)
     generator_matrix: tuple[tuple[int, ...], ...] = Field(
         min_length=1, max_length=MAX_LINEAR_CODE_DIMENSION
     )
@@ -371,12 +372,6 @@ class GeneratorMatrixRequest(StrictModel):
             "results preserve these labels."
         ),
     )
-
-    @model_validator(mode="after")
-    def require_bounded_prime_matrix(self) -> Self:
-        width = _validate_prime_matrix(self.field_order, self.generator_matrix)
-        _validate_coordinate_axis(self.coordinate_axis, width=width)
-        return self
 
 
 class DualCodeRequest(StrictModel):
@@ -421,7 +416,7 @@ class CodewordCheckRequest(StrictModel):
 class ParityCheckMatrix(StrictModel):
     """A prime-field matrix retaining its ordered column axis when it has no rows."""
 
-    field_order: int = Field(ge=2, le=251)
+    field_order: int = Field(ge=2, le=MAX_LINEAR_FIELD_ORDER)
     coordinate_axis: tuple[OpaqueLabel, ...] = Field(
         max_length=MAX_LINEAR_CODE_LENGTH,
         description=(
@@ -515,7 +510,7 @@ class CodeEqualRequest(StrictModel):
 class MacWilliamsRequest(StrictModel):
     """Primal weight distribution for MacWilliams transform."""
 
-    field_order: int = Field(ge=2, le=251)
+    field_order: int = Field(ge=2, le=MAX_LINEAR_FIELD_ORDER)
     code_cardinality: int = Field(ge=1)
     length: int = Field(ge=1, le=MAX_LINEAR_CODE_LENGTH)
     weights: tuple[int, ...] = Field(

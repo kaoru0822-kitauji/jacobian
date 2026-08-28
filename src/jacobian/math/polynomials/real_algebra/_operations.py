@@ -16,6 +16,10 @@ from jacobian.math.polynomials.real_algebra._models import (
     SturmChainRequest,
     SturmChainResult,
     UnivariatePolynomial,
+    _require_bounded_integer_coefficients,
+)
+from jacobian.math.polynomials.real_algebra._models import (
+    _validation_error as _real_algebra_validation_error,
 )
 from jacobian.math.polynomials.real_algebra._strict_sublevel import (
     compute_strict_sublevel_payload,
@@ -124,8 +128,31 @@ def _terms_to_poly(terms: list[tuple[Fraction, int]]) -> UnivariatePolynomial:
     )
 
 
+def _admit_integer_polynomial(polynomial: UnivariatePolynomial) -> None:
+    try:
+        _require_bounded_integer_coefficients(polynomial)
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=("polynomial",), code=exc.type, message=exc.message()
+        ) from exc
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=("polynomial",),
+            code="polynomial.real_algebra_coefficient_bound",
+            message=str(exc),
+        ) from exc
+
+
 def compute_sturm_chain(request: SturmChainRequest) -> SturmChainResult:
     poly = request.polynomial
+    _admit_integer_polynomial(poly)
+    if max(term.exponent for term in poly.terms) < 1:
+        error = _real_algebra_validation_error(
+            "constant_input", "Sturm chain requires a non-constant polynomial"
+        )
+        raise OperationDomainValidationError(
+            location=("polynomial",), code=error.type, message=error.message()
+        )
     terms = _poly_to_terms(poly)
     chain = sturm_chain(terms)
     degree = max(t.exponent for t in poly.terms)
@@ -136,6 +163,14 @@ def compute_sturm_chain(request: SturmChainRequest) -> SturmChainResult:
 
 
 def compute_root_count(request: RootCountRequest) -> RootCountResult:
+    _admit_integer_polynomial(request.polynomial)
+    if request.lower.as_fraction() > request.upper.as_fraction():
+        error = _real_algebra_validation_error(
+            "interval_order", "lower bound must not exceed upper bound"
+        )
+        raise OperationDomainValidationError(
+            location=("lower", "upper"), code=error.type, message=error.message()
+        )
     terms = _poly_to_terms(request.polynomial)
     lower = request.lower.as_fraction()
     upper = request.upper.as_fraction()

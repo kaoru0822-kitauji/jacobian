@@ -9,7 +9,6 @@ from pydantic_core import PydanticCustomError
 
 from jacobian._exact import require_bounded_rational
 from jacobian._models import StrictModel
-from jacobian.math.polynomials._conversions import rational_polynomial_to_sympy
 from jacobian.math.polynomials.maps._models import VariablePoint
 from jacobian.math.polynomials.values import (
     PolynomialVariable,
@@ -79,43 +78,11 @@ class AffineCurveRequest(StrictModel):
 
     polynomial: RationalPolynomial
 
-    @model_validator(mode="after")
-    def require_affine_plane(self) -> Self:
-        try:
-            _require_curve_polynomial(self.polynomial)
-        except ValueError as exc:
-            raise _validation_error_from(exc) from exc
-        if len(self.polynomial.variables) != 2:
-            raise _validation_error(
-                "affine_axis_invalid",
-                "affine plane curves require exactly two variables",
-            )
-        return self
-
 
 class ProjectiveClosureRequest(StrictModel):
     """Homogenize an affine plane curve with the reserved coordinate ``z``."""
 
     polynomial: RationalPolynomial
-
-    @model_validator(mode="after")
-    def require_available_homogenizing_coordinate(self) -> Self:
-        try:
-            _require_curve_polynomial(self.polynomial)
-        except ValueError as exc:
-            raise _validation_error_from(exc) from exc
-        if len(self.polynomial.variables) != 2:
-            raise _validation_error(
-                "closure_axis_invalid",
-                "projective closure requires exactly two variables",
-            )
-        if HOMOGENIZING_COORDINATE in self.polynomial.variables:
-            raise _validation_error(
-                "homogenizing_coordinate_reserved",
-                "affine variable axis must not contain the reserved "
-                f"homogenizing coordinate {HOMOGENIZING_COORDINATE!r}",
-            )
-        return self
 
 
 class AffineChartRequest(StrictModel):
@@ -123,29 +90,6 @@ class AffineChartRequest(StrictModel):
 
     polynomial: RationalPolynomial
     chart_variable: PolynomialVariable
-
-    @model_validator(mode="after")
-    def require_homogeneous_projective_plane(self) -> Self:
-        try:
-            _require_curve_polynomial(self.polynomial)
-        except ValueError as exc:
-            raise _validation_error_from(exc) from exc
-        if len(self.polynomial.variables) != 3:
-            raise _validation_error(
-                "chart_axis_invalid",
-                "projective plane curves require exactly three variables",
-            )
-        if self.chart_variable not in self.polynomial.variables:
-            raise _validation_error(
-                "chart_variable_axis_mismatch",
-                "chart_variable must belong to the polynomial axis",
-            )
-        if not rational_polynomial_to_sympy(self.polynomial).is_homogeneous:
-            raise _validation_error(
-                "polynomial_not_homogeneous",
-                "projective polynomial must be homogeneous",
-            )
-        return self
 
 
 class RationalConicParametrizationRequest(StrictModel):

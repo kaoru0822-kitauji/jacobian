@@ -362,9 +362,9 @@ def test_threshold_work_is_admitted_and_rejected_before_solving() -> None:
             "draw_payoff": {"num": "0", "den": "1"},
         }
 
-    admitted = DeterministicTerminalGame.model_validate(terminal_game(256))
+    admitted = DeterministicTerminalGame.model_validate(terminal_game(400))
     compute_deterministic_terminal_game(DeterministicTerminalGameRequest(game=admitted))
-    rejected = DeterministicTerminalGame.model_validate(terminal_game(400))
+    rejected = DeterministicTerminalGame.model_validate(terminal_game(500))
     with pytest.raises(OperationDomainValidationError) as exc_info:
         compute_deterministic_terminal_game(
             DeterministicTerminalGameRequest(game=rejected)

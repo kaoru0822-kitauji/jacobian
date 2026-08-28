@@ -269,11 +269,6 @@ def _build_matrix(request: SymmetricMatrixRequest) -> list[list[Fraction]]:
     return mat
 
 
-def _dense_fractions(matrix: RationalMatrix) -> list[list[Fraction]]:
-    """Convert a canonical rational matrix into dense Fractions."""
-    return [[entry.as_fraction() for entry in row] for row in matrix.entries]
-
-
 def _swap_symmetric(matrix: list[list[Fraction]], left: int, right: int) -> None:
     if left == right:
         return

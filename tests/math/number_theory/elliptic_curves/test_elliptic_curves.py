@@ -64,9 +64,12 @@ class TestDiscriminant:
         curve = ShortWeierstrassCurve(
             coefficient_a=_pt("1" + "0" * 19999), coefficient_b=_pt("0")
         )
-        with pytest.raises(ValidationError) as exc_info:
-            EllipticCurveRequest(curve=curve)
-        _assert_error_code(exc_info, "elliptic_curve.discriminant_result_bound")
+        request = EllipticCurveRequest(curve=curve)
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_discriminant(request)
+        assert exc_info.value.errors()[0]["type"] == (
+            "elliptic_curve.discriminant_result_bound"
+        )
 
     def test_boundary_coefficients_accepted_and_returned(self) -> None:
         """The exact reduced Δ = -64A^3 for A=10^N has 3N+2 digits: N=10923
@@ -74,9 +77,12 @@ class TestDiscriminant:
         rejected = ShortWeierstrassCurve(
             coefficient_a=_pt("1" + "0" * 10923), coefficient_b=_pt("0")
         )
-        with pytest.raises(ValidationError) as exc_info:
-            EllipticCurveRequest(curve=rejected)
-        _assert_error_code(exc_info, "elliptic_curve.discriminant_result_bound")
+        rejected_request = EllipticCurveRequest(curve=rejected)
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_discriminant(rejected_request)
+        assert exc_info.value.errors()[0]["type"] == (
+            "elliptic_curve.discriminant_result_bound"
+        )
         accepted = EllipticCurveRequest(
             curve=ShortWeierstrassCurve(
                 coefficient_a=_pt("1" + "0" * 10921), coefficient_b=_pt("0")
@@ -244,6 +250,39 @@ class TestGroupLawAdmission:
             add_points(request)
         assert exc_info.value.errors()[0]["type"] == "elliptic_curve.point_off_curve"
 
+    def test_point_addition_rejects_a_foreign_parent_curve(self) -> None:
+        curve = ShortWeierstrassCurve(coefficient_a=_pt("1"), coefficient_b=_pt("0"))
+        foreign = ShortWeierstrassCurve(coefficient_a=_pt("-1"), coefficient_b=_pt("0"))
+        identity = EllipticCurvePointResult(curve=foreign, at_infinity=True)
+        request = EllipticCurvePointAdditionRequest(
+            curve=curve,
+            first=identity,
+            second=identity,
+        )
+
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            add_points(request)
+
+        assert exc_info.value.errors()[0]["type"] == (
+            "elliptic_curve.parent_curve_mismatch"
+        )
+
+    def test_scalar_multiplication_rejects_a_foreign_parent_curve(self) -> None:
+        curve = ShortWeierstrassCurve(coefficient_a=_pt("1"), coefficient_b=_pt("0"))
+        foreign = ShortWeierstrassCurve(coefficient_a=_pt("-1"), coefficient_b=_pt("0"))
+        request = ScalarMultiplicationRequest(
+            curve=curve,
+            point=EllipticCurvePointResult(curve=foreign, at_infinity=True),
+            scalar=2,
+        )
+
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            scalar_multiply(request)
+
+        assert exc_info.value.errors()[0]["type"] == (
+            "elliptic_curve.parent_curve_mismatch"
+        )
+
     def test_singular_curve_rejected(self) -> None:
         """y^2=x^3 has a cusp at the origin: discriminant zero."""
         curve = ShortWeierstrassCurve(coefficient_a=_pt("0"), coefficient_b=_pt("0"))
@@ -337,18 +376,10 @@ class TestResultSourceBinding:
         )
         assert reparsed == result
 
-    def test_discriminant_result_rejects_a_forged_curve_invariant(self) -> None:
+    def test_discriminant_result_satisfies_the_defining_invariant(self) -> None:
         result = compute_discriminant(EllipticCurveRequest(curve=self._curve()))
-        payload = result.model_dump(mode="json")
-
-        with pytest.raises(ValidationError) as exc_info:
-            CurveDiscriminantResult.model_validate(
-                {**payload, "discriminant": {"num": "1", "den": "1"}}
-            )
-
-        assert exc_info.value.errors()[0]["type"] == (
-            "elliptic_curve.discriminant_mismatch"
-        )
+        assert result.discriminant.as_fraction() == result.request.curve.discriminant()
+        assert result.is_nonsingular is (result.discriminant.as_fraction() != 0)
 
     def test_point_on_curve_result_retains_and_reparses_the_source(self) -> None:
         request = CurvePointRequest(
@@ -362,13 +393,6 @@ class TestResultSourceBinding:
         assert result.on_curve is True
         payload = result.model_dump(mode="json")
         assert PointOnCurveResult.model_validate(payload).on_curve is True
-
-        with pytest.raises(ValidationError) as exc_info:
-            PointOnCurveResult.model_validate({**payload, "on_curve": False})
-
-        assert exc_info.value.errors()[0]["type"] == (
-            "elliptic_curve.point_decision_mismatch"
-        )
 
     def test_point_addition_result_retains_its_parent_curve(self) -> None:
         """Doubling (0,0) on y²=x³+x and on y²=x³-x must serialize

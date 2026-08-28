@@ -5,7 +5,8 @@ from __future__ import annotations
 import pytest
 
 from jacobian.catalog.catalog import Catalog
-from jacobian.dispatch import OperationRequestValidationError, invoke_operation
+from jacobian.catalog.models import OperationDomainValidationError
+from jacobian.dispatch import invoke_operation
 from jacobian.math.groups.root_systems._models import (
     MAX_RANK,
     MAX_REFLECTION_COORDINATE,
@@ -50,6 +51,6 @@ def test_simple_reflection_catalog_contract_matches_dispatch() -> None:
     assert result.output["reflected_vector"] == [-1, 0]
 
     malformed = {**example.input, "vector": [1]}
-    with pytest.raises(OperationRequestValidationError) as exc_info:
+    with pytest.raises(OperationDomainValidationError) as exc_info:
         invoke_operation(operation.operation_id, malformed, catalog)
     assert exc_info.value.errors()[0]["type"] == "root_system.vector_length_mismatch"

@@ -44,8 +44,7 @@ class ConstantWeightResult(StrictModel):
     """Complete generated constant-weight code.
 
     Construction checks the declared structural envelope only. The owner
-    kernel uses ``_from_kernel``; an explicit owner-local verifier checks a
-    claim supplied independently of that kernel.
+    kernel uses ``_from_kernel`` after establishing the complete profile.
     """
 
     length: Annotated[int, Field(strict=True, ge=0, le=MAX_EXPLICIT_CODE_LENGTH)]

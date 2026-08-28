@@ -18,10 +18,17 @@ from jacobian._models import StrictModel, canonicalize_json_containers
 from jacobian.math.optimization._arithmetic import rational_dot
 
 MAX_RATIONAL_DIGITS = 128
+MAX_LINEAR_PROGRAM_VARIABLES = 32
+MAX_LINEAR_PROGRAM_CONSTRAINTS = 64
+MAX_LINEAR_PROGRAM_VARIABLE_NAME_LENGTH = 64
 MAX_LINEAR_PROGRAM_RESULT_BYTES = 10 * 1024 * 1024
 MAX_LINEAR_PROGRAM_SIMPLEX_BASES = 1_000_000
 MAX_LINEAR_PROGRAM_SIMPLEX_SCALAR_UPDATES = 50_000_000
 _INTERMEDIATE_SCALAR_DIGITS = "standard_intermediate_scalar_digits"
+_RATIONAL_WIRE_OVERHEAD_BYTES = 32
+_VARIABLE_WIRE_OVERHEAD_BYTES = 4
+_PROGRAM_WIRE_OVERHEAD_BYTES = 2_048
+_RESULT_WIRE_OVERHEAD_BYTES = 4_096
 
 
 def _validation_error(reason: str, message: str) -> PydanticCustomError:
@@ -116,33 +123,44 @@ def _prepare_raw_program(
         return value
     variables = value.get("variables")
     if isinstance(variables, (list, tuple)):
-        if len(variables) > 32:
-            raise ValueError("linear-program variables exceed the 32-entry bound")
-        if any(isinstance(name, str) and len(name) > 64 for name in variables):
+        if len(variables) > MAX_LINEAR_PROGRAM_VARIABLES:
             raise ValueError(
-                "linear-program variable name exceeds the 64-character bound"
+                "linear-program variables exceed the "
+                f"{MAX_LINEAR_PROGRAM_VARIABLES}-entry bound"
+            )
+        if any(
+            isinstance(name, str)
+            and len(name) > MAX_LINEAR_PROGRAM_VARIABLE_NAME_LENGTH
+            for name in variables
+        ):
+            raise ValueError(
+                "linear-program variable name exceeds the "
+                f"{MAX_LINEAR_PROGRAM_VARIABLE_NAME_LENGTH}-character bound"
             )
     objective = _prepare_raw_rational_vector(
         value.get("objective"),
-        maximum_length=32,
+        maximum_length=MAX_LINEAR_PROGRAM_VARIABLES,
         maximum_digits=maximum_digits,
         label="rational linear-program objective",
     )
     rhs = _prepare_raw_rational_vector(
         value.get("rhs"),
-        maximum_length=64,
+        maximum_length=MAX_LINEAR_PROGRAM_CONSTRAINTS,
         maximum_digits=maximum_digits,
         label="rational linear-program rhs",
     )
     rows = value.get("coefficients")
     if not isinstance(rows, (list, tuple)):
         return value
-    if len(rows) > 64:
-        raise ValueError("linear-program coefficient rows exceed the 64-row bound")
+    if len(rows) > MAX_LINEAR_PROGRAM_CONSTRAINTS:
+        raise ValueError(
+            "linear-program coefficient rows exceed the "
+            f"{MAX_LINEAR_PROGRAM_CONSTRAINTS}-row bound"
+        )
     prepared_rows = tuple(
         _prepare_raw_rational_vector(
             row,
-            maximum_length=32,
+            maximum_length=MAX_LINEAR_PROGRAM_VARIABLES,
             maximum_digits=maximum_digits,
             label="rational linear-program coefficient row",
         )
@@ -329,9 +347,15 @@ def _source_wire_bytes(program: StandardFormRationalLinearProgram) -> int:
         *(value for row in program.coefficients for value in row),
     )
     return (
-        2_048
-        + sum(len(value.num) + len(value.den) + 32 for value in rationals)
-        + sum(len(variable) + 4 for variable in program.variables)
+        _PROGRAM_WIRE_OVERHEAD_BYTES
+        + sum(
+            len(value.num) + len(value.den) + _RATIONAL_WIRE_OVERHEAD_BYTES
+            for value in rationals
+        )
+        + sum(
+            len(variable) + _VARIABLE_WIRE_OVERHEAD_BYTES
+            for variable in program.variables
+        )
     )
 
 
@@ -362,16 +386,6 @@ def _primal_diagnostics(
     )
 
 
-def _recession_diagnostics(
-    program: StandardFormRationalLinearProgram,
-    direction: tuple[Fraction, ...],
-) -> tuple[Fraction, tuple[Fraction, ...]]:
-    objective, coefficients, _ = _program_fractions(program)
-    return rational_dot(objective, direction), tuple(
-        rational_dot(row, direction) for row in coefficients
-    )
-
-
 def _dual_diagnostics(
     program: StandardFormRationalLinearProgram,
     candidate: tuple[Fraction, ...],
@@ -397,10 +411,18 @@ class StandardFormRationalLinearProgram(StrictModel):
     An empty coefficient/RHS family is the unconstrained nonnegative orthant.
     """
 
-    variables: tuple[str, ...] = Field(min_length=1, max_length=32)
-    objective: tuple[CanonicalRational, ...] = Field(min_length=1, max_length=32)
-    coefficients: tuple[tuple[CanonicalRational, ...], ...] = Field(max_length=64)
-    rhs: tuple[CanonicalRational, ...] = Field(max_length=64)
+    variables: tuple[str, ...] = Field(
+        min_length=1, max_length=MAX_LINEAR_PROGRAM_VARIABLES
+    )
+    objective: tuple[CanonicalRational, ...] = Field(
+        min_length=1, max_length=MAX_LINEAR_PROGRAM_VARIABLES
+    )
+    coefficients: tuple[tuple[CanonicalRational, ...], ...] = Field(
+        max_length=MAX_LINEAR_PROGRAM_CONSTRAINTS
+    )
+    rhs: tuple[CanonicalRational, ...] = Field(
+        max_length=MAX_LINEAR_PROGRAM_CONSTRAINTS
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -419,7 +441,7 @@ class StandardFormRationalLinearProgram(StrictModel):
             )
         if any(
             not name
-            or len(name) > 64
+            or len(name) > MAX_LINEAR_PROGRAM_VARIABLE_NAME_LENGTH
             or not (name[0].isalpha() or name[0] == "_")
             or any(not (char.isalnum() or char == "_") for char in name)
             for name in self.variables
@@ -472,8 +494,8 @@ class StandardFormRationalLinearProgram(StrictModel):
         derived_rationals = 2 * len(self.variables) + 2 * len(self.rhs) + 2
         estimated_result_bytes = (
             _source_wire_bytes(self)
-            + derived_rationals * (2 * result_digits + 32)
-            + 4_096
+            + derived_rationals * (2 * result_digits + _RATIONAL_WIRE_OVERHEAD_BYTES)
+            + _RESULT_WIRE_OVERHEAD_BYTES
         )
         if estimated_result_bytes > MAX_LINEAR_PROGRAM_RESULT_BYTES:
             raise _validation_error(
@@ -513,24 +535,24 @@ class RationalLinearProgramResult(StrictModel):
     program: StandardFormRationalLinearProgram
     status: RationalLinearProgramStatus
     primal_candidate: tuple[CanonicalRational, ...] | None = Field(
-        default=None, max_length=32
+        default=None, max_length=MAX_LINEAR_PROGRAM_VARIABLES
     )
     dual_candidate: tuple[CanonicalRational, ...] | None = Field(
-        default=None, max_length=64
+        default=None, max_length=MAX_LINEAR_PROGRAM_CONSTRAINTS
     )
     primal_objective: CanonicalRational | None = None
     dual_objective: CanonicalRational | None = None
     primal_residuals: tuple[CanonicalRational, ...] | None = Field(
-        default=None, max_length=64
+        default=None, max_length=MAX_LINEAR_PROGRAM_CONSTRAINTS
     )
     dual_slacks: tuple[CanonicalRational, ...] | None = Field(
-        default=None, max_length=32
+        default=None, max_length=MAX_LINEAR_PROGRAM_VARIABLES
     )
     farkas_candidate: tuple[CanonicalRational, ...] | None = Field(
-        default=None, max_length=64
+        default=None, max_length=MAX_LINEAR_PROGRAM_CONSTRAINTS
     )
     recession_direction: tuple[CanonicalRational, ...] | None = Field(
-        default=None, max_length=32
+        default=None, max_length=MAX_LINEAR_PROGRAM_VARIABLES
     )
 
     @classmethod
@@ -555,37 +577,37 @@ class RationalLinearProgramResult(StrictModel):
             prepared["program"] = _prepare_raw_program(prepared.get("program"))
             prepared["primal_candidate"] = _prepare_raw_rational_vector(
                 prepared.get("primal_candidate"),
-                maximum_length=32,
+                maximum_length=MAX_LINEAR_PROGRAM_VARIABLES,
                 maximum_digits=MAX_CANONICAL_RATIONAL_DIGITS,
                 label="rational linear-program primal candidate",
             )
             prepared["dual_candidate"] = _prepare_raw_rational_vector(
                 prepared.get("dual_candidate"),
-                maximum_length=64,
+                maximum_length=MAX_LINEAR_PROGRAM_CONSTRAINTS,
                 maximum_digits=MAX_CANONICAL_RATIONAL_DIGITS,
                 label="rational linear-program dual candidate",
             )
             prepared["primal_residuals"] = _prepare_raw_rational_vector(
                 prepared.get("primal_residuals"),
-                maximum_length=64,
+                maximum_length=MAX_LINEAR_PROGRAM_CONSTRAINTS,
                 maximum_digits=MAX_CANONICAL_RATIONAL_DIGITS,
                 label="rational linear-program primal residuals",
             )
             prepared["dual_slacks"] = _prepare_raw_rational_vector(
                 prepared.get("dual_slacks"),
-                maximum_length=32,
+                maximum_length=MAX_LINEAR_PROGRAM_VARIABLES,
                 maximum_digits=MAX_CANONICAL_RATIONAL_DIGITS,
                 label="rational linear-program dual slacks",
             )
             prepared["farkas_candidate"] = _prepare_raw_rational_vector(
                 prepared.get("farkas_candidate"),
-                maximum_length=64,
+                maximum_length=MAX_LINEAR_PROGRAM_CONSTRAINTS,
                 maximum_digits=MAX_CANONICAL_RATIONAL_DIGITS,
                 label="rational linear-program Farkas candidate",
             )
             prepared["recession_direction"] = _prepare_raw_rational_vector(
                 prepared.get("recession_direction"),
-                maximum_length=32,
+                maximum_length=MAX_LINEAR_PROGRAM_VARIABLES,
                 maximum_digits=MAX_CANONICAL_RATIONAL_DIGITS,
                 label="rational linear-program recession direction",
             )

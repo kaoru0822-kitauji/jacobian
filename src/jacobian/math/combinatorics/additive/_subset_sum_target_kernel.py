@@ -5,6 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
+class SubsetSumWorkLimitError(ValueError):
+    """The exact target search exceeded its admitted finite work envelope."""
+
+    def __init__(self, kind: str) -> None:
+        super().__init__(kind)
+        self.kind = kind
+
+
 @dataclass(frozen=True, slots=True)
 class _WitnessNode:
     previous: _WitnessNode | None
@@ -56,6 +64,8 @@ def _solve_subset_sum_target(
     target: int,
     *,
     allow_empty_subset: bool,
+    maximum_transitions: int | None = None,
+    maximum_states: int | None = None,
 ) -> tuple[int, ...] | None:
     """Return the canonical index subset summing to ``target``, if one exists.
 
@@ -86,8 +96,12 @@ def _solve_subset_sum_target(
         # The retained empty witness is already the globally smallest mask,
         # and insert-only updates can never improve it later.
         return ()
+    transitions = 0
     for index, value in enumerate(values):
         previous = tuple(states.items())
+        transitions += len(previous) + (0 if allow_empty_subset else 1)
+        if maximum_transitions is not None and transitions > maximum_transitions:
+            raise SubsetSumWorkLimitError("transitions")
 
         # Every retained witness uses only earlier indices, so its incidence
         # mask is smaller than any witness containing this index.  For a fixed
@@ -108,6 +122,8 @@ def _solve_subset_sum_target(
                     previous=witness,
                     index=index,
                 )
+        if maximum_states is not None and len(states) > maximum_states:
+            raise SubsetSumWorkLimitError("states")
 
     # Every attaining insertion above returned early, so exhausting the loop
     # establishes exact non-attainment across the whole source.

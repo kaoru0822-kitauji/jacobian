@@ -23,8 +23,7 @@ from jacobian.math.optimization._general_normalization import (
     _mapped_certificate_digit_bound,
     _mapped_point_digit_bound,
     _mapped_residual_digit_bound,
-    normalize_general_program,
-    require_admitted_general_normalization,
+    admit_general_normalization,
 )
 from jacobian.math.optimization._models import (
     RationalLinearProgramRequest,
@@ -467,14 +466,13 @@ def _general_linear_program(
 
     program = request.program
     try:
-        require_admitted_general_normalization(program)
+        normalization = admit_general_normalization(program)
     except ValueError as error:
         raise OperationDomainValidationError(
             location=("program",),
             code="optimization.linear.general_normalization_admission",
             message=str(error),
         ) from error
-    normalization = normalize_general_program(program)
     standard_result = _linear_program(
         RationalLinearProgramRequest(program=normalization.standard_program)
     )

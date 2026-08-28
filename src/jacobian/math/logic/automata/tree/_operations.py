@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from jacobian.canonical import format_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.logic.automata.tree._models import (
     AcceptedTreeCountRequest,
     AcceptedTreeCountResult,
@@ -46,17 +47,21 @@ def compute_accepted_tree_count(
     request: AcceptedTreeCountRequest,
 ) -> AcceptedTreeCountResult:
     try:
-        accepted_tree_count_work_bound(request.automaton, request.tree_size)
+        estimated_work_bound = accepted_tree_count_work_bound(
+            request.automaton, request.tree_size
+        )
     except ValueError as exc:
-        raise ValueError(str(exc)) from exc
+        raise OperationDomainValidationError(
+            location=("tree_size",),
+            code="tree_automata.accepted_tree_count_work_bound",
+            message=str(exc),
+        ) from exc
     return AcceptedTreeCountResult._from_kernel(
         request,
         count=format_canonical_integer(
             accepted_tree_count(request.automaton, request.tree_size)
         ),
-        estimated_work_bound=accepted_tree_count_work_bound(
-            request.automaton, request.tree_size
-        ),
+        estimated_work_bound=estimated_work_bound,
     )
 
 

@@ -74,7 +74,9 @@ class RealQuadraticSpectrum(StrictModel):
     ) -> Self:
         """Construct a result emitted by the exact owner-local kernel."""
 
-        return cls(matrix=matrix, spectrum_kind=spectrum_kind, values=values)
+        return cls.model_construct(
+            matrix=matrix, spectrum_kind=spectrum_kind, values=values
+        )
 
 
 class RealQuadraticInertia(StrictModel):
@@ -126,7 +128,7 @@ class RealQuadraticInertia(StrictModel):
     ) -> Self:
         """Construct a result emitted by the exact owner-local kernel."""
 
-        return cls(
+        return cls.model_construct(
             matrix=matrix,
             n_positive=n_positive,
             n_negative=n_negative,

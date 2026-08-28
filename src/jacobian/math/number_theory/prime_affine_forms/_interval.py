@@ -203,7 +203,7 @@ class PrimePatternIntervalCountResult(StrictModel):
         lower = parse_canonical_integer(request.lower)
         upper = parse_canonical_integer(request.upper)
         interval_size = upper - lower + 1
-        return cls(
+        return cls.model_construct(
             source=request.source,
             lower=request.lower,
             upper=request.upper,
@@ -272,7 +272,7 @@ class PrimePatternIntervalEnumerateResult(StrictModel):
         lower = parse_canonical_integer(request.lower)
         upper = parse_canonical_integer(request.upper)
         interval_size = upper - lower + 1
-        return cls(
+        return cls.model_construct(
             source=request.source,
             lower=request.lower,
             upper=request.upper,

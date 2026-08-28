@@ -17,19 +17,23 @@ from jacobian.canonical import (
     format_canonical_integer,
     parse_canonical_integer,
 )
-from jacobian.math.graphs.values import SimpleUndirectedGraph
+from jacobian.math.graphs.values import (
+    MAX_INDEXED_SIMPLE_GRAPH_EDGES,
+    MAX_INDEXED_SIMPLE_GRAPH_VERTICES,
+    SimpleUndirectedGraph,
+)
 
 # The subset count separately bounds explicit candidate construction. The
 # total work budget below additionally charges exact isomorphism search. These
 # are conservative limits for the current pure-Python NetworkX envelope, not
 # restrictions on the mathematical definition; widening requires sharper
 # backend-specific search bounds and representative boundary measurements.
-MAX_INDUCED_PATTERN_SUBSETS_PER_PASS = 5_000
+MAX_INDUCED_PATTERN_CANDIDATES = 5_000
 MAX_INDUCED_PATTERN_TOTAL_WORK_UNITS = 64_000_000
 
 # Every returned count is at most the admitted number of candidate subsets.
 MAX_INDUCED_PATTERN_COUNT_DIGITS = len(
-    format_canonical_integer(MAX_INDUCED_PATTERN_SUBSETS_PER_PASS)
+    format_canonical_integer(MAX_INDUCED_PATTERN_CANDIDATES)
 )
 
 
@@ -116,11 +120,11 @@ def _require_bounded_request(
     host_order = len(host.vertices)
     pattern_order = len(pattern.vertices)
     candidate_count = _candidate_subset_count(host_order, pattern_order)
-    if candidate_count > MAX_INDUCED_PATTERN_SUBSETS_PER_PASS:
+    if candidate_count > MAX_INDUCED_PATTERN_CANDIDATES:
         raise PydanticCustomError(
             "graph.induced_pattern_subset_count_candidate_count_exceeds",
             f"induced-pattern subset count {candidate_count:,} exceeds the "
-            f"{MAX_INDUCED_PATTERN_SUBSETS_PER_PASS:,}-candidate bound",
+            f"{MAX_INDUCED_PATTERN_CANDIDATES:,}-candidate bound",
         )
 
     maximum_count = format_canonical_integer(candidate_count)
@@ -169,16 +173,21 @@ class InducedVertexSubsetPatternCountRequest(StrictModel):
             "description": (
                 "Count vertex subsets S of the canonical host for which host[S] "
                 "is isomorphic to the canonical pattern. Graphs use the shared "
-                "SimpleUndirectedGraph bounds (at most 256 vertices and 32,640 "
-                "edges). Admission preflights the exact candidate count "
+                f"SimpleUndirectedGraph bounds (at most "
+                f"{MAX_INDEXED_SIMPLE_GRAPH_VERTICES:,} vertices and "
+                f"{MAX_INDEXED_SIMPLE_GRAPH_EDGES:,} edges). Admission "
+                "preflights the exact candidate count "
                 "C(|V(host)|, |V(pattern)|), encoded request and retained-result "
                 "bytes, graph records, explicit candidate construction from "
                 "C(|V(pattern)|, 2) direct host-edge probes per subset, local "
                 "candidate scans, and a worst-case VF2++ partial-injection state "
-                "bound for every subset. It permits at most 5,000 subsets per pass "
-                "and 64,000,000 total work units for the one exact count. "
+                "bound for every subset. It permits at most "
+                f"{MAX_INDUCED_PATTERN_CANDIDATES:,} candidate subsets and "
+                f"{MAX_INDUCED_PATTERN_TOTAL_WORK_UNITS:,} total work units "
+                "for the one exact count. "
                 "The retained result must fit the "
-                "10,485,760-byte canonical output bound. These are conservative "
+                f"{CanonicalLimits().max_output_bytes:,}-byte canonical output "
+                "bound. These are conservative "
                 "current-backend limits, not restrictions on the mathematical "
                 "definition."
             )

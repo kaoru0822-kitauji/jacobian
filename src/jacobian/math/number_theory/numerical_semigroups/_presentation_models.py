@@ -11,7 +11,7 @@ from jacobian._models import StrictModel
 from jacobian.math.number_theory.numerical_semigroups._models import (
     _GENERAL_GENERATOR_ENVELOPE,
     MAX_GENERATORS,
-    _require_canonical_minimal_axis,
+    _require_canonical_generator_axis,
     _validation_error,
 )
 
@@ -74,7 +74,7 @@ class MinimalPresentationResult(StrictModel):
 
     @model_validator(mode="after")
     def require_minimal_relation_counts(self) -> Self:
-        generators = _require_canonical_minimal_axis(self.minimal_generators)
+        generators = _require_canonical_generator_axis(self.minimal_generators)
         for relation in self.relations:
             if len(relation.first) != len(generators):
                 raise _validation_error(
@@ -131,7 +131,7 @@ class PresentationBinomialsResult(StrictModel):
 
     @model_validator(mode="after")
     def require_canonical_axis_and_homogeneous_binomials(self) -> Self:
-        generators = _require_canonical_minimal_axis(self.minimal_generators)
+        generators = _require_canonical_generator_axis(self.minimal_generators)
         for binomial in self.binomials:
             if len(binomial.left_exponents) != len(generators) or len(
                 binomial.right_exponents

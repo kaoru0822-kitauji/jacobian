@@ -15,6 +15,7 @@ MAX_LINEAR_CODE_LENGTH = (
     64  # rowspace operations are O(k^2 n) and remain cheap; raised from 32
 )
 MAX_LINEAR_CODE_DIMENSION = MAX_LINEAR_CODE_LENGTH
+MAX_LINEAR_FIELD_ORDER = 251
 
 
 def _validation_error(code: str, message: str) -> PydanticCustomError:
@@ -26,7 +27,7 @@ class PrimeFieldLinearEncoder(StrictModel):
 
     field_order: StrictInt = Field(
         ge=2,
-        le=251,
+        le=MAX_LINEAR_FIELD_ORDER,
         description="Prime order p of the encoder's field GF(p).",
     )
     message_axis: tuple[OpaqueLabel, ...] = Field(
@@ -111,5 +112,6 @@ class PrimeFieldLinearEncoder(StrictModel):
 __all__ = [
     "MAX_LINEAR_CODE_DIMENSION",
     "MAX_LINEAR_CODE_LENGTH",
+    "MAX_LINEAR_FIELD_ORDER",
     "PrimeFieldLinearEncoder",
 ]

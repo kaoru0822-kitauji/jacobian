@@ -92,6 +92,9 @@ rejected as budget exhaustion.
 MAX_FACETS = 64
 """Absolute upper bound on the number of half-spaces in an H-representation."""
 
+MAX_COORDINATE_LABEL_LENGTH = 64
+"""Maximum Unicode-scalar length of an axis or vertex identifier."""
+
 MAX_HULL_SUBFACETS = 200_000
 """Ceiling on the d-subsets the exact hull enumeration may consider.
 
@@ -127,6 +130,16 @@ The volume is a canonical rational whose components cannot exceed the
 global ``CanonicalRational`` limit; requests whose exact volume can
 provably leave that domain are rejected at admission.
 """
+
+
+def _largest_combination_axis(*, ceiling: int, dimension: int, work: int) -> int:
+    """Largest axis size whose exact combination count fits ``work``."""
+
+    size = ceiling
+    while math.comb(size, dimension) > work:
+        size -= 1
+    return size
+
 
 MAX_SUPPORT_COMPONENT_DIGITS = 150
 """Per-component digit cap for rational polytope support inputs.
@@ -199,7 +212,11 @@ def _require_unicode_scalar_label(value: str) -> str:
 
 CoordinateAxis = Annotated[
     str,
-    StringConstraints(min_length=1, max_length=64, strict=True),
+    StringConstraints(
+        min_length=1,
+        max_length=MAX_COORDINATE_LABEL_LENGTH,
+        strict=True,
+    ),
     AfterValidator(_require_unicode_scalar_label),
 ]
 """One coordinate identifier in an ordered labelled rational space.
@@ -258,7 +275,7 @@ def _preflight_raw_support_components(data: object) -> object:
     """Measure every authored support component against the envelope.
 
     Shared by the support request and result models so a payload whose
-    components sit between the operation's 150-digit envelope and the
+    components sit between the operation's published component envelope and the
     global canonical limit is rejected before nested V-polytope parsing
     constructs (and canonically proves) the retained source.
     """
@@ -330,15 +347,10 @@ def _require_raw_component_within_support_envelope(
 def _require_raw_v_polytope_coordinates_within_facet_envelope(value: object) -> None:
     """Measure authored V-polytope coordinates against the facet envelope.
 
-    Reconstructing the canonical value replays its exact extremality proof —
-    up to the published orientation-test bound on large-height determinants —
-    while this operation admits at most ``MAX_FACET_COORDINATE_DIGITS`` digits
-    per reduced coordinate component. A serialized support-source polytope may
-    lawfully carry components between the two bounds, so without this gate a
-    ``math.run`` composition guaranteed to fail would still pay for the proof.
-    Measuring the authored coordinates here keeps even a rejected request
-    inside the admitted execution envelope; unrecognized shapes fall through
-    to ordinary nested validation errors.
+    The facet operation admits at most ``MAX_FACET_COORDINATE_DIGITS`` digits
+    per reduced coordinate component. Measuring the authored coordinates here
+    rejects an incompatible composed value before nested canonical parsing;
+    unrecognized shapes fall through to ordinary structural errors.
     """
 
     for vertex in _iter_raw_entries(value, "vertices"):
@@ -428,7 +440,10 @@ def _require_raw_coordinate_space(value: object, label: str) -> tuple[str, ...]:
             "coordinate_space_shape",
             f"{label} space must declare at most {MAX_FACET_DIMENSION} axes",
         )
-    if any(not isinstance(axis, str) or not 1 <= len(axis) <= 64 for axis in axes):
+    if any(
+        not isinstance(axis, str) or not 1 <= len(axis) <= MAX_COORDINATE_LABEL_LENGTH
+        for axis in axes
+    ):
         raise _validation_error(
             "coordinate_space_axes", f"{label} space axes must be short string labels"
         )
@@ -527,7 +542,7 @@ def _require_raw_exposed_face_vertex(
         not isinstance(vertex, dict)
         or set(vertex) != {"vertex_id", "coordinates"}
         or not isinstance(vertex["vertex_id"], str)
-        or not 1 <= len(vertex["vertex_id"]) <= 64
+        or not 1 <= len(vertex["vertex_id"]) <= MAX_COORDINATE_LABEL_LENGTH
     ):
         raise _validation_error(
             "exposed_face_vertex_shape",
@@ -779,10 +794,10 @@ def _deduplicate_exact_points(
     return unique
 
 
-def require_volume_components_within_result_bound(
+def _prepare_volume_components(
     points: Sequence[Sequence[object]],
     dim: int,
-) -> None:
+) -> tuple[list[list[Any]], list[tuple[int, ...]]]:
     """Reject inputs whose exact summed volume cannot fit the canonical type.
 
     The kernel sums simplex determinants over a whole triangulation, so
@@ -805,12 +820,13 @@ def require_volume_components_within_result_bound(
         # degenerate with exact volume zero, which is always representable.
         unique = _deduplicate_exact_points(points)
         if len(unique) < 2:
-            return
+            return [list(point) for point in unique], []
         _require_interval_volume_within_result_bound(unique)
-        return
+        return [list(point) for point in unique], []
 
-    from jacobian.math.geometry.polytopes._admission_kernels import (
-        triangulation_for_volume_admission,
+    from jacobian.math.geometry.polytopes._operations import (
+        _filter_redundant_vertices,
+        _triangulate,
     )
 
     # Deduplicate exactly as the kernel does before any admission work:
@@ -829,13 +845,15 @@ def require_volume_components_within_result_bound(
             "polytope hull enumeration exceeds the combinatorial bound "
             f"({subfacets} > {MAX_HULL_SUBFACETS} d-subsets)",
         )
-    pts, triangulation = triangulation_for_volume_admission(pts, dim)
+    pts = _filter_redundant_vertices(pts, dim)
+    triangulation = _triangulate(pts, dim)
     if len(pts) < dim + 1:
-        return
+        return pts, []
     if not triangulation:
-        return
+        return pts, []
     table = [_point_digit_lengths(row) for row in pts]
     _require_triangulated_volume_within_result_bound(table, triangulation, dim)
+    return pts, triangulation
 
 
 class PrimitiveFacet(StrictModel):
@@ -1043,14 +1061,10 @@ class FacetIncidenceRequest(StrictModel):
         every vertex. Both the constructed value and its serialized
         ``space``/``vertices`` shape are accepted unchanged and mapped
         positionally (the labelled axis fixes the coordinate order) before
-        ordinary validation, so admission and the kernel see exactly the
-        declared V-representation; a serialized value is re-validated as
-        the canonical type first.  Reconstructing that type replays its
-        exact extremality proof, so every cheap outer field — the closed
-        field set, the whole published ``dimension_bound`` schema, and this
-        operation's per-component coordinate envelope — is preflighted
-        first: an already-invalid request must fail before any hull replay
-        runs.
+        ordinary validation, so the operation sees exactly the declared
+        V-representation; a serialized value is re-validated as the canonical
+        type first. Cheap outer fields and the operation's coordinate envelope
+        are preflighted before nested parsing.
         """
 
         data = canonicalize_json_containers(data)
@@ -1084,29 +1098,6 @@ class FacetIncidenceRequest(StrictModel):
             canonical = RationalVPolytope.model_validate(value)
             return {**data, "vertices": _canonical_v_polytope_vertices(canonical)}
         return data
-
-    @model_validator(mode="after")
-    def require_admissible_full_dimensional_profile(self) -> Self:
-        vertices = self.vertices
-        assert isinstance(vertices, tuple)  # projected by the before-validator
-        dimension = len(vertices[0].coordinates)
-        if dimension > self.dimension_bound:
-            raise _validation_error(
-                "vertex_dimension_consistency",
-                f"dimension {dimension} exceeds the dimension bound {self.dimension_bound}",
-            )
-        if any(len(vertex.coordinates) != dimension for vertex in vertices):
-            raise _validation_error(
-                "vertex_dimension_consistency", "all vertices must share one dimension"
-            )
-        for vertex in vertices:
-            for coordinate in vertex.coordinates:
-                require_bounded_rational(
-                    coordinate,
-                    max_digits=MAX_FACET_COORDINATE_DIGITS,
-                    label="facet-profile vertex coordinate",
-                )
-        return self
 
 
 _FACET_DIMENSION_BOUND_ADAPTER: TypeAdapter[int] = TypeAdapter(
@@ -1148,7 +1139,7 @@ class RationalPolytopeVertex(StrictModel):
 
     vertex_id: Annotated[str, AfterValidator(_require_unicode_scalar_label)] = Field(
         min_length=1,
-        max_length=64,
+        max_length=MAX_COORDINATE_LABEL_LENGTH,
     )
     coordinates: tuple[CanonicalRational, ...] = Field(
         min_length=1,
@@ -1377,8 +1368,8 @@ def require_support_components_within_envelope(
 
     Canonical polytope values admit every canonical rational coordinate;
     this smaller operation-specific bound is the single admission decision
-    shared by the support request model and the native ``polytope_support``
-    entry point, keeping the exact hull intermediates of one accepted call
+    enforced by the native ``polytope_support`` entry point, keeping the exact
+    hull intermediates of one accepted call
     inside the bounded envelope derived for ``MAX_SUPPORT_COMPONENT_DIGITS``.
     """
 
@@ -1409,10 +1400,21 @@ class PolytopeSupportRequest(StrictModel):
     coordinate space: their serialized ``space`` values must be identical
     (same axis labels in the same order), and mismatched spaces are rejected
     before any evaluation. Each vertex coordinate and covector component is
-    a canonical rational carrying at most 150 digits per reduced numerator
-    or denominator — an operation-specific envelope, stricter than the
-    global canonical limit.
+    a canonical rational within the published per-component digit envelope,
+    which is stricter than the global canonical limit.
     """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "description": (
+                "Compute one support value and its complete exposed vertex face. "
+                "The full-dimensional exact V-representation and covector use "
+                "one identical labelled coordinate space. Each reduced numerator "
+                "and denominator is limited to "
+                f"{MAX_SUPPORT_COMPONENT_DIGITS} digits before evaluation."
+            )
+        }
+    )
 
     polytope: RationalVPolytope = Field(
         description=(
@@ -1440,10 +1442,10 @@ class PolytopeSupportRequest(StrictModel):
 
         Pydantic constructs (and canonically proves) nested values before
         parent after-validators run, so a raw ``math.run`` payload whose
-        components sit between this operation's 150-digit envelope and the
+        components sit between this operation's component envelope and the
         global canonical limit would reach the exact hull-facet proof
         inside ``RationalVPolytope`` construction before
-        ``require_admitted_support_components`` could reject it. This
+        native operation could reject it. This
         preflight measures only the authored reduced components of the raw
         payload — dict or already-built values alike — so even a rejected
         request stays inside the advertised execution envelope; the
@@ -1468,20 +1470,13 @@ class PolytopeSupportRequest(StrictModel):
             )
         return self
 
-    @model_validator(mode="after")
-    def require_admitted_support_components(self) -> Self:
-        require_support_components_within_envelope(self.polytope, self.covector)
-        return self
-
 
 class PolytopeSupportResult(StrictModel):
     """A source-bound exact support value and its complete exposed face.
 
     The retained source satisfies the same admitted execution envelope as
-    ``PolytopeSupportRequest``: each polytope vertex coordinate and
-    covector component carries at most 150 digits per reduced numerator or
-    denominator, so deserialization accepts only outputs the admitted
-    operation can produce and never replays a source outside the envelope.
+    ``PolytopeSupportRequest``: each polytope vertex coordinate and covector
+    component stays within the published support-component bound.
     """
 
     polytope: RationalVPolytope
@@ -1494,13 +1489,10 @@ class PolytopeSupportResult(StrictModel):
     def require_raw_components_within_support_envelope(cls, data: object) -> object:
         """Preflight the retained source before nested V-polytope parsing.
 
-        Deserializing a serialized result constructs (and canonically
-        proves) the nested values before parent after-validators run, so
+        Nested values are constructed before parent after-validators run, so
         the same raw-payload measurement as the request rejects an
-        over-envelope retained source before the exact hull-facet proof
-        can execute outside the advertised envelope. The result's cheap
-        outer shape and conclusion fields are preflighted the same way:
-        an already-invalid payload must fail before any hull replay runs.
+        over-envelope retained source early. The result's outer shape and
+        conclusion fields are preflighted at the same boundary.
         """
 
         data = canonicalize_json_containers(data)
@@ -1516,7 +1508,6 @@ class PolytopeSupportResult(StrictModel):
                 "coordinate_space_mismatch",
                 "polytope and covector must use the same coordinate space",
             )
-        require_support_components_within_envelope(self.polytope, self.covector)
         if self.exposed_face.space != self.polytope.space:
             raise _validation_error(
                 "coordinate_space_mismatch",
@@ -1586,18 +1577,15 @@ def _require_projected_dimension_bound(
     bound_adapter: TypeAdapter[int],
     upper_bound: int,
 ) -> None:
-    """Reject a V-polytope outside the published bound before hull replay.
+    """Reject a V-polytope outside the consumer's published dimension bound.
 
     The raw bound is measured with the consumer's own ``dimension_bound``
     field schema, derived from its declaration so the constraint range
     cannot drift, under the strict validation boundary every ``math.run``
     request passes through: an integer within ``[1, upper_bound]`` bounds
     the comparison exactly as the outer model would, while strings,
-    floats,
-    booleans, null, and out-of-range values — all rejected by strict
-    dispatch after the proof would already have run — are rejected here,
-    before the canonical reconstruction replays the exact extremality
-    proof.
+    floats, booleans, null, and out-of-range values are rejected here before
+    nested canonical parsing.
     """
 
     if dimension_bound is None:
@@ -1635,12 +1623,10 @@ class PolytopeVolumeRequest(StrictModel):
 
     Admission enforces a work bound that couples vertex count with ambient
     dimension: after duplicate points are removed, the exact hull
-    enumeration considers ``C(n, d)`` d-subsets of ``n`` distinct vertices
-    in dimension ``d``, and requests with ``C(n, d) > 200000`` are rejected.
-    The same limit applies to the vertex set derived from an
-    H-representation, whose own rows are additionally bounded by
-    ``C(m, d) <= 700000`` on the distinct half-spaces (see the field
-    descriptions for the exact published rules).
+    enumeration considers ``C(n, d)`` d-subsets of ``n`` distinct vertices.
+    The same named hull-work limit applies to a vertex set derived from an
+    H-representation, whose distinct rows have their own named boundedness
+    limit. The field descriptions publish both exact rules.
     """
 
     vertices: VertexTuple | RationalVPolytope | None = Field(
@@ -1656,9 +1642,12 @@ class PolytopeVolumeRequest(StrictModel):
             f"admission requires C(n, d) <= {MAX_HULL_SUBFACETS} on the n "
             "distinct vertices in ambient dimension d (the exact hull "
             "enumeration considers every d-subset); larger requests are "
-            "rejected. Within the 64-vertex maximum this admits up to 64 "
-            "distinct vertices for d <= 3, 48 for d = 4, 31 for d = 5, and "
-            "25 for d = 6."
+            f"rejected. Within the {MAX_VERTICES}-vertex maximum this admits "
+            f"up to {_largest_combination_axis(ceiling=MAX_VERTICES, dimension=3, work=MAX_HULL_SUBFACETS)} "
+            "distinct vertices for d <= 3, "
+            f"{_largest_combination_axis(ceiling=MAX_VERTICES, dimension=4, work=MAX_HULL_SUBFACETS)} for d = 4, "
+            f"{_largest_combination_axis(ceiling=MAX_VERTICES, dimension=5, work=MAX_HULL_SUBFACETS)} for d = 5, and "
+            f"{_largest_combination_axis(ceiling=MAX_VERTICES, dimension=6, work=MAX_HULL_SUBFACETS)} for d = 6."
         ),
     )
     halfspaces: tuple[Halfspace, ...] | None = Field(
@@ -1674,8 +1663,11 @@ class PolytopeVolumeRequest(StrictModel):
             f"admission requires C(m, d) <= {MAX_BOUNDEDNESS_COMBINATIONS} "
             "on the m distinct half-spaces in ambient dimension d (the "
             "boundedness precheck exactly enumerates the hull of the row "
-            "normals); within the 64-row maximum this admits 64 distinct "
-            "half-spaces for d <= 4, 40 for d = 5, and 30 for d = 6. The "
+            f"normals); within the {MAX_FACETS}-row maximum this admits "
+            f"{_largest_combination_axis(ceiling=MAX_FACETS, dimension=4, work=MAX_BOUNDEDNESS_COMBINATIONS)} distinct "
+            "half-spaces for d <= 4, "
+            f"{_largest_combination_axis(ceiling=MAX_FACETS, dimension=5, work=MAX_BOUNDEDNESS_COMBINATIONS)} for d = 5, and "
+            f"{_largest_combination_axis(ceiling=MAX_FACETS, dimension=6, work=MAX_BOUNDEDNESS_COMBINATIONS)} for d = 6. The "
             f"derived vertex set is then subject to the C(n, d) <= "
             f"{MAX_HULL_SUBFACETS} hull-work bound published on the "
             "vertices field."
@@ -1702,13 +1694,10 @@ class PolytopeVolumeRequest(StrictModel):
         every vertex. Both the constructed value and its serialized
         ``space``/``vertices`` shape are accepted unchanged and mapped
         positionally (the labelled axis fixes the coordinate order) before
-        ordinary validation, so admission and the kernel see exactly the
-        declared V-representation; a serialized value is re-validated as
-        the canonical type first.  Reconstructing that type replays its
-        exact extremality proof, so every cheap outer field — the closed
-        field set, the halfspace conflict, and the whole published
-        ``dimension_bound`` schema — is preflighted first: an
-        already-invalid request must fail before any hull replay runs.
+        ordinary validation, so the operation sees exactly the declared
+        V-representation; a serialized value is re-validated as the canonical
+        type first. The closed field set, halfspace conflict, and published
+        ``dimension_bound`` schema are preflighted before nested parsing.
         """
 
         data = canonicalize_json_containers(data)
@@ -1756,16 +1745,6 @@ class PolytopeVolumeRequest(StrictModel):
                 "halfspaces",
                 "exactly one of `vertices` or `halfspaces` must be provided",
             )
-        try:
-            if has_v:
-                vertices = self.vertices
-                assert isinstance(vertices, tuple)  # the before-validator projects it
-                _validate_vertices(vertices, self.dimension_bound)
-            else:
-                assert self.halfspaces is not None  # for type checkers
-                _validate_halfspaces(self.halfspaces, self.dimension_bound)
-        except PolytopeAdmissionError as exc:
-            raise _validation_error(exc.reason, str(exc)) from None
         return self
 
 
@@ -1775,7 +1754,9 @@ _DIMENSION_BOUND_ADAPTER: TypeAdapter[int] = TypeAdapter(
 )
 
 
-def _validate_vertices(vertices: tuple[Vertex, ...], dimension_bound: int) -> None:
+def _validate_vertices(
+    vertices: tuple[Vertex, ...], dimension_bound: int
+) -> tuple[list[list[Any]], int, list[tuple[int, ...]]]:
     """Validate a V-representation: count, per-component, and dimension bounds."""
     if len(vertices) < 1:
         raise _validation_error("vertices_bound", "`vertices` must be non-empty")
@@ -1803,19 +1784,22 @@ def _validate_vertices(vertices: tuple[Vertex, ...], dimension_bound: int) -> No
             raise _validation_error(
                 "vertex_dimension_consistency", "all vertices must share one dimension"
             )
-    from jacobian.math.geometry.polytopes._admission_kernels import (
-        volume_vertices_for_admission,
+    from jacobian.math.geometry.polytopes._operations import (
+        _vertices_from_v_representation,
     )
 
     # Exact-volume growth is bounded over the whole triangulation, so the
     # same admission runs on the rational points themselves; it applies
     # the combinatorial hull-work bound after exact deduplication,
     # mirroring the kernel pipeline.
-    points, resolved_dim = volume_vertices_for_admission(vertices)
-    require_volume_components_within_result_bound(points, resolved_dim)
+    points, resolved_dim = _vertices_from_v_representation(vertices)
+    prepared, triangulation = _prepare_volume_components(points, resolved_dim)
+    return prepared, resolved_dim, triangulation
 
 
-def _require_admissible_h_vertices(halfspaces: tuple[Halfspace, ...], dim: int) -> None:
+def _require_admissible_h_vertices(
+    halfspaces: tuple[Halfspace, ...], dim: int
+) -> tuple[list[list[Any]], list[tuple[int, ...]]]:
     """Admit the derived vertex set of an H-representation.
 
     Bounded-ness and non-emptiness must be decided before any exact
@@ -1827,16 +1811,17 @@ def _require_admissible_h_vertices(halfspaces: tuple[Halfspace, ...], dim: int) 
     result-size admission applies before accepting the request.
     """
 
-    from jacobian.math.geometry.polytopes._admission_kernels import (
-        bounded_h_vertices_for_admission,
+    from jacobian.math.geometry.polytopes._operations import (
+        _is_bounded_h,
+        _vertices_from_h_representation,
     )
 
-    bounded, verts, _resolved_dim = bounded_h_vertices_for_admission(halfspaces)
-    if not bounded:
+    if not _is_bounded_h(halfspaces):
         raise _validation_error(
             "halfspaces",
             "the H-representation is unbounded; polytope volume requires a bounded polytope",
         )
+    verts, _resolved_dim = _vertices_from_h_representation(halfspaces)
     if not verts:
         raise _validation_error(
             "h_representation", "the H-representation defines an empty polytope"
@@ -1850,12 +1835,12 @@ def _require_admissible_h_vertices(halfspaces: tuple[Halfspace, ...], dim: int) 
         )
     # Solved vertices can carry more digits than the declaring half-space
     # coefficients, so measure them directly.
-    require_volume_components_within_result_bound(verts, dim)
+    return _prepare_volume_components(verts, dim)
 
 
 def _validate_halfspaces(
     halfspaces: tuple[Halfspace, ...], dimension_bound: int
-) -> None:
+) -> tuple[list[list[Any]], int, list[tuple[int, ...]]]:
     """Validate an H-representation: count, per-component, and dimension bounds."""
     if len(halfspaces) < 1:
         raise _validation_error("halfspaces", "`halfspaces` must be non-empty")
@@ -1891,7 +1876,8 @@ def _validate_halfspaces(
             raise _validation_error(
                 "halfspaces", "half-space coefficients must not all be zero"
             )
-    _require_admissible_h_vertices(halfspaces, dim)
+    prepared, triangulation = _require_admissible_h_vertices(halfspaces, dim)
+    return prepared, dim, triangulation
 
 
 class PolytopeVolumeResult(StrictModel):

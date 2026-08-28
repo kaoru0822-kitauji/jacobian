@@ -500,9 +500,9 @@ class IdealMinimalPrimesResult(StrictModel):
         components: tuple[RationalPolynomialIdeal, ...] | None,
         backend_version: str | None,
     ) -> Self:
-        """Build a computed result after operation-local verification."""
+        """Build a computed result from the trusted Singular adapter."""
 
-        return cls(
+        return cls.model_construct(
             request=request,
             outcome="COMPUTED",
             components=components,
@@ -628,7 +628,7 @@ class GroebnerBasisResult(StrictModel):
     ) -> Self:
         """Build a computed result after the bounded kernel has produced it."""
 
-        return cls(
+        return cls.model_construct(
             request=request,
             basis=basis,
             generator_count=len(basis.generators),
@@ -683,19 +683,6 @@ class IdealNormalFormRequest(StrictModel):
     ideal: RationalPolynomialIdeal
     polynomial: RationalPolynomial
     monomial_order: NormalFormMonomialOrder = "grevlex"
-
-    @model_validator(mode="after")
-    def require_matching_ring(self) -> Self:
-        if self.polynomial.variables != self.ideal.variables:
-            raise _validation_error("polynomial must use the ideal's ordered ring")
-        require_polynomial_budget(
-            self.polynomial,
-            maximum_terms=MAX_INPUT_TERMS,
-            maximum_exponent=MAX_INPUT_EXPONENT,
-            maximum_coefficient_digits=MAX_COEFFICIENT_DIGITS,
-            label="polynomial",
-        )
-        return self
 
 
 NormalFormExecutionOutcome = Literal["COMPUTED", "ERROR", "LIMIT_EXCEEDED", "TIMEOUT"]
@@ -756,7 +743,7 @@ class IdealNormalFormResult(StrictModel):
     ) -> Self:
         """Build a computed normal form from the bounded kernel output."""
 
-        return cls(
+        return cls.model_construct(
             request=request,
             remainder=remainder,
             in_ideal=_is_zero_polynomial(remainder),
@@ -843,7 +830,7 @@ class EliminationIdealResult(StrictModel):
     ) -> Self:
         """Build a computed elimination result from the bounded kernel output."""
 
-        return cls(
+        return cls.model_construct(
             request=request,
             elimination_ideal=elimination_ideal,
             eliminated_variables=request.eliminated_variables,

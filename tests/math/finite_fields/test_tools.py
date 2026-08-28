@@ -5,15 +5,10 @@ from jacobian.catalog.models import MathTool, OperationDomainValidationError
 from jacobian.math.finite_fields import (
     Axis,
     AxisBoundMatrix,
-    CollisionResult,
-    DirectionRankLedger,
-    FiberPartition,
     FiniteDimensionalSubspace,
     FiniteFieldPresentation,
     FiniteLinearMap,
     FiniteMapTable,
-    OrbitDistribution,
-    PermutationResult,
     ProjectiveLine,
     RankResult,
     direction_rank_ledger,
@@ -39,24 +34,9 @@ def test_bundle_declares_atomic_inline_typed_operations() -> None:
         "finite_field.projective_line.enumerate",
         "finite_field.restrict_scalars.compute",
         "finite_field.linear_map.rank.compute",
-        "finite_field.direction_rank_ledger.compute",
-        "finite_field.orbit_distribution.compute",
         "finite_field.polynomial_map.table.compute",
-        "finite_field.polynomial_map.fibers.compute",
-        "finite_field.polynomial_map.collision.analyze",
-        "finite_field.polynomial_map.permutation.analyze",
     )
-    (
-        projective,
-        restrict_operation,
-        rank_operation,
-        ledger,
-        orbit,
-        table,
-        fibers,
-        collision,
-        permutation,
-    ) = bundle
+    projective, restrict_operation, rank_operation, table = bundle
     for operation in bundle:
         assert isinstance(operation, MathTool)
         assert not hasattr(operation, "provider_binding")
@@ -64,12 +44,7 @@ def test_bundle_declares_atomic_inline_typed_operations() -> None:
     assert projective.result_type is ProjectiveLine
     assert restrict_operation.result_type is FiniteLinearMap
     assert rank_operation.result_type is RankResult
-    assert ledger.result_type is DirectionRankLedger
-    assert orbit.result_type is OrbitDistribution
     assert table.result_type is FiniteMapTable
-    assert fibers.result_type is FiberPartition
-    assert collision.result_type is CollisionResult
-    assert permutation.result_type is PermutationResult
 
 
 def test_projective_enumeration_refuses_large_output_before_allocation() -> None:

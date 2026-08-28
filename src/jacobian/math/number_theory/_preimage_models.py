@@ -221,7 +221,7 @@ class PAdicIntervalProfileResult(StrictModel):
         total_valuation: int,
         maximum_valuation: int,
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             start=request.start,
             length=request.length,
             prime=request.prime,

@@ -15,12 +15,11 @@ from jacobian.math.geometry._models import (
     PolygonTriangle,
     TriangulationSplitEntry,
     WeightedPolygonDiagonal,
+    _bounded_split_table_rationals,
     _cross,
     _point_key,
     _reconstruct_split_triangulation,
-    _require_bounded_split_table_rationals,
     _subtract,
-    _triangulation_subproblem_costs,
 )
 
 
@@ -75,7 +74,7 @@ def minimum_weight_triangulation(
             message="diagonal weights must use lexicographic pair order",
         )
     try:
-        _require_bounded_split_table_rationals(count, request.diagonal_weights)
+        optimum, split = _bounded_split_table_rationals(count, request.diagonal_weights)
     except PydanticCustomError as exc:
         raise OperationDomainValidationError(
             location=("diagonal_weights",), code=exc.type, message=exc.message()
@@ -85,13 +84,6 @@ def minimum_weight_triangulation(
         for item in request.diagonal_weights
     }
 
-    def edge_weight(first: int, second: int) -> Fraction:
-        pair = (first, second) if first < second else (second, first)
-        if second == first + 1 or pair == (0, count - 1):
-            return Fraction()
-        return weights[pair]
-
-    optimum, split = _triangulation_subproblem_costs(count, edge_weight)
     ledger: list[TriangulationSplitEntry] = []
     for span in range(2, count):
         for start in range(count - span):

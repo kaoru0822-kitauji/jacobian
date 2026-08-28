@@ -336,7 +336,7 @@ class FiniteAbelianSpectralPairResult(StrictModel):
     ) -> Self:
         """Build a result after the admitted cyclotomic kernel established it."""
 
-        return cls(
+        return cls.model_construct(
             source=source,
             is_spectral=decision.is_spectral,
             reason=decision.reason,
@@ -422,11 +422,12 @@ def _spectral_pair_work(source: FiniteAbelianSpectralPairSource) -> _SpectralPai
 
     A cardinality mismatch, an equal singleton pair, and the equal empty pair
     are decided without a cyclotomic backend call; their admission is the
-    serialized source-plus-decision byte bound. Otherwise, the public
-    operation plus source-bound result validation perform two complete passes.
-    Each pass checks at most ``C(|Lambda|, 2)`` pairs and ``|A|`` character
-    terms per pair. No check depends on the ambient group order or modulus
-    size, only on the supplied rows, the rank, and the group exponent.
+    serialized source-plus-decision byte bound. Otherwise, the operation checks
+    both supplied difference families: at most ``C(|Lambda|, 2)`` frequency
+    pairs against ``|A|`` point characters and ``C(|A|, 2)`` point pairs
+    against ``|Lambda|`` frequency characters. No check depends on the ambient
+    group order or modulus size, only on the supplied rows, the rank, and the
+    group exponent.
 
     The serialized-source bound is enforced before any exponent arithmetic.
     It depends only on the declared moduli and supplied rows, so an oversized

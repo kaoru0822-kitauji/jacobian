@@ -6,9 +6,8 @@ import pytest
 
 from jacobian.canonical import CanonicalLimits, encode_strict_json
 from jacobian.catalog.catalog import Catalog
-from jacobian.catalog.models import OperationResult
+from jacobian.catalog.models import OperationDomainValidationError, OperationResult
 from jacobian.dispatch import (
-    OperationRequestValidationError,
     invoke_operation,
     parse_operation_input,
 )
@@ -65,7 +64,7 @@ def test_reroot_rejects_paths_that_exceed_transport_before_execution() -> None:
     payload = {"decomposition": decomposition, "root": tree_nodes[0]}
     assert len(encode_strict_json(payload)) <= CanonicalLimits().max_input_bytes
 
-    with pytest.raises(OperationRequestValidationError) as exc_info:
+    with pytest.raises(OperationDomainValidationError) as exc_info:
         invoke_operation(
             "graph.tree_decomposition.reroot.compute", payload, Catalog.open()
         )

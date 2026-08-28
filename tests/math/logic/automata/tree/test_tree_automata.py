@@ -5,6 +5,7 @@ from math import comb
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.logic.automata.tree import (
     ReachableStateProfile,
     reachable_state_profile,
@@ -33,9 +34,8 @@ from jacobian.math.logic.automata.tree.values import (
     BottomUpTreeAutomaton,
     RankedTree,
     TreeAutomatonTransition,
+    _priced_saturation,
     ranked_tree_node_count,
-    reachability_execution_work_bound,
-    reachability_price_components,
 )
 
 
@@ -43,6 +43,15 @@ def _assert_validation_code(
     exc: pytest.ExceptionInfo[ValidationError], code: str
 ) -> None:
     assert exc.value.errors()[0]["type"] == code
+
+
+def _reachability_price_components(
+    automaton: BottomUpTreeAutomaton,
+) -> tuple[int, int, int]:
+    """Project the producer's prepared saturation onto its work counters."""
+
+    _, sort_work, per_scan_work, scan_rounds, _ = _priced_saturation(automaton)
+    return sort_work, per_scan_work, scan_rounds
 
 
 # Helpers
@@ -689,13 +698,16 @@ class TestValidation:
     ) -> None:
         automaton = _nullary_saturated_with_wide_rows()
 
-        _, per_scan_work, scan_rounds = reachability_price_components(automaton)
+        sort_work, per_scan_work, scan_rounds = _reachability_price_components(
+            automaton
+        )
         assert scan_rounds == 2
 
-        per_profile = reachability_execution_work_bound(automaton)
-        assert per_profile == 983_040 + 2 * per_scan_work + 3 * 4096
+        per_profile = (
+            sort_work + scan_rounds * per_scan_work + 3 * MAX_REACHABILITY_WITNESS_NODES
+        )
         assert per_profile == 1_560_832
-        assert per_profile <= 30_000_000
+        assert per_profile <= MAX_TREE_AUTOMATON_REACHABILITY_WORK
 
         result = compute_tree_automaton_reachability(
             TreeAutomatonReachabilityRequest(automaton=automaton)
@@ -789,12 +801,15 @@ class TestValidation:
     ) -> None:
         automaton = _seeded_chain_with_padded_rows(16)
 
-        _, per_scan_work, scan_rounds = reachability_price_components(automaton)
+        sort_work, per_scan_work, scan_rounds = _reachability_price_components(
+            automaton
+        )
         assert scan_rounds == 17
-        per_profile = reachability_execution_work_bound(automaton)
-        assert per_profile == 983_040 + 17 * per_scan_work + 3 * 4096
+        per_profile = (
+            sort_work + scan_rounds * per_scan_work + 3 * MAX_REACHABILITY_WITNESS_NODES
+        )
         assert per_profile == 5_855_356
-        assert per_profile <= 30_000_000
+        assert per_profile <= MAX_TREE_AUTOMATON_REACHABILITY_WORK
 
         profile = reachable_state_profile(automaton)
         assert profile.reachable_states == tuple(range(16))
@@ -806,11 +821,14 @@ class TestValidation:
     def test_public_request_reuses_the_execution_envelope(self) -> None:
         automaton = _seeded_chain_with_padded_rows(31)
 
-        _, per_scan_work, scan_rounds = reachability_price_components(automaton)
+        sort_work, per_scan_work, scan_rounds = _reachability_price_components(
+            automaton
+        )
         assert scan_rounds == 32
-        per_profile = reachability_execution_work_bound(automaton)
-        assert per_profile == 983_040 + 32 * per_scan_work + 3 * 4096
-        assert per_profile <= 30_000_000
+        per_profile = (
+            sort_work + scan_rounds * per_scan_work + 3 * MAX_REACHABILITY_WITNESS_NODES
+        )
+        assert per_profile <= MAX_TREE_AUTOMATON_REACHABILITY_WORK
 
         result = compute_tree_automaton_reachability(
             TreeAutomatonReachabilityRequest(automaton=automaton)
@@ -829,30 +847,28 @@ class TestValidation:
         """
 
         def advertised_public_bound(automaton: BottomUpTreeAutomaton) -> int:
-            sort_work, per_scan_work, scan_rounds = reachability_price_components(
+            sort_work, per_scan_work, scan_rounds = _reachability_price_components(
                 automaton
             )
-            return sort_work + scan_rounds * per_scan_work + 3 * 4096
+            return (
+                sort_work
+                + scan_rounds * per_scan_work
+                + 3 * MAX_REACHABILITY_WITNESS_NODES
+            )
 
         admitted = _seeded_chain_with_padded_rows(30)
         rejected = _seeded_chain_with_padded_rows(31)
 
-        assert reachability_execution_work_bound(admitted) == 9_831_692
-        assert reachability_execution_work_bound(admitted) == (
-            advertised_public_bound(admitted)
-        )
-        assert reachability_execution_work_bound(admitted) <= 30_000_000
+        assert advertised_public_bound(admitted) == 9_831_692
+        assert advertised_public_bound(admitted) <= MAX_TREE_AUTOMATON_REACHABILITY_WORK
 
         result = compute_tree_automaton_reachability(
             TreeAutomatonReachabilityRequest(automaton=admitted)
         )
         assert result.reachable_states == tuple(range(30))
 
-        assert reachability_execution_work_bound(rejected) == 10_114_816
-        assert reachability_execution_work_bound(rejected) == (
-            advertised_public_bound(rejected)
-        )
-        assert reachability_execution_work_bound(rejected) <= 30_000_000
+        assert advertised_public_bound(rejected) == 10_114_816
+        assert advertised_public_bound(rejected) <= MAX_TREE_AUTOMATON_REACHABILITY_WORK
         result = compute_tree_automaton_reachability(
             TreeAutomatonReachabilityRequest(automaton=rejected)
         )
@@ -862,12 +878,15 @@ class TestValidation:
     def test_deepest_native_profile_and_public_operation_fit_one_envelope(self) -> None:
         automaton = _seeded_chain_with_padded_rows(64)
 
-        _, per_scan_work, scan_rounds = reachability_price_components(automaton)
+        sort_work, per_scan_work, scan_rounds = _reachability_price_components(
+            automaton
+        )
         assert scan_rounds == 65
-        per_profile = reachability_execution_work_bound(automaton)
-        assert per_profile == 983_040 + 65 * per_scan_work + 3 * 4096
+        per_profile = (
+            sort_work + scan_rounds * per_scan_work + 3 * MAX_REACHABILITY_WITNESS_NODES
+        )
         assert per_profile == 19_390_588
-        assert per_profile <= 30_000_000
+        assert per_profile <= MAX_TREE_AUTOMATON_REACHABILITY_WORK
 
         profile = reachable_state_profile(automaton)
         assert isinstance(profile, ReachableStateProfile)
@@ -1007,5 +1026,5 @@ class TestValidation:
         )
 
         request = AcceptedTreeCountRequest(automaton=automaton, tree_size=100)
-        with pytest.raises(ValueError, match="work"):
+        with pytest.raises(OperationDomainValidationError, match="work"):
             compute_accepted_tree_count(request)

@@ -635,7 +635,7 @@ def compute_jacobi_matrix(request: JacobiMatrixRequest) -> JacobiMatrix:
 def _construct_quadrature_rule(
     p_n: list[Fraction], moments: list[Fraction], n: int
 ) -> tuple[list[Fraction], list[Fraction] | None]:
-    """Exact nodes and weights shared by execution and admission replay.
+    """Construct exact rational nodes and weights once.
 
     Nodes are the rational roots of p_n; weights solve the moment
     Vandermonde system V[k][i] = node_i**k against mu_k.
@@ -665,22 +665,10 @@ def _construct_quadrature_rule(
     return nodes_frac, weights
 
 
-def _build_quadrature_rule(
+def _admit_gaussian_quadrature(
     prefix: MomentFunctionalPrefix, order: int
 ) -> tuple[list[Fraction], list[Fraction]]:
-    """Pure nodes+weights construction shared by execution and validation."""
-    moments = [_to_fraction(m) for m in prefix.moments]
-    p_n = _construct_monic_orthogonal_polynomial(moments, order)
-    nodes, weights = _construct_quadrature_rule(p_n, moments, order)
-    if weights is None:
-        raise ValueError("Vandermonde system is singular")
-    return nodes, weights
-
-
-def require_gaussian_quadrature_admission(
-    prefix: MomentFunctionalPrefix, order: int
-) -> None:
-    """Admit a canonical prefix for one exact rational Gaussian rule."""
+    """Admit and prepare one exact rational Gaussian rule."""
     from jacobian.math.analysis.orthogonal_polynomials.values import (
         MAX_QUADRATURE_ORDER,
     )
@@ -706,26 +694,22 @@ def require_gaussian_quadrature_admission(
             f"{len(prefix.moments)}",
         )
 
-    import sympy
-
     moments = [_to_fraction(value) for value in prefix.moments]
     coefficients = _construct_monic_orthogonal_polynomial(moments, order)
-    variable = sympy.Symbol(prefix.variable)
-    polynomial = sum(
-        coefficient * variable**index for index, coefficient in enumerate(coefficients)
-    )
-    _, factors = sympy.factor_list(polynomial)
-    if any(
-        sympy.degree(factor, variable) != 1 or multiplicity != 1
-        for factor, multiplicity in factors
-    ):
+    try:
+        nodes, weights = _construct_quadrature_rule(coefficients, moments, order)
+    except ValueError:
         raise GaussianQuadratureAdmissionError(
             "rational_nodes",
             f"quadrature order {order} requires p_{order} to split into "
             "distinct linear factors over QQ so every node is an exact rational; "
             "this moment prefix yields algebraic or repeated nodes",
+        ) from None
+    if weights is None:
+        raise GaussianQuadratureAdmissionError(
+            "rational_nodes",
+            f"quadrature order {order} requires p_{order} to have distinct nodes",
         )
-    nodes, weights = _build_quadrature_rule(prefix, order)
     if any(_fraction_exceeds_canonical_limit(value) for value in (*nodes, *weights)):
         raise GaussianQuadratureAdmissionError(
             "quadrature_height",
@@ -739,19 +723,14 @@ def require_gaussian_quadrature_admission(
             "quadrature admission requires strictly positive weights; this "
             "moment prefix yields a nonpositive weight",
         )
+    return nodes, weights
 
 
 def gaussian_quadrature_rule_from_prefix(
     prefix: MomentFunctionalPrefix, order: int
 ) -> GaussianQuadratureRule:
     """Construct one admitted exact Gaussian quadrature rule."""
-    nodes_frac, weights = _build_quadrature_rule(prefix, order)
-    for k in range(2 * order):
-        approximation = sum(
-            weights[index] * nodes_frac[index] ** k for index in range(order)
-        )
-        if approximation != _to_fraction(prefix.moments[k]):
-            raise ValueError(f"quadrature is not exact at degree {k}")
+    nodes_frac, weights = _admit_gaussian_quadrature(prefix, order)
     return GaussianQuadratureRule._from_kernel(
         order=order,
         nodes=tuple(
@@ -768,7 +747,6 @@ def compute_gaussian_quadrature(
 ) -> GaussianQuadratureRule:
     """MCP adapter: parse one request, call the canonical-prefix kernel."""
     try:
-        require_gaussian_quadrature_admission(request.prefix, request.order)
         return gaussian_quadrature_rule_from_prefix(request.prefix, request.order)
     except ValueError as exc:
         raise OperationDomainValidationError(

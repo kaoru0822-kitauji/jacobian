@@ -180,16 +180,14 @@ class CoherentConfigurationAnalyzeResult(StrictModel):
     ) -> Self:
         """Construct one fresh result after the owner-local kernel completed."""
 
-        return cls.model_validate(
-            {
-                "configuration": configuration,
-                "status": status,
-                "coherent_configuration": coherent_configuration,
-                "fibers": fibers,
-                "transpose_map": transpose_map,
-                "intersection_numbers": intersection_numbers,
-                "obstruction": obstruction,
-            }
+        return cls.model_construct(
+            configuration=configuration,
+            status=status,
+            coherent_configuration=coherent_configuration,
+            fibers=fibers,
+            transpose_map=transpose_map,
+            intersection_numbers=intersection_numbers,
+            obstruction=obstruction,
         )
 
 

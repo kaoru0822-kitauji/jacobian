@@ -4,12 +4,16 @@ from __future__ import annotations
 
 from fractions import Fraction
 
+from pydantic_core import PydanticCustomError
+
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.geometry.exact._line_arithmetic import (
     canonical_line_coefficients,
     squared_point_line_distance,
 )
 from jacobian.math.geometry.exact._models import (
+    MAX_PINNED_PROFILE_RESULT_BYTES,
     DistanceGraphRequest,
     DistanceMultiplicityEntry,
     DistanceProfileRequest,
@@ -17,6 +21,9 @@ from jacobian.math.geometry.exact._models import (
     LabelledRationalPoint,
     PinnedLineDistanceRequest,
     PinnedLineDistanceResult,
+    _maximum_pinned_profile_wire_bytes,
+    _require_bounded_point_configuration,
+    _validation_error,
 )
 from jacobian.math.graphs.values import IndexedSimpleUndirectedGraph
 
@@ -110,6 +117,36 @@ def compute_pinned_line_distance_profile(
     from jacobian.math.geometry.exact._models import PinnedLineEntry
 
     config = request.configuration
+    try:
+        _require_bounded_point_configuration(config, request.anchor)
+        if len(config.points[0].coordinates) != 2:
+            raise _validation_error(
+                "pinned_line_distance_profile_requires_a",
+                "pinned line-distance profile requires a planar configuration",
+            )
+        coordinates = {
+            tuple(component.as_fraction() for component in point.coordinates)
+            for point in config.points
+        }
+        if len(coordinates) != len(config.points):
+            raise _validation_error(
+                "pinned_line_distance_profile_requires_distinct",
+                "pinned line-distance profile requires distinct point coordinates",
+            )
+        if (
+            _maximum_pinned_profile_wire_bytes(config, request.anchor)
+            > MAX_PINNED_PROFILE_RESULT_BYTES
+        ):
+            raise _validation_error(
+                "complete_pinned_line_distance_profile_would",
+                "the complete pinned line-distance profile would exceed the "
+                f"{MAX_PINNED_PROFILE_RESULT_BYTES}-byte aggregate result "
+                "budget; reduce the point count or coordinate heights",
+            )
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=("configuration",), code=exc.type, message=exc.message()
+        ) from exc
     n = len(config.points)
     points = [_to_fraction_point(p) for p in config.points]
     anchor = tuple(c.as_fraction() for c in request.anchor)

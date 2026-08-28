@@ -5,6 +5,7 @@ from typing import TypedDict
 
 from jacobian._exact import CanonicalRational
 from jacobian.canonical import format_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.geometry.exact._models import (
     COORDINATE_DIGITS,
     DistanceGraphRequest,
@@ -20,6 +21,7 @@ from jacobian.math.geometry.exact._models import (
 from jacobian.math.geometry.exact._operations import (
     compute_distance_graph,
     compute_distance_profile,
+    compute_pinned_line_distance_profile,
 )
 from jacobian.math.graphs.spectra._models import GraphSpectrumRequest
 from jacobian.math.graphs.values import IndexedSimpleUndirectedGraph
@@ -291,18 +293,17 @@ class TestPinnedLineDistance:
             LabelledRationalPoint(label="b", coordinates=(_cr(1), _cr(0), _cr(0))),
             LabelledRationalPoint(label="c", coordinates=(_cr(0), _cr(1), _cr(0))),
         )
-        with pytest.raises(ValueError):
-            PinnedLineDistanceRequest.model_validate(
-                {
-                    "configuration": PointConfiguration(points=pts).model_dump(
-                        mode="json"
-                    ),
-                    "anchor": [
-                        {"num": "0", "den": "1"},
-                        {"num": "0", "den": "1"},
-                    ],
-                }
-            )
+        request = PinnedLineDistanceRequest.model_validate(
+            {
+                "configuration": PointConfiguration(points=pts).model_dump(mode="json"),
+                "anchor": [
+                    {"num": "0", "den": "1"},
+                    {"num": "0", "den": "1"},
+                ],
+            }
+        )
+        with pytest.raises(OperationDomainValidationError, match="planar"):
+            compute_pinned_line_distance_profile(request)
 
     def test_result_rejects_nonplanar_retained_configuration(self) -> None:
         import pytest
@@ -518,7 +519,6 @@ class TestPinnedLineDistance:
 
     def test_aggregate_output_budget_rejects_unencodable_profiles(self) -> None:
         import pytest
-        from pydantic import ValidationError
 
         from jacobian.math.geometry.exact._models import (
             MAX_PINNED_PROFILE_RESULT_BYTES,
@@ -556,13 +556,14 @@ class TestPinnedLineDistance:
             _maximum_pinned_profile_wire_bytes(cfg, anchor)
             > MAX_PINNED_PROFILE_RESULT_BYTES
         )
-        with pytest.raises(ValidationError):
-            PinnedLineDistanceRequest.model_validate(
-                {
-                    "configuration": cfg.model_dump(mode="json"),
-                    "anchor": anchor,
-                }
-            )
+        request = PinnedLineDistanceRequest.model_validate(
+            {
+                "configuration": cfg.model_dump(mode="json"),
+                "anchor": anchor,
+            }
+        )
+        with pytest.raises(OperationDomainValidationError, match="aggregate result"):
+            compute_pinned_line_distance_profile(request)
 
     def test_estimate_dominates_actual_encoding_for_admitted_requests(self) -> None:
         from jacobian.canonical import encode_strict_json

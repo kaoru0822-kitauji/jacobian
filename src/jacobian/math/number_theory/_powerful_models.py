@@ -104,7 +104,7 @@ class PowerfulNumberResult(StrictModel):
 
         from jacobian.canonical import format_canonical_integer
 
-        return cls(
+        return cls.model_construct(
             value=request.value,
             conclusion=data.conclusion,
             is_powerful=data.conclusion == "POWERFUL",

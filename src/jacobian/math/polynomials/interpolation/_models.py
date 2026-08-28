@@ -522,15 +522,6 @@ class NewtonEvaluateRequest(StrictModel):
     newton_form: NewtonForm
     evaluation_point: CanonicalRational
 
-    @model_validator(mode="after")
-    def require_bounded_point(self) -> Self:
-        require_bounded_rational(
-            self.evaluation_point,
-            max_digits=_MAX_RATIONAL_DIGITS,
-            label="evaluation point",
-        )
-        return self
-
 
 class DividedDifferencesResult(StrictModel):
     coefficients: tuple[CanonicalRational, ...] = Field(

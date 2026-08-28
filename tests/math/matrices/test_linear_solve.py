@@ -161,22 +161,11 @@ def test_serialized_results_round_trip_through_the_wire_shape() -> None:
         assert restored.convention == "LINEAR_SYSTEM_CLASSIFICATION_OVER_QQ"
 
 
-def test_result_reapplies_source_admission_without_replay() -> None:
-    """A relayed source outside the work envelope is rejected structurally."""
-    unadmitted = {
-        "matrix": {
-            "entries": [
-                [{"num": "1", "den": "1"}, {"num": "0", "den": "1"}],
-                [{"num": "0", "den": "1"}, {"num": "9" * 257, "den": "1"}],
-            ]
-        },
+def test_result_rejects_source_shape_mismatch() -> None:
+    non_square = {
+        "matrix": {"entries": [[{"num": "1", "den": "1"}]]},
         "rhs": _rhs("1", "1"),
         "outcome": "INCONSISTENT",
     }
-    with pytest.raises(ValidationError):
-        RationalLinearSolveResult.model_validate(unadmitted)
-
-    non_square = dict(unadmitted)
-    non_square["matrix"] = {"entries": [[{"num": "1", "den": "1"}]]}
     with pytest.raises(ValidationError):
         RationalLinearSolveResult.model_validate(non_square)

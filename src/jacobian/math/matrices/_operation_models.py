@@ -235,10 +235,6 @@ class RrefResult(StrictModel):
 
     @model_validator(mode="after")
     def require_source_bound(self) -> Self:
-        _require_computation_dimensions(self.matrix.entries)
-        require_matrix_scalar_digits(
-            self.matrix.entries, maximum=MAX_INPUT_SCALAR_DIGITS, label="matrix input"
-        )
         column_count = len(self.matrix.entries[0])
         if (
             len(self.reduced_matrix.entries) != len(self.matrix.entries)
@@ -287,10 +283,6 @@ class MatrixRankResult(StrictModel):
 
     @model_validator(mode="after")
     def require_source_bound(self) -> Self:
-        _require_computation_dimensions(self.matrix.entries)
-        require_matrix_scalar_digits(
-            self.matrix.entries, maximum=MAX_INPUT_SCALAR_DIGITS, label="matrix input"
-        )
         if self.rank != len(self.pivot_columns):
             raise _validation_error(
                 "budget_exceeded", "rank must equal the pivot column count"
@@ -329,10 +321,6 @@ class NullspaceResult(StrictModel):
 
     @model_validator(mode="after")
     def require_basis_shape(self) -> Self:
-        _require_computation_dimensions(self.matrix.entries)
-        require_matrix_scalar_digits(
-            self.matrix.entries, maximum=MAX_INPUT_SCALAR_DIGITS, label="matrix input"
-        )
         if self.ambient_dimension != len(self.matrix.entries[0]):
             raise _validation_error(
                 "shape_mismatch", "ambient dimension must equal the source column count"
@@ -467,7 +455,6 @@ class RationalLinearSolveResult(StrictModel):
                 "shape_mismatch",
                 "a non-unique or inconsistent result must not populate the solution field",
             )
-        _require_square_system_admission(self.matrix, self.rhs)
         if len(self.rhs) != len(self.matrix.entries):
             raise _validation_error(
                 "shape_mismatch",

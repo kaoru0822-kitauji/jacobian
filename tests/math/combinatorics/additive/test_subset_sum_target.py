@@ -18,12 +18,9 @@ from jacobian.math.combinatorics.additive._subset_sum_residue import (
     compute_subset_sum_residue_profile,
 )
 from jacobian.math.combinatorics.additive._subset_sum_target import (
-    MAX_SUBSET_SUM_COMPLETE_CALL_PASSES,
     MAX_SUBSET_SUM_INTEGER_DIGITS,
     MAX_SUBSET_SUM_RECONSTRUCTED_DIGITS,
     MAX_SUBSET_SUM_SOURCE_WIRE_BYTES,
-    MAX_SUBSET_SUM_TOTAL_TRANSITIONS,
-    MAX_SUBSET_SUM_TRANSITIONS_PER_PASS,
     SubsetSumTargetRequest,
     SubsetSumTargetResult,
     _SubsetSumTargetScalar,
@@ -359,15 +356,9 @@ def test_out_of_range_targets_resolve_before_state_expansion() -> None:
 
 
 @pytest.mark.scale
-def test_complete_call_charges_admission_and_kernel_passes() -> None:
-    assert (
-        MAX_SUBSET_SUM_TOTAL_TRANSITIONS
-        == MAX_SUBSET_SUM_COMPLETE_CALL_PASSES * MAX_SUBSET_SUM_TRANSITIONS_PER_PASS
-    )
-
-    # An in-range exhausting request whose single pass scans 499,500 states
-    # stays admitted: its admission and kernel passes fit the advertised
-    # complete-call budget.
+def test_kernel_enforces_the_transition_bound_in_one_pass() -> None:
+    # An in-range exhausting request whose pass scans 499,500 states stays
+    # admitted under the advertised kernel budget.
     dense = (2,) * 999
     unattained = _operation().run(_request(dense, 3, allow_empty_subset=True))
     assert unattained.status == "NOT_ATTAINED"

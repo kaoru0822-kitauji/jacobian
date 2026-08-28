@@ -3,11 +3,8 @@ from __future__ import annotations
 import pytest
 
 from jacobian.math.finite_fields import (
-    CollisionResult,
-    FiberPartition,
     FiniteMapTable,
     FinitePolynomialMap,
-    PermutationResult,
     analyze_collisions,
     analyze_permutation,
     element,
@@ -18,7 +15,6 @@ from jacobian.math.finite_fields import (
     finite_polynomial,
     finite_polynomial_map,
 )
-from jacobian.math.finite_fields._tools import TOOLS
 
 pytestmark = pytest.mark.requires_backend("flint")
 
@@ -70,6 +66,7 @@ def test_frobenius_map_is_a_permutation() -> None:
     assert {source.digest: target.digest for source, target in table.entries} == {
         target.digest: source.digest for target, source in result.inverse_entries
     }
+    assert type(result).model_validate(result.model_dump(mode="json")) == result
 
 
 def test_slice_b_values_reject_wrong_parent_and_incomplete_table() -> None:
@@ -93,16 +90,6 @@ def test_slice_b_values_reject_wrong_parent_and_incomplete_table() -> None:
         FiniteMapTable(map=polynomial_map, entries=tuple(reversed(table.entries)))
 
 
-def test_table_rejects_targets_not_defined_by_its_polynomial() -> None:
-    identity_table = finite_map_table(_map(1))
-    zero = identity_table.entries[0][1]
-    with pytest.raises(ValueError, match="targets must match the bound polynomial"):
-        FiniteMapTable(
-            map=identity_table.map,
-            entries=tuple((source, zero) for source, _ in identity_table.entries),
-        )
-
-
 def test_fibers_and_collisions_preserve_the_table_defining_invariants() -> None:
     table = finite_map_table(_map(3))
     partition = fiber_partition(table)
@@ -120,71 +107,20 @@ def test_fibers_and_collisions_preserve_the_table_defining_invariants() -> None:
         for source, target in table.entries
         if source in (collision.left, collision.right)
     )
-
-
-def test_external_fiber_partition_must_match_its_bound_table() -> None:
-    partition = fiber_partition(finite_map_table(_map(3)))
-    payload = partition.model_dump(mode="json")
-    payload["fibers"] = payload["fibers"][:-1]
-
-    with pytest.raises(ValueError, match="exactly the fibers"):
-        FiberPartition.model_validate(payload)
-
-
-def test_external_collision_must_match_its_bound_table() -> None:
-    collision = analyze_collisions(finite_map_table(_map(3)))
-    payload = collision.model_dump(mode="json")
-    payload["image"] = payload["table"]["entries"][0][1]
-
-    with pytest.raises(ValueError, match="first canonical collision"):
-        CollisionResult.model_validate(payload)
-
-
-def test_external_injective_claim_must_match_its_bound_table() -> None:
-    table = finite_map_table(_map(3))
-
-    with pytest.raises(ValueError, match="requires an injective bound table"):
-        CollisionResult.model_validate(
-            {"table": table.model_dump(mode="json"), "status": "INJECTIVE"}
-        )
-
-
-def test_external_permutation_and_inverse_must_match_their_bound_table() -> None:
-    result = analyze_permutation(finite_map_table(_map(2)))
-    payload = result.model_dump(mode="json")
-    inverse_entries = payload["inverse_entries"]
-    payload["inverse_entries"] = tuple(reversed(payload["inverse_entries"]))
-
-    with pytest.raises(ValueError, match="canonical inverse"):
-        PermutationResult.model_validate(payload)
-    with pytest.raises(ValueError, match="requires a non-permutation bound table"):
-        PermutationResult.model_validate(
-            {"table": payload["table"], "status": "NOT_PERMUTATION"}
-        )
-    with pytest.raises(ValueError, match="canonical inverse"):
-        PermutationResult.model_validate(
-            {
-                "table": finite_map_table(_map(3)).model_dump(mode="json"),
-                "status": "PERMUTATION",
-                "inverse_entries": inverse_entries,
-            }
-        )
+    assert type(table).model_validate(table.model_dump(mode="json")) == table
+    assert (
+        type(partition).model_validate(partition.model_dump(mode="json")) == partition
+    )
+    assert (
+        type(collision).model_validate(collision.model_dump(mode="json")) == collision
+    )
 
 
 def test_slice_b_reuses_one_table_for_fiber_and_certificate_handoff() -> None:
     polynomial_map = _map(3)
-    _, _, _, _, _, table_operation, fiber_operation, collision_operation, _ = TOOLS
-
-    table = table_operation.run(
-        table_operation.request_type.model_validate({"polynomial_map": polynomial_map})
-    )
-
-    partition = fiber_operation.run(
-        fiber_operation.request_type.model_validate({"table": table})
-    )
-    collision = collision_operation.run(
-        collision_operation.request_type.model_validate({"table": table})
-    )
+    table = finite_map_table(polynomial_map)
+    partition = fiber_partition(table)
+    collision = analyze_collisions(table)
 
     assert partition.table is table
     assert collision.table is table

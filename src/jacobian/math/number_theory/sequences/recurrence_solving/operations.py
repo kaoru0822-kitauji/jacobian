@@ -204,10 +204,10 @@ def berlekamp_massey(sequence: list[int], prime: int) -> PrimeFieldRecurrence:
     # The recurrence is s_n = -c_1 s_{n-1} - ... - c_L s_{n-L}, so the
     # recurrence coefficients are [-c_1, ..., -c_L].
     if length == 0:
-        return PrimeFieldRecurrence.model_construct(
+        return PrimeFieldRecurrence(
             prime=prime, coefficients=(), order=0, status="FOUND"
         )
     recurrence = tuple((-coeffs[j]) % prime for j in range(1, length + 1))
-    return PrimeFieldRecurrence.model_construct(
+    return PrimeFieldRecurrence(
         prime=prime, coefficients=recurrence, order=length, status="FOUND"
     )

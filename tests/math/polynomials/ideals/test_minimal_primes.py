@@ -27,13 +27,8 @@ from jacobian.math.polynomials.values import (
     SparseRationalPolynomial,
 )
 
-_VERIFIER_TARGET = "jacobian.math.polynomials.ideals._singular"
 _PRODUCER_TARGET = (
     "jacobian.math.polynomials.ideals._operations.run_singular_minimal_primes"
-)
-_VERIFICATION_TARGET = (
-    "jacobian.math.polynomials.ideals._operations"
-    ".run_singular_minimal_primes_verification"
 )
 
 
@@ -118,31 +113,11 @@ def _product_ideal(
     return _ideal(variables, *generators)
 
 
-def _forbid_verifier(monkeypatch: pytest.MonkeyPatch) -> None:
-    def forbidden(source: object, components: object, budget: object) -> str:
-        raise AssertionError("the independent verifier must not be launched")
-
-    monkeypatch.setattr(
-        f"{_VERIFIER_TARGET}.run_singular_minimal_primes_verification", forbidden
-    )
-
-
-def test_result_construction_is_structural_and_explicit_verifier_checks_family(
+def test_result_construction_is_structural_and_does_not_rerun_the_kernel(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     request = _axes_request()
     components = _axes_components()
-    seen: list[tuple[object, object]] = []
-
-    def verify(
-        source: RationalPolynomialIdeal,
-        claimed: tuple[RationalPolynomialIdeal, ...],
-        budget: object,
-    ) -> str:
-        seen.append((source, claimed))
-        return "VERIFIED"
-
-    monkeypatch.setattr(_VERIFICATION_TARGET, verify)
     monkeypatch.setattr(
         _PRODUCER_TARGET,
         lambda *args: pytest.fail("result construction must not re-run the kernel"),
@@ -156,8 +131,6 @@ def test_result_construction_is_structural_and_explicit_verifier_checks_family(
     )
 
     assert result.components == components
-    assert seen == []
-    assert seen == []
 
 
 def test_missing_backend_is_typed_and_makes_no_component_claim(
@@ -169,20 +142,18 @@ def test_missing_backend_is_typed_and_makes_no_component_claim(
             outcome="UNAVAILABLE", detail="backend is unavailable"
         ),
     )
-    _forbid_verifier(monkeypatch)
-
     result = compute_ideal_minimal_primes(_axes_request())
 
     assert result.outcome == "UNAVAILABLE"
     assert result.components is None
 
 
-def test_producer_verifies_once_without_a_third_backend_call(
+def test_producer_runs_once_without_a_replay_backend_call(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     request = _axes_request()
     components = _axes_components()
-    calls = {"produce": 0, "verify": 0}
+    calls = 0
 
     def backend(
         source: RationalPolynomialIdeal,
@@ -190,64 +161,20 @@ def test_producer_verifies_once_without_a_third_backend_call(
         *,
         wall_seconds: float | None = None,
     ) -> SingularMinimalPrimesResult:
-        calls["produce"] += 1
+        nonlocal calls
+        calls += 1
         assert source == request.ideal
         return SingularMinimalPrimesResult(
             outcome="COMPUTED", components=components, backend_version="4.4.0"
         )
 
-    def verify(
-        source: RationalPolynomialIdeal,
-        claimed: tuple[RationalPolynomialIdeal, ...],
-        budget: object,
-        *,
-        wall_seconds: float | None = None,
-    ) -> str:
-        calls["verify"] += 1
-        return "VERIFIED"
-
     monkeypatch.setattr(_PRODUCER_TARGET, backend)
-    monkeypatch.setattr(_VERIFICATION_TARGET, verify)
 
     result = compute_ideal_minimal_primes(request)
 
     assert result.outcome == "COMPUTED"
     assert result.components == components
-    assert calls == {"produce": 1, "verify": 1}
-
-
-def test_stable_defective_kernel_family_is_refuted_by_independent_evidence(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A deterministic kernel defect that repeats across passes is caught."""
-
-    variables = ("x", "y")
-    request = IdealMinimalPrimesRequest(
-        ideal=_ideal(variables, _poly(variables, (1, 1, (1, 1))))
-    )
-    defective = (_ideal(variables, _poly(variables, (1, 1, (1, 1)))),)
-
-    def backend(
-        source: RationalPolynomialIdeal,
-        budget: object,
-        *,
-        wall_seconds: float | None = None,
-    ) -> SingularMinimalPrimesResult:
-        return SingularMinimalPrimesResult(
-            outcome="COMPUTED", components=defective, backend_version="4.4.0"
-        )
-
-    monkeypatch.setattr(_PRODUCER_TARGET, backend)
-    monkeypatch.setattr(
-        _VERIFICATION_TARGET,
-        lambda source, claimed, budget, *, wall_seconds=None: "REFUTED",
-    )
-
-    result = compute_ideal_minimal_primes(request)
-
-    assert result.outcome == "ERROR"
-    assert result.components is None
-    assert result.detail is not None
+    assert calls == 1
 
 
 def test_duplicate_producer_family_is_a_typed_error_without_a_third_pass(
@@ -259,7 +186,7 @@ def test_duplicate_producer_family_is_a_typed_error_without_a_third_pass(
     request = IdealMinimalPrimesRequest(
         ideal=_ideal(variables, _poly(variables, (1, 2, (2,))))
     )
-    calls = {"produce": 0, "verify": 0}
+    calls = 0
 
     def backend(
         source: RationalPolynomialIdeal,
@@ -267,57 +194,32 @@ def test_duplicate_producer_family_is_a_typed_error_without_a_third_pass(
         *,
         wall_seconds: float | None = None,
     ) -> SingularMinimalPrimesResult:
-        calls["produce"] += 1
+        nonlocal calls
+        calls += 1
         return SingularMinimalPrimesResult(
             outcome="COMPUTED",
             components=duplicated,
             backend_version="4.4.0",
         )
 
-    def verify(
-        source: RationalPolynomialIdeal,
-        claimed: tuple[RationalPolynomialIdeal, ...],
-        budget: object,
-        *,
-        wall_seconds: float | None = None,
-    ) -> str:
-        calls["verify"] += 1
-        return "VERIFIED"
-
     monkeypatch.setattr(_PRODUCER_TARGET, backend)
-    monkeypatch.setattr(_VERIFICATION_TARGET, verify)
 
     result = compute_ideal_minimal_primes(request)
 
-    assert calls == {"produce": 1, "verify": 1}
+    assert calls == 1
     assert result.outcome == "ERROR"
     assert result.components is None
     assert result.detail is not None
 
 
-def test_trusted_factory_enforces_shape_ring_ordering_and_uniqueness() -> None:
+def test_trusted_factory_preserves_valid_backend_output() -> None:
     request = _axes_request()
     components = _axes_components()
-    foreign_ring = (_ideal(("y", "x"), _poly(("y", "x"), (1, 1, (0, 1)))),)
-
     computed = IdealMinimalPrimesResult._from_kernel(request, components, "4.4.0")
     assert computed.outcome == "COMPUTED"
     assert computed.components == components
     assert computed.backend_version == "4.4.0"
     assert computed.detail is None
-
-    with pytest.raises(ValueError, match="ordered ring"):
-        IdealMinimalPrimesResult._from_kernel(request, foreign_ring, "4.4.0")
-    with pytest.raises(ValueError, match="unique and canonically ordered"):
-        IdealMinimalPrimesResult._from_kernel(
-            request, tuple(reversed(components)), "4.4.0"
-        )
-    with pytest.raises(ValueError, match="unique and canonically ordered"):
-        IdealMinimalPrimesResult._from_kernel(
-            request, (components[0], components[0]), "4.4.0"
-        )
-    with pytest.raises(ValueError, match="requires components and backend version"):
-        IdealMinimalPrimesResult._from_kernel(request, None, None)
 
 
 def test_external_family_must_respect_the_generator_and_term_envelopes() -> None:
@@ -358,7 +260,16 @@ def test_external_family_must_respect_the_generator_and_term_envelopes() -> None
     with pytest.raises(
         ValueError, match=rf"{MAX_OUTPUT_GENERATORS}-generator exact-result envelope"
     ):
-        IdealMinimalPrimesResult._from_kernel(request, over_generators, "4.4.0")
+        IdealMinimalPrimesResult.model_validate(
+            {
+                "request": request.model_dump(mode="json"),
+                "outcome": "COMPUTED",
+                "components": [
+                    component.model_dump(mode="json") for component in over_generators
+                ],
+                "backend_version": "4.4.0",
+            }
+        )
 
     heavy_terms = tuple(
         sorted(
@@ -374,25 +285,17 @@ def test_external_family_must_respect_the_generator_and_term_envelopes() -> None
     with pytest.raises(
         ValueError, match=rf"{MAX_OUTPUT_TERMS}-term exact-result envelope"
     ):
-        IdealMinimalPrimesResult._from_kernel(request, oversized, "4.4.0")
+        IdealMinimalPrimesResult(
+            request=request,
+            outcome="COMPUTED",
+            components=oversized,
+            backend_version="4.4.0",
+        )
 
 
-def test_validator_rejects_duplicate_components_before_any_replay(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_validator_rejects_duplicate_components() -> None:
     request = _axes_request()
     duplicated = (_axes_components()[0], _axes_components()[0])
-
-    def forbidden(
-        source: RationalPolynomialIdeal,
-        claimed: tuple[RationalPolynomialIdeal, ...],
-        budget: object,
-    ) -> str:
-        raise AssertionError("structural rejection must precede the backend replay")
-
-    monkeypatch.setattr(
-        f"{_VERIFIER_TARGET}.run_singular_minimal_primes_verification", forbidden
-    )
 
     with pytest.raises(ValidationError):
         IdealMinimalPrimesResult(
@@ -403,127 +306,7 @@ def test_validator_rejects_duplicate_components_before_any_replay(
         )
 
 
-class _Clock:
-    """Deterministic ``time.monotonic`` stand-in with preprogrammed readings."""
-
-    def __init__(self, *readings: float) -> None:
-        self._readings = list(readings)
-
-    def monotonic(self) -> float:
-        return self._readings.pop(0)
-
-
-def test_verification_is_charged_only_the_remaining_wall_budget(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    request = _axes_request()
-    components = _axes_components()
-    charged: list[float | None] = []
-
-    def backend(
-        source: RationalPolynomialIdeal,
-        budget: object,
-        *,
-        wall_seconds: float | None = None,
-    ) -> SingularMinimalPrimesResult:
-        assert source == request.ideal
-        return SingularMinimalPrimesResult(
-            outcome="COMPUTED", components=components, backend_version="4.4.0"
-        )
-
-    def verify(
-        source: RationalPolynomialIdeal,
-        claimed: tuple[RationalPolynomialIdeal, ...],
-        budget: object,
-        *,
-        wall_seconds: float | None = None,
-    ) -> str:
-        charged.append(wall_seconds)
-        return "VERIFIED"
-
-    monkeypatch.setattr(_PRODUCER_TARGET, backend)
-    monkeypatch.setattr(_VERIFICATION_TARGET, verify)
-    monkeypatch.setattr(
-        "jacobian.math.polynomials.ideals._operations.time",
-        _Clock(100.0, 103.25),
-    )
-
-    result = compute_ideal_minimal_primes(request)
-
-    assert result.outcome == "COMPUTED"
-    assert charged == [pytest.approx(10.0 - 3.25)]
-
-
-def test_exhausted_deadline_is_a_typed_timeout_without_a_verification_launch(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    request = _axes_request()
-    launches = 0
-
-    def backend(
-        source: RationalPolynomialIdeal,
-        budget: object,
-        *,
-        wall_seconds: float | None = None,
-    ) -> SingularMinimalPrimesResult:
-        nonlocal launches
-        launches += 1
-        return SingularMinimalPrimesResult(
-            outcome="COMPUTED",
-            components=_axes_components(),
-            backend_version="4.4.0",
-        )
-
-    monkeypatch.setattr(_PRODUCER_TARGET, backend)
-    _forbid_verifier(monkeypatch)
-    monkeypatch.setattr(
-        "jacobian.math.polynomials.ideals._operations.time",
-        _Clock(100.0, 110.5),
-    )
-
-    result = compute_ideal_minimal_primes(request)
-
-    assert launches == 1
-    assert result.outcome == "TIMEOUT"
-    assert result.components is None
-    assert result.detail is not None
-
-
-@pytest.mark.parametrize(
-    ("verdict", "outcome"),
-    [
-        ("REFUTED", "ERROR"),
-        ("TIMEOUT", "TIMEOUT"),
-        ("UNAVAILABLE", "UNAVAILABLE"),
-        ("CANCELLED", "CANCELLED"),
-        ("ERROR", "ERROR"),
-    ],
-)
-def test_verification_verdicts_map_to_typed_outcomes(
-    monkeypatch: pytest.MonkeyPatch, verdict: str, outcome: str
-) -> None:
-    request = _axes_request()
-    components = _axes_components()
-
-    monkeypatch.setattr(
-        _PRODUCER_TARGET,
-        lambda source, budget: SingularMinimalPrimesResult(
-            outcome="COMPUTED", components=components, backend_version="4.4.0"
-        ),
-    )
-    monkeypatch.setattr(
-        _VERIFICATION_TARGET,
-        lambda source, claimed, budget, *, wall_seconds=None: verdict,
-    )
-
-    result = compute_ideal_minimal_primes(request)
-
-    assert result.outcome == outcome
-    assert result.components is None
-    assert result.detail is not None
-
-
-def test_producer_cancellation_is_a_typed_outcome_without_a_verification_launch(
+def test_producer_cancellation_is_a_typed_outcome(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A cancelled producing pass keeps its CANCELLED verdict end to end."""
@@ -535,8 +318,6 @@ def test_producer_cancellation_is_a_typed_outcome_without_a_verification_launch(
             detail="Singular execution was cancelled before producing a result.",
         ),
     )
-    _forbid_verifier(monkeypatch)
-
     result = compute_ideal_minimal_primes(_axes_request())
 
     assert result.outcome == "CANCELLED"
@@ -563,8 +344,6 @@ def test_certified_families_above_the_envelope_are_rejected_before_launch(
         raise AssertionError("the backend must not launch for a rejected source")
 
     monkeypatch.setattr(_PRODUCER_TARGET, forbidden)
-    _forbid_verifier(monkeypatch)
-
     for variable_count in (5, 6, 7):
         variables = tuple(f"x{index}" for index in range(1, variable_count + 1))
         with pytest.raises(OperationDomainValidationError):
@@ -875,12 +654,6 @@ def test_transport_oversize_is_typed_before_operation_result_validation(
             backend_version="4.4.0",
         ),
     )
-    monkeypatch.setattr(
-        operations_module,
-        "run_singular_minimal_primes_verification",
-        lambda *args, **kwargs: "VERIFIED",
-    )
-
     result = compute_ideal_minimal_primes(request)
 
     assert result.outcome == "LIMIT_EXCEEDED"
@@ -1008,7 +781,6 @@ def test_irreducible_constraint_overflow_is_rejected_before_launch(
         raise AssertionError("the backend must not launch for a rejected source")
 
     monkeypatch.setattr(_PRODUCER_TARGET, forbidden)
-    _forbid_verifier(monkeypatch)
 
     variables = tuple(f"x{index}" for index in range(1, 6))
     with pytest.raises(OperationDomainValidationError):

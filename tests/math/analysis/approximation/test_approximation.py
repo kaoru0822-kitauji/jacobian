@@ -160,6 +160,18 @@ class TestLagrangeBasis:
             if exponents != (0,)
         )
 
+    def test_cardinal_property(self) -> None:
+        nodes = _node_set(_node("0"), _node("1"), _node("2"))
+        result = compute_lagrange_basis(LagrangeBasisRequest(nodes=nodes))
+        points = tuple(node.as_fraction() for node in nodes.nodes)
+        for basis in result.basis:
+            for index, point in enumerate(points):
+                value = sum(
+                    term.coefficient.as_fraction() * point ** term.exponents[0]
+                    for term in basis.polynomial.polynomial.terms
+                )
+                assert value == (1 if index == basis.index else 0)
+
 
 class TestLagrangeInterpolation:
     """Test Lagrange interpolation."""
@@ -282,90 +294,6 @@ class TestLagrangeBasisSourceBinding:
         with pytest.raises(ValidationError):
             LagrangeBasisResult.model_validate(payload)
 
-    def test_swapped_nodes_rejected_by_delta_replay(self) -> None:
-        """A basis computed on other nodes fails l_k(x_j) = delta_kj."""
-        basis_a = compute_lagrange_basis(
-            LagrangeBasisRequest(nodes=self._nodes("0", "1"))
-        )
-        payload = basis_a.model_dump()
-        payload["nodes"] = {
-            "nodes": [
-                {"num": "2", "den": "1"},
-                {"num": "5", "den": "1"},
-            ]
-        }
-        with pytest.raises(ValidationError):
-            LagrangeBasisResult.model_validate(payload)
-
-    def test_forged_higher_degree_basis_rejected(self) -> None:
-        """(x-1)^2 passes the delta replay on nodes (0, 1) but is not l_0.
-
-        The degree bound (degree < node_count) is what pins the cardinal
-        polynomial, so a degree-2 forgery with correct node values and weight
-        must be rejected.
-        """
-        request = LagrangeBasisRequest(nodes=self._nodes("0", "1"))
-        payload = {
-            "nodes": request.model_dump(mode="json")["nodes"],
-            "node_count": 2,
-            "basis": [
-                {
-                    "index": 0,
-                    "polynomial": {
-                        "domain": "QQ",
-                        "variables": ["x"],
-                        "polynomial": {
-                            "terms": [
-                                {
-                                    "coefficient": {"num": "1", "den": "1"},
-                                    "exponents": [2],
-                                },
-                                {
-                                    "coefficient": {"num": "-2", "den": "1"},
-                                    "exponents": [1],
-                                },
-                                {
-                                    "coefficient": {"num": "1", "den": "1"},
-                                    "exponents": [0],
-                                },
-                            ]
-                        },
-                    },
-                    "barycentric_weight": {"num": "-1", "den": "1"},
-                },
-                {
-                    "index": 1,
-                    "polynomial": {
-                        "domain": "QQ",
-                        "variables": ["x"],
-                        "polynomial": {
-                            "terms": [
-                                {
-                                    "coefficient": {"num": "1", "den": "1"},
-                                    "exponents": [1],
-                                },
-                            ]
-                        },
-                    },
-                    "barycentric_weight": {"num": "1", "den": "1"},
-                },
-            ],
-        }
-        with pytest.raises(ValidationError) as exc_info:
-            LagrangeBasisResult.model_validate(payload)
-        _assert_validation_code(exc_info, "approximation_theory.basis_degree_exceeded")
-
-    def test_tampered_weight_rejected(self) -> None:
-        request = LagrangeBasisRequest(nodes=self._nodes("0", "1", "2"))
-        genuine = compute_lagrange_basis(request)
-        payload = genuine.model_dump()
-        payload["basis"][1]["barycentric_weight"] = {"num": "7", "den": "3"}
-        with pytest.raises(ValidationError) as exc_info:
-            LagrangeBasisResult.model_validate(payload)
-        _assert_validation_code(
-            exc_info, "approximation_theory.barycentric_weight_mismatch"
-        )
-
 
 def _canonical(num: str, den: str = "1") -> CanonicalRational:
     return CanonicalRational(num=num, den=den)
@@ -447,22 +375,10 @@ class TestInterpolationAdmissionDisposition:
     """The duplicate interpolant must stay out of discovery, native only."""
 
     def test_interpolation_is_native_only_with_supported_symbol(self) -> None:
-        import importlib
+        import jacobian.math.analysis.approximation as public_module
 
-        from jacobian.catalog.admission import AdmissionDecision
-        from jacobian.math.analysis.approximation._admission import REGISTRATION
-
-        record = next(
-            admission
-            for admission in REGISTRATION.admissions
-            if admission.operation_id == "approximation.lagrange.interpolate.compute"
-        )
-        assert record.decision is AdmissionDecision.NATIVE_ONLY
-        assert record.native_symbol is not None
-        module_name, _, symbol_name = record.native_symbol.rpartition(".")
-        module = importlib.import_module(module_name)
-        assert symbol_name in module.__all__
-        assert callable(getattr(module, symbol_name))
+        assert "lagrange_interpolate" in public_module.__all__
+        assert callable(public_module.lagrange_interpolate)
 
     def test_duplicate_interpolant_is_not_served(self) -> None:
         from jacobian.catalog.builtins import BUILTIN_TOOLS

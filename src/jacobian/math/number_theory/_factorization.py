@@ -17,20 +17,12 @@ from jacobian.math.number_theory._direct_factorization_models import (
     DivisorListResult,
     FactorizationRequest,
     PrimeFactorizationResult,
-    RadicalResult,
-    SquarefreeResult,
 )
 from jacobian.math.number_theory._factorization_kernels import (
     compute_pratt_certificate,
-    compute_radical,
-    decide_squarefree,
     enumerate_divisors,
-    enumerate_proper_divisors,
     factorize_certified,
     factorize_primes,
-)
-from jacobian.math.number_theory._integer_models import (
-    ArithmeticFunctionRequest,
 )
 
 
@@ -121,25 +113,6 @@ FACTORIZATION_OPERATIONS = (
         ),
     ),
     _operation(
-        operation_id="integer.compute.proper_divisors",
-        title="Enumerate proper divisors",
-        description=(
-            "Enumerate every positive proper divisor exactly, or return UNKNOWN "
-            "when the bounded factorization worker cannot establish it."
-        ),
-        request_model=FactorizationRequest,
-        result_model=DivisorListResult,
-        implementation=enumerate_proper_divisors,
-        tags=("number-theory", "enumeration"),
-        examples=(
-            example(
-                "proper_divisors_12",
-                "Enumerate the proper divisors of 12.",
-                {"value": "12"},
-            ),
-        ),
-    ),
-    _operation(
         operation_id="integer.compute.prime_factorization",
         title="Factor an integer",
         description=(
@@ -158,33 +131,5 @@ FACTORIZATION_OPERATIONS = (
                 {"value": "360"},
             ),
         ),
-    ),
-    _operation(
-        operation_id="integer.decide.squarefree",
-        title="Decide squarefreeness",
-        description=(
-            "Decide whether a bounded nonnegative integer is square-free, or "
-            "return UNKNOWN when the bounded factorization worker cannot decide."
-        ),
-        request_model=ArithmeticFunctionRequest,
-        result_model=SquarefreeResult,
-        implementation=decide_squarefree,
-        tags=("number-theory", "predicate"),
-        examples=(
-            example("squarefree_30", "Check whether 30 is square-free.", {"n": 30}),
-        ),
-    ),
-    _operation(
-        operation_id="integer.compute.radical",
-        title="Compute integer radical",
-        description=(
-            "Compute the product of distinct prime divisors exactly, or return "
-            "UNKNOWN when the bounded factorization worker cannot establish it."
-        ),
-        request_model=ArithmeticFunctionRequest,
-        result_model=RadicalResult,
-        implementation=compute_radical,
-        tags=("number-theory", "arithmetic-function"),
-        examples=(example("radical_360", "Compute the radical of 360.", {"n": 360}),),
     ),
 )

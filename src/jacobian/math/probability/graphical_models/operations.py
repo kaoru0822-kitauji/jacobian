@@ -8,6 +8,7 @@ from fractions import Fraction
 from itertools import combinations
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.probability.graphical_models._validation import (
     validate_d_separation_input,
 )
@@ -17,6 +18,14 @@ from jacobian.math.probability.graphical_models.values import (
     Factor,
     scope_size,
 )
+
+
+def _reject(code: str, message: str, *location: str) -> None:
+    raise OperationDomainValidationError(
+        location=location,
+        code=f"graphical_model.{code}",
+        message=message,
+    )
 
 
 def factor_multiply(left: Factor, right: Factor) -> Factor:
@@ -50,7 +59,7 @@ def factor_marginalize(factor: Factor, variable: int) -> Factor:
     """Sum one variable out of an exact factor, possibly yielding a scalar."""
 
     if variable not in factor.variables:
-        raise ValueError("variable is not in factor")
+        _reject("factor_variable_missing", "variable is not in factor", "variable")
     variables = tuple(item for item in factor.variables if item != variable)
     table: list[CanonicalRational] = []
     for index in range(scope_size(variables, factor.domain_sizes)):
@@ -105,7 +114,14 @@ def d_separation(
 ) -> bool:
     """Decide d-separation by ancestral restriction and moralization."""
 
-    validate_d_separation_input(variable_count, edges, set_a, set_b, set_c)
+    try:
+        validate_d_separation_input(variable_count, edges, set_a, set_b, set_c)
+    except ValueError as error:
+        raise OperationDomainValidationError(
+            location=("edges", "set_a", "set_b", "set_c"),
+            code="graphical_model.d_separation_invalid",
+            message=str(error),
+        ) from error
     parents = _parents(variable_count, edges)
     ancestral = _ancestors(set(set_a) | set(set_b) | set(set_c), parents)
     adjacency: dict[int, set[int]] = {node: set() for node in ancestral}
@@ -144,9 +160,17 @@ def _require_compatible_domains(
     factors: Sequence[Factor], domain_sizes: tuple[int, ...]
 ) -> None:
     if not 1 <= len(domain_sizes) <= MAX_MODEL_VARS:
-        raise ValueError("domain_sizes must describe between 1 and 16 variables")
+        _reject(
+            "domain_size_count",
+            f"domain_sizes must describe between 1 and {MAX_MODEL_VARS} variables",
+            "domain_sizes",
+        )
     if any(factor.domain_sizes != domain_sizes for factor in factors):
-        raise ValueError("all factors must share the exact model domain_sizes")
+        _reject(
+            "factor_domains_mismatch",
+            "all factors must share the exact model domain_sizes",
+            "factors",
+        )
 
 
 def _require_elimination_contract(
@@ -156,7 +180,11 @@ def _require_elimination_contract(
     query_variables: tuple[int, ...],
 ) -> None:
     if not 1 <= len(factors) <= MAX_FACTOR_COUNT:
-        raise ValueError("factor family must contain between 1 and 64 factors")
+        _reject(
+            "factor_count",
+            f"factor family must contain between 1 and {MAX_FACTOR_COUNT} factors",
+            "factors",
+        )
     _require_compatible_domains(factors, domain_sizes)
     model_variables = {variable for factor in factors for variable in factor.variables}
     if query_variables != tuple(sorted(set(query_variables))):

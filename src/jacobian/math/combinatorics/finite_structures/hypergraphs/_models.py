@@ -270,9 +270,7 @@ class HypergraphIndependenceBudget(StrictModel):
         ge=1,
         le=MAX_HYPERGRAPH_INDEPENDENCE_SOLVER_CALLS,
         description=(
-            "Maximum monotone cardinality thresholds submitted during search. "
-            "Independent validation of an externally supplied result may replay "
-            "one additional upper-bound threshold."
+            "Maximum monotone cardinality thresholds submitted during the exact search."
         ),
     )
 
@@ -580,8 +578,7 @@ class EdgeIntersectionsResult(StrictModel):
     ``pair_intersections`` contains every unordered pair exactly once in
     declared edge order.  ``histogram`` is reconstructed from that ledger.
     The maximum, linearity decision, and first canonical violation are derived
-    from the same authoritative entries.  An explicit owner verifier checks
-    the ledger against the retained source hypergraph when required.
+    from the same authoritative entries by the producing kernel.
     """
 
     hypergraph: FiniteHypergraph
@@ -858,9 +855,8 @@ class CliqueExpansionResult(StrictModel):
     share at least one hyperedge.  Each edge's endpoints appear in lexical
     order per the canonical graph value's own convention, independent of the
     source hypergraph's declared ordering, so the value composes directly
-    with downstream graph operations without translation.  This defining
-    property is checked by the explicit owner verifier against the retained
-    source hypergraph.
+    with downstream graph operations without translation. The producing
+    kernel establishes this defining property.
     """
 
     hypergraph: FiniteHypergraph

@@ -25,9 +25,8 @@ class CrossedProductMultiplyRequest(StrictModel):
 class CrossedProductMultiplyResult(StrictModel):
     """An exact sparse product bound to both ordered source operands.
 
-    Kernel output is built with the trusted factory below.  An independently
-    supplied claim can be checked with the explicit owner-local verifier,
-    rather than re-entering multiplication while parsing this value.
+    Kernel output is built with the trusted factory below rather than
+    re-entering multiplication while parsing this value.
     """
 
     left: FiniteCosetCrossedProductElement

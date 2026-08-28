@@ -17,7 +17,6 @@ from jacobian._exact import CanonicalRational
 from jacobian.canonical import format_canonical_integer
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.polynomials.series._models import (
-    MAX_TRUNCATION_ORDER,
     SeriesArithmeticResult,
     SeriesComposeResult,
     SeriesDerivativeResult,
@@ -99,15 +98,6 @@ def _cauchy_convolve(
     ]
 
 
-def _require_matching(
-    left: TruncatedSeries, right: TruncatedSeries, label: str
-) -> None:
-    if left.variable != right.variable:
-        raise ValueError(f"{label} must share the same variable")
-    if left.truncation_order != right.truncation_order:
-        raise ValueError(f"{label} must share the same truncation order")
-
-
 # ---------------------------------------------------------------------------
 # Arithmetic: add / subtract / multiply / scalar multiply
 # ---------------------------------------------------------------------------
@@ -118,7 +108,6 @@ def compute_add(
 ) -> SeriesArithmeticResult:
     """Add two series coefficientwise modulo x^N."""
     _run_admission(lambda: admit_native_add_subtract(left, right))
-    _require_matching(left, right, "operands")
     n = left.truncation_order
     a = _series_fractions(left)
     b = _series_fractions(right)
@@ -132,7 +121,6 @@ def compute_subtract(
 ) -> SeriesArithmeticResult:
     """Subtract two series coefficientwise modulo x^N."""
     _run_admission(lambda: admit_native_add_subtract(left, right))
-    _require_matching(left, right, "operands")
     n = left.truncation_order
     a = _series_fractions(left)
     b = _series_fractions(right)
@@ -146,7 +134,6 @@ def compute_multiply(
 ) -> SeriesMultiplyResult:
     """Multiply two series modulo x^N via Cauchy convolution."""
     _run_admission(lambda: admit_native_multiply(left, right))
-    _require_matching(left, right, "operands")
     n = left.truncation_order
     a = _series_fractions(left)
     b = _series_fractions(right)
@@ -179,8 +166,6 @@ def compute_scalar_multiply(
 def compute_power(series: TruncatedSeries, exponent: int) -> SeriesPowerResult:
     """Compute series^exponent via binary exponentiation modulo x^N."""
     _run_admission(lambda: admit_native_power(series, exponent))
-    if exponent < 0:
-        raise ValueError("negative exponents are not supported in this operation")
     n = series.truncation_order
     a = _series_fractions(series)
 
@@ -256,9 +241,6 @@ def compute_divide(
 ) -> SeriesDivideResult:
     """Compute Q = A / B mod x^N where b_0 != 0."""
     _run_admission(lambda: admit_native_divide(numerator, denominator))
-    _require_matching(numerator, denominator, "operands")
-    if denominator.coefficients[0].as_fraction() == 0:
-        raise ValueError("denominator with zero constant term is not a unit")
     n = numerator.truncation_order
     a = _series_fractions(numerator)
     b = _series_fractions(denominator)
@@ -284,12 +266,6 @@ def _compose_coefficients(
     outer: TruncatedSeries, inner: TruncatedSeries
 ) -> list[Fraction]:
     """Return composition coefficients after the caller admits the operation."""
-
-    _require_matching(outer, inner, "outer and inner series")
-    if inner.coefficients[0].as_fraction() != 0:
-        raise ValueError(
-            "inner series must have zero constant term for composition with a finite prefix"
-        )
     n = outer.truncation_order
     outer_coefficients = _series_fractions(outer)
     inner_coefficients = _series_fractions(inner)
@@ -338,12 +314,6 @@ def compute_reversion(series: TruncatedSeries) -> SeriesReversionResult:
     _run_admission(lambda: admit_native_reversion(series))
     n = series.truncation_order
     f = _series_fractions(series)
-    if f[0] != 0:
-        raise ValueError("reversion requires zero constant term")
-    if n < 2:
-        raise ValueError("reversion requires truncation order >= 2")
-    if f[1] == 0:
-        raise ValueError("reversion requires nonzero linear coefficient")
 
     # G(x) = g_0 + g_1 x + g_2 x^2 + ... such that F(G(x)) = x mod x^N
     # g_0 = 0, g_1 = 1/f_1
@@ -431,8 +401,6 @@ def compute_integral(
     _run_admission(lambda: admit_native_integral(series, output_order))
     n = series.truncation_order
     a = _series_fractions(series)
-    if output_order > n + 1:
-        raise ValueError("output_order must not exceed source_order + 1")
     result = [Fraction(0)] * output_order
     for i in range(1, output_order):
         if i - 1 < n:
@@ -452,10 +420,6 @@ def compute_truncate(
 ) -> SeriesTruncateResult:
     """Truncate a series to a smaller order."""
     _run_admission(lambda: admit_native_truncate(series, target_order))
-    if target_order > series.truncation_order:
-        raise ValueError("target_order must not exceed source truncation order")
-    if target_order > MAX_TRUNCATION_ORDER:
-        raise ValueError("target_order exceeds the public bound")
     a = _series_fractions(series)
     result = a[:target_order]
     return SeriesTruncateResult(
@@ -473,7 +437,6 @@ def compute_identity_check(
 ) -> SeriesIdentityCheckResult:
     """Check if two series are equal mod x^N."""
     _run_admission(lambda: admit_native_identity_check(left, right))
-    _require_matching(left, right, "operands")
     a = _series_fractions(left)
     b = _series_fractions(right)
     for i in range(left.truncation_order):

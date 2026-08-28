@@ -248,7 +248,7 @@ def duquenne_guigues_basis(
             "serialized_result_bytes": 1,
         },
     }
-    return CanonicalImplicationBasisResult._from_kernel(
+    return CanonicalImplicationBasisResult._from_payload(
         _result_payload_with_exact_wire_bytes(payload)
     )
 

@@ -40,6 +40,13 @@ def _validation_error(code: str) -> Iterator[None]:
     assert code in exc_info.value.errors()[0]["type"]
 
 
+@contextmanager
+def _operation_error(code: str) -> Iterator[None]:
+    with pytest.raises(OperationDomainValidationError) as exc_info:
+        yield
+    assert code in exc_info.value.errors()[0]["type"]
+
+
 def _encoder(
     generator: tuple[tuple[int, ...], ...],
     *,
@@ -645,30 +652,33 @@ def test_macwilliams_ternary() -> None:
 
 
 def test_request_rejects_nonprime_field() -> None:
-    with _validation_error("prime"):
-        GeneratorMatrixRequest(
-            field_order=4,
-            generator_matrix=((1,),),
-            coordinate_axis=("x",),
-        )
+    request = GeneratorMatrixRequest(
+        field_order=4,
+        generator_matrix=((1,),),
+        coordinate_axis=("x",),
+    )
+    with _operation_error("prime"):
+        compute_from_generator(request)
 
 
 def test_request_rejects_bad_entry() -> None:
-    with _validation_error("residues"):
-        GeneratorMatrixRequest(
-            field_order=2,
-            generator_matrix=((2,),),
-            coordinate_axis=("x",),
-        )
+    request = GeneratorMatrixRequest(
+        field_order=2,
+        generator_matrix=((2,),),
+        coordinate_axis=("x",),
+    )
+    with _operation_error("residues"):
+        compute_from_generator(request)
 
 
 def test_code_producer_requests_reject_ambiguous_coordinate_axes() -> None:
-    with _validation_error("match_the_generator_matrix_columns"):
-        GeneratorMatrixRequest(
-            field_order=2,
-            generator_matrix=((1, 1),),
-            coordinate_axis=("x",),
-        )
+    request = GeneratorMatrixRequest(
+        field_order=2,
+        generator_matrix=((1, 1),),
+        coordinate_axis=("x",),
+    )
+    with _operation_error("match_the_generator_matrix_columns"):
+        compute_from_generator(request)
 
 
 def test_syndrome_request_rejects_bad_word_length() -> None:

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.combinatorics.matroids._models import (
     LinearMatroid,
+    MatroidClosureRequest,
+    MatroidClosureResult,
     validate_subset_indices,
 )
 from jacobian.math.matrices.finite_fields.linear_algebra import (
@@ -66,3 +69,19 @@ def compute_matroid_closure(
     """
     validate_subset_indices(matroid, subset)
     return _closure_invariant(matroid, subset)
+
+
+def compute_closure(request: MatroidClosureRequest) -> MatroidClosureResult:
+    """Compute the closure for the catalog's typed request."""
+
+    try:
+        closure, subset_rank = compute_matroid_closure(
+            request.matroid, list(request.subset)
+        )
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=("subset",),
+            code="matroid.subset.invalid",
+            message=str(exc),
+        ) from exc
+    return MatroidClosureResult._from_kernel(request, closure, subset_rank)

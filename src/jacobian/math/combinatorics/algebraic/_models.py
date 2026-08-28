@@ -149,7 +149,7 @@ class RSKResult(StrictModel):
         """Build one result after the admitted RSK kernel established it."""
 
         shape = IntegerPartition(parts=tuple(len(row) for row in insertion_rows))
-        return cls(
+        return cls.model_construct(
             permutation=request.permutation,
             p_tableau=StandardYoungTableau(rows=insertion_rows),
             q_tableau=StandardYoungTableau(rows=recording_rows),

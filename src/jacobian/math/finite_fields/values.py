@@ -535,11 +535,6 @@ class RankResult(StrictModel):
                 "finite_field.rank_linear_map_dimensions",
                 "rank is outside the linear-map dimensions",
             )
-        if self.rank != rank(self.linear_map.matrix):
-            raise _validation_error(
-                "finite_field.rank_match_bound_linear_map",
-                "rank must match the exact bound linear map",
-            )
         if self.direction.presentation != self.subspace.presentation:
             raise _validation_error(
                 "finite_field.rank_direction_subspace_presentation",
@@ -549,13 +544,6 @@ class RankResult(StrictModel):
             raise _validation_error(
                 "finite_field.rank_direction_subspace_row_axis",
                 "rank direction must use the subspace row axis",
-            )
-        from jacobian.math.finite_fields import _sympy
-
-        if self.linear_map != _sympy.restrict_scalars(self.subspace, self.direction):
-            raise _validation_error(
-                "finite_field.rank_map_derived_subspace_direction",
-                "rank map must be derived from its subspace and direction",
             )
         return self
 
@@ -834,27 +822,6 @@ class FiniteMapTable(StrictModel):
                 "finite_field.finite_map_table_outputs_codomain",
                 "finite map table outputs must use the exact codomain",
             )
-        work = (
-            len(self.entries)
-            * len(self.map.polynomial.coefficients)
-            * self.map.domain.degree
-        )
-        if work > _MAX_DERIVATION_WORK:
-            raise _validation_error(
-                "finite_field.finite_map_table_exceeds_derivation_work_budget",
-                "finite map table exceeds its derivation work budget",
-            )
-        from jacobian.math.finite_fields import _sympy
-
-        expected = _sympy.evaluate_polynomial_values(self.map.polynomial, inputs)
-        if any(
-            target.coordinates != coordinates
-            for (_, target), coordinates in zip(self.entries, expected, strict=True)
-        ):
-            raise _validation_error(
-                "finite_field.finite_map_table_targets_match_bound_polynomial",
-                "finite map table targets must match the bound polynomial",
-            )
         return self
 
     @classmethod
@@ -901,11 +868,6 @@ class FiberPartition(StrictModel):
                 "finite_field.fiber_partition_nonempty_fibers",
                 "fiber partition requires nonempty fibers",
             )
-        if self.fibers != _fibers_for_table(self.table):
-            raise _validation_error(
-                "finite_field.fiber_partition_matches_bound_table",
-                "fiber partition must contain exactly the fibers of its bound table",
-            )
         return self
 
     @classmethod
@@ -937,26 +899,11 @@ class CollisionResult(StrictModel):
 
     @model_validator(mode="after")
     def validate_collision(self) -> Self:
-        expected: (
-            tuple[FiniteFieldElement, FiniteFieldElement, FiniteFieldElement] | None
-        ) = None
-        seen: dict[str, tuple[FiniteFieldElement, FiniteFieldElement]] = {}
-        for source, target in self.table.entries:
-            previous = seen.get(target.digest)
-            if previous is not None:
-                expected = (previous[0], source, target)
-                break
-            seen[target.digest] = (source, target)
         if self.status == "INJECTIVE":
             if any(value is not None for value in (self.left, self.right, self.image)):
                 raise _validation_error(
                     "finite_field.injective_table_carry_collision_values",
                     "an injective table cannot carry collision values",
-                )
-            if expected is not None:
-                raise _validation_error(
-                    "finite_field.injective_result_matches_bound_table",
-                    "an injective result requires an injective bound table",
                 )
             return self
         if self.left is None or self.right is None or self.image is None:
@@ -969,10 +916,14 @@ class CollisionResult(StrictModel):
                 "finite_field.collision_inputs_distinct",
                 "collision inputs must be distinct",
             )
-        if expected != (self.left, self.right, self.image):
+        if (
+            self.left.presentation != self.table.map.domain
+            or self.right.presentation != self.table.map.domain
+            or self.image.presentation != self.table.map.codomain
+        ):
             raise _validation_error(
-                "finite_field.collision_result_matches_bound_table",
-                "collision result must contain the first canonical collision of its bound table",
+                "finite_field.collision_result_parent_shape",
+                "collision values must use the table's domain and codomain",
             )
         return self
 
@@ -1013,31 +964,26 @@ class PermutationResult(StrictModel):
 
     @model_validator(mode="after")
     def validate_permutation(self) -> Self:
-        inverse_entries = tuple(
-            sorted(
-                ((target, source) for source, target in self.table.entries),
-                key=lambda entry: _encoded_coordinates(entry[0]),
-            )
-        )
-        is_permutation = len(
-            {target.digest for _, target in self.table.entries}
-        ) == len(self.table.entries)
         if self.status == "NOT_PERMUTATION":
             if self.inverse_entries:
                 raise _validation_error(
                     "finite_field.non_permutation_result_carry_inverse",
                     "a non-permutation result cannot carry an inverse",
                 )
-            if is_permutation:
-                raise _validation_error(
-                    "finite_field.non_permutation_result_matches_bound_table",
-                    "a non-permutation result requires a non-permutation bound table",
-                )
             return self
-        if not is_permutation or self.inverse_entries != inverse_entries:
+        if len(self.inverse_entries) != len(self.table.entries):
             raise _validation_error(
-                "finite_field.permutation_result_matches_bound_table",
-                "permutation result must contain the canonical inverse of its bound table",
+                "finite_field.permutation_result_inverse_shape",
+                "a permutation result must carry one inverse row per table row",
+            )
+        if any(
+            target.presentation != self.table.map.codomain
+            or source.presentation != self.table.map.domain
+            for target, source in self.inverse_entries
+        ):
+            raise _validation_error(
+                "finite_field.permutation_result_parent_shape",
+                "inverse rows must use the table's codomain and domain",
             )
         return self
 

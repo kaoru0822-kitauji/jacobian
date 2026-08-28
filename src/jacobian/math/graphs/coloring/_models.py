@@ -21,11 +21,20 @@ from jacobian.math.graphs.values import (
 # shared 256-vertex axis are no more expensive in the vertex-coloring formula.
 MAX_COLORING_VERTICES = MAX_INDEXED_SIMPLE_GRAPH_VERTICES
 MAX_EDGE_COLORING_VERTICES = MAX_COLORING_VERTICES
-MAX_EDGE_COLORING_EDGES = 64 * 63 // 2
+_DENSE_COLORING_REFERENCE_ORDER = 64
+MAX_COLORING_COLORS = _DENSE_COLORING_REFERENCE_ORDER
+MAX_EDGE_COLORING_EDGES = (
+    _DENSE_COLORING_REFERENCE_ORDER * (_DENSE_COLORING_REFERENCE_ORDER - 1) // 2
+)
 # Edge coloring has one inequality for every incident pair of edges.  A K_64
 # has 64 * C(63, 2) such pairs; this is the retained bound on the materialized
 # edge-coloring formula and checker, independently of the vertex count.
-MAX_EDGE_COLORING_CONFLICT_PAIRS = 64 * 63 * 62 // 2
+MAX_EDGE_COLORING_CONFLICT_PAIRS = (
+    _DENSE_COLORING_REFERENCE_ORDER
+    * (_DENSE_COLORING_REFERENCE_ORDER - 1)
+    * (_DENSE_COLORING_REFERENCE_ORDER - 2)
+    // 2
+)
 # Polynomial-time checks (independent_set.maximal, edge_coloring.check) and
 # SAT-based operations use the shared 256-vertex graph axis.  The derived
 # edge-variable and incident-pair limits above bound formula construction;
@@ -67,15 +76,6 @@ IndexedColoringGraph = Annotated[
 ]
 
 
-def _is_proper_vertex_coloring(
-    graph: IndexedSimpleUndirectedGraph,
-    coloring: tuple[int, ...],
-) -> bool:
-    """Check whether a coloring assigns distinct colors to adjacent vertices."""
-
-    return all(coloring[u] != coloring[v] for u, v in graph.edges)
-
-
 def _edge_coloring_graph_schema() -> JsonSchemaValue:
     """Project the edge-coloring input bounds onto the shared graph schema."""
 
@@ -111,17 +111,6 @@ def _incident_edge_index_pairs_for_canonical_graph(
             for b in range(a + 1, len(indices)):
                 pairs.append((indices[a], indices[b]))
     return pairs
-
-
-def _is_proper_edge_coloring(
-    graph: SimpleUndirectedGraph,
-    coloring: tuple[int, ...],
-) -> bool:
-    """Check whether a coloring assigns distinct colors to incident edges."""
-    for a, b in _incident_edge_index_pairs_for_canonical_graph(graph):
-        if coloring[a] == coloring[b]:
-            return False
-    return True
 
 
 def _edge_coloring_conflict_pair_count(graph: SimpleUndirectedGraph) -> int:
@@ -166,46 +155,11 @@ def _require_coloring_sequence(
             )
 
 
-def _require_conflicting_pair(
-    graph: SimpleUndirectedGraph,
-    coloring: tuple[int, ...],
-    blocking_edge: tuple[str, str],
-    conflicting_edge: tuple[str, str],
-) -> None:
-    if blocking_edge == conflicting_edge:
-        raise PydanticCustomError(
-            "graph.conflicting_edge_pair_must_be_distinct",
-            "conflicting edge pair must be distinct",
-        )
-    edge_index = {edge: idx for idx, edge in enumerate(graph.edges)}
-    for edge in (blocking_edge, conflicting_edge):
-        if edge[0] >= edge[1]:
-            raise PydanticCustomError(
-                "graph.blocking_edges_must_be_canonical_pairs_with_left",
-                "blocking edges must be canonical pairs with left < right",
-            )
-        if edge not in edge_index:
-            raise PydanticCustomError(
-                "graph.blocking_edges_must_be_edges_of_the_graph",
-                "blocking edges must be edges of the graph",
-            )
-    if not set(blocking_edge) & set(conflicting_edge):
-        raise PydanticCustomError(
-            "graph.conflicting_edges_must_share_a_vertex",
-            "conflicting edges must share a vertex",
-        )
-    if coloring[edge_index[blocking_edge]] != coloring[edge_index[conflicting_edge]]:
-        raise PydanticCustomError(
-            "graph.conflicting_edges_must_have_the_same_color",
-            "conflicting edges must have the same color",
-        )
-
-
 class KColorabilityRequest(StrictModel):
     """Decide whether a bounded simple graph admits a proper ``k``-coloring."""
 
     graph: IndexedColoringGraph
-    colors: int = Field(ge=1, le=64)
+    colors: int = Field(ge=1, le=MAX_COLORING_COLORS)
     solver_conflicts: int = Field(
         default=DEFAULT_SOLVER_CONFLICT_BUDGET,
         ge=1,
@@ -223,7 +177,7 @@ class KColorabilityResult(StrictModel):
     """Whether a proper ``k``-coloring exists, with one coloring witness."""
 
     graph: IndexedColoringGraph
-    colors: int = Field(ge=1, le=64)
+    colors: int = Field(ge=1, le=MAX_COLORING_COLORS)
     solver_conflicts: int = Field(
         default=DEFAULT_SOLVER_CONFLICT_BUDGET,
         ge=1,
@@ -247,7 +201,7 @@ class KColorabilityResult(StrictModel):
     ) -> Self:
         """Construct a result already established by the owner-local kernel."""
 
-        return cls(
+        return cls.model_construct(
             graph=graph,
             colors=colors,
             solver_conflicts=solver_conflicts,
@@ -259,7 +213,6 @@ class KColorabilityResult(StrictModel):
 
     @model_validator(mode="after")
     def require_claim_consistency(self) -> Self:
-        _require_indexed_coloring_graph(self.graph)
         if self.vertex_count != self.graph.vertex_count:
             raise PydanticCustomError(
                 "graph.vertex_count_must_equal_the_graph_s_vertex_count",
@@ -315,11 +268,6 @@ def _require_k_colorability_positive_witness(result: KColorabilityResult) -> Non
             "graph.coloring_values_must_be_in_0_colors_1",
             "coloring values must be in 0..colors-1",
         )
-    if not _is_proper_vertex_coloring(result.graph, result.coloring):
-        raise PydanticCustomError(
-            "graph.coloring_witness_must_be_a_proper_vertex_colorin",
-            "coloring witness must be a proper vertex coloring",
-        )
 
 
 def _require_k_colorability_negative_shape(result: KColorabilityResult) -> None:
@@ -341,11 +289,10 @@ class MaximalIndependentSetRequest(StrictModel):
     """One canonical candidate set in a bounded simple graph."""
 
     graph: IndexedColoringGraph
-    candidate_set: tuple[int, ...] = Field(max_length=64)
+    candidate_set: tuple[int, ...] = Field(max_length=MAX_COLORING_VERTICES)
 
     @model_validator(mode="after")
     def require_canonical_candidate_set(self) -> Self:
-        _require_indexed_coloring_graph(self.graph)
         if tuple(sorted(self.candidate_set)) != self.candidate_set:
             raise PydanticCustomError(
                 "graph.candidate_set_must_be_strictly_increasing",
@@ -426,7 +373,7 @@ class EdgeColoringAssignment(StrictModel):
     """
 
     graph: EdgeColoringGraph
-    colors: StrictInt = Field(ge=1, le=64)
+    colors: StrictInt = Field(ge=1, le=MAX_COLORING_COLORS)
     coloring: tuple[StrictInt, ...] = Field(
         max_length=MAX_EDGE_COLORING_EDGES,
         description=(
@@ -437,7 +384,6 @@ class EdgeColoringAssignment(StrictModel):
 
     @model_validator(mode="after")
     def require_bounded_assignment(self) -> Self:
-        _require_edge_coloring_graph_bound(self.graph)
         _require_coloring_sequence(self.graph, self.coloring, self.colors)
         return self
 
@@ -485,18 +431,13 @@ def _require_positive_witness(result: EdgeKColorabilityResult) -> None:
             "graph.witness_must_bind_the_result_s_own_graph_and_pal",
             "witness must bind the result's own graph and palette",
         )
-    if not _is_proper_edge_coloring(result.graph, result.coloring.coloring):
-        raise PydanticCustomError(
-            "graph.coloring_witness_must_be_a_proper_edge_coloring",
-            "coloring witness must be a proper edge coloring",
-        )
 
 
 class EdgeKColorabilityRequest(StrictModel):
     """Decide whether a simple graph admits a proper ``k``-edge-coloring."""
 
     graph: EdgeColoringGraph
-    colors: StrictInt = Field(ge=1, le=64)
+    colors: StrictInt = Field(ge=1, le=MAX_COLORING_COLORS)
     solver_conflicts: StrictInt = Field(
         default=DEFAULT_SOLVER_CONFLICT_BUDGET,
         ge=1,
@@ -514,7 +455,7 @@ class EdgeKColorabilityResult(StrictModel):
     """Whether a proper ``k``-edge-coloring exists, with one coloring witness."""
 
     graph: SimpleUndirectedGraph
-    colors: StrictInt = Field(ge=1, le=64)
+    colors: StrictInt = Field(ge=1, le=MAX_COLORING_COLORS)
     solver_conflicts: StrictInt = Field(
         default=DEFAULT_SOLVER_CONFLICT_BUDGET,
         ge=1,
@@ -538,7 +479,7 @@ class EdgeKColorabilityResult(StrictModel):
     ) -> Self:
         """Construct a result already established by the owner-local kernel."""
 
-        return cls(
+        return cls.model_construct(
             graph=graph,
             colors=colors,
             solver_conflicts=solver_conflicts,
@@ -550,7 +491,6 @@ class EdgeKColorabilityResult(StrictModel):
 
     @model_validator(mode="after")
     def require_witness_consistency(self) -> Self:
-        _require_edge_coloring_graph_bound(self.graph)
         if self.edge_count != len(self.graph.edges):
             raise PydanticCustomError(
                 "graph.edge_count_must_equal_the_number_of_graph_edges",
@@ -585,16 +525,24 @@ class EdgeColoringCheckResult(StrictModel):
     blocking_edge: tuple[str, str] | None = None
     conflicting_edge: tuple[str, str] | None = None
 
+    @classmethod
+    def _from_kernel(
+        cls,
+        *,
+        assignment: EdgeColoringAssignment,
+        proper: bool,
+        blocking_edge: tuple[str, str] | None,
+        conflicting_edge: tuple[str, str] | None,
+    ) -> Self:
+        return cls.model_construct(
+            assignment=assignment,
+            proper=proper,
+            blocking_edge=blocking_edge,
+            conflicting_edge=conflicting_edge,
+        )
+
     @model_validator(mode="after")
     def require_blocking_edge_consistency(self) -> Self:
-        actual_proper = _is_proper_edge_coloring(
-            self.assignment.graph, self.assignment.coloring
-        )
-        if self.proper != actual_proper:
-            raise PydanticCustomError(
-                "graph.proper_flag_does_not_match_the_submitted_colorin",
-                "proper flag does not match the submitted coloring",
-            )
         if self.proper:
             if self.blocking_edge is not None or self.conflicting_edge is not None:
                 raise PydanticCustomError(
@@ -607,10 +555,4 @@ class EdgeColoringCheckResult(StrictModel):
                 "graph.an_improper_coloring_must_carry_a_conflicting_ed",
                 "an improper coloring must carry a conflicting edge pair",
             )
-        _require_conflicting_pair(
-            self.assignment.graph,
-            self.assignment.coloring,
-            self.blocking_edge,
-            self.conflicting_edge,
-        )
         return self

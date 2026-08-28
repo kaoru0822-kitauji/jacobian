@@ -1,8 +1,4 @@
-"""Bounded admission for transition-Parikh profiles.
-
-This is intentionally separate from ``_admission``: catalog registration
-imports owner tools, while the operation owner constructs the per-call plan.
-"""
+"""Request-scoped bounds and prepared state for transition-Parikh profiles."""
 
 from __future__ import annotations
 

@@ -68,8 +68,6 @@ def _validate_prime_shift_interval(lower_bound: int, upper_bound: int) -> None:
         raise ValueError("upper_bound must be >= 1")
     if upper_bound < lower_bound:
         raise ValueError("upper_bound must be >= lower_bound")
-    if upper_bound - lower_bound + 1 > MAX_SHIFT_INTERVAL_WIDTH:
-        raise ValueError("interval width exceeds maximum supported width")
 
 
 class PrimeShiftProfileRequest(StrictModel):
@@ -91,6 +89,8 @@ def require_prime_shift_profile_admission(
     actual segmented-sieve work and complete result still fit.
     """
     _validate_prime_shift_interval(lower_bound, upper_bound)
+    if upper_bound - lower_bound + 1 > MAX_SHIFT_INTERVAL_WIDTH:
+        raise ValueError("interval width exceeds maximum supported width")
     result_bytes = _profile_result_byte_bound(lower_bound, upper_bound)
     if result_bytes > MAX_SHIFT_RESULT_BYTES:
         raise ValueError("interval result exceeds the canonical output budget")
@@ -148,9 +148,10 @@ class PrimeShiftProfileResult(StrictModel):
     @model_validator(mode="after")
     def bind_row_axis(self) -> Self:
         _validate_prime_shift_interval(self.lower_bound, self.upper_bound)
-        expected_axis = tuple(range(self.lower_bound, self.upper_bound + 1))
-        actual_axis = tuple(row.n for row in self.rows)
-        if actual_axis != expected_axis:
+        width = self.upper_bound - self.lower_bound + 1
+        if len(self.rows) != width or any(
+            row.n != self.lower_bound + offset for offset, row in enumerate(self.rows)
+        ):
             raise ValueError(
                 "rows must contain exactly one consecutive n for every value "
                 "in the declared interval"

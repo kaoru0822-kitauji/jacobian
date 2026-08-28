@@ -5,6 +5,7 @@ from typing import TypedDict
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.topology._models import (
     MAX_BARYCENTRIC_SOURCE_FACES,
     BarycentricSubdivisionRequest,
@@ -469,7 +470,9 @@ class TestShellingCheck:
         assert result.is_shelling
 
     def test_invalid_order(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(
+            OperationDomainValidationError, match="permutation of facet indices"
+        ):
             compute_shelling_check(
                 ShellingCheckRequest(complex=_complex(EDGE), facet_order=(1, 0))
             )

@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian.canonical import CanonicalLimits, canonicalize_json
-from jacobian.catalog.models import OperationResult
+from jacobian.catalog.models import OperationDomainValidationError, OperationResult
 from jacobian.math.graphs.decomposition.tree_decompositions import TreeDecomposition
 from jacobian.math.graphs.decomposition.tree_decompositions._models import (
     AdhesionsRequest,
@@ -192,8 +192,9 @@ class TestReroot:
         # ASCII labels are unchanged by NFC, so the canonical projection
         # itself exceeds the limit and admission must still reject.
         td = _labeled_path_decomposition(node_count=256, label_body="x" * 394)
-        with pytest.raises(ValidationError) as exc_info:
-            RerootRequest(decomposition=td, root=td.tree_nodes[0])
+        request = RerootRequest(decomposition=td, root=td.tree_nodes[0])
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_reroot(request)
         assert exc_info.value.errors()[0]["type"] == (
             "graph.reroot_result_exceeds_transport_limit"
         )
@@ -209,8 +210,9 @@ class TestReroot:
             tree_edges=((nodes[0], nodes[1]),),
             bags=(("a",), ("a",)),
         )
-        with pytest.raises(ValidationError) as exc_info:
-            RerootRequest(decomposition=td, root=nodes[0])
+        request = RerootRequest(decomposition=td, root=nodes[0])
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_reroot(request)
         assert exc_info.value.errors()[0]["type"] == (
             "graph.reroot_tree_node_labels_collide_after_normalization"
         )
@@ -233,11 +235,12 @@ class TestRestrict:
         # pruned if it is contained in its neighbor {a,b}.
 
     def test_rejects_vertices_outside_the_source_graph(self) -> None:
-        with pytest.raises(ValidationError):
-            RestrictRequest(
-                decomposition=_path_decomposition(),
-                subset=("a", "missing"),
-            )
+        request = RestrictRequest(
+            decomposition=_path_decomposition(),
+            subset=("a", "missing"),
+        )
+        with pytest.raises(OperationDomainValidationError, match="declared source"):
+            compute_restrict(request)
 
     def test_prunes_against_the_contracted_tree(self) -> None:
         decomposition = TreeDecomposition(

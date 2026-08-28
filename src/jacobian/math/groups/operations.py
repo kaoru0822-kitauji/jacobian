@@ -6,9 +6,9 @@ from typing import Any
 
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.groups._models import (
+    MAX_GROUP_DEGREE,
     PermutationGroup,
     SubgroupEntry,
-    _full_permutation_form,
 )
 
 __all__ = [
@@ -29,6 +29,12 @@ def _backend_group(group: PermutationGroup) -> Any:
     )
 
 
+def _full_permutation_form(permutation: Any, degree: int) -> tuple[int, ...]:
+    form = list(permutation.array_form)
+    form.extend(range(len(form), degree))
+    return tuple(form)
+
+
 def group_order(group: PermutationGroup) -> int:
     """Return the exact order of a permutation group via Schreier-Sims."""
     return int(_backend_group(group).order())
@@ -42,7 +48,7 @@ def element_order(degree: int, generator: list[int]) -> int:
         raise OperationDomainValidationError(
             location=("degree",),
             code="group.degree_out_of_range",
-            message="group degree must be between 1 and 64",
+            message=f"group degree must be between 1 and {MAX_GROUP_DEGREE}",
         )
     if len(generator) != degree or sorted(generator) != list(range(degree)):
         raise OperationDomainValidationError(
@@ -74,17 +80,15 @@ def group_conjugacy_classes(
     array forms over ``0..n-1``). The result is canonically ordered: members
     of each class are sorted lexicographically and classes are sorted by
     their smallest member, so equal groups serialize identically. The
-    generated group must have order at most 5000 (degree up to 64 alone
-    does not bound enumeration; e.g., S8 has order 40320); larger groups
-    are rejected before enumeration.
+    Groups beyond the owner-local order bound are rejected before enumeration.
     """
     from sympy.combinatorics import Permutation, PermutationGroup
 
-    if not 1 <= degree <= 64:
+    if not 1 <= degree <= MAX_GROUP_DEGREE:
         raise OperationDomainValidationError(
             location=("degree",),
             code="group.degree_out_of_range",
-            message="group degree must be between 1 and 64",
+            message=f"group degree must be between 1 and {MAX_GROUP_DEGREE}",
         )
     if not generators:
         raise OperationDomainValidationError(
@@ -171,13 +175,16 @@ def _require_admitted_lattice_source(group: PermutationGroup) -> Any:
     from jacobian.math.groups._models import MAX_SUBGROUP_LATTICE_GROUP_ORDER
 
     backend_group = _backend_group(group)
-    if int(backend_group.order()) > MAX_SUBGROUP_LATTICE_GROUP_ORDER:
+    order = int(backend_group.order())
+    if order > MAX_SUBGROUP_LATTICE_GROUP_ORDER:
         raise OperationDomainValidationError(
             location=("group",),
             code="group.order_bound",
             message=(
-                "subgroup lattice computation is bounded to groups of order "
-                f"at most {MAX_SUBGROUP_LATTICE_GROUP_ORDER}"
+                f"group order {order} exceeds the bounded maximum "
+                f"{MAX_SUBGROUP_LATTICE_GROUP_ORDER}; subgroup lattice enumeration "
+                "is bounded to groups of order at most "
+                f"{MAX_SUBGROUP_LATTICE_GROUP_ORDER}"
             ),
         )
     return backend_group

@@ -14,7 +14,7 @@ from jacobian._models import StrictModel, canonicalize_json_containers
 from jacobian.canonical import format_canonical_integer, parse_canonical_integer
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.combinatorics.additive._subset_sum_target_kernel import (
-    _attained_sum_interval,
+    SubsetSumWorkLimitError,
     _solve_subset_sum_target,
 )
 from jacobian.math.combinatorics.additive.values import (
@@ -25,14 +25,7 @@ from jacobian.math.combinatorics.additive.values import (
 
 MAX_SUBSET_SUM_INTEGER_DIGITS = 256
 MAX_SUBSET_SUM_REACHABLE_STATES = 65_536
-MAX_SUBSET_SUM_TRANSITIONS_PER_PASS = 500_000
-# One complete public call performs two charged DP-equivalent passes: request
-# admission and the solver kernel. Independent claims are checked explicitly
-# by the owner verifier, rather than as a result-model side effect.
-MAX_SUBSET_SUM_COMPLETE_CALL_PASSES = 2
-MAX_SUBSET_SUM_TOTAL_TRANSITIONS = (
-    MAX_SUBSET_SUM_COMPLETE_CALL_PASSES * MAX_SUBSET_SUM_TRANSITIONS_PER_PASS
-)
+MAX_SUBSET_SUM_TRANSITIONS = 500_000
 MAX_SUBSET_SUM_SOURCE_WIRE_BYTES = 4 * 1024 * 1024
 MAX_SUBSET_SUM_RECONSTRUCTED_DIGITS = 262
 
@@ -55,7 +48,7 @@ _SubsetSumTargetSource = Annotated[
     IndexedIntegerSequence,
     WithJsonSchema(
         indexed_sequence_item_ceiling(
-            MAX_SUBSET_SUM_TRANSITIONS_PER_PASS,
+            MAX_SUBSET_SUM_TRANSITIONS,
             maximum_item_digits=MAX_SUBSET_SUM_INTEGER_DIGITS,
         )
     ),
@@ -91,12 +84,11 @@ def _raw_source_item_count(source: object) -> int | None:
         return None
 
     item_count = len(values)
-    if item_count > MAX_SUBSET_SUM_TRANSITIONS_PER_PASS:
+    if item_count > MAX_SUBSET_SUM_TRANSITIONS:
         raise _validation_error(
             "_raw_source_item_count",
             "subset-sum request exceeds the "
-            f"{MAX_SUBSET_SUM_TOTAL_TRANSITIONS:,}-transition complete-call "
-            "bound across admission and computation",
+            f"{MAX_SUBSET_SUM_TRANSITIONS:,}-transition work bound",
         )
 
     source_wire_bound = 64
@@ -110,85 +102,10 @@ def _raw_source_item_count(source: object) -> int | None:
         if source_wire_bound > MAX_SUBSET_SUM_SOURCE_WIRE_BYTES:
             raise _validation_error(
                 "_raw_source_item_count",
-                "subset-sum source exceeds the 4 MiB wire-size bound",
+                "subset-sum source exceeds the "
+                f"{MAX_SUBSET_SUM_SOURCE_WIRE_BYTES:,}-byte wire-size bound",
             )
     return item_count
-
-
-def _require_admitted_work(
-    values: tuple[int, ...],
-    target: int,
-    *,
-    allow_empty_subset: bool,
-) -> None:
-    """Bound the kernel's insert-only passes with their exact reachable sums.
-
-    Every admissible subset sum lies in the attained interval from
-    ``_attained_sum_interval``, so a target outside that closed interval is
-    exactly unattainable before any state exists; with the empty subset
-    inadmissible the interval excludes its zero, so strictly one-signed
-    sources resolve a zero target without expansion. Admission resolves such
-    targets with no expansion, and the kernel returns the same decision
-    without building any state.
-
-    Otherwise admission simulates the same reachable-sum growth the kernel
-    performs and stops at the first source prefix whose canonical witness
-    resolves the target. A resolved request is bounded only by the work
-    through that prefix, because every witness inside a resolving prefix
-    carries a strictly smaller incidence mask than any witness of the later
-    expansion; the resolving scan itself is charged before its prefix is
-    accepted, so the charged work includes every scanned state. A request the
-    prefix simulation never resolves must fit the exhaustive reachable-state and
-    transition bounds across the whole source before execution.
-
-    The public path performs this scan once for request admission and runs the
-    kernel once for computation. Each pass inspects the same reachable states
-    through the same prefix, so charging two identical per-pass ceilings bounds
-    every accepted complete call by
-    ``MAX_SUBSET_SUM_TOTAL_TRANSITIONS``.
-    """
-
-    lower, upper = _attained_sum_interval(
-        values,
-        allow_empty_subset=allow_empty_subset,
-    )
-    if not lower <= target <= upper:
-        # Outside the attained interval no admissible subset sum can equal
-        # the target.
-        return
-    states: set[int] = {0} if allow_empty_subset else set()
-    if target in states:
-        # The retained empty witness is already the globally smallest mask.
-        return
-    transitions = 0
-    for value in values:
-        if not allow_empty_subset and value == target:
-            return
-        transitions += len(states) + (0 if allow_empty_subset else 1)
-        if transitions > MAX_SUBSET_SUM_TRANSITIONS_PER_PASS:
-            raise OperationDomainValidationError(
-                location=("source",),
-                code="additive_combinatorics.subset_sum.transition_bound",
-                message=(
-                    "subset-sum request exceeds the "
-                    f"{MAX_SUBSET_SUM_TOTAL_TRANSITIONS:,}-transition complete-call "
-                    "bound across admission and computation"
-                ),
-            )
-        if any(subtotal + value == target for subtotal in states):
-            return
-
-        grown = {subtotal + value for subtotal in states}
-        if not allow_empty_subset and value not in states:
-            grown.add(value)
-        grown.update(states)
-        if len(grown) > MAX_SUBSET_SUM_REACHABLE_STATES:
-            raise OperationDomainValidationError(
-                location=("source",),
-                code="additive_combinatorics.subset_sum.state_bound",
-                message="subset-sum request exceeds the 65,536-reachable-state bound",
-            )
-        states = grown
 
 
 class SubsetSumTargetRequest(StrictModel):
@@ -198,9 +115,10 @@ class SubsetSumTargetRequest(StrictModel):
         description=(
             "The materialized indexed integers available for selection; "
             "request admission bounds this operation to at most "
-            f"{MAX_SUBSET_SUM_TRANSITIONS_PER_PASS:,} items of at most "
-            f"{MAX_SUBSET_SUM_INTEGER_DIGITS} digits each with a 4 MiB wire "
-            "bound across the whole source."
+            f"{MAX_SUBSET_SUM_TRANSITIONS:,} items of at most "
+            f"{MAX_SUBSET_SUM_INTEGER_DIGITS} digits each with a "
+            f"{MAX_SUBSET_SUM_SOURCE_WIRE_BYTES:,}-byte wire bound across the "
+            "whole source."
         )
     )
     target: _SubsetSumTargetScalar = Field(
@@ -242,8 +160,8 @@ class SubsetSumTargetRequest(StrictModel):
         _raw_source_item_count(prepared.get("source"))
         raw_target = prepared.get("target")
         if isinstance(raw_target, str):
-            # Admitted sources hold at most 500,000 items of 256 digits each,
-            # so no attainable subset sum is wider than this raw bound.
+            # The named source item and digit bounds derive the attainable-sum
+            # width represented by this raw ceiling.
             _require_integer_digits(
                 raw_target, "target", MAX_SUBSET_SUM_RECONSTRUCTED_DIGITS
             )
@@ -337,12 +255,11 @@ class SubsetSumTargetResult(StrictModel):
         if len(indices) > MAX_SUBSET_SUM_REACHABLE_STATES:
             raise _validation_error(
                 "bound_raw_result",
-                "subset-sum witness exceeds the 65,536-index result bound",
+                "subset-sum witness exceeds the "
+                f"{MAX_SUBSET_SUM_REACHABLE_STATES:,}-index result bound",
             )
         maximum_index = (
-            item_count
-            if item_count is not None
-            else MAX_SUBSET_SUM_TRANSITIONS_PER_PASS
+            item_count if item_count is not None else MAX_SUBSET_SUM_TRANSITIONS
         )
         for index in indices:
             if type(index) is int and not 0 <= index < maximum_index:
@@ -387,14 +304,33 @@ def solve_subset_sum_target_request(
 ) -> SubsetSumTargetResult:
     """Decide one admitted exact target and return its canonical witness."""
 
-    _admit_subset_sum_target(request)
-    values = tuple(parse_canonical_integer(value) for value in request.source.items)
-    target = parse_canonical_integer(request.target)
-    indices = _solve_subset_sum_target(
-        values,
-        target,
-        allow_empty_subset=request.allow_empty_subset,
-    )
+    values, target = _admit_subset_sum_target(request)
+    try:
+        indices = _solve_subset_sum_target(
+            values,
+            target,
+            allow_empty_subset=request.allow_empty_subset,
+            maximum_transitions=MAX_SUBSET_SUM_TRANSITIONS,
+            maximum_states=MAX_SUBSET_SUM_REACHABLE_STATES,
+        )
+    except SubsetSumWorkLimitError as error:
+        if error.kind == "transitions":
+            raise OperationDomainValidationError(
+                location=("source",),
+                code="additive_combinatorics.subset_sum.transition_bound",
+                message=(
+                    "subset-sum request exceeds the "
+                    f"{MAX_SUBSET_SUM_TRANSITIONS:,}-transition work bound"
+                ),
+            ) from error
+        raise OperationDomainValidationError(
+            location=("source",),
+            code="additive_combinatorics.subset_sum.state_bound",
+            message=(
+                "subset-sum request exceeds the "
+                f"{MAX_SUBSET_SUM_REACHABLE_STATES:,}-reachable-state bound"
+            ),
+        ) from error
     if indices is None:
         return SubsetSumTargetResult._from_kernel(request, None)
 
@@ -405,7 +341,9 @@ def _validation_error(reason: str, message: str) -> PydanticCustomError:
     return PydanticCustomError(f"additive_combinatorics.{reason}", message)
 
 
-def _admit_subset_sum_target(request: SubsetSumTargetRequest) -> None:
+def _admit_subset_sum_target(
+    request: SubsetSumTargetRequest,
+) -> tuple[tuple[int, ...], int]:
     """Admit one native target query before invoking the subset-sum kernel."""
 
     source_wire_bound = 64 + sum(len(value) + 4 for value in request.source.items)
@@ -413,7 +351,10 @@ def _admit_subset_sum_target(request: SubsetSumTargetRequest) -> None:
         raise OperationDomainValidationError(
             location=("source",),
             code="additive_combinatorics.subset_sum.source_wire_bound",
-            message="subset-sum source exceeds the 4 MiB wire-size bound",
+            message=(
+                "subset-sum source exceeds the "
+                f"{MAX_SUBSET_SUM_SOURCE_WIRE_BYTES:,}-byte wire-size bound"
+            ),
         )
     for value in request.source.items:
         if len(value.lstrip("-")) > MAX_SUBSET_SUM_INTEGER_DIGITS:
@@ -427,8 +368,4 @@ def _admit_subset_sum_target(request: SubsetSumTargetRequest) -> None:
             )
     values = tuple(parse_canonical_integer(value) for value in request.source.items)
     target = parse_canonical_integer(request.target)
-    _require_admitted_work(
-        values,
-        target,
-        allow_empty_subset=request.allow_empty_subset,
-    )
+    return values, target

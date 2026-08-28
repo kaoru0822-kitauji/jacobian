@@ -259,6 +259,20 @@ def test_json_list_at_the_item_ceiling_remains_admitted_and_canonical() -> None:
     assert admitted.source.items == ("0",) * MAX_SUBSET_SUM_ITEMS
 
 
+@pytest.mark.scale
+def test_profile_budget_charges_only_the_single_producing_pass() -> None:
+    item_count = 1_000
+    request = _request(*((1,) * item_count))
+
+    envelope = subset_sum_profile_envelope(request.source)
+    result = compute_subset_sum_profile(request)
+
+    assert envelope.transition_bound == 2 * item_count * (item_count + 1)
+    assert result.support_size == item_count + 1
+    assert result.entries[0].multiplicity == "1"
+    assert result.entries[-1].multiplicity == "1"
+
+
 @pytest.mark.parametrize(
     ("prefix", "message"),
     [
@@ -284,7 +298,7 @@ def test_request_schema_exposes_source_shape_and_character_bounds() -> None:
 
     assert items_schema["maxItems"] == MAX_SUBSET_SUM_ITEMS
     assert items_schema["items"]["maxLength"] == MAX_SUBSET_SUM_ITEM_DIGITS + 1
-    assert "4*n*S" in source_description
+    assert "2*n*S" in source_description
     assert f"{MAX_SUBSET_SUM_DP_TRANSITIONS:,}" in source_description
     assert f"{MAX_SUBSET_SUM_PROFILE_RESULT_BYTES:,} bytes" in source_description
 

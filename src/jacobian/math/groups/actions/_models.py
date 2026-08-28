@@ -94,14 +94,6 @@ def _canonical_subset_positions(
     return tuple(sorted(subset))
 
 
-def _generated_group_order(action: FinitePermutationAction) -> int:
-    """Return the exact generated-group order without enumerating its elements."""
-    from sympy.combinatorics import Permutation, PermutationGroup
-
-    generators = [Permutation(list(generator)) for generator in action.generators]
-    return int(PermutationGroup(generators).order())
-
-
 class _ActionRequest(StrictModel):
     """Shared request shape: one finite permutation action."""
 
@@ -144,13 +136,7 @@ class ActionBoundSubset(StrictModel):
 
 
 class SubsetCanonicalizationRequest(StrictModel):
-    """Request a canonical image of an action-bound subset under its action.
-
-    The subset carries the action giving its positions meaning. The generated
-    group must have order at most 10000; validation establishes that bound with
-    SymPy's Schreier--Sims order computation
-    before the kernel enumerates any group elements.
-    """
+    """Request a canonical image of an action-bound subset under its action."""
 
     subset: ActionBoundSubset = Field(
         description=(
@@ -158,16 +144,6 @@ class SubsetCanonicalizationRequest(StrictModel):
             f"The generated group must have order at most {MAX_GROUP_ORDER}."
         )
     )
-
-    @model_validator(mode="after")
-    def bound_generated_group_order(self) -> Self:
-        order = _generated_group_order(self.subset.action)
-        if order > MAX_GROUP_ORDER:
-            raise _validation_error(
-                "group_order_exceeds_bound",
-                f"group order {order} exceeds the bounded maximum {MAX_GROUP_ORDER}",
-            )
-        return self
 
 
 class SubsetCanonicalizationResult(StrictModel):
@@ -256,7 +232,7 @@ class SubsetCanonicalizationResult(StrictModel):
         orbit_size: int,
         stabilizer_size: int,
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             source_subset=source_subset,
             canonical_subset=canonical_subset,
             transporter=transporter,
@@ -364,7 +340,7 @@ class ElementCyclesResult(StrictModel):
         fixed_points: tuple[int, ...],
         support: tuple[int, ...],
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             action=action,
             element=element,
             permutation=permutation,
@@ -448,7 +424,7 @@ class CycleIndexResult(StrictModel):
         degree: int,
         cycle_type_counts: tuple[tuple[tuple[int, ...], int], ...],
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             action=action,
             group_order=group_order,
             degree=degree,
@@ -517,7 +493,7 @@ class BurnsideCountResult(StrictModel):
         fixed_point_contributions: tuple[int, ...],
         orbit_count: int,
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             action=action,
             group_order=group_order,
             fixed_point_sum=sum(fixed_point_contributions),
@@ -589,4 +565,6 @@ class PolyaInventoryResult(StrictModel):
         degree: int,
         terms: tuple[tuple[tuple[int, ...], int], ...],
     ) -> Self:
-        return cls(action=action, colors=colors, degree=degree, terms=terms)
+        return cls.model_construct(
+            action=action, colors=colors, degree=degree, terms=terms
+        )

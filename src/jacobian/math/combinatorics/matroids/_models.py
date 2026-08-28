@@ -146,10 +146,6 @@ class MatroidClosureResult(MatroidClosureRequest):
 
     @model_validator(mode="after")
     def require_bounded_canonical_claim(self) -> Self:
-        try:
-            validate_subset_indices(self.matroid, self.subset)
-        except ValueError as exc:
-            raise _validation_error("subset.invalid", str(exc)) from exc
         if self.closure != tuple(sorted(set(self.closure))):
             raise _validation_error(
                 "closure.canonical",
@@ -176,7 +172,7 @@ class MatroidClosureResult(MatroidClosureRequest):
     ) -> Self:
         """Construct trusted output of the owner-local closure kernel."""
 
-        return cls(
+        return cls.model_construct(
             matroid=request.matroid,
             subset=request.subset,
             closure=closure,

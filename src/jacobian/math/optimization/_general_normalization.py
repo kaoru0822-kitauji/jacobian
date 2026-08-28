@@ -7,6 +7,8 @@ from fractions import Fraction
 
 from jacobian._exact import CanonicalRational
 from jacobian.math.optimization._general_models import (
+    MAX_GENERAL_LINEAR_PROGRAM_CONSTRAINTS,
+    MAX_GENERAL_LINEAR_PROGRAM_VARIABLES,
     GeneralFormRationalLinearProgram,
 )
 from jacobian.math.optimization._models import (
@@ -138,13 +140,15 @@ def normalize_general_program(
     for source_index, coefficient in enumerate(source_objective):
         for column, multiplier in columns[source_index]:
             objective[column] += sense_sign * coefficient * multiplier
-    if len(standard_names) > 32:
+    if len(standard_names) > MAX_GENERAL_LINEAR_PROGRAM_VARIABLES:
         raise ValueError(
-            "general linear-program normalized variables exceed the 32-entry bound"
+            "general linear-program normalized variables exceed the "
+            f"{MAX_GENERAL_LINEAR_PROGRAM_VARIABLES}-entry bound"
         )
-    if len(rows) > 64:
+    if len(rows) > MAX_GENERAL_LINEAR_PROGRAM_CONSTRAINTS:
         raise ValueError(
-            "general linear-program normalized rows exceed the 64-entry bound"
+            "general linear-program normalized rows exceed the "
+            f"{MAX_GENERAL_LINEAR_PROGRAM_CONSTRAINTS}-entry bound"
         )
     standard = StandardFormRationalLinearProgram.admit_derived_intermediate(
         {
@@ -248,29 +252,14 @@ def _mapped_certificate_digit_bound(normalization: GeneralLinearNormalization) -
     )
 
 
-def normalized_point_digit_bound(program: GeneralFormRationalLinearProgram) -> int:
-    return _mapped_point_digit_bound(normalize_general_program(program))
-
-
-def normalized_residual_digit_bound(program: GeneralFormRationalLinearProgram) -> int:
-    return _mapped_residual_digit_bound(normalize_general_program(program))
-
-
-def normalized_certificate_digit_bound(
-    program: GeneralFormRationalLinearProgram,
-) -> int:
-    return _mapped_certificate_digit_bound(normalize_general_program(program))
-
-
-def estimated_mapped_result_bytes(program: GeneralFormRationalLinearProgram) -> int:
+def estimated_mapped_result_bytes(normalization: GeneralLinearNormalization) -> int:
     """Upper-bound the wired bytes of any outcome this program can return."""
 
-    normalization = normalize_general_program(program)
     point_unit = 2 * _mapped_point_digit_bound(normalization) + 32
     residual_unit = 2 * _mapped_residual_digit_bound(normalization) + 32
     certificate_unit = 2 * _mapped_certificate_digit_bound(normalization) + 32
     variables = len(normalization.offsets)
-    rows = len(program.constraints)
+    rows = len(normalization.source_rows)
     # Each status carries its full replayable block: optimal adds the primal
     # residual sums plus one certificate family, unbounded swaps duals for the
     # recession ray, infeasible carries only Farkas coordinates, and unknown
@@ -286,24 +275,23 @@ def estimated_mapped_result_bytes(program: GeneralFormRationalLinearProgram) -> 
     return 4096 + max(optimal_bytes, unbounded_bytes, infeasible_bytes)
 
 
-def require_admitted_general_normalization(
+def admit_general_normalization(
     program: GeneralFormRationalLinearProgram,
-) -> None:
+) -> GeneralLinearNormalization:
     """Preflight the whole standard expansion and the mapped public result."""
 
-    if estimated_mapped_result_bytes(program) > MAX_LINEAR_PROGRAM_RESULT_BYTES:
+    normalization = normalize_general_program(program)
+    if estimated_mapped_result_bytes(normalization) > MAX_LINEAR_PROGRAM_RESULT_BYTES:
         raise ValueError(
             "general linear-program mapped result can exceed the "
             f"{MAX_LINEAR_PROGRAM_RESULT_BYTES}-byte result bound"
         )
+    return normalization
 
 
 __all__ = [
     "GeneralLinearNormalization",
+    "admit_general_normalization",
     "estimated_mapped_result_bytes",
     "normalize_general_program",
-    "normalized_certificate_digit_bound",
-    "normalized_point_digit_bound",
-    "normalized_residual_digit_bound",
-    "require_admitted_general_normalization",
 ]

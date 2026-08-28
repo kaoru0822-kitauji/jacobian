@@ -11,6 +11,9 @@ from jacobian._models import StrictModel
 
 MAX_RANK = 8
 MAX_REFLECTION_COORDINATE = ((1 << 53) - 1) // (1 + 3 * MAX_RANK)
+MAX_POSITIVE_ROOTS = 120
+MAX_ROOT_COORDINATE = 6
+MAX_COXETER_NUMBER = 30
 # E8 is the largest finite crystallographic Weyl group at the admitted rank.
 MAX_WEYL_GROUP_ORDER = 696_729_600
 
@@ -33,45 +36,6 @@ class CartanMatrixRequest(StrictModel):
         )
     )
 
-    @model_validator(mode="after")
-    def require_valid_cartan(self) -> Self:
-        n = len(self.matrix)
-        if n < 1 or n > MAX_RANK:
-            raise _validation_error(
-                "rank_out_of_range", f"rank must be between 1 and {MAX_RANK}"
-            )
-        for row in self.matrix:
-            if len(row) != n:
-                raise _validation_error("not_square", "Cartan matrix must be square")
-        for i in range(n):
-            if self.matrix[i][i] != 2:
-                raise _validation_error("diagonal_entry", "diagonal entries must be 2")
-        self._check_off_diagonal(n)
-        return self
-
-    def _check_off_diagonal(self, n: int) -> None:
-        for i in range(n):
-            for j in range(n):
-                if i == j:
-                    continue
-                aij = self.matrix[i][j]
-                aji = self.matrix[j][i]
-                if aij > 0:
-                    raise _validation_error(
-                        "positive_off_diagonal",
-                        "off-diagonal entries must be non-positive",
-                    )
-                if aij * aji not in (0, 1, 2, 3):
-                    raise _validation_error(
-                        "off_diagonal_product",
-                        "off-diagonal product must be 0, 1, 2, or 3",
-                    )
-                if (aij == 0) != (aji == 0):
-                    raise _validation_error(
-                        "zero_pattern",
-                        "generalized Cartan matrix requires a_ij == 0 iff a_ji == 0",
-                    )
-
 
 class PositiveRootsResult(CartanMatrixRequest):
     """The positive roots of a root system."""
@@ -91,9 +55,12 @@ class PositiveRootsResult(CartanMatrixRequest):
                 "positive_roots_count",
                 "num_positive_roots must equal the number of positive roots",
             )
-        if len(self.positive_roots) > 120 or any(
+        if len(self.positive_roots) > MAX_POSITIVE_ROOTS or any(
             len(root) != self.rank
-            or any(coordinate < 0 or coordinate > 6 for coordinate in root)
+            or any(
+                coordinate < 0 or coordinate > MAX_ROOT_COORDINATE
+                for coordinate in root
+            )
             or not any(root)
             for root in self.positive_roots
         ):
@@ -136,7 +103,6 @@ class RootSystemDataResult(StrictModel):
 
     @model_validator(mode="after")
     def require_root_data_shape(self) -> Self:
-        CartanMatrixRequest(matrix=self.cartan_matrix)
         rank = len(self.cartan_matrix)
         if self.rank != rank or self.num_positive_roots != len(self.positive_roots):
             raise _validation_error(
@@ -145,12 +111,18 @@ class RootSystemDataResult(StrictModel):
             )
         if any(
             len(root) != rank
-            or any(coordinate < 0 or coordinate > 6 for coordinate in root)
+            or any(
+                coordinate < 0 or coordinate > MAX_ROOT_COORDINATE
+                for coordinate in root
+            )
             or not any(root)
             for root in self.positive_roots
         ) or any(
             len(root) != rank
-            or any(coordinate < -6 or coordinate > 0 for coordinate in root)
+            or any(
+                coordinate < -MAX_ROOT_COORDINATE or coordinate > 0
+                for coordinate in root
+            )
             or not any(root)
             for root in self.negative_roots
         ):
@@ -176,19 +148,22 @@ class RootSystemDataResult(StrictModel):
             or any(not 0 <= index < rank for index in component.simple_root_indices)
             or any(
                 len(root) != rank
-                or any(coordinate < 0 or coordinate > 6 for coordinate in root)
+                or any(
+                    coordinate < 0 or coordinate > MAX_ROOT_COORDINATE
+                    for coordinate in root
+                )
                 or not any(root)
                 for root in component.positive_roots
             )
             or len(component.highest_root) != rank
             or any(
-                coordinate < 0 or coordinate > 6
+                coordinate < 0 or coordinate > MAX_ROOT_COORDINATE
                 for coordinate in component.highest_root
             )
             or len(component.marks) != len(component.simple_root_indices)
-            or any(mark < 0 or mark > 6 for mark in component.marks)
+            or any(mark < 0 or mark > MAX_ROOT_COORDINATE for mark in component.marks)
             or component.coxeter_number < 2
-            or component.coxeter_number > 49
+            or component.coxeter_number > MAX_COXETER_NUMBER
             for component in self.components
         ):
             raise _validation_error(
@@ -253,31 +228,6 @@ class SimpleReflectionRequest(StrictModel):
         ),
     )
 
-    @model_validator(mode="after")
-    def require_valid(self) -> Self:
-        n = len(self.matrix)
-        if n < 1 or n > MAX_RANK:
-            raise _validation_error(
-                "rank_out_of_range", f"rank must be between 1 and {MAX_RANK}"
-            )
-        if self.simple_index >= n:
-            raise _validation_error(
-                "simple_index_out_of_range", "simple_index out of range"
-            )
-        if len(self.vector) != n:
-            raise _validation_error(
-                "vector_length_mismatch", "vector length must match rank"
-            )
-        if any(
-            abs(coordinate) > MAX_REFLECTION_COORDINATE for coordinate in self.vector
-        ):
-            raise _validation_error(
-                "vector_coordinate_out_of_range",
-                "vector coordinates must fit the bounded reflected-coordinate domain",
-            )
-        CartanMatrixRequest(matrix=self.matrix)
-        return self
-
 
 class SimpleReflectionResult(StrictModel):
     """Result of applying a simple reflection to a vector."""
@@ -289,11 +239,6 @@ class SimpleReflectionResult(StrictModel):
 
     @model_validator(mode="after")
     def require_reflection_shape(self) -> Self:
-        SimpleReflectionRequest(
-            matrix=self.matrix,
-            vector=self.vector,
-            simple_index=self.simple_index,
-        )
         if len(self.reflected_vector) != len(self.vector) or any(
             abs(coordinate) > MAX_REFLECTION_COORDINATE
             for coordinate in self.reflected_vector
@@ -321,11 +266,6 @@ class WeylGroupOrderResult(StrictModel):
 
     matrix: tuple[tuple[int, ...], ...]
     group_order: int = Field(ge=1, le=MAX_WEYL_GROUP_ORDER)
-
-    @model_validator(mode="after")
-    def require_order_domain(self) -> Self:
-        CartanMatrixRequest(matrix=self.matrix)
-        return self
 
     @classmethod
     def _from_kernel(cls, request: CartanMatrixRequest, group_order: int) -> Self:

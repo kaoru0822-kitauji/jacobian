@@ -24,7 +24,6 @@ from typing import Any
 from jacobian.math.polynomials.values import RationalPolynomial
 
 __all__ = [
-    "FACTOR_VERIFY_WALL_SECONDS",
     "FACTOR_WORK_WALL_SECONDS",
     "FactorBackendExhaustedError",
     "FactorBackendFailureError",
@@ -43,10 +42,6 @@ FACTOR_WORK_WALL_SECONDS = 20.0
 _FACTOR_ADDRESS_SPACE_BYTES = 4 * 1024 * 1024 * 1024
 _FACTOR_STDOUT_LIMIT = 64 * 1024 * 1024
 _FACTOR_STDERR_LIMIT = 1024 * 1024
-
-# Explicit verification may replay a factorization that already succeeded once
-# inside the operation budget, so it gets a wider bounded margin.
-FACTOR_VERIFY_WALL_SECONDS = 60.0
 
 
 class FactorBackendExhaustedError(Exception):

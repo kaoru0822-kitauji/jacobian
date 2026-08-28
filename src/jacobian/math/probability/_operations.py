@@ -22,7 +22,6 @@ from jacobian.math.probability._distribution import (
     FiniteConvolutionRequest,
     FiniteConvolutionResult,
     FiniteDistributionAtom,
-    FiniteEventProbabilityResult,
     FiniteEventRequest,
     FinitePushforwardContribution,
     FinitePushforwardRequest,
@@ -295,27 +294,6 @@ def _raw_moment(
     )
 
 
-def _event_probability(
-    request: FiniteEventRequest,
-) -> FiniteEventProbabilityResult:
-    from flint import fmpq
-
-    _admit_event(request, require_positive=False)
-    selected_values = {value.as_fraction() for value in request.event_values}
-    selected = tuple(
-        atom
-        for atom in request.distribution.atoms
-        if atom.value.as_fraction() in selected_values
-    )
-    total = fmpq(0)
-    for atom in selected:
-        total += _fmpq(atom.probability)
-    return FiniteEventProbabilityResult._from_kernel(
-        event_probability=_wire(total),
-        selected_atoms=selected,
-    )
-
-
 def _condition(
     request: FiniteConditionRequest,
 ) -> FiniteConditionResult:
@@ -576,39 +554,6 @@ FINITE_PROBABILITY_OPERATIONS = (
                 {
                     "atoms": _FAIR_BIT["atoms"],
                     "order": 2,
-                },
-            ),
-        ),
-    ),
-    MathTool(
-        operation_id="probability.finite_distribution.event_probability.compute",
-        title="Exact finite-event probability",
-        description=(
-            "Sum the exact mass of one explicit subset of a canonical finite "
-            "rational distribution and preserve every selected atom."
-        ),
-        request_type=FiniteEventRequest,
-        result_type=FiniteEventProbabilityResult,
-        run=_event_probability,
-        tags=("probability", "event", "finite", "exact", "python-flint"),
-        examples=(
-            example(
-                "fair_bit_is_one",
-                "Compute the exact probability that a fair bit equals one.",
-                {
-                    "distribution": _FAIR_BIT,
-                    "event_values": [{"num": "1", "den": "1"}],
-                },
-            ),
-            example(
-                "fair_die_event_subset",
-                "Compute a fair-die event probability; event values must be increasing, bounded, and supported by the distribution.",
-                {
-                    "distribution": _FAIR_DIE_3,
-                    "event_values": [
-                        {"num": "0", "den": "1"},
-                        {"num": "2", "den": "1"},
-                    ],
                 },
             ),
         ),

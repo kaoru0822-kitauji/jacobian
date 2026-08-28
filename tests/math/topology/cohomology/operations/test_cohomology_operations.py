@@ -586,28 +586,13 @@ class TestInstabilityDegreeAdmission:
         )
 
 
-class TestCatalogAdmission:
-    """Owner-local admission expectations for the cohomology domain."""
+class TestCatalogPublication:
+    """Public and native-only cohomology operations stay distinct."""
 
-    def test_bockstein_is_native_only(self) -> None:
-        from jacobian.catalog.admission import AdmissionDecision
-        from jacobian.math.topology.cohomology.operations._admission import ADMISSIONS
-
-        record = next(
-            entry
-            for entry in ADMISSIONS
-            if entry.operation_id == "cohomology.bockstein.compute"
-        )
-        assert record.decision is AdmissionDecision.NATIVE_ONLY
-
-    def test_published_catalog_keeps_only_the_steenrod_square(self) -> None:
-        from jacobian.catalog.admission import curate_public_tools
-        from jacobian.math.topology.cohomology.operations._admission import ADMISSIONS
+    def test_published_manifest_keeps_only_the_steenrod_square(self) -> None:
         from jacobian.math.topology.cohomology.operations._tools import TOOLS
 
-        published = tuple(
-            tool.operation_id for tool in curate_public_tools(TOOLS, ADMISSIONS)
-        )
+        published = tuple(tool.operation_id for tool in TOOLS)
         assert published == ("cohomology.steenrod_square.compute",)
 
     def test_bockstein_native_symbol_is_supported(self) -> None:

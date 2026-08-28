@@ -65,7 +65,7 @@ class HankelMomentMatrix(StrictModel):
         variable: str,
     ) -> Self:
         """Build a trusted matrix result without replaying exact elimination."""
-        return cls(
+        return cls.model_construct(
             order=order,
             entries=entries,
             determinant=determinant,
@@ -140,7 +140,7 @@ class OrthogonalPolynomialFamily(StrictModel):
         is_quasi_definite: bool,
         is_positive_definite: bool,
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             polynomials=polynomials,
             variable=variable,
             is_quasi_definite=is_quasi_definite,
@@ -179,7 +179,7 @@ class ThreeTermRecurrence(StrictModel):
         beta: tuple[CanonicalRational, ...],
         variable: str,
     ) -> Self:
-        return cls(alpha=alpha, beta=beta, variable=variable)
+        return cls.model_construct(alpha=alpha, beta=beta, variable=variable)
 
 
 class ChristoffelDarbouxKernel(StrictModel):
@@ -225,7 +225,7 @@ class ChristoffelDarbouxKernel(StrictModel):
         variable: str,
         family: OrthogonalPolynomialFamily,
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             degree=degree,
             coefficients=coefficients,
             variable=variable,
@@ -285,7 +285,7 @@ class GaussianQuadratureRule(StrictModel):
         variable: str,
         prefix: MomentFunctionalPrefix,
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             order=order,
             nodes=nodes,
             variable=variable,
@@ -382,7 +382,7 @@ class JacobiMatrix(StrictModel):
         matrix: tuple[tuple[CanonicalRational, ...], ...],
         variable: str,
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             alphas=alphas,
             betas=betas,
             matrix=matrix,

@@ -283,10 +283,6 @@ class SolvableResult(StrictModel):
             group=group,
         )
 
-    @model_validator(mode="after")
-    def require_group_certificate(self) -> Self:
-        return self
-
 
 __all__ = [
     "FiniteFieldFactor",

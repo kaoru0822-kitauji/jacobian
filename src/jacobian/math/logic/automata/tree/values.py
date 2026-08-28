@@ -240,7 +240,7 @@ class ReachableStateProfile(StrictModel):
     ) -> Self:
         """Construct the canonical profile emitted by the trusted kernel."""
 
-        return cls(
+        return cls.model_construct(
             automaton=automaton,
             reachable_states=reachable_states,
             unreachable_states=unreachable_states,
@@ -366,22 +366,6 @@ def _priced_saturation(
     sorted_transitions = tuple(sorted(automaton.transitions, key=_transition_key))
     choices, scan_rounds = _saturate_choices(sorted_transitions, automaton.state_count)
     return sorted_transitions, sort_work, per_scan_work, scan_rounds, choices
-
-
-def reachability_price_components(
-    automaton: BottomUpTreeAutomaton,
-) -> tuple[int, int, int]:
-    """Return the exact sort, scan, and measured-round prices for one pass."""
-
-    _, sort_work, per_scan_work, scan_rounds, _ = _priced_saturation(automaton)
-    return sort_work, per_scan_work, scan_rounds
-
-
-def reachability_execution_work_bound(automaton: BottomUpTreeAutomaton) -> int:
-    """Price one native profile: one pass and its bounded witness output."""
-
-    sort_work, per_scan_work, scan_rounds = reachability_price_components(automaton)
-    return sort_work + scan_rounds * per_scan_work + 3 * MAX_REACHABILITY_WITNESS_NODES
 
 
 def _transition_key(

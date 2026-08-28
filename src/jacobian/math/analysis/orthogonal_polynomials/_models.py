@@ -6,7 +6,6 @@ from pydantic import Field
 from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
-from jacobian.math._rational_height import RationalHeight
 from jacobian.math.analysis.orthogonal_polynomials.values import (
     MAX_HANKEL_ORDER,
     MAX_POLYNOMIAL_DEGREE,
@@ -18,17 +17,6 @@ from jacobian.math.analysis.orthogonal_polynomials.values import (
 
 def _validation_error(reason: str, message: str) -> PydanticCustomError:
     return PydanticCustomError(f"moments_orthogonal.{reason}", message)
-
-
-def _require_moment_height(
-    prefix: MomentFunctionalPrefix, count: int, bound: int, reason: str, message: str
-) -> None:
-    """Apply a request-local exact-height envelope without running a kernel."""
-    if any(
-        RationalHeight.from_canonical(value).exceeds(bound)
-        for value in prefix.moments[:count]
-    ):
-        raise _validation_error(reason, message)
 
 
 class HankelRequest(StrictModel):

@@ -17,10 +17,10 @@ from jacobian.math.finite_categories.values import (
 
 
 class CategoryProfileResult(StrictModel):
-    """A bounded profile claim for one finite category.
+    """A bounded hom-set profile for one finite category.
 
-    Its source and result shape are structural.  The owner-local verifier
-    checks the derived hom-set and endomorphism counts for supplied claims.
+    Its source and result shape are structural. Defining count evidence belongs
+    to the producing kernel's tests rather than result deserialization.
     """
 
     objects: tuple[CategoryIdentifier, ...] = Field(max_length=MAX_CATEGORY_OBJECTS)
@@ -45,7 +45,7 @@ class CategoryProfileResult(StrictModel):
     ) -> Self:
         """Build a profile result from the trusted owner-local kernel."""
 
-        return cls(
+        return cls.model_construct(
             objects=category.objects,
             num_objects=len(category.objects),
             num_morphisms=len(category.morphisms),

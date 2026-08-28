@@ -1,8 +1,11 @@
 """Tests for incidence structure operations."""
 
+from typing import Literal
+
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.combinatorics.designs.incidence_structures._models import (
     ComplementRequest,
     ContainmentProfileRequest,
@@ -360,11 +363,47 @@ class TestDerivedResidual:
         assert result.blocks == (("p2", "p3"),)
         assert result.source_blocks == ("b2",)
 
+    @pytest.mark.parametrize(
+        ("incidence", "point", "kind"),
+        (
+            (
+                IncidenceStructure(
+                    points=("p1", "p2"),
+                    block_ids=("b1",),
+                    blocks=(("p1",),),
+                ),
+                "p2",
+                "derived",
+            ),
+            (
+                IncidenceStructure(
+                    points=("p1", "p2"),
+                    block_ids=("b1",),
+                    blocks=(("p1", "p2"),),
+                ),
+                "p1",
+                "residual",
+            ),
+        ),
+    )
+    def test_empty_derived_or_residual_structure_is_exact(
+        self,
+        incidence: IncidenceStructure,
+        point: str,
+        kind: Literal["derived", "residual"],
+    ) -> None:
+        result = compute_derived_residual(
+            DerivedResidualRequest(incidence=incidence, point=point, kind=kind)
+        )
+
+        assert result.block_ids == ()
+        assert result.blocks == ()
+        assert result.source_blocks == ()
+
     def test_derived_at_nonexistent_point(self) -> None:
-        with pytest.raises(ValueError):
-            compute_derived_residual(
-                DerivedResidualRequest(incidence=STRUCTURE, point="pX")
-            )
+        request = DerivedResidualRequest(incidence=STRUCTURE, point="pX")
+        with pytest.raises(OperationDomainValidationError, match="declared point"):
+            compute_derived_residual(request)
 
 
 class TestLeviGraph:

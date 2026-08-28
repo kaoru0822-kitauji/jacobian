@@ -24,16 +24,12 @@ from jacobian.math.graphs.optimization._invariant_models import (
     GraphCliqueNumberResult,
     GraphCoreRequest,
     GraphCoreResult,
-    GraphDiameterResult,
     GraphEdgeConnectivityResult,
-    GraphEulerianResult,
     GraphGirthResult,
     GraphInvariantRequest,
     GraphMaximumMatchingRequest,
     GraphMaximumMatchingResult,
-    GraphRadiusResult,
     GraphSpanningTreeCountResult,
-    GraphTriangleCountResult,
     GraphTutteBergeCertificate,
     GraphVertexConnectivityResult,
 )
@@ -93,24 +89,6 @@ def _girth(graph: Any) -> GraphGirthResult:
     return GraphGirthResult(girth=girth, has_cycle=girth > 0)
 
 
-def _diameter(graph: Any) -> GraphDiameterResult:
-    import networkx as nx
-
-    from jacobian.math.graphs import diameter
-
-    if not graph or not nx.is_connected(graph):
-        return GraphDiameterResult(
-            status="NOT_APPLICABLE",
-            connected=False,
-            detail="diameter requires a nonempty connected graph",
-        )
-    return GraphDiameterResult(
-        status="COMPUTED",
-        diameter=diameter(graph),
-        connected=True,
-    )
-
-
 def _edge_connectivity(graph: Any) -> GraphEdgeConnectivityResult:
     import networkx as nx
 
@@ -123,12 +101,6 @@ def _vertex_connectivity(graph: Any) -> GraphVertexConnectivityResult:
 
     value = 0 if len(graph) <= 1 else int(nx.node_connectivity(graph))
     return GraphVertexConnectivityResult(vertex_connectivity=value)
-
-
-def _eulerian(graph: Any) -> GraphEulerianResult:
-    from jacobian.math.graphs import is_eulerian
-
-    return GraphEulerianResult(is_eulerian=is_eulerian(graph))
 
 
 def _spanning_tree_count(graph: Any) -> GraphSpanningTreeCountResult:
@@ -215,28 +187,6 @@ def _maximum_matching_execute(
 ) -> GraphMaximumMatchingResult:
     graph = cast(Any, build_simple_graph(request.graph))
     return _maximum_matching(graph)
-
-
-def _triangle_count(graph: Any) -> GraphTriangleCountResult:
-    from jacobian.math.graphs import triangle_count
-
-    return GraphTriangleCountResult(triangle_count=triangle_count(graph))
-
-
-def _radius(graph: Any) -> GraphRadiusResult:
-    import networkx as nx
-
-    if not graph or not nx.is_connected(graph):
-        return GraphRadiusResult(
-            status="NOT_APPLICABLE",
-            connected=False,
-            detail="radius requires a nonempty connected graph",
-        )
-    return GraphRadiusResult(
-        status="COMPUTED",
-        radius=int(nx.radius(graph)),
-        connected=True,
-    )
 
 
 def _k_core_execute(
@@ -481,48 +431,6 @@ CLIQUE_NUMBER_OPERATION = MathTool(
 )
 
 EXACT_GRAPH_INVARIANT_OPERATIONS = (
-    _computed(
-        "graph.invariant.triangle_count.compute",
-        "Triangle count",
-        "Count the three-vertex cycles in a finite simple graph.",
-        GraphTriangleCountResult,
-        _triangle_count,
-        "triangle",
-        "exact",
-        examples=(
-            example(
-                "triangle_graph",
-                "Count triangles in a three-cycle.",
-                {
-                    "graph": {
-                        "vertices": ["a", "b", "c"],
-                        "edges": [["a", "b"], ["b", "c"], ["a", "c"]],
-                    }
-                },
-            ),
-        ),
-    ),
-    _computed(
-        "graph.invariant.radius.compute",
-        "Graph radius",
-        "Compute the minimum eccentricity of a connected graph.",
-        GraphRadiusResult,
-        _radius,
-        "radius",
-        "exact",
-        examples=(
-            example(
-                "path_three_radius",
-                "Compute the radius of a three-vertex path.",
-                {
-                    "graph": {
-                        "vertices": ["a", "b", "c"],
-                        "edges": [["a", "b"], ["b", "c"]],
-                    }
-                },
-            ),
-        ),
-    ),
     MathTool(
         operation_id="graph.k_core.compute",
         title="Compute a graph k-core",
@@ -567,30 +475,6 @@ EXACT_GRAPH_INVARIANT_OPERATIONS = (
         ),
     ),
     _computed(
-        "graph.invariant.diameter.compute",
-        "Diameter",
-        (
-            "Compute the exact diameter of a nonempty connected graph; return "
-            "NOT_APPLICABLE without a numeric value otherwise."
-        ),
-        GraphDiameterResult,
-        _diameter,
-        "diameter",
-        "exact",
-        examples=(
-            example(
-                "path_three_diameter",
-                "Compute the diameter of a three-vertex path.",
-                {
-                    "graph": {
-                        "vertices": ["a", "b", "c"],
-                        "edges": [["a", "b"], ["b", "c"]],
-                    }
-                },
-            ),
-        ),
-    ),
-    _computed(
         "graph.invariant.edge_connectivity.compute",
         "Edge connectivity",
         "Compute the minimum edge-cut cardinality.",
@@ -623,27 +507,6 @@ EXACT_GRAPH_INVARIANT_OPERATIONS = (
             example(
                 "triangle_vertex_connectivity",
                 "Compute vertex connectivity of a triangle.",
-                {
-                    "graph": {
-                        "vertices": ["a", "b", "c"],
-                        "edges": [["a", "b"], ["b", "c"], ["a", "c"]],
-                    }
-                },
-            ),
-        ),
-    ),
-    _computed(
-        "graph.invariant.is_eulerian.compute",
-        "Eulerian predicate",
-        "Decide whether the graph has an Eulerian circuit.",
-        GraphEulerianResult,
-        _eulerian,
-        "eulerian",
-        "exact",
-        examples=(
-            example(
-                "triangle_eulerian",
-                "Decide whether a triangle has an Eulerian circuit.",
                 {
                     "graph": {
                         "vertices": ["a", "b", "c"],

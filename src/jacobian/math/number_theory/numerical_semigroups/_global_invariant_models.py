@@ -13,7 +13,7 @@ from jacobian.canonical import parse_canonical_integer
 from jacobian.math.number_theory.numerical_semigroups._models import (
     _GENERAL_GENERATOR_ENVELOPE,
     MAX_GENERATORS,
-    _require_canonical_minimal_axis,
+    _require_canonical_generator_axis,
     _validation_error,
 )
 
@@ -62,7 +62,7 @@ class BettiElementsResult(StrictModel):
 
     @model_validator(mode="after")
     def require_complete_betti_data(self) -> Self:
-        _require_canonical_minimal_axis(self.minimal_generators)
+        _require_canonical_generator_axis(self.minimal_generators)
         if self.betti_elements != tuple(
             sorted(set(self.betti_elements), key=parse_canonical_integer)
         ):
@@ -119,7 +119,7 @@ class DeltaSetResult(StrictModel):
 
     @model_validator(mode="after")
     def require_set_semantics(self) -> Self:
-        _require_canonical_minimal_axis(self.minimal_generators)
+        _require_canonical_generator_axis(self.minimal_generators)
         if self.delta_set != tuple(sorted(set(self.delta_set))):
             raise _validation_error(
                 "delta_set must be strictly increasing and duplicate-free"
@@ -216,7 +216,7 @@ class CatenaryDegreeResult(StrictModel):
 
     @model_validator(mode="after")
     def require_maximizing_witnesses(self) -> Self:
-        _require_canonical_minimal_axis(self.minimal_generators)
+        _require_canonical_generator_axis(self.minimal_generators)
         if tuple(record.betti_element for record in self.betti_degrees) != tuple(
             sorted(
                 (record.betti_element for record in self.betti_degrees),

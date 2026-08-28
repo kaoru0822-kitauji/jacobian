@@ -70,17 +70,6 @@ def _basis_attribute_labels(attribute_count: int) -> tuple[str, ...]:
     return tuple(f"m{attribute}" for attribute in range(attribute_count))
 
 
-def _require_dg_subset(
-    name: str,
-    subset: tuple[int, ...],
-    attribute_count: int,
-) -> None:
-    if subset != tuple(sorted(set(subset))):
-        raise ValueError(f"{name} must be sorted and duplicate-free")
-    if any(attribute >= attribute_count for attribute in subset):
-        raise ValueError(f"{name} contains an attribute outside the source context")
-
-
 def _context_closure_masks(context: FormalContext) -> tuple[tuple[int, ...], int]:
     """Return every candidate state's context closure plus row intersections."""
 
@@ -347,9 +336,8 @@ class DGBasisWork(StrictModel):
     """Exact logical counts for one served request plus its reservations.
 
     Counts cover the one semantic admission plan consumed by the kernel and
-    its one source-closure-equivalence pass. Independently supplied result
-    data is checked by the explicit owner verifier, not ordinary result
-    construction, so native and catalog invocations report identical work.
+    its one source-closure-equivalence pass, so native and catalog invocations
+    report identical work.
     """
 
     candidate_states: StrictInt = Field(ge=1, le=MAX_DG_CANDIDATE_STATES)
@@ -500,8 +488,8 @@ class CanonicalImplicationBasisResult(StrictModel):
     work: DGBasisWork
 
     @classmethod
-    def _from_kernel(cls, payload: dict[str, object]) -> Self:
-        """Build a result emitted by the owner-local exhaustive kernel."""
+    def _from_payload(cls, payload: dict[str, object]) -> Self:
+        """Project the owner-local kernel payload into canonical typed fields."""
 
         return cls.model_validate(payload)
 

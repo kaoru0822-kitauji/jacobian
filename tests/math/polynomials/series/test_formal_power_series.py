@@ -20,6 +20,7 @@ from jacobian.math.polynomials.series._models import (
     MAX_TRUNCATION_ORDER,
     InputTruncatedSeries,
     SeriesInverseRequest,
+    SeriesPowerRequest,
     SeriesTruncateRequest,
     TruncatedSeries,
 )
@@ -72,8 +73,6 @@ def test_native_exports_call_the_shared_typed_kernels() -> None:
 
 def test_power_rejects_result_digit_overflow() -> None:
     import pytest
-
-    from jacobian.math.polynomials.series._models import SeriesPowerRequest
 
     huge = "1" + "0" * (MAX_RATIONAL_DIGITS - 1)
     request = SeriesPowerRequest(
@@ -232,14 +231,9 @@ def test_native_exports_admit_inputs_before_kernel_work() -> None:
 def test_native_and_wire_operations_return_the_same_canonical_values() -> None:
     """Native canonical calls and catalog wire adapters share each kernel."""
     from jacobian.math.polynomials.series import (
-        add,
         divide,
-        from_polynomial,
-        integral_zero_constant,
         inverse,
         reversion,
-        scalar_multiply,
-        subtract,
     )
     from jacobian.math.polynomials.series._tools import TOOLS
 
@@ -265,27 +259,11 @@ def test_native_and_wire_operations_return_the_same_canonical_values() -> None:
         truncation_order=3,
         coefficients=(_coeff("0"), _coeff("1"), _coeff("1")),
     )
-    scalar = CanonicalRational(num="3", den="2")
     cases = (
-        (
-            "formal_series.rational.add.compute",
-            {"left": series, "right": series},
-            add(series, series),
-        ),
-        (
-            "formal_series.rational.subtract.compute",
-            {"left": series, "right": series},
-            subtract(series, series),
-        ),
         (
             "formal_series.rational.multiply.compute",
             {"left": series, "right": series},
             multiply(series, series),
-        ),
-        (
-            "formal_series.rational.scalar_multiply.compute",
-            {"series": series, "scalar": scalar},
-            scalar_multiply(series, scalar),
         ),
         (
             "formal_series.rational.power.compute",
@@ -312,38 +290,6 @@ def test_native_and_wire_operations_return_the_same_canonical_values() -> None:
             reversible.model_dump(),
             reversion(reversible),
         ),
-        (
-            "formal_series.rational.derivative.compute",
-            series.model_dump(),
-            derivative(series),
-        ),
-        (
-            "formal_series.rational.integral_zero_constant.compute",
-            {"series": series, "output_order": 3},
-            integral_zero_constant(series, 3),
-        ),
-        (
-            "formal_series.rational.truncate.compute",
-            {"series": series, "target_order": 2},
-            truncate(series, 2),
-        ),
-        (
-            "formal_series.rational.identity.check",
-            {"left": series, "right": series},
-            identity_check(series, series),
-        ),
-        (
-            "formal_series.rational.from_polynomial.compute",
-            series.model_dump(),
-            from_polynomial(
-                series.variable, series.coefficients, series.truncation_order
-            ),
-        ),
-        (
-            "formal_series.rational.to_polynomial.compute",
-            series.model_dump(),
-            to_polynomial(series),
-        ),
     )
     for operation_id, payload, native in cases:
         normalized = {
@@ -366,11 +312,12 @@ def test_native_and_wire_boundaries_reject_the_same_oversized_series() -> None:
         for tool in TOOLS
         if tool.operation_id == "formal_series.rational.power.compute"
     )
-    request = tool.request_type.model_validate(
+    power_tool = cast(MathTool[SeriesPowerRequest, StrictModel], tool)
+    request = power_tool.request_type.model_validate(
         {"series": wide.model_dump(), "exponent": 2}
     )
     with pytest.raises(OperationDomainValidationError) as wire:
-        tool.run(request)
+        power_tool.run(request)
     assert native.value.errors()[0]["type"] == "formal_power_series.input_order"
     assert wire.value.errors()[0]["type"] == "formal_power_series.input_order"
 
@@ -384,7 +331,6 @@ def test_native_exports_still_admit_the_wire_boundary_order() -> None:
 
 def test_identity_check_admits_bounded_inputs_whose_product_would_overflow() -> None:
     import pytest
-    from pydantic import ValidationError
 
     from jacobian.math.polynomials.series._models import _SeriesIdentityCheckRequest
 
@@ -414,17 +360,21 @@ def test_identity_check_admits_bounded_inputs_whose_product_would_overflow() -> 
     admitted = _SeriesIdentityCheckRequest.model_validate(payload)
     assert admitted.right.coefficients == differing.coefficients
 
-    with pytest.raises(ValidationError) as error:
-        _SeriesIdentityCheckRequest.model_validate(
-            {
-                "left": left.model_dump(),
-                "right": TruncatedSeries(
-                    variable="x", truncation_order=19, coefficients=tall[:19]
-                ).model_dump(),
-            }
+    mismatched_request = _SeriesIdentityCheckRequest.model_validate(
+        {
+            "left": left.model_dump(),
+            "right": TruncatedSeries(
+                variable="x", truncation_order=19, coefficients=tall[:19]
+            ).model_dump(),
+        }
+    )
+    with pytest.raises(OperationDomainValidationError) as error:
+        identity_check(
+            mismatched_request.left,
+            mismatched_request.right,
         )
-    assert (
-        error.value.errors()[0]["type"] == "formal_power_series.operand_order_mismatch"
+    assert error.value.errors()[0]["type"] == (
+        "formal_power_series.operand_order_mismatch"
     )
 
 

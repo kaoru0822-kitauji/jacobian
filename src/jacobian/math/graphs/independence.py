@@ -108,8 +108,8 @@ class IndependenceNumberResult(StrictModel):
     every witness identifier belongs to the source, no source edge has both
     endpoints in the witness, the incumbent equals the witness cardinality,
     and the reported order matches the source.  Exact optimality is a
-    semantic claim, not structural JSON validation; callers accepting a
-    separately supplied ``EXACT`` result use the owner-local bounded verifier.
+    semantic claim established by the producing solver, not structural JSON
+    validation.
     Operational ``UNKNOWN`` stays distinct from a mathematical optimum. An
     incomplete outcome reports the graph order as its independently safe
     upper bound, so no unauthenticated incumbent gap survives validation.
@@ -144,7 +144,7 @@ class IndependenceNumberResult(StrictModel):
         """Construct one structurally checked outcome from the trusted kernel."""
 
         incumbent_value = len(incumbent_vertices)
-        return cls(
+        return cls.model_construct(
             graph=graph,
             status=status,
             order=len(graph.vertices),

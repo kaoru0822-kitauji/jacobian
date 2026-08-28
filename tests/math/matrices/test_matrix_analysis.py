@@ -311,10 +311,11 @@ def test_inertia_results_are_representation_invariant() -> None:
 
 
 def test_inertia_retained_matrix_reconstructs_the_source() -> None:
-    from jacobian.math.matrices.analysis._operations import _dense_fractions
-
     request = _inertia_request(3, {(0, 1): "2/3", (2, 2): "-5"})
-    dense = _dense_fractions(compute_inertia(request).matrix)
+    dense = [
+        [entry.as_fraction() for entry in row]
+        for row in compute_inertia(request).matrix.entries
+    ]
     assert dense == [
         [Fraction(0), Fraction(2, 3), Fraction(0)],
         [Fraction(2, 3), Fraction(0), Fraction(0)],

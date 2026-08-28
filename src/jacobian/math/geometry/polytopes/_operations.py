@@ -28,14 +28,16 @@ from fractions import Fraction
 from itertools import combinations
 from typing import Literal
 
+from pydantic_core import PydanticCustomError
 from sympy import Matrix, Rational
 
-from jacobian._exact import CanonicalRational
+from jacobian._exact import CanonicalRational, require_bounded_rational
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.geometry.polytopes._models import (
     MAX_BOUNDEDNESS_COMBINATIONS,
     MAX_COMPUTED_FACETS,
     MAX_EXTREMALITY_HEIGHT_WORK,
+    MAX_FACET_COORDINATE_DIGITS,
     MAX_FACET_INCIDENCES,
     MAX_FACET_SIGN_TESTS,
     MAX_HULL_SUBFACETS,
@@ -43,6 +45,7 @@ from jacobian.math.geometry.polytopes._models import (
     MAX_SUPPORT_VERTEX_SUBSETS,
     FacetIncidenceRequest,
     FacetIncidenceResult,
+    PolytopeAdmissionError,
     PolytopeSupportRequest,
     PolytopeSupportResult,
     PolytopeVolumeRequest,
@@ -51,6 +54,8 @@ from jacobian.math.geometry.polytopes._models import (
     RationalCovector,
     RationalPolytopeVertex,
     RationalVPolytope,
+    _validate_halfspaces,
+    _validate_vertices,
 )
 from jacobian.math.geometry.polytopes._rational_geometry import (
     facets_from_points as _facets_from_points,
@@ -220,6 +225,20 @@ def compute_facet_incidence(
     assert isinstance(vertices, tuple)  # projected by the request validator
     dimension = len(vertices[0].coordinates)
     try:
+        if dimension > request.dimension_bound:
+            raise ValueError(
+                f"dimension {dimension} exceeds the dimension bound "
+                f"{request.dimension_bound}"
+            )
+        if any(len(vertex.coordinates) != dimension for vertex in vertices):
+            raise ValueError("all vertices must share one dimension")
+        for vertex in vertices:
+            for coordinate in vertex.coordinates:
+                require_bounded_rational(
+                    coordinate,
+                    max_digits=MAX_FACET_COORDINATE_DIGITS,
+                    label="facet-profile vertex coordinate",
+                )
         facets = _computed_facets_from_vertices(vertices, dimension)
     except ValueError as exc:
         raise OperationDomainValidationError(
@@ -717,6 +736,23 @@ def _polytope_volume(points: list[list[Rational]], dim: int) -> Rational:
         coords = sorted({p[0] for p in points})
         return coords[-1] - coords[0] if len(coords) >= 2 else Rational(0)
     triangulation = _triangulate(points, dim)
+    return _polytope_volume_from_prepared(points, dim, triangulation)
+
+
+def _polytope_volume_from_prepared(
+    points: list[list[Rational]],
+    dim: int,
+    triangulation: list[tuple[int, ...]],
+) -> Rational:
+    """Compute volume from the hull data retained by request admission."""
+
+    if len(points) < dim + 1:
+        return Rational(0)
+    if dim == 1:
+        coordinates = sorted({point[0] for point in points})
+        return (
+            coordinates[-1] - coordinates[0] if len(coordinates) >= 2 else Rational(0)
+        )
     if not triangulation:
         return Rational(0)
     volume = Rational(0)
@@ -847,21 +883,38 @@ def compute_polytope_volume(
     The volume is exact rational; no floating-point approximation is used.
     """
     representation: Literal["vertices", "halfspaces"]
-    if request.vertices is not None:
-        representation = "vertices"
-        vertices = request.vertices
-        assert isinstance(vertices, tuple)  # projected by the request validator
-        raw_vertices = tuple(
-            tuple(c.as_fraction() for c in vertex.coordinates) for vertex in vertices
-        )
-    else:
-        assert request.halfspaces is not None
-        representation = "halfspaces"
-        derived, _dim = _vertices_from_h_representation(request.halfspaces)
-        raw_vertices = tuple(
-            tuple(Fraction(int(c.p), int(c.q)) for c in point) for point in derived
-        )
-    value, dim = convex_hull_volume(raw_vertices)
+    location: tuple[str, ...]
+    try:
+        if request.vertices is not None:
+            representation = "vertices"
+            location = ("vertices",)
+            vertices = request.vertices
+            assert isinstance(vertices, tuple)  # projected by the request validator
+            prepared, dim, triangulation = _validate_vertices(
+                vertices, request.dimension_bound
+            )
+        else:
+            representation = "halfspaces"
+            location = ("halfspaces",)
+            assert request.halfspaces is not None
+            prepared, dim, triangulation = _validate_halfspaces(
+                request.halfspaces, request.dimension_bound
+            )
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=location,
+            code=exc.type,
+            message=str(exc),
+        ) from exc
+    except (PolytopeAdmissionError, ValueError) as exc:
+        reason = exc.reason if isinstance(exc, PolytopeAdmissionError) else "admission"
+        raise OperationDomainValidationError(
+            location=location,
+            code=f"polytope.volume.{reason}",
+            message=str(exc),
+        ) from exc
+    volume = _polytope_volume_from_prepared(prepared, dim, triangulation)
+    value = _canonical_rational(volume)
     return PolytopeVolumeResult(
         volume=value,
         dimension=dim,

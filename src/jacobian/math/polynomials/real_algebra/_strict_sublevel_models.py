@@ -33,8 +33,9 @@ MAX_STRICT_SUBLEVEL_COMPONENTS = MAX_STRICT_SUBLEVEL_BOUNDARIES + 1
 # is strongly degree- and height-sensitive; ``degree**5 * sum(height_digits)``
 # is a deliberately conservative measured proxy over the fixed exact backend.
 # A degree-10 polynomial with twenty nearby level boundaries costs 1.6M units
-# and about 2.5 seconds including source-binding replay; a close-root degree-8,
-# 41-digit case costs 2.69M units and about 9 seconds, so it is rejected.  The
+# and about 2.5 seconds including canonical result construction; a close-root
+# degree-8, 41-digit case costs 2.69M units and about 9 seconds, so it is
+# rejected. The
 # envelope still admits degree 16 at unit height and progressively taller
 # inputs at lower degree.
 MAX_STRICT_SUBLEVEL_ISOLATION_WORK = 2_100_000

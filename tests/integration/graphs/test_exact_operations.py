@@ -8,7 +8,6 @@ from jacobian.catalog.models import (
     OperationDiscoveryRequest,
     OperationDomainValidationError,
 )
-from jacobian.math.graphs.coloring._admission import ADMISSIONS
 from jacobian.math.graphs.coloring._models import (
     KColorabilityRequest,
 )
@@ -145,10 +144,6 @@ def test_catalog_retires_the_duplicate_and_discovers_independence_number() -> No
             namespace="graph", limit=20, cursor=None
         ).operations
     }
-    assert retired_operation_id not in {
-        admission.operation_id for admission in ADMISSIONS
-    }
-
     discovered = catalog.search(
         OperationDiscoveryRequest(query="maximum independent set", limit=5)
     )

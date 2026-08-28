@@ -95,7 +95,7 @@ class DeltaMatroidRecognitionResult(StrictModel):
         delta_matroid: FiniteDeltaMatroid | None = None,
         obstruction: DeltaMatroidObstruction | None = None,
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             source=system,
             status="DELTA_MATROID"
             if delta_matroid is not None

@@ -86,8 +86,9 @@ class SubseqRunResult(SubseqRunRequest):
     ) -> Self:
         """Construct a run outcome emitted by the trusted owner-local kernel."""
 
-        return cls(
-            **request.model_dump(),
+        return cls.model_construct(
+            transducer=request.transducer,
+            word=request.word,
             status=status,
             output=output,
             final_state=final_state,
@@ -124,7 +125,11 @@ class ComposeResult(ComposeRequest):
     ) -> Self:
         """Construct a composition emitted by the trusted owner-local kernel."""
 
-        return cls(**request.model_dump(), transducer=transducer)
+        return cls.model_construct(
+            first=request.first,
+            second=request.second,
+            transducer=transducer,
+        )
 
 
 class RelationPathReplayRequest(StrictModel):
@@ -187,8 +192,10 @@ class RelationPathReplayResult(RelationPathReplayRequest):
     ) -> Self:
         """Construct a path replay emitted by the trusted owner-local kernel."""
 
-        return cls(
-            **request.model_dump(),
+        return cls.model_construct(
+            transducer=request.transducer,
+            initial_state=request.initial_state,
+            edge_path=request.edge_path,
             status=status,
             input_word=input_word,
             output_word=output_word,

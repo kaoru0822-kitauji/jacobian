@@ -76,7 +76,7 @@ class GrundyTableResult(GrundyTableRequest):
         histogram: tuple[int, ...],
         topological_order: tuple[str, ...],
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             game=request.game,
             entries=entries,
             max_grundy=max_grundy,
@@ -110,7 +110,7 @@ class BirthdayResult(BirthdayRequest):
     def _from_kernel(
         cls, request: BirthdayRequest, birthdays: tuple[tuple[str, int], ...]
     ) -> Self:
-        return cls(game=request.game, birthdays=birthdays)
+        return cls.model_construct(game=request.game, birthdays=birthdays)
 
 
 class SubtractionGrundyPrefixRequest(StrictModel):
@@ -184,7 +184,7 @@ class SubtractionGrundyPrefixResult(SubtractionGrundyPrefixRequest):
         p_positions: tuple[int, ...],
         n_positions: tuple[int, ...],
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             subtraction_set=request.subtraction_set,
             max_heap=request.max_heap,
             grundy_values=grundy_values,
@@ -235,7 +235,7 @@ class NimSumResult(NimSumRequest):
 
     @classmethod
     def _from_kernel(cls, request: NimSumRequest, nim_sum: int) -> Self:
-        return cls(
+        return cls.model_construct(
             position=request.position, nim_sum=nim_sum, is_p_position=(nim_sum == 0)
         )
 
@@ -294,7 +294,7 @@ class NimOptionsResult(NimOptionsRequest):
         raw_candidate_count: int,
         distinct_option_count: int,
     ) -> Self:
-        return cls(
+        return cls.model_construct(
             position=request.position,
             options=options,
             raw_candidate_count=raw_candidate_count,

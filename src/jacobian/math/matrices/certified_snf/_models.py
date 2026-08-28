@@ -72,7 +72,7 @@ class CertifiedSmithNormalFormResult(StrictModel):
     ) -> Self:
         """Construct the result emitted by the trusted Smith kernel."""
 
-        return cls(certificate=certificate)
+        return cls.model_construct(certificate=certificate)
 
 
 __all__ = [

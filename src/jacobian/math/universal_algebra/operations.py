@@ -186,7 +186,7 @@ def homomorphism_profile(
             ),
         )
 
-    homomorphism = FiniteAlgebraHomomorphism.model_construct(
+    homomorphism = FiniteAlgebraHomomorphism(
         source=carrier_map.source,
         target=carrier_map.target,
         mapping=carrier_map.mapping,

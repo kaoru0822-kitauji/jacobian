@@ -58,7 +58,9 @@ class PrimeAffineTranslationResult(StrictModel):
     ) -> PrimeAffineTranslationResult:
         """Build after the admitted translation kernel established the tuple."""
 
-        return cls(source=request.source, shift=request.shift, translated=translated)
+        return cls.model_construct(
+            source=request.source, shift=request.shift, translated=translated
+        )
 
 
 def compute_translation(

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pytest
 from flint import nmod_mat
-from pydantic import ValidationError
 
 from jacobian.math import finite_fields
 from jacobian.math.finite_fields import (
@@ -11,7 +10,6 @@ from jacobian.math.finite_fields import (
     FiniteDimensionalSubspace,
     FiniteFieldElement,
     ProjectiveLine,
-    RankResult,
     direction_rank_ledger,
     element,
     finite_field,
@@ -167,16 +165,7 @@ def test_restriction_and_rank_operations_preserve_their_defining_invariant() -> 
 
     assert result.linear_map == restricted
     assert result.rank == rank(restricted.matrix)
-
-
-def test_serialized_rank_result_rejects_a_forged_rank() -> None:
-    subspace, directions = _slice_a_values()
-    result = linear_map_rank(subspace, directions.points[0])
-    payload = result.model_dump(mode="json")
-    payload["rank"] = 0
-
-    with pytest.raises(ValidationError, match="rank must match the exact bound"):
-        RankResult.model_validate(payload)
+    assert type(result).model_validate(result.model_dump(mode="json")) == result
 
 
 def test_slice_a_keeps_directions_bound_through_orbit_aggregation() -> None:
@@ -210,23 +199,9 @@ def test_slice_a_rank_derives_the_restriction_from_its_source() -> None:
 
 def test_slice_a_composes_projective_line_into_orbit_distribution() -> None:
     subspace, _ = _slice_a_values()
-    projective, _, _, ledger_operation, orbit_operation, *_ = TOOLS
-
-    line = projective.run(
-        projective.request_type.model_validate(
-            {"presentation": subspace.presentation, "axis": subspace.row_axis}
-        )
-    )
-
-    ledger = ledger_operation.run(
-        ledger_operation.request_type.model_validate(
-            {"subspace": subspace, "directions": line}
-        )
-    )
-
-    distribution = orbit_operation.run(
-        orbit_operation.request_type.model_validate({"ledger": ledger})
-    )
+    line = projective_line(subspace.presentation, subspace.row_axis)
+    ledger = direction_rank_ledger(subspace, line)
+    distribution = orbit_distribution(ledger)
 
     assert len(line.points) == 9
     assert tuple(entry.rank for entry in ledger.entries).count(3) == 6

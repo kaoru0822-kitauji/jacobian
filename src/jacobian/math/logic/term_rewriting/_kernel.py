@@ -656,21 +656,6 @@ def _overlap_unification_terms(
     )
 
 
-def _standardize_apart(
-    outer: RewriteRule, inner: RewriteRule
-) -> tuple[RewriteRule, RewriteRule, dict[int, int], dict[int, int]]:
-    """Canonically rename one ordered pair of rules to disjoint variables."""
-    outer_variables = _preorder_variables(outer.lhs)
-    outer_renaming = _renaming_for(outer_variables, 0)
-    inner_renaming = _renaming_for(_preorder_variables(inner.lhs), len(outer_variables))
-    return (
-        _renamed_rule(outer, outer_renaming),
-        _renamed_rule(inner, inner_renaming),
-        outer_renaming,
-        inner_renaming,
-    )
-
-
 def critical_pairs(
     signature: RankedSignature, rules: tuple[RewriteRule, ...]
 ) -> CriticalPairProfile:

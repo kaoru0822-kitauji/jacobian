@@ -45,6 +45,13 @@ def test_rational_point_construct() -> None:
     assert result.point.coordinates[1].as_fraction() == 2
 
 
+def test_rational_point_construct_rejects_all_zero_coordinates() -> None:
+    request = RationalPointConstructRequest(coordinates=(_r("0"), _r("0")))
+
+    with pytest.raises(OperationDomainValidationError, match="nonzero coordinate"):
+        compute_rational_point_construct(request)
+
+
 def test_standard_chart() -> None:
     request = StandardChartRequest(
         point=_point(_r("1"), _r("2"), _r("3")),

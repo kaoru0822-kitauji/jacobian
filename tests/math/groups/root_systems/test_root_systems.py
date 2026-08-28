@@ -1,7 +1,6 @@
 """Tests for root system operations."""
 
 import pytest
-from pydantic import ValidationError
 
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.groups.root_systems._models import CartanMatrixRequest
@@ -41,18 +40,21 @@ class TestCartanMatrix:
         CartanMatrixRequest(matrix=G2)
 
     def test_invalid_non_symmetric(self) -> None:
-        with pytest.raises(ValidationError) as exc_info:
-            CartanMatrixRequest.model_validate({"matrix": [[2, -4], [-1, 2]]})
+        request = CartanMatrixRequest.model_validate({"matrix": [[2, -4], [-1, 2]]})
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_root_system_data(request)
         assert exc_info.value.errors()[0]["type"] == "root_system.off_diagonal_product"
 
     def test_invalid_diagonal(self) -> None:
-        with pytest.raises(ValidationError) as exc_info:
-            CartanMatrixRequest.model_validate({"matrix": [[3, -1], [-1, 2]]})
+        request = CartanMatrixRequest.model_validate({"matrix": [[3, -1], [-1, 2]]})
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_root_system_data(request)
         assert exc_info.value.errors()[0]["type"] == "root_system.diagonal_entry"
 
     def test_invalid_positive_offdiag(self) -> None:
-        with pytest.raises(ValidationError) as exc_info:
-            CartanMatrixRequest.model_validate({"matrix": [[2, 1], [-1, 2]]})
+        request = CartanMatrixRequest.model_validate({"matrix": [[2, 1], [-1, 2]]})
+        with pytest.raises(OperationDomainValidationError) as exc_info:
+            compute_root_system_data(request)
         assert exc_info.value.errors()[0]["type"] == "root_system.positive_off_diagonal"
 
     def test_finite_type_is_admitted_by_the_owner_operation(self) -> None:

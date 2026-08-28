@@ -229,15 +229,6 @@ def _require_canonical_entries(
             )
 
 
-def _component_sums(
-    flow: MulticommodityFlow,
-) -> tuple[dict[tuple[str, int], Fraction], dict[tuple[int, int], Fraction]]:
-    """Return the exact divergence-cell and edge-load sums for one tensor."""
-
-    divergences, loads, _fold_additions = _component_sums_with_folds(flow)
-    return divergences, loads
-
-
 def _component_sums_with_folds(
     flow: MulticommodityFlow,
 ) -> tuple[
@@ -428,40 +419,6 @@ def _measured_component_digit_bounds(
         None if congestion_ratio is None else _measured_side_bounds(congestion_ratio)
     )
     return cell_bounds, load_bounds, slack_bounds, congestion_bound
-
-
-def _profile_component_digit_bounds(
-    flow: MulticommodityFlow,
-    component_sums: tuple[
-        dict[tuple[str, int], Fraction],
-        dict[tuple[int, int], Fraction],
-    ]
-    | None = None,
-) -> tuple[
-    dict[tuple[str, int], tuple[int, int]],
-    dict[tuple[int, int], tuple[int, int]],
-    dict[tuple[int, int], tuple[int, int]],
-    tuple[int, int] | None,
-]:
-    """Measure the exact numerator/denominator sizes of every derived row.
-
-    Shared denominators, cancellation, and lone operands all keep real sums
-    far below any digit-count worst case, so each component is measured as
-    the exact reduced rational the kernel will produce; any accumulation that
-    crosses the canonical cap aborts immediately instead of growing further.
-    The congestion bound is None exactly when the result returns no
-    congestion value.
-    """
-
-    divergences, loads = (
-        component_sums if component_sums is not None else (_component_sums(flow))
-    )
-    slacks, congestion_ratio, _comparisons, _divisions = (
-        _edge_slacks_and_max_congestion(flow, loads)
-    )
-    return _measured_component_digit_bounds(
-        divergences, loads, slacks, congestion_ratio
-    )
 
 
 class AdmittedProfileScan(NamedTuple):

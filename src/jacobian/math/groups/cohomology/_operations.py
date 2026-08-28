@@ -20,12 +20,6 @@ from jacobian.math.groups.cohomology._models import (
 )
 
 
-def _enumerated_group_order(group: PermutationGroup) -> int:
-    return int(
-        SympyPermutationGroup(*(Permutation(list(g)) for g in group.generators)).order()
-    )
-
-
 def _admitted_max_degree(order: int) -> int:
     if order == 1:
         return MAX_COCHAIN_DEGREE
@@ -38,7 +32,7 @@ def _admitted_max_degree(order: int) -> int:
     return degree - 1
 
 
-def _require_admitted_request(request: GroupCohomologyRequest) -> int:
+def _admit_request(request: GroupCohomologyRequest) -> list[tuple[int, ...]]:
     from sympy import isprime
 
     if not isprime(request.prime):
@@ -47,7 +41,8 @@ def _require_admitted_request(request: GroupCohomologyRequest) -> int:
             code="group_cohomology.prime_not_prime",
             message="prime must be a prime integer",
         )
-    order = _enumerated_group_order(request.group)
+    elements = _enumerate_group_elements(request.group)
+    order = len(elements)
     if order > MAX_GROUP_ORDER:
         raise OperationDomainValidationError(
             location=("group",),
@@ -67,7 +62,7 @@ def _require_admitted_request(request: GroupCohomologyRequest) -> int:
                 f"budget {admitted_degree} for enumerated group order {order}"
             ),
         )
-    return order
+    return elements
 
 
 def _enumerate_group_elements(group: PermutationGroup) -> list[tuple[int, ...]]:
@@ -156,12 +151,12 @@ def _bar_delta_rank(group_size: int, n: int, cayley: list[list[int]], p: int) ->
 
 def _cohomology_profile(
     request: GroupCohomologyRequest,
+    elements: list[tuple[int, ...]],
 ) -> tuple[tuple[CohomologyGroup, ...], int]:
     """Exact cochain dimensions and Betti numbers for degrees 0..max_degree."""
     p = request.prime
     max_deg = request.max_degree
 
-    elements = _enumerate_group_elements(request.group)
     group_order = len(elements)
     cayley = _cayley_table(elements)
 
@@ -191,8 +186,8 @@ def compute_group_cohomology(request: GroupCohomologyRequest) -> GroupCohomology
     coboundaries are materialized exactly; each ``betti`` number is
     dim ker(delta^n) - rank(im(delta^{n-1})) = dim H^n(G, GF(p)).
     """
-    _require_admitted_request(request)
-    groups, group_order = _cohomology_profile(request)
+    elements = _admit_request(request)
+    groups, group_order = _cohomology_profile(request, elements)
     return GroupCohomologyResult._from_kernel(request, groups, group_order)
 
 

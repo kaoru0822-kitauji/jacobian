@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import shutil
 import sys
 import tempfile
 import threading
@@ -26,8 +25,6 @@ from jacobian.math.polynomials.ideals._singular import (
     _minimal_primes_stdout_limit,
     run_singular_ideal_operation,
     run_singular_minimal_primes,
-    run_singular_minimal_primes_verification,
-    run_singular_saturation_verification,
 )
 from jacobian.math.polynomials.values import (
     RationalPolynomial,
@@ -152,49 +149,6 @@ def test_minimal_prime_producing_cancellation_keeps_its_typed_outcome(
     assert result.detail == (
         "Singular execution was cancelled before producing a result."
     )
-
-
-def test_minimal_prime_verification_cancellation_is_a_typed_verdict(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """The independent verification pass preserves cancellation too."""
-
-    executable = _executable(tmp_path, "import time; time.sleep(30)")
-    _select_executable(monkeypatch, executable)
-    cancellation = threading.Event()
-    cancellation.set()
-
-    with bounded_process_cancellation(cancellation):
-        verdict = run_singular_minimal_primes_verification(
-            _ideal(), (_ideal(),), IdealComputationBudget()
-        )
-
-    assert verdict == "CANCELLED"
-
-
-def test_saturation_verification_cancellation_is_a_typed_verdict(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    executable = _executable(tmp_path, "import time; time.sleep(30)")
-    _select_executable(monkeypatch, executable)
-    variables = ("x", "y")
-    source = _monomial_ideal(variables, (1, 1))
-    saturator = RationalPolynomialIdeal(
-        variables=variables,
-        generators=(_single_term_poly(variables, (1, 0)),),
-    )
-    claimed = _monomial_ideal(variables, (1, 0))
-    cancellation = threading.Event()
-    cancellation.set()
-
-    with bounded_process_cancellation(cancellation):
-        verdict = run_singular_saturation_verification(
-            source, saturator, claimed, IdealComputationBudget()
-        )
-
-    assert verdict == "CANCELLED"
 
 
 def test_missing_backend_is_a_typed_unavailable_outcome(
@@ -672,51 +626,14 @@ def test_minimal_prime_producing_invocation_is_hermetic(
     assert result.components is not None
 
 
-def test_minimal_prime_verifying_invocation_is_hermetic(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    records = (
-        "JACOBIAN_SINGULAR_IDEAL_V1",
-        "44105",
-        "VERDICT 1",
-        "END",
-    )
-    body = (
-        "import sys\n"
-        f"required={set(_HERMETIC_ARGUMENTS)!r}\n"
-        "if not required.issubset(sys.argv): raise SystemExit(7)\n"
-        f"print({chr(10).join(records)!r})"
-    )
-    executable = _executable(tmp_path, body)
-    _select_executable(monkeypatch, executable)
-
-    verdict = run_singular_minimal_primes_verification(
-        _ideal(), (_ideal(),), IdealComputationBudget()
-    )
-
-    assert verdict == "VERIFIED"
-
-
 def test_adapter_scripts_gate_the_version_before_any_algebra() -> None:
     from jacobian.math.polynomials.ideals import _singular as adapter
 
-    variables = ("x",)
     source = _ideal()
-    saturator = RationalPolynomialIdeal(
-        variables=variables,
-        generators=(_single_term_poly(variables, (1,)),),
-    )
-    claimed = (_monomial_ideal(variables, (2,)),)
-    scripts = [
-        adapter._minimal_primes_script(source).decode("ascii"),
-        adapter._minimal_primes_verification_script(source, claimed).decode("ascii"),
-        adapter._verification_script(source, saturator, claimed[0]).decode("ascii"),
-    ]
+    script = adapter._minimal_primes_script(source).decode("ascii")
 
-    for script in scripts:
-        assert script.count('system("version")') == 1
-        assert script.index('system("version")') < script.index('LIB "primdec.lib"')
+    assert script.count('system("version")') == 1
+    assert script.index('system("version")') < script.index('LIB "primdec.lib"')
 
 
 def test_unsupported_version_quit_before_algebra_is_typed_unavailability(
@@ -732,14 +649,9 @@ def test_unsupported_version_quit_before_algebra_is_typed_unavailability(
     _select_executable(monkeypatch, executable)
 
     produced = run_singular_minimal_primes(_ideal(), IdealComputationBudget())
-    verified = run_singular_minimal_primes_verification(
-        _ideal(), (_ideal(),), IdealComputationBudget()
-    )
-
     assert produced.outcome == "UNAVAILABLE"
     assert produced.components is None
     assert produced.detail == "The installed Singular release is unsupported."
-    assert verified == "UNAVAILABLE"
 
 
 def test_exact_result_limit_is_not_reported_as_invalid_backend_encoding(
@@ -957,236 +869,3 @@ def test_request_scoped_directory_is_removed_after_execution(
 
     assert created
     assert all(not directory.exists() for directory in created)
-
-
-def _single_term_poly(
-    variables: tuple[str, ...], exponents: tuple[int, ...]
-) -> RationalPolynomial:
-    return RationalPolynomial(
-        variables=variables,
-        polynomial=SparseRationalPolynomial(
-            terms=(
-                RationalPolynomialTerm(
-                    coefficient=CanonicalRational(num="1", den="1"),
-                    exponents=exponents,
-                ),
-            )
-        ),
-    )
-
-
-def _zero_poly(variables: tuple[str, ...]) -> RationalPolynomial:
-    return RationalPolynomial(
-        variables=variables,
-        polynomial=SparseRationalPolynomial(terms=()),
-    )
-
-
-def _monomial_ideal(
-    variables: tuple[str, ...], monomial: tuple[int, ...]
-) -> RationalPolynomialIdeal:
-    return RationalPolynomialIdeal(
-        variables=variables,
-        generators=(_single_term_poly(variables, monomial),),
-    )
-
-
-def test_verification_narrows_the_allowance_like_the_producing_pass(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    seen: dict[str, object] = {}
-
-    def bounded_process(
-        command: object,
-        *,
-        timeout_seconds: float,
-        resource_limits: ProcessResourceLimits | None = None,
-        **kwargs: object,
-    ) -> BoundedProcessResult:
-        seen["timeout_seconds"] = timeout_seconds
-        seen["cpu_seconds"] = (
-            resource_limits.cpu_seconds if resource_limits is not None else None
-        )
-        return BoundedProcessResult(
-            returncode=0,
-            stdout=b"",
-            stderr=b"",
-            stdout_exceeded=False,
-            stderr_exceeded=False,
-            timed_out=True,
-            cancelled=False,
-        )
-
-    monkeypatch.setattr(
-        "jacobian.math.polynomials.ideals._singular.run_bounded_process",
-        bounded_process,
-    )
-    monkeypatch.setattr(
-        "jacobian.math.polynomials.ideals._singular.shutil.which",
-        lambda name: "/usr/bin/Singular" if name == "Singular" else None,
-    )
-
-    verdict = run_singular_minimal_primes_verification(
-        _ideal(),
-        (_ideal(),),
-        IdealComputationBudget(wall_seconds=60),
-        wall_seconds=6.75,
-    )
-
-    assert verdict == "TIMEOUT"
-    assert seen["timeout_seconds"] == 6.75
-    assert seen["cpu_seconds"] == 7
-
-
-def test_exhausted_verification_allowance_times_out_without_launching(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    def forbidden(command: object, **kwargs: object) -> BoundedProcessResult:
-        raise AssertionError("Singular must not launch on an exhausted allowance")
-
-    monkeypatch.setattr(
-        "jacobian.math.polynomials.ideals._singular.run_bounded_process",
-        forbidden,
-    )
-
-    verdict = run_singular_minimal_primes_verification(
-        _ideal(), (_ideal(),), IdealComputationBudget(), wall_seconds=-0.5
-    )
-
-    assert verdict == "TIMEOUT"
-
-
-def test_missing_backend_is_a_typed_unavailable_verification_verdict(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(
-        "jacobian.math.polynomials.ideals._singular.shutil.which",
-        lambda name: None,
-    )
-
-    verdict = run_singular_minimal_primes_verification(
-        _ideal(), (_ideal(),), IdealComputationBudget()
-    )
-
-    assert verdict == "UNAVAILABLE"
-
-
-def test_malformed_verification_output_is_an_error_verdict(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    executable = _executable(tmp_path, 'print("not the protocol")')
-    _select_executable(monkeypatch, executable)
-
-    verdict = run_singular_minimal_primes_verification(
-        _ideal(), (_ideal(),), IdealComputationBudget()
-    )
-
-    assert verdict == "ERROR"
-
-
-def _sorted_family(
-    *components: RationalPolynomialIdeal,
-) -> tuple[RationalPolynomialIdeal, ...]:
-    return tuple(sorted(components, key=lambda ideal: ideal.model_dump_json()))
-
-
-@pytest.mark.skipif(
-    shutil.which("Singular") is None,
-    reason="Singular 4.4 backend is not installed",
-)
-def test_verification_accepts_the_true_axes_family() -> None:
-    variables = ("x", "y")
-    source = _monomial_ideal(variables, (1, 1))
-    claimed = _sorted_family(
-        _monomial_ideal(variables, (1, 0)),
-        _monomial_ideal(variables, (0, 1)),
-    )
-
-    verdict = run_singular_minimal_primes_verification(
-        source, claimed, IdealComputationBudget()
-    )
-
-    assert verdict == "VERIFIED"
-
-
-@pytest.mark.skipif(
-    shutil.which("Singular") is None,
-    reason="Singular 4.4 backend is not installed",
-)
-def test_verification_refutes_a_non_prime_single_component() -> None:
-    variables = ("x", "y")
-    source = _monomial_ideal(variables, (1, 1))
-    claimed = _sorted_family(_monomial_ideal(variables, (1, 1)))
-
-    verdict = run_singular_minimal_primes_verification(
-        source, claimed, IdealComputationBudget()
-    )
-
-    assert verdict == "REFUTED"
-
-
-@pytest.mark.skipif(
-    shutil.which("Singular") is None,
-    reason="Singular 4.4 backend is not installed",
-)
-def test_verification_refutes_a_family_missing_a_component() -> None:
-    variables = ("x", "y")
-    source = _monomial_ideal(variables, (1, 1))
-    claimed = _sorted_family(_monomial_ideal(variables, (1, 0)))
-
-    verdict = run_singular_minimal_primes_verification(
-        source, claimed, IdealComputationBudget()
-    )
-
-    assert verdict == "REFUTED"
-
-
-@pytest.mark.skipif(
-    shutil.which("Singular") is None,
-    reason="Singular 4.4 backend is not installed",
-)
-def test_verification_refutes_a_non_minimal_family() -> None:
-    variables = ("x", "y")
-    source = _monomial_ideal(variables, (1, 0))
-    claimed = _sorted_family(
-        _monomial_ideal(variables, (1, 0)),
-        _monomial_ideal(variables, (1, 1)),
-    )
-
-    verdict = run_singular_minimal_primes_verification(
-        source, claimed, IdealComputationBudget()
-    )
-
-    assert verdict == "REFUTED"
-
-
-@pytest.mark.skipif(
-    shutil.which("Singular") is None,
-    reason="Singular 4.4 backend is not installed",
-)
-def test_verification_decides_degenerate_sources_structurally() -> None:
-    variables = ("x", "y")
-    unit = _monomial_ideal(variables, (0, 0))
-    zero_source = RationalPolynomialIdeal(
-        variables=variables, generators=(_zero_poly(variables),)
-    )
-    zero_family = _sorted_family(
-        RationalPolynomialIdeal(
-            variables=variables, generators=(_zero_poly(variables),)
-        )
-    )
-
-    empty_unit = run_singular_minimal_primes_verification(
-        unit, (), IdealComputationBudget()
-    )
-    populated_unit = run_singular_minimal_primes_verification(
-        unit, (unit,), IdealComputationBudget()
-    )
-    zero_verdict = run_singular_minimal_primes_verification(
-        zero_source, zero_family, IdealComputationBudget()
-    )
-
-    assert empty_unit == "VERIFIED"
-    assert populated_unit == "REFUTED"
-    assert zero_verdict == "VERIFIED"

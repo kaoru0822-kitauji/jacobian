@@ -25,8 +25,8 @@ from jacobian.math.graphs.flows.multicommodity._models import (
     MulticommodityFlow,
     MulticommodityFlowProfileRequest,
     MulticommodityFlowProfileResult,
-    _profile_component_digit_bounds,
     derived_profile_digit_budget,
+    measured_profile_components,
 )
 from jacobian.math.graphs.flows.multicommodity._operations import (
     _run_multicommodity_flow_profile,
@@ -885,12 +885,10 @@ def test_congestion_bound_uses_the_capacity_denominator() -> None:
         commodities=(CommodityDemand(commodity_id="a", source=0, sink=1, demand=q(1)),),
         entries=(CommodityEdgeFlow(commodity_id="a", source=0, target=1, amount=q(1)),),
     )
-    _cell_bounds, load_bounds, slack_bounds, congestion_bound = (
-        _profile_component_digit_bounds(flow)
-    )
-    assert congestion_bound == (4_000, 1)
-    assert max(load_bounds.values()) == (1, 1)
-    assert slack_bounds[(0, 1)] == (4_000, 4_000)
+    scan = measured_profile_components(flow)
+    assert scan.congestion_bound == (4_000, 1)
+    assert max(scan.load_bounds.values()) == (1, 1)
+    assert scan.slack_bounds[(0, 1)] == (4_000, 4_000)
 
 
 def oversized_ratio_tensor() -> MulticommodityFlow:
@@ -1168,32 +1166,23 @@ def test_oversized_source_is_rejected_before_the_component_scan(
 ) -> None:
     from jacobian.math.graphs.flows.multicommodity import _models
 
-    measured: list[MulticommodityFlow] = []
     executed: list[MulticommodityFlow] = []
-    original_bounds = _models._profile_component_digit_bounds
     original_scan = _models._component_sums_with_folds
-
-    def bounds_spy(flow: MulticommodityFlow) -> object:
-        measured.append(flow)
-        return original_bounds(flow)
 
     def scan_spy(flow: MulticommodityFlow) -> object:
         executed.append(flow)
         return original_scan(flow)
 
-    monkeypatch.setattr(_models, "_profile_component_digit_bounds", bounds_spy)
     monkeypatch.setattr(_models, "_component_sums_with_folds", scan_spy)
     # Request parsing remains structural. Execution measures the echoed source
     # before its own component scan and therefore never starts the scan.
     flow = oversized_echo_flow()
     MulticommodityFlowProfileRequest(flow=flow)
-    assert measured == []
     assert executed == []
     # A native call is rejected by the same preflight inside the kernel's
     # own admission, likewise before any rational arithmetic.
     with pytest.raises(ValueError, match="aggregate result bound"):
         compute_multicommodity_flow_profile(flow)
-    assert measured == []
     assert executed == []
 
 

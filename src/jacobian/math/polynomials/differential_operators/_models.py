@@ -84,9 +84,8 @@ class DifferentialOperatorApplyResult(DifferentialOperatorApplyRequest):
     def require_result_shape(self) -> Self:
         """Validate canonical result relations without re-executing FLINT.
 
-        Kernel-produced results use ``_from_kernel``.  A caller that receives a
-        separately supplied claim can ask the owner-local explicit verifier to
-        replay its admitted defining relation under a fresh bounded envelope.
+        Kernel-produced results use ``_from_kernel`` so parsing does not repeat
+        the defining computation.
         """
         if self.is_zero != (not self.output.polynomial.terms):
             raise _validation_error(

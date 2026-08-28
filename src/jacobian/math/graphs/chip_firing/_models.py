@@ -19,23 +19,6 @@ def _validation_error(code: str, message: str) -> PydanticCustomError:
     return PydanticCustomError(code, message)
 
 
-def _validate_divisor(
-    vertices: tuple[str, ...],
-    divisor: tuple[int, ...],
-    *,
-    label: str = "divisor",
-) -> None:
-    if len(divisor) != len(vertices):
-        raise _validation_error(
-            "chip_firing.divisor_length", f"{label} length must match vertex count"
-        )
-    if any(abs(c) >= 10**MAX_COEFFICIENT_DIGITS for c in divisor):
-        raise _validation_error(
-            "chip_firing.coefficient_bound",
-            f"{label} coefficients exceed the digit bound",
-        )
-
-
 def _validate_sink(vertices: tuple[str, ...], sink: str) -> None:
     if sink not in set(vertices):
         raise _validation_error(

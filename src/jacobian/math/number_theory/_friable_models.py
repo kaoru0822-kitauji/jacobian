@@ -142,7 +142,7 @@ class FriableCountResult(StrictModel):
     def _from_kernel(cls, request: FriableCountRequest, *, count: int) -> Self:
         """Build one result after the admitted kernel established its count."""
 
-        return cls(
+        return cls.model_construct(
             x=request.x,
             y=request.y,
             count=str(count),

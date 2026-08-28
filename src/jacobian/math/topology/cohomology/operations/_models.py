@@ -255,8 +255,7 @@ class SteenrodSquareResult(SteenrodSquareRequest):
     """A canonical Steenrod-square result bound structurally to its source.
 
     Deserialization checks only the source-derived degree and canonical
-    cochain representation.  Recomputing the cup product is an explicit
-    owner-local verifier concern, never a result-model side effect.
+    cochain representation. It does not recompute the cup product.
     """
 
     result_degree: int = Field(ge=0)
@@ -328,7 +327,7 @@ class SteenrodSquareResult(SteenrodSquareRequest):
     ) -> Self:
         """Construct a trusted result emitted by the owner-local kernel."""
 
-        return cls(
+        return cls.model_construct(
             cochain_degree=request.cochain_degree,
             simplex_values=request.simplex_values,
             simplex_coefficients=request.simplex_coefficients,
@@ -430,7 +429,7 @@ class BocksteinResult(BocksteinRequest):
     ) -> Self:
         """Construct a trusted result emitted by the owner-local kernel."""
 
-        return cls(
+        return cls.model_construct(
             prime=request.prime,
             cochain_degree=request.cochain_degree,
             simplex_values=request.simplex_values,

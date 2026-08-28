@@ -9,6 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.polynomials.multivariate._factor_models import (
     MultivariateFactorRequest,
     MultivariateFactorResult,
@@ -373,16 +374,18 @@ class TestAggregateContentAdmission:
         budget yet their least common multiple exceeds the canonical
         32,768-digit rational limit, so the operation could never return its
         declared typed result; admission rejects before invoking SymPy."""
-        with pytest.raises(ValidationError):
-            MultivariateFactorRequest(polynomial=_prime_denominator_poly(129))
+        request = MultivariateFactorRequest(polynomial=_prime_denominator_poly(129))
+        with pytest.raises(OperationDomainValidationError):
+            multivariate_factor(request)
 
     @pytest.mark.scale
     def test_content_within_limit_but_primitive_coefficients_rejected(self) -> None:
         """Even with the least common multiple inside the canonical limit,
         clearing denominators can push every primitive coefficient past the
         operation's own 256-digit coefficient budget."""
-        with pytest.raises(ValidationError):
-            MultivariateFactorRequest(polynomial=_prime_denominator_poly(127))
+        request = MultivariateFactorRequest(polynomial=_prime_denominator_poly(127))
+        with pytest.raises(OperationDomainValidationError):
+            multivariate_factor(request)
 
     def test_small_shared_denominators_still_admitted(self) -> None:
         """Ordinary rational coefficients clear to small primitive values
@@ -439,7 +442,6 @@ class TestKillableFactorBackend:
         from jacobian.math.polynomials.multivariate import _factor_backend
 
         monkeypatch.setattr(_factor_backend, "FACTOR_WORK_WALL_SECONDS", 5.0)
-        monkeypatch.setattr(_factor_backend, "FACTOR_VERIFY_WALL_SECONDS", 15.0)
 
         dense = _expanded_product(
             ("x1", "x2", "x3", "x4", "x5", "x6", "x7", "z"),

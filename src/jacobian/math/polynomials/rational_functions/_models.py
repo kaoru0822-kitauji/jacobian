@@ -49,14 +49,13 @@ def _require_hermite_result_budget(
     rational_part: RationalFunction,
     remainder: RationalFunction,
 ) -> None:
-    """Bound the certificate algebra accepted by the explicit verifier.
+    """Bound the retained exact Hermite-reduction result.
 
     A degree-six numerator over a degree-three denominator yields a
     zero-constant rational part with numerator degree at most six and
     denominator degree at most two.  The square-free residual denominator has
     degree at most three and its numerator is proper.  These derived limits
-    keep independently supplied certificates within the same exact envelope
-    as a kernel-produced result.
+    keep every retained result within the operation's exact envelope.
     """
 
     for label, polynomial, maximum_terms, maximum_exponent in (
@@ -142,7 +141,7 @@ class HermiteReductionResult(HermiteReductionRequest):
         """Build a trusted result from the owner-local Hermite kernel."""
 
         has_primitive = not remainder.numerator.terms
-        return cls(
+        return cls.model_construct(
             function=function,
             rational_part=rational_part,
             remainder=remainder,

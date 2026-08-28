@@ -125,7 +125,15 @@ class SmithNormalFormCertificate(StrictModel):
     @classmethod
     def _from_kernel(
         cls,
-        **values: object,
+        *,
+        source: CertifiedIntegerMatrix,
+        diagonal: CertifiedIntegerMatrix,
+        left_transformation: CertifiedIntegerMatrix,
+        right_transformation: CertifiedIntegerMatrix,
+        rank: int,
+        invariant_factors: tuple[CanonicalInteger, ...],
+        left_determinant: Literal["-1", "1"],
+        right_determinant: Literal["-1", "1"],
     ) -> Self:
         """Construct a certificate emitted by the trusted Smith kernel.
 
@@ -134,7 +142,16 @@ class SmithNormalFormCertificate(StrictModel):
         established the relation before it reaches this factory.
         """
 
-        return cls.model_validate(values)
+        return cls.model_construct(
+            source=source,
+            diagonal=diagonal,
+            left_transformation=left_transformation,
+            right_transformation=right_transformation,
+            rank=rank,
+            invariant_factors=invariant_factors,
+            left_determinant=left_determinant,
+            right_determinant=right_determinant,
+        )
 
 
 __all__ = ["CertifiedIntegerMatrix", "SmithNormalFormCertificate"]

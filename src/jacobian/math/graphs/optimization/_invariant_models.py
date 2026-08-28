@@ -8,9 +8,6 @@ from pydantic import Field, StrictBool, StrictInt, model_validator
 from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
-from jacobian.math.graphs.optimization._coloring_models import (
-    ChromaticGraph,
-)
 from jacobian.math.graphs.optimization._models import (
     OptimizationSearchStep,
     OptimizationStatus,
@@ -42,38 +39,12 @@ class GraphGirthResult(StrictModel):
         return self
 
 
-class GraphDiameterResult(StrictModel):
-    status: Literal["COMPUTED", "NOT_APPLICABLE"]
-    diameter: StrictInt | None = Field(default=None, ge=0, le=255)
-    connected: StrictBool
-    detail: str | None = Field(default=None, min_length=1, max_length=512)
-
-    @model_validator(mode="after")
-    def bind_connectivity(self) -> Self:
-        if self.status == "COMPUTED":
-            if self.diameter is None or not self.connected or self.detail is not None:
-                raise PydanticCustomError(
-                    "graph.computed_diameter_requires_exact_value_connected",
-                    "computed diameter requires an exact value on a connected graph",
-                )
-        elif self.diameter is not None or self.connected or self.detail is None:
-            raise PydanticCustomError(
-                "graph.inapplicable_diameter_requires_no_value_explicit_detail",
-                "inapplicable diameter requires no value and an explicit detail",
-            )
-        return self
-
-
 class GraphEdgeConnectivityResult(StrictModel):
     edge_connectivity: StrictInt = Field(ge=0, le=255)
 
 
 class GraphVertexConnectivityResult(StrictModel):
     vertex_connectivity: StrictInt = Field(ge=0, le=255)
-
-
-class GraphEulerianResult(StrictModel):
-    is_eulerian: StrictBool
 
 
 class GraphSpanningTreeCountResult(StrictModel):
@@ -129,10 +100,6 @@ class GraphMaximumMatchingResult(StrictModel):
         return self
 
 
-class GraphTriangleCountResult(StrictModel):
-    triangle_count: StrictInt = Field(ge=0, le=2_763_520)
-
-
 class GraphCoreRequest(GraphInvariantRequest):
     k: StrictInt = Field(ge=0, le=255)
 
@@ -151,28 +118,6 @@ class GraphCoreResult(StrictModel):
         if len(set(self.vertices)) != len(self.vertices):
             raise PydanticCustomError(
                 "graph.k_core_vertices_must_be_unique", "k-core vertices must be unique"
-            )
-        return self
-
-
-class GraphRadiusResult(StrictModel):
-    status: Literal["COMPUTED", "NOT_APPLICABLE"]
-    radius: StrictInt | None = Field(default=None, ge=0, le=255)
-    connected: StrictBool
-    detail: str | None = Field(default=None, min_length=1, max_length=512)
-
-    @model_validator(mode="after")
-    def bind_connectivity(self) -> Self:
-        if self.status == "COMPUTED":
-            if self.radius is None or not self.connected or self.detail is not None:
-                raise PydanticCustomError(
-                    "graph.computed_radius_requires_exact_value_connected",
-                    "computed radius requires an exact value on a connected graph",
-                )
-        elif self.radius is not None or self.connected or self.detail is None:
-            raise PydanticCustomError(
-                "graph.inapplicable_radius_requires_no_value_explicit_detail",
-                "inapplicable radius requires no value and an explicit detail",
             )
         return self
 
@@ -228,18 +173,3 @@ class GraphCliqueNumberResult(GraphCardinalityMaximumResult):
     convention: Literal["MAXIMUM_COMPLETE_VERTEX_SUBSET"] = (
         "MAXIMUM_COMPLETE_VERTEX_SUBSET"
     )
-
-
-class GraphCardinalityMaximumObligation(StrictModel):
-    graph: ChromaticGraph
-    predicate: Literal["GRAPH_CLIQUE_NUMBER_OPTIMALITY",]
-    status: OptimizationStatus
-    claimed_value: StrictInt | None = Field(default=None, ge=0, le=32)
-    lower_bound: StrictInt = Field(ge=0, le=32)
-    upper_bound: StrictInt = Field(ge=0, le=32)
-    witness_vertices: tuple[GraphVertex, ...]
-    tested: tuple[OptimizationSearchStep, ...]
-    required_checks: tuple[
-        Literal["WITNESS_FEASIBILITY", "MAXIMUM_CARDINALITY"],
-        ...,
-    ] = ("WITNESS_FEASIBILITY", "MAXIMUM_CARDINALITY")

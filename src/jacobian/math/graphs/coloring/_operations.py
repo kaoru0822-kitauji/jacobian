@@ -72,8 +72,12 @@ def _admit_chromatic_number_certificate(
 
 
 def _admit_k_colorability(request: KColorabilityRequest) -> None:
+    _admit_indexed_coloring_graph(request.graph)
+
+
+def _admit_indexed_coloring_graph(graph: IndexedSimpleUndirectedGraph) -> None:
     try:
-        _require_indexed_coloring_graph(request.graph)
+        _require_indexed_coloring_graph(graph)
     except PydanticCustomError as error:
         raise OperationDomainValidationError(
             location=("graph",), code=error.type, message=str(error)
@@ -81,8 +85,12 @@ def _admit_k_colorability(request: KColorabilityRequest) -> None:
 
 
 def _admit_edge_k_colorability(request: EdgeKColorabilityRequest) -> None:
+    _admit_edge_coloring_graph(request.graph)
+
+
+def _admit_edge_coloring_graph(graph: SimpleUndirectedGraph) -> None:
     try:
-        _require_edge_coloring_graph_bound(request.graph)
+        _require_edge_coloring_graph_bound(graph)
     except PydanticCustomError as error:
         raise OperationDomainValidationError(
             location=("graph",), code=error.type, message=str(error)
@@ -297,6 +305,7 @@ def compute_maximal_independent_set_decision(
     request: MaximalIndependentSetRequest,
 ) -> MaximalIndependentSetResult:
     """Decide maximal independence and return the first canonical obstruction."""
+    _admit_indexed_coloring_graph(request.graph)
     candidate = frozenset(request.candidate_set)
     edges = tuple(sorted((min(u, v), max(u, v)) for u, v in request.graph.edges))
     for edge in edges:
@@ -388,19 +397,20 @@ def compute_edge_coloring_check(
     request: EdgeColoringCheckRequest,
 ) -> EdgeColoringCheckResult:
     """Validate one source-bound edge-to-color assignment as a proper coloring."""
+    _admit_edge_coloring_graph(request.assignment.graph)
     edges = request.assignment.graph.edges
     coloring = request.assignment.coloring
     for a, b in _incident_edge_index_pairs_for_canonical_graph(
         request.assignment.graph
     ):
         if coloring[a] == coloring[b]:
-            return EdgeColoringCheckResult(
+            return EdgeColoringCheckResult._from_kernel(
                 assignment=request.assignment,
                 proper=False,
                 blocking_edge=edges[a],
                 conflicting_edge=edges[b],
             )
-    return EdgeColoringCheckResult(
+    return EdgeColoringCheckResult._from_kernel(
         assignment=request.assignment,
         proper=True,
         blocking_edge=None,

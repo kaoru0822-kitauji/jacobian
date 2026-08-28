@@ -110,8 +110,7 @@ class PolynomialSupport(StrictModel):
 
     @model_validator(mode="after")
     def bind_extrema_to_support(self) -> Self:
-        # Parsing checks the self-contained canonical shape only.  Computing
-        # extrema is deliberately left to ``verify_polynomial_support`` so
+        # Parsing checks the self-contained canonical shape only so
         # deserializing a result never re-enters an operation kernel.
         width = len(self.variables)
         _require_shape_consistency(self, width)
@@ -142,11 +141,11 @@ class PolynomialSupport(StrictModel):
     @classmethod
     def _from_kernel(cls, **values: Any) -> Self:
         """Build a support value from the trusted owner-local kernel."""
-        return cls(**values)
+        return cls.model_construct(**values)
 
 
 def _require_newton_context(value: NewtonPolytope) -> None:
-    """Dimension context and exponent widths bound an independent verifier."""
+    """Validate retained dimension context and exponent widths."""
     if len(set(value.variables)) != len(value.variables):
         raise _validation_error(
             "variables_not_unique", "variables must be unique and canonically named"
@@ -197,8 +196,7 @@ class NewtonPolytope(StrictModel):
     )
     ambient_dimension: int = Field(ge=0)
     affine_dimension: int = Field(ge=0)
-    # Retained support fields carry the admitted hull size (96 points), so an
-    # explicit verifier cannot be asked to replay an unbounded hull claim.
+    # Retained support fields carry the admitted hull size (96 points).
     vertices: tuple[tuple[int, ...], ...] = Field(
         default=(), max_length=MAX_NEWTON_TERMS
     )
@@ -254,14 +252,14 @@ class NewtonPolytope(StrictModel):
     @classmethod
     def _from_kernel(cls, **values: Any) -> Self:
         """Build a Newton polytope from trusted owner-local kernel output."""
-        return cls(**values)
+        return cls.model_construct(**values)
 
 
 class PolynomialWeightProfile(StrictModel):
     """Weight profile of a polynomial support under a retained weight vector.
 
-    The source polynomial and weight keep the claimed profile composable and
-    make its defining identity available to an explicit bounded verifier.
+    The source polynomial and weight keep the profile composable and retain
+    the context for its defining identity.
     """
 
     polynomial: RationalPolynomial
@@ -298,7 +296,7 @@ class PolynomialWeightProfile(StrictModel):
     @classmethod
     def _from_kernel(cls, **values: Any) -> Self:
         """Build a weight profile from trusted owner-local kernel output."""
-        return cls(**values)
+        return cls.model_construct(**values)
 
 
 class PolynomialFaceData(StrictModel):
@@ -330,4 +328,4 @@ class PolynomialFaceData(StrictModel):
     @classmethod
     def _from_kernel(cls, **values: Any) -> Self:
         """Build an initial-form value from trusted owner-local kernel output."""
-        return cls(**values)
+        return cls.model_construct(**values)

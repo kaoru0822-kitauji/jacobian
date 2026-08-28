@@ -3,7 +3,6 @@
 import pytest
 from pydantic import BaseModel, ValidationError
 from tests.math.number_theory.numerical_semigroups._support import (
-    numerical_semigroup_error,
     operation_domain_error,
 )
 
@@ -104,15 +103,6 @@ class TestFactorizations:
         assert result.minimal_generators == ("3", "5")
         assert result.factorizations == ((0, 3), (5, 0))
 
-    def test_factorization_result_rejects_a_redundant_coordinate_axis(self) -> None:
-        with numerical_semigroup_error():
-            FactorizationComputeResult(
-                value="15",
-                minimal_generators=("3", "5", "8"),
-                in_semigroup=True,
-                factorizations=((0, 3, 0), (5, 0, 0)),
-            )
-
     def test_factorization_materialization_is_complete_past_old_silent_cap(
         self,
     ) -> None:
@@ -128,96 +118,6 @@ class TestFactorizations:
         assert counts[200] == 14_506
         assert len(result.factorizations) == counts[200]
         assert result.in_semigroup
-
-
-@pytest.mark.parametrize(
-    ("result_model", "payload"),
-    [
-        (
-            FactorizationComputeResult,
-            {"value": "15", "in_semigroup": True, "factorizations": ((0, 3, 0),)},
-        ),
-        (
-            FactorizationLengthsComputeResult,
-            {"value": "18", "in_semigroup": True, "lengths": (3, 4, 5, 6)},
-        ),
-        (
-            FactorizationGraphComputeResult,
-            {
-                "value": "15",
-                "in_semigroup": True,
-                "factorizations": ((0, 3, 0),),
-                "edges": (),
-                "connected_components": ((0,),),
-                "is_connected": True,
-            },
-        ),
-        (
-            ElementDeltaSetResult,
-            {
-                "value": "18",
-                "factorization_lengths": (3, 4, 5, 6),
-                "delta_set": (1,),
-            },
-        ),
-        (
-            ElementElasticityResult,
-            {
-                "value": "18",
-                "minimum_length": 3,
-                "maximum_length": 6,
-                "elasticity": "2",
-            },
-        ),
-        (
-            ElementCatenaryDegreeResult,
-            {"value": "18", "factorization_count": 5, "catenary_degree": 3},
-        ),
-        (
-            BettiElementsResult,
-            {
-                "apery_set": ("0", "10", "5"),
-                "candidate_count": 6,
-                "betti_elements": ("15",),
-            },
-        ),
-        (
-            MinimalPresentationResult,
-            {
-                "betti_elements": ("15",),
-                "relations": ({"first": (5, 0, 0), "second": (0, 3, 0)},),
-            },
-        ),
-        (
-            PresentationBinomialsResult,
-            {
-                "binomials": (
-                    {
-                        "left_exponents": (5, 0, 0),
-                        "right_exponents": (0, 3, 0),
-                    },
-                )
-            },
-        ),
-        (
-            DeltaSetResult,
-            {"delta_set": (1,), "periodicity_bound": 45, "checked_through": 50},
-        ),
-        (
-            CatenaryDegreeResult,
-            {
-                "catenary_degree": 3,
-                "betti_degrees": ({"betti_element": "15", "catenary_degree": 3},),
-                "witness_betti_elements": ("15",),
-            },
-        ),
-    ],
-)
-def test_result_rejects_redundant_minimal_generator_axis(
-    result_model: type[BaseModel], payload: dict[str, object]
-) -> None:
-    with numerical_semigroup_error():
-        result_model.model_validate({"minimal_generators": ("3", "5", "6"), **payload})
 
 
 @pytest.mark.parametrize("axis", [(), tuple(map(str, range(30, 51)))])
@@ -389,18 +289,6 @@ class TestFactorizationGraph:
         assert result.minimal_generators == ("3", "5")
         assert result.factorizations == ((0, 3), (5, 0))
 
-    def test_graph_result_rejects_a_redundant_coordinate_axis(self) -> None:
-        with numerical_semigroup_error():
-            FactorizationGraphComputeResult(
-                value="15",
-                minimal_generators=("3", "5", "8"),
-                in_semigroup=True,
-                factorizations=((0, 3, 0), (5, 0, 0)),
-                edges=(),
-                connected_components=((0,), (1,)),
-                is_connected=False,
-            )
-
     def test_graph_15_in_3_5_disconnected(self) -> None:
         req = FactorizationGraphComputeRequest(generators=("3", "5"), value="15")
         result = compute_factorization_graph(req)
@@ -530,16 +418,6 @@ class TestMinimalPresentation:
             for relation in result.relations
         )
 
-    def test_presentation_result_rejects_a_redundant_coordinate_axis(self) -> None:
-        with numerical_semigroup_error():
-            MinimalPresentationResult.model_validate(
-                {
-                    "minimal_generators": ("3", "5", "8"),
-                    "betti_elements": ("15",),
-                    "relations": ({"first": [5, 0, 0], "second": [0, 3, 0]},),
-                }
-            )
-
     def test_presentation_3_5(self) -> None:
         req = MinimalPresentationRequest(generators=("3", "5"))
         result = compute_minimal_presentation(req)
@@ -595,20 +473,6 @@ class TestPresentationBinomials:
         assert result.minimal_generators == ("3", "5")
         assert result.binomials[0].left_exponents == (5, 0)
         assert result.binomials[0].right_exponents == (0, 3)
-
-    def test_binomial_result_rejects_a_redundant_coordinate_axis(self) -> None:
-        with numerical_semigroup_error():
-            PresentationBinomialsResult.model_validate(
-                {
-                    "minimal_generators": ("3", "5", "8"),
-                    "binomials": (
-                        {
-                            "left_exponents": [5, 0, 0],
-                            "right_exponents": [0, 3, 0],
-                        },
-                    ),
-                }
-            )
 
     def test_binomials_3_5(self) -> None:
         req = PresentationBinomialsRequest.model_validate(
@@ -754,10 +618,7 @@ class TestGeneratorEnvelopeIsSchemaVisible:
             "number_theory.numerical_semigroup.presentation_binomials.compute",
         ):
             assert f"each at most {MAX_GENERATOR}" in tools[operation_id].description
-        for operation_id in (
-            "number_theory.numerical_semigroup.elasticity.compute",
-            "number_theory.numerical_semigroup.elasticity.global_compute",
-        ):
+        for operation_id in ("number_theory.numerical_semigroup.elasticity.compute",):
             examples = tools[operation_id].examples
             assert examples
             assert all(

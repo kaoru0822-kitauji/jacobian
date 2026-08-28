@@ -10,7 +10,6 @@ from jacobian.math.geometry._models import (
     ConvexPolygonTriangulationResult,
     EuclideanConvexPolygonTriangulationRequest,
     EuclideanConvexPolygonTriangulationResult,
-    GeometryRationalResult,
     PolygonPointClassificationResult,
     PolygonRequest,
     SimplePolygonDecisionResult,
@@ -18,7 +17,6 @@ from jacobian.math.geometry._models import (
 )
 from jacobian.math.geometry._operations import (
     classify_polygon_point,
-    signed_area,
     simple_polygon,
 )
 from jacobian.math.geometry._support import geometry_operation
@@ -100,23 +98,6 @@ POLYGON_OPERATIONS = (
                         {"first": 1, "second": 3, "weight": {"num": "2", "den": "1"}},
                     ],
                 },
-            ),
-        ),
-    ),
-    geometry_operation(
-        "geometry.polygon.compute.signed_area",
-        "Compute polygon signed area",
-        "Compute exact oriented area of a simple rational polygon.",
-        PolygonRequest,
-        GeometryRationalResult,
-        signed_area,
-        "geometry",
-        "polygon",
-        examples=(
-            example(
-                "unit_square_signed_area",
-                "Compute the signed area of a unit square.",
-                {"points": _UNIT_SQUARE},
             ),
         ),
     ),
