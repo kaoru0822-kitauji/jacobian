@@ -35,7 +35,8 @@ def _positive_form(
 
 
 def _assert_error_type(
-    exc_info: pytest.ExceptionInfo[ValidationError], code: str
+    exc_info: pytest.ExceptionInfo[ValidationError | OperationDomainValidationError],
+    code: str,
 ) -> None:
     assert any(error["type"] == code for error in exc_info.value.errors())
 

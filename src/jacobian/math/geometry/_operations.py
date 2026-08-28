@@ -115,7 +115,10 @@ def _admit_configuration(
     except ValueError as exc:
         for index, point in enumerate(points):
             for axis, value in (("x", point.x), ("y", point.y)):
-                if max(len(value.num.lstrip("-")), len(value.den)) > MAX_COORDINATE_DIGITS:
+                if (
+                    max(len(value.num.lstrip("-")), len(value.den))
+                    > MAX_COORDINATE_DIGITS
+                ):
                     _reject_geometry_domain(
                         location=("points", index, axis),
                         code="geometry.coordinate_digits_max",

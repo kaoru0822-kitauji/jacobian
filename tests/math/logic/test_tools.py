@@ -204,7 +204,7 @@ def test_sat_solver_returns_unsat_without_a_model() -> None:
 def test_sat_solver_does_not_promote_a_malformed_backend_model(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import z3  # type: ignore[import-untyped]
+    import z3
 
     class MisreportingSolver:
         def set(self, **_settings: object) -> None:
@@ -213,7 +213,7 @@ def test_sat_solver_does_not_promote_a_malformed_backend_model(
         def add(self, *_clauses: object) -> None:
             pass
 
-        def check(self) -> z3.CheckSatResult:
+        def check(self) -> object:
             return z3.sat
 
         def model(self) -> object:
@@ -238,7 +238,7 @@ def test_smt_solver_does_not_promote_a_malformed_backend_model(
     import z3
 
     class MisreportingModel:
-        def eval(self, _assertion: object, **_kwargs: object) -> z3.BoolRef:
+        def eval(self, _assertion: object, **_kwargs: object) -> object:
             return z3.BoolVal(False)
 
         def sexpr(self) -> str:
@@ -251,7 +251,7 @@ def test_smt_solver_does_not_promote_a_malformed_backend_model(
         def add(self, _assertions: object) -> None:
             pass
 
-        def check(self) -> z3.CheckSatResult:
+        def check(self) -> object:
             return z3.sat
 
         def model(self) -> MisreportingModel:
@@ -1432,7 +1432,7 @@ def test_smt_solver_projects_exhaustion_from_model_serialization(
     import z3
 
     class ExhaustingModel:
-        def eval(self, _assertion: object, **_kwargs: object) -> z3.BoolRef:
+        def eval(self, _assertion: object, **_kwargs: object) -> object:
             return z3.BoolVal(True)
 
         def sexpr(self) -> str:

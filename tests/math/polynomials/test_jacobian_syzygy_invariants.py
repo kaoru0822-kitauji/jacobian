@@ -136,7 +136,6 @@ def test_four_variable_rank_fixture_has_the_published_first_kernel() -> None:
     ]
 
 
-
 def test_three_variable_sparse_and_labelled_inputs_remain_compatible() -> None:
     sparse_result = compute_graded_jacobian_syzygy(
         GradedJacobianSyzygyRequest(

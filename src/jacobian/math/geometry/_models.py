@@ -443,6 +443,7 @@ class CircleInversionRequest(StrictModel):
         ),
     )
 
+
 class PointTripleRequest(StrictModel):
     first: RationalPoint2D
     second: RationalPoint2D
@@ -1489,6 +1490,7 @@ class GeneralPositionRequest(StrictModel):
             )
         return self
 
+
 class CollinearTripleWitness(StrictModel):
     indices: tuple[int, int, int]
 
@@ -1571,6 +1573,7 @@ class CircumradiusProfileRequest(StrictModel):
                 "point_set_coordinates_unique", "point-set coordinates must be unique"
             )
         return self
+
 
 class CircumradiusTripleEntry(StrictModel):
     """One triple and its circumradius disposition."""

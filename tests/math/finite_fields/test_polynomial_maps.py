@@ -48,10 +48,7 @@ def test_complete_table_and_fibers_reuse_exact_slice_a_field_identity() -> None:
         next(target for source, target in table.entries if source == collision.left)
         == collision.image
     )
-    assert tuple(
-        target
-        for _source, target in table.entries
-    ) == tuple(
+    assert tuple(target for _source, target in table.entries) == tuple(
         evaluate_finite_polynomial(polynomial_map.polynomial, source)
         for source, _target in table.entries
     )
@@ -67,9 +64,9 @@ def test_frobenius_map_is_a_permutation() -> None:
     assert {target.digest for _, target in table.entries} == {
         source.digest for source, _ in result.inverse_entries
     }
-    assert {
-        source.digest: target.digest for source, target in table.entries
-    } == {target.digest: source.digest for target, source in result.inverse_entries}
+    assert {source.digest: target.digest for source, target in table.entries} == {
+        target.digest: source.digest for target, source in result.inverse_entries
+    }
 
 
 def test_slice_b_values_reject_wrong_parent_and_incomplete_table() -> None:
@@ -91,6 +88,8 @@ def test_slice_b_values_reject_wrong_parent_and_incomplete_table() -> None:
         FiniteMapTable(map=polynomial_map, entries=table.entries[:-1])
     with pytest.raises(ValueError, match="canonical domain order"):
         FiniteMapTable(map=polynomial_map, entries=tuple(reversed(table.entries)))
+
+
 def test_table_consumers_parse_structural_targets_without_replay() -> None:
     identity_table = finite_map_table(_map(1))
     zero = identity_table.entries[0][1]
@@ -98,7 +97,9 @@ def test_table_consumers_parse_structural_targets_without_replay() -> None:
         map=identity_table.map,
         entries=tuple((source, zero) for source, _ in identity_table.entries),
     )
-    assert parsed.entries == tuple((source, zero) for source, _ in identity_table.entries)
+    assert parsed.entries == tuple(
+        (source, zero) for source, _ in identity_table.entries
+    )
 
 
 def test_fibers_and_collisions_preserve_the_table_defining_invariants() -> None:
@@ -107,8 +108,7 @@ def test_fibers_and_collisions_preserve_the_table_defining_invariants() -> None:
     collision = analyze_collisions(table)
 
     assert all(
-        sources
-        == tuple(source for source, target in table.entries if target == image)
+        sources == tuple(source for source, target in table.entries if target == image)
         for image, sources in partition.fibers
     )
     assert collision.left is not None

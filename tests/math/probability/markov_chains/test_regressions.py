@@ -228,10 +228,11 @@ def test_transition_contract_rejects_non_stochastic_matrices(
     matrix: object, error_code: str
 ) -> None:
     if error_code == "markov_chain.transition_matrix_not_square":
-        with pytest.raises(ValidationError) as error:
+        with pytest.raises(ValidationError) as structural_error:
             TransitionMatrixRequest.model_validate({"matrix": matrix})
+        assert structural_error.value.errors()[0]["type"] == error_code
     else:
         request = TransitionMatrixRequest.model_validate({"matrix": matrix})
-        with pytest.raises(OperationDomainValidationError) as error:
+        with pytest.raises(OperationDomainValidationError) as domain_error:
             compute_ergodic_decision(request)
-    assert error.value.errors()[0]["type"] == error_code
+        assert domain_error.value.errors()[0]["type"] == error_code

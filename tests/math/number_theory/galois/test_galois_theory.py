@@ -223,12 +223,14 @@ def test_galois_backend_domain_is_enforced_before_execution(request_type: type) 
     operation = (
         compute_galois_group if request_type is GaloisGroupRequest else compute_solvable
     )
-    with pytest.raises(OperationDomainValidationError) as exc:
+    with pytest.raises(OperationDomainValidationError) as domain_error:
         operation(request_type(coefficients=(0, 0, 0, 0, 1)))
-    assert exc.value.errors()[0]["type"] == "galois_theory.polynomial_not_irreducible"
-    with pytest.raises(ValidationError) as exc:
+    assert domain_error.value.errors()[0]["type"] == (
+        "galois_theory.polynomial_not_irreducible"
+    )
+    with pytest.raises(ValidationError) as structural_error:
         request_type(coefficients=(-2, 0, 0, 0, 0, 0, 0, 1))
-    assert exc.value.errors()[0]["type"] == "too_long"
+    assert structural_error.value.errors()[0]["type"] == "too_long"
 
 
 def _group_from_result(result: object) -> PermutationGroup:
