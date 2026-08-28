@@ -29,8 +29,6 @@ MAX_RESULT_BYTES = 1_000_000
 MAX_TRADE_ORDER = MAX_T
 MAX_TRADE_DIFFERENCES = MAX_POINTS + MAX_SUBSETS
 
-_CONTAINMENT_RESULT_PASSES = 2
-_TRADE_TOTAL_PASSES = 4
 _MAX_CONTAINMENT_TOTAL_WORK_UNITS = 4_000_000
 _MAX_TRADE_TOTAL_WORK_UNITS = 5_000_000
 _RESULT_ENVELOPE_BYTES = 4_096
@@ -145,11 +143,11 @@ def _require_containment_profile_admitted(
             "containment profile exceeds the complete subset-count budget",
         )
 
-    total_work = _CONTAINMENT_RESULT_PASSES * _profile_work_units(incidence, order)
+    total_work = _profile_work_units(incidence, order)
     if total_work > _MAX_CONTAINMENT_TOTAL_WORK_UNITS:
         raise IncidenceStructureAdmissionError(
             "containment_work_budget_exceeded",
-            "containment profile exceeds the operation-plus-replay work budget",
+            "containment profile exceeds the execution work budget",
         )
 
     estimated_result_bytes = (
@@ -195,10 +193,10 @@ def _require_incidence_trade_admitted(
         _profile_work_units(left, order) + _profile_work_units(right, order)
         for order in range(1, max_order + 1)
     )
-    if _TRADE_TOTAL_PASSES * work_per_pass > _MAX_TRADE_TOTAL_WORK_UNITS:
+    if work_per_pass > _MAX_TRADE_TOTAL_WORK_UNITS:
         raise IncidenceStructureAdmissionError(
             "trade_work_budget_exceeded",
-            "trade comparison exceeds the operation-plus-replay work budget",
+            "trade comparison exceeds the execution work budget",
         )
 
     subset_label_bytes = sum(
@@ -253,7 +251,7 @@ class ContainmentProfileRequest(StrictModel):
                 "Compute the complete multiplicity map for every t-subset of "
                 "the ordered point axis. Zero-multiplicity subsets are retained. "
                 "The request is rejected before enumeration unless the complete "
-                "profile, operation work, result replay, and echoed source fit "
+                "profile, execution work, and echoed source fit "
                 "their declared budgets."
             )
         }
@@ -473,7 +471,7 @@ class IncidenceTradeRequest(StrictModel):
                 "point axis through max_order. Every positive-order multiplicity "
                 "is compared exactly; omitted result entries have equal, "
                 "possibly zero, multiplicity. Each requested order must fit the "
-                "complete subset-count, operation-plus-replay work, and exact-"
+                "complete subset-count, execution work, and exact-"
                 "output budgets; the schema ceiling is only a conservative "
                 "fallback shared with containment profiles. The zeroth "
                 "block-count difference is reported separately."

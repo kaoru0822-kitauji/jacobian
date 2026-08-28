@@ -15,9 +15,8 @@ NamedLevelOneModularForm = Literal["E4", "E6", "DELTA"]
 
 NAMED_LEVEL_ONE_FORMS = frozenset(("E4", "E6", "DELTA"))
 
-# Delta needs five finite convolutions to construct and three more to replay
-# its defining identity in the result value.  The factor eleven also leaves
-# room for the operation boundary to validate that value once more.
+# Delta needs five finite convolutions to construct its defining identity.
+# Explicit verification of independently supplied values has its own budget.
 MAX_LEVEL_ONE_WORK_TERMS = 4_000_000
 MAX_LEVEL_ONE_SERIALIZED_CHARACTERS = 65_536
 
@@ -142,7 +141,7 @@ def require_level_one_admission(
     p = truncation_order
     divisor_scans = p * isqrt(p)
     formula_scans = divisor_scans if form in {"E4", "E6"} else 2 * divisor_scans
-    series_terms = 0 if form in {"E4", "E6"} else 11 * p * p
+    series_terms = 0 if form in {"E4", "E6"} else 5 * p * p
     if formula_scans + series_terms > MAX_LEVEL_ONE_WORK_TERMS:
         raise ValueError("level-one q-expansion exceeds the exact work bound")
 

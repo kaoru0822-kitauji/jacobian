@@ -77,9 +77,9 @@ def test_delta_known_prefix_and_defining_e4_e6_identity() -> None:
 
 
 def test_full_public_precision_is_complete_and_carries_parent_metadata() -> None:
-    result = level_one_named_q_expansion("DELTA", 600)
-    assert result.q_expansion.truncation_order == 600
-    assert len(result.q_expansion.coefficients) == 600
+    result = level_one_named_q_expansion("DELTA", 844)
+    assert result.q_expansion.truncation_order == 844
+    assert len(result.q_expansion.coefficients) == 844
     assert result.congruence_subgroup == "SL2Z"
     assert result.level == 1
     assert result.weight == 12
@@ -124,12 +124,12 @@ def test_requests_above_the_serialized_budget_name_the_controlling_quantity() ->
         require_level_one_admission("E4", 1478)
 
 
-def test_delta_above_the_work_budget_names_the_controlling_quantity() -> None:
-    request = LevelOneNamedQExpansionRequest(form="DELTA", truncation_order=601)
-    with pytest.raises(ValueError, match="exact work bound"):
+def test_delta_above_the_serialized_budget_names_the_controlling_quantity() -> None:
+    request = LevelOneNamedQExpansionRequest(form="DELTA", truncation_order=845)
+    with pytest.raises(ValueError, match="serialized result bound"):
         level_one_named_q_expansion(request.form, request.truncation_order)
-    with pytest.raises(ValueError, match="exact work bound"):
-        require_level_one_admission("DELTA", 601)
+    with pytest.raises(ValueError, match="serialized result bound"):
+        require_level_one_admission("DELTA", 845)
 
 
 def test_wire_request_rejects_boolean_truncation_orders() -> None:

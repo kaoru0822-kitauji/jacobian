@@ -248,6 +248,20 @@ def test_trade_admission_is_budget_derived_with_conservative_order_ceiling() -> 
         )
 
 
+def test_trade_admission_charges_each_profile_once() -> None:
+    points = tuple(f"p{index}" for index in range(80))
+    blocks = (points,) * 100
+    left = _family(blocks, "l", points=points)
+    right = _family(blocks, "r", points=points)
+
+    result = compute_incidence_trade(
+        IncidenceTradeRequest(left=left, right=right, max_order=2)
+    )
+
+    assert result.positive_moments_equal
+    assert tuple(comparison.order for comparison in result.comparisons) == (1, 2)
+
+
 def test_trade_requires_identical_ordered_point_parents() -> None:
     left = _family((("a",),), "l", points=("a", "b"))
     right = _family((("a",),), "r", points=("b", "a"))

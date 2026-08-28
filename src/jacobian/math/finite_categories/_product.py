@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from pydantic_core import PydanticCustomError
 
 from jacobian.canonical import strict_json_object_size
@@ -29,7 +27,7 @@ from jacobian.math.finite_categories.values import (
 )
 
 MAX_CATEGORY_PRODUCT_RESULT_BYTES = 8 * 1024 * 1024
-MAX_CATEGORY_PRODUCT_REPLAY_STEPS = 1_000_000
+MAX_CATEGORY_PRODUCT_EXECUTION_STEPS = 1_000_000
 
 
 def _product_error(reason: str, message: str) -> PydanticCustomError:
@@ -50,16 +48,6 @@ def _product_admission_error(
     reason: str, message: str
 ) -> CategoryProductAdmissionError:
     return CategoryProductAdmissionError(reason, message)
-
-
-@dataclass(frozen=True, slots=True)
-class _CategoryProductPlan:
-    object_count: int
-    morphism_count: int
-    composable_pair_count: int
-    composable_triple_count: int
-    replay_steps: int
-    serialized_result_bytes: int
 
 
 def _source_identifier_sizes(
@@ -233,7 +221,9 @@ def _product_result_wire_size(
     )
 
 
-def _product_plan(left: FiniteCategory, right: FiniteCategory) -> _CategoryProductPlan:
+def _admit_product(left: FiniteCategory, right: FiniteCategory) -> int:
+    """Admit one product and return its exact serialized result size."""
+
     object_count = len(left.objects) * len(right.objects)
     morphism_count = len(left.morphisms) * len(right.morphisms)
     composable_pair_count = len(left.composition) * len(right.composition)
@@ -280,17 +270,19 @@ def _product_plan(left: FiniteCategory, right: FiniteCategory) -> _CategoryProdu
         label="product morphism identifiers",
     )
 
-    replay_steps = 2 * (
+    # Product rows are materialized once and then scanned once by the canonical
+    # FiniteCategory constructor to establish the category laws.
+    execution_steps = 2 * (
         5 * object_count
         + 7 * morphism_count
         + 4 * composable_pair_count
         + composable_triple_count
     )
-    if replay_steps > MAX_CATEGORY_PRODUCT_REPLAY_STEPS:
+    if execution_steps > MAX_CATEGORY_PRODUCT_EXECUTION_STEPS:
         raise _product_admission_error(
-            "product_replay_work_budget",
-            "product construction exceeds the bounded construction-and-replay work "
-            f"budget of {MAX_CATEGORY_PRODUCT_REPLAY_STEPS} steps",
+            "product_execution_work_budget",
+            "product construction exceeds the bounded execution work budget of "
+            f"{MAX_CATEGORY_PRODUCT_EXECUTION_STEPS} steps",
         )
 
     product_category_size = _product_category_wire_size(left, right, identifier_sizes)
@@ -308,14 +300,7 @@ def _product_plan(left: FiniteCategory, right: FiniteCategory) -> _CategoryProdu
             "product construction exceeds the bounded canonical serialized result "
             f"size of {MAX_CATEGORY_PRODUCT_RESULT_BYTES} bytes"
         )
-    return _CategoryProductPlan(
-        object_count=object_count,
-        morphism_count=morphism_count,
-        composable_pair_count=composable_pair_count,
-        composable_triple_count=composable_triple_count,
-        replay_steps=replay_steps,
-        serialized_result_bytes=serialized_result_bytes,
-    )
+    return serialized_result_bytes
 
 
 def _product_data(
@@ -325,7 +310,7 @@ def _product_data(
     tuple[ProductObjectProjection, ...],
     tuple[ProductMorphismProjection, ...],
 ]:
-    _product_plan(left, right)
+    _admit_product(left, right)
     objects = tuple(
         (left_object, right_object)
         for left_object in left.objects

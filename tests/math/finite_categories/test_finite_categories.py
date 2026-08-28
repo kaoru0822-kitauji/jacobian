@@ -21,7 +21,7 @@ from jacobian.math.finite_categories._operations import (
     verify_category_profile_claim,
 )
 from jacobian.math.finite_categories._product import (
-    _product_plan,
+    _admit_product,
 )
 
 
@@ -336,7 +336,7 @@ class TestProduct:
 
         result = product(left, right)
 
-        assert _product_plan(left, right).serialized_result_bytes == len(
+        assert _admit_product(left, right) == len(
             encode_strict_json(result.model_dump(mode="json"))
         )
 
