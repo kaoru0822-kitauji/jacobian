@@ -35,7 +35,8 @@ def _require_ratio_result_budget(
     ):
         raise _validation_error(
             "projective_coordinate_components_exceed_digit_ratio",
-            "projective coordinate components exceed the 16,384-digit ratio budget",
+            "projective coordinate components exceed the "
+            f"{MAX_PROJECTIVE_COORDINATE_DIGITS:,}-digit ratio budget",
         )
 
 
