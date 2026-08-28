@@ -14,6 +14,9 @@ from jacobian.math.combinatorics._recurrence_models import (
     PolynomialCoefficientRecurrenceEvaluationResult,
     _validate_result_inline_size,
 )
+from jacobian.math.combinatorics._recurrence_series_operations import (
+    evaluate_polynomial_coefficient_recurrence,
+)
 
 
 @contextmanager
@@ -156,5 +159,6 @@ def test_polynomial_recurrence_aborts_when_an_intermediate_exceeds_digit_bound()
         "indices": [],
     }
 
-    with raises_code("combinatorics.recurrence_invariant"):
-        PolynomialCoefficientRecurrenceEvaluationRequest.model_validate(request)
+    parsed = PolynomialCoefficientRecurrenceEvaluationRequest.model_validate(request)
+    with pytest.raises(ValueError, match="digit bound"):
+        evaluate_polynomial_coefficient_recurrence(parsed)
