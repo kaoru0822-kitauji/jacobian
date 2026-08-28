@@ -22,6 +22,7 @@ MAX_GRAPH_RELIABILITY_VERTICES = 16
 MAX_GRAPH_RELIABILITY_EDGES = 12
 MAX_GRAPH_RELIABILITY_STATES = 1 << MAX_GRAPH_RELIABILITY_EDGES
 MAX_GRAPH_RELIABILITY_LEDGER_BYTES = 9 * 1024 * 1024
+GRAPH_RELIABILITY_LEDGER_FIXED_BYTES = 16 * 1024
 
 
 def _validation_error(message: str) -> PydanticCustomError:
@@ -191,7 +192,7 @@ def _admit_graph_connection_request(
     estimated_ledger_bytes = (
         repeated_edge_bytes
         + state_count * len(canonicalize_json(maximum_state))
-        + 16 * 1024
+        + GRAPH_RELIABILITY_LEDGER_FIXED_BYTES
     )
     if estimated_ledger_bytes > MAX_GRAPH_RELIABILITY_LEDGER_BYTES:
         raise ValueError(
