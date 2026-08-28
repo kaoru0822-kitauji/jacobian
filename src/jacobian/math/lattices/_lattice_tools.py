@@ -1,4 +1,4 @@
-"""MathTool declarations for the issue-#1739 integer-lattice operations."""
+"""MathTool declarations for integer-lattice structural operations."""
 
 from __future__ import annotations
 

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from jacobian.math.prime_field_linear_algebra import PrimeFieldMatrix
+from jacobian.math.prime_field_linear_algebra import (
+    PrimeFieldMatrix,
+)
 from jacobian.math.prime_field_linear_algebra import (
     nullspace as _nullspace,
 )

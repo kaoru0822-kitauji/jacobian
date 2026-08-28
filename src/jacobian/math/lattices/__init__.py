@@ -3,7 +3,7 @@
 Lattice mathematics is owned separately from matrix mathematics.  This module
 exposes bounded LLL reduction over integer lattices backed by Python-FLINT,
 the row Hermite normal form, and the structural integer-lattice operations
-requested in issue #1739.
+defined by this domain.
 """
 
 from jacobian.math.lattices._lattice_operations import (

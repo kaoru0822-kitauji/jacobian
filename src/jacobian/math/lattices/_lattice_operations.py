@@ -1,4 +1,4 @@
-"""Wire layer for the issue-#1739 integer-lattice structural operations.
+"""Wire layer for integer-lattice structural operations.
 
 Each public function accepts a typed request model (defined in ``_models``),
 delegates to a pure kernel in ``_lattice_ops``, and returns a typed result
@@ -77,11 +77,6 @@ __all__ = [
     "compute_saturation",
     "compute_sublattice_index",
 ]
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 def _basis_int_list(lattice: IntegerLattice) -> list[list[int]]:

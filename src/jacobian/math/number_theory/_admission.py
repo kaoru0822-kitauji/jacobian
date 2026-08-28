@@ -118,10 +118,8 @@ ADMISSIONS: tuple[OperationAdmission, ...] = (
     OperationAdmission(
         "integer.compute.primorial",
         AdmissionDecision.KEEP,
-        "distinct exact bounded mathematical value or invariant with material computational or reliability leverage; "
-        "re-admitted for the v4 result-derived envelope: PrimorialRequest bounds n <= 1001 from the declared "
-        "3,400-digit result budget (primorial(1001) carries 3397 digits, primorial(1002) 3401), so admitted "
-        "work is n-1 big-integer multiplications whose intermediates and exact result stay inside that budget",
+        "distinct exact primorial value with a result-derived digit envelope that "
+        "bounds every multiplication intermediate and the returned integer",
     ),
     OperationAdmission(
         "integer.compute.proper_divisors",

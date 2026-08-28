@@ -454,7 +454,7 @@ def circle_inversion(request: CircleInversionRequest) -> GeometryPointResult:
 
 
 # ---------------------------------------------------------------------------
-# Configuration-level operations (issues #2107, #2106)
+# Configuration-level operations
 # ---------------------------------------------------------------------------
 
 

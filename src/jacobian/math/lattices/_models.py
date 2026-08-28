@@ -109,7 +109,7 @@ class LatticeReductionResult(StrictModel):
 
 
 # ---------------------------------------------------------------------------
-# Issue #1739: integer-lattice structural operations
+# Integer-lattice structural operations
 #
 # An ``IntegerLattice`` represents a rank-``r`` lattice in ``ZZ^n`` by a
 # full-row-rank integer basis matrix whose rows are basis vectors under the

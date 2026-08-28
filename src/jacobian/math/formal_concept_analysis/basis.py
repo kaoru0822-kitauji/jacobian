@@ -33,14 +33,14 @@ from jacobian.math.formal_concept_analysis.values import (
 #   * logical work -- the plan reports the exact closure-matrix and lectic
 #     enumeration counts. The kernel consumes that carrier, then performs one
 #     closure-equivalence pass over the constructed basis. The carrier-fit
-#     check below keeps that basis inside #2267's
-#     MAX_IMPLICATIONS rows and MAX_IMPLICATION_MEMBERSHIPS memberships, so
+#     check below keeps that basis inside MAX_IMPLICATIONS rows and
+#     MAX_IMPLICATION_MEMBERSHIPS memberships, so
 #     every admitted query also stays under MAX_CANONICAL_CLOSURE_WORK;
 #   * serialized result bytes -- a worst-case payload shaped by the probed
 #     basis size with full-width rows, measured through the strict-JSON
 #     canonical encoder.
 #
-# Contexts whose exact basis exceeds the #2267 canonical implication carrier
+# Contexts whose exact basis exceeds the canonical implication carrier
 # are rejected on the probe, so every accepted request returns the declared
 # typed result.
 MAX_DG_CANDIDATE_STATES = 4_096
@@ -65,7 +65,7 @@ def _subset_for_state(state: int, attribute_count: int) -> tuple[int, ...]:
 
 
 def _basis_attribute_labels(attribute_count: int) -> tuple[str, ...]:
-    """Return #2267-compatible labels for source-index coordinates."""
+    """Return canonical labels for source-index coordinates."""
 
     return tuple(f"m{attribute}" for attribute in range(attribute_count))
 
@@ -121,7 +121,7 @@ def _enumerate_dg_masks(
 def _require_dg_canonical_carrier_fit(
     pseudo_intent_pairs: tuple[tuple[int, int], ...],
 ) -> int:
-    """Reject exact bases beyond #2267's canonical implication-system carrier."""
+    """Reject exact bases beyond the canonical implication-system carrier."""
 
     count = len(pseudo_intent_pairs)
     if count > MAX_IMPLICATIONS:
@@ -338,7 +338,7 @@ class PseudoIntent(StrictModel):
         lt=MAX_DG_CANDIDATE_STATES,
         description=(
             "Index of premise -> (closure minus premise) in basis.implications "
-            "after #2267 canonical row normalization."
+            "after canonical row normalization."
         ),
     )
 

@@ -16,7 +16,9 @@ from pydantic import (
 from pydantic.json_schema import JsonSchemaValue
 
 from jacobian._models import StrictModel
-from jacobian.math.modular_polynomials import _INTEGER as _TERM_INTEGER
+from jacobian.math.modular_polynomials import (
+    _INTEGER as _TERM_INTEGER,
+)
 from jacobian.math.modular_polynomials import (
     ModularPolynomialTerm as _ModularPolynomialTerm,
 )

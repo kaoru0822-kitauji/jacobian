@@ -1149,7 +1149,7 @@ class ConvexPolygonTriangulationResult(StrictModel):
     exactness: Literal["EXACT_RATIONAL"] = "EXACT_RATIONAL"
 
 
-# Euclidean convex-polygon triangulation (issue #945)
+# Euclidean convex-polygon triangulation
 # ---------------------------------------------------------------------------
 
 MAX_EUCLIDEAN_TRIANGULATION_OUTPUT_CHARS = 7_000_000
@@ -1639,7 +1639,7 @@ class EuclideanConvexPolygonTriangulationResult(StrictModel):
 
 
 # ---------------------------------------------------------------------------
-# Configuration-level operations (issues #2107, #2106)
+# Configuration-level operations
 # ---------------------------------------------------------------------------
 
 

@@ -868,7 +868,7 @@ class CliqueExpansionResult(StrictModel):
 
 
 # ---------------------------------------------------------------------------
-# Induced uniform-hypergraph type profiles (#2888)
+# Induced uniform-hypergraph type profiles
 # --------------------------------------------------------------------------
 
 MAX_INDUCED_SUBSETS = 4_096
@@ -1039,7 +1039,7 @@ class InducedTypeProfileResult(StrictModel):
 
 
 # ---------------------------------------------------------------------------
-# Bounded exact minimum vertex transversals (#2876)
+# Bounded exact minimum vertex transversals
 # --------------------------------------------------------------------------
 
 MAX_TRANSVERSAL_RESULT_VERTICES = MAX_VERTICES
@@ -1170,7 +1170,7 @@ class MinimumTransversalResult(StrictModel):
 
 
 # ---------------------------------------------------------------------------
-# Bounded exact maximum edge-matchings (#2875)
+# Bounded exact maximum edge-matchings
 # --------------------------------------------------------------------------
 
 MAX_MATCHING_EDGES = 20

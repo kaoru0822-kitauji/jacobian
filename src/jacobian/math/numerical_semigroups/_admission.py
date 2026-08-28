@@ -13,17 +13,17 @@ ADMISSIONS: tuple[OperationAdmission, ...] = (
     OperationAdmission(
         "number_theory.numerical_semigroup.betti_elements.compute",
         AdmissionDecision.KEEP,
-        "exact complete Betti enumeration replacing the capped heuristic search after the #1977 contract repair",
+        "exact complete Betti enumeration rather than a capped heuristic search",
     ),
     OperationAdmission(
         "number_theory.numerical_semigroup.catenary_degree.compute",
         AdmissionDecision.KEEP,
-        "complete global catenary-degree invariant rebuilt on the repaired Betti basis after the #1977 contract repair",
+        "complete global catenary-degree invariant on the exact Betti basis",
     ),
     OperationAdmission(
         "number_theory.numerical_semigroup.delta_set.compute",
         AdmissionDecision.KEEP,
-        "complete global delta-set invariant rebuilt on the repaired Betti basis after the #1977 contract repair",
+        "complete global delta-set invariant on the exact Betti basis",
     ),
     OperationAdmission(
         "number_theory.numerical_semigroup.elasticity.compute",
@@ -50,30 +50,23 @@ ADMISSIONS: tuple[OperationAdmission, ...] = (
         "number_theory.numerical_semigroup.membership.compute",
         AdmissionDecision.KEEP,
         "exact bounded semigroup-membership predicate with material "
-        "reliability leverage; decision renewed when the request schema began "
-        "publishing its admission envelope - positive gcd-one generators at "
-        "most 500 (at most 20) and a tested value at most 10000 - through "
-        "catalog-discoverable field descriptions",
+        "reliability leverage and a catalog-discoverable request envelope",
     ),
     OperationAdmission(
         "number_theory.numerical_semigroup.minimal_presentation.compute",
         AdmissionDecision.KEEP,
-        "minimal presentation rebuilt on the exact Betti basis after the #1977 contract repair",
+        "minimal presentation constructed from the exact Betti basis",
     ),
     OperationAdmission(
         "number_theory.numerical_semigroup.presentation_binomials.compute",
         AdmissionDecision.KEEP,
-        "unit binomial coefficients of the repaired minimal presentation after the #1977 contract repair",
+        "unit binomial coefficients of the exact minimal presentation",
     ),
     OperationAdmission(
         "number_theory.numerical_semigroup.summary.compute",
         AdmissionDecision.KEEP,
         "one complete exact finite gap profile with its mutually determined "
-        "canonical invariants; decision renewed when the request and result "
-        "schemas began publishing the admission envelope - positive gcd-one "
-        "generators at most 500 (at most 20) normalized to the increasing "
-        "minimal generator axis - through catalog-discoverable field "
-        "descriptions",
+        "canonical invariants on the normalized increasing generator axis",
     ),
 )
 

@@ -668,7 +668,7 @@ class MobiusFunctionResult(PosetExactResult):
 
 
 # ---------------------------------------------------------------------------
-# Issue #1746: Closures, duals, zeta transforms, antichain profiles
+# Closures, duals, zeta transforms, and antichain profiles
 # ---------------------------------------------------------------------------
 
 
