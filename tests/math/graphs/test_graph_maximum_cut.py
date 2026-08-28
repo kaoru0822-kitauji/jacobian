@@ -11,6 +11,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian.canonical import encode_strict_json
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.optimization import _maximum_cut, _maximum_cut_process
 from jacobian.math.graphs.optimization._maximum_cut import (
     MAXIMUM_CUT_CANDIDATE_PARTITIONS,
@@ -292,15 +293,17 @@ def test_candidate_boundary_accepts_c21_and_rejects_c23_before_backend() -> None
     accepted = _validated_result(_cycle(21))
     assert accepted.cut_value == 20
 
-    with pytest.raises(ValidationError):
-        GraphMaximumCutRequest(graph=_cycle(23))
+    request = GraphMaximumCutRequest(graph=_cycle(23))
+    with pytest.raises(OperationDomainValidationError):
+        compute_maximum_cut(request)
 
 
 def test_edge_update_boundary_accepts_k19_and_rejects_k20_before_backend() -> None:
     GraphMaximumCutRequest(graph=_complete(19))
 
-    with pytest.raises(ValidationError):
-        GraphMaximumCutRequest(graph=_complete(20))
+    request = GraphMaximumCutRequest(graph=_complete(20))
+    with pytest.raises(OperationDomainValidationError):
+        compute_maximum_cut(request)
 
 
 def test_large_bipartite_graph_is_not_rejected_by_a_coarse_order_cap() -> None:
@@ -320,8 +323,9 @@ def test_projected_result_bytes_are_rejected_before_search() -> None:
     right = "b" * 1_400_000
     graph = _graph((left, right), ((left, right),))
 
-    with pytest.raises(ValidationError):
-        GraphMaximumCutRequest(graph=graph)
+    request = GraphMaximumCutRequest(graph=graph)
+    with pytest.raises(OperationDomainValidationError, match="projected exact result"):
+        compute_maximum_cut(request)
 
 
 def test_result_size_boundary_accepts_the_largest_fit_and_rejects_the_next() -> None:
@@ -338,16 +342,17 @@ def test_result_size_boundary_accepts_the_largest_fit_and_rejects_the_next() -> 
 
     assert accepted_bytes > MAXIMUM_CUT_RESULT_BYTES - 4
     assert accepted_bytes <= MAXIMUM_CUT_RESULT_BYTES
-    with pytest.raises(ValidationError):
-        GraphMaximumCutRequest(
-            graph=_graph(
-                (
-                    "a" * (accepted_label_length + 1),
-                    "b" * (accepted_label_length + 1),
-                ),
-                (),
-            )
+    request = GraphMaximumCutRequest(
+        graph=_graph(
+            (
+                "a" * (accepted_label_length + 1),
+                "b" * (accepted_label_length + 1),
+            ),
+            (),
         )
+    )
+    with pytest.raises(OperationDomainValidationError, match="projected exact result"):
+        compute_maximum_cut(request)
 
 
 def test_public_contract_explains_bounds_without_private_kernel_details() -> None:

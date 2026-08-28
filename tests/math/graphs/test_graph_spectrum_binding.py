@@ -7,6 +7,7 @@ import copy
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.spectra._models import (
     GraphSpectrumRequest,
     GraphSpectrumResult,
@@ -54,8 +55,11 @@ def test_null_graph_composes_and_yields_the_empty_spectrum() -> None:
 def test_spectral_request_rejects_the_shared_value_outside_its_envelope() -> None:
     graph = _graph(33, tuple((index, index + 1) for index in range(32)))
 
-    with pytest.raises(ValidationError, match="spectral operations support"):
-        GraphSpectrumRequest(graph=graph)
+    request = GraphSpectrumRequest(graph=graph)
+    with pytest.raises(
+        OperationDomainValidationError, match="spectral operations support"
+    ):
+        compute_adjacency_spectrum(request)
 
 
 def test_producer_spectra_retain_source() -> None:

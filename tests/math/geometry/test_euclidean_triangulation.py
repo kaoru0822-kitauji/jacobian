@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian.canonical import canonicalize_json, format_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.geometry._euclidean_triangulation import (
     minimum_euclidean_weight_triangulation,
 )
@@ -242,24 +243,27 @@ class TestEuclideanTriangulation:
         assert (comparison.left_split, comparison.right_split) == (2, 1)
 
     def test_rejects_a_nonconvex_polygon_before_arb(self) -> None:
-        with pytest.raises(ValidationError):
-            _request((_point(0, 0), _point(2, 0), _point(1, 1), _point(2, 2)))
+        request = _request((_point(0, 0), _point(2, 0), _point(1, 1), _point(2, 2)))
+        with pytest.raises(OperationDomainValidationError):
+            minimum_euclidean_weight_triangulation(request)
 
     def test_rejects_a_self_intersecting_ring_despite_positive_turns(self) -> None:
-        with pytest.raises(ValidationError):
-            _request(
-                (
-                    _point(0, 3),
-                    _point(-2, -3),
-                    _point(3, 1),
-                    _point(-3, 1),
-                    _point(2, -3),
-                )
+        request = _request(
+            (
+                _point(0, 3),
+                _point(-2, -3),
+                _point(3, 1),
+                _point(-3, 1),
+                _point(2, -3),
             )
+        )
+        with pytest.raises(OperationDomainValidationError):
+            minimum_euclidean_weight_triangulation(request)
 
     def test_request_rejects_a_triangle_below_the_admitted_vertex_floor(self) -> None:
-        with pytest.raises(ValidationError):
-            _request((_point(0, 0), _point(2, 0), _point(0, 2)))
+        request = _request((_point(0, 0), _point(2, 0), _point(0, 2)))
+        with pytest.raises(OperationDomainValidationError):
+            minimum_euclidean_weight_triangulation(request)
 
     def test_request_admits_a_ring_past_the_former_fixed_vertex_ceiling(
         self,
@@ -290,15 +294,14 @@ class TestEuclideanTriangulation:
         assert validated.optimum == result.optimum
 
     def test_request_rejects_a_ring_beyond_the_derived_vertex_ceiling(self) -> None:
-        with pytest.raises(
-            ValidationError,
-        ):
-            _request(
-                tuple(
-                    _point(index, index * index)
-                    for index in range(MAX_EUCLIDEAN_TRIANGULATION_VERTICES + 1)
-                )
+        request = _request(
+            tuple(
+                _point(index, index * index)
+                for index in range(MAX_EUCLIDEAN_TRIANGULATION_VERTICES + 1)
             )
+        )
+        with pytest.raises(OperationDomainValidationError):
+            minimum_euclidean_weight_triangulation(request)
 
     def test_request_admits_a_far_translated_unit_square(self) -> None:
         scale = 10**32 + 7
@@ -361,15 +364,16 @@ class TestEuclideanTriangulation:
         self,
     ) -> None:
         scale = 10**20000
-        with pytest.raises(ValidationError):
-            _request(
-                (
-                    _point(0, 0),
-                    _big_point(scale, 0),
-                    _big_point(scale, 1),
-                    _point(0, 1),
-                )
+        request = _request(
+            (
+                _point(0, 0),
+                _big_point(scale, 0),
+                _big_point(scale, 1),
+                _point(0, 1),
             )
+        )
+        with pytest.raises(OperationDomainValidationError):
+            minimum_euclidean_weight_triangulation(request)
 
     @pytest.mark.scale
     def test_request_admits_squared_lengths_inside_the_canonical_rational_cap(
@@ -395,13 +399,11 @@ class TestEuclideanTriangulation:
 
     def test_request_rejects_extent_beyond_the_derived_output_bound(self) -> None:
         spread = 10**90
-        with pytest.raises(ValidationError):
-            _request(
-                tuple(
-                    _point(index * spread, index * index * spread)
-                    for index in range(38)
-                )
-            )
+        request = _request(
+            tuple(_point(index * spread, index * index * spread) for index in range(38))
+        )
+        with pytest.raises(OperationDomainValidationError):
+            minimum_euclidean_weight_triangulation(request)
 
     @pytest.mark.scale
     def test_request_rejects_a_root_optimum_expression_beyond_the_output_bound(
@@ -416,19 +418,20 @@ class TestEuclideanTriangulation:
             _span_term_occurrences(10) - 2 * (10 - 3)
         ) == 6_588_512
         assert (2 * (4 * 7337 + 1) + 128) * _span_term_occurrences(10) == 7_412_076
-        with pytest.raises(ValidationError):
-            _request(
-                tuple(
-                    {
-                        "x": {"num": str(index), "den": "1"},
-                        "y": {
-                            "num": format_canonical_integer(index * index * scale),
-                            "den": "1",
-                        },
-                    }
-                    for index in range(10)
-                )
+        request = _request(
+            tuple(
+                {
+                    "x": {"num": str(index), "den": "1"},
+                    "y": {
+                        "num": format_canonical_integer(index * index * scale),
+                        "den": "1",
+                    },
+                }
+                for index in range(10)
             )
+        )
+        with pytest.raises(OperationDomainValidationError):
+            minimum_euclidean_weight_triangulation(request)
 
     @pytest.mark.scale
     def test_request_admits_a_ring_sized_by_span_specific_term_counts(self) -> None:
@@ -457,8 +460,9 @@ class TestEuclideanTriangulation:
         # canonical output limit on its echoed polygon. Admission now
         # measures the echoed source and result metadata directly.
         assert _span_term_occurrences(64) * (2 * (4 * 4 + 1) + 128) == 6_759_288
-        with pytest.raises(ValidationError):
-            _request(_translated_parabola_ring(64, 1200))
+        request = _request(_translated_parabola_ring(64, 1200))
+        with pytest.raises(OperationDomainValidationError):
+            minimum_euclidean_weight_triangulation(request)
 
     @pytest.mark.scale
     def test_request_admits_a_translation_ring_on_the_refined_envelope_boundary(
@@ -478,8 +482,9 @@ class TestEuclideanTriangulation:
         # A 901-digit anchor adds about twenty-six thousand echo characters
         # and crosses the published bound by roughly six thousand, so the
         # boundary is tight rather than a coarse fallback.
-        with pytest.raises(ValidationError):
-            _request(_translated_parabola_ring(64, 900))
+        request = _request(_translated_parabola_ring(64, 900))
+        with pytest.raises(OperationDomainValidationError):
+            minimum_euclidean_weight_triangulation(request)
 
     @pytest.mark.scale
     def test_translated_source_completes_inside_the_published_result_bound(

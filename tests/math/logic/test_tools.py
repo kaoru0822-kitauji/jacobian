@@ -11,6 +11,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.logic import _sat as sat
 from jacobian.math.logic import _smt as smt
 from jacobian.math.logic._cnf import (
@@ -321,34 +322,39 @@ def test_lpr_refutation_keeps_witnesses_and_deletions_structural() -> None:
 
 
 def test_lpr_refutation_rejects_out_of_axis_literals_and_non_live_hints() -> None:
-    with pytest.raises(ValueError, match="outside the CNF variable axis"):
-        SatRefutationCheckRequest(
-            cnf=CanonicalCnf(variables=("x",), clauses=((1,),)),
-            refutation=SatLprRefutation(
-                steps=(
-                    LprAddition(
-                        clause_id=2,
-                        clause=(2,),
-                        at_hint_clause_ids=(1,),
-                        propagation_hints=(),
-                    ),
-                )
-            ),
-        )
-    with pytest.raises(ValueError, match="non-live clause ID 2"):
-        SatRefutationCheckRequest(
-            cnf=CanonicalCnf(variables=("x",), clauses=((1,),)),
-            refutation=SatLprRefutation(
-                steps=(
-                    LprAddition(
-                        clause_id=2,
-                        clause=(),
-                        at_hint_clause_ids=(2,),
-                        propagation_hints=(),
-                    ),
-                )
-            ),
-        )
+    out_of_axis = SatRefutationCheckRequest(
+        cnf=CanonicalCnf(variables=("x",), clauses=((1,),)),
+        refutation=SatLprRefutation(
+            steps=(
+                LprAddition(
+                    clause_id=2,
+                    clause=(2,),
+                    at_hint_clause_ids=(1,),
+                    propagation_hints=(),
+                ),
+            )
+        ),
+    )
+    with pytest.raises(
+        OperationDomainValidationError, match="outside the CNF variable axis"
+    ):
+        check_sat_refutation(out_of_axis)
+
+    non_live_hint = SatRefutationCheckRequest(
+        cnf=CanonicalCnf(variables=("x",), clauses=((1,),)),
+        refutation=SatLprRefutation(
+            steps=(
+                LprAddition(
+                    clause_id=2,
+                    clause=(),
+                    at_hint_clause_ids=(2,),
+                    propagation_hints=(),
+                ),
+            )
+        ),
+    )
+    with pytest.raises(OperationDomainValidationError, match="non-live clause ID 2"):
+        check_sat_refutation(non_live_hint)
 
 
 def test_lpr_refutation_admits_sparse_solver_assigned_clause_labels() -> None:
@@ -383,49 +389,56 @@ def test_lpr_refutation_admits_sparse_solver_assigned_clause_labels() -> None:
 
 def test_lpr_refutation_still_binds_sparse_labels_to_live_clauses() -> None:
     cnf = CanonicalCnf(variables=("x",), clauses=((-1,), (1,)))
-    with pytest.raises(ValueError, match="may not overwrite a live clause ID"):
-        SatRefutationCheckRequest(
-            cnf=cnf,
-            refutation=SatLprRefutation(
-                steps=(
-                    LprAddition(
-                        clause_id=50_000,
-                        clause=(1,),
-                        at_hint_clause_ids=(1,),
-                        propagation_hints=(),
+    overwrite = SatRefutationCheckRequest(
+        cnf=cnf,
+        refutation=SatLprRefutation(
+            steps=(
+                LprAddition(
+                    clause_id=50_000,
+                    clause=(1,),
+                    at_hint_clause_ids=(1,),
+                    propagation_hints=(),
+                ),
+                LprAddition(
+                    clause_id=50_000,
+                    clause=(1,),
+                    at_hint_clause_ids=(1,),
+                    propagation_hints=(),
+                ),
+            )
+        ),
+    )
+    with pytest.raises(
+        OperationDomainValidationError, match="may not overwrite a live clause ID"
+    ):
+        check_sat_refutation(overwrite)
+
+    non_live_hint = SatRefutationCheckRequest(
+        cnf=cnf,
+        refutation=SatLprRefutation(
+            steps=(
+                LprAddition(
+                    clause_id=50_000,
+                    clause=(),
+                    at_hint_clause_ids=(1, 2),
+                    propagation_hints=(
+                        LprPropagationHint(clause_id=60_000, at_hint_clause_ids=()),
                     ),
-                    LprAddition(
-                        clause_id=50_000,
-                        clause=(1,),
-                        at_hint_clause_ids=(1,),
-                        propagation_hints=(),
-                    ),
-                )
-            ),
-        )
-    with pytest.raises(ValueError, match="non-live clause ID"):
-        SatRefutationCheckRequest(
-            cnf=cnf,
-            refutation=SatLprRefutation(
-                steps=(
-                    LprAddition(
-                        clause_id=50_000,
-                        clause=(),
-                        at_hint_clause_ids=(1, 2),
-                        propagation_hints=(
-                            LprPropagationHint(clause_id=60_000, at_hint_clause_ids=()),
-                        ),
-                    ),
-                )
-            ),
-        )
-    with pytest.raises(ValueError, match="non-live clause ID"):
-        SatRefutationCheckRequest(
-            cnf=cnf,
-            refutation=SatLprRefutation(
-                steps=(LprDeletion(kind="deletion", clause_ids=(50_000,)),)
-            ),
-        )
+                ),
+            )
+        ),
+    )
+    with pytest.raises(OperationDomainValidationError, match="non-live clause ID"):
+        check_sat_refutation(non_live_hint)
+
+    non_live_deletion = SatRefutationCheckRequest(
+        cnf=cnf,
+        refutation=SatLprRefutation(
+            steps=(LprDeletion(kind="deletion", clause_ids=(50_000,)),)
+        ),
+    )
+    with pytest.raises(OperationDomainValidationError, match="non-live clause ID"):
+        check_sat_refutation(non_live_deletion)
 
 
 def test_lpr_refutation_reserves_the_transport_result_budget(
@@ -433,8 +446,11 @@ def test_lpr_refutation_reserves_the_transport_result_budget(
 ) -> None:
     monkeypatch.setattr(sat, "_MAX_LPR_RESULT_BYTES", 1)
 
-    with pytest.raises(ValueError, match="source-bound result limit"):
-        _unit_refutation_request()
+    request = _unit_refutation_request()
+    with pytest.raises(
+        OperationDomainValidationError, match="source-bound result limit"
+    ):
+        check_sat_refutation(request)
 
 
 def test_lpr_refutation_returns_unavailable_without_the_pinned_provider(

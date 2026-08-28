@@ -5,6 +5,7 @@ from fractions import Fraction
 import pytest
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.geometry._models import (
     CircumradiusProfileRequest,
     GeneralPositionRequest,
@@ -141,8 +142,9 @@ class TestAdmissionBounds:
         points = tuple(
             _point(str(10**63 + 4 * i + 1), str(10**63 + 4 * i + 3)) for i in range(32)
         )
-        with pytest.raises(ValueError, match="output budget"):
-            CircumradiusProfileRequest(points=points)
+        request = CircumradiusProfileRequest(points=points)
+        with pytest.raises(OperationDomainValidationError, match="output budget"):
+            circumradius_profile(request)
 
     def test_circumradius_accepts_config_within_output_budget(self) -> None:
         """A moderate configuration still runs end to end."""
@@ -155,15 +157,17 @@ class TestAdmissionBounds:
         """32 points x 255-digit coordinates exceed the exhaustive work bound."""
         big = 10**254 + 1
         points = tuple(_point(str(big + i), str(big + 2 * i)) for i in range(32))
-        with pytest.raises(ValueError, match="work bound"):
-            GeneralPositionRequest(points=points)
+        request = GeneralPositionRequest(points=points)
+        with pytest.raises(OperationDomainValidationError, match="work bound"):
+            general_position_search(request)
 
     def test_general_position_rejects_quartic_point_growth(self) -> None:
         """32 points x 32 digits pass n*digits=1024 but C(32,4)*digits^2 is
         about 36M; the combinatorial count must gate admission instead."""
         points = tuple(_point(str(10**31 + i), str(10**31 + 2 * i)) for i in range(32))
-        with pytest.raises(ValueError, match="work bound"):
-            GeneralPositionRequest(points=points)
+        request = GeneralPositionRequest(points=points)
+        with pytest.raises(OperationDomainValidationError, match="work bound"):
+            general_position_search(request)
 
     def test_general_position_accepts_moderate_configurations(self) -> None:
         """Shapes within the C(n,4)*digits^2 budget still run end to end."""

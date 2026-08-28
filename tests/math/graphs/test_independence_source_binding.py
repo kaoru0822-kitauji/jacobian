@@ -11,6 +11,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian.canonical import CanonicalLimits, encode_strict_json
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs import _independence_z3 as z3_backend
 from jacobian.math.graphs.independence import (
     IndependenceNumberBudget,
@@ -426,8 +427,9 @@ def test_result_headroom_admission_rejects_oversized_echo() -> None:
     """A huge identifier is rejected before solving, not by dispatch after."""
 
     oversized = "v" * (6 * 1024 * 1024)
-    with pytest.raises(ValidationError):
-        IndependenceNumberRequest(graph=_graph((oversized,), ()))
+    request = IndependenceNumberRequest(graph=_graph((oversized,), ()))
+    with pytest.raises(OperationDomainValidationError, match="canonical output limit"):
+        solve_independence_number(request)
 
 
 def test_large_labels_near_boundary_stay_admitted_and_transportable() -> None:

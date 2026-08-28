@@ -1,5 +1,8 @@
 """Tests for graph polynomial operations."""
 
+import pytest
+
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.polynomials._models import (
     GraphPolynomialRequest,
     GraphPolynomialResult,
@@ -77,14 +80,14 @@ class TestFlowPolynomial:
         assert d.get(0) == -1
 
     def test_rejects_graph_beyond_deletion_budget(self) -> None:
-        import pytest
-        from pydantic import ValidationError
-
         edges = tuple((j, i) for i in range(8) for j in range(i))
-        with pytest.raises(ValidationError):
-            GraphPolynomialRequest(
-                graph=IndexedSimpleUndirectedGraph(vertex_count=8, edges=edges),
-            )
+        request = GraphPolynomialRequest(
+            graph=IndexedSimpleUndirectedGraph(vertex_count=8, edges=edges),
+        )
+        with pytest.raises(
+            OperationDomainValidationError, match="exact computation envelope"
+        ):
+            compute_flow_polynomial(request)
 
     def test_bridge_is_zero_polynomial(self) -> None:
         req = GraphPolynomialRequest(
