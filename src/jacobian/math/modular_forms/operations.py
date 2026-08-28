@@ -8,14 +8,10 @@ from typing import Literal, cast
 from jacobian._exact import CanonicalRational
 from jacobian.canonical import format_canonical_integer
 from jacobian.math.formal_power_series._models import TruncatedSeries
-from jacobian.math.formal_power_series._operations import (
-    compute_power,
-    compute_scalar_multiply,
-    compute_subtract,
-)
 from jacobian.math.modular_forms.kernel import (
     NamedLevelOneModularForm,
     eisenstein_coefficients,
+    expected_coefficients,
     metadata,
     require_level_one_admission,
 )
@@ -37,15 +33,16 @@ def _series(coefficients: tuple[Fraction, ...]) -> TruncatedSeries:
 
 
 def _delta_series(truncation_order: int) -> TruncatedSeries:
-    """Build Delta via its defining E4/E6 identity using the shared carrier."""
-    e4 = _series(eisenstein_coefficients("E4", truncation_order))
-    e6 = _series(eisenstein_coefficients("E6", truncation_order))
-    e4_cubed = compute_power(e4, 3).result
-    e6_squared = compute_power(e6, 2).result
-    difference = compute_subtract(e4_cubed, e6_squared).result
-    return compute_scalar_multiply(
-        difference, CanonicalRational(num="1", den="1728")
-    ).result
+    """Build Delta from its exact owner-local defining formula.
+
+    The modular-form kernel has a wider finite-prefix envelope than the
+    general-purpose formal-series arithmetic operations.  Keeping this
+    closed-form construction here lets the modular operation admit and
+    compute its own advertised precision without inheriting an unrelated
+    intermediate-power ceiling.
+    """
+
+    return _series(expected_coefficients("DELTA", truncation_order))
 
 
 def level_one_named_q_expansion(

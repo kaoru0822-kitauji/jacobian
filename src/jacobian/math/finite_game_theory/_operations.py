@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from fractions import Fraction
 from math import lcm
+
+from pydantic_core import PydanticCustomError
 
 from jacobian._exact import CanonicalRational
 from jacobian.catalog.models import OperationDomainValidationError
@@ -33,6 +36,23 @@ def _payoff_matrix(request: ZeroSumGameRequest) -> list[list[Fraction]]:
         [entries[row * matrix.n_cols + col] for col in range(matrix.n_cols)]
         for row in range(matrix.n_rows)
     ]
+
+
+def _run_admission(admission: Callable[[], None]) -> None:
+    """Translate owner admission failures to the native operation contract."""
+
+    try:
+        admission()
+    except OperationDomainValidationError:
+        raise
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=(), code=exc.type, message=exc.message()
+        ) from exc
+    except (TypeError, ValueError) as exc:
+        raise OperationDomainValidationError(
+            location=(), code="finite_game.admission", message=str(exc)
+        ) from exc
 
 
 def compute_best_response(request: ZeroSumGameRequest) -> BestResponseResult:
@@ -144,7 +164,7 @@ def compute_deterministic_terminal_game(
 ) -> DeterministicTerminalGameSolution:
     """Compute every value and canonical optimal stationary strategy pair."""
 
-    _require_terminal_game_envelope(request.game)
+    _run_admission(lambda: _require_terminal_game_envelope(request.game))
     value_classes, max_strategy, min_strategy = _solve_terminal_game_data(request.game)
     return DeterministicTerminalGameSolution._from_kernel(
         request.game, value_classes, max_strategy, min_strategy

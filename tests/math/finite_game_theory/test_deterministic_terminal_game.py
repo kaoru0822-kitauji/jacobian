@@ -11,6 +11,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math import finite_game_theory
 from jacobian.math.finite_game_theory import (
     DeterministicGameMove,
@@ -362,9 +363,15 @@ def test_threshold_work_is_admitted_and_rejected_before_solving() -> None:
             "draw_payoff": {"num": "0", "den": "1"},
         }
 
-    DeterministicTerminalGame.model_validate(terminal_game(256))
-    with pytest.raises(ValidationError) as exc_info:
-        DeterministicTerminalGame.model_validate(terminal_game(400))
+    admitted = DeterministicTerminalGame.model_validate(terminal_game(256))
+    compute_deterministic_terminal_game(
+        DeterministicTerminalGameRequest(game=admitted)
+    )
+    rejected = DeterministicTerminalGame.model_validate(terminal_game(400))
+    with pytest.raises(OperationDomainValidationError) as exc_info:
+        compute_deterministic_terminal_game(
+            DeterministicTerminalGameRequest(game=rejected)
+        )
     assert exc_info.value.errors()[0]["type"] == "finite_game.threshold_work_exceeded"
 
 
@@ -381,8 +388,9 @@ def test_result_size_is_rejected_independently_of_threshold_work() -> None:
         "draw_payoff": {"num": "0", "den": "1"},
     }
 
-    with pytest.raises(ValidationError) as exc_info:
-        DeterministicTerminalGame.model_validate(payload)
+    game = DeterministicTerminalGame.model_validate(payload)
+    with pytest.raises(OperationDomainValidationError) as exc_info:
+        compute_deterministic_terminal_game(DeterministicTerminalGameRequest(game=game))
     assert exc_info.value.errors()[0]["type"] == "finite_game.result_size_exceeded"
 
 
