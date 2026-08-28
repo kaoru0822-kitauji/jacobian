@@ -51,8 +51,8 @@ _GRAPH_EXAMPLE = {
     "graph": {
         "vertex_count": 3,
         "edges": [
-            {"source": 0, "target": 1},
-            {"source": 1, "target": 2},
+            [0, 1],
+            [1, 2],
         ],
     }
 }

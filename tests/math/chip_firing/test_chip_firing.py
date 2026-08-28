@@ -13,7 +13,6 @@ from jacobian.math.chip_firing._models import (
     DegreeRequest,
     FireVectorRequest,
     FiringRequest,
-    LabelledGraph,
     LaplacianRequest,
     ParallelStepRequest,
     QReducedRequest,
@@ -34,6 +33,7 @@ from jacobian.math.chip_firing._operations import (
     compute_reduced_laplacian,
     compute_stabilize,
 )
+from jacobian.math.graphs.values import SimpleUndirectedGraph
 
 
 class GraphWire(TypedDict):
@@ -41,9 +41,9 @@ class GraphWire(TypedDict):
     edges: list[list[str]]
 
 
-def _graph(wire: GraphWire) -> LabelledGraph:
+def _graph(wire: GraphWire) -> SimpleUndirectedGraph:
     """Validate a JSON-shaped graph fixture at the typed model boundary."""
-    return LabelledGraph.model_validate(wire)
+    return SimpleUndirectedGraph.model_validate(wire)
 
 
 GRAPH_WIRE: GraphWire = {
@@ -288,7 +288,7 @@ class TestCanonicalDivisor:
     def test_degree_formula(self) -> None:
         graph: GraphWire = {
             "vertices": ["a", "b", "c", "d"],
-            "edges": [["a", "b"], ["b", "c"], ["c", "d"], ["d", "a"]],
+            "edges": [["a", "b"], ["b", "c"], ["c", "d"], ["a", "d"]],
         }
         result = compute_canonical_divisor(CanonicalDivisorRequest(graph=_graph(graph)))
         assert result.degree == 2 * len(graph["edges"]) - 2 * len(graph["vertices"])
@@ -303,7 +303,7 @@ class TestCriticalGroup:
     def test_cycle_c4(self) -> None:
         c4: GraphWire = {
             "vertices": ["a", "b", "c", "d"],
-            "edges": [["a", "b"], ["b", "c"], ["c", "d"], ["d", "a"]],
+            "edges": [["a", "b"], ["b", "c"], ["c", "d"], ["a", "d"]],
         }
         result = compute_critical_group(
             CriticalGroupRequest(graph=_graph(c4), sink="a")
@@ -364,7 +364,7 @@ class TestCriticalGroup:
             (["a", "b", "c"], [("a", "b"), ("b", "c"), ("a", "c")]),
             (
                 ["a", "b", "c", "d"],
-                [("a", "b"), ("b", "c"), ("c", "d"), ("d", "a")],
+                [("a", "b"), ("b", "c"), ("c", "d"), ("a", "d")],
             ),
         ]:
             res, trees = count_spanning_trees(vertices, edges)

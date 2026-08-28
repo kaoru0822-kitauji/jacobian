@@ -16,7 +16,6 @@ from jacobian.math.graphs.decomposition._models import (
     EarDecompositionResult,
     SPQRTreeRequest,
     SPQRTreeResult,
-    UndirectedGraph,
 )
 from jacobian.math.graphs.decomposition._operations import (
     compute_biconnected_components,
@@ -26,6 +25,7 @@ from jacobian.math.graphs.decomposition._operations import (
     compute_spqr_tree,
 )
 from jacobian.math.graphs.multigraph._models import LooplessMultigraph
+from jacobian.math.graphs.values import IndexedSimpleUndirectedGraph
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -69,42 +69,46 @@ def _edges_as_sets(
 
 
 # ---------------------------------------------------------------------------
-# UndirectedGraph validation
+# Canonical graph validation
 # ---------------------------------------------------------------------------
 
 
-class TestUndirectedGraph:
+class TestIndexedSimpleUndirectedGraph:
     def test_valid_graph(self) -> None:
-        g = UndirectedGraph(vertex_count=4, edges=((0, 1), (1, 2)))
+        g = IndexedSimpleUndirectedGraph(vertex_count=4, edges=((0, 1), (1, 2)))
         assert g.vertex_count == 4
         assert g.edges == ((0, 1), (1, 2))
 
     def test_self_loop_rejected(self) -> None:
         with pytest.raises(ValidationError):
-            UndirectedGraph(vertex_count=2, edges=((0, 0),))
+            IndexedSimpleUndirectedGraph(vertex_count=2, edges=((0, 0),))
 
     def test_vertex_out_of_range_rejected(self) -> None:
         with pytest.raises(ValidationError):
-            UndirectedGraph(vertex_count=2, edges=((0, 2),))
+            IndexedSimpleUndirectedGraph(vertex_count=2, edges=((0, 2),))
 
     def test_duplicate_undirected_edge_rejected(self) -> None:
         # The same edge supplied in the same orientation is a duplicate.
         with pytest.raises(ValidationError):
-            UndirectedGraph(vertex_count=3, edges=((0, 1), (0, 1)))
+            IndexedSimpleUndirectedGraph(vertex_count=3, edges=((0, 1), (0, 1)))
 
     def test_duplicate_edge_opposite_orientation_rejected(self) -> None:
         # The same edge supplied in the opposite orientation is still a
         # duplicate for an undirected graph.
         with pytest.raises(ValidationError):
-            UndirectedGraph(vertex_count=3, edges=((0, 1), (1, 0)))
+            IndexedSimpleUndirectedGraph(vertex_count=3, edges=((0, 1), (1, 0)))
 
     def test_vertex_count_too_large(self) -> None:
         with pytest.raises(ValidationError):
-            UndirectedGraph(vertex_count=65, edges=())
+            BlockCutTreeRequest(
+                graph=IndexedSimpleUndirectedGraph(vertex_count=65, edges=())
+            )
 
     def test_vertex_count_too_small(self) -> None:
         with pytest.raises(ValidationError):
-            UndirectedGraph(vertex_count=0, edges=())
+            BlockCutTreeRequest(
+                graph=IndexedSimpleUndirectedGraph(vertex_count=0, edges=())
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -121,10 +125,10 @@ class TestBlockCutTree:
                 "edges": [
                     (0, 1),
                     (1, 2),
-                    (2, 0),
+                    (0, 2),
                     (0, 3),
                     (3, 4),
-                    (4, 0),
+                    (0, 4),
                 ],
             },
         )
@@ -144,7 +148,7 @@ class TestBlockCutTree:
         result = _block_cut_tree(
             {
                 "vertex_count": 4,
-                "edges": [(0, 1), (1, 2), (2, 3), (3, 0)],
+                "edges": [(0, 1), (1, 2), (2, 3), (0, 3)],
             },
         )
         assert len(result.blocks) == 1
@@ -190,10 +194,10 @@ class TestBridgeBlockTree:
                 "edges": [
                     (0, 1),
                     (1, 2),
-                    (2, 0),
+                    (0, 2),
                     (3, 4),
                     (4, 5),
-                    (5, 3),
+                    (3, 5),
                     (2, 3),
                 ],
             },
@@ -211,7 +215,7 @@ class TestBridgeBlockTree:
         result = _bridge_block_tree(
             {
                 "vertex_count": 4,
-                "edges": [(0, 1), (1, 2), (2, 3), (3, 0)],
+                "edges": [(0, 1), (1, 2), (2, 3), (0, 3)],
             },
         )
         assert len(result.components) == 1
@@ -237,13 +241,12 @@ class TestBridgeBlockTree:
         # The tree has 3 edges (a path of 4 components).
         assert len(result.tree) == 3
 
-    def test_bridges_are_normalised(self) -> None:
-        # Bridges are returned as normalised (min, max) pairs regardless of the
-        # edge orientation supplied in the input.
+    def test_bridges_preserve_canonical_orientation(self) -> None:
+        # Output bridges retain the canonical (min, max) orientation.
         result = _bridge_block_tree(
             {
                 "vertex_count": 3,
-                "edges": [(0, 2), (1, 0)],
+                "edges": [(0, 2), (0, 1)],
             },
         )
         for bridge in result.bridges:
@@ -311,7 +314,7 @@ def _validate_ear_decomposition(
 
 class TestEarDecomposition:
     def test_cycle(self) -> None:
-        edges = ((0, 1), (1, 2), (2, 3), (3, 0))
+        edges = ((0, 1), (1, 2), (2, 3), (0, 3))
         result = _ear_decomposition(
             {
                 "vertex_count": 4,
@@ -350,7 +353,7 @@ class TestEarDecomposition:
         assert len(result.ears) == 3
 
     def test_complete_graph_k5(self) -> None:
-        edges = tuple((i, j) for i in range(5) for j in range(i))
+        edges = tuple((j, i) for i in range(5) for j in range(i))
         result = _ear_decomposition(
             {
                 "vertex_count": 5,
@@ -394,7 +397,7 @@ class TestEarDecomposition:
         result = _ear_decomposition(
             {
                 "vertex_count": 3,
-                "edges": [(0, 1), (1, 2), (2, 0)],
+                "edges": [(0, 1), (1, 2), (0, 2)],
             },
         )
         first = result.ears[0]
@@ -414,10 +417,10 @@ class TestBiconnectedComponents:
                 "edges": [
                     (0, 1),
                     (1, 2),
-                    (2, 0),
+                    (0, 2),
                     (0, 3),
                     (3, 4),
-                    (4, 0),
+                    (0, 4),
                 ],
             },
         )
@@ -430,7 +433,7 @@ class TestBiconnectedComponents:
         result = _biconnected_components(
             {
                 "vertex_count": 4,
-                "edges": [(0, 1), (1, 2), (2, 3), (3, 0)],
+                "edges": [(0, 1), (1, 2), (2, 3), (0, 3)],
             },
         )
         assert len(result.components) == 1
@@ -493,7 +496,7 @@ class TestSPQRTree:
         result = _spqr_tree(
             {
                 "vertex_count": 4,
-                "edges": [(0, 1), (1, 2), (2, 3), (3, 0)],
+                "edges": [(0, 1), (1, 2), (2, 3), (0, 3)],
             }
         )
         assert result.status == "SPQR_TREE"
@@ -503,7 +506,7 @@ class TestSPQRTree:
         result = _spqr_tree(
             {
                 "vertex_count": 5,
-                "edges": [(0, 2), (2, 1), (0, 3), (3, 1), (0, 4), (4, 1)],
+                "edges": [(0, 2), (1, 2), (0, 3), (1, 3), (0, 4), (1, 4)],
             }
         )
         assert result.status == "SPQR_TREE"
@@ -547,7 +550,7 @@ class TestSPQRTree:
         result = _spqr_tree(
             {
                 "vertex_count": 5,
-                "edges": [(0, 2), (2, 1), (0, 3), (3, 1), (0, 4), (4, 1)],
+                "edges": [(0, 2), (1, 2), (0, 3), (1, 3), (0, 4), (1, 4)],
             }
         )
         replayed = SPQRTreeResult.model_validate(result.model_dump(mode="json"))

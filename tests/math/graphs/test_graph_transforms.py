@@ -4,11 +4,9 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian.math.graphs.transforms._models import (
-    GraphEdge,
     GraphResult,
     GraphTransformRequest,
     ResultGraphEdge,
-    SimpleGraph,
     SubgraphRequest,
 )
 from jacobian.math.graphs.transforms._operations import (
@@ -17,12 +15,13 @@ from jacobian.math.graphs.transforms._operations import (
     compute_induced_subgraph,
     compute_line_graph,
 )
+from jacobian.math.graphs.values import IndexedSimpleUndirectedGraph
 
 
-def _graph(vc: int, edges: list[tuple[int, int]]) -> SimpleGraph:
-    return SimpleGraph(
+def _graph(vc: int, edges: list[tuple[int, int]]) -> IndexedSimpleUndirectedGraph:
+    return IndexedSimpleUndirectedGraph(
         vertex_count=vc,
-        edges=tuple(GraphEdge(source=s, target=t) for s, t in edges),
+        edges=tuple(edges),
     )
 
 
@@ -99,25 +98,22 @@ def test_induced_subgraph_triangle() -> None:
 
 def test_contract_rejects_self_loop() -> None:
     with pytest.raises(ValidationError):
-        GraphEdge(source=0, target=0)
+        _graph(1, [(0, 0)])
 
 
 def test_contract_rejects_duplicate_edges() -> None:
     with pytest.raises(ValidationError):
-        SimpleGraph(
+        IndexedSimpleUndirectedGraph(
             vertex_count=3,
-            edges=(
-                GraphEdge(source=0, target=1),
-                GraphEdge(source=1, target=0),  # same edge reversed
-            ),
+            edges=((0, 1), (1, 0)),
         )
 
 
 def test_contract_rejects_out_of_range_vertices() -> None:
     with pytest.raises(ValidationError):
-        SimpleGraph(
+        IndexedSimpleUndirectedGraph(
             vertex_count=2,
-            edges=(GraphEdge(source=0, target=5),),
+            edges=((0, 5),),
         )
 
 
@@ -167,7 +163,7 @@ def test_line_graph_reindexes_endpoints_above_input_vertex_bound() -> None:
 
 def test_input_edge_rejects_endpoint_at_or_above_vertex_bound() -> None:
     with pytest.raises(ValidationError):
-        GraphEdge(source=0, target=64)
+        _graph(64, [(0, 64)])
 
 
 def test_result_edge_allows_endpoint_up_to_input_edge_bound() -> None:

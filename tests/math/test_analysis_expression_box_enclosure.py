@@ -24,7 +24,7 @@ from jacobian.math.analysis._models import (
 from jacobian.math.analysis._operations import (
     _expression_enclosure,
 )
-from jacobian.math.geometry.boxes import RationalAxisAlignedBox, RationalClosedInterval
+from jacobian.math.geometry.boxes import ClosedRationalInterval, RationalAxisAlignedBox
 
 
 def _q(numerator: int, denominator: int = 1) -> dict[str, str]:
@@ -76,7 +76,7 @@ def _const(value: int) -> dict[str, Any]:
 
 
 def test_analysis_and_geometry_boxes_compose_through_the_same_interval_value() -> None:
-    interval = RationalClosedInterval.model_validate({"lower": _q(0), "upper": _q(1)})
+    interval = ClosedRationalInterval.model_validate({"lower": _q(0), "upper": _q(1)})
 
     analysis_box = RationalIntervalBox(variables=("x",), intervals=(interval,))
     geometry_box = RationalAxisAlignedBox(dimension=1, intervals=(interval,))
@@ -87,7 +87,7 @@ def test_analysis_and_geometry_boxes_compose_through_the_same_interval_value() -
 
 
 def test_analysis_request_keeps_its_endpoint_digit_admission() -> None:
-    interval = RationalClosedInterval.model_validate(
+    interval = ClosedRationalInterval.model_validate(
         {"lower": _q(0), "upper": {"num": "1" * 129, "den": "1"}}
     )
     box = RationalIntervalBox(variables=("x",), intervals=(interval,))

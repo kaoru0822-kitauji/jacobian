@@ -13,8 +13,8 @@ from jacobian.canonical import encode_strict_json
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.geometry.boxes import (
     BoxUnionVolumeResult,
+    ClosedRationalInterval,
     RationalAxisAlignedBox,
-    RationalClosedInterval,
     compute_box_union_volume,
 )
 from jacobian.math.geometry.boxes._models import (
@@ -41,7 +41,7 @@ def _box(
     return RationalAxisAlignedBox(
         dimension=len(bounds),
         intervals=tuple(
-            RationalClosedInterval(lower=_rational(lower), upper=_rational(upper))
+            ClosedRationalInterval(lower=_rational(lower), upper=_rational(upper))
             for lower, upper in bounds
         ),
     )
@@ -285,7 +285,7 @@ def test_returned_intersections_compose_unchanged_as_box_inputs() -> None:
 
 def test_rejects_malformed_interval_and_dimension_mismatch() -> None:
     with pytest.raises(ValidationError):
-        RationalClosedInterval(lower=_rational(2), upper=_rational(1))
+        ClosedRationalInterval(lower=_rational(2), upper=_rational(1))
 
     request = BoxUnionVolumeRequest(boxes=(_box((0, 1)), _box((0, 1), (0, 1))))
     with pytest.raises(OperationDomainValidationError):

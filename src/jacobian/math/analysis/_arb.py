@@ -9,7 +9,7 @@ from jacobian.math.analysis._models import (
     MAX_DYADIC_EXPONENT,
     ExactDyadic,
 )
-from jacobian.math.geometry.boxes.values import RationalClosedInterval
+from jacobian.math.intervals import ClosedRationalInterval
 
 
 def dyadic_endpoints(
@@ -68,7 +68,7 @@ def _exact_arb_dyadic_pair(value: Any) -> tuple[int, int]:
     return _normalize_dyadic_pair(int(mantissa), int(exponent))
 
 
-def arb_source_interval(interval: RationalClosedInterval) -> Any:
+def arb_source_interval(interval: ClosedRationalInterval) -> Any:
     """Build one Arb ball that contains the exact rational source interval.
 
     Arb radii have a fixed implementation precision. Anchoring a one-sided

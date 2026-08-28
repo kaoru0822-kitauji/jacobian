@@ -30,8 +30,7 @@ def _build_graph(
 ) -> nx.Graph[int]:
     g: nx.Graph[int] = nx.Graph()
     g.add_nodes_from(range(request.graph.vertex_count))
-    for edge in request.graph.edges:
-        g.add_edge(edge.u, edge.v)
+    g.add_edges_from(request.graph.edges)
     return g
 
 

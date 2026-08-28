@@ -12,15 +12,15 @@ from jacobian.math.graphs.transforms._models import (
     GraphResult,
     GraphTransformRequest,
     ResultGraphEdge,
-    SimpleGraph,
     SubgraphRequest,
 )
+from jacobian.math.graphs.values import IndexedSimpleUndirectedGraph
 
 SQUARE_POWER = 2
 
 
-def _edges(graph: SimpleGraph) -> list[tuple[int, int]]:
-    return [(edge.source, edge.target) for edge in graph.edges]
+def _edges(graph: IndexedSimpleUndirectedGraph) -> list[tuple[int, int]]:
+    return list(graph.edges)
 
 
 def _result(vertex_count: int, edges: list[tuple[int, int]]) -> GraphResult:

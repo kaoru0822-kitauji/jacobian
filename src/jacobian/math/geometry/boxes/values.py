@@ -7,8 +7,8 @@ from typing import Self
 from pydantic import ConfigDict, Field, StrictInt, model_validator
 from pydantic_core import PydanticCustomError
 
-from jacobian._exact import CanonicalRational
 from jacobian._models import StrictModel
+from jacobian.math.intervals import ClosedRationalInterval
 
 
 def _validation_error(reason: str, message: str) -> PydanticCustomError:
@@ -18,22 +18,6 @@ def _validation_error(reason: str, message: str) -> PydanticCustomError:
 
 
 MAX_CANONICAL_BOX_DIMENSION = 64
-
-
-class RationalClosedInterval(StrictModel):
-    """One nonempty closed rational interval, including a singleton."""
-
-    lower: CanonicalRational
-    upper: CanonicalRational
-
-    @model_validator(mode="after")
-    def require_ordered_endpoints(self) -> Self:
-        if self.lower.as_fraction() > self.upper.as_fraction():
-            raise _validation_error(
-                "closed_interval_lower_endpoint_exceed_upper",
-                "closed interval lower endpoint must not exceed upper",
-            )
-        return self
 
 
 class RationalAxisAlignedBox(StrictModel):
@@ -70,7 +54,7 @@ class RationalAxisAlignedBox(StrictModel):
     )
 
     dimension: StrictInt = Field(ge=1, le=MAX_CANONICAL_BOX_DIMENSION)
-    intervals: tuple[RationalClosedInterval, ...] | None = Field(
+    intervals: tuple[ClosedRationalInterval, ...] | None = Field(
         max_length=MAX_CANONICAL_BOX_DIMENSION,
         description=(
             "Null exactly for the empty box; otherwise one interval per "
@@ -92,7 +76,4 @@ class RationalAxisAlignedBox(StrictModel):
         return self.intervals is None
 
 
-__all__ = [
-    "RationalAxisAlignedBox",
-    "RationalClosedInterval",
-]
+__all__ = ["RationalAxisAlignedBox"]

@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal, Self
+from typing import Literal, Self
 
 from pydantic import Field, model_validator
 
-from jacobian._exact import CanonicalRational
 from jacobian._models import StrictModel
 from jacobian.math.polynomials._conversions import (
     rational_polynomial_from_sympy,
     rational_polynomial_to_sympy,
     symbols_for_variables,
+)
+from jacobian.math.polynomials._models import (
+    PolynomialInvariantValue,
+    PolynomialScalarValue,
+    PolynomialValue,
 )
 from jacobian.math.polynomials.values import PolynomialVariable, RationalPolynomial
 
@@ -91,25 +95,9 @@ class MultivariateResultantRequest(StrictModel):
     )
 
 
-class MultivariateScalarValue(StrictModel):
-    kind: Literal["SCALAR"] = "SCALAR"
-    value: CanonicalRational
-
-
-class MultivariatePolynomialValue(StrictModel):
-    kind: Literal["POLYNOMIAL"] = "POLYNOMIAL"
-    value: RationalPolynomial
-
-
-MultivariateInvariantValue = Annotated[
-    MultivariateScalarValue | MultivariatePolynomialValue,
-    Field(discriminator="kind"),
-]
-
-
 def _sylvester_resultant_value(
     request: MultivariateResultantRequest,
-) -> MultivariateScalarValue | MultivariatePolynomialValue:
+) -> PolynomialScalarValue | PolynomialValue:
     """Replay the exact resultant value of an admitted request.
 
     The shared ``polynomial_resultant`` backend helper owns SymPy's
@@ -134,9 +122,9 @@ def _sylvester_resultant_value(
     if not remaining_variables:
         from jacobian.math.polynomials._conversions import rational_from_sympy
 
-        return MultivariateScalarValue(value=rational_from_sympy(value))
+        return PolynomialScalarValue(value=rational_from_sympy(value))
     resultant_poly = Poly(value, *symbols_for_variables(remaining_variables), domain=QQ)
-    return MultivariatePolynomialValue(
+    return PolynomialValue(
         value=rational_polynomial_from_sympy(
             resultant_poly,
             remaining_variables,
@@ -151,7 +139,7 @@ class MultivariateResultantResult(StrictModel):
     left: RationalPolynomial
     right: RationalPolynomial
     elimination_variable: PolynomialVariable
-    resultant: MultivariateInvariantValue
+    resultant: PolynomialInvariantValue
     convention: Literal["SYLVESTER_DETERMINANT"] = "SYLVESTER_DETERMINANT"
 
     @model_validator(mode="after")
@@ -166,7 +154,7 @@ class MultivariateResultantResult(StrictModel):
             for variable in self.left.variables
             if variable != self.elimination_variable
         )
-        if isinstance(self.resultant, MultivariateScalarValue):
+        if isinstance(self.resultant, PolynomialScalarValue):
             if remaining_variables:
                 raise _validation_error(
                     "a multivariate resultant must retain its remaining-variable ring"
@@ -182,7 +170,7 @@ class MultivariateResultantResult(StrictModel):
         cls,
         request: MultivariateResultantRequest,
         *,
-        resultant: MultivariateInvariantValue,
+        resultant: PolynomialInvariantValue,
     ) -> Self:
         """Build a result after the admitted Sylvester kernel established it."""
 
@@ -195,9 +183,6 @@ class MultivariateResultantResult(StrictModel):
 
 
 __all__ = [
-    "MultivariateInvariantValue",
-    "MultivariatePolynomialValue",
     "MultivariateResultantRequest",
     "MultivariateResultantResult",
-    "MultivariateScalarValue",
 ]

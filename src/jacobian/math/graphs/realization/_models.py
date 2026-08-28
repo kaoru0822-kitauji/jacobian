@@ -8,6 +8,7 @@ from pydantic import Field, model_validator
 from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
+from jacobian.math.graphs.values import IndexedSimpleUndirectedGraph
 
 # ---------------------------------------------------------------------------
 # Degree sequences
@@ -33,39 +34,6 @@ class DegreeSequence(StrictModel):
                 "graph.degrees_must_not_exceed_the_maximum_degree_bound",
                 "degrees must not exceed the maximum degree bound",
             )
-        return self
-
-
-class GraphEdges(StrictModel):
-    """A simple undirected graph for the check operation."""
-
-    vertex_count: int = Field(ge=1, le=MAX_GRAPH_LENGTH)
-    edges: tuple[tuple[int, int], ...] = Field(
-        default=(),
-        max_length=MAX_GRAPH_LENGTH * (MAX_GRAPH_LENGTH - 1) // 2,
-    )
-
-    @model_validator(mode="after")
-    def require_valid_edges(self) -> Self:
-        seen: set[tuple[int, int]] = set()
-        for source, target in self.edges:
-            if not (
-                0 <= source < self.vertex_count and 0 <= target < self.vertex_count
-            ):
-                raise PydanticCustomError(
-                    "graph.edge_vertices_must_be_in_0_vertex_count_1",
-                    "edge vertices must be in 0..vertex_count-1",
-                )
-            if source == target:
-                raise PydanticCustomError(
-                    "graph.self_loops_are_not_allowed", "self-loops are not allowed"
-                )
-            canonical = (min(source, target), max(source, target))
-            if canonical in seen:
-                raise PydanticCustomError(
-                    "graph.edges_must_be_unique", "edges must be unique"
-                )
-            seen.add(canonical)
         return self
 
 
@@ -123,7 +91,7 @@ class GraphicalityCheckResult(StrictModel):
 
 class RealizationCheckRequest(StrictModel):
     sequence: DegreeSequence
-    graph: GraphEdges
+    graph: IndexedSimpleUndirectedGraph
 
     @model_validator(mode="after")
     def require_matching_lengths(self) -> Self:
@@ -148,7 +116,6 @@ __all__ = [
     "DegreeSequence",
     "DegreeSequenceRequest",
     "DegreeSequenceResult",
-    "GraphEdges",
     "GraphRealizationRequest",
     "GraphRealizationResult",
     "GraphicalityCheckRequest",

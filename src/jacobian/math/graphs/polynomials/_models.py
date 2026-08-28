@@ -16,7 +16,10 @@ from jacobian.canonical import (
     format_canonical_integer,
     parse_canonical_integer,
 )
-from jacobian.math.graphs.values import SimpleUndirectedGraph
+from jacobian.math.graphs.values import (
+    IndexedSimpleUndirectedGraph,
+    SimpleUndirectedGraph,
+)
 from jacobian.math.polynomials.values import (
     RationalPolynomial,
     RationalPolynomialTerm,
@@ -147,47 +150,6 @@ def _admitted_tree_profile(graph: SimpleUndirectedGraph) -> _TreeProfile:
     )
 
 
-class GraphEdge(StrictModel):
-    """One undirected edge between two non-negative vertex indices."""
-
-    u: int = Field(ge=0)
-    v: int = Field(ge=0)
-
-    @model_validator(mode="after")
-    def require_no_loop(self) -> Self:
-        if self.u == self.v:
-            raise PydanticCustomError(
-                "graph.graph_edges_must_not_be_loops", "graph edges must not be loops"
-            )
-        return self
-
-
-class GraphSpec(StrictModel):
-    """A finite simple undirected graph as vertex count + edge list."""
-
-    vertex_count: int = Field(ge=0, le=64)
-    edges: tuple[GraphEdge, ...] = Field(default=(), max_length=512)
-
-    @model_validator(mode="after")
-    def require_valid_edges(self) -> Self:
-        for edge in self.edges:
-            if edge.u >= self.vertex_count or edge.v >= self.vertex_count:
-                raise PydanticCustomError(
-                    "graph.edge_endpoints_must_be_vertex_count",
-                    "edge endpoints must be < vertex_count",
-                )
-        seen: set[tuple[int, int]] = set()
-        for edge in self.edges:
-            key = (min(edge.u, edge.v), max(edge.u, edge.v))
-            if key in seen:
-                raise PydanticCustomError(
-                    "graph.duplicate_edges_are_not_allowed",
-                    "duplicate edges are not allowed",
-                )
-            seen.add(key)
-        return self
-
-
 MAX_GRAPH_POLYNOMIAL_VERTICES = 12
 MAX_GRAPH_POLYNOMIAL_EDGES = 24
 
@@ -195,7 +157,7 @@ MAX_GRAPH_POLYNOMIAL_EDGES = 24
 class GraphPolynomialRequest(StrictModel):
     """Request a Tutte, chromatic, or flow polynomial on a tractable graph."""
 
-    graph: GraphSpec
+    graph: IndexedSimpleUndirectedGraph
 
     @model_validator(mode="after")
     def require_deletion_contraction_budget(self) -> Self:
@@ -221,7 +183,7 @@ MAX_MATCHING_EDGES = 48
 class MatchingPolynomialRequest(StrictModel):
     """Request a matching polynomial on a graph this recurrence can exhaust."""
 
-    graph: GraphSpec
+    graph: IndexedSimpleUndirectedGraph
 
     @model_validator(mode="after")
     def require_matching_budget(self) -> Self:
@@ -512,10 +474,8 @@ class SparseMultivariatePolynomial(StrictModel):
 
 
 __all__ = [
-    "GraphEdge",
     "GraphPolynomialRequest",
     "GraphPolynomialResult",
-    "GraphSpec",
     "MatchingPolynomialRequest",
     "MultivariatePolynomialTerm",
     "PolynomialTerm",

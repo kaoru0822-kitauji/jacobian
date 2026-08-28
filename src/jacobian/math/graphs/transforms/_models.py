@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 
-from pydantic import Field, model_validator
+from pydantic import AfterValidator, Field, model_validator
 from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
+from jacobian.math.graphs.values import IndexedSimpleUndirectedGraph
 
 # Input graph bounds.
 MAX_VERTICES = 64
@@ -26,22 +27,6 @@ MAX_RESULT_EDGE_ENDPOINT = MAX_EDGES - 1
 # Complement, square, and induced subgraph produce at most C(MAX_VERTICES, 2)
 # = 2016 edges, so this line-graph bound covers every transform result.
 MAX_RESULT_EDGES = MAX_EDGES * (MAX_VERTICES - 2)
-
-
-class GraphEdge(StrictModel):
-    """One undirected edge of an input graph."""
-
-    source: int = Field(ge=0, le=MAX_VERTICES - 1)
-    target: int = Field(ge=0, le=MAX_VERTICES - 1)
-
-    @model_validator(mode="after")
-    def require_distinct(self) -> Self:
-        if self.source == self.target:
-            raise PydanticCustomError(
-                "graph.edge_endpoints_must_be_distinct",
-                "edge endpoints must be distinct",
-            )
-        return self
 
 
 class ResultGraphEdge(StrictModel):
@@ -64,41 +49,32 @@ class ResultGraphEdge(StrictModel):
         return self
 
 
-class SimpleGraph(StrictModel):
-    """A finite simple undirected graph."""
+def _require_transform_input_graph(
+    graph: IndexedSimpleUndirectedGraph,
+) -> IndexedSimpleUndirectedGraph:
+    if not 1 <= graph.vertex_count <= MAX_VERTICES:
+        raise PydanticCustomError(
+            "graph.transform_vertex_bound",
+            f"graph transforms require between 1 and {MAX_VERTICES} vertices",
+        )
+    if len(graph.edges) > MAX_EDGES:
+        raise PydanticCustomError(
+            "graph.transform_edge_bound",
+            f"graph transforms support at most {MAX_EDGES} edges",
+        )
+    return graph
 
-    vertex_count: int = Field(ge=1, le=MAX_VERTICES)
-    edges: tuple[GraphEdge, ...] = Field(default=(), max_length=MAX_EDGES)
 
-    @model_validator(mode="after")
-    def require_valid_edges(self) -> Self:
-        seen: set[tuple[int, int]] = set()
-        for edge in self.edges:
-            if not (
-                0 <= edge.source < self.vertex_count
-                and 0 <= edge.target < self.vertex_count
-            ):
-                raise PydanticCustomError(
-                    "graph.edge_vertices_must_be_in_0_vertex_count_1",
-                    "edge vertices must be in 0..vertex_count-1",
-                )
-            key = (
-                (edge.source, edge.target)
-                if edge.source < edge.target
-                else (edge.target, edge.source)
-            )
-            if key in seen:
-                raise PydanticCustomError(
-                    "graph.edges_must_be_unique", "edges must be unique"
-                )
-            seen.add(key)
-        return self
+_TransformInputGraph = Annotated[
+    IndexedSimpleUndirectedGraph,
+    AfterValidator(_require_transform_input_graph),
+]
 
 
 class GraphTransformRequest(StrictModel):
     """One graph transform operation."""
 
-    graph: SimpleGraph
+    graph: _TransformInputGraph
 
 
 class GraphResult(StrictModel):
@@ -115,7 +91,7 @@ class GraphResult(StrictModel):
 class SubgraphRequest(StrictModel):
     """Extract an induced subgraph on a vertex subset."""
 
-    graph: SimpleGraph
+    graph: _TransformInputGraph
     vertices: tuple[int, ...] = Field(min_length=0, max_length=MAX_VERTICES)
 
     @model_validator(mode="after")

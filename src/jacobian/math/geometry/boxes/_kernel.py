@@ -7,10 +7,8 @@ from fractions import Fraction
 from itertools import combinations
 
 from jacobian._exact import CanonicalRational
-from jacobian.math.geometry.boxes.values import (
-    RationalAxisAlignedBox,
-    RationalClosedInterval,
-)
+from jacobian.math.geometry.boxes.values import RationalAxisAlignedBox
+from jacobian.math.intervals import ClosedRationalInterval
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,7 +35,7 @@ def intersect_boxes(
 
     interval_rows = tuple(box.intervals for box in boxes if box.intervals is not None)
 
-    intersection: list[RationalClosedInterval] = []
+    intersection: list[ClosedRationalInterval] = []
     for axis in range(dimension):
         axis_intervals = tuple(intervals[axis] for intervals in interval_rows)
         lower = max(
@@ -48,7 +46,7 @@ def intersect_boxes(
         ).upper
         if lower.as_fraction() > upper.as_fraction():
             return RationalAxisAlignedBox(dimension=dimension, intervals=None)
-        intersection.append(RationalClosedInterval(lower=lower, upper=upper))
+        intersection.append(ClosedRationalInterval(lower=lower, upper=upper))
     return RationalAxisAlignedBox(dimension=dimension, intervals=tuple(intersection))
 
 

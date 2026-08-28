@@ -52,10 +52,10 @@ _CYCLE_GRAPH_EXAMPLE: dict[str, Any] = {
     "graph": {
         "vertex_count": 4,
         "edges": [
-            {"u": 0, "v": 1},
-            {"u": 1, "v": 2},
-            {"u": 2, "v": 3},
-            {"u": 3, "v": 0},
+            [0, 1],
+            [1, 2],
+            [2, 3],
+            [0, 3],
         ],
     },
 }
@@ -64,8 +64,8 @@ _PATH_GRAPH_EXAMPLE: dict[str, Any] = {
     "graph": {
         "vertex_count": 3,
         "edges": [
-            {"u": 0, "v": 1},
-            {"u": 1, "v": 2},
+            [0, 1],
+            [1, 2],
         ],
     },
 }

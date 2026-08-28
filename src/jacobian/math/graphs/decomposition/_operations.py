@@ -20,12 +20,12 @@ from jacobian.math.graphs.decomposition._models import (
     SPQRSkeleton,
     SPQRTreeRequest,
     SPQRTreeResult,
-    UndirectedGraph,
 )
 from jacobian.math.graphs.multigraph._models import LooplessMultigraph, MultigraphEdge
+from jacobian.math.graphs.values import IndexedSimpleUndirectedGraph
 
 
-def _build_graph(graph: UndirectedGraph) -> nx.Graph[int]:
+def _build_graph(graph: IndexedSimpleUndirectedGraph) -> nx.Graph[int]:
     """Build a NetworkX undirected graph from the contract model.
 
     All declared vertices are added as nodes, even isolated ones, so that
@@ -341,7 +341,7 @@ class _SPQRBuilder:
         self._next_node = 0
         self._next_virtual = 0
 
-    def build(self, graph: UndirectedGraph) -> SPQRTreeResult:
+    def build(self, graph: IndexedSimpleUndirectedGraph) -> SPQRTreeResult:
         source_edges = tuple(
             _SPQREdge(
                 edge_id=f"real:{min(left, right)}:{max(left, right)}",
@@ -644,7 +644,7 @@ class _SPQRBuilder:
         return "R_NODE"
 
 
-def _negative_spqr_result(graph: UndirectedGraph) -> SPQRTreeResult:
+def _negative_spqr_result(graph: IndexedSimpleUndirectedGraph) -> SPQRTreeResult:
     if graph.vertex_count < 3:
         return SPQRTreeResult._from_kernel(
             source_graph=graph,

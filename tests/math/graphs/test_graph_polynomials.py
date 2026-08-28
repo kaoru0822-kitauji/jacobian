@@ -1,10 +1,8 @@
 """Tests for graph polynomial operations."""
 
 from jacobian.math.graphs.polynomials._models import (
-    GraphEdge,
     GraphPolynomialRequest,
     GraphPolynomialResult,
-    GraphSpec,
     MatchingPolynomialRequest,
 )
 from jacobian.math.graphs.polynomials._operations import (
@@ -13,16 +11,17 @@ from jacobian.math.graphs.polynomials._operations import (
     compute_matching_polynomial,
     compute_tutte_polynomial,
 )
+from jacobian.math.graphs.values import IndexedSimpleUndirectedGraph
 
 
-def _cycle_graph(n: int) -> GraphSpec:
-    edges = [GraphEdge(u=i, v=(i + 1) % n) for i in range(n)]
-    return GraphSpec(vertex_count=n, edges=tuple(edges))
+def _cycle_graph(n: int) -> IndexedSimpleUndirectedGraph:
+    edges = tuple(sorted((min(i, (i + 1) % n), max(i, (i + 1) % n)) for i in range(n)))
+    return IndexedSimpleUndirectedGraph(vertex_count=n, edges=edges)
 
 
-def _path_graph(n: int) -> GraphSpec:
-    edges = [GraphEdge(u=i, v=i + 1) for i in range(n - 1)]
-    return GraphSpec(vertex_count=n, edges=tuple(edges))
+def _path_graph(n: int) -> IndexedSimpleUndirectedGraph:
+    edges = tuple((i, i + 1) for i in range(n - 1))
+    return IndexedSimpleUndirectedGraph(vertex_count=n, edges=edges)
 
 
 def _terms_to_dict(result: GraphPolynomialResult) -> dict[int, int]:
@@ -40,7 +39,7 @@ class TestTuttePolynomial:
 
     def test_single_edge(self) -> None:
         req = GraphPolynomialRequest(
-            graph=GraphSpec(vertex_count=2, edges=(GraphEdge(u=0, v=1),))
+            graph=IndexedSimpleUndirectedGraph(vertex_count=2, edges=((0, 1),))
         )
         result = compute_tutte_polynomial(req)
         # T(K2) = x
@@ -81,15 +80,15 @@ class TestFlowPolynomial:
         import pytest
         from pydantic import ValidationError
 
-        edges = tuple(GraphEdge(u=i, v=j) for i in range(8) for j in range(i))
+        edges = tuple((j, i) for i in range(8) for j in range(i))
         with pytest.raises(ValidationError):
             GraphPolynomialRequest(
-                graph=GraphSpec(vertex_count=8, edges=edges),
+                graph=IndexedSimpleUndirectedGraph(vertex_count=8, edges=edges),
             )
 
     def test_bridge_is_zero_polynomial(self) -> None:
         req = GraphPolynomialRequest(
-            graph=GraphSpec(vertex_count=2, edges=(GraphEdge(u=0, v=1),))
+            graph=IndexedSimpleUndirectedGraph(vertex_count=2, edges=((0, 1),))
         )
         result = compute_flow_polynomial(req)
         assert result.terms == ()
@@ -98,7 +97,7 @@ class TestFlowPolynomial:
 class TestMatchingPolynomial:
     def test_single_edge(self) -> None:
         req = MatchingPolynomialRequest(
-            graph=GraphSpec(vertex_count=2, edges=(GraphEdge(u=0, v=1),))
+            graph=IndexedSimpleUndirectedGraph(vertex_count=2, edges=((0, 1),))
         )
         result = compute_matching_polynomial(req)
         # M(K2) = x^2 - 1

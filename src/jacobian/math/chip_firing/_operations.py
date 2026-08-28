@@ -17,7 +17,6 @@ from jacobian.math.chip_firing._models import (
     FireVectorResult,
     FiringRequest,
     FiringResult,
-    LabelledGraph,
     LaplacianRequest,
     LaplacianResult,
     ParallelStepRequest,
@@ -29,10 +28,11 @@ from jacobian.math.chip_firing._models import (
     StabilizeRequest,
     StabilizeResult,
 )
+from jacobian.math.graphs.values import SimpleUndirectedGraph
 
 
-def _adjacency(graph: LabelledGraph) -> tuple[tuple[int, ...], ...]:
-    """Build an adjacency-list representation from a LabelledGraph."""
+def _adjacency(graph: SimpleUndirectedGraph) -> tuple[tuple[int, ...], ...]:
+    """Build an adjacency-list representation from a canonical graph."""
     n = len(graph.vertices)
     idx = {v: i for i, v in enumerate(graph.vertices)}
     adj: list[list[int]] = [[] for _ in range(n)]
@@ -43,7 +43,7 @@ def _adjacency(graph: LabelledGraph) -> tuple[tuple[int, ...], ...]:
     return tuple(tuple(row) for row in adj)
 
 
-def _degrees(graph: LabelledGraph) -> tuple[int, ...]:
+def _degrees(graph: SimpleUndirectedGraph) -> tuple[int, ...]:
     idx = {v: i for i, v in enumerate(graph.vertices)}
     deg = [0] * len(graph.vertices)
     for u, v in graph.edges:
@@ -329,7 +329,7 @@ def _smith_normal_form_diagonal(
 
 
 def _critical_group_factors(
-    graph: LabelledGraph,
+    graph: SimpleUndirectedGraph,
     sink: str,
 ) -> tuple[tuple[str, ...], tuple[int, ...]]:
     """Return (nonsink_vertices, invariant_factors) for the critical group."""

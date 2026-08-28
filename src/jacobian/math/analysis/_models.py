@@ -18,7 +18,7 @@ from pydantic_core import PydanticCustomError
 
 from jacobian._exact import CanonicalRational, require_bounded_rational
 from jacobian._models import StrictModel, canonicalize_json_containers
-from jacobian.math.geometry.boxes.values import RationalClosedInterval
+from jacobian.math.intervals import ClosedRationalInterval
 
 
 def _validation_error(message: str) -> PydanticCustomError:
@@ -205,7 +205,7 @@ class RationalIntervalBox(StrictModel):
             "variables[i]."
         ),
     )
-    intervals: tuple[RationalClosedInterval, ...] = Field(
+    intervals: tuple[ClosedRationalInterval, ...] = Field(
         max_length=MAX_BOX_VARIABLES,
         description="Closed rational coordinate intervals aligned to variables.",
     )
@@ -249,7 +249,7 @@ def _bound_raw_box(box: object) -> None:
     if not isinstance(intervals, (list, tuple)):
         return
     for interval in intervals:
-        if isinstance(interval, RationalClosedInterval):
+        if isinstance(interval, ClosedRationalInterval):
             lower: object = interval.lower
             upper: object = interval.upper
         elif isinstance(interval, Mapping):

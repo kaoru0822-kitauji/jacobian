@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Self
+from typing import Annotated, Self
 
-from pydantic import Field, model_validator
+from pydantic import AfterValidator, Field, model_validator
 from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
+from jacobian.math.graphs.values import SimpleUndirectedGraph
 
 MAX_VERTICES = 50
-MAX_DEGREE = 100
 MAX_COEFFICIENT_DIGITS = 1_000
 MAX_STABILIZATION_CHIPS = 1_000_000
 
@@ -43,54 +43,29 @@ def _validate_sink(vertices: tuple[str, ...], sink: str) -> None:
         )
 
 
-class LabelledGraph(StrictModel):
-    """A finite undirected simple graph with labelled vertices."""
+def _require_chip_firing_graph(
+    graph: SimpleUndirectedGraph,
+) -> SimpleUndirectedGraph:
+    if not graph.vertices:
+        raise _validation_error(
+            "chip_firing.empty_graph", "chip-firing requires a nonempty graph"
+        )
+    if len(graph.vertices) > MAX_VERTICES:
+        raise _validation_error(
+            "chip_firing.vertex_bound",
+            f"chip-firing supports at most {MAX_VERTICES} vertices",
+        )
+    return graph
 
-    vertices: tuple[str, ...] = Field(min_length=1, max_length=MAX_VERTICES)
-    edges: tuple[tuple[str, str], ...] = Field(default=())
 
-    @model_validator(mode="after")
-    def require_valid_graph(self) -> Self:
-        labels = set(self.vertices)
-        if len(labels) != len(self.vertices):
-            raise _validation_error(
-                "chip_firing.duplicate_vertices", "vertex labels must be distinct"
-            )
-        seen_edges: set[tuple[str, str]] = set()
-        for edge in self.edges:
-            u, v = edge
-            if u not in labels or v not in labels:
-                raise _validation_error(
-                    "chip_firing.edge_endpoint_not_in_graph",
-                    "every edge endpoint must be a declared vertex",
-                )
-            if u == v:
-                raise _validation_error(
-                    "chip_firing.self_loop", "self-loops are not allowed"
-                )
-            canonical = (min(u, v), max(u, v))
-            if canonical in seen_edges:
-                raise _validation_error(
-                    "chip_firing.duplicate_edge",
-                    "duplicate edges are not allowed in a simple graph",
-                )
-            seen_edges.add(canonical)
-        degree: dict[str, int] = dict.fromkeys(self.vertices, 0)
-        for u, v in self.edges:
-            degree[u] += 1
-            degree[v] += 1
-            if degree[u] > MAX_DEGREE or degree[v] > MAX_DEGREE:
-                raise _validation_error(
-                    "chip_firing.degree_bound",
-                    f"vertex degree exceeds maximum {MAX_DEGREE}",
-                )
-        if len(self.edges) > MAX_VERTICES * MAX_DEGREE // 2:
-            raise _validation_error("chip_firing.edge_bound", "too many edges")
-        return self
+_ChipFiringGraph = Annotated[
+    SimpleUndirectedGraph,
+    AfterValidator(_require_chip_firing_graph),
+]
 
 
 class LaplacianRequest(StrictModel):
-    graph: LabelledGraph
+    graph: _ChipFiringGraph
 
 
 class LaplacianResult(StrictModel):
@@ -104,7 +79,7 @@ class LaplacianResult(StrictModel):
 class ReducedLaplacianRequest(StrictModel):
     """Request the reduced Laplacian (sink row/column deleted)."""
 
-    graph: LabelledGraph
+    graph: _ChipFiringGraph
     sink: str
 
     @model_validator(mode="after")
@@ -124,7 +99,7 @@ class ReducedLaplacianResult(StrictModel):
 class FiringRequest(StrictModel):
     """Fire a vertex: transfer one chip to each neighbor."""
 
-    graph: LabelledGraph
+    graph: _ChipFiringGraph
     divisor: tuple[int, ...] = Field(min_length=1)
     firing_vertex: str
 
@@ -152,7 +127,7 @@ class FiringResult(StrictModel):
 class FireVectorRequest(StrictModel):
     """Fire a vector: D' = D - L f."""
 
-    graph: LabelledGraph
+    graph: _ChipFiringGraph
     divisor: tuple[int, ...] = Field(min_length=1)
     firing_vector: tuple[int, ...] = Field(min_length=1)
 
@@ -186,7 +161,7 @@ class FireVectorResult(StrictModel):
 class SinkConfiguration(StrictModel):
     """A sink configuration for chip-firing stabilization."""
 
-    graph: LabelledGraph
+    graph: _ChipFiringGraph
     sink: str
     configuration: tuple[int, ...] = Field(min_length=1)
 
@@ -244,7 +219,7 @@ class ParallelStepResult(StrictModel):
 class QReducedRequest(StrictModel):
     """Compute the q-reduced normal form of a divisor."""
 
-    graph: LabelledGraph
+    graph: _ChipFiringGraph
     divisor: tuple[int, ...] = Field(min_length=1)
     sink: str
 
@@ -281,7 +256,7 @@ class DegreeResult(StrictModel):
 class CanonicalDivisorRequest(StrictModel):
     """Compute the graph canonical divisor K(v) = deg(v) - 2."""
 
-    graph: LabelledGraph
+    graph: _ChipFiringGraph
 
 
 class CanonicalDivisorResult(StrictModel):
@@ -295,7 +270,7 @@ class CanonicalDivisorResult(StrictModel):
 class CriticalGroupRequest(StrictModel):
     """Request the critical group (sandpile group) of a graph."""
 
-    graph: LabelledGraph
+    graph: _ChipFiringGraph
     sink: str
 
     @model_validator(mode="after")
@@ -316,7 +291,7 @@ class CriticalGroupResult(StrictModel):
 class AbelJacobiRequest(StrictModel):
     """Map a degree-zero divisor into the critical group."""
 
-    graph: LabelledGraph
+    graph: _ChipFiringGraph
     divisor: tuple[int, ...] = Field(min_length=1)
     sink: str
 

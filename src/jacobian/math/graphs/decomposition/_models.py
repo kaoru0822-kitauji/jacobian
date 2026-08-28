@@ -9,53 +9,35 @@ the shared multigraph carrier bounds.
 
 from __future__ import annotations
 
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 
-from pydantic import Field, model_validator
+from pydantic import AfterValidator, Field, model_validator
 from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
 from jacobian.math.graphs.multigraph._models import MAX_EDGES, LooplessMultigraph
+from jacobian.math.graphs.values import IndexedSimpleUndirectedGraph
 
 
-class UndirectedGraph(StrictModel):
-    """A simple undirected graph for decomposition operations.
+def _require_decomposition_graph(
+    graph: IndexedSimpleUndirectedGraph,
+) -> IndexedSimpleUndirectedGraph:
+    if not 1 <= graph.vertex_count <= 64:
+        raise PydanticCustomError(
+            "graph.decomposition_vertex_count",
+            "graph decomposition requires between 1 and 64 vertices",
+        )
+    return graph
 
-    The declared vertex axis bounds admission: at most 64 vertices, hence at
-    most ``C(64, 2) = 2016`` distinct undirected edges.
-    """
 
-    vertex_count: int = Field(ge=1, le=64)
-    edges: tuple[tuple[int, int], ...] = Field(min_length=0, max_length=MAX_EDGES)
-
-    @model_validator(mode="after")
-    def require_valid_edges(self) -> Self:
-        seen: set[tuple[int, int]] = set()
-        for source, target in self.edges:
-            if not (
-                0 <= source < self.vertex_count and 0 <= target < self.vertex_count
-            ):
-                raise PydanticCustomError(
-                    "graph.edge_vertices_must_be_in_0_vertex_count_1",
-                    "edge vertices must be in 0..vertex_count-1",
-                )
-            if source == target:
-                raise PydanticCustomError(
-                    "graph.self_loops_are_not_allowed", "self-loops are not allowed"
-                )
-            endpoint_pair = (source, target)
-            canonical = (min(endpoint_pair), max(endpoint_pair))
-            if canonical in seen:
-                raise PydanticCustomError(
-                    "graph.undirected_edges_must_be_unique",
-                    "undirected edges must be unique",
-                )
-            seen.add(canonical)
-        return self
+_DecompositionGraph = Annotated[
+    IndexedSimpleUndirectedGraph,
+    AfterValidator(_require_decomposition_graph),
+]
 
 
 class BlockCutTreeRequest(StrictModel):
-    graph: UndirectedGraph
+    graph: _DecompositionGraph
 
 
 class BlockCutTreeResult(StrictModel):
@@ -74,7 +56,7 @@ class BlockCutTreeResult(StrictModel):
 
 
 class BridgeBlockRequest(StrictModel):
-    graph: UndirectedGraph
+    graph: _DecompositionGraph
 
 
 class BridgeBlockResult(StrictModel):
@@ -93,7 +75,7 @@ class BridgeBlockResult(StrictModel):
 
 
 class EarDecompositionRequest(StrictModel):
-    graph: UndirectedGraph
+    graph: _DecompositionGraph
 
 
 class EarDecompositionResult(StrictModel):
@@ -121,7 +103,7 @@ class EarDecompositionResult(StrictModel):
 
 
 class BiconnectedComponentsRequest(StrictModel):
-    graph: UndirectedGraph
+    graph: _DecompositionGraph
 
 
 class BiconnectedComponentsResult(StrictModel):
@@ -147,7 +129,7 @@ class SPQRTreeRequest(StrictModel):
     at most ``C(64, 2) = 2016`` edges.
     """
 
-    graph: UndirectedGraph = Field(
+    graph: _DecompositionGraph = Field(
         description=(
             "Finite simple undirected source graph. A positive SPQR tree uses"
             " the biconnected, at-least-three-vertices convention."
@@ -206,7 +188,7 @@ class SPQRSkeleton(StrictModel):
 class SPQRTreeResult(StrictModel):
     """Source-bound normalized SPQR decomposition or a negative witness."""
 
-    source_graph: UndirectedGraph
+    source_graph: _DecompositionGraph
     status: Literal["SPQR_TREE", "NOT_BICONNECTED"]
     witness_kind: Literal["ARTICULATION", "DISCONNECTED", "MINIMUM_SIZE"] | None = None
     witness_vertices: tuple[int, ...] = Field(default=(), max_length=2)
@@ -229,7 +211,7 @@ class SPQRTreeResult(StrictModel):
     def _from_kernel(
         cls,
         *,
-        source_graph: UndirectedGraph,
+        source_graph: IndexedSimpleUndirectedGraph,
         status: Literal["SPQR_TREE", "NOT_BICONNECTED"],
         witness_kind: Literal["ARTICULATION", "DISCONNECTED", "MINIMUM_SIZE"]
         | None = None,

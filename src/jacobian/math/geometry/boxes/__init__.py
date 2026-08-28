@@ -5,15 +5,13 @@ from jacobian.math.geometry.boxes._models import (
     BoxUnionVolumeResult,
 )
 from jacobian.math.geometry.boxes._operations import compute_box_union_volume
-from jacobian.math.geometry.boxes.values import (
-    RationalAxisAlignedBox,
-    RationalClosedInterval,
-)
+from jacobian.math.geometry.boxes.values import RationalAxisAlignedBox
+from jacobian.math.intervals import ClosedRationalInterval
 
 __all__ = [
     "BoxIntersectionLedgerEntry",
     "BoxUnionVolumeResult",
+    "ClosedRationalInterval",
     "RationalAxisAlignedBox",
-    "RationalClosedInterval",
     "compute_box_union_volume",
 ]
