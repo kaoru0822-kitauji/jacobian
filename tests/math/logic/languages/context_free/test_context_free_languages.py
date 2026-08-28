@@ -4,18 +4,18 @@ from collections.abc import Mapping
 
 import pytest
 
-from jacobian.math.logic.languages.context_free.context_free._models import (
+from jacobian.math.logic.languages.context_free._models import (
     DependencyGraphRequest,
     FiniteCFGO,
     FirstSetsRequest,
     SymbolProfilesRequest,
 )
-from jacobian.math.logic.languages.context_free.context_free._operations import (
+from jacobian.math.logic.languages.context_free._operations import (
     compute_dependency_graph,
     compute_first_sets,
     compute_symbol_profiles,
 )
-from jacobian.math.logic.languages.context_free.context_free._tools import TOOLS
+from jacobian.math.logic.languages.context_free._tools import TOOLS
 
 GRAMMAR = {
     "nonterminals": ["S", "A"],

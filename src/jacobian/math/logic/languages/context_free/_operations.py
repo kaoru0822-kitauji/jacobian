@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from jacobian.math.logic.languages.context_free.context_free._models import (
+from jacobian.math.logic.languages.context_free._models import (
     DependencyGraphRequest,
     DependencyGraphResult,
     FiniteCFGO,

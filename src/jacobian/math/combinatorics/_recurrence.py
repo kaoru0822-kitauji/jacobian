@@ -1,20 +1,7 @@
 """Recurrence-owned exact combinatorics operations."""
 
 from jacobian.catalog._examples import example
-from jacobian.math.combinatorics._models import (
-    IntegerResult,
-    NonnegativeIntegerRequest,
-    RationalResult,
-)
-from jacobian.math.combinatorics._operations import (
-    bernoulli,
-    fibonacci,
-    fibonacci_pair,
-    lucas,
-)
 from jacobian.math.combinatorics._recurrence_models import (
-    FibonacciPairRequest,
-    FibonacciPairResult,
     LinearRecurrenceEvaluationRequest,
     LinearRecurrenceEvaluationResult,
     PolynomialCoefficientRecurrenceEvaluationRequest,
@@ -37,61 +24,6 @@ from jacobian.math.combinatorics.recurrence_tables import (
 )
 
 RECURRENCE_OPERATIONS = (
-    combinatorics_operation(
-        "combinatorics.compute.fibonacci",
-        "Compute Fibonacci number",
-        "Compute the nth Fibonacci number exactly.",
-        NonnegativeIntegerRequest,
-        IntegerResult,
-        fibonacci,
-        "combinatorics",
-        "sequence",
-        examples=(
-            example("fibonacci_10", "Compute the tenth Fibonacci number.", {"n": 10}),
-        ),
-    ),
-    combinatorics_operation(
-        "combinatorics.compute.fibonacci_pair",
-        "Compute consecutive Fibonacci values",
-        "Return F_n and F_(n+1) as one exact recurrence boundary.",
-        FibonacciPairRequest,
-        FibonacciPairResult,
-        fibonacci_pair,
-        "combinatorics",
-        "fibonacci",
-        "recurrence-boundary",
-        examples=(
-            example(
-                "fibonacci_pair_8",
-                "Return consecutive Fibonacci values at n=8.",
-                {"n": 8},
-            ),
-        ),
-    ),
-    combinatorics_operation(
-        "combinatorics.compute.lucas",
-        "Compute Lucas number",
-        "Compute the nth Lucas number exactly.",
-        NonnegativeIntegerRequest,
-        IntegerResult,
-        lucas,
-        "combinatorics",
-        "sequence",
-        examples=(example("lucas_7", "Compute the seventh Lucas number.", {"n": 7}),),
-    ),
-    combinatorics_operation(
-        "combinatorics.compute.bernoulli",
-        "Compute Bernoulli number",
-        "Compute the nth Bernoulli number as a reduced rational.",
-        NonnegativeIntegerRequest,
-        RationalResult,
-        bernoulli,
-        "combinatorics",
-        "sequence",
-        examples=(
-            example("bernoulli_4", "Compute the fourth Bernoulli number.", {"n": 4}),
-        ),
-    ),
     combinatorics_operation(
         "combinatorics.recurrence.linear.evaluate",
         "Evaluate an exact linear recurrence",
