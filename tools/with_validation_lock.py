@@ -19,6 +19,7 @@ if str(ROOT) not in sys.path:
 from tools.command_runner import (  # noqa: E402
     ToolCommandRequest,
     ToolCommandStatus,
+    output_sink,
     operator_environment,
     run_tool_command,
 )
@@ -57,21 +58,6 @@ def _read_payload(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise SystemExit("validation lock payload must be an object")
     return payload
-
-
-def _stream_to(stream: Any) -> Any:
-    """Return a byte sink that preserves the wrapped command's output."""
-
-    binary = getattr(stream, "buffer", None)
-    target = binary if binary is not None else stream
-
-    def sink(block: bytes) -> None:
-        target.write(block if binary is not None else block.decode("utf-8", "replace"))
-        flush = getattr(target, "flush", None)
-        if callable(flush):
-            flush()
-
-    return sink
 
 
 def _run(target: str, command: list[str]) -> int:
@@ -116,8 +102,8 @@ def _run(target: str, command: list[str]) -> int:
                 timeout_seconds=_VALIDATION_TIMEOUT_SECONDS,
                 stdout_limit_bytes=_VALIDATION_OUTPUT_LIMIT_BYTES,
                 stderr_limit_bytes=_VALIDATION_OUTPUT_LIMIT_BYTES,
-                stdout_sink=_stream_to(sys.stdout),
-                stderr_sink=_stream_to(sys.stderr),
+                stdout_sink=output_sink(sys.stdout),
+                stderr_sink=output_sink(sys.stderr),
             )
         )
         if result.status is ToolCommandStatus.EXITED and result.exit_code is not None:

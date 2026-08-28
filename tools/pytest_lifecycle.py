@@ -17,9 +17,15 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tools.process_supervisor import run_process_tree  # noqa: E402
+from tools.command_runner import (  # noqa: E402
+    ToolCommandRequest,
+    ToolCommandStatus,
+    output_sink,
+    run_tool_command,
+)
 
 _SAFE_LABEL = re.compile(r"[^A-Za-z0-9_.-]+")
+_PYTEST_OUTPUT_LIMIT_BYTES = 64 * 1024 * 1024
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,7 +33,7 @@ class PytestResult:
     """Outcome of one supervised pytest process."""
 
     exit_code: int
-    status: str
+    status: ToolCommandStatus
     actual_seconds: float
     basetemp: Path
     retained: bool
@@ -68,22 +74,38 @@ def run_pytest(
     result: PytestResult | None = None
     try:
         started = time.monotonic()
-        tree = run_process_tree(
-            (sys.executable, "-m", "pytest", *arguments, f"--basetemp={basetemp}"),
-            timeout=timeout_seconds,
-            cwd=root.resolve(),
-            env=environment,
+        completed = run_tool_command(
+            ToolCommandRequest(
+                # Keep the environment interpreter path: resolving its symlink can
+                # reparent execution onto a base prefix without pytest installed.
+                executable=sys.executable,
+                arguments=("-m", "pytest", *arguments, f"--basetemp={basetemp}"),
+                environment=environment,
+                cwd=str(root.resolve()),
+                timeout_seconds=timeout_seconds,
+                stdout_limit_bytes=_PYTEST_OUTPUT_LIMIT_BYTES,
+                stderr_limit_bytes=_PYTEST_OUTPUT_LIMIT_BYTES,
+                stdout_sink=output_sink(sys.stdout),
+                stderr_sink=output_sink(sys.stderr),
+            )
         )
         elapsed = time.monotonic() - started
-        if tree.timed_out:
+        timed_out = completed.status is ToolCommandStatus.TIMED_OUT
+        if timed_out:
             print(
                 f"[{name}] process tree timed out after {timeout_seconds}s",
                 file=sys.stderr,
             )
-        retained = bool(tree.exit_code and retain_on_failure)
+        exit_code = (
+            completed.exit_code
+            if completed.status is ToolCommandStatus.EXITED
+            and completed.exit_code is not None
+            else 1
+        )
+        retained = bool(exit_code and retain_on_failure)
         result = PytestResult(
-            exit_code=tree.exit_code,
-            status="TIMED_OUT" if tree.timed_out else "EXITED",
+            exit_code=exit_code,
+            status=completed.status,
             actual_seconds=elapsed,
             basetemp=basetemp,
             retained=retained,

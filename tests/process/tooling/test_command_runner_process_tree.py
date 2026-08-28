@@ -7,7 +7,12 @@ from io import StringIO
 from pathlib import Path
 
 import pytest
-from tools.process_supervisor import run_process_tree
+from tools.command_runner import (
+    ToolCommandRequest,
+    ToolCommandStatus,
+    output_sink,
+    run_tool_command,
+)
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -38,14 +43,19 @@ def test_timeout_kills_a_descendant_that_ignores_sigterm(tmp_path: Path) -> None
         encoding="utf-8",
     )
 
-    result = run_process_tree(
-        (sys.executable, str(script), str(marker)),
-        timeout=1.0,
-        cwd=ROOT,
+    result = run_tool_command(
+        ToolCommandRequest(
+            executable=str(Path(sys.executable).resolve()),
+            arguments=(str(script), str(marker)),
+            environment=dict(os.environ),
+            cwd=str(ROOT),
+            timeout_seconds=1.0,
+            stdout_limit_bytes=4096,
+            stderr_limit_bytes=4096,
+        )
     )
 
-    assert result.timed_out is True
-    assert result.exit_code == 1
+    assert result.status is ToolCommandStatus.TIMED_OUT
 
     # Wait for the descendant PID marker until the deadline.
     deadline = time.monotonic() + 5
@@ -62,7 +72,7 @@ def test_timeout_kills_a_descendant_that_ignores_sigterm(tmp_path: Path) -> None
         raise AssertionError("descendant did not record its pid before timeout")
 
     # Verify the SIGTERM-ignoring descendant was actually killed.
-    # Poll for termination: the supervisor sends SIGTERM then SIGKILL.
+    # Poll for termination: the runner sends SIGTERM then SIGKILL.
     kill_deadline = time.monotonic() + 10
     still_alive = True
     while time.monotonic() < kill_deadline:
@@ -78,33 +88,46 @@ def test_timeout_kills_a_descendant_that_ignores_sigterm(tmp_path: Path) -> None
     )
 
 
-def test_omitted_environment_preserves_the_parent_environment(
+def test_explicit_parent_environment_is_preserved(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("JACOBIAN_SUPERVISOR_ENV_PROBE", "available")
+    monkeypatch.setenv("JACOBIAN_COMMAND_RUNNER_ENV_PROBE", "available")
 
-    result = run_process_tree(
-        (
-            sys.executable,
-            "-c",
-            "import os; raise SystemExit(os.environ['JACOBIAN_SUPERVISOR_ENV_PROBE'] != 'available')",
-        ),
-        timeout=5.0,
-        cwd=tmp_path,
+    result = run_tool_command(
+        ToolCommandRequest(
+            executable=str(Path(sys.executable).resolve()),
+            arguments=(
+                "-c",
+                "import os; raise SystemExit(os.environ['JACOBIAN_COMMAND_RUNNER_ENV_PROBE'] != 'available')",
+            ),
+            environment=dict(os.environ),
+            cwd=str(tmp_path),
+            timeout_seconds=5.0,
+            stdout_limit_bytes=4096,
+            stderr_limit_bytes=4096,
+        )
     )
 
     assert result.exit_code == 0
-    assert not result.timed_out
+    assert result.status is ToolCommandStatus.EXITED
 
 
 def test_text_only_output_stream_receives_decoded_child_output(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
 ) -> None:
     output = StringIO()
-    monkeypatch.setattr("tools.process_supervisor.sys.stdout", output)
 
-    result = run_process_tree(
-        (sys.executable, "-c", "print('hello')"), timeout=5.0, cwd=tmp_path
+    result = run_tool_command(
+        ToolCommandRequest(
+            executable=str(Path(sys.executable).resolve()),
+            arguments=("-c", "print('hello')"),
+            environment=dict(os.environ),
+            cwd=str(tmp_path),
+            timeout_seconds=5.0,
+            stdout_limit_bytes=4096,
+            stderr_limit_bytes=4096,
+            stdout_sink=output_sink(output),
+        )
     )
 
     assert result.exit_code == 0

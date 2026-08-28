@@ -1,15 +1,22 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+import sys
 from pathlib import Path
 
 import pytest
 from tools import pytest_lifecycle
-from tools.process_supervisor import ProcessTreeResult
+from tools.command_runner import ToolCommandResult, ToolCommandStatus
 
 
-def _tree_result(exit_code: int, *, timed_out: bool = False) -> ProcessTreeResult:
-    return ProcessTreeResult(exit_code=exit_code, timed_out=timed_out)
+def _command_result(
+    exit_code: int | None, *, status: ToolCommandStatus = ToolCommandStatus.EXITED
+) -> ToolCommandResult:
+    return ToolCommandResult(
+        status=status,
+        exit_code=exit_code,
+        stdout=b"",
+        stderr=b"",
+    )
 
 
 def test_success_uses_unique_worktree_basetemp_and_cleans_it(
@@ -17,23 +24,19 @@ def test_success_uses_unique_worktree_basetemp_and_cleans_it(
 ) -> None:
     observed: list[tuple[tuple[str, ...], Path]] = []
 
-    def run(
-        command: Sequence[str],
-        *,
-        timeout: float,
-        cwd: Path,
-        env: Mapping[str, str],
-    ) -> ProcessTreeResult:
-        del timeout, env
-        observed.append((tuple(command), cwd))
+    def run(request: pytest_lifecycle.ToolCommandRequest) -> ToolCommandResult:
+        assert request.executable == sys.executable
+        observed.append((request.arguments, Path(request.cwd)))
         basetemp_argument = next(
-            argument for argument in command if str(argument).startswith("--basetemp=")
+            argument
+            for argument in request.arguments
+            if argument.startswith("--basetemp=")
         )
-        basetemp = Path(str(basetemp_argument).split("=", 1)[1])
+        basetemp = Path(basetemp_argument.split("=", 1)[1])
         (basetemp.parent / "session-template").mkdir()
-        return _tree_result(0)
+        return _command_result(0)
 
-    monkeypatch.setattr(pytest_lifecycle, "run_process_tree", run)
+    monkeypatch.setattr(pytest_lifecycle, "run_tool_command", run)
 
     first = pytest_lifecycle.run_pytest(
         ["tests/math/test_one.py"],
@@ -61,7 +64,7 @@ def test_failure_cleanup_is_default_and_retention_is_opt_in(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(
-        pytest_lifecycle, "run_process_tree", lambda *_args, **_kwargs: _tree_result(1)
+        pytest_lifecycle, "run_tool_command", lambda _request: _command_result(1)
     )
 
     cleaned = pytest_lifecycle.run_pytest(
@@ -85,15 +88,15 @@ def test_timeout_reports_timed_out_status(
 ) -> None:
     monkeypatch.setattr(
         pytest_lifecycle,
-        "run_process_tree",
-        lambda *_args, **_kwargs: _tree_result(1, timed_out=True),
+        "run_tool_command",
+        lambda _request: _command_result(None, status=ToolCommandStatus.TIMED_OUT),
     )
 
     result = pytest_lifecycle.run_pytest(
         ["test_slow.py"], root=tmp_path, name="slow", environment={}
     )
 
-    assert result.status == "TIMED_OUT"
+    assert result.status is ToolCommandStatus.TIMED_OUT
     assert result.exit_code == 1
 
 

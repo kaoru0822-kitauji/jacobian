@@ -40,6 +40,24 @@ _GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 _TOOL_CLEANUP_ALLOWANCE_SECONDS = 0.5
 
 
+def output_sink(stream: object) -> Callable[[bytes], None]:
+    """Adapt a text or binary output stream to the command-runner byte sink."""
+
+    binary = getattr(stream, "buffer", None)
+    target = binary if binary is not None else stream
+    write = getattr(target, "write", None)
+    if not callable(write):
+        raise TypeError("output stream must provide write()")
+
+    def sink(block: bytes) -> None:
+        write(block if binary is not None else block.decode("utf-8", "replace"))
+        flush = getattr(target, "flush", None)
+        if callable(flush):
+            flush()
+
+    return sink
+
+
 class ToolCommandStatus(StrEnum):
     """Terminal state of one tooling command."""
 

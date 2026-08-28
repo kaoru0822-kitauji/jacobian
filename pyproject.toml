@@ -146,7 +146,7 @@ module = ["harbor.models.task.task", "harbor.publisher.packager"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["benchmarks.tooling.command_runner", "tools.process_supervisor"]
+module = ["benchmarks.tooling.command_runner"]
 # Windows-only attribute not in subprocess type stubs.
 disable_error_code = ["attr-defined"]
 

@@ -28,7 +28,6 @@ BENCHMARK_CONTROL_PATHS = frozenset(
         "tools/check_benchmark_static.py",
         "tools/check_harbor_dataset.py",
         "tools/harbor_task_workflow.py",
-        "tools/process_supervisor.py",
         "tools/pytest_lifecycle.py",
         "tools/sync_harbor_verifier_support.py",
     }
