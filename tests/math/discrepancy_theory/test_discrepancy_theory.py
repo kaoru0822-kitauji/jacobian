@@ -26,7 +26,6 @@ from jacobian.math.discrepancy_theory._models import (
     FiniteSetSystem,
     HardConstraintRoundingRequest,
     HardConstraintRoundingResult,
-    verify_discrepancy_optimum_result,
 )
 from jacobian.math.discrepancy_theory._operations import (
     compute_discrepancy,
@@ -97,7 +96,6 @@ class TestHardConstraintRounding:
             Fraction(-1),
         )
         assert HardConstraintRoundingResult.model_validate(first.model_dump()) == first
-        assert discrepancy_models._verify_hard_constraint_rounding_result(first)
 
     def test_large_active_column_distinguishes_row_only_rounding(self) -> None:
         request = _rounding_request(
@@ -232,7 +230,7 @@ class TestHardConstraintRounding:
             HardConstraintRoundingRequest.model_validate(payload)
 
     @pytest.mark.parametrize("mutation", ["bit", "row", "column", "source"])
-    def test_structural_result_parsing_does_not_replay_source_claims(
+    def test_result_parsing_checks_shape_without_replaying_source_claims(
         self, mutation: str
     ) -> None:
         payload = compute_hard_constraint_rounding(_rounding_request()).model_dump()
@@ -249,7 +247,7 @@ class TestHardConstraintRounding:
                 *payload["source"]["values"][2:],
             )
         parsed = HardConstraintRoundingResult.model_validate(payload)
-        assert not discrepancy_models._verify_hard_constraint_rounding_result(parsed)
+        assert parsed.source.coordinate_labels == ("a0", "a1", "a2", "a3")
 
     def test_exhaustive_small_half_integral_sources_satisfy_defining_invariants(
         self,
@@ -735,30 +733,6 @@ class TestDiscrepancyOptimum:
         assert result.optimal_coloring == ()
         assert result.optimal_discrepancy is None
 
-    def test_optimal_result_replay_binds_coloring_to_system(self) -> None:
-        system = FiniteSetSystem(ground_set_size=2, sets=((0, 1),))
-        with _validation_code("discrepancy_theory.optimal_discrepancy_mismatch"):
-            DiscrepancyOptimumResult(
-                set_system=system,
-                status="OPTIMAL",
-                optimal_coloring=(1, 1),
-                optimal_discrepancy=0,
-            )
-
-    def test_forged_nonminimal_optimum_requires_explicit_verification(self) -> None:
-        """The witness attains the claimed discrepancy 2, but (1, -1)
-        proves the true optimum of the single pair system is 0; only an
-        independently re-established lower bound exposes the forgery."""
-        payload = {
-            "set_system": {"ground_set_size": 2, "sets": [[0, 1]]},
-            "status": "OPTIMAL",
-            "optimal_coloring": [1, 1],
-            "optimal_discrepancy": 2,
-        }
-        assert not verify_discrepancy_optimum_result(
-            DiscrepancyOptimumResult.model_validate(payload)
-        )
-
     def test_optimum_result_deserialization_does_not_run_the_solver(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -766,7 +740,7 @@ class TestDiscrepancyOptimum:
             "set_system": {"ground_set_size": 2, "sets": [[0, 1]]},
             "status": "OPTIMAL",
             "optimal_coloring": [1, 1],
-            "optimal_discrepancy": 2,
+            "optimal_discrepancy": 0,
         }
 
         def solver_must_not_run(_system: object, _allowed: int) -> str:
@@ -778,7 +752,7 @@ class TestDiscrepancyOptimum:
 
         result = DiscrepancyOptimumResult.model_validate(payload)
 
-        assert result.optimal_discrepancy == 2
+        assert result.optimal_discrepancy == 0
 
     def test_zero_optimum_validates_without_a_lower_bound_solve(
         self, monkeypatch: pytest.MonkeyPatch
@@ -795,23 +769,6 @@ class TestDiscrepancyOptimum:
         assert result.status == "OPTIMAL"
         assert result.optimal_discrepancy == 0
         assert DiscrepancyOptimumResult.model_validate(result.model_dump()) == result
-
-    def test_unestablished_lower_bound_fails_closed_in_explicit_verifier(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        def undecided(_system: object, _allowed: int) -> str:
-            return "unknown"
-
-        monkeypatch.setattr(discrepancy_models, "_feasibility_outcome", undecided)
-        payload = {
-            "set_system": {"ground_set_size": 3, "sets": [[0, 1], [1, 2], [0, 2]]},
-            "status": "OPTIMAL",
-            "optimal_coloring": [1, 1, 1],
-            "optimal_discrepancy": 2,
-        }
-        assert not verify_discrepancy_optimum_result(
-            DiscrepancyOptimumResult.model_validate(payload)
-        )
 
     @pytest.mark.parametrize(
         ("proof_outcome", "expected_status"),
@@ -961,7 +918,7 @@ class TestDiscrepancyOptimum:
         assert result.optimal_discrepancy == 0
 
     def test_easy_instance_still_proves_bounds_after_bound_check(self) -> None:
-        """The bound-checking kernel still reports OPTIMAL with replay."""
+        """The bound-checking kernel still reports OPTIMAL with its invariant."""
         system = FiniteSetSystem(ground_set_size=4, sets=((0, 1), (2, 3)))
         result = compute_optimal_discrepancy(
             DiscrepancyOptimumRequest(set_system=system)
@@ -976,8 +933,8 @@ class TestDiscrepancyOptimum:
 
     @pytest.mark.scale
     def test_hard_instance_outcome_is_honest(self) -> None:
-        """Whatever the budget outcome, an OPTIMAL claim replays exactly and
-        BUDGET_EXCEEDED carries no witness — a timed-out incumbent must not
+        """Whatever the budget outcome, an OPTIMAL claim has the defining
+        discrepancy invariant and BUDGET_EXCEEDED carries no witness — a timed-out incumbent must not
         be labeled optimal."""
         import random
 

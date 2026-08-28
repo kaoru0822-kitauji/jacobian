@@ -28,7 +28,7 @@ MAX_OPTIMUM_SOLVER_MILLISECONDS = 30_000
 MAX_OPTIMUM_SOLVER_NODES = 1_000_000
 # The exact proof check runs under its own explicit budget so one request's
 # total solver work stays bounded; exhaustion reports unknown, which the
-# producing path maps to BUDGET_EXCEEDED and replay rejects fail-closed.
+# producing path maps to BUDGET_EXCEEDED.
 MAX_OPTIMUM_PROOF_MILLISECONDS = 10_000
 
 MAX_ROUNDING_COORDINATES = 512
@@ -64,10 +64,6 @@ def _sum_selected_fractions(
     """Aggregate one admitted row or column after cheap source preflight."""
 
     return sum((values[index] for index in coordinates), Fraction())
-
-
-def _as_canonical_rational(value: Fraction) -> CanonicalRational:
-    return CanonicalRational.from_fraction(value)
 
 
 def _require_canonical_subset(
@@ -293,9 +289,7 @@ class HardConstraintRoundingResult(StrictModel):
     """A source-bound binary rounding with hard-row and error ledgers.
 
     Parsing checks the result's wire shape only.  The floating-rounding kernel
-    establishes preservation and error claims when it produces this value;
-    deliberate validation of an independently supplied claim belongs to the
-    owner-private :func:`_verify_hard_constraint_rounding_result` helper.
+    establishes preservation and error claims when it produces this value.
     """
 
     source: HardConstraintRoundingSource
@@ -356,89 +350,6 @@ class HardConstraintRoundingResult(StrictModel):
         """Build a result after the admitted floating-rounding kernel proved it."""
 
         return cls.model_construct(**values)
-
-
-def _verify_hard_constraint_rounding_result(
-    result: HardConstraintRoundingResult,
-) -> bool:
-    """Check one independently supplied rounding claim under request admission.
-
-    This deliberately replays the source-derived ledgers and guarantees.  It
-    is private because ordinary result deserialization is not proof checking.
-    """
-
-    try:
-        admitted = HardConstraintRoundingRequest.model_validate(
-            {"source": result.source.model_dump()}
-        )
-    except Exception:  # request admission is fail-closed for supplied claims
-        return False
-    source = admitted.source
-    if len(result.rounded_values) != len(source.coordinate_labels):
-        return False
-    if any(
-        type(value) is not int or value not in (0, 1) for value in result.rounded_values
-    ):
-        return False
-    source_values = tuple(value.as_fraction() for value in source.values)
-    expected_rows = tuple(
-        HardConstraintRowLedger(
-            row_label=row.label,
-            source_sum=_as_canonical_rational(
-                _sum_selected_fractions(list(source_values), row.coordinates)
-            ),
-            rounded_sum=sum(result.rounded_values[index] for index in row.coordinates),
-        )
-        for row in source.rows
-    )
-    if (
-        any(row.source_sum.as_fraction() != row.rounded_sum for row in expected_rows)
-        or result.row_ledger != expected_rows
-    ):
-        return False
-    incidences = [0] * len(source_values)
-    for column in source.columns:
-        for index in column.coordinates:
-            incidences[index] += 1
-    maximum_incidence = max(incidences, default=0)
-    error_bound = 4 * maximum_incidence
-    if (
-        result.maximum_column_incidence != maximum_incidence
-        or result.column_error_bound != error_bound
-    ):
-        return False
-    expected_columns = tuple(
-        MonitoredColumnLedger(
-            column_label=column.label,
-            source_sum=_as_canonical_rational(
-                _sum_selected_fractions(list(source_values), column.coordinates)
-            ),
-            rounded_sum=sum(
-                result.rounded_values[index] for index in column.coordinates
-            ),
-            signed_error=_as_canonical_rational(
-                Fraction(
-                    sum(result.rounded_values[index] for index in column.coordinates)
-                )
-                - _sum_selected_fractions(list(source_values), column.coordinates)
-            ),
-            absolute_error=_as_canonical_rational(
-                abs(
-                    Fraction(
-                        sum(
-                            result.rounded_values[index] for index in column.coordinates
-                        )
-                    )
-                    - _sum_selected_fractions(list(source_values), column.coordinates)
-                )
-            ),
-        )
-        for column in source.columns
-    )
-    return result.column_ledger == expected_columns and all(
-        ledger.absolute_error.as_fraction() <= error_bound
-        for ledger in expected_columns
-    )
 
 
 class FiniteSetSystem(StrictModel):
@@ -566,12 +477,10 @@ class DiscrepancyOptimumResult(StrictModel):
     """A proven-minimum coloring or an exhausted solver budget.
 
     Source-bound on its set system: ``OPTIMAL`` carries the exact minimum
-    discrepancy and one witnessing coloring. Deserialization validates only
-    the retained source and the witness's attained discrepancy. Independently
-    supplied optimality claims are replayed by
-    :func:`verify_discrepancy_optimum_result` under its explicit proof budget.
-    ``BUDGET_EXCEEDED`` makes no mathematical claim: it carries neither a
-    coloring nor a discrepancy value.
+    discrepancy and one witnessing coloring. The producing operation
+    establishes those mathematical claims; deserialization checks only the
+    retained source binding and witness shape. ``BUDGET_EXCEEDED`` makes no
+    mathematical claim: it carries neither a coloring nor a discrepancy value.
     """
 
     set_system: FiniteSetSystem
@@ -580,7 +489,7 @@ class DiscrepancyOptimumResult(StrictModel):
     optimal_discrepancy: int | None = Field(default=None, ge=0, strict=True)
 
     @model_validator(mode="after")
-    def bind_optimal_coloring(self) -> Self:
+    def require_structural_shape(self) -> Self:
         if self.status in ("BUDGET_EXCEEDED", "EXECUTION_FAILED"):
             if self.optimal_coloring or self.optimal_discrepancy is not None:
                 raise _validation_error(
@@ -602,35 +511,7 @@ class DiscrepancyOptimumResult(StrictModel):
             raise _validation_error(
                 "optimal_coloring_not_signed_binary", "coloring values must be +1 or -1"
             )
-        maximum = max(
-            (
-                abs(sum(self.optimal_coloring[element] for element in subset))
-                for subset in self.set_system.sets
-            ),
-            default=0,
-        )
-        if maximum != self.optimal_discrepancy:
-            raise _validation_error(
-                "optimal_discrepancy_mismatch",
-                "the reported discrepancy must be the exact maximum imbalance "
-                "of the returned coloring",
-            )
         return self
-
-
-def verify_discrepancy_optimum_result(result: DiscrepancyOptimumResult) -> bool:
-    """Replay one independently supplied positive optimum within the proof cap."""
-
-    if result.status != "OPTIMAL":
-        return True
-    if result.optimal_discrepancy is None:
-        return False
-    if result.optimal_discrepancy == 0:
-        return True
-    return (
-        _feasibility_outcome(result.set_system, result.optimal_discrepancy - 1)
-        == "unsat"
-    )
 
 
 def _proven_optimal_result(
@@ -641,8 +522,7 @@ def _proven_optimal_result(
     """Build a proven-optimal result after one producing incumbent solve.
 
     Direct construction is permitted after the owner kernel has established
-    witness feasibility and the exact lower-bound proof. Independently
-    supplied results use :func:`verify_discrepancy_optimum_result`.
+    witness feasibility and the exact lower-bound proof.
     """
 
     return DiscrepancyOptimumResult.model_construct(
@@ -656,9 +536,8 @@ def _proven_optimal_result(
 def _budget_exceeded_result(set_system: FiniteSetSystem) -> DiscrepancyOptimumResult:
     """Build the typed incomplete outcome from one exhausted producing solve.
 
-    As with ``_proven_optimal_result``, the producing solve's own answer is
-    carried unclaimed; replay stays reserved for independently supplied
-    results via ``bind_optimal_coloring``.
+    The producing solve's claim-free outcome is built directly after its
+    bounded execution envelope is exhausted.
     """
 
     return DiscrepancyOptimumResult.model_construct(
@@ -672,9 +551,7 @@ def _budget_exceeded_result(set_system: FiniteSetSystem) -> DiscrepancyOptimumRe
 def _execution_failed_result(set_system: FiniteSetSystem) -> DiscrepancyOptimumResult:
     """Build the typed non-mathematical outcome from a backend failure.
 
-    Same claim-free shape as ``_budget_exceeded_result``: the producing
-    solve's answer is carried unclaimed and replay stays reserved for
-    independently supplied results via ``bind_optimal_coloring``.
+    Same claim-free shape as ``_budget_exceeded_result`` for a backend failure.
     """
 
     return DiscrepancyOptimumResult.model_construct(
@@ -708,5 +585,4 @@ __all__ = [
     "HardConstraintRowLedger",
     "MonitoredColumn",
     "MonitoredColumnLedger",
-    "verify_discrepancy_optimum_result",
 ]

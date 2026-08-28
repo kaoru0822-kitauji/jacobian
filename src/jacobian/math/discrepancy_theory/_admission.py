@@ -29,7 +29,8 @@ ADMISSIONS: tuple[OperationAdmission, ...] = (
         "scipy.optimize.milp (HiGHS) incumbent search plus a mandatory exact Z3 "
         "pseudo-boolean feasibility proof at D-1 before any OPTIMAL claim, so the "
         "published lower bound stays exact while the incumbent search scales. The "
-        "OPTIMAL witness replays exactly against its source system; BUDGET_EXCEEDED "
+        "OPTIMAL witness has its discrepancy recomputed exactly against the source "
+        "system; BUDGET_EXCEEDED "
         "and EXECUTION_FAILED carry no mathematical claim. Distinct bounded search "
         "outcome retaining the parent's 64-element ground-set leverage.",
     ),

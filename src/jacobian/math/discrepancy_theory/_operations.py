@@ -242,7 +242,7 @@ def compute_optimal_discrepancy(
     bound yields EXECUTION_FAILED and an exhausted or unavailable proof
     yields BUDGET_EXCEEDED. Zero is definitional. A solver limit produces
     BUDGET_EXCEEDED; any other nonzero status, a non-integral or out-of-domain
-    assignment, an objective/replay disagreement, or a failing backend call
+    assignment, an objective mismatch, or a failing backend call
     (failed NumPy/SciPy initialization included) produces the distinct
     non-mathematical EXECUTION_FAILED outcome. Neither carries a coloring or
     any claim. The empty ground set has the single empty coloring with
