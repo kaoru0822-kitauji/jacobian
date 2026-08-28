@@ -149,13 +149,6 @@ class TestRun:
         states = run_tree_automaton(automaton, tree)
         assert states == {0}
 
-    def test_balanced_tree_state1(self) -> None:
-        # With the simple automaton, f(a, a) -> state 0 (balanced)
-        automaton = _simple_automaton()
-        tree = _node(_leaf(), _leaf())
-        states = run_tree_automaton(automaton, tree)
-        assert states == {0}
-
     def test_run_request_accepts(self) -> None:
         automaton = _simple_automaton()
         tree = _node(_leaf(), _leaf())
@@ -624,6 +617,7 @@ class TestValidation:
         assert result.reachable_states == tuple(range(64))
         assert len(result.witnesses) == 64
 
+    @pytest.mark.scale
     def test_nullary_free_child_slot_scans_admit_immediately_stable_profile(
         self,
     ) -> None:
@@ -657,6 +651,7 @@ class TestValidation:
         assert profile.unreachable_states == tuple(range(64))
         assert profile.witnesses == ()
 
+    @pytest.mark.scale
     def test_nullary_seeded_child_slot_scans_admit_saturated_profile(self) -> None:
         automaton = BottomUpTreeAutomaton(
             state_count=64,
@@ -692,6 +687,7 @@ class TestValidation:
         assert profile.reachable_states == (0,)
         assert profile.unreachable_states == tuple(range(1, 64))
 
+    @pytest.mark.scale
     def test_two_scan_saturation_is_admitted_beyond_constructible_state_count(
         self,
     ) -> None:
@@ -760,6 +756,7 @@ class TestValidation:
             ranked_tree_node_count(tree) for _, tree in result.witnesses
         ) == tuple(range(1, 14))
 
+    @pytest.mark.scale
     def test_reachability_admits_seeded_deep_chain_within_one_pass_work_bound(
         self,
     ) -> None:
@@ -795,6 +792,7 @@ class TestValidation:
         )
         assert result.reachable_states == tuple(range(64))
 
+    @pytest.mark.scale
     def test_native_profile_prices_measured_convergence_within_shared_envelope(
         self,
     ) -> None:
@@ -813,6 +811,7 @@ class TestValidation:
             ranked_tree_node_count(tree) for _, tree in profile.witnesses
         ) == tuple(range(1, 17))
 
+    @pytest.mark.scale
     def test_public_request_reuses_the_execution_envelope(self) -> None:
         automaton = _seeded_chain_with_padded_rows(31)
 
@@ -831,6 +830,7 @@ class TestValidation:
         )
         assert result.reachable_states == tuple(range(31))
 
+    @pytest.mark.scale
     def test_near_envelope_rows_are_priced_exactly_and_admitted_only_when_they_fit(
         self,
     ) -> None:

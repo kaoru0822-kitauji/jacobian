@@ -190,8 +190,9 @@ def test_raise_strict_model_raises_harbor_suite_error() -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("synthetic_harbor_root")
 def test_topology_reports_strict_failure_for_extra_environment_field(
-    tmp_path: Path, synthetic_harbor_root: Path
+    tmp_path: Path,
 ) -> None:
     suite, task = _make_suite_with_task(tmp_path)
     task_toml = (task / "task.toml").read_text()
@@ -204,8 +205,9 @@ def test_topology_reports_strict_failure_for_extra_environment_field(
     assert any("task.toml.environment.rogue_field" in f for f in failures)
 
 
+@pytest.mark.usefixtures("synthetic_harbor_root")
 def test_topology_reports_strict_failure_for_non_float_agent_timeout(
-    tmp_path: Path, synthetic_harbor_root: Path
+    tmp_path: Path,
 ) -> None:
     suite, task = _make_suite_with_task(tmp_path)
     task_toml = (task / "task.toml").read_text()
@@ -215,9 +217,8 @@ def test_topology_reports_strict_failure_for_non_float_agent_timeout(
     assert any("task.toml.agent.timeout_sec" in f for f in failures)
 
 
-def test_topology_passes_for_valid_minimal_task(
-    tmp_path: Path, synthetic_harbor_root: Path
-) -> None:
+@pytest.mark.usefixtures("synthetic_harbor_root")
+def test_topology_passes_for_valid_minimal_task(tmp_path: Path) -> None:
     suite, task = _make_suite_with_task(tmp_path)
     assert validate_task_topology(suite, task) == []
 

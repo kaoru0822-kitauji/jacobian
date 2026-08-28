@@ -7,6 +7,7 @@ from collections.abc import Iterator
 import pytest
 from pydantic import ValidationError
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.arithmetic import absolute_value
 from jacobian.math.arithmetic.values import IntegerValue
 from jacobian.math.number_theory import FriableCountResult, count_friable
@@ -146,7 +147,7 @@ def test_native_source_digit_bound_covers_canonical_integer_values() -> None:
 
 
 def test_request_rejects_negative_and_noncanonical_sources() -> None:
-    with pytest.raises(ValueError, match="must be nonnegative"):
+    with pytest.raises(OperationDomainValidationError, match="must be nonnegative"):
         compute_friable_count(FriableCountRequest(x="-1", y="2"))
     with pytest.raises(ValidationError):
         FriableCountRequest(x="01", y="2")

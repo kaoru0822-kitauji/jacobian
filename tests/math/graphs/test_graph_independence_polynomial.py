@@ -14,6 +14,7 @@ from jacobian.canonical import (
     encode_strict_json,
     format_canonical_integer,
 )
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.graphs.operations import explicit_graph
 from jacobian.math.graphs.polynomials import (
     independence_polynomial,
@@ -191,8 +192,9 @@ def test_request_rejects_empty_disconnected_and_cyclic_graphs(
     graph: SimpleUndirectedGraph,
 ) -> None:
     request = TreeIndependencePolynomialRequest(graph=graph)
-    with pytest.raises(ValueError):
+    with pytest.raises(OperationDomainValidationError) as caught:
         compute_independence_polynomial(request)
+    assert caught.value.errors()[0]["loc"] == ("graph",)
 
 
 def test_star_beyond_the_old_consumer_degree_cap_is_admitted_exactly() -> None:

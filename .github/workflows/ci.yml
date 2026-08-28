@@ -221,6 +221,8 @@ jobs:
           coverage-artifact: coverage-data-python-scale
           coverage-file: .coverage.python-scale
           collect-coverage: "false"
+        env:
+          SCALE_WORKERS: "4"
 
   catalog:
     name: python (catalog)

@@ -99,7 +99,8 @@ def test_lanes_use_their_declared_worker_and_fixture_affinity() -> None:
     assert "pytest -n 2 --dist worksteal" in catalog
     assert "pytest -n 2 --dist worksteal" in integration
     assert '-m "$(ORDINARY_MARKER_EXPRESSION)"' in integration
-    assert "pytest -n 2 --dist worksteal" in scale
+    assert "SCALE_WORKERS ?= 2" in makefile
+    assert "pytest -n $(SCALE_WORKERS) --dist worksteal" in scale
     assert "pytest -n 2 --dist worksteal" in exhaustive
 
 

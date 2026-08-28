@@ -1,5 +1,51 @@
 # Changelog
 
+## [0.15.1](https://github.com/morluto/jacobian/compare/jacobian-v0.15.0...jacobian-v0.15.1) (2026-08-27)
+
+
+### Features
+
+* add exact Poisson-binomial count distributions ([8fe02cc](https://github.com/morluto/jacobian/commit/8fe02ccafd6e5507582f387a14aefd2970dd6e34))
+* add affine-plane, hypercube, Keller, triangle, and three-term progression constructors ([a0ccbb5](https://github.com/morluto/jacobian/commit/a0ccbb571c35ce16f6a8a8242c70713be818fb55), [839f931](https://github.com/morluto/jacobian/commit/839f93161a8a33297d3ab8315adecfd345eba1f8), [8cdf266](https://github.com/morluto/jacobian/commit/8cdf26622624bdedee8ceb4d1afa01b920dc6f14))
+* add gcd-quotient, product-divisibility, and fixed-length path profiles ([41797fe](https://github.com/morluto/jacobian/commit/41797feb6593713e6fd078e480418713495fbb68))
+* add hypergraph induced-type, transversal, matching, Sidon-extension, and divisibility-incidence profiles ([c2632b6](https://github.com/morluto/jacobian/commit/c2632b678cc20220c3b9015f9c4915057b19417e), [6dfd7ff](https://github.com/morluto/jacobian/commit/6dfd7ff616d426906d29020c8a50522e7ca71b5c), [7427f38](https://github.com/morluto/jacobian/commit/7427f38ee73ad2ff162128cb4bef091fbefd3f10))
+* add polynomial multiplication and number-theory profiles for interval, translated-prime, prime-coverage, and binomial-valuation representations ([7427f38](https://github.com/morluto/jacobian/commit/7427f38ee73ad2ff162128cb4bef091fbefd3f10), [ca20243](https://github.com/morluto/jacobian/commit/ca20243d40efd6736c2f4bd8e62aebcfc773f259), [ce73f7a](https://github.com/morluto/jacobian/commit/ce73f7a33d2936f461720037192730bda33bebea), [2c861fb](https://github.com/morluto/jacobian/commit/2c861fb555c1b966d153a3dad17dfa60a8a78fa3), [10b6e43](https://github.com/morluto/jacobian/commit/10b6e4339fc8156256a0b18f629347578109ce0f))
+
+
+### Bug Fixes
+
+* bound and compose Poisson-binomial results ([bfedfd3](https://github.com/morluto/jacobian/commit/bfedfd321f51c5b3e0e9ea672fc8271bf2558e15))
+* **catalog:** avoid mismatched divisor aliases ([#2919](https://github.com/morluto/jacobian/issues/2919)) ([343f154](https://github.com/morluto/jacobian/commit/343f15429f65affd557dd37d313437d588e8afd8))
+* **catalog:** correct incidence codegree profile example ([#2921](https://github.com/morluto/jacobian/issues/2921)) ([bc9c54b](https://github.com/morluto/jacobian/commit/bc9c54b0fe5452c84f1d61bdd07b87159db2756c))
+* **catalog:** normalize ordinary plural search terms ([#2920](https://github.com/morluto/jacobian/issues/2920)) ([11a9e2c](https://github.com/morluto/jacobian/commit/11a9e2c94faa07161550861dc840c85f8556bfc7))
+* **catalog:** preserve divisor discovery ranking ([21b321b](https://github.com/morluto/jacobian/commit/21b321b0466b10da7520e7347169f536d7bcfff8))
+* **catalog:** preserve divisor discovery terms ([c756174](https://github.com/morluto/jacobian/commit/c756174534fdbf606e76b1606c43d7b6ef19e1a5))
+* **catalog:** prioritize complete divisor queries ([6c00c1f](https://github.com/morluto/jacobian/commit/6c00c1f37b5f7cecc22fed62f7460ca92cf2d518))
+* **catalog:** report semantic request rejections as typed errors ([d16d5d7](https://github.com/morluto/jacobian/commit/d16d5d710d39036c6fe3a7fa895e3037d5e4490b))
+* **catalog:** type owner-local admission failures ([d720e94](https://github.com/morluto/jacobian/commit/d720e94961c2630b9813d27792f4247400eb8ddd))
+* **ci:** shard full math tests across four runners ([2edc231](https://github.com/morluto/jacobian/commit/2edc231478f517432df475919d23c37de29a795a))
+* **discovery:** remove misleading divisor aliases ([234cee2](https://github.com/morluto/jacobian/commit/234cee2d0086b774b5840f0ede13468e0bddc9f8))
+* **graphs:** format regular subgraph files ([515dc58](https://github.com/morluto/jacobian/commit/515dc58b79c075b493d1bac0d4750dea83b76f4f))
+* **graphs:** make regular subgraph witness typing explicit ([110c162](https://github.com/morluto/jacobian/commit/110c162fb0a6309c97f41a5f52e4709ed9c2424d))
+* **number-theory:** admit profiles by work and output bounds ([fb0e3be](https://github.com/morluto/jacobian/commit/fb0e3be6d5bd85c611a8c0dfbd0126a661172850))
+* **number-theory:** bound profile request outputs ([6a86fde](https://github.com/morluto/jacobian/commit/6a86fdef8c5de06bdd295ee969956464607ed7ca))
+* preserve execution-time admission diagnostics ([fb427ec](https://github.com/morluto/jacobian/commit/fb427ec6a32ace74bcdd300ee2bb1f162132f1f2))
+* reuse Poisson-binomial admission plan ([05585f7](https://github.com/morluto/jacobian/commit/05585f743161f4ce81b8c19cb8fee692fa96fbe1))
+* use canonical probabilities in Poisson-binomial requests ([574a497](https://github.com/morluto/jacobian/commit/574a497eef42ae465a224f8f82a0f3f6b646865f))
+* verify Poisson-binomial result masses ([b96cdaa](https://github.com/morluto/jacobian/commit/b96cdaa2ba1d5f985f2b26d44ae983988c8c96dd))
+
+
+### Documentation
+
+* clarify discovery composition guidance ([d8d6928](https://github.com/morluto/jacobian/commit/d8d69285a1fc8accd2ba115604149c5eb109da96))
+* clarify mathematical package ownership ([89400aa](https://github.com/morluto/jacobian/commit/89400aac3f40b58f286ddc02330c3814db38bd29))
+* clarify one-pass execution policy ([0363661](https://github.com/morluto/jacobian/commit/0363661b6f44537bc8acffb498822be4933d744e))
+* clarify one-pass operation admission ([83999ed](https://github.com/morluto/jacobian/commit/83999edcea15130ffd366f95c2c3f43f89b88d72))
+* clarify one-pass runtime ownership ([ec60c8b](https://github.com/morluto/jacobian/commit/ec60c8bcd968ac8711f314c44033f9aa7f5740de))
+* define owner-local backend adapters ([5839894](https://github.com/morluto/jacobian/commit/58398949a43a0e4398aeefbbf698940c0c82881b))
+* narrow validation and replay boundaries ([1c025a5](https://github.com/morluto/jacobian/commit/1c025a5079beba13aec3b0e823aabd217bac2a97))
+* simplify the native operation path ([77ab715](https://github.com/morluto/jacobian/commit/77ab7158459496ca1c0b98e062149dcba8495fb1))
+
 ## [0.15.0](https://github.com/morluto/jacobian/compare/jacobian-v0.14.0...jacobian-v0.15.0) (2026-08-27)
 
 

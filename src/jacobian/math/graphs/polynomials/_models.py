@@ -48,6 +48,10 @@ MAX_INDEPENDENCE_CONVOLUTION_PRODUCTS_PER_PASS = (
 )
 
 
+class TreeIndependencePolynomialAdmissionError(ValueError):
+    """Native admission failure for a tree independence polynomial."""
+
+
 @dataclass(frozen=True, slots=True)
 class _TreeProfile:
     """Pure structural admission data shared by the tree kernel."""
@@ -69,14 +73,18 @@ def _admitted_tree_profile(graph: SimpleUndirectedGraph) -> _TreeProfile:
 
     vertex_count = len(graph.vertices)
     if vertex_count == 0:
-        raise ValueError("independence polynomial requires a nonempty tree")
+        raise TreeIndependencePolynomialAdmissionError(
+            "independence polynomial requires a nonempty tree"
+        )
     if vertex_count > MAX_INDEPENDENCE_POLYNOMIAL_VERTICES:
-        raise ValueError(
+        raise TreeIndependencePolynomialAdmissionError(
             "independence polynomial supports at most "
             f"{MAX_INDEPENDENCE_POLYNOMIAL_VERTICES} vertices"
         )
     if len(graph.edges) != vertex_count - 1:
-        raise ValueError("independence polynomial requires a connected acyclic graph")
+        raise TreeIndependencePolynomialAdmissionError(
+            "independence polynomial requires a connected acyclic graph"
+        )
 
     adjacency: dict[str, list[str]] = {vertex: [] for vertex in graph.vertices}
     for left, right in graph.edges:
@@ -91,13 +99,15 @@ def _admitted_tree_profile(graph: SimpleUndirectedGraph) -> _TreeProfile:
             if child == parents[parent]:
                 continue
             if child in parents:
-                raise ValueError(
+                raise TreeIndependencePolynomialAdmissionError(
                     "independence polynomial requires a connected acyclic graph"
                 )
             parents[child] = parent
             order.append(child)
     if len(order) != vertex_count:
-        raise ValueError("independence polynomial requires a connected acyclic graph")
+        raise TreeIndependencePolynomialAdmissionError(
+            "independence polynomial requires a connected acyclic graph"
+        )
 
     child_lists: dict[str, list[str]] = {vertex: [] for vertex in graph.vertices}
     for child, predecessor in parents.items():
@@ -123,7 +133,7 @@ def _admitted_tree_profile(graph: SimpleUndirectedGraph) -> _TreeProfile:
 
     independence_degree = max(excluded_degree[root], included_degree[root])
     if convolution_products > MAX_INDEPENDENCE_CONVOLUTION_PRODUCTS_PER_PASS:
-        raise ValueError(
+        raise TreeIndependencePolynomialAdmissionError(
             "tree independence polynomial exceeds the "
             f"{MAX_INDEPENDENCE_CONVOLUTION_PRODUCTS_PER_PASS}-product "
             "coefficient-convolution budget"

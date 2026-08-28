@@ -15,7 +15,6 @@ from benchmarks.tooling.harbor_suite import (
     load_registry,
     verifier_bundle_checksum_bytes,
 )
-from tools.command_runner import ToolCommandStatus, run_operator_command
 
 type TomlValue = str | int | float | bool | Sequence[TomlValue] | dict[str, TomlValue]
 type TomlTable = dict[str, TomlValue]
@@ -23,7 +22,7 @@ type TomlTable = dict[str, TomlValue]
 
 def _apply_synthetic_profiles(
     monkeypatch: pytest.MonkeyPatch,
-) -> EnvironmentProfile:
+) -> None:
     """Replace ``load_environment_profiles`` with a deterministic test profile."""
     import benchmarks.tooling.harbor_suite as hs
 
@@ -36,34 +35,19 @@ def _apply_synthetic_profiles(
     monkeypatch.setattr(
         hs, "load_environment_profiles", lambda: {profile.name: profile}
     )
-    return profile
 
 
 def patch_harbor_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     """Redirect harbor_suite.ROOT to tmp_path and supply a synthetic profile.
 
-    This fixture does NOT create a Git repository. Tests that exercise real
-    ``git check-ignore`` behavior should use ``patch_harbor_root_with_git``.
+    This helper does NOT create a Git repository. Tests that exercise real
+    ``git check-ignore`` behavior should initialize one explicitly.
     """
 
     import benchmarks.tooling.harbor_suite as hs
 
     monkeypatch.setattr(hs, "ROOT", tmp_path)
     _apply_synthetic_profiles(monkeypatch)
-    return tmp_path
-
-
-def patch_harbor_root_with_git(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    """Like ``patch_harbor_root`` but also initializes a real Git repository.
-
-    Only tests that exercise ``git check-ignore`` semantics should use this
-    fixture. Ordinary registry, topology, and strict-boundary tests do not
-    need a Git repository.
-    """
-
-    patch_harbor_root(monkeypatch, tmp_path)
-    git = run_operator_command("git", ("init", "--quiet"), cwd=tmp_path)
-    assert git.status is ToolCommandStatus.EXITED and git.exit_code == 0
     return tmp_path
 
 

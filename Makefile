@@ -2,6 +2,7 @@
 
 UV_RUN := uv run --locked
 PYTEST_ARGS ?=
+SCALE_WORKERS ?= 2
 TESTS ?=
 PATHS ?=
 AFFECTED_BASE ?= origin/main
@@ -160,11 +161,11 @@ test-property: ## Run explicitly marked invariant checks once.
 test-stress: ## Repeat explicitly marked property tests on the scheduled lane.
 	$(MAKE) test-property PYTEST_ARGS="--count=$(STRESS_COUNT) $(PYTEST_ARGS)"
 
-test-scale: ## Run optional near-envelope mathematical execution evidence (2 workers).
+test-scale: ## Run optional near-envelope mathematical execution evidence ($(SCALE_WORKERS) workers).
 	$(VALIDATION_LOCK) run --target test-scale -- $(MAKE) _test-scale
 
 _test-scale:
-	$(UV_RUN) pytest -n 2 --dist worksteal --timeout=180 --timeout-method=thread -m scale \
+	$(UV_RUN) pytest -n $(SCALE_WORKERS) --dist worksteal --timeout=180 --timeout-method=thread -m scale \
 		$(if $(TESTS),$(TESTS),tests) \
 		$(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 

@@ -101,6 +101,8 @@ def test_python_jobs_select_math_and_public_contract_evidence_from_the_plan() ->
     assert "name: python (catalog)" in workflow
     assert "name: python (catalog examples)" in workflow
     assert "name: python (scale)" in workflow
+    scale = workflow.split("  scale:", 1)[1].split("  catalog:", 1)[0]
+    assert 'SCALE_WORKERS: "4"' in scale
     assert "tests: ${{ needs.plan.outputs.math_tests }}" in workflow
     assert "tests: tests/integration/catalog/" in workflow
     assert "fromJSON(needs.plan.outputs.python_lanes)" in workflow
@@ -201,6 +203,7 @@ def test_scheduled_deferred_lanes_run_as_independent_jobs() -> None:
     assert "run: make test-scale" not in stress
     assert "run: make test-exhaustive" in exhaustive
     assert "run: make test-scale" in scale
+    assert 'SCALE_WORKERS: "4"' in scale
     assert all(
         "uses: ./.github/actions/setup-python-tests" in job
         for job in (stress, exhaustive, scale)

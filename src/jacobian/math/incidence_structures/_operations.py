@@ -4,6 +4,7 @@ from collections import Counter
 from collections.abc import Callable
 from itertools import combinations
 
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.incidence_structures._models import (
     ComplementRequest,
     ComplementResult,
@@ -21,6 +22,7 @@ from jacobian.math.incidence_structures._models import (
     IncidenceMomentComparison,
     IncidenceMultiplicityDifference,
     IncidenceStructure,
+    IncidenceStructureAdmissionError,
     IncidenceTradeRequest,
     IncidenceTradeResult,
     IntersectionsRequest,
@@ -168,7 +170,16 @@ def compute_containment_profile(
 def compute_incidence_trade(request: IncidenceTradeRequest) -> IncidenceTradeResult:
     """Compare two indexed block families through a positive subset order."""
 
-    _require_incidence_trade_admitted(request.left, request.right, request.max_order)
+    try:
+        _require_incidence_trade_admitted(
+            request.left, request.right, request.max_order
+        )
+    except IncidenceStructureAdmissionError as exc:
+        raise OperationDomainValidationError(
+            location=("left", "right", "max_order"),
+            code=f"incidence_structure.{exc.reason}",
+            message=str(exc),
+        ) from exc
 
     zeroth_difference, comparisons, _positive_moments_equal = _incidence_trade_data(
         request.left, request.right, request.max_order
