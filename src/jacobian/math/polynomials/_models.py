@@ -40,13 +40,6 @@ def _degree(polynomial: RationalPolynomial, variable_index: int) -> int:
     )
 
 
-def _polynomial_total_degree(polynomial: RationalPolynomial) -> int:
-    return max(
-        (sum(term.exponents) for term in polynomial.polynomial.terms),
-        default=0,
-    )
-
-
 def _validation_error(message: str) -> PydanticCustomError:
     return PydanticCustomError("polynomial.invariant", message)
 

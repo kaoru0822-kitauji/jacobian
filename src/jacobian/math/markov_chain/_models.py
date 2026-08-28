@@ -10,6 +10,10 @@ from pydantic_core import PydanticCustomError
 from jacobian._exact import CanonicalRational
 from jacobian._models import StrictModel
 
+MAX_MARKOV_STATES = 32
+MAX_MIXING_STEPS = 256
+DEFAULT_MIXING_STEPS = 64
+
 
 def _validation_error(reason: str, message: str) -> PydanticCustomError:
     """Build a stable validation error owned by Markov-chain contracts."""
@@ -21,7 +25,7 @@ class TransitionMatrixRequest(StrictModel):
     """A finite stochastic transition matrix with rational entries."""
 
     matrix: tuple[tuple[CanonicalRational, ...], ...] = Field(
-        min_length=1, max_length=32
+        min_length=1, max_length=MAX_MARKOV_STATES
     )
 
     @model_validator(mode="after")
@@ -61,7 +65,7 @@ class StationaryDistributionResult(StrictModel):
     """Extreme points of the finite chain's stationary-distribution simplex."""
 
     transition_matrix: tuple[tuple[CanonicalRational, ...], ...] = Field(
-        min_length=1, max_length=32
+        min_length=1, max_length=MAX_MARKOV_STATES
     )
     """The source transition matrix whose stationary simplex was computed."""
 
@@ -136,15 +140,17 @@ class MixingTimeRequest(TransitionMatrixRequest):
     """A bounded exact search for worst-case total-variation mixing time."""
 
     epsilon: CanonicalRational
-    max_steps: StrictInt = Field(default=64, ge=1, le=256)
+    max_steps: StrictInt = Field(
+        default=DEFAULT_MIXING_STEPS, ge=1, le=MAX_MIXING_STEPS
+    )
 
 
 class MixingTimeResult(StrictModel):
     status: Literal["FOUND", "NOT_ERGODIC", "BOUND_EXCEEDED"]
     epsilon: CanonicalRational
-    max_steps: StrictInt = Field(ge=1, le=256)
-    steps_examined: StrictInt = Field(ge=0, le=257)
-    mixing_time: StrictInt | None = Field(default=None, ge=0, le=256)
+    max_steps: StrictInt = Field(ge=1, le=MAX_MIXING_STEPS)
+    steps_examined: StrictInt = Field(ge=0, le=MAX_MIXING_STEPS + 1)
+    mixing_time: StrictInt | None = Field(default=None, ge=0, le=MAX_MIXING_STEPS)
     max_total_variation_distance: CanonicalRational | None = None
     method: Literal["SYMPY_EXACT_MATRIX_POWERS"] = "SYMPY_EXACT_MATRIX_POWERS"
 
@@ -198,7 +204,7 @@ class CommunicatingClassesResult(StrictModel):
     """The communicating-class decomposition of a Markov chain."""
 
     transition_matrix: tuple[tuple[CanonicalRational, ...], ...] = Field(
-        min_length=1, max_length=32
+        min_length=1, max_length=MAX_MARKOV_STATES
     )
     """The source transition matrix whose support graph is decomposed."""
 

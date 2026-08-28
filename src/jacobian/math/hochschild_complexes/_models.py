@@ -13,6 +13,7 @@ from jacobian.math.prime_field_linear_algebra import (
 )
 
 MAX_HOCHSCHILD_DEGREE = 4
+MAX_PRIME = 10_000
 MAX_HOCHSCHILD_TENSOR_ELEMENTS = 20_000
 # A dense boundary matrix d_k holds n^(k-1) * n^k entries; Gaussian elimination
 # copies it and performs O(pivots * entries) field work. The entry budget keeps
@@ -56,7 +57,7 @@ class AlgebraStructure(StrictModel):
     trivial coefficient module K on which A acts through epsilon.
     """
 
-    prime: int = Field(ge=2, le=10_000)
+    prime: int = Field(ge=2, le=MAX_PRIME)
     dimension: int = Field(ge=1)
     structure_constants: tuple[tuple[tuple[int, ...], ...], ...] = Field(min_length=1)
     augmentation: tuple[int, ...] = Field(min_length=1)
@@ -213,7 +214,7 @@ class HochschildChainComplexResult(StrictModel):
     differentials: tuple[HochschildDifferential, ...] = Field(
         min_length=0, max_length=MAX_HOCHSCHILD_DEGREE
     )
-    prime: int = Field(ge=2, le=10_000)
+    prime: int = Field(ge=2, le=MAX_PRIME)
 
     @model_validator(mode="after")
     def require_bound_to_algebra(self) -> Self:
@@ -315,7 +316,7 @@ class HochschildHomologyResult(StrictModel):
     algebra: AlgebraStructure
     max_degree: int = Field(ge=1, le=MAX_HOCHSCHILD_DEGREE)
     groups: tuple[HochschildHomologyGroup, ...] = Field(min_length=1)
-    prime: int = Field(ge=2, le=10_000)
+    prime: int = Field(ge=2, le=MAX_PRIME)
 
     @model_validator(mode="after")
     def bind_to_source_algebra(self) -> Self:

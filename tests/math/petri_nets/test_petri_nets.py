@@ -1,7 +1,7 @@
 """Tests for Petri net operations."""
 
-# The behavior-focused legacy test methods intentionally follow pytest's
-# unannotated method convention; Petri production modules are type-checked.
+# These behavior-focused test methods follow pytest's unannotated method
+# convention; Petri production modules are type-checked.
 # mypy: disable-error-code=no-untyped-def
 
 import pytest

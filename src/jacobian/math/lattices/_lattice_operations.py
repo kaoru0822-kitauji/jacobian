@@ -63,7 +63,6 @@ from jacobian.math.lattices._models import (
 )
 from jacobian.math.matrices.values import (
     IntegerMatrix,
-    RationalMatrix,
     rational_matrix_from_fractions,
 )
 
@@ -102,12 +101,6 @@ def _integer_matrix(matrix: list[list[int]]) -> IntegerMatrix:
         entries=tuple(
             tuple(format_canonical_integer(int(v)) for v in row) for row in matrix
         )
-    )
-
-
-def _rational_matrix_from_int(matrix: list[list[int]]) -> RationalMatrix:
-    return rational_matrix_from_fractions(
-        [[Fraction(v, 1) for v in row] for row in matrix]
     )
 
 

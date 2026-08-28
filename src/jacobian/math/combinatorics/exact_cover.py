@@ -24,8 +24,6 @@ def _combinatorics_validation_error(message: str) -> PydanticCustomError:
     return PydanticCustomError(code, message, {})
 
 
-ValueError = _combinatorics_validation_error  # noqa: A001
-
 MAX_EXACT_COVER_ITEMS = 256
 MAX_EXACT_COVER_PRIMARY_ITEMS = MAX_EXACT_COVER_ITEMS
 MAX_EXACT_COVER_SECONDARY_ITEMS = MAX_EXACT_COVER_ITEMS
@@ -42,9 +40,9 @@ ExactCoverSearchStatus = Literal["FOUND", "NO_COVER", "UNKNOWN"]
 
 def _require_canonical_labels(labels: tuple[str, ...], role: str) -> None:
     if any(not unicodedata.is_normalized("NFC", label) for label in labels):
-        raise ValueError(f"{role} must use Unicode NFC")
+        raise _combinatorics_validation_error(f"{role} must use Unicode NFC")
     if labels != tuple(sorted(set(labels))):
-        raise ValueError(f"{role} must be sorted and unique")
+        raise _combinatorics_validation_error(f"{role} must be sorted and unique")
 
 
 class ExactCoverRow(StrictModel):
@@ -67,7 +65,7 @@ class ExactCoverRow(StrictModel):
     @model_validator(mode="after")
     def require_canonical_row(self) -> Self:
         if not unicodedata.is_normalized("NFC", self.row_id):
-            raise ValueError("row IDs must use Unicode NFC")
+            raise _combinatorics_validation_error("row IDs must use Unicode NFC")
         _require_canonical_labels(self.items, "row items")
         return self
 
@@ -120,9 +118,11 @@ class GeneralizedExactCoverInstance(StrictModel):
         _require_canonical_labels(self.primary_items, "primary items")
         _require_canonical_labels(self.secondary_items, "secondary items")
         if set(self.primary_items) & set(self.secondary_items):
-            raise ValueError("primary and secondary items must be disjoint")
+            raise _combinatorics_validation_error(
+                "primary and secondary items must be disjoint"
+            )
         if len(self.primary_items) + len(self.secondary_items) > MAX_EXACT_COVER_ITEMS:
-            raise ValueError(
+            raise _combinatorics_validation_error(
                 f"an exact-cover instance has at most {MAX_EXACT_COVER_ITEMS} items"
             )
 
@@ -132,10 +132,12 @@ class GeneralizedExactCoverInstance(StrictModel):
         incidence_count = 0
         for row in self.rows:
             if not set(row.items) <= declared:
-                raise ValueError("every row item must be declared by the instance")
+                raise _combinatorics_validation_error(
+                    "every row item must be declared by the instance"
+                )
             incidence_count += len(row.items)
         if incidence_count > MAX_EXACT_COVER_INCIDENCES:
-            raise ValueError(
+            raise _combinatorics_validation_error(
                 "exact-cover incidence count exceeds the "
                 f"{MAX_EXACT_COVER_INCIDENCES}-incidence bound"
             )
@@ -198,7 +200,7 @@ def _require_output_headroom(instance: GeneralizedExactCoverInstance) -> None:
         for wire in (found_wire, no_cover_wire, unknown_wire):
             encode_strict_json(wire)
     except CanonicalizationError as exc:
-        raise ValueError(
+        raise _combinatorics_validation_error(
             "the exact-cover result retains its source and would exceed the "
             "canonical output limit; shorten labels or shrink the incidence data"
         ) from exc
@@ -247,7 +249,9 @@ class ExactCoverItemMultiplicity(StrictModel):
     @model_validator(mode="after")
     def require_canonical_item_id(self) -> Self:
         if not unicodedata.is_normalized("NFC", self.item_id):
-            raise ValueError("item multiplicity IDs must use Unicode NFC")
+            raise _combinatorics_validation_error(
+                "item multiplicity IDs must use Unicode NFC"
+            )
         return self
 
 
@@ -256,24 +260,34 @@ def _expected_coverage(
     selected_row_ids: tuple[str, ...],
 ) -> tuple[ExactCoverItemMultiplicity, ...]:
     if selected_row_ids != tuple(sorted(set(selected_row_ids))):
-        raise ValueError("selected row IDs must be sorted and unique")
+        raise _combinatorics_validation_error(
+            "selected row IDs must be sorted and unique"
+        )
     rows_by_id = {row.row_id: row for row in instance.rows}
     if any(row_id not in rows_by_id for row_id in selected_row_ids):
-        raise ValueError("every selected row ID must be declared by the instance")
+        raise _combinatorics_validation_error(
+            "every selected row ID must be declared by the instance"
+        )
 
     primary = set(instance.primary_items)
     counts = dict.fromkeys((*instance.primary_items, *instance.secondary_items), 0)
     for row_id in selected_row_ids:
         row = rows_by_id[row_id]
         if not primary.intersection(row.items):
-            raise ValueError("a canonical witness omits rows with no primary item")
+            raise _combinatorics_validation_error(
+                "a canonical witness omits rows with no primary item"
+            )
         for item in row.items:
             counts[item] += 1
 
     if any(counts[item] != 1 for item in instance.primary_items):
-        raise ValueError("a FOUND witness must cover every primary item exactly once")
+        raise _combinatorics_validation_error(
+            "a FOUND witness must cover every primary item exactly once"
+        )
     if any(counts[item] > 1 for item in instance.secondary_items):
-        raise ValueError("a FOUND witness must cover every secondary item at most once")
+        raise _combinatorics_validation_error(
+            "a FOUND witness must cover every secondary item at most once"
+        )
 
     return tuple(
         ExactCoverItemMultiplicity(
@@ -331,13 +345,15 @@ class GeneralizedExactCoverResult(StrictModel):
     def require_result_shape(self) -> Self:
         if self.status == "FOUND":
             if self.selected_row_ids is None or self.item_multiplicities is None:
-                raise ValueError(
+                raise _combinatorics_validation_error(
                     "a FOUND result must carry selected rows and item multiplicities"
                 )
             return self
 
         if self.selected_row_ids is not None or self.item_multiplicities is not None:
-            raise ValueError("only a FOUND result may carry a selected-row family")
+            raise _combinatorics_validation_error(
+                "only a FOUND result may carry a selected-row family"
+            )
 
         return self
 
@@ -408,7 +424,7 @@ def find_generalized_exact_cover(
     if type(search_node_limit) is not int:
         raise TypeError("search_node_limit must be an integer")
     if not 1 <= search_node_limit <= MAX_EXACT_COVER_SEARCH_NODES_PER_PASS:
-        raise ValueError(
+        raise _combinatorics_validation_error(
             "search_node_limit must be between 1 and "
             f"{MAX_EXACT_COVER_SEARCH_NODES_PER_PASS}"
         )

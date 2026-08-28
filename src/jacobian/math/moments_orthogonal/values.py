@@ -19,6 +19,7 @@ MAX_MOMENT_DEGREE = 64
 MAX_HANKEL_ORDER = 32
 MAX_POLYNOMIAL_DEGREE = 32
 MAX_QUADRATURE_ORDER = 16
+MAX_VARIABLE_LENGTH = 64
 
 
 class MomentFunctionalPrefix(StrictModel):
@@ -27,7 +28,7 @@ class MomentFunctionalPrefix(StrictModel):
     moments: tuple[CanonicalRational, ...] = Field(
         min_length=1, max_length=MAX_MOMENT_DEGREE + 1
     )
-    variable: str = Field(min_length=1, max_length=64)
+    variable: str = Field(min_length=1, max_length=MAX_VARIABLE_LENGTH)
 
     @property
     def degree(self) -> int:
@@ -41,7 +42,7 @@ class HankelMomentMatrix(StrictModel):
     entries: tuple[tuple[CanonicalRational, ...], ...]
     determinant: CanonicalRational
     rank: int = Field(ge=0)
-    variable: str = Field(min_length=1, max_length=64)
+    variable: str = Field(min_length=1, max_length=MAX_VARIABLE_LENGTH)
 
     @model_validator(mode="after")
     def bind_determinant_and_rank_to_entries(self) -> Self:
@@ -92,7 +93,7 @@ class OrthogonalPolynomialFamily(StrictModel):
     polynomials: tuple[OrthogonalPolynomialTerm, ...] = Field(
         min_length=1, max_length=MAX_POLYNOMIAL_DEGREE + 1
     )
-    variable: str = Field(min_length=1, max_length=64)
+    variable: str = Field(min_length=1, max_length=MAX_VARIABLE_LENGTH)
     is_quasi_definite: bool
     is_positive_definite: bool
 
@@ -152,7 +153,7 @@ class ThreeTermRecurrence(StrictModel):
 
     alpha: tuple[CanonicalRational, ...]
     beta: tuple[CanonicalRational, ...]
-    variable: str = Field(min_length=1, max_length=64)
+    variable: str = Field(min_length=1, max_length=MAX_VARIABLE_LENGTH)
 
     @model_validator(mode="after")
     def require_recurrence_dimensions(self) -> Self:
@@ -191,7 +192,7 @@ class ChristoffelDarbouxKernel(StrictModel):
 
     degree: int = Field(ge=0)
     coefficients: tuple[tuple[CanonicalRational, ...], ...]
-    variable: str = Field(min_length=1, max_length=64)
+    variable: str = Field(min_length=1, max_length=MAX_VARIABLE_LENGTH)
     family: OrthogonalPolynomialFamily
 
     @model_validator(mode="after")
@@ -244,7 +245,7 @@ class GaussianQuadratureRule(StrictModel):
 
     order: int = Field(ge=1, le=MAX_QUADRATURE_ORDER)
     nodes: tuple[QuadratureNode, ...]
-    variable: str = Field(min_length=1, max_length=64)
+    variable: str = Field(min_length=1, max_length=MAX_VARIABLE_LENGTH)
     exactness_degree: int = Field(ge=0)
     prefix: MomentFunctionalPrefix
 
@@ -322,7 +323,7 @@ class JacobiMatrix(StrictModel):
     alphas: tuple[CanonicalRational, ...]
     betas: tuple[CanonicalRational, ...]
     matrix: tuple[tuple[CanonicalRational, ...], ...]
-    variable: str = Field(min_length=1, max_length=64)
+    variable: str = Field(min_length=1, max_length=MAX_VARIABLE_LENGTH)
 
     @model_validator(mode="after")
     def bind_matrix_to_coefficients(self) -> Self:

@@ -179,7 +179,7 @@ def _is_perfect_difference_set(
 
 class CyclicDifferenceMultiplicity(StrictModel):
     residue: StrictInt = Field(ge=1, lt=MAX_CYCLIC_DIFFERENCE_SET_MODULUS)
-    multiplicity: StrictInt = Field(ge=0, le=4_096)
+    multiplicity: StrictInt = Field(ge=0, le=MAX_CYCLIC_DIFFERENCE_SET_MODULUS)
 
 
 class CyclicPerfectDifferenceSetResult(StrictModel):

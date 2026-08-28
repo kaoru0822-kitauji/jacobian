@@ -12,6 +12,7 @@ from jacobian.math._rational_height import RationalHeight
 from jacobian.math.moments_orthogonal.values import (
     MAX_HANKEL_ORDER,
     MAX_POLYNOMIAL_DEGREE,
+    MAX_QUADRATURE_ORDER,
     MomentFunctionalPrefix,
     OrthogonalPolynomialFamily,
 )
@@ -207,7 +208,7 @@ class GaussianQuadratureRequest(StrictModel):
     """Compute an exact Gaussian quadrature rule."""
 
     prefix: MomentFunctionalPrefix
-    order: int = Field(ge=1, le=16)
+    order: int = Field(ge=1, le=MAX_QUADRATURE_ORDER)
 
     @model_validator(mode="after")
     def require_sufficient_moments(self) -> Self:

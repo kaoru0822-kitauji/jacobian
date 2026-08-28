@@ -15,6 +15,9 @@ from jacobian.math.geometry.projective.values import (
     RationalProjectiveLine,
 )
 
+MAX_ARRANGEMENT_LINES = 64
+MAX_ARRANGEMENT_PAIRS = comb(MAX_ARRANGEMENT_LINES, 2)
+
 
 def _validation_error(reason: str, message: str) -> PydanticCustomError:
     """Build a stable error owned by the geometry contracts."""
@@ -27,7 +30,7 @@ class ProjectiveLineArrangementRequest(StrictModel):
 
     lines: tuple[RationalProjectiveLine, ...] = Field(
         min_length=2,
-        max_length=64,
+        max_length=MAX_ARRANGEMENT_LINES,
     )
 
 
@@ -40,10 +43,10 @@ class ProjectiveArrangementFlat(StrictModel):
     point: PrimitiveProjectiveTriple
     incident_labels: tuple[ProjectiveLabel, ...] = Field(
         min_length=2,
-        max_length=64,
+        max_length=MAX_ARRANGEMENT_LINES,
     )
-    multiplicity: int = Field(ge=2, le=64, strict=True)
-    pair_count: int = Field(ge=1, le=2016, strict=True)
+    multiplicity: int = Field(ge=2, le=MAX_ARRANGEMENT_LINES, strict=True)
+    pair_count: int = Field(ge=1, le=MAX_ARRANGEMENT_PAIRS, strict=True)
 
     @model_validator(mode="after")
     def bind_incidence_multiplicity(self) -> Self:
@@ -66,25 +69,25 @@ class ProjectiveArrangementFlat(StrictModel):
 
 
 class ProjectiveMultiplicityCount(StrictModel):
-    multiplicity: int = Field(ge=2, le=64, strict=True)
-    flat_count: int = Field(ge=1, le=2016, strict=True)
+    multiplicity: int = Field(ge=2, le=MAX_ARRANGEMENT_LINES, strict=True)
+    flat_count: int = Field(ge=1, le=MAX_ARRANGEMENT_PAIRS, strict=True)
 
 
 class ProjectiveLineArrangementResult(StrictModel):
     """Complete exact flat lattice at rank two for one labelled arrangement."""
 
-    line_count: int = Field(ge=2, le=64, strict=True)
+    line_count: int = Field(ge=2, le=MAX_ARRANGEMENT_LINES, strict=True)
     normalized_lines: tuple[NormalizedProjectiveLine, ...] = Field(
         min_length=2,
-        max_length=64,
+        max_length=MAX_ARRANGEMENT_LINES,
     )
     flats: tuple[ProjectiveArrangementFlat, ...] = Field(
         min_length=1,
-        max_length=2016,
+        max_length=MAX_ARRANGEMENT_PAIRS,
     )
     non_double_flats: tuple[tuple[ProjectiveLabel, ...], ...]
     multiplicity_histogram: tuple[ProjectiveMultiplicityCount, ...]
-    pair_count_total: int = Field(ge=1, le=2016, strict=True)
+    pair_count_total: int = Field(ge=1, le=MAX_ARRANGEMENT_PAIRS, strict=True)
     completion: Literal["COMPLETE"] = "COMPLETE"
     arithmetic: Literal["EXACT_INTEGER"] = "EXACT_INTEGER"
 

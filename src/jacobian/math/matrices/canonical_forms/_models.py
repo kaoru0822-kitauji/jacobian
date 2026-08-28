@@ -732,8 +732,8 @@ def _acyclic_resolved_bounds(
 
     Returns ``(result numerator, result denominator, work numerator, work
     denominator)`` maxima, or ``None`` when the admission reduction budget
-    cannot complete the resolution; callers then keep their conservative
-    legacy bounds.
+    cannot complete the resolution; callers then keep the conservative
+    compound bounds.
     """
 
     term_count = len(coefficient_ratios)
@@ -958,7 +958,7 @@ def _general_result_component_bounds(
     denominators of such terms neither reject a request nor inflate its
     digit-work estimate, and no global coefficient lcm or clearing
     denominator is formed on this path. The resolution is budget-guarded;
-    on exhaustion the conservative legacy compounds stand in (the whole-
+    on exhaustion conservative compound bounds stand in (the whole-
     window denominator lcms over the maximum live shift, plus the proven-
     cancellation result bounds), which remain sound because they dominate
     every coexistence pattern; cyclic support keeps them unconditionally
@@ -1012,7 +1012,7 @@ def _general_result_component_bounds(
     # walks whose entry denominators multiply along distinct routes into one
     # component -- and stay disjoint otherwise, so no global coefficient or
     # clearing denominator is formed at all. Cyclic support (walks of
-    # unbounded length) and admission-budget exhaustion keep the legacy
+    # unbounded length) and admission-budget exhaustion keep the conservative
     # whole-matrix compounds below.
     resolved_bounds = (
         _acyclic_resolved_bounds(

@@ -8,7 +8,6 @@ from typing import TypedDict
 import pytest
 from pydantic import ValidationError
 
-from jacobian._exact import CanonicalInteger  # noqa: F401  (canonical grammar)
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.matroids import (
     LinearMatroid,

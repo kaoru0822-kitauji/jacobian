@@ -29,6 +29,7 @@ MAX_RATIONAL_SERIES_TRUNCATION_ORDER = 512
 MAX_COMBINATORICS_INPUT_RATIONAL_DIGITS = 64
 MAX_COMBINATORICS_RESULT_RATIONAL_DIGITS = 32_768
 MAX_COMBINATORICS_RESULT_ARTIFACT_BYTES = 10 * 1024 * 1024
+MAX_FIBONACCI_INDEX = 10_000
 
 
 def _recurrence_validation_error(message: str) -> PydanticCustomError:
@@ -99,13 +100,13 @@ def _require_canonical_polynomial(
 class FibonacciPairResult(StrictModel):
     """Two consecutive Fibonacci values forming one recurrence boundary."""
 
-    n: StrictInt = Field(ge=0, le=10_000)
+    n: StrictInt = Field(ge=0, le=MAX_FIBONACCI_INDEX)
     f_n: CanonicalInteger
     f_n_plus_one: CanonicalInteger
 
 
 class FibonacciPairRequest(StrictModel):
-    n: StrictInt = Field(ge=0, le=10_000)
+    n: StrictInt = Field(ge=0, le=MAX_FIBONACCI_INDEX)
 
 
 class LinearRecurrenceEvaluationRequest(StrictModel):

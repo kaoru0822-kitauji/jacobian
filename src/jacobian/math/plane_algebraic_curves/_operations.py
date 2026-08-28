@@ -10,6 +10,7 @@ from jacobian.math.plane_algebraic_curves._conic import (
     validate_rational_conic_request,
 )
 from jacobian.math.plane_algebraic_curves._models import (
+    _MAX_CURVE_TERMS,
     HOMOGENIZING_COORDINATE,
     AffineChartRequest,
     AffineChartResult,
@@ -72,7 +73,7 @@ def compute_projective_closure(
         polynomial=rational_polynomial_from_sympy(
             closure,
             variables,
-            maximum_terms=256,
+            maximum_terms=_MAX_CURVE_TERMS,
         )
     )
 
@@ -100,7 +101,7 @@ def compute_affine_chart(request: AffineChartRequest) -> AffineChartResult:
         polynomial=rational_polynomial_from_sympy(
             chart,
             remaining_variables,
-            maximum_terms=256,
+            maximum_terms=_MAX_CURVE_TERMS,
         )
     )
 

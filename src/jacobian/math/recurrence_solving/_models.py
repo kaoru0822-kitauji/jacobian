@@ -71,14 +71,19 @@ class RecurrenceFindResult(StrictModel):
 
 
 class ClosedFormRequest(StrictModel):
-    """Compute a SymPy-expression closed form for a recurrence of degree at most 16."""
+    """Compute a bounded SymPy-expression closed form for a recurrence."""
 
     characteristic_coefficients: tuple[CanonicalRational, ...] = Field(
         min_length=1,
-        max_length=17,
-        description="Characteristic polynomial coefficients in descending order, with degree at most 16.",
+        max_length=MAX_CLOSED_FORM_ORDER + 1,
+        description=(
+            "Characteristic polynomial coefficients in descending order, "
+            f"with degree at most {MAX_CLOSED_FORM_ORDER}."
+        ),
     )
-    initial_values: tuple[CanonicalRational, ...] = Field(min_length=1, max_length=16)
+    initial_values: tuple[CanonicalRational, ...] = Field(
+        min_length=1, max_length=MAX_CLOSED_FORM_ORDER
+    )
 
 
 class ClosedFormResult(StrictModel):

@@ -21,9 +21,9 @@ from jacobian.math.polynomials.values import (
 
 MAX_VARS = 3
 HOMOGENIZING_COORDINATE = "z"
-_MAX_TERMS = 256
-_MAX_EXPONENT = 64
-_MAX_COEFFICIENT_DIGITS = 128
+_MAX_CURVE_TERMS = 256
+_MAX_CURVE_EXPONENT = 64
+_MAX_CURVE_COEFFICIENT_DIGITS = 128
 
 
 def _validation_error(reason: str, message: str) -> PydanticCustomError:
@@ -62,13 +62,16 @@ def _validation_error_from(exc: ValueError) -> PydanticCustomError:
 def _require_curve_polynomial(polynomial: RationalPolynomial) -> None:
     require_polynomial_budget(
         polynomial,
-        maximum_terms=_MAX_TERMS,
-        maximum_exponent=_MAX_EXPONENT,
-        maximum_coefficient_digits=_MAX_COEFFICIENT_DIGITS,
+        maximum_terms=_MAX_CURVE_TERMS,
+        maximum_exponent=_MAX_CURVE_EXPONENT,
+        maximum_coefficient_digits=_MAX_CURVE_COEFFICIENT_DIGITS,
         label="curve polynomial",
     )
-    if any(sum(term.exponents) > _MAX_EXPONENT for term in polynomial.polynomial.terms):
-        raise ValueError(f"curve polynomial exceeds total degree {_MAX_EXPONENT}")
+    if any(
+        sum(term.exponents) > _MAX_CURVE_EXPONENT
+        for term in polynomial.polynomial.terms
+    ):
+        raise ValueError(f"curve polynomial exceeds total degree {_MAX_CURVE_EXPONENT}")
 
 
 class AffineCurveRequest(StrictModel):
@@ -183,7 +186,7 @@ class RationalConicParametrizationRequest(StrictModel):
 
 class AffineCurveResult(StrictModel):
     is_valid: bool
-    degree: int = Field(ge=0, le=_MAX_EXPONENT)
+    degree: int = Field(ge=0, le=_MAX_CURVE_EXPONENT)
     method: Literal["SYMPY_CURVE_CHECK"] = "SYMPY_CURVE_CHECK"
 
 
@@ -246,14 +249,14 @@ class RationalConicParametrizationResult(StrictModel):
                 self.source_polynomial,
                 maximum_terms=6,
                 maximum_exponent=2,
-                maximum_coefficient_digits=_MAX_COEFFICIENT_DIGITS,
+                maximum_coefficient_digits=_MAX_CURVE_COEFFICIENT_DIGITS,
                 label="source conic",
             )
             require_polynomial_budget(
                 self.finite_parameter_denominator,
                 maximum_terms=3,
                 maximum_exponent=2,
-                maximum_coefficient_digits=_MAX_COEFFICIENT_DIGITS,
+                maximum_coefficient_digits=_MAX_CURVE_COEFFICIENT_DIGITS,
                 label="finite-parameter denominator",
             )
             for label, function in (
@@ -265,20 +268,20 @@ class RationalConicParametrizationResult(StrictModel):
                     function.numerator,
                     maximum_terms=3,
                     maximum_exponent=2,
-                    maximum_coefficient_digits=_MAX_COEFFICIENT_DIGITS,
+                    maximum_coefficient_digits=_MAX_CURVE_COEFFICIENT_DIGITS,
                     label=f"{label} numerator",
                 )
                 require_sparse_polynomial_budget(
                     function.denominator,
                     maximum_terms=3,
                     maximum_exponent=2,
-                    maximum_coefficient_digits=_MAX_COEFFICIENT_DIGITS,
+                    maximum_coefficient_digits=_MAX_CURVE_COEFFICIENT_DIGITS,
                     label=f"{label} denominator",
                 )
             for coordinate in self.exceptional_point.values:
                 require_bounded_rational(
                     coordinate,
-                    max_digits=_MAX_COEFFICIENT_DIGITS,
+                    max_digits=_MAX_CURVE_COEFFICIENT_DIGITS,
                     label="exceptional point coordinate",
                 )
         except ValueError as exc:

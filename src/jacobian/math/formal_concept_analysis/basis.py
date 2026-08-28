@@ -64,10 +64,6 @@ def _subset_for_state(state: int, attribute_count: int) -> tuple[int, ...]:
     )
 
 
-def _state_for_subset(subset: tuple[int, ...]) -> int:
-    return sum(1 << attribute for attribute in subset)
-
-
 def _basis_attribute_labels(attribute_count: int) -> tuple[str, ...]:
     """Return #2267-compatible labels for source-index coordinates."""
 

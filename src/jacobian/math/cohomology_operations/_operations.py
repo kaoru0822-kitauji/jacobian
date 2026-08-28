@@ -169,14 +169,11 @@ def steenrod_square_fields(
 def _effective_ambient_for_request(
     request: SteenrodSquareRequest | BocksteinRequest,
 ) -> tuple[tuple[int, ...], ...]:
-    """Return the integer ambient set for a request, handling canonical complexes."""
+    """Return the integer ambient set for a request."""
     # Import here to avoid circular import at module load.
     from jacobian.math.cohomology_operations._models import _effective_ambient
 
-    # ``request`` is either Steenrod or Bockstein; both now carry the two fields.
-    ambient_simplices = getattr(request, "ambient_simplices", ())
-    ambient_complex = getattr(request, "ambient_complex", None)
-    return _effective_ambient(ambient_simplices, ambient_complex)
+    return _effective_ambient(request.ambient_simplices, request.ambient_complex)
 
 
 def compute_steenrod_square(request: SteenrodSquareRequest) -> SteenrodSquareResult:

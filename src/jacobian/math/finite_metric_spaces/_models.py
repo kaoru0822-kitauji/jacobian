@@ -113,7 +113,7 @@ class BallRequest(StrictModel):
 
     metric_space: FiniteMetricSpace
     center: int = Field(ge=0, le=MAX_POINTS - 1)
-    radius: int = Field(ge=0, le=10000)
+    radius: int = Field(ge=0, le=MAX_DISTANCE)
 
     @model_validator(mode="after")
     def require_center_in_range(self) -> Self:
@@ -129,7 +129,7 @@ class BallResult(StrictModel):
     """The ball (set of points within radius of center)."""
 
     center: int = Field(ge=0, le=MAX_POINTS - 1)
-    radius: int = Field(ge=0, le=10000)
+    radius: int = Field(ge=0, le=MAX_DISTANCE)
     points: tuple[int, ...] = Field(min_length=1)
     method: Literal["DIRECT_SCAN"] = "DIRECT_SCAN"
 

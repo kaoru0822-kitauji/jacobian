@@ -20,7 +20,9 @@ SINGULAR_VERSION_MAX = 45_000
 
 _STDOUT_LIMIT = 512 * 1024
 _STDERR_LIMIT = 64 * 1024
-_SINGULAR_ARGUMENTS = SINGULAR_ARGUMENTS = (
+_ADDRESS_SPACE_LIMIT = 1024 * 1024 * 1024
+_FILE_SIZE_LIMIT = 1024 * 1024
+SINGULAR_ARGUMENTS = (
     "-q",
     "-t",
     "--no-rc",
@@ -118,7 +120,7 @@ def run_bounded_singular(
     try:
         with tempfile.TemporaryDirectory(prefix="jacobian-singular-") as directory:
             return run_bounded_process(
-                [executable, *_SINGULAR_ARGUMENTS],
+                [executable, *SINGULAR_ARGUMENTS],
                 input_bytes=source,
                 timeout_seconds=float(wall_seconds),
                 environment=worker_environment(locale="C.UTF-8"),
@@ -126,8 +128,8 @@ def run_bounded_singular(
                 stderr_limit=_STDERR_LIMIT,
                 resource_limits=ProcessResourceLimits(
                     cpu_seconds=wall_seconds,
-                    address_space_bytes=1024 * 1024 * 1024,
-                    file_size_bytes=1024 * 1024,
+                    address_space_bytes=_ADDRESS_SPACE_LIMIT,
+                    file_size_bytes=_FILE_SIZE_LIMIT,
                 ),
                 platform_tools=ProcessPlatformTools(prlimit_executable=prlimit),
                 cwd=directory,

@@ -31,6 +31,7 @@ def _kernel_coefficients(polynomial: IntegerPolynomial) -> tuple[int, ...]:
 
 
 MAX_PRIME = 10_000
+MAX_PRECISION = 64
 
 
 class HenselRootRequest(StrictModel):
@@ -41,9 +42,9 @@ class HenselRootRequest(StrictModel):
     """
 
     polynomial: IntegerPolynomial
-    prime: int = Field(ge=2, le=10_000)
+    prime: int = Field(ge=2, le=MAX_PRIME)
     root_mod_p: int = Field(ge=0)
-    precision: int = Field(ge=1, le=64)
+    precision: int = Field(ge=1, le=MAX_PRECISION)
 
 
 class HenselRootResult(StrictModel):
@@ -56,9 +57,9 @@ class HenselRootResult(StrictModel):
 
     polynomial: IntegerPolynomial
     lifted_root: int = Field(ge=0)
-    prime: int = Field(ge=2, le=10_000)
+    prime: int = Field(ge=2, le=MAX_PRIME)
     root_mod_p: int = Field(ge=0)
-    precision: int = Field(ge=1, le=64)
+    precision: int = Field(ge=1, le=MAX_PRECISION)
     is_simple_root: bool
 
     @model_validator(mode="after")
@@ -97,8 +98,8 @@ class HenselFactorLiftRequest(StrictModel):
     polynomial: IntegerPolynomial
     factor_g: IntegerPolynomial
     factor_h: IntegerPolynomial
-    prime: int = Field(ge=2, le=10_000)
-    precision: int = Field(ge=1, le=64)
+    prime: int = Field(ge=2, le=MAX_PRIME)
+    precision: int = Field(ge=1, le=MAX_PRECISION)
 
 
 class HenselFactorLiftResult(StrictModel):
@@ -106,8 +107,8 @@ class HenselFactorLiftResult(StrictModel):
 
     lifted_g: IntegerPolynomial
     lifted_h: IntegerPolynomial
-    prime: int = Field(ge=2, le=10_000)
-    precision: int = Field(ge=1, le=64)
+    prime: int = Field(ge=2, le=MAX_PRIME)
+    precision: int = Field(ge=1, le=MAX_PRECISION)
 
 
 class PAdicRootsRequest(StrictModel):
@@ -120,8 +121,8 @@ class PAdicRootsRequest(StrictModel):
     """
 
     polynomial: IntegerPolynomial
-    prime: int = Field(ge=2, le=10_000)
-    precision: int = Field(ge=1, le=64)
+    prime: int = Field(ge=2, le=MAX_PRIME)
+    precision: int = Field(ge=1, le=MAX_PRECISION)
 
 
 class PAdicRootEntry(StrictModel):
@@ -142,8 +143,8 @@ class PAdicRootsResult(StrictModel):
 
     polynomial: IntegerPolynomial
     roots: tuple[PAdicRootEntry, ...]
-    prime: int = Field(ge=2, le=10_000)
-    precision: int = Field(ge=1, le=64)
+    prime: int = Field(ge=2, le=MAX_PRIME)
+    precision: int = Field(ge=1, le=MAX_PRECISION)
     root_count: int = Field(ge=0)
     multiple_residues: tuple[int, ...] = ()
 

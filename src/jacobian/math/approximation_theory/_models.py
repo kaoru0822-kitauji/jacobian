@@ -22,6 +22,7 @@ from jacobian.math.polynomials.values import RationalPolynomial
 # and barycentric weight inside the canonical 32,768-digit limit.
 MAX_NODE_COMPONENT_DIGITS_TOTAL = 512
 MAX_INTERPOLATION_VALUE_DIGITS = 256
+MAX_INTERPOLATION_NODES = 32
 
 
 def _validation_error(reason: str, message: str) -> PydanticCustomError:
@@ -33,7 +34,9 @@ def _validation_error(reason: str, message: str) -> PydanticCustomError:
 class RationalNodeSet(StrictModel):
     """A finite set of distinct rational interpolation nodes in increasing order."""
 
-    nodes: tuple[CanonicalRational, ...] = Field(min_length=1, max_length=32)
+    nodes: tuple[CanonicalRational, ...] = Field(
+        min_length=1, max_length=MAX_INTERPOLATION_NODES
+    )
 
     @model_validator(mode="after")
     def require_distinct_sorted(self) -> Self:
@@ -141,7 +144,7 @@ class LagrangeBasisResult(StrictModel):
     """
 
     nodes: RationalNodeSet
-    node_count: int = Field(ge=1, le=32)
+    node_count: int = Field(ge=1, le=MAX_INTERPOLATION_NODES)
     basis: tuple[LagrangeBasisPolynomial, ...] = Field(min_length=1)
 
     @model_validator(mode="after")
@@ -171,7 +174,9 @@ class LagrangeInterpolationRequest(StrictModel):
     """Interpolate values at nodes using Lagrange interpolation."""
 
     nodes: RationalNodeSet
-    values: tuple[CanonicalRational, ...] = Field(min_length=1, max_length=32)
+    values: tuple[CanonicalRational, ...] = Field(
+        min_length=1, max_length=MAX_INTERPOLATION_NODES
+    )
 
 
 def admit_interpolation_values(

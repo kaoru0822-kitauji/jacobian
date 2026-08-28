@@ -19,6 +19,8 @@ _WORKER = Path(__file__).resolve().with_name("_worker.py")
 _WORKER_TIMEOUT_SECONDS = 60.0
 _WORKER_ADDRESS_SPACE_BYTES = 1024 * 1024 * 1024
 _WORKER_FILE_SIZE_BYTES = 1024 * 1024
+_WORKER_STDOUT_BYTES = 128 * 1024
+_WORKER_STDERR_BYTES = 64 * 1024
 
 
 def compute_nf_discriminant(
@@ -42,8 +44,8 @@ def compute_nf_discriminant(
                 ).encode(),
                 timeout_seconds=_WORKER_TIMEOUT_SECONDS,
                 environment=worker_environment(locale="C.UTF-8"),
-                stdout_limit=128 * 1024,
-                stderr_limit=64 * 1024,
+                stdout_limit=_WORKER_STDOUT_BYTES,
+                stderr_limit=_WORKER_STDERR_BYTES,
                 resource_limits=ProcessResourceLimits(
                     cpu_seconds=math.ceil(_WORKER_TIMEOUT_SECONDS),
                     address_space_bytes=_WORKER_ADDRESS_SPACE_BYTES,

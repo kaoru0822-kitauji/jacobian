@@ -9,15 +9,20 @@ from pydantic import Field, StrictInt, model_validator
 from jacobian._models import StrictModel
 from jacobian.math.number_theory._models import _validation_error
 
+MAX_FACTORIAL_ARGUMENT = 100_000
+MAX_FACTORIAL_BASE = 1_000_000
+MAX_FLOOR_SQUARE_ROOT = 1_000_000
+MAX_LEGENDRE_PRIME = 10_000_000
+
 
 class FloorSquareRootRequest(StrictModel):
-    n: StrictInt = Field(ge=0, le=1_000_000_000_000)
+    n: StrictInt = Field(ge=0, le=MAX_FLOOR_SQUARE_ROOT**2)
 
 
 class FloorSquareRootResult(StrictModel):
     """The exact floor of the nonnegative integer square root."""
 
-    root: StrictInt = Field(ge=0, le=1_000_000)
+    root: StrictInt = Field(ge=0, le=MAX_FLOOR_SQUARE_ROOT)
 
 
 def _is_bounded_prime(value: int) -> bool:
@@ -41,7 +46,7 @@ class LegendreSymbolRequest(StrictModel):
     """Arguments for the Legendre symbol with a bounded odd prime denominator."""
 
     a: StrictInt = Field(ge=-(2**53 - 1), le=2**53 - 1)
-    prime: StrictInt = Field(ge=3, le=10_000_000)
+    prime: StrictInt = Field(ge=3, le=MAX_LEGENDRE_PRIME)
 
     @model_validator(mode="after")
     def require_prime_denominator(self) -> Self:
@@ -55,20 +60,20 @@ class LegendreSymbolRequest(StrictModel):
 
 class LegendreSymbolResult(StrictModel):
     a: StrictInt
-    prime: StrictInt = Field(ge=3, le=10_000_000)
+    prime: StrictInt = Field(ge=3, le=MAX_LEGENDRE_PRIME)
     symbol: Literal[-1, 0, 1]
 
 
 class FactorialValuationRequest(StrictModel):
     """Arguments for the largest exponent ``e`` such that ``base**e`` divides ``n!``."""
 
-    n: StrictInt = Field(ge=0, le=100_000)
-    base: StrictInt = Field(ge=2, le=1_000_000)
+    n: StrictInt = Field(ge=0, le=MAX_FACTORIAL_ARGUMENT)
+    base: StrictInt = Field(ge=2, le=MAX_FACTORIAL_BASE)
 
 
 class FactorialValuationResult(StrictModel):
-    n: StrictInt = Field(ge=0, le=100_000)
-    base: StrictInt = Field(ge=2, le=1_000_000)
+    n: StrictInt = Field(ge=0, le=MAX_FACTORIAL_ARGUMENT)
+    base: StrictInt = Field(ge=2, le=MAX_FACTORIAL_BASE)
     valuation: StrictInt = Field(ge=0)
 
 

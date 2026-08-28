@@ -17,7 +17,6 @@ from jacobian.math.code_linear.values import (
 )
 
 MAX_CODEWORDS = 16384  # binary k=14 (2^14), ternary k=8 (3^8=6561); mainly for equal.decide witness enumeration
-MAX_LENGTH = MAX_LINEAR_CODE_LENGTH  # rowspace operations are O(k^2 n) and remain cheap; raised from 32
 MAX_RECEIVED_PROFILE_REPLAY_WORK = 3_000_000
 MAX_RECEIVED_PROFILE_WITNESS_CELLS = 65_536
 
@@ -322,10 +321,10 @@ def _validate_prime_matrix(
             "field_order_must_be_prime", "field_order must be prime"
         )
     width = len(generator_matrix[0])
-    if width == 0 or width > MAX_LENGTH:
+    if width == 0 or width > MAX_LINEAR_CODE_LENGTH:
         raise _validation_error(
             "generator_rows_length",
-            f"generator rows must have between 1 and {MAX_LENGTH} entries",
+            f"generator rows must have between 1 and {MAX_LINEAR_CODE_LENGTH} entries",
         )
     if any(len(row) != width for row in generator_matrix):
         raise _validation_error(
@@ -361,10 +360,12 @@ class GeneratorMatrixRequest(StrictModel):
     """A linear code given by a generator matrix over a bounded prime field."""
 
     field_order: int = Field(ge=2, le=251)
-    generator_matrix: tuple[tuple[int, ...], ...] = Field(min_length=1, max_length=16)
+    generator_matrix: tuple[tuple[int, ...], ...] = Field(
+        min_length=1, max_length=MAX_LINEAR_CODE_DIMENSION
+    )
     coordinate_axis: tuple[OpaqueLabel, ...] = Field(
         min_length=1,
-        max_length=MAX_LENGTH,
+        max_length=MAX_LINEAR_CODE_LENGTH,
         description=(
             "Ordered unique labels for generator-matrix columns; code-producing "
             "results preserve these labels."
@@ -422,13 +423,13 @@ class ParityCheckMatrix(StrictModel):
 
     field_order: int = Field(ge=2, le=251)
     coordinate_axis: tuple[OpaqueLabel, ...] = Field(
-        max_length=MAX_LENGTH,
+        max_length=MAX_LINEAR_CODE_LENGTH,
         description=(
             "Ordered unique labels for matrix columns; syndrome words must "
             "present this same ordered axis."
         ),
     )
-    rows: tuple[tuple[int, ...], ...] = Field(max_length=MAX_LENGTH)
+    rows: tuple[tuple[int, ...], ...] = Field(max_length=MAX_LINEAR_CODE_LENGTH)
 
     @model_validator(mode="after")
     def require_valid(self) -> Self:
@@ -461,14 +462,14 @@ class SyndromeRequest(StrictModel):
 
     parity_check: ParityCheckMatrix
     coordinate_axis: tuple[OpaqueLabel, ...] = Field(
-        max_length=MAX_LENGTH,
+        max_length=MAX_LINEAR_CODE_LENGTH,
         description=(
             "Ordered labels of the word's coordinates; must equal the "
             "parity-check column axis so word entries cannot align to the "
             "wrong columns."
         ),
     )
-    word: tuple[int, ...] = Field(max_length=MAX_LENGTH)
+    word: tuple[int, ...] = Field(max_length=MAX_LINEAR_CODE_LENGTH)
 
     @model_validator(mode="after")
     def require_valid(self) -> Self:
@@ -516,8 +517,10 @@ class MacWilliamsRequest(StrictModel):
 
     field_order: int = Field(ge=2, le=251)
     code_cardinality: int = Field(ge=1)
-    length: int = Field(ge=1, le=MAX_LENGTH)
-    weights: tuple[int, ...] = Field(min_length=1, max_length=MAX_LENGTH + 1)
+    length: int = Field(ge=1, le=MAX_LINEAR_CODE_LENGTH)
+    weights: tuple[int, ...] = Field(
+        min_length=1, max_length=MAX_LINEAR_CODE_LENGTH + 1
+    )
 
     @model_validator(mode="after")
     def require_valid_distribution(self) -> Self:
