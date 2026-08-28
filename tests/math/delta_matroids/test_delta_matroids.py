@@ -166,11 +166,10 @@ def test_label_byte_budget_bounds_ground_count_without_a_fixed_cap() -> None:
     assert result.delta_matroid is not None
     assert len(result.delta_matroid.ground) == 1_024
 
-    with pytest.raises(ValidationError) as error:
-        DeltaMatroidFromFeasibleSetsRequest(
-            system=FiniteFeasibleSetSystem(ground=_labels(1_025), feasible=((),))
-        )
-    assert error.value.errors()[0]["type"] == "delta_matroid.label_bytes_exceeded"
+    oversized = FiniteFeasibleSetSystem(ground=_labels(1_025), feasible=((),))
+    request = DeltaMatroidFromFeasibleSetsRequest(system=oversized)
+    with pytest.raises(ValueError, match="ground labels exceed"):
+        compute_from_feasible_sets(request)
 
 
 def test_non_utf8_representable_ground_labels_are_rejected_not_host_errors() -> None:
@@ -182,9 +181,9 @@ def test_non_utf8_representable_ground_labels_are_rejected_not_host_errors() -> 
     with pytest.raises(ValueError, match="UTF-8-representable"):
         delta_matroids.from_feasible_sets(system)
 
-    with pytest.raises(ValidationError) as error:
-        DeltaMatroidFromFeasibleSetsRequest(system=system)
-    assert error.value.errors()[0]["type"] == "delta_matroid.labels_not_utf8"
+    request = DeltaMatroidFromFeasibleSetsRequest(system=system)
+    with pytest.raises(ValueError, match="UTF-8-representable"):
+        compute_from_feasible_sets(request)
 
     with pytest.raises(ValidationError) as error:
         FiniteDeltaMatroid(ground=("\ud800",), feasible=((),))
@@ -198,7 +197,6 @@ def test_request_schema_exposes_every_delta_specific_admission_limit() -> None:
         "max_feasible_set_memberships": 1_024,
         "max_ground_label_utf8_bytes": 2_048,
         "max_symmetric_exchange_candidate_checks_per_replay": 250_000,
-        "max_complete_axiom_replays_per_request": 4,
         "max_result_bytes": 65_536,
     }
     assert "no separate ground-size or row-count caps" in schema["description"]
@@ -236,17 +234,17 @@ def test_membership_envelope_rejects_wide_families_without_a_row_cap() -> None:
     for index in range(25):
         for offset in range(1, 25):
             feasible.append((index, index + offset))
-    with pytest.raises(ValidationError) as error:
-        DeltaMatroidFromFeasibleSetsRequest(
-            system=FiniteFeasibleSetSystem(
-                ground=tuple(f"e{index}" for index in range(50)),
-                feasible=tuple(feasible),
-            )
+    request = DeltaMatroidFromFeasibleSetsRequest(
+        system=FiniteFeasibleSetSystem(
+            ground=tuple(f"e{index}" for index in range(50)),
+            feasible=tuple(feasible),
         )
-    assert error.value.errors()[0]["type"] == "delta_matroid.memberships_exceeded"
+    )
+    with pytest.raises(ValueError, match="memberships exceed"):
+        compute_from_feasible_sets(request)
 
 
-def test_request_rejects_exchange_candidate_space_before_axiom_replay() -> None:
+def test_native_admission_rejects_exchange_candidate_space_before_axiom_pass() -> None:
     # The 128 even-parity subsets of an eight-element ground set are a compact
     # input whose complete ordered exchange candidate space exceeds the public
     # budget. Recognition must reject the work before attempting the axiom.
@@ -257,11 +255,11 @@ def test_request_rejects_exchange_candidate_space_before_axiom_replay() -> None:
             tuple(bit for bit in range(7) if (index >> bit) & 1) for index in range(128)
         )
     )
-    with pytest.raises(ValidationError) as error:
-        DeltaMatroidFromFeasibleSetsRequest(
-            system=FiniteFeasibleSetSystem(
-                ground=tuple(f"e{index}" for index in range(8)),
-                feasible=feasible,
-            )
+    request = DeltaMatroidFromFeasibleSetsRequest(
+        system=FiniteFeasibleSetSystem(
+            ground=tuple(f"e{index}" for index in range(8)),
+            feasible=feasible,
         )
-    assert error.value.errors()[0]["type"] == "delta_matroid.candidate_work_exceeded"
+    )
+    with pytest.raises(ValueError, match="candidate checks exceed"):
+        compute_from_feasible_sets(request)

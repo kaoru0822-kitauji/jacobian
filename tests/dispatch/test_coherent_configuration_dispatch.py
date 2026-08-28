@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from jacobian.catalog.catalog import Catalog
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.dispatch import OperationRequestValidationError, invoke_operation
 
 
@@ -76,7 +77,7 @@ def test_dispatch_rejects_oversized_utf8_relation_label() -> None:
 def test_dispatch_rejects_escaped_result_over_budget(
     escaped_character: str,
 ) -> None:
-    with pytest.raises(OperationRequestValidationError) as error:
+    with pytest.raises(OperationDomainValidationError) as error:
         invoke_operation(
             "coherent_configuration.analyze.compute",
             {

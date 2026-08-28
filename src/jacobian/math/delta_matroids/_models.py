@@ -9,15 +9,12 @@ from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
 from jacobian.math.delta_matroids.values import (
-    MAX_DELTA_AXIOM_REPLAYS_PER_REQUEST,
     MAX_DELTA_EXCHANGE_CANDIDATE_CHECKS,
     MAX_DELTA_LABEL_BYTES,
     MAX_DELTA_MEMBERSHIPS,
     MAX_DELTA_RESULT_BYTES,
-    DeltaMatroidAdmissionError,
     DeltaMatroidObstruction,
     FiniteDeltaMatroid,
-    require_delta_matroid_admission,
 )
 from jacobian.math.greedoids.values import FiniteFeasibleSetSystem
 
@@ -37,7 +34,7 @@ class DeltaMatroidFromFeasibleSetsRequest(StrictModel):
                 "result-sensitive: there are no separate ground-size or "
                 "row-count caps, and the shared finite feasible-set carrier "
                 "is structural only; the derived membership, UTF-8 label-byte, "
-                "candidate-work, replay-count, and result-size bounds below "
+                "candidate-work and result-size bounds below "
                 "admit every complete family whose recognition fits."
             ),
             "admission_limits": {
@@ -45,9 +42,6 @@ class DeltaMatroidFromFeasibleSetsRequest(StrictModel):
                 "max_ground_label_utf8_bytes": MAX_DELTA_LABEL_BYTES,
                 "max_symmetric_exchange_candidate_checks_per_replay": (
                     MAX_DELTA_EXCHANGE_CANDIDATE_CHECKS
-                ),
-                "max_complete_axiom_replays_per_request": (
-                    MAX_DELTA_AXIOM_REPLAYS_PER_REQUEST
                 ),
                 "max_result_bytes": MAX_DELTA_RESULT_BYTES,
             },
@@ -60,20 +54,11 @@ class DeltaMatroidFromFeasibleSetsRequest(StrictModel):
             f"allows at most {MAX_DELTA_MEMBERSHIPS} total feasible-row "
             f"memberships, {MAX_DELTA_LABEL_BYTES} UTF-8 ground-label bytes, and "
             f"{MAX_DELTA_EXCHANGE_CANDIDATE_CHECKS} symmetric-exchange candidate "
-            f"checks per complete axiom replay; one recognized request performs "
-            f"at most {MAX_DELTA_AXIOM_REPLAYS_PER_REQUEST} complete replays, "
+            "checks in its single complete axiom pass, "
             f"and the serialized recognition result is at most "
             f"{MAX_DELTA_RESULT_BYTES} bytes."
         )
     )
-
-    @model_validator(mode="after")
-    def require_bounded_exchange_replay(self) -> Self:
-        try:
-            require_delta_matroid_admission(self.system)
-        except DeltaMatroidAdmissionError as exc:
-            raise _validation_error(exc.reason, str(exc)) from None
-        return self
 
 
 class DeltaMatroidRecognitionResult(StrictModel):

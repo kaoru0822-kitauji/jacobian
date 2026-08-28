@@ -74,10 +74,6 @@ limit for the complete returned profile.
 MAX_FACET_SIGN_TESTS = 5_000_000
 """Maximum candidate-hyperplane/vertex side tests in one enumeration pass."""
 
-MAX_FACET_TOTAL_SIGN_TESTS = 3 * MAX_FACET_SIGN_TESTS
-"""Maximum candidate-side tests for request admission, execution, and exact
-result replay together."""
-
 MAX_COMPUTED_FACETS = 256
 """Maximum number of canonical facets materialized by one result."""
 
@@ -143,12 +139,12 @@ denominator clearing, and its active-normal rank proof has minors of at most
 intermediate stays below the 32,768-digit canonical rational limit (the
 largest bound is 32,421 digits). The support dot product is smaller at
 ``2*d*D + 2`` digits. This one cap therefore bounds the admitted support
-inputs and the exact construction/replay work required by the public
+inputs and the exact construction work required by the public
 V-polytope value.
 """
 
 MAX_SUPPORT_VERTEX_SUBSETS = 100_000
-"""Maximum ``C(n, d)`` exact subfacets used to verify a V-polytope.
+"""Maximum ``C(n, d)`` exact subfacets used to establish a V-polytope.
 
 The support kernel itself is a linear pass. Its canonical V-polytope value
 also proves that every declared generator is an extreme vertex, using the
@@ -1022,9 +1018,8 @@ class FacetIncidenceRequest(StrictModel):
             "rows is side-tested against exactly those distinct rows; the final-facet "
             "incidence scans then range over all n source positions and are bounded "
             "by the materialized-profile result limits below. Both charges apply "
-            "in each of request admission, execution, and exact result replay "
-            f"({MAX_FACET_TOTAL_SIGN_TESTS} total). Admission materializes the "
-            "complete bounded enumeration before accepting a request, so its exact "
+            "during the single owner-local execution. Execution materializes the "
+            "complete bounded enumeration, so its exact "
             f"facet and incidence counts are proven to fit the "
             f"{MAX_COMPUTED_FACETS}-facet and "
             f"{MAX_FACET_INCIDENCES}-incidence result limits."
@@ -1111,15 +1106,6 @@ class FacetIncidenceRequest(StrictModel):
                     max_digits=MAX_FACET_COORDINATE_DIGITS,
                     label="facet-profile vertex coordinate",
                 )
-        from jacobian.math.polytope._admission_kernels import (
-            facet_profile_for_admission,
-        )
-
-        # Materializing the complete bounded enumeration here proves the
-        # facet and incidence result bounds during request validation, so an
-        # admitted request cannot discover an oversized profile only in the
-        # execution backend.
-        facet_profile_for_admission(vertices, dimension)
         return self
 
 
@@ -1927,7 +1913,6 @@ __all__ = [
     "MAX_FACET_DIMENSION",
     "MAX_FACET_INCIDENCES",
     "MAX_FACET_SIGN_TESTS",
-    "MAX_FACET_TOTAL_SIGN_TESTS",
     "MAX_HULL_SUBFACETS",
     "MAX_SUPPORT_COMPONENT_DIGITS",
     "MAX_SUPPORT_ORIENTATION_TESTS",

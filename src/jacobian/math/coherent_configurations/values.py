@@ -115,14 +115,6 @@ class CoherentConfigurationInput(StrictModel):
                 "every declared relation_id must occur in relation_matrix",
             )
 
-        # This is request admission over canonical data, not a coherence replay.
-        # Keeping it neutral lets every boundary reject oversized complete
-        # partitions before the cubic kernel is considered.
-        from jacobian.math.coherent_configurations._bounds import (
-            require_analysis_admission,
-        )
-
-        require_analysis_admission(self)
         return self
 
 
@@ -138,7 +130,11 @@ class FiniteCoherentConfiguration(CoherentConfigurationInput):
     def _from_kernel(cls, source: CoherentConfigurationInput) -> Self:
         """Construct a value after the exact owner-local coherence kernel passed."""
 
-        return cls.model_validate(source.model_dump())
+        return cls.model_construct(
+            points=source.points,
+            relation_ids=source.relation_ids,
+            relation_matrix=source.relation_matrix,
+        )
 
 
 __all__ = [

@@ -19,7 +19,6 @@ from jacobian.math.polytope._models import (
     MAX_FACET_COORDINATE_DIGITS,
     MAX_FACET_INCIDENCES,
     MAX_FACET_SIGN_TESTS,
-    MAX_FACET_TOTAL_SIGN_TESTS,
     MAX_FACETS,
     MAX_VERTICES,
     FacetIncidenceRequest,
@@ -118,17 +117,16 @@ def _facet_profile(vertices: tuple[Vertex, ...]) -> FacetIncidenceResult:
 
 
 class TestFacetIncidence:
-    def test_schema_exposes_the_admission_execution_and_replay_budget(self) -> None:
+    def test_schema_exposes_the_single_execution_budget(self) -> None:
         schema = FacetIncidenceRequest.model_json_schema()
 
         description = schema["properties"]["vertices"]["description"]
         assert str(MAX_FACET_SIGN_TESTS) in description
-        assert str(MAX_FACET_TOTAL_SIGN_TESTS) in description
 
     def test_schema_publishes_where_the_result_bounds_attach(self) -> None:
         """The facet and incidence caps are enforced exactly on the
-        materialized profile of the bounded enumeration -- which request
-        admission itself runs -- and the schema must say so rather than
+        materialized profile of the bounded enumeration, and the schema must
+        say so rather than
         promise a row-count upper-bound proof that no admission step
         performs."""
         schema = FacetIncidenceRequest.model_json_schema()
@@ -303,14 +301,16 @@ class TestFacetIncidence:
                 source_vertex_indices=(0, 3),
             )
 
-    def test_lower_dimensional_input_and_work_overflow_reject_before_enumeration(
+    def test_lower_dimensional_input_and_work_overflow_reject_during_execution(
         self,
     ) -> None:
-        with pytest.raises(ValidationError):
-            FacetIncidenceRequest(
-                vertices=(
-                    _v((0, 1), (0, 1)),
-                    _v((1, 1), (0, 1)),
+        with pytest.raises(ValueError, match="not full-dimensional"):
+            compute_facet_incidence(
+                FacetIncidenceRequest(
+                    vertices=(
+                        _v((0, 1), (0, 1)),
+                        _v((1, 1), (0, 1)),
+                    )
                 )
             )
         vertices = (
@@ -321,8 +321,8 @@ class TestFacetIncidence:
             ),
             *(_v(*(((index, 1),) * 7)) for index in range(1, 57)),
         )
-        with pytest.raises(ValidationError):
-            FacetIncidenceRequest(vertices=vertices)
+        with pytest.raises(ValueError, match="side-test bound"):
+            compute_facet_incidence(FacetIncidenceRequest(vertices=vertices))
 
     @pytest.mark.scale
     def test_interior_source_rows_are_admitted_and_bind_no_facet(self) -> None:
@@ -353,7 +353,7 @@ class TestFacetIncidence:
         ) == list(range(8))
 
     @pytest.mark.scale
-    def test_cyclic_profile_beyond_the_facet_cap_is_rejected_at_request_admission(
+    def test_cyclic_profile_beyond_the_facet_cap_is_rejected_during_execution(
         self,
     ) -> None:
         """The moment-curve polytope with 15 vertices in d = 7 attains the
@@ -364,8 +364,8 @@ class TestFacetIncidence:
         failed only inside execution."""
         vertices = tuple(_v(*((t**k, 1) for k in range(1, 8))) for t in range(1, 16))
 
-        with pytest.raises(ValidationError):
-            FacetIncidenceRequest(vertices=vertices)
+        with pytest.raises(ValueError, match="facet result bound"):
+            compute_facet_incidence(FacetIncidenceRequest(vertices=vertices))
 
     def test_padded_seven_simplex_admits_distinct_candidates_and_binds_every_row(
         self,

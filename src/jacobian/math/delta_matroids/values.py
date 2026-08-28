@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal, Self
 
-from pydantic import Field, ValidationError, model_validator
+from pydantic import Field, model_validator
 from pydantic_core import PydanticCustomError
 
 from jacobian._models import StrictModel
@@ -14,7 +14,6 @@ from jacobian.math.greedoids.values import FiniteFeasibleSetSystem
 MAX_DELTA_MEMBERSHIPS = 1_024
 MAX_DELTA_LABEL_BYTES = 2_048
 MAX_DELTA_EXCHANGE_CANDIDATE_CHECKS = 250_000
-MAX_DELTA_AXIOM_REPLAYS_PER_REQUEST = 4
 MAX_DELTA_RESULT_BYTES = 65_536
 
 
@@ -204,36 +203,23 @@ class FiniteDeltaMatroid(StrictModel):
             )
         return self
 
+    @classmethod
+    def _from_kernel(cls, system: FiniteFeasibleSetSystem) -> FiniteDeltaMatroid:
+        """Construct after the exhaustive recognition kernel passed."""
 
-def canonical_delta_matroid(system: FiniteFeasibleSetSystem) -> FiniteDeltaMatroid:
-    """Construct the canonical value after the complete exchange replay."""
-
-    require_delta_matroid_admission(system)
-    try:
-        return FiniteDeltaMatroid(
+        return cls.model_construct(
             ground=system.ground,
             feasible=canonical_feasible_rows(system),
         )
-    except ValidationError as error:
-        obstruction = first_symmetric_exchange_obstruction(system)
-        if obstruction is None:
-            raise ValueError(
-                "feasible family is not a canonical delta-matroid"
-            ) from error
-        raise ValueError(
-            f"feasible family is not a delta-matroid: {obstruction.kind}"
-        ) from error
 
 
 __all__ = [
-    "MAX_DELTA_AXIOM_REPLAYS_PER_REQUEST",
     "MAX_DELTA_EXCHANGE_CANDIDATE_CHECKS",
     "MAX_DELTA_LABEL_BYTES",
     "MAX_DELTA_MEMBERSHIPS",
     "MAX_DELTA_RESULT_BYTES",
     "DeltaMatroidObstruction",
     "FiniteDeltaMatroid",
-    "canonical_delta_matroid",
     "canonical_feasible_rows",
     "first_symmetric_exchange_obstruction",
     "require_delta_matroid_admission",

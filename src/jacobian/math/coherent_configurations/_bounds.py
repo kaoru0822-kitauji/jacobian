@@ -1,9 +1,4 @@
-"""Neutral admission bounds for coherent-configuration values.
-
-These quantities depend only on the canonical complete pair partition.  They
-are shared by value parsing and the analysis kernel, so neither side needs to
-re-enter the public operation layer.
-"""
+"""Request-scoped admission bounds for coherent-configuration analysis."""
 
 from __future__ import annotations
 
@@ -15,6 +10,10 @@ from jacobian.math.coherent_configurations.values import (
     MAX_COHERENT_CONFIGURATION_SOURCE_BYTES,
     CoherentConfigurationInput,
 )
+
+
+class CoherentConfigurationAdmissionError(ValueError):
+    """A coherent-configuration analysis exceeds its execution envelope."""
 
 
 def _source_bytes(source: CoherentConfigurationInput) -> int:
@@ -53,14 +52,24 @@ def require_analysis_admission(source: CoherentConfigurationInput) -> None:
     """Reject source or predicted analysis/result work before cubic expansion."""
 
     if _source_bytes(source) > MAX_COHERENT_CONFIGURATION_SOURCE_BYTES:
-        raise ValueError("coherent-configuration source exceeds the byte budget")
+        raise CoherentConfigurationAdmissionError(
+            "coherent-configuration source exceeds the byte budget"
+        )
     point_count = len(source.points)
     relation_count = len(source.relation_ids)
     work = 4 * relation_count**2 * point_count**3
     if work > MAX_ANALYSIS_WORK:
-        raise ValueError("coherent-configuration analysis exceeds the work budget")
+        raise CoherentConfigurationAdmissionError(
+            "coherent-configuration analysis exceeds the work budget"
+        )
     if estimate_analysis_result_bytes(source) > MAX_COHERENT_CONFIGURATION_RESULT_BYTES:
-        raise ValueError("coherent-configuration result exceeds the byte budget")
+        raise CoherentConfigurationAdmissionError(
+            "coherent-configuration result exceeds the byte budget"
+        )
 
 
-__all__ = ["estimate_analysis_result_bytes", "require_analysis_admission"]
+__all__ = [
+    "CoherentConfigurationAdmissionError",
+    "estimate_analysis_result_bytes",
+    "require_analysis_admission",
+]

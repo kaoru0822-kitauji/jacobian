@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from jacobian.math.delta_matroids._models import DeltaMatroidRecognitionResult
 from jacobian.math.delta_matroids.values import (
-    canonical_delta_matroid,
+    FiniteDeltaMatroid,
     first_symmetric_exchange_obstruction,
     require_delta_matroid_admission,
 )
@@ -27,5 +27,5 @@ def from_feasible_sets(
         )
     return DeltaMatroidRecognitionResult._from_kernel(
         system,
-        delta_matroid=canonical_delta_matroid(system),
+        delta_matroid=FiniteDeltaMatroid._from_kernel(system),
     )

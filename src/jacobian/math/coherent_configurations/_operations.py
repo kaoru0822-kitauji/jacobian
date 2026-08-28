@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from jacobian.catalog.models import OperationDomainValidationError
+from jacobian.math.coherent_configurations._bounds import (
+    CoherentConfigurationAdmissionError,
+)
 from jacobian.math.coherent_configurations._models import (
     CoherenceObstruction,
     CoherentConfigurationAnalyzeRequest,
@@ -121,9 +125,15 @@ def compute_analyze(
 ) -> CoherentConfigurationAnalyzeResult:
     """Analyze one complete relation partition with one charged kernel pass."""
 
-    return _computed_analysis_result(
-        request.configuration, _analyze(request.configuration)
-    )
+    try:
+        data = _analyze(request.configuration)
+    except CoherentConfigurationAdmissionError as exc:
+        raise OperationDomainValidationError(
+            location=("configuration",),
+            code="coherent_configuration.analysis_not_admitted",
+            message=str(exc),
+        ) from exc
+    return _computed_analysis_result(request.configuration, data)
 
 
 def verify_finite_coherent_configuration(

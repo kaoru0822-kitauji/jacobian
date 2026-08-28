@@ -280,14 +280,14 @@ def test_utf8_label_byte_bounds_apply_to_direct_request() -> None:
 
 
 @pytest.mark.parametrize("escaped_character", ('"', "\x00"), ids=("quote", "nul"))
-def test_escaped_result_over_budget_is_rejected_at_direct_request_boundary(
+def test_escaped_result_over_budget_is_rejected_by_native_admission(
     escaped_character: str,
 ) -> None:
     payload = _escaped_thin_four_point_configuration(escaped_character)
+    request = _request(payload)
 
-    with pytest.raises(ValidationError) as exc_info:
-        _request(payload)
-    assert exc_info.value.errors()[0]["type"] == "value_error"
+    with pytest.raises(ValueError, match="result exceeds the byte budget"):
+        compute_analyze(request)
 
 
 def test_unicode_label_tensor_stays_inside_admitted_result_envelope() -> None:

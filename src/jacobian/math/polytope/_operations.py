@@ -32,6 +32,7 @@ from sympy import Matrix, Rational
 
 from jacobian._exact import CanonicalRational
 from jacobian.canonical import format_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.polytope._models import (
     MAX_BOUNDEDNESS_COMBINATIONS,
     MAX_COMPUTED_FACETS,
@@ -219,7 +220,14 @@ def compute_facet_incidence(
     vertices = request.vertices
     assert isinstance(vertices, tuple)  # projected by the request validator
     dimension = len(vertices[0].coordinates)
-    facets = _computed_facets_from_vertices(vertices, dimension)
+    try:
+        facets = _computed_facets_from_vertices(vertices, dimension)
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=("vertices",),
+            code="polytope.facet_profile_not_admitted",
+            message=str(exc),
+        ) from exc
     return FacetIncidenceResult._from_kernel(
         vertices=vertices,
         dimension=dimension,

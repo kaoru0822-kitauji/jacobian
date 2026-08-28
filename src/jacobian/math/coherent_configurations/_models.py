@@ -96,8 +96,8 @@ class CoherentConfigurationAnalyzeResult(StrictModel):
         max_length=MAX_COHERENT_CONFIGURATION_RELATIONS**3
     )
     obstruction: CoherenceObstruction | None = None
-    method: Literal["DIRECT_COMPLETE_PAIR_PARTITION_REPLAY"] = (
-        "DIRECT_COMPLETE_PAIR_PARTITION_REPLAY"
+    method: Literal["DIRECT_COMPLETE_PAIR_PARTITION_ANALYSIS"] = (
+        "DIRECT_COMPLETE_PAIR_PARTITION_ANALYSIS"
     )
 
     @model_validator(mode="after")
