@@ -11,16 +11,6 @@ TRANSIENT_SMOKE_EXIT = 75
 _TRANSIENT_HTTP_STATUSES = frozenset({502, 503, 504})
 
 
-def expected_tool_names() -> set[str]:
-    """Return the fixed and catalog-derived tools in an installed server."""
-
-    from jacobian.catalog.catalog import Catalog
-
-    return {"math.find", "math.run"} | {
-        descriptor.operation_id for descriptor in Catalog.open().snapshot().operations
-    }
-
-
 class TransientSmokeError(RuntimeError):
     """A bounded operational failure that may clear without changing inputs."""
 
@@ -75,7 +65,6 @@ __all__ = [
     "TRANSIENT_SMOKE_EXIT",
     "TransientSmokeError",
     "exit_for_smoke_failure",
-    "expected_tool_names",
     "is_transient_transport_failure",
     "raise_for_http_error",
 ]

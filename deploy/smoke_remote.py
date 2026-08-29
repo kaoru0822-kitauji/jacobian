@@ -18,7 +18,7 @@ from jacobian.canonical import canonicalize_json
 from jacobian.mcp.models import OperationFindResponse, OperationSearchResult
 from mcp import Client
 
-from .smoke import expected_tool_names, exit_for_smoke_failure, raise_for_http_error
+from .smoke import exit_for_smoke_failure, raise_for_http_error
 
 
 def _require_server_info(server_info: Implementation | None) -> Implementation:
@@ -71,9 +71,10 @@ def _headers() -> dict[str, str] | None:
     return {"Authorization": f"Bearer {token}"} if token else None
 
 
-def _validate_tool_surface(listed: Any, failures: list[str]) -> set[str]:
+def _validate_tool_surface(
+    listed: Any, expected: set[str], failures: list[str]
+) -> set[str]:
     tool_names = {tool.name for tool in listed.tools}
-    expected = expected_tool_names()
     missing = sorted(expected - tool_names)
     unexpected = sorted(tool_names - expected)
     if missing:
@@ -151,8 +152,6 @@ async def inspect(
         _validate_server_version(server_version, expected_version, failures)
 
         listed = await client.list_tools()
-        tool_names = _validate_tool_surface(listed, failures)
-
         catalog_result = await client.read_resource("operation://catalog")
         catalog_content = catalog_result.contents[0]
         if not isinstance(catalog_content, TextResourceContents):
@@ -172,6 +171,9 @@ async def inspect(
         operation_ids = {
             operation["operation_id"] for operation in catalog["operations"]
         }
+        tool_names = _validate_tool_surface(
+            listed, {"math.find", "math.run"} | operation_ids, failures
+        )
         missing = sorted(required_operations - operation_ids)
         if missing:
             failures.append(
