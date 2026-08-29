@@ -6,11 +6,12 @@ step. Direct typed tools are functionally promising, but two predeclared
 `math.run` removal gates remain unmeasured: observable deferred client discovery
 and exact per-task loaded tool-definition bytes.
 
-The corpus and decision policy were frozen before the accepted runs. Results
-below were collected on 2026-08-29 from repository revision
+The corpus and decision policy were frozen before the accepted runs. Real-client
+results below were collected on 2026-08-29 from repository revision
 `bf64a8a09dfb824d0db624b097043c2adc4cc8d5`, Codex CLI 0.150.1,
 `gpt-5.6-sol` at high reasoning effort, Python 3.12.13, MCP SDK 2.1.0, and
-macOS arm64.
+macOS arm64. Deterministic controls were repeated after integrating current
+`main`, at revision `c7ce898a65581c26a9b70ff38d44e7b4bdc1f4d9`.
 
 ## Frozen question and corpus
 
@@ -49,8 +50,8 @@ mathematical families.
 | Direct tool-definition bytes | 2,635,514 |
 | `math.find` + `math.run` definition bytes | 11,586 |
 | Direct input/output schema bytes | 2,317,300 |
-| Server construction | 983.607 ms |
-| `tools/list` median / p95, 7 repetitions | 48.140 / 115.842 ms |
+| Server construction | 961.505 ms |
+| `tools/list` median / p95, 7 repetitions | 44.520 / 102.385 ms |
 | Frozen discovery probes | 6/6 |
 | Direct tasks / legacy tasks / exact parity | 5/5 / 5/5 / 5/5 |
 | Exact typed multi-operation composition | 1/1 |
@@ -63,8 +64,8 @@ context.
 
 The semantic searches ranked the sandpile operation first. The neighborhood
 query ranked `graph.chip_firing.q_reduced.compute` first and
-`graph.chip_firing.critical_group.compute` second. The two searches took 2.558
-and 2.888 ms locally.
+`graph.chip_firing.critical_group.compute` second. The two searches took 2.345
+and 2.506 ms locally.
 
 ## Real-client observations
 
@@ -142,7 +143,7 @@ Recommendation for issue #2982:
 
 | Report | SHA-256 |
 | --- | --- |
-| Deterministic catalog controls | `61c85847d36e426c18b04fad8cbd7ed0cd7a5a1225d1c2a37b4620f961141e10` |
+| Deterministic catalog controls | `3a043026f7c9fd757b49bb7d08482f4b9a1d786e436568ebd057fffb1364516a` |
 | Direct, two repetitions | `516dff308235f5904b42b69a7ca5900320972ba902499ab62698c47f825767b0` |
 | Legacy, two repetitions | `f9ec01436c2d65d505467adbe1ff0f4876ccaa143c2719f595148d17678f3f25` |
 | Semantic `math.find`, two repetitions | `87c7674a1e05b9cbc7940dda0bce649c2162803a26e115e1e1fe0e98aa91f321` |
