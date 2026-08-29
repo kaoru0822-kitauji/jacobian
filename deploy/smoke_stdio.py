@@ -7,7 +7,16 @@ import asyncio
 import os
 from pathlib import Path
 
-from deploy.smoke import expected_tool_names
+from jacobian.catalog.catalog import Catalog
+
+
+def expected_tool_names() -> set[str]:
+    """Return the MCP surface published by the installed package."""
+
+    snapshot = Catalog.open().snapshot()
+    return {"math.find", "math.run"} | {
+        operation.operation_id for operation in snapshot.operations
+    }
 
 
 def _parser() -> argparse.ArgumentParser:
