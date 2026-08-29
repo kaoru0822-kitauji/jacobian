@@ -340,9 +340,7 @@ def _record_describe_and_attempt(
         if isinstance(request, Mapping) and request.get("op") == "inspect":
             requested_operation_id = request.get("operation_id")
             inspected_operation = (
-                response.get("operation")
-                if isinstance(response, Mapping)
-                else None
+                response.get("operation") if isinstance(response, Mapping) else None
             )
             if (
                 successful

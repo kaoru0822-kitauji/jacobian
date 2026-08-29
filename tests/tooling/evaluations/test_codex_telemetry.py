@@ -175,7 +175,9 @@ def test_agent_telemetry_preserves_discovery_to_invocation_dataflow(
     assert telemetry["operation_ids"] == ["graph.search.atlas"]
 
 
-def test_agent_telemetry_does_not_count_unknown_exact_inspection(tmp_path: Path) -> None:
+def test_agent_telemetry_does_not_count_unknown_exact_inspection(
+    tmp_path: Path,
+) -> None:
     events = [
         _tool_event(
             "math.find",
