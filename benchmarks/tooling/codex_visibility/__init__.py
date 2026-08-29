@@ -217,7 +217,12 @@ def classify_visibility(
         and not discovery_call_count
         and not inspection_call_count,
         "execution_free_discovery": execution_free,
-        "abstained": not mcp_calls and not resource_read_count,
+        "abstained": (
+            not mcp_calls
+            and not resource_read_count
+            and not attempted
+            and not completed
+        ),
     }
     expected_observed = {
         "described": sorted(expected & described),
@@ -324,6 +329,9 @@ async def inspect_surface(
         if not isinstance(catalog_content, TextResourceContents):
             raise RuntimeError("operation catalog is not text")
         catalog = json.loads(catalog_content.text)
+        operation_ids = sorted(
+            operation["operation_id"] for operation in catalog["operations"]
+        )
         catalog_digest = _sha256_bytes(
             canonicalize_json(
                 {
@@ -359,7 +367,7 @@ async def inspect_surface(
                 ),
                 "catalog_digest": catalog_digest,
                 "operation_count": len(catalog["operations"]),
-                "operation_ids": sorted(catalog_ids),
+                "operation_ids": operation_ids,
                 "content_sha256": _sha256_bytes(catalog_content.text.encode("utf-8")),
             },
             "client_surface": {
@@ -806,6 +814,9 @@ def _build_summary(runs: list[dict[str, Any]]) -> dict[str, Any]:
                 for run in runs
             ),
             "mcp_calls": sum(run["classification"]["mcp_call_count"] for run in runs),
+            "direct_operation_calls": sum(
+                run["classification"]["direct_operation_call_count"] for run in runs
+            ),
             "mcp_model_visible_bytes": sum(
                 run["classification"]["mcp_model_visible_bytes"] for run in runs
             ),

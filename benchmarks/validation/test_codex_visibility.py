@@ -93,21 +93,36 @@ def test_discovery_expectation_rejects_any_operation_execution() -> None:
     assert direct_execution["contract_satisfied"] is False
 
 
-def test_direct_call_count_is_independent_of_malformed_math_run_attempts() -> None:
+def test_abstention_rejects_operation_telemetry_even_without_mcp_call_names() -> None:
+    case = VisibilityCase(
+        case_id="abstain",
+        cue_level=CueLevel.LATENT,
+        prompt="Explain a matrix.",
+        expectation=AdoptionExpectation.ABSTAIN,
+    )
+
+    classification = classify_visibility(
+        case,
+        {"operation_attempt_ids": ["matrix.rank.compute"]},
+    )
+
+    assert classification["observed"]["abstained"] is False
+    assert classification["contract_satisfied"] is False
+
+
+def test_malformed_math_run_does_not_hide_direct_operation_calls() -> None:
     case = VisibilityCase(
         case_id="determinant",
         cue_level=CueLevel.EXPLICIT,
         prompt="Compute a determinant.",
-        expectation=AdoptionExpectation.USE,
         expected_operation_ids=("matrix.determinant.compute",),
     )
 
     classification = classify_visibility(
         case,
         {
-            "operation_attempt_ids": ["matrix.determinant.compute"],
-            "operation_ids": ["matrix.determinant.compute"],
             "mcp_calls": ["math.run", "matrix.determinant.compute"],
+            "operation_attempt_ids": [],
             "direct_operation_call_count": 1,
         },
     )

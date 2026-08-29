@@ -5,8 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections import Counter
-from collections.abc import Mapping, Sequence
-from collections.abc import Set as AbstractSet
+from collections.abc import Mapping, Sequence, Set
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -254,7 +253,7 @@ def _operation_recovery_metrics(
 @dataclass
 class _AgentTranscriptTelemetry:
     mcp_calls: list[str] = field(default_factory=list)
-    direct_operation_call_count: int = 0
+    mcp_servers: list[str] = field(default_factory=list)
     successful_calls: list[str] = field(default_factory=list)
     operation_attempt_ids: list[str] = field(default_factory=list)
     operation_attempts: list[dict[str, Any]] = field(default_factory=list)
@@ -266,6 +265,7 @@ class _AgentTranscriptTelemetry:
     tool_error_count: int = 0
     parameter_error_count: int = 0
     operation_rejection_count: int = 0
+    direct_operation_call_count: int = 0
     mcp_wire_bytes: int = 0
     mcp_wire_bytes_by_tool: Counter[str] = field(default_factory=Counter)
     mcp_model_visible_bytes: int = 0
@@ -333,7 +333,7 @@ def _record_describe_and_attempt(
     successful: bool,
     item: Mapping[str, Any],
     response: Mapping[str, Any] | None,
-    direct_operation_ids: AbstractSet[str],
+    direct_operation_ids: Set[str],
 ) -> None:
     if tool == "math.find":
         request = arguments.get("request") if isinstance(arguments, Mapping) else None
@@ -341,22 +341,17 @@ def _record_describe_and_attempt(
             telemetry.operation_describe_exact_calls += 1
         else:
             telemetry.operation_describe_index_calls += 1
-    is_legacy = tool == "math.run"
-    is_direct = tool in direct_operation_ids
-    if not is_legacy and not is_direct:
+    direct_operation_id = tool if tool in direct_operation_ids else None
+    if tool != "math.run" and direct_operation_id is None:
         return
-    operation_id = (
-        arguments.get("operation_id")
-        if is_legacy and isinstance(arguments, Mapping)
-        else tool
-        if is_direct
-        else None
+    operation_id = direct_operation_id or (
+        arguments.get("operation_id") if isinstance(arguments, Mapping) else None
     )
     payload = (
-        arguments.get("payload")
-        if is_legacy and isinstance(arguments, Mapping)
-        else arguments
-        if is_direct and isinstance(arguments, Mapping)
+        arguments
+        if direct_operation_id is not None
+        else arguments.get("payload")
+        if isinstance(arguments, Mapping)
         else None
     )
     attempt = {
@@ -519,10 +514,9 @@ def _mcp_call_failed(
             isinstance(execution, Mapping)
             and execution.get("status") in {"CANCELLED", "ERROR", "TIMEOUT"}
         )
-        or _contains_value(
-            item,
-            field="status",
-            accepted={"CANCELLED", "ERROR", "TIMEOUT"},
+        or (
+            isinstance(item.get("status"), str)
+            and item["status"] in {"CANCELLED", "ERROR", "TIMEOUT"}
         )
     )
 
@@ -574,12 +568,26 @@ def _record_operation_invocation(
     tool: str,
     arguments: object,
     response: Mapping[str, Any] | None,
-    direct_operation_ids: AbstractSet[str],
+    direct_operation_ids: Set[str],
 ) -> None:
     execution = response.get("execution") if isinstance(response, Mapping) else None
     execution_completed = execution is None or (
         isinstance(execution, Mapping) and execution.get("status") == "COMPLETED"
     )
+    if (
+        tool in direct_operation_ids
+        and isinstance(arguments, Mapping)
+        and isinstance(response, Mapping)
+    ):
+        telemetry.operation_ids.append(tool)
+        telemetry.operation_invocations.append(
+            {
+                "operation_id": tool,
+                "input": arguments,
+                "output": dict(response),
+            }
+        )
+        return
     if (
         tool == "math.run"
         and isinstance(arguments, Mapping)
@@ -614,21 +622,24 @@ def _record_successful_mcp_call(
     tool: str,
     arguments: object,
     response: Mapping[str, Any] | None,
-    direct_operation_ids: AbstractSet[str],
+    direct_operation_ids: Set[str],
 ) -> None:
     telemetry.successful_calls.append(tool)
     if tool == "math.find" and isinstance(arguments, Mapping):
         telemetry.operation_descriptions.append(
             _build_operation_description(arguments, response)
         )
-    if (
-        (tool == "math.run" or tool in direct_operation_ids)
-        and isinstance(response, Mapping)
-        and _contains_value(
-            response.get("output"),
-            field="status",
-            accepted={"REJECTED"},
-        )
+    operation_output = (
+        response
+        if tool in direct_operation_ids
+        else response.get("output")
+        if tool == "math.run" and isinstance(response, Mapping)
+        else None
+    )
+    if _contains_value(
+        operation_output,
+        field="status",
+        accepted={"REJECTED"},
     ):
         telemetry.operation_rejection_count += 1
     _record_operation_invocation(
@@ -639,9 +650,17 @@ def _record_successful_mcp_call(
 def _process_mcp_tool_call(
     telemetry: _AgentTranscriptTelemetry,
     item: dict[str, Any],
-    direct_operation_ids: AbstractSet[str],
+    direct_operation_ids: Set[str],
 ) -> None:
-    tool = item["tool"]
+    raw_tool = item["tool"]
+    server = item.get("server")
+    if isinstance(server, str):
+        telemetry.mcp_servers.append(server)
+    tool = (
+        raw_tool.removeprefix("jacobian.")
+        if server == "jacobian" and raw_tool.startswith("jacobian.")
+        else raw_tool
+    )
     telemetry.mcp_calls.append(tool)
     if tool in direct_operation_ids:
         telemetry.direct_operation_call_count += 1
@@ -678,12 +697,13 @@ def _process_mcp_tool_call(
 def _transcript_payload(telemetry: _AgentTranscriptTelemetry) -> dict[str, Any]:
     return {
         "mcp_calls": telemetry.mcp_calls,
-        "direct_operation_call_count": telemetry.direct_operation_call_count,
+        "mcp_servers": telemetry.mcp_servers,
         "shell_calls": telemetry.shell_calls,
         "usage": telemetry.usage,
         "tool_error_count": telemetry.tool_error_count,
         "parameter_error_count": telemetry.parameter_error_count,
         "operation_rejection_count": telemetry.operation_rejection_count,
+        "direct_operation_call_count": telemetry.direct_operation_call_count,
         "successful_tool_calls": telemetry.successful_calls,
         "operation_attempt_ids": telemetry.operation_attempt_ids,
         "operation_attempts": telemetry.operation_attempts,
@@ -733,7 +753,7 @@ def _transcript_payload(telemetry: _AgentTranscriptTelemetry) -> dict[str, Any]:
 def parse_agent_transcript_bytes(
     payload: bytes,
     *,
-    direct_operation_ids: AbstractSet[str] = frozenset(),
+    direct_operation_ids: Set[str] = frozenset(),
 ) -> dict[str, Any]:
     """Parse already-read transcript bytes without reopening mutable evidence."""
 
@@ -765,7 +785,7 @@ def parse_agent_transcript_bytes(
 def parse_agent_transcript(
     path: Path,
     *,
-    direct_operation_ids: AbstractSet[str] = frozenset(),
+    direct_operation_ids: Set[str] = frozenset(),
 ) -> dict[str, Any]:
     """Return calls, usage, failures, and successful operation dataflow."""
 

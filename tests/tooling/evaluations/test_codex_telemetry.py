@@ -267,6 +267,33 @@ def test_agent_telemetry_records_direct_catalog_operation_calls(tmp_path: Path) 
     ]
 
 
+def test_agent_telemetry_counts_direct_operation_calls_independently(
+    tmp_path: Path,
+) -> None:
+    operation_id = "integer.compute.extended_gcd"
+    transcript = tmp_path / "transcript.jsonl"
+    transcript.write_text(
+        json.dumps(
+            _tool_event(
+                operation_id,
+                {"left": "84", "right": "30"},
+                {"gcd": "6"},
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    telemetry = parse_agent_transcript(
+        transcript,
+        direct_operation_ids={operation_id},
+    )
+
+    assert telemetry["direct_operation_call_count"] == 1
+    assert telemetry["operation_attempt_ids"] == [operation_id]
+    assert telemetry["operation_ids"] == [operation_id]
+
+
 def test_agent_telemetry_retains_failed_math_run_attempts(tmp_path: Path) -> None:
     failed = {
         "type": "item.completed",
@@ -566,6 +593,41 @@ def test_agent_telemetry_ignores_non_string_mcp_status(tmp_path: Path) -> None:
     assert telemetry["successful_tool_calls"] == ["resources/read"]
     assert telemetry["mcp_resource_read_attempts"] == 1
     assert telemetry["mcp_resource_read_successes"] == 1
+
+
+def test_agent_telemetry_does_not_treat_operation_timeout_status_as_call_failure(
+    tmp_path: Path,
+) -> None:
+    operation_id = "analysis.real_function.point_enclosure.compute"
+    response = {
+        "status": "TIMEOUT",
+        "interval": {"lower": "0", "upper": "1"},
+    }
+    event = {
+        "type": "item.completed",
+        "item": {
+            "type": "mcp_tool_call",
+            "tool": operation_id,
+            "arguments": {"function": "x", "point": "0"},
+            "status": "completed",
+            "result": {
+                "isError": False,
+                "structured_content": response,
+                "content": [{"type": "text", "text": json.dumps(response)}],
+            },
+        },
+    }
+    transcript = tmp_path / "transcript.jsonl"
+    transcript.write_text(json.dumps(event) + "\n", encoding="utf-8")
+
+    telemetry = parse_agent_transcript(
+        transcript,
+        direct_operation_ids={operation_id},
+    )
+
+    assert telemetry["tool_error_count"] == 0
+    assert telemetry["successful_tool_calls"] == [operation_id]
+    assert telemetry["operation_ids"] == [operation_id]
 
 
 def test_agent_telemetry_ignores_non_string_mcp_tool(tmp_path: Path) -> None:
