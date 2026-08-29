@@ -225,7 +225,11 @@ def classify_visibility(
     if case.expectation is AdoptionExpectation.ABSTAIN:
         contract_satisfied = observed["abstained"]
     elif case.expectation is AdoptionExpectation.DISCOVER:
-        contract_satisfied = not expected_observed["missing_described"]
+        contract_satisfied = (
+            not expected_observed["missing_described"]
+            and not attempted
+            and not completed
+        )
     else:
         contract_satisfied = not expected_observed["missing_completed"] and (
             bool(matched_outcomes) or not case.acceptable_output_outcomes
