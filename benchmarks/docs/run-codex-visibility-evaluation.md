@@ -49,8 +49,24 @@ make codex-visibility \
   VISIBILITY_MCP_URL=http://127.0.0.1:8765/mcp \
   VISIBILITY_MODEL=<model> \
   VISIBILITY_SURFACE_ARM=direct \
+  VISIBILITY_CASES_SELECTED="straightforward-determinant alternate-term-sandpile-group complete-subset-sum-profile structured-polynomial-gcd canonical-cnf-composition" \
   VISIBILITY_REPETITIONS=2 \
   VISIBILITY_OUTPUT=tmp/direct-mcp-agent-direct-r2
+```
+
+The `direct` arm selects the five execution cases; the two semantic-discovery
+cases belong in a separate `find_only` run:
+
+```sh
+make codex-visibility \
+  VISIBILITY_EXECUTE=1 \
+  VISIBILITY_CASES=benchmarks/config/direct-mcp-agent-adoption-v1.json \
+  VISIBILITY_MCP_URL=http://127.0.0.1:8765/mcp \
+  VISIBILITY_MODEL=<model> \
+  VISIBILITY_SURFACE_ARM=find_only \
+  VISIBILITY_CASES_SELECTED="semantic-sandpile-synonym semantic-chip-firing-neighborhood" \
+  VISIBILITY_REPETITIONS=2 \
+  VISIBILITY_OUTPUT=tmp/direct-mcp-agent-find-only-r2
 ```
 
 `VISIBILITY_CASES_SELECTED="case-a case-b"` restricts a run without changing
