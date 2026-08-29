@@ -110,6 +110,28 @@ def test_abstention_rejects_operation_telemetry_even_without_mcp_call_names() ->
     assert classification["contract_satisfied"] is False
 
 
+def test_discovery_rejects_execution_even_when_the_operation_was_described() -> None:
+    case = VisibilityCase(
+        case_id="discover",
+        cue_level=CueLevel.EXPLICIT,
+        prompt="Find the determinant operation.",
+        expectation=AdoptionExpectation.DISCOVER,
+        expected_operation_ids=("matrix.determinant.compute",),
+    )
+
+    classification = classify_visibility(
+        case,
+        {
+            "operation_describe_index_calls": 1,
+            "operation_descriptions": [{"match_ids": ["matrix.determinant.compute"]}],
+            "operation_attempt_ids": ["matrix.determinant.compute"],
+            "operation_ids": ["matrix.determinant.compute"],
+        },
+    )
+
+    assert classification["contract_satisfied"] is False
+
+
 def test_malformed_math_run_does_not_hide_direct_operation_calls() -> None:
     case = VisibilityCase(
         case_id="determinant",

@@ -8,7 +8,7 @@ and exact per-task loaded tool-definition bytes.
 
 The corpus and decision policy were frozen before the accepted runs. Results
 below were collected on 2026-08-29 from repository revision
-`e84b7d6ae864dfc4ef847ddaca0f910daa9f440d`, Codex CLI 0.150.1,
+`bf64a8a09dfb824d0db624b097043c2adc4cc8d5`, Codex CLI 0.150.1,
 `gpt-5.6-sol` at high reasoning effort, Python 3.12.13, MCP SDK 2.1.0, and
 macOS arm64.
 
@@ -45,12 +45,12 @@ mathematical families.
 | Catalog operations / advertised direct tools | 769 / 769 |
 | Total advertised MCP tools | 771 |
 | Complete direct input/output schema coverage | Yes |
-| All tool-definition bytes | 2,647,576 |
-| Direct tool-definition bytes | 2,635,991 |
+| All tool-definition bytes | 2,647,099 |
+| Direct tool-definition bytes | 2,635,514 |
 | `math.find` + `math.run` definition bytes | 11,586 |
-| Direct input/output schema bytes | 2,317,802 |
-| Server construction | 990.452 ms |
-| `tools/list` median / p95, 7 repetitions | 55.817 / 100.180 ms |
+| Direct input/output schema bytes | 2,317,300 |
+| Server construction | 983.607 ms |
+| `tools/list` median / p95, 7 repetitions | 48.140 / 115.842 ms |
 | Frozen discovery probes | 6/6 |
 | Direct tasks / legacy tasks / exact parity | 5/5 / 5/5 / 5/5 |
 | Exact typed multi-operation composition | 1/1 |
@@ -63,7 +63,8 @@ context.
 
 The semantic searches ranked the sandpile operation first. The neighborhood
 query ranked `graph.chip_firing.q_reduced.compute` first and
-`graph.chip_firing.critical_group.compute` second, in 2.527 ms locally.
+`graph.chip_firing.critical_group.compute` second. The two searches took 2.558
+and 2.888 ms locally.
 
 ## Real-client observations
 
@@ -71,31 +72,31 @@ Each execution case ran twice in a fresh isolated Codex home. Both primary
 arms used the same suite, model, catalog/tool-definition snapshot, runner hash
 `sha256:44b7e0b58474f17237b071585f67f0a07ed6fa128f21593dacc34907e38b8e0b`,
 and telemetry-parser hash
-`sha256:b07cf5f99eb9ca16a3afb3690e388925018baf2d345da9dbf89955521128c93c`.
+`sha256:727717db40acdd7e90822472d8c57c6e41190fd42a282bd588241c056963459e`.
 Only the predeclared client-visible surface filter differed between arms.
 
 | Case | Direct success | Legacy success | Direct calls | Legacy calls |
 | --- | ---: | ---: | ---: | ---: |
 | Exact determinant | 2/2 | 2/2 | 2 | 6 |
 | Sandpile group | 2/2 | 2/2 | 2 | 6 |
-| Complete subset-sum profile | 2/2 | 2/2 | 3 | 6 |
+| Complete subset-sum profile | 2/2 | 2/2 | 2 | 6 |
 | Polynomial GCD | 2/2 | 2/2 | 2 | 6 |
 | CNF composition | 2/2 | 2/2 | 4 | 12 |
-| **Total** | **10/10** | **10/10** | **13** | **36** |
+| **Total** | **10/10** | **10/10** | **12** | **36** |
 
 Neither arm had a command failure, tool error, parameter error, or failed
 operation attempt. Direct execution also completed the CNF composition in both
-unified-exec repetitions, using exactly two direct calls each time.
+unified-exec repetitions, using five direct calls total across the two runs.
 
-| Arm | Visible tools | Eager definition bytes | Success | MCP calls | Uncached input tokens |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Legacy execution | 2 | 11,586 | 10/10 | 36 | 188,827 |
-| Direct execution | 769 | 2,635,991 | 10/10 | 13 | 218,713 |
-| Direct + `math.find` subset | 770 | 2,645,523 | 4/4 | 7 | 90,349 |
-| `math.find` semantic-only | 1 | 9,533 | 4/4 | 11 | 58,201 |
-| Direct unified composition | 769 | 2,635,991 | 2/2 | 4 | 41,912 |
+| Arm | Visible tools | Eager definition bytes | Success | MCP calls | Model-visible MCP bytes | Uncached input tokens |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Legacy execution | 2 | 11,586 | 10/10 | 36 | 128,136 | 169,713 |
+| Direct execution | 769 | 2,635,514 | 10/10 | 12 | 1,622 | 209,535 |
+| Direct + `math.find` subset | 770 | 2,645,046 | 4/4 | 7 | 9,136 | 86,768 |
+| `math.find` semantic-only | 1 | 9,533 | 4/4 | 15 | 74,958 | 71,570 |
+| Direct unified composition | 769 | 2,635,514 | 2/2 | 5 | 262 | 49,242 |
 
-The direct arm used fewer MCP calls but 29,886 more uncached input tokens than
+The direct arm used fewer MCP calls but 39,822 more uncached input tokens than
 the legacy arm in this repetition. Neither observation identifies which tool
 definitions the client loaded.
 
@@ -141,12 +142,12 @@ Recommendation for issue #2982:
 
 | Report | SHA-256 |
 | --- | --- |
-| Deterministic catalog controls | `f1cbddbc7c5bf01116324737af5facf946af12c9f2bdb9c3d03253c3283c673e` |
-| Direct, two repetitions | `a73d828357d459267763d940363e4afd56412dd5f96872a07e5391b02aaf67ec` |
-| Legacy, two repetitions | `3b2967cf0ca3134326834fafa01db358c1ac00fc15e40c061ce6759a701222f0` |
-| Semantic `math.find`, two repetitions | `edb9bfb970d5a0b0763934eaa99d9500c1f362d0633580090b72301ae98d122b` |
-| Direct + `math.find`, two repetitions | `0adb68dabd32eef2e26ceb4f424afbc931b38a126c399c91ff19e504a01dc3c5` |
-| Direct unified composition, two repetitions | `618a612a788a2d7fc593ee66b0ec6721d2406f8941e4cbec7331cc94939ee57d` |
+| Deterministic catalog controls | `61c85847d36e426c18b04fad8cbd7ed0cd7a5a1225d1c2a37b4620f961141e10` |
+| Direct, two repetitions | `516dff308235f5904b42b69a7ca5900320972ba902499ab62698c47f825767b0` |
+| Legacy, two repetitions | `f9ec01436c2d65d505467adbe1ff0f4876ccaa143c2719f595148d17678f3f25` |
+| Semantic `math.find`, two repetitions | `87c7674a1e05b9cbc7940dda0bce649c2162803a26e115e1e1fe0e98aa91f321` |
+| Direct + `math.find`, two repetitions | `85a28b2551c00c56ed275658294dad9aa593badfed2e7a44ef2c70f588f0255e` |
+| Direct unified composition, two repetitions | `1e73709b157141420da3e5a89013001615fc1c2558c4c654e2408244c711ba5d` |
 
 The raw reports and transcripts are intentionally uncommitted operator output.
 Use the commands and evidence-bound report fields documented in
