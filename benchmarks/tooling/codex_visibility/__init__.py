@@ -190,6 +190,20 @@ def classify_visibility(
     mcp_calls = [
         value for value in telemetry.get("mcp_calls", []) if isinstance(value, str)
     ]
+    math_run_call_count = mcp_calls.count("math.run")
+    direct_operation_call_count = telemetry.get("direct_operation_call_count")
+    if not isinstance(direct_operation_call_count, int) or isinstance(
+        direct_operation_call_count, bool
+    ):
+        direct_operation_call_count = sum(
+            tool_name not in _FIXED_TOOLS for tool_name in mcp_calls
+        )
+    execution_free = (
+        not attempted
+        and not completed
+        and not math_run_call_count
+        and not direct_operation_call_count
+    )
     discovery_call_count = int(telemetry.get("operation_describe_index_calls", 0))
     inspection_call_count = int(telemetry.get("operation_describe_exact_calls", 0))
     resource_read_count = int(telemetry.get("mcp_resource_read_attempts", 0))
@@ -202,6 +216,7 @@ def classify_visibility(
         "discovery_free_invocation": bool(expected_attempted)
         and not discovery_call_count
         and not inspection_call_count,
+        "execution_free_discovery": execution_free,
         "abstained": (
             not mcp_calls
             and not resource_read_count
@@ -226,9 +241,7 @@ def classify_visibility(
         contract_satisfied = observed["abstained"]
     elif case.expectation is AdoptionExpectation.DISCOVER:
         contract_satisfied = (
-            not expected_observed["missing_described"]
-            and not attempted
-            and not completed
+            not expected_observed["missing_described"] and execution_free
         )
     else:
         contract_satisfied = not expected_observed["missing_completed"] and (
@@ -265,8 +278,8 @@ def classify_visibility(
         "uncached_input_tokens": uncached_input_tokens,
         "mcp_call_count": len(mcp_calls),
         "math_find_call_count": discovery_call_count + inspection_call_count,
-        "math_run_call_count": mcp_calls.count("math.run"),
-        "direct_operation_call_count": telemetry.get("direct_operation_call_count", 0),
+        "math_run_call_count": math_run_call_count,
+        "direct_operation_call_count": direct_operation_call_count,
         "mcp_resource_read_count": resource_read_count,
         "mcp_wire_bytes": telemetry.get("mcp_wire_bytes", 0),
         "mcp_model_visible_bytes": telemetry.get("mcp_model_visible_bytes", 0),

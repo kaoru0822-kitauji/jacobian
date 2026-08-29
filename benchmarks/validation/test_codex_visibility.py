@@ -46,6 +46,53 @@ def test_completed_math_run_satisfies_visibility_without_a_verification_record()
     assert "verified" not in classification["observed"]
 
 
+def test_discovery_expectation_rejects_any_operation_execution() -> None:
+    case = VisibilityCase(
+        case_id="semantic-discovery",
+        cue_level=CueLevel.LATENT,
+        prompt="Find the relevant operation without executing it.",
+        expectation=AdoptionExpectation.DISCOVER,
+        expected_operation_ids=("matrix.determinant.compute",),
+    )
+    description = {
+        "operation_id": "matrix.determinant.compute",
+        "match_ids": [],
+    }
+
+    discovery_only = classify_visibility(
+        case,
+        {
+            "operation_descriptions": [description],
+            "operation_describe_exact_calls": 1,
+            "mcp_calls": ["math.find"],
+        },
+    )
+    malformed_legacy_execution = classify_visibility(
+        case,
+        {
+            "operation_descriptions": [description],
+            "operation_describe_exact_calls": 1,
+            "mcp_calls": ["math.find", "math.run"],
+        },
+    )
+    direct_execution = classify_visibility(
+        case,
+        {
+            "operation_descriptions": [description],
+            "operation_describe_exact_calls": 1,
+            "operation_attempt_ids": ["matrix.determinant.compute"],
+            "operation_ids": ["matrix.determinant.compute"],
+            "mcp_calls": ["math.find", "matrix.determinant.compute"],
+            "direct_operation_call_count": 1,
+        },
+    )
+
+    assert discovery_only["contract_satisfied"] is True
+    assert discovery_only["observed"]["execution_free_discovery"] is True
+    assert malformed_legacy_execution["contract_satisfied"] is False
+    assert direct_execution["contract_satisfied"] is False
+
+
 def test_abstention_rejects_operation_telemetry_even_without_mcp_call_names() -> None:
     case = VisibilityCase(
         case_id="abstain",

@@ -269,6 +269,7 @@ def test_agent_telemetry_records_direct_catalog_operation_calls(tmp_path: Path) 
         transcript, direct_operation_ids=frozenset({operation_id})
     )
 
+    assert telemetry["direct_operation_call_count"] == 1
     assert telemetry["operation_attempt_ids"] == [operation_id]
     assert telemetry["operation_ids"] == [operation_id]
     assert telemetry["operation_invocations"] == [
@@ -378,6 +379,7 @@ def test_agent_telemetry_retains_failed_math_run_attempts(tmp_path: Path) -> Non
 
     telemetry = parse_agent_transcript(transcript)
 
+    assert telemetry["direct_operation_call_count"] == 0
     assert telemetry["operation_attempts"] == [
         {
             "operation_id": None,
