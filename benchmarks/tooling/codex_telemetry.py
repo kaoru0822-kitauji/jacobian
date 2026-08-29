@@ -254,6 +254,7 @@ def _operation_recovery_metrics(
 @dataclass
 class _AgentTranscriptTelemetry:
     mcp_calls: list[str] = field(default_factory=list)
+    direct_operation_call_count: int = 0
     successful_calls: list[str] = field(default_factory=list)
     operation_attempt_ids: list[str] = field(default_factory=list)
     operation_attempts: list[dict[str, Any]] = field(default_factory=list)
@@ -642,6 +643,8 @@ def _process_mcp_tool_call(
 ) -> None:
     tool = item["tool"]
     telemetry.mcp_calls.append(tool)
+    if tool in direct_operation_ids:
+        telemetry.direct_operation_call_count += 1
     arguments = item.get("arguments")
     text_response, structured_response = _record_mcp_byte_metrics(telemetry, item, tool)
     telemetry.mcp_call_signatures[_mcp_call_signature(tool, arguments)] += 1
@@ -675,6 +678,7 @@ def _process_mcp_tool_call(
 def _transcript_payload(telemetry: _AgentTranscriptTelemetry) -> dict[str, Any]:
     return {
         "mcp_calls": telemetry.mcp_calls,
+        "direct_operation_call_count": telemetry.direct_operation_call_count,
         "shell_calls": telemetry.shell_calls,
         "usage": telemetry.usage,
         "tool_error_count": telemetry.tool_error_count,
