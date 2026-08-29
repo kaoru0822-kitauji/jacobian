@@ -76,9 +76,7 @@ def test_discovery_rejects_execution_even_when_the_operation_was_described() -> 
         case,
         {
             "operation_describe_index_calls": 1,
-            "operation_descriptions": [
-                {"match_ids": ["matrix.determinant.compute"]}
-            ],
+            "operation_descriptions": [{"match_ids": ["matrix.determinant.compute"]}],
             "operation_attempt_ids": ["matrix.determinant.compute"],
             "operation_ids": ["matrix.determinant.compute"],
         },
