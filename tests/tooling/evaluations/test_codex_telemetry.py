@@ -175,6 +175,31 @@ def test_agent_telemetry_preserves_discovery_to_invocation_dataflow(
     assert telemetry["operation_ids"] == ["graph.search.atlas"]
 
 
+def test_agent_telemetry_does_not_count_unknown_exact_inspection(tmp_path: Path) -> None:
+    events = [
+        _tool_event(
+            "math.find",
+            {
+                "request": {
+                    "op": "inspect",
+                    "operation_id": "missing.operation",
+                }
+            },
+            {
+                "kind": "error",
+                "error": {"code": "UNKNOWN_OPERATION"},
+            },
+        )
+    ]
+    transcript = tmp_path / "transcript.jsonl"
+    transcript.write_text(json.dumps(events[0]) + "\n", encoding="utf-8")
+
+    telemetry = parse_agent_transcript(transcript)
+
+    assert telemetry["operation_describe_exact_calls"] == 0
+    assert telemetry["operation_descriptions"] == []
+
+
 def test_agent_telemetry_records_current_inline_math_run_result(
     tmp_path: Path,
 ) -> None:

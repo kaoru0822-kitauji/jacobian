@@ -338,7 +338,21 @@ def _record_describe_and_attempt(
     if tool == "math.find":
         request = arguments.get("request") if isinstance(arguments, Mapping) else None
         if isinstance(request, Mapping) and request.get("op") == "inspect":
-            telemetry.operation_describe_exact_calls += 1
+            requested_operation_id = request.get("operation_id")
+            inspected_operation = (
+                response.get("operation")
+                if isinstance(response, Mapping)
+                else None
+            )
+            if (
+                successful
+                and response is not None
+                and response.get("kind") in {None, "operation"}
+                and isinstance(requested_operation_id, str)
+                and isinstance(inspected_operation, Mapping)
+                and inspected_operation.get("operation_id") == requested_operation_id
+            ):
+                telemetry.operation_describe_exact_calls += 1
         else:
             telemetry.operation_describe_index_calls += 1
     direct_operation_id = tool if tool in direct_operation_ids else None
