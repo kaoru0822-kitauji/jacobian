@@ -514,10 +514,9 @@ def _mcp_call_failed(
             isinstance(execution, Mapping)
             and execution.get("status") in {"CANCELLED", "ERROR", "TIMEOUT"}
         )
-        or _contains_value(
-            item,
-            field="status",
-            accepted={"CANCELLED", "ERROR", "TIMEOUT"},
+        or (
+            isinstance(item.get("status"), str)
+            and item["status"] in {"CANCELLED", "ERROR", "TIMEOUT"}
         )
     )
 
