@@ -12,11 +12,11 @@ from mcp.server.mcpserver.tools import Tool
 from mcp.server.mcpserver.utilities.func_metadata import ArgModelBase, FuncMetadata
 from mcp.shared.exceptions import MCPError
 from mcp.shared.tool_name_validation import validate_tool_name
-from mcp.types import CallToolResult, ToolAnnotations
+from mcp.types import CallToolResult, TextContent, ToolAnnotations
 from pydantic import ValidationError
 
 from jacobian._execution import current_request_execution, request_execution
-from jacobian.canonical import CanonicalizationError
+from jacobian.canonical import CanonicalizationError, encode_strict_json
 from jacobian.catalog.catalog import Catalog
 from jacobian.catalog.models import MathTool, OperationDomainValidationError
 from jacobian.dispatch import (
@@ -88,9 +88,10 @@ def _direct_operation_tool(
                 result = binding.run(request)
                 _require_active_deadline("before result serialization")
                 structured_content = result.model_dump(mode="json", by_alias=True)
+                content = encode_strict_json(structured_content).decode("utf-8")
                 _require_active_deadline("during result serialization")
                 return CallToolResult(
-                    content=[],
+                    content=[TextContent(type="text", text=content)],
                     structured_content=structured_content,
                 )
         except (OperationRequestValidationError, OperationDomainValidationError) as exc:

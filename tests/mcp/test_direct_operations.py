@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import json
 from typing import Any, Self
 
 from mcp.shared.exceptions import MCPError
@@ -134,6 +135,8 @@ def test_direct_calls_return_owner_results_without_dispatch_envelopes() -> None:
             "right_coefficient": "3",
         }
         assert matrix.structured_content == {"determinant": {"num": "-6", "den": "1"}}
+        assert json.loads(gcd.content[0].text) == gcd.structured_content
+        assert json.loads(matrix.content[0].text) == matrix.structured_content
         assert "operation_id" not in gcd.structured_content
         assert "output" not in gcd.structured_content
 
