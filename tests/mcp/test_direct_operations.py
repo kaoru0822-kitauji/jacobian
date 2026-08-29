@@ -11,7 +11,10 @@ from mcp.shared.exceptions import MCPError
 from mcp.types import INVALID_PARAMS, TextContent
 from pydantic import model_validator
 
-from jacobian._execution import current_request_execution
+from jacobian._execution import (
+    OperationExecutionCancelledError,
+    current_request_execution,
+)
 from jacobian._models import StrictModel
 from jacobian.catalog.catalog import Catalog
 from jacobian.catalog.models import MathTool
@@ -135,8 +138,12 @@ def test_direct_calls_return_owner_results_without_dispatch_envelopes() -> None:
             "right_coefficient": "3",
         }
         assert matrix.structured_content == {"determinant": {"num": "-6", "den": "1"}}
-        assert json.loads(gcd.content[0].text) == gcd.structured_content
-        assert json.loads(matrix.content[0].text) == matrix.structured_content
+        gcd_content = gcd.content[0]
+        matrix_content = matrix.content[0]
+        assert isinstance(gcd_content, TextContent)
+        assert isinstance(matrix_content, TextContent)
+        assert json.loads(gcd_content.text) == gcd.structured_content
+        assert json.loads(matrix_content.text) == matrix.structured_content
         assert "operation_id" not in gcd.structured_content
         assert "output" not in gcd.structured_content
 
@@ -283,5 +290,43 @@ def test_direct_calls_do_not_expose_unexpected_owner_failures() -> None:
             "Error executing tool test.direct.crash: operation execution failed"
         )
         assert "private backend value" not in result.content[0].text
+
+    asyncio.run(scenario())
+
+
+def test_direct_calls_preserve_owner_cancellation_diagnosis() -> None:
+    class Request(StrictModel):
+        value: int
+
+    class Result(StrictModel):
+        value: int
+
+    def cancel(_request: Request) -> Result:
+        raise OperationExecutionCancelledError("private cancellation detail")
+
+    operation = MathTool(
+        operation_id="test.direct.cancel",
+        title="Direct cancellation sentinel",
+        description="Exercises direct MCP cancellation projection.",
+        request_type=Request,
+        result_type=Result,
+        run=cancel,
+    )
+    server = _build_server(state=AppState(operation_catalog=Catalog((operation,))))
+
+    async def scenario() -> None:
+        from mcp import Client
+
+        async with Client(server, raise_exceptions=False) as client:
+            result = await client.call_tool(operation.operation_id, {"value": 1})
+
+        assert result.is_error is True
+        assert result.structured_content is None
+        assert result.content and isinstance(result.content[0], TextContent)
+        assert result.content[0].text == (
+            "Error executing tool test.direct.cancel: operation cancelled"
+        )
+        assert "private cancellation detail" not in result.content[0].text
+        assert "operation execution failed" not in result.content[0].text
 
     asyncio.run(scenario())
