@@ -72,9 +72,12 @@ def _headers() -> dict[str, str] | None:
 
 
 def _validate_tool_surface(
-    listed: Any, expected: set[str], failures: list[str]
+    listed: Any,
+    operation_ids: set[str],
+    failures: list[str],
 ) -> set[str]:
     tool_names = {tool.name for tool in listed.tools}
+    expected = {"math.find", "math.run"} | operation_ids
     missing = sorted(expected - tool_names)
     unexpected = sorted(tool_names - expected)
     if missing:
@@ -171,9 +174,7 @@ async def inspect(
         operation_ids = {
             operation["operation_id"] for operation in catalog["operations"]
         }
-        tool_names = _validate_tool_surface(
-            listed, {"math.find", "math.run"} | operation_ids, failures
-        )
+        tool_names = _validate_tool_surface(listed, operation_ids, failures)
         missing = sorted(required_operations - operation_ids)
         if missing:
             failures.append(

@@ -56,30 +56,20 @@ def test_remote_smoke_accepts_the_current_typed_discovery_response() -> None:
     assert failures == []
 
 
-def test_remote_smoke_matches_tools_to_the_remote_catalog() -> None:
+def test_remote_smoke_derives_tool_surface_from_deployed_catalog() -> None:
+    remote_operation = "test.remote.previous_release"
     listed = SimpleNamespace(
-        tools=tuple(
-            SimpleNamespace(name=name)
-            for name in (
-                "math.find",
-                "math.run",
-                "frozen.operation.compute",
-            )
-        )
+        tools=[
+            SimpleNamespace(name="math.find"),
+            SimpleNamespace(name="math.run"),
+            SimpleNamespace(name=remote_operation),
+        ]
     )
     failures: list[str] = []
 
-    names = _validate_tool_surface(
-        listed,
-        {"math.find", "math.run", "frozen.operation.compute"},
-        failures,
-    )
+    tool_names = _validate_tool_surface(listed, {remote_operation}, failures)
 
-    assert names == {
-        "math.find",
-        "math.run",
-        "frozen.operation.compute",
-    }
+    assert tool_names == {"math.find", "math.run", remote_operation}
     assert failures == []
 
 
