@@ -18,12 +18,7 @@ from jacobian.canonical import canonicalize_json
 from jacobian.mcp.models import OperationFindResponse, OperationSearchResult
 from mcp import Client
 
-from .smoke import exit_for_smoke_failure, raise_for_http_error
-
-REQUIRED_TOOLS = {
-    "math.find",
-    "math.run",
-}
+from .smoke import expected_tool_names, exit_for_smoke_failure, raise_for_http_error
 
 
 def _require_server_info(server_info: Implementation | None) -> Implementation:
@@ -78,8 +73,9 @@ def _headers() -> dict[str, str] | None:
 
 def _validate_tool_surface(listed: Any, failures: list[str]) -> set[str]:
     tool_names = {tool.name for tool in listed.tools}
-    missing = sorted(REQUIRED_TOOLS - tool_names)
-    unexpected = sorted(tool_names - REQUIRED_TOOLS)
+    expected = expected_tool_names()
+    missing = sorted(expected - tool_names)
+    unexpected = sorted(tool_names - expected)
     if missing:
         failures.append(
             f"deployed MCP tool surface is missing required tools: {missing!r}"

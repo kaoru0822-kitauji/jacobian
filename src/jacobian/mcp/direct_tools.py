@@ -12,11 +12,10 @@ from mcp.server.mcpserver.tools import Tool
 from mcp.server.mcpserver.utilities.func_metadata import ArgModelBase, FuncMetadata
 from mcp.shared.exceptions import MCPError
 from mcp.shared.tool_name_validation import validate_tool_name
-from mcp.types import ToolAnnotations
+from mcp.types import CallToolResult, ToolAnnotations
 from pydantic import ValidationError
 
 from jacobian._execution import current_request_execution, request_execution
-from jacobian._models import StrictModel
 from jacobian.canonical import CanonicalizationError
 from jacobian.catalog.catalog import Catalog
 from jacobian.catalog.models import MathTool, OperationDomainValidationError
@@ -72,7 +71,7 @@ def _direct_operation_tool(
         payload: dict[str, Any],
         *,
         ctx: Context[AppState, Any],
-    ) -> StrictModel:
+    ) -> CallToolResult:
         _authorize(ctx)
         cancellation = _request_cancellation(ctx)
         try:
@@ -88,9 +87,12 @@ def _direct_operation_tool(
                     raise ToolError("operation cancelled before execution")
                 result = binding.run(request)
                 _require_active_deadline("before result serialization")
-                result.model_dump(mode="json", by_alias=True)
+                structured_content = result.model_dump(mode="json", by_alias=True)
                 _require_active_deadline("during result serialization")
-                return result
+                return CallToolResult(
+                    content=[],
+                    structured_content=structured_content,
+                )
         except (OperationRequestValidationError, OperationDomainValidationError) as exc:
             raise _invalid_request_error(operation_id, exc) from exc
         except OperationExecutionTimeoutError as exc:
