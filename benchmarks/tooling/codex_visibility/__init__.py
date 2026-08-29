@@ -196,7 +196,12 @@ def classify_visibility(
         "discovery_free_invocation": bool(expected_attempted)
         and not discovery_call_count
         and not inspection_call_count,
-        "abstained": not mcp_calls and not resource_read_count,
+        "abstained": (
+            not mcp_calls
+            and not resource_read_count
+            and not attempted
+            and not completed
+        ),
     }
     expected_observed = {
         "described": sorted(expected & described),
@@ -247,7 +252,10 @@ def classify_visibility(
         "uncached_input_tokens": uncached_input_tokens,
         "mcp_call_count": len(mcp_calls),
         "math_find_call_count": discovery_call_count + inspection_call_count,
-        "math_run_call_count": len(attempted_sequence),
+        "math_run_call_count": mcp_calls.count("math.run"),
+        "direct_operation_call_count": telemetry.get(
+            "direct_operation_call_count", 0
+        ),
         "mcp_resource_read_count": resource_read_count,
         "mcp_wire_bytes": telemetry.get("mcp_wire_bytes", 0),
         "mcp_model_visible_bytes": telemetry.get("mcp_model_visible_bytes", 0),
@@ -296,6 +304,9 @@ async def inspect_surface(
         if not isinstance(catalog_content, TextResourceContents):
             raise RuntimeError("operation catalog is not text")
         catalog = json.loads(catalog_content.text)
+        operation_ids = sorted(
+            operation["operation_id"] for operation in catalog["operations"]
+        )
         catalog_digest = _sha256_bytes(
             canonicalize_json(
                 {
@@ -319,6 +330,7 @@ async def inspect_surface(
                 ),
                 "catalog_digest": catalog_digest,
                 "operation_count": len(catalog["operations"]),
+                "operation_ids": operation_ids,
                 "content_sha256": _sha256_bytes(catalog_content.text.encode("utf-8")),
             },
         }
@@ -528,6 +540,7 @@ def _run_case(
     timeout_seconds: float,
     tool_mode: ToolMode,
     environment: Mapping[str, str],
+    direct_operation_ids: frozenset[str],
 ) -> dict[str, Any]:
     stem = f"{case.case_id}-r{repetition:02d}"
     transcript_path = output / f"{stem}.jsonl"
@@ -552,7 +565,10 @@ def _run_case(
     elapsed_seconds = round(time.monotonic() - command_start, 6)
     transcript_path.write_bytes(result.stdout)
     stderr_path.write_bytes(result.stderr)
-    telemetry = parse_agent_transcript(transcript_path)
+    telemetry = parse_agent_transcript(
+        transcript_path,
+        direct_operation_ids=direct_operation_ids,
+    )
     classification = classify_visibility(case, telemetry)
     command_completed = (
         result.status is ToolCommandStatus.EXITED and result.exit_code == 0
@@ -724,6 +740,10 @@ def _build_summary(runs: list[dict[str, Any]]) -> dict[str, Any]:
                 for run in runs
             ),
             "mcp_calls": sum(run["classification"]["mcp_call_count"] for run in runs),
+            "direct_operation_calls": sum(
+                run["classification"]["direct_operation_call_count"]
+                for run in runs
+            ),
             "mcp_model_visible_bytes": sum(
                 run["classification"]["mcp_model_visible_bytes"] for run in runs
             ),
@@ -769,6 +789,7 @@ def main() -> None:
     if output.exists():
         raise SystemExit(f"output directory already exists: {output}")
     surface = asyncio.run(inspect_surface(args.mcp_url, args.timeout_seconds))
+    direct_operation_ids = frozenset(surface["catalog"].get("operation_ids", ()))
     output.mkdir(parents=True)
     with (
         tempfile.TemporaryDirectory(prefix="jacobian-codex-visibility-") as raw,
@@ -794,6 +815,7 @@ def main() -> None:
                 timeout_seconds=args.timeout_seconds,
                 tool_mode=args.tool_mode,
                 environment=environment,
+                direct_operation_ids=direct_operation_ids,
             )
             for case in selected_cases
             for repetition in range(1, args.repetitions + 1)

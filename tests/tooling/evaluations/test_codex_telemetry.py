@@ -175,6 +175,33 @@ def test_agent_telemetry_preserves_discovery_to_invocation_dataflow(
     assert telemetry["operation_ids"] == ["graph.search.atlas"]
 
 
+def test_agent_telemetry_counts_direct_operation_calls_independently(
+    tmp_path: Path,
+) -> None:
+    operation_id = "integer.compute.extended_gcd"
+    transcript = tmp_path / "transcript.jsonl"
+    transcript.write_text(
+        json.dumps(
+            _tool_event(
+                operation_id,
+                {"left": "84", "right": "30"},
+                {"gcd": "6"},
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    telemetry = parse_agent_transcript(
+        transcript,
+        direct_operation_ids={operation_id},
+    )
+
+    assert telemetry["direct_operation_call_count"] == 1
+    assert telemetry["operation_attempt_ids"] == [operation_id]
+    assert telemetry["operation_ids"] == [operation_id]
+
+
 def test_agent_telemetry_retains_failed_math_run_attempts(tmp_path: Path) -> None:
     failed = {
         "type": "item.completed",
