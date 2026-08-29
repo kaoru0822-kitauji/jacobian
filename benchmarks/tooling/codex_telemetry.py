@@ -6,6 +6,7 @@ import hashlib
 import json
 from collections import Counter
 from collections.abc import Mapping, Sequence
+from collections.abc import Set as AbstractSet
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -331,6 +332,7 @@ def _record_describe_and_attempt(
     successful: bool,
     item: Mapping[str, Any],
     response: Mapping[str, Any] | None,
+    direct_operation_ids: AbstractSet[str],
 ) -> None:
     if tool == "math.find":
         request = arguments.get("request") if isinstance(arguments, Mapping) else None
@@ -338,12 +340,24 @@ def _record_describe_and_attempt(
             telemetry.operation_describe_exact_calls += 1
         else:
             telemetry.operation_describe_index_calls += 1
-    if tool != "math.run":
+    is_legacy = tool == "math.run"
+    is_direct = tool in direct_operation_ids
+    if not is_legacy and not is_direct:
         return
     operation_id = (
-        arguments.get("operation_id") if isinstance(arguments, Mapping) else None
+        arguments.get("operation_id")
+        if is_legacy and isinstance(arguments, Mapping)
+        else tool
+        if is_direct
+        else None
     )
-    payload = arguments.get("payload") if isinstance(arguments, Mapping) else None
+    payload = (
+        arguments.get("payload")
+        if is_legacy and isinstance(arguments, Mapping)
+        else arguments
+        if is_direct and isinstance(arguments, Mapping)
+        else None
+    )
     attempt = {
         "operation_id": operation_id if isinstance(operation_id, str) else None,
         "input": payload,
@@ -559,26 +573,39 @@ def _record_operation_invocation(
     tool: str,
     arguments: object,
     response: Mapping[str, Any] | None,
+    direct_operation_ids: AbstractSet[str],
 ) -> None:
     execution = response.get("execution") if isinstance(response, Mapping) else None
-    if not (
+    execution_completed = execution is None or (
+        isinstance(execution, Mapping) and execution.get("status") == "COMPLETED"
+    )
+    if (
         tool == "math.run"
         and isinstance(arguments, Mapping)
         and isinstance(arguments.get("operation_id"), str)
         and isinstance(response, Mapping)
         and response.get("operation_id") == arguments["operation_id"]
-        and isinstance(execution, Mapping)
-        and execution.get("status") == "COMPLETED"
+        and "output" in response
+        and execution_completed
     ):
+        telemetry.operation_ids.append(arguments["operation_id"])
+        telemetry.operation_invocations.append(
+            {
+                "operation_id": arguments["operation_id"],
+                "input": arguments.get("payload"),
+                "output": response.get("output"),
+            }
+        )
         return
-    telemetry.operation_ids.append(arguments["operation_id"])
-    telemetry.operation_invocations.append(
-        {
-            "operation_id": arguments["operation_id"],
-            "input": arguments.get("payload"),
-            "output": response.get("output"),
-        }
-    )
+    if tool in direct_operation_ids and isinstance(response, Mapping):
+        telemetry.operation_ids.append(tool)
+        telemetry.operation_invocations.append(
+            {
+                "operation_id": tool,
+                "input": arguments,
+                "output": dict(response),
+            }
+        )
 
 
 def _record_successful_mcp_call(
@@ -586,6 +613,7 @@ def _record_successful_mcp_call(
     tool: str,
     arguments: object,
     response: Mapping[str, Any] | None,
+    direct_operation_ids: AbstractSet[str],
 ) -> None:
     telemetry.successful_calls.append(tool)
     if tool == "math.find" and isinstance(arguments, Mapping):
@@ -593,7 +621,7 @@ def _record_successful_mcp_call(
             _build_operation_description(arguments, response)
         )
     if (
-        tool == "math.run"
+        (tool == "math.run" or tool in direct_operation_ids)
         and isinstance(response, Mapping)
         and _contains_value(
             response.get("output"),
@@ -602,12 +630,15 @@ def _record_successful_mcp_call(
         )
     ):
         telemetry.operation_rejection_count += 1
-    _record_operation_invocation(telemetry, tool, arguments, response)
+    _record_operation_invocation(
+        telemetry, tool, arguments, response, direct_operation_ids
+    )
 
 
 def _process_mcp_tool_call(
     telemetry: _AgentTranscriptTelemetry,
     item: dict[str, Any],
+    direct_operation_ids: AbstractSet[str],
 ) -> None:
     tool = item["tool"]
     telemetry.mcp_calls.append(tool)
@@ -625,11 +656,14 @@ def _process_mcp_tool_call(
         successful=not failed,
         item=item,
         response=response,
+        direct_operation_ids=direct_operation_ids,
     )
     if failed:
         telemetry.tool_error_count += 1
     else:
-        _record_successful_mcp_call(telemetry, tool, arguments, response)
+        _record_successful_mcp_call(
+            telemetry, tool, arguments, response, direct_operation_ids
+        )
     if _contains_value(
         item,
         field="code",
@@ -692,7 +726,11 @@ def _transcript_payload(telemetry: _AgentTranscriptTelemetry) -> dict[str, Any]:
     }
 
 
-def parse_agent_transcript_bytes(payload: bytes) -> dict[str, Any]:
+def parse_agent_transcript_bytes(
+    payload: bytes,
+    *,
+    direct_operation_ids: AbstractSet[str] = frozenset(),
+) -> dict[str, Any]:
     """Parse already-read transcript bytes without reopening mutable evidence."""
 
     telemetry = _AgentTranscriptTelemetry()
@@ -715,12 +753,18 @@ def parse_agent_transcript_bytes(payload: bytes) -> dict[str, Any]:
             command = item.get("command")
             telemetry.shell_calls.append(command if isinstance(command, str) else "")
         if _is_mcp_tool_call_event(event, item):
-            _process_mcp_tool_call(telemetry, item)
+            _process_mcp_tool_call(telemetry, item, direct_operation_ids)
         _record_mcp_resource_telemetry(telemetry.resource_telemetry, item)
     return _transcript_payload(telemetry)
 
 
-def parse_agent_transcript(path: Path) -> dict[str, Any]:
+def parse_agent_transcript(
+    path: Path,
+    *,
+    direct_operation_ids: AbstractSet[str] = frozenset(),
+) -> dict[str, Any]:
     """Return calls, usage, failures, and successful operation dataflow."""
 
-    return parse_agent_transcript_bytes(path.read_bytes())
+    return parse_agent_transcript_bytes(
+        path.read_bytes(), direct_operation_ids=direct_operation_ids
+    )

@@ -68,6 +68,7 @@ def test_checked_in_visibility_suites_reference_public_operations() -> None:
 
     for name in (
         "codex-visibility-v2.json",
+        "direct-mcp-agent-adoption-v1.json",
         "schema-bound-selection-v1.json",
         "typed-checker-handoff-v1.json",
     ):

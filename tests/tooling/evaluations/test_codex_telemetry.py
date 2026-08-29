@@ -175,6 +175,97 @@ def test_agent_telemetry_preserves_discovery_to_invocation_dataflow(
     assert telemetry["operation_ids"] == ["graph.search.atlas"]
 
 
+def test_agent_telemetry_records_current_inline_math_run_result(
+    tmp_path: Path,
+) -> None:
+    transcript = tmp_path / "transcript.jsonl"
+    transcript.write_text(
+        json.dumps(
+            _tool_event(
+                "math.run",
+                {
+                    "operation_id": "matrix.determinant.compute",
+                    "payload": {"matrix": {"entries": []}},
+                },
+                {
+                    "operation_id": "matrix.determinant.compute",
+                    "runtime_ms": 0,
+                    "output": {"determinant": {"num": "-6", "den": "1"}},
+                },
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    telemetry = parse_agent_transcript(transcript)
+
+    assert telemetry["operation_ids"] == ["matrix.determinant.compute"]
+    assert telemetry["operation_invocations"] == [
+        {
+            "operation_id": "matrix.determinant.compute",
+            "input": {"matrix": {"entries": []}},
+            "output": {"determinant": {"num": "-6", "den": "1"}},
+        }
+    ]
+
+
+def test_agent_telemetry_records_direct_catalog_operation_calls(tmp_path: Path) -> None:
+    operation_id = "matrix.determinant.compute"
+    transcript = tmp_path / "transcript.jsonl"
+    transcript.write_text(
+        json.dumps(
+            _tool_event(
+                operation_id,
+                {
+                    "matrix": {
+                        "entries": [
+                            [
+                                {"num": "0", "den": "1"},
+                                {"num": "2", "den": "1"},
+                            ],
+                            [
+                                {"num": "3", "den": "1"},
+                                {"num": "4", "den": "1"},
+                            ],
+                        ]
+                    }
+                },
+                {"determinant": {"num": "-6", "den": "1"}},
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    telemetry = parse_agent_transcript(
+        transcript, direct_operation_ids=frozenset({operation_id})
+    )
+
+    assert telemetry["operation_attempt_ids"] == [operation_id]
+    assert telemetry["operation_ids"] == [operation_id]
+    assert telemetry["operation_invocations"] == [
+        {
+            "operation_id": operation_id,
+            "input": {
+                "matrix": {
+                    "entries": [
+                        [
+                            {"num": "0", "den": "1"},
+                            {"num": "2", "den": "1"},
+                        ],
+                        [
+                            {"num": "3", "den": "1"},
+                            {"num": "4", "den": "1"},
+                        ],
+                    ]
+                }
+            },
+            "output": {"determinant": {"num": "-6", "den": "1"}},
+        }
+    ]
+
+
 def test_agent_telemetry_retains_failed_math_run_attempts(tmp_path: Path) -> None:
     failed = {
         "type": "item.completed",
