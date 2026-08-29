@@ -15,7 +15,11 @@ from mcp.shared.tool_name_validation import validate_tool_name
 from mcp.types import CallToolResult, TextContent, ToolAnnotations
 from pydantic import ValidationError
 
-from jacobian._execution import current_request_execution, request_execution
+from jacobian._execution import (
+    OperationExecutionCancelledError,
+    current_request_execution,
+    request_execution,
+)
 from jacobian.canonical import CanonicalizationError, encode_strict_json
 from jacobian.catalog.catalog import Catalog
 from jacobian.catalog.models import MathTool, OperationDomainValidationError
@@ -98,6 +102,8 @@ def _direct_operation_tool(
             raise _invalid_request_error(operation_id, exc) from exc
         except OperationExecutionTimeoutError as exc:
             raise ToolError("operation execution deadline expired") from exc
+        except OperationExecutionCancelledError as exc:
+            raise ToolError("operation cancelled") from exc
         except (MCPError, ToolError):
             raise
         except Exception as exc:
