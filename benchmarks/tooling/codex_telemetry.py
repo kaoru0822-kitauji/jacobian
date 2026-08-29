@@ -571,6 +571,10 @@ def _record_operation_invocation(
     response: Mapping[str, Any] | None,
     direct_operation_ids: Set[str],
 ) -> None:
+    execution = response.get("execution") if isinstance(response, Mapping) else None
+    execution_completed = execution is None or (
+        isinstance(execution, Mapping) and execution.get("status") == "COMPLETED"
+    )
     if (
         tool in direct_operation_ids
         and isinstance(arguments, Mapping)
@@ -581,27 +585,37 @@ def _record_operation_invocation(
             {
                 "operation_id": tool,
                 "input": arguments,
-                "output": response,
+                "output": dict(response),
             }
         )
         return
-    if not (
+    if (
         tool == "math.run"
         and isinstance(arguments, Mapping)
         and isinstance(arguments.get("operation_id"), str)
         and isinstance(response, Mapping)
         and response.get("operation_id") == arguments["operation_id"]
-        and isinstance(response.get("output"), Mapping)
+        and "output" in response
+        and execution_completed
     ):
+        telemetry.operation_ids.append(arguments["operation_id"])
+        telemetry.operation_invocations.append(
+            {
+                "operation_id": arguments["operation_id"],
+                "input": arguments.get("payload"),
+                "output": response.get("output"),
+            }
+        )
         return
-    telemetry.operation_ids.append(arguments["operation_id"])
-    telemetry.operation_invocations.append(
-        {
-            "operation_id": arguments["operation_id"],
-            "input": arguments.get("payload"),
-            "output": response.get("output"),
-        }
-    )
+    if tool in direct_operation_ids and isinstance(response, Mapping):
+        telemetry.operation_ids.append(tool)
+        telemetry.operation_invocations.append(
+            {
+                "operation_id": tool,
+                "input": arguments,
+                "output": dict(response),
+            }
+        )
 
 
 def _record_successful_mcp_call(
@@ -630,11 +644,7 @@ def _record_successful_mcp_call(
     ):
         telemetry.operation_rejection_count += 1
     _record_operation_invocation(
-        telemetry,
-        tool,
-        arguments,
-        response,
-        direct_operation_ids,
+        telemetry, tool, arguments, response, direct_operation_ids
     )
 
 
@@ -675,11 +685,7 @@ def _process_mcp_tool_call(
         telemetry.tool_error_count += 1
     else:
         _record_successful_mcp_call(
-            telemetry,
-            tool,
-            arguments,
-            response,
-            direct_operation_ids,
+            telemetry, tool, arguments, response, direct_operation_ids
         )
     if _contains_value(
         item,
