@@ -266,9 +266,7 @@ def classify_visibility(
         "mcp_call_count": len(mcp_calls),
         "math_find_call_count": discovery_call_count + inspection_call_count,
         "math_run_call_count": mcp_calls.count("math.run"),
-        "direct_operation_call_count": telemetry.get(
-            "direct_operation_call_count", 0
-        ),
+        "direct_operation_call_count": telemetry.get("direct_operation_call_count", 0),
         "mcp_resource_read_count": resource_read_count,
         "mcp_wire_bytes": telemetry.get("mcp_wire_bytes", 0),
         "mcp_model_visible_bytes": telemetry.get("mcp_model_visible_bytes", 0),
@@ -804,8 +802,7 @@ def _build_summary(runs: list[dict[str, Any]]) -> dict[str, Any]:
             ),
             "mcp_calls": sum(run["classification"]["mcp_call_count"] for run in runs),
             "direct_operation_calls": sum(
-                run["classification"]["direct_operation_call_count"]
-                for run in runs
+                run["classification"]["direct_operation_call_count"] for run in runs
             ),
             "mcp_model_visible_bytes": sum(
                 run["classification"]["mcp_model_visible_bytes"] for run in runs
