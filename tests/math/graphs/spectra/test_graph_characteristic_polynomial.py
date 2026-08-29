@@ -8,7 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
-from jacobian.math.graphs.spectra import _operations as spectral_operations
+from jacobian.math.graphs.spectra import _tools as spectral_operations
 from jacobian.math.graphs.spectra import (
     adjacency_characteristic_polynomial,
     laplacian_characteristic_polynomial,
@@ -17,13 +17,13 @@ from jacobian.math.graphs.spectra._models import (
     GraphCharacteristicPolynomialResult,
     GraphSpectrumRequest,
 )
-from jacobian.math.graphs.spectra._operations import (
+from jacobian.math.graphs.spectra._tools import (
+    TOOLS,
     compute_adjacency_characteristic_polynomial,
     compute_laplacian_characteristic_polynomial,
 )
-from jacobian.math.graphs.spectra._tools import TOOLS
 from jacobian.math.graphs.values import IndexedSimpleUndirectedGraph
-from jacobian.math.polynomials._elementary_operations import (
+from jacobian.math.polynomials._elementary_kernel import (
     rational_polynomial_derivative,
 )
 from jacobian.math.polynomials._models import RationalPolynomialRequest
@@ -268,8 +268,10 @@ def test_native_polynomial_is_accepted_unchanged_by_a_polynomial_consumer() -> N
     serialized = RationalPolynomialRequest.model_validate(
         {"polynomial": polynomial.model_dump(mode="json")}
     )
-    derivative = rational_polynomial_derivative(request).derivative
-    assert rational_polynomial_derivative(serialized).derivative == derivative
+    derivative = rational_polynomial_derivative(request.polynomial).derivative
+    assert (
+        rational_polynomial_derivative(serialized.polynomial).derivative == derivative
+    )
     assert _coeffs(derivative) == [Fraction(-2), Fraction(0), Fraction(3)]
 
 
@@ -277,7 +279,9 @@ def test_native_isolated_vertex_composes_without_reshaping() -> None:
     polynomial = adjacency_characteristic_polynomial(_graph([], 1))
     request = RationalPolynomialRequest(polynomial=polynomial)
     assert request.polynomial is polynomial
-    assert _coeffs(rational_polynomial_derivative(request).derivative) == [Fraction(1)]
+    assert _coeffs(rational_polynomial_derivative(request.polynomial).derivative) == [
+        Fraction(1)
+    ]
 
 
 def test_catalog_result_round_trips_source_binding() -> None:

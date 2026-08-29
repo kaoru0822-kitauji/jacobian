@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.number_theory import FriableCountResult, count_friable
+from jacobian.math.number_theory._friable import compute_friable_count
 from jacobian.math.number_theory._friable_models import (
     _MAX_FRIABLE_SOURCE_ABS,
     _MAX_FRIABLE_SOURCE_DIGITS,
@@ -16,7 +17,6 @@ from jacobian.math.number_theory._friable_models import (
     MAX_FRIABLE_MATERIALIZED_X,
     FriableCountRequest,
 )
-from jacobian.math.number_theory._friable_operations import compute_friable_count
 from jacobian.math.number_theory.arithmetic import absolute_value
 from jacobian.math.number_theory.arithmetic.values import IntegerValue
 
@@ -178,18 +178,18 @@ def test_result_validation_is_structural() -> None:
 def test_producer_executes_the_friable_kernel_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import jacobian.math.number_theory._friable_operations as operations
+    import jacobian.math.number_theory._friable as publication
 
     calls = 0
-    original = operations.count_friable
+    original = publication.count_friable
 
     def observed_count(x: int, y: int) -> int:
         nonlocal calls
         calls += 1
         return original(x, y)
 
-    monkeypatch.setattr(operations, "count_friable", observed_count)
-    result = operations.compute_friable_count(FriableCountRequest(x="100", y="5"))
+    monkeypatch.setattr(publication, "count_friable", observed_count)
+    result = publication.compute_friable_count(FriableCountRequest(x="100", y="5"))
 
     assert result.count == "34"
     assert calls == 1
@@ -215,8 +215,31 @@ def test_number_theory_native_api_is_explicit() -> None:
     assert tuple(number_theory.__all__) == (
         "FriableCountResult",
         "PrimeShiftProfileResult",
+        "chinese_remainder",
+        "contiguous_sum_profile",
         "count_friable",
+        "euler_totient",
+        "factorial_valuation",
+        "floor_square_root",
+        "is_prime",
+        "jacobi_symbol",
+        "ksigma_preimage",
+        "legendre_symbol",
+        "mobius",
+        "modular_inverse",
+        "modular_polynomial_residue_assignments",
+        "modular_polynomial_residue_image",
+        "multiplicative_order",
+        "next_prime",
+        "nth_prime",
+        "p_adic_interval_profile",
+        "periodic_congruence_union_measure",
+        "periodic_congruence_union_profile",
+        "previous_prime",
+        "prime_count",
         "prime_shift_profile",
+        "primorial",
+        "quadratic_residues",
         "ramanujan_sum",
     )
     assert all(hasattr(number_theory, name) for name in number_theory.__all__)

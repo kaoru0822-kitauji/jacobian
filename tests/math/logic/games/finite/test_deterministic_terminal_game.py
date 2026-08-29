@@ -20,15 +20,11 @@ from jacobian.math.logic.games.finite import (
     DeterministicTerminalGameSolution,
     StationaryChoice,
     TerminalGameValueClass,
+    operations,
     solve_terminal_game,
 )
-from jacobian.math.logic.games.finite import _operations as operation_adapter
-from jacobian.math.logic.games.finite import operations as terminal_operations
 from jacobian.math.logic.games.finite._models import (
     DeterministicTerminalGameRequest,
-)
-from jacobian.math.logic.games.finite._operations import (
-    compute_deterministic_terminal_game,
 )
 from jacobian.math.logic.games.finite._tools import TOOLS
 
@@ -363,12 +359,10 @@ def test_threshold_work_is_admitted_and_rejected_before_solving() -> None:
         }
 
     admitted = DeterministicTerminalGame.model_validate(terminal_game(400))
-    compute_deterministic_terminal_game(DeterministicTerminalGameRequest(game=admitted))
+    solve_terminal_game(admitted)
     rejected = DeterministicTerminalGame.model_validate(terminal_game(500))
     with pytest.raises(OperationDomainValidationError) as exc_info:
-        compute_deterministic_terminal_game(
-            DeterministicTerminalGameRequest(game=rejected)
-        )
+        solve_terminal_game(rejected)
     assert exc_info.value.errors()[0]["type"] == "finite_game.threshold_work_exceeded"
 
 
@@ -387,7 +381,7 @@ def test_result_size_is_rejected_independently_of_threshold_work() -> None:
 
     game = DeterministicTerminalGame.model_validate(payload)
     with pytest.raises(OperationDomainValidationError) as exc_info:
-        compute_deterministic_terminal_game(DeterministicTerminalGameRequest(game=game))
+        solve_terminal_game(game)
     assert exc_info.value.errors()[0]["type"] == "finite_game.result_size_exceeded"
 
 
@@ -401,7 +395,7 @@ def test_public_request_and_example_return_the_declared_result() -> None:
         operation.examples[0].input
     )
 
-    result = compute_deterministic_terminal_game(request)
+    result = solve_terminal_game(request.game)
 
     assert isinstance(result, DeterministicTerminalGameSolution)
     assert result.value_classes[0].payoff.as_fraction() == 1
@@ -415,7 +409,7 @@ def test_trusted_terminal_game_producers_run_the_minimax_kernel_once(
     calls = 0
     original = cast(
         Callable[[DeterministicTerminalGame], object],
-        vars(terminal_operations)["_solve_terminal_game_data"],
+        vars(operations)["_solve_terminal_game_data"],
     )
 
     def counted_native(game: DeterministicTerminalGame) -> object:
@@ -423,25 +417,24 @@ def test_trusted_terminal_game_producers_run_the_minimax_kernel_once(
         calls += 1
         return original(game)
 
-    monkeypatch.setattr(
-        terminal_operations, "_solve_terminal_game_data", counted_native
-    )
+    monkeypatch.setattr(operations, "_solve_terminal_game_data", counted_native)
     solve_terminal_game(game)
     assert calls == 1
 
+    monkeypatch.undo()
     calls = 0
-    original_adapter = cast(
+    original = cast(
         Callable[[DeterministicTerminalGame], object],
-        vars(operation_adapter)["_solve_terminal_game_data"],
+        vars(operations)["_solve_terminal_game_data"],
     )
 
-    def counted_adapter(game: DeterministicTerminalGame) -> object:
+    def counted_projection(game: DeterministicTerminalGame) -> object:
         nonlocal calls
         calls += 1
-        return original_adapter(game)
+        return original(game)
 
-    monkeypatch.setattr(operation_adapter, "_solve_terminal_game_data", counted_adapter)
-    compute_deterministic_terminal_game(request)
+    monkeypatch.setattr(operations, "_solve_terminal_game_data", counted_projection)
+    solve_terminal_game(request.game)
     assert calls == 1
 
 

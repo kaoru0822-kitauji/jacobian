@@ -7,8 +7,37 @@ from dataclasses import dataclass
 from fractions import Fraction
 from typing import Any
 
+from pydantic_core import PydanticCustomError
+
+from jacobian._exact import MAX_CANONICAL_RATIONAL_DIGITS, CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
+from jacobian.math.matrices.canonical_forms._models import (
+    MATRIX_POLYNOMIAL_EVALUATION_PASSES,
+    MAX_CANONICAL_FORM_DIMENSION,
+    MAX_CANONICAL_FORM_SCALAR_DIGITS,
+    MAX_MATRIX_POLYNOMIAL_DIGIT_WORK,
+    MAX_MATRIX_POLYNOMIAL_SCALAR_PRODUCTS,
+    InvariantFactorEntry,
+    MonicPolynomial,
+    _polynomial_degree,
+    _require_matrix_polynomial_output_budget,
+    _validation_error,
+)
+from jacobian.math.matrices.values import (
+    RationalMatrix,
+    rational_matrix_from_fractions,
+    require_matrix_scalar_digits,
+)
+from jacobian.math.polynomials.values import (
+    MAX_POLYNOMIAL_EXPONENT,
+    MAX_POLYNOMIAL_TERMS,
+    RationalPolynomial,
+    require_polynomial_budget,
+)
+
 __all__ = [
     "characteristic_polynomial",
+    "evaluate_matrix_polynomial_value",
     "invariant_factors",
     "minimal_polynomial",
     "primary_decomposition",
@@ -296,3 +325,204 @@ def primary_decomposition(entries: RationalEntries) -> tuple[CoefficientList, ..
         monic = Poly(factor, x).monic()
         components.append(_coefficients(monic**power))
     return tuple(components)
+
+
+def _admit_matrix_polynomial_evaluation(
+    matrix: RationalMatrix,
+    polynomial: RationalPolynomial,
+) -> None:
+    dimension = len(matrix.entries)
+    if len(matrix.entries[0]) != dimension:
+        raise _validation_error(
+            "budget_exceeded",
+            "matrix polynomial evaluation requires a square matrix",
+        )
+    if len(polynomial.variables) != 1:
+        raise _validation_error(
+            "budget_exceeded",
+            "matrix polynomial evaluation requires exactly one polynomial variable",
+        )
+    require_polynomial_budget(
+        polynomial,
+        maximum_terms=MAX_POLYNOMIAL_TERMS,
+        maximum_exponent=MAX_POLYNOMIAL_EXPONENT,
+        maximum_coefficient_digits=MAX_CANONICAL_RATIONAL_DIGITS,
+        label="matrix polynomial",
+    )
+    degree = _polynomial_degree(polynomial)
+    scalar_products_per_pass = degree * dimension**3
+    total_scalar_products = (
+        MATRIX_POLYNOMIAL_EVALUATION_PASSES * scalar_products_per_pass
+    )
+    if total_scalar_products > MAX_MATRIX_POLYNOMIAL_SCALAR_PRODUCTS:
+        raise _validation_error(
+            "budget_exceeded",
+            "matrix polynomial Horner evaluation and retained-source accounting "
+            f"exceed the {MAX_MATRIX_POLYNOMIAL_SCALAR_PRODUCTS:,}-scalar-product "
+            "work bound",
+        )
+    maximum_arithmetic_digits = _require_matrix_polynomial_output_budget(
+        matrix,
+        polynomial,
+        degree,
+    )
+    digit_work = total_scalar_products * maximum_arithmetic_digits**2
+    if digit_work > MAX_MATRIX_POLYNOMIAL_DIGIT_WORK:
+        raise _validation_error(
+            "budget_exceeded",
+            "matrix polynomial exact-arithmetic work exceeds the coupled "
+            f"{MAX_MATRIX_POLYNOMIAL_DIGIT_WORK:,}-unit digit-work bound",
+        )
+
+
+def _admit_square_matrix(matrix: RationalMatrix) -> None:
+    rows = len(matrix.entries)
+    columns = len(matrix.entries[0])
+    if rows != columns:
+        raise _validation_error(
+            "budget_exceeded", "canonical-form operations require a square matrix"
+        )
+    if rows > MAX_CANONICAL_FORM_DIMENSION:
+        raise _validation_error(
+            "budget_exceeded",
+            f"canonical-form operations are bounded to {MAX_CANONICAL_FORM_DIMENSION} x "
+            f"{MAX_CANONICAL_FORM_DIMENSION} matrices",
+        )
+    require_matrix_scalar_digits(
+        matrix.entries,
+        maximum=MAX_CANONICAL_FORM_SCALAR_DIGITS,
+        label="canonical-form matrix",
+    )
+
+
+def _admit_matrix_polynomial(
+    matrix: RationalMatrix,
+    polynomial: RationalPolynomial,
+) -> None:
+    try:
+        _admit_matrix_polynomial_evaluation(matrix, polynomial)
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=("matrix",), code=exc.type, message=exc.message()
+        ) from exc
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=("matrix",), code="matrix.domain_invalid", message=str(exc)
+        ) from exc
+
+
+def _admit_square(matrix: RationalMatrix) -> None:
+    try:
+        _admit_square_matrix(matrix)
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=("matrix",), code=exc.type, message=exc.message()
+        ) from exc
+    except ValueError as exc:
+        raise OperationDomainValidationError(
+            location=("matrix",), code="matrix.domain_invalid", message=str(exc)
+        ) from exc
+
+
+def _matrix_entries(
+    matrix: RationalMatrix,
+) -> tuple[tuple[Fraction, ...], ...]:
+    return tuple(tuple(value.as_fraction() for value in row) for row in matrix.entries)
+
+
+def _to_monic_polynomial(coefficients: Sequence[Fraction]) -> MonicPolynomial:
+    return MonicPolynomial(
+        coefficients=tuple(
+            CanonicalRational.from_fraction(coefficient) for coefficient in coefficients
+        )
+    )
+
+
+def _dense_polynomial_coefficients(
+    polynomial: RationalPolynomial,
+) -> tuple[Fraction, ...]:
+    degree = max(
+        (term.exponents[0] for term in polynomial.polynomial.terms),
+        default=0,
+    )
+    coefficients = [Fraction(0)] * (degree + 1)
+    for term in polynomial.polynomial.terms:
+        coefficients[term.exponents[0]] = term.coefficient.as_fraction()
+    return tuple(coefficients)
+
+
+def evaluate_matrix_polynomial_value(
+    matrix: RationalMatrix,
+    polynomial: RationalPolynomial,
+) -> RationalMatrix:
+    _admit_matrix_polynomial(matrix, polynomial)
+    return _evaluate_matrix_polynomial_value(matrix, polynomial)
+
+
+def _evaluate_matrix_polynomial_value(
+    matrix: RationalMatrix,
+    polynomial: RationalPolynomial,
+) -> RationalMatrix:
+    evaluated = _evaluate_polynomial(
+        _matrix_entries(matrix),
+        _dense_polynomial_coefficients(polynomial),
+    )
+    return rational_matrix_from_fractions(evaluated)
+
+
+def _minimal_polynomial_components(
+    matrix: RationalMatrix,
+) -> tuple[MonicPolynomial, MonicPolynomial]:
+    """Admit one matrix and compute its minimal and characteristic values."""
+
+    _admit_square(matrix)
+    entries = _matrix_entries(matrix)
+    return (
+        _to_monic_polynomial(minimal_polynomial(entries)),
+        _to_monic_polynomial(characteristic_polynomial(entries)),
+    )
+
+
+def _rational_canonical_components(
+    matrix: RationalMatrix,
+) -> tuple[tuple[InvariantFactorEntry, ...], MonicPolynomial, MonicPolynomial]:
+    """Admit one matrix and compute all rational-canonical components."""
+
+    _admit_square(matrix)
+    entries = _matrix_entries(matrix)
+    factors = invariant_factors(entries)
+    minimal = minimal_polynomial(entries)
+    characteristic = characteristic_polynomial(entries)
+    invariant_entries = tuple(
+        InvariantFactorEntry(
+            factor=_to_monic_polynomial(coefficients),
+            block_size=len(coefficients) - 1,
+        )
+        for coefficients in factors
+    )
+    return (
+        invariant_entries,
+        _to_monic_polynomial(characteristic),
+        _to_monic_polynomial(minimal),
+    )
+
+
+def _primary_decomposition_components(
+    matrix: RationalMatrix,
+) -> tuple[tuple[MonicPolynomial, ...], MonicPolynomial]:
+    """Admit one matrix and compute its primary components and minimal value."""
+
+    _admit_square(matrix)
+    entries = _matrix_entries(matrix)
+    components = primary_decomposition(entries)
+    minimal_coefficients = [Fraction(1)]
+    for component in components:
+        product = [Fraction(0)] * (len(minimal_coefficients) + len(component) - 1)
+        for left_index, left in enumerate(minimal_coefficients):
+            for right_index, right in enumerate(component):
+                product[left_index + right_index] += left * right
+        minimal_coefficients = product
+    return (
+        tuple(_to_monic_polynomial(coefficient) for coefficient in components),
+        _to_monic_polynomial(minimal_coefficients),
+    )

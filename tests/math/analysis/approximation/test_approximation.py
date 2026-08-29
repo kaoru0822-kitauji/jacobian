@@ -9,6 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian._exact import CanonicalRational
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.analysis.approximation._models import (
     LagrangeBasisRequest,
     LagrangeBasisResult,
@@ -16,15 +17,27 @@ from jacobian.math.analysis.approximation._models import (
     LagrangeInterpolationResult,
     RationalNodeSet,
 )
-from jacobian.math.analysis.approximation._operations import (
-    compute_lagrange_basis,
-    compute_lagrange_interpolation,
+from jacobian.math.analysis.approximation.operations import (
+    lagrange_basis,
+    lagrange_interpolate,
 )
 from jacobian.math.polynomials.values import (
     RationalPolynomial,
     RationalPolynomialTerm,
     SparseRationalPolynomial,
 )
+
+
+def compute_lagrange_basis(request: LagrangeBasisRequest) -> LagrangeBasisResult:
+    return lagrange_basis(request.nodes)
+
+
+def compute_lagrange_interpolation(
+    request: LagrangeInterpolationRequest,
+) -> LagrangeInterpolationResult:
+    return LagrangeInterpolationResult(
+        polynomial=lagrange_interpolate(request.nodes.nodes, request.values)
+    )
 
 
 class RationalWire(TypedDict):
@@ -347,26 +360,33 @@ class TestLagrangeInterpolateNative:
     def test_unsorted_nodes_rejected(self) -> None:
         from jacobian.math.analysis.approximation import lagrange_interpolate
 
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises(OperationDomainValidationError) as exc_info:
             lagrange_interpolate(
                 (_canonical("1"), _canonical("0")), (_canonical("1"), _canonical("2"))
             )
-        _assert_validation_code(exc_info, "approximation_theory.nodes_not_increasing")
+        assert (
+            exc_info.value.errors()[0]["type"]
+            == "approximation.interpolation_invalid_domain"
+        )
 
     def test_duplicate_nodes_rejected(self) -> None:
         from jacobian.math.analysis.approximation import lagrange_interpolate
 
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises(OperationDomainValidationError) as exc_info:
             lagrange_interpolate(
                 (_canonical("0"), _canonical("0")), (_canonical("1"), _canonical("2"))
             )
-        _assert_validation_code(exc_info, "approximation_theory.nodes_not_distinct")
+        assert (
+            exc_info.value.errors()[0]["type"]
+            == "approximation.interpolation_invalid_domain"
+        )
 
     def test_mismatched_values_rejected(self) -> None:
         from jacobian.math.analysis.approximation import lagrange_interpolate
 
         with pytest.raises(
-            ValueError, match="values must have the same length as nodes"
+            OperationDomainValidationError,
+            match="values must have the same length as nodes",
         ):
             lagrange_interpolate((_canonical("0"), _canonical("1")), (_canonical("1"),))
 

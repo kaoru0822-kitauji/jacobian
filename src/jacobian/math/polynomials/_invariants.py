@@ -13,14 +13,43 @@ from jacobian.math.polynomials._models import (
     PolynomialSquareFreeDecompositionResult,
     PolynomialSquareFreeRequest,
 )
-from jacobian.math.polynomials._operations import (
+from jacobian.math.polynomials._support import polynomial_operation
+from jacobian.math.polynomials.operations import (
     polynomial_discriminant,
     polynomial_factorization,
     polynomial_gcd,
     polynomial_resultant,
     polynomial_square_free_decomposition,
 )
-from jacobian.math.polynomials._support import polynomial_operation
+
+
+def _run_gcd(request: PolynomialGcdRequest) -> PolynomialGcdResult:
+    return polynomial_gcd(request.left, request.right)
+
+
+def _run_resultant(request: PolynomialResultantRequest) -> PolynomialResultantResult:
+    return polynomial_resultant(
+        request.left, request.right, request.elimination_variable
+    )
+
+
+def _run_discriminant(
+    request: PolynomialDiscriminantRequest,
+) -> PolynomialDiscriminantResult:
+    return polynomial_discriminant(request.polynomial, request.variable)
+
+
+def _run_square_free(
+    request: PolynomialSquareFreeRequest,
+) -> PolynomialSquareFreeDecompositionResult:
+    return polynomial_square_free_decomposition(request.polynomial)
+
+
+def _run_factorization(
+    request: PolynomialFactorRequest,
+) -> PolynomialFactorizationResult:
+    return polynomial_factorization(request.polynomial)
+
 
 POLYNOMIAL_INVARIANT_OPERATIONS = (
     polynomial_operation(
@@ -29,7 +58,7 @@ POLYNOMIAL_INVARIANT_OPERATIONS = (
         "Compute the monic GCD of two bounded univariate polynomials over QQ.",
         PolynomialGcdRequest,
         PolynomialGcdResult,
-        polynomial_gcd,
+        _run_gcd,
         "polynomial",
         "gcd",
         "bezout",
@@ -80,7 +109,7 @@ POLYNOMIAL_INVARIANT_OPERATIONS = (
         "Compute the exact resultant in one named elimination variable over QQ.",
         PolynomialResultantRequest,
         PolynomialResultantResult,
-        polynomial_resultant,
+        _run_resultant,
         "polynomial",
         "resultant",
         "elimination",
@@ -134,7 +163,7 @@ POLYNOMIAL_INVARIANT_OPERATIONS = (
         "Compute the standard exact discriminant in one named variable over QQ.",
         PolynomialDiscriminantRequest,
         PolynomialDiscriminantResult,
-        polynomial_discriminant,
+        _run_discriminant,
         "polynomial",
         "discriminant",
         examples=(
@@ -169,7 +198,7 @@ POLYNOMIAL_INVARIANT_OPERATIONS = (
         "Decompose a bounded polynomial over QQ into monic square-free factors.",
         PolynomialSquareFreeRequest,
         PolynomialSquareFreeDecompositionResult,
-        polynomial_square_free_decomposition,
+        _run_square_free,
         "polynomial",
         "square-free",
         "multiplicity",
@@ -208,7 +237,7 @@ POLYNOMIAL_INVARIANT_OPERATIONS = (
         ),
         PolynomialFactorRequest,
         PolynomialFactorizationResult,
-        polynomial_factorization,
+        _run_factorization,
         "polynomial",
         "factorization",
         "exact-computation",

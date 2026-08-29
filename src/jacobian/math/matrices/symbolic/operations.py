@@ -7,10 +7,15 @@ terms; this module never parses caller text.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any, Literal
 
+from pydantic_core import PydanticCustomError
+
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.matrices.symbolic._models import (
     SymbolicMatrix,
+    _require_determinant_family_result_budget,
     _require_symbolic_product_admission,
 )
 from jacobian.math.polynomials._conversions import (
@@ -48,14 +53,49 @@ def _matrix_from_values(
     )
 
 
+def _require_matrix_values(
+    entries: tuple[tuple[RationalFunction, ...], ...],
+    variables: tuple[str, ...],
+) -> None:
+    from jacobian.math.matrices.symbolic._models import (
+        MAX_SYMBOLIC_MATRIX_DIMENSION,
+        MAX_SYMBOLIC_MATRIX_TERMS,
+        MAX_SYMBOLIC_VARIABLES,
+    )
+
+    if not entries or not entries[0]:
+        raise ValueError("symbolic matrix must be nonempty")
+    columns = len(entries[0])
+    if (
+        len(entries) > MAX_SYMBOLIC_MATRIX_DIMENSION
+        or columns > MAX_SYMBOLIC_MATRIX_DIMENSION
+    ):
+        raise ValueError(
+            "symbolic matrix dimensions must be between 1 and "
+            f"{MAX_SYMBOLIC_MATRIX_DIMENSION}"
+        )
+    if len(variables) > MAX_SYMBOLIC_VARIABLES or len(set(variables)) != len(variables):
+        raise ValueError("symbolic matrix variables must be unique and bounded")
+    if any(len(row) != columns for row in entries):
+        raise ValueError("symbolic matrix rows must all have the same length")
+    if any(value.variables != variables for row in entries for value in row):
+        raise ValueError("matrix entries must use the declared ordered field")
+    term_count = sum(
+        len(value.numerator.terms) + len(value.denominator.terms)
+        for row in entries
+        for value in row
+    )
+    if term_count > MAX_SYMBOLIC_MATRIX_TERMS:
+        raise ValueError("symbolic matrix exceeds the 512-term operation budget")
+
+
 def symbolic_determinant(
     entries: tuple[tuple[RationalFunction, ...], ...],
     variables: tuple[str, ...],
 ) -> RationalFunction:
     """Return the determinant in the declared rational-function field."""
+    _admit_determinant(entries, variables)
     matrix = _matrix_from_values(entries)
-    if matrix.rows != matrix.cols:
-        raise ValueError("determinant requires a square matrix")
     return rational_function_from_sympy(matrix.det(method="bareiss"), variables)
 
 
@@ -64,7 +104,7 @@ def symbolic_rank(
     variables: tuple[str, ...],
 ) -> tuple[int, tuple[int, ...]]:
     """Return the exact symbolic rank and RREF pivot columns."""
-    del variables
+    _domain_call(_require_matrix_values, entries, variables)
     matrix = _matrix_from_values(entries)
     _, pivots = matrix.rref()
     return len(pivots), tuple(int(c) for c in pivots)
@@ -80,7 +120,7 @@ def symbolic_matrix_multiply(
     admits complete work and result size before private SymPy multiplication.
     """
 
-    _require_symbolic_product_admission(left, right)
+    _domain_call(_require_symbolic_product_admission, left, right)
     product = _matrix_from_values(left.entries) * _matrix_from_values(right.entries)
     return SymbolicMatrix(
         variables=left.variables,
@@ -99,11 +139,17 @@ def symbolic_characteristic_polynomial(
     variables: tuple[str, ...],
 ) -> tuple[int, tuple[RationalFunction, ...]]:
     """Return (degree, descending coefficients) of det(lambda I - A)."""
+    _admit_characteristic(entries, variables)
+    return _symbolic_characteristic_polynomial_kernel(entries, variables)
+
+
+def _symbolic_characteristic_polynomial_kernel(
+    entries: tuple[tuple[RationalFunction, ...], ...],
+    variables: tuple[str, ...],
+) -> tuple[int, tuple[RationalFunction, ...]]:
     import sympy
 
     matrix = _matrix_from_values(entries)
-    if matrix.rows != matrix.cols:
-        raise ValueError("characteristic polynomial requires a square matrix")
     lam = sympy.Symbol("lambda")
     poly = (sympy.eye(matrix.rows) * lam - matrix).det(method="bareiss")
     expanded = sympy.Poly(poly, lam)
@@ -120,15 +166,13 @@ def symbolic_eigenvalues(
     """Return a list of (eigenvalue_string, multiplicity) pairs."""
     from sympy import sstr
 
-    del variables
+    _admit_characteristic(entries, variables)
     matrix = _matrix_from_values(entries)
-    if matrix.rows != matrix.cols:
-        raise ValueError("eigenvalues require a square matrix")
     eigenvalues = matrix.eigenvals()
     return [(sstr(value), int(mult)) for value, mult in eigenvalues.items()]
 
 
-def _require_native_system_request(
+def _require_native_system(
     entries: tuple[tuple[RationalFunction, ...], ...],
     rhs: tuple[RationalFunction, ...],
     variables: tuple[str, ...],
@@ -139,23 +183,13 @@ def _require_native_system_request(
     budget checks as the wire request model before SymPy is invoked.
     """
     from jacobian.math.matrices.symbolic._models import (
-        MAX_SYMBOLIC_MATRIX_DIMENSION,
         _require_linear_system_growth_admission,
     )
 
-    if not entries:
-        raise ValueError("symbolic matrix must be nonempty")
+    _require_matrix_values(entries, variables)
     # Wire matrix shape/dimension limits are applied BEFORE growth admission:
     # an oversized shape must be rejected up front instead of paying the
     # admission scan over a shape the wire envelope would never accept.
-    rows = len(entries)
-    columns = len(entries[0])
-    if not columns:
-        raise ValueError("symbolic matrix must be nonempty")
-    if rows > MAX_SYMBOLIC_MATRIX_DIMENSION or columns > MAX_SYMBOLIC_MATRIX_DIMENSION:
-        raise ValueError("symbolic matrix dimensions must be between 1 and 8")
-    if any(len(row) != columns for row in entries):
-        raise ValueError("symbolic matrix rows must all have the same length")
     if len(rhs) != len(entries):
         raise ValueError(
             "the right-hand side length must equal the coefficient row count"
@@ -188,7 +222,7 @@ def symbolic_linear_system_solve(
 
     # Native callers bypass the wire envelope, so the complete mathematical
     # request is validated here before the backend runs.
-    _require_native_system_request(entries, rhs, variables)
+    _domain_call(_require_native_system, entries, rhs, variables)
 
     matrix = _matrix_from_values(entries)
     rhs_vec = sympy.Matrix([[rational_function_to_sympy(v) for v in rhs]]).T
@@ -250,4 +284,52 @@ def symbolic_linear_system_solve(
         None,
         tuple(particular),
         nullspace_basis if nullspace_basis else None,
+    )
+
+
+def _domain_call[**P, R](call: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+    try:
+        return call(*args, **kwargs)
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=(), code=exc.type, message=exc.message()
+        ) from exc
+    except (ValueError, TypeError) as exc:
+        raise OperationDomainValidationError(
+            location=(), code="matrix.domain_invalid", message=str(exc)
+        ) from exc
+
+
+def _require_square_entries(
+    entries: tuple[tuple[RationalFunction, ...], ...], operation: str
+) -> None:
+    if not entries:
+        raise ValueError("symbolic matrix must be nonempty")
+    if len(entries) != len(entries[0]):
+        raise ValueError(f"{operation} requires a square matrix")
+
+
+def _admit_determinant(
+    entries: tuple[tuple[RationalFunction, ...], ...],
+    variables: tuple[str, ...],
+) -> None:
+    _domain_call(_require_matrix_values, entries, variables)
+    _domain_call(_require_square_entries, entries, "determinant")
+    _domain_call(
+        _require_determinant_family_result_budget,
+        entries,
+        characteristic_polynomial=False,
+    )
+
+
+def _admit_characteristic(
+    entries: tuple[tuple[RationalFunction, ...], ...],
+    variables: tuple[str, ...],
+) -> None:
+    _domain_call(_require_matrix_values, entries, variables)
+    _domain_call(_require_square_entries, entries, "characteristic polynomial")
+    _domain_call(
+        _require_determinant_family_result_budget,
+        entries,
+        characteristic_polynomial=True,
     )

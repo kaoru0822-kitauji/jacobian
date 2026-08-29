@@ -1,14 +1,15 @@
 """Triangle-owned exact geometry operations."""
 
 from jacobian.catalog._examples import example
+from jacobian.catalog.models import MathTools
 from jacobian.math.geometry._models import (
     CircumcircleRequest,
     GeometryCircleResult,
 )
-from jacobian.math.geometry._operations import circumcircle
 from jacobian.math.geometry._support import geometry_operation
+from jacobian.math.geometry._tools import circumcircle
 
-TRIANGLE_OPERATIONS = (
+TRIANGLE_OPERATIONS: MathTools = (
     geometry_operation(
         "geometry.triangle.compute.circumcircle",
         "Construct triangle circumcircle",

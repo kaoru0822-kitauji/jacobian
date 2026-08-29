@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian.canonical import parse_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.number_theory.diophantine_approximation import (
     continued_fraction,
     convergents,
@@ -18,7 +19,7 @@ from jacobian.math.number_theory.diophantine_approximation._models import (
     ConvergentRequest,
     PellEquationRequest,
 )
-from jacobian.math.number_theory.diophantine_approximation._operations import (
+from jacobian.math.number_theory.diophantine_approximation._tools import (
     compute_continued_fraction,
     compute_convergents,
     compute_pell_equation,
@@ -221,11 +222,11 @@ def test_contract_rejects_out_of_range() -> None:
 
 
 def test_public_kernels_reject_perfect_square() -> None:
-    with pytest.raises(ValueError, match="perfect square"):
+    with pytest.raises(OperationDomainValidationError, match="perfect square"):
         continued_fraction(4, 5)
-    with pytest.raises(ValueError, match="perfect square"):
+    with pytest.raises(OperationDomainValidationError, match="perfect square"):
         convergents(9, 3)
-    with pytest.raises(ValueError, match="perfect square"):
+    with pytest.raises(OperationDomainValidationError, match="perfect square"):
         solve_pell(16)
 
 

@@ -2,6 +2,7 @@
 
 from jacobian.catalog._examples import example
 from jacobian.catalog.models import MathTools
+from jacobian.math.combinatorics.finite_structures.sets import operations as native
 from jacobian.math.combinatorics.finite_structures.sets._models import (
     FiniteSetBooleanResult,
     FiniteSetCardinalityResult,
@@ -10,22 +11,74 @@ from jacobian.math.combinatorics.finite_structures.sets._models import (
     FiniteSetElementListResult,
     FiniteSetPairRequest,
 )
-from jacobian.math.combinatorics.finite_structures.sets._operations import (
-    decide_disjoint,
-    decide_exact_cover,
-    decide_proper_subset,
-    decide_subset,
-    intersection_cardinality,
-    left_cardinality,
-    set_difference,
-    set_intersection,
-    set_symmetric_difference,
-    set_union,
-    union_cardinality,
-)
 from jacobian.math.combinatorics.finite_structures.sets._support import (
     finite_set_operation,
 )
+
+
+def decide_exact_cover(request: FiniteSetCoverageRequest) -> FiniteSetCoverageResult:
+    return native.exact_cover(request.scope, request.values)
+
+
+def set_union(request: FiniteSetPairRequest) -> FiniteSetElementListResult:
+    return FiniteSetElementListResult(
+        elements=native.set_union(request.left, request.right).elements
+    )
+
+
+def set_intersection(request: FiniteSetPairRequest) -> FiniteSetElementListResult:
+    return FiniteSetElementListResult(
+        elements=native.set_intersection(request.left, request.right).elements
+    )
+
+
+def set_difference(request: FiniteSetPairRequest) -> FiniteSetElementListResult:
+    return FiniteSetElementListResult(
+        elements=native.set_difference(request.left, request.right).elements
+    )
+
+
+def set_symmetric_difference(
+    request: FiniteSetPairRequest,
+) -> FiniteSetElementListResult:
+    return FiniteSetElementListResult(
+        elements=native.set_symmetric_difference(request.left, request.right).elements
+    )
+
+
+def decide_subset(request: FiniteSetPairRequest) -> FiniteSetBooleanResult:
+    return FiniteSetBooleanResult(holds=native.is_subset(request.left, request.right))
+
+
+def decide_proper_subset(request: FiniteSetPairRequest) -> FiniteSetBooleanResult:
+    return FiniteSetBooleanResult(
+        holds=native.is_proper_subset(request.left, request.right)
+    )
+
+
+def decide_disjoint(request: FiniteSetPairRequest) -> FiniteSetBooleanResult:
+    return FiniteSetBooleanResult(
+        holds=native.are_disjoint(request.left, request.right)
+    )
+
+
+def left_cardinality(request: FiniteSetPairRequest) -> FiniteSetCardinalityResult:
+    return FiniteSetCardinalityResult(cardinality=native.cardinality(request.left))
+
+
+def intersection_cardinality(
+    request: FiniteSetPairRequest,
+) -> FiniteSetCardinalityResult:
+    return FiniteSetCardinalityResult(
+        cardinality=native.intersection_cardinality(request.left, request.right)
+    )
+
+
+def union_cardinality(request: FiniteSetPairRequest) -> FiniteSetCardinalityResult:
+    return FiniteSetCardinalityResult(
+        cardinality=native.union_cardinality(request.left, request.right)
+    )
+
 
 _PAIR = {"left": {"elements": ["1", "2"]}, "right": {"elements": ["2", "3"]}}
 

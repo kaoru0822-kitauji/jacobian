@@ -1,6 +1,7 @@
 """Polygon-owned exact geometry operations."""
 
 from jacobian.catalog._examples import example
+from jacobian.catalog.models import MathTools
 from jacobian.math.geometry._euclidean_triangulation import (
     minimum_euclidean_weight_triangulation,
 )
@@ -15,11 +16,11 @@ from jacobian.math.geometry._models import (
     SimplePolygonDecisionResult,
     SimplePolygonPointRequest,
 )
-from jacobian.math.geometry._operations import (
+from jacobian.math.geometry._support import geometry_operation
+from jacobian.math.geometry._tools import (
     classify_polygon_point,
     simple_polygon,
 )
-from jacobian.math.geometry._support import geometry_operation
 from jacobian.math.geometry._triangulation import minimum_weight_triangulation
 
 _UNIT_SQUARE = [
@@ -29,7 +30,7 @@ _UNIT_SQUARE = [
     {"x": {"num": "0", "den": "1"}, "y": {"num": "1", "den": "1"}},
 ]
 
-POLYGON_OPERATIONS = (
+POLYGON_OPERATIONS: MathTools = (
     geometry_operation(
         "geometry.polygon.triangulation.minimum_euclidean_weight.compute",
         "Compute a certified minimum Euclidean convex-polygon triangulation",

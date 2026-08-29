@@ -18,7 +18,7 @@ from jacobian.math.geometry._models import (
 from jacobian.math.geometry._models import (
     RationalPoint2D as GeometryRationalPoint2D,
 )
-from jacobian.math.geometry._operations import circumcircle, classify_polygon_point
+from jacobian.math.geometry._tools import circumcircle, classify_polygon_point
 from jacobian.math.geometry._triangulation import minimum_weight_triangulation
 from jacobian.math.geometry.euclidean._models import (
     AngleEqualityRequest,
@@ -27,7 +27,7 @@ from jacobian.math.geometry.euclidean._models import (
     Triangle,
     TriangleSimilarityRequest,
 )
-from jacobian.math.geometry.euclidean._operations import (
+from jacobian.math.geometry.euclidean._tools import (
     compute_angle_equality,
     compute_segment_ratio,
     compute_triangle_similarity,
@@ -74,6 +74,26 @@ def test_circumcircle_rejects_collinear_points_at_operation_boundary() -> None:
     )
 
 
+def test_circumcircle_handles_large_rational_coordinates_exactly() -> None:
+    """SymPy's large-rational Segment2D projection must not leak a host error."""
+
+    denominator = "9" * 30
+    request = CircumcircleRequest(
+        first=_pt(0, 0),
+        second=GeometryRationalPoint2D(
+            x=CanonicalRational(num="2", den=denominator),
+            y=CanonicalRational(num="0", den="1"),
+        ),
+        third=_pt(0, 2),
+    )
+
+    result = circumcircle(request)
+
+    assert result.center.x.den == denominator
+    assert result.center.y == CanonicalRational(num="1", den="1")
+    assert result.radius_squared.den == str(int(denominator) ** 2)
+
+
 def test_point_classification_rejects_non_simple_polygon_at_operation_boundary() -> (
     None
 ):
@@ -114,7 +134,7 @@ class TestSegmentRatio:
         )
         with pytest.raises(OperationDomainValidationError) as caught:
             compute_segment_ratio(request)
-        assert caught.value.errors()[0]["loc"] == ("second",)
+        assert caught.value.errors()[0]["loc"] == ("segment2",)
         assert caught.value.errors()[0]["type"] == "geometry.second_segment_nonzero"
 
     def test_native_ratio_matches_wire_projection(self) -> None:

@@ -16,12 +16,36 @@ from jacobian.math.number_theory.elliptic_curves._models import (
     ScalarMultiplicationRequest,
     ScalarMultiplicationResult,
 )
-from jacobian.math.number_theory.elliptic_curves._operations import (
+from jacobian.math.number_theory.elliptic_curves.operations import (
     add_points,
-    check_point_on_curve,
-    compute_discriminant,
+    discriminant,
+    point_on_curve,
     scalar_multiply,
 )
+
+
+def compute_discriminant(request: EllipticCurveRequest) -> CurveDiscriminantResult:
+    """Unpack a wire request for the native discriminant operation."""
+    return discriminant(request.curve)
+
+
+def check_point_on_curve(request: CurvePointRequest) -> PointOnCurveResult:
+    """Unpack a wire request for the native point-membership operation."""
+    return point_on_curve(request.curve, request.point)
+
+
+def compute_add_points(
+    request: EllipticCurvePointAdditionRequest,
+) -> EllipticCurvePointResult:
+    """Unpack a wire request for the native point-addition operation."""
+    return add_points(request.curve, request.first, request.second)
+
+
+def compute_scalar_multiply(
+    request: ScalarMultiplicationRequest,
+) -> ScalarMultiplicationResult:
+    """Unpack a wire request for the native scalar-multiplication operation."""
+    return scalar_multiply(request.curve, request.point, request.scalar)
 
 
 def elliptic_curve_operation[
@@ -164,7 +188,7 @@ TOOLS: tuple[MathTool[Any, Any], ...] = (
         "at infinity when P₁ + P₂ = O.",
         EllipticCurvePointAdditionRequest,
         EllipticCurvePointResult,
-        add_points,
+        compute_add_points,
         "elliptic-curve",
         "point-addition",
         "group-law",
@@ -185,7 +209,7 @@ TOOLS: tuple[MathTool[Any, Any], ...] = (
         "when n*P = O.",
         ScalarMultiplicationRequest,
         ScalarMultiplicationResult,
-        scalar_multiply,
+        compute_scalar_multiply,
         "elliptic-curve",
         "scalar-multiplication",
         "group-law",

@@ -11,11 +11,15 @@ from pydantic import ValidationError
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.combinatorics.matroids import (
     LinearMatroid,
-    compute_matroid_closure,
+    matroid_closure,
     matroid_rank,
 )
 from jacobian.math.combinatorics.matroids._models import MatroidClosureRequest
-from jacobian.math.combinatorics.matroids._tools import compute_closure
+from jacobian.math.combinatorics.matroids.operations import closure_result
+
+
+def compute_closure(request: MatroidClosureRequest):
+    return closure_result(request.matroid, request.subset)
 
 
 class _PrimeFieldMatrixPayload(TypedDict):
@@ -106,7 +110,7 @@ class TestLinearMatroidRepresentation:
         )
         assert m.ground_size == 0
         assert matroid_rank(m) == 0
-        closure, rank = compute_matroid_closure(m, [])
+        closure, rank = matroid_closure(m, [])
         assert closure == () and rank == 0
 
 
@@ -114,7 +118,7 @@ class TestClosure:
     def test_closure_of_basis_is_everything_in_its_span(self) -> None:
         """U(2,3): the closure of a basis is the whole ground set."""
         m = _matroid(5, _identity_rows(2) and [(1, 0, 1), (0, 1, 1)], 3)
-        closure, rank = compute_matroid_closure(m, [0, 1])
+        closure, rank = matroid_closure(m, [0, 1])
         assert rank == 2
         assert closure == (0, 1, 2)
 
@@ -138,11 +142,11 @@ class TestClosure:
         """The native entry point applies the wire subset admission."""
         m = _matroid(5, [(1, 0), (0, 1)], 2)
         with pytest.raises(ValueError, match=r"0\.\.n-1"):
-            compute_matroid_closure(m, [-1])
+            matroid_closure(m, [-1])
         with pytest.raises(ValueError, match=r"0\.\.n-1"):
-            compute_matroid_closure(m, [2])
+            matroid_closure(m, [2])
         with pytest.raises(ValueError, match="distinct"):
-            compute_matroid_closure(m, [0, 0])
+            matroid_closure(m, [0, 0])
 
 
 class TestCatalogAdmission:

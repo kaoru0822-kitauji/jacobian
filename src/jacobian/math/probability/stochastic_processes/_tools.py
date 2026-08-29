@@ -5,7 +5,12 @@ from typing import Any
 
 from jacobian._models import StrictModel
 from jacobian.catalog._examples import example
-from jacobian.catalog.models import MathTool, OperationExample
+from jacobian.catalog.models import (
+    MathTool,
+    OperationDomainValidationError,
+    OperationExample,
+)
+from jacobian.math.probability.stochastic_processes import operations as native
 from jacobian.math.probability.stochastic_processes._models import (
     ConditionalExpectationRequest,
     DoobMartingaleRequest,
@@ -15,24 +20,61 @@ from jacobian.math.probability.stochastic_processes._models import (
     FromObservationRequest,
     JoinRequest,
 )
-from jacobian.math.probability.stochastic_processes._operations import (
-    compute_conditional_expectation,
-    compute_doob_martingale,
-    compute_filtration,
-    compute_join,
-    compute_sigma_from_observation,
-)
 from jacobian.math.probability.stochastic_processes._poisson_binomial_models import (
+    PoissonBinomialAdmissionError,
     PoissonBinomialRequest,
     PoissonBinomialResult,
-)
-from jacobian.math.probability.stochastic_processes._poisson_binomial_operations import (
-    compute_poisson_binomial,
 )
 from jacobian.math.probability.stochastic_processes.values import (
     FiniteRandomVariable,
     FiniteSigmaAlgebra,
 )
+
+
+def compute_poisson_binomial(
+    request: PoissonBinomialRequest,
+) -> PoissonBinomialResult:
+    try:
+        count_distribution = native.poisson_binomial(request.probabilities)
+    except PoissonBinomialAdmissionError as exc:
+        raise OperationDomainValidationError(
+            location=("probabilities",),
+            code="probability.poisson_binomial.admission",
+            message=str(exc),
+        ) from exc
+    return PoissonBinomialResult._from_kernel(request, count_distribution)
+
+
+def compute_sigma_from_observation(
+    request: FromObservationRequest,
+) -> FiniteSigmaAlgebra:
+    return native.sigma_algebra_from_observation(request.space, request.observation)
+
+
+def compute_join(request: JoinRequest) -> FiniteSigmaAlgebra:
+    return native.sigma_algebra_join(request.sigma1, request.sigma2)
+
+
+def compute_conditional_expectation(
+    request: ConditionalExpectationRequest,
+) -> FiniteRandomVariable:
+    return native.conditional_expectation(request.rv, request.sigma)
+
+
+def compute_filtration(request: FiltrationRequest) -> FiltrationResult:
+    return FiltrationResult(
+        sigmas=native.filtration_natural(request.space, request.observations)
+    )
+
+
+def compute_doob_martingale(
+    request: DoobMartingaleRequest,
+) -> DoobMartingaleResult:
+    return DoobMartingaleResult(
+        martingale=native.doob_martingale(
+            request.space, request.observations, request.payoff
+        )
+    )
 
 
 def _op[

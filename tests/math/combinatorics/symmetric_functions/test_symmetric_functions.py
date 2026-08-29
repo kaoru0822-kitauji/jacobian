@@ -8,17 +8,26 @@ from pydantic import ValidationError
 from jacobian.math.combinatorics.symmetric_functions._models import (
     _MAX_SCHUR_PARTITION_LENGTH,
     IntegerPartition,
+    PartitionConjugateResult,
     PartitionRequest,
     SchurExpansionRequest,
 )
-from jacobian.math.combinatorics.symmetric_functions._operations import (
-    compute_partition_conjugate,
-    compute_schur_evaluation,
-)
 from jacobian.math.combinatorics.symmetric_functions._tools import TOOLS
+from jacobian.math.combinatorics.symmetric_functions.operations import (
+    partition_conjugate,
+    schur_evaluation,
+)
 from jacobian.math.combinatorics.symmetric_functions.values import (
     MAX_PARTITION_SIZE,
 )
+
+
+def compute_partition_conjugate(request: PartitionRequest) -> PartitionConjugateResult:
+    return PartitionConjugateResult(conjugate=partition_conjugate(request.partition))
+
+
+def compute_schur_evaluation(request: SchurExpansionRequest):
+    return schur_evaluation(request.partition, request.point)
 
 
 def test_operations_in_catalog() -> None:
@@ -27,6 +36,13 @@ def test_operations_in_catalog() -> None:
     # The narrowed request envelope (50 parts) is a versioned contract change.
     # conjugate is NATIVE_ONLY via algebraic_combinatorics; not a distinct public operation
     assert "symmetric_function.partition.conjugate.compute" not in tools
+
+
+def test_native_surface_accepts_canonical_partition_values() -> None:
+    partition = IntegerPartition(parts=(2, 1))
+
+    assert partition_conjugate(partition).parts == (2, 1)
+    assert schur_evaluation(partition, (1, 1)).value == "2"
 
 
 def test_conjugate_self_conjugate_partition() -> None:

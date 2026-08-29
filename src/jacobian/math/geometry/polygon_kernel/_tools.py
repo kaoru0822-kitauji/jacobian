@@ -6,9 +6,14 @@ from jacobian.math.geometry.polygon_kernel._models import (
     PolygonKernelRequest,
     PolygonKernelResult,
 )
-from jacobian.math.geometry.polygon_kernel._operations import (
-    compute_visibility_kernel,
+from jacobian.math.geometry.polygon_kernel.operations import (
+    visibility_kernel,
 )
+
+
+def _run_visibility_kernel(request: PolygonKernelRequest) -> PolygonKernelResult:
+    return visibility_kernel(request.polygon)
+
 
 _NAKANO_PENTAGON = [
     {"x": {"num": "0", "den": "1"}, "y": {"num": "4620", "den": "1"}},
@@ -34,7 +39,7 @@ TOOLS = (
         ),
         PolygonKernelRequest,
         PolygonKernelResult,
-        compute_visibility_kernel,
+        _run_visibility_kernel,
         "geometry",
         "polygon",
         "visibility-kernel",

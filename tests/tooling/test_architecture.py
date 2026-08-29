@@ -26,6 +26,16 @@ def _violations(root: Path, code: str) -> list[str]:
     ]
 
 
+def test_generic_private_operation_shadows_are_rejected(tmp_path: Path) -> None:
+    _write(tmp_path, "src/jacobian/math/example/_operations.py", "pass\n")
+    _write(tmp_path, "src/jacobian/math/example/operations.py", "pass\n")
+    _write(tmp_path, "src/jacobian/math/example/_singular.py", "pass\n")
+
+    assert _violations(tmp_path, "generic-operation-shadow") == [
+        "src/jacobian/math/example/_operations.py"
+    ]
+
+
 def test_direct_process_use_is_confined_to_process_owner(tmp_path: Path) -> None:
     _write(tmp_path, "src/jacobian/process.py", "import subprocess\n")
     _write(tmp_path, "src/jacobian/math/example.py", "import subprocess\n")
@@ -46,11 +56,29 @@ def test_bounded_process_gateway_requires_external_tool_owner(tmp_path: Path) ->
         source,
     )
     _write(tmp_path, "src/jacobian/math/logic/_sat.py", source)
+    _write(tmp_path, "src/jacobian/math/example/__init__.py", source)
+    _write(tmp_path, "src/jacobian/math/example/_helpers.py", source)
     _write(tmp_path, "src/jacobian/math/example/_operations.py", source)
 
     assert _violations(tmp_path, "bounded-process-gateway") == [
+        "src/jacobian/math/example/__init__.py",
+        "src/jacobian/math/example/__init__.py",
+        "src/jacobian/math/example/_helpers.py",
+        "src/jacobian/math/example/_helpers.py",
         "src/jacobian/math/example/_operations.py",
         "src/jacobian/math/example/_operations.py",
+    ]
+
+
+def test_executable_resolution_requires_external_tool_owner(tmp_path: Path) -> None:
+    source = "import shutil\nshutil.which('tool')\n"
+    _write(tmp_path, "src/jacobian/math/example/_solver_backend.py", source)
+    _write(tmp_path, "src/jacobian/math/example/__init__.py", source)
+    _write(tmp_path, "src/jacobian/math/example/_helpers.py", source)
+
+    assert _violations(tmp_path, "shutil-which-resolver") == [
+        "src/jacobian/math/example/__init__.py",
+        "src/jacobian/math/example/_helpers.py",
     ]
 
 
@@ -252,6 +280,29 @@ def test_exported_native_functions_do_not_annotate_wire_models(
     assert _violations(tmp_path, "native-wire-boundary") == [
         "src/jacobian/math/example/api.py",
         "src/jacobian/math/example/api.py",
+    ]
+
+
+def test_operations_modules_do_not_use_wire_models(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "src/jacobian/math/example/operations.py",
+        "class ExampleRequest: pass\n"
+        "def compute(request: ExampleRequest) -> ExampleRequest:\n"
+        "    return ExampleRequest()\n",
+    )
+    _write(
+        tmp_path,
+        "src/jacobian/math/example/_tools.py",
+        "class ExampleRequest: pass\n"
+        "def compute(request: ExampleRequest) -> ExampleRequest:\n"
+        "    return ExampleRequest()\n",
+    )
+
+    assert _violations(tmp_path, "operations-wire-boundary") == [
+        "src/jacobian/math/example/operations.py",
+        "src/jacobian/math/example/operations.py",
+        "src/jacobian/math/example/operations.py",
     ]
 
 

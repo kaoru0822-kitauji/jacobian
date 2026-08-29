@@ -3,8 +3,29 @@
 import pytest
 
 from jacobian.catalog.models import OperationDomainValidationError
-from jacobian.math.groups.root_systems._models import CartanMatrixRequest
-from jacobian.math.groups.root_systems._operations import compute_root_system_data
+from jacobian.math.groups.root_systems._models import (
+    CartanMatrixRequest,
+    SimpleReflectionRequest,
+)
+from jacobian.math.groups.root_systems.operations import (
+    positive_roots,
+    root_system_data,
+    simple_reflection,
+    weyl_group_order,
+)
+
+
+def compute_root_system_data(request: CartanMatrixRequest):
+    return root_system_data(request.matrix)
+
+
+def compute_simple_reflection(request: SimpleReflectionRequest):
+    return simple_reflection(request.matrix, request.vector, request.simple_index)
+
+
+def compute_weyl_group_order(request: CartanMatrixRequest):
+    return weyl_group_order(request.matrix)
+
 
 CartanMatrix = tuple[tuple[int, ...], ...]
 
@@ -63,6 +84,12 @@ class TestCartanMatrix:
             compute_root_system_data(request)
         assert exc_info.value.errors()[0]["type"] == "root_system.finite_type"
 
+    def test_native_surface_accepts_canonical_matrix_values(self) -> None:
+        assert root_system_data(A2).num_positive_roots == 3
+        assert len(positive_roots(A2).positive_roots) == 3
+        assert simple_reflection(A2, (1, 0), 0).reflected_vector == (-1, 0)
+        assert weyl_group_order(A2).group_order == 6
+
 
 class TestRootSystemData:
     def test_a2_positive_roots(self) -> None:
@@ -100,9 +127,6 @@ class TestSimpleReflection:
     def test_reflect_onto_itself(self) -> None:
         """s_i(alpha_i) = -alpha_i."""
         from jacobian.math.groups.root_systems._models import SimpleReflectionRequest
-        from jacobian.math.groups.root_systems._operations import (
-            compute_simple_reflection,
-        )
 
         result = compute_simple_reflection(
             SimpleReflectionRequest(matrix=A2, vector=(1, 0), simple_index=0)
@@ -112,9 +136,6 @@ class TestSimpleReflection:
     def test_reflect_other_simple_root(self) -> None:
         """s_0(alpha_1) = alpha_1 - A[0][1]*alpha_0 = alpha_1 + alpha_0."""
         from jacobian.math.groups.root_systems._models import SimpleReflectionRequest
-        from jacobian.math.groups.root_systems._operations import (
-            compute_simple_reflection,
-        )
 
         result = compute_simple_reflection(
             SimpleReflectionRequest(matrix=A2, vector=(0, 1), simple_index=0)
@@ -124,9 +145,6 @@ class TestSimpleReflection:
     def test_reflect_in_a3(self) -> None:
         """s_1(alpha_0) in A3."""
         from jacobian.math.groups.root_systems._models import SimpleReflectionRequest
-        from jacobian.math.groups.root_systems._operations import (
-            compute_simple_reflection,
-        )
 
         # s_1(alpha_0) = alpha_0 - A[1][0]*alpha_1 = alpha_0 + alpha_1
         result = compute_simple_reflection(
@@ -150,20 +168,12 @@ class TestWeylGroupOrder:
         ),
     )
     def test_known_orders(self, matrix: CartanMatrix, expected: int) -> None:
-        from jacobian.math.groups.root_systems._operations import (
-            compute_weyl_group_order,
-        )
-
         result = compute_weyl_group_order(CartanMatrixRequest(matrix=matrix))
 
         assert result.group_order == expected
         assert result.matrix == matrix
 
     def test_e8_order_does_not_materialize_weyl_group_elements(self) -> None:
-        from jacobian.math.groups.root_systems._operations import (
-            compute_weyl_group_order,
-        )
-
         result = compute_weyl_group_order(CartanMatrixRequest(matrix=E8))
 
         assert result.group_order == 696_729_600

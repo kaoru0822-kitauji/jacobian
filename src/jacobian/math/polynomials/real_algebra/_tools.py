@@ -12,15 +12,38 @@ from jacobian.math.polynomials.real_algebra._models import (
     SturmChainRequest,
     SturmChainResult,
 )
-from jacobian.math.polynomials.real_algebra._operations import (
-    compute_root_count,
-    compute_strict_sublevel_measure,
-    compute_sturm_chain,
-)
 from jacobian.math.polynomials.real_algebra._strict_sublevel_models import (
     StrictSublevelMeasureRequest,
     StrictSublevelMeasureResult,
 )
+from jacobian.math.polynomials.real_algebra.operations import (
+    compute_root_count as _compute_root_count_native,
+)
+from jacobian.math.polynomials.real_algebra.operations import (
+    compute_strict_sublevel_measure as _compute_strict_sublevel_measure_native,
+)
+from jacobian.math.polynomials.real_algebra.operations import (
+    compute_sturm_chain as _compute_sturm_chain_native,
+)
+
+
+def compute_sturm_chain(request: SturmChainRequest) -> SturmChainResult:
+    return _compute_sturm_chain_native(request.polynomial)
+
+
+def compute_root_count(request: RootCountRequest) -> RootCountResult:
+    return _compute_root_count_native(request.polynomial, request.lower, request.upper)
+
+
+def compute_strict_sublevel_measure(
+    request: StrictSublevelMeasureRequest,
+) -> StrictSublevelMeasureResult:
+    return _compute_strict_sublevel_measure_native(
+        request.polynomial,
+        request.threshold,
+        request.lower,
+        request.upper,
+    )
 
 
 def ra_operation[RequestT: StrictModel, ResultT: StrictModel](

@@ -14,6 +14,7 @@ from pydantic_core import PydanticCustomError
 from jacobian._exact import CanonicalInteger
 from jacobian._models import StrictModel
 from jacobian.canonical import format_canonical_integer
+from jacobian.catalog.models import OperationDomainValidationError
 
 if TYPE_CHECKING:
     from sympy import Poly, Symbol
@@ -652,14 +653,6 @@ def decide_finite_abelian_spectral_pair(
     return FiniteAbelianSpectralPairResult._from_kernel(source, decision)
 
 
-def _run_finite_abelian_spectral_pair(
-    request: FiniteAbelianSpectralPairRequest,
-) -> FiniteAbelianSpectralPairResult:
-    """Adapt the catalog request to the native source-value function."""
-
-    return decide_finite_abelian_spectral_pair(request.source)
-
-
 class FiniteAbelianRepresentationCount(StrictModel):
     """Number of group elements having one representation count."""
 
@@ -837,7 +830,14 @@ def finite_abelian_group_factorization(
 ) -> FiniteAbelianGroupFactorizationResult:
     """Exhaustively test unique representation from canonical group values."""
 
-    _require_factorization_admission(group, left, right)
+    try:
+        _require_factorization_admission(group, left, right)
+    except PydanticCustomError as exc:
+        raise OperationDomainValidationError(
+            location=("moduli", "left", "right"),
+            code=exc.type,
+            message=exc.message(),
+        ) from exc
     moduli = group.moduli
 
     def normalize(element: tuple[int, ...]) -> tuple[int, ...]:
@@ -901,16 +901,6 @@ def finite_abelian_group_factorization(
         is_exact_factorization=exact,
         first_missing=None if exact else first_missing,
         first_duplicate=None if exact else duplicate,
-    )
-
-
-def _run_finite_abelian_group_factorization(
-    request: FiniteAbelianGroupFactorizationRequest,
-) -> FiniteAbelianGroupFactorizationResult:
-    """Adapt the catalog request onto the canonical native boundary once."""
-
-    return finite_abelian_group_factorization(
-        FiniteAbelianProductGroup(moduli=request.moduli), request.left, request.right
     )
 
 

@@ -1,6 +1,7 @@
 """Point-owned exact geometry operations."""
 
 from jacobian.catalog._examples import example
+from jacobian.catalog.models import MathTools
 from jacobian.math.geometry._models import (
     CircleInversionRequest,
     GeometryBooleanResult,
@@ -9,14 +10,14 @@ from jacobian.math.geometry._models import (
     PointQuadrupleRequest,
     PointSetRequest,
 )
-from jacobian.math.geometry._operations import (
+from jacobian.math.geometry._support import geometry_operation
+from jacobian.math.geometry._tools import (
     circle_inversion,
     concyclic,
     convex_hull_points,
 )
-from jacobian.math.geometry._support import geometry_operation
 
-POINT_OPERATIONS = (
+POINT_OPERATIONS: MathTools = (
     geometry_operation(
         "geometry.points.decide.concyclic",
         "Decide concyclicity",

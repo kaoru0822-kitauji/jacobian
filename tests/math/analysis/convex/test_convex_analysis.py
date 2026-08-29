@@ -11,14 +11,43 @@ from jacobian.math.analysis.convex._models import (
     MaxAffineSubdifferentialRequest,
     RationalPoint,
 )
-from jacobian.math.analysis.convex._operations import (
-    compute_max_affine_evaluation,
-    compute_subdifferential,
+from jacobian.math.analysis.convex.operations import (
+    max_affine_evaluation,
+    max_affine_subdifferential,
 )
+
+
+def compute_max_affine_evaluation(request: MaxAffineEvalRequest):
+    return max_affine_evaluation(request.function, request.point)
+
+
+def compute_subdifferential(request: MaxAffineSubdifferentialRequest):
+    return max_affine_subdifferential(request.function, request.point)
 
 
 def _rational(num: str, den: str = "1") -> CanonicalRational:
     return CanonicalRational(num=num, den=den)
+
+
+def test_native_surface_accepts_canonical_function_and_point() -> None:
+    function = MaxAffineFunction(
+        pieces=(
+            AffinePiece(
+                piece_id="p1",
+                coefficients=(_rational("1"),),
+                intercept=_rational("0"),
+            ),
+            AffinePiece(
+                piece_id="p2",
+                coefficients=(_rational("-1"),),
+                intercept=_rational("0"),
+            ),
+        )
+    )
+    point = RationalPoint(coordinates=(_rational("0"),))
+
+    assert max_affine_evaluation(function, point).active_pieces == ("p1", "p2")
+    assert len(max_affine_subdifferential(function, point).active_gradients) == 2
 
 
 class TestMaxAffineEvaluation:

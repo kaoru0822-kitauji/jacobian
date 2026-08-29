@@ -3,9 +3,9 @@
 import pytest
 
 import jacobian.process as process
-from jacobian.math.graphs.isomorphism import _operations as isomorphism_operations
+from jacobian.math.graphs.isomorphism import _vf2_process as isomorphism_operations
 from jacobian.math.graphs.isomorphism._models import GraphIsomorphismRequest
-from jacobian.math.graphs.isomorphism._operations import decide_graph_isomorphism
+from jacobian.math.graphs.isomorphism._vf2_process import decide_graph_isomorphism
 from jacobian.math.graphs.isomorphism._vf2_worker import _first_isomorphism_mapping
 from jacobian.math.number_theory._certification_models import (
     CertifiedFactorizationRequest,
@@ -21,12 +21,12 @@ from jacobian.math.number_theory._factorization_kernels import (
     factorize_primes,
 )
 from jacobian.math.number_theory.number_fields import (
-    _operations as number_field_operations,
+    _discriminant_process as number_field_operations,
 )
-from jacobian.math.number_theory.number_fields._models import NumberFieldRequest
-from jacobian.math.number_theory.number_fields._operations import (
+from jacobian.math.number_theory.number_fields._discriminant_process import (
     compute_nf_discriminant,
 )
+from jacobian.math.number_theory.number_fields._models import NumberFieldRequest
 from jacobian.process import BoundedProcessResult, ProcessResourceLimits
 
 

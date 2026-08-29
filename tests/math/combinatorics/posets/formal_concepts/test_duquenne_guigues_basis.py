@@ -15,7 +15,7 @@ from jacobian.math.combinatorics.posets.formal_concepts import (
 from jacobian.math.combinatorics.posets.formal_concepts._models import (
     DuquenneGuiguesBasisRequest,
 )
-from jacobian.math.combinatorics.posets.formal_concepts._operations import (
+from jacobian.math.combinatorics.posets.formal_concepts._tools import (
     compute_duquenne_guigues_basis,
 )
 from jacobian.math.combinatorics.posets.formal_concepts.basis import (

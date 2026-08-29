@@ -12,7 +12,7 @@ from jacobian._exact import CanonicalRational
 from jacobian.canonical import encode_strict_json
 from jacobian.catalog.models import OperationDomainValidationError
 from jacobian.math.polynomials import interpolation
-from jacobian.math.polynomials._elementary_operations import (
+from jacobian.math.polynomials._elementary_kernel import (
     rational_polynomial_evaluate,
 )
 from jacobian.math.polynomials._models import RationalPolynomialEvaluationRequest
@@ -29,9 +29,6 @@ from jacobian.math.polynomials.interpolation._models import (
     MAX_HERMITE_RESULT_BYTES,
     MAX_HERMITE_SYSTEM_CELLS,
     HermiteInterpolationRequest,
-)
-from jacobian.math.polynomials.interpolation._operations import (
-    compute_hermite_interpolation,
 )
 
 
@@ -129,7 +126,10 @@ def test_native_api_exports_the_typed_hermite_operation() -> None:
         "OrdinaryDerivativeJet",
         "OrdinaryDerivativeJetTable",
         "OrdinaryDerivativeValue",
+        "divided_differences",
+        "evaluate_newton",
         "hermite_interpolation",
+        "newton_form",
     )
     assert interpolation.hermite_interpolation is hermite_interpolation
 
@@ -164,7 +164,7 @@ def test_known_polynomial_is_reconstructed_from_several_nodes() -> None:
         _jet(2, (62, 1)),
     )
 
-    result = compute_hermite_interpolation(HermiteInterpolationRequest(table=table))
+    result = hermite_interpolation(HermiteInterpolationRequest(table=table).table)
 
     assert _coefficient_map(result) == {
         5: Fraction(2),
@@ -258,7 +258,7 @@ def test_native_polynomial_value_composes_with_existing_evaluation() -> None:
         {"polynomial": serialized_polynomial, "point": {"num": "3", "den": "1"}}
     )
 
-    evaluated = rational_polynomial_evaluate(request)
+    evaluated = rational_polynomial_evaluate(request.polynomial, request.point)
 
     assert evaluated.value.as_fraction() == 9
 

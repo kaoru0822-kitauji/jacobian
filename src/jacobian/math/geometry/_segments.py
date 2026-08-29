@@ -1,14 +1,15 @@
 """Segment-owned exact geometry operations."""
 
 from jacobian.catalog._examples import example
+from jacobian.catalog.models import MathTools
 from jacobian.math.geometry._models import (
     SegmentIntersectionRequest,
     SegmentIntersectionResult,
 )
-from jacobian.math.geometry._operations import segment_intersection
 from jacobian.math.geometry._support import geometry_operation
+from jacobian.math.geometry._tools import segment_intersection
 
-SEGMENT_OPERATIONS = (
+SEGMENT_OPERATIONS: MathTools = (
     geometry_operation(
         "geometry.segments.intersection.compute",
         "Intersect two closed rational segments",

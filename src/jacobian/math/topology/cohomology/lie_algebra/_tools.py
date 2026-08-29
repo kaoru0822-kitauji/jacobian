@@ -12,10 +12,20 @@ from jacobian.math.topology.cohomology.lie_algebra._models import (
     LieHomologyRequest,
     LieHomologyResult,
 )
-from jacobian.math.topology.cohomology.lie_algebra._operations import (
-    compute_chevalley_eilenberg_complex,
-    compute_lie_homology,
+from jacobian.math.topology.cohomology.lie_algebra.operations import (
+    chevalley_eilenberg_complex,
+    lie_homology,
 )
+
+
+def _run_chevalley_eilenberg_complex(
+    request: ChevalleyEilenbergComplexRequest,
+) -> ChevalleyEilenbergComplexResult:
+    return chevalley_eilenberg_complex(request.lie_algebra)
+
+
+def _run_lie_homology(request: LieHomologyRequest) -> LieHomologyResult:
+    return lie_homology(request.lie_algebra)
 
 
 def lie_homology_operation[
@@ -67,7 +77,7 @@ TOOLS: tuple[MathTool[Any, Any], ...] = (
         "(alternating, antisymmetric, Jacobi) at the request boundary.",
         ChevalleyEilenbergComplexRequest,
         ChevalleyEilenbergComplexResult,
-        compute_chevalley_eilenberg_complex,
+        _run_chevalley_eilenberg_complex,
         "lie-algebra",
         "chevalley-eilenberg",
         "homology",
@@ -93,7 +103,7 @@ TOOLS: tuple[MathTool[Any, Any], ...] = (
         "(alternating, antisymmetric, Jacobi) at the request boundary.",
         LieHomologyRequest,
         LieHomologyResult,
-        compute_lie_homology,
+        _run_lie_homology,
         "lie-algebra",
         "homology",
         "exact",

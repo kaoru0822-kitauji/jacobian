@@ -17,7 +17,8 @@ from jacobian.math.topology.combinatorial_maps._models import (
     OrientationReverseResult,
     VertexFaceIncidenceRequest,
 )
-from jacobian.math.topology.combinatorial_maps._operations import (
+from jacobian.math.topology.combinatorial_maps._tools import (
+    TOOLS,
     compute_connected_components,
     compute_dual,
     compute_euler_characteristic,
@@ -26,7 +27,6 @@ from jacobian.math.topology.combinatorial_maps._operations import (
     compute_orientation_reverse,
     compute_vertex_face_incidence,
 )
-from jacobian.math.topology.combinatorial_maps._tools import TOOLS
 from jacobian.math.topology.combinatorial_maps.operations import (
     face_orbits,
     rotation_successor,

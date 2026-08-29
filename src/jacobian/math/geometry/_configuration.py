@@ -1,19 +1,20 @@
 """Configuration-level geometry operations."""
 
 from jacobian.catalog._examples import example
+from jacobian.catalog.models import MathTools
 from jacobian.math.geometry._models import (
     CircumradiusProfileRequest,
     CircumradiusProfileResult,
     GeneralPositionRequest,
     GeneralPositionResult,
 )
-from jacobian.math.geometry._operations import (
+from jacobian.math.geometry._support import geometry_operation
+from jacobian.math.geometry._tools import (
     circumradius_profile,
     general_position_search,
 )
-from jacobian.math.geometry._support import geometry_operation
 
-CONFIGURATION_OPERATIONS = (
+CONFIGURATION_OPERATIONS: MathTools = (
     geometry_operation(
         "geometry.points.general_position.search",
         "Search for collinear triples and concyclic quadruples",

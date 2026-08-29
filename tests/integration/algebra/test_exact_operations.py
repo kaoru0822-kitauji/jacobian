@@ -13,20 +13,20 @@ from jacobian.math.number_theory.algebraic_numbers.root_isolation._models import
     AlgebraicCompareRequest,
     UnivariatePolynomialRequest,
 )
-from jacobian.math.number_theory.algebraic_numbers.root_isolation._operations import (
+from jacobian.math.number_theory.algebraic_numbers.root_isolation._sympy import (
     compute_algebraic_compare,
     compute_root_isolation,
 )
 from jacobian.math.number_theory.number_fields import ring_of_integers
-from jacobian.math.number_theory.number_fields._models import NumberFieldRequest
-from jacobian.math.number_theory.number_fields._operations import (
+from jacobian.math.number_theory.number_fields._discriminant_process import (
     compute_nf_discriminant,
 )
+from jacobian.math.number_theory.number_fields._models import NumberFieldRequest
 from jacobian.math.number_theory.sequences.recurrence_solving._models import (
     ClosedFormRequest,
     RecurrenceFindRequest,
 )
-from jacobian.math.number_theory.sequences.recurrence_solving._operations import (
+from jacobian.math.number_theory.sequences.recurrence_solving._tools import (
     compute_closed_form,
     compute_find_recurrence,
 )

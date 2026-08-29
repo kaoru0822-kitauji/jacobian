@@ -8,16 +8,16 @@ from typing import Any
 
 from jacobian.canonical import encode_strict_json
 from jacobian.math.geometry.polytopes._models import PolytopeVolumeRequest
-from jacobian.math.geometry.polytopes._operations import (
+from jacobian.math.geometry.polytopes._tools import (
+    TOOLS,
     compute_polytope_support,
     compute_polytope_volume,
 )
-from jacobian.math.geometry.polytopes._tools import TOOLS
 from jacobian.math.logic.automata.tree._models import (
     AcceptedTreeCountRequest,
     TreeAutomatonReachabilityRequest,
 )
-from jacobian.math.logic.automata.tree._operations import (
+from jacobian.math.logic.automata.tree._tools import (
     compute_accepted_tree_count,
     compute_tree_automaton_reachability,
 )
@@ -25,14 +25,14 @@ from jacobian.math.matrices._operation_models import (
     MatrixDeterminantRequest,
     RationalMatrixProductRequest,
 )
-from jacobian.math.matrices._operations import compute_determinant, compute_product
+from jacobian.math.matrices._tools import compute_determinant, compute_product
 from jacobian.math.polynomials.series._models import (
     SeriesFromPolynomialRequest,
     SeriesTruncateRequest,
 )
-from jacobian.math.polynomials.series._operations import (
-    compute_from_polynomial,
-    compute_truncate,
+from jacobian.math.polynomials.series.operations import (
+    from_polynomial,
+    truncate,
 )
 
 
@@ -98,7 +98,7 @@ def test_formal_series_value_composes_into_truncation_request() -> None:
             "truncation_order": 3,
         }
     )
-    produced = compute_from_polynomial(
+    produced = from_polynomial(
         producer_request.variable,
         producer_request.coefficients,
         producer_request.truncation_order,
@@ -107,7 +107,7 @@ def test_formal_series_value_composes_into_truncation_request() -> None:
     consumer_request = SeriesTruncateRequest.model_validate(
         {"series": _canonical_json(produced.result), "target_order": 2}
     )
-    truncated = compute_truncate(consumer_request.series, consumer_request.target_order)
+    truncated = truncate(consumer_request.series, consumer_request.target_order)
 
     assert tuple(value.as_fraction() for value in truncated.result.coefficients) == (
         Fraction(1),

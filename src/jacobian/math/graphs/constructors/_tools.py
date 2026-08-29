@@ -13,11 +13,23 @@ from jacobian.math.graphs.constructors._models import (
     TriangleProfileRequest,
     TriangleProfileResult,
 )
-from jacobian.math.graphs.constructors._operations import (
-    _run_hypercube_graph,
-    _run_keller_graph,
-    _run_triangle_profile,
+from jacobian.math.graphs.constructors.operations import (
+    compute_triangle_profile,
+    construct_hypercube_graph,
+    construct_keller_graph,
 )
+
+
+def _run_hypercube_graph(request: HypercubeGraphRequest) -> HypercubeGraphResult:
+    return construct_hypercube_graph(request.dimension)
+
+
+def _run_keller_graph(request: KellerGraphRequest) -> KellerGraphResult:
+    return construct_keller_graph(request.dimension)
+
+
+def _run_triangle_profile(request: TriangleProfileRequest) -> TriangleProfileResult:
+    return compute_triangle_profile(request.graph)
 
 
 def gt_operation[RequestT: StrictModel, ResultT: StrictModel](

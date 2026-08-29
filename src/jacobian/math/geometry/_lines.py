@@ -1,19 +1,20 @@
 """Line-owned exact geometry operations."""
 
 from jacobian.catalog._examples import example
+from jacobian.catalog.models import MathTools
 from jacobian.math.geometry._models import (
     GeometryLineIntersectionResult,
     GeometryPointResult,
     LinePairRequest,
     PointLineRequest,
 )
-from jacobian.math.geometry._operations import (
+from jacobian.math.geometry._support import geometry_operation
+from jacobian.math.geometry._tools import (
     line_intersection,
     projection,
 )
-from jacobian.math.geometry._support import geometry_operation
 
-LINE_OPERATIONS = (
+LINE_OPERATIONS: MathTools = (
     geometry_operation(
         "geometry.lines.compute.intersection",
         "Intersect exact lines",

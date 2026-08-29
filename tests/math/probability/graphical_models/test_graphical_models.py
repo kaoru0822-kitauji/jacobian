@@ -19,10 +19,10 @@ from jacobian.math.probability.graphical_models._models import (
     FactorMarginalizeRequest,
     FactorMultiplyRequest,
 )
-from jacobian.math.probability.graphical_models._operations import (
-    compute_d_separation,
-    compute_factor_marginalize,
-    compute_factor_multiply,
+from jacobian.math.probability.graphical_models._tools import (
+    _d_separation,
+    _factor_marginalize,
+    _factor_multiply,
 )
 
 
@@ -147,7 +147,7 @@ class TestBoundResultContracts:
             right=_factor((0,), ("3", "4")),
         )
 
-        result = compute_factor_multiply(request)
+        result = _factor_multiply(request)
 
         assert result.left == request.left
         assert result.right == request.right
@@ -155,7 +155,7 @@ class TestBoundResultContracts:
 
     def test_marginal_adapter_binds_source_and_variable(self) -> None:
         source = _factor((0,), ("1", "2"))
-        result = compute_factor_marginalize(
+        result = _factor_marginalize(
             FactorMarginalizeRequest(factor=source, variable=0)
         )
 
@@ -272,7 +272,7 @@ class TestDSeparation:
             set_c=(1,),
         )
 
-        result = compute_d_separation(request)
+        result = _d_separation(request)
 
         assert result.d_separated is True
         assert result.edges == request.edges
@@ -294,7 +294,7 @@ class TestDSeparation:
             set_c=(),
         )
         with pytest.raises(OperationDomainValidationError) as error:
-            compute_d_separation(request)
+            _d_separation(request)
         assert error.value.errors()[0]["type"] == "graphical_model.d_separation_invalid"
 
     def test_node_sets_must_be_pairwise_disjoint(self) -> None:
@@ -305,5 +305,5 @@ class TestDSeparation:
             set_c=(1,),
         )
         with pytest.raises(OperationDomainValidationError) as error:
-            compute_d_separation(request)
+            _d_separation(request)
         assert error.value.errors()[0]["type"] == "graphical_model.d_separation_invalid"

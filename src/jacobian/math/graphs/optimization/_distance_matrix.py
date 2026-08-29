@@ -6,12 +6,12 @@ from typing import Any, cast
 
 from jacobian.catalog._examples import example
 from jacobian.catalog.models import MathTool
+from jacobian.math.graphs.optimization._chromatic_kernel import build_simple_graph
 from jacobian.math.graphs.optimization._distance_models import (
     GraphDistanceMatrixRequest,
     GraphDistanceMatrixResult,
     GraphDistanceRow,
 )
-from jacobian.math.graphs.optimization._operations import build_simple_graph
 
 
 def compute_distance_matrix(
@@ -41,10 +41,7 @@ def compute_distance_matrix(
     connected = bool(vertices) and all(
         distance is not None for row in rows for distance in row.distances
     )
-    return GraphDistanceMatrixResult(
-        vertex_ordering="LEXICOGRAPHIC_ASCENDING",
-        pair_coverage="ALL_ORDERED_VERTEX_PAIRS",
-        unreachable_representation="JSON_NULL",
+    return GraphDistanceMatrixResult._from_kernel(
         vertices=vertices,
         rows=rows,
         connected=connected,

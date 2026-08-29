@@ -18,32 +18,21 @@ from jacobian.math.number_theory.prime_affine_forms import (
 )
 from jacobian.math.number_theory.prime_affine_forms._admissibility import (
     PrimeTupleAdmissibilityRequest,
-    compute_local_admissibility,
 )
 from jacobian.math.number_theory.prime_affine_forms._interval import (
     PrimeAffineIntervalCountRequest,
     PrimeAffineIntervalEnumerateRequest,
     PrimePatternIntervalCountResult,
     PrimePatternIntervalEnumerateResult,
-    compute_interval_count,
-    compute_interval_enumerate,
 )
 from jacobian.math.number_theory.prime_affine_forms._local_factors import (
     FinitePrimeTupleFactorProduct,
     PrimeTupleLocalFactorRequest,
     PrimeTupleLocalFactorResult,
     PrimeTupleLocalFactorsRequest,
-    compute_local_factor,
-    compute_local_factors,
 )
 from jacobian.math.number_theory.prime_affine_forms._models import (
     PrimeTupleLocalSummary,
-)
-from jacobian.math.number_theory.prime_affine_forms._operations import (
-    compute_interval_residue_profile,
-    compute_residue_wheel,
-    compute_residue_wheel_enumeration,
-    compute_wheel_membership,
 )
 from jacobian.math.number_theory.prime_affine_forms._residue_wheel import (
     PrimeTupleIntervalResidueProfileRequest,
@@ -53,11 +42,22 @@ from jacobian.math.number_theory.prime_affine_forms._residue_wheel import (
     PrimeTupleResidueWheelRequest,
     PrimeTupleWheelMembershipRequest,
 )
-from jacobian.math.number_theory.prime_affine_forms._tools import TOOLS
+from jacobian.math.number_theory.prime_affine_forms._tools import (
+    TOOLS,
+    compute_interval_count,
+    compute_interval_enumerate,
+    compute_interval_residue_profile,
+    compute_local_admissibility,
+    compute_local_factor,
+    compute_local_factors,
+    compute_residue_wheel,
+    compute_residue_wheel_enumeration,
+    compute_translation,
+    compute_wheel_membership,
+)
 from jacobian.math.number_theory.prime_affine_forms._translation import (
     PrimeAffineTranslationRequest,
     PrimeAffineTranslationResult,
-    compute_translation,
 )
 from jacobian.math.number_theory.prime_affine_forms.values import (
     MAX_AFFINE_AGGREGATE_DIGITS,

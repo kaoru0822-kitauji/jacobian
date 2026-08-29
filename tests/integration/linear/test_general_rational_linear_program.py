@@ -13,11 +13,11 @@ from tests.support.rationals import rational_payload as q
 
 from jacobian._exact import CanonicalRational
 from jacobian.catalog.models import OperationDomainValidationError
+from jacobian.math.optimization import general_linear_program
 from jacobian.math.optimization._general_models import (
     GeneralRationalLinearProgramRequest,
     GeneralRationalLinearProgramResult,
 )
-from jacobian.math.optimization._tools import TOOLS
 
 pytestmark = pytest.mark.requires_backend("flint")
 
@@ -59,16 +59,8 @@ def _row(
 
 
 def _run(program: dict[str, object]) -> GeneralRationalLinearProgramResult:
-    operation = next(
-        tool
-        for tool in TOOLS
-        if tool.operation_id == "optimization.linear.rational_general_optimum.compute"
-    )
-    result = operation.run(
-        GeneralRationalLinearProgramRequest.model_validate({"program": program})
-    )
-    assert isinstance(result, GeneralRationalLinearProgramResult)
-    return result
+    request = GeneralRationalLinearProgramRequest.model_validate({"program": program})
+    return general_linear_program(request.program)
 
 
 def _fractions(

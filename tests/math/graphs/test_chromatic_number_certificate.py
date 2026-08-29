@@ -11,7 +11,7 @@ from pydantic import ValidationError
 from jacobian._exact import CanonicalRational
 from jacobian.canonical import CanonicalLimits, encode_strict_json
 from jacobian.catalog.models import OperationDomainValidationError
-from jacobian.math.graphs.coloring import _operations
+from jacobian.math.graphs.coloring import operations as _operations
 from jacobian.math.graphs.coloring._chromatic_number_models import (
     MAX_CHROMATIC_CERTIFICATE_DERIVED_RATIONAL_DIGITS,
     MAX_CHROMATIC_CERTIFICATE_EDGES,
@@ -20,9 +20,7 @@ from jacobian.math.graphs.coloring._chromatic_number_models import (
     ChromaticNumberCertificateCheckRequest,
     ChromaticNumberCertificateCheckResult,
 )
-from jacobian.math.graphs.coloring._operations import (
-    compute_chromatic_number_certificate_check,
-)
+from jacobian.math.graphs.coloring.operations import chromatic_number_certificate
 from jacobian.math.graphs.values import SimpleUndirectedGraph
 
 
@@ -43,13 +41,8 @@ def _check(
     coloring: tuple[int, ...],
     weights: tuple[CanonicalRational, ...],
 ) -> ChromaticNumberCertificateCheckResult:
-    return compute_chromatic_number_certificate_check(
-        ChromaticNumberCertificateCheckRequest(
-            graph=graph,
-            claimed_chromatic_number=claimed_chromatic_number,
-            coloring=coloring,
-            weights=weights,
-        )
+    return chromatic_number_certificate(
+        graph, claimed_chromatic_number, coloring, weights
     )
 
 
@@ -331,7 +324,12 @@ def test_producer_evaluates_the_certificate_once(
         return original(*args)
 
     monkeypatch.setattr(_operations, "_evaluate_chromatic_number_certificate", counted)
-    result = compute_chromatic_number_certificate_check(request)
+    result = chromatic_number_certificate(
+        request.graph,
+        request.claimed_chromatic_number,
+        request.coloring,
+        request.weights,
+    )
 
     assert result.verdict == "ACCEPTED"
     assert calls == 1
@@ -401,7 +399,12 @@ def test_vertex_and_subset_enumeration_boundaries() -> None:
         weights=(_rational(1, order),) * order,
     )
     with pytest.raises(OperationDomainValidationError) as error:
-        compute_chromatic_number_certificate_check(request)
+        chromatic_number_certificate(
+            request.graph,
+            request.claimed_chromatic_number,
+            request.coloring,
+            request.weights,
+        )
     assert error.value.errors()[0]["type"] == (
         "graph.chromatic_number_certificate_checking_supports_at_most"
     )
@@ -476,7 +479,12 @@ def test_retained_source_output_headroom_boundary() -> None:
         weights=(_rational(2),),
     )
     with pytest.raises(OperationDomainValidationError):
-        compute_chromatic_number_certificate_check(request)
+        chromatic_number_certificate(
+            request.graph,
+            request.claimed_chromatic_number,
+            request.coloring,
+            request.weights,
+        )
 
 
 def test_schema_and_tool_expose_bounds_axis_and_example() -> None:

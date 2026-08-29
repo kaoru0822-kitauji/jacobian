@@ -15,34 +15,31 @@ from pathlib import Path, PurePosixPath
 ROOT = Path(__file__).resolve().parents[1]
 _PRODUCT_ROOT = PurePosixPath("src/jacobian")
 _PROCESS_OWNER = PurePosixPath("src/jacobian/process.py")
-_EXTERNAL_OPERATION_OWNERS = frozenset(
+_EXTERNAL_OPERATION_OWNER_SUFFIXES = (
+    "_backend.py",
+    "_process.py",
+    "_sat.py",
+    "_singular.py",
+    "_smt.py",
+    "_z3.py",
+)
+_REGISTERED_EXTERNAL_OPERATION_OWNERS = frozenset(
     {
-        _PROCESS_OWNER,
-        PurePosixPath("src/jacobian/math/_singular.py"),
-        PurePosixPath("src/jacobian/math/graphs/isomorphism/_operations.py"),
-        PurePosixPath("src/jacobian/math/polynomials/ideals/_singular.py"),
-        PurePosixPath("src/jacobian/math/logic/_sat.py"),
-        PurePosixPath("src/jacobian/math/logic/_smt.py"),
-        PurePosixPath("src/jacobian/math/logic/_unsat_core.py"),
-        PurePosixPath(
-            "src/jacobian/math/combinatorics/finite_structures/"
-            "hypergraphs/_independence_z3.py"
-        ),
-        PurePosixPath("src/jacobian/math/graphs/_independence_z3.py"),
-        PurePosixPath("src/jacobian/math/graphs/coloring/_operations.py"),
+        PurePosixPath("src/jacobian/math/graphs/optimization/_chromatic_number.py"),
         PurePosixPath("src/jacobian/math/graphs/optimization/_finite_optimization.py"),
         PurePosixPath("src/jacobian/math/graphs/optimization/_invariants.py"),
-        PurePosixPath("src/jacobian/math/graphs/optimization/_chromatic_number.py"),
-        PurePosixPath("src/jacobian/math/graphs/optimization/_maximum_cut_process.py"),
-        PurePosixPath(
-            "src/jacobian/math/combinatorics/discrepancy/_optimum_process.py"
-        ),
+        PurePosixPath("src/jacobian/math/logic/_unsat_core.py"),
         PurePosixPath("src/jacobian/math/number_theory/_factorization_kernels.py"),
-        PurePosixPath(
-            "src/jacobian/math/number_theory/number_fields/_operations.py"
-        ),
-        PurePosixPath("src/jacobian/math/polynomials/multivariate/_factor_backend.py"),
-        PurePosixPath("src/jacobian/math/polynomials/maps/_replay.py"),
+    }
+)
+_GENERIC_PRIVATE_MODULES = frozenset(
+    {
+        "_admission.py",
+        "_bounds.py",
+        "_kernel.py",
+        "_models.py",
+        "_operations.py",
+        "_tools.py",
     }
 )
 _GENERATED_DIRECTORIES = frozenset(
@@ -154,6 +151,16 @@ def _violation(
     return Violation(str(relative), code, message, getattr(node, "lineno", None))
 
 
+def _is_external_operation_owner(relative: PurePosixPath) -> bool:
+    """Recognize a private module whose name states its external responsibility."""
+
+    if relative == _PROCESS_OWNER or relative in _REGISTERED_EXTERNAL_OPERATION_OWNERS:
+        return True
+    return relative.is_relative_to(
+        PurePosixPath("src/jacobian/math")
+    ) and relative.name.endswith(_EXTERNAL_OPERATION_OWNER_SUFFIXES)
+
+
 def _process_violations(
     relative: PurePosixPath, tree: ast.AST
 ) -> tuple[Violation, ...]:
@@ -207,7 +214,7 @@ def _process_violations(
 def _bounded_process_violations(
     relative: PurePosixPath, tree: ast.AST
 ) -> tuple[Violation, ...]:
-    if relative in _EXTERNAL_OPERATION_OWNERS:
+    if _is_external_operation_owner(relative):
         return ()
     violations: list[Violation] = []
     for node in _walk(tree):
@@ -242,7 +249,7 @@ def _bounded_process_violations(
 def _resolver_violations(
     relative: PurePosixPath, tree: ast.AST
 ) -> tuple[Violation, ...]:
-    if relative in _EXTERNAL_OPERATION_OWNERS:
+    if _is_external_operation_owner(relative):
         return ()
     return tuple(
         _violation(
@@ -803,13 +810,15 @@ def _wire_model_names(root: Path, tree: ast.AST, source_module: str) -> set[str]
         names = {
             node.name
             for node in tree.body
-            if isinstance(node, ast.ClassDef)
-            and node.name.endswith(("Request", "Input"))
+            if isinstance(node, ast.ClassDef) and node.name.endswith("Request")
         }
-    for local, (_, original) in _imports_by_local_name(
+    for local, (module, original) in _imports_by_local_name(
         root, tree, source_module
     ).items():
-        if original.endswith(("Request", "Input")):
+        if original.endswith("Request") or (
+            original.endswith("Input")
+            and module.rsplit(".", 1)[-1] in {"_models", "models"}
+        ):
             names.add(local)
     return names
 
@@ -915,6 +924,58 @@ def _native_public_boundary_violations(root: Path) -> tuple[Violation, ...]:
     return tuple(violations)
 
 
+def _native_operations_wire_violations(
+    root: Path, relative: PurePosixPath, tree: ast.AST
+) -> tuple[Violation, ...]:
+    """Keep transport Request/Input models out of canonical native modules."""
+
+    if relative.name != "operations.py" or not relative.is_relative_to(
+        PurePosixPath("src/jacobian/math")
+    ):
+        return ()
+    module = _module_name(relative)
+    if module is None:
+        return ()
+    wire_names = _wire_model_names(root, tree, module)
+    violations: list[Violation] = []
+    for node in _walk(tree):
+        if isinstance(node, ast.arg) and node.annotation is not None:
+            if _annotation_contains_wire_model(node.annotation, wire_names):
+                violations.append(
+                    _violation(
+                        relative,
+                        node.annotation,
+                        "operations-wire-boundary",
+                        "operations.py functions must accept canonical mathematical values, not Request/Input models",
+                    )
+                )
+        elif (
+            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.returns is not None
+            and _annotation_contains_wire_model(node.returns, wire_names)
+        ):
+            violations.append(
+                _violation(
+                    relative,
+                    node.returns,
+                    "operations-wire-boundary",
+                    "operations.py functions must not return Request/Input models",
+                )
+            )
+        elif isinstance(node, ast.Call) and _is_wire_model_reference(
+            node.func, wire_names
+        ):
+            violations.append(
+                _violation(
+                    relative,
+                    node,
+                    "operations-wire-boundary",
+                    "operations.py must not construct Request/Input models",
+                )
+            )
+    return tuple(violations)
+
+
 def _contains_component(node: ast.AST, attributes: frozenset[str]) -> bool:
     return any(
         isinstance(descendant, ast.Attribute) and descendant.attr in attributes
@@ -1010,6 +1071,27 @@ def _source_files(root: Path) -> tuple[Path, ...]:
     )
 
 
+def _generic_operation_shadow_violations(
+    relative: PurePosixPath,
+) -> tuple[Violation, ...]:
+    """Reject the retired request-coupled private operation layer."""
+
+    if relative.is_relative_to(PurePosixPath("src/jacobian/math")) and (
+        relative.name == "_operations.py"
+    ):
+        return (
+            Violation(
+                str(relative),
+                "generic-operation-shadow",
+                (
+                    "move native mathematics to operations.py and keep request "
+                    "projection in the publication module"
+                ),
+            ),
+        )
+    return ()
+
+
 def _check_file(root: Path, path: Path) -> tuple[Violation, ...]:
     relative = PurePosixPath(path.relative_to(root).as_posix())
     try:
@@ -1017,6 +1099,7 @@ def _check_file(root: Path, path: Path) -> tuple[Violation, ...]:
     except (OSError, SyntaxError) as exc:
         return (Violation(str(relative), "parse-error", f"cannot parse file: {exc}"),)
     return (
+        *_generic_operation_shadow_violations(relative),
         *_process_violations(relative, tree),
         *_bounded_process_violations(relative, tree),
         *_resolver_violations(relative, tree),
@@ -1024,6 +1107,7 @@ def _check_file(root: Path, path: Path) -> tuple[Violation, ...]:
         *_evaluator_parser_violations(relative, tree),
         *_owner_operation_reentry_violations(relative, tree),
         *_result_validator_replay_violations(relative, tree),
+        *_native_operations_wire_violations(root, relative, tree),
         *_unsafe_wire_conversion_violations(relative, tree),
         *_rational_output_violations(relative, tree),
     )
